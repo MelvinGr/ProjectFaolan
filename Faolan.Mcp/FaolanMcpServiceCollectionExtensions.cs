@@ -10,7 +10,8 @@ namespace Faolan.Mcp
 	{
 		/// <summary>
 		///     Registers the in-process MCP server (streamable HTTP) directly on Faolan's own container, so the tools
-		///     resolve the SAME live singletons the server uses (<see cref="Faolan.Core.Database.Repositories.IDatabaseRepository" />,
+		///     resolve the SAME live singletons the server uses (
+		///     <see cref="Faolan.Core.Database.Repositories.IDatabaseRepository" />,
 		///     the chat/game dispatchers, <see cref="ClaudeChannel" />) with no nested host and no by-instance re-import.
 		///     The host must be a <see cref="WebApplication" /> - call <see cref="MapFaolanMcp" /> on it to expose the endpoint.
 		/// </summary>

@@ -204,17 +204,21 @@ namespace Faolan.Importer.Captures
 				// Maps and areas are FK targets - a placeholder beats dropping the quest (it's okay to insert
 				// maps without a name).
 				if (q.MapId != 0 && maps.Add(q.MapId))
+				{
 					db.Maps.Add(new Map
 					{
 						Id = q.MapId,
 						Name = ""
 					});
+				}
 
 				if (q.AreaId != 0 && areas.Add(q.AreaId))
+				{
 					db.QuestAreas.Add(new QuestArea
 					{
 						AreaId = q.AreaId
 					});
+				}
 
 				if (!existing.TryGetValue(q.QuestId, out var def))
 				{
@@ -459,11 +463,13 @@ namespace Faolan.Importer.Captures
 				}
 
 				if (mapId is { } m && maps.Add(m))
+				{
 					db.Maps.Add(new Map
 					{
 						Id = m,
 						Name = ""
 					});
+				}
 
 				db.QuestGoalDefinitions.Add(new QuestGoalDefinition
 				{
@@ -673,12 +679,14 @@ namespace Faolan.Importer.Captures
 				{
 					var g = existing.Goals.FirstOrDefault(x => x.GoalId == hg.GoalId);
 					if (g == null)
+					{
 						existing.Goals.Add(g = new QuestGoalDefinition
 						{
 							GoalId = hg.GoalId,
 							Sequence = hg.Sequence,
 							RequiredCount = hg.RequiredCount
 						});
+					}
 
 					g.MapId = hg.MapId;
 					g.MarkerX = hg.MarkerX;
@@ -707,115 +715,6 @@ namespace Faolan.Importer.Captures
 			}
 
 			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated, {skipped} skipped (map not in catalog).");
-		}
-
-		// Overlay the hand-authored quest WIRING onto the harvested definitions - the fields captures don't carry: the
-		// server trigger (GoalType/TargetName/QuestItemId via SeedGoal), the chain successor (NextQuestId via Chain), and
-		// the byte-exact @609/snapshot detail the beach + Casilda quests need. Run as its OWN importer module
-		// (QuestWiringModule) AFTER the `quests` module, so it applies last - the trigger fields are preserved by the
-		// objective-goals refresh, and the @609-detail seeds are authoritative (they're calibrated to match the capture).
-		// Trigger/chain seeds are BOOTSTRAP-ONLY (see SeedGoal/Chain), so a re-run never reverts a Quest-editor edit.
-		public static async Task WireQuests(DatabaseContext db)
-		{
-			await SeedBeachQuestGoals(db);
-			await SeedShipwreckedCityChain(db);
-			await SeedCaptureReachQuests(db);
-			await SeedCasildaChain(db);
-			await SeedCasildaQuestSnapshot(db);
-			await SeedQuestWorldEffects(db);
-		}
-
-		// After-quest world-object EFFECTS (#262): tag decor with the quest whose state changes its dynel look
-		// (WorldObject.EffectQuestId/EffectDynelState, applied by WorldBroadcaster.ApplyQuestWorldEffects). The Tortage
-		// beach "invisible wall" = the Casilda chain decor's collision, dropped (SimpleDynel visual-change state 5) once
-		// the escort quest (12407) is active - data now, replacing the hard-coded DropBeachWall lookup. Idempotent.
-		private static async Task SeedQuestWorldEffects(DatabaseContext db)
-		{
-			var chain = await db.WorldObjects.FirstOrDefaultAsync(o => o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
-			if (chain == null)
-				return;
-
-			chain.EffectQuestId = 12407;
-			chain.EffectDynelState = 5;
-			await db.SaveChangesAsync();
-			Console.WriteLine("Seeded after-quest world effect: beach chain-wall (decor_chain_hangingwoman) -> drop on quest 12407 (state 5).");
-		}
-
-		// Other capture-harvested quests whose single objective is a LOCATION (TrailingCategory 100 + a map marker),
-		// each granted by a SPAWNED NPC's dialogue (ConversationNodes.GrantQuestId). Wire the goal as ReachArea off its
-		// captured marker so it completes on arrival - the most quest data we can source without per-quest capture
-		// correlation (#358). Best-effort ("as much as possible, not 100%"): cat-100 = a location objective (proven for
-		// Shipwrecked III "enter city" / VIII Nadini), but the exact retail purpose (reach vs talk-at-location) isn't
-		// pinned; reaching the marker is a reasonable stand-in. All 7 granting NPCs are spawned and all target maps
-		// exist. Server-trigger field only (not byte-exact); bootstrap-only via SeedGoal.
-		private static async Task SeedCaptureReachQuests(DatabaseContext db)
-		{
-			await SeedGoal(db, 13041, 4833, QuestGoalType.ReachArea);  // giver Alyssa        -> reach @4020 (959,723)
-			await SeedGoal(db, 13986, 6459, QuestGoalType.ReachArea);  // giver Tanner Chael  -> reach @1000 (283,659)
-			await SeedGoal(db, 14092, 6597, QuestGoalType.ReachArea);  // giver Borcha        -> reach @1010 (88,205)
-			await SeedGoal(db, 14617, 7389, QuestGoalType.ReachArea);  // giver Cadarn        -> reach @3000 (992,1134)
-			await SeedGoal(db, 14622, 7394, QuestGoalType.ReachArea);  // giver Serving Wench -> reach @2000 (826,533)
-			await SeedGoal(db, 14627, 7399, QuestGoalType.ReachArea);  // giver Caor          -> reach @1000 (403,445)
-			await SeedGoal(db, 19522, 14328, QuestGoalType.ReachArea); // giver Hadrathus     -> reach @30200 (627,868)
-		}
-
-		// The Shipwrecked destiny chain past stage I (#262/#358). Beach dump proves the supersession 10238 -> 12369 ->
-		// 12373 (stages I "The Slaver" -> II "The Acheronian Gate" -> III "The City of Tortage"). Stages II/III are wired
-		// as ReachArea goals off their captured MARKERS (verified world X,Z): II's goal 3492 at the beach ruins
-		// (4010, 524/755), III's goal 3498 in the city itself (4020, 913/718) - "enter the city" completes on arrival.
-		// Stage III is chain-final for now: stages IV-VIII (talk Turach 951 / bricks 12371 / guard / Tina 2805 / Nadini
-		// 806) have no imported goal targets yet - tracked on #358. NOT byte-exact; markers/types are best-effort ("polish
-		// later"). Idempotent.
-		private static async Task SeedShipwreckedCityChain(DatabaseContext db)
-		{
-			// II "The Acheronian Gate" -> III "The City of Tortage". II's key objective is LOOTING the Acheronian Gate
-			// Key (item 193186) from Saddur's corpse bag - the same kill->loot pattern as Casilda's Tuut key: Hoxxling
-			// gameplay fr11942 Saddur dies -> fr11947 his corpse becomes a loot bag -> fr12023 the key is added to the
-			// 0x71 quest container. So goal 3492 = LootFromNpc "Saddur" (its 524/755 marker is Saddur's spot). (Retail's
-			// 2nd goal 7134 "unlock the gate" wasn't imported.) III's goal 3498 = enter the city (ReachArea @4020,
-			// completes on arrival). III is chain-final for now.
-			await Chain(db, 12369, 12373);
-			await SeedGoal(db, 12369, 3492, QuestGoalType.LootFromNpc, "Saddur", questItemId: 193186);
-			await SeedGoal(db, 12373, 3498, QuestGoalType.ReachArea);
-
-			// V "The Quarry" (12371) - granted by Turach's dialogue (ConversationNodes.GrantQuestId 12371), so NOT chained
-			// here. goal 3495 "get 3 stone bricks" = CollectItem of item 193400 (its TrailingRefId), picked up from the 12
-			// "Stone Brick" QuestItemEffect dynels at the quarry (4020). goal 3497 "deliver 3 to Turach" = TalkToNpc Turach
-			// (his spawn 824/722 == the marker); the captured count 3 is kept (byte-exact @609) and the talk SOLVES it.
-			// Decoded from Hoxxling gameplay2 (pickups fr4310/4367/4447 = DispatchAddItem+SimpleDynelPickup; deliver fr5102).
-			await SeedGoal(db, 12371, 3495, QuestGoalType.CollectItem);
-			await SeedGoal(db, 12371, 3497, QuestGoalType.TalkToNpc, "Turach");
-
-			// The city TALK stages (#358), progressed by each NPC's conversation GrantQuestId (already imported) - so no
-			// Chain() is needed, only the goal TARGET. Confirmed in the Hoxxling gameplay2 dump by the talk-then-complete
-			// pairs: Laranga (guard, 0x4FDA) convo fr5680 -> 10286 done fr5829; Tina (0x4FF0) convo fr9214 -> 10287 done
-			// fr9738. 10320 "talk Turach" (granted by the entry guard Laranga; talking to Turach completes it + his
-			// dialogue grants the quarry 12371) is the pre-quarry "The Blacksmith" stage - inferred from the grant graph
-			// + wiki, its dump proof is the quarry grant that predates gameplay2.
-			await SeedGoal(db, 10320, 436, QuestGoalType.TalkToNpc, "Turach");  // IV The Blacksmith - talk Turach (pre-quarry)
-			await SeedGoal(db, 10286, 399, QuestGoalType.TalkToNpc, "Laranga"); // VI The Guard - talk the city guard
-			await SeedGoal(db, 10287, 400, QuestGoalType.TalkToNpc, "Tina");    // VII The Barmaid - talk Tina
-
-			// VIII "Nadini" (10915, granted by Tina): the wiki objective is "Talk to Nadini", but Nadini 806 has NO
-			// conversation imported, so her greeting can't fire the talk trigger (PickConversationScreen returns null).
-			// Her spawn (1026,670 @4022 night city) EXACTLY matches the goal marker, so wire it as ReachArea (reach her)
-			// - the robust stand-in until her dialogue is imported. Chain end (Shipwrecked -> "The Awakening I" is a
-			// separate destiny quest, out of scope; Nadini can't grant it without dialogue).
-			await SeedGoal(db, 10915, 1352, QuestGoalType.ReachArea);
-		}
-
-		// Set a quest's chain SUCCESSOR (the QuestFullUpdate the supersession swaps to). nextQuestId null = chain end.
-		// BOOTSTRAP-ONLY (#262): only sets an UN-chained quest (NextQuestId still null), so a re-import never clobbers a
-		// successor set by hand (the Quest editor) or a prior run. A fresh capture-harvested quest has NextQuestId null,
-		// so it still bootstraps; a chain-end seed (null) is a no-op on the already-null quest.
-		private static async Task Chain(DatabaseContext db, uint questId, uint? nextQuestId)
-		{
-			var quest = await db.QuestDefinitions.FirstOrDefaultAsync(q => q.QuestId == questId);
-			if (quest == null || quest.NextQuestId != null)
-				return;
-
-			quest.NextQuestId = nextQuestId;
-			await db.SaveChangesAsync();
 		}
 
 		// Static world objects (decor/containers/zones), deduped by (map, position). Transient loot bags skipped.
@@ -991,6 +890,22 @@ namespace Faolan.Importer.Captures
 			return (verified, total);
 		}
 
+		// Overlay the hand-authored quest WIRING onto the harvested definitions - the fields captures don't carry: the
+		// server trigger (GoalType/TargetName/QuestItemId via SeedGoal), the chain successor (NextQuestId via Chain), and
+		// the byte-exact @609/snapshot detail the beach + Casilda quests need. Run as its OWN importer module
+		// (QuestWiringModule) AFTER the `quests` module, so it applies last - the trigger fields are preserved by the
+		// objective-goals refresh, and the @609-detail seeds are authoritative (they're calibrated to match the capture).
+		// Trigger/chain seeds are BOOTSTRAP-ONLY (see SeedGoal/Chain), so a re-run never reverts a Quest-editor edit.
+		public static async Task WireQuests(DatabaseContext db)
+		{
+			await SeedBeachQuestGoals(db);
+			await SeedShipwreckedCityChain(db);
+			await SeedCaptureReachQuests(db);
+			await SeedCasildaChain(db);
+			await SeedCasildaQuestSnapshot(db);
+			await SeedQuestWorldEffects(db);
+		}
+
 		// Flattens the task tree into path.Nodes (every node gets PatrolPathId; the Parent/Children navs stay so EF
 		// sets ParentId).
 		private static void AddNodeTree(PatrolPath path, PatrolNode node)
@@ -1061,6 +976,20 @@ namespace Faolan.Importer.Captures
 			return pkt;
 		}
 
+		// Set a quest's chain SUCCESSOR (the QuestFullUpdate the supersession swaps to). nextQuestId null = chain end.
+		// BOOTSTRAP-ONLY (#262): only sets an UN-chained quest (NextQuestId still null), so a re-import never clobbers a
+		// successor set by hand (the Quest editor) or a prior run. A fresh capture-harvested quest has NextQuestId null,
+		// so it still bootstraps; a chain-end seed (null) is a no-op on the already-null quest.
+		private static async Task Chain(DatabaseContext db, uint questId, uint? nextQuestId)
+		{
+			var quest = await db.QuestDefinitions.FirstOrDefaultAsync(q => q.QuestId == questId);
+			if (quest == null || quest.NextQuestId != null)
+				return;
+
+			quest.NextQuestId = nextQuestId;
+			await db.SaveChangesAsync();
+		}
+
 		private static PatrolNode CloneNode(PatrolNode n)
 		{
 			var clone = new PatrolNode
@@ -1120,6 +1049,14 @@ namespace Faolan.Importer.Captures
 			}
 
 			return result;
+		}
+
+		// A goal is "wired" once its server-trigger fields diverge from the fresh-harvest default (GoalType Kill, no
+		// TargetName/QuestItemId) - i.e. a Seed* or the Quest editor has configured it. Bootstrap-only seeds skip a wired
+		// goal so a re-import never reverts a hand edit.
+		private static bool IsWired(QuestGoalDefinition goal)
+		{
+			return goal.GoalType != QuestGoalType.Kill || goal.TargetName != null || goal.QuestItemId != null;
 		}
 
 		// The beach starter (quest 10238) per-goal objective detail (the snapshot's @609 region). Idempotent.
@@ -1219,6 +1156,24 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
+		// Other capture-harvested quests whose single objective is a LOCATION (TrailingCategory 100 + a map marker),
+		// each granted by a SPAWNED NPC's dialogue (ConversationNodes.GrantQuestId). Wire the goal as ReachArea off its
+		// captured marker so it completes on arrival - the most quest data we can source without per-quest capture
+		// correlation (#358). Best-effort ("as much as possible, not 100%"): cat-100 = a location objective (proven for
+		// Shipwrecked III "enter city" / VIII Nadini), but the exact retail purpose (reach vs talk-at-location) isn't
+		// pinned; reaching the marker is a reasonable stand-in. All 7 granting NPCs are spawned and all target maps
+		// exist. Server-trigger field only (not byte-exact); bootstrap-only via SeedGoal.
+		private static async Task SeedCaptureReachQuests(DatabaseContext db)
+		{
+			await SeedGoal(db, 13041, 4833, QuestGoalType.ReachArea); // giver Alyssa        -> reach @4020 (959,723)
+			await SeedGoal(db, 13986, 6459, QuestGoalType.ReachArea); // giver Tanner Chael  -> reach @1000 (283,659)
+			await SeedGoal(db, 14092, 6597, QuestGoalType.ReachArea); // giver Borcha        -> reach @1010 (88,205)
+			await SeedGoal(db, 14617, 7389, QuestGoalType.ReachArea); // giver Cadarn        -> reach @3000 (992,1134)
+			await SeedGoal(db, 14622, 7394, QuestGoalType.ReachArea); // giver Serving Wench -> reach @2000 (826,533)
+			await SeedGoal(db, 14627, 7399, QuestGoalType.ReachArea); // giver Caor          -> reach @1000 (403,445)
+			await SeedGoal(db, 19522, 14328, QuestGoalType.ReachArea); // giver Hadrathus     -> reach @30200 (627,868)
+		}
+
 		// The Tortage intro quest CHAIN (#261): 13479 is a four-stage supersession chain. Idempotent.
 		private static async Task SeedCasildaChain(DatabaseContext db)
 		{
@@ -1227,7 +1182,7 @@ namespace Faolan.Importer.Captures
 			// The loot stage's key item: Scavenger Tuut's bag drops 319224 "Scavenger's Key" (#261), so the player sees
 			// and takes the actual key, not just an empty source-matched bag.
 			await Chain(db, 13563, 13480);
-			await SeedGoal(db, 13563, 5867, QuestGoalType.LootFromNpc, "Scavenger Tuut", questItemId: 319224, required: 1);
+			await SeedGoal(db, 13563, 5867, QuestGoalType.LootFromNpc, "Scavenger Tuut", 319224, 1);
 			await Chain(db, 13480, 12407);
 			await SeedGoal(db, 13480, 5745, QuestGoalType.TalkToNpc, "Casilda", required: 1);
 			await Chain(db, 12407, null); // escort is the chain end
@@ -1336,12 +1291,65 @@ namespace Faolan.Importer.Captures
 			Console.WriteLine($"Seeded goal: quest {questId} goal {goalId} = {type}{(target != null ? $" '{target}'" : "")}.");
 		}
 
-		// A goal is "wired" once its server-trigger fields diverge from the fresh-harvest default (GoalType Kill, no
-		// TargetName/QuestItemId) - i.e. a Seed* or the Quest editor has configured it. Bootstrap-only seeds skip a wired
-		// goal so a re-import never reverts a hand edit.
-		private static bool IsWired(QuestGoalDefinition goal)
+		// After-quest world-object EFFECTS (#262): tag decor with the quest whose state changes its dynel look
+		// (WorldObject.EffectQuestId/EffectDynelState, applied by WorldBroadcaster.ApplyQuestWorldEffects). The Tortage
+		// beach "invisible wall" = the Casilda chain decor's collision, dropped (SimpleDynel visual-change state 5) once
+		// the escort quest (12407) is active - data now, replacing the hard-coded DropBeachWall lookup. Idempotent.
+		private static async Task SeedQuestWorldEffects(DatabaseContext db)
 		{
-			return goal.GoalType != QuestGoalType.Kill || goal.TargetName != null || goal.QuestItemId != null;
+			var chain = await db.WorldObjects.FirstOrDefaultAsync(o => o.Name != null && o.Name.Contains("decor_chain_hangingwoman"));
+			if (chain == null)
+				return;
+
+			chain.EffectQuestId = 12407;
+			chain.EffectDynelState = 5;
+			await db.SaveChangesAsync();
+			Console.WriteLine("Seeded after-quest world effect: beach chain-wall (decor_chain_hangingwoman) -> drop on quest 12407 (state 5).");
+		}
+
+		// The Shipwrecked destiny chain past stage I (#262/#358). Beach dump proves the supersession 10238 -> 12369 ->
+		// 12373 (stages I "The Slaver" -> II "The Acheronian Gate" -> III "The City of Tortage"). Stages II/III are wired
+		// as ReachArea goals off their captured MARKERS (verified world X,Z): II's goal 3492 at the beach ruins
+		// (4010, 524/755), III's goal 3498 in the city itself (4020, 913/718) - "enter the city" completes on arrival.
+		// Stage III is chain-final for now: stages IV-VIII (talk Turach 951 / bricks 12371 / guard / Tina 2805 / Nadini
+		// 806) have no imported goal targets yet - tracked on #358. NOT byte-exact; markers/types are best-effort ("polish
+		// later"). Idempotent.
+		private static async Task SeedShipwreckedCityChain(DatabaseContext db)
+		{
+			// II "The Acheronian Gate" -> III "The City of Tortage". II's key objective is LOOTING the Acheronian Gate
+			// Key (item 193186) from Saddur's corpse bag - the same kill->loot pattern as Casilda's Tuut key: Hoxxling
+			// gameplay fr11942 Saddur dies -> fr11947 his corpse becomes a loot bag -> fr12023 the key is added to the
+			// 0x71 quest container. So goal 3492 = LootFromNpc "Saddur" (its 524/755 marker is Saddur's spot). (Retail's
+			// 2nd goal 7134 "unlock the gate" wasn't imported.) III's goal 3498 = enter the city (ReachArea @4020,
+			// completes on arrival). III is chain-final for now.
+			await Chain(db, 12369, 12373);
+			await SeedGoal(db, 12369, 3492, QuestGoalType.LootFromNpc, "Saddur", 193186);
+			await SeedGoal(db, 12373, 3498, QuestGoalType.ReachArea);
+
+			// V "The Quarry" (12371) - granted by Turach's dialogue (ConversationNodes.GrantQuestId 12371), so NOT chained
+			// here. goal 3495 "get 3 stone bricks" = CollectItem of item 193400 (its TrailingRefId), picked up from the 12
+			// "Stone Brick" QuestItemEffect dynels at the quarry (4020). goal 3497 "deliver 3 to Turach" = TalkToNpc Turach
+			// (his spawn 824/722 == the marker); the captured count 3 is kept (byte-exact @609) and the talk SOLVES it.
+			// Decoded from Hoxxling gameplay2 (pickups fr4310/4367/4447 = DispatchAddItem+SimpleDynelPickup; deliver fr5102).
+			await SeedGoal(db, 12371, 3495, QuestGoalType.CollectItem);
+			await SeedGoal(db, 12371, 3497, QuestGoalType.TalkToNpc, "Turach");
+
+			// The city TALK stages (#358), progressed by each NPC's conversation GrantQuestId (already imported) - so no
+			// Chain() is needed, only the goal TARGET. Confirmed in the Hoxxling gameplay2 dump by the talk-then-complete
+			// pairs: Laranga (guard, 0x4FDA) convo fr5680 -> 10286 done fr5829; Tina (0x4FF0) convo fr9214 -> 10287 done
+			// fr9738. 10320 "talk Turach" (granted by the entry guard Laranga; talking to Turach completes it + his
+			// dialogue grants the quarry 12371) is the pre-quarry "The Blacksmith" stage - inferred from the grant graph
+			// + wiki, its dump proof is the quarry grant that predates gameplay2.
+			await SeedGoal(db, 10320, 436, QuestGoalType.TalkToNpc, "Turach"); // IV The Blacksmith - talk Turach (pre-quarry)
+			await SeedGoal(db, 10286, 399, QuestGoalType.TalkToNpc, "Laranga"); // VI The Guard - talk the city guard
+			await SeedGoal(db, 10287, 400, QuestGoalType.TalkToNpc, "Tina"); // VII The Barmaid - talk Tina
+
+			// VIII "Nadini" (10915, granted by Tina): the wiki objective is "Talk to Nadini", but Nadini 806 has NO
+			// conversation imported, so her greeting can't fire the talk trigger (PickConversationScreen returns null).
+			// Her spawn (1026,670 @4022 night city) EXACTLY matches the goal marker, so wire it as ReachArea (reach her)
+			// - the robust stand-in until her dialogue is imported. Chain end (Shipwrecked -> "The Awakening I" is a
+			// separate destiny quest, out of scope; Nadini can't grant it without dialogue).
+			await SeedGoal(db, 10915, 1352, QuestGoalType.ReachArea);
 		}
 
 		// Upserts the NpcTemplate TYPE rows (#244). Keyed by TemplateId; Id stays stable across re-imports.

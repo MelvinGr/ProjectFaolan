@@ -13,34 +13,6 @@ namespace Faolan.Tests
 	// that lets the appearance table generate from the DB so NpcSpawn.Data can be retired (Gitea #185 / #243).
 	public class NpcSpawnAppearanceTests
 	{
-		// Animals carry no appearance table (the 41-byte minimal post-IIR), so the decoder declines them - they
-		// stay on the minimal-scaffold path.
-		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcMinimalPanther")]
-		public void DecodeAppearance_Animal_ReturnsFalse(string golden)
-		{
-			Assert.False(NpcSpawnAppearanceCodec.TryDecodeAppearance(Golden.Bytes(golden), out var morphs));
-			Assert.Empty(morphs);
-		}
-
-		[Fact]
-		public void DecodeAppearance_Casilda_RoundTripsBuildPostIir()
-		{
-			var body = Golden.Bytes("SpawnNpcCasilda");
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
-			var capturedPostIir = body[(read.Offset + read.Length)..];
-
-			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var morphs));
-			Assert.Equal(14, morphs.Count);
-
-			// The texscript colour ref rides the id 0x10D entry; the rest are plain [morphId][float] morph values.
-			var texscript = morphs.Single(m => m.Text.Length > 0);
-			Assert.Equal(0x10Du, texscript.MorphId);
-			Assert.Equal("*ii=-1;*bl=-1", texscript.Text);
-
-			// Re-encoding the decoded rows reproduces the captured post-IIR byte-for-byte.
-			Assert.Equal(capturedPostIir, NpcSpawnAppearanceCodec.BuildPostIir(morphs));
-		}
-
 		// Animals (the 41-byte minimal post-IIR) carry no table under either decoder.
 		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcMinimalPanther")]
 		public void DecodeAppearanceLenient_Animal_ReturnsFalse(string golden)
@@ -91,6 +63,34 @@ namespace Faolan.Tests
 			Assert.Equal(cleanMorphs.Count, lenientMorphs.Count);
 			// Both lift the identical appearance table (BuildPostIir is the canonical fresh form for both).
 			Assert.Equal(NpcSpawnAppearanceCodec.BuildPostIir(cleanMorphs), NpcSpawnAppearanceCodec.BuildPostIir(lenientMorphs));
+		}
+
+		// Animals carry no appearance table (the 41-byte minimal post-IIR), so the decoder declines them - they
+		// stay on the minimal-scaffold path.
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcMinimalPanther")]
+		public void DecodeAppearance_Animal_ReturnsFalse(string golden)
+		{
+			Assert.False(NpcSpawnAppearanceCodec.TryDecodeAppearance(Golden.Bytes(golden), out var morphs));
+			Assert.Empty(morphs);
+		}
+
+		[Fact]
+		public void DecodeAppearance_Casilda_RoundTripsBuildPostIir()
+		{
+			var body = Golden.Bytes("SpawnNpcCasilda");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
+			var capturedPostIir = body[(read.Offset + read.Length)..];
+
+			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var morphs));
+			Assert.Equal(14, morphs.Count);
+
+			// The texscript colour ref rides the id 0x10D entry; the rest are plain [morphId][float] morph values.
+			var texscript = morphs.Single(m => m.Text.Length > 0);
+			Assert.Equal(0x10Du, texscript.MorphId);
+			Assert.Equal("*ii=-1;*bl=-1", texscript.Text);
+
+			// Re-encoding the decoded rows reproduces the captured post-IIR byte-for-byte.
+			Assert.Equal(capturedPostIir, NpcSpawnAppearanceCodec.BuildPostIir(morphs));
 		}
 	}
 }

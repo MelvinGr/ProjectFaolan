@@ -99,9 +99,9 @@ namespace Faolan.Core.Rdb.Assets
 
 		public sealed record Bone(string Name, Quaternion LocalRotation, Vector3 LocalTranslation, int[] Children)
 		{
-			public int Parent { get; set; } = -1;
 			public Matrix4x4 World { get; set; } = Matrix4x4.Identity;
 			public Vector3 WorldPosition => World.Translation;
+			public int Parent { get; set; } = -1;
 		}
 	}
 }

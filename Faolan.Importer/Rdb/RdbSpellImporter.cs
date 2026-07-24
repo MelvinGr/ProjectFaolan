@@ -53,6 +53,7 @@ namespace Faolan.Importer.Rdb
 		private const uint CastTimeField = 0x126; // 294 - cast time in centiseconds (value * 10 = milliseconds)
 		private const uint DamageRatingField = 0x15C; // 348 - spell damage rating * 100 (Ice 3000 -> 30.00%)
 		private const uint DurationField = 0x008; // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
+		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
 
 		// 125 - the level requirement. Verified against the independent wiki scrape: identical for every rank >= 2
 		// (Runed Flesh 25/40/55/70, Pestilential Blast 20/35/50/65/80) and MORE COMPLETE than it - the wiki has
@@ -73,26 +74,6 @@ namespace Faolan.Importer.Rdb
 		private const uint LevelField = 0x07D;
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 		private const uint SpellDataType = 1040005;
-		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
-
-		// #402: the game's dev/PvP-internal naming conventions for the buffs that live in cat 50210 but are NOT
-		// player-facing spells - flag/test/spawner/wrapper buffs. Their name begins with an "XX" or "CTF" tag
-		// (as a whole token: "XX", "XX_", "XX ", "XX-", "CTF_", ... - not the start of a real word), case-insensitive,
-		// or the row is unnamed. A record nameless in its own 1040005 body is recovered only if NONE of its localized
-		// names is such a marker.
-		private static bool IsDevMarker(string ldbName)
-		{
-			var t = ldbName.Trim();
-			if (t.Length == 0)
-				return true;
-			return HasTagPrefix(t, "XX") || HasTagPrefix(t, "CTF");
-
-			// The tag is a standalone leading token: <tag> optionally followed by a non-letter (separator), so it
-			// matches "XX_Foo"/"XX Foo"/"XX-Foo"/"XX" but never a real name that merely starts with those letters.
-			static bool HasTagPrefix(string s, string tag) =>
-				s.StartsWith(tag, StringComparison.OrdinalIgnoreCase)
-				&& (s.Length == tag.Length || !char.IsLetter(s[tag.Length]));
-		}
 
 		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
 			ILogger? logger = null)
@@ -109,12 +90,22 @@ namespace Faolan.Importer.Rdb
 			foreach (var e in rdb.EntriesOfType(LdbType).Where(x => x.IsLocal))
 			{
 				byte[] page;
-				try { page = rdb.ReadDecompressed(e); }
-				catch { continue; }
+				try
+				{
+					page = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue;
+				}
+
 				if (LdbStringIndex.CategoryOf(page) != LdbStringIndex.SpellNameCategory)
 					continue;
+
 				foreach (var entry in LdbStringIndex.Parse(page))
-					(ldbSpellNames.TryGetValue(entry.Id, out var names) ? names : ldbSpellNames[entry.Id] = []).Add(entry.Value);
+					(ldbSpellNames.TryGetValue(entry.Id, out var names)
+						? names
+						: ldbSpellNames[entry.Id] = []).Add(entry.Value);
 			}
 
 			var byId = (await db.Spells.ToListAsync()).ToDictionary(s => s.Id);
@@ -154,6 +145,7 @@ namespace Faolan.Importer.Rdb
 					// asset/aura junk and stays dropped.
 					if (!ldbSpellNames.TryGetValue(entry.Id, out var ldbNames) || ldbNames.Any(IsDevMarker))
 						continue;
+
 					name = ""; // provisional: rdb-ldb-names fills the localized name (a raw name here would block that)
 				}
 
@@ -248,15 +240,44 @@ namespace Faolan.Importer.Rdb
 				db.SpellStatEffects.RemoveRange(stale);
 			var effectRows = 0;
 			foreach (var (spellId, deltas) in statEffects)
-				foreach (var (statId, amount) in deltas)
+			foreach (var (statId, amount) in deltas)
+			{
+				db.SpellStatEffects.Add(new SpellStatEffect
 				{
-					db.SpellStatEffects.Add(new SpellStatEffect { SpellId = spellId, StatId = (CharacterStatId)statId, Amount = amount });
-					effectRows++;
-				}
+					SpellId = spellId,
+					StatId = (CharacterStatId)statId,
+					Amount = amount
+				});
+				effectRows++;
+			}
+
 			await db.SaveChangesAsync();
 
-			logger?.LogInformation("RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects.", seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows);
+			logger?.LogInformation(
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects.", seen, inserted,
+				namesSet, castTimesSet, statEffects.Count, effectRows);
 			return (seen, inserted, namesSet, castTimesSet, levelsSet);
+		}
+
+		// #402: the game's dev/PvP-internal naming conventions for the buffs that live in cat 50210 but are NOT
+		// player-facing spells - flag/test/spawner/wrapper buffs. Their name begins with an "XX" or "CTF" tag
+		// (as a whole token: "XX", "XX_", "XX ", "XX-", "CTF_", ... - not the start of a real word), case-insensitive,
+		// or the row is unnamed. A record nameless in its own 1040005 body is recovered only if NONE of its localized
+		// names is such a marker.
+		private static bool IsDevMarker(string ldbName)
+		{
+			var t = ldbName.Trim();
+			if (t.Length == 0)
+				return true;
+
+			return HasTagPrefix(t, "XX") || HasTagPrefix(t, "CTF");
+
+			// The tag is a standalone leading token: <tag> optionally followed by a non-letter (separator), so it
+			// matches "XX_Foo"/"XX Foo"/"XX-Foo"/"XX" but never a real name that merely starts with those letters.
+			static bool HasTagPrefix(string s, string tag)
+			{
+				return s.StartsWith(tag, StringComparison.OrdinalIgnoreCase) && (s.Length == tag.Length || !char.IsLetter(s[tag.Length]));
+			}
 		}
 
 		// Reads the spell-data field table from a record body (the span AFTER the 12-byte RDB-Id header): the LONGEST

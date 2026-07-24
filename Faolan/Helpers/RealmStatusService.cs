@@ -17,8 +17,8 @@ namespace Faolan.Helpers
 	// after a crash becomes a problem (see the multi-realm plan).
 	public sealed class RealmStatusService : IHostedService
 	{
-		private readonly IRealmRepository _database;
 		private readonly ILogger<RealmStatusService> _logger;
+		private readonly IRealmRepository _database;
 		private readonly uint _realmId;
 
 		public RealmStatusService(IRealmRepository database, ILogger<RealmStatusService> logger, uint realmId)

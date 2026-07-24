@@ -50,8 +50,6 @@ namespace Faolan.Core.Database.Tables
 		// The trailing text record: a <remoteformat category=51200> or a <localized category=51000 flags=..>.
 		public uint TrailingRefId { get; set; }
 
-		public bool TrailingLocalized { get; set; }
-
 		// What server-side ACTION advances/completes this goal (Gitea #261). The wire output of a completion is
 		// identical for every type (QuestProgressionService); the type only selects which trigger matches:
 		//   Kill       - a kill of the NPC named TargetName (QuestProgressionService.AdvanceKillGoals).
@@ -61,6 +59,8 @@ namespace Faolan.Core.Database.Tables
 		//   Escort     - escorting the NPC named TargetName to a destination (not yet wired; Gitea sub-ticket).
 		// Default Kill keeps the existing single-goal rows (seeded before this field) as kill goals.
 		public QuestGoalType GoalType { get; set; } = QuestGoalType.Kill;
+
+		public bool TrailingLocalized { get; set; }
 
 		[MaxLength(128)]
 		public string? ObjectiveKey { get; set; }

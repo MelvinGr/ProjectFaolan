@@ -20,7 +20,6 @@ namespace Faolan.Importer.Modules
 	// AH listings (TradepostListing) from the captured search results (0x2005).
 	public sealed class ListingsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -28,6 +27,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Auction-house listings (0x2005 search results).";
 		public string Name => "listings";
@@ -44,7 +45,6 @@ namespace Faolan.Importer.Modules
 
 	public sealed class StockPhrasesModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -53,6 +53,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Upsert,
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Cutscene stock-phrase subtitles ({stock_N}: 0x205E req -> 0x205D resp).";
 		public string Name => "stock-phrases";
@@ -68,7 +70,6 @@ namespace Faolan.Importer.Modules
 	// Maps (MapChange) + the #31 tooling-suffix name sanitize backfill.
 	public sealed class MapsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -76,6 +77,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Maps from MapChange packets (+ name sanitize).";
 		public string Name => "maps";
@@ -105,7 +108,6 @@ namespace Faolan.Importer.Modules
 	// Cast/applied spell ids (ApplySpell) -> Spells.
 	public sealed class SpellsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -113,6 +115,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Spell ids from ApplySpell packets.";
 		public string Name => "spells";
@@ -127,7 +131,6 @@ namespace Faolan.Importer.Modules
 	// DoT effects (StatDamageIIR 0xE9F24184) -> Spell.DotDelta/DotType (#274).
 	public sealed class StatDamageModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(SpellsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -135,6 +138,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "DoT per-tick deltas from StatDamageIIR packets.";
 		public string Name => "dot-effects";
@@ -162,7 +167,6 @@ namespace Faolan.Importer.Modules
 			[3675584] = 259 // switch weapon
 		};
 
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -170,6 +174,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Ability grants (0x2052), incl. the rehomed slot seed.";
 		public string Name => "abilities";
@@ -198,7 +204,6 @@ namespace Faolan.Importer.Modules
 	// Per-class STARTING spells (#74) from the create captures' 0x200A grants.
 	public sealed class StartingSpellsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -206,6 +211,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Per-class spell access map (create 0x200A grants).";
 		public string Name => "class-spells";
@@ -222,7 +229,6 @@ namespace Faolan.Importer.Modules
 	// the per-class grants); registration order (after the tsv level modules) places it after the ellatha/wiki levels.
 	public sealed class StarterSpellLevelsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(StartingSpellsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -230,6 +236,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Upsert,
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Mark create-granted spells as each captured class's starter kit + the levels later grants land at (ClassSpell).";
 		public string Name => "starter-spells";
@@ -248,8 +256,6 @@ namespace Faolan.Importer.Modules
 	// rows must be purged), so Overwrite-only.
 	public sealed class ConversationsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
-
 		// Conversation nodes FK NpcTemplateId (NpcsModule, #244) and GrantQuestId (QuestsModule) - both must import
 		// first so the references resolve (FK is enforced on every provider; no import-time deferral).
 		public IReadOnlyList<string> DependsOn => [nameof(NpcsModule), nameof(QuestsModule)];
@@ -258,6 +264,8 @@ namespace Faolan.Importer.Modules
 		{
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "NPC dialogue trees (per-capture condition-tagged, clean rebuild).";
 		public string Name => "conversations";
@@ -273,7 +281,6 @@ namespace Faolan.Importer.Modules
 	// Observed live character state: wallet balances + hotbar slots. Needs the characters to exist.
 	public sealed class CharacterStateModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -281,6 +288,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Wallet balances + hotbar slots from captures.";
 		public string Name => "character-state";
@@ -295,7 +304,6 @@ namespace Faolan.Importer.Modules
 	// Per-character LEARNED spell sets (#74) re-granted on login (DispatchLearnSpell). Needs characters + spells.
 	public sealed class LearnedSpellsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(SpellsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -303,6 +311,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Per-character learned spell sets (0x200A grants).";
 		public string Name => "learned-spells";
@@ -320,7 +330,6 @@ namespace Faolan.Importer.Modules
 	// the ability grants resolve against).
 	public sealed class CharacterAbilitiesModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(AbilitiesModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -328,6 +337,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Per-character ability sets (0x2052) + combo books (ComboBookIIR).";
 		public string Name => "character-abilities";
@@ -357,7 +368,6 @@ namespace Faolan.Importer.Modules
 	// quest definitions (the journal references them).
 	public sealed class CharacterQuestsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(QuestsModule), nameof(MapsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -365,6 +375,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Per-character quest journals (QuestIIR/QuestGoal).";
 		public string Name => "character-quests";
@@ -381,7 +393,6 @@ namespace Faolan.Importer.Modules
 	// templates the bank references).
 	public sealed class CharacterBankModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -389,6 +400,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Per-character bank contents (BankIIR, kind 105).";
 		public string Name => "character-bank";
@@ -407,8 +420,6 @@ namespace Faolan.Importer.Modules
 	// --reseed-npcs wipe (NpcSpawns + morphs/equipment + patrol only; NpcSpells left as-is).
 	public sealed class NpcsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
-
 		// Depends on `items` (NpcSpawnEquipment.Template is an FK to Items - the worn item's quad + hash live there,
 		// harvested by ItemHashHarvester's spawn source over the same FA015807 packets). NOT on `characters`: the old
 		// "characters" dep was spurious - it only dragged the characters module in and added stray captured player
@@ -423,6 +434,8 @@ namespace Faolan.Importer.Modules
 		{
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "NPC spawns/types/spells/patrol (burst-truth set, #266).";
 		public string Name => "npcs";
@@ -466,7 +479,6 @@ namespace Faolan.Importer.Modules
 	public sealed class NpcDispositionModule : IImportModule
 	{
 		private const long NullCommunity = -1; // sentinel for NPCs with no NpcStats.community
-		public ImportSource Source => ImportSource.Captures;
 
 		// No hard DependsOn: it attaches to whatever NpcStatCores exist, and registration order already sequences it
 		// after `npcs` in a full default run. (A hard dep would force `npcs` -> `characters` -> ... into a targeted
@@ -478,6 +490,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Upsert,
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "NPC hostility disposition (cCategory from RequestAggroStatus).";
 		public string Name => "npc-disposition";
@@ -506,9 +520,11 @@ namespace Faolan.Importer.Modules
 			foreach (var core in cores)
 			{
 				if (nameById.TryGetValue(core.NpcTemplateId, out var nm) && nm != null)
+				{
 					commByName[nm] = core.Community.HasValue
 						? core.Community.Value
 						: NullCommunity;
+				}
 			}
 
 			var commVotes = new Dictionary<long, Dictionary<uint, int>>();
@@ -554,8 +570,6 @@ namespace Faolan.Importer.Modules
 	// NpcTemplate.DeathBehaviorId by name; un-harvested types keep NULL and the runtime falls back to the humanoid id.
 	public sealed class NpcDeathBehaviorsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
-
 		// No hard DependsOn (mirrors NpcDispositionModule): enriches whatever NpcTemplates exist; registration order
 		// sequences it after `npcs`. No-ops on an empty DB.
 		public IReadOnlyList<string> DependsOn => [];
@@ -565,6 +579,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Upsert,
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Per-creature death animation (death BccIIR behaviorId from captured NPC kills).";
 		public string Name => "npc-death-behaviors";
@@ -608,7 +624,6 @@ namespace Faolan.Importer.Modules
 	// GenericDisplayAreaName feedback. Enriches Map.AreaNameId by map id.
 	public sealed class AreaNamesModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -616,6 +631,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Upsert,
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Named sub-areas per map + the positions their banner fires at (MapArea).";
 		public string Name => "area-names";
@@ -658,7 +675,6 @@ namespace Faolan.Importer.Modules
 	// Static world objects (decor/containers/zones).
 	public sealed class WorldObjectsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -666,6 +682,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Static world objects (decor/containers/zones).";
 		public string Name => "world-objects";
@@ -686,8 +704,6 @@ namespace Faolan.Importer.Modules
 	{
 		private const float PositionTolerance = 1.0f; // burst pos vs stored row pos (both from the same import)
 
-		public ImportSource Source => ImportSource.Captures;
-
 		// No hard DependsOn (mirrors NpcDispositionModule): it enriches whatever zone-line WorldObjects already exist,
 		// and registration order already sequences it right after `world-objects` in a full default run. A hard dep
 		// would drag the heavy world-objects re-import into a targeted `--only world-teleports` run - which fails on a
@@ -699,6 +715,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Upsert,
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Zone-line teleport destinations (captured UseObject->N3Teleport).";
 		public string Name => "world-teleports";
@@ -784,13 +802,14 @@ namespace Faolan.Importer.Modules
 	// from instead of the all-items random sample. Needs the items first so the pool can be filtered to buildable rows.
 	public sealed class MapLootModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Per-map loot pool from captured bag contents (#273).";
 		public string Name => "map-loot";
@@ -806,7 +825,6 @@ namespace Faolan.Importer.Modules
 	// Quest journal-content definitions + the hand-decoded snapshot/chain seeds (beach 10238, Casilda #261/#255).
 	public sealed class QuestsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(MapsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -814,6 +832,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Quest definitions + areas + @609 objective goals (harvest; wiring is the quest-wiring module).";
 		public string Name => "quests";
@@ -855,7 +875,6 @@ namespace Faolan.Importer.Modules
 	// BOOTSTRAP-ONLY, so a re-run never reverts a Quest-editor edit (only wire fields refresh from the capture).
 	public sealed class QuestWiringModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(QuestsModule), nameof(MapsModule), nameof(WorldObjectsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -863,6 +882,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Hand-authored quest wiring (trigger fields + chains + @609 detail) onto the harvested definitions.";
 		public string Name => "quest-wiring";
@@ -878,10 +899,6 @@ namespace Faolan.Importer.Modules
 	// set, so opt-in via --only mounts.
 	public sealed class MountsModule : IImportModule
 	{
-		public bool InDefaultSet => false;
-
-		public ImportSource Source => ImportSource.Captures;
-
 		// NpcEquipment.Template is an FK to Items (the worn item's quad + hash), so items must be harvested first.
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
@@ -890,6 +907,9 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
+		public bool InDefaultSet => false;
 
 		public string Description => "Summonable mount creatures (#27, opt-in).";
 		public string Name => "mounts";
@@ -905,9 +925,6 @@ namespace Faolan.Importer.Modules
 	// Recipes window. Opt-in (its only capture is one L80 char's full 603-recipe book).
 	public sealed class RecipesModule : IImportModule
 	{
-		public bool InDefaultSet => false;
-		public ImportSource Source => ImportSource.Captures;
-
 		// Depends on `items`: every RecipeItem.ItemId is a hard FK to Items. The recipe importer harvests each
 		// referenced item's identity (key + hash) into Items from the recipe element, but the items module must run
 		// first so a real named item wins over the bare harvested placeholder (and the FK resolves for a `--only
@@ -919,6 +936,9 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
+		public bool InDefaultSet => false;
 
 		public string Description => "Crafting recipes book (TradeskillReplyIIR (uint)GameServer0X2000Opcodes.TradeskillReplyIIR, opt-in).";
 		public string Name => "recipes";
@@ -937,7 +957,6 @@ namespace Faolan.Importer.Modules
 	// rows it sets the column on). Upsert - it only writes items already present.
 	public sealed class ConsumableUsesModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule), nameof(SpellsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -945,6 +964,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Consumable on-use spells (TemplateActionIIR + ApplySpell) -> Items.OnUseSpell.";
 		public string Name => "consumable-uses";
@@ -962,14 +983,15 @@ namespace Faolan.Importer.Modules
 	// re-sends on the wire. Overwrite = rebuild the account's claim set cleanly. See docs/subsystems/item-claims.md.
 	public sealed class ClaimsModule : IImportModule
 	{
-		public bool InDefaultSet => false;
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
+		public bool InDefaultSet => false;
 
 		public string Description => "Account claims (CoreClaimIIR list) -> AccountClaim (opt-in).";
 		public string Name => "claims";
@@ -990,10 +1012,6 @@ namespace Faolan.Importer.Modules
 	// capture, e.g. `--only pets`.
 	public sealed class PetsModule : IImportModule
 	{
-		public bool InDefaultSet => false;
-
-		public ImportSource Source => ImportSource.Captures;
-
 		// NpcEquipment.Template is an FK to Items (the worn item's quad + hash), so items must be harvested first.
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
@@ -1002,6 +1020,9 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
+		public bool InDefaultSet => false;
 
 		public string Description => "Summonable pet creatures - type-level stat core (#307, opt-in).";
 		public string Name => "pets";

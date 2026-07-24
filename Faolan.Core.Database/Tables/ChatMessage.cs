@@ -20,15 +20,15 @@ namespace Faolan.Core.Database.Tables
 		// Non-null for a whisper/tell: the recipient character id. Null for a channel post.
 		public uint? TargetId { get; set; }
 
+		// When the server received the message (UTC).
+		public DateTimeOffset SentAt { get; set; }
+
 		// True if this line was a private tell rather than a channel broadcast.
 		public bool IsWhisper { get; set; }
 
 		// The chat channel type byte + id the post went to (e.g. global channels, or a ~Playfield channel whose id is
 		// a map id). For a WHISPER both are 0 and TargetId carries the recipient.
 		public byte ChannelType { get; set; }
-
-		// When the server received the message (UTC).
-		public DateTimeOffset SentAt { get; set; }
 
 		[MaxLength(64)]
 		public string SenderName { get; set; } = null!;

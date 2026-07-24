@@ -18,20 +18,6 @@ namespace Faolan.Tests
 		private const uint Instance = 0x3BC035EC;
 
 		[Fact]
-		public async Task HandlePing_ProducesTheExpectedFrame()
-		{
-			var client = ClientAt(Instance);
-
-			await KeepAliveService.HandlePing(client);
-
-			// The expected frame: GameAgent -> GameInterface, GameServerStats, body [0x42B32A07][0][0].
-			var expected = new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, Instance),
-				GameInterfaceOpcodes.DispatchGameServerStats, b => b.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)).Serialize();
-
-			Assert.Equal(expected, client.Sent);
-		}
-
-		[Fact]
 		public async Task HandleLatencyCheck_FramesPongWithEchoedCounterAndFlag()
 		{
 			const uint counter = 0x00000007;
@@ -39,8 +25,8 @@ namespace Faolan.Tests
 
 			// Stimulus: an inbound LatencyCheck whose body starts with the counter the reply must echo. Parsed straight
 			// into the Rpc the receive path now dispatches on (Gitea #407).
-			var incoming = Rpc.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance,
-				(ushort)GameCharInterfaceOpcodes.DispatchPong, [], [0x00, 0x00, 0x00, 0x07]));
+			var incoming = Rpc.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance, (ushort)GameCharInterfaceOpcodes.DispatchPong, [],
+				[0x00, 0x00, 0x00, 0x07]));
 
 			await KeepAliveService.HandleLatencyCheck(client, incoming, incoming.BodyReader());
 
@@ -58,11 +44,18 @@ namespace Faolan.Tests
 			Assert.Equal(0x00000012u, body.ReadUInt32());
 		}
 
-		private static CapturingClient ClientAt(uint characterId)
+		[Fact]
+		public async Task HandlePing_ProducesTheExpectedFrame()
 		{
-			var client = new CapturingClient();
-			client.Session.Character = new Character { Id = characterId };
-			return client;
+			var client = ClientAt(Instance);
+
+			await KeepAliveService.HandlePing(client);
+
+			// The expected frame: GameAgent -> GameInterface, GameServerStats, body [0x42B32A07][0][0].
+			var expected = new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, Instance), GameInterfaceOpcodes.DispatchGameServerStats,
+				b => b.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)).Serialize();
+
+			Assert.Equal(expected, client.Sent);
 		}
 
 		private static byte[] BuildFrame(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, ushort opcode, byte[] headerData, byte[] body)
@@ -70,13 +63,22 @@ namespace Faolan.Tests
 			return new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, headerData, body).Serialize();
 		}
 
+		private static CapturingClient ClientAt(uint characterId)
+		{
+			var client = new CapturingClient();
+			client.Session.Character = new Character
+			{
+				Id = characterId
+			};
+			return client;
+		}
+
 		// Minimal INetworkClient that records the last-sent bytes. The default SendAsync(Rpc) on the interface
 		// serializes and routes through SendAsync(byte[]), which we capture.
 		private sealed class CapturingClient : INetworkClient
 		{
-			public byte[]? Sent { get; private set; }
-
 			public INetworkClientSession Session { get; } = new NetworkClientSession();
+			public byte[]? Sent { get; private set; }
 			public string? IpAddress => "127.0.0.1";
 
 			public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)

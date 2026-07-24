@@ -9,10 +9,10 @@ namespace Faolan.Core.Enums
 	// uint -> EF stores it as the same INTEGER column as the raw uint it replaced, no migration.
 	public enum ConversationSubOpcode : uint
 	{
-		KnubotOpenChatWindow = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR,
-		KnubotAppendText = (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR,
-		KnubotAnswerList = (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR,
-		KnubotCloseChatWindow = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR,
-		SetDialogueCamera = (uint)GameCharInterfaceOpcodes.DispatchSetDialogueCamera
+		KnubotOpenChatWindow = GameServer0X2000Opcodes.KnubotOpenChatWindowIIR,
+		KnubotAppendText = GameServer0X2000Opcodes.KnubotAppendTextIIR,
+		KnubotAnswerList = GameServer0X2000Opcodes.KnubotAnswerListIIR,
+		KnubotCloseChatWindow = GameServer0X2000Opcodes.KnubotCloseChatWindowIIR,
+		SetDialogueCamera = GameCharInterfaceOpcodes.DispatchSetDialogueCamera
 	}
 }

@@ -32,8 +32,7 @@ namespace Faolan.GameServer.Session
 			var counter = body.ReadUInt32();
 			var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
 
-			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchPong, (byte[])[0x01],
+			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchPong, (byte[])[0x01],
 				b => b.WriteUInt32(counter).WriteUInt32(0x00000012).WriteUInt32(tick)));
 		}
 
@@ -42,8 +41,7 @@ namespace Faolan.GameServer.Session
 		// plausible value (0x42B32A07 = ~89.6) is sent. The client just treats it as a readout.
 		public static Task HandlePing(INetworkClient client)
 		{
-			return client.SendAsync(new Rpc(PingSender, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchGameServerStats,
+			return client.SendAsync(new Rpc(PingSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchGameServerStats,
 				b => b.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)));
 		}
 	}

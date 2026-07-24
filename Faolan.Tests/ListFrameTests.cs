@@ -11,7 +11,7 @@ namespace Faolan.Tests
 	{
 		[Theory, InlineData(0u), InlineData(1u), InlineData(0x3F0u), InlineData(0x7E1u), InlineData(0xC7A0u)]
 		// zero is NOT an empty list - it is invalid framing
-			// the resurrection-spot type word: a real constant that is NOT count-framed
+		// the resurrection-spot type word: a real constant that is NOT count-framed
 		public void CountOf_ThrowsOnAWordThatIsNotCountFramed(uint word)
 		{
 			Assert.False(ListFrame.TryCountOf(word, out _));
@@ -33,7 +33,7 @@ namespace Faolan.Tests
 		// an EMPTY list - the AH's empty search grid is a 4-byte body carrying just this
 		// ⚠️ THE TRAP: the "constant 0x7E2" of the resurrection-spots body, mail, quest index
 		// the 2-spot discovery re-send (#372)
-			// a 78-row auction-house search grid
+		// a 78-row auction-house search grid
 		public void ForCount_MatchesTheWordsSeenInCaptures(int count, uint expected)
 		{
 			Assert.Equal(expected, ListFrame.ForCount(count));

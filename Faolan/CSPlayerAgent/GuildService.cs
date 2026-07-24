@@ -45,14 +45,14 @@ namespace Faolan.CSPlayerAgent
 		// handle, not session data). We stamp a constant so our s2c headers match retail's shape instead of echoing the
 		// client's instance-0 endpoint back as the sender.
 		private const uint GuildServerInstance = 0x04;
+		private static readonly ProtoEndpoint PushSender = Endpoints.Endpoint(Endpoints.CSPlayerAgentType, GuildServerInstance);
+		private static readonly ProtoEndpoint PushReceiver = Endpoints.Endpoint(Endpoints.CSPlayerInterfaceType, 0);
 
 		// The s2c endpoints for an unsolicited CsPlayerAgent PUSH (a guild event to a player who didn't just send a
 		// request, so there is no incoming packet to echo). Retail addresses every reply the same way, and every
 		// request carries the same endpoints - target = the guild-server class (CSPlayerAgent), caller =
 		// CSPlayerInterface at instance 0 - so a push reuses the exact endpoints a reply would have echoed
 		// (ReplySender(packet.Receiver) / packet.Sender). This is why we don't need to remember each client's endpoints.
-		private static readonly ProtoEndpoint PushSender = Endpoints.Endpoint(Endpoints.CSPlayerAgentType, GuildServerInstance);
-		private static readonly ProtoEndpoint PushReceiver = Endpoints.Endpoint(Endpoints.CSPlayerInterfaceType, 0);
 
 		private readonly ConcurrentDictionary<uint, PendingGuildInvite> _pendingGuildInvites = [];
 		private readonly Func<uint, INetworkClient?> _clientForCharacter;
@@ -126,13 +126,7 @@ namespace Faolan.CSPlayerAgent
 				// [charId][guild ID32][03][02][charId][01] - the constants are not decoded (likely rank/flags);
 				// taken verbatim from the capture (Dahviie, same-guild reply).
 				await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateMember,
-					b => b.WriteUInt32(targetId)
-						.WriteUInt32(Guild.WireType)
-						.WriteUInt32(targetGuildId)
-						.WriteByte(0x03)
-						.WriteByte(0x02)
-						.WriteUInt32(targetId)
-						.WriteByte(0x01)));
+					b => b.WriteUInt32(targetId).WriteUInt32(Guild.WireType).WriteUInt32(targetGuildId).WriteByte(0x03).WriteByte(0x02).WriteUInt32(targetId).WriteByte(0x01)));
 				return;
 			}
 
@@ -144,7 +138,8 @@ namespace Faolan.CSPlayerAgent
 			// the capture ("The Undreamed" reply); 0x3F1 also appears in the Authenticate 0x20D0 trailer, so it
 			// is a server-wide constant rather than guild data.
 			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateOther,
-				b => b.WriteUInt32(targetId)
+				b => b
+					.WriteUInt32(targetId)
 					.WriteUInt32(Guild.WireType)
 					.WriteUInt32(targetGuildId)
 					.WriteByte(0x03)
@@ -329,13 +324,6 @@ namespace Faolan.CSPlayerAgent
 			return _gameServerDispatcher.GetWorldSessions().Any(s => s.Character?.Id == characterId);
 		}
 
-		private static async Task SendGuildCreated(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character creator, byte form)
-		{
-			using var body = new FaolanStream();
-			WriteGuildCreatedBody(body, guild, creator, form, creator.MapId);
-			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildCreated, body.ToArray()));
-		}
-
 		// 0x203F full guild update - the packet that makes the client consider itself a guild member (guild
 		// window, guild chat tab, MOTD popup). Retail pushes it right after the Authenticate ack on login and
 		// again on join/member-list requests. DispatchGuildUpdate reads THREE arguments in order (FUN_013428d0),
@@ -391,15 +379,6 @@ namespace Faolan.CSPlayerAgent
 			body.WriteUInt32(EntityClass.Character).WriteUInt32(member.Id);
 			WriteGuildMemberRecord(body, member);
 			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMemberJoined, body.ToArray()));
-		}
-
-		// 0x2057 DispatchGuildMessageOfTheDayChanged(i_cMessageOfTheDay): retail's TARGETED MOTD-change push - updates
-		// the stored MOTD + pops the "message of the day" toast, without re-sending the whole roster (unlike 0x203F).
-		// No capture for it; the body is the single string arg from the client method sig, s16-framed like the other
-		// guild strings (docs/re/aoc-client-rpc-methods.json). Validate in-client.
-		private static async Task SendGuildMessageOfTheDayChanged(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, string motd)
-		{
-			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMessageOfTheDayChanged, b => b.WriteString(motd)));
 		}
 
 		private void WriteGuildMemberRecord(FaolanStream s, Character member)
@@ -478,11 +457,27 @@ namespace Faolan.CSPlayerAgent
 				.WriteArray(new byte[48]);
 		}
 
+		private static async Task SendGuildCreated(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character creator, byte form)
+		{
+			using var body = new FaolanStream();
+			WriteGuildCreatedBody(body, guild, creator, form, creator.MapId);
+			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildCreated, body.ToArray()));
+		}
+
 		private static Task SendGuildInvite(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, uint inviteeId, string inviterName)
 		{
 			using var body = new FaolanStream();
 			WriteGuildInviteBody(body, guild, inviteeId, inviterName);
 			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildInvite, body.ToArray()));
+		}
+
+		// 0x2057 DispatchGuildMessageOfTheDayChanged(i_cMessageOfTheDay): retail's TARGETED MOTD-change push - updates
+		// the stored MOTD + pops the "message of the day" toast, without re-sending the whole roster (unlike 0x203F).
+		// No capture for it; the body is the single string arg from the client method sig, s16-framed like the other
+		// guild strings (docs/re/aoc-client-rpc-methods.json). Validate in-client.
+		private static async Task SendGuildMessageOfTheDayChanged(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, string motd)
+		{
+			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMessageOfTheDayChanged, b => b.WriteString(motd)));
 		}
 
 		// A guild invite offered to a character, awaiting AcceptGuildInvitation/DeclineGuildInvitation. Keyed by

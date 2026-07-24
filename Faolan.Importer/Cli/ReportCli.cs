@@ -28,20 +28,13 @@ namespace Faolan.Importer.Cli
 	// These inspect captures or the DB and print; they never write, so they bypass the import runner entirely.
 	public static class ReportCli
 	{
+		private static (FaolanDbProvider Provider, string Connection)? _db;
 		private static readonly string RepoRoot = RepoPaths.Root;
 
 		// DB config (provider + connection) for the DB-backed reports. Resolved LAZILY on the first OpenDb so the
 		// capture/RDB-only reports (corpus-extract, coverage-of-captures, ...) need no DB config at all. Same source
 		// and precedence as the import path (env > cmdline(--connectionstring) > faolan.json) - see CliConfig.
 		private static string[] _args = [];
-		private static (FaolanDbProvider Provider, string Connection)? _db;
-
-		// The client's RDB folder is part of the game install, not this repo. Resolve it from --rdb, else the
-		// AOC_RDB env var; RDB-backed reports fail with a clear message if neither is set.
-		private static string RdbDir(string[] args) =>
-			GetOption(args, "--rdb")
-			?? Environment.GetEnvironmentVariable("AOC_RDB")
-			?? throw new InvalidOperationException("Pass --rdb <dir> (or set AOC_RDB) pointing at the client's RDB folder.");
 
 		public static async Task<int> RunAsync(string[] args, string report)
 		{
@@ -192,8 +185,7 @@ namespace Faolan.Importer.Cli
 
 				case "terrain-export":
 				{
-					await TerrainExport(RdbDir(args),
-						GetOption(args, "--terrain-out") ?? Path.Combine(RepoRoot, "Terrain"));
+					await TerrainExport(RdbDir(args), GetOption(args, "--terrain-out") ?? Path.Combine(RepoRoot, "Terrain"));
 					return 0;
 				}
 
@@ -210,6 +202,7 @@ namespace Faolan.Importer.Cli
 							Console.WriteLine($"{id}: no 1040005 entry");
 							continue;
 						}
+
 						var b = rdb.ReadDecompressed(e);
 						// The [2][9] stat-modifier region - SAME parser as item templates. Body = the span after the
 						// 12-byte RDB-Id header.
@@ -222,9 +215,11 @@ namespace Faolan.Importer.Cli
 							if (f == 551)
 								mag = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan((i + 1) * 4, 4));
 						}
+
 						var modStr = string.Join(", ", mods.Select(m => $"0x{m.StatId:x}={m.WireAmount}"));
 						Console.WriteLine($"  {id}: mag(551)={mag}  region[{mods.Count}]: {modStr}");
 					}
+
 					return 0;
 				}
 
@@ -237,19 +232,29 @@ namespace Faolan.Importer.Cli
 					foreach (var e in rdb.EntriesOfType(1040005).Where(x => x.IsLocal))
 					{
 						byte[] dec;
-						try { dec = rdb.ReadDecompressed(e); }
-						catch { continue; }
+						try
+						{
+							dec = rdb.ReadDecompressed(e);
+						}
+						catch
+						{
+							continue;
+						}
+
 						if (dec.Length < 12)
 							continue;
+
 						total++;
 						var mods = ItemTemplateStatModifiers.Parse(dec.AsSpan(12));
 						if (mods.Count == 0)
 							continue;
+
 						withMods++;
 						records += mods.Count;
 						foreach (var m in mods)
 							byStat[m.StatId] = byStat.GetValueOrDefault(m.StatId) + 1;
 					}
+
 					Console.WriteLine($"spells scanned={total}  with [2][9] stat mods={withMods}  total records={records}");
 					foreach (var kv in byStat.OrderByDescending(k => k.Value).Take(30))
 						Console.WriteLine($"  stat 0x{kv.Key:x} ({kv.Key}): {kv.Value} spells");
@@ -264,8 +269,15 @@ namespace Faolan.Importer.Cli
 					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
 					{
 						byte[] dec;
-						try { dec = rdb.ReadDecompressed(e); }
-						catch { continue; }
+						try
+						{
+							dec = rdb.ReadDecompressed(e);
+						}
+						catch
+						{
+							continue;
+						}
+
 						var sb = new StringBuilder();
 						var runs = new List<string>();
 						foreach (var b in dec)
@@ -274,15 +286,21 @@ namespace Faolan.Importer.Cli
 								sb.Append((char)b);
 							else
 							{
-								if (sb.Length >= 3) runs.Add(sb.ToString());
+								if (sb.Length >= 3)
+									runs.Add(sb.ToString());
 								sb.Clear();
 							}
 						}
-						if (sb.Length >= 3) runs.Add(sb.ToString());
+
+						if (sb.Length >= 3)
+							runs.Add(sb.ToString());
 						for (var i = 0; i < runs.Count; i++)
+						{
 							if (runs[i].ToLowerInvariant().Contains(needle))
 								Console.WriteLine($"  {e.Id}[{i}]: {runs[i]}");
+						}
 					}
+
 					return 0;
 				}
 
@@ -309,19 +327,37 @@ namespace Faolan.Importer.Cli
 					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
 					{
 						byte[] b;
-						try { b = rdb.ReadDecompressed(e); }
-						catch { continue; }
-						if (b.Length < 48) continue;
+						try
+						{
+							b = rdb.ReadDecompressed(e);
+						}
+						catch
+						{
+							continue;
+						}
+
+						if (b.Length < 48)
+							continue;
+
 						var span = b.AsSpan(12);
-						if (BinaryPrimitives.ReadUInt32LittleEndian(span) != 0x32434454u) { badMagic++; continue; }
+						if (BinaryPrimitives.ReadUInt32LittleEndian(span) != 0x32434454u)
+						{
+							badMagic++;
+							continue;
+						}
+
 						var category = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(4, 4));
 						var size = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(12, 4));
 						var count = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(16, 4));
 						var blobStart = 36; // span: TDC2(4) + cat/flags/size/count(16) + MD5(16) = 36
 						var indexStart = blobStart + (int)size;
-						if (indexStart + (long)count * 16 > span.Length) continue; // grammar mismatch for this page
+						if (indexStart + (long)count * 16 > span.Length)
+							continue; // grammar mismatch for this page
+
 						pages++;
-						var thisPage = category is 50210 or 50200 or 50220 ? new Dictionary<uint, string>() : null;
+						var thisPage = category is 50210 or 50200 or 50220
+							? new Dictionary<uint, string>()
+							: null;
 						for (var i = 0; i < count; i++)
 						{
 							var rec = span.Slice(indexStart + i * 16, 16);
@@ -329,10 +365,13 @@ namespace Faolan.Importer.Cli
 							var lang = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(4, 4)); // 2nd u32 = language (loader arg3)
 							var off = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(8, 4));
 							var len = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(12, 4));
-							if (off + len > size) continue;
+							if (off + len > size)
+								continue;
+
 							var strBytes = span.Slice(blobStart + (int)off, (int)len);
 							var nul = strBytes.IndexOf((byte)0);
-							if (nul >= 0) strBytes = strBytes.Slice(0, nul);
+							if (nul >= 0)
+								strBytes = strBytes.Slice(0, nul);
 							var str = Encoding.UTF8.GetString(strBytes);
 							map[id] = str;
 							byCat[(category, id)] = str;
@@ -341,40 +380,52 @@ namespace Faolan.Importer.Cli
 							perCategory[category] = perCategory.GetValueOrDefault(category) + 1;
 							thisPage?[id] = str;
 						}
+
 						if (thisPage is { Count: > 0 })
 						{
-							if (category == 50210) spellNamePages.Add((e.Id, thisPage));
-							else itemNamePages.Add((category, e.Id, thisPage));
+							if (category == 50210)
+								spellNamePages.Add((e.Id, thisPage));
+							else
+								itemNamePages.Add((category, e.Id, thisPage));
 						}
 					}
+
 					Console.WriteLine($"LDB: {pages} pages parsed, {map.Count} unique ids, {badMagic} bad-magic, {perCategory.Count} categories.");
 					// Per-category: count + an ASCII-ratio on a sample so English (high ASCII) is distinguishable from CJK.
 					Console.WriteLine("=== categories (id, count, asciiPct, sample) ===");
 					foreach (var (cat, cnt) in perCategory.OrderByDescending(kv => kv.Value).Take(30))
 					{
 						var sample = byCat.First(kv => kv.Key.cat == cat).Value;
-						var ascii = sample.Length == 0 ? 0 : sample.Count(c => c < 128) * 100 / sample.Length;
+						var ascii = sample.Length == 0
+							? 0
+							: sample.Count(c => c < 128) * 100 / sample.Length;
 						Console.WriteLine($"  cat {cat,-8} n={cnt,-6} ascii={ascii,3}%  '{sample.Substring(0, Math.Min(40, sample.Length))}'");
 					}
+
 					Console.WriteLine("=== language histogram (2nd u32 per index entry) ===");
 					foreach (var (lang, n) in langHisto.OrderByDescending(kv => kv.Value).Take(12))
 						Console.WriteLine($"  lang {lang,-6} n={n}");
 					await using (var db = OpenDb())
 					{
-						var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "")
-							.ToDictionaryAsync(s => s.Id, s => Norm(s.Name!));
+						var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "").ToDictionaryAsync(s => s.Id, s => Norm(s.Name!));
 						Console.WriteLine($"=== spell-name crib ({spellNamePages.Count} cat-50210 pages vs {spellNames.Count} named Spells) ===");
 						var scored = spellNamePages
 							.Select(p =>
 							{
 								int overlap = 0, match = 0;
 								foreach (var (id, str) in p.ids)
+								{
 									if (spellNames.TryGetValue(id, out var known))
 									{
 										overlap++;
-										if (Norm(str) == known) match++;
+										if (Norm(str) == known)
+											match++;
 									}
-								return (p.page, p.ids.Count, overlap, match, pct: overlap == 0 ? 0 : match * 100 / overlap);
+								}
+
+								return (p.page, p.ids.Count, overlap, match, pct: overlap == 0
+									? 0
+									: match * 100 / overlap);
 							})
 							.Where(x => x.overlap >= 5)
 							.OrderByDescending(x => x.match)
@@ -384,18 +435,18 @@ namespace Faolan.Importer.Cli
 							Console.WriteLine($"  page {x.page,-9} ids={x.Item2,-5} overlap={x.overlap,-5} match={x.match,-5} {x.pct,3}% {(x.pct >= 80 ? "<-- ENGLISH" : "")}");
 						var englishNames = new Dictionary<uint, string>();
 						foreach (var x in english)
-							foreach (var (id, str) in spellNamePages.First(p => p.page == x.page).ids)
-								englishNames[id] = str;
+						foreach (var (id, str) in spellNamePages.First(p => p.page == x.page).ids)
+							englishNames[id] = str;
 						var emptyNamed = await db.Spells.Where(s => s.Name == null || s.Name == "").Select(s => s.Id).ToListAsync();
 						var fillable = emptyNamed.Where(englishNames.ContainsKey).ToList();
-						Console.WriteLine($"=== backfill preview: {english.Count} English pages, {englishNames.Count} English names; {emptyNamed.Count} empty-name Spells, {fillable.Count} fillable ===");
+						Console.WriteLine(
+							$"=== backfill preview: {english.Count} English pages, {englishNames.Count} English names; {emptyNamed.Count} empty-name Spells, {fillable.Count} fillable ===");
 						foreach (var id in fillable.Take(20))
 							Console.WriteLine($"  spell {id}: '{englishNames[id]}'");
 
 						// Items: same crib, per candidate category (50200 dev-names, 50220). Which category is keyed by
 						// item id AND English is what this tells us.
-						var itemNames = await db.Items.Where(i => i.Name != null && i.Name != "")
-							.ToDictionaryAsync(i => i.Id, i => Norm(i.Name!));
+						var itemNames = await db.Items.Where(i => i.Name != null && i.Name != "").ToDictionaryAsync(i => i.Id, i => Norm(i.Name!));
 						foreach (var cat in new uint[] { 50200, 50220 })
 						{
 							var catPages = itemNamePages.Where(p => p.cat == cat).ToList();
@@ -405,12 +456,18 @@ namespace Faolan.Importer.Cli
 								{
 									int overlap = 0, match = 0;
 									foreach (var (id, str) in p.ids)
+									{
 										if (itemNames.TryGetValue(id, out var known))
 										{
 											overlap++;
-											if (Norm(str) == known) match++;
+											if (Norm(str) == known)
+												match++;
 										}
-									return (p.page, p.ids.Count, overlap, match, pct: overlap == 0 ? 0 : match * 100 / overlap);
+									}
+
+									return (p.page, p.ids.Count, overlap, match, pct: overlap == 0
+										? 0
+										: match * 100 / overlap);
 								})
 								.Where(x => x.overlap >= 5)
 								.OrderByDescending(x => x.match)
@@ -419,8 +476,8 @@ namespace Faolan.Importer.Cli
 								Console.WriteLine($"  page {x.page,-9} ids={x.Item2,-6} overlap={x.overlap,-5} match={x.match,-5} {x.pct,3}% {(x.pct >= 80 ? "<-- ENGLISH" : "")}");
 							var engI = new Dictionary<uint, string>();
 							foreach (var x in scoredI.Where(x => x.pct >= 80))
-								foreach (var (id, str) in catPages.First(p => p.page == x.page).ids)
-									engI[id] = str;
+							foreach (var (id, str) in catPages.First(p => p.page == x.page).ids)
+								engI[id] = str;
 							var emptyI = await db.Items.Where(i => i.Name == null || i.Name == "").Select(i => i.Id).ToListAsync();
 							var fillI = emptyI.Where(engI.ContainsKey).ToList();
 							Console.WriteLine($"    -> {engI.Count} English names; {emptyI.Count} empty-name Items, {fillI.Count} fillable");
@@ -428,12 +485,16 @@ namespace Faolan.Importer.Cli
 								Console.WriteLine($"       item {id}: '{engI[id]}'");
 						}
 					}
+
 					return 0;
 
 					// #291/#300 crib: identify the ENGLISH spell-name page(s) by scoring each cat-50210 page against the
 					// English names our Spells catalog already carries (from the template ExtractName). The page whose
 					// strings match our names is English; the FR/DE/ES/RU/PL/KO copies of the same ids won't.
-					static string Norm(string s) => s.Trim().ToLowerInvariant().Replace('’', '\'').Replace('‘', '\'');
+					static string Norm(string s)
+					{
+						return s.Trim().ToLowerInvariant().Replace('’', '\'').Replace('‘', '\'');
+					}
 				}
 
 				default:
@@ -481,26 +542,26 @@ namespace Faolan.Importer.Cli
 		private static void Anim(IReadOnlyList<NamedCapture> captures, string target)
 		{
 			foreach (var c in captures)
-				foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
-				{
-					var body = e.Data is { Length: >= 12 }
-						? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
-						: null;
-					var anim = body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read)
-						? read.Message?.Bcc?.AnimIdleId.ToString() ?? "(no bcc)"
-						: "(unreadable)";
-					Console.WriteLine($"{c.Name[..Math.Min(40, c.Name.Length)]} | handle 0x{e.Handle:X} | AnimIdleId={anim} | pos=({e.X:0.#},{e.Z:0.#})");
-				}
+			foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
+			{
+				var body = e.Data is { Length: >= 12 }
+					? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
+					: null;
+				var anim = body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read)
+					? read.Message?.Bcc?.AnimIdleId.ToString() ?? "(no bcc)"
+					: "(unreadable)";
+				Console.WriteLine($"{c.Name[..Math.Min(40, c.Name.Length)]} | handle 0x{e.Handle:X} | AnimIdleId={anim} | pos=({e.X:0.#},{e.Z:0.#})");
+			}
 		}
 
 		private static void ConversationStates(IReadOnlyList<NamedCapture> captures)
 		{
 			foreach (var c in captures)
-				foreach (var g in ConversationExtractor.Extract(c.Packets).Where(e => !string.IsNullOrEmpty(e.NpcName)).GroupBy(e => e.NpcName).OrderBy(g => g.Key))
-				{
-					var grants = g.Where(e => e.GrantQuestId != 0).OrderBy(e => e.AnswerPath).Select(e => $"'{e.AnswerPath}'->{e.GrantQuestId}");
-					Console.WriteLine($"{c.Name} | {g.Key} | screens={g.Count()} | grants=[{string.Join(", ", grants)}]");
-				}
+			foreach (var g in ConversationExtractor.Extract(c.Packets).Where(e => !string.IsNullOrEmpty(e.NpcName)).GroupBy(e => e.NpcName).OrderBy(g => g.Key))
+			{
+				var grants = g.Where(e => e.GrantQuestId != 0).OrderBy(e => e.AnswerPath).Select(e => $"'{e.AnswerPath}'->{e.GrantQuestId}");
+				Console.WriteLine($"{c.Name} | {g.Key} | screens={g.Count()} | grants=[{string.Join(", ", grants)}]");
+			}
 		}
 
 		// Per-NPC dialogue screens + mid-conversation quest grants per (capture, NPC) (#37).
@@ -513,14 +574,14 @@ namespace Faolan.Importer.Cli
 			// Conversations: greeted NPCs (denominator) vs imported ConversationNodes (numerator).
 			var greeted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var c in captures)
-				foreach (var n in ConversationExtractor.GreetedNpcNames(c.Packets))
-					greeted.Add(n);
+			foreach (var n in ConversationExtractor.GreetedNpcNames(c.Packets))
+				greeted.Add(n);
 
 			// Shops: vendors whose 0x2033 window appears in a dump (denominator) vs imported Shop rows (numerator).
 			var vendorsSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var c in captures)
-				foreach (var e in CaptureShopImporter.Extract(c.Packets))
-					vendorsSeen.Add(e.VendorName);
+			foreach (var e in CaptureShopImporter.Extract(c.Packets))
+				vendorsSeen.Add(e.VendorName);
 
 			using var db = OpenDb();
 			var convImported = (await db.ConversationNodes.Where(n => n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -597,10 +658,10 @@ namespace Faolan.Importer.Cli
 
 			// Imported-content stats: the scale of the DB (the server's source of truth). One `·`-separated line.
 			var stats = $"**Imported content** (the DB is the server's source of truth): " +
-						$"{await db.Maps.CountAsync():N0} maps · {await db.NpcTemplates.CountAsync():N0} NPC types / {await db.NpcSpawns.CountAsync():N0} placements · " +
-						$"{await db.Items.CountAsync():N0} items · {await db.Spells.CountAsync():N0} spells · {await db.Abilities.CountAsync():N0} abilities · " +
-						$"{await db.ConversationNodes.CountAsync():N0} conversation nodes · {await db.Shops.CountAsync():N0} shops · {await db.QuestDefinitions.CountAsync():N0} quests · " +
-						$"{await db.WorldObjects.CountAsync():N0} world objects · {await db.PatrolPaths.CountAsync():N0} patrol routes";
+			            $"{await db.Maps.CountAsync():N0} maps · {await db.NpcTemplates.CountAsync():N0} NPC types / {await db.NpcSpawns.CountAsync():N0} placements · " +
+			            $"{await db.Items.CountAsync():N0} items · {await db.Spells.CountAsync():N0} spells · {await db.Abilities.CountAsync():N0} abilities · " +
+			            $"{await db.ConversationNodes.CountAsync():N0} conversation nodes · {await db.Shops.CountAsync():N0} shops · {await db.QuestDefinitions.CountAsync():N0} quests · " +
+			            $"{await db.WorldObjects.CountAsync():N0} world objects · {await db.PatrolPaths.CountAsync():N0} patrol routes";
 			Console.WriteLine("\n" + stats);
 
 			if (string.Equals(arg, "readme", StringComparison.OrdinalIgnoreCase))
@@ -631,28 +692,28 @@ namespace Faolan.Importer.Cli
 		private static void Equip(IReadOnlyList<NamedCapture> captures, string target)
 		{
 			foreach (var c in captures)
-				foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
+			foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
+			{
+				var body = e.Data is { Length: >= 12 }
+					? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
+					: null;
+				if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 				{
-					var body = e.Data is { Length: >= 12 }
-						? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
-						: null;
-					if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-					{
-						Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} | (unreadable)");
-						continue;
-					}
-
-					var slots = read
-						.Message.InventoryEntries.Select(entry => NpcSpawnEquipmentBuilder.TryLift<NpcSpawnEquipment>(entry, out var row)
-							// The row stores only slot/template/level now (the quad + hash are the Items row Template FKs to);
-							// read the identity for the report off the captured entry itself.
-							? $"slot{row.Pos}=tpl{row.Template}[k={entry.Item.Key1.Key1},{entry.Item.Key1.Key2},{entry.Item.Key1.Key3},{entry.Item.Key1.Key4} lvl={row.Level} hash={entry.Item.Hash}]"
-							: "slot?=unliftable")
-						.ToList();
-					Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} pos=({e.X:0.#},{e.Z:0.#})");
-					foreach (var s in slots)
-						Console.WriteLine($"    {s}");
+					Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} | (unreadable)");
+					continue;
 				}
+
+				var slots = read
+					.Message.InventoryEntries.Select(entry => NpcSpawnEquipmentBuilder.TryLift<NpcSpawnEquipment>(entry, out var row)
+						// The row stores only slot/template/level now (the quad + hash are the Items row Template FKs to);
+						// read the identity for the report off the captured entry itself.
+						? $"slot{row.Pos}=tpl{row.Template}[k={entry.Item.Key1.Key1},{entry.Item.Key1.Key2},{entry.Item.Key1.Key3},{entry.Item.Key1.Key4} lvl={row.Level} hash={entry.Item.Hash}]"
+						: "slot?=unliftable")
+					.ToList();
+				Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} pos=({e.X:0.#},{e.Z:0.#})");
+				foreach (var s in slots)
+					Console.WriteLine($"    {s}");
+			}
 		}
 
 		private static string? GetOption(string[] args, string name)
@@ -820,24 +881,24 @@ namespace Faolan.Importer.Cli
 			// captures) or still vary by session - the gate for whether a per-map stored template is sound.
 			var byMap = new Dictionary<uint, List<(string Cap, string Masked)>>();
 			foreach (var c in captures)
-				foreach (var p in c.Packets)
-				{
-					if (p.Opcode != 0x2000u || p.SubOpcode != (uint)GameServer0X2000Opcodes.PlayfieldFIIR || p.Bytes.Length < 16)
-						continue;
+			foreach (var p in c.Packets)
+			{
+				if (p.Opcode != 0x2000u || p.SubOpcode != (uint)GameServer0X2000Opcodes.PlayfieldFIIR || p.Bytes.Length < 16)
+					continue;
 
-					var body = p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..];
-					if (body.Length < 79)
-						continue;
+				var body = p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..];
+				if (body.Length < 79)
+					continue;
 
-					var map = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
-					var masked = (byte[])body.Clone();
-					Array.Clear(masked, 42, 4); // instance
-					Array.Clear(masked, 58, 4); // playfield token
-					Array.Clear(masked, 75, 4); // playfield token (2nd)
-					(byMap.TryGetValue(map, out var l)
-						? l
-						: byMap[map] = []).Add((c.Name, Convert.ToHexString(masked)));
-				}
+				var map = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+				var masked = (byte[])body.Clone();
+				Array.Clear(masked, 42, 4); // instance
+				Array.Clear(masked, 58, 4); // playfield token
+				Array.Clear(masked, 75, 4); // playfield token (2nd)
+				(byMap.TryGetValue(map, out var l)
+					? l
+					: byMap[map] = []).Add((c.Name, Convert.ToHexString(masked)));
+			}
 
 			foreach (var (map, list) in byMap.OrderBy(kv => kv.Key))
 			{
@@ -881,7 +942,7 @@ namespace Faolan.Importer.Cli
 
 			Console.Error.WriteLine($"{ops2.Count} opcode columns + {subs2.Count} sub-opcode columns across {captures.Count} captures");
 			Console.WriteLine("capture," + string.Join(",", ops2.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}")) + "," +
-							  string.Join(",", subs2.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}:0x{x.Sub:X8}")));
+			                  string.Join(",", subs2.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}:0x{x.Sub:X8}")));
 			foreach (var c in captures.OrderBy(c => c.Name, StringComparer.Ordinal))
 			{
 				var op = perCapOp[c.Name];
@@ -1052,6 +1113,14 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"  with a RenderMesh ref         : {withGeometry} (geometry local={geomLocal} cdn={geomCdn})");
 			Console.WriteLine($"  texture refs: local={texLocal} cdn={texCdn} missing={texMissing}");
 			Console.WriteLine("Pass --report-arg <meshIndexId> [--out <dir>] [--dump-mesh] to extract one model.");
+		}
+
+		// The client's RDB folder is part of the game install, not this repo. Resolve it from --rdb, else the
+		// AOC_RDB env var; RDB-backed reports fail with a clear message if neither is set.
+		private static string RdbDir(string[] args)
+		{
+			return GetOption(args, "--rdb") ?? Environment.GetEnvironmentVariable("AOC_RDB") ??
+				throw new InvalidOperationException("Pass --rdb <dir> (or set AOC_RDB) pointing at the client's RDB folder.");
 		}
 
 		// List all entries of a TYPE (--report-arg <type>) and dump each decompressed payload to --out as
@@ -1257,17 +1326,17 @@ namespace Faolan.Importer.Cli
 		{
 			var snaps = new List<(string Cap, byte[] Body)>();
 			foreach (var c in captures)
-				foreach (var p in c.Packets)
-				{
-					if (!p.IsDownload || p.SubOpcode != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
-						continue;
+			foreach (var p in c.Packets)
+			{
+				if (!p.IsDownload || p.SubOpcode != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
+					continue;
 
-					var body = p.Bytes.Length >= 16
-						? p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..]
-						: [];
-					if (body.Length >= 16)
-						snaps.Add((c.Name, body));
-				}
+				var body = p.Bytes.Length >= 16
+					? p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..]
+					: [];
+				if (body.Length >= 16)
+					snaps.Add((c.Name, body));
+			}
 
 			foreach (var (cap, body) in snaps.OrderByDescending(s => s.Body.Length).Take(6))
 			{

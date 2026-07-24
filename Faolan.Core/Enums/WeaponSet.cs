@@ -11,7 +11,7 @@ namespace Faolan.Core.Enums
 	// slot 6 -> 20 -> 6 (Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed).
 	public enum WeaponSet
 	{
-		Primary = 0,  // main_hand_left (slot 6) + off_hand_left (slot 8)
+		Primary = 0, // main_hand_left (slot 6) + off_hand_left (slot 8)
 		Secondary = 1 // main_hand_right (slot 20) + off_hand_right (slot 21) - often, but not necessarily, ranged
 	}
 }

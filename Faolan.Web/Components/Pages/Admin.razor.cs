@@ -12,8 +12,8 @@ namespace Faolan.Web.Components.Pages
 {
 	public partial class Admin
 	{
-		private bool _authorized;
 		private List<AccountRow> _accounts = [];
+		private bool _authorized;
 		private string? _notice;
 		private uint _selfId;
 

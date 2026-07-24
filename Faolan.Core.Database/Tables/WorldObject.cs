@@ -26,6 +26,21 @@ namespace Faolan.Core.Database.Tables
 		// arrival matches the destination map's reciprocal zone-line. Null when the object isn't a teleporter or its
 		// destination hasn't been captured. Nullable floats mirror Base3DEntity's transform columns.
 		public uint? DestinationMapId { get; set; }
+
+		// #262: an AFTER-QUEST EFFECT. When the viewing player has EffectQuestId ACTIVE or COMPLETED, this object is
+		// shown with the SimpleDynel visual-change state EffectDynelState (instead of its default), pushed both at world
+		// entry and the instant the player reaches that quest state. Generalises the Casilda beach "wall drop" (the chain
+		// decor's collision, dropped when the escort begins - EffectQuestId 12407, state 5): data now, not a hard-coded
+		// lookup. null = no effect (the default). Business columns, NOT wire fields.
+		public uint? EffectQuestId { get; set; }
+
+		// #262: quest GATE - when set, this object is delivered ONLY to a player who has this quest ACTIVE (the
+		// world-object analogue of an NPC's GateQuestIds / IsVisibleTo). null = ungated (delivered to everyone, the
+		// default). A BUSINESS column, NOT a wire field, so it never affects the byte-exact rebuild. Nothing is gated
+		// yet - the mechanism is in place for quest-conditional decor/pickups (e.g. gating the quarry Stone Bricks on
+		// 12371) once needed. Currently only filtered at world entry; mid-session appear/disappear on quest state
+		// change (like RefreshQuestVisibility for NPCs) is a follow-up.
+		public uint? GateQuestId { get; set; }
 		public uint MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
@@ -34,7 +49,21 @@ namespace Faolan.Core.Database.Tables
 		public uint ObjectId { get; set; }
 		public uint? TemplateItemId { get; set; } // proto field 8 (present on ~25%)
 
+		// What using this object DOES ([[InteractAction]]). Default None = no column-driven interaction (decor, or a
+		// door handled by the subop-based open/loot path). Teleport/ProxyTeleport carry a Destination* below; the
+		// world-teleports importer sets these from captured UseObject->N3Teleport sequences. A zone-line marked
+		// Teleport/ProxyTeleport with a NULL DestinationMapId is a teleporter we haven't sourced a destination for yet
+		// (the server surfaces a message rather than dropping the player) - distinct from a None object that just
+		// isn't a teleporter.
+		public InteractAction InteractAction { get; set; }
+
+		[NotMapped]
+		public Vector3? DestinationPosition => DestinationMapId == null
+			? null
+			: new Vector3(DestinationX!.Value, DestinationY!.Value, DestinationZ!.Value); // Just throw if any are null, the DB should never have a partial position.
+
 		public bool IsClosed { get; set; } // proto field 12
+		public byte EffectDynelState { get; set; }
 
 		// The bytes AFTER the identity message: the kd-tree / collision / bounds geometry (FUN_0080c620), per-object
 		// but session-INDEPENDENT (static decor geometry, 406 distinct blobs). Lifted out of the captured packet into
@@ -46,14 +75,6 @@ namespace Faolan.Core.Database.Tables
 		public float? DestinationX { get; set; }
 		public float? DestinationY { get; set; }
 		public float? DestinationZ { get; set; }
-
-		// What using this object DOES ([[InteractAction]]). Default None = no column-driven interaction (decor, or a
-		// door handled by the subop-based open/loot path). Teleport/ProxyTeleport carry a Destination* below; the
-		// world-teleports importer sets these from captured UseObject->N3Teleport sequences. A zone-line marked
-		// Teleport/ProxyTeleport with a NULL DestinationMapId is a teleporter we haven't sourced a destination for yet
-		// (the server surfaces a message rather than dropping the player) - distinct from a None object that just
-		// isn't a teleporter.
-		public InteractAction InteractAction { get; set; }
 
 		[MaxLength(128)]
 		public string? DisplayName { get; set; } // proto field 3
@@ -75,22 +96,6 @@ namespace Faolan.Core.Database.Tables
 		public uint? QuestItemEffect { get; set; } // proto field 6 (present on ~23%)
 		public uint? WaypointType { get; set; } // proto field 7 (present on zone-label objects)
 
-		// #262: quest GATE - when set, this object is delivered ONLY to a player who has this quest ACTIVE (the
-		// world-object analogue of an NPC's GateQuestIds / IsVisibleTo). null = ungated (delivered to everyone, the
-		// default). A BUSINESS column, NOT a wire field, so it never affects the byte-exact rebuild. Nothing is gated
-		// yet - the mechanism is in place for quest-conditional decor/pickups (e.g. gating the quarry Stone Bricks on
-		// 12371) once needed. Currently only filtered at world entry; mid-session appear/disappear on quest state
-		// change (like RefreshQuestVisibility for NPCs) is a follow-up.
-		public uint? GateQuestId { get; set; }
-
-		// #262: an AFTER-QUEST EFFECT. When the viewing player has EffectQuestId ACTIVE or COMPLETED, this object is
-		// shown with the SimpleDynel visual-change state EffectDynelState (instead of its default), pushed both at world
-		// entry and the instant the player reaches that quest state. Generalises the Casilda beach "wall drop" (the chain
-		// decor's collision, dropped when the escort begins - EffectQuestId 12407, state 5): data now, not a hard-coded
-		// lookup. null = no effect (the default). Business columns, NOT wire fields.
-		public uint? EffectQuestId { get; set; }
-		public byte EffectDynelState { get; set; }
-
 		// Whether this object SPAWNS for a player holding `activeQuestIds` - i.e. whether it is sent at world entry. A
 		// gated object the player doesn't qualify for simply isn't delivered (it never spawns; it is NOT spawned-and-
 		// hidden). Ungated objects always spawn.
@@ -98,10 +103,5 @@ namespace Faolan.Core.Database.Tables
 		{
 			return GateQuestId is not { } gate || (activeQuestIds != null && activeQuestIds.Contains(gate));
 		}
-
-		[NotMapped]
-		public Vector3? DestinationPosition => DestinationMapId == null
-			? null
-			: new Vector3(DestinationX!.Value, DestinationY!.Value, DestinationZ!.Value); // Just throw if any are null, the DB should never have a partial position.
 	}
 }

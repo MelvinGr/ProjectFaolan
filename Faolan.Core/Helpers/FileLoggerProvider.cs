@@ -56,8 +56,8 @@ namespace Faolan.Core.Helpers
 	public sealed class FileLogger : ILogger
 	{
 		internal static readonly Lock Lock = new();
-		private readonly string _categoryName;
 		private readonly TextWriter _writer;
+		private readonly string _categoryName;
 
 		public FileLogger(string categoryName, TextWriter writer)
 		{

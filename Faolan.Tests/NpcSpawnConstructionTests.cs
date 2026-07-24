@@ -15,26 +15,6 @@ namespace Faolan.Tests
 	// identity/appearance/stats/equipment) round-trips through the typed ProtoCoreCharacterIIR.
 	public class NpcSpawnConstructionTests
 	{
-		// The full construction oracle: rebuilding the whole NPC body from its own transform AND its own decoded
-		// CharacterIIR (transform via BuildSpawnBody, identity/equipment via the now-generic SetCharacterMessage)
-		// reproduces the captured bytes exactly. This is the gate for driving an NPC spawn from structured data -
-		// swap any field and the body stays valid.
-		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
-		public void BuildSpawn_FromOwnTransformAndIir_IsByteIdentical(string golden)
-		{
-			var template = Golden.Bytes(golden);
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(template, out var read));
-
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
-			var position = new Vector3(ReadLE(template, SpawnPacketBuilder.PosXOffset), ReadLE(template, SpawnPacketBuilder.PosYOffset), ReadLE(template, SpawnPacketBuilder.PosZOffset));
-			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset), ReadLE(template, SpawnPacketBuilder.RotYOffset), ReadLE(template, SpawnPacketBuilder.RotZOffset),
-				ReadLE(template, SpawnPacketBuilder.RotWOffset));
-
-			var built = SpawnPacketBuilder.BuildSpawn(template, handle, position, rotation, read.Message);
-
-			Assert.Equal(template, built);
-		}
-
 		// Rebuilding an NPC body from its own handle/position/rotation reproduces the captured bytes exactly -
 		// the same Phase-0 gate the player spawn passes, now for an animal (Crocodile: no equipment, minimal
 		// 41B post-IIR) and a humanoid (Casilda: worn equipment). Any mis-mapped transform offset fails here.
@@ -64,6 +44,26 @@ namespace Faolan.Tests
 			Assert.Equal(0x00088888u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(SpawnPacketBuilder.HandleOffset, 4)));
 			Assert.Equal(1f, ReadLE(built, SpawnPacketBuilder.PosXOffset));
 			Assert.Equal(3f, ReadLE(built, SpawnPacketBuilder.PosZOffset));
+		}
+
+		// The full construction oracle: rebuilding the whole NPC body from its own transform AND its own decoded
+		// CharacterIIR (transform via BuildSpawnBody, identity/equipment via the now-generic SetCharacterMessage)
+		// reproduces the captured bytes exactly. This is the gate for driving an NPC spawn from structured data -
+		// swap any field and the body stays valid.
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
+		public void BuildSpawn_FromOwnTransformAndIir_IsByteIdentical(string golden)
+		{
+			var template = Golden.Bytes(golden);
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(template, out var read));
+
+			var handle = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
+			var position = new Vector3(ReadLE(template, SpawnPacketBuilder.PosXOffset), ReadLE(template, SpawnPacketBuilder.PosYOffset), ReadLE(template, SpawnPacketBuilder.PosZOffset));
+			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset), ReadLE(template, SpawnPacketBuilder.RotYOffset), ReadLE(template, SpawnPacketBuilder.RotZOffset),
+				ReadLE(template, SpawnPacketBuilder.RotWOffset));
+
+			var built = SpawnPacketBuilder.BuildSpawn(template, handle, position, rotation, read.Message);
+
+			Assert.Equal(template, built);
 		}
 
 		// The NPC's identity/appearance/stats/equipment is a ProtoCoreCharacterIIR (same type the player spawn

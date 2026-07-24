@@ -30,6 +30,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public const uint GoalLead = 1; // every goal record opens with this word
 		public const uint IndexTag = ListFrame.Unit; // opens the quest index that terminates this region
 
+		public List<QuestObjectiveGoal> Goals { get; init; } = [];
+
 		// The serialized byte length, measured via Write without materializing the array (reuses the one Write path,
 		// so it can't drift from ToArray).
 		public int ByteLength
@@ -41,8 +43,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 				return (int)w.Length;
 			}
 		}
-
-		public List<QuestObjectiveGoal> Goals { get; init; } = [];
 
 		public static QuestObjectiveRegion Read(FaolanStream r)
 		{
@@ -61,9 +61,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			for (var i = 0; i < count; i++)
 			{
 				if (r.Position + 4 > r.Length || Peek(r) != GoalLead)
-				{
 					throw new InvalidOperationException($"@609 region: lead word 0x{tag:X} promises {count} goals, but goal {i} is absent");
-				}
 
 				region.Goals.Add(QuestObjectiveGoal.Read(r));
 			}

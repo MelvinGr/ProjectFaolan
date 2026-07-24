@@ -11,6 +11,33 @@ namespace Faolan.Core.Network
 
 		Account Account { get; set; }
 
+		Character Character { get; set; }
+
+		// Live NPC entity handle -> name, captured from the world-burst spawns (FA015807) actually sent this session.
+		// NPC dynel handles are session-volatile, so this is how a clicked handle is resolved to the stable NPC name
+		// that conversation routing keys on. Populated when the burst is replayed.
+		Dictionary<uint, string> SpawnedNpcNamesByHandle { get; }
+
+		// Live NPC entity handle -> NpcTemplateId, captured alongside SpawnedNpcNamesByHandle. The template is the stable
+		// per-type key for shop/conversation lookup (names collide: 25 templates share "Halen van Dummy"), so a clicked
+		// handle resolves to the right shop/dialogue by template, not the shared name.
+		Dictionary<uint, uint> SpawnedNpcTemplatesByHandle { get; }
+
+		// The AccountClaim ids in the order last sent in the claims list (CoreClaimIIR sub 0x0001), so a redeem
+		// (sub 0x0003) resolves its 1-based index against a STABLE snapshot - "Claim All" fires one redeem per row
+		// using the original indices, and deleting rows as they redeem would otherwise shift every later index.
+		IReadOnlyList<uint>? ClaimSlots { get; set; }
+		List<uint> CreateEditorObservedRequestIds { get; }
+
+		List<uint> WeaveComponents { get; }
+		Vector3 SeatedPosition { get; set; }
+
+		// The role this GameServer connection plays in the world-entry handshake, decided ONCE at
+		// GameAgent.Authenticate2 and the single source of truth for routing every later handshake signal.
+		// See docs/subsystems/world-entry-flow.md. IsCreateEditorConnection / IsCreateWorldSession are derived
+		// views of it (kept for the call sites that only care about one role).
+		WorldEntryMode EntryMode { get; set; }
+
 		// Set after CharCreationFinished + the world-prep burst: the creator is now waiting for the client's
 		// 0x206E enter-world signal, which we answer with the 0x2002 world-address handoff.
 		bool AwaitingEnterWorld { get; set; }
@@ -60,18 +87,6 @@ namespace Faolan.Core.Network
 		// args are begin-specific; the rest of the abort comes from the cancel packet. Cleared on resolve/cancel.
 		byte[] PendingCastArgs { get; set; }
 
-		Character Character { get; set; }
-
-		// Live NPC entity handle -> name, captured from the world-burst spawns (FA015807) actually sent this session.
-		// NPC dynel handles are session-volatile, so this is how a clicked handle is resolved to the stable NPC name
-		// that conversation routing keys on. Populated when the burst is replayed.
-		Dictionary<uint, string> SpawnedNpcNamesByHandle { get; }
-
-		// Live NPC entity handle -> NpcTemplateId, captured alongside SpawnedNpcNamesByHandle. The template is the stable
-		// per-type key for shop/conversation lookup (names collide: 25 templates share "Halen van Dummy"), so a clicked
-		// handle resolves to the right shop/dialogue by template, not the shared name.
-		Dictionary<uint, uint> SpawnedNpcTemplatesByHandle { get; }
-
 		// Index of the next post-creation world cutscene chunk to send. Advanced once per client script
 		// trigger (ClientLoadingDone, StartScript, Move, IntroDone) so each chunk is sent in order.
 		int CreateWorldChunkIndex { get; set; }
@@ -83,14 +98,6 @@ namespace Faolan.Core.Network
 		// The Spellweaving(1) buff STACK level: each time the component picker reappears a fresh stack is applied at
 		// an incremented buff id (37e5a8 -> 37e5a9 -> 37e5aa), overlapping the previous (retail stacks to ~x2).
 		int SpellweaveBuffStack { get; set; }
-
-		// The AccountClaim ids in the order last sent in the claims list (CoreClaimIIR sub 0x0001), so a redeem
-		// (sub 0x0003) resolves its 1-based index against a STABLE snapshot - "Claim All" fires one redeem per row
-		// using the original indices, and deleting rows as they redeem would otherwise shift every later index.
-		IReadOnlyList<uint>? ClaimSlots { get; set; }
-		List<uint> CreateEditorObservedRequestIds { get; }
-
-		List<uint> WeaveComponents { get; }
 
 		string ConversationAnswerPath { get; set; }
 
@@ -151,19 +158,27 @@ namespace Faolan.Core.Network
 		// The token embedded in a pending feat-untrain confirm dialog (DispatchFeatUntrainMessageBox); the client
 		// echoes it in FeatUntrainAnswer, so the reset only fires when the answer matches an outstanding request.
 		uint? PendingFeatUntrainToken { get; set; }
-		Vector3 SeatedPosition { get; set; }
-
-		// The role this GameServer connection plays in the world-entry handshake, decided ONCE at
-		// GameAgent.Authenticate2 and the single source of truth for routing every later handshake signal.
-		// See docs/subsystems/world-entry-flow.md. IsCreateEditorConnection / IsCreateWorldSession are derived
-		// views of it (kept for the call sites that only care about one role).
-		WorldEntryMode EntryMode { get; set; }
 	}
 
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
 		public uint ConversationTypeId { get; set; }
 		public Account Account { get; set; } = null!;
+		public Character Character { get; set; } = null!;
+
+		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = [];
+		public Dictionary<uint, uint> SpawnedNpcTemplatesByHandle { get; } = [];
+
+		// The claim ids in the order last sent to this client (see the interface), so "Claim All"'s per-row redeems
+		// resolve their original 1-based index even as rows are deleted mid-batch.
+		public IReadOnlyList<uint>? ClaimSlots { get; set; }
+		public List<uint> CreateEditorObservedRequestIds { get; } = [];
+		public List<uint> WeaveComponents { get; } = [];
+
+		// The player's position at the moment they sat: standup only fires once they've moved away from it (the client
+		// keeps streaming position syncs while seated - and a small seat-snap - which must NOT be read as leaving).
+		public Vector3 SeatedPosition { get; set; }
+		public WorldEntryMode EntryMode { get; set; } = WorldEntryMode.Login;
 
 		public bool AwaitingEnterWorld { get; set; }
 		public bool EnergyLoopActive { get; set; }
@@ -183,20 +198,10 @@ namespace Faolan.Core.Network
 		public bool SeatedHoldConfirmed { get; set; }
 		public bool WorldEntered { get; set; }
 		public byte[] PendingCastArgs { get; set; } = null!;
-		public Character Character { get; set; } = null!;
-
-		public Dictionary<uint, string> SpawnedNpcNamesByHandle { get; } = [];
-		public Dictionary<uint, uint> SpawnedNpcTemplatesByHandle { get; } = [];
 
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }
 		public int SpellweaveBuffStack { get; set; }
-
-		// The claim ids in the order last sent to this client (see the interface), so "Claim All"'s per-row redeems
-		// resolve their original 1-based index even as rows are deleted mid-batch.
-		public IReadOnlyList<uint>? ClaimSlots { get; set; }
-		public List<uint> CreateEditorObservedRequestIds { get; } = [];
-		public List<uint> WeaveComponents { get; } = [];
 		public string ConversationAnswerPath { get; set; } = null!;
 		public string ConversationNpcName { get; set; } = null!;
 		public uint ActiveCastToken { get; set; }
@@ -219,10 +224,5 @@ namespace Faolan.Core.Network
 
 		// The outstanding feat-untrain confirm token (see the interface); null when no untrain dialog is pending.
 		public uint? PendingFeatUntrainToken { get; set; }
-
-		// The player's position at the moment they sat: standup only fires once they've moved away from it (the client
-		// keeps streaming position syncs while seated - and a small seat-snap - which must NOT be read as leaving).
-		public Vector3 SeatedPosition { get; set; }
-		public WorldEntryMode EntryMode { get; set; } = WorldEntryMode.Login;
 	}
 }

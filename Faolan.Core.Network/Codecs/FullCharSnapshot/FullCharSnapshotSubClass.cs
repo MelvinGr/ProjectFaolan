@@ -32,18 +32,37 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		//   terminal 0x000156E7 (constant). See tools/capture/decode_snapshot_quests.py + the *-create captures.
 		private const uint EmptyQuestTerminal = 0x000156E7;
 
-		// The game-static PFAccessWindow_ playfield catalog (the tails region @1292..7917) - the one tails region that
-		// is reference data, not generated. Emitted from the TYPED AccessWindowCatalog (the 86 PfAccessWindowEntry
-		// records, formerly the AccessWindowTable.bin blob, #258) so no captured byte-blob is shipped; byte-identical
-		// to the captured region (BeachTailsFromScratchTests). Identical for every character.
-		private static readonly byte[] AccessWindowTable = SerializeAccessWindowEntries(AccessWindowCatalog.Entries);
-
 		// #255: the multi-quest journal portion from the player's held quests. One QuestcRecord per quest (journal
 		// entries), but the objective (@609) region + the quest index belong to the PRIMARY (tracked) quest only -
 		// other held quests just add their journal record + their questId to the index list (decoded from the
 		// compeltefirstquest 2-quest snapshot: beach + Casilda). Quests are ordered primary-first then by id (the
 		// captured order). Reproduces that capture's 2247-byte quest region byte-exact (BuildQuestPortionTests).
+		private static readonly byte[] AccessWindowTable = SerializeAccessWindowEntries(AccessWindowCatalog.Entries);
 		private static readonly QuestTextSlot[] HeaderSlots = [QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName];
+
+		// The game-static PFAccessWindow_ playfield catalog (the tails region @1292..7917) - the one tails region that
+		// is reference data, not generated. Emitted from the TYPED AccessWindowCatalog (the 86 PfAccessWindowEntry
+		// records, formerly the AccessWindowTable.bin blob, #258) so no captured byte-blob is shipped; byte-identical
+		// to the captured region (BeachTailsFromScratchTests). Identical for every character.
+
+		// The COMPLETED-quest journal, grouped by area - the Completed tab's data, sitting directly after the active
+		// journal (#390). Null for tails without one: the beach template holds no completed quests, which is exactly
+		// why the region went unmodelled and every real journal's bytes fell into UnknownBefore.
+		public CompletedQuestJournalRegion? CompletedQuests { get; init; }
+
+		public List<PfAccessWindowEntry> AccessWindowEntries { get; init; } = null!;
+
+		// The quest INDEX region (the [0x3F1] index + the "W6QT" goal-id table) between the @609 objective region and
+		// the access-window table; modeled by QuestIndexRegion. Null when not present (then it rides UnknownBefore).
+		public QuestIndexRegion? QuestIndex { get; init; }
+
+		// The quest JOURNAL region at the START of the tails (version + 0x3F1-framed Quest_c list), modeled from
+		// the recovered FullPlayerCharacterIIR grammar (docs/re/fullplayer-snapshot-reader.md) instead of an opaque
+		// header+string blob. Replaces the former Header0/Unknown*/RemoteFormat* fields, which were really the
+		// first Quest_c record's header + its 5 <remoteformat> strings.
+		public QuestcRegion Quests { get; init; } = new QuestcRegion();
+
+		public SubClassPostAccessBlock? PostAccessBlock { get; init; }
 
 		[JsonIgnore]
 		public bool HasKnownRepeatedStatTable => PostAccessBlock?.LargestAdjacentRepeatedRun != null;
@@ -57,26 +76,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// still opaque (decoded by tools/capture/decode_snapshot_quests.py).
 		public byte[] UnknownBeforeAccessWindowTable { get; init; } = null!;
 
-		// The COMPLETED-quest journal, grouped by area - the Completed tab's data, sitting directly after the active
-		// journal (#390). Null for tails without one: the beach template holds no completed quests, which is exactly
-		// why the region went unmodelled and every real journal's bytes fell into UnknownBefore.
-		public CompletedQuestJournalRegion? CompletedQuests { get; init; }
-
 		public int KnownHeaderLength { get; init; }
-
-		public List<PfAccessWindowEntry> AccessWindowEntries { get; init; } = null!;
-
-		// The quest JOURNAL region at the START of the tails (version + 0x3F1-framed Quest_c list), modeled from
-		// the recovered FullPlayerCharacterIIR grammar (docs/re/fullplayer-snapshot-reader.md) instead of an opaque
-		// header+string blob. Replaces the former Header0/Unknown*/RemoteFormat* fields, which were really the
-		// first Quest_c record's header + its 5 <remoteformat> strings.
-		public QuestcRegion Quests { get; init; } = new QuestcRegion();
-
-		// The quest INDEX region (the [0x3F1] index + the "W6QT" goal-id table) between the @609 objective region and
-		// the access-window table; modeled by QuestIndexRegion. Null when not present (then it rides UnknownBefore).
-		public QuestIndexRegion? QuestIndex { get; init; }
-
-		public SubClassPostAccessBlock? PostAccessBlock { get; init; }
 
 		// Back-compat shim: the lead quest's STATE word (@20). World entry historically patched the live
 		// character "level" here - the field is actually the first Quest_c record's state (for a fresh beach
@@ -1032,12 +1032,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	public sealed class PfAccessWindowEntry
 	{
 		public uint PlayfieldId { get; init; }
+
+		public PfAccessWindowChild? Child { get; init; }
 		public byte ChildMode { get; init; }
 
 		public byte SectionOrTier { get; init; }
 		public int Offset { get; init; }
-
-		public PfAccessWindowChild? Child { get; init; }
 
 		public string InternalName { get; init; } = null!;
 
@@ -1059,12 +1059,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 	public sealed class PfAccessWindowChild
 	{
+		public List<PfAccessWindowChildDetail> Details { get; init; } = [];
 		public bool HasDetails => Details.Count != 0;
 		public byte Variant { get; init; }
 
 		public byte? DetailsMode { get; init; }
-
-		public List<PfAccessWindowChildDetail> Details { get; init; } = [];
 
 		public uint? Id { get; init; }
 
@@ -1092,9 +1091,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 	public sealed class PfAccessWindowChildDetail
 	{
-		public byte DetailsMode { get; init; }
-
 		public byte DetailUnknown { get; init; }
+		public byte DetailsMode { get; init; }
 
 		public string DisplayName { get; init; } = null!;
 
@@ -1114,13 +1112,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		private const int RepeatedBlockOffset = 148;
 		private const int RepeatedBlockStartIndex = 35;
 
-		public byte[] Trailer { get; init; } = [];
-
 		public List<uint> Values { get; init; } = [];
 
 		public SubClassPostAccessLayout? Layout { get; init; }
 
 		public SubClassRepeatedUInt32Run? LargestAdjacentRepeatedRun { get; init; }
+
+		public byte[] Trailer { get; init; } = [];
 
 		public uint BlockType { get; init; }
 
@@ -1407,8 +1405,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 	public sealed class SubClassPostAccessLayout
 	{
-		public int RepeatCount { get; init; }
-
 		public List<uint> FooterValues { get; init; } = [];
 		public List<uint> PrefixValues { get; init; } = [];
 
@@ -1444,6 +1440,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		///     so write-back stays lossless while the exact stat table format is decoded.
 		/// </summary>
 		public List<uint> RepeatedValues { get; init; } = [];
+
+		public int RepeatCount { get; init; }
 	}
 
 	public sealed class SubClassRepeatedUInt32Run

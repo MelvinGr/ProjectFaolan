@@ -20,6 +20,13 @@ namespace Faolan.Importer.Extractors
 	// unconditional regardless of capture.
 	public static class ConversationConditions
 	{
+		// RequiredContextId = the quest that must have been ACTIVE at the captured greeting (ConversationEntry.
+		// QuestContextId) for this rule to apply; AnyContext (-1) = apply regardless. This splits ONE capture that talks
+		// to an NPC at several chain stages into per-state rows (#264): the Hoxxling gameplay capture talks to Casilda
+		// both at the offer AND after you have the key, both as the "" greeting - only the captured quest state tells
+		// them apart.
+		private const long AnyContext = -1;
+
 		// Casilda gives the "Casilda" quest, id 13479 (capture: …randochar-login-get-casilda-quest, QuestFullUpdate
 		// 0x63268258 id=13479 after the ApproachCasilda destiny step). Her dialogue + her chained/unchained state flip
 		// on it. (Separate from the "Shipwrecked" quest, given after the Kalanthes conversation — id not yet captured.)
@@ -37,13 +44,6 @@ namespace Faolan.Importer.Extractors
 		// The Casilda chain (#261/#264): 13479 (kill) -> 13563 (loot) -> 13480 (free) -> 12407 (escort). She is
 		// "freed" when 13480 is completed; her dialogue flips per chain stage.
 		private const uint CasildaFreeQuest = 13480;
-
-		// RequiredContextId = the quest that must have been ACTIVE at the captured greeting (ConversationEntry.
-		// QuestContextId) for this rule to apply; AnyContext (-1) = apply regardless. This splits ONE capture that talks
-		// to an NPC at several chain stages into per-state rows (#264): the Hoxxling gameplay capture talks to Casilda
-		// both at the offer AND after you have the key, both as the "" greeting - only the captured quest state tells
-		// them apart.
-		private const long AnyContext = -1;
 
 		private static readonly List<(string CaptureBaseName, string NpcName, long RequiredContextId, uint? ConditionQuestId, QuestState? ConditionQuestState)> Rules =
 		[

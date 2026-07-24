@@ -5,6 +5,10 @@ namespace Faolan.Core.Network.Codecs.World
 {
 	public sealed class MoveTaskNode : ICodec<MoveTaskNode>
 	{
+		public List<MoveTaskNode> Children { get; set; } = [];
+
+		public List<uint> Waypoints { get; set; } = []; // else branch: 3 u32 per waypoint
+
 		// mode 3 Jump / 11 GroundAlign / 5 Ballistic-flag
 		public byte Flag { get; set; }
 
@@ -19,8 +23,6 @@ namespace Faolan.Core.Network.Codecs.World
 		public byte PathFlags { get; set; }
 		public byte TrailerByte { get; set; } // a3e400 [u8][7 u32]
 		public byte[] ApproachTail { get; set; } = new byte[10]; // [u8 1][9 zero bytes]
-		public List<MoveTaskNode> Children { get; set; } = [];
-		public List<uint> Waypoints { get; set; } = []; // else branch: 3 u32 per waypoint
 		public uint ApproachTarget { get; set; }
 
 		// mode 8 approach

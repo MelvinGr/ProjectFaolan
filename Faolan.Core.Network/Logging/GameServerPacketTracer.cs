@@ -28,8 +28,8 @@ namespace Faolan.Core.Network.Logging
 				return;
 			}
 
-			Logger.LogPacketWithSubOpcode(direction, ChannelName, opcodeName, PacketLogFormatter.OpcodeName(typeof(GameServer0X2000Opcodes), iir), payloadLength, rpc.Body.Length,
-				rpc.FrameLength, ("headerData", rpc.HeaderData), ("body", rpc.Body));
+			Logger.LogPacketWithSubOpcode(direction, ChannelName, opcodeName, PacketLogFormatter.OpcodeName(typeof(GameServer0X2000Opcodes), iir), payloadLength, rpc.Body.Length, rpc.FrameLength,
+				("headerData", rpc.HeaderData), ("body", rpc.Body));
 		}
 
 		// A PassBlob carrier's body starts [u32 payloadLength][u32 iirType]. Gated on the receiver CLASS as well as the

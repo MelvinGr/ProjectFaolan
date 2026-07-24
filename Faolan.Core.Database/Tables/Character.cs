@@ -47,12 +47,6 @@ namespace Faolan.Core.Database.Tables
 		// entry only when the destination map allows mounts (Map.PlayfieldFlags mount bit).
 		public uint? MountId { get; set; }
 
-		// #400: which of the two swappable weapon LOADOUTS (WeaponSet.Primary = equip slots 6/8, Secondary = 20/21)
-		// the character currently has drawn. Toggled by the SwitchWeaponsButton action (0x2E, capture-confirmed as the
-		// SET switch) and persisted so BOTH the drawn set and the login-time gear-stat aggregation (which counts only
-		// the ACTIVE set's weapons, CharacterEquipment.StatBearingItemIds) survive relog. Default Primary.
-		public WeaponSet ActiveWeaponSet { get; set; }
-
 		// Required: set on creation (CreateCharacter) and by the capture importer.
 		public uint RealmId { get; set; }
 
@@ -96,17 +90,6 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<CharacterSpell> Spells { get; set; } = [];
 		public virtual ICollection<CharacterTag> Tags { get; set; } = [];
 
-		// True once a bind point has been set (an unbound character recalls to / reports its current map).
-		[NotMapped]
-		public bool HasBind => BindRespawnPointId.HasValue;
-
-		// True while the character is DEAD and awaiting resurrection (#214). Persisted so a player who logs out
-		// dead returns dead: the world-entry FullPlayerChar snapshot then carries current-health = 0 (the tails
-		// stat block's HealthCurrent stat 0x1B), which is what the retail client reads at SimpleChar construction
-		// to show the release/resurrect window (tools/capture/decode_death_snapshot.py). Set on death
-		// (WorldSimulation.TickPlayerDeaths), cleared on respawn (RespawnPlayer).
-		public bool IsDead { get; set; }
-
 		[ConstrainToEnumValues]
 		public Class Class { get; set; }
 
@@ -123,6 +106,23 @@ namespace Faolan.Core.Database.Tables
 		// the CHECK - a row created before the editor's ChangeSex (or in tests) still needs a valid sex.
 		[ConstrainToEnumValues]
 		public Sex Sex { get; set; } = Sex.Male;
+
+		// #400: which of the two swappable weapon LOADOUTS (WeaponSet.Primary = equip slots 6/8, Secondary = 20/21)
+		// the character currently has drawn. Toggled by the SwitchWeaponsButton action (0x2E, capture-confirmed as the
+		// SET switch) and persisted so BOTH the drawn set and the login-time gear-stat aggregation (which counts only
+		// the ACTIVE set's weapons, CharacterEquipment.StatBearingItemIds) survive relog. Default Primary.
+		public WeaponSet ActiveWeaponSet { get; set; }
+
+		// True once a bind point has been set (an unbound character recalls to / reports its current map).
+		[NotMapped]
+		public bool HasBind => BindRespawnPointId.HasValue;
+
+		// True while the character is DEAD and awaiting resurrection (#214). Persisted so a player who logs out
+		// dead returns dead: the world-entry FullPlayerChar snapshot then carries current-health = 0 (the tails
+		// stat block's HealthCurrent stat 0x1B), which is what the retail client reads at SimpleChar construction
+		// to show the release/resurrect window (tools/capture/decode_death_snapshot.py). Set on death
+		// (WorldSimulation.TickPlayerDeaths), cleared on respawn (RespawnPlayer).
+		public bool IsDead { get; set; }
 
 		[MaxLength(32)]
 		public string? AuthChallenge { get; set; }

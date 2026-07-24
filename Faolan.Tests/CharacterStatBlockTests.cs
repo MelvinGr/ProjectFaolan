@@ -13,19 +13,6 @@ namespace Faolan.Tests
 	public class CharacterStatBlockTests
 	{
 		[Fact]
-		public void Build_VitalsBlock_MatchesCapturedBytes()
-		{
-			// Captured packet sends the CURRENT ids (0x1B/0x1F8/0x1FA) - an entity announcing its full vitals on
-			// spawn (current == max at full health; ids in-client verified, see CharacterStatId).
-			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).Set(CharacterStatId.StaminaCurrent, 63).Set(CharacterStatId.ManaCurrent, 63);
-
-			Assert.Equal(3, block.Count);
-
-			// count(03) + HealthCurrent(001B)=189C + StaminaCurrent(01F8)=189C + ManaCurrent(01FA)=189C
-			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(block.ToArray()));
-		}
-
-		[Fact]
 		public void BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame()
 		{
 			// strickenbla combat capture frame 6424: the combat-mode (weapon-draw) update on beach mob 0x00002C56 the
@@ -39,11 +26,16 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Set_AppliesVitalsScale()
+		public void Build_VitalsBlock_MatchesCapturedBytes()
 		{
-			// HealthCurrent (0x001B) is a ×100 vital: display 63 -> raw 6300 (0x189C).
-			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63);
-			Assert.Equal("010000001b0000189c", ToHex(block.ToArray()));
+			// Captured packet sends the CURRENT ids (0x1B/0x1F8/0x1FA) - an entity announcing its full vitals on
+			// spawn (current == max at full health; ids in-client verified, see CharacterStatId).
+			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).Set(CharacterStatId.StaminaCurrent, 63).Set(CharacterStatId.ManaCurrent, 63);
+
+			Assert.Equal(3, block.Count);
+
+			// count(03) + HealthCurrent(001B)=189C + StaminaCurrent(01F8)=189C + ManaCurrent(01FA)=189C
+			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(block.ToArray()));
 		}
 
 		[Fact]
@@ -53,6 +45,14 @@ namespace Faolan.Tests
 
 			// count(01) + Level(0036) = 25 (0x19), unscaled
 			Assert.Equal("010000003600000019", ToHex(block.ToArray()));
+		}
+
+		[Fact]
+		public void Set_AppliesVitalsScale()
+		{
+			// HealthCurrent (0x001B) is a ×100 vital: display 63 -> raw 6300 (0x189C).
+			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63);
+			Assert.Equal("010000001b0000189c", ToHex(block.ToArray()));
 		}
 
 		[Fact]

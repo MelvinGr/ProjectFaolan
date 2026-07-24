@@ -12,11 +12,6 @@ namespace Faolan.Importer.Extractors
 	public sealed record NpcSpawnEntry(uint MapId, string Name, uint Handle, float X, float Y, float Z, byte[] Data)
 	{
 		public uint TemplateId { get; init; }
-		public bool HasEquipment { get; init; }
-		public float RotW { get; init; }
-		public float RotX { get; init; }
-		public float RotY { get; init; }
-		public float RotZ { get; init; }
 
 		// The humanoid appearance/morph table lifted from the post-IIR (#185), empty for animals. Lets the spawn's
 		// post-IIR generate from rows instead of the Data blob.
@@ -25,6 +20,11 @@ namespace Faolan.Importer.Extractors
 		// The worn equipment lifted from the CharacterIIR f23 (#185), empty for unarmed NPCs and for any NPC whose
 		// items don't match the reproducible ProtoAcgItem shape (then equipment stays sourced from the Data blob).
 		public IReadOnlyList<NpcSpawnEquipment> Equipment { get; init; } = [];
+		public bool HasEquipment { get; init; }
+		public float RotW { get; init; }
+		public float RotX { get; init; }
+		public float RotY { get; init; }
+		public float RotZ { get; init; }
 
 		// NpcStats.community = the faction id: 0 = neutral/friendly, > 0 = a hostile faction (drives aggro hostility).
 		public uint Community { get; init; }

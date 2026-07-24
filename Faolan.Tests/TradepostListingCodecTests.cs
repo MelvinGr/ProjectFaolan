@@ -19,6 +19,19 @@ namespace Faolan.Tests
 		                                    "1a140de5971bd61556c078261d9280fde2255a5c7bf125970a3e002d970a3e0038014500000000";
 
 		[Fact]
+		public void BuildThenParse_RoundTrips()
+		{
+			var listing = JockoListing();
+			var body = TradepostListingCodec.Build(0x7e2, [listing]);
+
+			var row = TradepostListingCodec.Parse(body).Rows.Single();
+
+			Assert.Equal(listing.SaleId, row.SaleId);
+			Assert.Equal(listing.Price, row.Price);
+			Assert.Equal(listing.SellerName, row.Seller);
+		}
+
+		[Fact]
 		public void Build_MatchesCapturedRow()
 		{
 			var body = TradepostListingCodec.Build(0x7e2, [JockoListing()]);
@@ -42,19 +55,6 @@ namespace Faolan.Tests
 			Assert.Equal(5, rows.Count);
 			Assert.Equal(5, rows.Select(r => r.Handle).Distinct().Count());
 			Assert.Equal(5, rows.Select(r => r.ItemHandle).Distinct().Count());
-		}
-
-		[Fact]
-		public void BuildThenParse_RoundTrips()
-		{
-			var listing = JockoListing();
-			var body = TradepostListingCodec.Build(0x7e2, [listing]);
-
-			var row = TradepostListingCodec.Parse(body).Rows.Single();
-
-			Assert.Equal(listing.SaleId, row.SaleId);
-			Assert.Equal(listing.Price, row.Price);
-			Assert.Equal(listing.SellerName, row.Seller);
 		}
 
 		[Fact]

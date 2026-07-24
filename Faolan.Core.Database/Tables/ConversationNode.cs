@@ -10,6 +10,16 @@ namespace Faolan.Core.Database.Tables
 	// ConversationReplay (which routes a live KnubotAnswer index along the AnswerPath).
 	public class ConversationNode : BaseEntity
 	{
+		// The QUEST-STATE gate for this screen variant - how the SAME (NpcName, TypeId, AnswerPath) serves different
+		// dialogue by quest state (e.g. Casilda's pre- vs post-first-quest greeting). NULL = unconditional (the fallback).
+		// When set, the variant applies only while the player holds quest ConditionQuestId in state ConditionQuestState
+		// (Active = accepted-not-completed, Completed = turned in). The runtime picks the first variant whose gate passes,
+		// else the unconditional one. The importer tags each captured variant with the state it was captured in
+		// (ConversationConditions). Replaced the old free-form Lua condition source (issue #37); the two shapes retail's
+		// Lua actually used - HasCompletedQuest(X) and HasQuest(X) and not HasCompletedQuest(X) - are exactly these two
+		// columns, so no interpreter is needed.
+		public uint? ConditionQuestId { get; set; }
+
 		// The RDB quest id this screen GRANTS when reached (NULL = none). Harvested from the captures: a QuestFullUpdate /
 		// QuestIIR-add for a quest arrived while this screen's responses were being collected (i.e. the player walked
 		// the accept branch). When the runtime serves this screen it persists the quest (active) for the player and
@@ -34,23 +44,13 @@ namespace Faolan.Core.Database.Tables
 
 		public uint TypeId { get; set; }
 		public virtual ICollection<ConversationPacket> Packets { get; set; } = [];
+		public QuestState? ConditionQuestState { get; set; }
 
 		// The answer-index path to this screen within the NPC's dialogue: "" = the greeting, "0" = after picking
 		// option 0, "0>1" = then option 1, ... The runtime tracks the live player's path and serves the matching
 		// screen. This is the STABLE branch key (the old Mode/Field3 were session-volatile counters).
 		[MaxLength(128)]
 		public string AnswerPath { get; set; } = null!;
-
-		// The QUEST-STATE gate for this screen variant - how the SAME (NpcName, TypeId, AnswerPath) serves different
-		// dialogue by quest state (e.g. Casilda's pre- vs post-first-quest greeting). NULL = unconditional (the fallback).
-		// When set, the variant applies only while the player holds quest ConditionQuestId in state ConditionQuestState
-		// (Active = accepted-not-completed, Completed = turned in). The runtime picks the first variant whose gate passes,
-		// else the unconditional one. The importer tags each captured variant with the state it was captured in
-		// (ConversationConditions). Replaced the old free-form Lua condition source (issue #37); the two shapes retail's
-		// Lua actually used - HasCompletedQuest(X) and HasQuest(X) and not HasCompletedQuest(X) - are exactly these two
-		// columns, so no interpreter is needed.
-		public uint? ConditionQuestId { get; set; }
-		public QuestState? ConditionQuestState { get; set; }
 
 		// The NPC's name, resolved at import from the captured FA015807 spawn with this handle. Display/routing hint;
 		// the runtime now gates on NpcTemplateId (below), not the name alone.

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
@@ -22,38 +21,91 @@ namespace Faolan.Tests
 	// tracer, the one tier that renders the extra IIR sub-opcode on top of that shared line.
 	public class PacketTraceTests
 	{
-		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
 		private static readonly ProtoEndpoint Receiver = Endpoints.Endpoint(Endpoints.GameInterfaceType, 0x0012D687);
+		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
 
-		public static IEnumerable<object[]> Cases()
+		// The IIR sub-opcode is a property of the GameAgent/GameInterface class pair, NOT of the number 0x2000: on every
+		// other RPC class 0x2000 is a different method whose body would be misread as an [payloadLength][iir] header.
+		[Fact]
+		public void Opcode0x2000_OnAnotherClass_IsNotReadAsAnIirCarrier()
 		{
-			// A PassBlob (IIR) carrier: [u32 payloadLen][u32 subOpcode][payload] - exercises the sub-opcode branch.
-			yield return
-			[
-				new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
-					(FaolanStream body) => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.StatUpdateIIR).WriteUInt32(0x0000C350).WriteUInt32(0x0012D687)))
-			];
+			var capture = new CapturingLogger();
+			var tracer = Tracer(capture);
 
-			// A non-PassBlob carrier with a plain byte body (no sub-opcode branch).
-			yield return
-			[
-				new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceOpcodes.DispatchUpdateCash,
-					(byte[]) [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00, 0x00, 0x01])
-			];
+			var rpc = new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceOpcodes.DispatchUpdateAggroStatus,
+				(byte[])[0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44]);
 
-			// A carrier that also carries interface HeaderData after the opcode.
-			yield return
-			[
-				new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob, (byte[]) [0xDE, 0xAD, 0xBE, 0xEF],
-					(byte[]) [0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44])
-			];
+			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
 
-			// An empty-body carrier.
-			yield return [new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob, ReadOnlyMemory<byte>.Empty)];
+			var line = Assert.Single(capture.Messages);
+			Assert.Contains("DispatchUpdateAggroStatus (0x2000)", line);
+			Assert.DoesNotContain("subOpcode=", line);
 		}
 
-		[Theory]
-		[MemberData(nameof(Cases))]
+		// A PassBlob carrier names the IIR it carries - in BOTH directions. The inbound trace used to drop it, so an
+		// inbound 0x2000 read as a bare "PassBlob" with no hint of which IIR the client had sent.
+		[Fact]
+		public void PassBlobCarrier_NamesItsIir_InBothDirections()
+		{
+			var capture = new CapturingLogger();
+			var tracer = Tracer(capture);
+
+			var rpc = new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), Endpoints.Endpoint(Endpoints.GameAgentType, 0x0012D687), GameAgentOpcodes.PassBlob,
+				body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
+
+			tracer.Received(Rpc.Parse(rpc.Serialize()));
+			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
+
+			Assert.All(capture.Messages, line =>
+			{
+				Assert.Contains($"subOpcode={nameof(GameServer0X2000Opcodes.MoveTaskIIR)}", line);
+				Assert.Contains("PassBlob (0x2000)", line);
+			});
+		}
+
+		// The IIR line shape belongs to the GameServer tier alone - it is the only one that multiplexes a sub-protocol
+		// inside a carrier. To a login-tier tracer the same body is opaque, so it renders the plain line.
+		[Fact]
+		public void PlainConanTracer_DoesNotReadABodyAsAnIirCarrier()
+		{
+			var capture = new CapturingLogger();
+			var tracer = new ConanPacketTracer(capture, "UniverseAgent", typeof(UniverseInterfaceOpcodes));
+
+			var rpc = new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
+				body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
+
+			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
+
+			var line = Assert.Single(capture.Messages);
+			Assert.Contains("DispatchPassBlob (0x2000)", line);
+			Assert.DoesNotContain("subOpcode=", line);
+		}
+
+		// THE unification gate: the same frame traced in both directions differs only by its direction tag. Naming,
+		// sub-opcode handling, lengths and the byte dump all come from the one render, so they cannot drift per
+		// direction (they used to: RX named through a different call path and dumped no headerData at all).
+		[Theory, MemberData(nameof(Cases))]
+		public void ReceivedAndTransmitted_RenderTheSameLineApartFromTheDirectionTag(Rpc rpc)
+		{
+			WithByteDump(() =>
+			{
+				var capture = new CapturingLogger();
+				var tracer = Tracer(capture);
+
+				var wire = rpc.Serialize();
+				var inbound = Rpc.Parse(wire); // an RX-shaped Rpc: FrameLength stamped by the parser
+
+				tracer.Transmitted(Sent(rpc, wire));
+				tracer.Received(in inbound);
+
+				Assert.Equal(2, capture.Messages.Count);
+				Assert.StartsWith($"{PacketLogFormatter.Transmitted} ", capture.Messages[0]);
+				Assert.StartsWith($"{PacketLogFormatter.Received} ", capture.Messages[1]);
+				Assert.Equal(capture.Messages[0][PacketLogFormatter.Transmitted.Length..], capture.Messages[1][PacketLogFormatter.Received.Length..]);
+			});
+		}
+
+		[Theory, MemberData(nameof(Cases))]
 		public void Transmitted_RendersTheFramesRealFields(Rpc rpc)
 		{
 			WithByteDump(() =>
@@ -80,93 +132,37 @@ namespace Faolan.Tests
 			});
 		}
 
-		// THE unification gate: the same frame traced in both directions differs only by its direction tag. Naming,
-		// sub-opcode handling, lengths and the byte dump all come from the one render, so they cannot drift per
-		// direction (they used to: RX named through a different call path and dumped no headerData at all).
-		[Theory]
-		[MemberData(nameof(Cases))]
-		public void ReceivedAndTransmitted_RenderTheSameLineApartFromTheDirectionTag(Rpc rpc)
+		public static IEnumerable<object[]> Cases()
 		{
-			WithByteDump(() =>
-			{
-				var capture = new CapturingLogger();
-				var tracer = Tracer(capture);
+			// A PassBlob (IIR) carrier: [u32 payloadLen][u32 subOpcode][payload] - exercises the sub-opcode branch.
+			yield return
+			[
+				new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
+					body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.StatUpdateIIR).WriteUInt32(0x0000C350).WriteUInt32(0x0012D687)))
+			];
 
-				var wire = rpc.Serialize();
-				var inbound = Rpc.Parse(wire); // an RX-shaped Rpc: FrameLength stamped by the parser
+			// A non-PassBlob carrier with a plain byte body (no sub-opcode branch).
+			yield return
+			[
+				new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceOpcodes.DispatchUpdateCash,
+					(byte[])[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00, 0x00, 0x01])
+			];
 
-				tracer.Transmitted(Sent(rpc, wire));
-				tracer.Received(in inbound);
+			// A carrier that also carries interface HeaderData after the opcode.
+			yield return [new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob, (byte[])[0xDE, 0xAD, 0xBE, 0xEF], (byte[])[0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44])];
 
-				Assert.Equal(2, capture.Messages.Count);
-				Assert.StartsWith($"{PacketLogFormatter.Transmitted} ", capture.Messages[0]);
-				Assert.StartsWith($"{PacketLogFormatter.Received} ", capture.Messages[1]);
-				Assert.Equal(capture.Messages[0][PacketLogFormatter.Transmitted.Length..], capture.Messages[1][PacketLogFormatter.Received.Length..]);
-			});
-		}
-
-		// A PassBlob carrier names the IIR it carries - in BOTH directions. The inbound trace used to drop it, so an
-		// inbound 0x2000 read as a bare "PassBlob" with no hint of which IIR the client had sent.
-		[Fact]
-		public void PassBlobCarrier_NamesItsIir_InBothDirections()
-		{
-			var capture = new CapturingLogger();
-			var tracer = Tracer(capture);
-
-			var rpc = new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), Endpoints.Endpoint(Endpoints.GameAgentType, 0x0012D687), GameAgentOpcodes.PassBlob,
-				(FaolanStream body) => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
-
-			tracer.Received(Rpc.Parse(rpc.Serialize()));
-			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
-
-			Assert.All(capture.Messages, line =>
-			{
-				Assert.Contains($"subOpcode={nameof(GameServer0X2000Opcodes.MoveTaskIIR)}", line);
-				Assert.Contains("PassBlob (0x2000)", line);
-			});
-		}
-
-		// The IIR sub-opcode is a property of the GameAgent/GameInterface class pair, NOT of the number 0x2000: on every
-		// other RPC class 0x2000 is a different method whose body would be misread as an [payloadLength][iir] header.
-		[Fact]
-		public void Opcode0x2000_OnAnotherClass_IsNotReadAsAnIirCarrier()
-		{
-			var capture = new CapturingLogger();
-			var tracer = Tracer(capture);
-
-			var rpc = new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceOpcodes.DispatchUpdateAggroStatus,
-				(byte[]) [0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44]);
-
-			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
-
-			var line = Assert.Single(capture.Messages);
-			Assert.Contains("DispatchUpdateAggroStatus (0x2000)", line);
-			Assert.DoesNotContain("subOpcode=", line);
-		}
-
-		// The IIR line shape belongs to the GameServer tier alone - it is the only one that multiplexes a sub-protocol
-		// inside a carrier. To a login-tier tracer the same body is opaque, so it renders the plain line.
-		[Fact]
-		public void PlainConanTracer_DoesNotReadABodyAsAnIirCarrier()
-		{
-			var capture = new CapturingLogger();
-			var tracer = new ConanPacketTracer(capture, "UniverseAgent", typeof(UniverseInterfaceOpcodes));
-
-			var rpc = new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
-				(FaolanStream body) => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
-
-			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
-
-			var line = Assert.Single(capture.Messages);
-			Assert.Contains("DispatchPassBlob (0x2000)", line);
-			Assert.DoesNotContain("subOpcode=", line);
+			// An empty-body carrier.
+			yield return [new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob, ReadOnlyMemory<byte>.Empty)];
 		}
 
 		// What the transport hands the tracer for a send: the built Rpc with the serialized frame's size stamped on it
 		// (NetworkClient.SendAsync does exactly this), so a TX line reads its whole shape off the message like an RX one.
 		private static Rpc Sent(Rpc rpc, byte[] wire)
 		{
-			return rpc with { FrameLength = wire.Length };
+			return rpc with
+			{
+				FrameLength = wire.Length
+			};
 		}
 
 		private static GameServerPacketTracer Tracer(ILogger logger)

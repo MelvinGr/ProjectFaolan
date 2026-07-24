@@ -433,11 +433,11 @@ namespace Faolan.Core.Rdb.Assets
 			var min = Enumerable.Repeat(float.MaxValue, comps).ToArray();
 			var max = Enumerable.Repeat(float.MinValue, comps).ToArray();
 			for (var i = 0; i < data.Length; i += comps)
-				for (var c = 0; c < comps; c++)
-				{
-					min[c] = Math.Min(min[c], data[i + c]);
-					max[c] = Math.Max(max[c], data[i + c]);
-				}
+			for (var c = 0; c < comps; c++)
+			{
+				min[c] = Math.Min(min[c], data[i + c]);
+				max[c] = Math.Max(max[c], data[i + c]);
+			}
 
 			return (min, max);
 		}

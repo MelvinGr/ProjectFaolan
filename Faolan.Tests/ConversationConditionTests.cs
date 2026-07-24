@@ -11,6 +11,35 @@ namespace Faolan.Tests
 	// onto (X, Completed) and (X, Active), so the gate is a plain state match, no interpreter.
 	public class ConversationConditionTests
 	{
+		[Fact]
+		public void ActiveGate_MatchesOnlyWhileInProgress()
+		{
+			var gate = Gate(13479, QuestState.Active);
+
+			Assert.True(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Active)]));
+			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Completed)])); // already turned in
+			Assert.False(ConversationService.QuestConditionMet(gate, [])); // not accepted
+		}
+
+		[Fact]
+		public void CompletedGate_MatchesOnlyWhenCompleted()
+		{
+			var gate = Gate(13480, QuestState.Completed);
+
+			Assert.True(ConversationService.QuestConditionMet(gate, [Held(13480, QuestState.Completed)]));
+			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13480, QuestState.Active)])); // has it, not done
+			Assert.False(ConversationService.QuestConditionMet(gate, [])); // doesn't have it
+		}
+
+		[Fact]
+		public void Gate_IsQuestSpecific()
+		{
+			var gate = Gate(13480, QuestState.Completed);
+
+			// Completing a DIFFERENT quest must not satisfy this gate.
+			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Completed)]));
+		}
+
 		private static ConversationNode Gate(uint questId, QuestState state)
 		{
 			return new ConversationNode
@@ -27,35 +56,6 @@ namespace Faolan.Tests
 				QuestId = questId,
 				State = state
 			};
-		}
-
-		[Fact]
-		public void CompletedGate_MatchesOnlyWhenCompleted()
-		{
-			var gate = Gate(13480, QuestState.Completed);
-
-			Assert.True(ConversationService.QuestConditionMet(gate, [Held(13480, QuestState.Completed)]));
-			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13480, QuestState.Active)])); // has it, not done
-			Assert.False(ConversationService.QuestConditionMet(gate, [])); // doesn't have it
-		}
-
-		[Fact]
-		public void ActiveGate_MatchesOnlyWhileInProgress()
-		{
-			var gate = Gate(13479, QuestState.Active);
-
-			Assert.True(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Active)]));
-			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Completed)])); // already turned in
-			Assert.False(ConversationService.QuestConditionMet(gate, [])); // not accepted
-		}
-
-		[Fact]
-		public void Gate_IsQuestSpecific()
-		{
-			var gate = Gate(13480, QuestState.Completed);
-
-			// Completing a DIFFERENT quest must not satisfy this gate.
-			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Completed)]));
 		}
 	}
 }

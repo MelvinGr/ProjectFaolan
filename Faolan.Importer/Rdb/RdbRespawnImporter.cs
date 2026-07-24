@@ -186,6 +186,16 @@ namespace Faolan.Importer.Rdb
 			return null;
 		}
 
+		// A variant copy of a real playfield (the RIVERS/AUDIO/"BA sounds"/"FPS test" duplicates, e.g. "Tortage Island
+		// - RIVERS_AUDIO"). These are the only maps that legitimately duplicate another map's resurrection Guids; no
+		// real gameplay playfield name carries these tokens, and the check only decides a same-Guid COLLISION, so a
+		// mis-tagged audio/test map can never lose a point it doesn't share with a real map.
+		private static bool IsVariantMap(string name)
+		{
+			return name.Contains("RIVERS", StringComparison.OrdinalIgnoreCase) || name.Contains("AUDIO", StringComparison.OrdinalIgnoreCase) ||
+			       name.Contains("BA sounds", StringComparison.OrdinalIgnoreCase) || name.Contains("FPS test", StringComparison.OrdinalIgnoreCase);
+		}
+
 		// #374 collision ranking: true when the map that already owns a Guid this run (`current`) is as-good-or-better
 		// than the `candidate` re-claiming it, so the current owner is KEPT. Rank = (isVariant ? 1 : 0, mapId), lower
 		// wins - a real playfield (0) beats a variant copy (1); among equals the lowest map id wins for stability.
@@ -194,28 +204,18 @@ namespace Faolan.Importer.Rdb
 			return Rank(current, names).CompareTo(Rank(candidate, names)) <= 0;
 		}
 
-		private static (int Variant, uint Id) Rank(uint mapId, IReadOnlyDictionary<uint, string> names)
-		{
-			return (IsVariantMap(names.GetValueOrDefault(mapId, "")) ? 1 : 0, mapId);
-		}
-
-		// A variant copy of a real playfield (the RIVERS/AUDIO/"BA sounds"/"FPS test" duplicates, e.g. "Tortage Island
-		// - RIVERS_AUDIO"). These are the only maps that legitimately duplicate another map's resurrection Guids; no
-		// real gameplay playfield name carries these tokens, and the check only decides a same-Guid COLLISION, so a
-		// mis-tagged audio/test map can never lose a point it doesn't share with a real map.
-		private static bool IsVariantMap(string name)
-		{
-			return name.Contains("RIVERS", StringComparison.OrdinalIgnoreCase)
-				|| name.Contains("AUDIO", StringComparison.OrdinalIgnoreCase)
-				|| name.Contains("BA sounds", StringComparison.OrdinalIgnoreCase)
-				|| name.Contains("FPS test", StringComparison.OrdinalIgnoreCase);
-		}
-
 		private static float Num(Match m, string name)
 		{
 			return float.TryParse(Attr(m, name), NumberStyles.Float, CultureInfo.InvariantCulture, out var v)
 				? v
 				: 0f;
+		}
+
+		private static (int Variant, uint Id) Rank(uint mapId, IReadOnlyDictionary<uint, string> names)
+		{
+			return (IsVariantMap(names.GetValueOrDefault(mapId, ""))
+				? 1
+				: 0, mapId);
 		}
 
 		public readonly record struct Result(int Maps, int Points, int Empty, int FetchFailed);

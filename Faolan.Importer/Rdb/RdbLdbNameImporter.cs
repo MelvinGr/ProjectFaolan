@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -26,18 +27,16 @@ namespace Faolan.Importer.Rdb
 	//           need the item record's name-id field decoded first - a follow-up, see docs/rdb/ldb-string-index.md.)
 	public static class RdbLdbNameImporter
 	{
-		private const uint LdbType = 1030002;
-		private const int MinOverlap = 50;       // need enough shared ids to trust a page's language verdict
 		private const int EnglishMatchPercent = 80;
+		private const int MinOverlap = 50; // need enough shared ids to trust a page's language verdict
+		private const uint LdbType = 1030002;
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string proxyBase, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
 
-			var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "")
-				.ToDictionaryAsync(s => s.Id, s => Norm(s.Name!));
-			var itemNames = await db.Items.Where(i => i.Name != null && i.Name != "")
-				.ToDictionaryAsync(i => i.Id, i => Norm(i.Name!));
+			var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "").ToDictionaryAsync(s => s.Id, s => Norm(s.Name!));
+			var itemNames = await db.Items.Where(i => i.Name != null && i.Name != "").ToDictionaryAsync(i => i.Id, i => Norm(i.Name!));
 
 			// One pass over the LDB: bucket the name-category pages we care about as id->string.
 			var spellPages = new List<Dictionary<uint, string>>();
@@ -45,17 +44,28 @@ namespace Faolan.Importer.Rdb
 			foreach (var e in rdb.EntriesOfType(LdbType).Where(x => x.IsLocal))
 			{
 				byte[] body;
-				try { body = rdb.ReadDecompressed(e); }
-				catch { continue; }
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue;
+				}
+
 				var cat = LdbStringIndex.CategoryOf(body);
 				if (cat != LdbStringIndex.SpellNameCategory && cat != LdbStringIndex.ItemNameCategory)
 					continue;
+
 				var ids = new Dictionary<uint, string>();
 				foreach (var entry in LdbStringIndex.Parse(body))
 					ids[entry.Id] = entry.Value;
 				if (ids.Count == 0)
 					continue;
-				(cat == LdbStringIndex.SpellNameCategory ? spellPages : itemPages).Add(ids);
+
+				(cat == LdbStringIndex.SpellNameCategory
+					? spellPages
+					: itemPages).Add(ids);
 			}
 
 			var spellEnglish = EnglishNames(spellPages, spellNames);
@@ -65,39 +75,12 @@ namespace Faolan.Importer.Rdb
 			var itemsFilled = await BackfillAsync(db.Items, i => i.Id, (i, n) => i.Name = n, itemEnglish);
 
 			await db.SaveChangesAsync();
-			logger?.LogInformation("RdbLdbNameImporter: spell English={SpellEng} (filled {SpellFill}); item English={ItemEng} (filled {ItemFill}).",
-				spellEnglish.Count, spellsFilled, itemEnglish.Count, itemsFilled);
+			logger?.LogInformation("RdbLdbNameImporter: spell English={SpellEng} (filled {SpellFill}); item English={ItemEng} (filled {ItemFill}).", spellEnglish.Count, spellsFilled,
+				itemEnglish.Count, itemsFilled);
 			return new Result(spellEnglish.Count, spellsFilled, itemEnglish.Count, itemsFilled);
 		}
 
-		// The union of every page that cribs clean (>= EnglishMatchPercent over >= MinOverlap shared ids) against the
-		// catalog's existing names - i.e. the English page(s), which partition the id space. Empty if none cribs clean.
-		private static Dictionary<uint, string> EnglishNames(List<Dictionary<uint, string>> pages, Dictionary<uint, string> known)
-		{
-			var english = new Dictionary<uint, string>();
-			foreach (var page in pages)
-			{
-				int overlap = 0, match = 0;
-				foreach (var (id, str) in page)
-					if (known.TryGetValue(id, out var name))
-					{
-						overlap++;
-						if (Norm(str) == name)
-							match++;
-					}
-
-				if (overlap < MinOverlap || match * 100 / overlap < EnglishMatchPercent)
-					continue;
-
-				foreach (var (id, str) in page)
-					english[id] = str;
-			}
-
-			return english;
-		}
-
-		private static async Task<int> BackfillAsync<T>(DbSet<T> set, Func<T, uint> idOf, Action<T, string> setName, Dictionary<uint, string> english)
-			where T : class
+		private static async Task<int> BackfillAsync<T>(DbSet<T> set, Func<T, uint> idOf, Action<T, string> setName, Dictionary<uint, string> english) where T : class
 		{
 			if (english.Count == 0)
 				return 0;
@@ -116,13 +99,41 @@ namespace Faolan.Importer.Rdb
 			return filled;
 		}
 
+		// The union of every page that cribs clean (>= EnglishMatchPercent over >= MinOverlap shared ids) against the
+		// catalog's existing names - i.e. the English page(s), which partition the id space. Empty if none cribs clean.
+		private static Dictionary<uint, string> EnglishNames(List<Dictionary<uint, string>> pages, Dictionary<uint, string> known)
+		{
+			var english = new Dictionary<uint, string>();
+			foreach (var page in pages)
+			{
+				int overlap = 0, match = 0;
+				foreach (var (id, str) in page)
+				{
+					if (known.TryGetValue(id, out var name))
+					{
+						overlap++;
+						if (Norm(str) == name)
+							match++;
+					}
+				}
+
+				if (overlap < MinOverlap || match * 100 / overlap < EnglishMatchPercent)
+					continue;
+
+				foreach (var (id, str) in page)
+					english[id] = str;
+			}
+
+			return english;
+		}
+
 		private static bool IsEmptyName(object row)
 		{
 			var name = row switch
 			{
-				Core.Database.Tables.Spell s => s.Name,
-				Core.Database.Tables.Item i => i.Name,
-				_ => null
+				Spell s => s.Name,
+				Item i  => i.Name,
+				_       => null
 			};
 			return string.IsNullOrEmpty(name);
 		}

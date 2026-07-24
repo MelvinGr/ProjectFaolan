@@ -192,17 +192,6 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void NonHostileNpc_DoesNotAttack()
-		{
-			var world = new WorldState();
-			var zone = world.ZoneFor(4010);
-			zone.Add(NpcTemplate(1, 0, 0, hostile: false)); // a quest-giver / vendor
-			zone.Add(Player(2, 3, 0)); // right next to it
-
-			Assert.Empty(NonHeartbeat(world.Tick(WorldState.NpcAttackInterval)));
-		}
-
-		[Fact]
 		public void NoPlayerInRange_NoAttack()
 		{
 			var world = new WorldState();
@@ -211,6 +200,17 @@ namespace Faolan.Tests
 			zone.Add(Player(2, 1000, 1000)); // far away
 
 			Assert.Empty(NonHeartbeat(world.Tick(WorldState.NpcAttackInterval * 2)));
+		}
+
+		[Fact]
+		public void NonHostileNpc_DoesNotAttack()
+		{
+			var world = new WorldState();
+			var zone = world.ZoneFor(4010);
+			zone.Add(NpcTemplate(1, 0, 0, hostile: false)); // a quest-giver / vendor
+			zone.Add(Player(2, 3, 0)); // right next to it
+
+			Assert.Empty(NonHeartbeat(world.Tick(WorldState.NpcAttackInterval)));
 		}
 
 		[Fact]

@@ -2,9 +2,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Faolan.Core.Enums;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
@@ -176,20 +176,13 @@ namespace Faolan.GameServer.Dialogue
 
 				if (QuestConditionMet(v, quests))
 				{
-					_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant (quest {Quest} {State}).", npcName, answerPath, v.ConditionQuestId, v.ConditionQuestState);
+					_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant (quest {Quest} {State}).", npcName, answerPath, v.ConditionQuestId,
+						v.ConditionQuestState);
 					return v;
 				}
 			}
 
 			return fallback;
-		}
-
-		// A conditioned variant applies when the player holds ConditionQuestId in state ConditionQuestState - the two
-		// shapes retail's dialogue Lua actually used: HasCompletedQuest(X) == (X, Completed), and HasQuest(X) and not
-		// HasCompletedQuest(X) == (X, Active). Kept internal-static so ConversationConditionTests can pin the gate.
-		internal static bool QuestConditionMet(ConversationNode node, IReadOnlyCollection<CharacterQuest> quests)
-		{
-			return node.ConditionQuestId is { } questId && quests.Any(q => q.QuestId == questId && q.State == node.ConditionQuestState);
 		}
 
 		// Reaching a conversation node that GRANTS a quest accepts it for the player: persist it ACTIVE and return its
@@ -446,6 +439,14 @@ namespace Faolan.GameServer.Dialogue
 					: RemoteFormatXml.WithLivePlayer(screens[i], playerName, guildName ?? "");
 				return Encoding.Latin1.GetBytes(RemoteFormatXml.Build(screen));
 			}
+		}
+
+		// A conditioned variant applies when the player holds ConditionQuestId in state ConditionQuestState - the two
+		// shapes retail's dialogue Lua actually used: HasCompletedQuest(X) == (X, Completed), and HasQuest(X) and not
+		// HasCompletedQuest(X) == (X, Active). Kept internal-static so ConversationConditionTests can pin the gate.
+		internal static bool QuestConditionMet(ConversationNode node, IReadOnlyCollection<CharacterQuest> quests)
+		{
+			return node.ConditionQuestId is { } questId && quests.Any(q => q.QuestId == questId && q.State == node.ConditionQuestState);
 		}
 
 		// Frames a constructed Knubot record exactly as retail does (verified against the captures): the conversation

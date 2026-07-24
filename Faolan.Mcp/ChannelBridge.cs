@@ -39,6 +39,8 @@ namespace Faolan.Mcp
 		private const string ChannelNotificationMethod = "notifications/claude/channel";
 
 		private static McpClient? _gameServer;
+		private static TimeSpan _backlogGrace;
+		private static TimeSpan _pollInterval;
 
 		// Set once from config in Main (McpUrl = the game-server MCP endpoint this bridge connects to). _backlogGrace:
 		// on its first read after (re)connecting the bridge skips pre-existing posts as "backlog", but only those
@@ -46,8 +48,6 @@ namespace Faolan.Mcp
 		// speaks still surfaces that post instead of dropping it forever (#205). The bridge is respawned on every
 		// /mcp reconnect / session restart, so a fresh process must catch the immediately-preceding chatter.
 		private static string _mcpUrl = "";
-		private static TimeSpan _backlogGrace;
-		private static TimeSpan _pollInterval;
 
 		// The backlog floor for the bridge's first successful read: the newest message OLDER than the grace
 		// window (relative to <paramref name="nowUtc" />). Messages newer than the window have Sequence greater
@@ -64,11 +64,7 @@ namespace Faolan.Mcp
 			// Config: env > cmdline > json, with an OPTIONAL faolan.json (located via RepoPaths, CWD-independent) - parity
 			// with the server / Faolan.Web / importer. Claude Code spawns this bridge with no args/env, so it runs on the
 			// defaults; override McpUrl / ChannelPollMs / ChannelBacklogGraceMs in faolan.json or the environment.
-			var config = new ConfigurationBuilder()
-				.AddJsonFile(RepoPaths.Combine("faolan.json"), optional: true)
-				.AddCommandLine(args)
-				.AddEnvironmentVariables()
-				.Build();
+			var config = new ConfigurationBuilder().AddJsonFile(RepoPaths.Combine("faolan.json"), true).AddCommandLine(args).AddEnvironmentVariables().Build();
 			_mcpUrl = config.McpUrl;
 			_backlogGrace = TimeSpan.FromMilliseconds(config.ChannelBacklogGraceMs);
 			_pollInterval = TimeSpan.FromMilliseconds(config.ChannelPollMs);
@@ -268,11 +264,11 @@ namespace Faolan.Mcp
 		private sealed class ChannelMessage
 		{
 			public uint SenderId { get; set; }
+			public DateTime TimestampUtc { get; set; }
 			public bool FromClaude { get; set; }
 			public bool ViaWhisper { get; set; }
-			public DateTime TimestampUtc { get; set; }
-			public string Message { get; set; } = null!;
-			public string SenderName { get; set; } = null!;
+			public string Message { get; } = null!;
+			public string SenderName { get; } = null!;
 			public ulong Sequence { get; set; }
 		}
 

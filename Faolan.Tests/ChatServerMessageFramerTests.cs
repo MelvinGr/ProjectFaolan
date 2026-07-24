@@ -12,26 +12,20 @@ namespace Faolan.Tests
 	// cases that buffering has to survive.
 	public class ChatServerMessageFramerTests
 	{
+		// An empty body frames as the bare 4-byte header (the unnamed 0x0005 chat-connect beat has this shape), and must
+		// not stall the frames behind it.
 		[Fact]
-		public void ManyFramesInOneRecv_AreAllFramed()
+		public void EmptyBodiedFrame_DoesNotStallTheStream()
 		{
-			var frames = Enumerable.Range(0, 50).Select(i => Frame($"message {i}")).ToList();
+			var beat = new ChatServerMessage(0x0005).Serialize();
+			var next = Frame("after the beat");
 
-			var framed = new ChatServerMessageFramer().PushBytes(Concat(frames));
-
-			Assert.Equal(frames.Count, framed.Count);
-			Assert.All(frames.Zip(framed), pair => Assert.Equal(pair.First, pair.Second));
+			Assert.Equal([beat, next], new ChatServerMessageFramer().PushBytes(Concat([beat, next])));
 		}
 
 		// A frame split at every possible offset: the framer must emit it exactly once, and only once both halves have
 		// arrived - covering a split inside the 4-byte header as well as inside the body.
-		[Theory]
-		[InlineData(1)]
-		[InlineData(2)]
-		[InlineData(3)]
-		[InlineData(4)]
-		[InlineData(5)]
-		[InlineData(9)]
+		[Theory, InlineData(1), InlineData(2), InlineData(3), InlineData(4), InlineData(5), InlineData(9)]
 		public void FrameSplitAcrossRecvs_IsEmittedOnceComplete(int splitAt)
 		{
 			var frame = new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(0x01313438).WriteString("Conan")).Serialize();
@@ -41,6 +35,17 @@ namespace Faolan.Tests
 
 			var completed = framer.PushBytes(frame.AsSpan(splitAt));
 			Assert.Equal(frame, Assert.Single(completed));
+		}
+
+		[Fact]
+		public void ManyFramesInOneRecv_AreAllFramed()
+		{
+			var frames = Enumerable.Range(0, 50).Select(i => Frame($"message {i}")).ToList();
+
+			var framed = new ChatServerMessageFramer().PushBytes(Concat(frames));
+
+			Assert.Equal(frames.Count, framed.Count);
+			Assert.All(frames.Zip(framed), pair => Assert.Equal(pair.First, pair.Second));
 		}
 
 		// The realistic shape: a recv ends mid-frame with whole frames in front of it, and the next recv carries the
@@ -58,17 +63,6 @@ namespace Faolan.Tests
 
 			Assert.Equal(first, Assert.Single(head));
 			Assert.Equal([split, last], tail);
-		}
-
-		// An empty body frames as the bare 4-byte header (the unnamed 0x0005 chat-connect beat has this shape), and must
-		// not stall the frames behind it.
-		[Fact]
-		public void EmptyBodiedFrame_DoesNotStallTheStream()
-		{
-			var beat = new ChatServerMessage(0x0005).Serialize();
-			var next = Frame("after the beat");
-
-			Assert.Equal([beat, next], new ChatServerMessageFramer().PushBytes(Concat([beat, next])));
 		}
 
 		private static byte[] Concat(IReadOnlyCollection<byte[]> frames)

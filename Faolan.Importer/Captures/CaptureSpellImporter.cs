@@ -181,8 +181,10 @@ namespace Faolan.Importer.Captures
 			var cataloged = (await db.Spells.Where(s => learnedIds.Contains(s.Id)).Select(s => s.Id).ToListAsync()).ToHashSet();
 			var uncataloged = learnedIds.Where(id => !cataloged.Contains(id)).ToList();
 			if (uncataloged.Count > 0)
+			{
 				logger?.LogWarning("CaptureSpellImporter: {Count} learned spell ids not in the Spell catalog, skipped: {Ids}. (complete the Spell catalog to seed them)", uncataloged.Count,
 					string.Join(", ", uncataloged));
+			}
 
 			var charactersSeeded = 0;
 			var inserted = 0;

@@ -12,7 +12,6 @@ namespace Faolan.Importer.Modules
 	// Spell LEVELS (not in the RDB record), by exact name.
 	public sealed class EllathaLevelsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Tsv;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -20,6 +19,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Tsv;
 
 		public string Description => "Spell levels from the ellatha scrape (ellatha_spells.tsv).";
 		public string Name => "ellatha-levels";
@@ -38,7 +39,6 @@ namespace Faolan.Importer.Modules
 	// Class<->spell ACCESS map from the AoC fandom wiki's per-class spell categories (#296), by base name.
 	public sealed class WikiClassSpellsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Tsv;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -46,6 +46,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Tsv;
 
 		public string Description => "Class<->spell access map from the AoC fandom wiki (aoc_wiki_class_spells.tsv).";
 		public string Name => "wiki-class-spells";
@@ -64,7 +66,6 @@ namespace Faolan.Importer.Modules
 	// Spell LEVELS from the AoC fandom wiki per-class spell tables (fills the base/rank-1 rows ellatha missed).
 	public sealed class WikiSpellLevelsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Tsv;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -72,6 +73,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Tsv;
 
 		public string Description => "Spell base levels from the AoC fandom wiki (aoc_wiki_spell_levels.tsv).";
 		public string Name => "wiki-spell-levels";
@@ -90,7 +93,6 @@ namespace Faolan.Importer.Modules
 	// Combo LEVEL + COOLDOWN (the combos list is the one source with cooldown), by exact name.
 	public sealed class EllathaCombosModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Tsv;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -98,6 +100,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Tsv;
 
 		public string Description => "Combo level+cooldown from the ellatha scrape (ellatha_combos.tsv).";
 		public string Name => "ellatha-combos";

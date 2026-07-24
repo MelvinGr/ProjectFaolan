@@ -130,7 +130,7 @@ namespace Faolan.Tests
 		[Theory, InlineData(0u, "00000000"), InlineData(1u << 2, "00000004"), InlineData(1u << 5, "00000020"), InlineData((1u << 5) | (1u << 31), "80000020")]
 		// Head (slot 2), from vanity-head-selected
 		// Chest (slot 5), from vanity-chest-selected
-			// chest + global master (slot 31)
+		// chest + global master (slot 31)
 		public void FreshPreFrame_WritesVanityMaskBigEndian(uint mask, string expectedHex)
 		{
 			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(Class.Assassin, mask);

@@ -23,12 +23,12 @@ namespace Faolan.GameServer.World
 		// LoS sampling: how many intermediate ground samples along the sightline, and how far a hill must rise above
 		// the eye-line to actually block (a little slack so a gentle slope or a 1u bump doesn't read as a wall).
 		private const int LineOfSightSamples = 24;
-
-		// Maps whose terrain file we've already attempted to load (present or not), so a query never re-reads it.
-		private readonly ConcurrentDictionary<uint, byte> _loaded = [];
 		private readonly ConcurrentDictionary<uint, RdbCollisionMesh> _collision = [];
 
 		private readonly ConcurrentDictionary<uint, RdbHeightmap> _heightmaps = [];
+
+		// Maps whose terrain file we've already attempted to load (present or not), so a query never re-reads it.
+		private readonly ConcurrentDictionary<uint, byte> _loaded = [];
 		private readonly ILogger _logger;
 		private readonly string? _terrainDir;
 

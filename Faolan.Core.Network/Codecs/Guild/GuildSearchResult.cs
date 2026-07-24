@@ -12,10 +12,9 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// guilds.
 	public sealed class GuildSearchResult
 	{
-		public const byte Trailer = 0x01;
-
 		// The CSPlayerInterface opcode this body is the payload of (0x205C).
 		public const CSPlayerInterfaceOpcodes Opcode = CSPlayerInterfaceOpcodes.DispatchGuildSearchResult;
+		public const byte Trailer = 0x01;
 
 		public List<Entry> Guilds { get; set; } = [];
 
@@ -40,9 +39,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 
 			var count = GuildRankings.ListCount(s.ReadUInt32());
 			for (var i = 0; i < count; i++)
-			{
 				result.Guilds.Add(new Entry(s.ReadUInt32(), s.ReadString(), s.ReadString(), s.ReadUInt16(), s.ReadUInt32(), s.ReadByte()));
-			}
 
 			s.ReadByte(); // trailer
 			return result;

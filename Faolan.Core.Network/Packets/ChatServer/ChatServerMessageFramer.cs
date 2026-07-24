@@ -69,17 +69,17 @@ namespace Faolan.Core.Network.Packets.ChatServer
 			return packets ?? [];
 		}
 
+		private void EnsurePending(int length)
+		{
+			if (_pending.Length < length)
+				Array.Resize(ref _pending, length);
+		}
+
 		// The length field counts the BODY, so a frame is bodyLength + the 4-byte header (matches what the server itself
 		// sends via ChatServerMessage.Build and the retail captures).
 		private static int FrameLength(ReadOnlySpan<byte> frame)
 		{
 			return BinaryPrimitives.ReadUInt16BigEndian(frame[sizeof(ushort)..]) + HeaderSize;
-		}
-
-		private void EnsurePending(int length)
-		{
-			if (_pending.Length < length)
-				Array.Resize(ref _pending, length);
 		}
 	}
 }

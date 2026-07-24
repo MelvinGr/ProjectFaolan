@@ -76,6 +76,7 @@ namespace Faolan.Tests
 				prefix |= (x & 0x7F) << shift;
 				if ((x & 0x80) == 0)
 					break;
+
 				shift += 7;
 			}
 

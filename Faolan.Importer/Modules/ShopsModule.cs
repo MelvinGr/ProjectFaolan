@@ -10,8 +10,6 @@ namespace Faolan.Importer.Modules
 	// TODO(importer step 2a): thread ctx.Mode (Insert/Overwrite) into CaptureShopImporter.
 	public sealed class ShopsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
-
 		// Depends on `items`: every ware's ProtoAcgItem identity (quad + template + hash) is harvested into Items by
 		// the items module (ItemHashHarvester's shop source reads the same 0x2033 packets). Shops must run AFTER that
 		// so the ShopItem -> Items FK resolves; otherwise a `--only shops` run leaves the wares orphaned and the shop
@@ -24,6 +22,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Vendor shop windows (0x2033 NPC trade lists).";
 		public string Name => "shops";

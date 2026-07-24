@@ -24,9 +24,9 @@ namespace Faolan.GameServer.World
 
 		public uint MapId { get; }
 
-		public int Count => _entities.Count;
-
 		public IReadOnlyCollection<WorldEntity> Entities => _entities.Values.ToArray();
+
+		public int Count => _entities.Count;
 
 		// The per-playfield-instance token stamped into every despawn so the client scopes the removal to this playfield
 		// (see WorldDespawn). Minted by WorldState on zone creation as a fallback; for a REPLAYED playfield the burst's

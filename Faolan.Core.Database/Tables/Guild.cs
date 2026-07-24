@@ -26,14 +26,14 @@ namespace Faolan.Core.Database.Tables
 
 		public virtual ICollection<Character> Members { get; set; } = [];
 
+		public DateTimeOffset CreationDate { get; set; }
+
 		// The guild government form. NOTE: this is NOT the 0x203F's first byte (that is the CoreGuild_c streaming
 		// version, fixed at 3 - see GuildService). The actual government-form byte sits after guildId and is fixed
 		// at 1 on the wire today, because GuildRenownBlock only encodes that form's body layout (the captured
 		// "Sepulchra Invictus" guild was form 1). This column is retained for a future real government-form feature
 		// and is not yet emitted. The client UI maps the value to a government label (#219, docs/subsystems/guilds.md).
 		public byte GovernmentForm { get; set; } = 1; // TODO: To enum
-
-		public DateTimeOffset CreationDate { get; set; }
 
 		[MaxLength(512)]
 		public string Description { get; set; } = "";

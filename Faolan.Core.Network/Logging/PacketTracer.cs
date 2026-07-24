@@ -48,11 +48,6 @@ namespace Faolan.Core.Network.Logging
 			}
 		}
 
-		// The raw-frame TX render. The Conan tracer decodes the frame back to an Rpc and renders it through the SAME
-		// path as a structured send (so a raw send can't produce a differently-shaped line); the chat tracer parses its
-		// own frame format here - this is the only path it has, its wire has no Rpc model.
-		protected abstract void RenderTransmitted(byte[] frame);
-
 		// The structured TX render. Not abstract: the chat wire carries no Rpc, so that tracer never sees one.
 		protected virtual void RenderTransmitted(in Rpc rpc)
 		{
@@ -63,5 +58,10 @@ namespace Faolan.Core.Network.Logging
 		{
 			Logger.LogDebug(ex, "Failed to render a {Channel} packet trace.", ChannelName);
 		}
+
+		// The raw-frame TX render. The Conan tracer decodes the frame back to an Rpc and renders it through the SAME
+		// path as a structured send (so a raw send can't produce a differently-shaped line); the chat tracer parses its
+		// own frame format here - this is the only path it has, its wire has no Rpc model.
+		protected abstract void RenderTransmitted(byte[] frame);
 	}
 }

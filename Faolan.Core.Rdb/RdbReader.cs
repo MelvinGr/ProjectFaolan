@@ -36,9 +36,9 @@ namespace Faolan.Core.Rdb
 		// Resolve a single resource by its (type, id) key, the form RDB cross-references use ("TYPE:ID"). Builds a
 		// lookup on first use (873k entries, so linear scans per lookup would be quadratic when resolving a graph).
 		private Dictionary<(uint, uint), Entry>? _byKey;
+		public IReadOnlyList<Entry> Entries => _entries;
 
 		public int Count => _entries.Count;
-		public IReadOnlyList<Entry> Entries => _entries;
 
 		public RdbReader(string rdbDir, string? cdnBaseUrl = null)
 		{

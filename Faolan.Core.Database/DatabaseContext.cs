@@ -192,7 +192,7 @@ namespace Faolan.Core.Database
 		{
 			// Enum columns marked [ConstrainToEnumValues] get a generated CHECK constraint (the allowed list is built from
 			// the enum, so it stays in sync). CharacterStatId is intentionally left open (Unknown fillers for undecoded ids).
-			ConstrainToEnumValuesAttribute.ApplyEnumCheckConstraints(modelBuilder, quoteColumns: Database.IsNpgsql());
+			ConstrainToEnumValuesAttribute.ApplyEnumCheckConstraints(modelBuilder, Database.IsNpgsql());
 
 			// Natural-key catalogs whose Id is an external id set by the importer (RDB/wire id), never DB-generated - so
 			// EF must not treat the integer PK as auto-increment (like Character/RespawnPoint/MorphTarget below).

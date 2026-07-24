@@ -110,6 +110,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToArray();
 		}
 
+		// CharInPlayIIR (0x864CFEF8): the "character is now in play" signal. 9 bytes:
+		//   [u32 type][u32 handle][u8 flag]
+		// An EMPTY record - the client reader (FUN_0075a920) only resolves the SimpleChar for `handle` and logs; the
+		// carrier handle is the whole message (docs/re/iir-readers-combat-world.md). flag is the base IIR's, 0 in every capture.
+		public static byte[] BuildCharInPlayIir(uint handle, byte flag = 0, uint type = EntityClass.Character)
+		{
+			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).ToArray();
+		}
+
 		// CharacterActionIIR (0x6B6FD368): grants one action/ability id to an entity. 41 bytes:
 		//   [u32 type][u32 handle][u32 0][u8 0x1D][16x 0x00][u32 actionId][8x 0x00]
 		// The create-editor WorldPrep burst streams one per granted id (the same ability/feat id space as the
@@ -118,15 +127,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public static byte[] BuildCharacterActionIir(uint handle, uint actionId, uint type = EntityClass.Character)
 		{
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteUInt32(0u).WriteByte(0x1D).WriteArray(new byte[16]).WriteUInt32(actionId).WriteArray(new byte[8]).ToArray();
-		}
-
-		// CharInPlayIIR (0x864CFEF8): the "character is now in play" signal. 9 bytes:
-		//   [u32 type][u32 handle][u8 flag]
-		// An EMPTY record - the client reader (FUN_0075a920) only resolves the SimpleChar for `handle` and logs; the
-		// carrier handle is the whole message (docs/re/iir-readers-combat-world.md). flag is the base IIR's, 0 in every capture.
-		public static byte[] BuildCharInPlayIir(uint handle, byte flag = 0, uint type = EntityClass.Character)
-		{
-			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).ToArray();
 		}
 
 		// ComboBookIIR (0xA8BBEB7F): grants one combo/ability to the entity's combo book. 14 bytes:

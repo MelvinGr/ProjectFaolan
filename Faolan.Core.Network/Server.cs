@@ -33,11 +33,6 @@ namespace Faolan.Core.Network
 		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener.LocalEndpoint;
 		protected IEnumerable<INetworkClient> NetworkClients => _clients.Keys;
 
-		public IEnumerable<INetworkClientSession> GetWorldSessions()
-		{
-			return NetworkClients.Select(nc => nc.Session);
-		}
-
 		protected ServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database)
 		{
 			Logger = logger;
@@ -45,10 +40,6 @@ namespace Faolan.Core.Network
 			Database = database;
 			_tcpListener = new TcpListener(IPAddress.Any, port);
 		}
-
-		// Build the protocol-specific client for the accepted socket, wired with the shared lifecycle callbacks
-		// (OnClientDisconnected / OnBatchComplete) plus its own receive dispatch.
-		protected abstract NetworkClient CreateClient(Socket socket);
 
 		protected override async Task ExecuteAsync(CancellationToken cancellationToken)
 		{
@@ -100,31 +91,9 @@ namespace Faolan.Core.Network
 			}
 		}
 
-		// The shared disconnect/batch-drained callbacks a CreateClient wires onto its NetworkClient.
-		protected async Task OnClientDisconnected(INetworkClient client)
+		public IEnumerable<INetworkClientSession> GetWorldSessions()
 		{
-			try
-			{
-				_clients.TryRemove(client, out _);
-				await ClientDisconnected(client);
-			}
-			catch (Exception ex)
-			{
-				Logger.LogError(ex, "Exception in Disconnected");
-			}
-		}
-
-		protected async Task OnBatchComplete(INetworkClient client)
-		{
-			try
-			{
-				await ReceivedBatchComplete(client);
-			}
-			catch (Exception ex)
-			{
-				Logger.LogError(ex, "Exception in ReceivedBatchComplete");
-				client.Stop();
-			}
+			return NetworkClients.Select(nc => nc.Session);
 		}
 
 		protected virtual Task ClientConnected(INetworkClient client)
@@ -157,11 +126,42 @@ namespace Faolan.Core.Network
 			return NetworkClients.FirstOrDefault(nc => nc.Session.Character?.Id == characterId);
 		}
 
+		// Build the protocol-specific client for the accepted socket, wired with the shared lifecycle callbacks
+		// (OnClientDisconnected / OnBatchComplete) plus its own receive dispatch.
+		protected abstract NetworkClient CreateClient(Socket socket);
+
 		// An extra opcode-specific body dump a handler emits on its own line, on the same byte-dump gate as the packet
 		// lines - all line shaping lives in the logging layer.
 		protected void LogPacketBodyDebug(string label, ReadOnlyMemory<byte> bytes)
 		{
 			Logger.LogBodyDump(label, bytes);
+		}
+
+		protected async Task OnBatchComplete(INetworkClient client)
+		{
+			try
+			{
+				await ReceivedBatchComplete(client);
+			}
+			catch (Exception ex)
+			{
+				Logger.LogError(ex, "Exception in ReceivedBatchComplete");
+				client.Stop();
+			}
+		}
+
+		// The shared disconnect/batch-drained callbacks a CreateClient wires onto its NetworkClient.
+		protected async Task OnClientDisconnected(INetworkClient client)
+		{
+			try
+			{
+				_clients.TryRemove(client, out _);
+				await ClientDisconnected(client);
+			}
+			catch (Exception ex)
+			{
+				Logger.LogError(ex, "Exception in Disconnected");
+			}
 		}
 	}
 
@@ -175,8 +175,7 @@ namespace Faolan.Core.Network
 		// SENDS are traced through the same object, with the same channel label (Gitea #406 phase 6).
 		private readonly ChatPacketTracer _tracer;
 
-		protected ChatServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ChatPacketTracer tracer)
-			: base(port, logger, configuration, database)
+		protected ChatServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ChatPacketTracer tracer) : base(port, logger, configuration, database)
 		{
 			_tracer = tracer;
 		}
@@ -219,14 +218,12 @@ namespace Faolan.Core.Network
 
 	// The structured-Rpc listener (every Conan protocol tier): each frame is parsed straight to an Rpc (Rpc.Parse)
 	// and dispatched - no per-frame Packet object, no ConanPacket (Gitea #406/#407).
-	public abstract class RpcServer<TMessageFramer> : ServerBase
-		where TMessageFramer : IMessageFramer, new()
+	public abstract class RpcServer<TMessageFramer> : ServerBase where TMessageFramer : IMessageFramer, new()
 	{
 		// This channel's packet trace - both directions through one object (see ChatServerBase._tracer).
 		private readonly ConanPacketTracer _tracer;
 
-		protected RpcServer(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ConanPacketTracer tracer)
-			: base(port, logger, configuration, database)
+		protected RpcServer(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database, ConanPacketTracer tracer) : base(port, logger, configuration, database)
 		{
 			_tracer = tracer;
 		}

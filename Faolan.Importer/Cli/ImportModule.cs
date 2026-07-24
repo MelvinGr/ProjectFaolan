@@ -33,15 +33,15 @@ namespace Faolan.Importer.Cli
 
 	public interface IImportModule
 	{
-		// The input this module needs; absent input gates it out of a run.
-		ImportSource Source { get; }
-
 		// Module names that must run before this one (the runner resolves + topo-sorts these).
 		IReadOnlyList<string> DependsOn { get; }
 
 		// The write modes this module can honour. The runner warns + falls back to the module's first
 		// supported mode if an unsupported one is requested.
 		IReadOnlySet<WriteMode> SupportedModes { get; }
+
+		// The input this module needs; absent input gates it out of a run.
+		ImportSource Source { get; }
 
 		// One-line description for --list and the dry-run header.
 		string Description { get; }

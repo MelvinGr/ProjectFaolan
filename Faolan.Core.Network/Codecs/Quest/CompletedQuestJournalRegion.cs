@@ -39,8 +39,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// objective interleaving.
 	public sealed class CompletedQuestJournalRegion
 	{
-		public int QuestCount => Areas.Sum(a => a.Quests.Count);
 		public List<AreaGroup> Areas { get; init; } = [];
+		public int QuestCount => Areas.Sum(a => a.Quests.Count);
 
 		public byte[] ToArray()
 		{

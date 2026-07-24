@@ -11,6 +11,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// captured template/burst bytes.
 	public sealed class PlayerSpawnScaffold
 	{
+		public List<ScaffoldEntry> Entries { get; } = [];
+
+		public List<ScaffoldIdEntry> IdList { get; } = [];
+
+		// EndPairs (the first ending list) IS the FACTION-REPUTATION block: Id = faction id, Value = signed standing
+		// (+/-50000) shown in the client's Factions window. See CharacterScaffoldPair / Gitea #315.
+		public List<ScaffoldPair> EndPairs { get; } = [];
+		public List<ScaffoldPair> EndPairs2 { get; } = [];
+
+		// Post-IIR stream. Buff/timer records are 60-byte transient state (only on captured chars with active
+		// buffs); the entry table / ID list / end pairs are the per-character skill+feat scaffold.
+		public List<byte[]> BuffRecords { get; } = [];
+
 		// The embedded ProtoCoreCharacterIIR bytes (typed round-trip via FromProtobuf/ToProtobufBytes is
 		// byte-identical; see PlayerSpawnGenerationTests).
 		public byte[] CharacterIir { get; set; } = null!;
@@ -21,23 +34,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public byte[] PreFrame { get; set; } = null!;
 
 		public byte[] Quat { get; set; } = null!; // #352: columnize (kept raw - typed would lose the exact captured field-set)
-		public byte[]? Scale { get; set; } // null when absent
 
 		// Transform component payloads (the 0x2C group), kept as raw field payloads: 0x0A vec3 (3 x fixed32),
 		// 0x12 quat (4 x fixed32), optional 0x25 scale (4 bytes), 0x18 playfield varint.
 		public byte[] Vec3 { get; set; } = null!; // #352: columnize (kept raw - typed would lose the exact captured field-set)
-
-		// Post-IIR stream. Buff/timer records are 60-byte transient state (only on captured chars with active
-		// buffs); the entry table / ID list / end pairs are the per-character skill+feat scaffold.
-		public List<byte[]> BuffRecords { get; } = [];
-		public List<ScaffoldEntry> Entries { get; } = [];
-
-		public List<ScaffoldIdEntry> IdList { get; } = [];
-
-		// EndPairs (the first ending list) IS the FACTION-REPUTATION block: Id = faction id, Value = signed standing
-		// (+/-50000) shown in the client's Factions window. See CharacterScaffoldPair / Gitea #315.
-		public List<ScaffoldPair> EndPairs { get; } = [];
-		public List<ScaffoldPair> EndPairs2 { get; } = [];
+		public byte[]? Scale { get; set; } // null when absent
 		public uint Ack { get; set; } = EntityClass.Character;
 
 		public uint EntryTableX { get; set; } // per-char u32 after the entry count (Strie 0xB7, necrol80 0x2B6, editor 0x3F1)

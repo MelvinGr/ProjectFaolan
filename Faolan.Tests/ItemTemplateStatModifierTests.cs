@@ -13,11 +13,31 @@ namespace Faolan.Tests
 	// parser reproduces an independently-observed tooltip.
 	public class ItemTemplateStatModifierTests
 	{
-		private const string RoyalSignetBodyBase64 =
-			"RXUAAAQAAAAPAAAAFwAAAEwvAABMAAAAAAAAAB4AAAAFAAAAAAAAAAEAAAUqAQAAAAYAAFgAAAAJAAAA8wEAAAMAAADwAQAArA0AAGgB" +
-			"AABkAAAASgAAAORxAAA2AAAASAAAAAwAAAAGkjEAFQAAACEAAAAMAAAAUm95YWwgU2lnbmV0AgAAAA4AAADEDwAANc8AAAAAAAAEAAAA" +
-			"AAAAAAEAAAAAAAAAAgAAAAkAAAA2AQAADwAAADXPAAAAAAAABAAAAAAAAAABAAAAAAAAAAIAAAAJAAAAJgMAACwBAAA1zwAAAAAAAAQA" +
-			"AAAAAAAAAQAAAAAAAAACAAAACQAAAF0DAABQFAAAFgAAACQAAADiBwAABgAAAOIHAAAAAAAApB8AAF0AAAA=";
+		private const string RoyalSignetBodyBase64 = "RXUAAAQAAAAPAAAAFwAAAEwvAABMAAAAAAAAAB4AAAAFAAAAAAAAAAEAAAUqAQAAAAYAAFgAAAAJAAAA8wEAAAMAAADwAQAArA0AAGgB" +
+		                                             "AABkAAAASgAAAORxAAA2AAAASAAAAAwAAAAGkjEAFQAAACEAAAAMAAAAUm95YWwgU2lnbmV0AgAAAA4AAADEDwAANc8AAAAAAAAEAAAA" +
+		                                             "AAAAAAEAAAAAAAAAAgAAAAkAAAA2AQAADwAAADXPAAAAAAAABAAAAAAAAAABAAAAAAAAAAIAAAAJAAAAJgMAACwBAAA1zwAAAAAAAAQA" +
+		                                             "AAAAAAAAAQAAAAAAAAACAAAACQAAAF0DAABQFAAAFgAAACQAAADiBwAABgAAAOIHAAAAAAAApB8AAF0AAAA=";
+
+		[Fact]
+		public void IgnoresGarbageAndResourceRefSignatureHits()
+		{
+			// A statId outside the real range (an RDB resource type id / garbage) must be dropped even if the 6-word
+			// signature matches. Records: [marker 0][4][0][1][0][2][9][statId][amount].
+			uint[] words =
+			[
+				0xCF35, 0, 4, 0, 1, 0, 2, 9, 0x0001, 6600, // valid: +66 HealthMax
+				0xCF35, 0, 4, 0, 1, 0, 2, 9, 1000017, 42 // resource-ref statId -> dropped
+			];
+			var body = new byte[words.Length * 4];
+			for (var i = 0; i < words.Length; i++)
+				BitConverter.GetBytes(words[i]).CopyTo(body, i * 4);
+
+			var mods = ItemTemplateStatModifiers.Parse(body);
+
+			Assert.Single(mods);
+			Assert.Equal((uint)CharacterStatId.HealthMax, mods[0].StatId);
+			Assert.Equal(6600u, mods[0].WireAmount);
+		}
 
 		[Fact]
 		public void RoyalSignet_DecodesToItsInClientTooltip()
@@ -44,28 +64,10 @@ namespace Faolan.Tests
 			return;
 
 			// ...and each divided by its wire scale reproduces the displayed tooltip value.
-			int Display(uint statId) => (int)(mods.First(m => m.StatId == statId).WireAmount / ((CharacterStatId)statId).GetScale());
-		}
-
-		[Fact]
-		public void IgnoresGarbageAndResourceRefSignatureHits()
-		{
-			// A statId outside the real range (an RDB resource type id / garbage) must be dropped even if the 6-word
-			// signature matches. Records: [marker 0][4][0][1][0][2][9][statId][amount].
-			uint[] words =
-			[
-				0xCF35, 0, 4, 0, 1, 0, 2, 9, 0x0001, 6600, // valid: +66 HealthMax
-				0xCF35, 0, 4, 0, 1, 0, 2, 9, 1000017, 42 // resource-ref statId -> dropped
-			];
-			var body = new byte[words.Length * 4];
-			for (var i = 0; i < words.Length; i++)
-				BitConverter.GetBytes(words[i]).CopyTo(body, i * 4);
-
-			var mods = ItemTemplateStatModifiers.Parse(body);
-
-			Assert.Single(mods);
-			Assert.Equal((uint)CharacterStatId.HealthMax, mods[0].StatId);
-			Assert.Equal(6600u, mods[0].WireAmount);
+			int Display(uint statId)
+			{
+				return (int)(mods.First(m => m.StatId == statId).WireAmount / ((CharacterStatId)statId).GetScale());
+			}
 		}
 	}
 }

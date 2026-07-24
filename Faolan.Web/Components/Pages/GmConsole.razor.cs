@@ -17,10 +17,10 @@ namespace Faolan.Web.Components.Pages
 		private readonly Dictionary<uint, string> _tpY = [];
 		private readonly Dictionary<uint, string> _tpZ = [];
 		private readonly Dictionary<uint, uint> _tpTarget = [];
+		private IReadOnlyList<LiveSession>? _online;
 
 		private bool _authorized;
 		private bool _busy;
-		private IReadOnlyList<LiveSession>? _online;
 		private string _broadcast = "";
 		private string? _notice;
 

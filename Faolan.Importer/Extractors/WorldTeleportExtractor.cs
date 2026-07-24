@@ -140,9 +140,11 @@ namespace Faolan.Importer.Extractors
 					// The N3Teleport closes the sequence. If no IntendedTeleport carried the map, fall back to the
 					// N3Teleport's own proxy (a cross-map record) or the current map (a same-map record).
 					if (!haveDest)
+					{
 						destMap = TryParseProxyDestMap(qbody, out var n3Map)
 							? n3Map
 							: currentMap;
+					}
 
 					if (destMap != 0 && TryParseArrival(qbody, out var ax, out var ay, out var az))
 						links.Add(new TeleportLink(currentMap, used.Name, used.X, used.Y, used.Z, destMap, ax, ay, az));

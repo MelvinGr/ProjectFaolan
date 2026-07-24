@@ -22,10 +22,10 @@ namespace Faolan.Core.Database.Tables
 
 		public uint RefId { get; set; }
 
+		public QuestTextSlot Slot { get; set; }
+
 		// True for <localized> slots (which carry Flags and have no closing tag); false for <remoteformat>.
 		public bool IsLocalized { get; set; }
-
-		public QuestTextSlot Slot { get; set; }
 
 		// The deterministic content hash from the capture (pre-escaped, e.g. contains &#36;). Render-critical:
 		// the client validates it, a wrong key yields blank text.

@@ -59,10 +59,9 @@ namespace Faolan.Core.Enums
 	{
 		private static readonly ImmutableHashSet<CharacterEquipmentSlot> StatBearingSlots =
 		[
-			CharacterEquipmentSlot.Neck, CharacterEquipmentSlot.Head, CharacterEquipmentSlot.Chest, CharacterEquipmentSlot.MainWeapon,
-			CharacterEquipmentSlot.Belt, CharacterEquipmentSlot.OffHandWeapon, CharacterEquipmentSlot.LeftRing, CharacterEquipmentSlot.RightRing,
-			CharacterEquipmentSlot.Cape, CharacterEquipmentSlot.Shoulder, CharacterEquipmentSlot.Boots, CharacterEquipmentSlot.Hands,
-			CharacterEquipmentSlot.Legs, CharacterEquipmentSlot.Wrist, CharacterEquipmentSlot.RangedWeapon, CharacterEquipmentSlot.Ammo
+			CharacterEquipmentSlot.Neck, CharacterEquipmentSlot.Head, CharacterEquipmentSlot.Chest, CharacterEquipmentSlot.MainWeapon, CharacterEquipmentSlot.Belt,
+			CharacterEquipmentSlot.OffHandWeapon, CharacterEquipmentSlot.LeftRing, CharacterEquipmentSlot.RightRing, CharacterEquipmentSlot.Cape, CharacterEquipmentSlot.Shoulder,
+			CharacterEquipmentSlot.Boots, CharacterEquipmentSlot.Hands, CharacterEquipmentSlot.Legs, CharacterEquipmentSlot.Wrist, CharacterEquipmentSlot.RangedWeapon, CharacterEquipmentSlot.Ammo
 		];
 
 		extension(CharacterEquipmentSlot)

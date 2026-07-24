@@ -29,12 +29,14 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 					: uint.Parse(s.Antitag, CultureInfo.InvariantCulture)
 			};
 			for (var i = 0; i < s.Parameters.Count; i++)
+			{
 				row.Parameters.Add(new ConversationScreenParameter
 				{
 					Sequence = i,
 					Name = s.Parameters[i].Name,
 					InnerRaw = s.Parameters[i].InnerRaw
 				});
+			}
 
 			// Verify the TYPED round-trip reproduces the captured screen byte-for-byte - so any lossy field (a
 			// non-numeric / leading-zero id, a value that doesn't survive the uint round-trip) surfaces at import

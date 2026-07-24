@@ -2,7 +2,6 @@ using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Protocol;
 using Faolan.GameServer;
 using Faolan.GameServer.World;
 using Faolan.Tests.Support;

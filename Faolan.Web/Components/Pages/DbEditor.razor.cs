@@ -20,15 +20,15 @@ namespace Faolan.Web.Components.Pages
 		private static readonly MethodInfo SetMethod = typeof(DbContext).GetMethod(nameof(DbContext.Set), 1, Type.EmptyTypes)!;
 		private readonly Dictionary<string, FkOptions> _fks = [];
 		private readonly List<object> _rows = [];
-		private bool _authorized;
-		private bool _error;
 		private DatabaseContext? _ctx;
 		private IReadOnlyList<DbEditorField> _fields = [];
 		private List<Type> _tables = [];
+		private Type? _table;
+		private bool _authorized;
+		private bool _error;
 		private object? _row;
 		private string _filter = "";
 		private string? _status;
-		private Type? _table;
 
 		[CascadingParameter]
 		private Task<AuthenticationState>? AuthState { get; set; }

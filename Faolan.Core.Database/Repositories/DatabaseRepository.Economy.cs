@@ -12,10 +12,10 @@ namespace Faolan.Core.Database.Repositories
 		Task DeleteMail(ulong mailId);
 		Task DeleteTradepostListing(ulong saleId, uint realmId);
 		Task<Mail?> GetMailByWireId(ulong mailId);
-		Task<ulong> GetNextMailId();
 		Task<Mail[]> GetMailsForRecipient(string recipientName, uint realmId);
-		Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId, uint realmId);
+		Task<ulong> GetNextMailId();
 		Task<ulong> GetNextTradepostSaleId(uint realmId);
+		Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId, uint realmId);
 		Task<TradepostListing?> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId);
 		Task<TradepostListing[]> GetTradepostListings(uint itemId, uint realmId);
 		Task RemoveMailAttachment(ulong mailId, ulong itemInstanceId);
@@ -58,15 +58,6 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Mails.Include(m => m.Attachments).ThenInclude(a => a.Item).FirstOrDefaultAsync(m => m.MailId == mailId);
 		}
 
-		// The next wire MailId: max + 1 (MailId is the global PK, #368). A deterministic sequence, not a random id +
-		// collision retry. Computed in MEMORY because SQLite cannot MAX a ulong (its INTEGER is signed 64-bit).
-		public async Task<ulong> GetNextMailId()
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var mailIds = await ctx.Mails.Select(m => m.MailId).ToListAsync();
-			return mailIds.Count == 0 ? 1UL : mailIds.Max() + 1UL;
-		}
-
 		public async Task<Mail[]> GetMailsForRecipient(string recipientName, uint realmId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -82,10 +73,15 @@ namespace Faolan.Core.Database.Repositories
 			return rows.OrderByDescending(m => m.Timestamp1).ThenByDescending(m => m.MailId).ToArray();
 		}
 
-		public async Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId, uint realmId)
+		// The next wire MailId: max + 1 (MailId is the global PK, #368). A deterministic sequence, not a random id +
+		// collision retry. Computed in MEMORY because SQLite cannot MAX a ulong (its INTEGER is signed 64-bit).
+		public async Task<ulong> GetNextMailId()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.RealmId == realmId && l.SaleId == saleId);
+			var mailIds = await ctx.Mails.Select(m => m.MailId).ToListAsync();
+			return mailIds.Count == 0
+				? 1UL
+				: mailIds.Max() + 1UL;
 		}
 
 		// The next sale id for a new listing in this realm: max in the realm + 1 (SaleId is realm-unique, #324). A
@@ -95,7 +91,15 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var saleIds = await ctx.TradepostListings.Where(l => l.RealmId == realmId).Select(l => l.SaleId).ToListAsync();
-			return saleIds.Count == 0 ? 1UL : saleIds.Max() + 1UL;
+			return saleIds.Count == 0
+				? 1UL
+				: saleIds.Max() + 1UL;
+		}
+
+		public async Task<TradepostListing?> GetTradepostListingBySaleId(ulong saleId, uint realmId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.TradepostListings.FirstOrDefaultAsync(l => l.RealmId == realmId && l.SaleId == saleId);
 		}
 
 		public async Task<TradepostListing?> GetTradepostListingBySellerSlot(string sellerName, uint bankSlot, uint realmId)

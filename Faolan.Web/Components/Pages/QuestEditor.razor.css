@@ -89,8 +89,17 @@
 }
 
 .rowlist .qid { font-weight: 600; }
-.rowlist .arrow { color: var(--muted); font-size: .74rem; }
-.rowlist .gcount { color: var(--muted); font-size: .72rem; margin-left: auto; }
+
+.rowlist .arrow {
+	color: var(--muted);
+	font-size: .74rem;
+}
+
+.rowlist .gcount {
+	color: var(--muted);
+	font-size: .72rem;
+	margin-left: auto;
+}
 
 .qe-fields {
 	display: grid;
@@ -132,7 +141,10 @@
 	margin: 1rem 0 .4rem;
 }
 
-.qe-goals-head h2 { font-size: 1.1rem; margin: 0; }
+.qe-goals-head h2 {
+	font-size: 1.1rem;
+	margin: 0;
+}
 
 .add, .save, .del {
 	background: var(--field);

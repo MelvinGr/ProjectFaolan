@@ -39,18 +39,6 @@ namespace Faolan.Core.Network.Packets.ChatServer
 		{
 		}
 
-		// Frame -> message. Lenient like Rpc.Parse: a body shorter than its declared length is taken as-is
-		// rather than throwing, so a malformed frame surfaces where a handler reads a field off it (and the dispatch
-		// try/catch turns that into a disconnect) instead of at two different layers. The framer only ever emits
-		// complete frames, so this clamp is a backstop, not the normal path.
-		public static ChatServerMessage Parse(byte[] frame)
-		{
-			var opcode = BinaryPrimitives.ReadUInt16BigEndian(frame);
-			var declared = BinaryPrimitives.ReadUInt16BigEndian(frame.AsSpan(sizeof(ushort)));
-
-			return new ChatServerMessage(opcode, frame.AsMemory(HeaderSize, Math.Min(declared, frame.Length - HeaderSize))) { FrameLength = frame.Length };
-		}
-
 		// A fresh reader over the body, for the RECEIVE path (handlers read fields sequentially off it). A new cursor
 		// per call, so callers keep their own position - one `var body = packet.BodyReader();` per handler.
 		public FaolanStream BodyReader()
@@ -70,6 +58,21 @@ namespace Faolan.Core.Network.Packets.ChatServer
 			Body.Span.CopyTo(frame.AsSpan(HeaderSize));
 
 			return frame;
+		}
+
+		// Frame -> message. Lenient like Rpc.Parse: a body shorter than its declared length is taken as-is
+		// rather than throwing, so a malformed frame surfaces where a handler reads a field off it (and the dispatch
+		// try/catch turns that into a disconnect) instead of at two different layers. The framer only ever emits
+		// complete frames, so this clamp is a backstop, not the normal path.
+		public static ChatServerMessage Parse(byte[] frame)
+		{
+			var opcode = BinaryPrimitives.ReadUInt16BigEndian(frame);
+			var declared = BinaryPrimitives.ReadUInt16BigEndian(frame.AsSpan(sizeof(ushort)));
+
+			return new ChatServerMessage(opcode, frame.AsMemory(HeaderSize, Math.Min(declared, frame.Length - HeaderSize)))
+			{
+				FrameLength = frame.Length
+			};
 		}
 
 		private static byte[] BuildBody(Action<FaolanStream> body)

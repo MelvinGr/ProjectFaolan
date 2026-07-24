@@ -17,12 +17,12 @@ namespace Faolan.Core.Rdb.Assets
 	// file paths carry Windows backslashes inside attribute values, which is valid XML). We parse from the first '<'.
 	public sealed record MeshIndexFile(uint Id, string? SourceFile, uint? RenderMeshId, BoundingBox? Bounds, uint? CollisionMeshId, IReadOnlyList<MeshMaterial> Materials)
 	{
+		// The texture resources referenced anywhere in this model's materials, de-duplicated, in first-seen order.
+		public IReadOnlyList<TextureRef> UniqueTextures => Materials.SelectMany(m => m.Textures).Where(t => t.Type != null).GroupBy(t => (t.Type, t.Id)).Select(g => g.First()).ToList();
+
 		// True when the geometry is a skinned character/equipment body (<RenderSkinnedMesh>); its texture is bound by
 		// the item/character system, not the mesh manifest (MaterialSets is empty).
 		public bool Skinned { get; init; }
-
-		// The texture resources referenced anywhere in this model's materials, de-duplicated, in first-seen order.
-		public IReadOnlyList<TextureRef> UniqueTextures => Materials.SelectMany(m => m.Textures).Where(t => t.Type != null).GroupBy(t => (t.Type, t.Id)).Select(g => g.First()).ToList();
 
 		public static MeshIndexFile Parse(uint id, ReadOnlySpan<byte> decompressed)
 		{

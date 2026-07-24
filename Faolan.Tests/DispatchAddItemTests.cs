@@ -23,13 +23,13 @@ namespace Faolan.Tests
 	{
 		// Captured DispatchAddItem method body (frame 2881 of the questcomplete capture).
 		private const string CapturedBody = "0000006801316d8a000000000000007d08b2b6ecdab1ec8aec201204080010011208080810ffffffff0f1206081710b2e634" +
-											"1204082e10071a530a140d99bf60dd15f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c" +
-											"7ed8d1a140d99bf60dd15f67309761dcaed497925d2c7ed8d25154b33002d154b33003801453550554300000000";
+		                                    "1204082e10071a530a140d99bf60dd15f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c" +
+		                                    "7ed8d1a140d99bf60dd15f67309761dcaed497925d2c7ed8d25154b33002d154b33003801453550554300000000";
 
 		// The bare ProtoInventoryGameEntry carried as i_cEntry (the InventoryListEntry.item without the Pos wrapper).
 		private const string CapturedEntry = "08b2b6ecdab1ec8aec201204080010011208080810ffffffff0f1206081710b2e6341204082e10071a530a140d99bf60dd15" +
-											 "f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c7ed8d1a140d99bf60dd15f67309761dca" +
-											 "ed497925d2c7ed8d25154b33002d154b330038014535505543";
+		                                     "f67309761dcaed497925d2c7ed8d12140d99bf60dd15f67309761dcaed497925d2c7ed8d1a140d99bf60dd15f67309761dca" +
+		                                     "ed497925d2c7ed8d25154b33002d154b330038014535505543";
 
 		private const uint CharId = 0x01316d8a;
 		private const uint ItemPos = 0;

@@ -30,7 +30,8 @@ namespace Faolan.Mcp.Tools
 		 Description("List the clients currently connected to the live Faolan agent server, with account/character identity. Read-only snapshot of the running server.")]
 		public string ListSessions()
 		{
-			var sessions = _dispatcher.GetWorldSessions()
+			var sessions = _dispatcher
+				.GetWorldSessions()
 				.Select(s => new
 				{
 					CharacterId = s.Character?.Id,

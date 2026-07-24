@@ -12,12 +12,12 @@ namespace Faolan.Web.Components.Pages
 {
 	public partial class Mail
 	{
+		private List<MailView> _mailbox = [];
+		private List<string> _characters = [];
 		private bool _busy;
 		private bool _isAdmin;
 
 		private bool _ready;
-		private List<MailView> _mailbox = [];
-		private List<string> _characters = [];
 		private string _active = "";
 		private string _body = "";
 		private string _itemId = "";

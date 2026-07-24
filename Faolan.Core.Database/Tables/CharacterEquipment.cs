@@ -451,7 +451,7 @@ namespace Faolan.Core.Database.Tables
 			{
 				WeaponSet.Primary   => (MainHandLeftId, OffHandLeftId),
 				WeaponSet.Secondary => (MainHandRightId, OffHandRightId),
-				_                   => ((uint?)null, (uint?)null)
+				_                   => (null, null)
 			};
 			if (main is > 0)
 				yield return main.Value;

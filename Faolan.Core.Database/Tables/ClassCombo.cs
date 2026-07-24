@@ -24,10 +24,10 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(ComboId))]
 		public virtual Combo Combo { get; set; } = null!;
 
-		// The character level this combo unlocks at FOR THIS CLASS.
-		public byte Level { get; set; }
-
 		[ConstrainToEnumValues]
 		public Class Class { get; set; }
+
+		// The character level this combo unlocks at FOR THIS CLASS.
+		public byte Level { get; set; }
 	}
 }

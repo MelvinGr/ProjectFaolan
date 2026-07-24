@@ -54,7 +54,8 @@ namespace Faolan.Importer.Cli
 				var dbFile = new SqliteConnectionStringBuilder(connection).DataSource;
 				if (!File.Exists(dbFile))
 				{
-					await Console.Error.WriteLineAsync($"Database not found: {dbFile} (the DB is the source of truth; set Database:ConnectionString in faolan.json, or pass --connectionstring \"Data Source=<path>\").");
+					await Console.Error.WriteLineAsync(
+						$"Database not found: {dbFile} (the DB is the source of truth; set Database:ConnectionString in faolan.json, or pass --connectionstring \"Data Source=<path>\").");
 					return 1;
 				}
 			}
@@ -194,10 +195,10 @@ namespace Faolan.Importer.Cli
 		{
 			return s.Trim().ToLowerInvariant() switch
 			{
-				"insert" => WriteMode.Insert,
-				"upsert" => WriteMode.Upsert,
+				"insert"    => WriteMode.Insert,
+				"upsert"    => WriteMode.Upsert,
 				"overwrite" => WriteMode.Overwrite,
-				_ => throw new ArgumentException($"Unknown write mode '{s}' (expected insert|upsert|overwrite).")
+				_           => throw new ArgumentException($"Unknown write mode '{s}' (expected insert|upsert|overwrite).")
 			};
 		}
 

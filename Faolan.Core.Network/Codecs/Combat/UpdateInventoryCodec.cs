@@ -26,12 +26,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteArrayUInt32Length(b => b
-				.WriteUInt32(Opcode)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(Handle)
-				.WriteByte(Env)
-				.WriteArrayUInt32Length(InventoryProtobuf));
+			s.WriteArrayUInt32Length(b => b.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteArrayUInt32Length(InventoryProtobuf));
 		}
 
 		public static UpdateInventoryCodec Parse(byte[] body)

@@ -61,6 +61,11 @@ namespace Faolan.GameServer.World
 		// quadruped). Read by CombatService.OnNpcKilled when it sends the death BccIIR.
 		public uint DeathBehaviorId { get; set; } = WorldDeath.HumanoidDeathBehaviorId;
 
+		// For an NPC: a quest that, once the VIEWER has COMPLETED it, HIDES this NPC (they don't spawn / are despawned).
+		// The complement of GateQuestIds ("show while active") - e.g. Casilda vanishes from the beach once her escort
+		// quest is completed. Data-driven from the Escort goal (escortee template -> escort quest id). null = never hidden.
+		public uint? HideWhenQuestCompletedId { get; set; }
+
 		// Which instance (copy) of MapId this entity lives in (#268). Equals its Zone's PlayfieldToken - the retail
 		// playfield-instance id. 0 until placed; WorldState.Place sets it from the resolved/created instance so every
 		// later ZoneFor(entity) lands in the same copy. Two entities only see each other if MapId AND InstanceId match.
@@ -79,6 +84,96 @@ namespace Faolan.GameServer.World
 		// a replacement at a free area point when it dies) instead of the per-entity respawn - and its wander waypoints
 		// are the area's points, so it roams the group's area.
 		public uint? SpawnAreaId { get; set; }
+
+		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
+		// On a server-initiated cancel the server pushes the decoded buff-removal IIR (#253: the ApplySpell rank-1
+		// "end" twin with an empty payload) so the client clears the icon live. On the client-initiated CancelBuff
+		// (0x201E right-click) retail sends only a FormatFeedback text - the client removes its own icon - and a
+		// timed buff is expired client-side from the ApplySpell duration. Durations come from the RDB spell defs once
+		// imported (TODO 5); entries with one expire on the tick, the rest live until cancel/disconnect. Stat effects
+		// land with the same spell-def work.
+		public ConcurrentDictionary<uint, ActiveBuff> ActiveBuffs { get; } = new ConcurrentDictionary<uint, ActiveBuff>();
+
+		// UTC time this player last dealt or took damage. HP/mana regen is OUT-OF-COMBAT only in retail (the client's
+		// OOCHealth/ManaRegeneration stats), so while within WorldSimulation.CombatRegenPause of this the HP+mana regen
+		// is halted; stamina (the action resource) keeps regenerating. MinValue = never in combat (fresh player regens).
+		public DateTimeOffset LastCombatAt { get; set; } = DateTimeOffset.MinValue;
+
+		// Live vitals (NPCs are seeded at load; null for entities the combat/world layer doesn't track here yet).
+		// The world is the authoritative owner - combat applies damage to this, and the tick respawns off it.
+		public EntityVitals Vitals { get; set; } = null!;
+
+		// For a PLAYER: the quest ids the player currently has ACTIVE. Drives quest-gated NPC visibility (#261).
+		// Refreshed at world entry and whenever the player's quest state changes (accept / advance / complete).
+		public HashSet<uint> ActiveQuestIds { get; } = [];
+
+		// For a PLAYER: the quest ids the player has COMPLETED. Drives "hide once done" NPC gating (#262) - e.g. Casilda
+		// is gone from the beach once her escort quest is completed. Loaded alongside ActiveQuestIds.
+		public HashSet<uint> CompletedQuestIds { get; } = [];
+
+		// For a player: the handles the client has actually CONFIRMED constructing - i.e. polled via 0x2020 (the poll's
+		// requestId is the entity handle; the server answers with a 0x2008 SpawnCheck that renders it). Known means "spawn
+		// sent"; Confirmed means "client built it". A despawn (n3ToClientQuit) for a Known-but-not-Confirmed handle hits a
+		// pcDynel-NULL loader crash on a still-loading client (#245), so interest only despawns Confirmed handles.
+		public HashSet<uint> Confirmed { get; } = [];
+
+		// For a player: the handles this player currently sees (has been sent a spawn for). Interest management diffs
+		// against this set to decide what to spawn/despawn as entities move in and out of range. Unused for NPCs.
+		public HashSet<uint> Known { get; } = [];
+
+		// The owning connection for a player (so the broadcaster can send packets to it); null for NPCs.
+		public INetworkClient Client { get; }
+
+		// #266 patrol: the captured waypoint route (absolute world coords) this NPC walks + its walk speed; empty for a
+		// stationary NPC. Sent as a patrol MoveTask after the NPC spawns - retail drives idle patrol client-side (the
+		// client walks the route), so the server just issues the captured route once per spawn/respawn.
+		public IReadOnlyList<Vector3> PatrolWaypoints { get; set; } = [];
+
+		// For an NPC: the quest ids that gate this NPC's visibility (null/empty = ungated, seen by everyone). A gated
+		// NPC is streamed only to a viewer holding one of these quests active - e.g. Scavenger Tuut appears only while
+		// you carry Casilda's kill quest. Data-driven from the quest goal definitions (kill-target NPCs that aren't
+		// quest givers), so it generalises to any number of quests/NPCs. See IsVisibleTo.
+		public IReadOnlyList<uint> GateQuestIds { get; set; } = null!;
+
+		// Spells this CASTER NPC can cast at its target (#232), loaded from NpcSpell rows (by name) at zone load.
+		// Empty for non-caster NPCs and players; IsCaster gates the sim's cast branch.
+		public List<NpcSpellCast> Spells { get; } = [];
+
+		// For a PLAYER: the pending ReachArea quest goals (#262) - a location objective is solved when the player moves
+		// within range of its point. Loaded once at world entry (null = not yet loaded) so the per-move check is a pure
+		// in-memory distance test, no DB hit; entries are removed as they're reached. Empty list = nothing to watch.
+		public List<ReachGoalTarget> PendingReachGoals { get; set; } = null!;
+
+		// Item template ids carried by a loot bag, rolled when it drops; granted to the looter's backpack via
+		// DispatchAddItem (0x2020) on TryLootAll and removed as they're taken, so each item is granted exactly once.
+		public List<uint> LootItems { get; } = [];
+
+		// The loot CONTAINER this creature drops on death (from its NpcTemplate.LootContainerTemplateId): a plain Bag
+		// by default, a bigger chest for bosses/elites. Read by the kill-drop path (OnNpcKilled -> SpawnLootBagAt) to
+		// pick the LootContainerTemplate variant. Stamped at spawn from the type; harmless (unused) on players.
+		public LootContainerTemplateId LootContainer { get; set; } = LootContainerTemplateId.Bag;
+		public Quaternion Rotation { get; set; }
+		public Quaternion SpawnRotation { get; set; }
+
+		// #272: the FROM point of the segment the broadcaster actually sends (MoveFrom -> Position), captured when a move
+		// effect is queued. Distinct from MoveOrigin (which re-anchors to Position at that moment to start the next
+		// segment); the broadcaster reads MoveFrom so its segment isn't degenerate. Also the facing source for the StopIIR.
+		public Vector3 MoveFrom { get; set; }
+
+		// #272 smooth movement: MoveOrigin is the ACCUMULATION ANCHOR for the move-broadcast throttle - the start of the
+		// segment currently being built up. The model steps Position every tick, but a MoveTask is only broadcast once
+		// Position has travelled a retail-sized distance (MoveBroadcastSegment) from this anchor, at which point the anchor
+		// re-advances to Position. So the client interpolates ~6u segments instead of a 1.2u-per-tick snap (the jitter).
+		public Vector3 MoveOrigin { get; set; }
+		public Vector3 Position { get; set; }
+
+		// Where the entity respawns (its original spawn point) - set for NPCs by ForNpc.
+		public Vector3 SpawnPosition { get; set; }
+
+		// #400: a PLAYER's currently-drawn weapon set (Primary = equip slots 6/8, Secondary = 20/21). Toggled by the
+		// SwitchWeaponsButton action and seeded from Character.ActiveWeaponSet on world entry; the swap is relayed to
+		// viewers via the BCC behavior channel. Unused for NPCs (they carry a fixed loadout).
+		public WeaponSet ActiveWeaponSet { get; set; }
 		public bool Following => FollowTargetHandle != null;
 
 		// GM toggles on a PLAYER entity (.godmode / .invisible). GodMode: the player takes no damage from NPC swings.
@@ -116,11 +211,6 @@ namespace Faolan.GameServer.World
 
 		public bool IsPlayer { get; }
 
-		// #400: a PLAYER's currently-drawn weapon set (Primary = equip slots 6/8, Secondary = 20/21). Toggled by the
-		// SwitchWeaponsButton action and seeded from Character.ActiveWeaponSet on world entry; the swap is relayed to
-		// viewers via the BCC behavior channel. Unused for NPCs (they carry a fixed loadout).
-		public WeaponSet ActiveWeaponSet { get; set; }
-
 		// #272: true while this entity is mid-move (chasing / returning home / following a player). Drives the segment
 		// throttle (the anchor is seeded when a move starts) and the one-shot stop (so an arrival emits a single StopIIR).
 		// Cleared on arrival, death and respawn.
@@ -151,80 +241,10 @@ namespace Faolan.GameServer.World
 		// re-frames per recipient (current position + live playfield token) in SendWorldSpawn, so it isn't rebuilt for
 		// every viewer. Null until built / for entities with no spawn.
 		public byte[] SpawnBody { get; set; } = null!;
-
-		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
-		// On a server-initiated cancel the server pushes the decoded buff-removal IIR (#253: the ApplySpell rank-1
-		// "end" twin with an empty payload) so the client clears the icon live. On the client-initiated CancelBuff
-		// (0x201E right-click) retail sends only a FormatFeedback text - the client removes its own icon - and a
-		// timed buff is expired client-side from the ApplySpell duration. Durations come from the RDB spell defs once
-		// imported (TODO 5); entries with one expire on the tick, the rest live until cancel/disconnect. Stat effects
-		// land with the same spell-def work.
-		public ConcurrentDictionary<uint, ActiveBuff> ActiveBuffs { get; } = new ConcurrentDictionary<uint, ActiveBuff>();
 		public double PatrolCycleSeconds { get; set; }
 
 		// How long this entity stays dead before the tick respawns it.
 		public double RespawnDelaySeconds { get; set; } = DefaultRespawnDelaySeconds;
-
-		// Live vitals (NPCs are seeded at load; null for entities the combat/world layer doesn't track here yet).
-		// The world is the authoritative owner - combat applies damage to this, and the tick respawns off it.
-		public EntityVitals Vitals { get; set; } = null!;
-
-		// For a PLAYER: the quest ids the player currently has ACTIVE. Drives quest-gated NPC visibility (#261).
-		// Refreshed at world entry and whenever the player's quest state changes (accept / advance / complete).
-		public HashSet<uint> ActiveQuestIds { get; } = [];
-
-		// For a PLAYER: the quest ids the player has COMPLETED. Drives "hide once done" NPC gating (#262) - e.g. Casilda
-		// is gone from the beach once her escort quest is completed. Loaded alongside ActiveQuestIds.
-		public HashSet<uint> CompletedQuestIds { get; } = [];
-
-		// For a player: the handles the client has actually CONFIRMED constructing - i.e. polled via 0x2020 (the poll's
-		// requestId is the entity handle; the server answers with a 0x2008 SpawnCheck that renders it). Known means "spawn
-		// sent"; Confirmed means "client built it". A despawn (n3ToClientQuit) for a Known-but-not-Confirmed handle hits a
-		// pcDynel-NULL loader crash on a still-loading client (#245), so interest only despawns Confirmed handles.
-		public HashSet<uint> Confirmed { get; } = [];
-
-		// For a player: the handles this player currently sees (has been sent a spawn for). Interest management diffs
-		// against this set to decide what to spawn/despawn as entities move in and out of range. Unused for NPCs.
-		public HashSet<uint> Known { get; } = [];
-
-		// The owning connection for a player (so the broadcaster can send packets to it); null for NPCs.
-		public INetworkClient Client { get; }
-
-		// For an NPC: the quest ids that gate this NPC's visibility (null/empty = ungated, seen by everyone). A gated
-		// NPC is streamed only to a viewer holding one of these quests active - e.g. Scavenger Tuut appears only while
-		// you carry Casilda's kill quest. Data-driven from the quest goal definitions (kill-target NPCs that aren't
-		// quest givers), so it generalises to any number of quests/NPCs. See IsVisibleTo.
-		public IReadOnlyList<uint> GateQuestIds { get; set; } = null!;
-
-		// For an NPC: a quest that, once the VIEWER has COMPLETED it, HIDES this NPC (they don't spawn / are despawned).
-		// The complement of GateQuestIds ("show while active") - e.g. Casilda vanishes from the beach once her escort
-		// quest is completed. Data-driven from the Escort goal (escortee template -> escort quest id). null = never hidden.
-		public uint? HideWhenQuestCompletedId { get; set; }
-
-		// For a PLAYER: the pending ReachArea quest goals (#262) - a location objective is solved when the player moves
-		// within range of its point. Loaded once at world entry (null = not yet loaded) so the per-move check is a pure
-		// in-memory distance test, no DB hit; entries are removed as they're reached. Empty list = nothing to watch.
-		public List<ReachGoalTarget> PendingReachGoals { get; set; } = null!;
-
-		// #266 patrol: the captured waypoint route (absolute world coords) this NPC walks + its walk speed; empty for a
-		// stationary NPC. Sent as a patrol MoveTask after the NPC spawns - retail drives idle patrol client-side (the
-		// client walks the route), so the server just issues the captured route once per spawn/respawn.
-		public IReadOnlyList<Vector3> PatrolWaypoints { get; set; } = [];
-
-		// Spells this CASTER NPC can cast at its target (#232), loaded from NpcSpell rows (by name) at zone load.
-		// Empty for non-caster NPCs and players; IsCaster gates the sim's cast branch.
-		public List<NpcSpellCast> Spells { get; } = [];
-
-		// Item template ids carried by a loot bag, rolled when it drops; granted to the looter's backpack via
-		// DispatchAddItem (0x2020) on TryLootAll and removed as they're taken, so each item is granted exactly once.
-		public List<uint> LootItems { get; } = [];
-
-		// The loot CONTAINER this creature drops on death (from its NpcTemplate.LootContainerTemplateId): a plain Bag
-		// by default, a bigger chest for bosses/elites. Read by the kill-drop path (OnNpcKilled -> SpawnLootBagAt) to
-		// pick the LootContainerTemplate variant. Stamped at spawn from the type; harmless (unused) on players.
-		public LootContainerTemplateId LootContainer { get; set; } = LootContainerTemplateId.Bag;
-		public Quaternion Rotation { get; set; }
-		public Quaternion SpawnRotation { get; set; }
 
 		// For a LOOT BAG dropped by a kill: the NAME of the NPC whose corpse it is (e.g. "Scavenger Tuut"). The bag is a
 		// decoupled entity (#246) whose own Name is the generic "Bag of loot", so the source is recorded separately - it
@@ -255,42 +275,20 @@ namespace Faolan.GameServer.World
 		// mitigate incoming physical damage (CombatResolver.ApplyPhysicalMitigation). 0 for NPCs and unarmored players.
 		public uint ArmorRating { get; set; }
 
-		// The player's aggregated magical Protection rating from worn gear (#401); mitigates incoming MAGIC damage
-		// (CombatResolver.ApplyMagicMitigation). 0 for NPCs and players with no Protection gear.
-		public uint Protection { get; set; }
-
-		// The player's aggregated Hit Rating from worn gear (#399). Hit Rating governs HIT chance (miss avoidance),
-		// which isn't modelled yet, so it is currently unused. 0 for NPCs / no gear.
-		public uint HitRating { get; set; }
-
-		// Aggregated crit stats from worn gear (#399): Critical Rating drives the melee crit CHANCE, Critical Damage
-		// Rating the crit MAGNITUDE (CombatResolver). 0 for NPCs / no gear.
-		public uint CriticalRating { get; set; }
-		public uint CriticalDamageRating { get; set; }
-
-		// The player's aggregated Combat Rating from worn gear (#399, generic 0x36B), added as a provisional flat
-		// melee damage bonus (its real hit-rate role needs a hit/miss model). 0 for NPCs / no gear.
-		public uint CombatRating { get; set; }
-
-		// The player's aggregated Magic Damage rating from worn gear (#399), summed at world entry; added flat to the
-		// damage of spells they cast (CombatResolver.ResolveSpellDamage). 0 for NPCs and players with no such gear.
-		public uint MagicDamage { get; set; }
-
-		// The player's aggregated Natural Mana/Stamina Regen from worn gear (display units/sec), summed at world entry
-		// and added onto the base regen tick (WorldSimulation). 0 for NPCs and players with no such gear.
-		public uint NaturalManaRegen { get; set; }
-		public uint NaturalStaminaRegen { get; set; }
-
 		public uint AttackSwingCounter { get; set; }
-
-		// UTC time this player last dealt or took damage. HP/mana regen is OUT-OF-COMBAT only in retail (the client's
-		// OOCHealth/ManaRegeneration stats), so while within WorldSimulation.CombatRegenPause of this the HP+mana regen
-		// is halted; stamina (the action resource) keeps regenerating. MinValue = never in combat (fresh player regens).
-		public DateTimeOffset LastCombatAt { get; set; } = DateTimeOffset.MinValue;
 
 		// Coins carried by a loot bag (tin, the wallet wire unit), rolled when the bag drops; zeroed once looted
 		// (TryLootCash is granted exactly once per bag).
 		public uint CashTin { get; set; }
+
+		// The player's aggregated Combat Rating from worn gear (#399, generic 0x36B), added as a provisional flat
+		// melee damage bonus (its real hit-rate role needs a hit/miss model). 0 for NPCs / no gear.
+		public uint CombatRating { get; set; }
+		public uint CriticalDamageRating { get; set; }
+
+		// Aggregated crit stats from worn gear (#399): Critical Rating drives the melee crit CHANCE, Critical Damage
+		// Rating the crit MAGNITUDE (CombatResolver). 0 for NPCs / no gear.
+		public uint CriticalRating { get; set; }
 
 		// The retail overhead-name disposition toward the player: 0 = friendly (green), 1 = hostile (red),
 		// 2 = neutral (yellow). Sourced from NpcStatCore.Disposition (captured cCategory, #256/aggro) at zone load.
@@ -301,8 +299,25 @@ namespace Faolan.GameServer.World
 		// The wire handle other entities address this one by (the player's client instance / an NPC's spawn handle).
 		public uint Handle { get; }
 
+		// The player's aggregated Hit Rating from worn gear (#399). Hit Rating governs HIT chance (miss avoidance),
+		// which isn't modelled yet, so it is currently unused. 0 for NPCs / no gear.
+		public uint HitRating { get; set; }
+
 		// The entity's level (NPCs: from their NpcSpawn row; drives the kill-XP award). 0 if unknown.
 		public uint Level { get; set; }
+
+		// The player's aggregated Magic Damage rating from worn gear (#399), summed at world entry; added flat to the
+		// damage of spells they cast (CombatResolver.ResolveSpellDamage). 0 for NPCs and players with no such gear.
+		public uint MagicDamage { get; set; }
+
+		// The player's aggregated Natural Mana/Stamina Regen from worn gear (display units/sec), summed at world entry
+		// and added onto the base regen tick (WorldSimulation). 0 for NPCs and players with no such gear.
+		public uint NaturalManaRegen { get; set; }
+		public uint NaturalStaminaRegen { get; set; }
+
+		// The player's aggregated magical Protection rating from worn gear (#401); mitigates incoming MAGIC damage
+		// (CombatResolver.ApplyMagicMitigation). 0 for NPCs and players with no Protection gear.
+		public uint Protection { get; set; }
 
 		// #262 companion-follow: the handle of the PLAYER this NPC follows (0 = not following). Set when the player
 		// "releases" the NPC (e.g. Casilda after her rescue stage); the world tick steps the NPC toward that player and
@@ -320,21 +335,6 @@ namespace Faolan.GameServer.World
 		// If this entity is a PET, the handle of the owner (the summoner's client instance); null = not a pet (#307).
 		// Set when the pet is bound via PetIIR owner-assign; QueuePetCommand (0x205b) validates the commander owns it.
 		public uint? OwnerHandle { get; set; }
-
-		// #272: the FROM point of the segment the broadcaster actually sends (MoveFrom -> Position), captured when a move
-		// effect is queued. Distinct from MoveOrigin (which re-anchors to Position at that moment to start the next
-		// segment); the broadcaster reads MoveFrom so its segment isn't degenerate. Also the facing source for the StopIIR.
-		public Vector3 MoveFrom { get; set; }
-
-		// #272 smooth movement: MoveOrigin is the ACCUMULATION ANCHOR for the move-broadcast throttle - the start of the
-		// segment currently being built up. The model steps Position every tick, but a MoveTask is only broadcast once
-		// Position has travelled a retail-sized distance (MoveBroadcastSegment) from this anchor, at which point the anchor
-		// re-advances to Position. So the client interpolates ~6u segments instead of a 1.2u-per-tick snap (the jitter).
-		public Vector3 MoveOrigin { get; set; }
-		public Vector3 Position { get; set; }
-
-		// Where the entity respawns (its original spawn point) - set for NPCs by ForNpc.
-		public Vector3 SpawnPosition { get; set; }
 
 		public WorldEntity(uint handle, uint mapId, bool isPlayer, string name, INetworkClient client)
 		{

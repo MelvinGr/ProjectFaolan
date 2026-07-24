@@ -216,7 +216,7 @@ namespace Faolan.GameServer.Combat
 			var weapon = await _database.GetEquippedWeaponDamage(client.Session.Character.Id);
 			var attackerEntity = _sim.PlayerWorldEntity(client);
 			attackerEntity?.LastCombatAt = DateTimeOffset.UtcNow; // attacking -> in combat (halts HP/mana regen)
-																  // Roll between the weapon's min and max for per-swing variance (#395); Combat Rating adds a flat bonus (#399).
+			// Roll between the weapon's min and max for per-swing variance (#395); Combat Rating adds a flat bonus (#399).
 			var damage = (uint)CombatResolver.ResolveMeleeDamage(weapon?.Min, weapon?.Max, level, Random.Shared.Next(101), attackerEntity?.CombatRating ?? 0);
 			// #399: roll a critical hit off the player's Critical Rating; a crit scales the damage by the base 1.5x plus
 			// their Critical Damage Rating. A crit is NOT a distinct wire flag - RE of all captured DamageResults
@@ -230,9 +230,8 @@ namespace Faolan.GameServer.Combat
 			var next = (ushort)(seq + 1);
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing.
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(s => s
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, b =>
+				b.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(instance)
@@ -252,8 +251,8 @@ namespace Faolan.GameServer.Combat
 					.WriteUInt32(EntityClass.Character)
 					.WriteUInt32(targetHandle)
 					.WriteUInt32(0) // result: count, c350, VICTIM=target, 0 - the entity that plays the hit-react/blood.
-									// Was `instance` (the player), which played the blood/impact on SELF when hitting an NPC (#228);
-									// the proven NPC->player ack (BuildNpcAttackAnimationAckBody) names the victim handle in this slot.
+					// Was `instance` (the player), which played the blood/impact on SELF when hitting an NPC (#228);
+					// the proven NPC->player ack (BuildNpcAttackAnimationAckBody) names the victim handle in this slot.
 					.WriteByte(0x06)
 					.WriteUInt32(0x000000CBu) // result constant (was 0xCD; the capture's BccAck result block uses 0xCB)
 					.WriteUInt32(0)
@@ -617,16 +616,6 @@ namespace Faolan.GameServer.Combat
 			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, school));
 		}
 
-		// Retail's per-tick vitals regen (RegenIIR 0x28D0AC99, decoded): a compact [+hp][+mana][+stamina] delta the
-		// client ADDS to the current bars, ×100 wire scale. Lets the bars regen smoothly without pushing a full
-		// 0x96B8DC59 block every tick. RegenCodec.Build already frames it as the [u32 len][iir] carrier body, so it
-		// rides the DispatchPassBlob directly (WriteArray, not WriteArrayUInt32Length).
-		public static Task SendRegen(INetworkClient client, uint handle, int healthDelta, int manaDelta, int staminaDelta)
-		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, RegenCodec.Build(handle, healthDelta, manaDelta, staminaDelta)));
-		}
-
 		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:
 		// prefix 0x65 + state = the destination equip slot for a move INTO a slot, prefix 0x68 + state 0 for a move
 		// OUT of one (combat capture frames 289-290/320-321/375-376).
@@ -665,6 +654,16 @@ namespace Faolan.GameServer.Combat
 			return SendWorldPacket(client, body);
 		}
 
+		// Retail's per-tick vitals regen (RegenIIR 0x28D0AC99, decoded): a compact [+hp][+mana][+stamina] delta the
+		// client ADDS to the current bars, ×100 wire scale. Lets the bars regen smoothly without pushing a full
+		// 0x96B8DC59 block every tick. RegenCodec.Build already frames it as the [u32 len][iir] carrier body, so it
+		// rides the DispatchPassBlob directly (WriteArray, not WriteArrayUInt32Length).
+		public static Task SendRegen(INetworkClient client, uint handle, int healthDelta, int manaDelta, int staminaDelta)
+		{
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+				RegenCodec.Build(handle, healthDelta, manaDelta, staminaDelta)));
+		}
+
 		// A DoT tick's StatDamageIIR (the health effect of an active bleed/HoT). idx 1 is the typical effect slot in
 		// the capture; statValue = the resulting HealthCurrent so the client's bar/number matches the vitals move. #274
 		public static Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
@@ -688,8 +687,8 @@ namespace Faolan.GameServer.Combat
 		// Frames a raw 0x2000 body on the world conversation.
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(body)));
 		}
 	}
 }

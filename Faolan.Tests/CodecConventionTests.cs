@@ -131,10 +131,10 @@ namespace Faolan.Tests
 			var offenders = new List<string>();
 
 			foreach (var file in roots
-						 .Where(Directory.Exists)
-						 .SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
-						 .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") &&
-									 !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}")))
+				         .Where(Directory.Exists)
+				         .SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
+				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") &&
+				                     !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}")))
 			{
 				var lines = File.ReadAllLines(file);
 				for (var i = 0; i < lines.Length; i++)
@@ -172,13 +172,13 @@ namespace Faolan.Tests
 			var bad = new List<string>();
 			var checkedCount = 0;
 			foreach (var t in CodecTypes)
-				foreach (var f in Fields(t).Where(f => f.IsLiteral && f.FieldType == typeof(uint) && f.Name.EndsWith("Opcode", StringComparison.Ordinal)))
-				{
-					checkedCount++;
-					var value = (uint)f.GetRawConstantValue()!;
-					if (!Enum.IsDefined((GameServer0X2000Opcodes)value))
-						bad.Add($"{t.Name}.{f.Name} = 0x{value:X8} is not a defined GameServer0X2000Opcodes member");
-				}
+			foreach (var f in Fields(t).Where(f => f.IsLiteral && f.FieldType == typeof(uint) && f.Name.EndsWith("Opcode", StringComparison.Ordinal)))
+			{
+				checkedCount++;
+				var value = (uint)f.GetRawConstantValue()!;
+				if (!Enum.IsDefined((GameServer0X2000Opcodes)value))
+					bad.Add($"{t.Name}.{f.Name} = 0x{value:X8} is not a defined GameServer0X2000Opcodes member");
+			}
 
 			Assert.True(bad.Count == 0, "Opcode constants must be (uint)GameServer0X2000Opcodes.<Type>:\n  " + string.Join("\n  ", bad));
 			Assert.True(checkedCount >= 15, $"only {checkedCount} Opcode constants found - the reflection filter is probably broken");

@@ -128,6 +128,34 @@ namespace Faolan.Tests
 			Assert.Equal("a36d3b740000c35001316d8a000000001f080510021800220f57656c636f6d655475746f7269616c2a00320408001000",
 				Convert.ToHexString(ScryScript.BuildStep(0x01316D8A, "WelcomeTutorial")).ToLowerInvariant());
 		}
+
+		[Fact]
+		public void MatchingCollectGoal_ByItemId_CollectTypeOnly()
+		{
+			// Shipwrecked V (12371): goal 3495 = CollectItem brick 193400; goal 3497 = deliver (TalkToNpc Turach) also
+			// carries item 193400 in TrailingRefId, but the collect matcher must ignore it (wrong type).
+			var goals = new[]
+			{
+				new QuestGoalDefinition
+				{
+					Sequence = 1,
+					GoalId = 3495,
+					GoalType = QuestGoalType.CollectItem,
+					TrailingRefId = 193400
+				},
+				new QuestGoalDefinition
+				{
+					Sequence = 2,
+					GoalId = 3497,
+					GoalType = QuestGoalType.TalkToNpc,
+					TargetName = "Turach",
+					TrailingRefId = 193400
+				}
+			};
+			Assert.Equal(3495u, QuestProgress.MatchingCollectGoal(goals, 193400)?.GoalId); // CollectItem by item id
+			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 999)); // no collect goal for that item
+			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 0)); // no item -> no match (never the TalkToNpc goal)
+		}
 		// --- Quest objective-tracking rules (#261/#357) ---------------------------------------------------------------
 
 		[Fact]
@@ -149,33 +177,40 @@ namespace Faolan.Tests
 			// ReachArea "enter jungle", which the kill matcher must never return.
 			var goals = new[]
 			{
-				new QuestGoalDefinition { Sequence = 1, GoalId = 1448, GoalType = QuestGoalType.ReachArea, TrailingRefId = 180 },
-				new QuestGoalDefinition { Sequence = 2, GoalId = 3490, GoalType = QuestGoalType.Kill, TargetName = "Saddur", TrailingRefId = 9500 }
+				new QuestGoalDefinition
+				{
+					Sequence = 1,
+					GoalId = 1448,
+					GoalType = QuestGoalType.ReachArea,
+					TrailingRefId = 180
+				},
+				new QuestGoalDefinition
+				{
+					Sequence = 2,
+					GoalId = 3490,
+					GoalType = QuestGoalType.Kill,
+					TargetName = "Saddur",
+					TrailingRefId = 9500
+				}
 			};
 			Assert.Equal(3490u, QuestProgress.MatchingKillGoal(goals, 9500, "Saddur")?.GoalId); // by STABLE template id
 			Assert.Equal(3490u, QuestProgress.MatchingKillGoal(goals, 9500, null!)?.GoalId); // id alone, no name needed
 			Assert.Null(QuestProgress.MatchingKillGoal(goals, 12141, "Some Lackey")); // wrong id + unknown name -> no match
 
 			// Fallback: a goal seeded by NAME only (no TrailingRefId - e.g. a "kill N <group>" whose ref is a group id).
-			var byName = new[] { new QuestGoalDefinition { Sequence = 1, GoalId = 700, GoalType = QuestGoalType.Kill, TargetName = "Scavenger Lackey" } };
+			var byName = new[]
+			{
+				new QuestGoalDefinition
+				{
+					Sequence = 1,
+					GoalId = 700,
+					GoalType = QuestGoalType.Kill,
+					TargetName = "Scavenger Lackey"
+				}
+			};
 			Assert.Equal(700u, QuestProgress.MatchingKillGoal(byName, 12141, "scavenger lackey")?.GoalId); // id misses -> name, case-insensitive
 			Assert.Equal(700u, QuestProgress.MatchingKillGoal(byName, null, "Scavenger Lackey")?.GoalId); // no id -> name
 			Assert.Null(QuestProgress.MatchingKillGoal(byName, null, "Nobody")); // no id, wrong name
-		}
-
-		[Fact]
-		public void MatchingCollectGoal_ByItemId_CollectTypeOnly()
-		{
-			// Shipwrecked V (12371): goal 3495 = CollectItem brick 193400; goal 3497 = deliver (TalkToNpc Turach) also
-			// carries item 193400 in TrailingRefId, but the collect matcher must ignore it (wrong type).
-			var goals = new[]
-			{
-				new QuestGoalDefinition { Sequence = 1, GoalId = 3495, GoalType = QuestGoalType.CollectItem, TrailingRefId = 193400 },
-				new QuestGoalDefinition { Sequence = 2, GoalId = 3497, GoalType = QuestGoalType.TalkToNpc, TargetName = "Turach", TrailingRefId = 193400 }
-			};
-			Assert.Equal(3495u, QuestProgress.MatchingCollectGoal(goals, 193400)?.GoalId); // CollectItem by item id
-			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 999)); // no collect goal for that item
-			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 0)); // no item -> no match (never the TalkToNpc goal)
 		}
 
 		// End-to-end: the importer harvests the Casilda definition from the captures, and feeding it back

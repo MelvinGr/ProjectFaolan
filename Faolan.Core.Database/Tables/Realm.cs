@@ -28,10 +28,10 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(64)]
 		public string IpAddress { get; set; } = null!;
 
-		public uint IpAddressLong => BinaryPrimitives.ReadUInt32BigEndian(IPAddress.Parse(IpAddress).GetAddressBytes());
-
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;
+
+		public uint IpAddressLong => BinaryPrimitives.ReadUInt32BigEndian(IPAddress.Parse(IpAddress).GetAddressBytes());
 
 		// Multi-realm (process-per-realm, #324): chat + guild/team run IN the realm process, so their ports are
 		// per-realm too. The login/router tier advertises these (with IpAddress) in the ChatServer/CsPlayerAgent

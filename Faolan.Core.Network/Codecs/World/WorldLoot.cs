@@ -45,14 +45,6 @@ namespace Faolan.Core.Network.Codecs.World
 			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.N3ToClientFadeIIR).WriteUInt32(typeTag).WriteUInt32(handle).WriteByte(0x00).WriteFloat(fadeSeconds).ToArray();
 		}
 
-		// NewCurrentLooter / NewAllowedLooter RESET (looter -> none) once the bag is emptied. 21 B:
-		// [subop][lootTypetag][bagHandle][00000000][00000000][00]. Distinct from BuildNewCurrentLooterBody (which
-		// ASSIGNS a looter with [0x00][entityTypetag][playerHandle]); the reset clears it with two zero words.
-		public static byte[] BuildLooterResetBody(uint subOpcode, uint bagHandle)
-		{
-			return new FaolanStream().WriteUInt32(subOpcode).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteUInt32(0).WriteUInt32(0).WriteByte(0x00).ToArray();
-		}
-
 		// LootRemoveItemsIIR (0x70010162): the per-take ACK that tells the client which display slot to remove from the
 		// open bag window. The trailing u32 is the looted item's display Pos (the srcPos the client sent in TryLootItem
 		// 0x2046); the client removes that slot and compacts the window. 25 B:
@@ -72,6 +64,14 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteByte(0xE2)
 				.WriteUInt32(removedPos)
 				.ToArray();
+		}
+
+		// NewCurrentLooter / NewAllowedLooter RESET (looter -> none) once the bag is emptied. 21 B:
+		// [subop][lootTypetag][bagHandle][00000000][00000000][00]. Distinct from BuildNewCurrentLooterBody (which
+		// ASSIGNS a looter with [0x00][entityTypetag][playerHandle]); the reset clears it with two zero words.
+		public static byte[] BuildLooterResetBody(uint subOpcode, uint bagHandle)
+		{
+			return new FaolanStream().WriteUInt32(subOpcode).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteUInt32(0).WriteUInt32(0).WriteByte(0x00).ToArray();
 		}
 
 		// "bag -> ALLOWED looter = this player" (NewAllowedLooterIIR), same shape as the current-looter body but the

@@ -26,17 +26,16 @@ namespace Faolan.Core.Rdb
 	// a value - see RdbLdbNameImporter.
 	public static class LdbStringIndex
 	{
+		public const uint ItemNameCategory = 50200;
 		public const uint Magic = 0x32434454; // "TDC2" little-endian
 		public const uint SpellNameCategory = 50210;
-		public const uint ItemNameCategory = 50200;
-
-		public readonly record struct Entry(uint Category, uint Id, string Value);
 
 		// The page's category, or 0 if the body is not a TDC2 page (too short / wrong magic).
 		public static uint CategoryOf(ReadOnlySpan<byte> body)
 		{
 			if (body.Length < 48)
 				return 0;
+
 			var span = body[12..];
 			return BinaryPrimitives.ReadUInt32LittleEndian(span) != Magic
 				? 0u
@@ -56,6 +55,7 @@ namespace Faolan.Core.Rdb
 				var span = body.AsSpan(12);
 				if (BinaryPrimitives.ReadUInt32LittleEndian(span) != Magic)
 					yield break;
+
 				category = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(4, 4));
 				size = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(12, 4));
 				count = (int)BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(16, 4));
@@ -82,5 +82,7 @@ namespace Faolan.Core.Rdb
 				yield return new Entry(category, id, Encoding.UTF8.GetString(strBytes));
 			}
 		}
+
+		public readonly record struct Entry(uint Category, uint Id, string Value);
 	}
 }

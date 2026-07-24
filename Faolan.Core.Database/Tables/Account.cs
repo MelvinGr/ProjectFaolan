@@ -20,6 +20,9 @@ namespace Faolan.Core.Database.Tables
 		[ConstrainToEnumValues]
 		public AccountType Type { get; set; }
 
+		public DateTimeOffset CreationDate { get; set; } = DateTimeOffset.UtcNow;
+		public DateTimeOffset? LastConnection { get; set; }
+
 		// Whether the account has UNSEEN claims - drives the "new claims available" glow on the client's claims button
 		// (CoreClaimIIR sub 0x0009). Set true when a claim is added; cleared when the player opens the Claims window
 		// (the list request). One flag per account, not per-claim. See GameServerListener.Claims.cs / #359.
@@ -31,9 +34,6 @@ namespace Faolan.Core.Database.Tables
 		// commands (gated to AccountType >= GameMaster), so a normal account never carries them.
 		public bool GmGodMode { get; set; }
 		public bool GmInvisible { get; set; }
-
-		public DateTimeOffset CreationDate { get; set; } = DateTimeOffset.UtcNow;
-		public DateTimeOffset? LastConnection { get; set; }
 
 		[MaxLength(128)]
 		public string Password { get; set; } = null!;

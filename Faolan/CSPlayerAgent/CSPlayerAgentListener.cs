@@ -59,21 +59,20 @@ namespace Faolan.CSPlayerAgent
 					if (client.Session.Character == null)
 						throw new Exception($"Character not found for account {accountId:X} and client instance {characterId:X}");
 
-					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchAuthenticateAck,
-						b => b.WriteUInt32(authReply)));
+					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchAuthenticateAck, b => b.WriteUInt32(authReply)));
 
 					// Guilded character: retail pushes the 0x203F full guild update right after the
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.
 					await _guild.SendGuildStateOnLogin(client, packet);
 
-					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderUpdateFeaturedActivities,
-						(byte[]) [0x01], b => b.WriteArray(0x00, 0x00, 0x03, 0xF1)));
+					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderUpdateFeaturedActivities, (byte[])[0x01],
+						b => b.WriteArray(0x00, 0x00, 0x03, 0xF1)));
 
 					//if(character.Name == null)
 					{
-						await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderRemoved,
-							(byte[]) [0x01],
-							b => b.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>")
+						await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderRemoved, (byte[])[0x01],
+							b => b
+								.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>")
 								.WriteByte(0x01)));
 					}
 

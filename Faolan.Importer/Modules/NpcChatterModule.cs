@@ -24,7 +24,6 @@ namespace Faolan.Importer.Modules
 	// the matching *.tshark.json directly. Correlation: bark sender handle -> the spawn's TemplateId (same capture).
 	public sealed class NpcChatterModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -32,6 +31,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Upsert,
 			WriteMode.Overwrite
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Ambient NPC chatter bark lines (chat-server sayinchat remoteformats), keyed by template.";
 		public string Name => "npc-chatter";
@@ -104,11 +105,13 @@ namespace Faolan.Importer.Modules
 				var existing = await ctx.Db.NpcChatter.Where(c => c.NpcTemplateId == npc.TemplateId).ToListAsync();
 				ctx.Db.NpcChatter.RemoveRange(existing);
 				foreach (var text in texts)
+				{
 					ctx.Db.NpcChatter.Add(new NpcChatter
 					{
 						NpcTemplateId = npc.TemplateId,
 						RemoteFormat = text
 					});
+				}
 
 				npcs++;
 				lines += texts.Count;

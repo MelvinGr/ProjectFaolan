@@ -28,6 +28,10 @@ namespace Faolan.GameServer.Quest
 	// Replaces the single-stage #47 turn-in for chained quests.
 	public sealed class QuestProgressionService
 	{
+		// How close (world units, horizontal) the player must get to a ReachArea goal's marker to solve it (#262). The
+		// markers are approximate (Shipwrecked's "Enter the jungle" is at 416/701, ~28u off the spawn->Saddur path), so
+		// this is generous enough to fire while walking past yet far enough (94u) not to trip at the spawn.
+		private const float ReachRadius = 40f;
 		private readonly IChatServerDispatcher _agents;
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
@@ -64,39 +68,6 @@ namespace Faolan.GameServer.Quest
 		{
 			return Advance(client, QuestGoalType.TalkToNpc, npcName);
 		}
-
-		// #262: the player interacted with a quest-pickup world object (a QuestItemEffect dynel, e.g. a quarry stone
-		// brick). Advance the first active, still-incomplete CollectItem goal and return the item it grants (its
-		// TrailingRefId) so the caller can add it to the bag; null when no collect quest is active (the pickup is then
-		// inert - that's what makes the brick nodes only respond while Shipwrecked V is active). One item per call.
-		public async Task<uint?> TryAdvanceCollectPickup(INetworkClient client)
-		{
-			var character = client.Session.Character;
-
-			foreach (var quest in await _database.GetCharacterQuests(character.Id))
-			{
-				if (quest.State != QuestState.Active)
-					continue;
-
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				var goal = def?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.CollectItem);
-				if (goal == null || goal.TrailingRefId == 0)
-					continue;
-
-				if (await GoalProgressOf(character.Id, quest, def!, goal) >= GoalRequired(quest, def!, goal))
-					continue; // this collect goal is already full
-
-				await Advance(client!, QuestGoalType.CollectItem, null!, goal.TrailingRefId);
-				return goal.TrailingRefId;
-			}
-
-			return null;
-		}
-
-		// How close (world units, horizontal) the player must get to a ReachArea goal's marker to solve it (#262). The
-		// markers are approximate (Shipwrecked's "Enter the jungle" is at 416/701, ~28u off the spawn->Saddur path), so
-		// this is generous enough to fire while walking past yet far enough (94u) not to trip at the spawn.
-		private const float ReachRadius = 40f;
 
 		// #262: the ReachArea goals the player still needs to reach, as in-memory targets for the move-handler proximity
 		// check (WorldEntity.PendingReachGoals). Loaded ONCE at first move so the per-move test hits no DB; skips goals
@@ -166,6 +137,34 @@ namespace Faolan.GameServer.Quest
 				await _outbound.RefreshQuestVisibility(client!);
 		}
 
+		// #262: the player interacted with a quest-pickup world object (a QuestItemEffect dynel, e.g. a quarry stone
+		// brick). Advance the first active, still-incomplete CollectItem goal and return the item it grants (its
+		// TrailingRefId) so the caller can add it to the bag; null when no collect quest is active (the pickup is then
+		// inert - that's what makes the brick nodes only respond while Shipwrecked V is active). One item per call.
+		public async Task<uint?> TryAdvanceCollectPickup(INetworkClient client)
+		{
+			var character = client.Session.Character;
+
+			foreach (var quest in await _database.GetCharacterQuests(character.Id))
+			{
+				if (quest.State != QuestState.Active)
+					continue;
+
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				var goal = def?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.CollectItem);
+				if (goal == null || goal.TrailingRefId == 0)
+					continue;
+
+				if (await GoalProgressOf(character.Id, quest, def!, goal) >= GoalRequired(quest, def!, goal))
+					continue; // this collect goal is already full
+
+				await Advance(client!, QuestGoalType.CollectItem, null!, goal.TrailingRefId);
+				return goal.TrailingRefId;
+			}
+
+			return null;
+		}
+
 		// Advance the goal of `triggerType`/`targetName` for each of the player's active quests. #357: a quest can have
 		// several goals, so the trigger ticks the MATCHING goal (not always goal[0]); the quest only completes once EVERY
 		// goal has reached its required count. A tick that leaves the quest incomplete (this goal not yet done, or a
@@ -194,9 +193,9 @@ namespace Faolan.GameServer.Quest
 				// greeting's name) - #262.
 				var goal = triggerType switch
 				{
-					QuestGoalType.Kill => QuestProgress.MatchingKillGoal(def.Goals, targetTemplateId, targetName),
+					QuestGoalType.Kill        => QuestProgress.MatchingKillGoal(def.Goals, targetTemplateId, targetName),
 					QuestGoalType.CollectItem => QuestProgress.MatchingCollectGoal(def.Goals, targetTemplateId ?? 0),
-					_ => QuestProgress.MatchingGoal(def.Goals, triggerType, targetName)
+					_                         => QuestProgress.MatchingGoal(def.Goals, triggerType, targetName)
 				};
 				if (goal == null)
 					continue;

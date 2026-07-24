@@ -43,6 +43,10 @@ namespace Faolan.Core.Database.Tables
 
 		public virtual ICollection<WorldObject> Objects { get; set; } = [];
 
+		// How the live world instances this map (#268). Defaults to Shared so every existing map keeps its single
+		// global zone; the assignment policy only mints per-character/per-party copies for maps flagged otherwise.
+		public MapInstanceMode InstanceMode { get; set; } = MapInstanceMode.Shared;
+
 		// word3 = the player instance when instanced (beach), else 0 (shared/mainland). NB this is the WIRE-layer
 		// counterpart of InstanceMode (#268): same concept (is this playfield instanced?) but a different layer -
 		// InstanceMode drives the server's zone-COPY policy, this only sets the client-facing PlayfieldFIIR word.
@@ -53,10 +57,6 @@ namespace Faolan.Core.Database.Tables
 		// Max players per Shared instance before the policy spins up another copy. 0 = uncapped (and ignored for
 		// Solo/Group, which are sized by character/party).
 		public int PopulationCap { get; set; }
-
-		// How the live world instances this map (#268). Defaults to Shared so every existing map keeps its single
-		// global zone; the assignment policy only mints per-character/per-party copies for maps flagged otherwise.
-		public MapInstanceMode InstanceMode { get; set; } = MapInstanceMode.Shared;
 
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;

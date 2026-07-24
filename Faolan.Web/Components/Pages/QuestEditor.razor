@@ -22,7 +22,11 @@
 	{
 		@if (_status != null)
 		{
-			<p class="qe-status @(_error ? "err" : "")">@_status</p>
+			<p class="qe-status @(_error
+				                    ? "err"
+				                    : "")">
+				@_status
+			</p>
 		}
 
 		<div class="qe-grid">
@@ -31,7 +35,9 @@
 				<div class="rowlist">
 					@foreach (var q in Filtered())
 					{
-						<button class="@(ReferenceEquals(q, _quest) ? "sel" : "")" @onclick="() => Select(q)">
+						<button class="@(ReferenceEquals(q, _quest)
+							               ? "sel"
+							               : "")" @onclick="() => Select(q)">
 							<span class="qid">@q.QuestId</span>
 							@if (q.NextQuestId is { } nx)
 							{
@@ -86,8 +92,12 @@
 							@foreach (var g in Goals())
 							{
 								<tr>
-									<td><input class="n" @bind="g.Sequence"/></td>
-									<td><input class="n" @bind="g.GoalId"/></td>
+									<td>
+										<input class="n" @bind="g.Sequence"/>
+									</td>
+									<td>
+										<input class="n" @bind="g.GoalId"/>
+									</td>
 									<td>
 										<select @bind="g.GoalType">
 											@foreach (var t in GoalTypes)
@@ -96,14 +106,30 @@
 											}
 										</select>
 									</td>
-									<td><input @bind="g.TargetName" placeholder="—"/></td>
-									<td><input class="n" @bind="g.TrailingRefId"/></td>
-									<td><input class="n" @bind="g.RequiredCount"/></td>
-									<td><input class="n" @bind="g.MapId" placeholder="—"/></td>
-									<td><input class="n" @bind="g.MarkerX" placeholder="—"/></td>
-									<td><input class="n" @bind="g.MarkerY" placeholder="—"/></td>
-									<td><input class="n" @bind="g.QuestItemId" placeholder="—"/></td>
-									<td><button class="del" title="Remove goal" @onclick="() => RemoveGoal(g)">✕</button></td>
+									<td>
+										<input @bind="g.TargetName" placeholder="—"/>
+									</td>
+									<td>
+										<input class="n" @bind="g.TrailingRefId"/>
+									</td>
+									<td>
+										<input class="n" @bind="g.RequiredCount"/>
+									</td>
+									<td>
+										<input class="n" @bind="g.MapId" placeholder="—"/>
+									</td>
+									<td>
+										<input class="n" @bind="g.MarkerX" placeholder="—"/>
+									</td>
+									<td>
+										<input class="n" @bind="g.MarkerY" placeholder="—"/>
+									</td>
+									<td>
+										<input class="n" @bind="g.QuestItemId" placeholder="—"/>
+									</td>
+									<td>
+										<button class="del" title="Remove goal" @onclick="() => RemoveGoal(g)">✕</button>
+									</td>
 								</tr>
 							}
 							</tbody>

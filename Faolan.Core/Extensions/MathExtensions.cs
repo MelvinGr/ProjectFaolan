@@ -5,14 +5,6 @@ namespace Faolan.Core.Extensions
 {
 	public static class MathExtensions
 	{
-		extension(MathF)
-		{
-			public static float DegreesToRadians(float degrees)
-			{
-				return degrees * (MathF.PI / 180f);
-			}
-		}
-
 		extension(Vector3 vector3)
 		{
 			// A yaw-only facing quaternion (rotation about the Y/up axis) that points `from` at `target` - the
@@ -65,6 +57,14 @@ namespace Faolan.Core.Extensions
 			public static Quaternion CreateFromYawPitchRollDegrees(float yawDegrees, float pitchDegrees, float rollDegrees)
 			{
 				return Quaternion.CreateFromYawPitchRoll(MathF.DegreesToRadians(yawDegrees), MathF.DegreesToRadians(pitchDegrees), MathF.DegreesToRadians(rollDegrees));
+			}
+		}
+
+		extension(MathF)
+		{
+			public static float DegreesToRadians(float degrees)
+			{
+				return degrees * (MathF.PI / 180f);
 			}
 		}
 	}

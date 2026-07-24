@@ -41,6 +41,13 @@ namespace Faolan.Tests
 			Assert.Equal(xml, RemoteFormatXml.Build(ConversationScreenColumns.ToScreen(row)));
 		}
 
+		[Theory, InlineData(CloseXml), InlineData(AppendXml)]
+		public void ParseThenBuild_IsByteExact(string xml)
+		{
+			var screen = RemoteFormatXml.Parse(xml);
+			Assert.Equal(xml, RemoteFormatXml.Build(screen));
+		}
+
 		[Fact]
 		public void Parse_Append_ExtractsStructure()
 		{
@@ -63,13 +70,6 @@ namespace Faolan.Tests
 			Assert.Null(s.Antitag);
 			Assert.Empty(s.Parameters);
 			Assert.Equal("100", s.Category);
-		}
-
-		[Theory, InlineData(CloseXml), InlineData(AppendXml)]
-		public void ParseThenBuild_IsByteExact(string xml)
-		{
-			var screen = RemoteFormatXml.Parse(xml);
-			Assert.Equal(xml, RemoteFormatXml.Build(screen));
 		}
 
 		[Fact]

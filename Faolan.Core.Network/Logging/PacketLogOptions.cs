@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Logging
 	{
 		// When false, the raw byte dump is suppressed on every packet line even at Debug level (leaving just the
 		// opcode + length summary). Default true preserves the historical Debug-level byte trace.
-		public static bool ShouldLogBytes { get; set; }= true;
+		public static bool ShouldLogBytes { get; set; } = true;
 
 		// The " label={ .. } .." suffix appended to a packet's single log line, or "" when bytes are suppressed.
 		// Each (label, data) pair with data is rendered as " <label>({len})={hex}".

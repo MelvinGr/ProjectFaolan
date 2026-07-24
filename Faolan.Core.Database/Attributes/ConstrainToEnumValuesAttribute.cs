@@ -39,7 +39,9 @@ namespace Faolan.Core.Database.Attributes
 
 					var values = Enum.GetValues(enumType).Cast<object>().Select(Convert.ToInt64).Distinct().OrderBy(v => v).JoinAsString(", ");
 					var column = property.GetColumnName(store.Value);
-					var columnRef = quoteColumns ? $"\"{column}\"" : column;
+					var columnRef = quoteColumns
+						? $"\"{column}\""
+						: column;
 					entityType.AddCheckConstraint($"CK_{entityType.ClrType.Name}_{property.Name}", $"{columnRef} IN ({values})");
 				}
 			}

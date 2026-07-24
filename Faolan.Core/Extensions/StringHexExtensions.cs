@@ -44,9 +44,11 @@ namespace Faolan.Core.Extensions
 				builder.Append(span[i].ToHex());
 			}
 
-			return builder.Append(asArray
-				? " ]"
-				: " }").ToString();
+			return builder
+				.Append(asArray
+					? " ]"
+					: " }")
+				.ToString();
 		}
 
 		public static string ToHex(this Enum value)

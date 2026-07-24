@@ -38,6 +38,10 @@ namespace Faolan.Core.Database.Tables
 
 		// The primary spawn-point anchors of this group (the exact retail spots); cascade-delete with the area.
 		public virtual ICollection<NpcSpawnAreaPoint> Points { get; set; } = [];
+
+		// How NpcTemplateId was assigned (provenance): None until resolved; Name/Containment/IdPropagation for the
+		// resolver's confidence tiers; Manual once confirmed by hand.
+		public SpawnResolutionSource ResolvedBy { get; set; }
 		public float BoundsMaxX { get; set; }
 		public float BoundsMaxY { get; set; }
 		public float BoundsMaxZ { get; set; }
@@ -55,10 +59,6 @@ namespace Faolan.Core.Database.Tables
 		// The group's population = the number of primary spawn points (~one creature per point). The count an ambient
 		// spawner should keep alive in the area.
 		public int MaxCount { get; set; }
-
-		// How NpcTemplateId was assigned (provenance): None until resolved; Name/Containment/IdPropagation for the
-		// resolver's confidence tiers; Manual once confirmed by hand.
-		public SpawnResolutionSource ResolvedBy { get; set; }
 
 		// The grouping CATEGORY the id is scoped by: Community / Race / Superfamily / Name / "no category".
 		[MaxLength(32)]

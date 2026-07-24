@@ -68,9 +68,8 @@ namespace Faolan.GameServer
 
 			var owner = client.Session.Character.Id;
 			entity.OwnerHandle = owner;
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(PetIirCodec.BuildAssign(owner, entity.Handle, combat
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, b =>
+				b.WriteArrayUInt32Length(PetIirCodec.BuildAssign(owner, entity.Handle, combat
 					? PetIirCodec.CombatKind
 					: PetIirCodec.SocialKind))));
 
@@ -222,8 +221,7 @@ namespace Faolan.GameServer
 		{
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // the rank-1 "end" twin of the applied buff id
 
-			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, []))));
 		}
 
@@ -235,8 +233,8 @@ namespace Faolan.GameServer
 		// 0x2011 have no capture oracle yet, so they are not built - see #73.)
 		private Task SendLearnSpell(INetworkClient client, uint spellId)
 		{
-			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchLearnSpell, AbilityGrantBody.BuildLearnSpellBody(spellId)));
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchLearnSpell,
+				AbilityGrantBody.BuildLearnSpellBody(spellId)));
 		}
 
 		// Sends the MagicBuffIIR (ApplySpell 0x6B87E316) carrier with an already-CONSTRUCTED payload and, for a SELF
@@ -251,8 +249,7 @@ namespace Faolan.GameServer
 			// (NpcSpellCastBuilderTests). Built once so the identical bytes go to the caster AND to nearby viewers below.
 			var body = NpcSpellCastBuilder.Build(applyTo, applyFrom, spellId, payload);
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 
 			// #48-analogue: nearby players see the cast EFFECT, not just the gesture. Retail streams the actor's
 			// ApplySpell to observers who see the caster (other_playersvisible capture: other-player self-buffs +
@@ -332,8 +329,7 @@ namespace Faolan.GameServer
 		private Task SendSprintBar(INetworkClient client, uint energy)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType),
-				GameCharInterfaceProjectOpcodes.DispatchUpdateSprintBar,
-				b => b.WriteUInt32(energy).WriteByte(0x01)));
+				GameCharInterfaceProjectOpcodes.DispatchUpdateSprintBar, b => b.WriteUInt32(energy).WriteByte(0x01)));
 		}
 
 		private void TrackSprintEnergy(INetworkClient client, bool sprinting)
@@ -359,8 +355,8 @@ namespace Faolan.GameServer
 		// the two grant sites (the 81-byte body incl. the TEA key comes wholly from the Ability row either way).
 		internal static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true, ProtoEndpoint? sender = null)
 		{
-			return client.SendAsync(new Rpc(sender ?? LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchAddSpecialAbility, AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)));
+			return client.SendAsync(new Rpc(sender ?? LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchAddSpecialAbility,
+				AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)));
 		}
 
 		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute

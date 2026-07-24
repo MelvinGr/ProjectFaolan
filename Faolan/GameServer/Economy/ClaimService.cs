@@ -27,9 +27,9 @@ namespace Faolan.GameServer.Economy
 	// composed collaborator (#200): item-grant rides the IEconomyOutbound port, system messages the chat dispatcher.
 	public sealed class ClaimService
 	{
+		private readonly IChatServerDispatcher _chat;
 		private readonly IDatabaseRepository _database;
 		private readonly IEconomyOutbound _outbound;
-		private readonly IChatServerDispatcher _chat;
 		private readonly ILogger _logger;
 
 		public ClaimService(IDatabaseRepository database, ILogger logger, IEconomyOutbound outbound, IChatServerDispatcher chat)
@@ -69,7 +69,7 @@ namespace Faolan.GameServer.Economy
 			}
 
 			if (parts.Length is < 2 or > 3 || !parts[0].Equals("add", StringComparison.OrdinalIgnoreCase) ||
-				!uint.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var itemId))
+			    !uint.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var itemId))
 			{
 				await _chat.SendSystemMessage(characterId, "Usage: .claim add &lt;itemId&gt; [count]  |  .claim list");
 				return;
@@ -98,8 +98,7 @@ namespace Faolan.GameServer.Economy
 					? null
 					: count
 			});
-			await _chat.SendSystemMessage(characterId,
-				$"Added claim: {(count == 0 ? 1 : count)}x '{template?.Name ?? "?"}' (template {itemId}). Open the Claims/Redeem window to collect it.");
+			await _chat.SendSystemMessage(characterId, $"Added claim: {(count == 0 ? 1 : count)}x '{template?.Name ?? "?"}' (template {itemId}). Open the Claims/Redeem window to collect it.");
 		}
 
 		// Dispatch an inbound CoreClaimIIR. Body (after the 0x2000 sub-header) = [receiverClass][receiverInstance][u16 sub][args].
@@ -114,17 +113,17 @@ namespace Faolan.GameServer.Economy
 			switch (sub)
 			{
 				case CoreClaimListCodec.SubRequest: // 0x0007 - "send me my claims"
-				await SendClaimList(client);
-				break;
+					await SendClaimList(client);
+					break;
 
 				case CoreClaimListCodec.SubRedeem: // 0x0003 - redeem the 1-based claim index
-				var index = body.ReadUInt32();
-				await RedeemClaim(client, index);
-				break;
+					var index = body.ReadUInt32();
+					await RedeemClaim(client, index);
+					break;
 
 				default:
-				_logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", sub, body.Length);
-				break;
+					_logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", sub, body.Length);
+					break;
 			}
 		}
 
@@ -195,8 +194,7 @@ namespace Faolan.GameServer.Economy
 			// as "Claim All" deletes rows one by one (which would otherwise shift every later index).
 			client.Session.ClaimSlots = rows.Select(r => r.Id).ToList();
 
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CoreClaimListCodec.Build(handle, entries))));
 
 			// Opening the window counts as seeing the claims - clear the account's glow flag (DB + the live session copy
@@ -215,24 +213,8 @@ namespace Faolan.GameServer.Economy
 			if (!client.Session.Account.ClaimsAvailable)
 				return;
 
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Character.Id))));
-		}
-
-		// The sub-0x05 refresh for a multi-charge claim: echo the redeemed row (at its 1-based list index) with its new
-		// remaining amount so the client updates that row in place (retail's window "refresh" - it sends no re-list).
-		private static async Task SendRedeemAck(INetworkClient client, AccountClaim claim, uint index, uint remaining)
-		{
-			var guid = DeriveBytes($"claim-batch:{client.Session.Account.Id}", ClaimEntry.BatchGuidLength);
-			var code = string.IsNullOrEmpty(claim.Code)
-				? DeriveCode(claim.Id)
-				: claim.Code;
-			var entry = new ClaimEntry(index, claim.ItemTemplateId, claim.Level, code, ItemKeyBytes(claim.Item), guid, claim.ClaimType, remaining, claim.MaxCharges ?? 0);
-
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Character.Id, entry))));
 		}
 
 		// Map DB rows to wire entries: assign 1-based indices in Id order and, per row, emit the item's real TEA key
@@ -294,6 +276,20 @@ namespace Faolan.GameServer.Economy
 			BinaryPrimitives.WriteUInt32BigEndian(key.AsSpan(8), k.Key3);
 			BinaryPrimitives.WriteUInt32BigEndian(key.AsSpan(12), k.Key4);
 			return key;
+		}
+
+		// The sub-0x05 refresh for a multi-charge claim: echo the redeemed row (at its 1-based list index) with its new
+		// remaining amount so the client updates that row in place (retail's window "refresh" - it sends no re-list).
+		private static async Task SendRedeemAck(INetworkClient client, AccountClaim claim, uint index, uint remaining)
+		{
+			var guid = DeriveBytes($"claim-batch:{client.Session.Account.Id}", ClaimEntry.BatchGuidLength);
+			var code = string.IsNullOrEmpty(claim.Code)
+				? DeriveCode(claim.Id)
+				: claim.Code;
+			var entry = new ClaimEntry(index, claim.ItemTemplateId, claim.Level, code, ItemKeyBytes(claim.Item), guid, claim.ClaimType, remaining, claim.MaxCharges ?? 0);
+
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+				b => b.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Character.Id, entry))));
 		}
 	}
 }

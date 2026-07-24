@@ -30,9 +30,11 @@ namespace Faolan.Importer.Extractors
 					// EVERY capture of the quest, not just the first: a region that reproduces one capture but not
 					// another is not safe to ship (goal 1448's trailing record is spelled differently across captures).
 					if (record.Objectives is { Goals.Count: > 0 } objectives)
+					{
 						(byQuest.TryGetValue(record.QuestId, out var all)
 							? all
 							: byQuest[record.QuestId] = []).Add(objectives.Goals);
+					}
 				}
 			}
 

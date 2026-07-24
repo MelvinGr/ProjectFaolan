@@ -15,12 +15,6 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(PatrolNodeId))]
 		public virtual PatrolNode PatrolNode { get; set; } = null!;
 
-		public float PositionX { get; set; }
-		public float PositionY { get; set; }
-		public float PositionZ { get; set; }
-
-		public int Ordinal { get; set; }
-
 		[NotMapped]
 		public Vector3 Position
 		{
@@ -32,5 +26,11 @@ namespace Faolan.Core.Database.Tables
 				PositionZ = value.Z;
 			}
 		}
+
+		public float PositionX { get; set; }
+		public float PositionY { get; set; }
+		public float PositionZ { get; set; }
+
+		public int Ordinal { get; set; }
 	}
 }

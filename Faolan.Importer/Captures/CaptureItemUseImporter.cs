@@ -66,8 +66,8 @@ namespace Faolan.Importer.Captures
 		{
 			var merged = new Dictionary<uint, uint>();
 			foreach (var cap in captures)
-				foreach (var (template, spell) in Extract(cap))
-					merged[template] = spell;
+			foreach (var (template, spell) in Extract(cap))
+				merged[template] = spell;
 
 			if (merged.Count == 0)
 				return (0, 0);

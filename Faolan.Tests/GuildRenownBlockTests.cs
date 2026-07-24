@@ -22,18 +22,6 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void Decode_RecoversTheKnownScaffold()
-		{
-			var block = GuildRenownBlock.Decode(Golden.Bytes("GuildRenownBlock"));
-
-			Assert.Equal((byte)0x01, block.Flag);
-			Assert.Equal(GuildRenownBlock.StatSlotIds, block.StatIds);
-			Assert.Equal(3, block.List2.Length); // the second 0x3F1 list (count 3)
-			// RenownCounters[1] is the renown total that ticked between the two captured snapshots.
-			Assert.Equal(20085677ul, block.RenownCounters[1]);
-		}
-
-		[Fact]
 		public void Decode_ReEncode_IsByteIdentical()
 		{
 			var golden = Golden.Bytes("GuildRenownBlock");
@@ -43,6 +31,18 @@ namespace Faolan.Tests
 
 			// ICodec stream Read/ToArray round-trips too.
 			Assert.Equal(golden, GuildRenownBlock.Read(new FaolanStream(golden)).ToArray());
+		}
+
+		[Fact]
+		public void Decode_RecoversTheKnownScaffold()
+		{
+			var block = GuildRenownBlock.Decode(Golden.Bytes("GuildRenownBlock"));
+
+			Assert.Equal((byte)0x01, block.Flag);
+			Assert.Equal(GuildRenownBlock.StatSlotIds, block.StatIds);
+			Assert.Equal(3, block.List2.Length); // the second 0x3F1 list (count 3)
+			// RenownCounters[1] is the renown total that ticked between the two captured snapshots.
+			Assert.Equal(20085677ul, block.RenownCounters[1]);
 		}
 
 		[Fact]

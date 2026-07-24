@@ -35,10 +35,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Extract_IgnoresBagsBeforeAnyMapChange()
 		{
-			Assert.Empty(MapLootExtractor.Extract(
-			[
-				LootBag(Convert.FromHexString(RecordHex))
-			]));
+			Assert.Empty(MapLootExtractor.Extract([LootBag(Convert.FromHexString(RecordHex))]));
 		}
 
 		[Fact]

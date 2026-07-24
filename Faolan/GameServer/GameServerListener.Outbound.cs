@@ -166,18 +166,6 @@ namespace Faolan.GameServer
 			return true;
 		}
 
-		// #348: the top-of-screen FIFO banner naming the SUB-AREA the player just walked into. Retail fires one on
-		// every sub-area crossing, not once per playfield - Old Tarantia alone has six (Bridge of Vilerus I, The East
-		// Gate, The West Gate, ...) - so the world tick drives this off MapArea, and the entry banner is simply the
-		// first crossing. `areaNameId` is the client's localized-string id; the client renders the text itself.
-		//
-		// This used to take a mapId and read the single `Map.AreaNameId`, which could only ever name one area per
-		// playfield (it had picked "The West Gate" for Old Tarantia, an arbitrary one of the six).
-		private static Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
-		{
-			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaNameId)));
-		}
-
 		// Answers a TradeskillRequestIIR (recipe-book open) with the TradeskillReplyIIR (0x9062D559) recipe list built
 		// from the Recipe catalog, so the Crafting -> Recipes window populates. The carrier is the standard world IIR
 		// framing (GameAgent 0x58 -> GameInterface <instance>), body = [subop][0xC350][handle][reply], byte-exact vs
@@ -189,8 +177,7 @@ namespace Faolan.GameServer
 			var rows = await Database.GetRecipes();
 			var records = rows.Select(TradeskillRecipeCodec.ToRecord).ToList();
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(TradeskillRecipeCodec.BuildReplyIir(handle, records))));
 
 			Logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
@@ -214,20 +201,11 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, matches.Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
 		}
 
-		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the
-		// resurrection-spots re-send that adds the point to the player's list, and it is what the player actually
-		// sees; only the point id goes on the wire (the client resolves the name from LDB category 270).
-		private static Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
-		{
-			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildRespawnPointDiscoveredXml(pointId, nameKey)));
-		}
-
 		// Pushes the character's wallet balance, framed on the same login-world conversation as the 0x201C
 		// record stream (the retail money updates ride that conversation).
 		private async Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
 		{
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchUpdateCash,
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchUpdateCash,
 				b => UpdateCashBody.WriteUpdateCashBody(b, balanceTin, reason)));
 
 			Logger.LogInformation("UpdateCash: {Balance} tin ({Reason}) -> {Character}.", balanceTin, reason, client.Session.Character?.Name);
@@ -244,8 +222,7 @@ namespace Faolan.GameServer
 		// fixed snapshot is emitted. Live day/night cycle is #351 (advance dayTime at rate; pin its unit in-client).
 		internal static Rpc BuildGameTime(INetworkClient client)
 		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build()));
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build()));
 		}
 
 		// Frames the GuildUpdateIIR_c (GuildTagBody) on the world conversation: [RpcHeader][DispatchPassBlob]
@@ -253,8 +230,7 @@ namespace Faolan.GameServer
 		// guild-accept flow through the dispatcher seam. The body grammar + round-trip live on GuildTagBody.
 		internal static Rpc BuildGuildTag(INetworkClient client, uint characterId, string guildName)
 		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(x => new GuildTagBody(characterId, guildName).Write(x)));
 		}
 
@@ -275,8 +251,7 @@ namespace Faolan.GameServer
 			var fieldB = map?.PlayfieldFieldB ?? 3u;
 			var flags = map?.PlayfieldFlags ?? 0u;
 
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(MapChangeCodec.BuildIir(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, character.PositionY, character.PositionZ, character.MapId,
 					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB))));
 		}
@@ -344,8 +319,7 @@ namespace Faolan.GameServer
 		// from-scratch record body reach the wire without a captured packet header.
 		internal static Rpc FrameWorldEntryRecord(INetworkClient client, params ReadOnlySpan<byte> bodyWithLenPrefix)
 		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, bodyWithLenPrefix.ToArray());
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, bodyWithLenPrefix.ToArray());
 		}
 
 		// Pushes one item into the client's inventory live, on the same GameCharAgent conversation the wallet
@@ -354,17 +328,28 @@ namespace Faolan.GameServer
 		{
 			var charId = client.Session.Character.Id;
 
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchAddItem,
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchAddItem,
 				b => AddItemBody.WriteAddItemBody(b, containerType, charId, itemPos, AddItemBody.SerializeInventoryEntry(entry), feedback)));
+		}
+
+		// #348: the top-of-screen FIFO banner naming the SUB-AREA the player just walked into. Retail fires one on
+		// every sub-area crossing, not once per playfield - Old Tarantia alone has six (Bridge of Vilerus I, The East
+		// Gate, The West Gate, ...) - so the world tick drives this off MapArea, and the entry banner is simply the
+		// first crossing. `areaNameId` is the client's localized-string id; the client renders the text itself.
+		//
+		// This used to take a mapId and read the single `Map.AreaNameId`, which could only ever name one area per
+		// playfield (it had picked "The West Gate" for Old Tarantia, an arbitrary one of the six).
+		private static Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
+		{
+			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildAreaNameXml(areaNameId)));
 		}
 
 		// Pushes one bank-slot stat update (0x201c on container 105): [kind=105][charInstance][slot][statId][value], 		// byte-exact to the capture (F376/F377/F364/F398). Rides the same GameCharAgent conversation as the bank
 		// slot registrations (BankHandler), so the client applies it to the live bank cell.
 		private static Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
 		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchSetItemStat, BuildBankSlotStatBody(client.Session.Character.Id, slot, statId, value)));
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetItemStat,
+				BuildBankSlotStatBody(client.Session.Character.Id, slot, statId, value)));
 		}
 
 		// Pushes a FormatFeedback message (raw remoteformat XML) to the client's on-screen feedback. typeFlags =
@@ -374,8 +359,7 @@ namespace Faolan.GameServer
 			var instance = client.Session.Character.Id;
 			var body = FormatFeedbackCodec.Build(instance, typeFlags, footer, Encoding.Latin1.GetBytes(xml));
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, body));
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, body));
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).
@@ -383,9 +367,16 @@ namespace Faolan.GameServer
 		{
 			var charId = client.Session.Character.Id;
 
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchRemoveItem,
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchRemoveItem,
 				b => RemoveItemBody.WriteRemoveItemBody(b, containerType, charId, itemPos, amountToRemove)));
+		}
+
+		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the
+		// resurrection-spots re-send that adds the point to the player's list, and it is what the player actually
+		// sees; only the point id goes on the wire (the client resolves the name from LDB category 270).
+		private static Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
+		{
+			return SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildRespawnPointDiscoveredXml(pointId, nameKey)));
 		}
 
 		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text
@@ -400,8 +391,7 @@ namespace Faolan.GameServer
 		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots,
-				b => ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(b, deathPosition, spots)));
+				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots, b => ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(b, deathPosition, spots)));
 		}
 
 		// Pushes the character's own vitals from its persisted MaxStats (or class/level defaults if a legacy
@@ -431,15 +421,13 @@ namespace Faolan.GameServer
 			var instance = client.Session.Character.Id;
 			var body = ChatTextCodec.Build(instance, Encoding.Latin1.GetBytes(xml));
 
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, body));
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, body));
 		}
 
 		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
 		private static Task SendWorldIir(INetworkClient client, byte[] body)
 		{
-			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, body));
+			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, body));
 		}
 	}
 }

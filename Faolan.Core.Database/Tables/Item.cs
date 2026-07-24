@@ -16,6 +16,14 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(OnUseSpell))]
 		public virtual Spell? OnUseSpellDefinition { get; set; }
 
+		// The stat bonuses this item grants when equipped - the whole tooltip stat list (attributes, vitals AND
+		// ratings), one row per (statId, amount). Decoded from the RDB item-template stat-modifier region
+		// (RdbItemImporter -> ItemTemplateStatModifiers, docs/rdb/item-template-stats.md, #3) PLUS the field-972 primary
+		// attribute. MaxStatAggregator sums these by wire stat id across a character's equipped gear so worn gear raises
+		// the character's derived MaxHealth/MaxStamina/MaxMana (and attributes). Replaced the old flattened
+		// *Bonus columns (Str/Con/Int/Wis/Dex), which could only hold the primary attribute.
+		public virtual ICollection<ItemStatModifier> StatModifiers { get; set; } = [];
+
 		// The item's stable identity - the per-template 128-bit TEA key (4 words) that unlocks the item's encrypted
 		// RDB template. On the wire it is exactly ProtoAcgItem.key1, repeated in the inventory-snapshot tail and the
 		// add-item packet; the client REJECTS an item whose key isn't a template it knows (the add/remove stall).
@@ -23,6 +31,17 @@ namespace Faolan.Core.Database.Tables
 		// owned type -> flat columns Key1..Key4. virtual for the lazy-loading-proxy test context (owned types load
 		// eagerly regardless; virtual only satisfies the proxy's all-navigations-virtual rule). See docs/re/spawn-dissection.md Phase 5.
 		public virtual ProtoDecryptionKey Key { get; set; } = new();
+
+		// The item's quality/rarity tier (Mundane..Legendary) = RDB item-template property field 499 (the client's own
+		// tier id; see ItemQuality). Extracted by RdbItemImporter with the same strictly-decreasing property-table parse
+		// as Value (field 74). NULL when the template carries no field 499 (or the item was never RDB-imported) - the
+		// generated CHECK admits NULL (a closed enum, so the values are constrained; unset stays NULL).
+		[ConstrainToEnumValues]
+		public ItemQuality? Quality { get; set; }
+
+		// Normal / Quest / Resource, set at import from the container an item was captured in (default Normal).
+		[ConstrainToEnumValues]
+		public ItemType Type { get; set; }
 
 		// Keeps the item out of RANDOM loot rolls (the per-map pool sample + the all-items fallback, #273). The Type
 		// filter already excludes Quest/Resource, but some quest items are typed Normal (only ever seen in a loot bag,
@@ -36,14 +55,7 @@ namespace Faolan.Core.Database.Tables
 		// Level requirement / item level. byte on the wire; mostly 0 for capture-harvested items (the RDB carries
 		// the real value), so level-appropriate filtering is limited until RDB item levels are imported.
 		public byte Level { get; set; }
-
-		// The stat bonuses this item grants when equipped - the whole tooltip stat list (attributes, vitals AND
-		// ratings), one row per (statId, amount). Decoded from the RDB item-template stat-modifier region
-		// (RdbItemImporter -> ItemTemplateStatModifiers, docs/rdb/item-template-stats.md, #3) PLUS the field-972 primary
-		// attribute. MaxStatAggregator sums these by wire stat id across a character's equipped gear so worn gear raises
-		// the character's derived MaxHealth/MaxStamina/MaxMana (and attributes). Replaced the old flattened
-		// *Bonus columns (Str/Con/Int/Wis/Dex), which could only hold the primary attribute.
-		public virtual ICollection<ItemStatModifier> StatModifiers { get; set; } = [];
+		public int? MaxDamage { get; set; }
 
 		// The weapon's inherent MIN/MAX damage - RDB item-template property fields 286 (0x11E) / 285 (0x11D), decoded
 		// from the client's CoreCombatManager::GUIGetMinDamage()/GUIGetMaxDamage() (docs/rdb/item-template-stats.md,
@@ -51,18 +63,6 @@ namespace Faolan.Core.Database.Tables
 		// attribute/rating bonuses on top for display; these are just the weapon base, factored into melee by
 		// CombatResolver. Raw template values (scale provisional).
 		public int? MinDamage { get; set; }
-		public int? MaxDamage { get; set; }
-
-		// The item's quality/rarity tier (Mundane..Legendary) = RDB item-template property field 499 (the client's own
-		// tier id; see ItemQuality). Extracted by RdbItemImporter with the same strictly-decreasing property-table parse
-		// as Value (field 74). NULL when the template carries no field 499 (or the item was never RDB-imported) - the
-		// generated CHECK admits NULL (a closed enum, so the values are constrained; unset stays NULL).
-		[ConstrainToEnumValues]
-		public ItemQuality? Quality { get; set; }
-
-		// Normal / Quest / Resource, set at import from the container an item was captured in (default Normal).
-		[ConstrainToEnumValues]
-		public ItemType Type { get; set; }
 
 		[MaxLength(256)]
 		public string Name { get; set; } = null!;

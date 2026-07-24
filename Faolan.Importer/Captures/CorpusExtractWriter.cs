@@ -100,9 +100,9 @@ namespace Faolan.Importer.Captures
 					{
 						frame = fEl.ValueKind switch
 						{
-							JsonValueKind.Number => fEl.GetInt32(),
+							JsonValueKind.Number                                                    => fEl.GetInt32(),
 							JsonValueKind.String when int.TryParse(fEl.GetString(), out var parsed) => parsed,
-							_ => 0
+							_                                                                       => 0
 						};
 					}
 

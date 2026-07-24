@@ -20,8 +20,6 @@ namespace Faolan.Core.Network.Server.GameServer
 		public string HandleHex => $"0x{Handle:X8}";
 	}
 
-
-
 	// Resolves an inbound GameServer RPC (receiver class id, 16-bit method opcode) to its recovered method name
 	// for diagnostic logging. The GameServer connection multiplexes several RPC class-pairs, so the SAME 0x20xx
 	// opcode means different methods per class - the receiver endpoint's class id is the disambiguator (memory

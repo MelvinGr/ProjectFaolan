@@ -36,6 +36,27 @@ namespace Faolan.Tests
 			Assert.Equal(s.Entries.Count, back.Entries.Count);
 		}
 
+		[Theory, InlineData("SpawnEditorPreview"), InlineData("SpawnDikketestLogin"), InlineData("SpawnNecroL80KingsCastle"), InlineData("SpawnDemoL80RandomActions"), InlineData("SpawnHoxxlingBuffed")]
+		public void ParseThenGenerate_IsByteIdentical(string name)
+		{
+			var body = Golden(name);
+
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
+			var rebuilt = PlayerSpawnScaffoldCodec.Generate(scaffold);
+
+			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(rebuilt));
+		}
+
+		[Fact]
+		public void ParseThenGenerate_Template_IsByteIdentical()
+		{
+			var body = Support.Golden.Bytes("SpawnStrieTemplate");
+
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
+
+			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(scaffold)));
+		}
+
 		[Fact]
 		public void Parse_BuffedSpawn_LiftsBuffRecords()
 		{
@@ -87,27 +108,6 @@ namespace Faolan.Tests
 			Assert.All(s.IdList, id => Assert.Equal(0, id.Rank));
 			Assert.Empty(s.EndPairs);
 			Assert.Empty(s.EndPairs2);
-		}
-
-		[Theory, InlineData("SpawnEditorPreview"), InlineData("SpawnDikketestLogin"), InlineData("SpawnNecroL80KingsCastle"), InlineData("SpawnDemoL80RandomActions"), InlineData("SpawnHoxxlingBuffed")]
-		public void ParseThenGenerate_IsByteIdentical(string name)
-		{
-			var body = Golden(name);
-
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
-			var rebuilt = PlayerSpawnScaffoldCodec.Generate(scaffold);
-
-			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(rebuilt));
-		}
-
-		[Fact]
-		public void ParseThenGenerate_Template_IsByteIdentical()
-		{
-			var body = Support.Golden.Bytes("SpawnStrieTemplate");
-
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
-
-			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(scaffold)));
 		}
 
 		private static byte[] Golden(string name)

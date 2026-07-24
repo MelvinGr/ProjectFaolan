@@ -14,10 +14,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Extract_IgnoresObjectsBeforeAnyMapChange()
 		{
-			Assert.Empty(WorldObjectExtractor.Extract(
-			[
-				RawObject(Golden.Bytes("WorldObjZone"))
-			]));
+			Assert.Empty(WorldObjectExtractor.Extract([RawObject(Golden.Bytes("WorldObjZone"))]));
 		}
 
 		// Decor (66AEDD50) is identified by name only (its message id is 0); the container/zone carry a numeric id.

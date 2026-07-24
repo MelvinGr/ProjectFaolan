@@ -32,14 +32,14 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				switch (Level(name))
 				{
 					case "V3":
-					v3++;
-					break;
+						v3++;
+						break;
 					case "V2":
-					v2++;
-					break;
+						v2++;
+						break;
 					default:
-					v1++;
-					break;
+						v1++;
+						break;
 				}
 			}
 
@@ -113,7 +113,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			{
 				"V3" => 0,
 				"V2" => 1,
-				_ => 2
+				_    => 2
 			};
 		}
 	}

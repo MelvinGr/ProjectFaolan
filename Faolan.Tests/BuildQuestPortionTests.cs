@@ -67,6 +67,17 @@ namespace Faolan.Tests
 			Assert.True(golden.SequenceEqual(built), $"2-quest region must equal the capture; lengths golden={golden.Length} built={built.Length}; first diff @{diff}");
 		}
 
+		// Single-quest path must still equal the multi-quest portion for one held quest (regression guard for the
+		// generalization).
+		[Fact]
+		public async Task BuildSingleQuestPortion_EqualsMultiQuestForm()
+		{
+			var beach = await LoadDefinition(10238);
+			var built = FullCharSnapshotSubClass.BuildQuestPortion([beach], beach, CaptureInstance);
+			var single = QuestPortionOracle.BuildSingle(beach, beach.Level, CaptureInstance);
+			Assert.True(single.SequenceEqual(built), "single-quest portion must equal the multi-quest form");
+		}
+
 		// Casilda 13479's journal record is a per-quest CONSTANT (byte-identical across its active + completed login
 		// captures, #255). Generate it via BuildSingle from the DB and assert it matches the record in the captured
 		// 2-quest region byte-for-byte - the core proof that a non-beach quest's record generates correctly. (The full
@@ -101,17 +112,6 @@ namespace Faolan.Tests
 			}
 
 			Assert.True(slice.SequenceEqual(built), $"13479 record must match the capture; first diff @{diff} of {built.Length}");
-		}
-
-		// Single-quest path must still equal the multi-quest portion for one held quest (regression guard for the
-		// generalization).
-		[Fact]
-		public async Task BuildSingleQuestPortion_EqualsMultiQuestForm()
-		{
-			var beach = await LoadDefinition(10238);
-			var built = FullCharSnapshotSubClass.BuildQuestPortion([beach], beach, CaptureInstance);
-			var single = QuestPortionOracle.BuildSingle(beach, beach.Level, CaptureInstance);
-			Assert.True(single.SequenceEqual(built), "single-quest portion must equal the multi-quest form");
 		}
 
 		private static int IndexOf(byte[] hay, byte[] needle)

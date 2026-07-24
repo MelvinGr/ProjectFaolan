@@ -23,13 +23,10 @@ namespace Faolan.Tests
 		public async Task SendOpenTradepost_MatchesCapture()
 		{
 			const string expected = "0000002f0552eb23000000170a070d5db9eca91059120a0db5d5c2f210b1de81402000447d700c42e62e00441a8ddb41700000";
-			var position = new Vector3(
-				BitConverter.UInt32BitsToSingle(0x447d700cu),
-				BitConverter.UInt32BitsToSingle(0x42e62e00u),
-				BitConverter.UInt32BitsToSingle(0x441a8ddbu));
+			var position = new Vector3(BitConverter.UInt32BitsToSingle(0x447d700cu), BitConverter.UInt32BitsToSingle(0x42e62e00u), BitConverter.UInt32BitsToSingle(0x441a8ddbu));
 
 			var client = new RecordingNetworkClient(0);
-			await TradepostResponses.SendOpenTradepost(client, position, InterfaceInstance);
+			await TradepostResponses.SendOpenTradepost(client, position);
 
 			Assert.Equal(expected, ToHex(Assert.Single(client.Sent)));
 		}

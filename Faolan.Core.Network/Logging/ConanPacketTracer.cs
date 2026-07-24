@@ -27,6 +27,19 @@ namespace Faolan.Core.Network.Logging
 			_interfaceOpcodes = interfaceOpcodes;
 		}
 
+		// A raw Conan frame handed to the transport as bytes (no structured send site). Decoded back to an Rpc - which
+		// stamps its FrameLength - so it renders through the one path; production sends are all structured, so this
+		// costs nothing on the hot path.
+		protected override void RenderTransmitted(byte[] frame)
+		{
+			RenderTransmitted(Rpc.Parse(frame));
+		}
+
+		protected override void RenderTransmitted(in Rpc rpc)
+		{
+			Trace(PacketLogFormatter.Transmitted, in rpc, _interfaceOpcodes, true);
+		}
+
 		// Inbound (RX): the listener dispatched this parsed frame. Both the method NAME (from the Receiver.Type + Opcode
 		// pair) and the frame length ride on the Rpc itself, so the listener passes nothing but the packet.
 		public void Received(in Rpc packet)
@@ -52,19 +65,6 @@ namespace Faolan.Core.Network.Logging
 			{
 				RenderFailed(ex);
 			}
-		}
-
-		// A raw Conan frame handed to the transport as bytes (no structured send site). Decoded back to an Rpc - which
-		// stamps its FrameLength - so it renders through the one path; production sends are all structured, so this
-		// costs nothing on the hot path.
-		protected override void RenderTransmitted(byte[] frame)
-		{
-			RenderTransmitted(Rpc.Parse(frame));
-		}
-
-		protected override void RenderTransmitted(in Rpc rpc)
-		{
-			Trace(PacketLogFormatter.Transmitted, in rpc, _interfaceOpcodes, true);
 		}
 
 		// The line for a packet the listener handled. Virtual so a tier that multiplexes a sub-protocol can render a

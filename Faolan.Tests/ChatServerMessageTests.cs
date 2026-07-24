@@ -10,29 +10,6 @@ namespace Faolan.Tests
 	// which is what stops a send and a receive drifting apart.
 	public class ChatServerMessageTests
 	{
-		[Fact]
-		public void Serialize_FramesOpcodeAndBodyLength()
-		{
-			var frame = new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(0x01313438).WriteString("Conan")).Serialize();
-
-			Assert.Equal("0014", Convert.ToHexString(frame.AsSpan(0, 2)).ToLowerInvariant());
-			Assert.Equal(frame.Length - 4, (frame[2] << 8) | frame[3]); // bodyLen counts the bytes AFTER the 4-byte header
-		}
-
-		[Fact]
-		public void SerializeAndParse_AreMutualInverses()
-		{
-			var message = new ChatServerMessage(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteUInt16(0x0000).WriteString("hello").WriteUInt16(0x0000));
-			var frame = message.Serialize();
-
-			var parsed = ChatServerMessage.Parse(frame);
-
-			Assert.Equal(message.Opcode, parsed.Opcode);
-			Assert.Equal(message.Body.ToArray(), parsed.Body.ToArray());
-			Assert.Equal(frame.Length, parsed.FrameLength);
-			Assert.Equal(frame, parsed.Serialize());
-		}
-
 		// The reader is a fresh cursor over the body per call, so a handler reads its fields sequentially off one.
 		[Fact]
 		public void BodyReader_ReadsTheBodyFields()
@@ -60,6 +37,29 @@ namespace Faolan.Tests
 			var parsed = ChatServerMessage.Parse([0x00, 0x23, 0x00, 0x40, 0xAA, 0xBB]); // declares 0x40 bytes, carries 2
 
 			Assert.Equal([0xAA, 0xBB], parsed.Body.ToArray());
+		}
+
+		[Fact]
+		public void SerializeAndParse_AreMutualInverses()
+		{
+			var message = new ChatServerMessage(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteUInt16(0x0000).WriteString("hello").WriteUInt16(0x0000));
+			var frame = message.Serialize();
+
+			var parsed = ChatServerMessage.Parse(frame);
+
+			Assert.Equal(message.Opcode, parsed.Opcode);
+			Assert.Equal(message.Body.ToArray(), parsed.Body.ToArray());
+			Assert.Equal(frame.Length, parsed.FrameLength);
+			Assert.Equal(frame, parsed.Serialize());
+		}
+
+		[Fact]
+		public void Serialize_FramesOpcodeAndBodyLength()
+		{
+			var frame = new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(0x01313438).WriteString("Conan")).Serialize();
+
+			Assert.Equal("0014", Convert.ToHexString(frame.AsSpan(0, 2)).ToLowerInvariant());
+			Assert.Equal(frame.Length - 4, (frame[2] << 8) | frame[3]); // bodyLen counts the bytes AFTER the 4-byte header
 		}
 	}
 }

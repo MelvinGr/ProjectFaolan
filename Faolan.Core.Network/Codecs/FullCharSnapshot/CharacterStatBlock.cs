@@ -51,10 +51,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			}
 		}
 
-		public int Count => _records.Count;
-
 		/// <summary>The parsed/built records at wire scale, in order ([statId], [rawValue]).</summary>
 		public IReadOnlyList<(CharacterStatId StatId, uint RawValue)> Records => _records;
+
+		public int Count => _records.Count;
 
 		/// <summary>Adds a record using the player-facing value; the wire scale for the stat is applied.</summary>
 		public CharacterStatBlock Set(CharacterStatId statId, uint displayValue)

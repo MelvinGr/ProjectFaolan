@@ -16,6 +16,17 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return goals.All(g => progressOf(g) >= Math.Max(g.RequiredCount, 1));
 		}
 
+		// The CollectItem goal for `itemId` (#262): the lowest-Sequence CollectItem goal whose TrailingRefId is that item
+		// (the item a quest-pickup grants, e.g. Shipwrecked V's stone brick 193400). Null if none - the pickup is inert
+		// unless a matching collect quest is active, which is what gates the brick nodes to quest-holders.
+		public static QuestGoalDefinition? MatchingCollectGoal(IEnumerable<QuestGoalDefinition> goals, uint itemId)
+		{
+			if (goals == null || itemId == 0)
+				return null;
+
+			return goals.Where(g => g.GoalType == QuestGoalType.CollectItem && g.TrailingRefId == itemId).OrderBy(g => g.Sequence).FirstOrDefault();
+		}
+
 		// The goal a trigger of `triggerType` against `targetName` advances (#357): the first (lowest-Sequence) goal of
 		// that type naming that target. Multi-goal quests can have several goals; a trigger fires the one it matches, not
 		// always goal[0]. Returns null if no goal matches (wrong type/target, or an unsourced target). The Sequence order
@@ -49,20 +60,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return string.IsNullOrEmpty(name)
 				? null
 				: kills.FirstOrDefault(g => !string.IsNullOrEmpty(g.TargetName) && g.TargetName.Equals(name, StringComparison.OrdinalIgnoreCase));
-		}
-
-		// The CollectItem goal for `itemId` (#262): the lowest-Sequence CollectItem goal whose TrailingRefId is that item
-		// (the item a quest-pickup grants, e.g. Shipwrecked V's stone brick 193400). Null if none - the pickup is inert
-		// unless a matching collect quest is active, which is what gates the brick nodes to quest-holders.
-		public static QuestGoalDefinition? MatchingCollectGoal(IEnumerable<QuestGoalDefinition> goals, uint itemId)
-		{
-			if (goals == null || itemId == 0)
-				return null;
-
-			return goals
-				.Where(g => g.GoalType == QuestGoalType.CollectItem && g.TrailingRefId == itemId)
-				.OrderBy(g => g.Sequence)
-				.FirstOrDefault();
 		}
 	}
 }

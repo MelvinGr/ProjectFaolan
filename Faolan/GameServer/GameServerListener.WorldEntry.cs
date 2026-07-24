@@ -19,6 +19,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
+using Faolan.GameServer.Economy;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -40,22 +41,6 @@ namespace Faolan.GameServer
 		// force on a private server that has no Funcom store.
 		// TODO: Confirm
 		private static readonly uint[] ItemShopSuppressTags = []; //6617, 6618, 6619, 6620, 7316, 7416, 7417, 7418, 7419, 7420, 7421];
-
-		// The burst-less world-object packets: each WorldObjects row built via WorldObjectBuilder and framed. Built on
-		// the row's captured handle + the live playfield instance (the rewrite the live splice path applies).
-		private static IEnumerable<Rpc> BuildBurstlessWorldObjects(INetworkClient client, IReadOnlyList<WorldObject> rows, uint playfieldInstance, IReadOnlySet<uint> activeQuestIds)
-		{
-			foreach (var row in rows)
-			{
-				// #262: quest-GATED objects (GateQuestId set) spawn only for a player holding that quest active - the
-				// world-object analogue of an NPC's gating (but the object simply isn't sent; it doesn't spawn). Ungated
-				// objects (the default, incl. the bricks for now) always spawn.
-				if (!row.SpawnsFor(activeQuestIds))
-					continue;
-
-				yield return FrameWorldEntryRecord(client, WorldObjectBuilder.Build(row, row.CapturedHandle, playfieldInstance));
-			}
-		}
 
 		// Loads the character's CharacterEquipment (creating it and seeding default starter gear if absent), with the
 		// item navs included so they can be built into the snapshot. Beach characters only.
@@ -260,8 +245,7 @@ namespace Faolan.GameServer
 			// cleanup the old "Remove ...Name != null checks below" TODO asked for, now that the early return is in
 			// place: the create-vs-named conditionals that used to guard this body were all unreachable dead code.
 			Logger.LogInformation("Flushing pending post-0x205F follow-up on this 0x2020.");
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
 					.WriteUInt32(EntityClass.Character)
@@ -271,8 +255,7 @@ namespace Faolan.GameServer
 					.WriteUInt32(0x00000000))));
 			Logger.LogInformation("Sent deferred (uint)GameServer0X2000Opcodes.StatIIR prompt.");
 
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker,
 				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteByte(0)));
 
 			// Retail sends 0x2024 ReadyForPlayScreen right after the spawn handshake (0x2076) - the "leave the
@@ -330,11 +313,10 @@ namespace Faolan.GameServer
 			// "New claims available" glow (CoreClaimIIR sub 0x0009) - pushed ONLY when the account has unseen claims,
 			// matching retail (present on a fresh login with new claims, absent once viewed). Previously this fired
 			// unconditionally, so the claims button lit up for every account; see GameServerListener.Claims.cs.
-			await Economy.ClaimService.SendNewClaimsGlowIfAny(client);
+			await ClaimService.SendNewClaimsGlowIfAny(client);
 
 			// record 0: 0x00002000, 17-byte body
-			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
 				b => b.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50).WriteUInt32(instance).WriteArray(0x00)));
 
 			// record 1: 0x0000200C, 1-byte body
@@ -349,8 +331,8 @@ namespace Faolan.GameServer
 			if (!client.Session.IsCreateWorldSession)
 			{
 				var startFixed3d = ScryScript.BuildStep(instance, "StartFixed3d");
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),
-					GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(startFixed3d)));
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
+					s => s.WriteArrayUInt32Length(startFixed3d)));
 			}
 
 			// record 2b (BEACH ONLY, #267): the destiny SCRIPT GROUP that builds the chained-Casilda tableau - it
@@ -369,17 +351,17 @@ namespace Faolan.GameServer
 			// ReSharper disable once ConditionIsAlwaysTrueOrFalse
 			if (enableTutorialOverlay)
 			{
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),
-					GameInterfaceOpcodes.DispatchPassBlob,
-					b => b.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
+					b => b
+						.WriteArray(0x00, 0x00, 0x00, 0x1F, 0xA3, 0x6D, 0x3B, 0x74, 0x00, 0x00, 0xC3, 0x50)
 						.WriteUInt32(instance)
 						.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)));
 
 				// record 4: 0x00002000 - the WelcomeTutorial destiny step (ScryScriptIIR 0xA36D3B74), constructed (was
 				// verbatim; byte-identical, proven by QuestTests.BuildScryStep_MatchesCapture).
 				var welcomeTutorial = ScryScript.BuildStep(instance, "WelcomeTutorial");
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance),
-					GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(welcomeTutorial)));
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
+					s => s.WriteArrayUInt32Length(welcomeTutorial)));
 			}
 
 			// #262: apply any after-quest world-object effects up-front (e.g. a relog after freeing Casilda drops the
@@ -495,8 +477,7 @@ namespace Faolan.GameServer
 
 			foreach (var comboId in comboIds)
 			{
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-					GameInterfaceOpcodes.DispatchPassBlob, ComboBookIirCodec.Build(instance, comboId)));
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, ComboBookIirCodec.Build(instance, comboId)));
 			}
 
 			if (comboIds.Count > 0)
@@ -746,8 +727,8 @@ namespace Faolan.GameServer
 			// The quest INDEX needs, per active quest, its AREA's 4CC and that area's full quest catalog ordered by
 			// JournalSequence (#390) - neither is per-quest data.
 			var (indexAreas, areaCatalog) = await LoadAreaCatalog(snapshotQuests);
-			var snapshot = BuildBurstlessSnapshot(client, equipment!, inventoryRows, characterTags, snapshotQuests, primaryQuest!, knownSpellIds, statSheet, playfieldToken, completedJournal, indexAreas,
-				areaCatalog);
+			var snapshot = BuildBurstlessSnapshot(client, equipment!, inventoryRows, characterTags, snapshotQuests, primaryQuest!, knownSpellIds, statSheet, playfieldToken, completedJournal,
+				indexAreas, areaCatalog);
 
 			var toSend = new List<Rpc>(worldObjectRows.Length + 5)
 			{
@@ -834,8 +815,7 @@ namespace Faolan.GameServer
 			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
 			foreach (var body in new[] { TeleportCodec.BuildBegin(instance, destMapId), TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor) })
 			{
-				await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client),
-					GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
+				await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 			}
 		}
 
@@ -911,8 +891,7 @@ namespace Faolan.GameServer
 			// 0x00 after (Ranochar frames 125 -> 698).
 			var status = await _broadcaster.QuestMarkerStateForHandle(client, handle);
 
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker,
 				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteByte(status)));
 		}
 
@@ -951,8 +930,7 @@ namespace Faolan.GameServer
 			var realm = await Database.GetRealm(client.Session.Character.RealmId);
 			var address = $"{realm!.IpAddress}:{realm.Port}";
 
-			await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client),
-				GameInterfaceOpcodes.DispatchRedirectToServer,
+			await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceOpcodes.DispatchRedirectToServer,
 				b => b.WriteByte(0x00).WriteStringByteLength(address)));
 
 			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
@@ -1011,6 +989,22 @@ namespace Faolan.GameServer
 			return typedRoot.ToProtobuf();
 		}
 
+		// The burst-less world-object packets: each WorldObjects row built via WorldObjectBuilder and framed. Built on
+		// the row's captured handle + the live playfield instance (the rewrite the live splice path applies).
+		private static IEnumerable<Rpc> BuildBurstlessWorldObjects(INetworkClient client, IReadOnlyList<WorldObject> rows, uint playfieldInstance, IReadOnlySet<uint> activeQuestIds)
+		{
+			foreach (var row in rows)
+			{
+				// #262: quest-GATED objects (GateQuestId set) spawn only for a player holding that quest active - the
+				// world-object analogue of an NPC's gating (but the object simply isn't sent; it doesn't spawn). Ungated
+				// objects (the default, incl. the bricks for now) always spawn.
+				if (!row.SpawnsFor(activeQuestIds))
+					continue;
+
+				yield return FrameWorldEntryRecord(client, WorldObjectBuilder.Build(row, row.CapturedHandle, playfieldInstance));
+			}
+		}
+
 		// The character-creator (editor) phase: a not-yet-named character is connected. The client instance is
 		// the character's real id now, so the unnamed-character state alone identifies the editor flow.
 
@@ -1044,11 +1038,7 @@ namespace Faolan.GameServer
 		private static Task Send0X201CEntry(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, uint prefix, uint state, uint ticket)
 		{
 			return client.SendAsync(new Rpc(sender, receiver, GameCharInterfaceOpcodes.DispatchSetItemStat,
-				b => b.WriteUInt32(prefix)
-					.WriteUInt32(client.Session.Character.Id)
-					.WriteUInt32(state)
-					.WriteUInt32(0x00000017)
-					.WriteUInt32(ticket)));
+				b => b.WriteUInt32(prefix).WriteUInt32(client.Session.Character.Id).WriteUInt32(state).WriteUInt32(0x00000017).WriteUInt32(ticket)));
 		}
 	}
 }

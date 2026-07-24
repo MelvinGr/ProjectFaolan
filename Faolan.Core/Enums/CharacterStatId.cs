@@ -187,6 +187,7 @@ namespace Faolan.Core.Enums
 		Unknown39 = 0x332,
 		Unknown40 = 0x39D,
 		Unknown41 = 0x39B,
+
 		// Two of the level-scaled rating quad (0x398/0x39A/0x39B/0x39D) pinned via the client (Ghidra 2026-07-21):
 		// CoreCombatManager::GetAttackRating() reads 0x398, GetDefenseRating() reads 0x39A. The other two
 		// (Unknown40/41 = 0x39D/0x39B) are the quad's remaining members (_rating/_effect or melee/ranged - Unknown).
@@ -222,8 +223,9 @@ namespace Faolan.Core.Enums
 		{
 			return statId switch
 			{
-				CharacterStatId.HealthCurrent or CharacterStatId.HealthMax or CharacterStatId.StaminaMax or CharacterStatId.StaminaCurrent or CharacterStatId.ManaMax
-					or CharacterStatId.ManaCurrent or CharacterStatId.MagicDamage or CharacterStatId.NaturalManaRegen or CharacterStatId.NaturalStaminaRegen or CharacterStatId.PvpMagicDamage or CharacterStatId.MagicDamageHoly or CharacterStatId.BowRangeModifier => 100,
+				CharacterStatId.HealthCurrent or CharacterStatId.HealthMax or CharacterStatId.StaminaMax or CharacterStatId.StaminaCurrent or CharacterStatId.ManaMax or CharacterStatId.ManaCurrent
+					or CharacterStatId.MagicDamage or CharacterStatId.NaturalManaRegen or CharacterStatId.NaturalStaminaRegen or CharacterStatId.PvpMagicDamage or CharacterStatId.MagicDamageHoly
+					or CharacterStatId.BowRangeModifier => 100,
 
 				CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity => 10,
 

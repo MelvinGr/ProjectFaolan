@@ -21,10 +21,10 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(RecipeId))]
 		public virtual Recipe Recipe { get; set; } = null!;
 
-		public int Position { get; set; } // order within its list
-
 		[ConstrainToEnumValues]
 		public RecipeItemRole Role { get; set; } // ingredient (input) or result (output)
+
+		public int Position { get; set; } // order within its list
 
 		public uint Flag { get; set; } // element field [3] (small enum-ish; 0x14/0x28/...)
 

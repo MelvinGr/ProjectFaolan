@@ -11,6 +11,16 @@ namespace Faolan.GameServer.Quest
 	// recording fake.
 	public interface IQuestOutbound
 	{
+		// #262: apply the after-quest world-object effects for the player (WorldObject.EffectQuestId) - e.g. drop the
+		// beach chain-wall collision the instant the escort quest becomes active. Data-driven; no-op if nothing matches.
+		Task ApplyQuestWorldEffects(INetworkClient client);
+
+		// #262: drop the player's cached pending ReachArea goals (WorldEntity.PendingReachGoals) so the next move
+		// reloads them from the DB. Called after a supersession changes the active quest set - a newly-granted stage
+		// may carry a ReachArea goal (e.g. Shipwrecked II's "find the gate key", III's "enter the city") that the
+		// once-lazy cache would otherwise miss until relog.
+		void InvalidateReachGoals(INetworkClient client);
+
 		// #267: re-send the named NPC's quest marker to the player in-place (handles are session-volatile, so by NAME).
 		// Used after a chain stage supersedes to a TALK goal while that NPC is away (e.g. looting Tuut's key activates
 		// the talk-Casilda stage), so her '?' appears immediately instead of only on the next 0x2020 poll / re-stream.
@@ -36,15 +46,5 @@ namespace Faolan.GameServer.Quest
 		// follows (or stops following) the player. Id-based (data-driven escort, not a hard-coded name). No-op if no such
 		// NPC is loaded; returns true if applied.
 		bool SetNpcFollowByTemplate(uint mapId, uint templateId, uint playerHandle, bool follow);
-
-		// #262: apply the after-quest world-object effects for the player (WorldObject.EffectQuestId) - e.g. drop the
-		// beach chain-wall collision the instant the escort quest becomes active. Data-driven; no-op if nothing matches.
-		Task ApplyQuestWorldEffects(INetworkClient client);
-
-		// #262: drop the player's cached pending ReachArea goals (WorldEntity.PendingReachGoals) so the next move
-		// reloads them from the DB. Called after a supersession changes the active quest set - a newly-granted stage
-		// may carry a ReachArea goal (e.g. Shipwrecked II's "find the gate key", III's "enter the city") that the
-		// once-lazy cache would otherwise miss until relog.
-		void InvalidateReachGoals(INetworkClient client);
 	}
 }

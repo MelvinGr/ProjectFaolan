@@ -29,13 +29,12 @@ namespace Faolan.Core.Network.Protocol
 		// instead of newing + disposing a stream at every call site. The scratch stream is created and DISPOSED here
 		// (unlike the old fluent PacketStream send pattern). The Action<FaolanStream> is distinct from the primary
 		// ctor's ReadOnlyMemory<byte> Body, so there is no overload ambiguity.
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, ReadOnlyMemory<byte> headerData, Action<FaolanStream> body)
-			: this(sender, receiver, opcode, headerData, BuildBody(body))
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, ReadOnlyMemory<byte> headerData, Action<FaolanStream> body) : this(sender, receiver, opcode, headerData,
+			BuildBody(body))
 		{
 		}
 
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, Action<FaolanStream> body)
-			: this(sender, receiver, opcode, default, BuildBody(body))
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, Action<FaolanStream> body) : this(sender, receiver, opcode, default, BuildBody(body))
 		{
 		}
 
@@ -43,30 +42,27 @@ namespace Faolan.Core.Network.Protocol
 		// one (mirrors WriteHeader's Convert.ToUInt16). Constructors can't be generic, so the param is the boxing base
 		// Enum - one negligible box per packet. The 16-bit interface opcodes are ushort-backed; a value that overflows
 		// ushort throws here (fail-fast) rather than silently truncating.
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> headerData, ReadOnlyMemory<byte> body)
-			: this(sender, receiver, Convert.ToUInt16(opcode), headerData, body)
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> headerData, ReadOnlyMemory<byte> body) : this(sender, receiver, Convert.ToUInt16(opcode), headerData,
+			body)
 		{
 		}
 
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> headerData, Action<FaolanStream> body)
-			: this(sender, receiver, Convert.ToUInt16(opcode), headerData, body)
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> headerData, Action<FaolanStream> body) : this(sender, receiver, Convert.ToUInt16(opcode), headerData,
+			body)
 		{
 		}
 
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, Action<FaolanStream> body)
-			: this(sender, receiver, Convert.ToUInt16(opcode), body)
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, Action<FaolanStream> body) : this(sender, receiver, Convert.ToUInt16(opcode), body)
 		{
 		}
 
 		// Byte body, no headerData - for the many sends whose whole body is a single pre-encoded blob (codec.Encode())
 		// or a stream built by a helper. Distinct from the Action<FaolanStream> overloads (a byte[] is not a delegate).
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, ReadOnlyMemory<byte> body)
-			: this(sender, receiver, opcode, default, body)
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, ReadOnlyMemory<byte> body) : this(sender, receiver, opcode, default, body)
 		{
 		}
 
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> body)
-			: this(sender, receiver, Convert.ToUInt16(opcode), default, body)
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> body) : this(sender, receiver, Convert.ToUInt16(opcode), default, body)
 		{
 		}
 
@@ -78,43 +74,6 @@ namespace Faolan.Core.Network.Protocol
 			return MemoryMarshal.TryGetArray(Body, out var segment) && segment.Array is not null
 				? new FaolanStream(segment.Array, segment.Offset, segment.Count)
 				: new FaolanStream(Body.ToArray());
-		}
-
-		// Wire frame -> message. The ONE place a Conan frame is decoded, and the inverse of Serialize. Lenient: the CRC
-		// is NOT re-checked (the live wire is trusted once framed, and capture-derived frames may carry a placeholder
-		// CRC), so a corrupt frame surfaces where a handler reads a field off it - which the dispatch try/catch turns
-		// into a disconnect. IsCrcValid is the independent recompute the round-trip test uses.
-		public static Rpc Parse(byte[] frame)
-		{
-			using var stream = new FaolanStream(frame);
-			stream.ReadUInt32(); // length - recomputed on serialize
-			stream.ReadUInt32(); // crc32 - see IsCrcValid
-
-			using var header = new FaolanStream(stream.ReadArrayUInt32Length());
-			var sender = ProtoEndpoint.Read(header);
-			var receiver = ProtoEndpoint.Read(header);
-			var opcode = header.ReadUInt16();
-			var headerData = header.ReadRemainingArray();
-			var body = stream.ReadRemainingArray();
-
-			return new Rpc(sender, receiver, opcode, headerData, body) { FrameLength = frame.Length };
-		}
-
-		public static Rpc Parse(ReadOnlySpan<byte> frame)
-		{
-			return Parse(frame.ToArray());
-		}
-
-		// The INDEPENDENT crc recompute: a frame's crc32 field must equal Crc32 over everything after it (Crc32.Calculate
-		// skips the leading length+crc). The guardrail PacketFrameRoundTripTests asserts, so a builder that miswrites a
-		// single byte fails there rather than silently on the wire.
-		public static bool IsCrcValid(byte[] frame)
-		{
-			using var stream = new FaolanStream(frame);
-			stream.ReadUInt32(); // length
-			var crc32 = stream.ReadUInt32();
-
-			return crc32 == Crc32.Calculate(stream);
 		}
 
 		// Message -> wire frame. The ONE place a Conan frame is encoded, and the inverse of Parse (the contract
@@ -149,6 +108,46 @@ namespace Faolan.Core.Network.Protocol
 			stream.Position = end;
 
 			return stream.ToArray();
+		}
+
+		// The INDEPENDENT crc recompute: a frame's crc32 field must equal Crc32 over everything after it (Crc32.Calculate
+		// skips the leading length+crc). The guardrail PacketFrameRoundTripTests asserts, so a builder that miswrites a
+		// single byte fails there rather than silently on the wire.
+		public static bool IsCrcValid(byte[] frame)
+		{
+			using var stream = new FaolanStream(frame);
+			stream.ReadUInt32(); // length
+			var crc32 = stream.ReadUInt32();
+
+			return crc32 == Crc32.Calculate(stream);
+		}
+
+		// Wire frame -> message. The ONE place a Conan frame is decoded, and the inverse of Serialize. Lenient: the CRC
+		// is NOT re-checked (the live wire is trusted once framed, and capture-derived frames may carry a placeholder
+		// CRC), so a corrupt frame surfaces where a handler reads a field off it - which the dispatch try/catch turns
+		// into a disconnect. IsCrcValid is the independent recompute the round-trip test uses.
+		public static Rpc Parse(byte[] frame)
+		{
+			using var stream = new FaolanStream(frame);
+			stream.ReadUInt32(); // length - recomputed on serialize
+			stream.ReadUInt32(); // crc32 - see IsCrcValid
+
+			using var header = new FaolanStream(stream.ReadArrayUInt32Length());
+			var sender = ProtoEndpoint.Read(header);
+			var receiver = ProtoEndpoint.Read(header);
+			var opcode = header.ReadUInt16();
+			var headerData = header.ReadRemainingArray();
+			var body = stream.ReadRemainingArray();
+
+			return new Rpc(sender, receiver, opcode, headerData, body)
+			{
+				FrameLength = frame.Length
+			};
+		}
+
+		public static Rpc Parse(ReadOnlySpan<byte> frame)
+		{
+			return Parse(frame.ToArray());
 		}
 
 		private static byte[] BuildBody(Action<FaolanStream> body)

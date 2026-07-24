@@ -98,10 +98,10 @@ namespace Faolan.GameServer
 			}
 
 			if (!await Database.SetAccountState(account.Id, ban
-					? AccountState.Banned
-					: AccountState.Active))
+				    ? AccountState.Banned
+				    : AccountState.Active))
 			{
-				await _agentServerDispatcher.SendSystemMessage(gmId, $"<span style=\"color: red;\">Error changing account state.</span>");
+				await _agentServerDispatcher.SendSystemMessage(gmId, "<span style=\"color: red;\">Error changing account state.</span>");
 				return;
 			}
 
@@ -323,8 +323,7 @@ namespace Faolan.GameServer
 
 			if (command == PetCommand.Dismiss)
 			{
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-					GameInterfaceOpcodes.DispatchPassBlob,
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 					b => b.WriteArrayUInt32Length(PetIirCodec.BuildRemove(owner, petHandle))));
 
 				var removed = await _broadcaster.DespawnEntityForPlayer(client, petHandle);
@@ -363,32 +362,6 @@ namespace Faolan.GameServer
 				["graduatenpcgroup"] = GraduateNpcGroupCommand,
 				["weaponset"] = WeaponSetCommand
 			};
-		}
-
-		// .weaponset [primary | secondary]  - the server-side test bootstrap for the SwitchWeaponsButton set switch (#400).
-		// No arg (or "swap"/"toggle") flips the active loadout; "primary"/"secondary" (or 1/2) forces one. Persists the
-		// set and mirrors it on the live entity so the login-time gear-stat aggregation (which counts only the active
-		// set's weapons) uses it. NB this drives the MODEL only - the cross-player swap RELAY needs the real BCC payload,
-		// so exercise that with the retail weapon-swap key against a live viewer.
-		private async Task WeaponSetCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var arg = (arguments ?? "").Trim();
-
-			WeaponSet set;
-			if (arg.Equals("secondary", StringComparison.OrdinalIgnoreCase) || arg == "2")
-				set = WeaponSet.Secondary;
-			else if (arg.Equals("primary", StringComparison.OrdinalIgnoreCase) || arg == "1")
-				set = WeaponSet.Primary;
-			else
-			{
-				var toggled = await _broadcaster.TogglePlayerWeaponSet(client);
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"Weapon set toggled -> {toggled} (persisted).");
-				return;
-			}
-
-			await _broadcaster.SetPlayerWeaponSet(client, set);
-			await _agentServerDispatcher.SendSystemMessage(characterId, $"Weapon set -> {set} (persisted).");
 		}
 
 		// .kill [<handle> | self]  - kill the player's currently SELECTED target (last LookAt/SelectDeselect), or the
@@ -554,7 +527,8 @@ namespace Faolan.GameServer
 			// (#209): the kill path (CombatService.PushLevelUp) sets the same three stats, so both level-up paths emit an
 			// identical Level + AttributeChanged-burst + vitals max push.
 			await SendStatUpdate(client,
-				new CharacterStatBlock().Set(CharacterStatId.Level, level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)), client.Session.Character.Id);
+				new CharacterStatBlock().Set(CharacterStatId.Level, level).Set(CharacterStatId.Exp, character.Experience).Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)),
+				client.Session.Character.Id);
 			await SendVitals(client);
 			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.
@@ -748,7 +722,7 @@ namespace Faolan.GameServer
 			// Invariant culture so a comma-decimal locale doesn't reject the dotted coordinates.
 			var tokens = arg.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 			if (tokens.Length == 3 && float.TryParse(tokens[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var px) &&
-				float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py) && float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
+			    float.TryParse(tokens[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var py) && float.TryParse(tokens[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var pz))
 			{
 				await DoTeleport(characterId, client.Session.Character.MapId, new Vector3(px, py, pz));
 				return;
@@ -758,7 +732,7 @@ namespace Faolan.GameServer
 			// (#247). The map is the first token, the trailing three are the coordinates; the map name itself may contain
 			// spaces, so everything before the last three tokens is the map argument.
 			if (tokens.Length >= 4 && float.TryParse(tokens[^3], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpx) &&
-				float.TryParse(tokens[^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpy) && float.TryParse(tokens[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpz))
+			    float.TryParse(tokens[^2], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpy) && float.TryParse(tokens[^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var mpz))
 			{
 				var mapArg = string.Join(' ', tokens[..^3]);
 				var resolved = await ResolveMap(mapArg);
@@ -838,6 +812,32 @@ namespace Faolan.GameServer
 			var (on, affected) = await _broadcaster.ToggleAreaLabels(client);
 			await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
 				$"Spawn-area nameplate labels {(on ? "ON" : "OFF")} - {affected} nearby NPC(s) updated. Walk to re-stream the rest.");
+		}
+
+		// .weaponset [primary | secondary]  - the server-side test bootstrap for the SwitchWeaponsButton set switch (#400).
+		// No arg (or "swap"/"toggle") flips the active loadout; "primary"/"secondary" (or 1/2) forces one. Persists the
+		// set and mirrors it on the live entity so the login-time gear-stat aggregation (which counts only the active
+		// set's weapons) uses it. NB this drives the MODEL only - the cross-player swap RELAY needs the real BCC payload,
+		// so exercise that with the retail weapon-swap key against a live viewer.
+		private async Task WeaponSetCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+
+			WeaponSet set;
+			if (arg.Equals("secondary", StringComparison.OrdinalIgnoreCase) || arg == "2")
+				set = WeaponSet.Secondary;
+			else if (arg.Equals("primary", StringComparison.OrdinalIgnoreCase) || arg == "1")
+				set = WeaponSet.Primary;
+			else
+			{
+				var toggled = await _broadcaster.TogglePlayerWeaponSet(client);
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Weapon set toggled -> {toggled} (persisted).");
+				return;
+			}
+
+			await _broadcaster.SetPlayerWeaponSet(client, set);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Weapon set -> {set} (persisted).");
 		}
 
 		private static float AreaDistanceSq(NpcSpawnArea a, Vector3 pos)

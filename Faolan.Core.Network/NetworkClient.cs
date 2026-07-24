@@ -19,8 +19,6 @@ namespace Faolan.Core.Network
 
 		string? IpAddress { get; }
 
-		Task SendAsync(byte[] value, CancellationToken cancellationToken = default);
-
 		// The structured send boundary (Gitea #406): a handler builds an Rpc and hands it here instead of a hand-framed
 		// packet buffer. The real client (NetworkClient) implements this to serialize ONCE and trace the send directly
 		// from the Rpc model - no re-parse (phase 6). This default only serves lightweight INetworkClient test doubles
@@ -39,6 +37,8 @@ namespace Faolan.Core.Network
 			return SendAsync(message.Serialize(), cancellationToken);
 		}
 
+		Task SendAsync(byte[] value, CancellationToken cancellationToken = default);
+
 		void Start();
 		void Stop();
 	}
@@ -51,15 +51,18 @@ namespace Faolan.Core.Network
 	{
 		protected readonly ILogger Logger;
 		protected readonly Socket Socket;
-
-		private readonly byte[] _tcpBuffer = new byte[0xFFFF];
 		private readonly IMessageFramer _messageFramer;
 		private readonly IPacketTracer _tracer;
 		private readonly SemaphoreSlim _sendLock = new(1, 1);
 
+		private readonly byte[] _tcpBuffer = new byte[0xFFFF];
+
 		private CancellationTokenSource? _cancellationTokenSource;
-		private int _stopped;
 		private Task? _receiveTask;
+		private int _stopped;
+
+		// A short protocol name for the receive-loop error logs (was typeof(TPacket).Name).
+		protected abstract string ProtocolName { get; }
 
 		public Func<INetworkClient, Task>? Disconnected { get; init; }
 
@@ -80,13 +83,6 @@ namespace Faolan.Core.Network
 			_tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
 		}
 
-		// A short protocol name for the receive-loop error logs (was typeof(TPacket).Name).
-		protected abstract string ProtocolName { get; }
-
-		// Turn one completed wire frame into the listener's dispatch. Packet subclass: factory.Create + IsValid gate;
-		// Rpc subclass: Rpc.Parse.
-		protected abstract Task DispatchFrame(byte[] frame);
-
 		// The byte[] send path: trace the frame (the tracer decodes it), then put it on the wire. Used by the chat
 		// server (its own framing has no Rpc model) and by the SendAsync(Rpc) default for lightweight test doubles.
 		public Task SendAsync(byte[] value, CancellationToken cancellationToken = default)
@@ -103,34 +99,11 @@ namespace Faolan.Core.Network
 			var bytes = rpc.Serialize();
 			// Stamp the wire size the serializer just determined, so the trace reads the whole line off the message -
 			// exactly as it does for an inbound frame, which Rpc.Parse stamped.
-			_tracer.Transmitted(rpc with { FrameLength = bytes.Length });
+			_tracer.Transmitted(rpc with
+			{
+				FrameLength = bytes.Length
+			});
 			return SendRawAsync(bytes, cancellationToken);
-		}
-
-		private async Task SendRawAsync(byte[] value, CancellationToken cancellationToken)
-		{
-			await _sendLock.WaitAsync(cancellationToken);
-			try
-			{
-				// Socket.SendAsync can complete having written FEWER bytes than requested (send buffer full); the
-				// old code discarded the count, silently truncating large frames mid-stream. The client's framer
-				// then consumed the FOLLOWING packets as the truncated frame's remainder and misparsed everything
-				// after ("Wrong IIR_t version <garbage>" on the 10 KB post-load inventory snapshot, which goes out
-				// right behind the multi-hundred-KB world burst - isolated 2026-06-12). Loop until fully sent.
-				var sent = 0;
-				while (sent < value.Length)
-				{
-					var n = await Socket.SendAsync(value.AsMemory(sent), SocketFlags.None, cancellationToken);
-					if (n <= 0)
-						throw new SocketException((int)SocketError.ConnectionReset);
-
-					sent += n;
-				}
-			}
-			finally
-			{
-				_sendLock.Release();
-			}
 		}
 
 		public void Start()
@@ -171,6 +144,10 @@ namespace Faolan.Core.Network
 			// ClientDisconnected internally and logs any fault.
 			_ = Disconnected?.Invoke(this);
 		}
+
+		// Turn one completed wire frame into the listener's dispatch. Packet subclass: factory.Create + IsValid gate;
+		// Rpc subclass: Rpc.Parse.
+		protected abstract Task DispatchFrame(byte[] frame);
 
 		private async Task DataReceivedAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
 		{
@@ -233,6 +210,32 @@ namespace Faolan.Core.Network
 				Stop();
 			}
 		}
+
+		private async Task SendRawAsync(byte[] value, CancellationToken cancellationToken)
+		{
+			await _sendLock.WaitAsync(cancellationToken);
+			try
+			{
+				// Socket.SendAsync can complete having written FEWER bytes than requested (send buffer full); the
+				// old code discarded the count, silently truncating large frames mid-stream. The client's framer
+				// then consumed the FOLLOWING packets as the truncated frame's remainder and misparsed everything
+				// after ("Wrong IIR_t version <garbage>" on the 10 KB post-load inventory snapshot, which goes out
+				// right behind the multi-hundred-KB world burst - isolated 2026-06-12). Loop until fully sent.
+				var sent = 0;
+				while (sent < value.Length)
+				{
+					var n = await Socket.SendAsync(value.AsMemory(sent), SocketFlags.None, cancellationToken);
+					if (n <= 0)
+						throw new SocketException((int)SocketError.ConnectionReset);
+
+					sent += n;
+				}
+			}
+			finally
+			{
+				_sendLock.Release();
+			}
+		}
 	}
 
 	// The chat-protocol client: frames the chat wire format and parses each frame into the structured ChatServerMessage
@@ -242,11 +245,11 @@ namespace Faolan.Core.Network
 	{
 		public Func<INetworkClient, ChatServerMessage, Task>? ReceivedPacket { get; init; }
 
+		protected override string ProtocolName => nameof(ChatServerMessage);
+
 		public ChatNetworkClient(Socket socket, ILogger logger, IPacketTracer tracer) : base(socket, logger, new ChatServerMessageFramer(), tracer)
 		{
 		}
-
-		protected override string ProtocolName => nameof(ChatServerMessage);
 
 		protected override async Task DispatchFrame(byte[] frame)
 		{
@@ -257,16 +260,15 @@ namespace Faolan.Core.Network
 
 	// The Rpc-dispatching client (Gitea #406/#407): parses each frame straight into the structured Rpc via
 	// Rpc.Parse - no per-frame packet object - and hands it to the listener. Used by every Conan protocol listener.
-	public sealed class RpcNetworkClient<TMessageFramer> : NetworkClient
-		where TMessageFramer : IMessageFramer, new()
+	public sealed class RpcNetworkClient<TMessageFramer> : NetworkClient where TMessageFramer : IMessageFramer, new()
 	{
 		public Func<INetworkClient, Rpc, Task>? ReceivedRpc { get; init; }
+
+		protected override string ProtocolName => "Rpc";
 
 		public RpcNetworkClient(Socket socket, ILogger logger, IPacketTracer tracer) : base(socket, logger, new TMessageFramer(), tracer)
 		{
 		}
-
-		protected override string ProtocolName => "Rpc";
 
 		protected override async Task DispatchFrame(byte[] frame)
 		{

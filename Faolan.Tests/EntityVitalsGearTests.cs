@@ -11,21 +11,19 @@ namespace Faolan.Tests
 	// health-bar-fill fix). Pure over a Character + a gear-bonus dict - no DB/session.
 	public class EntityVitalsGearTests
 	{
-		private static Character Guardian(uint hp, uint stamina) => new()
-		{
-			Class = Class.Guardian,
-			Level = 1,
-			MaxStats = new CharacterMaxStats { Health = hp, Stamina = stamina, Mana = 0 }
-		};
-
 		[Fact]
-		public void NoGear_UsesTheBaseMax()
+		public void DeadCharacter_StaysDeadEvenWithGear()
 		{
-			var vitals = EntityVitals.FromCharacter(Guardian(320, 179));
+			var character = Guardian(320, 179);
+			character.IsDead = true;
 
-			Assert.Equal(320u, vitals.MaxHealth);
-			Assert.Equal(320u, vitals.Health); // seeds full
-			Assert.Equal(179u, vitals.MaxStamina);
+			var vitals = EntityVitals.FromCharacter(character, new Dictionary<CharacterStatId, int>
+			{
+				[CharacterStatId.HealthMax] = 328
+			});
+
+			Assert.Equal(648u, vitals.MaxHealth); // max still gear-boosted
+			Assert.Equal(0u, vitals.Health); // but a dead login stays dead
 		}
 
 		[Fact]
@@ -45,15 +43,28 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void DeadCharacter_StaysDeadEvenWithGear()
+		public void NoGear_UsesTheBaseMax()
 		{
-			var character = Guardian(320, 179);
-			character.IsDead = true;
+			var vitals = EntityVitals.FromCharacter(Guardian(320, 179));
 
-			var vitals = EntityVitals.FromCharacter(character, new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 328 });
+			Assert.Equal(320u, vitals.MaxHealth);
+			Assert.Equal(320u, vitals.Health); // seeds full
+			Assert.Equal(179u, vitals.MaxStamina);
+		}
 
-			Assert.Equal(648u, vitals.MaxHealth); // max still gear-boosted
-			Assert.Equal(0u, vitals.Health); // but a dead login stays dead
+		private static Character Guardian(uint hp, uint stamina)
+		{
+			return new Character
+			{
+				Class = Class.Guardian,
+				Level = 1,
+				MaxStats = new CharacterMaxStats
+				{
+					Health = hp,
+					Stamina = stamina,
+					Mana = 0
+				}
+			};
 		}
 	}
 }

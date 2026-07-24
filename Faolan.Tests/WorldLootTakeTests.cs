@@ -1,7 +1,6 @@
 using System;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Constants;
 using Xunit;
 
 namespace Faolan.Tests

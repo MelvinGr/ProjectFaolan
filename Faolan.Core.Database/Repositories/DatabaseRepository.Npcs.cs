@@ -12,13 +12,13 @@ namespace Faolan.Core.Database.Repositories
 		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
 		Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
 		Task<ConversationNode[]> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
+		Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap();
 		Task<NpcTemplate?> GetNpcByName(string name);
 		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
 		Task<NpcSpawn?> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
 		Task<NpcSpell[]> GetNpcSpellsByName(string name);
 		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
-		Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap();
 		Task<Dictionary<string, uint>> GetQuestGiverMap();
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
 		Task<Shop?> GetShopByTemplate(uint npcTemplateId);
@@ -66,6 +66,25 @@ namespace Faolan.Core.Database.Repositories
 				.ToListAsync();
 
 			return nodes.OrderBy(n => n.ConditionQuestId == null).ToArray(); // conditioned variants first, unconditional fallback last
+		}
+
+		// #262: escortee NPCs that DISAPPEAR once their escort quest is COMPLETED (the escort is over - they're not back
+		// at the spawn). Keyed by the escortee's TEMPLATE id (the Escort goal's TrailingRefId) -> the escort quest id.
+		// Data-driven from the Escort goals; generalises to any escort (e.g. Casilda 9411 -> 12407).
+		public async Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var escorts = await ctx
+				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Escort && g.TrailingRefId != 0)
+				.Select(g => new
+				{
+					g.TrailingRefId,
+					g.QuestDefinitionId
+				})
+				.Distinct()
+				.ToListAsync();
+
+			return escorts.GroupBy(x => x.TrailingRefId).ToDictionary(g => g.Key, g => g.First().QuestDefinitionId);
 		}
 
 		public async Task<NpcTemplate?> GetNpcByName(string name)
@@ -148,25 +167,6 @@ namespace Faolan.Core.Database.Repositories
 				.ToListAsync();
 
 			return killTargets.Where(x => !givers.Contains(x.TargetName)).GroupBy(x => x.TargetName!).ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
-		}
-
-		// #262: escortee NPCs that DISAPPEAR once their escort quest is COMPLETED (the escort is over - they're not back
-		// at the spawn). Keyed by the escortee's TEMPLATE id (the Escort goal's TrailingRefId) -> the escort quest id.
-		// Data-driven from the Escort goals; generalises to any escort (e.g. Casilda 9411 -> 12407).
-		public async Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap()
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var escorts = await ctx
-				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Escort && g.TrailingRefId != 0)
-				.Select(g => new
-				{
-					g.TrailingRefId,
-					g.QuestDefinitionId
-				})
-				.Distinct()
-				.ToListAsync();
-
-			return escorts.GroupBy(x => x.TrailingRefId).ToDictionary(g => g.Key, g => g.First().QuestDefinitionId);
 		}
 
 		public async Task<Dictionary<string, uint>> GetQuestGiverMap()

@@ -34,29 +34,6 @@ namespace Faolan.Tests
 		                                     "224c6f73744772616365456666656374222063617465676f72793d2231303022206b65793d22524f3553516c5a6e2e682f4476" +
 		                                     "766148262333363b57477522206b6e75626f743d22302220203e3c2f72656d6f7465666f726d61743e00000001";
 
-		[Theory, InlineData(AreaNameBody), InlineData(LostGraceBody)]
-		public void Build_FromParsedFields_MatchesCapture(string capturedHex)
-		{
-			var captured = Convert.FromHexString(capturedHex);
-			var p = FormatFeedbackCodec.Parse(captured);
-
-			var rebuilt = FormatFeedbackCodec.Build(p.Instance, p.TypeFlags, p.Footer, p.Xml);
-
-			Assert.Equal(capturedHex, Convert.ToHexStringLower(rebuilt));
-		}
-
-		[Fact]
-		public void Build_FromScratch_ProducesParsableBanner()
-		{
-			var xml = Encoding.ASCII.GetBytes("<remoteformat token=\"showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName\" category=\"50018\" key=\"x\" knubot=\"0\"  ></remoteformat>");
-
-			var body = FormatFeedbackCodec.Build(0x12345678, 0, 1, xml);
-			var p = FormatFeedbackCodec.Parse(body);
-
-			Assert.Equal(0x12345678u, p.Instance);
-			Assert.Equal(xml, p.Xml);
-		}
-
 		[Fact]
 		public void BuildAreaNameXml_MatchesCapturedBanner()
 		{
@@ -103,6 +80,29 @@ namespace Faolan.Tests
 
 			Assert.Equal(capturedBody, Convert.ToHexStringLower(rebuilt));
 			Assert.Equal(FormatFeedbackCodec.FifoBannerTypeFlags, p.TypeFlags); // a FIFO banner, like the area name
+		}
+
+		[Theory, InlineData(AreaNameBody), InlineData(LostGraceBody)]
+		public void Build_FromParsedFields_MatchesCapture(string capturedHex)
+		{
+			var captured = Convert.FromHexString(capturedHex);
+			var p = FormatFeedbackCodec.Parse(captured);
+
+			var rebuilt = FormatFeedbackCodec.Build(p.Instance, p.TypeFlags, p.Footer, p.Xml);
+
+			Assert.Equal(capturedHex, Convert.ToHexStringLower(rebuilt));
+		}
+
+		[Fact]
+		public void Build_FromScratch_ProducesParsableBanner()
+		{
+			var xml = Encoding.ASCII.GetBytes("<remoteformat token=\"showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName\" category=\"50018\" key=\"x\" knubot=\"0\"  ></remoteformat>");
+
+			var body = FormatFeedbackCodec.Build(0x12345678, 0, 1, xml);
+			var p = FormatFeedbackCodec.Parse(body);
+
+			Assert.Equal(0x12345678u, p.Instance);
+			Assert.Equal(xml, p.Xml);
 		}
 
 		[Fact]

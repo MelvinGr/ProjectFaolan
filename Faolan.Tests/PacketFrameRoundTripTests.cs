@@ -2,7 +2,6 @@ using System;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Xunit;
 
@@ -15,16 +14,24 @@ namespace Faolan.Tests
 	// frame byte fails here rather than silently on the wire.
 	public class PacketFrameRoundTripTests
 	{
+		// Endpoints.EndpointFromBytes must reconstruct a ProtoEndpoint that re-serializes to the EXACT input bytes, so
+		// the hand-rolled capture-literal endpoints (the UniverseAgent InitAuth receiver, and the old echo-receiver it
+		// replaced) survive the migration to the structured Rpc receiver byte-for-byte.
+		[Theory, InlineData("0d5440380c1099a742"), InlineData("0d5440380c10eceb80de03")]
+		// InitAuth receiver (instance 0x109399)
+			// the old hardcoded echo receiver (larger instance)
+		public void EndpointFromBytes_RoundTripsToTheSameBytes(string hex)
+		{
+			var bytes = Convert.FromHexString(hex);
+			Assert.Equal(bytes, Endpoints.EndpointFromBytes(bytes).ToProtobuf());
+		}
+
 		// (senderType, senderInstance, receiverType, receiverInstance, opcode, headerDataHex, bodyHex)
 		// The two keepalive replies from KeepAliveService are the seed cases (GameServerStats on GameInterface with no
 		// headerData; Pong on GameCharInterface with a 1-byte headerData) plus a header-data-heavy control case.
-		[Theory]
-		[InlineData(Endpoints.GameAgentType, 0x08u, Endpoints.GameInterfaceType, 0x3BC035ECu,
-			(ushort)GameInterfaceOpcodes.DispatchGameServerStats, "", "42B32A07000000000000000000000000")]
-		[InlineData(Endpoints.GameCharAgentType, 0x08u, Endpoints.GameCharInterfaceType, 0x3BC035ECu,
-			(ushort)GameCharInterfaceOpcodes.DispatchPong, "01", "0000000700000012AF50A848")]
-		[InlineData(Endpoints.GameInterfaceType, 0x01u, Endpoints.GameCharInterfaceType, 0xDEADBEEFu,
-			(ushort)GameCharInterfaceOpcodes.DispatchPong, "0D385715", "")]
+		[Theory, InlineData(Endpoints.GameAgentType, 0x08u, Endpoints.GameInterfaceType, 0x3BC035ECu, (ushort)GameInterfaceOpcodes.DispatchGameServerStats, "", "42B32A07000000000000000000000000"),
+		 InlineData(Endpoints.GameCharAgentType, 0x08u, Endpoints.GameCharInterfaceType, 0x3BC035ECu, (ushort)GameCharInterfaceOpcodes.DispatchPong, "01", "0000000700000012AF50A848"),
+		 InlineData(Endpoints.GameInterfaceType, 0x01u, Endpoints.GameCharInterfaceType, 0xDEADBEEFu, (ushort)GameCharInterfaceOpcodes.DispatchPong, "0D385715", "")]
 		public void Frame_Builder_And_Parser_AreMutualInverses(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, ushort opcode, string headerDataHex, string bodyHex)
 		{
 			var headerData = Convert.FromHexString(headerDataHex);
@@ -48,18 +55,6 @@ namespace Faolan.Tests
 			// Re-serialize from the parsed fields and assert byte-for-byte equality with the original frame - the
 			// Serialize(Parse(bytes)) == bytes oracle.
 			Assert.Equal(frame, parsed.Serialize());
-		}
-
-		// Endpoints.EndpointFromBytes must reconstruct a ProtoEndpoint that re-serializes to the EXACT input bytes, so
-		// the hand-rolled capture-literal endpoints (the UniverseAgent InitAuth receiver, and the old echo-receiver it
-		// replaced) survive the migration to the structured Rpc receiver byte-for-byte.
-		[Theory]
-		[InlineData("0d5440380c1099a742")] // InitAuth receiver (instance 0x109399)
-		[InlineData("0d5440380c10eceb80de03")] // the old hardcoded echo receiver (larger instance)
-		public void EndpointFromBytes_RoundTripsToTheSameBytes(string hex)
-		{
-			var bytes = Convert.FromHexString(hex);
-			Assert.Equal(bytes, Endpoints.EndpointFromBytes(bytes).ToProtobuf());
 		}
 
 		// Builds a whole wire frame through the production serializer.

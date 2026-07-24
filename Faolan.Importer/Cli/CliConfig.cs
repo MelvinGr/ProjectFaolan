@@ -16,8 +16,11 @@ namespace Faolan.Importer.Cli
 		public static (FaolanDbProvider Provider, string Connection) ResolveDatabase(string[] args)
 		{
 			var config = new ConfigurationBuilder()
-				.AddJsonFile(RepoPaths.Combine("faolan.json"), optional: true)
-				.AddCommandLine(args, new Dictionary<string, string> { ["--connectionstring"] = "Database:ConnectionString" })
+				.AddJsonFile(RepoPaths.Combine("faolan.json"), true)
+				.AddCommandLine(args, new Dictionary<string, string>
+				{
+					["--connectionstring"] = "Database:ConnectionString"
+				})
 				.AddEnvironmentVariables()
 				.Build();
 

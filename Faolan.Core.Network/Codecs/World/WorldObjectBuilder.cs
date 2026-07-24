@@ -16,6 +16,20 @@ namespace Faolan.Core.Network.Codecs.World
 	// One builder handles every object class. Byte-identical to the captured body (WorldObjectBuilderTests).
 	public static class WorldObjectBuilder
 	{
+		// Builds a world-object body from the row's TYPED COLUMNS + KdTreeTail (the retired Data blob is no longer read),
+		// stamped with the live `playfieldInstance` token. This is the sole burst-less / create-editor object path.
+		// THROWS when the row isn't lifted (no DisplayName / KdTreeTail) - see BuildBody.
+		public static byte[] Build(WorldObject row, uint handle, uint playfieldInstance)
+		{
+			return BuildBody(row, handle, row?.Position ?? default, row?.Rotation ?? Quaternion.Identity, TypeTagForClass(row?.SubOpcode ?? 0), playfieldInstance);
+		}
+
+		// As Build but with a placeholder playfield token (0) - for diagnostics / callers that re-stamp per recipient.
+		public static byte[] Build(WorldObject row, uint handle)
+		{
+			return Build(row, handle, 0u);
+		}
+
 		// Builds a world-object body FROM SCRATCH (#249) - no captured `Data`: the header (subOpcode + typeTag +
 		// handle, fieldA=0) + the transform (pos/rot + the live playfield token as the 0x18 4-byte varint) + the
 		// identity message generated from the row's columns (SimpleDynelMessageCodec) + the row's KdTreeTail (the
@@ -26,7 +40,8 @@ namespace Faolan.Core.Network.Codecs.World
 		public static byte[] BuildBody(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken)
 		{
 			if (row?.DisplayName == null || row.KdTreeTail == null)
-				throw new InvalidOperationException($"WorldObject '{row?.Name ?? "?"}' (id {row?.Id}) is not lifted: no DisplayName/KdTreeTail. Re-run the importer to lift it (or Include the columns).");
+				throw new InvalidOperationException(
+					$"WorldObject '{row?.Name ?? "?"}' (id {row?.Id}) is not lifted: no DisplayName/KdTreeTail. Re-run the importer to lift it (or Include the columns).");
 
 			var head = new FaolanStream()
 				.WriteUInt32(0) // body length placeholder @0 (set below)
@@ -34,10 +49,10 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteUInt32(typeTag)
 				.WriteUInt32(handle)
 				.WriteUInt32(0) // fieldA
-								// The 0x2C transform component: a ProtoGameCodeDynelIIR { position=1, rotation=2, playfield_instance=3 }.
-								// All 15787 captured FA015807/66AEDD50 groups carry exactly those three fields in that order, and every
-								// captured playfield token falls in [2^21, 2^28) - where the MINIMAL varint protobuf-net writes is
-								// already 4 bytes, so SpawnPlayfieldRewriter's splice-free in-place re-address still holds.
+				// The 0x2C transform component: a ProtoGameCodeDynelIIR { position=1, rotation=2, playfield_instance=3 }.
+				// All 15787 captured FA015807/66AEDD50 groups carry exactly those three fields in that order, and every
+				// captured playfield token falls in [2^21, 2^28) - where the MINIMAL varint protobuf-net writes is
+				// already 4 bytes, so SpawnPlayfieldRewriter's splice-free in-place re-address still holds.
 				.WriteByte(0x2C)
 				.WriteArray(new ProtoGameCodeDynelIIR
 				{
@@ -97,20 +112,6 @@ namespace Faolan.Core.Network.Codecs.World
 			return row?.DisplayName ?? string.Empty;
 		}
 
-		// Builds a world-object body from the row's TYPED COLUMNS + KdTreeTail (the retired Data blob is no longer read),
-		// stamped with the live `playfieldInstance` token. This is the sole burst-less / create-editor object path.
-		// THROWS when the row isn't lifted (no DisplayName / KdTreeTail) - see BuildBody.
-		public static byte[] Build(WorldObject row, uint handle, uint playfieldInstance)
-		{
-			return BuildBody(row, handle, row?.Position ?? default, row?.Rotation ?? Quaternion.Identity, TypeTagForClass(row?.SubOpcode ?? 0), playfieldInstance);
-		}
-
-		// As Build but with a placeholder playfield token (0) - for diagnostics / callers that re-stamp per recipient.
-		public static byte[] Build(WorldObject row, uint handle)
-		{
-			return Build(row, handle, 0u);
-		}
-
 		// The wire typeTag (the 0x0000C8xx EntityClass ack in the object header) for a world-object CLASS. Class-stable
 		// (one distinct tag per SubOpcode across the whole capture set), so it is derived here rather than stored.
 		public static uint TypeTagForClass(uint subOpcode)
@@ -118,11 +119,11 @@ namespace Faolan.Core.Network.Codecs.World
 			return subOpcode switch
 			{
 				(uint)GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR => EntityClass.ClimbingDynel,
-				(uint)GameServer0X2000Opcodes.DoorFullUpdateIIR => EntityClass.ZoneLabel,
-				(uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR => EntityClass.SimpleDynel,
-				(uint)GameServer0X2000Opcodes.DestructibleFullUpdateIIR => EntityClass.Destructible,
-				(uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR => EntityClass.LootBag,
-				_ => EntityClass.SimpleDynel
+				(uint)GameServer0X2000Opcodes.DoorFullUpdateIIR          => EntityClass.ZoneLabel,
+				(uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR   => EntityClass.SimpleDynel,
+				(uint)GameServer0X2000Opcodes.DestructibleFullUpdateIIR  => EntityClass.Destructible,
+				(uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR       => EntityClass.LootBag,
+				_                                                        => EntityClass.SimpleDynel
 			};
 		}
 	}

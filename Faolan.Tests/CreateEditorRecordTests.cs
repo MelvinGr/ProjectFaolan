@@ -12,17 +12,6 @@ namespace Faolan.Tests
 	public class CreateEditorRecordTests
 	{
 		[Fact]
-		public void BehaviorControlCenterIir_MatchesCapturedBytes()
-		{
-			// WorldPrep behavior (handle 0x00039232, slot 7, behaviorId 41413, phase 1) and a CreationScript one
-			// (handle 0x0009FF94, slot 5, behaviorId 85843, phase 2).
-			Assert.Equal("0000c350000392320004000000070000000a08c5c302180128183000",
-				Convert.ToHexString(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039232, 7, 41413, 1, 24, 0)).ToLowerInvariant());
-			Assert.Equal("0000c3500009ff940004000000050000000a08d39e05180228183000",
-				Convert.ToHexString(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF94, 5, 85843, 2, 24, 0)).ToLowerInvariant());
-		}
-
-		[Fact]
 		public void BehaviorControlCenterIirLong_MatchesCapturedBytes()
 		{
 			// The three 116-byte item-bound BehaviorControlCenterIIR records of the WorldPrep stream
@@ -39,14 +28,14 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void CharacterActionIir_MatchesCapturedBytes()
+		public void BehaviorControlCenterIir_MatchesCapturedBytes()
 		{
-			// First + last CharacterActionIIR of the WorldPrep stream (handle 0x02000001): grants action ids
-			// 0x012C and 0x050E24 (decode_character_action.py validated all 26 records).
-			Assert.Equal("0000c35002000001000000001d000000000000000000000000000000000000012c0000000000000000",
-				Convert.ToHexString(CreateEditorRecordBuilder.BuildCharacterActionIir(0x02000001, 0x0000012C)).ToLowerInvariant());
-			Assert.Equal("0000c35002000001000000001d0000000000000000000000000000000000050e240000000000000000",
-				Convert.ToHexString(CreateEditorRecordBuilder.BuildCharacterActionIir(0x02000001, 0x00050E24)).ToLowerInvariant());
+			// WorldPrep behavior (handle 0x00039232, slot 7, behaviorId 41413, phase 1) and a CreationScript one
+			// (handle 0x0009FF94, slot 5, behaviorId 85843, phase 2).
+			Assert.Equal("0000c350000392320004000000070000000a08c5c302180128183000",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x00039232, 7, 41413, 1, 24, 0)).ToLowerInvariant());
+			Assert.Equal("0000c3500009ff940004000000050000000a08d39e05180228183000",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF94, 5, 85843, 2, 24, 0)).ToLowerInvariant());
 		}
 
 		[Fact]
@@ -55,6 +44,17 @@ namespace Faolan.Tests
 			// The "character in play" signal: type=C350 handle=021662C8 flag=00 (the whole message is the handle).
 			var bytes = CreateEditorRecordBuilder.BuildCharInPlayIir(0x021662C8);
 			Assert.Equal("0000c350021662c800", Convert.ToHexString(bytes).ToLowerInvariant());
+		}
+
+		[Fact]
+		public void CharacterActionIir_MatchesCapturedBytes()
+		{
+			// First + last CharacterActionIIR of the WorldPrep stream (handle 0x02000001): grants action ids
+			// 0x012C and 0x050E24 (decode_character_action.py validated all 26 records).
+			Assert.Equal("0000c35002000001000000001d000000000000000000000000000000000000012c0000000000000000",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildCharacterActionIir(0x02000001, 0x0000012C)).ToLowerInvariant());
+			Assert.Equal("0000c35002000001000000001d0000000000000000000000000000000000050e240000000000000000",
+				Convert.ToHexString(CreateEditorRecordBuilder.BuildCharacterActionIir(0x02000001, 0x00050E24)).ToLowerInvariant());
 		}
 
 		[Fact]

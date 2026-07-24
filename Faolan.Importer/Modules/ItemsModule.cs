@@ -9,7 +9,6 @@ namespace Faolan.Importer.Modules
 	// TODO(importer step 2a): thread ctx.Mode into CaptureItemImporter so Insert skips existing keys.
 	public sealed class ItemsModule : IImportModule
 	{
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -17,6 +16,8 @@ namespace Faolan.Importer.Modules
 			WriteMode.Insert,
 			WriteMode.Upsert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Item identities from inventory/ApplySpell packets.";
 		public string Name => "items";

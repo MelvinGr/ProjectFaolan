@@ -158,13 +158,13 @@ namespace Faolan.Tests
 
 		private sealed class Group
 		{
-			public string Category = "";
-			public string Id = "";
-			public string Name = "";
 			public Vector3 Max;
 			public Vector3 Min;
 			public Vector3[] Points = [];
 			public Vector3[][] Paths = [];
+			public string Category = "";
+			public string Id = "";
+			public string Name = "";
 		}
 	}
 }

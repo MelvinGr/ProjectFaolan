@@ -35,20 +35,20 @@ namespace Faolan.Web.Components.Pages
 		// morphs are the decoded signed slider values (the unit CharacterBody stores / BodyMorphDeformer takes);
 		// _eHead is editor-2x units. Preview is a strict ad-hoc build (no fallback) - _editError shows why it failed.
 		private CharacterModelService.AppearanceOptions? _appOptions;
-		private bool _ownsSelected;
-		private bool _refreshThumbs;
 		private Character? _selected;
 		private IJSObjectReference? _module;
-		private int _eArm, _eChest, _eBosom, _eStomach, _eArse, _eThigh, _eLeg;
-		private int _invPage;
 		private IReadOnlyDictionary<string, ItemInfo> _equipment = new Dictionary<string, ItemInfo>();
 		private IReadOnlyList<(ItemInfo Info, string Tab)> _inventory = [];
 		private IReadOnlyList<(string Name, byte Level, float Range, float Damage)> _spells = [];
 
 		private List<Character>? _characters;
+		private bool _ownsSelected;
+		private bool _refreshThumbs;
+		private int _eArm, _eChest, _eBosom, _eStomach, _eArse, _eThigh, _eLeg;
+		private int _invPage;
+		private string _eHairStyle = "", _eHairColor = "", _eEyes = "", _eSkin = "", _eBodyTat = "", _eFaceTat = "";
 
 		private string _editStatus = "";
-		private string _eHairStyle = "", _eHairColor = "", _eEyes = "", _eSkin = "", _eBodyTat = "", _eFaceTat = "";
 		private string _invTab = "Normal";
 		private string _mapName = "—";
 		private string _money = "0";
@@ -66,12 +66,12 @@ namespace Faolan.Web.Components.Pages
 		[SupplyParameterFromQuery(Name = "char")]
 		public long? CharId { get; set; }
 
-		private int InvPageCount => Math.Max(1, (int)Math.Ceiling(TabItems.Count / (double)InvPageSize));
-
 		private List<(ItemInfo Info, string Tab)> TabItems => _inventory.Where(i => i.Tab == _invTab).ToList();
 
 		[CascadingParameter]
 		private Task<AuthenticationState>? AuthState { get; set; }
+
+		private int InvPageCount => Math.Max(1, (int)Math.Ceiling(TabItems.Count / (double)InvPageSize));
 
 		protected override async Task OnAfterRenderAsync(bool firstRender)
 		{

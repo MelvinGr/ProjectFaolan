@@ -1,7 +1,8 @@
 {
 	"Database": {
 		"Provider": "Sqlite", // Postgres
-		"ConnectionString": "Data Source=faolan.db" // "Host=localhost;Port=5432;Database=faolan;Username=faolan;Password=faolan"
+		"ConnectionString":
+			"Data Source=faolan.db" // "Host=localhost;Port=5432;Database=faolan;Username=faolan;Password=faolan"
 	},
 
 	"ServerIpAddress": "127.0.0.1",
@@ -28,10 +29,12 @@
 	"ChatBridge": {
 		// "PollMs": 1500,
 		// "BacklogGraceMs": 120000
+	
 	},
 
 	"Log": {
-		"File": "faolan.log", // log file location (default faolan.log in the CWD); point at a mounted volume in a container
+		"File":
+			"faolan.log", // log file location (default faolan.log in the CWD); point at a mounted volume in a container
 		"PacketBytes": true // false = drop the raw header/body hex dump, keep just the opcode + lengths
 	}
 }

@@ -138,35 +138,35 @@ namespace Faolan.Importer.Captures
 			var harvested = 0;
 			var seen = new HashSet<uint>();
 			foreach (var r in records)
-				foreach (var e in r.Ingredients.Concat(r.Results))
+			foreach (var e in r.Ingredients.Concat(r.Results))
+			{
+				if (e.ItemId == 0 || !seen.Add(e.ItemId))
+					continue;
+
+				var existing = await db.Items.FirstOrDefaultAsync(i => i.Id == e.ItemId);
+				if (existing != null)
 				{
-					if (e.ItemId == 0 || !seen.Add(e.ItemId))
-						continue;
-
-					var existing = await db.Items.FirstOrDefaultAsync(i => i.Id == e.ItemId);
-					if (existing != null)
-					{
-						if (existing.Hash == 0 && e.Hash != 0)
-							existing.Hash = e.Hash;
-						continue;
-					}
-
-					db.Items.Add(new Item
-					{
-						Id = e.ItemId,
-						Name = "",
-						Type = ItemType.Normal,
-						Hash = e.Hash,
-						Key = new ProtoDecryptionKey
-						{
-							Key1 = e.Key1,
-							Key2 = e.Key2,
-							Key3 = e.Key3,
-							Key4 = e.Key4
-						}
-					});
-					harvested++;
+					if (existing.Hash == 0 && e.Hash != 0)
+						existing.Hash = e.Hash;
+					continue;
 				}
+
+				db.Items.Add(new Item
+				{
+					Id = e.ItemId,
+					Name = "",
+					Type = ItemType.Normal,
+					Hash = e.Hash,
+					Key = new ProtoDecryptionKey
+					{
+						Key1 = e.Key1,
+						Key2 = e.Key2,
+						Key3 = e.Key3,
+						Key4 = e.Key4
+					}
+				});
+				harvested++;
+			}
 
 			await db.SaveChangesAsync();
 			return harvested;

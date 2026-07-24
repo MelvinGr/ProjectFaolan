@@ -10,12 +10,12 @@ namespace Faolan.Web.Components.Pages
 	public partial class Items
 	{
 		private const int PageSize = 48;
+		private IJSObjectReference? _module;
+		private IReadOnlyList<ItemInfo> _items = [];
 		private bool _loading;
 		private bool _refreshThumbs;
-		private IJSObjectReference? _module;
 		private int _page;
 		private int _total;
-		private IReadOnlyList<ItemInfo> _items = [];
 		private string _query = "";
 		private string _type = "";
 		private int PageCount => Math.Max(1, (int)Math.Ceiling(_total / (double)PageSize));

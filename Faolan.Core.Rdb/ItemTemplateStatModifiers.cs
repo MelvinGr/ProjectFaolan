@@ -25,9 +25,6 @@ namespace Faolan.Core.Rdb
 		// hits without needing a full whitelist here (the importer whitelists to the stats it applies).
 		private const uint MaxStatId = 0x1000;
 
-		// The wire amount as it sits in the template (NOT yet scaled). Divide by CharacterStatId.GetScale() for display.
-		public readonly record struct Modifier(uint StatId, uint WireAmount);
-
 		// All stat-modifier records in a decrypted template BODY (the span AFTER the 12-byte RDB-Id header), in file
 		// order. Signature-anchored; statId bounded to the real range. Duplicates are preserved (a template never
 		// repeats a stat id in the corpus, but the parser stays faithful to what's on the wire).
@@ -56,5 +53,8 @@ namespace Faolan.Core.Rdb
 		{
 			return BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(wordIndex * 4, 4));
 		}
+
+		// The wire amount as it sits in the template (NOT yet scaled). Divide by CharacterStatId.GetScale() for display.
+		public readonly record struct Modifier(uint StatId, uint WireAmount);
 	}
 }

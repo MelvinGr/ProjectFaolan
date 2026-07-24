@@ -18,8 +18,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<Item?> GetItem(uint id);
-		Task<Item[]> GetItems(params IReadOnlyList<uint> ids);
 		Task<uint?> GetItemSearchCategory(uint template);
+		Task<Item[]> GetItems(params IReadOnlyList<uint> ids);
 		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
 		Task<Item[]> GetRandomBuildableItems(int count);
 		Task<Item[]> GetRandomLootExcludedItems();
@@ -97,12 +97,6 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Items.FirstOrDefaultAsync(i => i.Id == id);
 		}
 
-		public async Task<Item[]> GetItems(params IReadOnlyList<uint> ids)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Items.Where(i => ids.Contains(i.Id)).ToArrayAsync();
-		}
-
 		public async Task<uint?> GetItemSearchCategory(uint template)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -116,6 +110,12 @@ namespace Faolan.Core.Database.Repositories
 				return null;
 
 			return categories.GroupBy(c => c).OrderByDescending(g => g.Count()).First().Key;
+		}
+
+		public async Task<Item[]> GetItems(params IReadOnlyList<uint> ids)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Items.Where(i => ids.Contains(i.Id)).ToArrayAsync();
 		}
 
 		public async Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names)

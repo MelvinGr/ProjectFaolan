@@ -5,6 +5,14 @@ namespace Faolan.Core.Extensions
 {
 	public static class ObjectExtensions
 	{
+		extension<TEnum>(TEnum value) where TEnum : struct, Enum
+		{
+			public static TEnum[] GetValues()
+			{
+				return Enum.GetValues<TEnum>();
+			}
+		}
+
 		public static T? FromJson<T>(this string json)
 		{
 			if (string.IsNullOrEmpty(json))
@@ -22,14 +30,6 @@ namespace Faolan.Core.Extensions
 			{
 				WriteIndented = indented
 			});
-		}
-
-		extension<TEnum>(TEnum value) where TEnum : struct, Enum
-		{
-			public static TEnum[] GetValues()
-			{
-				return Enum.GetValues<TEnum>();
-			}
 		}
 	}
 }

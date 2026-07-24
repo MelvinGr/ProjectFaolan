@@ -46,14 +46,6 @@ namespace Faolan.Importer.Rdb
 		// leave their captured (empty) name untouched.
 		private const uint StringTag = 0x21;
 
-		// The 5 primary-attribute wire stat ids field 972 is validated to hold (Str/Con/Int/Wis/Dex) - the guard that
-		// keeps the field-972 import to the decode-first-clean slice (docs/rdb/item-template-stats.md, #3).
-		private static readonly HashSet<uint> AttributeStatIds =
-		[
-			(uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution, (uint)CharacterStatId.Intelligence,
-			(uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity
-		];
-
 		// The [2][9]-region stats we import + apply today: vitals (the #3 health-bar-fill headline), the five
 		// attributes, and the combat ratings that now HAVE a consumer (Armor/Protection mitigation #401, Hit/Crit/
 		// CombatRating + Magic Damage + regen #399, all read off gearBonuses in WorldSimulation.RegisterPlayerInWorld).
@@ -64,9 +56,8 @@ namespace Faolan.Importer.Rdb
 		// patching gear totals onto the wire would diverge from retail and double-count (#399 item 1, won't-do).
 		private static readonly HashSet<uint> ApplicableStatIds =
 		[
-			(uint)CharacterStatId.HealthMax, (uint)CharacterStatId.StaminaMax, (uint)CharacterStatId.ManaMax,
-			(uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution, (uint)CharacterStatId.Intelligence,
-			(uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity,
+			(uint)CharacterStatId.HealthMax, (uint)CharacterStatId.StaminaMax, (uint)CharacterStatId.ManaMax, (uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution,
+			(uint)CharacterStatId.Intelligence, (uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity,
 			(uint)CharacterStatId.Armor, // #401: physical armor rating, applied as incoming-damage mitigation
 			(uint)CharacterStatId.HitRating, // #399: drives the provisional critical-hit chance
 			(uint)CharacterStatId.MagicDamage, // #399: added flat to the caster's spell damage
@@ -77,6 +68,14 @@ namespace Faolan.Importer.Rdb
 			(uint)CharacterStatId.Protection, // #401: magical mitigation of incoming NPC-cast damage
 			(uint)CharacterStatId.CombatRating // #399: provisional flat melee damage bonus
 		];
+
+		// The 5 primary-attribute wire stat ids field 972 is validated to hold (Str/Con/Int/Wis/Dex) - the guard that
+		// keeps the field-972 import to the decode-first-clean slice (docs/rdb/item-template-stats.md, #3).
+		private static readonly HashSet<uint> AttributeStatIds =
+		[
+			(uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution, (uint)CharacterStatId.Intelligence, (uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity
+		];
+
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
 		public static string? ExtractName(ReadOnlySpan<byte> template)
@@ -131,7 +130,17 @@ namespace Faolan.Importer.Rdb
 			if (dumpDir != null)
 				Directory.CreateDirectory(dumpDir);
 
-			int decrypted = 0, noEntry = 0, headerMismatch = 0, decryptFailed = 0, namesAdded = 0, categoriesAdded = 0, valuesAdded = 0, qualitiesAdded = 0, statsAdded = 0, bagsAdded = 0, weaponDamageAdded = 0;
+			int decrypted = 0,
+				noEntry = 0,
+				headerMismatch = 0,
+				decryptFailed = 0,
+				namesAdded = 0,
+				categoriesAdded = 0,
+				valuesAdded = 0,
+				qualitiesAdded = 0,
+				statsAdded = 0,
+				bagsAdded = 0,
+				weaponDamageAdded = 0;
 			var firstSampleShown = false;
 
 			foreach (var item in items)
@@ -336,7 +345,12 @@ namespace Faolan.Importer.Rdb
 				var row = item.StatModifiers.FirstOrDefault(m => (uint)m.StatId == statId);
 				if (row == null)
 				{
-					item.StatModifiers.Add(new ItemStatModifier { ItemId = item.Id, StatId = (CharacterStatId)statId, Amount = amount });
+					item.StatModifiers.Add(new ItemStatModifier
+					{
+						ItemId = item.Id,
+						StatId = (CharacterStatId)statId,
+						Amount = amount
+					});
 					changed = true;
 				}
 				else if (row.Amount != amount)

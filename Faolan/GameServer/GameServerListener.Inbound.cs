@@ -70,8 +70,10 @@ namespace Faolan.GameServer
 				{
 					// Create-editor (unnamed) avatar stat stream: retail sends no response, we just observe it.
 					if (client.Session.IsUnnamedCreatePhase)
+					{
 						Logger.LogInformation("Observed retail create-editor (uint)GameServer0X2000Opcodes.StatIIR while pendingPost205F={PendingPost205F}.",
 							client.Session.HasPendingPost205FFollowUp);
+					}
 
 					break;
 				}
@@ -200,8 +202,8 @@ namespace Faolan.GameServer
 									BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(22, 4), acceptedPosition.Z);
 								}
 
-								await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-									GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(echoBody)));
+								await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+									s => s.WriteArrayUInt32Length(echoBody)));
 
 								// Interest-managed broadcast: spawn this player to newly-near players and forward the move
 								// to players who already see them (Gitea #404). No-op solo.
@@ -669,7 +671,7 @@ namespace Faolan.GameServer
 										{
 											if (await _questProgression.TryAdvanceCollectPickup(client) is { } pickedItem)
 											{
-												await GrantItemToBackpack(client, pickedItem, 1);
+												await GrantItemToBackpack(client, pickedItem);
 												await WorldBroadcaster.HidePickupObject(client, target);
 											}
 
@@ -720,7 +722,7 @@ namespace Faolan.GameServer
 								// a quest NPC, an un-imported vendor) yields a null shop and falls through - do NOT break here, or
 								// the greeting is swallowed and dialogue never opens.
 								if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var vendorTemplate) &&
-									await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
+								    await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
 								{
 									await _shop.HandleVendorTradeOpen(client, rawPayload, args.CommandqueueClientId, vendorShop, npcHandle);
 									break;
@@ -732,7 +734,7 @@ namespace Faolan.GameServer
 								// is the stable key (like shop vendors above); the player is standing next to the auctioneer to
 								// click it, so their own position trivially satisfies the 15-unit client proximity check.
 								if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
-									talkedNpcName == AuctioneerNpcName && PlayerWorldEntity(client) is { } auctioneerPlayer)
+								    talkedNpcName == AuctioneerNpcName && PlayerWorldEntity(client) is { } auctioneerPlayer)
 								{
 									await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
 									break;
@@ -770,9 +772,7 @@ namespace Faolan.GameServer
 									// handle so the client floats it over the NPC; recipient = the clicking player (SayRecipients
 									// excludes the actor, which would drop the clicker here). No-fallbacks rule: say what's missing.
 									if (npcHandle != 0)
-									{
 										await _agentServerDispatcher.CharacterSay(npcHandle, $"({routedName}: no dialogue or shop imported yet)", [client.Session.Character.Id]);
-									}
 
 									await ConversationService.SendConversationClose(client, npcHandle); // #217: close the CLICKED NPC's window (re-address the camera release)
 								}
@@ -1761,10 +1761,7 @@ namespace Faolan.GameServer
 				category = target.Disposition;
 
 			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),
-				GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteUInt32(targetType)
-					.WriteUInt32(targetInstance)
-					.WriteUInt32(category))); // cCategory: 0 = friendly, 1 = hostile, 2 = neutral
+				GameInterfaceOpcodes.DispatchPassBlob, b => b.WriteUInt32(targetType).WriteUInt32(targetInstance).WriteUInt32(category))); // cCategory: 0 = friendly, 1 = hostile, 2 = neutral
 
 			Logger.LogDebug("RequestAggroStatus(target=0x{Target:X8}) -> cCategory={Category}.", targetInstance, category);
 		}
@@ -1806,9 +1803,9 @@ namespace Faolan.GameServer
 
 			var slot = body.ReadUInt32();
 			body.ReadUInt32(); // removedItemOccupySlots (bitmask; 0 across all captures - not needed to persist)
-							   // Polarity CONFIRMED in-client: checkbox ON (the slot's vanity toggle enabled / its vanity item is
-							   // shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
-							   // (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
+			// Polarity CONFIRMED in-client: checkbox ON (the slot's vanity toggle enabled / its vanity item is
+			// shown) sends toggleState=1 and SETS the slot's mask bit - matching the retail vanity-head-selected capture
+			// (checkbox on -> bit 2 set). So the mask bit = "this slot's vanity toggle is on"; toggleState maps straight to it.
 			var toggleState = Convert.ToBoolean(body.ReadByte());
 
 			var applied = await Database.SetVanityFilter(character.Id, slot, toggleState);

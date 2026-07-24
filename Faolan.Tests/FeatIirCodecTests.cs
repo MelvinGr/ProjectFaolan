@@ -14,13 +14,6 @@ namespace Faolan.Tests
 		private const string RequestHex = "28da68a00000c3501101b4f500040000000000000fc40001adb00001b83c000643e8";
 
 		[Fact]
-		public void Build_MatchesTheCapturedAck()
-		{
-			var body = FeatIirCodec.Build(0x1101B4F5, FeatIirCodec.StateAck, [110000u, 112700u, 410600u]);
-			Assert.Equal(AckHex, Convert.ToHexString(body).ToLowerInvariant());
-		}
-
-		[Fact]
 		public void BuildParse_RoundTrips_IncludingEmpty()
 		{
 			foreach (var feats in new[] { new uint[] { }, [110004u], [80004u, 82704u, 410604u] })
@@ -31,6 +24,13 @@ namespace Faolan.Tests
 				Assert.Equal(FeatIirCodec.StateTrainRequest, state);
 				Assert.Equal(feats, ids);
 			}
+		}
+
+		[Fact]
+		public void Build_MatchesTheCapturedAck()
+		{
+			var body = FeatIirCodec.Build(0x1101B4F5, FeatIirCodec.StateAck, [110000u, 112700u, 410600u]);
+			Assert.Equal(AckHex, Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]

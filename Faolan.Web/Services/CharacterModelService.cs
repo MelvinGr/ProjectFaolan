@@ -48,12 +48,6 @@ namespace Faolan.Web.Services
 		private const uint MaleHead = 4821637;
 
 		private static readonly AppearanceOptions EmptyOptions = new([], [], [], [], [], [], [], 0, 0, new Dictionary<string, int[]>());
-		private static readonly byte[] None = [];
-
-		// A map's top-down image (RDB type 1010209 keyed by playfield id) as a ready-to-serve PNG, or null when the
-		// RDB is unavailable, the map has no local image (CDN-gated), or no PNG is embedded. The record is a small
-		// [type][id][count] preamble followed by the raw PNG, so we carve from the PNG signature.
-		private static readonly byte[] PngSig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
 		// (race, sex) -> the body's CHARACTERCREATOR monsterdata id (RDB type 1010700 <body monsterdataid>, the
 		// authoritative per-race/sex body). The MonsterData in turn names the body's skinned RenderMesh, resolved via
@@ -74,6 +68,12 @@ namespace Faolan.Web.Services
 		// Deterministic renders are cached for a while after last use; the empty array is the "no model" sentinel so a
 		// 404 result is cached too (a slot with no display mesh isn't rebuilt on every draw).
 		private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(30);
+		private static readonly byte[] None = [];
+
+		// A map's top-down image (RDB type 1010209 keyed by playfield id) as a ready-to-serve PNG, or null when the
+		// RDB is unavailable, the map has no local image (CDN-gated), or no PNG is embedded. The record is a small
+		// [type][id][count] preamble followed by the raw PNG, so we carve from the PNG signature.
+		private static readonly byte[] PngSig = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
 		// A map's world extent (tilemap Width/Height in world units) from the RDB playfield description (1070003),
 		// used to scale the live radar. Null when the RDB is unavailable or the playfield is CDN-gated. Cached.

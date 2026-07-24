@@ -15,13 +15,14 @@ namespace Faolan.Importer.Modules
 		// Fresh/tutorial captures (level <= 5) are skipped: they carry no trained feats and only a base ability
 		// scaffold, so they add nothing to the reference set. The kept chars are the leveled retail captures.
 		private const uint MinLevel = 5;
-		public ImportSource Source => ImportSource.Captures;
 		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
 			WriteMode.Insert
 		};
+
+		public ImportSource Source => ImportSource.Captures;
 
 		public string Description => "Captured characters (incl. other players) and their bodies/gear.";
 		public string Name => "characters";

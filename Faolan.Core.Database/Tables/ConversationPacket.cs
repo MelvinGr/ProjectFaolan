@@ -21,6 +21,13 @@ namespace Faolan.Core.Database.Tables
 		// rows (ConversationScreenColumns.ToScreen -> RemoteFormatXml.Build). Empty for OpenChatWindow / non-Knubot.
 		public virtual ICollection<ConversationScreen> Screens { get; set; } = [];
 
+		// --- structured screen (#188) ----------------------------------------------------------------------------
+		// SubOpcode is the Knubot dialogue IIR (0x045B0B0F / 0x4A3D899A / 0xF164A4A5 / 0xC4AF39EB) OR the dialogue
+		// camera (0x2015 DispatchSetDialogueCamera) - REQUIRED (the importer rejects a packet it can't decode).
+		// Knubot uses Env/Field/Flag + the Screens rows; the camera uses CameraParams. Both use SenderInstance and
+		// the live npc/player handles at send time.
+		public ConversationSubOpcode? SubOpcode { get; set; }
+
 		public byte? Env { get; set; } // KnubotBaseIIR env byte
 		public byte? Flag { get; set; } // OpenChatWindow/AppendText trailing flag (null otherwise)
 		public byte[]? CameraParams { get; set; }
@@ -35,12 +42,5 @@ namespace Faolan.Core.Database.Tables
 		// conversation (0x07..0x5a; 0x08 most common) and the client addresses its KnubotAnswer back to it, so it's
 		// stored and re-framed at send time (was read from the raw Data blob, now retired).
 		public uint? SenderInstance { get; set; }
-
-		// --- structured screen (#188) ----------------------------------------------------------------------------
-		// SubOpcode is the Knubot dialogue IIR (0x045B0B0F / 0x4A3D899A / 0xF164A4A5 / 0xC4AF39EB) OR the dialogue
-		// camera (0x2015 DispatchSetDialogueCamera) - REQUIRED (the importer rejects a packet it can't decode).
-		// Knubot uses Env/Field/Flag + the Screens rows; the camera uses CameraParams. Both use SenderInstance and
-		// the live npc/player handles at send time.
-		public ConversationSubOpcode? SubOpcode { get; set; }
 	}
 }

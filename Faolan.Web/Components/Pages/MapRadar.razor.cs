@@ -10,9 +10,9 @@ namespace Faolan.Web.Components.Pages
 {
 	public partial class MapRadar
 	{
-		private bool _authorized;
 		private IJSObjectReference? _module;
 		private List<(uint Id, string Name)> _maps = [];
+		private bool _authorized;
 
 		private uint MapId { get; set; } = 4010; // Tortage Island default
 

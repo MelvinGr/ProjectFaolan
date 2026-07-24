@@ -73,10 +73,6 @@ namespace Faolan.GameServer.World
 		// target=player + attacker=NPC (the player-attacks-NPC direction already rides CombatService). #274.
 		Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage);
 
-		// Retail's per-tick vitals regen delta (RegenIIR): [+health][+mana][+stamina] in the ×100 wire scale, added to
-		// the client's current bars so they regen smoothly (vs pushing a full stat block every tick).
-		Task SendRegen(INetworkClient client, uint handle, int healthDelta, int manaDelta, int staminaDelta);
-
 		// The in-session DEATH action (BccIIR 0x642CD3D6, behaviorId 41877) that transitions the live SimpleChar INTO
 		// the dead state (bcc_state 29) so the release window shows - the in-session analogue of the login spawn's
 		// bcc_state=29. Sent at the end of the death sequence (#214).
@@ -102,6 +98,10 @@ namespace Faolan.GameServer.World
 		// Send a caster NPC's spell cast at the player: the ApplySpell (0x6B87E316) from the NPC handle (#232). The
 		// damage/effect is the captured payload; visual + the HP move rides the caller's PushVitals (like the swing).
 		Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell);
+
+		// Retail's per-tick vitals regen delta (RegenIIR): [+health][+mana][+stamina] in the ×100 wire scale, added to
+		// the client's current bars so they regen smoothly (vs pushing a full stat block every tick).
+		Task SendRegen(INetworkClient client, uint handle, int healthDelta, int manaDelta, int staminaDelta);
 
 		// The "resurrection point discovered" FIFO banner (#372) - retail's toast, sent in the same frame as the
 		// spots re-send. `nameKey` is the per-point key of the point's category-270 name string; see

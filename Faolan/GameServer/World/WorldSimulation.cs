@@ -49,6 +49,9 @@ namespace Faolan.GameServer.World
 		// wall-clock dt, not the nominal period, so a late tick doesn't desync the rates.
 		private const double BaseTickSeconds = 0.1;
 
+		// How long after dealing/taking damage a player counts as "in combat" (HP + mana regen halted). Provisional.
+		private const double CombatRegenPause = 6.0;
+
 		// Applies damage/heal-over-time from active DoT debuffs (#274). Each tracked buff with a DotDelta bleeds (or
 		// heals) the target's HealthCurrent on a fixed cadence, mirroring the captured StatDamageIIR cycle: the tick
 		// moves the player's vitals by the delta and sends the byte-exact StatDamageIIR (+ a PushVitals for the bar).
@@ -57,9 +60,6 @@ namespace Faolan.GameServer.World
 
 		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
 		private const double RegenIntervalSeconds = 1.0;
-
-		// How long after dealing/taking damage a player counts as "in combat" (HP + mana regen halted). Provisional.
-		private const double CombatRegenPause = 6.0;
 
 		// #348: how far OUTSIDE a captured area hull still counts as inside. The hull is built from the positions
 		// retail was seen firing the banner at, so it can only cover ground a captured player walked - it is always
@@ -525,19 +525,18 @@ namespace Faolan.GameServer.World
 				var entity = pair.Value;
 				var inCombat = (DateTimeOffset.UtcNow - entity.LastCombatAt).TotalSeconds < CombatRegenPause;
 				uint beforeH = vitals.Health, beforeM = vitals.Mana, beforeS = vitals.Stamina;
-				var changed = vitals.Regenerate(
-					inCombat
+				var changed = vitals.Regenerate(inCombat
 						? 0u
 						: RegenAmount(vitals.MaxHealth, 0.05, elapsedSeconds), // ~5% hp / sec out of combat (provisional)
-					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds) + (uint)(entity.NaturalStaminaRegen * elapsedSeconds),
-					inCombat
+					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds) + (uint)(entity.NaturalStaminaRegen * elapsedSeconds), inCombat
 						? 0u
 						: RegenAmount(vitals.MaxMana, 0.05, elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));
 				if (changed)
 					// Send retail's compact RegenIIR delta (the client adds it to its bars) instead of a full 0x96B8DC59
 					// push - the per-tick rise per pool, ×100 to the wire vitals scale.
-					await _output.SendRegen(client, entity.Handle,
-						(int)(vitals.Health - beforeH) * 100, (int)(vitals.Mana - beforeM) * 100, (int)(vitals.Stamina - beforeS) * 100);
+				{
+					await _output.SendRegen(client, entity.Handle, (int)(vitals.Health - beforeH) * 100, (int)(vitals.Mana - beforeM) * 100, (int)(vitals.Stamina - beforeS) * 100);
+				}
 			}
 		}
 

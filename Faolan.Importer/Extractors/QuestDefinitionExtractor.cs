@@ -334,12 +334,14 @@ namespace Faolan.Importer.Extractors
 		{
 			var goal = def.Goals.FirstOrDefault(g => g.GoalId == goalId);
 			if (goal == null)
+			{
 				def.Goals.Add(goal = new QuestGoalDefinition
 				{
 					GoalId = goalId,
 					Sequence = 1,
 					RequiredCount = 1
 				});
+			}
 
 			goal.MapId = mapId;
 			goal.MarkerX = markerX;

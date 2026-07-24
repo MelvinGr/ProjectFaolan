@@ -9,17 +9,17 @@ namespace Faolan.Web.Components.Pages
 {
 	public partial class Status
 	{
-		private bool _loaded;
 		private DateTimeOffset? _lastLogin;
+		private IReadOnlyList<LiveSession>? _online; // null = game server unreachable (offline)
+		private List<ClassRow> _classes = [];
+
+		private List<RecentRow> _recent = [];
+		private bool _loaded;
 		private int _accounts;
 		private int _chars;
 		private int _classMax;
 		private int _maps;
 		private int _recent24h;
-		private IReadOnlyList<LiveSession>? _online; // null = game server unreachable (offline)
-		private List<ClassRow> _classes = [];
-
-		private List<RecentRow> _recent = [];
 		private long _items;
 		private long _spells;
 

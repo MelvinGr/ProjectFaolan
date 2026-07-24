@@ -30,10 +30,7 @@ namespace Faolan.Core.Database.Extensions
 			// NpcTemplate load = Spells + Equipment + Morphs) all have SMALL collections and run per-quest-check /
 			// per-NPC-at-zone-load, so one query (a tiny cartesian, ONE round-trip) beats split (a round-trip per
 			// collection). Stating it also silences EF's QuerySplittingBehavior warning (which fires when it's unset).
-			services.AddPooledDbContextFactory<DatabaseContext>(options =>
-			{
-				options.UseFaolanDatabase(configuration.DatabaseProvider, configuration.DatabaseConnection);
-			});
+			services.AddPooledDbContextFactory<DatabaseContext>(options => { options.UseFaolanDatabase(configuration.DatabaseProvider, configuration.DatabaseConnection); });
 
 			services.AddSingleton<IDatabaseRepository, DatabaseRepository>();
 
@@ -68,8 +65,10 @@ namespace Faolan.Core.Database.Extensions
 			// that provider's set. The apps reference both so EF can load the one named here at runtime.
 			return provider switch
 			{
-				FaolanDbProvider.Postgres => builder.UseNpgsql(connection, x => x.MigrationsAssembly("Faolan.Core.Database.Migrations.Postgres").UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery)),
-				FaolanDbProvider.Sqlite => builder.UseSqlite(connection, x => x.MigrationsAssembly("Faolan.Core.Database.Migrations.Sqlite").UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery)),
+				FaolanDbProvider.Postgres => builder.UseNpgsql(connection,
+					x => x.MigrationsAssembly("Faolan.Core.Database.Migrations.Postgres").UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery)),
+				FaolanDbProvider.Sqlite => builder.UseSqlite(connection,
+					x => x.MigrationsAssembly("Faolan.Core.Database.Migrations.Sqlite").UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery)),
 				_ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "Unknown database provider.")
 			};
 		}

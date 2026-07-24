@@ -105,9 +105,11 @@ namespace Faolan.Importer.Captures
 				if (stateByChar.TryGetValue(characterId, out var states))
 				{
 					foreach (var (id, wire) in states)
+					{
 						merged[id] = wire == WorldQuest.StateCompleted
 							? QuestState.Completed
 							: QuestState.Active;
+					}
 				}
 
 				var existing = await db.CharacterQuests.Where(q => q.CharacterId == characterId).ToDictionaryAsync(q => q.QuestId);
@@ -175,11 +177,11 @@ namespace Faolan.Importer.Captures
 						if (!completedByChar.TryGetValue(charId, out var set))
 							completedByChar[charId] = set = [];
 						foreach (var area in completed.Areas)
-							foreach (var q in area.Quests)
-							{
-								if (q.QuestId != 0)
-									set.Add(q.QuestId);
-							}
+						foreach (var q in area.Quests)
+						{
+							if (q.QuestId != 0)
+								set.Add(q.QuestId);
+						}
 					}
 
 					return;

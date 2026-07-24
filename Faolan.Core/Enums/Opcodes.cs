@@ -1,4 +1,5 @@
 // ReSharper disable InconsistentNaming
+
 namespace Faolan.Core.Enums
 {
 	public enum ChatServerOpcodes : ushort

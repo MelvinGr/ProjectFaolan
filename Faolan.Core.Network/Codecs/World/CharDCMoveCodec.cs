@@ -107,6 +107,14 @@ namespace Faolan.Core.Network.Codecs.World
 	// vectors are present (FUN_007ad6b0). Parse/Build preserve every field so the record round-trips byte-exact.
 	public sealed class CharDCMove
 	{
+		public Vector3 Acceleration; // present when !bit3
+		public Vector3 Heading; // present when !bit1
+		public Vector3 MoveVector; // bit4 clear: the full post-position vector
+
+		public Vector3 Position;
+
+		// the velocity/accel/heading block, present only when Flag2 < 8:
+		public Vector3 Velocity; // present when !bit2
 		public byte Bool1;
 		public byte Bool2;
 		public byte Env;
@@ -117,15 +125,6 @@ namespace Faolan.Core.Network.Codecs.World
 		public float Param19;
 		public float Param6;
 		public uint Handle;
-
-		public Vector3 Acceleration; // present when !bit3
-		public Vector3 Heading; // present when !bit1
-		public Vector3 MoveVector; // bit4 clear: the full post-position vector
-
-		public Vector3 Position;
-
-		// the velocity/accel/heading block, present only when Flag2 < 8:
-		public Vector3 Velocity; // present when !bit2
 
 		public bool Bit1 => (Flag1 & 0x02) != 0;
 		public bool Bit2 => (Flag1 & 0x04) != 0;

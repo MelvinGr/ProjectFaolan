@@ -1,5 +1,5 @@
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -12,30 +12,6 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// #262: solve any ReachArea quest goal the player has just walked into range of. Called from the move handler
-		// on every accepted player move; the goal targets are cached on the player WorldEntity (lazily loaded once, so
-		// this stays a pure in-memory distance test with no DB hit until a goal actually fires). A solved target is
-		// removed so it fires exactly once; SolveGoal handles the tick / completion / chain supersession.
-		private async Task CheckPlayerReachGoals(INetworkClient client, WorldEntity player, Vector3 position)
-		{
-			var pending = player.PendingReachGoals ??= await _questProgression.LoadReachGoals(client.Session.Character.Id);
-			if (pending.Count == 0)
-				return;
-
-			// Snapshot the in-range targets BEFORE solving: SolveGoal can complete a stage whose supersession calls
-			// InvalidateReachGoals (PendingReachGoals -> null, reloaded next move), so we must not index the live list
-			// across a solve. Removes are null-safe; a target solved after an invalidation is simply excluded from the
-			// reload (LoadReachGoals skips completed goals), so no double-fire.
-			var reached = pending.Where(t => t.MapId == player.MapId
-			                                 && (position.X - t.X) * (position.X - t.X) + (position.Z - t.Z) * (position.Z - t.Z) <= t.RadiusSq).ToList();
-			foreach (var target in reached)
-			{
-				player.PendingReachGoals?.Remove(target);
-				Logger.LogInformation("#262: player {Char} reached quest {Quest} goal {Goal} area ({X},{Z}).", client.Session.Character.Name, target.QuestId, target.GoalId, target.X, target.Z);
-				await _questProgression.SolveGoal(client, target.GoalId);
-			}
-		}
-
 		Task IWorldOutbound.BroadcastEntityFade(WorldEntity entity)
 		{
 			return _broadcaster.BroadcastEntityFade(entity);
@@ -110,6 +86,29 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.SendResurrectionSpots(INetworkClient client, Vector3 referencePosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			return SendValidResurrectionSpots(client, referencePosition, spots);
+		}
+
+		// #262: solve any ReachArea quest goal the player has just walked into range of. Called from the move handler
+		// on every accepted player move; the goal targets are cached on the player WorldEntity (lazily loaded once, so
+		// this stays a pure in-memory distance test with no DB hit until a goal actually fires). A solved target is
+		// removed so it fires exactly once; SolveGoal handles the tick / completion / chain supersession.
+		private async Task CheckPlayerReachGoals(INetworkClient client, WorldEntity player, Vector3 position)
+		{
+			var pending = player.PendingReachGoals ??= await _questProgression.LoadReachGoals(client.Session.Character.Id);
+			if (pending.Count == 0)
+				return;
+
+			// Snapshot the in-range targets BEFORE solving: SolveGoal can complete a stage whose supersession calls
+			// InvalidateReachGoals (PendingReachGoals -> null, reloaded next move), so we must not index the live list
+			// across a solve. Removes are null-safe; a target solved after an invalidation is simply excluded from the
+			// reload (LoadReachGoals skips completed goals), so no double-fire.
+			var reached = pending.Where(t => t.MapId == player.MapId && (position.X - t.X) * (position.X - t.X) + (position.Z - t.Z) * (position.Z - t.Z) <= t.RadiusSq).ToList();
+			foreach (var target in reached)
+			{
+				player.PendingReachGoals?.Remove(target);
+				Logger.LogInformation("#262: player {Char} reached quest {Quest} goal {Goal} area ({X},{Z}).", client.Session.Character.Name, target.QuestId, target.GoalId, target.X, target.Z);
+				await _questProgression.SolveGoal(client, target.GoalId);
+			}
 		}
 	}
 }

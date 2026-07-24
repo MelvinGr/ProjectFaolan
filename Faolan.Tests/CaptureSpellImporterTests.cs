@@ -28,35 +28,6 @@ namespace Faolan.Tests
 		private const uint DemoL80Id = 0x110099bd;
 
 		[Fact]
-		public async Task Import_CatalogsCastSpellId()
-		{
-			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-spell-{Guid.NewGuid():N}.db");
-			try
-			{
-				var packet = Convert.FromHexString(ApplySpellHex);
-
-				await using (var db = NewContext(dbPath))
-				{
-					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					var (seen, inserted) = await CaptureSpellImporter.ImportAsync(db, [packet]);
-					Assert.Equal(1, seen);
-					Assert.Equal(1, inserted);
-				}
-
-				await using (var db = NewContext(dbPath))
-				{
-					var spell = await db.Spells.FindAsync([4061768u], TestContext.Current.CancellationToken); // 0x3dfa48
-					Assert.NotNull(spell);
-				}
-			}
-			finally
-			{
-				if (File.Exists(dbPath))
-					File.Delete(dbPath);
-			}
-		}
-
-		[Fact]
 		public async Task ImportLearnedSpells_SeedsTargetedCharacterOnly()
 		{
 			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-learn-{Guid.NewGuid():N}.db");
@@ -151,6 +122,35 @@ namespace Faolan.Tests
 				var (characters, inserted) = await CaptureSpellImporter.ImportLearnedSpellsAsync(db, [Convert.FromHexString(LearnSpellHex)]);
 				Assert.Equal(0, characters);
 				Assert.Equal(0, inserted);
+			}
+			finally
+			{
+				if (File.Exists(dbPath))
+					File.Delete(dbPath);
+			}
+		}
+
+		[Fact]
+		public async Task Import_CatalogsCastSpellId()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-spell-{Guid.NewGuid():N}.db");
+			try
+			{
+				var packet = Convert.FromHexString(ApplySpellHex);
+
+				await using (var db = NewContext(dbPath))
+				{
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					var (seen, inserted) = await CaptureSpellImporter.ImportAsync(db, [packet]);
+					Assert.Equal(1, seen);
+					Assert.Equal(1, inserted);
+				}
+
+				await using (var db = NewContext(dbPath))
+				{
+					var spell = await db.Spells.FindAsync([4061768u], TestContext.Current.CancellationToken); // 0x3dfa48
+					Assert.NotNull(spell);
+				}
 			}
 			finally
 			{

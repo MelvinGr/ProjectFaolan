@@ -19,12 +19,12 @@ namespace Faolan.Web.Components.Pages
 	public partial class QuestEditor : IDisposable
 	{
 		private static readonly QuestGoalType[] GoalTypes = Enum.GetValues<QuestGoalType>();
+		private DatabaseContext? _ctx;
+		private List<QuestDefinition> _quests = [];
+		private QuestDefinition? _quest;
 		private bool _authorized;
 		private bool _error;
-		private DatabaseContext? _ctx;
 		private string _filter = "";
-		private QuestDefinition? _quest;
-		private List<QuestDefinition> _quests = [];
 		private string? _status;
 
 		[CascadingParameter]
@@ -53,35 +53,6 @@ namespace Faolan.Web.Components.Pages
 				Select(_quests[0]);
 		}
 
-		private void Select(QuestDefinition q)
-		{
-			_quest = q;
-		}
-
-		private IEnumerable<QuestDefinition> Filtered()
-		{
-			if (string.IsNullOrWhiteSpace(_filter))
-				return _quests;
-
-			var f = _filter.Trim();
-			return _quests.Where(q => q.QuestId.ToString().Contains(f, StringComparison.OrdinalIgnoreCase)
-			                          || (q.NextQuestId?.ToString() ?? "").Contains(f, StringComparison.OrdinalIgnoreCase)
-			                          || q.Goals.Any(g => (g.TargetName ?? "").Contains(f, StringComparison.OrdinalIgnoreCase)));
-		}
-
-		private IEnumerable<QuestGoalDefinition> Goals()
-		{
-			return _quest?.Goals.OrderBy(g => g.Sequence).ThenBy(g => g.GoalId) ?? Enumerable.Empty<QuestGoalDefinition>();
-		}
-
-		// The successor a completed quest supersedes to (its NextQuestId), for the little chain hint under the header.
-		private QuestDefinition? Next(QuestDefinition q)
-		{
-			return q.NextQuestId is { } n
-				? _quests.FirstOrDefault(x => x.QuestId == n)
-				: null;
-		}
-
 		private void AddGoal()
 		{
 			if (_quest == null)
@@ -102,6 +73,30 @@ namespace Faolan.Web.Components.Pages
 				RequiredCount = 1
 			});
 			Set("Added goal (unsaved — press Save)");
+		}
+
+		private IEnumerable<QuestDefinition> Filtered()
+		{
+			if (string.IsNullOrWhiteSpace(_filter))
+				return _quests;
+
+			var f = _filter.Trim();
+			return _quests.Where(q =>
+				q.QuestId.ToString().Contains(f, StringComparison.OrdinalIgnoreCase) || (q.NextQuestId?.ToString() ?? "").Contains(f, StringComparison.OrdinalIgnoreCase) ||
+				q.Goals.Any(g => (g.TargetName ?? "").Contains(f, StringComparison.OrdinalIgnoreCase)));
+		}
+
+		private IEnumerable<QuestGoalDefinition> Goals()
+		{
+			return _quest?.Goals.OrderBy(g => g.Sequence).ThenBy(g => g.GoalId) ?? Enumerable.Empty<QuestGoalDefinition>();
+		}
+
+		// The successor a completed quest supersedes to (its NextQuestId), for the little chain hint under the header.
+		private QuestDefinition? Next(QuestDefinition q)
+		{
+			return q.NextQuestId is { } n
+				? _quests.FirstOrDefault(x => x.QuestId == n)
+				: null;
 		}
 
 		private void RemoveGoal(QuestGoalDefinition g)
@@ -131,6 +126,11 @@ namespace Faolan.Web.Components.Pages
 			{
 				Set(ex.InnerException?.Message ?? ex.Message, true);
 			}
+		}
+
+		private void Select(QuestDefinition q)
+		{
+			_quest = q;
 		}
 
 		private void Set(string msg, bool err = false)

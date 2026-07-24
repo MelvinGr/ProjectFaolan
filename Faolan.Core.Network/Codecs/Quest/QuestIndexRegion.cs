@@ -44,6 +44,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// this is 241 == 0xF1, which is why it read as a constant "sentinel" until the corpus-wide decode (#391).
 		public uint LeadAreaId { get; init; }
 
+		public List<Block> Blocks { get; init; } = [];
+		public List<uint> QuestIds { get; init; } = [];
+
 		// The serialized byte length, measured via Write without materializing the array (reuses the one Write path,
 		// so it can't drift from ToArray).
 		public int ByteLength
@@ -55,9 +58,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 				return (int)w.Length;
 			}
 		}
-
-		public List<Block> Blocks { get; init; } = [];
-		public List<uint> QuestIds { get; init; } = [];
 
 		// The id-list count framing, (QuestIds.Count + 1) * 0x3F1 - Build derives it. The default is the 1-quest
 		// word; it is NOT a constant (0x7E2 just IS ListFrame.ForCount(1), which is what makes it look like one).

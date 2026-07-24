@@ -75,13 +75,13 @@ namespace Faolan.GameServer.World
 		// Off by default; toggled live per-session by the `.togglenpcgroup` GM command (ToggleAreaLabels) - no config.
 		public static bool DebugAreaLabels;
 
-		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
-		// to that copy - each instance gets its own NPC population) (#268).
-		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
-
 		// #363 ambient spawn-group pools per loaded zone (built in LoadAmbientSpawns on the entry thread, iterated by
 		// MaintainAmbientPools on the tick thread - concurrent so the tick doesn't throw mid-load).
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), List<AmbientPool>> _ambientPools = new();
+
+		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
+		// to that copy - each instance gets its own NPC population) (#268).
+		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
 
 		// Cached loot-bag template (a captured "Bag of loot" world object) per map; null values cache loot-less maps.
 		private readonly IDatabaseRepository _database;
@@ -93,13 +93,13 @@ namespace Faolan.GameServer.World
 
 		private readonly WorldSimulation _sim;
 
+		// Quest-giver NPC name -> granted quest id, cached once (small set).
+		private Dictionary<string, uint> _questGivers = null!;
+
 		// Quest-gated NPC name -> the quest ids that reveal it (#261). Cached once; an NPC in this map is streamed only
 		// to players holding one of its quests active (see WorldEntity.GateQuestIds / IsVisibleTo).
 		private Dictionary<string, uint[]> _questGatedNpcs = null!;
 		private Dictionary<uint, uint> _escortHiddenNpcs = null!;
-
-		// Quest-giver NPC name -> granted quest id, cached once (small set).
-		private Dictionary<string, uint> _questGivers = null!;
 
 		// Monotonic allocator for ALL runtime-spawned entity handles - dropped-loot bags, pets, summoned NPCs,
 		// and the #363 ambient pool members (not loot-specific despite the range's origin). CRITICAL: the
@@ -118,6 +118,37 @@ namespace Faolan.GameServer.World
 			_database = database;
 			_logger = logger;
 			_questHandler = questHandler;
+		}
+
+		// #262: apply the AFTER-QUEST world-object effects for this player - every object on their map whose EffectQuestId
+		// they hold ACTIVE or COMPLETED gets its SimpleDynel visual-change pushed (e.g. the beach chain-wall collision
+		// dropping when the escort begins). Data-driven (WorldObject.EffectQuestId/EffectDynelState), no hard-coded
+		// lookup. Called at world entry (a returning player isn't re-blocked by the burst) and on quest supersession /
+		// completion (the change fires the instant the player reaches the quest state).
+		public async Task ApplyQuestWorldEffects(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			var player = _sim.PlayerWorldEntity(client);
+			if (character == null || player == null)
+				return;
+
+			var held = (await _database.GetCharacterQuests(character.Id)).Where(q => q.State is QuestState.Active or QuestState.Completed).Select(q => q.QuestId).ToHashSet();
+			if (held.Count == 0)
+				return;
+
+			foreach (var obj in await _database.GetWorldObjects(player.MapId))
+			{
+				if (obj.EffectQuestId is { } eq && held.Contains(eq))
+					await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(obj.CapturedHandle, obj.EffectDynelState));
+			}
+		}
+
+		// #262: drop the reach-goal cache so the next move reloads it (a supersession may have granted a stage carrying
+		// a new ReachArea goal). No-op if the player has no live entity yet.
+		public void InvalidateReachGoals(INetworkClient client)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			player?.PendingReachGoals = null!;
 		}
 
 		// #267: re-send the NAMED NPC's quest marker in-place (handles are session-volatile, so resolve by name in the
@@ -161,26 +192,24 @@ namespace Faolan.GameServer.World
 			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
 				.Select(s => WorldBroadcastBodies.Record(def, s))
 				.ToArray();
-			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Character.Id, def.QuestId, levelValue, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-				def.MapId, def.MarkerX, def.MarkerY, WorldBroadcastBodies.Record(def, QuestTextSlot.Objective), WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
+			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Character.Id, def.QuestId, levelValue, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), def.MapId,
+				def.MarkerX, def.MarkerY, WorldBroadcastBodies.Record(def, QuestTextSlot.Objective), WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
 
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(body)));
 		}
 
 		// Sends a QuestGoal (objective progress) to the player.
 		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, uint count)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(WorldQuest.BuildQuestGoal(client.Session.Character.Id, questId, goalId, count))));
 		}
 
 		// Sends a QuestIIR (add/update a quest in the player's journal) to the player.
 		public Task SendQuestIir(INetworkClient client, uint questId, uint state)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(WorldQuest.BuildQuestIir(client.Session.Character.Id, questId, state))));
 		}
 
@@ -193,35 +222,6 @@ namespace Faolan.GameServer.World
 		public bool SetNpcFollowByTemplate(uint mapId, uint templateId, uint playerHandle, bool follow)
 		{
 			return SetNpcFollow(mapId, playerHandle, follow, e => e.NpcTemplateId == templateId, $"template {templateId}");
-		}
-
-		// Resolve the PLAYER's instance, not the default one: the beach is Solo-instanced (#268), so the player and
-		// their own escortee live in a private playfield copy (e.g. 0x00A00001), not the shared instance 0. Find the
-		// map's live zone that actually contains this player, then look up the escortee (by `match`) in THAT copy - a
-		// TryGetZone(mapId) default-instance lookup misses her entirely and the follow silently no-ops.
-		private bool SetNpcFollow(uint mapId, uint playerHandle, bool follow, Func<WorldEntity, bool> match, string label)
-		{
-			var zone = _sim.World.ZonesForMap(mapId).FirstOrDefault(z => z.TryGet(playerHandle, out _));
-
-			var npc = zone?.Entities.FirstOrDefault(e => !e.IsPlayer && match(e));
-			if (npc == null)
-				return false;
-
-			npc.FollowTargetHandle = follow
-				? playerHandle
-				: null;
-			_logger.LogInformation("Follow: {Label} {State} player 0x{Player:X8}.", label, follow
-				? "now follows"
-				: "stopped following", playerHandle);
-			return true;
-		}
-
-		// #262: drop the reach-goal cache so the next move reloads it (a supersession may have granted a stage carrying
-		// a new ReachArea goal). No-op if the player has no live entity yet.
-		public void InvalidateReachGoals(INetworkClient client)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			player?.PendingReachGoals = null!;
 		}
 
 		// Called after items are taken from a bag (loot-all OR a single drag): confirm the take to the client with
@@ -246,8 +246,7 @@ namespace Faolan.GameServer.World
 
 			// Fully emptied -> the captured completion sequence: DispatchCloseLootBag -> looter resets -> fade ->
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchCloseLootBag,
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchCloseLootBag,
 				b => b.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
 			await SendWorldIir(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle));
 			await SendWorldIir(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewAllowedLooterIIR, bag.Handle));
@@ -323,8 +322,8 @@ namespace Faolan.GameServer.World
 				if (viewer.Client == null)
 					continue;
 
-				await viewer.Client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, viewer.Client.Endpoint(Endpoints.GameInterfaceType),
-					GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
+				await viewer.Client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, viewer.Client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+					s => s.WriteArrayUInt32Length(body)));
 			}
 		}
 
@@ -459,72 +458,6 @@ namespace Faolan.GameServer.World
 			return DispatchInterest(events, null);
 		}
 
-		// #398: builds the in-range NPC spawns for the world-ENTRY BURST - the close NPCs retail ships in the burst
-		// BEFORE the client's first move (fr64-75 in the Hoxxling beach login capture), instead of dribbling them out
-		// as a post-load interest volley. Each is SEEDED into the entering player's Known set so the interest layer
-		// (BroadcastPlayerMove) streams only the DELTA as the player walks and never re-spawns or culls the initial
-		// set - which subsumes the #245 despawn-during-load root cause. Registers each handle -> name/template for
-		// click routing exactly as DispatchInterest does for a streamed spawn. Returns the framed FA015807 records to
-		// append to the entry burst (`toSend`) plus the NPCs themselves, whose quest markers / captive pose ride
-		// SendEntryNpcFollowups after the burst flush (those are separate IIRs, not spawn records). The entering
-		// player is spawned to OTHER viewers separately (BroadcastPlayerEntry, section 2).
-		public async Task<(List<Rpc> Records, List<WorldEntity> Npcs)> BuildEntryNpcBurst(INetworkClient client)
-		{
-			var records = new List<Rpc>();
-			var npcs = new List<WorldEntity>();
-
-			var entity = _sim.PlayerWorldEntity(client);
-			if (entity?.SpawnBody == null)
-				return (records, npcs);
-
-			// Seed the player's active/completed quest set first so quest-gated NPCs (#261 Scavenger Tuut, #262 hide-
-			// once-done) are correctly included/excluded in the burst from the very start.
-			await LoadActiveQuestIds(entity);
-
-			var zone = _sim.World.ZoneForEntity(entity);
-			var token = zone.PlayfieldToken;
-			foreach (var npc in zone.EntitiesInRange(entity.Position, WorldSimulation.PlayerInterestRange, entity.Handle))
-			{
-				if (npc.IsPlayer || npc.IsLoot || npc.IsDead || npc.SpawnBody == null)
-					continue;
-				if (!npc.IsVisibleTo(entity))
-					continue; // #261: a quest-gated NPC the player doesn't qualify for yet - treat as not in range
-				if (!entity.Known.Add(npc.Handle))
-					continue; // already seeded (idempotent guard)
-
-				if (npc.Name != null)
-				{
-					client.Session.SpawnedNpcNamesByHandle[npc.Handle] = npc.Name;
-					client.Session.SpawnedNpcTemplatesByHandle[npc.Handle] = npc.NpcTemplateId;
-				}
-
-				records.Add(BuildWorldSpawnRecord(client, npc, token));
-				npcs.Add(npc);
-			}
-
-			return (records, npcs);
-		}
-
-		// #398: the per-NPC follow-ups for the entry-burst NPCs (BuildEntryNpcBurst) - the quest markers and the
-		// Casilda captive pose that DispatchInterest sends right after a streamed spawn. Sent AFTER the burst flush
-		// (these are separate IIRs, not FA015807 spawn records) but still before the player starts moving.
-		public async Task SendEntryNpcFollowups(INetworkClient client, List<WorldEntity> burstNpcs)
-		{
-			foreach (var npc in burstNpcs)
-			{
-				// #241: quest-giver marker from THIS viewer's quest state (! available / ? ready-to-turn-in / none).
-				await SendQuestMarkerIfGiver(client, npc);
-
-				// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose).
-				if (npc.NpcTemplateId == QuestHandlerService.CasildaTemplateId && client.Session.Character != null && !await _questHandler.IsCasildaFreed(client.Session.Character.Id))
-					await _questHandler.SendCasildaPose(client, npc.Handle, true);
-
-				// #363 dev nameplate override (dev-only, gated on .togglenpcgroup).
-				if (DebugAreaLabels && npc.OverheadNameOverride is { } overrideName)
-					await SendSetName(client, npc.Handle, overrideName);
-			}
-		}
-
 		// After world entry: spawn the entering player to nearby OTHER players (its NPC set now rides the entry burst,
 		// #398 BuildEntryNpcBurst, and is already in Known - so the interest pass streams no NPCs, only section 2's
 		// spawn-me-to-viewers fires). Interest remains the sole path for the STREAMED delta as the player then walks.
@@ -606,6 +539,52 @@ namespace Faolan.GameServer.World
 
 				await SendWorldIir(viewer.Client, body);
 			}
+		}
+
+		// #398: builds the in-range NPC spawns for the world-ENTRY BURST - the close NPCs retail ships in the burst
+		// BEFORE the client's first move (fr64-75 in the Hoxxling beach login capture), instead of dribbling them out
+		// as a post-load interest volley. Each is SEEDED into the entering player's Known set so the interest layer
+		// (BroadcastPlayerMove) streams only the DELTA as the player walks and never re-spawns or culls the initial
+		// set - which subsumes the #245 despawn-during-load root cause. Registers each handle -> name/template for
+		// click routing exactly as DispatchInterest does for a streamed spawn. Returns the framed FA015807 records to
+		// append to the entry burst (`toSend`) plus the NPCs themselves, whose quest markers / captive pose ride
+		// SendEntryNpcFollowups after the burst flush (those are separate IIRs, not spawn records). The entering
+		// player is spawned to OTHER viewers separately (BroadcastPlayerEntry, section 2).
+		public async Task<(List<Rpc> Records, List<WorldEntity> Npcs)> BuildEntryNpcBurst(INetworkClient client)
+		{
+			var records = new List<Rpc>();
+			var npcs = new List<WorldEntity>();
+
+			var entity = _sim.PlayerWorldEntity(client);
+			if (entity?.SpawnBody == null)
+				return (records, npcs);
+
+			// Seed the player's active/completed quest set first so quest-gated NPCs (#261 Scavenger Tuut, #262 hide-
+			// once-done) are correctly included/excluded in the burst from the very start.
+			await LoadActiveQuestIds(entity);
+
+			var zone = _sim.World.ZoneForEntity(entity);
+			var token = zone.PlayfieldToken;
+			foreach (var npc in zone.EntitiesInRange(entity.Position, WorldSimulation.PlayerInterestRange, entity.Handle))
+			{
+				if (npc.IsPlayer || npc.IsLoot || npc.IsDead || npc.SpawnBody == null)
+					continue;
+				if (!npc.IsVisibleTo(entity))
+					continue; // #261: a quest-gated NPC the player doesn't qualify for yet - treat as not in range
+				if (!entity.Known.Add(npc.Handle))
+					continue; // already seeded (idempotent guard)
+
+				if (npc.Name != null)
+				{
+					client.Session.SpawnedNpcNamesByHandle[npc.Handle] = npc.Name;
+					client.Session.SpawnedNpcTemplatesByHandle[npc.Handle] = npc.NpcTemplateId;
+				}
+
+				records.Add(BuildWorldSpawnRecord(client, npc, token));
+				npcs.Add(npc);
+			}
+
+			return (records, npcs);
 		}
 
 		// Stashes the player's own FA015807 body on their world entity, so the broadcaster can re-frame it to spawn this
@@ -923,6 +902,20 @@ namespace Faolan.GameServer.World
 				labelSample ?? "<none>");
 		}
 
+		// #262: whether the used world object is a quest-item PICKUP (a QuestItemEffect dynel - e.g. a quarry Stone
+		// Brick), as opposed to a door/container. Only reports the object KIND; the pickup's EFFECT (grant item +
+		// advance the CollectItem goal) is quest-driven, so the caller no-ops it when no collect quest is active - which
+		// is what gates the brick nodes to Shipwrecked-V holders.
+		public async Task<bool> IsQuestPickup(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return false;
+
+			var obj = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o => o.CapturedHandle == handle);
+			return obj?.QuestItemEffect is > 0;
+		}
+
 		// #363 pool maintenance (called on a slow cadence from the sim tick): keep each loaded zone's ambient pools at
 		// MaxCount. A killed member fades + is removed (LootExpired), dropping the pool's live count; here we respawn ONE
 		// replacement per under-strength pool per pass (a gentle trickle - the cadence IS the respawn delay) at a free
@@ -965,8 +958,7 @@ namespace Faolan.GameServer.World
 
 			// NewCurrentLooter rides the WORLD conversation (GameAgent -> GameInterface), as in retail (mount/gameplay
 			// capture frame 1477).
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle))));
 
 			// The actual window-open is DispatchOpenLootBag (0x2037) on the GameCharAgent -> GameCharInterface
@@ -974,8 +966,7 @@ namespace Faolan.GameServer.World
 			// handle] - NOT a SimpleDynelVisualChange on the world conversation (that only played the open animation, no
 			// window). Decoded from the hoxxling gameplay capture (f1477): after this the client itself sends
 			// TryLootCash (0x2045) then TryLootAll (0x2043), which we already handle.
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchOpenLootBag,
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchOpenLootBag,
 				b => b.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
 
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
@@ -1002,54 +993,6 @@ namespace Faolan.GameServer.World
 			await SendWorldIir(client, WorldLoot.BuildOpenWindowBody(SimpleDynelMessageCodec.VisualChangeTypeTag, handle, "object_open"));
 			_logger.LogInformation("Object: {Player} opened '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name ?? obj.DisplayName ?? "object", handle);
 			return true;
-		}
-
-		// #262: whether the used world object is a quest-item PICKUP (a QuestItemEffect dynel - e.g. a quarry Stone
-		// Brick), as opposed to a door/container. Only reports the object KIND; the pickup's EFFECT (grant item +
-		// advance the CollectItem goal) is quest-driven, so the caller no-ops it when no collect quest is active - which
-		// is what gates the brick nodes to Shipwrecked-V holders.
-		public async Task<bool> IsQuestPickup(INetworkClient client, uint handle)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
-				return false;
-
-			var obj = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o => o.CapturedHandle == handle);
-			return obj?.QuestItemEffect is > 0;
-		}
-
-		// #262: remove a picked-up quest dynel from the player's view (SimpleDynel visual change, state 0x09 = the
-		// GenericSimpleDynelPickup vanish retail sends, Hoxxling gameplay2 @4310) so the brick disappears when taken.
-		// Live-only: the static DB object re-streams on the next zone load (it respawns, retail-style).
-		public static Task HidePickupObject(INetworkClient client, uint handle)
-		{
-			return SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x09));
-		}
-
-		// #262: apply the AFTER-QUEST world-object effects for this player - every object on their map whose EffectQuestId
-		// they hold ACTIVE or COMPLETED gets its SimpleDynel visual-change pushed (e.g. the beach chain-wall collision
-		// dropping when the escort begins). Data-driven (WorldObject.EffectQuestId/EffectDynelState), no hard-coded
-		// lookup. Called at world entry (a returning player isn't re-blocked by the burst) and on quest supersession /
-		// completion (the change fires the instant the player reaches the quest state).
-		public async Task ApplyQuestWorldEffects(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			var player = _sim.PlayerWorldEntity(client);
-			if (character == null || player == null)
-				return;
-
-			var held = (await _database.GetCharacterQuests(character.Id))
-				.Where(q => q.State is QuestState.Active or QuestState.Completed)
-				.Select(q => q.QuestId)
-				.ToHashSet();
-			if (held.Count == 0)
-				return;
-
-			foreach (var obj in await _database.GetWorldObjects(player.MapId))
-			{
-				if (obj.EffectQuestId is { } eq && held.Contains(eq))
-					await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(obj.CapturedHandle, obj.EffectDynelState));
-			}
 		}
 
 		// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
@@ -1114,6 +1057,26 @@ namespace Faolan.GameServer.World
 			return new UsedObjectInteraction(obj.InteractAction, teleport);
 		}
 
+		// #398: the per-NPC follow-ups for the entry-burst NPCs (BuildEntryNpcBurst) - the quest markers and the
+		// Casilda captive pose that DispatchInterest sends right after a streamed spawn. Sent AFTER the burst flush
+		// (these are separate IIRs, not FA015807 spawn records) but still before the player starts moving.
+		public async Task SendEntryNpcFollowups(INetworkClient client, List<WorldEntity> burstNpcs)
+		{
+			foreach (var npc in burstNpcs)
+			{
+				// #241: quest-giver marker from THIS viewer's quest state (! available / ? ready-to-turn-in / none).
+				await SendQuestMarkerIfGiver(client, npc);
+
+				// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose).
+				if (npc.NpcTemplateId == QuestHandlerService.CasildaTemplateId && client.Session.Character != null && !await _questHandler.IsCasildaFreed(client.Session.Character.Id))
+					await _questHandler.SendCasildaPose(client, npc.Handle, true);
+
+				// #363 dev nameplate override (dev-only, gated on .togglenpcgroup).
+				if (DebugAreaLabels && npc.OverheadNameOverride is { } overrideName)
+					await SendSetName(client, npc.Handle, overrideName);
+			}
+		}
+
 		// #262 companion-follow: make the NPC `npcHandle` follow `client`'s player (or stop, when follow=false). The
 		// world tick (WorldState) then steps it toward the player and broadcasts a MoveTask each step. Returns the NPC,
 		// or null if the handle isn't a non-player entity in the caller's zone. Used by the .npcfollow GM command and by
@@ -1131,6 +1094,22 @@ namespace Faolan.GameServer.World
 				? "now follows"
 				: "stopped following", player.Name);
 			return npc;
+		}
+
+		// Set the player's active weapon set explicitly (the .weaponset GM test-bootstrap forces a set; the live
+		// SwitchWeaponsButton toggles via TogglePlayerWeaponSet). Persists + mirrors on the live entity; returns it.
+		public async Task<WeaponSet> SetPlayerWeaponSet(INetworkClient client, WeaponSet set)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			player?.ActiveWeaponSet = set;
+
+			if (client.Session.Character is { } character)
+			{
+				character.ActiveWeaponSet = set;
+				await _database.SaveCharacterWeaponSet(character.Id, set);
+			}
+
+			return set;
 		}
 
 		// Spawns a captured NPC (any NpcSpawns row with spawn Data, matched by NAME - the stable key) at the
@@ -1152,8 +1131,8 @@ namespace Faolan.GameServer.World
 			}
 
 			var handle = NextRuntimeHandle(); // a fresh summoned-entity handle (high range, no player/NPC collision)
-											  // Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
-											  // baked ones are just placeholders (the player's zone token here).
+			// Build wholly from columns (#243/#244); SendWorldSpawn re-stamps the position + token per recipient, so the
+			// baked ones are just placeholders (the player's zone token here).
 			var body = NpcSpawnBuilder.BuildLive(npc, handle, _sim.World.ZoneForEntity(player).PlayfieldToken);
 
 			EntityVitals? vitals = null;
@@ -1221,9 +1200,9 @@ namespace Faolan.GameServer.World
 			var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
 			var entity = WorldEntity.ForNpc(handle, player.MapId, player.Position, player.Rotation, npcType.Name, vitals, npcType.TemplateId);
 			entity.InstanceId = player.InstanceId; // #268: the pet belongs to the SUMMONER's map INSTANCE, not the default
-												   // (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
-												   // than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the
-												   // client silently drops the spawn - no pet bar, no model. (Broke when #268 instanced.)
+			// (instance 0). Without this ZoneForEntity(pet) resolves a different zone/token
+			// than the player's, so SendWorldSpawn re-stamps the wrong playfield token and the
+			// client silently drops the spawn - no pet bar, no model. (Broke when #268 instanced.)
 			entity.Level = level;
 			entity.SpawnBody = body;
 			entity.NoRespawn = true;
@@ -1350,28 +1329,10 @@ namespace Faolan.GameServer.World
 		// 6<->20). No-op-safe: defaults Primary->Secondary if the player isn't in the world yet.
 		public Task<WeaponSet> TogglePlayerWeaponSet(INetworkClient client)
 		{
-			var current = _sim.PlayerWorldEntity(client)?.ActiveWeaponSet
-					  ?? client.Session.Character?.ActiveWeaponSet
-						  ?? WeaponSet.Primary;
+			var current = _sim.PlayerWorldEntity(client)?.ActiveWeaponSet ?? client.Session.Character?.ActiveWeaponSet ?? WeaponSet.Primary;
 			return SetPlayerWeaponSet(client, current == WeaponSet.Primary
 				? WeaponSet.Secondary
 				: WeaponSet.Primary);
-		}
-
-		// Set the player's active weapon set explicitly (the .weaponset GM test-bootstrap forces a set; the live
-		// SwitchWeaponsButton toggles via TogglePlayerWeaponSet). Persists + mirrors on the live entity; returns it.
-		public async Task<WeaponSet> SetPlayerWeaponSet(INetworkClient client, WeaponSet set)
-		{
-			var player = _sim.PlayerWorldEntity(client);
-			player?.ActiveWeaponSet = set;
-
-			if (client.Session.Character is { } character)
-			{
-				character.ActiveWeaponSet = set;
-				await _database.SaveCharacterWeaponSet(character.Id, set);
-			}
-
-			return set;
 		}
 
 		// Seat the player on a BENCH (the sit interaction - tools/capture/decode_sit.py). Interacting with a bench
@@ -1543,7 +1504,8 @@ namespace Faolan.GameServer.World
 						// death/loot/aggro land where the client actually has it.
 						// #267: a not-yet-freed Casilda streams in CHAINED (the captive struggle pose); once the player has
 						// freed her she streams in normally (and follows). Per-viewer + per-instance (the beach is Solo).
-					if (ev.Subject is { IsPlayer: false, NpcTemplateId: QuestHandlerService.CasildaTemplateId } && recipient.Session.Character != null && !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
+						if (ev.Subject is { IsPlayer: false, NpcTemplateId: QuestHandlerService.CasildaTemplateId } && recipient.Session.Character != null &&
+						    !await _questHandler.IsCasildaFreed(recipient.Session.Character.Id))
 							await _questHandler.SendCasildaPose(recipient, ev.Subject.Handle, true);
 						break;
 					}
@@ -1678,37 +1640,8 @@ namespace Faolan.GameServer.World
 				return Task.CompletedTask;
 			}
 
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(WorldDespawn.BuildBody(subjectHandle, token, classWord))));
-		}
-
-		// Sends the subject's FA015807 spawn to `recipient`, re-framed to the recipient and patched to the subject's
-		// CURRENT position (its captured spawn body holds its entry position, which may be stale).
-		// Builds one entity's FA015807 spawn record, framed for `recipient`: the stored SpawnBody with the LIVE position
-		// patched in and the playfield-instance token re-stamped to `playfieldToken`. Shared by the interest send
-		// (SendWorldSpawn) and the world-entry burst (#398, BuildEntryNpcBurst) so both produce byte-identical spawn
-		// records - the burst is retail's shape (close NPCs on map enter) with our DB-constructed bodies.
-		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)
-		{
-			var body = (byte[])subject.SpawnBody.Clone();
-			if (body.Length >= SpawnPacketBuilder.PosZOffset + 4)
-			{
-				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosXOffset, 4), subject.Position.X);
-				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosYOffset, 4), subject.Position.Y);
-				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosZOffset, 4), subject.Position.Z);
-			}
-
-			// Re-stamp the playfield-instance token to the LIVE value at send time. The token baked into SpawnBody at
-			// map-load (NpcSpawnBuilder.TryBuildLive) is the zone's DEFAULT token - but the client only registers, and
-			// then polls (0x2020), a spawn whose playfield matches the one IT loaded at world entry, and that live token
-			// isn't known until the player actually enters (docs/subsystems/mid-session-spawn-blocker.md part 3). Baking the
-			// load-time token shipped every NPC with a stale playfield, so the client silently dropped them all and
-			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
-			SpawnPlayfieldRewriter.TryRewrite(body, playfieldToken);
-
-			return new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, body);
 		}
 
 		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
@@ -1721,6 +1654,27 @@ namespace Faolan.GameServer.World
 			// live `.togglenpcgroup` toggle, so it never touches retail parity.
 			if (DebugAreaLabels && subject.OverheadNameOverride is { } overrideName)
 				await SendSetName(recipient, subject.Handle, overrideName);
+		}
+
+		// Resolve the PLAYER's instance, not the default one: the beach is Solo-instanced (#268), so the player and
+		// their own escortee live in a private playfield copy (e.g. 0x00A00001), not the shared instance 0. Find the
+		// map's live zone that actually contains this player, then look up the escortee (by `match`) in THAT copy - a
+		// TryGetZone(mapId) default-instance lookup misses her entirely and the follow silently no-ops.
+		private bool SetNpcFollow(uint mapId, uint playerHandle, bool follow, Func<WorldEntity, bool> match, string label)
+		{
+			var zone = _sim.World.ZonesForMap(mapId).FirstOrDefault(z => z.TryGet(playerHandle, out _));
+
+			var npc = zone?.Entities.FirstOrDefault(e => !e.IsPlayer && match(e));
+			if (npc == null)
+				return false;
+
+			npc.FollowTargetHandle = follow
+				? playerHandle
+				: null;
+			_logger.LogInformation("Follow: {Label} {State} player 0x{Player:X8}.", label, follow
+				? "now follows"
+				: "stopped following", playerHandle);
+			return true;
 		}
 
 		// Builds one member of an ambient pool at `pos` and adds it to the zone (no wire send - the interest stream, or
@@ -1817,6 +1771,14 @@ namespace Faolan.GameServer.World
 			return bag;
 		}
 
+		// #262: remove a picked-up quest dynel from the player's view (SimpleDynel visual change, state 0x09 = the
+		// GenericSimpleDynelPickup vanish retail sends, Hoxxling gameplay2 @4310) so the brick disappears when taken.
+		// Live-only: the static DB object re-streams on the next zone load (it respawns, retail-style).
+		public static Task HidePickupObject(INetworkClient client, uint handle)
+		{
+			return SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x09));
+		}
+
 		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken
 		// from the first definition. The trailing "tracked quest" pointer is the captured no-track block; pinning the
 		// multi-quest tracked variant needs more decode.
@@ -1840,8 +1802,8 @@ namespace Faolan.GameServer.World
 			var trailing = WorldQuest.BuildTrackedQuestPointer();
 
 			var body = WorldQuest.BuildQuestJournal(client.Session.Character.Id, first.AreaId, areaHeader, entries, trailing);
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(body)));
 		}
 
 		// Sends the active-quest LIST (0x504B7924) that POPULATES the J-panel - WITHOUT it an accepted quest never
@@ -1851,8 +1813,8 @@ namespace Faolan.GameServer.World
 		{
 			var body = WorldQuest.BuildQuestLogList(client.Session.Character.Id, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds,
 				WorldBroadcastBodies.Record(trackedDef, QuestTextSlot.AreaTitle));
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(body)));
 		}
 
 		// The spawn area a position lands in (nearest by centroid when several overlap; bounds padded), or null.
@@ -1892,6 +1854,33 @@ namespace Faolan.GameServer.World
 			return area == null
 				? null
 				: FormatAreaLabel(area);
+		}
+
+		// Sends the subject's FA015807 spawn to `recipient`, re-framed to the recipient and patched to the subject's
+		// CURRENT position (its captured spawn body holds its entry position, which may be stale).
+		// Builds one entity's FA015807 spawn record, framed for `recipient`: the stored SpawnBody with the LIVE position
+		// patched in and the playfield-instance token re-stamped to `playfieldToken`. Shared by the interest send
+		// (SendWorldSpawn) and the world-entry burst (#398, BuildEntryNpcBurst) so both produce byte-identical spawn
+		// records - the burst is retail's shape (close NPCs on map enter) with our DB-constructed bodies.
+		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)
+		{
+			var body = (byte[])subject.SpawnBody.Clone();
+			if (body.Length >= SpawnPacketBuilder.PosZOffset + 4)
+			{
+				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosXOffset, 4), subject.Position.X);
+				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosYOffset, 4), subject.Position.Y);
+				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosZOffset, 4), subject.Position.Z);
+			}
+
+			// Re-stamp the playfield-instance token to the LIVE value at send time. The token baked into SpawnBody at
+			// map-load (NpcSpawnBuilder.TryBuildLive) is the zone's DEFAULT token - but the client only registers, and
+			// then polls (0x2020), a spawn whose playfield matches the one IT loaded at world entry, and that live token
+			// isn't known until the player actually enters (docs/subsystems/mid-session-spawn-blocker.md part 3). Baking the
+			// load-time token shipped every NPC with a stale playfield, so the client silently dropped them all and
+			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
+			SpawnPlayfieldRewriter.TryRewrite(body, playfieldToken);
+
+			return new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, body);
 		}
 
 		// The nameplate label for an area: "<group> | <tier> x<count>" (e.g. "Ape2 | id-prop x8"). ASCII-only on
@@ -1940,11 +1929,11 @@ namespace Faolan.GameServer.World
 		{
 			return resolvedBy switch
 			{
-				SpawnResolutionSource.Name => "name",
-				SpawnResolutionSource.Containment => "contain",
+				SpawnResolutionSource.Name          => "name",
+				SpawnResolutionSource.Containment   => "contain",
 				SpawnResolutionSource.IdPropagation => "id-prop",
-				SpawnResolutionSource.Manual => "manual",
-				_ => "unresolved"
+				SpawnResolutionSource.Manual        => "manual",
+				_                                   => "unresolved"
 			};
 		}
 
@@ -1975,8 +1964,7 @@ namespace Faolan.GameServer.World
 		// (same framing as the static create-editor marker burst).
 		private static Task SendQuestMarker(INetworkClient client, uint npcHandle, byte state)
 		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchSetQuestMarker,
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker,
 				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(npcHandle).WriteByte(state)));
 		}
 
@@ -1985,8 +1973,7 @@ namespace Faolan.GameServer.World
 		// the name AND refreshes the already-built OverheadText). Used by the spawn path and the .togglenpcgroup toggle.
 		private static Task SendSetName(INetworkClient recipient, uint handle, string name)
 		{
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(x => x.WriteUInt32(GameServer0X2000Opcodes.SetNameIIR).WriteArray(CreateEditorRecordBuilder.BuildWorldSetNameIir(handle, name)))));
 		}
 
@@ -1994,16 +1981,15 @@ namespace Faolan.GameServer.World
 		// dedicated builders share - e.g. the NPC MoveTask chase step).
 		private static Task SendWorldIir(INetworkClient recipient, byte[] body)
 		{
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
+			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(body)));
 		}
 
 		// Forwards a player's Move to `recipient` (same body - the moving entity's handle + transform - only the
 		// receiver differs), so the recipient sees the subject move.
 		private static Task SendWorldMove(INetworkClient recipient, MoveForward move)
 		{
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType),
-				GameInterfaceOpcodes.DispatchPassBlob,
+			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(x => x
 					.WriteUInt32(move.Subop)
 					.WriteUInt32(move.DataObject)

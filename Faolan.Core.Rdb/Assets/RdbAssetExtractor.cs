@@ -22,8 +22,6 @@ namespace Faolan.Core.Rdb.Assets
 		public const uint RenderMeshType = 1010001;
 		public const uint SkeletonType = 1010002;
 
-		private static readonly byte[] PngSig = [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A];
-
 		// palette signature -> chosen skeleton id, so the per-mesh scan only happens once per distinct palette.
 		private static readonly Dictionary<string, uint> _skeletonForPalette = [];
 
@@ -35,6 +33,8 @@ namespace Faolan.Core.Rdb.Assets
 			WriteIndented = true,
 			DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
 		};
+
+		private static readonly byte[] PngSig = [0x89, (byte)'P', (byte)'N', (byte)'G', 0x0D, 0x0A, 0x1A, 0x0A];
 
 		// Texture container type ids worth converting/dumping (FCTX variants + the PNG/JPEG types from rdbreader's enum).
 		private static readonly uint[] FctxTypes = [1010004, 1010006, 1010218, 1066606, 1066610];
@@ -1181,9 +1181,7 @@ namespace Faolan.Core.Rdb.Assets
 			return s.BonePalette is { } pal
 				? s with
 				{
-					BonePalette = pal
-						.Select(n => prefix + n)
-						.ToArray()
+					BonePalette = pal.Select(n => prefix + n).ToArray()
 				}
 				: s;
 		}

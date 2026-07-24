@@ -40,10 +40,12 @@ namespace Faolan.Core.Network.Protocol
 		// so the caller falls back to its own default/expected enum. Both conditions matter: a receiver type we don't
 		// map, and an opcode the mapped enum doesn't carry, are equally "not resolvable here". Used by the DL logger's
 		// fall-back-to-listener-default naming.
-		public static Type? OpcodeEnumFor(uint receiverType, ushort opcode) =>
-			OpcodeEnumsByReceiverType.TryGetValue(receiverType, out var enumType) && Enum.IsDefined(enumType, opcode)
+		public static Type? OpcodeEnumFor(uint receiverType, ushort opcode)
+		{
+			return OpcodeEnumsByReceiverType.TryGetValue(receiverType, out var enumType) && Enum.IsDefined(enumType, opcode)
 				? enumType
 				: null;
+		}
 
 		// The (Receiver.Type, opcode) pair -> "MethodName (0xHEX)". THE naming entry point, used by both directions of the
 		// packet trace, so an RX line and a TX line name the same method the same way. The receiver Type already selects

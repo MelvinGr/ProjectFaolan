@@ -52,9 +52,9 @@ namespace Faolan.CSPlayerAgent
 		// reads the empty frame then runs off the end (the #408 dropped-trailer failure mode). Empty body = [(0+1)*0x3F1][0].
 		private static Task SendCharacterSearchResult(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchCharacterSearchResult,
-				b => b.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
-					.WriteByte(0x00))); // list end-marker
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchCharacterSearchResult, b => b
+				.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
+				.WriteByte(0x00))); // list end-marker
 		}
 
 		// 0x2039 DispatchGuildRenownHistoryUpdate: the renown-over-time graph in the guild window (answer to 0x2040
@@ -80,11 +80,10 @@ namespace Faolan.CSPlayerAgent
 		// drops.) Build the real records here if/when a minigame subsystem exists.
 		private static Task SendMassivePvpInfo(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchMassivePvpInfoRequestReturn,
-				(byte[])[0x01],
-				b => b.WriteUInt32(0) // last-update timestamp (cosmetic; 0 = never updated)
-					.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed guild list ((0+1)*0x3F1)
-					.WriteUInt32(1))); // trailing guildCount+1 (= 1 for the empty board) - the field the client read past
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchMassivePvpInfoRequestReturn, (byte[])[0x01], b => b
+				.WriteUInt32(0) // last-update timestamp (cosmetic; 0 = never updated)
+				.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed guild list ((0+1)*0x3F1)
+				.WriteUInt32(1))); // trailing guildCount+1 (= 1 for the empty board) - the field the client read past
 		}
 
 		// 0x2092 DispatchPvPMatchMakingInfoRequestReturn: PvP matchmaking info (answer to 0x2054
@@ -92,10 +91,9 @@ namespace Faolan.CSPlayerAgent
 		// the header carries the same 0x01 extra byte as the capture.
 		private static Task SendPvpMatchMakingInfo(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn,
-				(byte[])[0x01],
-				b => b.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
-					.WriteUInt32(0))); // trailer
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn, (byte[])[0x01], b => b
+				.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
+				.WriteUInt32(0))); // trailer
 		}
 
 		// 0x200F DispatchTeamSearchResult: the LFG team-search result (answer to 0x200B SearchForTeam). Body is a
@@ -103,9 +101,9 @@ namespace Faolan.CSPlayerAgent
 		// login capture, where Hoxxling's search returned nothing).
 		private static Task SendTeamSearchResult(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchTeamSearchResult,
-				b => b.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
-					.WriteByte(0x00))); // list trailer
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchTeamSearchResult, b => b
+				.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
+				.WriteByte(0x00))); // list trailer
 		}
 	}
 }

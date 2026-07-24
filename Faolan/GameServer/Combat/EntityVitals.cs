@@ -136,27 +136,13 @@ namespace Faolan.GameServer.Combat
 		public static EntityVitals FromCharacter(Character character, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses = null)
 		{
 			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
-			var vitals = FromMax(
-				AddGear(max.Health, gearBonuses, CharacterStatId.HealthMax),
-				AddGear(max.Mana, gearBonuses, CharacterStatId.ManaMax),
+			var vitals = FromMax(AddGear(max.Health, gearBonuses, CharacterStatId.HealthMax), AddGear(max.Mana, gearBonuses, CharacterStatId.ManaMax),
 				AddGear(max.Stamina, gearBonuses, CharacterStatId.StaminaMax));
 			// #214: a character that logged out dead is still dead - seed current health at 0 (max stays full) so the
 			// world model agrees with the dead login snapshot and RespawnMe/TryRespawnNow (which gate on IsDead) work.
 			if (character.IsDead)
 				vitals.Health = 0;
 			return vitals;
-		}
-
-		// Adds the gear bonus for one vital stat onto its base max, clamped at 0 (a bonus never drops a pool below zero).
-		private static uint AddGear(uint baseMax, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses, CharacterStatId stat)
-		{
-			if (gearBonuses == null || !gearBonuses.TryGetValue(stat, out var bonus))
-				return baseMax;
-
-			var total = (long)baseMax + bonus;
-			return total < 0
-				? 0
-				: (uint)total;
 		}
 
 		/// <summary>Creates a full-health entity (current == max) from max values.</summary>
@@ -171,6 +157,18 @@ namespace Faolan.GameServer.Combat
 				Stamina = stamina,
 				MaxStamina = stamina
 			};
+		}
+
+		// Adds the gear bonus for one vital stat onto its base max, clamped at 0 (a bonus never drops a pool below zero).
+		private static uint AddGear(uint baseMax, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses, CharacterStatId stat)
+		{
+			if (gearBonuses == null || !gearBonuses.TryGetValue(stat, out var bonus))
+				return baseMax;
+
+			var total = baseMax + bonus;
+			return total < 0
+				? 0
+				: (uint)total;
 		}
 
 		private static uint ClampToMax(uint value, uint max)

@@ -13,7 +13,7 @@ namespace Faolan.Tests
 		[Theory, InlineData(41877u, "0895c702"), InlineData(17036u, "088c8501"), InlineData(215333u, "08a5920d")]
 		// humanoid biped (Picts, Nemedians, pirates, ...)
 		// demon / large caster (Arcanist, Bat Demon, Corruptor, Reaper, ...)
-			// quadruped / beast (Ape King, Jungle Ape, Panther)
+		// quadruped / beast (Ape King, Jungle Ape, Panther)
 		public void BuildDeathBcc_EncodesCreatureDeathBehaviorId_AsVarint(uint behaviorId, string field1Hex)
 		{
 			// The behaviorId (protobuf field 1) is the creature's death animation, harvested per NpcTemplate (#362).

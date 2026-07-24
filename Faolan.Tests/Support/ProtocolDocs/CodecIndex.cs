@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Protocol;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
@@ -22,19 +23,19 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		// byte-exact test signals: golden loads + hex/byte asserts. "ToHex" covers both Convert.ToHexString and the
 		// local ToHex() helpers several test classes define (CharacterStatBlockTests, CombatTests, ...).
 		private static readonly string[] ByteExactMarkers = ["Golden.Bytes", "ToHex", "TestPaths.Asset", "SequenceEqual"];
-		public Dictionary<string, bool> CodecGolden { get; } = new(StringComparer.Ordinal); // codec -> has a byte-exact test
 
 		public Dictionary<string, HashSet<string>> CodecToIir { get; } = new(StringComparer.Ordinal); // codec class -> IIR type names
 		public Dictionary<string, SortedSet<string>> IirToCodecs { get; } = new(StringComparer.Ordinal); // IIR type -> codec classes
+		public Dictionary<string, bool> CodecGolden { get; } = new(StringComparer.Ordinal); // codec -> has a byte-exact test
 		public Dictionary<string, string> BuiltIn { get; } = new(StringComparer.Ordinal); // IIR type -> representative file (inline builders)
 		public Dictionary<string, string> CodecGoldenMethod { get; } = new(StringComparer.Ordinal); // codec -> "TestClass.Method" (byte-exact), when found
 		public Dictionary<uint, string> NameByValue { get; } = [];
 		public HashSet<string> BuiltSomewhere { get; } = new(StringComparer.Ordinal); // IIR types built anywhere
+		public List<(string Name, uint Value)> IirTypes { get; } = []; // the 32-bit carrier types (value >= 0x10000)
 		public int CodecsWithGolden => CodecGolden.Count(kv => kv.Value);
 		public int Dissectors { get; private set; }
 
 		public int RpcOpcodeTotal { get; private set; }
-		public List<(string Name, uint Value)> IirTypes { get; } = []; // the 32-bit carrier types (value >= 0x10000)
 
 		public string Level(string iir)
 		{
@@ -60,7 +61,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			// Anchor the scan on a Faolan.Core.Network type (Rpc), NOT GameServer0X2000Opcodes: the opcode enums moved to
 			// Faolan.Core, so typeof(GameServer0X2000Opcodes).Assembly is now Faolan.Core.dll - the codecs live in
 			// Faolan.Core.Network.dll, and scanning the wrong assembly found zero codecs (every IIR fell back to "inline").
-			foreach (var t in typeof(Faolan.Core.Network.Protocol.Rpc).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith("Faolan.Core.Network.Codecs", StringComparison.Ordinal)))
+			foreach (var t in typeof(Rpc).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith("Faolan.Core.Network.Codecs", StringComparison.Ordinal)))
 			{
 				var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly);
 				var iirs = new HashSet<string>(StringComparer.Ordinal);
@@ -96,25 +97,25 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			// listeners. They name the opcode member directly, so a plain reference scan finds them (V2 vs V1).
 			idx.BuiltSomewhere.UnionWith(idx.IirToCodecs.Keys);
 			foreach (var dir in new[] { Path.Combine(repo, "Faolan"), Path.Combine(repo, "Faolan.Core.Network") })
-				foreach (var file in SourceFiles(dir, "*.cs"))
+			foreach (var file in SourceFiles(dir, "*.cs"))
+			{
+				if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
+				    file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}") || file.EndsWith("Opcodes.cs", StringComparison.Ordinal))
+					continue;
+
+				var text = File.ReadAllText(file);
+				foreach (var iir in allIirNames)
 				{
-					if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") ||
-						file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}") || file.EndsWith("Opcodes.cs", StringComparison.Ordinal))
+					if (idx.BuiltSomewhere.Contains(iir))
 						continue;
 
-					var text = File.ReadAllText(file);
-					foreach (var iir in allIirNames)
+					if (text.Contains($"GameServer0X2000Opcodes.{iir}", StringComparison.Ordinal))
 					{
-						if (idx.BuiltSomewhere.Contains(iir))
-							continue;
-
-						if (text.Contains($"GameServer0X2000Opcodes.{iir}", StringComparison.Ordinal))
-						{
-							idx.BuiltSomewhere.Add(iir);
-							idx.BuiltIn[iir] = Path.GetFileNameWithoutExtension(file);
-						}
+						idx.BuiltSomewhere.Add(iir);
+						idx.BuiltIn[iir] = Path.GetFileNameWithoutExtension(file);
 					}
 				}
+			}
 
 			// codec -> has a byte-exact test, and the NAME of that test method (for messages.md citations).
 			var testFiles = SourceFiles(Path.Combine(repo, "Faolan.Tests"), "*.cs").Select(f => (Text: File.ReadAllText(f), Path: f)).ToList();
@@ -166,7 +167,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			{
 				"V3" => 0,
 				"V2" => 1,
-				_ => 2
+				_    => 2
 			};
 		}
 
@@ -191,16 +192,6 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			return testFile.Contains(subject, StringComparison.Ordinal)
 				? 2
 				: 3;
-		}
-
-		// Every source file under `dir`, in a DETERMINISTIC order. Directory.EnumerateFiles returns filesystem order,
-		// which changes when a file is rewritten (an editor or `sed -i` replaces the inode) - and several of the picks
-		// below are "first match wins", so an unordered scan silently rewrites generated pages: a codec with two equally
-		// valid golden tests would flip citation between machines and between commits. Sorted, the page is a function of
-		// the sources alone.
-		private static List<string> SourceFiles(string dir, string pattern, SearchOption option = SearchOption.AllDirectories)
-		{
-			return Directory.EnumerateFiles(dir, pattern, option).OrderBy(f => f, StringComparer.Ordinal).ToList();
 		}
 
 		// Finds a `TestClass.Method` whose body references `codec` AND asserts on bytes - a real [V3: ...] citation.
@@ -237,6 +228,16 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		private static bool IsByteExact(string scope, string codec)
 		{
 			return ByteExactMarkers.Any(scope.Contains) || (scope.Contains("FromHexString") && (scope.Contains(".ToArray(") || scope.Contains($"{codec}.Build")));
+		}
+
+		// Every source file under `dir`, in a DETERMINISTIC order. Directory.EnumerateFiles returns filesystem order,
+		// which changes when a file is rewritten (an editor or `sed -i` replaces the inode) - and several of the picks
+		// below are "first match wins", so an unordered scan silently rewrites generated pages: a codec with two equally
+		// valid golden tests would flip citation between machines and between commits. Sorted, the page is a function of
+		// the sources alone.
+		private static List<string> SourceFiles(string dir, string pattern, SearchOption option = SearchOption.AllDirectories)
+		{
+			return Directory.EnumerateFiles(dir, pattern, option).OrderBy(f => f, StringComparer.Ordinal).ToList();
 		}
 	}
 }

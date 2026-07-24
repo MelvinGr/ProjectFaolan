@@ -85,11 +85,6 @@ namespace Faolan.GameServer
 		// (0xFC across all NecroL80 spellweave captures). Other 0x205A actions (0xFF crafting book, combo inputs) are NOT
 		// spellweaves.
 		private const uint SpellweaveToggleParam = 0xFC;
-
-		private static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x58);
-
-		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
-		private static readonly ProtoEndpoint LoginWorld201CSenderEndpoint = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58);
 		// The create-flow packets build each endpoint through Endpoints.Endpoint(type, id) with the client instance
 		// (the character's real id) woven into the sender/receiver conversation id.
 
@@ -103,12 +98,6 @@ namespace Faolan.GameServer
 		// Tested 0x08 (2026-06-13) to clear the client's "n3ToClientQuit sent from 0 -> e_Impossible" warning - it did
 		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's). Reverted to 0x58.
 		public static readonly ProtoEndpoint WorldSenderEndpoint = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
-
-		// The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
-		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldSenderEndpoint that
-		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
-		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
-		private static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
 
 		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
 		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
@@ -138,6 +127,17 @@ namespace Faolan.GameServer
 
 		private static Dictionary<string, GmCommandDelegate> _gmCommandsDict = null!;
 
+		private static readonly ProtoEndpoint ExistingCharacterPostReadyReportServerIdSenderEndpoint = Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x58);
+
+		// The 0x201C handshake uses a different conversation family, but the same sub-id 0x58 + instance tail.
+		private static readonly ProtoEndpoint LoginWorld201CSenderEndpoint = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58);
+
+		// The player-death-screen packets (death-pose MoveTask, SimpleCharKilledBy, death-state ApplySpell) come from
+		// GameAgent at instance 0x59 in the capture (AssassinL23_..._resurect), NOT the 0x58 of WorldSenderEndpoint that
+		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
+		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
+		private static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
+
 		// Per-application effect-instance id counter for spellweave buffs (so distinct buffs don't collapse onto one
 		// client-side effect). Kept in the 0x18xxxxxx neighbourhood of the captured nonces.
 		private static int _spellweaveEffectSeq;
@@ -145,6 +145,7 @@ namespace Faolan.GameServer
 		// Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
 		// See Economy/BankService.cs.
 		private readonly BankService _bank;
+		private readonly ClaimService _claims;
 
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
 		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
@@ -162,6 +163,7 @@ namespace Faolan.GameServer
 		// Persists equip/unequip/inventory-move/drop/split actions to the DB (no packet sends). The Inbound
 		// handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
 		private readonly EquipmentService _equipment;
+		private readonly FeatService _feats;
 
 		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
@@ -186,8 +188,6 @@ namespace Faolan.GameServer
 		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/ShopService.cs.
 		private readonly ShopService _shop;
-		private readonly ClaimService _claims;
-		private readonly FeatService _feats;
 
 		// The player action bar / hotbar persistence + login restore (#71). See Inventory/ShortcutBarService.cs.
 		private readonly ShortcutBarService _shortcutBar;
@@ -214,8 +214,7 @@ namespace Faolan.GameServer
 		private CancellationTokenSource _loopCts = null!;
 
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, Realm realm, IChatServerDispatcher agentServerDispatcher,
-			IGameServerDispatcher gameServerDispatcher) : base(realm.Port, logger, configuration, database,
-			new GameServerPacketTracer(logger))
+			IGameServerDispatcher gameServerDispatcher) : base(realm.Port, logger, configuration, database, new GameServerPacketTracer(logger))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
@@ -234,7 +233,7 @@ namespace Faolan.GameServer
 				SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
 			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Character.Id, msg),
 				ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
-									 // reactive element list + fire burst (docs/subsystems/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
+				// reactive element list + fire burst (docs/subsystems/combos.md); SendWorldIir wants a [u32 len]-prefixed body, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
 				(c, record) => SendWorldIir(c, new FaolanStream().WriteArrayUInt32Length(record).ToArray()), SendBuffRemoval, // trance-buff end-twins on cancel/fire
 				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
 				EnsureEnergyLoop); // start the persistent energy tracking/regen loop

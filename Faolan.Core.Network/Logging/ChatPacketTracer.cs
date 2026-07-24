@@ -20,6 +20,15 @@ namespace Faolan.Core.Network.Logging
 		{
 		}
 
+		// The chat transport writes bytes (its frame is 4 bytes plus the body, so a send serializes straight through),
+		// which are decoded back to the message here - the same render either way.
+		protected override void RenderTransmitted(byte[] frame)
+		{
+			var packet = ChatServerMessage.Parse(frame);
+			Logger.LogPacket(PacketLogFormatter.Transmitted, ChannelName, PacketLogFormatter.OpcodeName(typeof(ChatServerInterfaceOpcodes), packet.Opcode), packet.Body.Length, packet.FrameLength,
+				("body", packet.Body));
+		}
+
 		// Inbound (RX): the listener dispatched this parsed frame.
 		public void Received(in ChatServerMessage packet)
 		{
@@ -45,15 +54,6 @@ namespace Faolan.Core.Network.Logging
 			{
 				RenderFailed(ex);
 			}
-		}
-
-		// The chat transport writes bytes (its frame is 4 bytes plus the body, so a send serializes straight through),
-		// which are decoded back to the message here - the same render either way.
-		protected override void RenderTransmitted(byte[] frame)
-		{
-			var packet = ChatServerMessage.Parse(frame);
-			Logger.LogPacket(PacketLogFormatter.Transmitted, ChannelName, PacketLogFormatter.OpcodeName(typeof(ChatServerInterfaceOpcodes), packet.Opcode), packet.Body.Length, packet.FrameLength,
-				("body", packet.Body));
 		}
 	}
 }

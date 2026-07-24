@@ -11,12 +11,14 @@ namespace Faolan.Web.Services
 	// the UI supplies. Navigation properties and collections are skipped (see Editable).
 	public sealed class DbEditorField
 	{
-		private readonly object _entity;
 		private readonly PropertyInfo _prop;
+		private readonly object _entity;
 
 		public Array EnumValues => IsEnum
 			? Enum.GetValues(Type)
 			: Array.Empty<object>();
+
+		public Type Type { get; }
 
 		public bool BoolValue
 		{
@@ -36,8 +38,6 @@ namespace Faolan.Web.Services
 			get => _prop.GetValue(_entity)?.ToString() ?? "";
 			set => _prop.SetValue(_entity, Convert(value));
 		}
-
-		public Type Type { get; }
 
 		public DbEditorField(object entity, PropertyInfo prop)
 		{

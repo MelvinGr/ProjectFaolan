@@ -25,20 +25,20 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character?> GetCharacterByName(string name, uint realmId);
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		Task<CharacterEquipment?> GetCharacterEquipment(uint characterId);
-		Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet);
 		Task<uint[]> GetCharacterFeats(uint characterId);
-		Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId);
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
-		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 		Task<Character?> GetCharacterScaffold(uint characterId);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
 		Task<CharacterStat[]> GetCharacterStats(uint characterId);
 		Task<uint[]> GetCharacterTags(uint characterId);
+		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
+		Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet);
+		Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task RemoveCharacterShortcut(uint characterId, uint slot);
 		Task SaveCharacter(Character character);
@@ -47,9 +47,9 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveCharacterDeadState(uint characterId, bool isDead);
 		Task SaveCharacterEquipment(CharacterEquipment equipment);
 		Task SaveCharacterMount(uint characterId, uint? mountId);
-		Task SaveCharacterWeaponSet(uint characterId, WeaponSet activeSet);
 		Task SaveCharacterScaffold(Character character);
 		Task SaveCharacterTransform(uint characterId, Vector3 position, Quaternion rotation, uint mapId);
+		Task SaveCharacterWeaponSet(uint characterId, WeaponSet activeSet);
 		Task<bool> SetCharacterGuild(uint characterId, uint? guildId, GuildRank rank);
 		Task SetCharacterInventorySlot(uint characterId, ContainerKind container, int slot, uint? itemId, uint count = 1);
 		Task SetCharacterMoney(uint characterId, ulong money);
@@ -283,48 +283,10 @@ namespace Faolan.Core.Database.Repositories
 				.FirstOrDefaultAsync(e => e.CharacterId == characterId);
 		}
 
-		// The character's worn STAT-BEARING items (the 16 combat slots) with their StatModifiers loaded, one entry per
-		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation (#3). Reads the
-		// equipment's *Id columns (no nav load), then fetches only those Items + their modifiers. Empty when the
-		// character has no equipment row or no stat-bearing gear.
-		public async Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var equipment = await ctx.CharacterEquipment.AsNoTracking().FirstOrDefaultAsync(e => e.CharacterId == characterId);
-			if (equipment == null)
-				return [];
-
-			// #400: fold in only the ACTIVE weapon set's two weapon slots (armour + jewellery always apply); counting
-			// both the melee and ranged sets when both are equipped would double-count.
-			var ids = equipment.StatBearingItemIds(activeSet).ToHashSet();
-			if (ids.Count == 0)
-				return [];
-
-			var byId = await ctx.Items.AsNoTracking().Include(i => i.StatModifiers).Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
-			// Preserve one entry per occupied slot (duplicates included) so a stat granted by two worn copies stacks.
-			return ids.Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
-		}
-
 		public async Task<uint[]> GetCharacterFeats(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArrayAsync();
-		}
-
-		// The (min, max) damage of the character's equipped MELEE main-hand weapon (MainHandLeft), for melee resolution
-		// (#395), or null if that slot is empty or the item carries no imported weapon damage. A lightweight projection -
-		// no nav graph loaded (the combat swing hot path).
-		public async Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var dmg = await ctx.CharacterEquipment
-				.Where(e => e.CharacterId == characterId && e.MainHandLeftId != null)
-				.Join(ctx.Items, e => e.MainHandLeftId, i => i.Id, (_, i) => new { i.MinDamage, i.MaxDamage })
-				.FirstOrDefaultAsync();
-
-			return dmg is { MinDamage: { } min, MaxDamage: { } max }
-				? (min, max)
-				: null;
 		}
 
 		public async Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance)
@@ -354,16 +316,6 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterQuests.Where(q => q.CharacterId == characterId).ToArrayAsync();
-		}
-
-		public async Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var q = ctx.Characters.Where(a => a.AccountId == id);
-			if (skipUninitialized)
-				q = q.Where(c => c.Name != null);
-
-			return await q.ToArrayAsync();
 		}
 
 		public async Task<Character?> GetCharacterScaffold(uint characterId)
@@ -404,10 +356,62 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterTags.Where(t => t.CharacterId == characterId).Select(t => t.TagId).ToArrayAsync();
 		}
 
+		public async Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var q = ctx.Characters.Where(a => a.AccountId == id);
+			if (skipUninitialized)
+				q = q.Where(c => c.Name != null);
+
+			return await q.ToArrayAsync();
+		}
+
 		public async Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterRespawnPoints.Where(c => c.CharacterId == characterId).Select(c => c.RespawnPointId).ToArrayAsync();
+		}
+
+		// The character's worn STAT-BEARING items (the 16 combat slots) with their StatModifiers loaded, one entry per
+		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation (#3). Reads the
+		// equipment's *Id columns (no nav load), then fetches only those Items + their modifiers. Empty when the
+		// character has no equipment row or no stat-bearing gear.
+		public async Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var equipment = await ctx.CharacterEquipment.AsNoTracking().FirstOrDefaultAsync(e => e.CharacterId == characterId);
+			if (equipment == null)
+				return [];
+
+			// #400: fold in only the ACTIVE weapon set's two weapon slots (armour + jewellery always apply); counting
+			// both the melee and ranged sets when both are equipped would double-count.
+			var ids = equipment.StatBearingItemIds(activeSet).ToHashSet();
+			if (ids.Count == 0)
+				return [];
+
+			var byId = await ctx.Items.AsNoTracking().Include(i => i.StatModifiers).Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
+			// Preserve one entry per occupied slot (duplicates included) so a stat granted by two worn copies stacks.
+			return ids.Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
+		}
+
+		// The (min, max) damage of the character's equipped MELEE main-hand weapon (MainHandLeft), for melee resolution
+		// (#395), or null if that slot is empty or the item carries no imported weapon damage. A lightweight projection -
+		// no nav graph loaded (the combat swing hot path).
+		public async Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var dmg = await ctx
+				.CharacterEquipment.Where(e => e.CharacterId == characterId && e.MainHandLeftId != null)
+				.Join(ctx.Items, e => e.MainHandLeftId, i => i.Id, (_, i) => new
+				{
+					i.MinDamage,
+					i.MaxDamage
+				})
+				.FirstOrDefaultAsync();
+
+			return dmg is { MinDamage: { } min, MaxDamage: { } max }
+				? (min, max)
+				: null;
 		}
 
 		public async Task RemoveCharacterQuest(uint characterId, uint questId)
@@ -554,14 +558,6 @@ namespace Faolan.Core.Database.Repositories
 			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.MountId, mountId));
 		}
 
-		// #400: persist the character's drawn weapon SET after a SwitchWeaponsButton toggle, so the active loadout (and
-		// the login-time gear-stat aggregation that counts only its weapons) survives relog. Targeted update, no load.
-		public async Task SaveCharacterWeaponSet(uint characterId, WeaponSet activeSet)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.ActiveWeaponSet, activeSet));
-		}
-
 		public async Task SaveCharacterScaffold(Character character)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -591,6 +587,14 @@ namespace Faolan.Core.Database.Repositories
 					.SetProperty(c => c.RotationZ, rotation.Z)
 					.SetProperty(c => c.RotationW, rotation.W)
 					.SetProperty(c => c.MapId, mapId));
+		}
+
+		// #400: persist the character's drawn weapon SET after a SwitchWeaponsButton toggle, so the active loadout (and
+		// the login-time gear-stat aggregation that counts only its weapons) survives relog. Targeted update, no load.
+		public async Task SaveCharacterWeaponSet(uint characterId, WeaponSet activeSet)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.ActiveWeaponSet, activeSet));
 		}
 
 		public async Task<bool> SetCharacterGuild(uint characterId, uint? guildId, GuildRank rank)
