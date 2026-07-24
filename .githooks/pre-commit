@@ -8,14 +8,16 @@
 # change show up twice in review and invited the dump to drift into a second, unapplied source of truth. So this
 # file answers "what game CONTENT changed", and the migrations answer "what shape is it".
 #
-# ⚠️ CONSEQUENCE - this dump is NOT a portable restore. `.dump --data-only` writes POSITIONAL inserts
-# (`INSERT INTO T VALUES(...)`, no column list), so it only loads into a schema whose column ORDER matches the db
-# it came from. That is not the same as a freshly migrated schema: EF's SQLite table rebuilds re-emit columns
-# alphabetically, so 55 of 73 tables in the committed faolan.db are already ordered differently from what
-# `InitialCreate` produces - loading this into a fresh `dotnet ef database update` db fails on ~26k rows with NOT
-# NULL/CHECK violations as values land in the wrong columns. faolan.db stays the restorable artifact; faolan.sql is
-# the REVIEW artifact. (If it ever has to restore, the fix is emitting a column list per row - correct anywhere,
-# but it doubles the file: 22 MB vs 11 MB.)
+# It IS a working restore: `dotnet ef database update` to create the schema, then `sqlite3 <db> < faolan.sql` -
+# verified at 0 errors with full row parity.
+#
+# ⚠️ What that depends on: `.dump --data-only` writes POSITIONAL inserts (`INSERT INTO T VALUES(...)`, no column
+# list), so it only loads into a schema whose column ORDER matches the db it came from. That is not automatic -
+# EF's SQLite table rebuilds re-emit columns alphabetically, so a db grown through a chain of migrations drifts
+# out of the order a fresh `InitialCreate` produces (it had drifted in 56 of 75 tables before the migrations were
+# squashed, and loading the dump then failed on ~24k rows as values landed in the wrong columns). faolan.db was
+# REBUILT from the squashed migration to put it back in step. If a future migration rebuilds a table, check that
+# order again - or emit a column list per row, which is correct anywhere but doubles the file (22 MB vs 11 MB).
 #
 # Regenerates ONLY when faolan.db is actually being committed, so a normal code commit costs nothing and the
 # server's session writes (character positions, timestamps) never churn the dump on their own.
@@ -33,6 +35,11 @@
 # The excluded set is DERIVED from the schema, never listed here: `Characters` plus every table with a foreign key
 # to it. Excluding only `Characters` would orphan its children and the dump would not restore under FK
 # enforcement; a hardcoded list would go stale the first time a CharacterX table is added.
+#
+# `__EFMigrationsHistory` IS EXCLUDED TOO - it is per-database bookkeeping, not game content. It says which
+# migrations that particular file has had applied, so dumping it (a) churns the diff on every migration and every
+# squash for no reviewable reason, and (b) breaks the restore it is supposed to serve: loading this into a database
+# the EF tools just created fails on the history row's primary key, because the tool already wrote its own.
 set -e
 
 git diff --cached --name-only | grep -qx 'faolan.db' || exit 0
@@ -66,6 +73,7 @@ for t in $(sqlite3 "$tmp" "SELECT name FROM sqlite_master WHERE type='table' AND
 done
 
 sqlite3 "$tmp" "PRAGMA foreign_keys=ON; DELETE FROM Characters;"
+sqlite3 "$tmp" "DELETE FROM __EFMigrationsHistory;"
 
 for t in $char_tables; do
 	n=$(sqlite3 "$tmp" "SELECT COUNT(*) FROM \"$t\";")
@@ -97,4 +105,4 @@ done
 } > faolan.sql
 
 git add faolan.sql
-echo "pre-commit: regenerated faolan.sql from the staged faolan.db, characters excluded ($(wc -l < faolan.sql) lines)"
+echo "pre-commit: regenerated faolan.sql from the staged faolan.db, characters + migration history excluded ($(wc -l < faolan.sql) lines)"

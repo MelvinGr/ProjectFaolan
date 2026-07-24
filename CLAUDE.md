@@ -138,12 +138,13 @@ Two things already run ahead of that move:
   `sqlite3 faolan.db ".dump --data-only" | sed '/^CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq);$/d' > faolan.sql`
   (that one line is dropped because SQLite rejects it on restore — it owns that table; the hook also wraps the
   output in `PRAGMA foreign_keys=OFF; BEGIN TRANSACTION; … COMMIT;`, which `--data-only` does not emit itself).
-  **DATA ONLY — no `CREATE TABLE`**: the schema's one owner is the EF migrations, so a column change shows up in
-  review once, not twice. ⚠️ The flip side is that these are POSITIONAL `INSERT INTO T VALUES(…)` statements, so
-  the file only loads against the column ORDER it came from — `faolan.db` stays the restorable artifact, and
-  `faolan.sql` is the review artifact. (A fresh `dotnet ef database update` schema is NOT interchangeable: EF's
-  SQLite table rebuilds re-emit columns alphabetically, so most tables in the committed db are already ordered
-  differently from `InitialCreate`.)
+  **DATA ONLY — no `CREATE TABLE`**, and no `__EFMigrationsHistory` (per-database bookkeeping, not content): the
+  schema's one owner is the EF migrations, so a column change shows up in review once, not twice. Restoring is
+  `dotnet ef database update` for the schema then `sqlite3 <db> < faolan.sql` for the data (verified at 0 errors,
+  full row parity). ⚠️ These are POSITIONAL `INSERT INTO T VALUES(…)` statements, so they only load against the
+  column ORDER they came from. That is why `faolan.db` is kept in step with the migrations: EF's SQLite table
+  rebuilds re-emit columns alphabetically, so a db grown through a migration chain drifts out of the order a fresh
+  `InitialCreate` produces — after squashing, `faolan.db` was rebuilt from the squashed migration to match.
 - **`journal_mode=WAL`** — a persistent FILE-HEADER flag (no code, nothing to configure). Without it a reader
   BLOCKS a writer, so any concurrent read (a `sqlite3` query, the MCP server, Faolan.Web, another realm process)
   makes a live world write FAIL and be lost. ⚠️ A busy_timeout does NOT help and is already 30s by default
