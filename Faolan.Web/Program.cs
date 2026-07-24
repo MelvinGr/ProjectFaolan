@@ -4,6 +4,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Cli;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -25,17 +26,26 @@ namespace Faolan.Web
 {
 	public class Program
 	{
-		public static void Main(string[] args)
+		public static int Main(string[] args)
 		{
 			var builder = WebApplication.CreateBuilder(args);
 
-			// Shared config (DB provider/connection, etc.) - OPTIONAL, like the server, so a container can supply it
-			// by env vars instead. The app's own appsettings.json (RdbDir, ...) lives next to the dll, not the CWD.
-			builder.Configuration.AddJsonFile(Global.ConfigPath, true);
-			builder.Configuration.AddJsonFile("appsettings.json");
-			// Env vars / command line override the files (parity with the server): env > cmdline > json.
-			builder.Configuration.AddCommandLine(args);
-			builder.Configuration.AddEnvironmentVariables();
+			// appsettings.json FIRST: it is the app's own defaults (logging, CdnUrl), and the shared faolan.json is
+			// deployment config, so the shared file has to win over it - not the other way round.
+			//
+			// ⚠️ It used to be the other way round, and appsettings.json shipped `"RdbDir": ""`. An empty value is
+			// still a value, so it OVERRODE a perfectly good RdbDir in faolan.json and the viewer reported the folder
+			// as unconfigured. The empty entry is gone too: absent means unset, "" does not.
+			builder.Configuration.Sources.Clear();
+			builder.Configuration.AddJsonFile("appsettings.json", true);
+			builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true);
+
+			// Then the shared layers, in the order every Faolan executable uses: faolan.json < command line < env.
+			var overrides = WebCommand.Overrides(args, out var parseExit);
+			if (overrides == null)
+				return parseExit;
+
+			builder.Configuration.AddConfiguration(FaolanCommandLine.Build(overrides));
 
 			builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
@@ -351,7 +361,7 @@ namespace Faolan.Web
 			app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 			app.Run();
-			return;
+			return 0;
 
 			// Browser cache for deterministic-by-id renders (item models, race/sex base, map images): a day, immutable.
 			static void CacheADay(HttpContext ctx)
