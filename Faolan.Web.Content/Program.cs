@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using Faolan.Core;
+using Faolan.Core.Cli;
 using Faolan.Core.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -46,15 +47,16 @@ namespace Faolan.Web.Content
 		{
 			var builder = WebApplication.CreateBuilder(args);
 
-			// Config precedence (highest wins): environment variables > command line > faolan.json. faolan.json is
-			// OPTIONAL - the mirror runs on the built-in defaults with no file (parity with the server / Faolan.Web).
-			// The command-line key IS the config path (`--CdnMirror:Store <dir>`), so one NAME per setting whatever the
-			// input method - the old --store/--ip/--port aliases were a third spelling to keep in step. Sources are
-			// cleared first so the order is exactly this (no appsettings.json in the mix).
+			// Config precedence (highest wins): environment variables > command line > faolan.json, through the shared
+			// builder so it matches the server and the importer exactly. faolan.json is OPTIONAL - the mirror runs on
+			// its built-in defaults with no file. The command-line key IS the config path (`--CdnMirror:Store <dir>`),
+			// declared in MirrorCommand. Sources are cleared first so the order is exactly this (no appsettings.json).
+			var overrides = MirrorCommand.Overrides(args, out var parseExit);
+			if (overrides == null)
+				return parseExit;
+
 			builder.Configuration.Sources.Clear();
-			builder.Configuration.AddJsonFile(Global.ConfigPath, true); // absolute (CWD-rooted), like Faolan.Web
-			builder.Configuration.AddCommandLine(args);
-			builder.Configuration.AddEnvironmentVariables();
+			builder.Configuration.AddConfiguration(FaolanCommandLine.Build(overrides));
 
 			var ip = builder.Configuration.CdnMirrorIp;
 			var port = builder.Configuration.CdnMirrorPort;

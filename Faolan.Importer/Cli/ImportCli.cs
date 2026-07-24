@@ -15,18 +15,17 @@ namespace Faolan.Importer.Cli
 	// migrates, and hands a resolved plan to ImportRunner. See docs/tooling/importer.md for the CLI spec.
 	public static class ImportCli
 	{
-		public static async Task<int> RunAsync(string[] args)
+		public static async Task<int> RunAsync(ImporterOptions options)
 		{
-			var capturesDir = GetOption(args, "--captures");
-			var rdbDir = GetOption(args, "--rdb");
+			var capturesDir = options.Captures;
+			var rdbDir = CliConfig.Resolve(options.ConfigOverrides)["RdbDir"];
 
 			// --report <name>: read-only diagnostics (no import, bypasses the runner).
-			var report = GetOption(args, "--report");
-			if (report != null)
-				return await ReportCli.RunAsync(args, report);
+			if (options.Report != null)
+				return await ReportCli.RunAsync(options, options.Report);
 
 			// --list: catalog the modules and exit (no DB needed).
-			if (args.Contains("--list"))
+			if (options.List)
 			{
 				Console.WriteLine("Importer modules:");
 				foreach (var m in ModuleRegistry.All)
@@ -40,13 +39,13 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
-			var (mode, overrides) = ParseMode(GetOption(args, "--mode"));
-			var dryRun = args.Contains("--dry-run");
-			var force = args.Contains("--force");
+			var (mode, overrides) = ParseMode(options.Mode);
+			var dryRun = options.DryRun;
+			var force = options.Force;
 
 			// Provider + connection come from the SHARED config (the same DB the server uses); see CliConfig.
 			// `--Database:ConnectionString` overrides that key in the command-line layer (env > cmdline > json); the provider follows config.
-			var (provider, connection) = CliConfig.ResolveDatabase(args);
+			var (provider, connection) = CliConfig.ResolveDatabase(options.ConfigOverrides);
 
 			// A SQLite DB is a FILE that must already exist (the DB is the source of truth). Postgres targets a server.
 			if (provider == FaolanDbProvider.Sqlite)
@@ -71,8 +70,8 @@ namespace Faolan.Importer.Cli
 
 			// Resolve the requested module set: --only X,Y | --skip X,Y | (default = all non-RDB).
 			IReadOnlyList<IImportModule> requested;
-			var only = GetOption(args, "--only");
-			var skip = GetOption(args, "--skip");
+			var only = options.Only;
+			var skip = options.Skip;
 			if (only != null)
 			{
 				requested = ResolveNames(only, out var unknownOnly);
@@ -139,8 +138,8 @@ namespace Faolan.Importer.Cli
 				RdbDir = rdbDir,
 				RawPackets = rawPackets,
 				CreateCaptures = createCaptures,
-				RdbProxyBase = GetOption(args, "--rdb-proxy") ?? ImportContext.DefaultProxyBase,
-				DumpTemplatesDir = GetOption(args, "--dump-templates"),
+				RdbProxyBase = options.RdbProxy ?? ImportContext.DefaultProxyBase,
+				DumpTemplatesDir = options.DumpTemplates,
 				Mode = mode,
 				ModeOverrides = overrides,
 				DryRun = dryRun,

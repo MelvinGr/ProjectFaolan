@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core;
+using Faolan.Core.Cli;
 using Faolan.Core.Extensions;
 using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Client;
@@ -61,10 +61,10 @@ namespace Faolan.Mcp
 
 		public static async Task Main(string[] args)
 		{
-			// Config: env > cmdline > json, with an OPTIONAL faolan.json (Global.ConfigPath - beside the exe / the CWD,
-			// or FAOLAN_CONFIG) - parity with the server / Faolan.Web / importer. Claude Code spawns this bridge with no
-			// args/env, so it runs on the defaults; override McpUrl / ChannelPollMs / ChannelBacklogGraceMs there.
-			var config = new ConfigurationBuilder().AddJsonFile(Global.ConfigPath, true).AddCommandLine(args).AddEnvironmentVariables().Build();
+			// Config: env > json, through the shared builder (FaolanCommandLine) - parity with the server / importer.
+			// No command-line layer: Claude Code spawns this bridge as a stdio MCP server with no arguments at all,
+			// so its settings (Mcp:Url, ChatBridge:PollMs / :BacklogGraceMs) come from faolan.json or the environment.
+			var config = FaolanCommandLine.Build();
 			_mcpUrl = config.McpUrl;
 			_backlogGrace = TimeSpan.FromMilliseconds(config.ChannelBacklogGraceMs);
 			_pollInterval = TimeSpan.FromMilliseconds(config.ChannelPollMs);

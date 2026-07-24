@@ -33,20 +33,20 @@ namespace Faolan.Importer.Cli
 		// DB config (provider + connection) for the DB-backed reports. Resolved LAZILY on the first OpenDb so the
 		// capture/RDB-only reports (corpus-extract, coverage-of-captures, ...) need no DB config at all. Same source
 		// and precedence as the import path (env > cmdline(--Database:ConnectionString) > faolan.json) - see CliConfig.
-		private static string[] _args = [];
+		private static ImporterOptions _options = null!;
 
-		public static async Task<int> RunAsync(string[] args, string report)
+		public static async Task<int> RunAsync(ImporterOptions options, string report)
 		{
-			_args = args; // OpenDb resolves the DB connection from these on demand (CliConfig)
-			var capturesDir = GetOption(args, "--captures");
-			var arg = GetOption(args, "--report-arg");
+			_options = options; // OpenDb resolves the DB connection from these on demand (CliConfig)
+			var capturesDir = options.Captures;
+			var arg = options.ReportArg;
 
 			// The DB-only reports never touch the corpus, so they run before the captures check below.
 			if (report == "sql-seed")
 				return await SqlSeed(arg);
 
 			if (report == "apply-seed")
-				return ApplySeed(args);
+				return ApplySeed();
 
 			// Every report below reads the corpus. It is NOT in this repo (private ProjectFaolan-Data), so say where
 			// to point rather than letting Directory.EnumerateFiles throw a bare path error.
@@ -78,7 +78,7 @@ namespace Faolan.Importer.Cli
 
 				case "coverage":
 				{
-					await Coverage(LoadCaptures(capturesDir), arg, CliConfig.Resolve(args).RdbDir);
+					await Coverage(LoadCaptures(capturesDir), arg, RdbDir());
 					return 0;
 				}
 
@@ -132,73 +132,73 @@ namespace Faolan.Importer.Cli
 
 				case "spell-fields":
 				{
-					SpellFields(RdbDir(args), arg);
+					SpellFields(RdbDir(), arg);
 					return 0;
 				}
 
 				case "rdb-assets":
 				{
-					RdbAssets(RdbDir(args), arg, GetOption(args, "--out"), args.Contains("--dump-mesh"));
+					RdbAssets(RdbDir(), arg, _options.Out, _options.DumpMesh);
 					return 0;
 				}
 
 				case "rdb-skeleton":
 				{
-					RdbSkeleton(RdbDir(args), arg ?? "14853");
+					RdbSkeleton(RdbDir(), arg ?? "14853");
 					return 0;
 				}
 
 				case "rdb-rig":
 				{
-					RdbRig(RdbDir(args), arg ?? "", GetOption(args, "--out"), GetOption(args, "--skeleton"));
+					RdbRig(RdbDir(), arg ?? "", _options.Out, _options.Skeleton);
 					return 0;
 				}
 
 				case "rdb-search":
 				{
-					RdbSearch(RdbDir(args), arg ?? "");
+					RdbSearch(RdbDir(), arg ?? "");
 					return 0;
 				}
 
 				case "rdb-id":
 				{
-					RdbId(RdbDir(args), arg ?? "");
+					RdbId(RdbDir(), arg ?? "");
 					return 0;
 				}
 
 				case "rdb-dump":
 				{
-					RdbDump(RdbDir(args), arg ?? "", GetOption(args, "--out"));
+					RdbDump(RdbDir(), arg ?? "", _options.Out);
 					return 0;
 				}
 
 				case "item-template":
 				{
-					ItemTemplate(RdbDir(args), arg ?? "", GetOption(args, "--out"));
+					ItemTemplate(RdbDir(), arg ?? "", _options.Out);
 					return 0;
 				}
 
 				case "ability-names":
 				{
-					AbilityNames(RdbDir(args));
+					AbilityNames(RdbDir());
 					return 0;
 				}
 
 				case "rdb-types":
 				{
-					RdbTypes(RdbDir(args));
+					RdbTypes(RdbDir());
 					return 0;
 				}
 
 				case "terrain-export":
 				{
-					await TerrainExport(RdbDir(args), GetOption(args, "--terrain-out") ?? "Terrain");
+					await TerrainExport(RdbDir(), _options.TerrainOut ?? "Terrain");
 					return 0;
 				}
 
 				case "spell-template":
 				{
-					var rdbDir = RdbDir(args);
+					var rdbDir = RdbDir();
 					var ids = (arg ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries);
 					using var rdb = new RdbReader(rdbDir);
 					foreach (var idStr in ids)
@@ -232,7 +232,7 @@ namespace Faolan.Importer.Cli
 
 				case "spell-stat-coverage":
 				{
-					var rdbDir = RdbDir(args);
+					var rdbDir = RdbDir();
 					using var rdb = new RdbReader(rdbDir);
 					int total = 0, withMods = 0, records = 0;
 					var byStat = new Dictionary<uint, int>();
@@ -270,7 +270,7 @@ namespace Faolan.Importer.Cli
 
 				case "ldb-strings":
 				{
-					var rdbDir = RdbDir(args);
+					var rdbDir = RdbDir();
 					var needle = (arg ?? "damage").ToLowerInvariant();
 					using var rdb = new RdbReader(rdbDir);
 					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
@@ -319,7 +319,7 @@ namespace Faolan.Importer.Cli
 					// global id -> string map and print lookups for the pins + any --report-arg ids, to verify offline.
 					//   body: [12 RDB-Id][u32 "TDC2"][u32 category][u32 flags][u32 size][u32 count][16 MD5]
 					//         [size string-blob][count x { u32 id, u32 unk, u32 offset, u32 length }]
-					var rdbDir = RdbDir(args);
+					var rdbDir = RdbDir();
 					using var rdb = new RdbReader(rdbDir);
 					var map = new Dictionary<uint, string>();
 					var byCat = new Dictionary<(uint cat, uint id), string>();
@@ -613,7 +613,7 @@ namespace Faolan.Importer.Cli
 			// the encrypted RDBH header, so a per-category %-of-total is impossible (we can't tell an undecrypted
 			// entry's category) - we report the overall decrypted share + the absolute per-category decrypted counts.
 			var rdb = string.IsNullOrEmpty(rdbDir)
-				? CliConfig.Resolve(_args).RdbDir
+				? RdbDir()
 				: rdbDir;
 			if (!string.IsNullOrEmpty(rdb) && Directory.Exists(rdb))
 			{
@@ -1021,7 +1021,7 @@ namespace Faolan.Importer.Cli
 		// Reports read the DB from the shared config (faolan.db by default, --Database:ConnectionString to override); one short-lived context.
 		private static DatabaseContext OpenDb()
 		{
-			_db ??= CliConfig.ResolveDatabase(_args);
+			_db ??= CliConfig.ResolveDatabase(_options.ConfigOverrides);
 			return DatabaseExtensions.CreateContext(_db.Value.Provider, _db.Value.Connection);
 		}
 
@@ -1125,9 +1125,9 @@ namespace Faolan.Importer.Cli
 		// The client's RDB folder is part of the game install, not this repo, so it comes from config like every
 		// other setting - ONE name across all three input methods (#412). RDB-backed reports fail with a clear
 		// message if it is not set anywhere.
-		private static string RdbDir(string[] args)
+		private static string RdbDir()
 		{
-			return CliConfig.Resolve(args).RdbDir ??
+			return CliConfig.Resolve(_options.ConfigOverrides)["RdbDir"] ??
 				throw new InvalidOperationException(
 					"The client's RDB folder is not configured - set RdbDir in faolan.json, the RdbDir environment variable, or pass --RdbDir <dir>.");
 		}
@@ -1562,9 +1562,9 @@ namespace Faolan.Importer.Cli
 		// `--report apply-seed [--dry-run]` (#412): upgrade an EXISTING database's game content from faolan.sql.
 		// The seed only loads itself into an EMPTY database, so this is how a database you have been playing on picks
 		// up newer content - as a merge that leaves characters and everything else player-owned alone.
-		private static int ApplySeed(string[] args)
+		private static int ApplySeed()
 		{
-			var dryRun = args.Contains("--dry-run");
+			var dryRun = _options.DryRun;
 			using var db = OpenDb();
 			var report = SqlSeedApplier.Apply(db, Global.SeedPath, dryRun);
 

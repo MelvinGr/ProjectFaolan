@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.ChatServer;
 using Faolan.Core;
+using Faolan.Core.Cli;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Repositories;
@@ -44,9 +45,20 @@ namespace Faolan
 		public static async Task Main(string[] args)
 		{
 			Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+
+			// Parse ONCE, up front - BEFORE the banner, so `--help` answers with help rather than nine lines of ASCII
+			// art first. An unknown option is an error here rather than a setting that quietly stays on its default.
+			// Null means the parser handled the invocation itself (--help, or it reported an error).
+			var options = ServerCommand.Parse(args, out var parseExit);
+			if (options == null)
+			{
+				Environment.ExitCode = parseExit;
+				return;
+			}
+
 			Console.WriteLine(Global.StartupBanner);
 
-			var (realmId, runLogin, runRealm, runMcp) = GetRunInfo(args);
+			var (realmId, runLogin, runRealm, runMcp) = GetRunInfo(options);
 
 			IHostApplicationBuilder builder = runMcp
 				? WebApplication.CreateBuilder(args)
@@ -57,7 +69,7 @@ namespace Faolan
 
 			// Sources are cleared first so the precedence is exactly env > cmdline > json (no appsettings.json in the mix).
 			//builder.Configuration.Sources.Clear();
-			AddConfigSources(builder.Configuration, args);
+			AddConfigSources(builder.Configuration, options.ConfigOverrides);
 
 			// Packet trace bytes: each packet logs on a single line; set Log:PacketBytes false (faolan.json "Log": {
 			// "PacketBytes": false }, or --Log:PacketBytes false) to drop the raw headerData/body hex dump.
@@ -185,20 +197,16 @@ namespace Faolan
 			}
 		}
 
-		private static void AddConfigSources(IConfigurationBuilder cfg, string[] args)
+		// Config sources (highest precedence wins): environment variables > command line > faolan.json, in the shared
+		// order every Faolan executable uses (FaolanCommandLine). faolan.json is OPTIONAL - a container can be
+		// configured entirely by env vars with no file baked in. The command-line half arrives ALREADY PARSED, so the
+		// same values shape the throwaway config below and the host builder's own.
+		private static void AddConfigSources(IConfigurationBuilder cfg, Dictionary<string, string?> commandLine)
 		{
-			// Config sources (highest precedence wins): environment variables > command line > faolan.json. faolan.json
-			// is OPTIONAL - a container can be configured entirely by env vars (e.g. DatabaseProvider /
-			// DatabaseConnectionString) with no file baked in. Applied to a throwaway config below (to shape the host)
-			// and to the host builder's own configuration identically.
-
-			cfg
-				.AddJsonFile(Global.ConfigPath, true) // absolute (CWD-rooted), so no SetBasePath needed
-				.AddCommandLine(args)
-				.AddEnvironmentVariables();
+			cfg.AddConfiguration(FaolanCommandLine.Build(commandLine));
 		}
 
-		private static (uint? realmId, bool runLogin, bool runRealm, bool runMcp) GetRunInfo(string[] args)
+		private static (uint? realmId, bool runLogin, bool runRealm, bool runMcp) GetRunInfo(ServerOptions options)
 		{
 			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
 			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):
@@ -211,20 +219,13 @@ namespace Faolan
 			// dispatchers + session aggregation across realms (a cross-realm leak) - that's what separate processes avoid.
 			// Parsed from argv up front (before the host is built) because the host SHAPE depends on it - see runMcp below.
 
-			// All --role values from argv (the option is repeatable: `--role login --role realm=2`). The config binder keeps
-			// only the LAST value for a repeated key, so the roles are parsed straight from argv. Handles `--role X` and `--role=X`.
-			var roles = new List<string>();
-			for (var i = 0; i < args.Length; i++)
-			{
-				if (args[i].Equals("--role", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-					roles.Add(args[++i]);
-				else if (args[i].StartsWith("--role=", StringComparison.OrdinalIgnoreCase))
-					roles.Add(args[i]["--role=".Length..]);
-			}
+			// The option is REPEATABLE, which the parser handles (ServerCommand) - a configuration binder could not,
+			// since it keeps only the LAST value of a repeated key.
+			var roles = options.Roles;
 
 			uint? selectedRealmId = null;
 			bool runLogin = false, runRealm = false;
-			if (roles.Count == 0)
+			if (roles.Length == 0)
 				runLogin = runRealm = true; // default: all-in-one (dev)
 			else
 			{
@@ -254,7 +255,7 @@ namespace Faolan
 			// host otherwise, so a login-only / MCP-off process stays web-server-free (no stray bound port). McpEnabled is
 			// read from a throwaway config; the builder's own configuration is set up identically just below.
 			var preConfig = new ConfigurationBuilder();
-			AddConfigSources(preConfig, args);
+			AddConfigSources(preConfig, options.ConfigOverrides);
 			var runMcp = runRealm && preConfig.Build().McpEnabled;
 			return (selectedRealmId, runLogin, runRealm, runMcp);
 		}

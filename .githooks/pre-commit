@@ -53,9 +53,9 @@ tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 git show :faolan.db > "$tmp"
 
-# Point the exporter at the staged copy rather than the working faolan.db (--connectionstring overrides the
+# Point the exporter at the staged copy rather than the working faolan.db (--Database:ConnectionString overrides the
 # configured connection; see CliConfig). It writes faolan.sql + both sidecars into the repo root.
-dotnet run --project Faolan.Importer --verbosity quiet -- --report sql-seed --connectionstring "Data Source=$tmp"
+dotnet run --project Faolan.Importer --verbosity quiet -- --report sql-seed --Database:ConnectionString "Data Source=$tmp"
 
 git add faolan.sql faolan.seq.sqlite.sql faolan.seq.postgres.sql
 echo "pre-commit: regenerated faolan.sql from the staged faolan.db ($(wc -l < faolan.sql) lines, characters excluded)"

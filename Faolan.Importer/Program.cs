@@ -10,7 +10,12 @@ namespace Faolan.Importer
 	{
 		private static Task<int> Main(string[] args)
 		{
-			return ImportCli.RunAsync(args);
+			// Parse ONCE, up front: an unknown option is an error here rather than something silently ignored deeper
+			// in. Returns null when the parser handled the invocation itself (--help, or it reported a parse error).
+			var options = ImporterCommand.Parse(args, out var exitCode);
+			return options == null
+				? Task.FromResult(exitCode)
+				: ImportCli.RunAsync(options);
 		}
 	}
 }

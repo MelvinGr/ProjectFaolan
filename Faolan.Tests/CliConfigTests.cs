@@ -54,7 +54,10 @@ namespace Faolan.Tests
 		[Theory, MemberData(nameof(Orderings))]
 		public void ResolveDatabase_TakesTheConnectionString_WhereverTheFlagsSit(string[] args)
 		{
-			Assert.Equal(Connection, CliConfig.ResolveDatabase(args).Connection);
+			var options = ImporterCommand.Parse(args, out var exitCode);
+			Assert.NotNull(options);
+			Assert.Equal(0, exitCode);
+			Assert.Equal(Connection, CliConfig.ResolveDatabase(options.ConfigOverrides).Connection);
 		}
 
 		// With no override on the command line the config file is what should be used - and the override must not
@@ -62,7 +65,34 @@ namespace Faolan.Tests
 		[Fact]
 		public void ResolveDatabase_FallsBackToTheConfigFile()
 		{
-			Assert.Equal(Decoy, CliConfig.ResolveDatabase(["--dry-run"]).Connection);
+			var options = ImporterCommand.Parse(["--dry-run"], out _);
+			Assert.NotNull(options);
+			Assert.Equal(Decoy, CliConfig.ResolveDatabase(options.ConfigOverrides).Connection);
+		}
+
+		// What the declared command line buys over the old argv scans: a misspelling is an ERROR, not a silent
+		// default. `--dryrun` used to parse as "not a dry run" and the import would write for real.
+		[Theory]
+		[InlineData("--dryrun")]
+		[InlineData("--Database:Connection")]
+		[InlineData("--captures")] // an option with its value missing
+		public void Parse_RejectsWhatItDoesNotUnderstand(string bad)
+		{
+			Assert.Null(ImporterCommand.Parse([bad], out var exitCode));
+			Assert.NotEqual(0, exitCode);
+		}
+
+		// ...and the flags it DOES understand come back typed, wherever they sit.
+		[Fact]
+		public void Parse_ReadsTheCommandFlags()
+		{
+			var options = ImporterCommand.Parse(["--dry-run", "--only", "npcs", "--mode", "overwrite", "--force"], out _);
+			Assert.NotNull(options);
+			Assert.True(options.DryRun);
+			Assert.True(options.Force);
+			Assert.Equal("npcs", options.Only);
+			Assert.Equal("overwrite", options.Mode);
+			Assert.False(options.List);
 		}
 	}
 }
