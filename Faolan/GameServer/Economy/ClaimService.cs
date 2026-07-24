@@ -145,6 +145,21 @@ namespace Faolan.GameServer.Economy
 			if (claim == null || claim.AccountId != client.Session.Account.Id)
 				return; // already redeemed (or not this account's) - no-op
 
+			// Retail refuses the redeem when the player ALREADY HOLDS one of the item (#360) - it is why the capture
+			// retried the same redeem four times and got nothing each time. Enforced on a MULTI-CHARGE claim only: an
+			// infinite claim has nothing to protect (redeeming it never spends anything), whereas letting a charge be
+			// spent on a duplicate the player cannot use burns it for good.
+			if (claim.Quantity is not null && characterId != 0)
+			{
+				var alreadyHeld = (await _database.GetCharacterInventory(characterId)).Any(i => i.Item?.Id == claim.ItemTemplateId);
+				if (alreadyHeld)
+				{
+					_logger.LogInformation("Redeem of claim {ClaimId} (template {Template}) refused: {Character} already holds one.", claim.Id, claim.ItemTemplateId, characterId);
+					await _chat.SendSystemMessage(characterId, "You already have one of those - use it before claiming another.");
+					return;
+				}
+			}
+
 			// Each redeem delivers exactly ONE of the item (proven by the capture: the delivered DispatchAddItem carries
 			// no stat-26 stack count). The Type is the BINDING (6 account / 4 character), not item-vs-currency. Claim
 			// items carry a key but no hash, so allow the hashless live add.
