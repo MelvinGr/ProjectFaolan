@@ -44,6 +44,9 @@ namespace Faolan.Importer.Cli
 			if (report == "sql-seed")
 				return await SqlSeed(arg);
 
+			if (report == "apply-seed")
+				return ApplySeed(args);
+
 			// Every report below reads the corpus. It is NOT in this repo (private ProjectFaolan-Data), so say where
 			// to point rather than letting Directory.EnumerateFiles throw a bare path error.
 			if (!Directory.Exists(capturesDir))
@@ -1550,6 +1553,39 @@ namespace Faolan.Importer.Cli
 			var body = Path.Combine(directory, "faolan.sql");
 			var (tables, rows) = SqlSeedWriter.Write(db, body, Path.Combine(directory, "faolan.seq.sqlite.sql"), Path.Combine(directory, "faolan.seq.postgres.sql"));
 			Console.WriteLine($"wrote {body} ({tables} tables, {rows} rows) + the sqlite/postgres counter sidecars");
+			return 0;
+		}
+
+		// `--report apply-seed [--dry-run]` (#412): upgrade an EXISTING database's game content from faolan.sql.
+		// The seed only loads itself into an EMPTY database, so this is how a database you have been playing on picks
+		// up newer content - as a merge that leaves characters and everything else player-owned alone.
+		private static int ApplySeed(string[] args)
+		{
+			var dryRun = args.Contains("--dry-run");
+			using var db = OpenDb();
+			var report = SqlSeedApplier.Apply(db, Global.SeedPath, dryRun);
+
+			foreach (var change in report.Changes.Where(c => c.Any).OrderByDescending(c => c.Inserted + c.Updated + c.Deleted))
+				Console.WriteLine($"  {change.Table,-28} +{change.Inserted} ~{change.Updated} -{change.Deleted}");
+
+			if (report.Changes.All(c => !c.Any))
+				Console.WriteLine("  the database already matches the seed - nothing to do.");
+
+			if (report.Blocked)
+			{
+				Console.Error.WriteLine();
+				Console.Error.WriteLine("REFUSED: the new seed drops rows that are still referenced from outside it:");
+				foreach (var blocker in report.Blockers)
+					Console.Error.WriteLine($"  {blocker}");
+
+				Console.Error.WriteLine("Nothing was written. Resolve those references (or keep the rows) and re-run - deleting");
+				Console.Error.WriteLine("someone's character data to make a content upgrade fit is not a call this tool makes.");
+				return 1;
+			}
+
+			Console.WriteLine(dryRun
+				? $"DRY RUN - would apply +{report.Inserted} ~{report.Updated} -{report.Deleted} rows."
+				: $"applied +{report.Inserted} ~{report.Updated} -{report.Deleted} rows.");
 			return 0;
 		}
 

@@ -58,16 +58,47 @@ namespace Faolan.Importer.Captures
 		// a multi-megabyte single line would make its diffs useless.
 		private const int BatchRows = 1000;
 
-		public static (int Tables, int Rows) Write(DatabaseContext db, string bodyPath, string sqliteSidecarPath, string postgresSidecarPath)
+		// The content tables the seed covers, in FOREIGN-KEY DEPENDENCY ORDER (principals first) with the player and
+		// deployment state excluded. Shared with SqlSeedApplier so the writer and the merge cannot disagree about
+		// what "the seed" is - the exclusion set especially.
+		//
+		// GROUPED BY TABLE, not per entity type: two entity types can share one table (EF table splitting - here
+		// Items and Abilities each split their Key1..Key4 off into a second type). Treating them separately would
+		// see each row TWICE, each time with only that type's share of the columns.
+		public static List<IGrouping<string, IEntityType>> ContentTables(DatabaseContext db)
 		{
-			// GROUPED BY TABLE, not per entity type: two entity types can share one table (EF table splitting - here
-			// Items and Abilities each split their Key1..Key4 off into a second type). Emitting per entity type would
-			// write each row TWICE, each time with only that type's share of the columns.
 			var tables = OrderByDependency(db.Model.GetEntityTypes()
 				.Where(e => e.GetTableName() != null)
 				.GroupBy(e => e.GetTableName()!)
 				.ToList());
 			var excluded = PlayerStateTables(tables);
+			return tables.Where(g => !excluded.Contains(g.Key) && g.Key != "__EFMigrationsHistory").ToList();
+		}
+
+		// The columns of a table, unioned across the entity types that share it, and their CLR types.
+		public static (List<string> Columns, Type[] ClrTypes) ColumnsOf(IGrouping<string, IEntityType> group)
+		{
+			var storeObject = StoreObjectIdentifier.Table(group.Key, group.First().GetSchema());
+			var properties = group
+				.SelectMany(e => e.GetProperties())
+				.Where(p => p.GetColumnName(storeObject) != null)
+				.GroupBy(p => p.GetColumnName(storeObject)!)
+				.Select(g => g.First())
+				.ToList();
+			return (properties.Select(p => p.GetColumnName(storeObject)!).ToList(), properties.Select(p => p.ClrType).ToArray());
+		}
+
+		// The primary-key columns, which the merge keys rows on.
+		public static List<string> KeyOf(IGrouping<string, IEntityType> group)
+		{
+			var entity = group.First();
+			var storeObject = StoreObjectIdentifier.Table(group.Key, entity.GetSchema());
+			return entity.FindPrimaryKey()!.Properties.Select(p => p.GetColumnName(storeObject)!).ToList();
+		}
+
+		public static (int Tables, int Rows) Write(DatabaseContext db, string bodyPath, string sqliteSidecarPath, string postgresSidecarPath)
+		{
+			var tables = ContentTables(db);
 
 			var body = new StringBuilder();
 			body.AppendLine("-- Faolan game data. GENERATED - see SqlSeedWriter (#411); do not hand-edit.");
@@ -83,26 +114,15 @@ namespace Faolan.Importer.Captures
 			foreach (var group in tables)
 			{
 				var table = group.Key;
-				if (excluded.Contains(table) || table == "__EFMigrationsHistory")
-					continue;
-
 				var entity = group.First();
 				var storeObject = StoreObjectIdentifier.Table(table, entity.GetSchema());
-				// Union across the split types, deduped by column name - the shared key appears in both.
-				var properties = group
-					.SelectMany(e => e.GetProperties())
-					.Where(p => p.GetColumnName(storeObject) != null)
-					.GroupBy(p => p.GetColumnName(storeObject)!)
-					.Select(g => g.First())
-					.ToList();
-				var columns = properties.Select(p => p.GetColumnName(storeObject)!).ToList();
+				var (columns, clrTypes) = ColumnsOf(group);
 
 				var rows = ReadRows(db, table, columns);
 				rowTotal += rows.Count;
 				written++;
 
 				var columnList = string.Join(", ", columns.Select(Quote));
-				var clrTypes = properties.Select(p => p.ClrType).ToArray();
 				for (var start = 0; start < rows.Count; start += BatchRows)
 				{
 					var batch = rows.Skip(start).Take(BatchRows).ToList();
@@ -167,7 +187,7 @@ namespace Faolan.Importer.Captures
 			return sb.ToString();
 		}
 
-		private static List<object?[]> ReadRows(DatabaseContext db, string table, List<string> columns)
+		public static List<object?[]> ReadRows(DatabaseContext db, string table, List<string> columns)
 		{
 			var connection = db.Database.GetDbConnection();
 			if (connection.State != System.Data.ConnectionState.Open)
@@ -217,11 +237,15 @@ namespace Faolan.Importer.Captures
 				throw new InvalidOperationException(
 					"A byte[] column reached the SQL seed. There is no blob literal both dialects accept (SQLite x'..' vs Postgres '\\x..'), which is why #410 columnized every blob away - decode the new one or store it as text.");
 
-			// Round-trip ("R") so re-loading is bit-identical rather than merely close.
-			if (type == typeof(float))
-				return Convert.ToSingle(value, CultureInfo.InvariantCulture).ToString("R", CultureInfo.InvariantCulture);
-
-			if (type == typeof(double))
+			// Round-trip ("R") so re-loading is bit-identical rather than merely close - and note this widens a
+			// `float` property to DOUBLE rather than narrowing to single.
+			//
+			// ⚠️ Narrowing loses data. A float column holds the double widening of its float (0.3f is stored as
+			// 0.30000001192092896); rendering it as single gives "0.3", which reloads as the DOUBLE 0.3 - a
+			// different value. It shifted 41731 rows by ~1e-8 and was invisible to a tolerance-based check.
+			// Emitting the stored double reproduces the exact bits on SQLite, and Postgres rounds it back to the
+			// same float4 on the way into a `real` column.
+			if (type == typeof(float) || type == typeof(double))
 				return Convert.ToDouble(value, CultureInfo.InvariantCulture).ToString("R", CultureInfo.InvariantCulture);
 
 			if (type == typeof(decimal))
@@ -251,7 +275,7 @@ namespace Faolan.Importer.Captures
 
 		// Double quotes are the SQL standard for identifiers and mean the same thing in both dialects - without them
 		// Postgres folds to lower case and stops finding EF's case-preserved tables.
-		private static string Quote(string identifier)
+		public static string Quote(string identifier)
 		{
 			return $"\"{identifier}\"";
 		}

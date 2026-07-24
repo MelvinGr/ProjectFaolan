@@ -37,6 +37,8 @@ dotnet run --project Faolan.Importer -- --list                # catalog every mo
 dotnet run --project Faolan.Importer -- --only npcs --mode overwrite   # one module; overwrite = the old --reseed-npcs
 dotnet run --project Faolan.Importer -- --only rdb-maps --rdb <dir>    # rdb-* + mounts are OPT-IN (not in the default run)
 dotnet run --project Faolan.Importer -- --report burst-coverage       # read-only diagnostics (was --burst-coverage / --dump-*)
+dotnet run --project Faolan.Importer -- --report sql-seed             # (re)write faolan.sql + the counter sidecars from the DB
+dotnet run --project Faolan.Importer -- --report apply-seed --dry-run # upgrade an EXISTING db's content FROM faolan.sql (#412)
 # Modes: --mode insert|upsert(default)|overwrite (per-module: --mode npcs=overwrite,items=insert). NO old-flag
 # aliases - the legacy one-off flags (--reseed-*, --rdb-maps, --archive, --dump-*) don't exist; use the module CLI.
 
