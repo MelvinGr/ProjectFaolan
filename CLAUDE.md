@@ -164,6 +164,11 @@ Two things already run ahead of that move:
   `dotnet run --project Faolan.Importer -- --report sql-seed`
   **Restore:** create the schema (`dotnet ef database update`), run `faolan.sql`, then the sidecar for your
   dialect — verified at 0 errors with full row parity into a fresh SQLite *and* a fresh Postgres.
+  ⚠️ **The sidecars are currently EMPTY, and that is the expected state.** They exist to restore AUTOINCREMENT /
+  identity-sequence high-water marks, and no game-content table has a store-generated key any more — every one is
+  keyed by its identity (see the model conventions above). They are still generated and still part of the restore
+  because they repopulate automatically the moment a generated key reappears; an empty sidecar is the signal that
+  the seed is fully identity-keyed, not that something failed.
   It is GENERATED from the EF model (`SqlSeedWriter`), not by `sqlite3 .dump`, because a dump is SQLite-only:
   identifiers are quoted (Postgres folds unquoted `Items` to `items`), every row carries an explicit column list
   (so column ORDER is irrelevant), literals come from each property's **CLR type** rather than the value the
