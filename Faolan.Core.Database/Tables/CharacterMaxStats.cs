@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +8,10 @@ namespace Faolan.Core.Database.Tables
 	public class CharacterMaxStats
 	{
 		public uint CharacterId { get; set; }
+
+		// The one-to-one's DEPENDENT side: this attribute is what tells EF the FK lives here rather than on
+		// Character, which the fluent HasForeignKey<CharacterMaxStats> used to say.
+		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; } = null!;
 
 		// Player-facing values (what the character sheet shows), e.g. Health 1270. The on-wire ×100 vitals scale

@@ -206,14 +206,14 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Item>().Property(i => i.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Map>().Property(m => m.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Recipe>().Property(r => r.Id).ValueGeneratedNever();
-			modelBuilder.Entity<RecipeItem>().HasOne(ri => ri.Recipe).WithMany(r => r.Items).HasForeignKey(ri => ri.RecipeId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<RecipeItem>().HasOne(ri => ri.Recipe).WithMany(r => r.Items).OnDelete(DeleteBehavior.Cascade);
 
 			modelBuilder.Entity<Item>().OwnsOne(i => i.Key, OwnKey);
 			modelBuilder.Entity<Ability>().OwnsOne(a => a.Key, OwnKey);
 
 			// The item's equipped stat bonuses (#3); cascade-delete with the item.
-			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).HasForeignKey(m => m.ItemId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).HasForeignKey(m => m.SpellId).OnDelete(DeleteBehavior.Cascade); // #367
+			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade); // #367
 
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
 			// MapId/RealmId are required, so SetNull is no longer possible - and cascading would delete
@@ -238,9 +238,9 @@ namespace Faolan.Core.Database
 			// (playfield, group ordinal) pair. Restrict on the map FK (a map referenced by an area can't be deleted out
 			// from under it); SetNull on the resolved-creature FK (removing a type reverts the area to unresolved, never
 			// deletes it). The child anchor points cascade-delete with their area.
-			modelBuilder.Entity<NpcSpawnArea>().HasOne(a => a.Map).WithMany().HasForeignKey(a => a.MapId).OnDelete(DeleteBehavior.Restrict);
-			modelBuilder.Entity<NpcSpawnArea>().HasOne(a => a.NpcTemplate).WithMany().HasForeignKey(a => a.NpcTemplateId).OnDelete(DeleteBehavior.SetNull);
-			modelBuilder.Entity<NpcSpawnArea>().HasMany(a => a.Points).WithOne(p => p.Area).HasForeignKey(p => p.NpcSpawnAreaId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<NpcSpawnArea>().HasOne(a => a.Map).WithMany().OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<NpcSpawnArea>().HasOne(a => a.NpcTemplate).WithMany().OnDelete(DeleteBehavior.SetNull);
+			modelBuilder.Entity<NpcSpawnArea>().HasMany(a => a.Points).WithOne(p => p.Area).OnDelete(DeleteBehavior.Cascade);
 			// ItemType.Normal (104) is the default classification - existing item rows backfill to Normal when the
 			// column is added; the importer reclassifies quest/resource items by the container they were seen in.
 			// The enum has no 0 member, so the CLR default 0 is a safe sentinel: an Item left at Type==0 (e.g. a
@@ -251,46 +251,46 @@ namespace Faolan.Core.Database
 			// Every Tradepost (AH) listing is filed under a real catalog Item (FK ItemId -> Items.Id). Restrict: an
 			// item referenced by a listing can't be deleted out from under it. Guards the #212 placeholder-ItemId import
 			// bug (listings with a bogus ItemId=30000 that the client collapsed into one "Torn Rags" row).
-			modelBuilder.Entity<TradepostListing>().HasOne(t => t.Item).WithMany().HasForeignKey(t => t.ItemId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<TradepostListing>().HasOne(t => t.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
 
 			// A shop ware references its Items row (the harvested ProtoAcgItem identity); Restrict so an item can't be
 			// deleted out from under an open shop, and so an un-harvested ware fails the import loudly (empty shop bug).
-			modelBuilder.Entity<ShopItem>().HasOne(si => si.Item).WithMany().HasForeignKey(si => si.ItemTemplateId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<ShopItem>().HasOne(si => si.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
 
 			// NPC worn equipment references its Items row by template (the quad + hash live once in Items, harvested
 			// from the same spawn packet). Restrict, same rationale as the shop ware: an un-harvested worn item fails
 			// the import loudly instead of rendering the NPC with missing gear.
-			modelBuilder.Entity<NpcSpawnEquipment>().HasOne(e => e.Item).WithMany().HasForeignKey(e => e.Template).OnDelete(DeleteBehavior.Restrict);
-			modelBuilder.Entity<NpcEquipment>().HasOne(e => e.Item).WithMany().HasForeignKey(e => e.Template).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<NpcSpawnEquipment>().HasOne(e => e.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<NpcEquipment>().HasOne(e => e.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
 
 			// A recipe ingredient/result references its Items row (the item's TEA key + hash live once in Items,
 			// harvested from the recipe element by the recipes importer). Restrict, same rationale as the shop ware:
 			// an un-harvested referenced item fails the import loudly instead of a recipe with a dangling ingredient.
-			modelBuilder.Entity<RecipeItem>().HasOne(ri => ri.Item).WithMany().HasForeignKey(ri => ri.ItemId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<RecipeItem>().HasOne(ri => ri.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
 
 			// A mail attachment / AH listing carries a concrete item INSTANCE, but the instance's TEA key is
 			// per-TEMPLATE and lives once in Items; both reference it by Template (Restrict). For TradepostListing this
 			// is a SECOND FK to Items distinct from the ItemId search-key FK above (ItemId is the search category, the
 			// listed instance's Template usually differs). The codec reads Key1..4 through these navs; ItemHash stays a
 			// row column (the captured wire hash, 0 for AH, differs from Items.Hash).
-			modelBuilder.Entity<MailAttachment>().HasOne(a => a.Item).WithMany().HasForeignKey(a => a.Template).OnDelete(DeleteBehavior.Restrict);
-			modelBuilder.Entity<TradepostListing>().HasOne(t => t.TemplateItem).WithMany().HasForeignKey(t => t.Template).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<MailAttachment>().HasOne(a => a.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<TradepostListing>().HasOne(t => t.TemplateItem).WithMany().OnDelete(DeleteBehavior.Restrict);
 
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
-			modelBuilder.Entity<Character>().HasOne(c => c.MaxStats).WithOne(s => s.Character).HasForeignKey<CharacterMaxStats>(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Character>().HasMany(c => c.Inventory).WithOne(i => i.Character).HasForeignKey(i => i.CharacterId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Character>().HasMany(c => c.Attributes).WithOne(a => a.Character).HasForeignKey(a => a.CharacterId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Character>().HasMany(c => c.Skills).WithOne(s => s.Character).HasForeignKey(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Character>().HasMany(c => c.ScaffoldPairs).WithOne(s => s.Character).HasForeignKey(s => s.CharacterId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Character>().HasMany(c => c.BodyResources).WithOne(r => r.Character).HasForeignKey(r => r.CharacterId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasOne(c => c.MaxStats).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasMany(c => c.Inventory).WithOne(i => i.Character).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasMany(c => c.Attributes).WithOne(a => a.Character).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasMany(c => c.Skills).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasMany(c => c.ScaffoldPairs).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasMany(c => c.BodyResources).WithOne(r => r.Character).OnDelete(DeleteBehavior.Cascade);
 
 			// Hotbar shortcuts delete with the character.
 			modelBuilder.Entity<CharacterShortcut>().HasOne(s => s.Character).WithMany(c => c.Shortcuts).OnDelete(DeleteBehavior.Cascade);
 
 			// Quest state, quest/dialogue tags and discovered respawn points all delete with the character.
-			modelBuilder.Entity<Character>().HasMany(c => c.Quests).WithOne(q => q.Character).HasForeignKey(q => q.CharacterId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Character>().HasMany(c => c.Tags).WithOne(t => t.Character).HasForeignKey(t => t.CharacterId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Character>().HasMany(c => c.RespawnPoints).WithOne(r => r.Character).HasForeignKey(r => r.CharacterId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasMany(c => c.Quests).WithOne(q => q.Character).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasMany(c => c.Tags).WithOne(t => t.Character).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Character>().HasMany(c => c.RespawnPoints).WithOne(r => r.Character).OnDelete(DeleteBehavior.Cascade);
 
 			// Learned spells delete with the character (a character knows a given spell at most once - now the
 			// (CharacterId, SpellId) compound primary key).
@@ -305,7 +305,7 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Character>().HasOne(c => c.Guild).WithMany(g => g.Members).OnDelete(DeleteBehavior.SetNull);
 
 			// A shop's wares delete with the shop (the importer replaces a shop's items wholesale on re-import).
-			modelBuilder.Entity<Shop>().HasMany(s => s.Items).WithOne(i => i.Shop).HasForeignKey(i => i.ShopId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Shop>().HasMany(s => s.Items).WithOne(i => i.Shop).OnDelete(DeleteBehavior.Cascade);
 
 			// MorphTarget.Id IS the wire tag (the client registry's 1-based id minus 1) - assigned by the
 			// importer, never generated.
@@ -323,17 +323,17 @@ namespace Faolan.Core.Database
 			// A class<->spell access row is unique per (Class, SpellId) - now the compound primary key.
 			// SpellId references the Spell catalog (the importer catalogs every harvested spell id). Restrict so a
 			// spell can't be deleted out from under a class loadout.
-			modelBuilder.Entity<ClassSpell>().HasOne(s => s.Spell).WithMany().HasForeignKey(s => s.SpellId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<ClassSpell>().HasOne(s => s.Spell).WithMany().OnDelete(DeleteBehavior.Restrict);
 
 			// A humanoid NPC's appearance/morph table (#185), ordered, cascade-deletes with its NpcSpawn.
-			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.Morphs).WithOne(m => m.NpcSpawn).HasForeignKey(m => m.NpcSpawnId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.Morphs).WithOne(m => m.NpcSpawn).OnDelete(DeleteBehavior.Cascade);
 
 			// An NPC's worn equipment (CharacterIIR f23, #185), cascade-deletes with its NpcSpawn.
-			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.Equipment).WithOne(e => e.NpcSpawn).HasForeignKey(e => e.NpcSpawnId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.Equipment).WithOne(e => e.NpcSpawn).OnDelete(DeleteBehavior.Cascade);
 
 			// #363: a captured spawn's membership of an ambient spawn AREA. SetNull so wiping the areas (a re-import)
 			// un-links these rows rather than deleting them; `.graduatenpcgroup` deletes the linked rows explicitly.
-			modelBuilder.Entity<NpcSpawn>().HasOne(n => n.NpcSpawnArea).WithMany().HasForeignKey(n => n.NpcSpawnAreaId).OnDelete(DeleteBehavior.SetNull);
+			modelBuilder.Entity<NpcSpawn>().HasOne(n => n.NpcSpawnArea).WithMany().OnDelete(DeleteBehavior.SetNull);
 
 			// The NPC TYPE table (#244): one row per TemplateId, deduping the type identity duplicated across every
 			// placement. A spawn (instance) and a spell point at their type by the NpcTemplate PK (NpcTemplateId); SetNull keeps the
@@ -346,39 +346,39 @@ namespace Faolan.Core.Database
 			// DB-generated. Its Goals/TextRefs FK to QuestId (populated via the nav on import).
 			modelBuilder.Entity<QuestDefinition>().Property(q => q.QuestId).ValueGeneratedNever();
 
-			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spawns).WithOne(s => s.NpcTemplate).HasForeignKey(s => s.NpcTemplateId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spawns).WithOne(s => s.NpcTemplate).OnDelete(DeleteBehavior.Restrict);
 
-			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spells).WithOne(s => s.NpcTemplate).HasForeignKey(s => s.NpcTemplateId).OnDelete(DeleteBehavior.SetNull);
+			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spells).WithOne(s => s.NpcTemplate).OnDelete(DeleteBehavior.SetNull);
 
 			// A vendor shop points at its NPC TYPE (#244) - keyed by template (unique), not the non-unique internal
 			// name, so it's one-to-one (NpcTemplate.Shop). Restrict like the other NpcTemplate references: the type is
 			// reference data, not a cascade parent.
-			modelBuilder.Entity<Shop>().HasOne(s => s.NpcTemplate).WithOne(t => t.Shop).HasForeignKey<Shop>(s => s.NpcTemplateId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<Shop>().HasOne(s => s.NpcTemplate).WithOne(t => t.Shop).OnDelete(DeleteBehavior.Restrict);
 
 			// A conversation node points at its NPC TYPE (#244) - many nodes per type, keyed by template so a same-named
 			// NPC (25 share "Halen van Dummy") can't open another's dialogue. Nullable (create-flow scripted screens have
 			// no captured spawn/template); Restrict, the type is reference data.
-			modelBuilder.Entity<ConversationNode>().HasOne(n => n.NpcTemplate).WithMany().HasForeignKey(n => n.NpcTemplateId).OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<ConversationNode>().HasOne(n => n.NpcTemplate).WithMany().OnDelete(DeleteBehavior.Restrict);
 
 			// A summon-only creature's TYPE-level equipment + appearance table (#307), cascade-deletes with its NpcTemplate type.
-			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Equipment).WithOne(e => e.NpcTemplate).HasForeignKey(e => e.NpcTemplateId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Morphs).WithOne(m => m.NpcTemplate).HasForeignKey(m => m.NpcTemplateId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Equipment).WithOne(e => e.NpcTemplate).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Morphs).WithOne(m => m.NpcTemplate).OnDelete(DeleteBehavior.Cascade);
 
 			// One-to-one NpcTemplate <-> NpcStatCore (#244), keyed by NpcTemplateId; the type-level stat core lifted off the Data blob
 			// so a spawn body is constructed from typed storage, not spliced. Cascades with the type.
-			modelBuilder.Entity<NpcTemplate>().HasOne(n => n.StatCore).WithOne(s => s.NpcTemplate).HasForeignKey<NpcStatCore>(s => s.NpcTemplateId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<NpcTemplate>().HasOne(n => n.StatCore).WithOne(s => s.NpcTemplate).OnDelete(DeleteBehavior.Cascade);
 
 			// One patrol route per NpcSpawn (#316): the FK joins a route to the NPC that walks it, so the runtime
 			// looks it up via the spawn's nav instead of matching floats. Cascade-deletes with the spawn.
-			modelBuilder.Entity<PatrolPath>().HasOne(p => p.NpcSpawn).WithOne(n => n.PatrolPath).HasForeignKey<PatrolPath>(p => p.NpcSpawnId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<PatrolPath>().HasOne(p => p.NpcSpawn).WithOne(n => n.PatrolPath).OnDelete(DeleteBehavior.Cascade);
 			// The columnarized task tree (#316): all of a patrol's nodes hang off the path (cascade-delete); the tree
 			// shape is the self-reference ParentId (NoAction - every node is already deleted via its PatrolPathId, so
 			// the self-ref must not add a second cascade path). Each node's waypoints cascade with it.
-			modelBuilder.Entity<PatrolPath>().HasMany(p => p.Nodes).WithOne(n => n.PatrolPath).HasForeignKey(n => n.PatrolPathId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Children).WithOne(n => n.Parent).HasForeignKey(n => n.ParentId).OnDelete(DeleteBehavior.NoAction);
-			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Waypoints).WithOne(w => w.PatrolNode).HasForeignKey(w => w.PatrolNodeId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Words).WithOne(w => w.PatrolNode).HasForeignKey(w => w.PatrolNodeId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<WorldObject>().HasMany(o => o.Words).WithOne(w => w.WorldObject).HasForeignKey(w => w.WorldObjectId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<PatrolPath>().HasMany(p => p.Nodes).WithOne(n => n.PatrolPath).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Children).WithOne(n => n.Parent).OnDelete(DeleteBehavior.NoAction);
+			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Waypoints).WithOne(w => w.PatrolNode).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Words).WithOne(w => w.PatrolNode).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<WorldObject>().HasMany(o => o.Words).WithOne(w => w.WorldObject).OnDelete(DeleteBehavior.Cascade);
 			return;
 
 			// The 128-bit TEA DecryptionKey (ProtoAcgItem.key1) is an EF OWNED type, shared by every table that carries an
