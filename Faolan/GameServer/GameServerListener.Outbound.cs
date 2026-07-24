@@ -201,6 +201,21 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, matches.Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
 		}
 
+		// Tells the client WHERE the character is bound (GameCharInterface DispatchUpdateBindLocation, 0x2002 - one
+		// field, the playfield id; recovered method signature `nPlayfieldInstanceID`).
+		//
+		// Sent UNSOLICITED when the server changes the bind, not only in reply to RequestBindLocation. Retail's
+		// "You are now bound here" banner is client-generated - it appears in no capture, and the text is a localized
+		// string in the client's LDB (#346) - so the client has to be told the bind moved for it to render anything.
+		// Without this the client's bind state stays stale until it next asks.
+		private async Task SendUpdateBindLocation(INetworkClient client, uint bindMapId)
+		{
+			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchUpdateBindLocation,
+				s => s.WriteUInt32(bindMapId)));
+
+			Logger.LogInformation("Bind: told {Character} their bind playfield is {MapId}.", client.Session.Character?.Name, bindMapId);
+		}
+
 		// Pushes the character's wallet balance, framed on the same login-world conversation as the 0x201C
 		// record stream (the retail money updates ride that conversation).
 		private async Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)

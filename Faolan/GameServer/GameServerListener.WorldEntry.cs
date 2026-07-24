@@ -102,6 +102,10 @@ namespace Faolan.GameServer
 			character.BindRespawnPointId = spawn.Id;
 			await Database.SaveCharacterBind(character.Id, spawn.Id);
 			Logger.LogInformation("Bind: {Char} auto-bound to respawn point {Point} on map {Map} (first entry).", character.Name, spawn.Id, character.MapId);
+
+			// Tell the client the bind moved - it is what renders the "You are now bound here" banner (#346), and
+			// without it the client's bind state stays stale until it next asks.
+			await SendUpdateBindLocation(client, character.MapId);
 		}
 
 		// Ensures the character's LOADOUT on EVERY world entry (#74/#71), not just at creation:

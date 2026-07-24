@@ -1787,6 +1787,8 @@ namespace Faolan.GameServer
 			if (character?.BindRespawnPointId is { } bindPointId)
 				bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
 
+			// Reply framing (sender/receiver swapped from the request), unlike the unsolicited push in
+			// SendUpdateBindLocation - retail answers a request on the conversation it arrived on.
 			await client.SendAsync(new Rpc(packet.Receiver, packet.Sender, GameCharInterfaceOpcodes.DispatchUpdateBindLocation, s => s.WriteUInt32(bindMapId)));
 			Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
 		}
