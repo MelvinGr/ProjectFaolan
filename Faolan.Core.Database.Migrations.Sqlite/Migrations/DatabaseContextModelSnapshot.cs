@@ -1196,9 +1196,26 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<int>("Sequence")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("InnerRaw")
+                    b.Property<uint?>("Category")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContentKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Flags")
                         .IsRequired()
-                        .HasMaxLength(512)
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("LocalizedId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LocalizedToken")
+                        .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
@@ -1206,9 +1223,16 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Text")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
                     b.HasKey("ConversationNodeId", "PacketSequence", "ScreenSequence", "Sequence");
 
-                    b.ToTable("ConversationScreenParameters");
+                    b.ToTable("ConversationScreenParameters", t =>
+                        {
+                            t.HasCheckConstraint("CK_ConversationScreenParameter_Kind", "Kind IN (0, 1, 2)");
+                        });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Guild", b =>

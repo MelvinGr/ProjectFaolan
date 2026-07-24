@@ -101,14 +101,14 @@ namespace Faolan.Tests
 			var row = ConversationScreenColumns.ToStoredRow(AppendXml, 0);
 
 			Assert.Equal(10, row.Parameters.Count);
-			Assert.Equal("<stringentry string=\"\" flags=\"m\" >", row.Parameters.Single(p => p.Name == "name").InnerRaw);
-			Assert.Equal("<stringentry string=\"\" flags=\"\" >", row.Parameters.Single(p => p.Name == "guildname").InnerRaw);
-			Assert.Equal("<stringentry string=\"\" flags=\"\" >", row.Parameters.Single(p => p.Name == "npcguildname").InnerRaw);
+			Assert.Equal("<stringentry string=\"\" flags=\"m\" >", ConversationScreenColumns.InnerRawOf(row.Parameters.Single(p => p.Name == "name")));
+			Assert.Equal("<stringentry string=\"\" flags=\"\" >", ConversationScreenColumns.InnerRawOf(row.Parameters.Single(p => p.Name == "guildname")));
+			Assert.Equal("<stringentry string=\"\" flags=\"\" >", ConversationScreenColumns.InnerRawOf(row.Parameters.Single(p => p.Name == "npcguildname")));
 
 			// Everything else is dialogue content and is stored verbatim.
-			Assert.Contains("localized id=\"15148\"", row.Parameters.Single(p => p.Name == "npcname").InnerRaw);
-			Assert.All(row.Parameters, p => Assert.DoesNotContain("DemoL80", p.InnerRaw));
-			Assert.All(row.Parameters, p => Assert.DoesNotContain("Legacy of", p.InnerRaw));
+			Assert.Contains("localized id=\"15148\"", ConversationScreenColumns.InnerRawOf(row.Parameters.Single(p => p.Name == "npcname")));
+			Assert.All(row.Parameters, p => Assert.DoesNotContain("DemoL80", ConversationScreenColumns.InnerRawOf(p)));
+			Assert.All(row.Parameters, p => Assert.DoesNotContain("Legacy of", ConversationScreenColumns.InnerRawOf(p)));
 		}
 
 		// The other captured shape of the npcguildname slot: a localized token, which is content (no name in it) and
@@ -121,7 +121,7 @@ namespace Faolan.Tests
 				token.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;"));
 
 			var row = ConversationScreenColumns.ToStoredRow(xml, 0);
-			Assert.Equal(token, row.Parameters.Single(p => p.Name == "npcguildname").InnerRaw);
+			Assert.Equal(token, ConversationScreenColumns.InnerRawOf(row.Parameters.Single(p => p.Name == "npcguildname")));
 
 			var live = RemoteFormatXml.WithLivePlayer(ConversationScreenColumns.ToScreen(row), "Conan", "", RemoteFormatXml.NotInGuildLabel("Project Faolan"));
 			Assert.Equal(token, live.Parameters.Single(p => p.Name == "npcguildname").InnerRaw);

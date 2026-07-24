@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Text;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
@@ -30,12 +31,13 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			};
 			for (var i = 0; i < s.Parameters.Count; i++)
 			{
-				row.Parameters.Add(new ConversationScreenParameter
+				var parameter = new ConversationScreenParameter
 				{
 					Sequence = i,
-					Name = s.Parameters[i].Name,
-					InnerRaw = s.Parameters[i].InnerRaw
-				});
+					Name = s.Parameters[i].Name
+				};
+				SetInner(parameter, s.Parameters[i].InnerRaw);
+				row.Parameters.Add(parameter);
 			}
 
 			// Verify the TYPED round-trip reproduces the captured screen byte-for-byte - so any lossy field (a
@@ -60,17 +62,48 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			var row = ToRow(screenXml, sequence);
 			foreach (var p in row.Parameters)
 			{
-				if (RemoteFormatXml.SessionSlots.Contains(p.Name) && RemoteFormatXml.IsStringEntry(p.InnerRaw))
-					p.InnerRaw = RemoteFormatXml.StringEntry(p.Name, "", RemoteFormatXml.FlagsOf(p.InnerRaw)).InnerRaw;
+				// The slot itself stays (name, order and flags are part of the screen the client parses); only the
+				// literal goes. Flags is preserved because it drives the localized declension.
+				if (RemoteFormatXml.SessionSlots.Contains(p.Name) && p.Kind == InnerElementKind.StringEntry)
+					p.Text = "";
 			}
 
 			return row;
 		}
 
 		// Project a stored ConversationScreen row back to the RemoteFormatXml.Screen the builder serialises.
+		// The parameter's inner element, rebuilt from its columns (#188 follow-up: the InnerRaw blob is retired).
+		public static string InnerRawOf(ConversationScreenParameter p)
+		{
+			ArgumentNullException.ThrowIfNull(p);
+			return new InnerElement(p.Kind, p.LocalizedId, p.LocalizedToken, p.Category, p.Flags, p.ContentKey, p.Text, null).Build();
+		}
+
+		// Lift a captured inner element into the parameter's columns, refusing anything the columns cannot hold: an
+		// unknown shape, one that does not rebuild byte-for-byte, or the nested-remoteformat kind (which only world
+		// objects carry, and which therefore has no column here). A reject fails the import - the blob that used to
+		// absorb these is gone, so silently storing something unreproducible is no longer possible.
+		private static void SetInner(ConversationScreenParameter row, string innerRaw)
+		{
+			if (InnerElement.Parse(innerRaw) is not { } element)
+				throw new InvalidOperationException($"Conversation parameter value is not a recognised inner element: {innerRaw}");
+			if (element.Build() != innerRaw)
+				throw new InvalidOperationException($"Conversation parameter value is not byte-exact round-trippable from columns: {innerRaw}");
+			if (element.Kind == InnerElementKind.RemoteFormat)
+				throw new InvalidOperationException($"Conversation parameter carries a nested remoteformat, which has no column here: {innerRaw}");
+
+			row.Kind = element.Kind;
+			row.LocalizedId = element.Id;
+			row.LocalizedToken = element.Token;
+			row.Category = element.Category;
+			row.Flags = element.Flags;
+			row.ContentKey = element.Key;
+			row.Text = element.Text;
+		}
+
 		public static RemoteFormatXml.Screen ToScreen(ConversationScreen row)
 		{
-			var pars = row.Parameters.OrderBy(p => p.Sequence).Select(p => new RemoteFormatXml.Parameter(p.Name, p.InnerRaw)).ToList();
+			var pars = row.Parameters.OrderBy(p => p.Sequence).Select(p => new RemoteFormatXml.Parameter(p.Name, InnerRawOf(p))).ToList();
 
 			return new RemoteFormatXml.Screen(row.ScreenId.ToString(CultureInfo.InvariantCulture), row.Category.ToString(CultureInfo.InvariantCulture), row.Key,
 				row.Knubot.ToString(CultureInfo.InvariantCulture), row.Antitag?.ToString(CultureInfo.InvariantCulture), pars);
