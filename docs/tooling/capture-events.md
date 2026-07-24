@@ -42,7 +42,7 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
 - Guild-invite accept packet itself not yet isolated (no distinct "guild invite" sub-op found; likely an Interact/
   remoteformat dialog - look for a `2002`/remoteformat around the accept moment).
 
-### necrol80 — changemap + accept_quest
+### NecroL80 — changemap + accept_quest
 `...login-changemap-accept_quest.json`
 - **Map change**: two `5D85BFC7` MapChange (see world-burst extraction).
 - **Quest accept dialogue**: `4A3D899A` nodes 30031/30033/30039/30040/30041/30045 + `43131/43013/43102/43104`
@@ -56,7 +56,7 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
 - **Trader NPC**: `FA015807` "Trader".
 - **Totem of origin** (teleport item → long load): triggers a MapChange + full world burst (the "long loading"); the use itself is an Interact (`642CD3D6`) on the totem item - not yet isolated by sub-op.
 
-### assassinl23 — resurect
+### AssassinL23 — resurect
 `...randomActions-resurect.json`
 - `0x642CD3D6` dominates (3632) - the death/resurrect interactions + the resurrect confirm are Interact actions.
 - `FA015807` "Inexperienced Nemedian" (the mob).

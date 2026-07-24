@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact construct + round-trip for the DispatchMailMessage (S->C 0x2002) body against the necrol80
+	// Byte-exact construct + round-trip for the DispatchMailMessage (S->C 0x2002) body against the NecroL80
 	// buy_from_autionhouse_get_mail capture: the base mail (#1604, 629 B, no attachment) and the same mail with the
 	// bought item appended (#1607, 754 B). Proves the mail builder reconstructs the captured bytes from a Mail row
 	// (construct-don't-replay) and that Parse is its faithful inverse. docs/subsystems/tradepost-protocol.md "Buy -> mail".

@@ -347,7 +347,7 @@ namespace Faolan.GameServer
 		}
 
 		// TradepostSellItem (0x200A) [nBankItemSlot:u32][nPrice:u64]: list one of the player's BANK items (container
-		// 105) for sale. Decoded from the necrol80 sell_item_on_ah capture (F375 = slot 6 @ 1,000,000 tin). Creates a
+		// 105) for sale. Decoded from the NecroL80 sell_item_on_ah capture (F375 = slot 6 @ 1,000,000 tin). Creates a
 		// TradepostListing from the bank item's identity, escrows the item out of the bank, and refreshes the bank tab.
 		private async Task HandleTradepostSell(INetworkClient client, Rpc packet, FaolanStream body)
 		{
@@ -400,7 +400,7 @@ namespace Faolan.GameServer
 
 			// Retail pushes a 0x2005 wallet refresh after a listing - but the balance is UNCHANGED: there is NO
 			// listing deposit / postage fee. Verified across the sell / send-mail / change-price / cancel captures
-			// (necrol80 stays at 1,365,148 tin throughout), #182. Push the current balance (reason 0, as captured) so
+			// (NecroL80 stays at 1,365,148 tin throughout), #182. Push the current balance (reason 0, as captured) so
 			// the HUD stays in sync; no debit.
 			await SendUpdateCash(client, character.Money, UpdateCashReason.Spend);
 

@@ -21,7 +21,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void UpdateCashBody_Spend_UsesReasonZero()
 		{
-			// The demol80 capture shows a DECREASED balance with reason 0 (a purchase): 0x2638 after 0x26E8.
+			// The DemoL80 capture shows a DECREASED balance with reason 0 (a purchase): 0x2638 after 0x26E8.
 			var s = new FaolanStream();
 			UpdateCashBody.WriteUpdateCashBody(s, 0x2638, UpdateCashReason.Spend);
 

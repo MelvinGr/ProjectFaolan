@@ -90,7 +90,7 @@ namespace Faolan.Core.Network.Constants
 
 	// One summonable mount: the bar/feat id the client casts (SummonMount action `from`), the creature it spawns
 	// (an FA015807 NPC, matched by NAME against the harvested mount spawns - the stable key), and the summon SPELL
-	// the server casts in response (ApplySpell 0x6B87E316). Decoded from the necrol80 mount captures (#27).
+	// the server casts in response (ApplySpell 0x6B87E316). Decoded from the NecroL80 mount captures (#27).
 	// RideStat = the mount's value for player stat 0xBA in the mount StatUpd retail pushes alongside the ride buff
 	// (mount capture frame 520: stat 0xBA = 0x00313C9B, stat 0xBB = 100). It selects the mount the player is riding;
 	// paired with the ride buff it's what the CLIENT animates the whole horse-runs-up-and-mount from - retail spawns

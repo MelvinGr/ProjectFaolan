@@ -2,7 +2,7 @@ using System;
 
 namespace Faolan.Tests
 {
-	// Test fixture: the captured DispatchShopData (0x2033) body from the necrol80 sell_items_to_trader session - the
+	// Test fixture: the captured DispatchShopData (0x2033) body from the NecroL80 sell_items_to_trader session - the
 	// Old Town trader's full shop inventory: [shop ID32 0xC75B:0x1E7E][vendor NPC ID32][protobuf shop content]
 	// (6932 bytes). Reference data for the ShopContentCodec round-trip tests (decode the blob -> rows ->
 	// rebuild byte-exact). Lives in the test project because nothing in production references it.

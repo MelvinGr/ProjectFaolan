@@ -27,7 +27,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		// The server's account-entitlement policy: every account gets the full expansion + subscription set. These
 		// are the root's f4/f5 (account bitfields the client reads to gate expansion content, NOT per-character
-		// state); the captured faolan snapshots carry exactly these, so authoring them reproduces those roots
+		// state); the captured TestAccount snapshots carry exactly these, so authoring them reproduces those roots
 		// byte-identically (other captured accounts e.g. Strie carry fewer - presence is per-account).
 		public const uint FullExpansionFlags = 0x000C0001;
 

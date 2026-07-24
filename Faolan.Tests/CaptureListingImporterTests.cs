@@ -8,7 +8,7 @@ namespace Faolan.Tests
 {
 	// The AH listings importer maps a captured DispatchTradepostSearchResults row to a TradepostListing whose
 	// fields rebuild the captured bytes byte-exact (construct-don't-replay). Validates CaptureListingImporter.ToListing
-	// is a faithful inverse of TradepostListingCodec.BuildEntry against the necrol80 auctionhouse capture (#1029:
+	// is a faithful inverse of TradepostListingCodec.BuildEntry against the NecroL80 auctionhouse capture (#1029:
 	// seller "Jocko", item 0x755D, price 1,000,000).
 	public class CaptureListingImporterTests
 	{

@@ -17,7 +17,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy
 {
-	// NPC vendor / shop flow (TODO §9b), decoded from the necrol80 sell_items_to_trader capture:
+	// NPC vendor / shop flow (TODO §9b), decoded from the NecroL80 sell_items_to_trader capture:
 	//   DL 0x2033 DispatchShopData   [shop ID32 (type 0xC75B)][vendor NPC ID32][protobuf shop content]
 	//   UL 0x2034 SellItem           [shop ID32][u32 container][u32 charId][u32 slot]
 	//   DL 0x2035 DispatchItemSoldToShop [u32 container][u32 charId][u32 slot]  (the client clears the bag slot)

@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Text
 	// player's GameInterface = GameInterfaceType + ClientInstance). The IIR body's `instance` is that receiver
 	// instance, so a live send is fully addressable from the session.
 	//
-	// Wire grammar (big-endian, decoded 2026-06-16 from demol80 randomActions #7564, golden-tested in
+	// Wire grammar (big-endian, decoded 2026-06-16 from DemoL80 randomActions #7564, golden-tested in
 	// ChatTextCodecTests):
 	//   [u32 len]          = byte length of everything after this field
 	//   [u32 0xE0B51102]   ChatTextIIR sub-opcode

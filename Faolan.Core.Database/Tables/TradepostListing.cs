@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Core.Database.Tables
 {
 	// One auction-house (Tradepost) listing - a row in the DispatchTradepostSearchResults grid (S→C 0x2005).
-	// Decoded from the necrol80 auctionhouse capture (tools/capture/decode_tradepost.py, docs/subsystems/tradepost-protocol.md);
+	// Decoded from the NecroL80 auctionhouse capture (tools/capture/decode_tradepost.py, docs/subsystems/tradepost-protocol.md);
 	// the on-the-wire row is built byte-exact by TradepostListingCodec. The listing carries a concrete item
 	// INSTANCE (its own Data1..4 quad + template), not a template reference - the AH sells the specific item a
 	// seller posted, so the identity lives here, not via the Items table (the row's ItemId search key and the

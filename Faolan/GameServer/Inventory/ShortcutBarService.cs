@@ -57,7 +57,7 @@ namespace Faolan.GameServer.Inventory
 			_logger.LogInformation("RemoveShortcut slot 0x{Slot:X4}.", slot);
 		}
 
-		// UpdateShortcut: body = [u32 slot][u32 flag][u32 container]. Partial decode (#71, necrol80
+		// UpdateShortcut: body = [u32 slot][u32 flag][u32 container]. Partial decode (#71, NecroL80
 		// randomActions/changemap captures): the slot is in the bar-PAGE range (0x4E20.., not the 0x64.. item
 		// range), container is always 0x68 (the backpack kind), and flag is 0/1. The bar's restorable contents ride
 		// AddShortcut; this bar-page toggle's exact semantics are still fuzzy, so it stays log-only.

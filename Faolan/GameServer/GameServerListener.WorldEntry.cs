@@ -138,7 +138,7 @@ namespace Faolan.GameServer
 			// retail 0x2052 grants) - NOT the bar (the bar is only shortcuts). A freshly-created character with no set
 			// gets the class-starting kit. We resolve them here ONLY to seed the default bar layout below; the actual
 			// 0x2052 WIRE grants (+ the combo book) are NOT sent here. Retail sends them AFTER the FullChar snapshot and
-			// after 0x2024 ReadyForPlayScreen (faolan necro login capture: abilities at frame 192, snapshot at 81), 			// driven by the 0x205f post-ready flush (FlushPendingPost205FFollowUp -> GrantCharacterAbilities/Combos).
+			// after 0x2024 ReadyForPlayScreen (TestAccount necro login capture: abilities at frame 192, snapshot at 81), 			// driven by the 0x205f post-ready flush (FlushPendingPost205FFollowUp -> GrantCharacterAbilities/Combos).
 			// Granting them pre-snapshot (the old behaviour) had the snapshot reconstruction discard them (abilities are
 			// NOT in the snapshot known-list, unlike spells), so the abilities tab + ability-slot shortcuts came up empty.
 			var abilities = await GetLoadoutAbilities(character);
@@ -265,7 +265,7 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Existing-character login: sending 0x2024 ReadyForPlayScreen after the spawn handshake.");
 			await SendReadyForPlayScreen(client);
 			// Retail grants the starting abilities (0x2052) + combo book right after 0x2024, not during world entry
-			// (faolan necro login capture: abilities at frame 192, just after ReadyForPlayScreen). Both are granted
+			// (TestAccount necro login capture: abilities at frame 192, just after ReadyForPlayScreen). Both are granted
 			// here, post-snapshot: neither rides the FullChar snapshot known-list (spells do), so a pre-snapshot grant
 			// is discarded by the client's identity reconstruction.
 			await GrantCharacterAbilities(client);

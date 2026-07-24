@@ -6,7 +6,7 @@ namespace Faolan.Core.Database.Tables
 	//   [itemInstanceId:u64][entryLen:u32][ProtoInventoryGameEntry][trailer:12 bytes]
 	// The entry is the SAME ProtoInventoryGameEntry the snapshot / shop / AH-search / live-add use (item_id =
 	// itemInstanceId, stat_list = {26: qty}, item_data = the item's ProtoAcgItem). Identity fields mirror
-	// TradepostListing (the AH delivers the listed instance via mail). Decoded from the necrol80 get-mail capture
+	// TradepostListing (the AH delivers the listed instance via mail). Decoded from the NecroL80 get-mail capture
 	// (#1607, 754 B vs the 629 B no-attachment base); MailMessageCodec builds it byte-exact.
 	public class MailAttachment : BaseEntity
 	{

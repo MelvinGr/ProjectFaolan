@@ -41,7 +41,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public byte[]? Scale { get; set; } // null when absent
 		public uint Ack { get; set; } = EntityClass.Character;
 
-		public uint EntryTableX { get; set; } // per-char u32 after the entry count (Strie 0xB7, necrol80 0x2B6, editor 0x3F1)
+		public uint EntryTableX { get; set; } // per-char u32 after the entry count (Strie 0xB7, NecroL80 0x2B6, editor 0x3F1)
 		public uint FieldA { get; set; }
 		public uint Handle { get; set; }
 		public ulong Playfield { get; set; }

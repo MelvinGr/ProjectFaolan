@@ -151,7 +151,7 @@ namespace Faolan.Tests
 		}
 
 		// The melee weapons render from the LEFT-hand navs (the wire melee pair is 6/8); the ranged pair
-		// (MainHandRight/OffHandRight) is 20/21 - necrol80's crossbow/quiver slots. A swap here makes weapons
+		// (MainHandRight/OffHandRight) is 20/21 - NecroL80's crossbow/quiver slots. A swap here makes weapons
 		// silently not render (the bug this fixed: MainWeapon read MainHandRight).
 		[Fact]
 		public void PlayerSpawnEquipment_MapsWeaponPairsToTheCorrectHands()

@@ -16,7 +16,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
 {
-	// Materializes the CAPTURED characters (necrol80, demol80, Strie, ...) as playable DB characters: every
+	// Materializes the CAPTURED characters (NecroL80, DemoL80, Strie, ...) as playable DB characters: every
 	// player-own FA015807 spawn that parses with the byte-exact scaffold codec yields the character's name,
 	// identity (race/sex/level), looks (head/voice/size, stored as CharacterBody in editor 2x units), vitals,
 	// position/map, worn equipment (IIR InventoryEntries whose templates are DB items) and the full spawn
@@ -196,7 +196,7 @@ namespace Faolan.Importer.Captures
 			var stats = message.Stats ?? new ProtoCoreCharacterIIR.CharacterStats();
 
 			// The character keeps its ORIGINAL retail id (the spawn handle = the on-wire instance, e.g. Strie
-			// 0x02165EFF, demol80 0x110099BD) unless that id is already taken locally - then the DB generates
+			// 0x02165EFF, DemoL80 0x110099BD) unless that id is already taken locally - then the DB generates
 			// one. Dependents that bake the raw CharacterId (scaffold rows, equipment) are added after the
 			// first save settles it.
 			var originalId = scaffold.Handle != 0 && !await db.Characters.AnyAsync(c => c.Id == scaffold.Handle)

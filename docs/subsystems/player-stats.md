@@ -8,7 +8,7 @@ removed from the repo in the tshark-JSON migration) with the capture packets. Re
 ## Where the data is
 
 The character stats are inside the big **`0x737A6DF9`** inventory/character-state snapshot (the same packet
-family that carries inventory; see [[inventory_db_items_work]]). In assassinl23's snapshot (79431 bytes) the stat
+family that carries inventory; see [[inventory_db_items_work]]). In AssassinL23's snapshot (79431 bytes) the stat
 block sits near the end, roughly offset **78000–78800**.
 
 ## Encoding
@@ -89,9 +89,9 @@ is clearest in the `0x96B8DC59` entity-vitals packet (`...<entityHandle><0000000
 
 - ✅ ~~Locate real Max-Health / Max-Mana / Max-Stamina ids~~ — DONE (current/max pair table above).
 - ✅ ~~Determine whether attributes are sent at all, or derived client-side~~ — **DONE (2026-06-15, #6):
-  client-derived.** The sheet attribute values (necrol80: Str 20 / Con 56 / Int 39 / Wis 26 / Dex 79, and ×10)
+  client-derived.** The sheet attribute values (NecroL80: Str 20 / Con 56 / Int 39 / Wis 26 / Dex 79, and ×10)
   appear **nowhere** as the value following their stat id (`0x0324`/`0x0326`/`0x0328`/`0x032A`/`0x032E`) across
-  any necrol80 capture — the only clean value the wire carries for those ids is a base `10` (= 1.0 at ×10). So the
+  any NecroL80 capture — the only clean value the wire carries for those ids is a base `10` (= 1.0 at ×10). So the
   displayed attributes are computed client-side (base + gear + buffs), NOT transmitted as plain stat records.
   (Corroborating from the binary: the on-wire stat set is bounded by `g_Int32StatsOrder`, asserted
   `== generic_stats_size()` in `CoreCharacterFullUpdateIIR::ReadSubClass`; the array is built indirectly via

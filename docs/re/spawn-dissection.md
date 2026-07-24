@@ -582,7 +582,7 @@ We have **many** captured conversations, including full branching trees - not ju
 - The **strickenbla combat dump** has a fuller tree for its quest/combat NPC: `12493` (greeting) ->
   `12490 -> 20018 -> 20019 -> 20020` (with remoteformats `12621/12622/12623`) -> `19919, 26909, 12492,
   12494` as the player clicks through options.
-- The **Strie-randomActions** and **demol80** login captures have yet more (`7731/19985/31636`, `21717/22047/
+- The **Strie-randomActions** and **DemoL80** login captures have yet more (`7731/19985/31636`, `21717/22047/
   35071`, etc.).
 
 Mechanism: each player option-click is a `TalkToNpc` whose args encode the chosen branch (e.g. `105f` ->

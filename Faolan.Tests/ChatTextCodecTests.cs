@@ -7,7 +7,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for the ChatTextIIR (0xE0B51102) body - a world/system chat line the server
-	// pushes into the client's chat window (#103). Oracle: the localized CriteriaYou system line from the demol80
+	// pushes into the client's chat window (#103). Oracle: the localized CriteriaYou system line from the DemoL80
 	// randomActions capture (#7564). Proves the codec reconstructs the captured bytes from the parsed fields
 	// (construct-don't-replay) and that Parse is its faithful inverse.
 	public class ChatTextCodecTests

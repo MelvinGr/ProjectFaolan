@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Golden-byte tests for the vendor sell flow against the necrol80 sell_items_to_trader capture.
+	// Golden-byte tests for the vendor sell flow against the NecroL80 sell_items_to_trader capture.
 	public class ShopTests
 	{
 		[Fact]

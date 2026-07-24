@@ -31,7 +31,7 @@ just logs a warning and skips the spawn):
    items built like `SnapshotItemBuilder`); `SpawnPacketBuilder.SetCharacterMessage` splices it back.
 3. **Scaffold frame** — `PlayerSpawnScaffoldCodec` (byte-exact parse/generate of the full body) +
    `PlayerSpawnScaffoldRows` regenerate everything around the CharacterIIR from the character's rows:
-   - `CharacterAttribute` — the uniform entry table (`Sequence`-ordered; wire order ≠ index order, see demol80)
+   - `CharacterAttribute` — the uniform entry table (`Sequence`-ordered; wire order ≠ index order, see DemoL80)
    - `CharacterSkill` — the feat/ability ID list (`SkillId` ascending + a `Rank` byte)
    - `CharacterScaffoldPair` — the two ending `[id][s32]` pair lists (`ListIndex` 0/1)
    - the pre-IIR frame + `EntryTableX` scalar are CONSTRUCTED from `Character.Class`
@@ -80,7 +80,7 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
     (usually 0), final marker byte @303 (08, once 0a). Constants include 0x7E2 (=2018) @178, 0x3F1 @186 and
     the `41 00 00 82 08|0a` closer.
     **NOTE: the u32 @133 is NOT a length** (an early misread): Hoxxling's stays 1067 while his post-IIR
-    varies by ±280 bytes, assassinl23's is 2018 (the 0x7E2 constant), and several chars have no length-consistent
+    varies by ±280 bytes, AssassinL23's is 2018 (the 0x7E2 constant), and several chars have no length-consistent
     u32 at all. It is the u16 value island @135. The legacy splice path
     (the obsolete `SpawnPacketBuilder.SetCharacterMessage`, using `NameOuterLengthOffset` = 133) still
     adjusts it on resize — the client demonstrably tolerates that — but the generation path builds the
@@ -94,17 +94,17 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
     that follow: `[t0][0x7E2][0][0x1207CF][a][b][0][seq from 4][0xC350][handle][5x u32 0]` (only on chars
     with active buffs; otherwise a bare 0x3F1).
   - `[u32 count][u32 X]` + (`[f32 1.0]` iff count>0) — the entry-table count and the per-char scalar X
-    (Strie 0xB7, necrol80 0x2B6, editor preview 0x3F1) = `PlayerSpawnScaffold.EntryTableX`.
+    (Strie 0xB7, NecroL80 0x2B6, editor preview 0x3F1) = `PlayerSpawnScaffold.EntryTableX`.
   - **count entries, UNIFORM 14 bytes**: `[u32 idx][u32 0][u16 tag][u32 value]` = `CharacterAttribute`.
     Three payload flavors share the shape: weighted attributes (`tag` = value, `value` = 0x3F800000 weight),
     **morph entries** (`tag` = type<<8|sliderId, `value` = float bits — see the morph finding below) and the
-    closing `[u16][u32]` record. Wire order is the stored `Sequence`, not ascending idx (demol80's closer is
+    closing `[u16][u32]` record. Wire order is the stored `Sequence`, not ascending idx (DemoL80's closer is
     out of order).
   - iff count>0: **ID list of 5-byte groups `[u8 rank][u32 id]`** = `CharacterSkill`; ids ascending,
-    terminated by the group with id 0x3F1 (ranks are small values, e.g. necrol80 has 0x0A/0x41-0x4B on ability
+    terminated by the group with id 0x3F1 (ranks are small values, e.g. NecroL80 has 0x0A/0x41-0x4B on ability
     ids). Iff count==0: a bare `[u32 0x3F1]` terminator instead.
   - ending: TWO count-prefixed pair lists `[u32 N][N x (u32 id, s32 value)]` = `CharacterScaffoldPair` (ids
-    are decades 10,20,...,110; demol80 has both lists non-empty) + final `[u32 0x3F1]`.
+    are decades 10,20,...,110; DemoL80 has both lists non-empty) + final `[u32 0x3F1]`.
 
 NPC FA015807 bodies use a different post-IIR header (`[0][5]`, `[0][0x129]`, ...) — out of scope (NPCs are
 replayed from the burst).
@@ -185,7 +185,7 @@ The same playbook applied to the FullChar/inventory snapshot:
   5 subscription_flags, 4× field-6 containers in kind order 101/104/112/113, 7, 8) + the tails
   (`FullCharSnapshotSubClass`, formerly `BigboyTailsFile`/`SnapshotTails`). NOTE: the inspector's `Prefix` currently lumps `[u32 X][u8 Y]` + the leading root
   fields 1/4/5 (its root finder starts at the first container) — harmless, they ride verbatim.
-  `X` is a progression counter (0 fresh; necrol80 15→43, demol80 70; quest-ish), `Y` session-varying
+  `X` is a progression counter (0 fresh; NecroL80 15→43, DemoL80 70; quest-ish), `Y` session-varying
   (fresh chars: 0x44 base accounts / 0x49 expansion accounts). Container constants (all captures):
   max_size 1028/24/48/48 (24 = starter bag, grows with upgrades), disabled_slots_count 0/0/12/0, owner =
   instance. Entry ids: itemId = epoch **0x20D82B63**<<32 | server-counter; record id (stat 23) another

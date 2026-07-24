@@ -6,8 +6,8 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for the FormatFeedbackIIR (0x8D5A8B6B) body - AoC's on-screen feedback /
-	// FIFO-message overlay (NOT chat). Oracles: the GenericDisplayAreaName zone-name banner (necrol80 Has-inventory
-	// #1753) and the LostGraceEffect feedback line (necrol80 changemap #1262). Proves the codec reconstructs the
+	// FIFO-message overlay (NOT chat). Oracles: the GenericDisplayAreaName zone-name banner (NecroL80 Has-inventory
+	// #1753) and the LostGraceEffect feedback line (NecroL80 changemap #1262). Proves the codec reconstructs the
 	// captured bytes from the parsed fields (construct-don't-replay) and that Parse is its faithful inverse.
 	public class FormatFeedbackCodecTests
 	{

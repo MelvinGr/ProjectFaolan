@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact construct + round-trip for the DispatchTradepostSearchResults grid against the necrol80
+	// Byte-exact construct + round-trip for the DispatchTradepostSearchResults grid against the NecroL80
 	// auctionhouse capture (pkt#1028: seller "Jocko", item 0x755D, price 1,000,000). Proves a DB-backed listing
 	// row rebuilds the captured bytes (construct-don't-replay) and that Parse is its faithful inverse.
 	public class TradepostListingCodecTests

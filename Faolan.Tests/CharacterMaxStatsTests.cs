@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Class/level vitals defaults. Anchored on assassinl23 (Assassin lvl 23 -> captured Health 1270, Stamina 736,
+	// Class/level vitals defaults. Anchored on AssassinL23 (Assassin lvl 23 -> captured Health 1270, Stamina 736,
 	// Mana 0 - Assassins are stamina-only per the captures, memory class_resource_mana_stamina). See
 	// docs/subsystems/player-stats.md.
 	public class CharacterMaxStatsTests

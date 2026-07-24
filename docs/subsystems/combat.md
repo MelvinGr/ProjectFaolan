@@ -302,7 +302,7 @@ looks correct in the server log is almost always one of these two.**
 **Mount buff — fully captured** (`NecroL80_mage-necromancer_login_mount_move_dismount`, the only 2
 ApplySpell packets in it): mount up = self ApplySpell **`0x31EB1500`** + a **54-byte** payload
 (`…0031eb15…` at [22..26]); dismount = **`0x31EB1501`** (base|rank 01) with an **empty** payload. So the mount
-**buff** apply/remove is a real oracle now — distinct from the demol80 `0x3BAD7D` summon. The mount **entity
+**buff** apply/remove is a real oracle now — distinct from the DemoL80 `0x3BAD7D` summon. The mount **entity
 spawn** is still gated on the mid-session-spawn blocker (#26), so the buff renders but the horse model does not.
 
 **Buff persistence across relog (#274).** Self-buffs survive a logout **with their remaining time**. The live

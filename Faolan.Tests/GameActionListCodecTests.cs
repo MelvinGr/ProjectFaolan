@@ -10,7 +10,7 @@ namespace Faolan.Tests
 	// the construct-don't-replay step for this movement/AI record. Grammar: tools/capture/decode_gameactionlist.py.
 	public class GameActionListCodecTests
 	{
-		// strickenbla / necrol80 capture bodies (subop onward, i.e. BodyHex minus the 4-byte length).
+		// strickenbla / NecroL80 capture bodies (subop onward, i.e. BodyHex minus the 4-byte length).
 		private const string EmoteBody = // frame 765: dynel 0xD014, action tail = "idle2_emote"
 			"f508f4c10000c35000017e0300000007e20000d01400000000000000040000000000000001000000000000000100000009000b69646c65325f656d6f74650000000000";
 

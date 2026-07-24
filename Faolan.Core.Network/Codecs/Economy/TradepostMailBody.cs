@@ -3,7 +3,7 @@ using System.Text;
 namespace Faolan.Core.Network.Codecs.Economy
 {
 	// Builds the remoteformat XML body of the auction-house "you bought an item" mail
-	// (DispatchMailMessage, token TradePostGUI_MailItemBought). Decoded byte-exact from the necrol80
+	// (DispatchMailMessage, token TradePostGUI_MailItemBought). Decoded byte-exact from the NecroL80
 	// buy_from_autionhouse_get_mail capture (the 576-byte XML inside the 629-byte mail #1604/#1611;
 	// docs/subsystems/tradepost-protocol.md). The captured body:
 	//

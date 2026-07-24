@@ -2,7 +2,7 @@
 
 Initial dissection (2026-06-08) of the quest and combat protocol, from
 `Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.json` (4878
-packets: create → combat → level-up → quest complete) and the necrol80 `accept_quest` capture. Builds on
+packets: create → combat → level-up → quest complete) and the NecroL80 `accept_quest` capture. Builds on
 `docs/tooling/capture-events.md`. Sub-ops are GameServer `0x2000` body sub-opcodes (`[bodylen4][subop4]...`); handles
 are 4-byte entity instances. Marker `0x0000C350` (50256) prefixes most gameplay bodies after the sub-op.
 
@@ -40,7 +40,7 @@ count-prefixed record block (applies the ×100 vitals / ×10 attribute scale); `
 (`GameServerListener.Outbound.cs`, wire codec `Faolan.Core.Network/Codecs/World/StatUpdateCodec.cs`) write the full packet. `SendVitals(client)` sources Health/Stamina/Mana from the
 character's persisted **`CharacterMaxStats`** (now an active DbSet/table with a 1-1 cascade to Character,
 schema since squashed into the `InitialCreate` migration), seeded on creation via `CharacterMaxStats.CreateDefaults(class, level)` —
-rough class/level defaults anchored on assassinl23 (Assassin lvl 23 ≈ 1281/1143/73 vs sheet 1270/1148/74); legacy
+rough class/level defaults anchored on AssassinL23 (Assassin lvl 23 ≈ 1281/1143/73 vs sheet 1270/1148/74); legacy
 characters with no row fall back to computed defaults in-memory. The create-editor commits the chosen class
 before naming, so `CommitCharacterName` calls `Character.RegenerateMaxStats()` (updates the seeded row in place)
 to replace the level-1 rogue baseline with the chosen class's vitals. (The `.setstat` / `.setstatrange` / `.vitals`
@@ -75,7 +75,7 @@ splice (`InsertBehaviorPhaseField`) reproduces the captured swing-1 ack args byt
   entity (the built-NPC test).
 
 ### Mounts (summon spell found)
-Decoded from demol80's `...very_long_loading_screen_after_field_change` capture (the player rides: 122 MountedRun
+Decoded from DemoL80's `...very_long_loading_screen_after_field_change` capture (the player rides: 122 MountedRun
 + 19 MountedJump moves). The summon sequence right before the player switches to `MovingType.MountedRun` (0x010A,
 first mounted move at idx 787):
 - **a channeled `0x6B87E316` ApplySpell with spell id `0x3BAD7D`** (3911037), repeated ~11× paired with
@@ -144,7 +144,7 @@ inventory-delivery mechanism — see memory `protocol_containeradditem`).
 - `0x4A3D899A` — conversation nodes (category 50002): the quest-giver branch tree. Already served by
   `ConversationReplay` and imported to `ConversationNode`/`ConversationPacket` ([[faolan_importer]]).
 - `0xF164A4A5` — `remoteformat` display XML (category 50001): the dialogue/UI text by id.
-- necrol80 accept_quest tree: nodes 30031/30033/30039/… ; strickenbla beach tree: 12493→12490→…→12494.
+- NecroL80 accept_quest tree: nodes 30031/30033/30039/… ; strickenbla beach tree: 12493→12490→…→12494.
 
 ### Accept / interact
 - `0x642CD3D6` Interact carries the talk-to-NPC / accept actions (ActionType `0x16` = TalkToNpc). The discrete

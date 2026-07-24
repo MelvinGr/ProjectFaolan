@@ -5,7 +5,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact reconstruction of the TradePostGUI_MailItemBought remoteformat XML (the body of the AH buy->mail
-	// notification) from its substitutable fields, against the necrol80 buy_from_autionhouse_get_mail capture. Proves
+	// notification) from its substitutable fields, against the NecroL80 buy_from_autionhouse_get_mail capture. Proves
 	// the buy->mail body is CONSTRUCTED, not replayed, for the captured inputs; arbitrary-item buys reuse the same
 	// builder with a best-effort item-name fragment (the per-item RDB name key is unsynthesizable - see the builder).
 	public class TradepostMailBodyTests

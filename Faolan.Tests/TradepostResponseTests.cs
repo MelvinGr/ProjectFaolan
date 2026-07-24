@@ -31,7 +31,7 @@ namespace Faolan.Tests
 			Assert.Equal(expected, ToHex(Assert.Single(client.Sent)));
 		}
 
-		// The captured single-row DispatchTradepostSearchResults (necrol80 auctionhouse pkt#1028: seller "Jocko",
+		// The captured single-row DispatchTradepostSearchResults (NecroL80 auctionhouse pkt#1028: seller "Jocko",
 		// item 0x755D, price 1,000,000). The live search builds the grid from DB listings via TradepostListingCodec,
 		// so one Jocko listing reproduces the captured packet (head = (1+1)*0x3F1 = 0x7E2 + the row).
 		[Fact]

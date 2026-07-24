@@ -14,7 +14,7 @@ namespace Faolan.Tests
 	// 0x2000 packet length prefix (WriteArrayUInt32Length).
 	public class BankStorageTests
 	{
-		// The full captured BankIIR 0x2000 record body (necrol80, 9 bank items).
+		// The full captured BankIIR 0x2000 record body (NecroL80, 9 bank items).
 		private const string CapturedBankBody = "000004920ba1c1cb0000c3500802e5d401000004810a07086910d4cb8b401032181e227a0800127608c194e19c818080ea20" +
 		                                        "1207080010818080201206081710a0943c1204081a10011a530a140dec662fc115a26bd85c1d31597189257d4344d212140d" +
 		                                        "ec662fc115a26bd85c1d31597189257d4344d21a140dec662fc115a26bd85c1d31597189257d4344d2258cf037002d8cf037" +
