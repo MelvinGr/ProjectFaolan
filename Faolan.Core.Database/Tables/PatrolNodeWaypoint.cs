@@ -10,15 +10,15 @@ namespace Faolan.Core.Database.Tables
 	// list) so multi-segment patrols keep each segment's waypoints under their own node (#316).
 	// Keyed by the natural composite (PatrolNodeId, Ordinal) - configured in DatabaseContext.OnModelCreating -
 	// rather than a surrogate Id: a node has exactly one waypoint per walk position.
-	[PrimaryKey(nameof(PatrolPathId), nameof(OrdinalPath), nameof(Ordinal))]
+	[PrimaryKey(nameof(NpcSpawnId), nameof(OrdinalPath), nameof(Ordinal))]
 	public class PatrolNodeWaypoint : IPositionProvider
 	{
-		public uint PatrolPathId { get; set; }
+		public uint NpcSpawnId { get; set; }
 
 		[MaxLength(64)]
 		public string OrdinalPath { get; set; } = "";
 
-		[ForeignKey($"{nameof(PatrolPathId)},{nameof(OrdinalPath)}")]
+		[ForeignKey($"{nameof(NpcSpawnId)},{nameof(OrdinalPath)}")]
 		public virtual PatrolNode PatrolNode { get; set; } = null!;
 
 		public float PositionX { get; set; }

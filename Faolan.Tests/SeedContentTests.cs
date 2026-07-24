@@ -45,7 +45,7 @@ namespace Faolan.Tests
 				("Recipes", await db.Recipes.CountAsync(ct), 100),
 				("RecipeItems", await db.RecipeItems.CountAsync(ct), 1000),
 				("AppearanceChoices", await db.AppearanceChoices.CountAsync(ct), 300),
-				("PatrolPaths", await db.PatrolPaths.CountAsync(ct), 50),
+				("PatrolNodes (roots)", await db.PatrolNodes.CountAsync(n => n.ParentPath == null, ct), 50),
 				("PatrolNodes", await db.PatrolNodes.CountAsync(ct), 300)
 			};
 

@@ -70,9 +70,11 @@ namespace Faolan.Core.Database.Tables
 		// keeping the captured blob's (the from-DB lift of the bald-fix's verbatim post-IIR, #243).
 		public virtual ICollection<NpcSpawnMorph> Morphs { get; set; } = [];
 
-		// The captured patrol route this spawn walks (#316), or null for a stationary NPC. One-to-one; cascade-deletes
-		// with the spawn.
-		public virtual PatrolPath? PatrolPath { get; set; }
+		// The captured patrol route this spawn walks (#316) - the columnarized MoveTask task tree, empty for a
+		// stationary NPC. Held DIRECTLY: the PatrolPath table that used to sit between them carried nothing but this
+		// collection and the spawn's own id once it was keyed by the spawn, so it was a join with no content of its
+		// own. Cascade-deletes with the spawn.
+		public virtual ICollection<PatrolNode> PatrolNodes { get; set; } = [];
 
 		public bool HasEquipment { get; set; }
 		public uint ApprenticeLevel { get; set; }

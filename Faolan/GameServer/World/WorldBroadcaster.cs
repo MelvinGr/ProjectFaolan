@@ -825,7 +825,7 @@ namespace Faolan.GameServer.World
 				// MoveTask re-addressed to this entity (handle + from = its spawn) - the original form carries the real
 				// speed/flags, so the client walks the route at the right pace (a rebuilt mode-1 path lost the speed and
 				// run-crawled). The cycle timer (path time + dwell) re-issues it so it keeps looping.
-				if (npc.PatrolPath is { Nodes.Count: > 0 } patrol)
+				if (npc.PatrolNodes is { Count: > 0 } patrol)
 				{
 					var waypoints = MoveTaskCodec.PatrolWaypoints(patrol);
 					if (waypoints.Count > 0)

@@ -458,7 +458,6 @@ namespace Faolan.Importer.Modules
 				// Patrols FK the spawn (#316) - delete them (children first) before the spawns they reference.
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"PatrolNodeWaypoints\"");
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"PatrolNodes\"");
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"PatrolPaths\"");
 				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"NpcSpawns\"");
 			}
 

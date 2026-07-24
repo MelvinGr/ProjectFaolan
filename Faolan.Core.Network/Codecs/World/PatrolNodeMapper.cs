@@ -270,7 +270,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			var words = n.Words.OrderBy(w => w.Ordinal).Select(w => w.Value).ToArray();
 			if (words.Length != count)
-				throw new InvalidOperationException($"PatrolNode {n.PatrolPathId}#{n.OrdinalPath} (mode {n.Mode}) has {words.Length} word row(s), expected {count} - the patrol cannot be rebuilt byte-exact.");
+				throw new InvalidOperationException($"PatrolNode {n.NpcSpawnId}#{n.OrdinalPath} (mode {n.Mode}) has {words.Length} word row(s), expected {count} - the patrol cannot be rebuilt byte-exact.");
 
 			return words;
 		}

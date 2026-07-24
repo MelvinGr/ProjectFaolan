@@ -183,10 +183,10 @@ namespace Faolan.Core.Network.Codecs.World
 		// tree (any of the captured forms - single- or multi-segment) re-addressed to the live `handle` and the
 		// spawn's current position `from`, re-emitted byte-exact via MoveTaskComposite. Replaces the captured-Body
 		// re-address (the retired WorldBroadcastBodies.ReaddressPatrol).
-		public static byte[] BuildPatrol(uint handle, Vector3 from, PatrolPath path)
+		public static byte[] BuildPatrol(uint handle, Vector3 from, ICollection<PatrolNode> nodes)
 		{
-			ArgumentNullException.ThrowIfNull(path);
-			var root = path.Nodes.FirstOrDefault(n => n.ParentPath == null) ?? throw new InvalidOperationException($"patrol for spawn {path.NpcSpawnId} has no root node");
+			ArgumentNullException.ThrowIfNull(nodes);
+			var root = nodes.FirstOrDefault(n => n.ParentPath == null) ?? throw new InvalidOperationException($"patrol for spawn {nodes.FirstOrDefault()?.NpcSpawnId} has no root node");
 
 			return new MoveTaskComposite
 			{
@@ -246,11 +246,11 @@ namespace Faolan.Core.Network.Codecs.World
 
 		// The patrol's ordered waypoints (every PathMoveTask's waypoint list, walked in tree order) - the world
 		// simulation's route + cycle-length source, from the columnarized tree.
-		public static IReadOnlyList<Vector3> PatrolWaypoints(PatrolPath path)
+		public static IReadOnlyList<Vector3> PatrolWaypoints(ICollection<PatrolNode> nodes)
 		{
-			ArgumentNullException.ThrowIfNull(path);
+			ArgumentNullException.ThrowIfNull(nodes);
 			var waypoints = new List<Vector3>();
-			var root = path.Nodes.FirstOrDefault(n => n.ParentPath == null);
+			var root = nodes.FirstOrDefault(n => n.ParentPath == null);
 			if (root != null)
 				CollectWaypoints(root, waypoints);
 			return waypoints;

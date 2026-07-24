@@ -8,23 +8,23 @@ namespace Faolan.Core.Database.Tables
 	// One node of a patrol's MoveTaskIIR (0x96C46740) task tree, columnarized from the captured record (#316). The
 	// tree is a recursive mode-polymorphic AST (a mode-4 ListMoveTask of Path/Wait/Jump/nested-List children); this
 	// self-referencing table stores it row-per-node so the runtime CONSTRUCTS the patrol from DB columns instead of
-	// replaying the captured `PatrolPath.Body` blob. The mapping to/from Faolan.Core.Network's MoveTaskNode is
+	// replaying the captured patrol `Body` blob. The mapping to/from Faolan.Core.Network's MoveTaskNode is
 	// PatrolNodeMapper; MoveTaskBuilder.BuildPatrol re-emits the byte-exact record (PatrolNodeRoundTripTests over
 	// every committed patrol). Only mode-specific fields are populated (null otherwise); the fixed numeric arrays
 	// (Path's middle trailer words, Ballistic/Formation/Vec words) are one row per word in [[PatrolNodeWord]] and
 	// the approach tail is ApproachFlag. Floats confirmed as floats (duration/remaining/speed/anchor/waypoints) are
 	// stored as floats; slots of unknown numeric type stay raw u32 bits so the record round-trips exactly.
-	// Keyed by WHERE IT SITS IN THE TREE: (path, OrdinalPath). A MoveTask node is a recursive AST, so `Ordinal` is
-	// only unique among its SIBLINGS - (PatrolPathId, Ordinal) collides 608 -> 407. OrdinalPath folds the whole
+	// Keyed by WHERE IT SITS IN THE TREE: (spawn, OrdinalPath). A MoveTask node is a recursive AST, so `Ordinal` is
+	// only unique among its SIBLINGS - (NpcSpawnId, Ordinal) collides 608 -> 407. OrdinalPath folds the whole
 	// ancestor chain into that ordinal ("" = the root, "1" = its second child, "1>0" = that child's first), which
 	// IS unique (608/608 verified, max depth 2) and, unlike the surrogate it replaces, is reproduced exactly by a
 	// re-harvest. Same device as ConversationNode.AnswerPath.
-	// Keyed by WHERE IT SITS IN THE TREE: (path, OrdinalPath). A MoveTask node is a recursive AST, so `Ordinal` is
-	// only unique among its SIBLINGS - (PatrolPathId, Ordinal) collides 608 -> 407. OrdinalPath folds the whole
+	// Keyed by WHERE IT SITS IN THE TREE: (spawn, OrdinalPath). A MoveTask node is a recursive AST, so `Ordinal` is
+	// only unique among its SIBLINGS - (NpcSpawnId, Ordinal) collides 608 -> 407. OrdinalPath folds the whole
 	// ancestor chain into that ordinal ("" = the root, "1" = its second child, "1>0" = that child's first), which
 	// IS unique (608/608, max depth 2) and, unlike the surrogate it replaces, is reproduced by a re-harvest.
 	// Same device as ConversationNode.AnswerPath.
-	[PrimaryKey(nameof(PatrolPathId), nameof(OrdinalPath))]
+	[PrimaryKey(nameof(NpcSpawnId), nameof(OrdinalPath))]
 	public class PatrolNode
 	{
 
@@ -37,13 +37,13 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(64)]
 		public string? ParentPath { get; set; }
 
-		[ForeignKey($"{nameof(PatrolPathId)},{nameof(ParentPath)}")]
+		[ForeignKey($"{nameof(NpcSpawnId)},{nameof(ParentPath)}")]
 		public virtual PatrolNode? Parent { get; set; }
 
-		public uint PatrolPathId { get; set; }
+		public uint NpcSpawnId { get; set; }
 
-		[ForeignKey(nameof(PatrolPathId))]
-		public virtual PatrolPath PatrolPath { get; set; } = null!;
+		[ForeignKey(nameof(NpcSpawnId))]
+		public virtual NpcSpawn NpcSpawn { get; set; } = null!;
 
 		public virtual ICollection<PatrolNode> Children { get; set; } = [];
 

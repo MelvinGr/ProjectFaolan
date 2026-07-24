@@ -2157,7 +2157,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNode", b =>
                 {
-                    b.Property<uint>("PatrolPathId")
+                    b.Property<uint>("NpcSpawnId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("OrdinalPath")
@@ -2261,16 +2261,16 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<byte?>("TrailerByte")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("PatrolPathId", "OrdinalPath");
+                    b.HasKey("NpcSpawnId", "OrdinalPath");
 
-                    b.HasIndex("PatrolPathId", "ParentPath");
+                    b.HasIndex("NpcSpawnId", "ParentPath");
 
                     b.ToTable("PatrolNodes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNodeWaypoint", b =>
                 {
-                    b.Property<uint>("PatrolPathId")
+                    b.Property<uint>("NpcSpawnId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("OrdinalPath")
@@ -2289,14 +2289,14 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float>("PositionZ")
                         .HasColumnType("REAL");
 
-                    b.HasKey("PatrolPathId", "OrdinalPath", "Ordinal");
+                    b.HasKey("NpcSpawnId", "OrdinalPath", "Ordinal");
 
                     b.ToTable("PatrolNodeWaypoints");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNodeWord", b =>
                 {
-                    b.Property<uint>("PatrolPathId")
+                    b.Property<uint>("NpcSpawnId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("OrdinalPath")
@@ -2309,19 +2309,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Value")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("PatrolPathId", "OrdinalPath", "Ordinal");
+                    b.HasKey("NpcSpawnId", "OrdinalPath", "Ordinal");
 
                     b.ToTable("PatrolNodeWords");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolPath", b =>
-                {
-                    b.Property<uint>("NpcSpawnId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("NpcSpawnId");
-
-                    b.ToTable("PatrolPaths");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestArea", b =>
@@ -3979,27 +3969,27 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNode", b =>
                 {
-                    b.HasOne("Faolan.Core.Database.Tables.PatrolPath", "PatrolPath")
-                        .WithMany("Nodes")
-                        .HasForeignKey("PatrolPathId")
+                    b.HasOne("Faolan.Core.Database.Tables.NpcSpawn", "NpcSpawn")
+                        .WithMany("PatrolNodes")
+                        .HasForeignKey("NpcSpawnId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "Parent")
                         .WithMany("Children")
-                        .HasForeignKey("PatrolPathId", "ParentPath")
+                        .HasForeignKey("NpcSpawnId", "ParentPath")
                         .OnDelete(DeleteBehavior.NoAction);
 
-                    b.Navigation("Parent");
+                    b.Navigation("NpcSpawn");
 
-                    b.Navigation("PatrolPath");
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNodeWaypoint", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "PatrolNode")
                         .WithMany("Waypoints")
-                        .HasForeignKey("PatrolPathId", "OrdinalPath")
+                        .HasForeignKey("NpcSpawnId", "OrdinalPath")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -4010,22 +4000,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "PatrolNode")
                         .WithMany("Words")
-                        .HasForeignKey("PatrolPathId", "OrdinalPath")
+                        .HasForeignKey("NpcSpawnId", "OrdinalPath")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("PatrolNode");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolPath", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.NpcSpawn", "NpcSpawn")
-                        .WithOne("PatrolPath")
-                        .HasForeignKey("Faolan.Core.Database.Tables.PatrolPath", "NpcSpawnId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("NpcSpawn");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestDefinition", b =>
@@ -4288,7 +4267,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Navigation("Morphs");
 
-                    b.Navigation("PatrolPath");
+                    b.Navigation("PatrolNodes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnArea", b =>
@@ -4320,11 +4299,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Waypoints");
 
                     b.Navigation("Words");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolPath", b =>
-                {
-                    b.Navigation("Nodes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestArea", b =>

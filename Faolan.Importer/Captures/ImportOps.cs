@@ -551,32 +551,33 @@ namespace Faolan.Importer.Captures
 		// on re-import.
 		public static async Task ImportPatrolPaths(DatabaseContext db, List<PatrolPathEntry> paths)
 		{
+			// Resolve every route to its spawn FIRST, keyed by spawn. Two captured routes can correlate to the same
+			// spawn (they share a transform), and a per-entry loop cannot see what an earlier iteration already
+			// queued - so the second route's nodes would collide with the first's on the primary key. Last route for
+			// a spawn wins, which is what the old per-entry lookup effectively did once it found the tracked path.
+			var bySpawn = new Dictionary<uint, (NpcSpawn Spawn, PatrolNode Root)>();
 			foreach (var e in paths)
 			{
 				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.Position.X && n.PositionY == e.Position.Y && n.PositionZ == e.Position.Z);
 				if (spawn == null)
 					continue; // a route with no matching spawn (should not happen for burst-truth patrols) - skip
 
-				var existing = await db.PatrolPaths.Include(p => p.Nodes).ThenInclude(n => n.Waypoints).Include(p => p.Nodes).ThenInclude(n => n.Words).FirstOrDefaultAsync(p => p.NpcSpawnId == spawn.Id);
-
-				if (existing == null)
-				{
-					existing = new PatrolPath
-					{
-						NpcSpawnId = spawn.Id
-					};
-					db.PatrolPaths.Add(existing);
-				}
-				else
-				{
-					db.PatrolNodes.RemoveRange(existing.Nodes); // cascades the waypoints
-					existing.Nodes.Clear();
-				}
-
-				// Attach a fresh copy of the task tree, flattened so EF assigns every node its PatrolPathId and
-				// AddNodeTree stamps its position key. Clone because a Root can be shared across entries.
-				AddNodeTree(existing, CloneNode(e.Root));
+				bySpawn[spawn.Id] = (spawn, e.Root);
 			}
+
+			// Drop the persisted routes for those spawns BEFORE staging the replacements. The node key is derived
+			// from the tree position now, so a re-import reuses the very same keys - queueing the deletes and the
+			// inserts into one SaveChanges races them (`UNIQUE constraint failed: PatrolNodeWaypoints...`), the same
+			// way it does for the conversation tree. ExecuteDelete runs immediately, inside the import transaction,
+			// and cascades to the waypoints and words.
+			var spawnIds = bySpawn.Keys.ToList();
+			if (spawnIds.Count > 0)
+				await db.PatrolNodes.Where(n => spawnIds.Contains(n.NpcSpawnId)).ExecuteDeleteAsync();
+
+			// Attach a fresh copy of each task tree, flattened so every node carries its spawn and AddNodeTree stamps
+			// its position key. Clone because a Root can be shared across entries.
+			foreach (var (spawn, root) in bySpawn.Values)
+				AddNodeTree(spawn, CloneNode(root));
 
 			await db.SaveChangesAsync();
 		}
@@ -935,11 +936,11 @@ namespace Faolan.Importer.Captures
 
 		// Flattens the task tree into path.Nodes (every node gets PatrolPathId; the Parent/Children navs stay so EF
 		// sets ParentId).
-		// Flattens the task tree onto the path, stamping each node's POSITION as it goes: OrdinalPath is the chain
+		// Flattens the task tree onto the spawn, stamping each node's POSITION as it goes: OrdinalPath is the chain
 		// of sibling ordinals from the root ("" at the root, then "1", "1>0", ...) and ParentPath is its parent's.
 		// That pair IS the node's key now (PatrolNode) - EF used to assign a surrogate and derive ParentId from the
 		// Children nav, so nothing had to be computed here.
-		private static void AddNodeTree(PatrolPath path, PatrolNode node, string? parentPath = null)
+		private static void AddNodeTree(NpcSpawn spawn, PatrolNode node, string? parentPath = null)
 		{
 			node.ParentPath = parentPath;
 			node.OrdinalPath = parentPath switch
@@ -949,9 +950,9 @@ namespace Faolan.Importer.Captures
 				_ => $"{parentPath}>{node.Ordinal.ToString(CultureInfo.InvariantCulture)}"
 			};
 
-			path.Nodes.Add(node);
+			spawn.PatrolNodes.Add(node);
 			foreach (var child in node.Children)
-				AddNodeTree(path, child, node.OrdinalPath);
+				AddNodeTree(spawn, child, node.OrdinalPath);
 		}
 
 		// Only ever ADDS a slot that is absent - an existing ref is authoritative, having come from a full-update.

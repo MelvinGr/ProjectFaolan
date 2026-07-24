@@ -71,7 +71,6 @@ namespace Faolan.Core.Database
 		DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; }
 		DbSet<PatrolNodeWord> PatrolNodeWords { get; }
 		DbSet<WorldObjectWord> WorldObjectWords { get; }
-		DbSet<PatrolPath> PatrolPaths { get; }
 		DbSet<QuestArea> QuestAreas { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
@@ -150,7 +149,6 @@ namespace Faolan.Core.Database
 		public DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; set; }
 		public DbSet<PatrolNodeWord> PatrolNodeWords { get; set; }
 		public DbSet<WorldObjectWord> WorldObjectWords { get; set; }
-		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<QuestArea> QuestAreas { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
@@ -409,13 +407,12 @@ namespace Faolan.Core.Database
 			// so a spawn body is constructed from typed storage, not spliced. Cascades with the type.
 			modelBuilder.Entity<NpcTemplate>().HasOne(n => n.StatCore).WithOne(s => s.NpcTemplate).OnDelete(DeleteBehavior.Cascade);
 
-			// One patrol route per NpcSpawn (#316): the FK joins a route to the NPC that walks it, so the runtime
-			// looks it up via the spawn's nav instead of matching floats. Cascade-deletes with the spawn.
-			modelBuilder.Entity<PatrolPath>().HasOne(p => p.NpcSpawn).WithOne(n => n.PatrolPath).OnDelete(DeleteBehavior.Cascade);
+			// The patrol route hangs directly off the NpcSpawn that walks it (#316) - the PatrolPath table between
+			// them held nothing but the spawn id and this collection, so it was a join carrying no content.
 			// The columnarized task tree (#316): all of a patrol's nodes hang off the path (cascade-delete); the tree
 			// shape is the self-reference ParentPath (NoAction - every node is already deleted via its PatrolPathId, so
 			// the self-ref must not add a second cascade path). Each node's waypoints cascade with it.
-			modelBuilder.Entity<PatrolPath>().HasMany(p => p.Nodes).WithOne(n => n.PatrolPath).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.PatrolNodes).WithOne(n => n.NpcSpawn).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Children).WithOne(n => n.Parent).OnDelete(DeleteBehavior.NoAction);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Waypoints).WithOne(w => w.PatrolNode).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Words).WithOne(w => w.PatrolNode).OnDelete(DeleteBehavior.Cascade);
