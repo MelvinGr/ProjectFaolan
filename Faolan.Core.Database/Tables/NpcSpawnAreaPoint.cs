@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Numerics;
+using Faolan.Core.Database.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -11,24 +11,12 @@ namespace Faolan.Core.Database.Tables
 	// Compound key (NpcSpawnAreaId, PointIndex). No surrogate Id: a point has no identity beyond its slot within its
 	// area, and the pair is the natural key (stable across re-imports).
 	[PrimaryKey(nameof(NpcSpawnAreaId), nameof(PointIndex))]
-	public class NpcSpawnAreaPoint
+	public class NpcSpawnAreaPoint : IPositionProvider
 	{
 		[ForeignKey(nameof(NpcSpawnAreaId))]
 		public virtual NpcSpawnArea Area { get; set; } = null!;
 
 		public uint NpcSpawnAreaId { get; set; }
-
-		[NotMapped]
-		public Vector3 Position
-		{
-			get => new(PositionX, PositionY, PositionZ);
-			set
-			{
-				PositionX = value.X;
-				PositionY = value.Y;
-				PositionZ = value.Z;
-			}
-		}
 
 		public float PositionX { get; set; }
 		public float PositionY { get; set; }

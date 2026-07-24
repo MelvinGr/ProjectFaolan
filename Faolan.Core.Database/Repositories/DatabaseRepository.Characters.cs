@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -722,7 +723,10 @@ namespace Faolan.Core.Database.Repositories
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.Characters.Where(c => c.Id == characterId)
-				.ExecuteUpdateAsync(s => s.SetProperty(c => c.MapId, Map.NewPlayerSpawnSpawnPoint.MapId).SetProperty(c => c.Position, Map.NewPlayerSpawnSpawnPoint.Position)) == 1;
+				.ExecuteUpdateAsync(s => s.SetProperty(c => c.MapId, Map.NewPlayerSpawnSpawnPoint.MapId)
+					.SetProperty(c => c.PositionX, Map.NewPlayerSpawnSpawnPoint.Position.X)
+					.SetProperty(c => c.PositionY, Map.NewPlayerSpawnSpawnPoint.Position.Y)
+					.SetProperty(c => c.PositionZ, Map.NewPlayerSpawnSpawnPoint.Position.Z)) == 1;
 		}
 
 		public async Task<bool> SetVanityFilter(uint characterId, uint slot, bool toggleState)

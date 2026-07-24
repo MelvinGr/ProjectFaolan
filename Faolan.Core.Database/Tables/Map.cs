@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Numerics;
+using Faolan.Core.Database.Interfaces;
 
 namespace Faolan.Core.Database.Tables
 {

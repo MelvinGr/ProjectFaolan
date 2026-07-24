@@ -1,7 +1,6 @@
 using System;
 using System.Data;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;

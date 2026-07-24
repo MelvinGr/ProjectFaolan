@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Numerics;
+using Faolan.Core.Database.Interfaces;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -15,33 +14,8 @@ namespace Faolan.Core.Database.Tables
 		}
 	}
 
-	public abstract class Base3DEntity : BaseEntity
+	public abstract class Base3DEntity : BaseEntity, IPositionProvider, IRotationProvider
 	{
-		[NotMapped]
-		public Quaternion Rotation
-		{
-			get => new(RotationX, RotationY, RotationZ, RotationW);
-			set
-			{
-				RotationX = value.X;
-				RotationY = value.Y;
-				RotationZ = value.Z;
-				RotationW = value.W;
-			}
-		}
-
-		[NotMapped]
-		public Vector3 Position
-		{
-			get => new(PositionX, PositionY, PositionZ);
-			set
-			{
-				PositionX = value.X;
-				PositionY = value.Y;
-				PositionZ = value.Z;
-			}
-		}
-
 		public float PositionX { get; set; }
 		public float PositionY { get; set; }
 		public float PositionZ { get; set; }
@@ -57,7 +31,7 @@ namespace Faolan.Core.Database.Tables
 
 		public override string ToString()
 		{
-			return $"{Id} [{GetType().Name}] [{Position}, {Rotation}]";
+			return $"{Id} [{GetType().Name}] [{this.Position}, {this.Rotation}]";
 		}
 	}
 }

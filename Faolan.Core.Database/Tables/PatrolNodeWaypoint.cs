@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Numerics;
+using Faolan.Core.Database.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -11,7 +11,7 @@ namespace Faolan.Core.Database.Tables
 	// Keyed by the natural composite (PatrolNodeId, Ordinal) - configured in DatabaseContext.OnModelCreating -
 	// rather than a surrogate Id: a node has exactly one waypoint per walk position.
 	[PrimaryKey(nameof(PatrolPathId), nameof(OrdinalPath), nameof(Ordinal))]
-	public class PatrolNodeWaypoint
+	public class PatrolNodeWaypoint : IPositionProvider
 	{
 		public uint PatrolPathId { get; set; }
 
@@ -20,18 +20,6 @@ namespace Faolan.Core.Database.Tables
 
 		[ForeignKey($"{nameof(PatrolPathId)},{nameof(OrdinalPath)}")]
 		public virtual PatrolNode PatrolNode { get; set; } = null!;
-
-		[NotMapped]
-		public Vector3 Position
-		{
-			get => new(PositionX, PositionY, PositionZ);
-			set
-			{
-				PositionX = value.X;
-				PositionY = value.Y;
-				PositionZ = value.Z;
-			}
-		}
 
 		public float PositionX { get; set; }
 		public float PositionY { get; set; }

@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Cli;
 using Faolan.Core.Extensions;
-using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;

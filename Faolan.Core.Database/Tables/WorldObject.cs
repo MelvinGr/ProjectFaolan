@@ -4,7 +4,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Numerics;
 using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
-using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {

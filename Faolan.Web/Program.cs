@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Cli;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;

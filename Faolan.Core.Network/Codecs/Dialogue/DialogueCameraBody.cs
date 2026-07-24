@@ -1,4 +1,3 @@
-using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;

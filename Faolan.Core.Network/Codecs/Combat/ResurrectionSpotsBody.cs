@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Combat

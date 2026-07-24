@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 

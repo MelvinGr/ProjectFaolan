@@ -1,4 +1,5 @@
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Mcp.Tools;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;

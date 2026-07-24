@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.GameServer.World;
 using Xunit;

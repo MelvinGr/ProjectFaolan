@@ -7,7 +7,6 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
-using Faolan.Core;
 using Faolan.Core.Cli;
 using Faolan.Core.Extensions;
 using Microsoft.AspNetCore.Builder;
