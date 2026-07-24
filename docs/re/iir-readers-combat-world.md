@@ -81,6 +81,41 @@ Self-describing mode word — wire-derivable, byte-exact:
 The blob length-prefix and the trailing `N` u32s land byte-exact (262/262, 614/614, 214/214, 7/7);
 the kd-tree region is the same shared reader already decoded for SimpleDynel.
 
+### The shared bounds/kd-tree struct (`FUN_0080c620`)
+
+Decompiled and checked against every committed `WorldObjects.KdTreeTail` (1052 rows) [V3:
+WorldObjectDynelColumnTests]. It is NOT opaque geometry - it opens with an RDB asset reference:
+
+```
+[u32 assetId][u32 assetType]   # an RDB resource reference, see below
+[u32 nameLen][name]            # length-prefixed ASCII (FUN_0048f840); empty in 1029/1052 rows
+[u32 nodeCount]
+  nodeCount x [u32 x 6]        # 24 bytes/node on the wire (the client widens each to 32 in its vector)
+[f32 minX][f32 minY][f32 minZ] # the AABB; the client derives centre/extent as (max-min)*0.5
+[f32 maxX][f32 maxY][f32 maxZ]
+[u32][u32]                     # obj+0x30 / obj+0x31
+[u8 flag]                      # obj+0x32, read as a bool
+```
+
+- `assetType` is one of exactly three RDB types: **1010030** MESHINDEXFILE (628 rows), **1010001** RenderMesh
+  geometry (298), **1010201** MONSTERDATA (126) - see [`../rdb/rdb-type-catalog.md`](../rdb/rdb-type-catalog.md).
+  `assetId` has 199 distinct values.
+- The node list is almost always EMPTY: 1028 of 1052 rows carry `nodeCount == 0`, the other 24 carry exactly one.
+- An object with no bounds writes the inverted-box sentinel rather than zeros - min `+FLT_MAX` (`0x7f7fffee`),
+  max `-FLT_MAX` (`0xff7fff..`).
+- The only name seen in the corpus is `object_closed` (23 rows, all `DoorFullUpdateIIR`-adjacent MONSTERDATA).
+
+Struct + per-class trailer accounts for the record exactly, which is what makes the 18 distinct
+`KdTreeTail` lengths fall out of just five classes:
+
+| class | trailer | rows |
+| --- | --- | --- |
+| `SimpleDynelFullUpdateIIR` `0x66AEDD50` | none | 678 |
+| `DestructibleFullUpdateIIR` `0x6BD56736` | `u32 x 5` | 251 |
+| `DoorFullUpdateIIR` `0x33A56FB0` | `u32 x 1` | 59 |
+| `ClimbingDynelFullUpdateIIR` `0x1FD6412B` | `u32 x 1` | 49 |
+| `LootBagFullUpdateIIR` `0xF096251E` | protobuf | 15 |
+
 ## No-op / out-of-band readers
 
 - `UpdateInventoryIIR_t` (`0xA74D2814`, `FUN_005b9230`) — `ReadSubClass` just `return 0`. The
