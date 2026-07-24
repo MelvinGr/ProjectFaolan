@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Database.Attributes;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -9,7 +10,11 @@ namespace Faolan.Core.Database.Tables
 	// also queryable ("which recipes produce / consume item X"). Each references the item template by id (hard FK to
 	// Items) - the item's TEA key (the same key RequestRecipeInfo 0x2090 uses) and hash live there, harvested into
 	// Items from the recipe element by the recipes importer, so they're not duplicated here.
-	public class RecipeItem : BaseEntity
+	// Keyed by its position in the recipe's element list: (recipe, which list, index in it). That IS the wire
+	// element's identity - the codec rebuilds the record by walking the two lists in Position order - so a
+	// re-harvest reproduces the same keys instead of renumbering a surrogate.
+	[PrimaryKey(nameof(RecipeId), nameof(Role), nameof(Position))]
+	public class RecipeItem
 	{
 		public uint ItemId { get; set; }
 

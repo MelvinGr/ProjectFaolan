@@ -1516,19 +1516,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapLootEntry", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<uint>("MapId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("ItemTemplateId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("MapId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MapId");
+                    b.HasKey("MapId", "ItemTemplateId");
 
                     b.ToTable("MapLootEntries");
                 });
@@ -1828,25 +1822,19 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnEquipment", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Level")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("NpcSpawnId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("Pos")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("Level")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("Template")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcSpawnId");
+                    b.HasKey("NpcSpawnId", "Pos");
 
                     b.HasIndex("Template");
 
@@ -1855,17 +1843,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnMorph", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("MorphId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("NpcSpawnId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("MorphId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Text")
@@ -1876,17 +1860,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float>("Value")
                         .HasColumnType("REAL");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcSpawnId");
+                    b.HasKey("NpcSpawnId", "Ordinal");
 
                     b.ToTable("NpcSpawnMorphs");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpell", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("SpellId")
                         .HasColumnType("INTEGER");
 
                     b.Property<ushort>("Duration")
@@ -1904,18 +1888,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<byte>("Magnitude")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("NpcTemplateId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<byte>("Rank")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("SpellId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcTemplateId");
+                    b.HasKey("NpcTemplateId", "SpellId");
 
                     b.ToTable("NpcSpells");
                 });
@@ -2690,8 +2666,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.RecipeItem", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<uint>("RecipeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("Role")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Position")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("Flag")
@@ -2700,23 +2681,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("ItemId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Position")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("RecipeId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<byte>("Role")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("Trailing")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
+                    b.HasKey("RecipeId", "Role", "Position");
 
                     b.HasIndex("ItemId");
-
-                    b.HasIndex("RecipeId");
 
                     b.ToTable("RecipeItems", t =>
                         {
@@ -2798,8 +2768,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ShopItem", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<uint>("ShopId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Pos")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("Count")
@@ -2808,24 +2780,15 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("ItemTemplateId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("Pos")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("ShopId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("Stat356")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("TailLevel")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
+                    b.HasKey("ShopId", "Pos");
 
                     b.HasIndex("ItemTemplateId");
-
-                    b.HasIndex("ShopId", "Pos")
-                        .IsUnique();
 
                     b.ToTable("ShopItems");
                 });

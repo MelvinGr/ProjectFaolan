@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -10,7 +11,10 @@ namespace Faolan.Core.Database.Tables
 	// The captured bags read as STATIC map bags (world-entry burst objects), not per-NPC death drops, so this is a
 	// MAP pool, not a per-NPC table - a per-NPC association needs a kill<->bag correlation that isn't in the current
 	// captures (see the issue). Dedup key is (MapId, ItemTemplateId); the row carries no quantity/weight yet.
-	public class MapLootEntry : BaseEntity
+	// The dedup key IS the row: (MapId, ItemTemplateId) carries everything, so it is the primary key - there was
+	// never anything for a surrogate id to identify.
+	[PrimaryKey(nameof(MapId), nameof(ItemTemplateId))]
+	public class MapLootEntry
 	{
 		// The item template id (matches Item.Id) seen in a bag on that map.
 		public uint ItemTemplateId { get; set; }

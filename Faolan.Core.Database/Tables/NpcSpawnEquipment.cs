@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -9,7 +10,11 @@ namespace Faolan.Core.Database.Tables
 	// no template3 - and that quad+hash is TEMPLATE-level identity, so it lives ONCE in Items and this row references
 	// it by an FK on Template (the item is always harvested from the same spawn packet). Stores only the slot +
 	// Template + Level. Cascade-deletes with its NpcSpawn. Codec/build: NpcSpawnEquipmentBuilder.
-	public class NpcSpawnEquipment : BaseEntity, INpcEquipment
+	// Keyed by (spawn, equipment SLOT) - a spawn wears one item per slot, so Pos is the identity within its spawn.
+	// The npcs module wipes and rebuilds the whole spawn set on every re-harvest; with a surrogate id that
+	// renumbered all 5973 rows (~37 times over), which is the single largest source of faolan.sql churn.
+	[PrimaryKey(nameof(NpcSpawnId), nameof(Pos))]
+	public class NpcSpawnEquipment : INpcEquipment
 	{
 		[ForeignKey(nameof(Template))]
 		public virtual Item Item { get; set; } = null!;

@@ -1553,21 +1553,13 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapLootEntry", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<long>("MapId")
                         .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<long>("ItemTemplateId")
                         .HasColumnType("bigint");
 
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MapId");
+                    b.HasKey("MapId", "ItemTemplateId");
 
                     b.ToTable("MapLootEntries");
                 });
@@ -1877,27 +1869,19 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnEquipment", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("Level")
-                        .HasColumnType("bigint");
-
                     b.Property<long>("NpcSpawnId")
                         .HasColumnType("bigint");
 
                     b.Property<long>("Pos")
                         .HasColumnType("bigint");
 
+                    b.Property<long>("Level")
+                        .HasColumnType("bigint");
+
                     b.Property<long>("Template")
                         .HasColumnType("bigint");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcSpawnId");
+                    b.HasKey("NpcSpawnId", "Pos");
 
                     b.HasIndex("Template");
 
@@ -1906,20 +1890,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnMorph", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("MorphId")
-                        .HasColumnType("bigint");
-
                     b.Property<long>("NpcSpawnId")
                         .HasColumnType("bigint");
 
                     b.Property<int>("Ordinal")
                         .HasColumnType("integer");
+
+                    b.Property<long>("MorphId")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("Text")
                         .IsRequired()
@@ -1929,20 +1907,18 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<float>("Value")
                         .HasColumnType("real");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcSpawnId");
+                    b.HasKey("NpcSpawnId", "Ordinal");
 
                     b.ToTable("NpcSpawnMorphs");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpell", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<long>("NpcTemplateId")
                         .HasColumnType("bigint");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<long>("SpellId")
+                        .HasColumnType("bigint");
 
                     b.Property<int>("Duration")
                         .HasColumnType("integer");
@@ -1959,18 +1935,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<byte>("Magnitude")
                         .HasColumnType("smallint");
 
-                    b.Property<long>("NpcTemplateId")
-                        .HasColumnType("bigint");
-
                     b.Property<byte>("Rank")
                         .HasColumnType("smallint");
 
-                    b.Property<long>("SpellId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcTemplateId");
+                    b.HasKey("NpcTemplateId", "SpellId");
 
                     b.ToTable("NpcSpells");
                 });
@@ -2752,11 +2720,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.RecipeItem", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<long>("RecipeId")
                         .HasColumnType("bigint");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<byte>("Role")
+                        .HasColumnType("smallint");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
 
                     b.Property<long>("Flag")
                         .HasColumnType("bigint");
@@ -2764,23 +2735,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("ItemId")
                         .HasColumnType("bigint");
 
-                    b.Property<int>("Position")
-                        .HasColumnType("integer");
-
-                    b.Property<long>("RecipeId")
-                        .HasColumnType("bigint");
-
-                    b.Property<byte>("Role")
-                        .HasColumnType("smallint");
-
                     b.Property<long>("Trailing")
                         .HasColumnType("bigint");
 
-                    b.HasKey("Id");
+                    b.HasKey("RecipeId", "Role", "Position");
 
                     b.HasIndex("ItemId");
-
-                    b.HasIndex("RecipeId");
 
                     b.ToTable("RecipeItems", t =>
                         {
@@ -2864,22 +2824,16 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ShopItem", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("Count")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("ItemTemplateId")
+                    b.Property<long>("ShopId")
                         .HasColumnType("bigint");
 
                     b.Property<long>("Pos")
                         .HasColumnType("bigint");
 
-                    b.Property<long>("ShopId")
+                    b.Property<long>("Count")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ItemTemplateId")
                         .HasColumnType("bigint");
 
                     b.Property<long>("Stat356")
@@ -2888,12 +2842,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("TailLevel")
                         .HasColumnType("bigint");
 
-                    b.HasKey("Id");
+                    b.HasKey("ShopId", "Pos");
 
                     b.HasIndex("ItemTemplateId");
-
-                    b.HasIndex("ShopId", "Pos")
-                        .IsUnique();
 
                     b.ToTable("ShopItems");
                 });

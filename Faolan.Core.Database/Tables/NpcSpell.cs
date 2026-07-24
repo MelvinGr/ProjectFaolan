@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -12,7 +13,10 @@ namespace Faolan.Core.Database.Tables
 	//
 	// The 54-byte ApplySpell effect payload is now DECODED into columns (#304, NpcSpellEffectCodec): the sim BUILDS
 	// the wire payload from these instead of replaying a stored blob. See NpcSpellEffect for the byte layout.
-	public class NpcSpell : BaseEntity
+	// Keyed by (caster TYPE, wire spell id) - one row per spell a type casts, which is what the importer already
+	// deduped on. A natural key so a re-harvest doesn't renumber the table (see ConversationNode).
+	[PrimaryKey(nameof(NpcTemplateId), nameof(SpellId))]
+	public class NpcSpell
 	{
 		// The NPC TYPE that casts this spell (#244, contract step done): the loader reads spells via this FK
 		// (NpcTemplate.Spells), so a spell whose caster has no NpcTemplate type isn't stored. Resolved from the caster name at import.

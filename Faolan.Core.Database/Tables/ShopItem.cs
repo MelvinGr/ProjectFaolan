@@ -6,8 +6,11 @@ namespace Faolan.Core.Database.Tables
 	// One ware in a shop window: a standard InventoryListEntry whose ProtoAcgItem identity lives in the Items
 	// table (the importer harvests the wares' quads/archetypes into Items from the same packet, so the template
 	// resolves). Stat356/TailLevel are the shop-specific entry fields, kept verbatim for byte-exact rebuilds.
-	[Index(nameof(ShopId), nameof(Pos), IsUnique = true)]
-	public class ShopItem : BaseEntity
+	// Keyed by its SLOT in the shop window - the identity the importer already deduped on as a unique index, now
+	// promoted to the primary key. The wares are delete+reinserted on every re-harvest, so a surrogate id was
+	// renumbering all 782 rows (~17 times over) and churning faolan.sql for no semantic change.
+	[PrimaryKey(nameof(ShopId), nameof(Pos))]
+	public class ShopItem
 	{
 		[ForeignKey(nameof(ItemTemplateId))]
 		public virtual Item Item { get; set; } = null!;
