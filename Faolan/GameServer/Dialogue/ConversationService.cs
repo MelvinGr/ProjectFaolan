@@ -296,7 +296,7 @@ namespace Faolan.GameServer.Dialogue
 				// from the typed screen columns re-addressed to the live player + clicked NPC.
 				var senderInstance = p.SenderInstance ?? DefaultSenderInstance;
 				if (subOp == ConversationSubOpcode.SetDialogueCamera)
-					await SendDialogueCamera(client, senderInstance, liveInstance, clickedNpcHandle, p.CameraParams!);
+					await SendDialogueCamera(client, senderInstance, liveInstance, clickedNpcHandle, DialogueCameraBody.BuildParams(p));
 				else
 					await SendConstructedKnubot(client, senderInstance, liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName));
 			}

@@ -7,7 +7,7 @@ namespace Faolan.Core.Database.Tables
 	// One response packet of a ConversationNode, in send order (Sequence). FULLY STRUCTURED (#188) - the raw on-wire
 	// Data blob is retired; the runtime constructs the packet entirely from typed columns: SubOpcode (the Knubot
 	// dialogue IIR or the 0x2015 camera) + Env/Field/Flag scalars + SenderInstance + the decoded remoteformat
-	// screen(s) as typed ConversationScreen rows (Screens) / CameraParams for the camera. The screen text is dialogue
+	// screen(s) as typed ConversationScreen rows (Screens) / the Shot* columns for the camera. The screen text is dialogue
 	// content (its content key is the harvested, client-validated hash); the live player name/guild are regenerated
 	// into the name/guildname parameters, and the npc/player handles re-addressed, at send time.
 	public class ConversationPacket : BaseEntity
@@ -24,18 +24,30 @@ namespace Faolan.Core.Database.Tables
 		// --- structured screen (#188) ----------------------------------------------------------------------------
 		// SubOpcode is the Knubot dialogue IIR (0x045B0B0F / 0x4A3D899A / 0xF164A4A5 / 0xC4AF39EB) OR the dialogue
 		// camera (0x2015 DispatchSetDialogueCamera) - REQUIRED (the importer rejects a packet it can't decode).
-		// Knubot uses Env/Field/Flag + the Screens rows; the camera uses CameraParams. Both use SenderInstance and
+		// Knubot uses Env/Field/Flag + the Screens rows; the camera uses the Shot*/Autoface/HeadPaddingY columns. Both use SenderInstance and
 		// the live npc/player handles at send time.
 		public ConversationSubOpcode? SubOpcode { get; set; }
 
 		public byte? Env { get; set; } // KnubotBaseIIR env byte
 		public byte? Flag { get; set; } // OpenChatWindow/AppendText trailing flag (null otherwise)
-		public byte[]? CameraParams { get; set; }
 
 		public int Sequence { get; set; }
 
-		// SetDialogueCamera (0x2015): the 10 camera param bytes after the two endpoint handles. Body =
-		// [0xC350][npc][0xC350][player][CameraParams]. The sender instance is SenderInstance (shared with Knubot).
+		// SetDialogueCamera (0x2015): the camera arguments after the two endpoint handles. Body =
+		// [0xC350][npc][0xC350][player][camera args]. The sender instance is SenderInstance (shared with Knubot).
+		// COLUMNIZED (#410) from the 10-byte CameraParams blob, named after the client's own signature
+		// DispatchSetDialogueCamera(i_cTargetID, i_cOther, nShotSize, nShotType, nShotEmphasis, nShotFov, nShotTilt,
+		// bAutoface, i_vHeadPaddingY) - five bytes, a bool byte, then a big-endian float, exactly 10. Null on every
+		// non-camera (Knubot) packet. Observed across the corpus: size 3/5, type 1/4, emphasis 1, fov 25, tilt
+		// 0/5/10, autoface 0/1, headPaddingY 0.
+		public byte? ShotSize { get; set; }
+		public byte? ShotType { get; set; }
+		public byte? ShotEmphasis { get; set; }
+		public byte? ShotFov { get; set; }
+		public byte? ShotTilt { get; set; }
+		public bool? Autoface { get; set; }
+		public float? HeadPaddingY { get; set; }
+
 		public uint? Field { get; set; } // AppendText/CloseChatWindow scalar (null for Open/AnswerList)
 
 		// The rpcHeader caller endpoint instance the packet was sent from - retail VARIES the GameAgent instance per

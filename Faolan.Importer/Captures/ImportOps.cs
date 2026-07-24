@@ -965,7 +965,13 @@ namespace Faolan.Importer.Captures
 				Field = cols.Field,
 				Flag = cols.Flag,
 				SenderInstance = cols.SenderInstance,
-				CameraParams = cols.CameraParams
+				ShotSize = cols.Camera?.ShotSize,
+				ShotType = cols.Camera?.ShotType,
+				ShotEmphasis = cols.Camera?.ShotEmphasis,
+				ShotFov = cols.Camera?.ShotFov,
+				ShotTilt = cols.Camera?.ShotTilt,
+				Autoface = cols.Camera?.Autoface,
+				HeadPaddingY = cols.Camera?.HeadPaddingY
 			};
 			if (cols.Screens != null)
 			{

@@ -111,6 +111,8 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			}
 		}
 
+		private const int CameraParamsLength = 10;
+
 		// DispatchSetDialogueCamera (opcode 0x2015 in the rpcHeader, not an IIR sub). Payload (after the rpcHeader)
 		// = [u32 0xC350][u32 npc][u32 0xC350][u32 player][CameraParams]. We store the GameCharAgent sender instance
 		// (varies per conversation) + the param bytes; the npc/player are re-addressed live at send time.
@@ -125,8 +127,17 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				return null;
 
 			var agentInstance = RpcCallerInstance(data);
-			var paramsBytes = data.AsSpan(start + 16).ToArray();
-			return new Columns((ConversationSubOpcode)SetDialogueCamera, null, null, null, null, agentInstance, paramsBytes);
+			var paramsBytes = data.AsSpan(start + 16);
+
+			// The client's signature after the two endpoint handles is (nShotSize, nShotType, nShotEmphasis, nShotFov,
+			// nShotTilt, bAutoface, i_vHeadPaddingY) = 5 bytes + a bool byte + a big-endian float = exactly 10.
+			if (paramsBytes.Length != CameraParamsLength)
+				return null;
+
+			var camera = new CameraArgs(paramsBytes[0], paramsBytes[1], paramsBytes[2], paramsBytes[3], paramsBytes[4], paramsBytes[5] != 0,
+				BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32BigEndian(paramsBytes.Slice(6, 4))));
+
+			return new Columns((ConversationSubOpcode)SetDialogueCamera, null, null, null, null, agentInstance, camera);
 		}
 
 		// The caller endpoint instance from the rpcHeader: [0x0A len][0x0D class:u32][0x10 instance:varint].
@@ -163,6 +174,13 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		// importer columnizes each into ConversationScreen rows via ConversationScreenColumns.ToRow). SenderInstance
 		// is the rpcHeader caller endpoint instance (retail varies it per conversation), stored so the send path
 		// re-frames from columns instead of the raw Data blob; CameraParams is the SetDialogueCamera payload.
-		public sealed record Columns(ConversationSubOpcode SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string>? Screens, uint? SenderInstance = null, byte[]? CameraParams = null);
+		// Camera* are the SetDialogueCamera arguments, split out of the wire bytes (#410): nShotSize, nShotType,
+		// nShotEmphasis, nShotFov, nShotTilt, bAutoface, i_vHeadPaddingY - null on every Knubot packet.
+		public sealed record Columns(ConversationSubOpcode SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string>? Screens, uint? SenderInstance = null,
+			CameraArgs? Camera = null);
+
+		// Exactly the ten wire bytes, typed. A camera packet that is not ten bytes long is NOT decodable into these
+		// columns, so DecodeCamera rejects it rather than importing a row that would rebuild different bytes.
+		public sealed record CameraArgs(byte ShotSize, byte ShotType, byte ShotEmphasis, byte ShotFov, byte ShotTilt, bool Autoface, float HeadPaddingY);
 	}
 }
