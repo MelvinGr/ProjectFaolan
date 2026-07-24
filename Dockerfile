@@ -40,6 +40,12 @@ WORKDIR /app
 
 COPY --from=build /app/publish ./
 
+# The game data. The image ships the SEED, not a database: the server builds one on first start from the EF
+# migrations + faolan.sql (DatabaseInitializer) into the mounted /app/data, so a container never mutates a file
+# from the repo and a clean deploy is just an empty directory. Global.SeedPath looks for faolan.sql beside the
+# exe, which is where this lands; the sidecar carries the auto-increment counter resync.
+COPY faolan.sql faolan.seq.sqlite.sql faolan.seq.postgres.sql ./
+
 # Ports for the all-in-one default run
 #EXPOSE 7001 7010 7011 7012 7014
 

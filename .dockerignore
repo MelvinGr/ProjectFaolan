@@ -27,8 +27,8 @@ README.md
 Faolan.Files
 
 # Projects + assets not in the server's build graph (the Dockerfile copies only Faolan, Faolan.Core, Faolan.Mcp).
-# Keeps the build context small (Captures alone is hundreds of MB of pcaps/JSON). faolan.json + faolan.db at the
-# repo root are NOT matched here and ARE shipped into the image.
+# Keeps the build context small (Captures alone is hundreds of MB of pcaps/JSON). faolan.sql + its counter
+# sidecars at the repo root are NOT matched here - the image ships the SEED and builds its database from it.
 Faolan.Tests
 Faolan.Importer
 Faolan.ClientLauncher

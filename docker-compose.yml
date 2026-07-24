@@ -7,14 +7,14 @@
 # so every game process sets its config in `environment:` - shared here via the `x-faolan-config` anchor. Two caveats:
 #   - ServerIpAddress must be an address the CLIENT can reach (the host IP / a resolvable hostname), NOT 127.0.0.1 -
 #     the login tier advertises it (and each Realm row's IpAddress) and the client connects there from OUTSIDE Docker.
-#   - The all-in-one SQLite default bind-mounts faolan.db; a shared multi-realm deployment wants Postgres (no
-#     single-writer file lock) - see the commented POSTGRES section.
+#   - The all-in-one SQLite default builds its database into the bind-mounted ./data on first start; a shared
+#     multi-realm deployment wants Postgres (no single-writer file lock) - see the commented POSTGRES section.
 
 name: projectfaolan
 
 x-faolan-config: &faolan-config
   Database__Provider: Sqlite                            # nested key -> env uses the __ separator (Database:Provider)
-  Database__ConnectionString: "Data Source=/app/faolan.db"
+  Database__ConnectionString: "Data Source=/app/data/faolan.db"
   ServerIpAddress: "127.0.0.1"   # host IP / hostname for a real deploy (see note above)
   UniverseAgentPort: 7010
   PlayerAgentPort: 7011
@@ -33,10 +33,11 @@ services:
       - "7014:7014" # GameServer (realm world)
       - "7012:7012" # AgentServer (chat)
       - "7001:7001" # CsPlayerAgent (guilds/teams)
-    # Persist character saves + EF migrations across restarts. Bind-mounts the committed faolan.db, so it is
-    # MUTATED in place; for a clean deploy copy faolan.db somewhere else and bind that path instead.
+    # Persist the database across restarts. It is BUILT on first start from the migrations + the faolan.sql baked
+    # into the image, then mutated in place by character saves - so this binds a DIRECTORY the container can create
+    # the file in, and a clean deploy is just `rm -rf ./data`. Nothing from the repo is mutated.
     volumes:
-      - ./faolan.db:/app/faolan.db
+      - ./data:/app/data
     restart: unless-stopped
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -53,7 +54,7 @@ services:
 #      - "7010:7010"
 #      - "7011:7011"
 #    volumes:
-#      - ./faolan.db:/app/faolan.db
+#      - ./data:/app/data
 #    restart: unless-stopped
 #
 #  realm-2:
@@ -66,7 +67,7 @@ services:
 #      - "7012:7012"
 #      - "7001:7001"
 #    volumes:
-#      - ./faolan.db:/app/faolan.db
+#      - ./data:/app/data
 #    restart: unless-stopped
 #
 #  realm-3:
@@ -79,14 +80,14 @@ services:
 #      - "7022:7022"
 #      - "7021:7021"
 #    volumes:
-#      - ./faolan.db:/app/faolan.db
+#      - ./data:/app/data
 #    restart: unless-stopped
 
 # ---------------------------------------------------------------------------------------------------------------
-# POSTGRES backend (commented). Run the game DB on Postgres instead of the bind-mounted SQLite faolan.db - the store
+# POSTGRES backend (commented). Run the game DB on Postgres instead of the per-container SQLite file - the store
 # for a shared multi-realm deployment (no single-writer file lock). To use it:
 #   1. Uncomment the `postgres` service + the top-level `volumes:` block below.
-#   2. On each game process, MERGE the anchor and override the DB keys (env > everything), DROP its `./faolan.db`
+#   2. On each game process, MERGE the anchor and override the DB keys (env > everything), DROP its `./data`
 #      bind mount, and add `depends_on: [postgres]`:
 #          environment:
 #            <<: *faolan-config
@@ -117,13 +118,13 @@ services:
 #    image: projectfaolan-web
 #    environment:
 #      Database__Provider: Sqlite
-#      Database__ConnectionString: "Data Source=/app/faolan.db"
+#      Database__ConnectionString: "Data Source=/app/data/faolan.db"
 #      RdbDir: "/rdb"                                             # the client RDB, mounted below
 #      CdnUrl: "http://host.docker.internal:7081/gameupdate/upm/rdb"
 #    ports:
 #      - "7080:8080"                                             # armory/viewer (Kestrel listens on 8080 in-container)
 #    volumes:
-#      - ./faolan.db:/app/faolan.db:ro                           # read-only roster
+#      - ./data:/app/data:ro                           # read-only roster
 #      - /path/to/client/RDB:/rdb:ro                             # the client RDB (3D models / renders)
 #    restart: unless-stopped
 
