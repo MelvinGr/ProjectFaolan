@@ -53,6 +53,39 @@ score each cat-50210 page's strings against the English names the `Spells` catal
 template `ExtractName`. The English page matches ~**97 %**; every other language scores **< 30 %**, so the winner
 is unambiguous and self-calibrating (no hard-coded page id).
 
+## What each name category keys
+
+A category's key space is identified by intersecting its string ids with each RDB **type**'s entry ids (873,588
+entries, `RdbReader.Entries`). Every name category resolves to exactly one type at ≥93 %, so the key is the
+resource id itself — there is no indirection through a separate "name id":
+
+| cat | keys RDB type | ids | hit | content |
+|---|---|---|---|---|
+| `50200` | `1000020` item template | 76,850 | 76,551 (99 %) | item **name** |
+| `50220` | `1000020` item template | 19,359 | 19,348 (99 %) | item **name** (a DISJOINT id set — see below) |
+| `50201` | `1000020` item template | 4,264 | 4,006 (93 %) | item **description** ("Deals piercing damage over time.") |
+| `50210` | `1040005` spell | 20,356 | 19,929 (97 %) | spell name |
+| `50211` | `1040005` spell | 3,754 | — | spell description |
+
+**`50200` and `50220` are two halves of one id space, not name vs. polished-name.** They overlap in exactly
+**4** of 96,209 ids, and on all 4 they carry the *same* string (`126183` → "Zealot: HP Regeneration (1)" in
+both). Between them they name **95,895 of the 98,048** item templates. `50220`'s half is the
+training/proficiency items ("Basic Cloth Armor", "Equip: Cloth Armor", "1HB Damage and Combos 40-60"); all
+3,240 of our named catalog items fall in `50200`'s half, and **none** in `50220`'s.
+
+So `LDB[50200][item.Id]` on the English page **is** the localized, player-facing name — it is not shadowed by a
+polished name elsewhere. Cross-checking the English page (226593) against the French one (226589): **84 %** of
+the 76,841 entries genuinely differ (translated), and the 16 % that are byte-identical are the dev codenames for
+NPC-only gear (`NPC_Stygia_splintmail_medium_chest_(A0013/A0118)`) — untranslated because retail displayed them
+as-is. Restricted to our 3,240 items the split is 2,176 translated / 1,064 dev codenames.
+
+Where the catalog and the LDB disagree (**9** items) the LDB is the *fuller* string, because the template's
+embedded `ExtractName` is an internal short name: template `716360` embeds `Hathor-Ka`, the LDB says
+**"Hathor-Ka's Note"** (likewise `Alchemist` → "Alchemist's Offal Creel", `Veteran` → "Veteran's Path"). The
+other 6 are capture-derived names for NPC gear (`Scavenger Lackey Boots` vs the LDB's dev codename). The
+importer's fill-EMPTIES-only policy leaves all 9 alone deliberately — overwriting a capture-observed name from
+an asset file is the one direction this project doesn't take.
+
 ## Importer
 
 `RdbLdbNameImporter` (module `rdb-ldb-names`, runs after `rdb-spells`) parses the name-category pages, crib-picks
@@ -71,11 +104,11 @@ the spell + item crib scores.
 
 ## Still open
 
-- **Polished item names** — cat `50200` (id == item id, backfilled above) carries the same **dev-style** names our
-  template `ExtractName` already uses (e.g. `NPC_Aquilonia_na_heavy_head_(A0296/NA)` for NPC-only gear alongside
-  real ones like `High Priest Leather Cap`), so it recovers a catalog-CONSISTENT name but not the polished localized
-  UI name. Those live in cat `50220` (e.g. "Basic Cloth Armor"), which is keyed by a **separate name-id, NOT the item
-  id** (its ids don't overlap the item ids at all), so it needs the item template's name-id field decoded first.
+- **Item descriptions** — cat `50201` is keyed by item id and holds the tooltip text (4,006 templates, 421 of
+  them ours). Nothing reads it yet; `Items` has no description column.
+- **Catalog coverage** — the LDB names **76,546** item templates but the catalog holds **3,245** rows, because an
+  item only enters it when a capture yields its TEA key quad. The 73,339 named-but-uncataloged templates are a
+  name source for whatever fills that gap.
 - **Missing catalog rows** — e.g. spell `222682` is absent from `Spells` entirely (an extraction gap, #402), so
   there is no row to name; that is separate from the name *source* this solved.
 - **Appearance (hair) names** (#291's original target) — the hair LDB page holds only ~15 internal art codenames,

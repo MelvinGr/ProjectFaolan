@@ -25,10 +25,15 @@ resolves the blend + a backlash roll on deactivate.
 
 ## Data model (DONE)
 
-- **`Combos`** catalog — RDB 1010206 (plaintext XML). `Name` is an engine name `{Class}_{level}_{tags}_{Display}_{Rank}`,
-  `Level` = unlock level, `Actions` = the required input (melee: `UR,UP`; weave/reactive: markers like `MagicCombo`/
-  `Magic_Reactive`), `GameActionId`, `ParentId` (= the weapon-VARIANT group root, NOT the input chain), `Criteria`
-  (weapon/state).
+- **`Combos`** catalog — RDB 1010206 (plaintext XML), **744 rows = all 744 entries of the type**. `Name` is an engine
+  name `{Class}_{level}_{tags}_{Display}_{Rank}`, `Level` = unlock level, `Actions` = the required input (melee:
+  `UR,UP`; weave/reactive: markers like `MagicCombo`/`Magic_Reactive`), `GameActionId`, `ParentId` (= the
+  weapon-VARIANT group root, NOT the input chain), `Criteria` (weapon/state).
+  ⚠️ A combo with **no `<action>` children is written SELF-CLOSING** (`<combo … />`) — 151 of the 744: the bow attacks
+  (`Freefireattack`, `Sniperattack`), `firebreath`, `PowerAttack`, `Bladestorm`, the racial dance emotes. The carve
+  used to require a `</combo>` and skipped them silently, which is what made #313 read the
+  `0x00416541..0x00416549` block as "cataloged nowhere in faolan.db" and hunt for a TEA-encrypted RDB type that was
+  never involved. `RdbComboImporter.CarveComboXml` handles both forms (`RdbComboXmlTests`).
 - **`ClassCombo`** access map — `(Class, ComboId, Level)`, derived from the `Combos` name prefix
   (`CaptureAbilityImporter.DeriveClassCombosAsync`): the 8 literal class-name prefixes = the 8 archetypes that have
   combos. Validated by Hakotep's HoX `0x2076` combo book. 292 rows; casters empty.
