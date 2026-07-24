@@ -146,6 +146,8 @@ Two things already run ahead of that move:
   and tables are emitted in FK-dependency order so it loads with constraints enforced. No `CREATE TABLE` — the
   schema's one owner is the EF migrations — and no `__EFMigrationsHistory`, which is per-database bookkeeping.
   Characters are excluded (per-developer play state); the excluded set is derived from the model, not listed.
+  Rows are batched into multi-row `INSERT … VALUES (…),(…)` so the column list is paid once per 1000 rows rather
+  than per row (24 MB → 7.4 MB), while each row keeps its own LINE so the diff stays reviewable.
 - **`journal_mode=WAL`** — a persistent FILE-HEADER flag (no code, nothing to configure). Without it a reader
   BLOCKS a writer, so any concurrent read (a `sqlite3` query, the MCP server, Faolan.Web, another realm process)
   makes a live world write FAIL and be lost. ⚠️ A busy_timeout does NOT help and is already 30s by default

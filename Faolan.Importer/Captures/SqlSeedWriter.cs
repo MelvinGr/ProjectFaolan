@@ -35,6 +35,13 @@ namespace Faolan.Importer.Captures
 		// model rather than listed, because it is per-developer play state and not reference content.
 		private const string ExcludedRoot = "Characters";
 
+		// Rows per multi-row INSERT. The column list is the expensive part of this format - repeating it per row cost
+		// 16 MB of the 24 (68%), more than the values themselves for narrow tables - so it is paid once per BATCH
+		// instead. Both dialects accept `VALUES (..),(..)`; SQLite swallows 100k rows in one statement, but batching
+		// keeps any parser's memory bounded. Each row still gets its OWN LINE: faolan.sql is a reviewed artifact and
+		// a multi-megabyte single line would make its diffs useless.
+		private const int BatchRows = 1000;
+
 		public static (int Tables, int Rows) Write(DatabaseContext db, string bodyPath, string sqliteSidecarPath, string postgresSidecarPath)
 		{
 			// GROUPED BY TABLE, not per entity type: two entity types can share one table (EF table splitting - here
@@ -79,8 +86,16 @@ namespace Faolan.Importer.Captures
 
 				var columnList = string.Join(", ", columns.Select(Quote));
 				var clrTypes = properties.Select(p => p.ClrType).ToArray();
-				foreach (var row in rows)
-					body.AppendLine($"INSERT INTO {Quote(table)} ({columnList}) VALUES ({string.Join(", ", row.Select((v, i) => Literal(v, clrTypes[i])))});");
+				for (var start = 0; start < rows.Count; start += BatchRows)
+				{
+					var batch = rows.Skip(start).Take(BatchRows).ToList();
+					body.AppendLine($"INSERT INTO {Quote(table)} ({columnList}) VALUES");
+					for (var i = 0; i < batch.Count; i++)
+					{
+						var values = string.Join(", ", batch[i].Select((v, c) => Literal(v, clrTypes[c])));
+						body.AppendLine($"({values}){(i == batch.Count - 1 ? ";" : ",")}");
+					}
+				}
 
 				// A key the store generates needs its counter moved past the ids we just inserted explicitly.
 				var identity = entity.FindPrimaryKey()?.Properties.FirstOrDefault(p => p.ValueGenerated == ValueGenerated.OnAdd);
