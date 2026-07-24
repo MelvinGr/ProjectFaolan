@@ -1087,21 +1087,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
                 {
                     b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<string>("AnswerPath")
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
-
-                    b.Property<long>("CapturedInstance")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("CapturedNpcHandle")
-                        .HasColumnType("bigint");
 
                     b.Property<long?>("ConditionQuestId")
                         .HasColumnType("bigint");
@@ -1113,6 +1104,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<string>("NpcName")
+                        .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
@@ -1128,25 +1120,21 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.HasIndex("NpcTemplateId");
 
-                    b.HasIndex("NpcName", "TypeId", "AnswerPath", "ConditionQuestId", "ConditionQuestState")
-                        .IsUnique();
+                    b.HasIndex("NpcName", "TypeId", "AnswerPath");
 
                     b.ToTable("ConversationNodes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationPacket", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<long>("ConversationNodeId")
                         .HasColumnType("bigint");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
 
                     b.Property<bool?>("Autoface")
                         .HasColumnType("boolean");
-
-                    b.Property<long>("ConversationNodeId")
-                        .HasColumnType("bigint");
 
                     b.Property<byte?>("Env")
                         .HasColumnType("smallint");
@@ -1162,9 +1150,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.Property<long?>("SenderInstance")
                         .HasColumnType("bigint");
-
-                    b.Property<int>("Sequence")
-                        .HasColumnType("integer");
 
                     b.Property<byte?>("ShotEmphasis")
                         .HasColumnType("smallint");
@@ -1184,28 +1169,26 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long?>("SubOpcode")
                         .HasColumnType("bigint");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversationNodeId");
+                    b.HasKey("ConversationNodeId", "Sequence");
 
                     b.ToTable("ConversationPackets");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationScreen", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<long>("ConversationNodeId")
                         .HasColumnType("bigint");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<int>("PacketSequence")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
 
                     b.Property<long?>("Antitag")
                         .HasColumnType("bigint");
 
                     b.Property<long>("Category")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("ConversationPacketId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("Key")
@@ -1219,26 +1202,24 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long>("ScreenId")
                         .HasColumnType("bigint");
 
-                    b.Property<int>("Sequence")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversationPacketId");
+                    b.HasKey("ConversationNodeId", "PacketSequence", "Sequence");
 
                     b.ToTable("ConversationScreens");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationScreenParameter", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<long>("ConversationNodeId")
                         .HasColumnType("bigint");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<int>("PacketSequence")
+                        .HasColumnType("integer");
 
-                    b.Property<long>("ConversationScreenId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("ScreenSequence")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer");
 
                     b.Property<string>("InnerRaw")
                         .IsRequired()
@@ -1250,12 +1231,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<int>("Sequence")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversationScreenId");
+                    b.HasKey("ConversationNodeId", "PacketSequence", "ScreenSequence", "Sequence");
 
                     b.ToTable("ConversationScreenParameters");
                 });
@@ -2281,6 +2257,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<long?>("ParentId")
                         .HasColumnType("bigint");
 
+                    b.Property<float?>("PathDirection1")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("PathDirection2")
+                        .HasColumnType("real");
+
                     b.Property<byte?>("PathFlags")
                         .HasColumnType("smallint");
 
@@ -2296,6 +2278,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Property<int?>("PathPacked2")
                         .HasColumnType("integer");
 
+                    b.Property<long?>("PathTrailerWord")
+                        .HasColumnType("bigint");
+
                     b.Property<long>("PatrolPathId")
                         .HasColumnType("bigint");
 
@@ -2306,6 +2291,27 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         .HasColumnType("integer");
 
                     b.Property<float?>("Speed")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("TargetRotationW")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("TargetRotationX")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("TargetRotationY")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("TargetRotationZ")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("TargetX")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("TargetY")
+                        .HasColumnType("real");
+
+                    b.Property<float?>("TargetZ")
                         .HasColumnType("real");
 
                     b.Property<byte?>("TrailerByte")
@@ -3764,7 +3770,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.ConversationPacket", "Packet")
                         .WithMany("Screens")
-                        .HasForeignKey("ConversationPacketId")
+                        .HasForeignKey("ConversationNodeId", "PacketSequence")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -3775,7 +3781,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.ConversationScreen", "Screen")
                         .WithMany("Parameters")
-                        .HasForeignKey("ConversationScreenId")
+                        .HasForeignKey("ConversationNodeId", "PacketSequence", "ScreenSequence")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

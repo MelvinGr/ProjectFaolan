@@ -132,6 +132,20 @@ navigations explicitly with `Include`. All access goes through `IDatabaseReposit
 git) and the server only migrates + reads/writes at save/load points. The sqlite3 CLI has foreign keys
 OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan child rows.
 
+**Model conventions** (enforced by `Faolan.Tests/DatabaseConventionTests.cs`):
+- **A foreign key is declared with `[ForeignKey]` on the navigation property — never a fluent
+  `.HasForeignKey(...)`.** Reading `Tables/Foo.cs` must tell you what `Foo` points at; a fluent FK moves half of
+  that into `OnModelCreating`. A **composite** key is no exception and is not a reason to reach for the fluent
+  API — `[ForeignKey]` takes a comma-separated column list, kept rename-safe with `nameof`:
+  `[ForeignKey($"{nameof(ConversationNodeId)},{nameof(PacketSequence)}")]`. What legitimately stays fluent is
+  everything that is *not* the FK column mapping: `.OnDelete(...)` (no attribute exists),
+  `.ValueGeneratedNever()`, and the `HasMany`/`WithOne` pairing that names both ends.
+- **A table the importer delete+reinserts must have a natural or derived key, never an AUTOINCREMENT
+  surrogate** — a surrogate is reassigned on every re-harvest, so a reimport churns thousands of `faolan.sql`
+  lines for zero semantic change, and cascades into every child FK. Use `[PrimaryKey(...)]` on a plain class
+  (not `BaseEntity`); where the identity is too wide to carry down a tree, derive the root id from it
+  (`ConversationNode.ComputeId`) and key each child by its parent's key + its own `Sequence`.
+
 **SQLite is INTERIM (#379).** The goal is a real DB with the schema+seed as a `.sql` file, dropping the binary.
 Two things already run ahead of that move:
 - **`faolan.sql` — the reviewable mirror of `faolan.db`'s DATA, and a seed that loads into BOTH SQLite and

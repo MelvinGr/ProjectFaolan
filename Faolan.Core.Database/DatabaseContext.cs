@@ -311,11 +311,12 @@ namespace Faolan.Core.Database
 			// importer, never generated.
 			modelBuilder.Entity<MorphTarget>().Property(t => t.Id).ValueGeneratedNever();
 
-			// A conversation node is identified by the clicked NPC + the player's TalkToNpc args. The NPC handle is
-			// part of the key because (TypeId, Mode, Field3) is NOT NPC-unique: the same mode means different
-			// conversations for different NPCs / quest states (e.g. mode 1 is Casilda's create intro but Kalanthes's
-			// regular login dialog). Handles are stable because scenes are replayed verbatim. Packets cascade-delete.
-			// The dedup key is an [Index] attribute on the entity.
+			// The dialogue tree (node -> packet -> screen -> parameter) is keyed by POSITION all the way down, so a
+			// re-import - the importer delete+reinserts the whole tree - reproduces the same keys instead of
+			// renumbering surrogates and churning faolan.sql (see ConversationNode for the full why). The node's own
+			// id is derived from its identity and never store-generated; each child's key is its parent's key plus
+			// its Sequence, so every FK below the root is composite. Children cascade-delete with their parent.
+			modelBuilder.Entity<ConversationNode>().Property(n => n.Id).ValueGeneratedNever();
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<ConversationPacket>().HasMany(p => p.Screens).WithOne(s => s.Packet).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<ConversationScreen>().HasMany(s => s.Parameters).WithOne(sp => sp.Screen).OnDelete(DeleteBehavior.Cascade);

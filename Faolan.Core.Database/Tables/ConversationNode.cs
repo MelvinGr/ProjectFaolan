@@ -1,20 +1,33 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One NPC-conversation SCREEN, keyed by (NpcName, TypeId, AnswerPath) - the player's path through the dialogue
-	// tree. Holds the captured response packets to replay (ordered), plus the captured NPC handle + player instance
-	// that the runtime substitutes for the live ones. Imported from captures by Faolan.Importer; replayed by
-	// ConversationReplay (which routes a live KnubotAnswer index along the AnswerPath).
-	// Keyed for dedup by NPC NAME (stable identity), not the session-volatile handle. A screen can have
-	// quest-state-gated variants under one (name, type, path), so the condition columns are part of it.
-	// NpcName is nullable and SQLite treats NULLs as distinct, so nodes whose NPC couldn't be named stay separate.
-	[Index(nameof(NpcName), nameof(TypeId), nameof(AnswerPath), nameof(ConditionQuestId), nameof(ConditionQuestState), IsUnique = true)]
-	public class ConversationNode : BaseEntity
+	// One NPC-conversation SCREEN, identified by (NpcName, TypeId, AnswerPath) + the quest-state gate - the player's
+	// path through the dialogue tree. Holds the response packets to send (ordered), fully structured since #188.
+	// Imported from captures by Faolan.Importer; served by ConversationService (which routes a live KnubotAnswer
+	// index along the AnswerPath). Identified by NPC NAME (stable), not the session-volatile handle. A screen can
+	// have quest-state-gated variants under one (name, type, path), so the condition columns are part of its identity.
+	//
+	// The PK is DERIVED from that identity (ComputeId), never store-generated. The importer delete+reinserts this
+	// whole table on every re-harvest, so an AUTOINCREMENT surrogate renumbered all 242 nodes - and, through the
+	// packet/screen/parameter children, ~8.8k rows - on every run, churning faolan.sql (the reviewable data mirror,
+	// #411) for zero semantic change. A derived id is byte-stable across re-imports instead. It also ENFORCES the
+	// identity, which the old unique index could not: two of its columns are nullable and SQL treats NULLs as
+	// distinct, so 232 of the 242 rows (the unconditional ones) were never constrained by it at all. Identical
+	// identities now collide on the PK. The index that remains is the runtime lookup path (GetConversationScreens),
+	// not a uniqueness gate.
+	[Index(nameof(NpcName), nameof(TypeId), nameof(AnswerPath))]
+	public class ConversationNode
 	{
+		[Key]
+		[DatabaseGenerated(DatabaseGeneratedOption.None)]
+		public uint Id { get; set; }
+
 		// The QUEST-STATE gate for this screen variant - how the SAME (NpcName, TypeId, AnswerPath) serves different
 		// dialogue by quest state (e.g. Casilda's pre- vs post-first-quest greeting). NULL = unconditional (the fallback).
 		// When set, the variant applies only while the player holds quest ConditionQuestId in state ConditionQuestState
@@ -42,6 +55,8 @@ namespace Faolan.Core.Database.Tables
 		// then the runtime falls back to name-only matching (create-flow scripted intros, etc.).
 		// Nullable BY DESIGN: the world is pruned, so a conversation NPC's TYPE may not be imported (e.g. the Conarch
 		// Village Guard's 42008 tree) - null there means "gate off, match by name only" rather than dropping the dialogue.
+		// NOT an identity column: it is a gate the name already determines (35 names, 35 name/template pairs), and a
+		// nullable column cannot key a row.
 		public uint? NpcTemplateId { get; set; }
 
 		[ForeignKey(nameof(NpcTemplateId))]
@@ -57,12 +72,41 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string AnswerPath { get; set; } = null!;
 
-		// The NPC's name, resolved at import from the captured FA015807 spawn with this handle. Display/routing hint;
-		// the runtime now gates on NpcTemplateId (below), not the name alone.
+		// The NPC's name, resolved at import from the captured FA015807 spawn with this handle - the identity the
+		// runtime routes on (GetConversationScreens), gated by NpcTemplateId. Never null: a node whose NPC could not
+		// be named from its capture stores the "#<handle>" fallback the importer's merge already dedups on, so it
+		// stays a distinct, addressable identity rather than a NULL no key can constrain.
 		[MaxLength(128)]
-		public string? NpcName { get; set; }
+		public string NpcName { get; set; } = null!;
 
-		public uint CapturedInstance { get; set; }
-		public uint CapturedNpcHandle { get; set; }
+		// The node's identity, hashed into its primary key. Every component is part of what makes this screen a
+		// DISTINCT screen, so two nodes agreeing on all of them are the same node and must collide. FNV-1a over a
+		// NUL-separated canonical rendering - neither NpcName (an entity name from a spawn body) nor AnswerPath
+		// (digits and '>') can contain a NUL, so the rendering is unambiguous. The importer asserts the ids it
+		// computes are distinct, so a hash collision fails the import rather than silently dropping a screen.
+		public static uint ComputeId(string npcName, uint typeId, string answerPath, uint? conditionQuestId, QuestState? conditionQuestState)
+		{
+			var identity = string.Join('\0', npcName, typeId.ToString(CultureInfo.InvariantCulture), answerPath, conditionQuestId?.ToString(CultureInfo.InvariantCulture) ?? "",
+				conditionQuestState?.ToString() ?? "");
+
+			var hash = 2166136261u;
+			foreach (var b in Encoding.UTF8.GetBytes(identity))
+			{
+				hash ^= b;
+				hash *= 16777619u;
+			}
+
+			return hash;
+		}
+
+		public uint ComputeId()
+		{
+			return ComputeId(NpcName, TypeId, AnswerPath, ConditionQuestId, ConditionQuestState);
+		}
+
+		public override string ToString()
+		{
+			return $"{Id} [{nameof(ConversationNode)}] {NpcName} '{AnswerPath}'";
+		}
 	}
 }

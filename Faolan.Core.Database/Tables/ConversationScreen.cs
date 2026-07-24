@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -10,11 +11,17 @@ namespace Faolan.Core.Database.Tables
 	// instead of storing it as text. A Knubot packet carries an ordered list of these (0..N; OpenChatWindow has
 	// none). Byte-exact vs the captured screen (ConversationConstructTests). The live player name/guild are
 	// regenerated into the "name"/"guildname" parameters at send time (RemoteFormatXml.WithLivePlayer).
-	public class ConversationScreen : BaseEntity
+	//
+	// Keyed by its position in the tree - (node, packet, Sequence) - like its ConversationPacket parent, so a
+	// re-import reproduces the same key (see ConversationNode). The leading two columns ARE the parent's key.
+	[PrimaryKey(nameof(ConversationNodeId), nameof(PacketSequence), nameof(Sequence))]
+	public class ConversationScreen
 	{
-		public uint ConversationPacketId { get; set; }
+		public uint ConversationNodeId { get; set; }
 
-		[ForeignKey(nameof(ConversationPacketId))]
+		public int PacketSequence { get; set; } // the owning ConversationPacket's Sequence
+
+		[ForeignKey($"{nameof(ConversationNodeId)},{nameof(PacketSequence)}")]
 		public virtual ConversationPacket Packet { get; set; } = null!;
 
 		public uint ScreenId { get; set; } // remoteformat @id (0 for the close screen)

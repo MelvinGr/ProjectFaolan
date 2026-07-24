@@ -21,8 +21,10 @@ namespace Faolan.Importer.Captures
 	// seed no longer has - keyed on the primary key. That works precisely because the seed is content-only: every
 	// table it covers that is referenced from OUTSIDE it (Items, Spells, QuestDefinitions, QuestGoalDefinitions,
 	// RespawnPoints, Maps) has a NATURAL, stable key, so a live character's inventory item or bound respawn point
-	// keeps pointing at the same row. The generated-id tables in the seed (WorldObjects, ConversationNodes, ...) are
-	// internal to it - nothing outside points into them, so their renumbering is invisible.
+	// keeps pointing at the same row. The generated-id tables that remain in the seed (WorldObjects, ...) are
+	// internal to it - nothing outside points into them, so their renumbering is invisible. The conversation tree
+	// is no longer among them: its keys are derived from each node's identity and each child's position, so a
+	// re-harvest reproduces them exactly and this merge sees only genuine content changes.
 	//
 	// The one thing a merge cannot decide for you is a row the new seed DROPS while something still references it -
 	// a character holding an item the catalog no longer has. That is reported and the upgrade REFUSES; silently

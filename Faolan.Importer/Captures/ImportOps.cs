@@ -257,26 +257,45 @@ namespace Faolan.Importer.Captures
 
 		public static async Task ImportConversations(DatabaseContext db, List<ConversationEntry> conversations)
 		{
-			var existing = await db.ConversationNodes.Include(n => n.Packets).ToListAsync();
-			db.ConversationPackets.RemoveRange(existing.SelectMany(n => n.Packets));
-			db.ConversationNodes.RemoveRange(existing);
+			// Clean rebuild, and the drop MUST land before the inserts are staged. The node ids are derived from the
+			// node's identity now, so a re-import of the same corpus reuses the very same keys - queueing the deletes
+			// and the inserts into one SaveChanges races them on the same primary key ("UNIQUE constraint failed:
+			// ConversationScreens..."). ExecuteDelete runs the DELETE immediately (inside the importer's transaction)
+			// and cascades to packets/screens/parameters in the database.
+			await db.ConversationNodes.ExecuteDeleteAsync();
 
 			// A conversation NPC's template must exist to be the FK target (#244); the world is pruned, so a template
 			// resolved from a capture may not be imported - null it out (name-only fallback) rather than fail the FK.
 			var knownTemplates = (await db.NpcTemplates.Select(t => t.TemplateId).ToListAsync()).ToHashSet();
 
+			// The node id is DERIVED from the node's identity (ConversationNode.ComputeId), so a re-harvest of the same
+			// corpus reproduces the same ids and faolan.sql doesn't churn. Two entries hashing to one id is either the
+			// same screen twice (the extractor's Merge should already have deduped it) or a genuine hash collision -
+			// both are import bugs, so name the pair and fail rather than let one screen silently overwrite the other.
+			var byId = new Dictionary<uint, string>();
+
 			foreach (var e in conversations)
 			{
+				// The NAME is the identity the runtime routes on, so it must be present. An entry whose NPC couldn't be
+				// named from its capture's spawns keeps the "#<handle>" fallback the extractor's Merge already dedups
+				// on - a distinct, addressable identity instead of a NULL (which no key constrains).
+				var npcName = string.IsNullOrEmpty(e.NpcName)
+					? $"#{e.CapturedNpcHandle}"
+					: e.NpcName;
+				var id = ConversationNode.ComputeId(npcName, e.TypeId, e.AnswerPath, e.ConditionQuestId, e.ConditionQuestState);
+				var identity = $"{npcName}/{e.TypeId}/'{e.AnswerPath}'/{e.ConditionQuestId}/{e.ConditionQuestState}";
+				if (!byId.TryAdd(id, identity))
+					throw new InvalidOperationException($"Conversation node id 0x{id:X8} is not unique: '{identity}' collides with '{byId[id]}'.");
+
 				db.ConversationNodes.Add(new ConversationNode
 				{
+					Id = id,
 					TypeId = e.TypeId,
 					AnswerPath = e.AnswerPath,
-					CapturedNpcHandle = e.CapturedNpcHandle,
-					NpcName = e.NpcName,
+					NpcName = npcName,
 					NpcTemplateId = e.NpcTemplateId is { } t && knownTemplates.Contains(t)
 						? t
 						: null,
-					CapturedInstance = e.CapturedInstance,
 					ConditionQuestId = e.ConditionQuestId,
 					ConditionQuestState = e.ConditionQuestState,
 					GrantQuestId = e.GrantQuestId == 0

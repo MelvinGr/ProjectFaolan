@@ -22,6 +22,27 @@ from the rows via `ConversationScreenColumns.ToScreen` → `RemoteFormatXml.Buil
 columns are authoritative. The screen TEXT (`key`) is the captured template; the content `key` is non-computable
 (same as the item TEA keys).
 
+### Keys — derived, so a re-import is byte-stable
+
+The tree carries **no surrogate ids**. A `ConversationNode`'s primary key is DERIVED from its identity —
+`ConversationNode.ComputeId(NpcName, TypeId, AnswerPath, ConditionQuestId, ConditionQuestState)`, FNV-1a over a
+NUL-separated rendering — and each child is keyed by its parent's key plus its own `Sequence`:
+`ConversationPacket` = `(node, Sequence)`, `ConversationScreen` = `(node, PacketSequence, Sequence)`,
+`ConversationScreenParameter` = `(node, PacketSequence, ScreenSequence, Sequence)`.
+
+The importer rebuilds the whole tree on every re-harvest (`conversations` is an `Overwrite`-only module: the
+merge scores each screen across ALL captures and keeps the winner, so it is not incremental). With
+AUTOINCREMENT that renumbered all 8781 rows every run, churning `faolan.sql` for no semantic change; with
+derived keys two runs over the same corpus produce byte-identical tables. Two consequences worth knowing:
+
+- The derived id also **enforces** the identity, which the old unique index could not — two of its columns are
+  nullable and SQL treats NULLs as distinct, so the 232 unconditional nodes were never constrained by it.
+- Because a re-import reuses the same keys, the rebuild must DELETE before it stages the inserts
+  (`ExecuteDeleteAsync`); queuing both into one `SaveChanges` races them on the same primary key.
+
+`NpcName` is non-nullable and is the identity the runtime routes on; a node whose NPC could not be named from
+its capture stores the `#<handle>` fallback the merge already dedups on.
+
 ### Session slots — regenerated, never stored (#417)
 
 A screen carries no dialogue text: `id`+`category` name a string in the CLIENT's LDB and each `<parameter>` fills

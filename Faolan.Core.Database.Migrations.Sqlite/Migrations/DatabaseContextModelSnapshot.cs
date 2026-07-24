@@ -1062,19 +1062,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
                 {
                     b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("AnswerPath")
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
-
-                    b.Property<uint>("CapturedInstance")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("CapturedNpcHandle")
-                        .HasColumnType("INTEGER");
 
                     b.Property<uint?>("ConditionQuestId")
                         .HasColumnType("INTEGER");
@@ -1086,6 +1079,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("NpcName")
+                        .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
@@ -1101,22 +1095,20 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.HasIndex("NpcTemplateId");
 
-                    b.HasIndex("NpcName", "TypeId", "AnswerPath", "ConditionQuestId", "ConditionQuestState")
-                        .IsUnique();
+                    b.HasIndex("NpcName", "TypeId", "AnswerPath");
 
                     b.ToTable("ConversationNodes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationPacket", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<uint>("ConversationNodeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool?>("Autoface")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("ConversationNodeId")
                         .HasColumnType("INTEGER");
 
                     b.Property<byte?>("Env")
@@ -1132,9 +1124,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("REAL");
 
                     b.Property<uint?>("SenderInstance")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Sequence")
                         .HasColumnType("INTEGER");
 
                     b.Property<byte?>("ShotEmphasis")
@@ -1155,26 +1144,26 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("SubOpcode")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversationNodeId");
+                    b.HasKey("ConversationNodeId", "Sequence");
 
                     b.ToTable("ConversationPackets");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationScreen", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<uint>("ConversationNodeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PacketSequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint?>("Antitag")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("Category")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("ConversationPacketId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Key")
@@ -1188,23 +1177,23 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("ScreenId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Sequence")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversationPacketId");
+                    b.HasKey("ConversationNodeId", "PacketSequence", "Sequence");
 
                     b.ToTable("ConversationScreens");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationScreenParameter", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<uint>("ConversationNodeId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("ConversationScreenId")
+                    b.Property<int>("PacketSequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ScreenSequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("InnerRaw")
@@ -1217,12 +1206,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Sequence")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversationScreenId");
+                    b.HasKey("ConversationNodeId", "PacketSequence", "ScreenSequence", "Sequence");
 
                     b.ToTable("ConversationScreenParameters");
                 });
@@ -3711,7 +3695,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.ConversationPacket", "Packet")
                         .WithMany("Screens")
-                        .HasForeignKey("ConversationPacketId")
+                        .HasForeignKey("ConversationNodeId", "PacketSequence")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -3722,7 +3706,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.ConversationScreen", "Screen")
                         .WithMany("Parameters")
-                        .HasForeignKey("ConversationScreenId")
+                        .HasForeignKey("ConversationNodeId", "PacketSequence", "ScreenSequence")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

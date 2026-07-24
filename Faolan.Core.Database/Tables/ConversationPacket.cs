@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -10,12 +11,19 @@ namespace Faolan.Core.Database.Tables
 	// screen(s) as typed ConversationScreen rows (Screens) / the Shot* columns for the camera. The screen text is dialogue
 	// content (its content key is the harvested, client-validated hash); the live player name/guild are regenerated
 	// into the name/guildname parameters, and the npc/player handles re-addressed, at send time.
-	public class ConversationPacket : BaseEntity
+	//
+	// Keyed by (node, Sequence): its position in the node's send order IS its identity, so a re-import reproduces the
+	// same key instead of renumbering a surrogate and churning faolan.sql (see ConversationNode). The key widens by
+	// one column per level down the tree, which is why only the ROOT needs a derived id.
+	[PrimaryKey(nameof(ConversationNodeId), nameof(Sequence))]
+	public class ConversationPacket
 	{
 		public uint ConversationNodeId { get; set; }
 
 		[ForeignKey(nameof(ConversationNodeId))]
 		public virtual ConversationNode Node { get; set; } = null!;
+
+		public int Sequence { get; set; }
 
 		// The decoded remoteformat dialogue screen(s), STRUCTURED (#188) - the runtime builds the wire XML from these
 		// rows (ConversationScreenColumns.ToScreen -> RemoteFormatXml.Build). Empty for OpenChatWindow / non-Knubot.
@@ -30,8 +38,6 @@ namespace Faolan.Core.Database.Tables
 
 		public byte? Env { get; set; } // KnubotBaseIIR env byte
 		public byte? Flag { get; set; } // OpenChatWindow/AppendText trailing flag (null otherwise)
-
-		public int Sequence { get; set; }
 
 		// SetDialogueCamera (0x2015): the camera arguments after the two endpoint handles. Body =
 		// [0xC350][npc][0xC350][player][camera args]. The sender instance is SenderInstance (shared with Knubot).
@@ -54,5 +60,10 @@ namespace Faolan.Core.Database.Tables
 		// conversation (0x07..0x5a; 0x08 most common) and the client addresses its KnubotAnswer back to it, so it's
 		// stored and re-framed at send time (was read from the raw Data blob, now retired).
 		public uint? SenderInstance { get; set; }
+
+		public override string ToString()
+		{
+			return $"{ConversationNodeId}#{Sequence} [{nameof(ConversationPacket)}] {SubOpcode}";
+		}
 	}
 }

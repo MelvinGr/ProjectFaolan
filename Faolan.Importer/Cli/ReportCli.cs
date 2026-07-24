@@ -591,7 +591,7 @@ namespace Faolan.Importer.Cli
 				vendorsSeen.Add(e.VendorName);
 
 			using var db = OpenDb();
-			var convImported = (await db.ConversationNodes.Where(n => n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+			var convImported = (await db.ConversationNodes.Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 			var shopImported = (await db.Shops.Select(s => s.VendorName).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
 			// A greeted VENDOR opens its shop, not a conversation - exclude vendors (imported shops) from the dialogue

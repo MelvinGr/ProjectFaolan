@@ -286,7 +286,7 @@ namespace Faolan.GameServer.Dialogue
 				// import bug; surface it rather than silently dropping the line.
 				if (p.SubOpcode is not { } subOp)
 				{
-					_logger.LogError("Conversation: packet {Id} (node {Node}) has no SubOpcode; the importer should have columnized it. Skipping.", p.Id, node.Id);
+					_logger.LogError("Conversation: packet #{Sequence} (node {Node}) has no SubOpcode; the importer should have columnized it. Skipping.", p.Sequence, node.Id);
 					continue;
 				}
 
@@ -336,7 +336,7 @@ namespace Faolan.GameServer.Dialogue
 				return;
 			}
 
-			client.Session.ConversationNpcName = node.NpcName!;
+			client.Session.ConversationNpcName = node.NpcName;
 			client.Session.ConversationTypeId = node.TypeId;
 			client.Session.ConversationAnswerPath = node.AnswerPath;
 			client.Session.ConversationNpcHandle = clickedNpcHandle;

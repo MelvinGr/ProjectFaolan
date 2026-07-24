@@ -159,7 +159,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var givers = (await ctx.ConversationNodes.Where(n => n.GrantQuestId > 0 && n.NpcName != null).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet();
+			var givers = (await ctx.ConversationNodes.Where(n => n.GrantQuestId > 0).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet();
 
 			var killTargets = await ctx
 				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Kill && g.TargetName != null && g.TargetName != "")
@@ -171,14 +171,14 @@ namespace Faolan.Core.Database.Repositories
 				.Distinct()
 				.ToListAsync();
 
-			return killTargets.Where(x => !givers.Contains(x.TargetName)).GroupBy(x => x.TargetName!).ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
+			return killTargets.Where(x => !givers.Contains(x.TargetName!)).GroupBy(x => x.TargetName!).ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
 		}
 
 		public async Task<Dictionary<string, uint>> GetQuestGiverMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var grants = await ctx
-				.ConversationNodes.Where(n => n.GrantQuestId > 0 && n.NpcName != null)
+				.ConversationNodes.Where(n => n.GrantQuestId > 0)
 				.Select(n => new
 				{
 					n.NpcName,
@@ -186,7 +186,7 @@ namespace Faolan.Core.Database.Repositories
 				})
 				.Distinct()
 				.ToListAsync();
-			return grants.GroupBy(g => g.NpcName!).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId!.Value));
+			return grants.GroupBy(g => g.NpcName).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId!.Value));
 		}
 
 		public async Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId)
