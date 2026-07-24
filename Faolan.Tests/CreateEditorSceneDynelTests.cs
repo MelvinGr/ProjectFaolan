@@ -62,7 +62,7 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task InitialBurst_WithDb_IsByteIdenticalToGolden()
 		{
-			var options = TestDb.ReadOnly(FaolanDbPath());
+			var options = TestDb.ReadOnly(TestPaths.FaolanDb);
 			var repo = new DatabaseRepository(new SingleOptionsContextFactory(options));
 			var client = new RecordingNetworkClient(0x02000001); // the instance the golden was recorded with
 
@@ -107,12 +107,6 @@ namespace Faolan.Tests
 			return message.DisplayName;
 		}
 
-		private static string FaolanDbPath([CallerFilePath] string thisFile = "")
-		{
-			// thisFile = <repo>/Faolan.Tests/CreateEditorSceneDynelTests.cs -> <repo>/faolan.db
-			return Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!, "faolan.db");
-		}
-
 		private static int IndexOf(byte[] haystack, byte[] needle, int start)
 		{
 			for (var i = start; i <= haystack.Length - needle.Length; i++)
@@ -136,7 +130,7 @@ namespace Faolan.Tests
 
 		private static Dictionary<string, WorldObject> LoadMap4000ObjectsByDisplayName()
 		{
-			var options = TestDb.ReadOnly(FaolanDbPath());
+			var options = TestDb.ReadOnly(TestPaths.FaolanDb);
 			using var ctx = new DatabaseContext(options);
 			var map = new Dictionary<string, WorldObject>();
 			foreach (var o in ctx.WorldObjects.Where(o => o.MapId == 4000 && o.DisplayName != null).AsNoTracking())

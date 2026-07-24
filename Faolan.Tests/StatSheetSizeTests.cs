@@ -59,7 +59,7 @@ namespace Faolan.Tests
 
 		private static async Task<QuestDefinition?> LoadDefinition()
 		{
-			await using var db = new DatabaseContext(TestDb.Options(TestPaths.FaolanDb));
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestPaths.FaolanDb)); // shared fixture - read-only so a future edit can't mutate it
 			return await db.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == BeachStarterQuestId);
 		}
 	}

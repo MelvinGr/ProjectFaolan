@@ -1,6 +1,12 @@
+using System;
+using System.IO;
+using System.Security.Cryptography;
+using System.Threading;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Enums;
+using Faolan.Tests.Support;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Tests
@@ -24,6 +30,71 @@ namespace Faolan.Tests
 	// THIS CLASS IS THE SINGLE SEAM: to change the strategy, edit only these two methods; the tests don't change.
 	public static class TestDb
 	{
+		// The real-data fixture, BUILT rather than checked in (#412): migrations + faolan.sql, through the very same
+		// DatabaseInitializer the server runs at startup. So the golden tests keep asserting against the shipped
+		// game DATA without depending on a shipped BINARY - and if seeding ever breaks, these tests break with it.
+		//
+		// Cached by the seed's content hash under the temp dir: a repeat run reuses it (the build is ~150ms of seed
+		// load plus a migrate, but free is better), and editing faolan.sql changes the hash so a stale fixture can
+		// never be picked up. Built to a unique temp name and MOVED into place, so two concurrent test runs racing on
+		// the same hash cannot observe a half-written database.
+		//
+		// NB it carries no CHARACTER rows - the seed excludes them as per-developer play state. No test needs them
+		// (verified: the whole suite passes against this fixture); one that does should create its own.
+		public static string GameDatabase => Fixture.Value;
+
+		private static readonly Lazy<string> Fixture = new(BuildFixture, LazyThreadSafetyMode.ExecutionAndPublication);
+
+		private static string BuildFixture()
+		{
+			var seed = TestPaths.Repo("faolan.sql");
+			var hash = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(seed)))[..16];
+			var directory = Path.Combine(Path.GetTempPath(), "faolan-tests");
+			Directory.CreateDirectory(directory);
+
+			var path = Path.Combine(directory, $"seed-{hash}.db");
+			if (File.Exists(path))
+				return path;
+
+			// DatabaseInitializer finds the seed through Global.SeedPath, which is CWD-relative - and the test host's
+			// CWD is the test bin directory, not the repo root. Point it at the real one.
+			Environment.SetEnvironmentVariable("FAOLAN_SEED", seed);
+
+			var building = $"{path}.{Guid.NewGuid():N}.tmp";
+			using (var db = new DatabaseContext(Options(building)))
+			{
+				DatabaseInitializer.InitializeAsync(db).GetAwaiter().GetResult();
+
+				// Fold the write-ahead log back into the database file. Without this the move below takes the main
+				// file and LEAVES ITS -wal BEHIND - i.e. potentially an incomplete database - because the seed's
+				// writes are still sitting in the log.
+				db.Database.ExecuteSqlRaw("PRAGMA wal_checkpoint(TRUNCATE);");
+			}
+
+			// Disposing the context returns its connection to Microsoft.Data.Sqlite's POOL rather than closing it, so
+			// the file (and any -wal/-shm) stays open and the move can fail or copy a locked, mid-checkpoint file.
+			SqliteConnection.ClearAllPools();
+
+			try
+			{
+				File.Move(building, path);
+			}
+			catch (IOException) when (File.Exists(path))
+			{
+				File.Delete(building); // another run won the race - its database is just as good
+			}
+			finally
+			{
+				foreach (var sidecar in new[] { $"{building}-wal", $"{building}-shm" })
+				{
+					if (File.Exists(sidecar))
+						File.Delete(sidecar);
+				}
+			}
+
+			return path;
+		}
+
 		// A writable throwaway SQLite database at `path` (typically a temp file). Routed through the shared
 		// UseFaolanDatabase (SQLite - the test fixture is always SQLite, see above) so it inherits the right migrations
 		// assembly + settings. Opt into lazy-loading proxies for the few tests that need them.

@@ -8,6 +8,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.GameServer.Dialogue;
 using Microsoft.EntityFrameworkCore;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -54,14 +55,9 @@ namespace Faolan.Tests
 			Assert.Equal(expectedHex, Convert.ToHexStringLower(body));
 		}
 
-		private static string DbPath([CallerFilePath] string thisFile = "")
-		{
-			return Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!, "faolan.db");
-		}
-
 		private static DatabaseRepository Repo()
 		{
-			var options = TestDb.ReadOnly(DbPath());
+			var options = TestDb.ReadOnly(TestPaths.FaolanDb);
 			return new DatabaseRepository(new Factory(options));
 		}
 

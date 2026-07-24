@@ -2,6 +2,7 @@ using System.IO;
 using System.Linq;
 using Faolan.Core.Database;
 using Microsoft.EntityFrameworkCore;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -23,7 +24,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void EveryShippedSpawn_BuildsFromColumns()
 		{
-			var db = Path.Combine(FindRepoRoot(), "faolan.db");
+			var db = TestPaths.FaolanDb;
 			var options = TestDb.ReadOnly(db);
 			using var ctx = new DatabaseContext(options);
 			var rows = ctx
@@ -42,14 +43,6 @@ namespace Faolan.Tests
 			foreach (var s in fallback.Take(20))
 				_out.WriteLine($"  {s.NpcTemplate?.Name} map={s.MapId}");
 			Assert.Empty(fallback);
-		}
-
-		private static string FindRepoRoot()
-		{
-			var d = new DirectoryInfo(Directory.GetCurrentDirectory());
-			while (d != null && !File.Exists(Path.Combine(d.FullName, "faolan.db")))
-				d = d.Parent;
-			return d?.FullName ?? throw new FileNotFoundException("faolan.db not found up-tree");
 		}
 	}
 }

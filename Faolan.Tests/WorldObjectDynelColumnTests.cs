@@ -3,6 +3,7 @@ using System.IO;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.World;
 using Microsoft.Data.Sqlite;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -17,7 +18,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void EveryPopulatedObject_BuildsFromColumns_AndRoundTrips()
 		{
-			var db = Path.Combine(FindRepoRoot(), "faolan.db");
+			var db = TestPaths.FaolanDb;
 			using var con = new SqliteConnection($"Data Source={db};Mode=ReadOnly");
 			con.Open();
 			using var cmd = con.CreateCommand();
@@ -68,14 +69,6 @@ namespace Faolan.Tests
 			Assert.Equal(0, mismatch);
 			Assert.Equal(0, noTail); // every lifted object carries its geometry columns (fully DB-buildable, no Data)
 			Assert.True(ok > 250, $"expected >250 objects built from columns, got {ok}");
-		}
-
-		private static string FindRepoRoot()
-		{
-			var d = new DirectoryInfo(Directory.GetCurrentDirectory());
-			while (d != null && !File.Exists(Path.Combine(d.FullName, "faolan.db")))
-				d = d.Parent;
-			return d?.FullName ?? Directory.GetCurrentDirectory();
 		}
 	}
 }

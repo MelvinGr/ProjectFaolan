@@ -15,8 +15,9 @@ namespace Faolan.Tests.Support
 		[Obsolete]
 		public static string CapturesDir => Path.Combine(RepoRoot(), "Captures");
 
-		// The committed game database at the repo root.
-		public static string FaolanDb => Path.Combine(RepoRoot(), "faolan.db");
+		// The real-data game database for tests. BUILT from the migrations + faolan.sql rather than read from the
+		// committed faolan.db (#412) - see TestDb.GameDatabase, which is the single place that strategy lives.
+		public static string FaolanDb => TestDb.GameDatabase;
 
 		// Faolan.Tests/Assets - capture blobs + render templates used as test INPUTS (Golden/ holds the expected
 		// OUTPUTS). The four strie-login-*/bigboy captures live here because only the test suite reads them.
