@@ -84,10 +84,11 @@ namespace Faolan.Tests
 			Assert.Null(RemoteFormatXml.ParseChatter(xml));
 		}
 
-		// Every shipped row must rebuild to something the parser reads back identically - the whole-table version of
-		// the gate above, run against the fixture built from faolan.sql.
+		// Whole-table CONSISTENCY, not fidelity - the same distinction as InnerElementXmlTests. The value it builds
+		// from is our own output, so it proves the columns express a legal bark, not that they match retail. Fidelity
+		// is the two [Fact] cases above, whose strings are real captured barks.
 		[Fact]
-		public async Task EveryShippedBark_RoundTripsThroughItsColumns()
+		public async Task EveryShippedBark_IsExpressibleAndSelfConsistent()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var rows = await db.NpcChatter.AsNoTracking().ToListAsync(TestContext.Current.CancellationToken);

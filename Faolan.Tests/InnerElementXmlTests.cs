@@ -71,10 +71,18 @@ namespace Faolan.Tests
 			Assert.Null(InnerElement.Parse(xml));
 		}
 
-		// The whole-corpus gate: every inner element the seed ships must round-trip. This is what would catch a new
-		// capture introducing a shape the grammar does not cover.
+		// Whole-table CONSISTENCY, not fidelity. Every shipped row must produce an element the parser reads back
+		// identically - which catches a row whose columns cannot express a legal element at all (a Localized row with
+		// neither id nor token, say).
+		//
+		// It deliberately does NOT claim byte-exactness against the capture, because it cannot: the serialized blobs
+		// were dropped when these columns replaced them, so there is nothing left in the database to compare to. The
+		// value it builds from is our own output, and a test fed its own output proves only self-consistency. FIDELITY
+		// is gated by the [Theory] cases above - those strings are real captured values, one per shape in the corpus -
+		// and, for the dialogue path, by ConversationConstructTests against captured packets. The full 8232-row
+		// comparison against the original blobs was run once, at migration time, before they were dropped.
 		[Fact]
-		public async Task EveryShippedInnerElement_RoundTripsByteExactly()
+		public async Task EveryShippedInnerElement_IsExpressibleAndSelfConsistent()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
