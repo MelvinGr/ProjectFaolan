@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -7,7 +8,9 @@ namespace Faolan.Core.Database.Tables
 	// equipment lives on the type here and TryBuildFromType builds it into the spawn body from these rows (instead of
 	// the retired NpcTemplate.Data blob). Same stored shape as NpcSpawnEquipment (INpcEquipment): slot + Template (FK to
 	// Items, the quad + hash live there) + Level; cascade-deletes with its NpcTemplate.
-	public class NpcEquipment : BaseEntity, INpcEquipment
+	// Keyed by (type, equipment SLOT) - the NpcTemplate-level twin of NpcSpawnEquipment, keyed the same way.
+	[PrimaryKey(nameof(NpcTemplateId), nameof(Pos))]
+	public class NpcEquipment : INpcEquipment
 	{
 		[ForeignKey(nameof(Template))]
 		public virtual Item Item { get; set; } = null!;

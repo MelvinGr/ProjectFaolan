@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -9,7 +10,10 @@ namespace Faolan.Core.Database.Tables
 	// referenced RDB object's own name= (texscript for tattoos, monsterdata for heads) and the swatch Color from the
 	// creator XML. The morph slider bounds and the height range ride as special Category rows (Min/Max set). This is
 	// what the Faolan.Web appearance editor reads for its race/sex-gated pickers (replacing a runtime XML parse).
-	public class AppearanceChoice : BaseEntity
+	// Keyed by (Race, Sex, Category, Sequence) - a choice IS its slot in one race/sex/category list, so there was
+	// never anything for a surrogate id to identify. Verified unique across all 634 rows.
+	[PrimaryKey(nameof(Race), nameof(Sex), nameof(Category), nameof(Sequence))]
+	public class AppearanceChoice
 	{
 		[ConstrainToEnumValues]
 		public Race Race { get; set; }

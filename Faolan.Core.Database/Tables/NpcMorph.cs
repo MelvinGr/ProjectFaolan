@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -7,7 +8,9 @@ namespace Faolan.Core.Database.Tables
 	// NpcSpawnMorph. A summon-only creature (pet/mount) has no placement, so its appearance lives on the type here and
 	// TryBuildFromType generates the post-IIR from these rows (instead of the retired NpcTemplate.Data blob). Ordinal preserves
 	// the wire order; the texscript entry (id 0x10D) carries a resource string in Text. Cascade-deletes with its NpcTemplate.
-	public class NpcMorph : BaseEntity
+	// Keyed by (type, Ordinal) - its position in the type's morph list, like its NpcSpawnMorph twin.
+	[PrimaryKey(nameof(NpcTemplateId), nameof(Ordinal))]
+	public class NpcMorph
 	{
 		public uint MorphId { get; set; }
 
