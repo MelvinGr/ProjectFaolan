@@ -2,6 +2,7 @@
     <Folder Name="/Solution Files/">
         <File Path=".dockerignore" />
         <File Path=".gitattributes" />
+        <File Path=".githooks/pre-commit" />
         <File Path=".gitignore" />
         <File Path="AGENTS.md" />
         <File Path="CLAUDE.md" />
@@ -10,6 +11,8 @@
         <File Path="Dockerfile" />
         <File Path="faolan.db" />
         <File Path="faolan.json" />
+        <File Path="faolan.seq.postgres.sql" />
+        <File Path="faolan.seq.sqlite.sql" />
         <File Path="faolan.sql" />
         <File Path="logo.ico" />
         <File Path="logo.png" />
