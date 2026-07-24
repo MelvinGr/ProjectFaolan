@@ -116,6 +116,12 @@ Struct + per-class trailer accounts for the record exactly, which is what makes 
 | `ClimbingDynelFullUpdateIIR` `0x1FD6412B` | `u32 x 1` | 49 |
 | `LootBagFullUpdateIIR` `0xF096251E` | protobuf | 15 |
 
+The container trailer is `[u32 len][ProtoLootBagIIR]` - the chest's loot CONTENTS, not geometry, which is why
+those 15 rows vary in length so much. It is capture-time session state, so the server does not persist it (a chest
+spawns with a clean empty scaffold and the loot system fills it). What the captures happened to hold was decoded
+before the column was retired and kept as evidence in
+[`container-loot-observed.json`](container-loot-observed.json) - 15 containers, 45 items, 12 distinct.
+
 ## No-op / out-of-band readers
 
 - `UpdateInventoryIIR_t` (`0xA74D2814`, `FUN_005b9230`) — `ReadSubClass` just `return 0`. The

@@ -1,0 +1,456 @@
+{
+  "_comment": [
+    "Captured loot contents of the 15 static world containers (chests), recovered from the WorldObjects.KdTreeTail",
+    "blob before it was retired in #410 (commit 814933ad). Decoded with LootBagMessageCodec from the container's",
+    "wire trailer: [u32 len][ProtoLootBagIIR].",
+    "",
+    "This is a SAMPLE, not a loot table: it is whatever each chest happened to hold at the moment of capture, so it",
+    "is evidence about what these containers drop, not a definition. The server does NOT persist it - a chest spawns",
+    "with a clean empty scaffold and the loot system fills it (LootContainerTemplate / WithLootContents).",
+    "",
+    "itemId is ProtoAcgItem.Template1; name is that id resolved against the Items table at dump time (null = the id",
+    "is not in Items)."
+  ],
+  "source": {
+    "issue": 410,
+    "recoveredFrom": "814933ad~1:faolan.db",
+    "containers": 15
+  },
+  "containers": [
+    {
+      "worldObjectId": 1089,
+      "name": "aquilonian_treasure_chest [QRON]",
+      "mapId": 2000,
+      "position": [
+        898.059,
+        53.48147,
+        761.1619
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3723204,
+          "name": "Algid Lexicon"
+        },
+        {
+          "pos": 1,
+          "itemId": 3721403,
+          "name": "Observer's Coarse Gloves"
+        },
+        {
+          "pos": 2,
+          "itemId": 180478,
+          "name": "Whorled Matricaria"
+        },
+        {
+          "pos": 3,
+          "itemId": 180483,
+          "name": "Maulsmead"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 1138,
+      "name": "loot_chest_04 [QRON]",
+      "mapId": 2000,
+      "position": [
+        991.5,
+        122.718,
+        674.29
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3725676,
+          "name": "Deft Coarse Padsoles"
+        },
+        {
+          "pos": 1,
+          "itemId": 3715943,
+          "name": "Unhallowed Rough-stitched Hood"
+        },
+        {
+          "pos": 2,
+          "itemId": 161197,
+          "name": "Copper"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 11,
+      "name": "Chest [N7FU]",
+      "mapId": 4000,
+      "position": [
+        594.101,
+        175.465,
+        947.196
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 12,
+      "name": "Chest [N7FU]",
+      "mapId": 4000,
+      "position": [
+        604.7737,
+        170.2652,
+        868.96875
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 13,
+      "name": "Chest [N7FU]",
+      "mapId": 4000,
+      "position": [
+        690.482,
+        179.968,
+        637.97
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 637,
+      "name": "Chest [N7FU]",
+      "mapId": 4000,
+      "position": [
+        291.987,
+        140.102,
+        699.252
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 2,
+          "itemId": 3737052,
+          "name": "Pirate Ring"
+        },
+        {
+          "pos": 3,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 638,
+      "name": "Chest [N7FU]",
+      "mapId": 4000,
+      "position": [
+        348.988,
+        153.41,
+        744.461
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 2,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        },
+        {
+          "pos": 3,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 641,
+      "name": "Chest [N7FU]",
+      "mapId": 4000,
+      "position": [
+        233.272,
+        148.493,
+        566.131
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        },
+        {
+          "pos": 2,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 17,
+      "name": "Chest [N7FU]",
+      "mapId": 4010,
+      "position": [
+        233.272,
+        148.493,
+        566.131
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3737052,
+          "name": "Pirate Ring"
+        },
+        {
+          "pos": 2,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        },
+        {
+          "pos": 3,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 18,
+      "name": "Chest [N7FU]",
+      "mapId": 4010,
+      "position": [
+        291.987,
+        140.102,
+        699.252
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        },
+        {
+          "pos": 2,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        },
+        {
+          "pos": 3,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 19,
+      "name": "Chest [N7FU]",
+      "mapId": 4010,
+      "position": [
+        348.988,
+        153.41,
+        744.461
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 627,
+      "name": "Chest [N7FU]",
+      "mapId": 4010,
+      "position": [
+        604.7737,
+        170.2652,
+        868.96875
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 2,
+          "itemId": 3737052,
+          "name": "Pirate Ring"
+        },
+        {
+          "pos": 3,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 628,
+      "name": "Chest [N7FU]",
+      "mapId": 4010,
+      "position": [
+        594.101,
+        175.465,
+        947.196
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 2,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 629,
+      "name": "Chest [N7FU]",
+      "mapId": 4010,
+      "position": [
+        690.482,
+        179.968,
+        637.97
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3478994,
+          "name": "Fresh Bloodbelly Ale"
+        },
+        {
+          "pos": 1,
+          "itemId": 3737052,
+          "name": "Pirate Ring"
+        },
+        {
+          "pos": 2,
+          "itemId": 3770803,
+          "name": "Blue Pearl"
+        }
+      ]
+    },
+    {
+      "worldObjectId": 141,
+      "name": "cimmerian_treasure_chest [QO2V ]",
+      "mapId": 4022,
+      "position": [
+        748.28314,
+        156.37538,
+        813.20685
+      ],
+      "cash": 0,
+      "maxSize": 10,
+      "items": [
+        {
+          "pos": 0,
+          "itemId": 3917220,
+          "name": "Bronze Bauble"
+        },
+        {
+          "pos": 1,
+          "itemId": 3716762,
+          "name": "Observer's Coarse Gloves"
+        }
+      ]
+    }
+  ]
+}
