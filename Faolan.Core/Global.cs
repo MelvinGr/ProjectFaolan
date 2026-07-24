@@ -15,6 +15,11 @@ namespace Faolan.Core
         public static bool IsDebug => false;
 #endif
 
+		// The shared config file, for every exe that reads it (server, importer, web, CDN mirror, MCP bridge). It sits
+		// next to the exe - or at the solution root when debugging, where the CWD is set to the same place - so the
+		// plain relative name resolves in both cases; FAOLAN_CONFIG overrides it (container / one-off run).
+		public static string ConfigPath => Environment.GetEnvironmentVariable("FAOLAN_CONFIG") ?? "faolan.json";
+
 		// Account "premium" (subscribed) flag. Decoded by diffing the faolan-account-login-{nopremium,premium}
 		// captures: the only per-account difference in the PlayerAgent character list (0x20EF) trailing block is
 		// the subscribed flag byte 0x81 -> 0x80 and the unlocked-character-slot count 4 -> 10. Enabled globally so

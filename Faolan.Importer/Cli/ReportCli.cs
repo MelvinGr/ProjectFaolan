@@ -11,7 +11,6 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Helpers;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
@@ -29,7 +28,6 @@ namespace Faolan.Importer.Cli
 	public static class ReportCli
 	{
 		private static (FaolanDbProvider Provider, string Connection)? _db;
-		private static readonly string RepoRoot = RepoPaths.Root;
 
 		// DB config (provider + connection) for the DB-backed reports. Resolved LAZILY on the first OpenDb so the
 		// capture/RDB-only reports (corpus-extract, coverage-of-captures, ...) need no DB config at all. Same source
@@ -58,7 +56,8 @@ namespace Faolan.Importer.Cli
 				{
 					// The test suite's slice of the corpus, so a plain clone can run the whole-corpus gates without
 					// the 349 MB capture repo. See CorpusExtractWriter.
-					var target = arg ?? Path.Combine(RepoRoot, "Faolan.Tests", "Assets", "corpus-extract.bin");
+					// Default paths here are CWD-relative: the importer runs from the repo root (see CLAUDE.md).
+					var target = arg ?? Path.Combine("Faolan.Tests", "Assets", "corpus-extract.bin");
 					CorpusExtractWriter.Write(capturesDir, target);
 					return 0;
 				}
@@ -185,7 +184,7 @@ namespace Faolan.Importer.Cli
 
 				case "terrain-export":
 				{
-					await TerrainExport(RdbDir(args), GetOption(args, "--terrain-out") ?? Path.Combine(RepoRoot, "Terrain"));
+					await TerrainExport(RdbDir(args), GetOption(args, "--terrain-out") ?? "Terrain");
 					return 0;
 				}
 
@@ -1541,7 +1540,7 @@ namespace Faolan.Importer.Cli
 		// leaving the rest untouched.
 		private static void UpdateReadmeSection(string marker, string block)
 		{
-			var path = Path.Combine(RepoRoot, "README.md");
+			var path = "README.md"; // CWD-relative: the importer runs from the repo root
 			var text = File.ReadAllText(path);
 			var start = $"<!-- {marker}:start -->";
 			var end = $"<!-- {marker}:end -->";

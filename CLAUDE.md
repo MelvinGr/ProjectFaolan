@@ -48,11 +48,18 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 # TCP-reassembled, one record per packet, includes the compressed DL packets.
 # Lossy captures in the Wireshark GUI: set TCP pref analyze_sequence_numbers off (the script does).
 
-# EF migrations (context lives in Faolan.Core.Database, migrations in Faolan/Migrations).
-dotnet ef migrations add <Name> --project Faolan
-# GOTCHA: plain `database update` runs with CWD = Faolan/ and creates a stray Faolan/faolan.db.
-# Use the absolute connection override (or just start the server - it migrates + seeds at startup, before the host):
-dotnet ef database update --project Faolan --connection "Data Source=$PWD/faolan.db"
+# EF migrations (context lives in Faolan.Core.Database; the migrations themselves are PER PROVIDER, in
+# Faolan.Core.Database.Migrations.{Sqlite,Postgres}/Migrations - scaffold into the one matching the provider).
+# GOTCHA: the EF tools run design time with CWD = the PROJECT dir, so the design-time factory can't see the
+# repo-root faolan.json - point FAOLAN_CONFIG at it (every exe reads Global.ConfigPath: "faolan.json" beside
+# the exe / in the CWD, or whatever FAOLAN_CONFIG names):
+FAOLAN_CONFIG=$PWD/faolan.json dotnet ef migrations add <Name> \
+  --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite
+# Same CWD gotcha for `database update`: a relative `Data Source=faolan.db` would create a stray DB beside the
+# project. Use the absolute connection override (or just start the server - it migrates + seeds at startup):
+FAOLAN_CONFIG=$PWD/faolan.json dotnet ef database update \
+  --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite \
+  --connection "Data Source=$PWD/faolan.db"
 # For pure DATA changes (no schema change) just UPDATE faolan.db directly and commit it - no migration.
 ```
 

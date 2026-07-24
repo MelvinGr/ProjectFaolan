@@ -7,8 +7,8 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
+using Faolan.Core;
 using Faolan.Core.Extensions;
-using Faolan.Core.Helpers;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -52,7 +52,7 @@ namespace Faolan.Web.Content
 			// working (as the command-line layer, overriding faolan.json but below env vars). Sources are cleared first
 			// so the order is exactly this (no appsettings.json in the mix).
 			builder.Configuration.Sources.Clear();
-			builder.Configuration.AddJsonFile(RepoPaths.Combine("faolan.json"), true); // repo-root-relative (CWD-independent), like Faolan.Web
+			builder.Configuration.AddJsonFile(Path.GetFullPath(Global.ConfigPath), true); // absolute (CWD-rooted), like Faolan.Web
 			builder.Configuration.AddCommandLine(args, new Dictionary<string, string>
 			{
 				["--store"] = "CdnMirror:Store",

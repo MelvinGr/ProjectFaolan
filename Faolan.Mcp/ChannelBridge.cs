@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Extensions;
-using Faolan.Core.Helpers;
 using Microsoft.Extensions.Configuration;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -61,10 +62,10 @@ namespace Faolan.Mcp
 
 		public static async Task Main(string[] args)
 		{
-			// Config: env > cmdline > json, with an OPTIONAL faolan.json (located via RepoPaths, CWD-independent) - parity
-			// with the server / Faolan.Web / importer. Claude Code spawns this bridge with no args/env, so it runs on the
-			// defaults; override McpUrl / ChannelPollMs / ChannelBacklogGraceMs in faolan.json or the environment.
-			var config = new ConfigurationBuilder().AddJsonFile(RepoPaths.Combine("faolan.json"), true).AddCommandLine(args).AddEnvironmentVariables().Build();
+			// Config: env > cmdline > json, with an OPTIONAL faolan.json (Global.ConfigPath - beside the exe / the CWD,
+			// or FAOLAN_CONFIG) - parity with the server / Faolan.Web / importer. Claude Code spawns this bridge with no
+			// args/env, so it runs on the defaults; override McpUrl / ChannelPollMs / ChannelBacklogGraceMs there.
+			var config = new ConfigurationBuilder().AddJsonFile(Path.GetFullPath(Global.ConfigPath), true).AddCommandLine(args).AddEnvironmentVariables().Build();
 			_mcpUrl = config.McpUrl;
 			_backlogGrace = TimeSpan.FromMilliseconds(config.ChannelBacklogGraceMs);
 			_pollInterval = TimeSpan.FromMilliseconds(config.ChannelPollMs);

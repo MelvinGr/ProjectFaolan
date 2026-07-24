@@ -1,7 +1,8 @@
 using System.Collections.Generic;
+using System.IO;
+using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Helpers;
 using Microsoft.Extensions.Configuration;
 
 namespace Faolan.Importer.Cli
@@ -16,7 +17,7 @@ namespace Faolan.Importer.Cli
 		public static (FaolanDbProvider Provider, string Connection) ResolveDatabase(string[] args)
 		{
 			var config = new ConfigurationBuilder()
-				.AddJsonFile(RepoPaths.Combine("faolan.json"), true)
+				.AddJsonFile(Path.GetFullPath(Global.ConfigPath), true)
 				.AddCommandLine(args, new Dictionary<string, string>
 				{
 					["--connectionstring"] = "Database:ConnectionString"
