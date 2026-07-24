@@ -2767,14 +2767,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Shop", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<uint>("NpcTemplateId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("MaxSize")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("NpcTemplateId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("VendorName")
@@ -2782,10 +2778,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcTemplateId")
-                        .IsUnique();
+                    b.HasKey("NpcTemplateId");
 
                     b.ToTable("Shops");
                 });

@@ -9,11 +9,14 @@ namespace Faolan.Core.Database.Tables
 	// (tools/capture/decode_shopdata.py for the wire grammar). Keyed by the vendor NPC TEMPLATE id (#244) - shop ids
 	// and NPC handles are session-volatile, and the internal NAME is not unique (25 templates share "Halen van Dummy",
 	// so keying by name merged distinct vendors and leaked a shop onto non-vendor same-named NPCs like Atraxus).
-	[Index(nameof(NpcTemplateId), IsUnique = true)]
-	public class Shop : BaseEntity
+	// Keyed BY its vendor TYPE: the relationship is one-to-one (NpcTemplate.Shop), so NpcTemplateId is both the
+	// foreign key and the whole identity - a surrogate id alongside it identified nothing and renumbered the shop
+	// set (and its wares) on every re-harvest. It was already the declared unique index.
+	[PrimaryKey(nameof(NpcTemplateId))]
+	public class Shop
 	{
 		// The shop container type inside the content's ProtoInventoryGame.inventory_id (the bag is 104).
-		public const uint ContainerType = 111;
+		public const uint ContainerType = 111; // TODO: Should just use the enum
 
 		// The shop ID32 type word on the wire (0x0000C75B).
 		public const uint WireType = 0x0000C75B;
