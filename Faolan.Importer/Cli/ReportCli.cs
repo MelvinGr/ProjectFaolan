@@ -1575,7 +1575,7 @@ namespace Faolan.Importer.Cli
 				}
 
 				var rewriteOk = baseOk && SpawnPlayfieldRewriter.TryRewrite(baseBody!, 0x01EA985Cu);
-				Console.WriteLine($"map {row.MapId} {row.Name} handle 0x{row.CapturedHandle:X} baseBuild={baseOk} rewrite={rewriteOk} kd={row.KdTreeTail?.Length}");
+				Console.WriteLine($"map {row.MapId} {row.Name} handle 0x{row.CapturedHandle:X} baseBuild={baseOk} rewrite={rewriteOk} asset={row.GeometryAssetId}/{row.GeometryAssetType} words={row.Words.Count}");
 				if (baseOk)
 					Console.WriteLine("  BUILT: " + Convert.ToHexString(baseBody!).ToLowerInvariant());
 			}

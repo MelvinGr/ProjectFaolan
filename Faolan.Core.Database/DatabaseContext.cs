@@ -70,6 +70,7 @@ namespace Faolan.Core.Database
 		DbSet<PatrolNode> PatrolNodes { get; }
 		DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; }
 		DbSet<PatrolNodeWord> PatrolNodeWords { get; }
+		DbSet<WorldObjectWord> WorldObjectWords { get; }
 		DbSet<PatrolPath> PatrolPaths { get; }
 		DbSet<QuestArea> QuestAreas { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
@@ -148,6 +149,7 @@ namespace Faolan.Core.Database
 		public DbSet<PatrolNode> PatrolNodes { get; set; }
 		public DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; set; }
 		public DbSet<PatrolNodeWord> PatrolNodeWords { get; set; }
+		public DbSet<WorldObjectWord> WorldObjectWords { get; set; }
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<QuestArea> QuestAreas { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
@@ -425,6 +427,17 @@ namespace Faolan.Core.Database
 				.HasKey(w => new
 				{
 					w.PatrolNodeId,
+					w.Ordinal
+				});
+
+			modelBuilder.Entity<WorldObject>().HasMany(o => o.Words).WithOne(w => w.WorldObject).HasForeignKey(w => w.WorldObjectId).OnDelete(DeleteBehavior.Cascade);
+			// A geometry word is identified by its object + which array it belongs to + its position in it (#410).
+			modelBuilder
+				.Entity<WorldObjectWord>()
+				.HasKey(w => new
+				{
+					w.WorldObjectId,
+					w.Kind,
 					w.Ordinal
 				});
 

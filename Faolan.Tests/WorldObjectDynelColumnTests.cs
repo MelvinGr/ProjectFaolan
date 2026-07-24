@@ -8,7 +8,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Guards the shipped DB-source path for #187: EVERY populated world-object row in the committed faolan.db must be
-	// fully buildable from its typed columns - it carries the geometry tail (KdTreeTail) and its identity message
+	// fully buildable from its typed columns - it carries its geometry columns (#410) and its identity message
 	// round-trips (columns -> ProtoSimpleDynelIIR -> record -> re-parse == same columns). The captured Data blob is
 	// retired, so this is the standing gate that nothing regressed back into needing it. The capture-grounded byte-exact
 	// golden for a single record lives in SimpleDynelMessageTests / WorldObjectBuilderTests.
@@ -21,7 +21,7 @@ namespace Faolan.Tests
 			using var con = new SqliteConnection($"Data Source={db};Mode=ReadOnly");
 			con.Open();
 			using var cmd = con.CreateCommand();
-			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,KdTreeTail " + "FROM WorldObjects WHERE DisplayName IS NOT NULL";
+			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,GeometryAssetType " + "FROM WorldObjects WHERE DisplayName IS NOT NULL";
 			using var r = cmd.ExecuteReader();
 			int total = 0, ok = 0, noTail = 0, mismatch = 0;
 			while (r.Read())
@@ -44,16 +44,16 @@ namespace Faolan.Tests
 					WaypointType = r.IsDBNull(7)
 						? null
 						: (uint)r.GetInt64(7),
-					KdTreeTail = r.IsDBNull(8)
-						? null
-						: (byte[])r[8]
+					GeometryAssetType = (uint)r.GetInt64(8)
 				};
 
-				if (row.KdTreeTail == null)
+				// The geometry record always names an RDB asset (1010030 MESHINDEXFILE / 1010001 RenderMesh /
+				// 1010201 MONSTERDATA), so a zero here means the row was never lifted - not buildable.
+				if (row.GeometryAssetType == 0)
 				{
 					noTail++;
 					continue;
-				} // not fully buildable without the geometry tail
+				}
 
 				// The identity message builds from columns without error (byte-exact reproduction is gated by
 				// WorldObjectBuilderTests against captured goldens); here we assert every lifted row is expressible.
@@ -64,9 +64,9 @@ namespace Faolan.Tests
 					mismatch++;
 			}
 
-			Console.WriteLine($"objects={total} builtFromColumns={ok} noTail={noTail} mismatch={mismatch}");
+			Console.WriteLine($"objects={total} builtFromColumns={ok} noGeometry={noTail} mismatch={mismatch}");
 			Assert.Equal(0, mismatch);
-			Assert.Equal(0, noTail); // every lifted object carries its geometry tail (fully DB-buildable, no Data)
+			Assert.Equal(0, noTail); // every lifted object carries its geometry columns (fully DB-buildable, no Data)
 			Assert.True(ok > 250, $"expected >250 objects built from columns, got {ok}");
 		}
 

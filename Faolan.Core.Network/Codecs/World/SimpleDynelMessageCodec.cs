@@ -100,23 +100,27 @@ namespace Faolan.Core.Network.Codecs.World
 			return message;
 		}
 
-		// Lifts the identity columns + geometry tail from the captured object `body` (the importer path; `body` is the
+		// Lifts the identity + geometry columns from the captured object `body` (the importer path; `body` is the
 		// FA015807-style object body extracted from the dump packet). Self-validating: populates the typed columns +
-		// KdTreeTail only if the column-rebuild reproduces the record byte-exact, else leaves DisplayName null (the row
+		// geometry columns only if the column-rebuild reproduces the record byte-exact, else leaves DisplayName null (the row
 		// then can't build - zero risk for any shape not fully modelled). Idempotent. Returns true if the row was lifted.
 		public static bool TryLiftColumns(WorldObject row, byte[] body)
 		{
 			row.DisplayName = null;
-			row.KdTreeTail = null;
 			if (body is not { Length: > 8 } || !TryParse(body.AsSpan(8), out var message, out var messageStart, out var consumed))
 				return false;
 
 			ApplyColumns(row, message);
 			if (TryReplaceIdentityFromColumns(body.AsSpan(8), row, out var rebuilt) && rebuilt.AsSpan().SequenceEqual(body.AsSpan(8)))
 			{
-				// Store the geometry tail (everything after the identity message) so the build needs no Data slice.
-				row.KdTreeTail = body.AsSpan(8)[(messageStart + consumed)..].ToArray();
-				return true;
+				// Columnize the geometry record that follows the identity message, and keep the lift ALL-OR-NOTHING:
+				// if the record doesn't parse or doesn't rebuild byte-exact, the row stays un-lifted rather than
+				// half-imported (#410).
+				// A container's tail carries its loot CONTENTS after the geometry record; those are session state and
+				// are not persisted (#410), so the rebuild is compared against the part the columns own.
+				var tail = body.AsSpan(8)[(messageStart + consumed)..];
+				if (WorldObjectGeometryCodec.TryParse(row, tail, out var geometryLength) && WorldObjectGeometryCodec.Build(row).AsSpan().SequenceEqual(tail[..geometryLength]))
+					return true;
 			}
 
 			row.DisplayName = null; // un-faithful lift -> fall back to the verbatim slice

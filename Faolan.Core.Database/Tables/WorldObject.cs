@@ -65,13 +65,46 @@ namespace Faolan.Core.Database.Tables
 		public bool IsClosed { get; set; } // proto field 12
 		public byte EffectDynelState { get; set; }
 
-		// The bytes AFTER the identity message: the kd-tree / collision / bounds geometry (FUN_0080c620), per-object
-		// but session-INDEPENDENT (static decor geometry, 406 distinct blobs). Lifted out of the captured packet into
-		// its own column so the world-entry build constructs the whole object from the DB - identity (columns above) +
-		// this tail (#187). This is the object's geometry TRUTH (not re-derivable), the counterpart of the NPC stat
-		// columns; the captured raw `Data` packet has been RETIRED. The transform (pos/rot) is rebuilt from
-		// Base3DEntity's columns and the live playfield token comes from the burst.
-		public byte[]? KdTreeTail { get; set; }
+		// The geometry record AFTER the identity message (the client's shared bounds reader FUN_0080c620), per-object
+		// but session-INDEPENDENT: it is the object's geometry TRUTH, not re-derivable, and NOT a per-template cache
+		// (identical name + transform can still carry different values). Lifted from the captured packet so the
+		// world-entry build constructs the whole object from the DB - identity (columns above) + this (#187).
+		// COLUMNIZED (#410) out of the old `KdTreeTail` blob; WorldObjectGeometryCodec re-emits it byte-exact and
+		// documents the grammar. The transform (pos/rot) is rebuilt from Base3DEntity's columns and the live
+		// playfield token comes from the burst.
+		//
+		// The record opens with an RDB asset reference: GeometryAssetType is 1010030 MESHINDEXFILE / 1010001
+		// RenderMesh / 1010201 MONSTERDATA, nothing else across the corpus.
+		public uint GeometryAssetId { get; set; }
+		public uint GeometryAssetType { get; set; }
+
+		// A length-prefixed name inside the record - null when empty, which is 1029 of 1052 captured rows (the only
+		// value seen is "object_closed").
+		[MaxLength(64)]
+		public string? GeometryName { get; set; }
+
+		// The object's AABB. ⚠️ An object with NO bounds writes an INVERTED box - min = +FLT_MAX, max = -FLT_MAX -
+		// rather than zeros, and those values are kept verbatim so the record round-trips bit-for-bit. A reader that
+		// treats min > max as corrupt is wrong.
+		public float BoundsMinX { get; set; }
+		public float BoundsMinY { get; set; }
+		public float BoundsMinZ { get; set; }
+		public float BoundsMaxX { get; set; }
+		public float BoundsMaxY { get; set; }
+		public float BoundsMaxZ { get; set; }
+
+		// The two words + bool that close the record (client obj+0x30 / +0x31 / +0x32). Raw bits: GeometryWord0 reads
+		// as a float in most rows (1.0 in 813 of them) but not all, so it is not typed as one.
+		public uint GeometryWord0 { get; set; }
+		public uint GeometryWord1 { get; set; }
+		public bool GeometryFlag { get; set; }
+
+		// The kd-tree node list + the per-class trailer words, one row per u32 - see [[WorldObjectWord]].
+		public virtual ICollection<WorldObjectWord> Words { get; set; } = [];
+
+		// NB the LootBag class (chests) has no trailer columns at all: its captured trailer is the container's loot
+		// CONTENTS, which is session state rather than placement truth, so it is deliberately NOT persisted -
+		// WorldObjectBuilder appends a clean empty scaffold instead (LootContainerTemplate).
 		public float? DestinationX { get; set; }
 		public float? DestinationY { get; set; }
 		public float? DestinationZ { get; set; }

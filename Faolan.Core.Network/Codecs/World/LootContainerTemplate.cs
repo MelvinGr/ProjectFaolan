@@ -50,23 +50,39 @@ namespace Faolan.Core.Network.Codecs.World
 			return BuildBounds(Variants[LootContainerTemplateId.Bag].NodeTag);
 		}
 
-		// The 49-byte kd-tree bounds node for a variant's NodeTag (the geometry is otherwise identical).
+		// The 49-byte kd-tree bounds node for a variant's NodeTag (the geometry is otherwise identical). Emitted
+		// through the ONE geometry emitter (#410) so the container box and every captured object share a builder:
+		// the old hand-rolled writer's `WriteUInt64(0) // children / flags` is really the record's empty name +
+		// empty node list, and its "scale" is the first of the two closing words.
 		public static byte[] BuildBounds(uint nodeTag)
 		{
-			using var w = new FaolanStream();
-			w.WriteUInt32(nodeTag);
-			w.WriteUInt32(NodeType);
-			w.WriteUInt64(0); // children / flags
-			w.WriteFloat(-0.5f); // AABB min x
-			w.WriteFloat(-0.5f); // AABB min y
-			w.WriteFloat(-0.5f); // AABB min z
-			w.WriteFloat(0.5f); // AABB max x
-			w.WriteFloat(0.5f); // AABB max y
-			w.WriteFloat(0.5f); // AABB max z
-			w.WriteFloat(1.0f); // scale
-			w.WriteUInt32(0);
-			w.WriteByte(0);
-			return w.ToArray();
+			return WorldObjectGeometryCodec.Build(WithBoundsColumns(new WorldObject(), nodeTag));
+		}
+
+		// The unit-box geometry columns every container shares - the pick/collision volume, [-0.5,0.5]^3.
+		public static WorldObject WithBoundsColumns(WorldObject row, uint nodeTag)
+		{
+			row.GeometryAssetId = nodeTag;
+			row.GeometryAssetType = NodeType;
+			row.GeometryName = null;
+			row.BoundsMinX = -0.5f;
+			row.BoundsMinY = -0.5f;
+			row.BoundsMinZ = -0.5f;
+			row.BoundsMaxX = 0.5f;
+			row.BoundsMaxY = 0.5f;
+			row.BoundsMaxZ = 0.5f;
+			row.GeometryWord0 = 0x3F800000; // 1.0f
+			row.GeometryWord1 = 0;
+			row.GeometryFlag = false;
+			return row;
+		}
+
+		// A container's wire trailer: its loot contents, as the clean empty scaffold. Captured contents are session
+		// state and are never persisted (#410), so every chest/bag spawns from this and WithLootContents splices the
+		// live cash + items per drop.
+		public static byte[] BuildEmptyContents()
+		{
+			return LootBagMessageCodec.BuildContents(BuildEmptyScaffold());
 		}
 
 		// A fresh WorldObject for a specific container VARIANT (bag / Large Chest / a future raid chest) - identity
@@ -76,7 +92,7 @@ namespace Faolan.Core.Network.Codecs.World
 			if (!Variants.TryGetValue(typeId, out var variant))
 				throw new KeyNotFoundException($"LootContainerTemplateId {typeId} is not defined in the Variants table.");
 
-			return new WorldObject
+			var row = new WorldObject
 			{
 				Name = variant.Name,
 				SubOpcode = Opcode,
@@ -84,9 +100,11 @@ namespace Faolan.Core.Network.Codecs.World
 				TemplateItemId = (uint)typeId,
 				CarsGroup = 1,
 				IsClosed = true,
-				Kdtree = 0,
-				KdTreeTail = [.. BuildBounds(variant.NodeTag), .. LootBagMessageCodec.BuildContents(BuildEmptyScaffold())]
+				Kdtree = 0
 			};
+
+			WithBoundsColumns(row, variant.NodeTag);
+			return row;
 		}
 
 		// A clean, empty ProtoLootBagIIR scaffold (no owner, no items) - WithLootContents fills in the live cash +
