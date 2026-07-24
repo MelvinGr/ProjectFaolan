@@ -413,7 +413,7 @@ namespace Faolan.Core.Database
 			// looks it up via the spawn's nav instead of matching floats. Cascade-deletes with the spawn.
 			modelBuilder.Entity<PatrolPath>().HasOne(p => p.NpcSpawn).WithOne(n => n.PatrolPath).OnDelete(DeleteBehavior.Cascade);
 			// The columnarized task tree (#316): all of a patrol's nodes hang off the path (cascade-delete); the tree
-			// shape is the self-reference ParentId (NoAction - every node is already deleted via its PatrolPathId, so
+			// shape is the self-reference ParentPath (NoAction - every node is already deleted via its PatrolPathId, so
 			// the self-ref must not add a second cascade path). Each node's waypoints cascade with it.
 			modelBuilder.Entity<PatrolPath>().HasMany(p => p.Nodes).WithOne(n => n.PatrolPath).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Children).WithOne(n => n.Parent).OnDelete(DeleteBehavior.NoAction);

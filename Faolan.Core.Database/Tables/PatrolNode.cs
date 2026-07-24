@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -12,12 +14,30 @@ namespace Faolan.Core.Database.Tables
 	// (Path's middle trailer words, Ballistic/Formation/Vec words) are one row per word in [[PatrolNodeWord]] and
 	// the approach tail is ApproachFlag. Floats confirmed as floats (duration/remaining/speed/anchor/waypoints) are
 	// stored as floats; slots of unknown numeric type stay raw u32 bits so the record round-trips exactly.
-	public class PatrolNode : BaseEntity
+	// Keyed by WHERE IT SITS IN THE TREE: (path, OrdinalPath). A MoveTask node is a recursive AST, so `Ordinal` is
+	// only unique among its SIBLINGS - (PatrolPathId, Ordinal) collides 608 -> 407. OrdinalPath folds the whole
+	// ancestor chain into that ordinal ("" = the root, "1" = its second child, "1>0" = that child's first), which
+	// IS unique (608/608 verified, max depth 2) and, unlike the surrogate it replaces, is reproduced exactly by a
+	// re-harvest. Same device as ConversationNode.AnswerPath.
+	// Keyed by WHERE IT SITS IN THE TREE: (path, OrdinalPath). A MoveTask node is a recursive AST, so `Ordinal` is
+	// only unique among its SIBLINGS - (PatrolPathId, Ordinal) collides 608 -> 407. OrdinalPath folds the whole
+	// ancestor chain into that ordinal ("" = the root, "1" = its second child, "1>0" = that child's first), which
+	// IS unique (608/608, max depth 2) and, unlike the surrogate it replaces, is reproduced by a re-harvest.
+	// Same device as ConversationNode.AnswerPath.
+	[PrimaryKey(nameof(PatrolPathId), nameof(OrdinalPath))]
+	public class PatrolNode
 	{
-		// Self-reference: null for the root task, else the parent ListMoveTask. Ordinal is the child order.
-		public uint? ParentId { get; set; }
 
-		[ForeignKey(nameof(ParentId))]
+		// This node's position within its path: the chain of sibling ordinals from the root.
+		[MaxLength(64)]
+		public string OrdinalPath { get; set; } = "";
+
+		// Self-reference: the parent's OrdinalPath (this node's own, minus its last segment). NULL for the root
+		// task, else the parent ListMoveTask. Replaces the surrogate ParentId; the tree shape is unchanged.
+		[MaxLength(64)]
+		public string? ParentPath { get; set; }
+
+		[ForeignKey($"{nameof(PatrolPathId)},{nameof(ParentPath)}")]
 		public virtual PatrolNode? Parent { get; set; }
 
 		public uint PatrolPathId { get; set; }

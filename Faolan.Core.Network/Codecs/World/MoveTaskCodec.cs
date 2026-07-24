@@ -186,7 +186,7 @@ namespace Faolan.Core.Network.Codecs.World
 		public static byte[] BuildPatrol(uint handle, Vector3 from, PatrolPath path)
 		{
 			ArgumentNullException.ThrowIfNull(path);
-			var root = path.Nodes.FirstOrDefault(n => n.ParentId == null) ?? throw new InvalidOperationException($"patrol {path.Id} has no root node");
+			var root = path.Nodes.FirstOrDefault(n => n.ParentPath == null) ?? throw new InvalidOperationException($"patrol for spawn {path.NpcSpawnId} has no root node");
 
 			return new MoveTaskComposite
 			{
@@ -250,7 +250,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			ArgumentNullException.ThrowIfNull(path);
 			var waypoints = new List<Vector3>();
-			var root = path.Nodes.FirstOrDefault(n => n.ParentId == null);
+			var root = path.Nodes.FirstOrDefault(n => n.ParentPath == null);
 			if (root != null)
 				CollectWaypoints(root, waypoints);
 			return waypoints;

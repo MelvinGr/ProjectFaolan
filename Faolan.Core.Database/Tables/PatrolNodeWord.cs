@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,12 +18,15 @@ namespace Faolan.Core.Database.Tables
 	// 0..41, the dirs are floats), and Vec7 reads as a position + a unit quaternion - e.g. (1147.29, 199.54,
 	// 1758.06) + (0, -0.204, 0, 0.979). Naming those slots is follow-up work on #410; modes 5/7 have no rows in the
 	// corpus at all, so their words stay unnamed on purpose.
-	[PrimaryKey(nameof(PatrolNodeId), nameof(Ordinal))]
+	[PrimaryKey(nameof(PatrolPathId), nameof(OrdinalPath), nameof(Ordinal))]
 	public class PatrolNodeWord
 	{
-		public uint PatrolNodeId { get; set; }
+		public uint PatrolPathId { get; set; }
 
-		[ForeignKey(nameof(PatrolNodeId))]
+		[MaxLength(64)]
+		public string OrdinalPath { get; set; } = "";
+
+		[ForeignKey($"{nameof(PatrolPathId)},{nameof(OrdinalPath)}")]
 		public virtual PatrolNode PatrolNode { get; set; } = null!;
 
 		public uint Value { get; set; }

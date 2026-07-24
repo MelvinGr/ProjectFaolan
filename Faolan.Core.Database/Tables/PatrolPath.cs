@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -10,7 +11,12 @@ namespace Faolan.Core.Database.Tables
 	// directly (no float-position match). MoveTaskBuilder.BuildPatrol re-emits the tree byte-exact, re-addressed to
 	// the live handle + spawn position. Map + anchor position live on the NpcSpawn. Imported from captures by
 	// Faolan.Importer (PatrolPathExtractor); cascade-deletes with its spawn.
-	public class PatrolPath : BaseEntity
+	// Keyed BY its spawn: the relationship is 1:1 (an NPC walks one route), so NpcSpawnId is both the foreign key
+	// and the whole identity - a surrogate alongside it identified nothing and renumbered on every re-harvest.
+	// Keyed BY its spawn: the relationship is 1:1 (an NPC walks one route), so NpcSpawnId is both the foreign key
+	// and the whole identity - a surrogate alongside it identified nothing and renumbered on every re-harvest.
+	[PrimaryKey(nameof(NpcSpawnId))]
+	public class PatrolPath
 	{
 		public uint NpcSpawnId { get; set; }
 

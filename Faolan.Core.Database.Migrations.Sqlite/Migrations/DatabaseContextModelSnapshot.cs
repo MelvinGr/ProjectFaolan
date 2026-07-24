@@ -2157,9 +2157,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNode", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<uint>("PatrolPathId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("OrdinalPath")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<float?>("AnchorX")
                         .HasColumnType("REAL");
@@ -2197,8 +2200,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<int>("Ordinal")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint?>("ParentId")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("ParentPath")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<float?>("PathDirection1")
                         .HasColumnType("REAL");
@@ -2222,9 +2226,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<uint?>("PathTrailerWord")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("PatrolPathId")
                         .HasColumnType("INTEGER");
 
                     b.Property<float?>("Remaining")
@@ -2260,19 +2261,21 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<byte?>("TrailerByte")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
+                    b.HasKey("PatrolPathId", "OrdinalPath");
 
-                    b.HasIndex("ParentId");
-
-                    b.HasIndex("PatrolPathId");
+                    b.HasIndex("PatrolPathId", "ParentPath");
 
                     b.ToTable("PatrolNodes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNodeWaypoint", b =>
                 {
-                    b.Property<uint>("PatrolNodeId")
+                    b.Property<uint>("PatrolPathId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("OrdinalPath")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Ordinal")
                         .HasColumnType("INTEGER");
@@ -2286,15 +2289,19 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float>("PositionZ")
                         .HasColumnType("REAL");
 
-                    b.HasKey("PatrolNodeId", "Ordinal");
+                    b.HasKey("PatrolPathId", "OrdinalPath", "Ordinal");
 
                     b.ToTable("PatrolNodeWaypoints");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNodeWord", b =>
                 {
-                    b.Property<uint>("PatrolNodeId")
+                    b.Property<uint>("PatrolPathId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("OrdinalPath")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Ordinal")
                         .HasColumnType("INTEGER");
@@ -2302,24 +2309,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Value")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("PatrolNodeId", "Ordinal");
+                    b.HasKey("PatrolPathId", "OrdinalPath", "Ordinal");
 
                     b.ToTable("PatrolNodeWords");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolPath", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("NpcSpawnId")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcSpawnId")
-                        .IsUnique();
+                    b.HasKey("NpcSpawnId");
 
                     b.ToTable("PatrolPaths");
                 });
@@ -3979,16 +3979,16 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNode", b =>
                 {
-                    b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "Parent")
-                        .WithMany("Children")
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.HasOne("Faolan.Core.Database.Tables.PatrolPath", "PatrolPath")
                         .WithMany("Nodes")
                         .HasForeignKey("PatrolPathId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("PatrolPathId", "ParentPath")
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Parent");
 
@@ -3999,7 +3999,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "PatrolNode")
                         .WithMany("Waypoints")
-                        .HasForeignKey("PatrolNodeId")
+                        .HasForeignKey("PatrolPathId", "OrdinalPath")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -4010,7 +4010,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "PatrolNode")
                         .WithMany("Words")
-                        .HasForeignKey("PatrolNodeId")
+                        .HasForeignKey("PatrolPathId", "OrdinalPath")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
