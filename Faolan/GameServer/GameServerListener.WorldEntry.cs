@@ -425,8 +425,20 @@ namespace Faolan.GameServer
 			foreach (var ga in granted)
 			{
 				var ability = await Database.GetAbility(ga.AbilityId);
-				if (ability != null) // ids we do not have cataloged are skipped (that bar slot stays empty)
-					abilities.Add(ability);
+				if (ability == null) // ids we do not have cataloged are skipped (that bar slot stays empty)
+					continue;
+
+				// An identity-only catalog row (named from the client's LDB, never seen granted - #303) has no TEA key,
+				// and the 0x2052 body carries that key. Sending one would be a grant the client cannot resolve, so say
+				// so rather than putting a null key on the wire.
+				if (!ability.IsGrantable)
+				{
+					Logger.LogWarning("GetLoadoutAbilities: ability {Id} '{Name}' has no grant key (catalogued from the client's data, never captured) - not granting it.", ability.Id,
+						ability.Name);
+					continue;
+				}
+
+				abilities.Add(ability);
 			}
 
 			return [.. abilities];

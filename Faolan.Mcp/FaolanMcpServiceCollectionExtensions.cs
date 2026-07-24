@@ -2,7 +2,6 @@ using Faolan.Core.Extensions;
 using Faolan.Mcp.Tools;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace Faolan.Mcp
 {
@@ -40,7 +39,6 @@ namespace Faolan.Mcp
 			var port = app.Configuration.McpPort;
 			app.Urls.Add($"http://127.0.0.1:{port}");
 			app.MapMcp("/mcp");
-			app.Logger.LogInformation("Faolan MCP server listening on http://127.0.0.1:{Port}/mcp", port);
 			return app;
 		}
 	}

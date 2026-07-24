@@ -256,6 +256,20 @@ byte-exact:
 - **`0x2052 DispatchAddSpecialAbility`** — grants a catalog **ability** (the melee/utility kit). Body = the 81-byte
   ability struct. `SendAddSpecialAbility`/`AbilityGrantBody.BuildAddSpecialAbilityBody`, used by login
   `GrantCharacterAbilities` (post-0x2024, from `FlushPendingPost205FFollowUp`).
+
+  **The `Abilities` catalog has two tiers (#303), and only one of them can be granted.** An ability is an RDB
+  **1000020** record — the same type as an item template, so the type alone can't identify one; the **LDB** does: an
+  ability is named in cat **50210** (the ability/spell name category, description in 50211) and is *not* named in
+  the item-name categories 50200/50220. That yields **265**, which `RdbLdbAbilityImporter` (module
+  `rdb-ldb-abilities`) catalogues. Validated both ways: all 27 captured abilities match the classifier and **none**
+  of them carries an item name, while the 12 candidates that do are consumables whose spell-name entry is their
+  effect ("Purple Lotus Powder Spray").
+
+  ⚠️ The other **238 are IDENTITY ONLY**. The `0x2052` body is built around the ability's 128-bit **TEA key**, which
+  rides the grant itself and is **random** (not derivable from the id — checked), so an ability no capture ever
+  granted has a name and nothing else. `Ability.IsGrantable` is the test; `GetLoadoutAbilities` logs and skips a
+  key-less row rather than putting a null key on the wire. Recovering the rest needs a capture that grants them —
+  the same key blocker as the item catalog (Gitea #415). Pinned by `AbilityCatalogTests`.
 - **`0x200A DispatchLearnSpell`** — grants a real **spell**. Body = a bare big-endian `u32` spell id (`i_nSpellID`),
   invariant across all 68 captured packets. `SendLearnSpell`/`AbilityGrantBody.BuildLearnSpellBody` (decode
   `CaptureSpellImporterTests`, golden `LearnSpellTests`).

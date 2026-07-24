@@ -27,9 +27,9 @@ namespace Faolan.Importer.Rdb
 	//           need the item record's name-id field decoded first - a follow-up, see docs/rdb/ldb-string-index.md.)
 	public static class RdbLdbNameImporter
 	{
-		private const int EnglishMatchPercent = 80;
-		private const int MinOverlap = 50; // need enough shared ids to trust a page's language verdict
-		private const uint LdbType = 1030002;
+		internal const int EnglishMatchPercent = 80;
+		internal const int MinOverlap = 50; // need enough shared ids to trust a page's language verdict
+		internal const uint LdbType = 1030002;
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string proxyBase, ILogger? logger = null)
 		{
@@ -101,7 +101,7 @@ namespace Faolan.Importer.Rdb
 
 		// The union of every page that cribs clean (>= EnglishMatchPercent over >= MinOverlap shared ids) against the
 		// catalog's existing names - i.e. the English page(s), which partition the id space. Empty if none cribs clean.
-		private static Dictionary<uint, string> EnglishNames(List<Dictionary<uint, string>> pages, Dictionary<uint, string> known)
+		internal static Dictionary<uint, string> EnglishNames(List<Dictionary<uint, string>> pages, Dictionary<uint, string> known)
 		{
 			var english = new Dictionary<uint, string>();
 			foreach (var page in pages)
@@ -140,7 +140,7 @@ namespace Faolan.Importer.Rdb
 
 		// Match key: trim, case-fold, and normalise the curly apostrophes the LDB uses (’/‘) to a straight one so an
 		// LDB "Set's Ruin" cribs against a catalog "Set's Ruin".
-		private static string Norm(string s)
+		internal static string Norm(string s)
 		{
 			return s.Trim().ToLowerInvariant().Replace('’', '\'').Replace('‘', '\'');
 		}

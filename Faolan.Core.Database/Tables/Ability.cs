@@ -24,5 +24,11 @@ namespace Faolan.Core.Database.Tables
 		// the strickenbla combat capture: 769094->108, 769099->112). Despite the "slot" name it is ability-intrinsic
 		// metadata, not a hotbar position.
 		public uint Slot { get; set; }
+
+		// True when this row carries everything a 0x2052 grant needs. FALSE for the identity-only rows the client's own
+		// data yields (RdbLdbAbilityImporter, #303): the LDB names all 265 abilities, but the 128-bit TEA key rides the
+		// GRANT, and the keys are random - so an ability no capture ever granted is a name and an id, nothing more.
+		// Granting one would put a null key on the wire, so the grant path skips it instead.
+		public bool IsGrantable => Key.Key1 != 0 || Key.Key2 != 0 || Key.Key3 != 0 || Key.Key4 != 0;
 	}
 }
