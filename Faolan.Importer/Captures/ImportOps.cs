@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
@@ -572,8 +573,8 @@ namespace Faolan.Importer.Captures
 					existing.Nodes.Clear();
 				}
 
-				// Attach a fresh copy of the task tree, flattened so EF assigns every node its PatrolPathId (the
-				// Parent/Children navs carry ParentId). Clone because a Root can be shared across entries.
+				// Attach a fresh copy of the task tree, flattened so EF assigns every node its PatrolPathId and
+				// AddNodeTree stamps its position key. Clone because a Root can be shared across entries.
 				AddNodeTree(existing, CloneNode(e.Root));
 			}
 
@@ -934,11 +935,23 @@ namespace Faolan.Importer.Captures
 
 		// Flattens the task tree into path.Nodes (every node gets PatrolPathId; the Parent/Children navs stay so EF
 		// sets ParentId).
-		private static void AddNodeTree(PatrolPath path, PatrolNode node)
+		// Flattens the task tree onto the path, stamping each node's POSITION as it goes: OrdinalPath is the chain
+		// of sibling ordinals from the root ("" at the root, then "1", "1>0", ...) and ParentPath is its parent's.
+		// That pair IS the node's key now (PatrolNode) - EF used to assign a surrogate and derive ParentId from the
+		// Children nav, so nothing had to be computed here.
+		private static void AddNodeTree(PatrolPath path, PatrolNode node, string? parentPath = null)
 		{
+			node.ParentPath = parentPath;
+			node.OrdinalPath = parentPath switch
+			{
+				null => "",
+				"" => node.Ordinal.ToString(CultureInfo.InvariantCulture),
+				_ => $"{parentPath}>{node.Ordinal.ToString(CultureInfo.InvariantCulture)}"
+			};
+
 			path.Nodes.Add(node);
 			foreach (var child in node.Children)
-				AddNodeTree(path, child);
+				AddNodeTree(path, child, node.OrdinalPath);
 		}
 
 		// Only ever ADDS a slot that is absent - an existing ref is authoritative, having come from a full-update.
