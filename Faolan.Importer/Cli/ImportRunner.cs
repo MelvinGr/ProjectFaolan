@@ -25,9 +25,16 @@ namespace Faolan.Importer.Cli
 				var mode = ctx.ModeFor(module.Name);
 				if (!module.SupportedModes.Contains(mode))
 				{
-					var fallback = module.SupportedModes.First();
+					// Deterministic, and NOT SupportedModes.First() - that is a HashSet, so its order is unspecified
+					// and the fallback could differ between runs. Preference order is Upsert (refresh in place, the
+					// closest thing to any request), then Overwrite, then Insert.
+					var fallback = new[] { WriteMode.Upsert, WriteMode.Overwrite, WriteMode.Insert }.First(module.SupportedModes.Contains);
 					await ctx.Out.WriteLineAsync($"[{module.Name}] WARNING: mode '{mode}' unsupported; using '{fallback}'.");
+					mode = fallback;
 				}
+
+				// Record it so the module sees the mode it is actually running in - it branches on ModeFor.
+				ctx.SetEffectiveMode(module.Name, mode);
 
 				var result = await module.RunAsync(ctx);
 				await ctx.Out.WriteLineAsync($"[{module.Name}] {result.Summary}");

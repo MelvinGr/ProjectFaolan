@@ -448,24 +448,35 @@ namespace Faolan.Importer.Modules
 
 		public ImportSource Source => ImportSource.Captures;
 
-		public string Description => "NPC spawns/types/spells/patrol (burst-truth set, #266).";
+		public string Description => "NPC spawns/types/spells/patrol (burst-truth set, #266; overwrite is scoped to the maps the run saw).";
 		public string Name => "npcs";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var (spawns, patrols) = ImportOps.BuildBurstTruthSpawns(ctx.Captures);
 
+			// SCOPED overwrite (#419): the wipe covers only the MAPS this run actually saw. The spawn set is
+			// burst-truth, so it cannot be row-merged - a walked NPC accretes a second row at its new spot, and the
+			// Noble District guards went to 41 against a true burst of 29 - but the whole-table wipe is what made a
+			// single dump destructive: importing one capture deleted every other map's spawns. Replacing per map keeps
+			// the burst-truth guarantee where the dump has authority and leaves the rest of the world alone.
+			var maps = spawns.Select(s => s.MapId).Concat(patrols.Select(p => p.MapId)).Distinct().ToList();
 			var removed = 0;
-			if (ctx.ModeFor(Name) == WriteMode.Overwrite)
+			if (ctx.ModeFor(Name) == WriteMode.Overwrite && maps.Count > 0)
 			{
-				removed = await ctx.Db.NpcSpawns.CountAsync();
-				// Table names double-quoted so they survive Postgres identifier case-folding (SQLite accepts the quotes too).
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"NpcSpawnMorphs\"");
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"NpcSpawnEquipment\"");
-				// Patrols FK the spawn (#316) - delete them (children first) before the spawns they reference.
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"PatrolNodeWaypoints\"");
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"PatrolNodes\"");
-				await ctx.Db.Database.ExecuteSqlRawAsync("DELETE FROM \"NpcSpawns\"");
+				removed = await ctx.Db.NpcSpawns.CountAsync(n => maps.Contains(n.MapId));
+
+				// Children first - they FK the spawn (#316), and on SQLite a cascade would fire on the parent delete
+				// anyway; being explicit keeps the order obvious and works the same on Postgres.
+				await ctx.Db.PatrolNodes.Where(n => maps.Contains(n.NpcSpawn.MapId)).ExecuteDeleteAsync();
+				await ctx.Db.NpcSpawnMorphs.Where(m => maps.Contains(m.NpcSpawn.MapId)).ExecuteDeleteAsync();
+				await ctx.Db.NpcSpawnEquipment.Where(e => maps.Contains(e.NpcSpawn.MapId)).ExecuteDeleteAsync();
+				await ctx.Db.NpcSpawns.Where(n => maps.Contains(n.MapId)).ExecuteDeleteAsync();
+
+				// ExecuteDelete bypasses the change tracker, so anything this context still holds would collide on
+				// the identity map when the same derived spawn ids are re-added.
+				foreach (var entry in ctx.Db.ChangeTracker.Entries<NpcSpawn>().ToList())
+					entry.State = EntityState.Detached;
 			}
 
 			await ImportOps.ImportNpcSpawns(ctx.Db, spawns);
@@ -474,7 +485,7 @@ namespace Faolan.Importer.Modules
 			await ImportOps.ImportPatrolPaths(ctx.Db, patrols);
 
 			var prefix = removed > 0
-				? $"removed {removed}; "
+				? $"replaced {removed} spawn(s) across {maps.Count} map(s); "
 				: "";
 			return new ImportResult($"{prefix}{spawns.Count} spawns, {npcSpells.Count} npc-spell pairs ({spellsAdded} new), {patrols.Count} patrol routes.");
 		}

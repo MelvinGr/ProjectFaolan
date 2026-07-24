@@ -47,12 +47,30 @@ namespace Faolan.Importer.Cli
 		// under DryRun by the module.
 		public string? RdbDir { get; init; }
 
-		// The effective write mode for a module (per-module override beats the global default).
+		// The mode a module will actually RUN in: the requested one (per-module override beats the global default),
+		// COERCED to something the module supports.
+		//
+		// The coercion has to be recorded here rather than computed by the module, because a module only declares
+		// what it supports - it cannot resolve its own fallback. Before this existed the runner printed
+		// "mode 'Upsert' unsupported; using 'Overwrite'" and then ran the module with Upsert anyway, so every module
+		// that branches on its mode took the wrong branch: `npcs` never performed the clean rebuild it documents,
+		// and its spawn set ACCRETED across imports - exactly the failure its own comment warns Upsert would cause.
 		public WriteMode ModeFor(string moduleName)
 		{
+			if (_effectiveModes.TryGetValue(moduleName, out var effective))
+				return effective;
+
 			return ModeOverrides.TryGetValue(moduleName, out var m)
 				? m
 				: Mode;
 		}
+
+		// Called by ImportRunner once per module, before it runs.
+		public void SetEffectiveMode(string moduleName, WriteMode mode)
+		{
+			_effectiveModes[moduleName] = mode;
+		}
+
+		private readonly Dictionary<string, WriteMode> _effectiveModes = [];
 	}
 }
