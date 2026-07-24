@@ -43,6 +43,12 @@ namespace Faolan.Importer.Extractors
 			uint currentMap = 0;
 			(float X, float Y, float Z)? pos = null;
 
+			// Banners seen on this playfield before ANY c2s move, waiting for the next one. The ENTRY banner fires
+			// right after the MapChange - before the client has moved - so a "last move before the banner" rule drops
+			// exactly the sighting that names the area the player spawns into. The next move is inside the same area
+			// (the player is standing in it when the banner shows), so it places the sighting just as well.
+			var pending = new List<uint>();
+
 			foreach (var p in packets)
 			{
 				// NB both directions: the banner is s2c but the POSITION comes from the client's own c2s move, so
@@ -61,6 +67,7 @@ namespace Faolan.Importer.Extractors
 					{
 						currentMap = map;
 						pos = null; // a stale position from the previous playfield would place the banner nowhere
+						pending.Clear(); // ditto: a pending banner belongs to the playfield it fired on
 					}
 
 					continue;
@@ -69,6 +76,9 @@ namespace Faolan.Importer.Extractors
 				if (p is { SubOpcode: MoveSubOpcode, IsDownload: false } && TryReadMovePosition(body, out var moved))
 				{
 					pos = moved;
+					foreach (var areaId in pending)
+						results.Add(new MapAreaName(currentMap, areaId, moved.X, moved.Y, moved.Z));
+					pending.Clear();
 					continue;
 				}
 
@@ -76,10 +86,14 @@ namespace Faolan.Importer.Extractors
 					continue;
 
 				var m = AreaId.Match(Encoding.Latin1.GetString(body));
-				if (!m.Success || pos is not { } at)
-					continue; // no position yet (the entry banner precedes the first move) - can't place it
+				if (!m.Success)
+					continue;
 
-				results.Add(new MapAreaName(currentMap, uint.Parse(m.Groups[1].Value), at.X, at.Y, at.Z));
+				var id = uint.Parse(m.Groups[1].Value);
+				if (pos is { } at)
+					results.Add(new MapAreaName(currentMap, id, at.X, at.Y, at.Z));
+				else
+					pending.Add(id); // placed by the next move on this playfield
 			}
 
 			return results;

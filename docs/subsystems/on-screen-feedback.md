@@ -83,6 +83,16 @@ from the session** — not just a verbatim replay.
   `<localized>` naming the point by its own id under category 270 — the client resolves the text, so no name crosses
   the wire. The nested per-point `key` is OPTIONAL (a keyless banner renders), which is the only reason this works
   for all 538 points: captures only ever discover 2, and the rest are underivable.
+- ⚠️ **The area-name id is an LDB `50025` string id, and that id space is PER-BUILD.** The banner's nested element
+  says so outright: `<localized category='50025' token='DisplayedText(3)|GenericDisplayAreaName|<id>'>`, so the
+  client resolves the text out of its own LDB (`docs/rdb/ldb-string-index.md`) and no name crosses the wire. But the
+  ids are **not stable content ids**: none of the **11** ids the corpus carries (48 sightings) exist in the current
+  client's cat-50025 — while the *names* do, under different ids. `3474586` rendered **"Castle Approach"** in-client
+  on 2026-06-14; the same text is now cat-50025 id **19303910**, and the RDB index was rewritten by a client patch on
+  2026-07-23. Likewise "Bridge of Vilerus I" is `20356377`/`32857349` locally, not the corpus's `3373519`.
+  So a harvested id can silently stop resolving after a client patch, and the durable form is to carry the area
+  **name** and resolve it to the running client's id (crib-picking the English page the way `RdbLdbNameImporter`
+  does). Open work in Gitea #377.
 - ⚠️ **`id=` vs `token=` — do not enumerate feedback by `token=` alone.** A `remoteformat` identifies its string by
   EITHER; across the captures **175** frames use `token="…"` and **8** use `id="…"` (message ids 218327236, 64771509,
   23). #372 scanned for `token=` only, found nothing for discovery, concluded *retail sends no discovery toast*, and
