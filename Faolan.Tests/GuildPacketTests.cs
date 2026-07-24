@@ -38,7 +38,10 @@ namespace Faolan.Tests
 				Description = "",
 				MessageOfTheDay = ""
 			};
-			var demol80 = new Character
+			// The creator as the CAPTURE recorded them: this asserts against captured bytes, so the name has to be the
+			// one encoded in Golden/GuildCreated.bin. It is the one place a real captured character name is still
+			// spelled out in the tests (#417) - everywhere the name is free input it is a pseudonym.
+			var creator = new Character
 			{
 				Id = 0x110099BD,
 				Name = "DemoL80",
@@ -48,7 +51,7 @@ namespace Faolan.Tests
 			};
 
 			var s = new FaolanStream();
-			GuildService.WriteGuildCreatedBody(s, guild, demol80, 0x06, 0x2B20);
+			GuildService.WriteGuildCreatedBody(s, guild, creator, 0x06, 0x2B20);
 
 			Assert.Equal(Convert.ToHexStringLower(Golden.Bytes("GuildCreated")), Convert.ToHexStringLower(s.ToArray()));
 		}

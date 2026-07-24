@@ -976,7 +976,9 @@ namespace Faolan.Importer.Captures
 			if (cols.Screens != null)
 			{
 				for (var i = 0; i < cols.Screens.Count; i++)
-					pkt.Screens.Add(ConversationScreenColumns.ToRow(cols.Screens[i], i)); // throws if a screen isn't byte-exact round-trippable
+					// Throws if a screen isn't byte-exact round-trippable; stores it with the session slots (the capturing
+					// player's name/guild, the retail server label) blanked - the runtime fills them from the live player.
+					pkt.Screens.Add(ConversationScreenColumns.ToStoredRow(cols.Screens[i], i));
 			}
 
 			return pkt;

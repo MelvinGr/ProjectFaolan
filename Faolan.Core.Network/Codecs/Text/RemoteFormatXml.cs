@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -58,23 +59,42 @@ namespace Faolan.Core.Network.Codecs.Text
 				: null, pars);
 		}
 
-		// Convenience for the two live (session) parameters: a literal string entry the client renders verbatim.
+		// The parameters whose value is SESSION state rather than dialogue content: the player's name, their guild, and
+		// the NPC's guild label. They are regenerated from live values on every send (WithLivePlayer) and are NOT
+		// persisted - ConversationScreenColumns.ToStoredRow blanks them so the capturing player's character/guild name
+		// and their retail SERVER name never ride the DB into a live session.
+		public static readonly string[] SessionSlots = ["name", "guildname", "npcguildname"];
+
+		// Convenience for the live (session) parameters: a literal string entry the client renders verbatim.
 		public static Parameter StringEntry(string name, string value, string flags = "")
 		{
 			return new Parameter(name, $"<stringentry string=\"{value}\" flags=\"{flags}\" >");
 		}
 
-		// Regenerate the session-specific string-entry parameters (name = player, guildname = guild) from live values,
-		// preserving each parameter's captured flags. Other parameters (NPC name, localized tokens) are kept as-is.
-		public static Screen WithLivePlayer(Screen s, string playerName, string guildName)
+		// The NPC guild slot's literal, as retail composed it: "<guild> [<server>]", e.g. captured as
+		// "Not in guild [Legacy of Cimmeria]". Only the GUILDLESS form is attested (no captured NPC is in a guild) and
+		// ours never are either, so that is the only form we build - the realm name is ours, not the capture's.
+		public static string NotInGuildLabel(string realmName)
+		{
+			return $"Not in guild [{realmName}]";
+		}
+
+		// Regenerate the session string-entry parameters (name = player, guildname = their guild, npcguildname = the
+		// NPC's guild label) from live values, preserving each parameter's captured flags (the grammatical gender the
+		// localized text declines against). A slot carrying a <localized …> element instead - npcguildname's
+		// "StrangerGuild" token variant, npcname, the grammar tokens - is content, not session state, and is kept.
+		public static Screen WithLivePlayer(Screen s, string playerName, string guildName, string npcGuildName)
 		{
 			var pars = new List<Parameter>(s.Parameters.Count);
-			pars.AddRange(s.Parameters.Select(p => p.Name switch
-			{
-				"name"      => StringEntry("name", playerName, FlagsOf(p.InnerRaw)),
-				"guildname" => StringEntry("guildname", guildName, FlagsOf(p.InnerRaw)),
-				_           => p
-			}));
+			pars.AddRange(s.Parameters.Select(p => !IsStringEntry(p.InnerRaw)
+				? p
+				: p.Name switch
+				{
+					"name"         => StringEntry("name", playerName, FlagsOf(p.InnerRaw)),
+					"guildname"    => StringEntry("guildname", guildName, FlagsOf(p.InnerRaw)),
+					"npcguildname" => StringEntry("npcguildname", npcGuildName, FlagsOf(p.InnerRaw)),
+					_              => p
+				}));
 
 			return s with
 			{
@@ -82,18 +102,23 @@ namespace Faolan.Core.Network.Codecs.Text
 			};
 		}
 
-		// XML escape/unescape for the parameter value's inner (& must be first on the way out, last on the way in).
-		private static string Escape(string s)
+		public static bool IsStringEntry(string innerRaw)
 		{
-			return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+			return innerRaw.StartsWith("<stringentry", StringComparison.Ordinal);
 		}
 
-		private static string FlagsOf(string innerRaw)
+		public static string FlagsOf(string innerRaw)
 		{
 			var m = FlagsRx.Match(innerRaw);
 			return m.Success
 				? m.Groups["f"].Value
 				: "";
+		}
+
+		// XML escape/unescape for the parameter value's inner (& must be first on the way out, last on the way in).
+		private static string Escape(string s)
+		{
+			return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
 		}
 
 		private static string Unescape(string s)

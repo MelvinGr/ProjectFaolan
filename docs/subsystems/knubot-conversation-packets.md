@@ -19,10 +19,27 @@ child rows of `name`/`InnerRaw`) — the old JSON-array-of-XML `ScreensJson` blo
 columnizes each screen via `ConversationScreenColumns.ToRow`, which throws unless the typed round-trip
 reproduces the captured XML byte-for-byte (652/652 screens, 6090 parameters); the runtime rebuilds the wire XML
 from the rows via `ConversationScreenColumns.ToScreen` → `RemoteFormatXml.Build`, with **no fallback** — the
-columns are authoritative. The **live player name/guild are regenerated** into each screen's `name`/`guildname`
-parameters (`RemoteFormatXml.WithLivePlayer`) so the NPC greets the real character — the captured player's name
-is gone. The screen TEXT (`key`) is the captured template; the content `key` is non-computable (same as the item
-TEA keys).
+columns are authoritative. The screen TEXT (`key`) is the captured template; the content `key` is non-computable
+(same as the item TEA keys).
+
+### Session slots — regenerated, never stored (#417)
+
+A screen carries no dialogue text: `id`+`category` name a string in the CLIENT's LDB and each `<parameter>` fills
+one of that template's placeholders. Three of them are **session state** rather than content, and all three are
+regenerated per send by `RemoteFormatXml.WithLivePlayer` from the live character, their guild and the realm:
+
+| parameter | captured value | what we send |
+|---|---|---|
+| `name` | the capturing player's character | the live character's name (captured `flags` kept — the gender the localized text declines against) |
+| `guildname` | their guild, or empty | the live character's guild (empty when guildless), looked up by `Character.GuildId` |
+| `npcguildname` | `Not in guild [<retail server>]` | `Not in guild [<our realm's name>]` (`RemoteFormatXml.NotInGuildLabel`) |
+
+The importer therefore stores them **blank** (`ConversationScreenColumns.ToStoredRow`, applied after `ToRow`'s
+byte-exact gate): the slot stays — the client parses the screen by parameter name and order, and `flags` matters —
+but the string goes, so no captured character / guild / retail-server name reaches `faolan.db` or the committed
+`faolan.sql` seed. `SeedSessionDataTests` gates that on the shipped seed. `npcguildname` also has a second captured
+shape, the `<localized token="StrangerGuild" category="100">` reference; that one is content and is kept verbatim.
+Only the guildless label is attested (no captured NPC belongs to a guild), so it is the only one we build.
 
 `AnswerList` (0xF164A4A5) and `CloseChatWindow` (0xC4AF39EB) **share one grammar** (validated 163/163 +
 40/40 across the structured rows): the KnubotBase header then `[u32 count][ count x ([u16 len][remoteformat string]) ]`. CloseChatWindow

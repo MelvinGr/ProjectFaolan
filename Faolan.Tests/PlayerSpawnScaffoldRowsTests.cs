@@ -29,7 +29,7 @@ namespace Faolan.Tests
 		// The row-carried content (entry table / feat id-list / pair lists) + IIR still regenerate byte-exact; only the
 		// pre-IIR frame is now the constructed canonical form (FreshPreFrame(class)). Dikketest's captured frame already
 		// equals FreshPreFrame(Barbarian), so his case is still byte-identical to the raw capture.
-		[Theory, InlineData("SpawnDikketestLogin", Class.Barbarian), InlineData("SpawnNecroL80KingsCastle", Class.Necromancer), InlineData("SpawnDemoL80RandomActions", Class.Demonologist)]
+		[Theory, InlineData("SpawnDikketestLogin", Class.Barbarian), InlineData("SpawnNecroKingsCastle", Class.Necromancer), InlineData("SpawnDemoRandomActions", Class.Demonologist)]
 		public void ExtractThenApply_RegeneratesTheConstructedForm(string name, Class @class)
 		{
 			var body = Golden(name);
@@ -49,7 +49,7 @@ namespace Faolan.Tests
 				80004, 82704, 410604, 80200, 80104, 81603, 84004, 84104, 410204, 81804, 82801, 410104, 81702, 80401, 82904, 83401, 85700, 410901, 80800, 80902, 82202, 83000, 85400, 81001, 82500
 			];
 
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroL80KingsCastle"), out var scaffold, out _));
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroKingsCastle"), out var scaffold, out _));
 			var character = new Character
 			{
 				Id = 0x0200000A,

@@ -11,6 +11,8 @@ namespace Faolan.Tests
 	public class RemoteFormatXmlTests
 	{
 		// Real AppendText screen with all three inner parameter shapes (localized token, stringentry, localized id).
+		// The `name` session slot holds a PLACEHOLDER, not the captured player (#417) - the grammar under test is the
+		// parameter framing, which is indifferent to the string, and no real character name belongs in the repo.
 		private const string AppendXml =
 			"<remoteformat id=\"33600\" category=\"50002\" key=\"djaj!xgdVQpMtKta6Csp\" knubot=\"0\" antitag=\"0\" ><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\" a\" /><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\" p\" /><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\" t\" /><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\"a\" /><parameter value=\"7;&lt;stringentry string=&quot;&quot; flags=&quot;&quot; &gt;\" name=\"guildname\" /><parameter value=\"7;&lt;stringentry string=&quot;DemoL80&quot; flags=&quot;m&quot; &gt;\" name=\"name\" /><parameter value=\"7;&lt;stringentry string=&quot;Not in guild [Legacy of Cimmeria]&quot; flags=&quot;&quot; &gt;\" name=\"npcguildname\" /><parameter value=\"7;&lt;localized id=&quot;15148&quot; category=&quot;51000&quot; flags=&quot;m&quot; key=&quot;+u#I9(w2ZeOsi!lii6qs&quot; &gt;\" name=\"npcname\" /><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\"p\" /><parameter value=\"7;&lt;localized token=&quot;Stranger&quot; category=&quot;100&quot; flags=&quot;&quot; key=&quot;&amp;#39;TXPNx_CPtJl(C`-&amp;#36;1/z&quot; &gt;\" name=\"t\" /></remoteformat>";
 
@@ -73,20 +75,56 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void WithLivePlayer_RegeneratesNameAndGuild_KeepingTheRest()
+		public void WithLivePlayer_RegeneratesTheSessionSlots_KeepingTheRest()
 		{
-			var s = RemoteFormatXml.WithLivePlayer(RemoteFormatXml.Parse(AppendXml), "Conan", "Cimmerians");
+			var s = RemoteFormatXml.WithLivePlayer(RemoteFormatXml.Parse(AppendXml), "Conan", "Cimmerians", RemoteFormatXml.NotInGuildLabel("Project Faolan"));
 			var xml = RemoteFormatXml.Build(s);
 
 			// Player name regenerated (captured flags="m" preserved), guild filled, the captured player gone.
 			Assert.Contains("string=&quot;Conan&quot; flags=&quot;m&quot;", xml);
 			Assert.Contains("string=&quot;Cimmerians&quot;", xml);
 			Assert.DoesNotContain("DemoL80", xml);
+			// The NPC guild label carries OUR realm, not the capture's retail server (#417).
+			Assert.Contains("string=&quot;Not in guild [Project Faolan]&quot;", xml);
+			Assert.DoesNotContain("Legacy of Cimmeria", xml);
 			// NPC name + localized tokens untouched.
 			Assert.Contains("localized id=&quot;15148&quot;", xml);
-			Assert.Contains("Not in guild [Legacy of Cimmeria]", xml);
 			// Root (incl. the harvested key) unchanged.
 			Assert.StartsWith("<remoteformat id=\"33600\" category=\"50002\" key=\"djaj!xgdVQpMtKta6Csp\"", xml);
+		}
+
+		// #417: what gets PERSISTED carries no captured character / guild / server name - the slot stays (the client
+		// parses the screen by parameter name and order, and `flags` drives the localized declension), the string goes.
+		[Fact]
+		public void ToStoredRow_BlanksTheSessionSlots_KeepingSlotAndFlags()
+		{
+			var row = ConversationScreenColumns.ToStoredRow(AppendXml, 0);
+
+			Assert.Equal(10, row.Parameters.Count);
+			Assert.Equal("<stringentry string=\"\" flags=\"m\" >", row.Parameters.Single(p => p.Name == "name").InnerRaw);
+			Assert.Equal("<stringentry string=\"\" flags=\"\" >", row.Parameters.Single(p => p.Name == "guildname").InnerRaw);
+			Assert.Equal("<stringentry string=\"\" flags=\"\" >", row.Parameters.Single(p => p.Name == "npcguildname").InnerRaw);
+
+			// Everything else is dialogue content and is stored verbatim.
+			Assert.Contains("localized id=\"15148\"", row.Parameters.Single(p => p.Name == "npcname").InnerRaw);
+			Assert.All(row.Parameters, p => Assert.DoesNotContain("DemoL80", p.InnerRaw));
+			Assert.All(row.Parameters, p => Assert.DoesNotContain("Legacy of", p.InnerRaw));
+		}
+
+		// The other captured shape of the npcguildname slot: a localized token, which is content (no name in it) and
+		// must survive both the store and the live regeneration untouched.
+		[Fact]
+		public void LocalizedNpcGuildToken_SurvivesStoreAndRegeneration()
+		{
+			const string token = "<localized token=\"StrangerGuild\" category=\"100\" flags=\"\" key=\"y1SEN#hsYh/Aqi0M&quot;79g\" >";
+			var xml = AppendXml.Replace("&lt;stringentry string=&quot;Not in guild [Legacy of Cimmeria]&quot; flags=&quot;&quot; &gt;",
+				token.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;"));
+
+			var row = ConversationScreenColumns.ToStoredRow(xml, 0);
+			Assert.Equal(token, row.Parameters.Single(p => p.Name == "npcguildname").InnerRaw);
+
+			var live = RemoteFormatXml.WithLivePlayer(ConversationScreenColumns.ToScreen(row), "Conan", "", RemoteFormatXml.NotInGuildLabel("Project Faolan"));
+			Assert.Equal(token, live.Parameters.Single(p => p.Name == "npcguildname").InnerRaw);
 		}
 	}
 }

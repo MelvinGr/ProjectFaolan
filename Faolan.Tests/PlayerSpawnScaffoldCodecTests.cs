@@ -13,8 +13,8 @@ namespace Faolan.Tests
 	// player-own spawns, including captures added after the codec was written; these pin the C# port):
 	//   SpawnEditorPreview      - in-editor preview, 228-byte constant pre frame, empty scaffold
 	//   SpawnDikketestLogin     - fresh char at world entry (the fresh-character generation reference)
-	//   SpawnNecroL80KingsCastle  - geared char, 339-byte pre frame with the 26-slot table, end pairs
-	//   SpawnDemoL80RandomActions- both ending pair lists non-empty
+	//   SpawnNecroKingsCastle  - geared char, 339-byte pre frame with the 26-slot table, end pairs
+	//   SpawnDemoRandomActions- both ending pair lists non-empty
 	//   SpawnHoxxlingBuffed     - active buffs (two 60-byte buff records)
 	public class PlayerSpawnScaffoldCodecTests
 	{
@@ -36,7 +36,7 @@ namespace Faolan.Tests
 			Assert.Equal(s.Entries.Count, back.Entries.Count);
 		}
 
-		[Theory, InlineData("SpawnEditorPreview"), InlineData("SpawnDikketestLogin"), InlineData("SpawnNecroL80KingsCastle"), InlineData("SpawnDemoL80RandomActions"), InlineData("SpawnHoxxlingBuffed")]
+		[Theory, InlineData("SpawnEditorPreview"), InlineData("SpawnDikketestLogin"), InlineData("SpawnNecroKingsCastle"), InlineData("SpawnDemoRandomActions"), InlineData("SpawnHoxxlingBuffed")]
 		public void ParseThenGenerate_IsByteIdentical(string name)
 		{
 			var body = Golden(name);
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_GearedSpawn_LiftsEndPairsAndPreTable()
 		{
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroL80KingsCastle"), out var s, out _));
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroKingsCastle"), out var s, out _));
 
 			Assert.Equal(339, s.PreFrame.Length); // the geared variant with the 26-slot table
 			Assert.Equal(14, s.Entries.Count);

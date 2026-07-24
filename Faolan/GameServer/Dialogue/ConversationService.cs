@@ -243,10 +243,18 @@ namespace Faolan.GameServer.Dialogue
 		{
 			var liveInstance = client.Session.Character.Id;
 
-			// The live player's name/guild are regenerated into each screen's remoteformat XML (replacing the captured
-			// player's), so a dialogue addresses the player who's actually talking. Guild is empty when guildless.
-			var playerName = client.Session.Character?.Name ?? "";
-			var guildName = client.Session.Character?.Guild?.Name ?? "";
+			// The session slots are regenerated into each screen's remoteformat XML from LIVE values (the stored screen
+			// has them blank, #417): the player who's actually talking, their guild (empty when guildless), and the NPC
+			// guild label, which carries OUR realm name rather than the capture's retail server. Character.Guild is a
+			// navigation nobody loads (lazy loading is off), so the guild is fetched by id.
+			var character = client.Session.Character;
+			var playerName = character?.Name ?? "";
+			var guildName = character?.GuildId is { } guildId
+				? (await _database.GetGuild(guildId))?.Name ?? ""
+				: "";
+			var npcGuildName = RemoteFormatXml.NotInGuildLabel(character != null
+				? (await _database.GetRealm(character.RealmId))?.Name ?? ""
+				: "");
 
 			// A captured screen that offers options (AnswerList 0xF164A4A5) sometimes ALSO carries a trailing
 			// CloseChatWindow (0xC4AF39EB) - the captured session closed the window right after. Replaying that close
@@ -298,7 +306,7 @@ namespace Faolan.GameServer.Dialogue
 				if (subOp == ConversationSubOpcode.SetDialogueCamera)
 					await SendDialogueCamera(client, senderInstance, liveInstance, clickedNpcHandle, DialogueCameraBody.BuildParams(p));
 				else
-					await SendConstructedKnubot(client, senderInstance, liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName));
+					await SendConstructedKnubot(client, senderInstance, liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName, npcGuildName));
 			}
 
 			if (grantDef != null && !grantSent) // no AnswerList on this screen - send after the (terminal) screen
@@ -416,7 +424,7 @@ namespace Faolan.GameServer.Dialogue
 		// ConversationScreen rows (RemoteFormatXml.Build) with the live player name/guild regenerated in. The rows are
 		// gated byte-exact at import (ConversationScreenColumns.ToRow), so this build is authoritative - no Data-path
 		// fallback. Byte-identical to the raw-capture construct for the same inputs (ConversationConstructTests).
-		internal static byte[] BuildKnubotFromColumns(ConversationPacket p, uint liveInstance, uint npcHandle, string playerName, string guildName)
+		internal static byte[] BuildKnubotFromColumns(ConversationPacket p, uint liveInstance, uint npcHandle, string playerName, string guildName, string npcGuildName = "")
 		{
 			var env = p.Env ?? 0;
 			var screens = ConversationScreenColumns.ToScreens(p.Screens); // ordered RemoteFormatXml.Screen list
@@ -432,11 +440,12 @@ namespace Faolan.GameServer.Dialogue
 
 			byte[] Screen(int i)
 			{
-				// With no live player (empty name) keep the captured screen content as-is, matching the raw-Data
-				// construct; otherwise regenerate the live player name/guild into the name/guildname parameters.
+				// With no live player (empty name) keep the screen's stored content as-is - the construct-vs-capture gate
+				// feeds it capture-parsed rows and expects them back verbatim; otherwise regenerate the session slots
+				// (player name, their guild, the NPC guild label) from the live values.
 				var screen = string.IsNullOrEmpty(playerName)
 					? screens[i]
-					: RemoteFormatXml.WithLivePlayer(screens[i], playerName, guildName ?? "");
+					: RemoteFormatXml.WithLivePlayer(screens[i], playerName, guildName ?? "", npcGuildName ?? "");
 				return Encoding.Latin1.GetBytes(RemoteFormatXml.Build(screen));
 			}
 		}

@@ -47,6 +47,26 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			return row;
 		}
 
+		// The row as it is PERSISTED: parsed and gated exactly like ToRow, then with the session slots blanked. The
+		// captured `name` / `guildname` / `npcguildname` string entries carry the capturing player's character name,
+		// their guild, and the retail SERVER they played on ("Not in guild [Legacy of Cimmeria]") - none of which is
+		// dialogue content, and all of which the runtime regenerates from the live player + realm at send time
+		// (RemoteFormatXml.WithLivePlayer). Storing them would leak real retail names into faolan.db and the committed
+		// faolan.sql seed, and a stale one would reach a client whenever the live value is missing. The slot itself
+		// stays (name, order and flags are part of the screen the client parses); only the string goes.
+		// Blanked AFTER ToRow's round-trip gate, so a screen we cannot reproduce byte-exactly still fails at import.
+		public static ConversationScreen ToStoredRow(string screenXml, int sequence)
+		{
+			var row = ToRow(screenXml, sequence);
+			foreach (var p in row.Parameters)
+			{
+				if (RemoteFormatXml.SessionSlots.Contains(p.Name) && RemoteFormatXml.IsStringEntry(p.InnerRaw))
+					p.InnerRaw = RemoteFormatXml.StringEntry(p.Name, "", RemoteFormatXml.FlagsOf(p.InnerRaw)).InnerRaw;
+			}
+
+			return row;
+		}
+
 		// Project a stored ConversationScreen row back to the RemoteFormatXml.Screen the builder serialises.
 		public static RemoteFormatXml.Screen ToScreen(ConversationScreen row)
 		{

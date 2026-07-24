@@ -27,7 +27,9 @@ namespace Faolan.Tests
 		                                      "201204081a10051a530a140d274a93cb1564da8ff71d166eedda25bf045b3b12140d274a93cb1564da8ff71d166eedda25bf" +
 		                                      "045b3b1a140d274a93cb1564da8ff71d166eedda25bf045b3b252e7d02002d2e7d0200380a45000000000000007208006f31" + "00000000";
 
-		// DispatchMailMessage body (bytes after the 0x2002 opcode), system mail to "AssassinL23", attachCount=0.
+		// DispatchMailMessage body (bytes after the 0x2002 opcode), system mail to "AssassinL23", attachCount=0. The
+		// recipient is the captured character - it is IN these bytes (and in the body XML), so the assertions spell it
+		// out; a pseudonym belongs anywhere the name is free input, not where it is what the dump says (#417).
 		private const string BaseBody = "20d82b631c0c578f08006f3100074d656c6c69656a08006f31000002403c72656d6f7465666f726d617420746f6b656e3d22" +
 		                                "5472616465506f73744755495f4d61696c4974656d426f75676874222063617465676f72793d2236323922206b65793d2223" +
 		                                "785b63604e745d3665512136495d546a5d4c7722206b6e75626f743d22302220203e3c706172616d657465722076616c7565" +
