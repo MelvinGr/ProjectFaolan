@@ -1,16 +1,8 @@
 -- GENERATED (#411): SQLite half of the seed - the AUTOINCREMENT high-water marks.
 -- Run after faolan.sql. Pointless on a db with no AUTOINCREMENT tables; harmless there.
 BEGIN TRANSACTION;
-DELETE FROM sqlite_sequence WHERE name = 'Accounts';
-INSERT INTO sqlite_sequence (name, seq) VALUES ('Accounts', 822930519);
 DELETE FROM sqlite_sequence WHERE name = 'AppearanceChoices';
 INSERT INTO sqlite_sequence (name, seq) VALUES ('AppearanceChoices', 634);
-DELETE FROM sqlite_sequence WHERE name = 'ChatMessages';
-INSERT INTO sqlite_sequence (name, seq) VALUES ('ChatMessages', 1);
-DELETE FROM sqlite_sequence WHERE name = 'Realms';
-INSERT INTO sqlite_sequence (name, seq) VALUES ('Realms', 1);
-DELETE FROM sqlite_sequence WHERE name = 'Guilds';
-INSERT INTO sqlite_sequence (name, seq) VALUES ('Guilds', 1);
 DELETE FROM sqlite_sequence WHERE name = 'MapLootEntries';
 INSERT INTO sqlite_sequence (name, seq) VALUES ('MapLootEntries', 98);
 DELETE FROM sqlite_sequence WHERE name = 'NpcChatter';
@@ -25,8 +17,6 @@ DELETE FROM sqlite_sequence WHERE name = 'Shops';
 INSERT INTO sqlite_sequence (name, seq) VALUES ('Shops', 29);
 DELETE FROM sqlite_sequence WHERE name = 'WorldObjects';
 INSERT INTO sqlite_sequence (name, seq) VALUES ('WorldObjects', 1870);
-DELETE FROM sqlite_sequence WHERE name = 'AccountClaims';
-INSERT INTO sqlite_sequence (name, seq) VALUES ('AccountClaims', 76);
 DELETE FROM sqlite_sequence WHERE name = 'ConversationNodes';
 INSERT INTO sqlite_sequence (name, seq) VALUES ('ConversationNodes', 8235);
 DELETE FROM sqlite_sequence WHERE name = 'NpcEquipment';
@@ -37,8 +27,6 @@ DELETE FROM sqlite_sequence WHERE name = 'RecipeItems';
 INSERT INTO sqlite_sequence (name, seq) VALUES ('RecipeItems', 7406);
 DELETE FROM sqlite_sequence WHERE name = 'ShopItems';
 INSERT INTO sqlite_sequence (name, seq) VALUES ('ShopItems', 13619);
-DELETE FROM sqlite_sequence WHERE name = 'TradepostListings';
-INSERT INTO sqlite_sequence (name, seq) VALUES ('TradepostListings', 489);
 DELETE FROM sqlite_sequence WHERE name = 'ConversationPackets';
 INSERT INTO sqlite_sequence (name, seq) VALUES ('ConversationPackets', 31890);
 DELETE FROM sqlite_sequence WHERE name = 'NpcSpawnEquipment';

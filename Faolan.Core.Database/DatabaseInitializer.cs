@@ -109,8 +109,9 @@ namespace Faolan.Core.Database
 			// Migrate applies the pending set for the active provider.
 			await db.Database.MigrateAsync(cancellationToken);
 
-			// The game data first, so the realm/account below see what the seed already carries instead of adding a
-			// second copy - faolan.sql ships one Realm and one Account (characters are the only excluded rows).
+			// The game data first, then the deployment defaults. The seed is CONTENT ONLY (#412) - it carries no
+			// Accounts/Realms/Characters rows - so the two Ensure calls below are what give a fresh database its
+			// default realm and the `faolan` admin account to log in with.
 			var dataSeeded = seedGameData && await EnsureGameDataAsync(db, cancellationToken);
 
 			// A world can't serve without a realm (guild/AH/mail/character FK it, #324) or an account to log into.

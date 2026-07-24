@@ -31,9 +31,25 @@ namespace Faolan.Importer.Captures
 	// ids, so that goes in a small SIDECAR file per dialect and the big body stays 100% common.
 	public static class SqlSeedWriter
 	{
-		// Same exclusion as the pre-commit hook: `Characters` plus everything that hangs off it, DERIVED from the
-		// model rather than listed, because it is per-developer play state and not reference content.
-		private const string ExcludedRoot = "Characters";
+		// The seed carries GAME CONTENT. Everything below is PLAYER or DEPLOYMENT state - per install, not shipped -
+		// and so is every table that hangs off one of them (the closure is derived from the model's foreign keys, so
+		// it cannot go stale the way a hardcoded list would; these roots pull in 20 more, the CharacterX tables and
+		// MailAttachments).
+		//
+		// `Characters` was the only root until #412: the character-FK closure was standing in for "player state" and
+		// missed everything that is not FK-linked to a character, so a fresh clone came up carrying 243 live auction
+		// listings, 19 account claims, someone's mail and a chat message. Accounts and Realms are deployment state -
+		// DatabaseInitializer creates the defaults for a new database, which is why they do not belong in the data.
+		//
+		// This boundary is also what makes a content UPGRADE tractable: with player state out, every seeded table
+		// referenced from OUTSIDE the seed has a natural, stable key (Items, Spells, QuestDefinitions,
+		// QuestGoalDefinitions, RespawnPoints, Maps), so a live character's references survive a refresh by
+		// construction. The generated-id tables that remain (WorldObjects, ConversationNodes, ...) are internal to
+		// the seed - nothing outside points into them, so renumbering them on a regeneration is harmless.
+		private static readonly string[] ExcludedRoots =
+		[
+			"Characters", "Accounts", "Realms", "Guilds", "Mails", "ChatMessages", "TradepostListings", "AccountClaims"
+		];
 
 		// Rows per multi-row INSERT. The column list is the expensive part of this format - repeating it per row cost
 		// 16 MB of the 24 (68%), more than the values themselves for narrow tables - so it is paid once per BATCH
@@ -51,13 +67,14 @@ namespace Faolan.Importer.Captures
 				.Where(e => e.GetTableName() != null)
 				.GroupBy(e => e.GetTableName()!)
 				.ToList());
-			var excluded = CharacterScopedTables(tables);
+			var excluded = PlayerStateTables(tables);
 
 			var body = new StringBuilder();
 			body.AppendLine("-- Faolan game data. GENERATED - see SqlSeedWriter (#411); do not hand-edit.");
 			body.AppendLine("-- Loads into SQLite and Postgres alike: create the schema first (dotnet ef database update),");
 			body.AppendLine("-- then run this, then the matching faolan.seq.<dialect>.sql sidecar.");
-			body.AppendLine("-- Character rows are excluded on purpose (per-developer play state, not game content).");
+			body.AppendLine("-- Player and deployment state is excluded on purpose (characters, accounts, realms, guilds,");
+			body.AppendLine("-- mail, chat, auction listings, claims) - this file is GAME CONTENT.");
 			body.AppendLine("BEGIN TRANSACTION;");
 
 			var rowTotal = 0;
@@ -239,11 +256,10 @@ namespace Faolan.Importer.Captures
 			return $"\"{identifier}\"";
 		}
 
-		// `Characters` and everything that reaches it through foreign keys, so the exclusion cannot go stale the way
-		// a hardcoded list would (the pre-commit hook derives the same set in SQL).
-		private static HashSet<string> CharacterScopedTables(List<IGrouping<string, IEntityType>> tables)
+		// The excluded ROOTS plus everything that reaches one of them through foreign keys.
+		private static HashSet<string> PlayerStateTables(List<IGrouping<string, IEntityType>> tables)
 		{
-			var excluded = new HashSet<string> { ExcludedRoot };
+			var excluded = new HashSet<string>(ExcludedRoots);
 			bool grew;
 			do
 			{
