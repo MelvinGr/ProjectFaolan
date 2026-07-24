@@ -3026,8 +3026,28 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float?>("DestinationZ")
                         .HasColumnType("REAL");
 
-                    b.Property<string>("DisplayName")
-                        .HasMaxLength(128)
+                    b.Property<uint?>("DisplayCategory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisplayFlags")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint?>("DisplayId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisplayKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte?>("DisplayKind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("DisplayKnubot")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisplayToken")
+                        .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
                     b.Property<byte>("EffectDynelState")
@@ -3112,10 +3132,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("MapId", "PositionX", "PositionY", "PositionZ", "DisplayName")
-                        .IsUnique();
+                    b.HasIndex("MapId");
 
-                    b.ToTable("WorldObjects");
+                    b.ToTable("WorldObjects", t =>
+                        {
+                            t.HasCheckConstraint("CK_WorldObject_DisplayKind", "DisplayKind IN (0, 1, 2)");
+                        });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.WorldObjectWord", b =>

@@ -44,7 +44,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			row.Kdtree = message.Kdtree;
 			row.Name = message.Name;
-			row.DisplayName = message.DisplayName;
+			WorldObjectDisplay.TryApply(row, message.DisplayName);
 			row.CarsGroup = message.CarsGroup;
 			row.IsClosed = message.IsClosed;
 			row.QuestItemEffect = message.ShouldSerializeQuestItemEffect()
@@ -87,7 +87,7 @@ namespace Faolan.Core.Network.Codecs.World
 			{
 				Kdtree = row.Kdtree,
 				Name = row.Name,
-				DisplayName = row.DisplayName,
+				DisplayName = WorldObjectDisplay.Build(row),
 				CarsGroup = row.CarsGroup,
 				IsClosed = row.IsClosed
 			};
@@ -106,7 +106,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// then can't build - zero risk for any shape not fully modelled). Idempotent. Returns true if the row was lifted.
 		public static bool TryLiftColumns(WorldObject row, byte[] body)
 		{
-			row.DisplayName = null;
+			WorldObjectDisplay.Clear(row);
 			if (body is not { Length: > 8 } || !TryParse(body.AsSpan(8), out var message, out var messageStart, out var consumed))
 				return false;
 
@@ -123,7 +123,7 @@ namespace Faolan.Core.Network.Codecs.World
 					return true;
 			}
 
-			row.DisplayName = null; // un-faithful lift -> fall back to the verbatim slice
+			WorldObjectDisplay.Clear(row); // un-faithful lift -> fall back to the verbatim slice
 			return false;
 		}
 
@@ -178,7 +178,7 @@ namespace Faolan.Core.Network.Codecs.World
 		public static bool TryReplaceIdentityFromColumns(ReadOnlySpan<byte> body, WorldObject row, [NotNullWhen(true)] out byte[]? result)
 		{
 			result = null;
-			if (row?.DisplayName == null || !TryParse(body, out _, out var start, out var consumed))
+			if (row?.DisplayKind == null || !TryParse(body, out _, out var start, out var consumed))
 				return false;
 
 			var rebuilt = BuildMessage(ToMessage(row));

@@ -13,6 +13,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Combat;
@@ -152,7 +153,7 @@ namespace Faolan.GameServer
 				if (obj != null)
 				{
 					await _agentServerDispatcher.SendSystemMessage(characterId,
-						$"Deleted world object {obj.DisplayName ?? obj.Name ?? "(unnamed)"} (0x{handle:X8}) - removed live + DB row (gone on relog too).");
+						$"Deleted world object {WorldObjectDisplay.Build(obj) ?? obj.Name ?? "(unnamed)"} (0x{handle:X8}) - removed live + DB row (gone on relog too).");
 					return;
 				}
 
@@ -674,7 +675,7 @@ namespace Faolan.GameServer
 			var obj = await Database.GetWorldObject(player.MapId, handle);
 			if (obj != null)
 			{
-				var oname = obj.DisplayName ?? obj.Name ?? "(unnamed object)";
+				var oname = WorldObjectDisplay.Build(obj) ?? obj.Name ?? "(unnamed object)";
 				var dest = obj.DestinationPosition is { } dp
 					? $" · teleports to map {obj.DestinationMapId} ({dp.X:F1}, {dp.Y:F1}, {dp.Z:F1})"
 					: "";

@@ -711,7 +711,7 @@ namespace Faolan.GameServer.World
 			}
 
 			var deleted = await _database.DeleteWorldObject(player.MapId, handle);
-			_logger.LogInformation("Delete: removed world object {Name} 0x{Handle:X8} ({Rows} row(s), by {Player}).", obj.DisplayName ?? obj.Name, handle, deleted, player.Name);
+			_logger.LogInformation("Delete: removed world object {Name} 0x{Handle:X8} ({Rows} row(s), by {Player}).", WorldObjectDisplay.Build(obj) ?? obj.Name, handle, deleted, player.Name);
 			return obj;
 		}
 
@@ -993,7 +993,7 @@ namespace Faolan.GameServer.World
 
 			await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x05));
 			await SendWorldIir(client, WorldLoot.BuildOpenWindowBody(SimpleDynelMessageCodec.VisualChangeTypeTag, handle, "object_open"));
-			_logger.LogInformation("Object: {Player} opened '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name ?? obj.DisplayName ?? "object", handle);
+			_logger.LogInformation("Object: {Player} opened '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name ?? WorldObjectDisplay.Build(obj) ?? "object", handle);
 			return true;
 		}
 
@@ -1052,7 +1052,7 @@ namespace Faolan.GameServer.World
 			if (obj == null)
 				return new UsedObjectInteraction(InteractAction.None, default);
 
-			var name = obj.Name ?? obj.DisplayName ?? "?";
+			var name = obj.Name ?? WorldObjectDisplay.Build(obj) ?? "?";
 			var teleport = obj.DestinationMapId is { } destMap
 				? new ZoneLineDestination(destMap, obj.DestinationPosition, name)
 				: new ZoneLineDestination(0, null, name);

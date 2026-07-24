@@ -4,6 +4,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -84,7 +85,7 @@ namespace Faolan.Tests
 			Assert.NotEmpty(parameters);
 			Assert.NotEmpty(objects);
 
-			foreach (var raw in parameters.Select(ConversationScreenColumns.InnerRawOf).Concat(objects.Select(o => o.DisplayName)).Where(x => !string.IsNullOrEmpty(x)))
+			foreach (var raw in parameters.Select(ConversationScreenColumns.InnerRawOf).Concat(objects.Select(WorldObjectDisplay.Build)).Where(x => !string.IsNullOrEmpty(x)))
 			{
 				var element = InnerElement.Parse(raw);
 				Assert.True(element != null, $"inner element outside the known grammar: {raw}");

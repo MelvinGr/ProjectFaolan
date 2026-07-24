@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
 using System.Numerics;
+using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -24,22 +25,24 @@ namespace Faolan.Core.Database.Tables
 	// same coordinates (#222), so position alone would reject the second. (Identity-less classes have a null
 	// DisplayName; SQLite treats NULLs as distinct, so they fall back to position-only dedup, which the importer's
 	// in-memory Merge already enforces.)
-	// Identified by WHERE it is plus WHAT it is - (map, position, DisplayName), the declared unique index, now the
-	// source of the primary key via ComputeId. DisplayName is in the identity because props do share an exact
-	// position (#222: keying on position alone dropped them); CapturedHandle is NOT a candidate, it has only 999
-	// distinct values across 1053 rows. A DERIVED id rather than a composite because the identity contains floats
-	// and this is a parent (WorldObjectWord) - see DerivedKey.
-	[Index(nameof(MapId), nameof(PositionX), nameof(PositionY), nameof(PositionZ), nameof(DisplayName), IsUnique = true)]
+	// Identified by WHERE it is plus WHICH STRING IT SHOWS - (map, position, display reference). Position alone is
+	// not enough: exactly one pair of objects shares an exact coordinate and is identical in every structural field
+	// (same ObjectId, GeometryAssetId, Name, SubOpcode), differing ONLY in which LDB string it displays - dropping
+	// that from the identity collapses them into one row, which is bug #222. What is keyed is the localized
+	// REFERENCE (kind + id/token), not the serialized display string: an id is content identity, a blob is not.
+	// CapturedHandle is NOT a candidate - it is session-volatile and has only 999 distinct values across 1053 rows.
+	// A DERIVED id rather than a composite because the identity contains floats and this is a parent
+	// (WorldObjectWord) - see DerivedKey.
 	public class WorldObject : Base3DEntity, IDerivedKey
 	{
-		public static uint ComputeId(uint mapId, float x, float y, float z, string? displayName)
+		public static uint ComputeId(uint mapId, float x, float y, float z, InnerElementKind? displayKind, uint? displayId, string? displayToken)
 		{
-			return DerivedKey.From(mapId, x, y, z, displayName);
+			return DerivedKey.From(mapId, x, y, z, displayKind, displayId, displayToken);
 		}
 
 		public uint ComputeId()
 		{
-			return ComputeId(MapId, PositionX, PositionY, PositionZ, DisplayName);
+			return ComputeId(MapId, PositionX, PositionY, PositionZ, DisplayKind, DisplayId, DisplayToken);
 		}
 
 		// The teleport destination (map + arrival position), populated for Teleport/ProxyTeleport. Extracted from the
@@ -130,8 +133,36 @@ namespace Faolan.Core.Database.Tables
 		public float? DestinationY { get; set; }
 		public float? DestinationZ { get; set; }
 
-		[MaxLength(128)]
-		public string? DisplayName { get; set; } // proto field 3
+		// --- the display element, COLUMNIZED (see InnerElement) ---------------------------------------------------
+		// Proto field 3 is a STRING, and every captured value is a serialized remoteformat inner element: an LDB
+		// reference (by id or name token) or a nested parameter-less remoteformat root. It is stored as columns and
+		// rebuilt by BuildDisplayName; the string it replaced is retired.
+		//
+		// DisplayKind null = NO display element, which is also the "row is not lifted" signal the build path checks
+		// (SimpleDynelMessageCodec.TryLiftColumns leaves it null when the identity does not rebuild byte-exact, so
+		// an un-modelled shape degrades to un-lifted rather than being half-stored).
+		[ConstrainToEnumValues]
+		public InnerElementKind? DisplayKind { get; set; }
+
+		public uint? DisplayId { get; set; }
+
+		[MaxLength(64)]
+		public string? DisplayToken { get; set; }
+
+		public uint? DisplayCategory { get; set; }
+
+		[MaxLength(16)]
+		public string? DisplayFlags { get; set; }
+
+		// The client-validated content hash, as the raw ATTRIBUTE TEXT the capture carries (entities included).
+		[MaxLength(64)]
+		public string? DisplayKey { get; set; }
+
+		public uint? DisplayKnubot { get; set; }
+
+
+		// The wire string these rebuild into lives in the codec layer (WorldObjectDisplay.Build) - Faolan.Core.Database
+		// does not reference Faolan.Core.Network, which is where the InnerElement grammar lives.
 
 		[MaxLength(128)]
 		public string? Name { get; set; }

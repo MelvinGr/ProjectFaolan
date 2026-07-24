@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
 using Microsoft.Data.Sqlite;
 using Faolan.Tests.Support;
@@ -22,7 +23,7 @@ namespace Faolan.Tests
 			using var con = new SqliteConnection($"Data Source={db};Mode=ReadOnly");
 			con.Open();
 			using var cmd = con.CreateCommand();
-			cmd.CommandText = "SELECT Name,DisplayName,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,GeometryAssetType " + "FROM WorldObjects WHERE DisplayName IS NOT NULL";
+			cmd.CommandText = "SELECT Name,DisplayKind,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,GeometryAssetType,DisplayId,DisplayToken,DisplayCategory,DisplayFlags,DisplayKey,DisplayKnubot " + "FROM WorldObjects WHERE DisplayKind IS NOT NULL";
 			using var r = cmd.ExecuteReader();
 			int total = 0, ok = 0, noTail = 0, mismatch = 0;
 			while (r.Read())
@@ -32,7 +33,7 @@ namespace Faolan.Tests
 				{
 					SubOpcode = SimpleDynelMessageCodec.Opcode,
 					Name = r.GetString(0),
-					DisplayName = r.GetString(1),
+					DisplayKind = (InnerElementKind)r.GetInt64(1),
 					CarsGroup = (uint)r.GetInt64(2),
 					IsClosed = r.GetBoolean(3),
 					QuestItemEffect = r.IsDBNull(4)
@@ -45,7 +46,25 @@ namespace Faolan.Tests
 					WaypointType = r.IsDBNull(7)
 						? null
 						: (uint)r.GetInt64(7),
-					GeometryAssetType = (uint)r.GetInt64(8)
+					GeometryAssetType = (uint)r.GetInt64(8),
+					DisplayId = r.IsDBNull(9)
+						? null
+						: (uint)r.GetInt64(9),
+					DisplayToken = r.IsDBNull(10)
+						? null
+						: r.GetString(10),
+					DisplayCategory = r.IsDBNull(11)
+						? null
+						: (uint)r.GetInt64(11),
+					DisplayFlags = r.IsDBNull(12)
+						? null
+						: r.GetString(12),
+					DisplayKey = r.IsDBNull(13)
+						? null
+						: r.GetString(13),
+					DisplayKnubot = r.IsDBNull(14)
+						? null
+						: (uint)r.GetInt64(14)
 				};
 
 				// The geometry record always names an RDB asset (1010030 MESHINDEXFILE / 1010001 RenderMesh /

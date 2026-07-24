@@ -133,8 +133,8 @@ namespace Faolan.Tests
 			var options = TestDb.ReadOnly(TestPaths.FaolanDb);
 			using var ctx = new DatabaseContext(options);
 			var map = new Dictionary<string, WorldObject>();
-			foreach (var o in ctx.WorldObjects.Where(o => o.MapId == 4000 && o.DisplayName != null).AsNoTracking())
-				map.TryAdd(o.DisplayName!, o);
+			foreach (var o in ctx.WorldObjects.Where(o => o.MapId == 4000 && o.DisplayKind != null).AsNoTracking())
+				map.TryAdd(WorldObjectDisplay.Build(o)!, o);
 			return map;
 		}
 

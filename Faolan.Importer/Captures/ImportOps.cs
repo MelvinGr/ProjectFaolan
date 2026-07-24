@@ -755,19 +755,20 @@ namespace Faolan.Importer.Captures
 				Console.WriteLine($"World objects: purged {stale.Count} transient loot-bag row(s) (live-only entities).");
 			}
 
-			// The DB UNIQUE index is (MapId, PositionX/Y/Z, DisplayName). Two Adds sharing that key collide at
-			// SaveChanges - and the existing-row query below does NOT see un-saved Adds, so two duplicate entries in
-			// THIS batch both fell through to Add and crashed a full import (#394). Track the rows queued this batch by
-			// the exact constraint key and update the pending/existing one instead of adding a second. SQLite treats a
-			// NULL DisplayName as distinct (never collides), so those skip the dedup and always add, as before.
-			var pending = new Dictionary<(uint MapId, float X, float Y, float Z, string Name), WorldObject>();
+			// Two Adds sharing an IDENTITY collide at SaveChanges - and the existing-row query below does NOT see
+			// un-saved Adds, so two duplicate entries in THIS batch both fell through to Add and crashed a full import
+			// (#394). Track the rows queued this batch and update the pending/existing one instead of adding a second.
+			// The key is simply the row's DERIVED id, which IS the identity (map + position + display reference) - it
+			// used to be a hand-built tuple mirroring the old unique index. A row with NO display element has no
+			// identity to dedup on (it is un-lifted), so those skip the dedup and always add, as before.
+			var pending = new Dictionary<uint, WorldObject>();
 			foreach (var e in objects)
 			{
 				if (e.DisplayName == "Bag of loot")
 					continue;
 
-				// Populate FIRST: the DisplayName column is DERIVED by TryLiftColumns (from the object message body) and
-				// can differ from e.DisplayName, so the dedup must key on the actual stored value the UNIQUE index sees.
+				// Populate FIRST: the display columns are DERIVED by TryLiftColumns (from the object message body) and
+				// can differ from e.DisplayName, so the identity must be computed from the actual stored values.
 				var built = PopulateObject(new WorldObject
 				{
 					MapId = e.MapId,
@@ -776,28 +777,26 @@ namespace Faolan.Importer.Captures
 					PositionZ = e.Z
 				}, e);
 
-				// The id is DERIVED from (map, position, DisplayName) - computed AFTER PopulateObject for the same
-				// reason the dedup keys on the stored value: DisplayName is lifted from the object body here.
 				built.Id = built.ComputeId();
 
-				if (built.DisplayName is { } name)
+				if (built.DisplayKind != null)
 				{
-					var key = (e.MapId, e.X, e.Y, e.Z, name);
-					if (pending.TryGetValue(key, out var queued))
+					if (pending.TryGetValue(built.Id, out var queued))
 					{
 						PopulateObject(queued, e); // a duplicate within this batch: fold it into the row already queued
 						continue;
 					}
 
-					var existing = await db.WorldObjects.FirstOrDefaultAsync(o => o.MapId == e.MapId && o.PositionX == e.X && o.PositionY == e.Y && o.PositionZ == e.Z && o.DisplayName == name);
+					var id = built.Id;
+					var existing = await db.WorldObjects.FirstOrDefaultAsync(o => o.Id == id);
 					if (existing != null)
 					{
 						PopulateObject(existing, e);
-						pending[key] = existing;
+						pending[id] = existing;
 						continue;
 					}
 
-					pending[key] = built;
+					pending[built.Id] = built;
 				}
 
 				db.WorldObjects.Add(built);

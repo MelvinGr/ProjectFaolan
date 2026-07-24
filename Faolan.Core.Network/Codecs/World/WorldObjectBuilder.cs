@@ -40,9 +40,9 @@ namespace Faolan.Core.Network.Codecs.World
 		// columns (DisplayName) - an un-lifted / partially-imported row, not a normal outcome.
 		public static byte[] BuildBody(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken)
 		{
-			if (row?.DisplayName == null)
+			if (row?.DisplayKind == null)
 				throw new InvalidOperationException(
-					$"WorldObject '{row?.Name ?? "?"}' (id {row?.Id}) is not lifted: no DisplayName. Re-run the importer to lift it (or Include the columns).");
+					$"WorldObject '{row?.Name ?? "?"}' (id {row?.Id}) is not lifted: no display element. Re-run the importer to lift it (or Include the columns).");
 
 			var head = new FaolanStream()
 				.WriteUInt32(0) // body length placeholder @0 (set below)
@@ -115,11 +115,14 @@ namespace Faolan.Core.Network.Codecs.World
 				: string.Empty;
 		}
 
-		// The stored row's object identity - the lifted DisplayName column (was read from the captured Data; the blob
-		// is retired). Used to key the table rows the same way the burst bodies are keyed.
+		// The stored row's object identity - its display element, rebuilt from the columns (was the lifted
+		// DisplayName string, and before that the captured blob; both retired). Used to key the table rows the same
+		// way the burst bodies are keyed.
 		public static string ReadIdentity(WorldObject row)
 		{
-			return row?.DisplayName ?? string.Empty;
+			return row == null
+				? string.Empty
+				: WorldObjectDisplay.Build(row) ?? string.Empty;
 		}
 
 		// The wire typeTag (the 0x0000C8xx EntityClass ack in the object header) for a world-object CLASS. Class-stable

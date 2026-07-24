@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Faolan.Core.Database.Tables;
@@ -96,12 +97,16 @@ namespace Faolan.Core.Network.Codecs.World
 			{
 				Name = variant.Name,
 				SubOpcode = Opcode,
-				DisplayName = variant.DisplayName,
 				TemplateItemId = (uint)typeId,
 				CarsGroup = 1,
 				IsClosed = true,
 				Kdtree = 0
 			};
+
+			// The variant's display value is a captured LDB remoteformat string; lift it into the columns the same
+			// way an imported object's is, so a template row builds through exactly the same path.
+			if (!WorldObjectDisplay.TryApply(row, variant.DisplayName))
+				throw new InvalidOperationException($"LootContainerTemplate variant {typeId} has a display value outside the inner-element grammar: {variant.DisplayName}");
 
 			WithBoundsColumns(row, variant.NodeTag);
 			return row;

@@ -107,13 +107,13 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<WorldObject?> GetWorldObject(uint mapId, uint captureId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.WorldObjects.FirstOrDefaultAsync(o => o.MapId == mapId && o.DisplayName != null && o.CapturedHandle == captureId);
+			return await ctx.WorldObjects.FirstOrDefaultAsync(o => o.MapId == mapId && o.DisplayKind != null && o.CapturedHandle == captureId);
 		}
 
 		public async Task<WorldObject[]> GetWorldObjects(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.DisplayName != null).ToArrayAsync();
+			return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.DisplayKind != null).ToArrayAsync();
 		}
 	}
 }

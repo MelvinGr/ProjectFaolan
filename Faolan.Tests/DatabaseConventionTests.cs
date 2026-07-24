@@ -90,7 +90,7 @@ namespace Faolan.Tests
 			foreach (var a in areas.Where(a => a.Id != a.ComputeId()))
 				wrong.Add($"NpcSpawnArea {a.Id} (map {a.MapId} group {a.GroupOrdinal}) != {a.ComputeId()}");
 			foreach (var o in objects.Where(o => o.Id != o.ComputeId()))
-				wrong.Add($"WorldObject {o.Id} (map {o.MapId} '{o.DisplayName}') != {o.ComputeId()}");
+				wrong.Add($"WorldObject {o.Id} (map {o.MapId} display {o.DisplayKind}/{o.DisplayId}/{o.DisplayToken}) != {o.ComputeId()}");
 
 			Assert.True(wrong.Count == 0, $"{wrong.Count} row(s) carry an id that is not derived from their identity: {string.Join("; ", wrong.Take(5))}");
 		}
