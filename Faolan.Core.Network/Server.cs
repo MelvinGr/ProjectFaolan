@@ -33,6 +33,11 @@ namespace Faolan.Core.Network
 		public IPEndPoint LocalEndPoint => (IPEndPoint)_tcpListener.LocalEndpoint;
 		protected IEnumerable<INetworkClient> NetworkClients => _clients.Keys;
 
+		public IEnumerable<INetworkClientSession> GetWorldSessions()
+		{
+			return NetworkClients.Select(nc => nc.Session);
+		}
+
 		protected ServerBase(ushort port, ILogger logger, IConfiguration configuration, IDatabaseRepository database)
 		{
 			Logger = logger;

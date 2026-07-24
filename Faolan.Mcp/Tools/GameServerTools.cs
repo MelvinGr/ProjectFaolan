@@ -80,17 +80,18 @@ namespace Faolan.Mcp.Tools
 			if (!string.IsNullOrWhiteSpace(filter))
 			{
 				var f = filter.Trim();
-				sessions = sessions
-					.Where(s => Contains(s.Character?.Name, f) || Contains(s.Account?.UserName, f) || Contains(s.Character?.Id.ToString(CultureInfo.InvariantCulture), f) ||
-					            Contains(s.Account?.Id.ToString(CultureInfo.InvariantCulture), f))
-					.ToArray();
+				sessions = sessions.Where(s =>
+					Contains(s.Character?.Name, f) || Contains(s.Account?.UserName, f) || Contains(s.Character?.Id.ToString(CultureInfo.InvariantCulture), f) ||
+					Contains(s.Account?.Id.ToString(CultureInfo.InvariantCulture), f));
 			}
 
-			return sessions.Count == 0
+			var s = sessions.ToArray();
+
+			return s.Length == 0
 				? string.IsNullOrWhiteSpace(filter)
 					? "No clients are currently connected to the GameServer."
 					: $"No connected session matches filter '{filter}'."
-				: JsonSerializer.Serialize(sessions, SessionJsonOptions);
+				: JsonSerializer.Serialize(s, SessionJsonOptions);
 		}
 
 		[McpServerTool(Name = "list_zone_entities"),

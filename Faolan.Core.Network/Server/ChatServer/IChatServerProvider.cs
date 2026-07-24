@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Server.ChatServer
 		///     Cheap, read-only, safe to call at any time (e.g. the MCP list_sessions tool); do not mutate the returned
 		///     objects.
 		/// </summary>
-		IReadOnlyList<INetworkClientSession> GetWorldSessions();
+		IEnumerable<INetworkClientSession> GetWorldSessions();
 
 		/// <summary>
 		///     Posts a message on the Claude channel (<see cref="ClaudeChannel" />) as the synthetic "Claude" sender,

@@ -42,7 +42,7 @@ namespace Faolan.Core.Network.Server.ChatServer
 				await _provider.CharacterSay(characterId, message, recipientCharacterIds);
 		}
 
-		public IReadOnlyList<INetworkClientSession> GetWorldSessions()
+		public IEnumerable<INetworkClientSession> GetWorldSessions()
 		{
 			lock (_lock)
 			{

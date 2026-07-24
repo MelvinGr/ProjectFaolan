@@ -30,7 +30,7 @@ namespace Faolan.Core.Network.Server.GameServer
 		///     the full session state (selected target, energy, conversation, entry mode, account/character, …).
 		///     Read-only inspection (e.g. the MCP list_world_sessions tool); do not mutate the returned objects.
 		/// </summary>
-		IReadOnlyList<INetworkClientSession> GetWorldSessions();
+		IEnumerable<INetworkClientSession> GetWorldSessions();
 
 		/// <summary>
 		///     Snapshot of the live world model for a map: every entity in the zone (players, NPCs, loot bags)

@@ -276,11 +276,6 @@ namespace Faolan.GameServer
 				entity.Vitals?.MaxHealth, buffs);
 		}
 
-		public IReadOnlyList<INetworkClientSession> GetWorldSessions()
-		{
-			return NetworkClients.Select(nc => nc.Session).Where(s => s != null).ToArray();
-		}
-
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
 		{
 			// Observer view: union every live instance (copy) of the map (#268), so the MCP tool sees all entities

@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -33,11 +31,6 @@ namespace Faolan.ChatServer
 			_dispatcher = dispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
 			_claudeChannel = claudeChannel;
-		}
-
-		public IReadOnlyList<INetworkClientSession> GetWorldSessions()
-		{
-			return NetworkClients.Select(nc => nc.Session).Where(s => s != null).ToArray();
 		}
 
 		public override Task StartAsync(CancellationToken cancellationToken)
@@ -145,9 +138,7 @@ namespace Faolan.ChatServer
 					{
 						var character = client.Session.Character!;
 						var senderId = character.Id;
-						var senderName = character.Name?.Length > 0
-							? character.Name
-							: $"Character{senderId}";
+						var senderName = character.Name!;
 						_claudeChannel.Append(senderId, senderName, message, false);
 					}
 
@@ -163,9 +154,7 @@ namespace Faolan.ChatServer
 					var targetCharacterId = body.ReadUInt32();
 					var message = body.ReadString();
 					var senderId = client.Session.Character.Id;
-					var senderName = client.Session.Character?.Name?.Length > 0
-						? client.Session.Character.Name
-						: $"Character{senderId}";
+					var senderName = client.Session.Character.Name!;
 
 					Logger.LogInformation("ChatServer whisper {Sender} -> {Target:X8}: {Message}", senderName, targetCharacterId, message);
 
@@ -223,9 +212,8 @@ namespace Faolan.ChatServer
 			try
 			{
 				var senderId = client.Session.Character.Id;
-				var senderName = client.Session.Character?.Name?.Length > 0
-					? client.Session.Character.Name
-					: $"Character{senderId}";
+				var senderName = client.Session.Character.Name!;
+
 				await Database.SaveChatMessage(new ChatMessage
 				{
 					SentAt = DateTimeOffset.UtcNow,
@@ -235,9 +223,9 @@ namespace Faolan.ChatServer
 					ChannelId = channelId,
 					TargetId = target,
 					IsWhisper = isWhisper,
-					Text = message?.Length > 512
+					Text = message.Length > 512
 						? message[..512]
-						: message!
+						: message
 				});
 			}
 			catch (Exception ex)
@@ -258,7 +246,7 @@ namespace Faolan.ChatServer
 			if (text.Length <= 2 || text[0] != '.' || text[1] == '.')
 				return false;
 
-			if (client.Session.Character == null || client.Session.Account is not { } account || account.Type < AccountType.GameMaster)
+			if (client.Session.Account is not { } account || account.Type < AccountType.GameMaster)
 				return false;
 
 			await _gameServerDispatcher.RunGmCommand(client.Session.Character.Id, text);

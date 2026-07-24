@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core.Network.Server.ChatServer;
 
 namespace Faolan.Core.Network.Server.GameServer
 {
@@ -47,9 +46,9 @@ namespace Faolan.Core.Network.Server.GameServer
 			return _providers.Keys.Select(p => p.GetCharacterLiveState(characterId)).FirstOrDefault(s => s != null);
 		}
 
-		public IReadOnlyList<INetworkClientSession> GetWorldSessions()
+		public IEnumerable<INetworkClientSession> GetWorldSessions()
 		{
-			return _providers.Keys.SelectMany(p => p.GetWorldSessions()).ToArray();
+			return _providers.Keys.SelectMany(p => p.GetWorldSessions());
 		}
 
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)

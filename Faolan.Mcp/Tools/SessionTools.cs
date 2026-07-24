@@ -30,21 +30,23 @@ namespace Faolan.Mcp.Tools
 		 Description("List the clients currently connected to the live Faolan agent server, with account/character identity. Read-only snapshot of the running server.")]
 		public string ListSessions()
 		{
-			var sessions = _dispatcher.GetWorldSessions();
-			if (sessions.Count == 0)
+			var sessions = _dispatcher.GetWorldSessions()
+				.Select(s => new
+				{
+					CharacterId = s.Character?.Id,
+					CharacterName = s.Character?.Name,
+					CharacterLevel = s.Character?.Level,
+					AccountId = s.Account?.Id,
+					AccountName = s.Account?.UserName
+				})
+				.ToArray();
+
+			if (sessions.Length == 0)
 				return "No clients are currently connected.";
 
 			// Flat identity projection (the shape Faolan.Web's LiveSession deserializes) rather than dumping the whole
 			// session - list_world_sessions is the full-state dump.
-			var summary = sessions.Select(s => new
-			{
-				CharacterId = s.Character?.Id,
-				CharacterName = s.Character?.Name,
-				CharacterLevel = s.Character?.Level,
-				AccountId = s.Account?.Id,
-				AccountName = s.Account?.UserName
-			});
-			return JsonSerializer.Serialize(summary, JsonOptions);
+			return JsonSerializer.Serialize(sessions, JsonOptions);
 		}
 
 		[McpServerTool(Name = "send_system_message"),
