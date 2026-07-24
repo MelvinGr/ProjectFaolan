@@ -2,7 +2,7 @@
 -- explicit ids inserted by faolan.sql, so the next INSERT does not collide. Run after it.
 BEGIN;
 SELECT setval(pg_get_serial_sequence('"AppearanceChoices"', 'Id'), 634);
-SELECT setval(pg_get_serial_sequence('"MapLootEntries"', 'Id'), 98);
+SELECT setval(pg_get_serial_sequence('"MapLootEntries"', 'Id'), 160);
 SELECT setval(pg_get_serial_sequence('"NpcChatter"', 'Id'), 16);
 SELECT setval(pg_get_serial_sequence('"NpcMorphs"', 'Id'), 2);
 SELECT setval(pg_get_serial_sequence('"NpcSpawnAreas"', 'Id'), 5328);

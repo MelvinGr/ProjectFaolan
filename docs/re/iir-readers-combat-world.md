@@ -101,6 +101,13 @@ WorldObjectDynelColumnTests]. It is NOT opaque geometry - it opens with an RDB a
   geometry (298), **1010201** MONSTERDATA (126) - see [`../rdb/rdb-type-catalog.md`](../rdb/rdb-type-catalog.md).
   `assetId` has 199 distinct values.
 - The node list is almost always EMPTY: 1028 of 1052 rows carry `nodeCount == 0`, the other 24 carry exactly one.
+  Those 24 are all `SimpleDynelFullUpdateIIR` signposts/landmarks ("Tortage Keep", "West Dock", "Avenue of
+  Honor", ...) sharing one sign-shaped AABB, and their single node holds just **two distinct values** across the
+  whole corpus: `[id, 0, 0, 0, 0, 34]`. The trailing `34` (`0x22`) is constant; the four middle words are zero;
+  and the leading id CO-VARIES WITH THE ASSET - all 23 objects on asset 4935650 (MONSTERDATA) carry `4998690`,
+  the one on asset 3761257 (MESHINDEXFILE) carries `3139195`. It matches no id in the database (items, spells,
+  maps, npc templates, quests, respawn points), so it is a second client-side resource reference rather than
+  geometry. Two samples cannot pin more than that, which is why those six words keep positional names.
 - An object with no bounds writes the inverted-box sentinel rather than zeros - min `+FLT_MAX` (`0x7f7fffee`),
   max `-FLT_MAX` (`0xff7fff..`).
 - The only name seen in the corpus is `object_closed` (23 rows, all `DoorFullUpdateIIR`-adjacent MONSTERDATA).

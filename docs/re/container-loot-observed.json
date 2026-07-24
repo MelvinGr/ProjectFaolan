@@ -9,7 +9,12 @@
     "with a clean empty scaffold and the loot system fills it (LootContainerTemplate / WithLootContents).",
     "",
     "itemId is ProtoAcgItem.Template1; name is that id resolved against the Items table at dump time (null = the id",
-    "is not in Items)."
+    "is not in Items).",
+    "",
+    "Consumed: these observations feed the per-map loot pool (MapLootEntries, #273), which the runtime rolls",
+    "random drops from. 12 of the 15 (map,item) pairs here are in that pool; the other 3 are the map-4000",
+    "chests, whose positions are SHARED with map 4010 (Stygian Galley and Tortage Island overlap on 12 world-",
+    "object positions), so they are the same physical chests already covered under 4010."
   ],
   "source": {
     "issue": 410,

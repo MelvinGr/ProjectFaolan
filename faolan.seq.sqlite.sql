@@ -4,7 +4,7 @@ BEGIN TRANSACTION;
 DELETE FROM sqlite_sequence WHERE name = 'AppearanceChoices';
 INSERT INTO sqlite_sequence (name, seq) VALUES ('AppearanceChoices', 634);
 DELETE FROM sqlite_sequence WHERE name = 'MapLootEntries';
-INSERT INTO sqlite_sequence (name, seq) VALUES ('MapLootEntries', 98);
+INSERT INTO sqlite_sequence (name, seq) VALUES ('MapLootEntries', 160);
 DELETE FROM sqlite_sequence WHERE name = 'NpcChatter';
 INSERT INTO sqlite_sequence (name, seq) VALUES ('NpcChatter', 16);
 DELETE FROM sqlite_sequence WHERE name = 'NpcMorphs';
