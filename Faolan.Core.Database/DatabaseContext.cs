@@ -69,6 +69,7 @@ namespace Faolan.Core.Database
 		DbSet<NpcTemplate> NpcTemplates { get; }
 		DbSet<PatrolNode> PatrolNodes { get; }
 		DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; }
+		DbSet<PatrolNodeWord> PatrolNodeWords { get; }
 		DbSet<PatrolPath> PatrolPaths { get; }
 		DbSet<QuestArea> QuestAreas { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
@@ -146,6 +147,7 @@ namespace Faolan.Core.Database
 		public DbSet<NpcTemplate> NpcTemplates { get; set; }
 		public DbSet<PatrolNode> PatrolNodes { get; set; }
 		public DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; set; }
+		public DbSet<PatrolNodeWord> PatrolNodeWords { get; set; }
 		public DbSet<PatrolPath> PatrolPaths { get; set; }
 		public DbSet<QuestArea> QuestAreas { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
@@ -408,6 +410,15 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<PatrolPath>().HasMany(p => p.Nodes).WithOne(n => n.PatrolPath).HasForeignKey(n => n.PatrolPathId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Children).WithOne(n => n.Parent).HasForeignKey(n => n.ParentId).OnDelete(DeleteBehavior.NoAction);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Waypoints).WithOne(w => w.PatrolNode).HasForeignKey(w => w.PatrolNodeId).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Words).WithOne(w => w.PatrolNode).HasForeignKey(w => w.PatrolNodeId).OnDelete(DeleteBehavior.Cascade);
+			// Same natural key as a waypoint: a node has exactly one word per position in its array (#410).
+			modelBuilder
+				.Entity<PatrolNodeWord>()
+				.HasKey(w => new
+				{
+					w.PatrolNodeId,
+					w.Ordinal
+				});
 			// A waypoint is identified by its node + walk position, not a surrogate id (its FK is half the key).
 			modelBuilder
 				.Entity<PatrolNodeWaypoint>()

@@ -58,11 +58,11 @@ namespace Faolan.Core.Network.Codecs.World
 					n.AnchorX = ToFloat(m.TrailerWords[4]);
 					n.AnchorY = ToFloat(m.TrailerWords[5]);
 					n.AnchorZ = ToFloat(m.TrailerWords[6]);
-					n.WordsData = PackWords(m.TrailerWords[1], m.TrailerWords[2], m.TrailerWords[3]);
+					SetWords(n, m.TrailerWords[1], m.TrailerWords[2], m.TrailerWords[3]);
 					break;
 
 				case 2: // Rotate
-					n.WordsData = PackWords(m.Vec7);
+					SetWords(n, m.Vec7);
 					n.RotateTail = m.RotateTail;
 					break;
 
@@ -85,7 +85,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 				case 5: // Ballistic
 					CopyHeaderToNode(m, n);
-					n.WordsData = PackWords(m.Ballistic7);
+					SetWords(n, m.Ballistic7);
 					n.Flag = m.Flag;
 					break;
 
@@ -93,17 +93,18 @@ namespace Faolan.Core.Network.Codecs.World
 					break;
 
 				case 7: // Formation
-					n.WordsData = PackWords(m.Formation6);
+					SetWords(n, m.Formation6);
 					break;
 
 				case 8: // Approach
 					n.ApproachType = m.ApproachType;
 					n.ApproachTarget = m.ApproachTarget;
-					n.WordsData = m.ApproachTail;
+					// The tail is [u8 flag][9 zero bytes]; only the flag is data (#410).
+					n.ApproachFlag = m.ApproachTail[0];
 					break;
 
 				case 10: // SetPos
-					n.WordsData = PackWords(m.Vec7);
+					SetWords(n, m.Vec7);
 					break;
 
 				default:
@@ -151,12 +152,12 @@ namespace Faolan.Core.Network.Codecs.World
 					}
 
 					m.TrailerByte = n.TrailerByte!.Value;
-					var mid = UnpackWords(n.WordsData!, 3);
+					var mid = Words(n, 3);
 					m.TrailerWords = [ToBits(n.Speed), mid[0], mid[1], mid[2], ToBits(n.AnchorX), ToBits(n.AnchorY), ToBits(n.AnchorZ)];
 					break;
 
 				case 2:
-					m.Vec7 = UnpackWords(n.WordsData!, 7);
+					m.Vec7 = Words(n, 7);
 					m.RotateTail = (ushort)n.RotateTail!.Value;
 					break;
 
@@ -174,7 +175,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 				case 5:
 					CopyHeaderToTask(n, m);
-					m.Ballistic7 = UnpackWords(n.WordsData!, 7);
+					m.Ballistic7 = Words(n, 7);
 					m.Flag = n.Flag!.Value;
 					break;
 
@@ -182,17 +183,18 @@ namespace Faolan.Core.Network.Codecs.World
 					break;
 
 				case 7:
-					m.Formation6 = UnpackWords(n.WordsData!, 6);
+					m.Formation6 = Words(n, 6);
 					break;
 
 				case 8:
 					m.ApproachType = n.ApproachType!.Value;
 					m.ApproachTarget = n.ApproachTarget!.Value;
-					m.ApproachTail = n.WordsData!;
+					m.ApproachTail = new byte[10];
+					m.ApproachTail[0] = n.ApproachFlag!.Value;
 					break;
 
 				case 10:
-					m.Vec7 = UnpackWords(n.WordsData!, 7);
+					m.Vec7 = Words(n, 7);
 					break;
 
 				default:
@@ -223,12 +225,30 @@ namespace Faolan.Core.Network.Codecs.World
 			}
 		}
 
-		private static byte[] PackWords(params uint[] words)
+		// The node's fixed numeric array, as one PatrolNodeWord row per 32-bit word in wire order (#410 - these used
+		// to be packed into a WordsData blob).
+		private static void SetWords(PatrolNode n, params uint[] words)
 		{
-			var bytes = new byte[words.Length * 4];
+			n.Words.Clear();
 			for (var i = 0; i < words.Length; i++)
-				BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(i * 4, 4), words[i]);
-			return bytes;
+			{
+				n.Words.Add(new PatrolNodeWord
+				{
+					Ordinal = i,
+					Value = words[i]
+				});
+			}
+		}
+
+		// Reads them back in order. The count is the MODE's (3 for Path's middle trailer, 7 for Vec7/Ballistic, 6 for
+		// Formation), so a row set of the wrong size cannot rebuild the record - fail loudly rather than emit short.
+		private static uint[] Words(PatrolNode n, int count)
+		{
+			var words = n.Words.OrderBy(w => w.Ordinal).Select(w => w.Value).ToArray();
+			if (words.Length != count)
+				throw new InvalidOperationException($"PatrolNode {n.Id} (mode {n.Mode}) has {words.Length} word row(s), expected {count} - the patrol cannot be rebuilt byte-exact.");
+
+			return words;
 		}
 
 		private static uint ToBits(float? value)
@@ -241,12 +261,5 @@ namespace Faolan.Core.Network.Codecs.World
 			return BitConverter.UInt32BitsToSingle(bits);
 		}
 
-		private static uint[] UnpackWords(byte[] data, int count)
-		{
-			var words = new uint[count];
-			for (var i = 0; i < count; i++)
-				words[i] = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(i * 4, 4));
-			return words;
-		}
 	}
 }

@@ -9,9 +9,9 @@ namespace Faolan.Core.Database.Tables
 	// replaying the captured `PatrolPath.Body` blob. The mapping to/from Faolan.Core.Network's MoveTaskNode is
 	// PatrolNodeMapper; MoveTaskBuilder.BuildPatrol re-emits the byte-exact record (PatrolNodeRoundTripTests over
 	// every committed patrol). Only mode-specific fields are populated (null otherwise); the fixed numeric arrays
-	// that don't columnize (Path's middle trailer words, Ballistic/Formation/Vec words, the approach tail) ride in
-	// WordsData. Floats confirmed as floats (duration/remaining/speed/anchor/waypoints) are stored as floats; slots
-	// of unknown numeric type stay raw u32 bits so the record round-trips exactly.
+	// (Path's middle trailer words, Ballistic/Formation/Vec words) are one row per word in [[PatrolNodeWord]] and
+	// the approach tail is ApproachFlag. Floats confirmed as floats (duration/remaining/speed/anchor/waypoints) are
+	// stored as floats; slots of unknown numeric type stay raw u32 bits so the record round-trips exactly.
 	public class PatrolNode : BaseEntity
 	{
 		// Self-reference: null for the root task, else the parent ListMoveTask. Ordinal is the child order.
@@ -30,6 +30,11 @@ namespace Faolan.Core.Database.Tables
 		// mode 1 PathMoveTask else-branch waypoints (empty for other modes / the packed branch).
 		public virtual ICollection<PatrolNodeWaypoint> Waypoints { get; set; } = [];
 
+		// The node's fixed numeric array as one row per 32-bit word, in wire order (#410 - this was the packed
+		// WordsData blob). Empty for the modes that have no array. See [[PatrolNodeWord]] for which mode owns which
+		// count; PatrolNodeMapper packs/unpacks them.
+		public virtual ICollection<PatrolNodeWord> Words { get; set; } = [];
+
 		// MoveTaskNode.Mode (0 Wait, 1 Path, 2 Rotate, 3 Jump, 4 List, 5 Ballistic, 7 Formation, 8 Approach, 10 SetPos, 11 GroundAlign).
 		public byte Mode { get; set; }
 
@@ -46,10 +51,9 @@ namespace Faolan.Core.Database.Tables
 		public byte? PathFlags { get; set; }
 		public byte? TrailerByte { get; set; }
 
-		// The node's fixed numeric-array payload that doesn't columnize, as raw big-endian bytes: Path's 3 middle
-		// trailer words (pad + 2 dir), Ballistic's 7 words, Formation's 6, Rotate/SetPos's 7 (Vec7), Approach's 10-byte
-		// tail. Null when the mode has none.
-		public byte[]? WordsData { get; set; }
+		// mode 8 Approach's tail, which is [u8 flag][9 zero bytes] - only the flag carries anything, the padding is
+		// re-emitted by the builder. Null for every other mode.
+		public byte? ApproachFlag { get; set; }
 		public float? AnchorX { get; set; } // trailer word 4
 		public float? AnchorY { get; set; } // trailer word 5
 		public float? AnchorZ { get; set; } // trailer word 6

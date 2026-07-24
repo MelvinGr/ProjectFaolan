@@ -533,7 +533,7 @@ namespace Faolan.Importer.Captures
 				if (spawn == null)
 					continue; // a route with no matching spawn (should not happen for burst-truth patrols) - skip
 
-				var existing = await db.PatrolPaths.Include(p => p.Nodes).ThenInclude(n => n.Waypoints).FirstOrDefaultAsync(p => p.NpcSpawnId == spawn.Id);
+				var existing = await db.PatrolPaths.Include(p => p.Nodes).ThenInclude(n => n.Waypoints).Include(p => p.Nodes).ThenInclude(n => n.Words).FirstOrDefaultAsync(p => p.NpcSpawnId == spawn.Id);
 
 				if (existing == null)
 				{
@@ -1020,8 +1020,17 @@ namespace Faolan.Importer.Captures
 				RotateTail = n.RotateTail,
 				ApproachType = n.ApproachType,
 				ApproachTarget = n.ApproachTarget,
-				WordsData = n.WordsData?.ToArray()
+				ApproachFlag = n.ApproachFlag
 			};
+
+			foreach (var w in n.Words)
+			{
+				clone.Words.Add(new PatrolNodeWord
+				{
+					Ordinal = w.Ordinal,
+					Value = w.Value
+				});
+			}
 
 			foreach (var w in n.Waypoints)
 			{

@@ -140,6 +140,11 @@ namespace Faolan.Core.Database.Repositories
 				.Include(n => n.PatrolPath)
 				.ThenInclude(p => p!.Nodes)
 				.ThenInclude(pn => pn.Waypoints)
+				// Words too - lazy loading is off, and PatrolNodeMapper throws on a short word set rather than
+				// rebuilding a wrong record, so a missing Include would break every patrol (#410).
+				.Include(n => n.PatrolPath)
+				.ThenInclude(p => p!.Nodes)
+				.ThenInclude(pn => pn.Words)
 				.Where(n => n.MapId == mapId)
 				.ToArrayAsync();
 		}
