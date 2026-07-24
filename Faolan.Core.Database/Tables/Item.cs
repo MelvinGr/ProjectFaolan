@@ -67,6 +67,12 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(256)]
 		public string Name { get; set; } = null!;
 
+		// The tooltip description, from LDB category 50201 keyed by the item template id (#414) - e.g. 8757
+		// "Animated Dagger" -> "Deals piercing damage over time.". NULL when the LDB has none for this template, or
+		// when the RDB-backed rdb-ldb-names module has not been run (it is opt-in, needing --RdbDir).
+		[MaxLength(512)]
+		public string? Description { get; set; }
+
 		// Per-TEMPLATE hash the client needs (alongside the Data quad) to fully realize/render the item from its RDB.
 		// On the wire it is ProtoAcgItem.Hash (and the FullChar snapshot tail's f8 field). It is NOT in the old C++
 		// `p_items`, so it can only be HARVESTED from a capture where the item sat in an inventory (a 0x737A6DF9

@@ -26,6 +26,7 @@ namespace Faolan.Core.Rdb
 	// a value - see RdbLdbNameImporter.
 	public static class LdbStringIndex
 	{
+		public const uint ItemDescriptionCategory = 50201; // tooltip descriptions, keyed by item template id
 		public const uint ItemNameCategory = 50200;
 		public const uint Magic = 0x32434454; // "TDC2" little-endian
 		public const uint SpellNameCategory = 50210;

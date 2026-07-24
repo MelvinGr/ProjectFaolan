@@ -1294,6 +1294,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("BagExtraSlots")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("ExcludeFromRandomLoot")
                         .HasColumnType("INTEGER");
 
