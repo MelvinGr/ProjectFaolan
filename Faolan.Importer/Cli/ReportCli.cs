@@ -40,6 +40,10 @@ namespace Faolan.Importer.Cli
 			var capturesDir = GetOption(args, "--captures");
 			var arg = GetOption(args, "--report-arg");
 
+			// The DB-only reports never touch the corpus, so they run before the captures check below.
+			if (report == "sql-seed")
+				return await SqlSeed(arg);
+
 			// Every report below reads the corpus. It is NOT in this repo (private ProjectFaolan-Data), so say where
 			// to point rather than letting Directory.EnumerateFiles throw a bare path error.
 			if (!Directory.Exists(capturesDir))
@@ -1534,6 +1538,19 @@ namespace Faolan.Importer.Cli
 			{
 				return 0;
 			}
+		}
+
+		// `--report sql-seed [--report-arg <dir>]` (#411): the dialect-neutral SQL seed - the game DATA as one file
+		// that loads into SQLite and Postgres alike, plus a small per-dialect sidecar for the auto-increment
+		// counters. Writes to the repo root by default, which is where faolan.sql is committed.
+		private static async Task<int> SqlSeed(string? outputDir)
+		{
+			var directory = outputDir ?? ".";
+			await using var db = OpenDb();
+			var body = Path.Combine(directory, "faolan.sql");
+			var (tables, rows) = SqlSeedWriter.Write(db, body, Path.Combine(directory, "faolan.seq.sqlite.sql"), Path.Combine(directory, "faolan.seq.postgres.sql"));
+			Console.WriteLine($"wrote {body} ({tables} tables, {rows} rows) + the sqlite/postgres counter sidecars");
+			return 0;
 		}
 
 		// Rewrites the content between the named markers (<!-- MARKER:start -->/<!-- MARKER:end -->) in README.md,
