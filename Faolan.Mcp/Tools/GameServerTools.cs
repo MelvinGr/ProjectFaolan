@@ -11,8 +11,8 @@ using ModelContextProtocol.Server;
 namespace Faolan.Mcp.Tools
 {
 	/// <summary>
-	///     Tools that drive the live world. Backed by <see cref="IGameServerDispatcher" />, which aggregates the
-	///     creator + world GameServer listeners and routes actions through the same already-validated GM command
+	///     Tools that drive the live world. Backed by <see cref="IGameServerDispatcher" />, the seam onto this
+	///     process's GameServer listener, which routes actions through the same already-validated GM command
 	///     paths a game master uses (spawn, teleport, …).
 	/// </summary>
 	[McpServerToolType]

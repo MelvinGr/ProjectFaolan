@@ -14,14 +14,13 @@ namespace Faolan.Core.Network.Server.GameServer
 	{
 		/// <summary>
 		///     Force-disconnect a connected character (closes the world socket). Returns false when the
-		///     character is not connected to this listener (so a dispatcher can try the next provider). Used by
-		///     the web admin "ban + kick" path via MCP.
+		///     character is not connected to this listener. Used by the web admin "ban + kick" path via MCP.
 		/// </summary>
 		bool DisconnectCharacter(uint characterId);
 
 		/// <summary>
 		///     The live world state of a connected character (position, vitals, buffs), or null when the
-		///     character is not connected to this listener (so a dispatcher can try the next provider).
+		///     character is not connected to this listener.
 		/// </summary>
 		CharacterLiveState? GetCharacterLiveState(uint characterId);
 
@@ -40,8 +39,8 @@ namespace Faolan.Core.Network.Server.GameServer
 
 		/// <summary>
 		///     Runs a GM command (e.g. ".teleport 5", ".test") for the given character if it is connected to
-		///     this listener. Returns false when the character is not connected here (so a dispatcher can try
-		///     the next provider). The text must include the leading command prefix.
+		///     this listener. Returns false when the character is not connected here. The text must include the
+		///     leading command prefix.
 		/// </summary>
 		Task<bool> RunGmCommand(uint characterId, string commandText);
 
