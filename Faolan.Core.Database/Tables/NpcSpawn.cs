@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -14,6 +15,7 @@ namespace Faolan.Core.Database.Tables
 	// The structured columns below are LIFTED from the ProtoCoreCharacterIIR: NPC identity/appearance
 	// (TemplateId/Race/Sex/Level/HeadMesh/...). Transform (PositionX/Y/Z + RotationX/Y/Z/W + the Position/Rotation
 	// accessors) is inherited from Base3DEntity, shared with the player Character and the world objects.
+	[Index(nameof(MapId), nameof(PositionX), nameof(PositionY), nameof(PositionZ), IsUnique = true)]
 	public class NpcSpawn : Base3DEntity
 	{
 		public uint? GuildId { get; set; }

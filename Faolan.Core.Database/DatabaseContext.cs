@@ -241,15 +241,6 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<NpcSpawnArea>().HasOne(a => a.Map).WithMany().HasForeignKey(a => a.MapId).OnDelete(DeleteBehavior.Restrict);
 			modelBuilder.Entity<NpcSpawnArea>().HasOne(a => a.NpcTemplate).WithMany().HasForeignKey(a => a.NpcTemplateId).OnDelete(DeleteBehavior.SetNull);
 			modelBuilder.Entity<NpcSpawnArea>().HasMany(a => a.Points).WithOne(p => p.Area).HasForeignKey(p => p.NpcSpawnAreaId).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder
-				.Entity<NpcSpawnArea>()
-				.HasIndex(a => new
-				{
-					a.MapId,
-					a.GroupOrdinal
-				})
-				.IsUnique();
-
 			// ItemType.Normal (104) is the default classification - existing item rows backfill to Normal when the
 			// column is added; the importer reclassifies quest/resource items by the container they were seen in.
 			// The enum has no 0 member, so the CLR default 0 is a safe sentinel: an Item left at Type==0 (e.g. a
@@ -324,19 +315,7 @@ namespace Faolan.Core.Database
 			// part of the key because (TypeId, Mode, Field3) is NOT NPC-unique: the same mode means different
 			// conversations for different NPCs / quest states (e.g. mode 1 is Casilda's create intro but Kalanthes's
 			// regular login dialog). Handles are stable because scenes are replayed verbatim. Packets cascade-delete.
-			// Keyed by NPC NAME (stable identity), not the session-volatile handle. NpcName == nullable; SQLite treats
-			// NULLs as distinct, so nodes whose NPC couldn't be named stay distinct rows.
-			modelBuilder
-				.Entity<ConversationNode>()
-				.HasIndex(n => new
-				{
-					n.NpcName,
-					n.TypeId,
-					n.AnswerPath,
-					n.ConditionQuestId, // a screen can have quest-state-gated variants under one (name,type,path)
-					n.ConditionQuestState
-				})
-				.IsUnique();
+			// The dedup key is an [Index] attribute on the entity.
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<ConversationPacket>().HasMany(p => p.Screens).WithOne(s => s.Packet).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<ConversationScreen>().HasMany(s => s.Parameters).WithOne(sp => sp.Screen).OnDelete(DeleteBehavior.Cascade);
@@ -345,18 +324,6 @@ namespace Faolan.Core.Database
 			// SpellId references the Spell catalog (the importer catalogs every harvested spell id). Restrict so a
 			// spell can't be deleted out from under a class loadout.
 			modelBuilder.Entity<ClassSpell>().HasOne(s => s.Spell).WithMany().HasForeignKey(s => s.SpellId).OnDelete(DeleteBehavior.Restrict);
-
-			// A captured NPC spawn is deduped by its (map, spawn point); the entity handle is session-scoped.
-			modelBuilder
-				.Entity<NpcSpawn>()
-				.HasIndex(n => new
-				{
-					n.MapId,
-					n.PositionX,
-					n.PositionY,
-					n.PositionZ
-				})
-				.IsUnique();
 
 			// A humanoid NPC's appearance/morph table (#185), ordered, cascade-deletes with its NpcSpawn.
 			modelBuilder.Entity<NpcSpawn>().HasMany(n => n.Morphs).WithOne(m => m.NpcSpawn).HasForeignKey(m => m.NpcSpawnId).OnDelete(DeleteBehavior.Cascade);
@@ -373,12 +340,10 @@ namespace Faolan.Core.Database
 			// instance/spell if the type is ever removed (the type is reference data, not a cascade parent).
 			// TemplateId (the RDB NpcStats.f4 id) IS the primary key - a natural-key catalog like Item/Spell/Map, set
 			// from the RDB by the importer and never DB-generated (#350).
-			modelBuilder.Entity<NpcTemplate>().HasKey(n => n.TemplateId);
 			modelBuilder.Entity<NpcTemplate>().Property(n => n.TemplateId).ValueGeneratedNever();
 
 			// QuestDefinition is a natural-key catalog too (#350): QuestId (the RDB quest id) IS the PK, never
 			// DB-generated. Its Goals/TextRefs FK to QuestId (populated via the nav on import).
-			modelBuilder.Entity<QuestDefinition>().HasKey(q => q.QuestId);
 			modelBuilder.Entity<QuestDefinition>().Property(q => q.QuestId).ValueGeneratedNever();
 
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Spawns).WithOne(s => s.NpcTemplate).HasForeignKey(s => s.NpcTemplateId).OnDelete(DeleteBehavior.Restrict);
@@ -413,50 +378,7 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Children).WithOne(n => n.Parent).HasForeignKey(n => n.ParentId).OnDelete(DeleteBehavior.NoAction);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Waypoints).WithOne(w => w.PatrolNode).HasForeignKey(w => w.PatrolNodeId).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<PatrolNode>().HasMany(n => n.Words).WithOne(w => w.PatrolNode).HasForeignKey(w => w.PatrolNodeId).OnDelete(DeleteBehavior.Cascade);
-			// Same natural key as a waypoint: a node has exactly one word per position in its array (#410).
-			modelBuilder
-				.Entity<PatrolNodeWord>()
-				.HasKey(w => new
-				{
-					w.PatrolNodeId,
-					w.Ordinal
-				});
-			// A waypoint is identified by its node + walk position, not a surrogate id (its FK is half the key).
-			modelBuilder
-				.Entity<PatrolNodeWaypoint>()
-				.HasKey(w => new
-				{
-					w.PatrolNodeId,
-					w.Ordinal
-				});
-
 			modelBuilder.Entity<WorldObject>().HasMany(o => o.Words).WithOne(w => w.WorldObject).HasForeignKey(w => w.WorldObjectId).OnDelete(DeleteBehavior.Cascade);
-			// A geometry word is identified by its object + which array it belongs to + its position in it (#410).
-			modelBuilder
-				.Entity<WorldObjectWord>()
-				.HasKey(w => new
-				{
-					w.WorldObjectId,
-					w.Kind,
-					w.Ordinal
-				});
-
-			// A captured world object is deduped by its (map, spawn point, identity): two distinct props can occupy the
-			// EXACT same coordinates (#222), so the display_name identity is part of the key - position alone would
-			// reject the second prop. (Identity-less classes have a null DisplayName; SQLite treats NULLs as distinct,
-			// so they fall back to position-only dedup, which the importer's in-memory Merge already enforces.)
-			modelBuilder
-				.Entity<WorldObject>()
-				.HasIndex(o => new
-				{
-					o.MapId,
-					o.PositionX,
-					o.PositionY,
-					o.PositionZ,
-					o.DisplayName
-				})
-				.IsUnique();
-
 			return;
 
 			// The 128-bit TEA DecryptionKey (ProtoAcgItem.key1) is an EF OWNED type, shared by every table that carries an

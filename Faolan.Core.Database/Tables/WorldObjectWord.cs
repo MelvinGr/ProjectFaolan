@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -20,6 +21,7 @@ namespace Faolan.Core.Database.Tables
 	// Replaces part of the KdTreeTail blob (#410). Values stay RAW u32 BITS rather than floats: the node words'
 	// types are not known (the node list is empty in 1028 of 1052 rows, so the corpus barely constrains them), and
 	// the record has to round-trip bit-for-bit.
+	[PrimaryKey(nameof(WorldObjectId), nameof(Kind), nameof(Ordinal))]
 	public class WorldObjectWord
 	{
 		public uint WorldObjectId { get; set; }

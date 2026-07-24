@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -16,6 +17,7 @@ namespace Faolan.Core.Database.Tables
 	// 0..41, the dirs are floats), and Vec7 reads as a position + a unit quaternion - e.g. (1147.29, 199.54,
 	// 1758.06) + (0, -0.204, 0, 0.979). Naming those slots is follow-up work on #410; modes 5/7 have no rows in the
 	// corpus at all, so their words stay unnamed on purpose.
+	[PrimaryKey(nameof(PatrolNodeId), nameof(Ordinal))]
 	public class PatrolNodeWord
 	{
 		public uint PatrolNodeId { get; set; }

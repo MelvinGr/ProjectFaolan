@@ -27,6 +27,7 @@ namespace Faolan.Core.Database.Tables
 
 		// The stable per-type identity (NpcStats.f4 / NpcSpawn.TemplateId) - the PRIMARY KEY (set from the RDB by the
 		// importer, never DB-generated; see DatabaseContext). One NpcTemplate row per template.
+		[Key]
 		public uint TemplateId { get; set; }
 
 		// Ambient chatter bark lines this NPC type periodically says (per-NPC; see NpcChatter).

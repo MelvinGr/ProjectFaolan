@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Numerics;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -8,6 +9,7 @@ namespace Faolan.Core.Database.Tables
 	// list) so multi-segment patrols keep each segment's waypoints under their own node (#316).
 	// Keyed by the natural composite (PatrolNodeId, Ordinal) - configured in DatabaseContext.OnModelCreating -
 	// rather than a surrogate Id: a node has exactly one waypoint per walk position.
+	[PrimaryKey(nameof(PatrolNodeId), nameof(Ordinal))]
 	public class PatrolNodeWaypoint
 	{
 		public uint PatrolNodeId { get; set; }

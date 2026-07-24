@@ -1,6 +1,7 @@
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -8,6 +9,10 @@ namespace Faolan.Core.Database.Tables
 	// tree. Holds the captured response packets to replay (ordered), plus the captured NPC handle + player instance
 	// that the runtime substitutes for the live ones. Imported from captures by Faolan.Importer; replayed by
 	// ConversationReplay (which routes a live KnubotAnswer index along the AnswerPath).
+	// Keyed for dedup by NPC NAME (stable identity), not the session-volatile handle. A screen can have
+	// quest-state-gated variants under one (name, type, path), so the condition columns are part of it.
+	// NpcName is nullable and SQLite treats NULLs as distinct, so nodes whose NPC couldn't be named stay separate.
+	[Index(nameof(NpcName), nameof(TypeId), nameof(AnswerPath), nameof(ConditionQuestId), nameof(ConditionQuestState), IsUnique = true)]
 	public class ConversationNode : BaseEntity
 	{
 		// The QUEST-STATE gate for this screen variant - how the SAME (NpcName, TypeId, AnswerPath) serves different

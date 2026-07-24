@@ -1,8 +1,9 @@
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
 using System.Numerics;
 using Faolan.Core.Enums;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -19,6 +20,11 @@ namespace Faolan.Core.Database.Tables
 	// lifts these columns from the dump body at import time and never persists it.
 	// Transform (PositionX/Y/Z + the RotationX/Y/Z/W quaternion + the Position/Rotation accessors) is inherited
 	// from Base3DEntity, shared with the player Character and the NPC spawns.
+	// The dedup key below adds the display-name identity to the spawn point: two distinct props can occupy the EXACT
+	// same coordinates (#222), so position alone would reject the second. (Identity-less classes have a null
+	// DisplayName; SQLite treats NULLs as distinct, so they fall back to position-only dedup, which the importer's
+	// in-memory Merge already enforces.)
+	[Index(nameof(MapId), nameof(PositionX), nameof(PositionY), nameof(PositionZ), nameof(DisplayName), IsUnique = true)]
 	public class WorldObject : Base3DEntity
 	{
 		// The teleport destination (map + arrival position), populated for Teleport/ProxyTeleport. Extracted from the
