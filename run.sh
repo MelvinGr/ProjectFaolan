@@ -20,9 +20,9 @@ case "$command" in
     --cdn)
         shift
         dotnet run --project ./Faolan.Web.Content/Faolan.Web.Content.csproj -- \
-            --store "/mnt/btrfs/@games/mirror-archive" \
-            --ip 127.0.0.1 \
-            --port 7081 \
+            --CdnMirror:Store "/mnt/btrfs/@games/mirror-archive" \
+            --CdnMirror:Ip 127.0.0.1 \
+            --CdnMirror:Port 7081 \
             "$@"
         ;;
 

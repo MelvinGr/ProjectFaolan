@@ -11,6 +11,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
@@ -31,7 +32,7 @@ namespace Faolan.Importer.Cli
 
 		// DB config (provider + connection) for the DB-backed reports. Resolved LAZILY on the first OpenDb so the
 		// capture/RDB-only reports (corpus-extract, coverage-of-captures, ...) need no DB config at all. Same source
-		// and precedence as the import path (env > cmdline(--connectionstring) > faolan.json) - see CliConfig.
+		// and precedence as the import path (env > cmdline(--Database:ConnectionString) > faolan.json) - see CliConfig.
 		private static string[] _args = [];
 
 		public static async Task<int> RunAsync(string[] args, string report)
@@ -77,7 +78,7 @@ namespace Faolan.Importer.Cli
 
 				case "coverage":
 				{
-					await Coverage(LoadCaptures(capturesDir), arg, GetOption(args, "--rdb"));
+					await Coverage(LoadCaptures(capturesDir), arg, CliConfig.Resolve(args).RdbDir);
 					return 0;
 				}
 
@@ -612,7 +613,7 @@ namespace Faolan.Importer.Cli
 			// the encrypted RDBH header, so a per-category %-of-total is impossible (we can't tell an undecrypted
 			// entry's category) - we report the overall decrypted share + the absolute per-category decrypted counts.
 			var rdb = string.IsNullOrEmpty(rdbDir)
-				? Environment.GetEnvironmentVariable("AOC_RDB")
+				? CliConfig.Resolve(_args).RdbDir
 				: rdbDir;
 			if (!string.IsNullOrEmpty(rdb) && Directory.Exists(rdb))
 			{
@@ -1017,7 +1018,7 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"{(k.Dl ? "S2C" : "C2S")} op=0x{k.Op:X4} sub=0x{k.Sub:X8}  total={count}  in {globalDumps[k].Count} dumps");
 		}
 
-		// Reports read the DB from the shared config (faolan.db by default, --connectionstring to override); one short-lived context.
+		// Reports read the DB from the shared config (faolan.db by default, --Database:ConnectionString to override); one short-lived context.
 		private static DatabaseContext OpenDb()
 		{
 			_db ??= CliConfig.ResolveDatabase(_args);
@@ -1121,12 +1122,14 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("Pass --report-arg <meshIndexId> [--out <dir>] [--dump-mesh] to extract one model.");
 		}
 
-		// The client's RDB folder is part of the game install, not this repo. Resolve it from --rdb, else the
-		// AOC_RDB env var; RDB-backed reports fail with a clear message if neither is set.
+		// The client's RDB folder is part of the game install, not this repo, so it comes from config like every
+		// other setting - ONE name across all three input methods (#412). RDB-backed reports fail with a clear
+		// message if it is not set anywhere.
 		private static string RdbDir(string[] args)
 		{
-			return GetOption(args, "--rdb") ?? Environment.GetEnvironmentVariable("AOC_RDB") ??
-				throw new InvalidOperationException("Pass --rdb <dir> (or set AOC_RDB) pointing at the client's RDB folder.");
+			return CliConfig.Resolve(args).RdbDir ??
+				throw new InvalidOperationException(
+					"The client's RDB folder is not configured - set RdbDir in faolan.json, the RdbDir environment variable, or pass --RdbDir <dir>.");
 		}
 
 		// List all entries of a TYPE (--report-arg <type>) and dump each decompressed payload to --out as

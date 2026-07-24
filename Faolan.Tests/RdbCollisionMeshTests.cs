@@ -24,10 +24,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void RealBeachCollision_MatchesPythonValidation()
 		{
-			// Non-hermetic: only runs where the client RDB is present (set AOC_RDB to the client's RDB folder).
+			// Non-hermetic: only runs where the client RDB is present (set RdbDir to the client's RDB folder).
 			// Locks the C# parser to the Python decode (beach 4010 = 666 actors / 116,178 triangles) so a
 			// real-data regression is caught, not just the synthetic.
-			var rdbDir = Environment.GetEnvironmentVariable("AOC_RDB");
+			var rdbDir = Environment.GetEnvironmentVariable("RdbDir");
 			if (string.IsNullOrEmpty(rdbDir) || !File.Exists(Path.Combine(rdbDir, "le.idx")))
 				return; // client RDB unavailable (CI) - skip
 

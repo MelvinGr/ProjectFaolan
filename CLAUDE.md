@@ -35,7 +35,7 @@ dotnet run --project Faolan.ClientLauncher -- --console --universeaddr 127.0.0.1
 dotnet run --project Faolan.Importer -- --skip characters     # idempotent EXCEPT characters; skip on a populated DB
 dotnet run --project Faolan.Importer -- --list                # catalog every module (+ which are opt-in)
 dotnet run --project Faolan.Importer -- --only npcs --mode overwrite   # one module; overwrite = the old --reseed-npcs
-dotnet run --project Faolan.Importer -- --only rdb-maps --rdb <dir>    # rdb-* + mounts are OPT-IN (not in the default run)
+dotnet run --project Faolan.Importer -- --only rdb-maps --RdbDir <dir> # rdb-* + mounts are OPT-IN (not in the default run)
 dotnet run --project Faolan.Importer -- --report burst-coverage       # read-only diagnostics (was --burst-coverage / --dump-*)
 dotnet run --project Faolan.Importer -- --report sql-seed             # (re)write faolan.sql + the counter sidecars from the DB
 dotnet run --project Faolan.Importer -- --report apply-seed --dry-run # upgrade an EXISTING db's content FROM faolan.sql (#412)
@@ -229,7 +229,7 @@ assuming a command exists; several older ones were removed, and any MCP tools wr
 The 349 MB of retail traces, the Ghidra project and the baked terrain live in a separate PRIVATE repo,
 [ProjectFaolan-Data](https://git.groenendaal.io/MelvinGr/ProjectFaolan-Data), so this repo stays small
 (and can go public). Clone it near this repo (it holds `Captures/`, `Ghidra/`, `Terrain/`) and pass its
-`Captures/` dir to importer commands as `--captures <data-repo>/Captures` (and `--rdb` likewise).
+`Captures/` dir to importer commands as `--captures <data-repo>/Captures` (and `--RdbDir` likewise).
 
 **The test suite does NOT need it.** All 1046 tests read `Faolan.Tests/Assets/corpus-extract.bin` (12 MB,
 committed): the eight IIR types the gates need, pulled out of the corpus and deflated, with each
@@ -240,8 +240,8 @@ capture. Regenerate it with the data repo present:
 dotnet run --project Faolan.Importer -- --report corpus-extract --captures <data-repo>/Captures
 ```
 
-`--captures` is how every importer command takes it (`--rdb` likewise). The importer's DB comes from faolan.json
-(the `Database` section: `Database:Provider` + `Database:ConnectionString`), the same as the server; override the connection with `--connectionstring "<conn string>"`
+`--captures` is how every importer command takes it (`--RdbDir` likewise). The importer's DB comes from faolan.json
+(the `Database` section: `Database:Provider` + `Database:ConnectionString`), the same as the server; override the connection with `--Database:ConnectionString "<conn string>"`
 
 ⚠️ The extract is DERIVED. A regeneration against a partial corpus would quietly WEAKEN every whole-corpus
 gate while they all still pass - the exact failure mode those gates exist to catch. Its manifest pins the
@@ -276,7 +276,7 @@ that ground-snap and line-of-sight are DISABLED and carries on, so check that li
   go public and must stay machine-agnostic; a local path is wrong on every other clone and leaks the layout.
   Instead:
   - **Runtime code / config:** take the location from a CLI flag or env var, falling back to a clear error —
-    the client RDB dir is `--rdb` → `AOC_RDB` (`ReportCli.RdbDir`); `Faolan.Web`'s `RdbDir` is blank in the
+    the client RDB dir is the `RdbDir` key (`--RdbDir` / `RdbDir` env / faolan.json), blank in `Faolan.Web`'s
     committed `appsettings.json` and set in the gitignored `appsettings.Development.json` or the env.
   - **RE / tool scripts:** write outputs under a repo-relative dir (Ghidra → `Captures/ghidra/output/`) or the
     system temp dir (`tempfile.gettempdir()`, `Path.GetTempPath()`) — never a hardcoded scratchpad path.

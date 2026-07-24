@@ -48,17 +48,12 @@ namespace Faolan.Web.Content
 
 			// Config precedence (highest wins): environment variables > command line > faolan.json. faolan.json is
 			// OPTIONAL - the mirror runs on the built-in defaults with no file (parity with the server / Faolan.Web).
-			// The --store/--ip/--port switches are mapped onto the CdnMirror* keys so the existing launch scripts keep
-			// working (as the command-line layer, overriding faolan.json but below env vars). Sources are cleared first
-			// so the order is exactly this (no appsettings.json in the mix).
+			// The command-line key IS the config path (`--CdnMirror:Store <dir>`), so one NAME per setting whatever the
+			// input method - the old --store/--ip/--port aliases were a third spelling to keep in step. Sources are
+			// cleared first so the order is exactly this (no appsettings.json in the mix).
 			builder.Configuration.Sources.Clear();
 			builder.Configuration.AddJsonFile(Global.ConfigPath, true); // absolute (CWD-rooted), like Faolan.Web
-			builder.Configuration.AddCommandLine(args, new Dictionary<string, string>
-			{
-				["--store"] = "CdnMirror:Store",
-				["--ip"] = "CdnMirror:Ip",
-				["--port"] = "CdnMirror:Port"
-			});
+			builder.Configuration.AddCommandLine(args);
 			builder.Configuration.AddEnvironmentVariables();
 
 			var ip = builder.Configuration.CdnMirrorIp;

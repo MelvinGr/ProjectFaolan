@@ -33,7 +33,7 @@ namespace Faolan.Importer.Cli
 		public WriteMode Mode { get; init; } = WriteMode.Upsert;
 
 		// Informational - the runner's transaction rollback is what actually makes a dry run write nothing -
-		// but a module with an OUT-OF-DB side effect (e.g. rdb-respawns writing CDN blobs to --store) must
+		// but a module with an OUT-OF-DB side effect (e.g. rdb-respawns writing CDN blobs to the mirror store) must
 		// check this and skip that side effect.
 		public bool DryRun { get; init; }
 

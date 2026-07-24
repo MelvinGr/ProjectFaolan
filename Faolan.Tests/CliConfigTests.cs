@@ -6,15 +6,16 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The importer's DB config comes from env > command line > faolan.json. The command-line CONFIG PROVIDER pairs
-	// SEQUENTIAL tokens, so a valueless flag swallows whatever follows it: `--dry-run --connectionstring "X"` parsed
-	// as dry-run="--connectionstring", the connection string never reached the config, and the command silently ran
-	// against the CONFIGURED database instead of the one named on the command line. A --dry-run that reports on the
-	// wrong database is worse than one that fails outright.
+	// The importer's DB config comes from env > command line > faolan.json, and the command-line key IS the config
+	// path - one NAME per setting whatever the input method.
 	//
-	// These pin the BEHAVIOUR, not the mechanism: the resolved connection must not depend on where the flags sit,
-	// and it must beat the config file. (The fix was to stop handing the whole argv to that provider - this layer
-	// needs exactly one option, so it reads exactly one option.)
+	// The bug these pin: the command-line CONFIG PROVIDER pairs SEQUENTIAL tokens, so a valueless flag swallowed
+	// whatever followed it. `--dry-run --Database:ConnectionString "X"` parsed as dry-run="--Database:...", the
+	// connection string never reached the config, and the command silently ran against the CONFIGURED database
+	// instead of the one named. A --dry-run reporting on the wrong database is worse than one that fails outright.
+	//
+	// They pin the BEHAVIOUR, not the mechanism: the resolved connection must not depend on where the flags sit,
+	// and it must beat the config file.
 	public class CliConfigTests : IDisposable
 	{
 		private const string Connection = "Data Source=/tmp/faolan-cliconfig-test.db";
@@ -39,15 +40,15 @@ namespace Faolan.Tests
 		public static IEnumerable<object[]> Orderings()
 		{
 			// the flag before the option - the ordering that used to lose the value
-			yield return [new[] { "--report", "apply-seed", "--dry-run", "--connectionstring", Connection }];
+			yield return [new[] { "--report", "apply-seed", "--dry-run", "--Database:ConnectionString", Connection }];
 			// and after it, which happened to work
-			yield return [new[] { "--report", "apply-seed", "--connectionstring", Connection, "--dry-run" }];
+			yield return [new[] { "--report", "apply-seed", "--Database:ConnectionString", Connection, "--dry-run" }];
 			// several valueless flags either side
-			yield return [new[] { "--dry-run", "--force", "--connectionstring", Connection, "--list" }];
+			yield return [new[] { "--dry-run", "--force", "--Database:ConnectionString", Connection, "--list" }];
 			// a value-taking option elsewhere in the line
-			yield return [new[] { "--only", "npcs", "--connectionstring", Connection, "--mode", "overwrite" }];
+			yield return [new[] { "--only", "npcs", "--Database:ConnectionString", Connection, "--mode", "overwrite" }];
 			// no other flags at all
-			yield return [new[] { "--connectionstring", Connection }];
+			yield return [new[] { "--Database:ConnectionString", Connection }];
 		}
 
 		[Theory, MemberData(nameof(Orderings))]
@@ -56,7 +57,8 @@ namespace Faolan.Tests
 			Assert.Equal(Connection, CliConfig.ResolveDatabase(args).Connection);
 		}
 
-		// With no --connectionstring the config file is what should be used - the override must not fabricate one.
+		// With no override on the command line the config file is what should be used - and the override must not
+		// fabricate one out of nothing.
 		[Fact]
 		public void ResolveDatabase_FallsBackToTheConfigFile()
 		{

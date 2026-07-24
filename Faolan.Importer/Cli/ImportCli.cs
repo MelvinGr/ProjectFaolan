@@ -45,7 +45,7 @@ namespace Faolan.Importer.Cli
 			var force = args.Contains("--force");
 
 			// Provider + connection come from the SHARED config (the same DB the server uses); see CliConfig.
-			// `--connectionstring` is a Database:ConnectionString override in the command-line layer (env > cmdline > json), the provider follows config.
+			// `--Database:ConnectionString` overrides that key in the command-line layer (env > cmdline > json); the provider follows config.
 			var (provider, connection) = CliConfig.ResolveDatabase(args);
 
 			// A SQLite DB is a FILE that must already exist (the DB is the source of truth). Postgres targets a server.
@@ -55,7 +55,7 @@ namespace Faolan.Importer.Cli
 				if (!File.Exists(dbFile))
 				{
 					await Console.Error.WriteLineAsync(
-						$"Database not found: {dbFile} (the DB is the source of truth; set Database:ConnectionString in faolan.json, or pass --connectionstring \"Data Source=<path>\").");
+						$"Database not found: {dbFile} (the DB is the source of truth; set Database:ConnectionString in faolan.json, or pass --Database:ConnectionString \"Data Source=<path>\").");
 					return 1;
 				}
 			}

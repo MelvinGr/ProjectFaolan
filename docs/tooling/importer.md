@@ -128,7 +128,7 @@ Rules and edge cases:
 dotnet run --project Faolan.Importer -- [paths] [selection] [modifiers]
 
 Paths
-  --connectionstring <s>  override the connection; default: faolan.json Database:ConnectionString (e.g. Data Source=faolan.db)
+  --Database:ConnectionString <s>  override the connection; default: faolan.json Database:ConnectionString (e.g. Data Source=faolan.db)
   --captures <dir>     default: <repo>/Captures
   --rdb <dir>          client RDB dir (enables rdb-* modules)
 
@@ -175,7 +175,7 @@ else        await tx.CommitAsync();
 - `TableSnapshot` counts **all** EF-mapped tables (so new tables are picked up automatically) — the delta is
   complete.
 - The two modules with a side effect outside the DB guard on `ctx.DryRun` and skip the disk write under
-  `--dry-run`: the CDN-fetching `rdb-respawns` (writing blobs to `--store`) and `rdb-items` (dumping decrypted
+  `--dry-run`: the CDN-fetching `rdb-respawns` (writing blobs to the CDN mirror store) and `rdb-items` (dumping decrypted
   templates to `--dump-templates`). These are the only two places a module reads the dry-run flag.
 
 ## Diagnostics (`--report`)

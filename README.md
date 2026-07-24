@@ -266,12 +266,19 @@ Related keys are grouped into sections; the remaining shared keys stay flat:
 | `Log` `{ File, PacketBytes }` | log-file path; whether packet log lines include the raw byte dump |
 | `Account` `{ Premium, PremiumCharSlots, FreeCharSlots }` | subscription state advertised to every account in the character list (default: premium, 10 slots / 4 free) |
 
-Any key can be overridden from the environment (this is how the Docker images are configured) — a flat key by
-its own name (`ServerIpAddress=…`), a grouped key with the `__` separator (`Database__ConnectionString=…`,
-`Mcp__Port=7098`, `CdnMirror__Store=/data`). A few tools also expose a short flag that maps onto a key: the
-importer's `--connectionstring "<…>"` (→ `Database:ConnectionString`) and the mirror's `--store` / `--ip` /
-`--port` (→ `CdnMirror:*`). `Faolan.ClientLauncher` is the one exception — its flags are client-launch parameters, not
-server config, so it has its own arguments (see below).
+**One name per setting, whatever the input method.** A key is spelled the same in `faolan.json`, in the
+environment and on the command line — only the separator differs:
+
+| method | how |
+| --- | --- |
+| `faolan.json` | nested: `"Database": { "ConnectionString": … }` |
+| environment | `__` between the parts: `Database__ConnectionString=…`, `Mcp__Port=7098`, `CdnMirror__Store=/data` |
+| command line | the config path itself: `--Database:ConnectionString "…"`, `--CdnMirror:Store /data` |
+
+Flat keys are just their own name in all three (`ServerIpAddress=…` / `--ServerIpAddress …`). There are **no
+short aliases** — `--store`, `--ip`, `--port` and `--connectionstring` were a fourth spelling to keep in step and
+are gone. `Faolan.ClientLauncher` is the one exception: its flags are client-launch parameters, not server
+config, so it has its own arguments (see below).
 
 ## Test
 

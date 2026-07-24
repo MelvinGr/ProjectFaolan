@@ -7,7 +7,7 @@ using Faolan.Importer.Rdb;
 namespace Faolan.Importer.Modules
 {
 	// RDB-sourced modules. Opt-in (Source == Rdb keeps them out of the default set); all require --rdb. The two
-	// with out-of-DB write side effects (rdb-respawns -> --store blobs, rdb-items -> --dump-templates) suppress
+	// with out-of-DB write side effects (rdb-respawns -> mirror-store blobs, rdb-items -> --dump-templates) suppress
 	// that write under --dry-run.
 
 	// Read-only inventory of the RDB resource types (writes nothing). The friendly names cover the resource

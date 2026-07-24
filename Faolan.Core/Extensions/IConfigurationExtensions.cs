@@ -39,8 +39,13 @@ namespace Faolan.Core.Extensions
 
 			public string CdnMirrorIp => config["CdnMirror:Ip"] ?? "127.0.0.1";
 
+			// The client's RDB folder - part of the game INSTALL, not this repo, so it has no default. One key for
+			// every consumer (Faolan.Web's viewer and the importer's rdb-* modules/reports) and every input method:
+			// `RdbDir` in faolan.json, `RdbDir` in the environment, `--RdbDir <dir>` on the command line.
+			public string? RdbDir => config["RdbDir"];
+
 			// CDN content mirror (Faolan.Web.Content). All optional with the built-in defaults so the mirror runs with no
-			// config at all; override via faolan.json, env vars, or the --store/--ip/--port switches (mapped to these keys).
+			// config at all; override in faolan.json, the environment, or on the command line - all under this one name.
 			public string CdnMirrorStore => config["CdnMirror:Store"] ?? "mirror-store";
 			public string DatabaseConnection => Required(config, "Database:ConnectionString");
 

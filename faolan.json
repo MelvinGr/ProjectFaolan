@@ -25,7 +25,7 @@
 		"Url": "http://127.0.0.1:7099/mcp" // Faolan.Mcp chat-bridge -> game-server MCP endpoint
 	},
 
-	// Faolan.Web.Content CDN mirror (also --store/--ip/--port).
+	// Faolan.Web.Content CDN mirror (override with --CdnMirror:Store / :Ip / :Port, or CdnMirror__* in the env).
 	"CdnMirror": {
 		"Store": "mirror-store",
 		"Ip": "127.0.0.1",
