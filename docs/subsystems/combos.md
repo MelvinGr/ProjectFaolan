@@ -34,12 +34,21 @@ resolves the blend + a backlash roll on deactivate.
   used to require a `</combo>` and skipped them silently, which is what made #313 read the
   `0x00416541..0x00416549` block as "cataloged nowhere in faolan.db" and hunt for a TEA-encrypted RDB type that was
   never involved. `RdbXml.Carve` handles both forms, for every RDB XML reader (`RdbXmlCarveTests`).
-- **`ClassCombo`** access map — `(Class, ComboId, Level)`, derived from the `Combos` name prefix
-  (`CaptureAbilityImporter.DeriveClassCombosAsync`): the 8 literal class-name prefixes = the 8 archetypes that have
-  combos. Validated by Hakotep's HoX `0x2076` combo book. 292 rows; casters empty.
-- **Grant** — `GetClassCombos` is **rank-superseded** per family (`ComboFamilyKey`, the combo twin of the spell-bar
-  family collapse): one combo per line at the highest qualifying rank (a lvl-24 HoX → Hell Strikes II, not I+II —
-  matches the retail `0x2076` book). `GrantCharacterCombos` + the level-up dings emit it.
+- **`ClassCombo`** access map — `(Class, ComboId, Level)`, from **two** sources, **436 rows**:
+  - the `Combos` name prefix (`CaptureAbilityImporter.DeriveClassCombosAsync`): the 8 literal class-name prefixes =
+    the 8 archetypes that have combos. Validated by Hakotep's HoX `0x2076` combo book. 292 rows; casters empty.
+  - the **universal kit** (`DeriveUniversalCombosFromCreatesAsync`): the 4 playable races' dance emotes
+    (`Cimmerian_`/`Khitan_`/`Stygian_`/`Aquilonian_Dance_combo1..3`), 12 × 12 classes = 144 rows at level 0.
+    ⚠️ **Racially NAMED, universally GRANTED** — across the corpus **19 characters spanning every class receive the
+    same 12**, i.e. all four races' dances, so the grant follows neither race nor class. The prefix derivation
+    structurally cannot express that (it keys on CLASS names), which is why `Combos` held all 12 while `ClassCombos`
+    held none and the emotes reached nobody (#416). Derived as the **intersection** across create dumps, not the
+    union the abilities twin uses: a create burst also carries the class's own combos (the Ranger's 14, the HoX's
+    21), and a union would hand every class the Ranger's. Guarded by `UniversalComboKitTests`.
+- **Grant** — `GetClassCombos` returns **every rank the character qualifies for** (Hell Strikes I *and* II), and
+  `GrantCharacterCombos` + the level-up dings emit them all. Showing only the highest rank of a line is a
+  **client-side display filter**, not something the server does — an earlier "rank-supersede per family" collapse
+  here was wrong about that and has been removed.
 - **`ComboActionParser`** (`Faolan/GameServer/Combat/ComboActionParser.cs`) — normalises all 33 `Actions` tokens into the
   `ComboInput` enum (4 quadrants + Up/Head/Thrust); returns false for the non-directional markers (spellweaving /
   reactive). Validated against all 130 distinct `Actions` (109 directional, 21 non-directional, 0 unknown).

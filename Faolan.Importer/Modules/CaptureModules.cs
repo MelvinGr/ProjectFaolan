@@ -356,9 +356,13 @@ namespace Faolan.Importer.Modules
 			var (createInserted, _) = await CaptureAbilityImporter.DeriveClassAbilitiesFromCreatesAsync(ctx.Db, ctx.CreateCaptures);
 			var (caInserted, _) = await CaptureAbilityImporter.DeriveClassAbilitiesAsync(ctx.Db);
 			caInserted += createInserted;
-			// Combos have no per-character grant to derive from, so ClassCombo comes from the catalog's capture-validated
-			// name prefixes (e.g. Herald_ = HoX, confirmed by Hakotep's 0x2076 combo book) - see DeriveClassCombosAsync.
+			// ClassCombo from two sources, mirroring the abilities above. The catalog's capture-validated class-name
+			// prefixes (e.g. Herald_ = HoX, confirmed by Hakotep's 0x2076 combo book) give each class its own lines;
+			// the create dumps give the UNIVERSAL kit those prefixes can't express, because it is named by RACE
+			// (Cimmerian_/Khitan_/Stygian_/Aquilonian_Dance) yet granted to every class alike (#416).
 			var (ccInserted, _) = await CaptureAbilityImporter.DeriveClassCombosAsync(ctx.Db);
+			var (ucInserted, _) = await CaptureAbilityImporter.DeriveUniversalCombosFromCreatesAsync(ctx.Db, ctx.CreateCaptures);
+			ccInserted += ucInserted;
 			return new ImportResult($"{aRows} ability rows ({aChars} chars), {cRows} combo rows ({cChars} chars); {caInserted} ClassAbility, {ccInserted} ClassCombo rows.");
 		}
 	}

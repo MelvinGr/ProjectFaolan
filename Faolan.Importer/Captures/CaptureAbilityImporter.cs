@@ -252,6 +252,85 @@ namespace Faolan.Importer.Captures
 			return (inserted, updated);
 		}
 
+		// The UNIVERSAL combo kit: the combos every created character is granted regardless of class, written as a
+		// ClassCombo row per class (the combo twin of DeriveClassAbilitiesFromCreatesAsync). Idempotent.
+		//
+		// This is what the prefix derivation above structurally cannot produce. `DeriveClassCombosAsync` keys on the 8
+		// CLASS-name prefixes, but the universal kit is named by RACE - `Cimmerian_Dance_combo1..3`,
+		// `Khitan_…`, `Stygian_…`, `Aquilonian_…`: the 4 playable races' dance emotes, 12 combos (Gitea #416).
+		//
+		// ⚠️ Racially NAMED, universally GRANTED - the names invite a race-keyed grant and that is wrong. Across the
+		// corpus 19 characters covering every class receive the SAME 12 (all four races' dances), so the grant follows
+		// neither race nor class. That is also why this takes the INTERSECTION across create dumps where
+		// DeriveClassAbilitiesFromCreatesAsync takes the union: a create burst carries the class's own combos too (the
+		// Ranger's 14, the HoX's 21), and a union would hand every class the Ranger's.
+		public static async Task<(int Inserted, int Kit)> DeriveUniversalCombosFromCreatesAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures,
+			ILogger? logger = null)
+		{
+			HashSet<uint>? kit = null;
+			var dumps = 0;
+			foreach (var capture in createCaptures)
+			{
+				if (DetectClass(capture) is not { } cls || !Enum.IsDefined((Class)cls))
+					continue; // can't confirm this is a class create
+
+				var byCharacter = new Dictionary<uint, HashSet<uint>>();
+				foreach (var packet in capture)
+					TryReadCharacterGrant(packet, byCharacter, true);
+
+				var granted = byCharacter.Values.SelectMany(x => x).ToHashSet();
+				if (granted.Count == 0)
+					continue; // capture never reached the combo burst
+
+				dumps++;
+				if (kit == null)
+					kit = granted;
+				else
+					kit.IntersectWith(granted);
+			}
+
+			// One dump can't establish "universal" - it is indistinguishable from that class's own kit.
+			if (kit is not { Count: > 0 } || dumps < 2)
+			{
+				logger?.LogInformation("CaptureAbilityImporter: no universal combo kit ({Dumps} usable create dumps).", dumps);
+				return (0, 0);
+			}
+
+			var levels = await db.Combos.Where(c => kit.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Level);
+			var existing = (await db.ClassCombos.Select(x => new
+				{
+					x.Class,
+					x.ComboId
+				})
+				.ToListAsync()).Select(x => (x.Class, x.ComboId)).ToHashSet();
+			var inserted = 0;
+
+			foreach (var cls in Enum.GetValues<Class>())
+			foreach (var comboId in kit)
+			{
+				if (!levels.TryGetValue(comboId, out var level))
+					continue; // a grant for a combo we never cataloged would be a catalog gap, not a fake id
+
+				if (!existing.Add((cls, comboId)))
+					continue; // already known; DeriveClassCombosAsync owns the level for those
+
+				db.ClassCombos.Add(new ClassCombo
+				{
+					Class = cls,
+					ComboId = comboId,
+					Level = level
+				});
+				inserted++;
+			}
+
+			if (inserted > 0)
+				await db.SaveChangesAsync();
+
+			logger?.LogInformation("CaptureAbilityImporter: universal kit of {Kit} combos (intersection of {Dumps} create dumps) -> {Inserted} new ClassCombo rows across {Classes} classes.",
+				kit.Count, dumps, inserted, Enum.GetValues<Class>().Length);
+			return (inserted, kit.Count);
+		}
+
 		// rawPackets = ALL captures. Catalogs every ability's Id + Slot/Data identity seen on the wire (the Data quad is
 		// also its RDB 1000020 TEA key, so RdbAbilityImporter can name it). The class<->ability ACCESS and per-class
 		// unlock LEVEL are NOT set here - they are derived from the per-character grants (DeriveClassAbilitiesAsync).
