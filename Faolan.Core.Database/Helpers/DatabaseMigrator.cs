@@ -10,20 +10,25 @@ namespace Faolan.Core.Database.Helpers
 	// Applies pending EF schema migrations on startup. The server does NOT seed data: the database is the single
 	// source of truth (committed faolan.db). Game data is (re)built from the raw sources by the Faolan.Importer
 	// tool, not embedded in the server. See docs/tooling/importer.md.
-	public class DatabaseMigrator : BackgroundService
+	//
+	// A plain IHostedService, deliberately NOT a BackgroundService: the host awaits each hosted service's
+	// StartAsync in registration order, and this one is registered ahead of every listener - so migrating here
+	// BLOCKS startup until the schema is current. A BackgroundService opts out of exactly that (its StartAsync
+	// returns at the first await inside ExecuteAsync), which would let the listeners come up against a
+	// half-migrated schema. Only holds if the host keeps sequential start (HostOptions.ServicesStartConcurrently
+	// stays false, the default).
+	public class DatabaseMigrator : IHostedService
 	{
 		private readonly IDbContextFactory<DatabaseContext> _contextFactory;
-		private readonly IHostApplicationLifetime _lifetime;
 		private readonly ILogger<DatabaseMigrator> _logger;
 
-		public DatabaseMigrator(IDbContextFactory<DatabaseContext> contextFactory, IHostApplicationLifetime lifetime, ILogger<DatabaseMigrator> logger)
+		public DatabaseMigrator(IDbContextFactory<DatabaseContext> contextFactory, ILogger<DatabaseMigrator> logger)
 		{
 			_contextFactory = contextFactory;
-			_lifetime = lifetime;
 			_logger = logger;
 		}
 
-		protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+		public async Task StartAsync(CancellationToken cancellationToken)
 		{
 			try
 			{
@@ -39,11 +44,16 @@ namespace Faolan.Core.Database.Helpers
 			catch (Exception ex)
 			{
 				// A failed migration leaves the schema half-applied; refuse to run on a broken DB rather than
-				// limping on (a BackgroundService exception is otherwise swallowed and the server keeps going).
-				_logger.LogCritical(ex, "Database migration failed - stopping the server to avoid running on a broken schema.");
-				_lifetime.StopApplication();
+				// limping on. Rethrowing from StartAsync aborts host startup outright - no listener ever binds, and
+				// the exception surfaces from RunAsync (so no IHostApplicationLifetime.StopApplication needed).
+				_logger.LogCritical(ex, "Database migration failed - refusing to start on a broken schema.");
 				throw;
 			}
+		}
+
+		public Task StopAsync(CancellationToken cancellationToken)
+		{
+			return Task.CompletedTask;
 		}
 	}
 }
