@@ -26,13 +26,6 @@ namespace Faolan.Core
 		// up with no content, which is what lets a clone run without the committed faolan.db.
 		public static string SeedPath => Environment.GetEnvironmentVariable("FAOLAN_SEED") ?? Path.GetFullPath("faolan.sql");
 
-		public static string SeedSequencePath(bool postgres)
-		{
-			return Path.ChangeExtension(SeedPath, null) + (postgres
-				? ".seq.postgres.sql"
-				: ".seq.sqlite.sql");
-		}
-
 		public static readonly string BuildConfiguration;
 		public static readonly DateTime BuildDateTimeUtc;
 		public static readonly string BuildString;

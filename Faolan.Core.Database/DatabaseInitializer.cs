@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -75,12 +74,14 @@ namespace Faolan.Core.Database
 				throw new InvalidOperationException(
 					$"The database has no game content and the seed '{seed}' is missing, so the world would come up empty. Point FAOLAN_SEED at faolan.sql, or regenerate it with `dotnet run --project Faolan.Importer -- --report sql-seed`.");
 
-			// The seed is dialect-neutral, but the counter resync after it is not - identity/AUTOINCREMENT state lives
-			// in sqlite_sequence vs a Postgres sequence (see SqlSeedWriter).
-			var postgres = db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
 			await ExecuteScriptAsync(db, seed, cancellationToken);
 
-			var sequences = Global.SeedSequencePath(postgres);
+			// The seed is dialect-neutral, but the counter resync after it is not - identity/AUTOINCREMENT state lives
+			// in sqlite_sequence vs a Postgres sequence (see SqlSeedWriter).
+			var sequences = Path.ChangeExtension(Global.SeedPath, null) + (db.Database.IsNpgsql()
+				? ".seq.postgres.sql"
+				: ".seq.sqlite.sql");
+
 			if (File.Exists(sequences))
 				await ExecuteScriptAsync(db, sequences, cancellationToken);
 
