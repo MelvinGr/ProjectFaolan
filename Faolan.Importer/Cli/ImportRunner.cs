@@ -11,8 +11,8 @@ namespace Faolan.Importer.Cli
 	{
 		public static async Task<int> RunAsync(ImportContext ctx, IReadOnlyList<IImportModule> plan)
 		{
-			ctx.Out.WriteLine($"Plan ({plan.Count} modules): {string.Join(" -> ", plan.Select(m => m.Name))}");
-			ctx.Out.WriteLine($"Mode: {ctx.Mode}{(ctx.ModeOverrides.Count > 0 ? " (" + string.Join(", ", ctx.ModeOverrides.Select(o => $"{o.Key}={o.Value}")) + ")" : "")}" + (ctx.DryRun
+			await ctx.Out.WriteLineAsync($"Plan ({plan.Count} modules): {string.Join(" -> ", plan.Select(m => m.Name))}");
+			await ctx.Out.WriteLineAsync($"Mode: {ctx.Mode}{(ctx.ModeOverrides.Count > 0 ? " (" + string.Join(", ", ctx.ModeOverrides.Select(o => $"{o.Key}={o.Value}")) + ")" : "")}" + (ctx.DryRun
 				? "   [DRY-RUN - nothing will be written]"
 				: ""));
 
@@ -26,11 +26,11 @@ namespace Faolan.Importer.Cli
 				if (!module.SupportedModes.Contains(mode))
 				{
 					var fallback = module.SupportedModes.First();
-					ctx.Out.WriteLine($"[{module.Name}] WARNING: mode '{mode}' unsupported; using '{fallback}'.");
+					await ctx.Out.WriteLineAsync($"[{module.Name}] WARNING: mode '{mode}' unsupported; using '{fallback}'.");
 				}
 
 				var result = await module.RunAsync(ctx);
-				ctx.Out.WriteLine($"[{module.Name}] {result.Summary}");
+				await ctx.Out.WriteLineAsync($"[{module.Name}] {result.Summary}");
 			}
 
 			var after = await TableSnapshot.CaptureAsync(ctx.Db);
@@ -39,12 +39,12 @@ namespace Faolan.Importer.Cli
 			if (ctx.DryRun)
 			{
 				await tx.RollbackAsync();
-				ctx.Out.WriteLine("\n[dry-run] transaction rolled back - nothing written.");
+				await ctx.Out.WriteLineAsync("\n[dry-run] transaction rolled back - nothing written.");
 			}
 			else
 			{
 				await tx.CommitAsync();
-				ctx.Out.WriteLine("\nCommitted.");
+				await ctx.Out.WriteLineAsync("\nCommitted.");
 			}
 
 			return 0;

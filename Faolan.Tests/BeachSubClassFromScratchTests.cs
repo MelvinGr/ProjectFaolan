@@ -43,7 +43,7 @@ namespace Faolan.Tests
 			};
 			var built = FullCharSnapshotSubClass.BuildFromScratch(def, strie, TemplateInstance);
 
-			var template = File.ReadAllBytes(TemplatePath);
+			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.True(template.SequenceEqual(built), "authoring the per-class block for an Assassin L1 must still equal the captured Strie template byte-for-byte");
 		}
 
@@ -118,7 +118,7 @@ namespace Faolan.Tests
 			// re-addressing: the assembly must equal the captured tails exactly.
 			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null!, TemplateInstance);
 
-			var template = File.ReadAllBytes(TemplatePath);
+			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.Equal(template.Length, built.Length);
 			Assert.True(template.SequenceEqual(built), "from-scratch tails must equal BeachTailsTemplate.bin byte-for-byte");
 		}

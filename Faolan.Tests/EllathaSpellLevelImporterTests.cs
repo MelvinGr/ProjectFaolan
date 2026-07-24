@@ -20,8 +20,8 @@ namespace Faolan.Tests
 			var tsv = Path.Combine(Path.GetTempPath(), $"ella-{Guid.NewGuid():N}.tsv");
 			try
 			{
-				File.WriteAllText(tsv, string.Join("\n", "# name\trank\tlevel\tmana\tcast", "Smite\t1\t1\t35\t", "Smite\t2\t20\t79\t", "Chill\t5\t15\t33\t1s", // exact match exists
-					"Mystery Spell\t1\t40\t\t")); // no DB row -> ignored
+				await File.WriteAllTextAsync(tsv, string.Join("\n", "# name\trank\tlevel\tmana\tcast", "Smite\t1\t1\t35\t", "Smite\t2\t20\t79\t", "Chill\t5\t15\t33\t1s", // exact match exist, TestContext.Current.CancellationTokens
+					"Mystery Spell\t1\t40\t\t"), TestContext.Current.CancellationToken); // no DB row -> ignored
 
 				await using (var db = NewContext(dbPath))
 				{
@@ -96,7 +96,7 @@ namespace Faolan.Tests
 			try
 			{
 				// combos list cols: name, level, cooldown, stamina, hash (same combo repeats per class)
-				File.WriteAllText(tsv, string.Join("\n", "# name\tlevel\tcooldown\tstamina\tarchetype", "Sweep\t2\t10\t20\tGuardian", "Sweep\t2\t10\t20\tConqueror", "Slam\t4\t15\t22\tGuardian"));
+				await File.WriteAllTextAsync(tsv, string.Join("\n", "# name\tlevel\tcooldown\tstamina\tarchetype", "Sweep\t2\t10\t20\tGuardian", "Sweep\t2\t10\t20\tConqueror", "Slam\t4\t15\t22\tGuardian", TestContext.Current.CancellationToken), TestContext.Current.CancellationToken);
 
 				await using (var db = NewContext(dbPath))
 				{

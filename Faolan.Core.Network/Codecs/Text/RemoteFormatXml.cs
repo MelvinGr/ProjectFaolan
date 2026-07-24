@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -20,6 +21,16 @@ namespace Faolan.Core.Network.Codecs.Text
 		private static readonly Regex FlagsRx = new Regex("flags=\"(?<f>.*?)\"", RegexOptions.Compiled);
 
 		private static readonly Regex ParamRx = new Regex("<parameter value=\"7;(?<inner>.*?)\" name=\"(?<name>.*?)\" />", RegexOptions.Compiled);
+
+		// The ambient-bark root: the same shape as RootRx but keyed by `token=`, whose value is structured
+		// `sayinchat(N)|<channel>(K)|<Group>`. The channel is NOT always a numbered conversation - the corpus has
+		// `conversation1`, `conversation2` and `sendtell` - so it is captured as a name. A bark carries at most one
+		// `<parameter>` (only the sendtell crier line does). Anchored and fully specified so anything that is NOT a
+		// bark fails to match rather than being half-read.
+		private static readonly Regex ChatterRootRx = new Regex(
+			"^<remoteformat token=\"sayinchat\\((?<say>\\d+)\\)\\|(?<channel>[A-Za-z][A-Za-z0-9]*)\\((?<count>\\d+)\\)\\|(?<group>[^\"|]*)\" category=\"(?<cat>[^\"]*)\" key=\"(?<key>[^\"]*)\" knubot=\"(?<knubot>[^\"]*)\"  >"
+			+ "(?:<parameter value=\"7;(?<pvalue>[^\"]*)\" name=\"(?<pname>[^\"]*)\" />)?</remoteformat>$",
+			RegexOptions.Compiled);
 
 		// Root attrs, then the `knubot="X" {antitag} >` slot - antitag sits between two spaces (empty when absent,
 		// giving the double space `knubot="0"  >`), so the optional group must NOT eat the trailing space.
@@ -45,6 +56,74 @@ namespace Faolan.Core.Network.Codecs.Text
 		public static byte[] BuildStockPhrase(StockPhrase row)
 		{
 			return Encoding.Latin1.GetBytes(Build(new Screen($"{row.RemoteFormatId}", $"{row.Category}", row.FormatKey, $"{row.Knubot}", null, [])));
+		}
+
+		// The ambient NPC bark payload: the same PARAMETER-LESS root as a stock phrase, but its first attribute is
+		// `token=` rather than `id=`, and the token is structured - `sayinchat(N)|conversationM(K)|<Group>`. So an
+		// NpcChatter row's columns rebuild the exact CharacterChat (0x0022) string the capture carries. Latin-1
+		// because that is the wire's string encoding. Note the DOUBLE space before `>`: these barks carry no antitag,
+		// which is the same empty-attribute slot Build() produces for a screen without one.
+		// `detectedCharName` fills the row's single parameter slot when it has one (the sendtell crier's
+		// `DetectedChar.name` - the player being addressed). Passing nothing renders the slot empty, which is what a
+		// broadcast bark does today: the send path picks one line for everyone in range, so there is no single
+		// player to name. Per-recipient rendering is open work tracked in Gitea.
+		public static string BuildChatter(NpcChatter row, string detectedCharName = "")
+		{
+			ArgumentNullException.ThrowIfNull(row);
+			// Written out rather than routed through Build(): only the first attribute differs, but patching `id=` to
+			// `token=` afterwards would be a blind string replace over a payload that also carries a content hash.
+			// The trailing DOUBLE space is Build()'s empty-antitag slot, which these barks always have.
+			var parameter = row.ParameterName is { } name
+				? $"<parameter value=\"7;{Escape(detectedCharName)}\" name=\"{name}\" />"
+				: "";
+			return $"<remoteformat token=\"{ChatterToken(row)}\" category=\"{row.Category}\" key=\"{row.FormatKey}\" knubot=\"{row.Knubot}\"  >{parameter}</remoteformat>";
+		}
+
+		public static byte[] BuildChatterBytes(NpcChatter row, string detectedCharName = "")
+		{
+			return Encoding.Latin1.GetBytes(BuildChatter(row, detectedCharName));
+		}
+
+		public static string ChatterToken(NpcChatter row)
+		{
+			ArgumentNullException.ThrowIfNull(row);
+			return $"sayinchat({row.SayInChat})|{row.Channel}({row.ChannelCount})|{row.Group}";
+		}
+
+		// Lift a captured bark into its columns. Returns null when the string is not a chatter root at all, so the
+		// importer can report it rather than storing something it cannot rebuild. The parameter's VALUE is
+		// deliberately not carried over - it is the capturing player's name (see NpcChatter.ParameterName).
+		public static NpcChatter? ParseChatter(string xml)
+		{
+			return ParseChatter(xml, out _);
+		}
+
+		// `parameterValue` is the captured slot's value, unescaped - NOT stored, but the importer needs it to prove
+		// the columns rebuild the captured string byte-for-byte before blanking it (the same gate-then-blank split
+		// as ConversationScreenColumns.ToRow / ToStoredRow).
+		public static NpcChatter? ParseChatter(string xml, out string parameterValue)
+		{
+			parameterValue = "";
+			var m = ChatterRootRx.Match(xml);
+			if (!m.Success)
+				return null;
+
+			if (m.Groups["pvalue"].Success)
+				parameterValue = Unescape(m.Groups["pvalue"].Value);
+
+			return new NpcChatter
+			{
+				SayInChat = uint.Parse(m.Groups["say"].Value, CultureInfo.InvariantCulture),
+				Channel = m.Groups["channel"].Value,
+				ChannelCount = uint.Parse(m.Groups["count"].Value, CultureInfo.InvariantCulture),
+				Group = m.Groups["group"].Value,
+				Category = uint.Parse(m.Groups["cat"].Value, CultureInfo.InvariantCulture),
+				FormatKey = m.Groups["key"].Value,
+				Knubot = uint.Parse(m.Groups["knubot"].Value, CultureInfo.InvariantCulture),
+				ParameterName = m.Groups["pname"].Success
+					? m.Groups["pname"].Value
+					: null
+			};
 		}
 
 		public static Screen Parse(string xml)

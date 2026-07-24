@@ -1,27 +1,66 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
 	// An ambient "chatter" bark an NPC TYPE periodically says (CharacterChat 0x0022 local-say, a chat bubble over the
-	// NPC). Keyed by NpcTemplateId (the NPC type), like NpcSpell. The dialogue is SPECIFIC per NPC - each NPC references its
-	// own conversation group; they do NOT share one table - so lines are stored per NPC type.
+	// NPC). Keyed by the NPC type, like NpcSpell: the dialogue is SPECIFIC per NPC - each references its own
+	// conversation group - so lines are stored per type.
 	//
-	// Harvested from captures by Faolan.Importer (NpcChatterModule): the bark is a
-	// `<remoteformat token="sayinchat(N)|conversationM(K)|<Group>" category="50015" key="..." knubot="0" >` the client
-	// resolves to a localized line. `RemoteFormat` is that XML verbatim - the client needs the exact token + per-line
-	// key, so we store + replay it byte-for-byte rather than reconstructing it.
-	public class NpcChatter : BaseEntity
+	// COLUMNIZED, like its StockPhrase sibling (#410): the bark is a PARAMETER-LESS remoteformat root
+	//   <remoteformat token="sayinchat(16)|conversation1(3)|RenownBystanderLovers" category="50015" key="..." knubot="0"  >
+	// so these columns ARE the whole payload and the wire string is rebuilt with RemoteFormatXml.BuildChatter. The
+	// raw blob it replaced is gone. Same root grammar as a dialogue screen, with `token=` where a screen has `id=`.
+	//
+	// The token decomposes further, and that is what makes the row addressable rather than an opaque string: a line
+	// is one `sayinchat` entry within one CHANNEL of a named group. The runtime picks a line at random per bark
+	// (WorldSimulation), so the set is what matters, not an order.
+	[PrimaryKey(nameof(NpcTemplateId), nameof(Channel), nameof(SayInChat))]
+	public class NpcChatter
 	{
-		// The NPC TYPE that says this line (loader reads via NpcTemplate.Chatter). A bark whose speaker has no NpcTemplate type is dropped.
+		// The NPC TYPE that says this line (loader reads via NpcTemplate.Chatter). A bark whose speaker has no
+		// NpcTemplate type is dropped.
 		public uint NpcTemplateId { get; set; }
 
 		[ForeignKey(nameof(NpcTemplateId))]
 		public virtual NpcTemplate NpcTemplate { get; set; } = null!;
 
-		// The verbatim <remoteformat> XML sent as the CharacterChat (0x0022) message. ~150 chars in practice (the
-		// token + group name + per-line key); 512 leaves generous headroom for longer groups/keys.
-		[MaxLength(512)]
-		public string RemoteFormat { get; set; } = null!;
+		// The token's SECOND segment, `<channel>(K)` - stored as the channel's literal name because it is not always
+		// a numbered conversation: the corpus carries `conversation1`, `conversation2` AND `sendtell` (a crier
+		// addressing a detected player), so parsing an index out of it would only work for two of the three forms.
+		// Part of the key - a `sayinchat` index is unique only WITHIN a channel (template 14164 says sayinchat(19)
+		// in both conversation1 and conversation2).
+		[MaxLength(32)]
+		public string Channel { get; set; } = null!;
+
+		// The line count the channel declares - the `(K)` in `conversation1(3)`.
+		public uint ChannelCount { get; set; }
+
+		// `sayinchat(N)`: the line's index within its conversation group's string table.
+		public uint SayInChat { get; set; }
+
+		// The conversation group the token names (e.g. "RenownBystanderLovers"). Shared ACROSS NPC types - 11852 and
+		// 14165 carry byte-identical line sets because both are bystander lovers - so this is a normalisation seam:
+		// the lines really belong to the group, with types referencing it (open work tracked in Gitea).
+		[MaxLength(64)]
+		public string Group { get; set; } = null!;
+
+		public uint Category { get; set; } // always 50015 in the captures - the ambient-chatter category
+		public uint Knubot { get; set; }
+
+		// The remoteformat's own `key=` attribute: the harvested, client-validated per-line content hash. Stored as
+		// the raw ATTRIBUTE TEXT the capture carries, XML entities and all (`&#39;`, `&quot;`) - the client is fed
+		// these bytes verbatim and re-escaping is not round-trip safe. Same rule as StockPhrase.FormatKey.
+		[MaxLength(64)]
+		public string FormatKey { get; set; } = null!;
+
+		// The NAME of this bark's single `<parameter>` slot, or null when it has none (11 of the 12 captured barks).
+		// The one that has it is the `sendtell` crier line, whose slot is `DetectedChar.name` - the player being
+		// addressed. That is SESSION state, exactly like a dialogue screen's name/guildname (#417), so only the slot
+		// NAME is stored and the value is regenerated per send: the capture's value is the capturing player's real
+		// character name, which must never ride the DB into faolan.sql.
+		[MaxLength(64)]
+		public string? ParameterName { get; set; }
 	}
 }

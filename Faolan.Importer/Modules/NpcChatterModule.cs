@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Importer.Cli;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -106,15 +106,26 @@ namespace Faolan.Importer.Modules
 				ctx.Db.NpcChatter.RemoveRange(existing);
 				foreach (var text in texts)
 				{
-					ctx.Db.NpcChatter.Add(new NpcChatter
-					{
-						NpcTemplateId = npc.TemplateId,
-						RemoteFormat = text
-					});
+					// COLUMNIZED, not stored verbatim: a bark whose token/attributes we cannot lift is REJECTED rather
+					// than kept as a blob, and the columns must rebuild the captured string byte-for-byte - the runtime
+					// has no raw-text path to fall back to. Same rule as ConversationScreenColumns.ToRow.
+					if (RemoteFormatXml.ParseChatter(text, out var parameterValue) is not { } row)
+						throw new InvalidOperationException($"NPC {npc.TemplateId} bark is not a recognised chatter remoteformat: {text}");
+
+					row.NpcTemplateId = npc.TemplateId;
+
+					// Gate WITH the captured parameter value, then store WITHOUT it. The one bark that has a parameter
+					// is the sendtell crier's `DetectedChar.name`, whose captured value is the capturing player's real
+					// character name - session state the runtime regenerates, and which must never reach faolan.sql
+					// (#417). Proving the round trip first means a bark we cannot reproduce still fails here.
+					if (RemoteFormatXml.BuildChatter(row, parameterValue) != text)
+						throw new InvalidOperationException($"NPC {npc.TemplateId} bark is not byte-exact round-trippable from columns: {text}");
+
+					ctx.Db.NpcChatter.Add(row);
+					lines++;
 				}
 
 				npcs++;
-				lines += texts.Count;
 			}
 
 			await ctx.Db.SaveChangesAsync();

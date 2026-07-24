@@ -15,6 +15,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -879,8 +880,9 @@ namespace Faolan.GameServer.World
 				}
 
 				// Ambient chatter lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent).
+				// CONSTRUCTED from the columnized token/category/key rather than replayed from a stored blob.
 				if (npc.NpcTemplate.Chatter is { Count: > 0 } chatter)
-					entity.ChatterLines = chatter.Select(c => c.RemoteFormat).Where(x => !string.IsNullOrEmpty(x)).ToArray();
+					entity.ChatterLines = chatter.Select(c => RemoteFormatXml.BuildChatter(c)).ToArray();
 
 				// #363: a captured spawn LINKED to an ambient area is a member of that area's POOL (the softer alternative
 				// to graduating/deleting it). It renders with its captured appearance but the POOL owns its respawn (fades

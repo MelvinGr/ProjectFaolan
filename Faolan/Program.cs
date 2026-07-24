@@ -122,7 +122,7 @@ namespace Faolan
 			{
 				// A failed migration leaves the schema half-applied; refuse to start rather than limping on. Written to
 				// stderr because the file logger isn't up yet - so a container/service run still captures the reason.
-				Console.Error.WriteLine($"[db] FATAL: database bootstrap failed - refusing to start on a broken schema.\n{ex}");
+				await Console.Error.WriteLineAsync($"[db] FATAL: database bootstrap failed - refusing to start on a broken schema.\n{ex}");
 				throw;
 			}
 

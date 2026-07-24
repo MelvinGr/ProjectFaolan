@@ -40,7 +40,7 @@ namespace Faolan.Tests
 			const uint templateInstance = 0x02165EFF;
 			var built = QuestObjectiveRegion.Build(def, templateInstance).ToArray();
 
-			var template = File.ReadAllBytes(TemplatePath);
+			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.Equal(template[RegionEnd..1168], built);
 		}
 
@@ -55,7 +55,7 @@ namespace Faolan.Tests
 			var portion = QuestPortionOracle.BuildSingle(def, BeachState, 0x02165EFF);
 
 			Assert.Equal(FullCharSnapshotSubClass.QuestPortionLength, portion.Length);
-			Assert.Equal(File.ReadAllBytes(TemplatePath)[..1292], portion);
+			Assert.Equal((await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken))[..1292], portion);
 		}
 
 		[Fact]
@@ -75,7 +75,7 @@ namespace Faolan.Tests
 			};
 			var built = region.ToArray();
 
-			var template = File.ReadAllBytes(TemplatePath);
+			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.Equal(RegionEnd, built.Length);
 			Assert.Equal(template[..RegionEnd], built);
 		}
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 			// it is the word the index USED to swallow as a phantom "IndexTag".
 			byte[] built = [.. quests.ToArray(), .. objectives.ToArray(), .. CompletedQuestJournalRegion.Build([]).ToArray(), .. index.ToArray()];
 
-			var template = File.ReadAllBytes(TemplatePath);
+			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.Equal(template[..1292], built);
 		}
 

@@ -37,7 +37,7 @@ namespace Faolan.Tests
 
 			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null!, TemplateInstance, null, []);
 
-			var template = File.ReadAllBytes(TemplatePath);
+			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.True(template.SequenceEqual(built), "an empty known-list must equal BeachTailsTemplate.bin byte-for-byte");
 		}
 

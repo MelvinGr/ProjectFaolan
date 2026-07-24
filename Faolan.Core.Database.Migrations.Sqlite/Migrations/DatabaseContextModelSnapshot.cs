@@ -1550,21 +1550,40 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>
                 {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("NpcTemplateId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("RemoteFormat")
-                        .IsRequired()
-                        .HasMaxLength(512)
+                    b.Property<string>("Channel")
+                        .HasMaxLength(32)
                         .HasColumnType("TEXT");
 
-                    b.HasKey("Id");
+                    b.Property<uint>("SayInChat")
+                        .HasColumnType("INTEGER");
 
-                    b.HasIndex("NpcTemplateId");
+                    b.Property<uint>("Category")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("ChannelCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FormatKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Group")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint>("Knubot")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ParameterName")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("NpcTemplateId", "Channel", "SayInChat");
 
                     b.ToTable("NpcChatter");
                 });
