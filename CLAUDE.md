@@ -56,7 +56,8 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 FAOLAN_CONFIG=$PWD/faolan.json dotnet ef migrations add <Name> \
   --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite
 # Same CWD gotcha for `database update`: a relative `Data Source=faolan.db` would create a stray DB beside the
-# project. Use the absolute connection override (or just start the server - it migrates + seeds at startup):
+# project. Use the absolute connection override (or just start the server - it migrates, loads faolan.sql
+# into a database with no content, and seeds the default realm/account at startup):
 FAOLAN_CONFIG=$PWD/faolan.json dotnet ef database update \
   --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite \
   --connection "Data Source=$PWD/faolan.db"
@@ -148,6 +149,12 @@ Two things already run ahead of that move:
   Characters are excluded (per-developer play state); the excluded set is derived from the model, not listed.
   Rows are batched into multi-row `INSERT … VALUES (…),(…)` so the column list is paid once per 1000 rows rather
   than per row (24 MB → 7.4 MB), while each row keeps its own LINE so the diff stays reviewable.
+  **A database with NO game content gets this loaded automatically** (`DatabaseInitializer.EnsureGameDataAsync`,
+  #412) — delete `faolan.db` and the server rebuilds it from the migrations + `faolan.sql`, on SQLite *or*
+  Postgres. Probed on `Items` being empty, so a populated database is never touched and nothing is re-seeded on a
+  second boot; if the seed is missing when it IS needed, startup fails with a clear error instead of coming up
+  with an empty world. `FAOLAN_SEED` overrides the path (`Global.SeedPath`), like `FAOLAN_CONFIG`. The importer
+  opts OUT (`InitializeAsync(db, seedGameData: false)`) — its job is to build that content from captures.
 - **`journal_mode=WAL`** — a persistent FILE-HEADER flag (no code, nothing to configure). Without it a reader
   BLOCKS a writer, so any concurrent read (a `sqlite3` query, the MCP server, Faolan.Web, another realm process)
   makes a live world write FAIL and be lost. ⚠️ A busy_timeout does NOT help and is already 30s by default

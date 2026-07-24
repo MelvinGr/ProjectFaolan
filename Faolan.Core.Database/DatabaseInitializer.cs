@@ -1,15 +1,20 @@
+using System;
+using System.Data;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database
 {
-	// Brings a database up to a runnable state: migrate to the latest schema for the active provider, then ensure the
-	// default realm + account exist. Shared by the server (DatabaseMigrator) and the importer so a fresh DB is brought
-	// up the SAME way on either path - the one place the migrate+seed sequence lives. Returns what was seeded so the
-	// caller logs in its own style (ILogger on the server, Console in the importer).
+	// Brings a database up to a runnable state: migrate to the latest schema for the active provider, load the game
+	// data if the database has none, then ensure the default realm + account exist. Shared by the server and the
+	// importer so a fresh DB is brought up the SAME way on either path - the one place that sequence lives. Returns
+	// what happened so the caller logs in its own style (ILogger on the server, Console in the importer).
 	public static class DatabaseInitializer
 	{
 		// The default admin login (game login validation is stubbed to accept any password, see the login_encryption
@@ -53,17 +58,65 @@ namespace Faolan.Core.Database
 			return await db.SaveChangesAsync(cancellationToken) == 1;
 		}
 
-		public static async Task<(bool RealmCreated, bool AccountCreated)> InitializeAsync(DatabaseContext db, CancellationToken cancellationToken = default)
+		// Loads faolan.sql into a database that came up with NO GAME CONTENT (#412) - what makes a fresh clone
+		// runnable without the committed faolan.db. Returns false when there was nothing to do.
+		//
+		// "No content" is probed on Items rather than on the migration history: a database can be migrated but empty
+		// (someone deleted the binary, a container started on an empty volume, a test built a schema), and those are
+		// exactly the cases that want the data. A database that already HAS content is never touched, so this cannot
+		// resurrect rows someone deliberately deleted.
+		public static async Task<bool> EnsureGameDataAsync(DatabaseContext db, CancellationToken cancellationToken = default)
+		{
+			if (await db.Items.AnyAsync(cancellationToken))
+				return false;
+
+			var seed = Global.SeedPath;
+			if (!File.Exists(seed))
+				throw new InvalidOperationException(
+					$"The database has no game content and the seed '{seed}' is missing, so the world would come up empty. Point FAOLAN_SEED at faolan.sql, or regenerate it with `dotnet run --project Faolan.Importer -- --report sql-seed`.");
+
+			// The seed is dialect-neutral, but the counter resync after it is not - identity/AUTOINCREMENT state lives
+			// in sqlite_sequence vs a Postgres sequence (see SqlSeedWriter).
+			var postgres = db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+			await ExecuteScriptAsync(db, seed, cancellationToken);
+
+			var sequences = Global.SeedSequencePath(postgres);
+			if (File.Exists(sequences))
+				await ExecuteScriptAsync(db, sequences, cancellationToken);
+
+			return true;
+		}
+
+		// Runs a whole script through the raw connection rather than ExecuteSqlRaw: the file carries its own
+		// BEGIN/COMMIT and many statements, and both providers execute multi-statement command text as-is.
+		private static async Task ExecuteScriptAsync(DatabaseContext db, string path, CancellationToken cancellationToken)
+		{
+			var connection = db.Database.GetDbConnection();
+			if (connection.State != ConnectionState.Open)
+				await connection.OpenAsync(cancellationToken);
+
+			await using var command = connection.CreateCommand();
+			command.CommandText = await File.ReadAllTextAsync(path, cancellationToken);
+			command.CommandTimeout = 0; // the seed is ~110k rows; no arbitrary deadline
+			await command.ExecuteNonQueryAsync(cancellationToken);
+		}
+
+		public static async Task<(bool RealmCreated, bool AccountCreated, bool DataSeeded)> InitializeAsync(DatabaseContext db, bool seedGameData = true,
+			CancellationToken cancellationToken = default)
 		{
 			// Both providers migrate the same way - each has its own migration project (see UseFaolanDatabase);
 			// Migrate applies the pending set for the active provider.
 			await db.Database.MigrateAsync(cancellationToken);
 
+			// The game data first, so the realm/account below see what the seed already carries instead of adding a
+			// second copy - faolan.sql ships one Realm and one Account (characters are the only excluded rows).
+			var dataSeeded = seedGameData && await EnsureGameDataAsync(db, cancellationToken);
+
 			// A world can't serve without a realm (guild/AH/mail/character FK it, #324) or an account to log into.
 			// These are config state, not schema, so they're ensured here rather than shipped in a migration. Idempotent.
 			var realmCreated = await EnsureDefaultRealmAsync(db, cancellationToken);
 			var accountCreated = await EnsureDefaultAccountAsync(db, cancellationToken);
-			return (realmCreated, accountCreated);
+			return (realmCreated, accountCreated, dataSeeded);
 		}
 	}
 }

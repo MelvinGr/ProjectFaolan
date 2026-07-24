@@ -122,7 +122,10 @@ namespace Faolan.Importer.Cli
 			await using var db = DatabaseExtensions.CreateContext(provider, connection);
 			// Migrate + seed the default realm/account before any module runs - the same sequence the server runs
 			// (DatabaseInitializer). Migrations run here, outside the runner's transaction (they can't run inside one).
-			var seeded = await DatabaseInitializer.InitializeAsync(db);
+			// seedGameData: false ON PURPOSE - the importer's whole job is to BUILD that content from captures, so
+			// loading faolan.sql first would import on top of a copy of its own previous output and blur what this run
+			// actually produced (the --dry-run per-table delta especially).
+			var seeded = await DatabaseInitializer.InitializeAsync(db, false);
 			if (seeded.RealmCreated)
 				Console.WriteLine("Importer: no realm present - inserted the default realm.");
 			if (seeded.AccountCreated)

@@ -21,6 +21,18 @@ namespace Faolan.Core
 		// plain relative name resolves in both cases; FAOLAN_CONFIG overrides it (container / one-off run).
 		public static string ConfigPath => Environment.GetEnvironmentVariable("FAOLAN_CONFIG") ?? Path.GetFullPath("faolan.json");
 
+		// The game-data seed (#412) and its per-dialect counter sidecar, found the same way as the config: beside the
+		// exe / in the CWD, or wherever FAOLAN_SEED points. DatabaseInitializer loads these into a database that comes
+		// up with no content, which is what lets a clone run without the committed faolan.db.
+		public static string SeedPath => Environment.GetEnvironmentVariable("FAOLAN_SEED") ?? Path.GetFullPath("faolan.sql");
+
+		public static string SeedSequencePath(bool postgres)
+		{
+			return Path.ChangeExtension(SeedPath, null) + (postgres
+				? ".seq.postgres.sql"
+				: ".seq.sqlite.sql");
+		}
+
 		public static readonly string BuildConfiguration;
 		public static readonly DateTime BuildDateTimeUtc;
 		public static readonly string BuildString;

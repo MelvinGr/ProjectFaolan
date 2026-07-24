@@ -84,9 +84,12 @@ namespace Faolan
 			{
 				await using var db = DatabaseExtensions.CreateContext(builder.Configuration.DatabaseProvider, builder.Configuration.DatabaseConnection);
 
-				// The shared migrate+seed sequence the importer runs too (DatabaseInitializer), logged Console-style
-				// because the host - and with it any ILogger - does not exist yet.
+				// The shared migrate + load-the-data + seed sequence (DatabaseInitializer), logged Console-style because
+				// the host - and with it any ILogger - does not exist yet. A database with no content gets faolan.sql
+				// loaded into it here, which is what lets a clone run without the committed binary (#412).
 				var seeded = await DatabaseInitializer.InitializeAsync(db);
+				if (seeded.DataSeeded)
+					Console.WriteLine($"[db] Empty database - loaded the game data from {Global.SeedPath}.");
 				if (seeded.RealmCreated)
 					Console.WriteLine("[db] No realm present - inserted the default realm.");
 				if (seeded.AccountCreated)
