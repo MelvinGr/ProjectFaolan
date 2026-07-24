@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.GameServer.Dialogue;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -46,8 +47,10 @@ namespace Faolan.Tests
 		public async Task ReceivedStockPhraseBody_MatchesCapture(string stockKey, uint threadCtx, string expectedHex)
 		{
 			var phrases = await Repo().GetStockPhrases();
-			Assert.True(phrases.TryGetValue(stockKey, out var text), $"no StockPhrases row for {stockKey}");
-			var body = StockConversationService.BuildReceivedStockPhraseBody(threadCtx, text);
+			Assert.True(phrases.TryGetValue(stockKey, out var phrase), $"no StockPhrases row for {stockKey}");
+			// #410: the payload is REBUILT from the row's columns (the raw blob column is gone), so this gate now
+			// also proves the columnization is lossless - the bytes must still equal the captured reply exactly.
+			var body = StockConversationService.BuildReceivedStockPhraseBody(threadCtx, RemoteFormatXml.BuildStockPhrase(phrase));
 			Assert.Equal(expectedHex, Convert.ToHexStringLower(body));
 		}
 

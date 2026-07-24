@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
@@ -35,6 +36,14 @@ namespace Faolan.Core.Network.Codecs.Text
 				sb.Append($"<parameter value=\"7;{Escape(p.InnerRaw)}\" name=\"{p.Name}\" />");
 			sb.Append("</remoteformat>");
 			return sb.ToString();
+		}
+
+		// The cutscene stock-phrase payload (#410): every captured phrase is a PARAMETER-LESS root, so a StockPhrase
+		// row's four attribute columns rebuild the exact bytes the 0x205D reply carries - the blob column they
+		// replaced is gone. Latin-1 because that is the wire's string encoding.
+		public static byte[] BuildStockPhrase(StockPhrase row)
+		{
+			return Encoding.Latin1.GetBytes(Build(new Screen($"{row.RemoteFormatId}", $"{row.Category}", row.FormatKey, $"{row.Knubot}", null, [])));
 		}
 
 		public static Screen Parse(string xml)

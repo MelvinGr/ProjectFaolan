@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Captures
@@ -13,7 +14,10 @@ namespace Faolan.Importer.Captures
 	// Harvests cutscene stock-phrase subtitles (Kalanthes's beach lines, ...) from create-flow captures: pairs each
 	// client PlayStockphraseAsSubtitle (0x205E: [ProtoID npc][u16 len]{stock_N}[u32 threadCtx]) with the retail
 	// ReceivedStockPhraseText reply (0x205D: [u32 threadCtx][u16 len][remoteformat]) by thread-context. Yields
-	// {stock_N} -> the category-50000 remoteformat payload, which GameServer StockConversationService replays.
+	// {stock_N} -> the category-50000 remoteformat payload, which GameServer StockConversationService rebuilds from
+	// the row's COLUMNS (#410 - the payload used to be stored as a raw blob). Every captured phrase is a
+	// parameter-less root tag, so the four root attributes are the whole payload; a phrase that ever arrives WITH
+	// parameters would not round-trip through these columns, so it is rejected loudly rather than truncated.
 	public static class CaptureStockPhraseImporter
 	{
 		private const ushort PlayStockphraseAsSubtitle = 0x205E; // c2s request
@@ -71,19 +75,27 @@ namespace Faolan.Importer.Captures
 			foreach (var (key, rf) in phrases)
 			{
 				seen++;
+				var screen = RemoteFormatXml.Parse(Encoding.Latin1.GetString(rf));
+				if (screen.Parameters.Count > 0 || screen.Antitag != null)
+					throw new InvalidOperationException(
+						$"Stock phrase {key} has {screen.Parameters.Count} parameter(s)/antitag - the StockPhrases columns only model a bare root tag, so this would not round-trip. Extend the table before importing it.");
+
 				var existing = await db.StockPhrases.FindAsync(key);
+				var row = existing ?? new StockPhrase { Key = key };
+				var before = (row.RemoteFormatId, row.Category, row.Knubot, row.FormatKey);
+
+				row.RemoteFormatId = uint.Parse(screen.Id);
+				row.Category = uint.Parse(screen.Category);
+				row.Knubot = uint.Parse(screen.Knubot);
+				row.FormatKey = screen.Key;
+
 				if (existing == null)
 				{
-					db.StockPhrases.Add(new StockPhrase
-					{
-						Key = key,
-						RemoteFormat = rf
-					});
+					db.StockPhrases.Add(row);
 					added++;
 				}
-				else if (existing.RemoteFormat == null || !existing.RemoteFormat.AsSpan().SequenceEqual(rf))
+				else if (before != (row.RemoteFormatId, row.Category, row.Knubot, row.FormatKey))
 				{
-					existing.RemoteFormat = rf;
 					updated++;
 				}
 			}

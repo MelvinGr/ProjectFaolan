@@ -28,7 +28,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Spell[]> GetSpells();
 		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
 		Task<uint[]> GetStartingSpells(uint level, Class @class);
-		Task<Dictionary<string, byte[]>> GetStockPhrases();
+		Task<Dictionary<string, StockPhrase>> GetStockPhrases();
 		Task<Item[]> SearchItems(string nameSubstring, int limit = 25);
 		Task<bool> SetItemRandomLootExcluded(uint itemId, bool excluded);
 	}
@@ -236,10 +236,12 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		public async Task<Dictionary<string, byte[]>> GetStockPhrases()
+		// Returns the ROWS, not bytes: the 0x205D payload is rebuilt from their columns by RemoteFormatXml
+		// (Faolan.Core.Network), which this layer cannot reference - Network depends on Database, not the reverse.
+		public async Task<Dictionary<string, StockPhrase>> GetStockPhrases()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.StockPhrases.ToDictionaryAsync(p => p.Key, p => p.RemoteFormat);
+			return await ctx.StockPhrases.ToDictionaryAsync(p => p.Key, p => p);
 		}
 
 		public async Task<Item[]> SearchItems(string nameSubstring, int limit = 25)

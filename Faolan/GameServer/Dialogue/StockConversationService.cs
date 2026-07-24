@@ -4,8 +4,10 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
@@ -22,7 +24,7 @@ namespace Faolan.GameServer.Dialogue
 		private readonly ILogger _logger;
 
 		// {stock_N} -> captured remoteformat, loaded once from the DB (small, stable server content).
-		private Dictionary<string, byte[]>? _phrases;
+		private Dictionary<string, StockPhrase>? _phrases;
 
 		public StockConversationService(ILogger logger, ICatalogRepository database)
 		{
@@ -39,7 +41,7 @@ namespace Faolan.GameServer.Dialogue
 			}
 
 			var phrases = _phrases ??= await _database.GetStockPhrases();
-			if (!phrases.TryGetValue(stockKey, out var textBytes))
+			if (!phrases.TryGetValue(stockKey, out var phrase))
 			{
 				_logger.LogWarning(
 					"PlayStockphraseAsSubtitle: no StockPhrases row for {Key} (tc=0x{Tc:X8}) - client will time out; re-run the importer's stock-phrases module against a capture that has it",
@@ -49,7 +51,7 @@ namespace Faolan.GameServer.Dialogue
 
 			var id = client.Session.Character.Id;
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id),
-				GameCharInterfaceOpcodes.DispatchReceivedStockPhraseText, BuildReceivedStockPhraseBody(threadContext, textBytes)));
+				GameCharInterfaceOpcodes.DispatchReceivedStockPhraseText, BuildReceivedStockPhraseBody(threadContext, RemoteFormatXml.BuildStockPhrase(phrase))));
 
 			_logger.LogInformation("PlayStockphraseAsSubtitle: answered {Key} (tc=0x{Tc:X8}) for client {Id} (#234 cutscene speech)", stockKey, threadContext, id);
 		}
