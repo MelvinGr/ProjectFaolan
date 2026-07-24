@@ -190,7 +190,7 @@ namespace Faolan
 			// and to the host builder's own configuration identically.
 
 			cfg
-				.AddJsonFile(Path.GetFullPath(Global.ConfigPath), true) // absolute (CWD-rooted), so no SetBasePath needed
+				.AddJsonFile(Global.ConfigPath, true) // absolute (CWD-rooted), so no SetBasePath needed
 				.AddCommandLine(args)
 				.AddEnvironmentVariables();
 		}

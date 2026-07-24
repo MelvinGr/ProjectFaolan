@@ -1,4 +1,3 @@
-using System.IO;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -19,7 +18,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite
 	{
 		public DatabaseContext CreateDbContext(string[] args)
 		{
-			var config = new ConfigurationBuilder().AddJsonFile(Path.GetFullPath(Global.ConfigPath), true).AddEnvironmentVariables().Build();
+			var config = new ConfigurationBuilder().AddJsonFile(Global.ConfigPath, true).AddEnvironmentVariables().Build();
 			return DatabaseExtensions.CreateContext(FaolanDbProvider.Sqlite, config.DatabaseConnection);
 		}
 	}

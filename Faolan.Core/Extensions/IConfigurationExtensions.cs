@@ -19,6 +19,16 @@ namespace Faolan.Core.Extensions
 			public bool LogPacketBytes => bool.TryParse(config["Log:PacketBytes"], out var enabled) && enabled;
 			public bool McpEnabled => bool.TryParse(config["Mcp:Enabled"], out var enabled) && enabled;
 
+			// Account "premium" (subscribed) advertisement in the PlayerAgent character list (0x20EF). Decoded by
+			// diffing the account-login-{nopremium,premium} captures: the only per-account difference in the trailing
+			// block is the subscribed flag byte 0x81 -> 0x80 and the unlocked-character-slot count 4 -> 10. Defaults to
+			// ON (unlike the toggles above) - the historical behaviour is that every account is treated as subscribed.
+			public bool AccountPremium => !bool.TryParse(config["Account:Premium"], out var premium) || premium;
+
+			// Unlocked character-slot counts advertised in that same block, per subscription state.
+			public uint AccountPremiumCharSlots => uint.TryParse(config["Account:PremiumCharSlots"], out var slots) ? slots : 10;
+			public uint AccountFreeCharSlots => uint.TryParse(config["Account:FreeCharSlots"], out var slots) ? slots : 4;
+
 			public double ChannelBacklogGraceMs => double.TryParse(config["ChatBridge:BacklogGraceMs"], out var ms)
 				? ms
 				: 120_000;

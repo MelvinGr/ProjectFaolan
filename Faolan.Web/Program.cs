@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -32,7 +31,7 @@ namespace Faolan.Web
 
 			// Shared config (DB provider/connection, etc.) - OPTIONAL, like the server, so a container can supply it
 			// by env vars instead. The app's own appsettings.json (RdbDir, ...) lives next to the dll, not the CWD.
-			builder.Configuration.AddJsonFile(Path.GetFullPath(Global.ConfigPath), true);
+			builder.Configuration.AddJsonFile(Global.ConfigPath, true);
 			builder.Configuration.AddJsonFile("appsettings.json");
 			// Env vars / command line override the files (parity with the server): env > cmdline > json.
 			builder.Configuration.AddCommandLine(args);

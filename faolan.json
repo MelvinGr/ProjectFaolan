@@ -10,6 +10,13 @@
 	"PlayerAgentPort": 7011,
 	"WelcomeString": "Welcome to Project Faolan!",
 
+	// Subscription state advertised in the PlayerAgent character list (0x20EF), per deployment.
+	"Account": {
+		"Premium": true,
+		"PremiumCharSlots": 10,
+		"FreeCharSlots": 4
+	},
+
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 
 	"Mcp": {

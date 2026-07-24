@@ -264,6 +264,7 @@ Related keys are grouped into sections; the remaining shared keys stay flat:
 | `CdnMirror` `{ Store, Ip, Port }` | the `Faolan.Web.Content` mirror's store dir + bind address |
 | `ChatBridge` `{ PollMs, BacklogGraceMs }` | the Claude chat-bridge poll-loop tuning |
 | `Log` `{ File, PacketBytes }` | log-file path; whether packet log lines include the raw byte dump |
+| `Account` `{ Premium, PremiumCharSlots, FreeCharSlots }` | subscription state advertised to every account in the character list (default: premium, 10 slots / 4 free) |
 
 Any key can be overridden from the environment (this is how the Docker images are configured) — a flat key by
 its own name (`ServerIpAddress=…`), a grouped key with the `__` separator (`Database__ConnectionString=…`,

@@ -52,7 +52,7 @@ namespace Faolan.Web.Content
 			// working (as the command-line layer, overriding faolan.json but below env vars). Sources are cleared first
 			// so the order is exactly this (no appsettings.json in the mix).
 			builder.Configuration.Sources.Clear();
-			builder.Configuration.AddJsonFile(Path.GetFullPath(Global.ConfigPath), true); // absolute (CWD-rooted), like Faolan.Web
+			builder.Configuration.AddJsonFile(Global.ConfigPath, true); // absolute (CWD-rooted), like Faolan.Web
 			builder.Configuration.AddCommandLine(args, new Dictionary<string, string>
 			{
 				["--store"] = "CdnMirror:Store",

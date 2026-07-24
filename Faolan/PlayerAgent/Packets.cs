@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
@@ -68,14 +69,17 @@ namespace Faolan.PlayerAgent
 			body.WriteUInt32(0x00000014);
 			body.WriteUInt32(client.Session.Account.ClientInstance); // (pre-selection, no Session.Character)
 			body.WriteUInt32(0x000c0001);
-			body.WriteUInt32(Global.Premium
+			// Subscription state comes from config (Account:{Premium,PremiumCharSlots,FreeCharSlots}); it is a
+			// per-deployment policy, not a per-account one - every account is advertised the same way.
+			var premium = Configuration.AccountPremium;
+			body.WriteUInt32(premium
 				? 0x00018081
 				: 0x00018181); // subscribed flag byte: 0x80 premium / 0x81 free
 			body.WriteUInt32(0x00000015);
 			body.WriteUInt32(0x00000020);
-			body.WriteUInt32(Global.Premium
-				? Global.PremiumCharSlots
-				: Global.FreeCharSlots); // unlocked character slots
+			body.WriteUInt32(premium
+				? Configuration.AccountPremiumCharSlots
+				: Configuration.AccountFreeCharSlots); // unlocked character slots
 			body.WriteUInt32(0x00000000);
 			body.WriteString("https://www.facebook.com/dialog/oauth?client_id=.....");
 			body.WriteUInt32(0x00000000);
