@@ -359,7 +359,7 @@ slot table; (b) build the `737A6DF9` snapshot from `player_items` ⋈ `p_items` 
 instance-rewritten captured inventory verbatim, and drive counts/stats onto it.
 
 ARCHIVE IMPORT — DONE (2026-06-07). Step (a) is implemented and verified. `Faolan/Helpers/ArchiveDataImporter.cs`
-is an idempotent startup seeder (run from `DatabaseMigrator` after `MigrateAsync`) that parses the embedded
+is an idempotent startup seeder (run at startup after the schema migration) that parses the embedded
 archive SQL (`Faolan/GameServer/Data/archive/p_items.sql` + `aocdatabase.sql`) and fills the DB when empty:
 - `Item` gained the template identity columns `Level, Data0..Data4` (migration `ImportArchiveItemTemplate`);
   **219 item templates** imported from `p_items` (the Data1..Data4 identity quad the inventory/add packets need).

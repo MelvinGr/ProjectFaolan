@@ -134,34 +134,44 @@ namespace Faolan
 			// faolan.log in the CWD (repo root), rewritten each start. Point it at a mounted volume in a container.
 			builder.Logging.AddProvider(new FileLoggerProvider(builder.Configuration.LogFile));
 
-			// The realm this process hosts (realm role). Resolved from the DB up front - the Realm row is the single
-			// source of truth for the bind ports, so the world/chat/guild listeners bind exactly what the login tier
-			// advertises for this realm (SendGameServer/ChatServer/CsPlayerAgent). The ports are needed at listener
-			// CONSTRUCTION (ServerBase builds its TcpListener in the ctor), and the host constructs every hosted
-			// service before starting any - so this cannot be deferred into a hosted service; it has to happen here.
+			// Bring the DB up, then resolve the realm this process hosts - both BEFORE the host is built, on one
+			// context, for every role. This is the whole migrate+seed story: there is no migration hosted service,
+			// because a hosted service would be too late for the realm lookup below. The Realm row is the single
+			// source of truth for the bind ports (so the world/chat/guild listeners bind exactly what the login tier
+			// advertises - SendGameServer/ChatServer/CsPlayerAgent), and those ports are needed at listener
+			// CONSTRUCTION (ServerBase builds its TcpListener in the ctor) while the host constructs every hosted
+			// service before starting any. Doing it here instead is strictly stronger than ordering hosted services:
+			// the schema is current before the host object even exists.
 			Realm? hostRealm = null;
-			if (runRealm)
+			try
 			{
-				await using var probe = DatabaseExtensions.CreateContext(builder.Configuration.DatabaseProvider, builder.Configuration.DatabaseConnection);
+				await using var db = DatabaseExtensions.CreateContext(builder.Configuration.DatabaseProvider, builder.Configuration.DatabaseConnection);
 
-				// Which makes this the process's FIRST DB touch - before the host exists, so before DatabaseMigrator
-				// can possibly have run. So bring the DB up right here: without it a fresh or pending-migration DB dies
-				// on the Realm read below ("no such table: Realms") that the migrator was meant to prevent. Same shared
-				// migrate+seed sequence the migrator and the importer run, logged Console-style because there is no
-				// ILogger yet. Idempotent, so the migrator still owns the login-only role, which never probes.
-				var seeded = await DatabaseInitializer.InitializeAsync(probe);
+				// The shared migrate+seed sequence the importer runs too (DatabaseInitializer), logged Console-style
+				// because the host - and with it any ILogger - does not exist yet.
+				var seeded = await DatabaseInitializer.InitializeAsync(db);
 				if (seeded.RealmCreated)
 					Console.WriteLine("[db] No realm present - inserted the default realm.");
 				if (seeded.AccountCreated)
 					Console.WriteLine("[db] No account present - inserted the default account.");
 
-				hostRealm = selectedRealmId.HasValue
-					? probe.Realms.FirstOrDefault(r => r.Id == selectedRealmId.Value)
-					: probe.Realms.OrderBy(r => r.Id).FirstOrDefault();
-				// Only reachable for an explicit id now - the no-id branch always finds a realm, since the seed above
-				// inserts the default one when the table is empty.
-				if (hostRealm == null)
-					throw new Exception($"--role realm={selectedRealmId}: no such realm in the DB (add the Realm row, or omit the id to host the first one).");
+				if (runRealm)
+				{
+					hostRealm = selectedRealmId.HasValue
+						? db.Realms.FirstOrDefault(r => r.Id == selectedRealmId.Value)
+						: db.Realms.OrderBy(r => r.Id).FirstOrDefault();
+					// Only reachable for an explicit id - the no-id branch always finds a realm, since the seed above
+					// inserts the default one when the table is empty.
+					if (hostRealm == null)
+						throw new Exception($"--role realm={selectedRealmId}: no such realm in the DB (add the Realm row, or omit the id to host the first one).");
+				}
+			}
+			catch (Exception ex)
+			{
+				// A failed migration leaves the schema half-applied; refuse to start rather than limping on. Written to
+				// stderr because the file logger isn't up yet - so a container/service run still captures the reason.
+				Console.Error.WriteLine($"[db] FATAL: database bootstrap failed - refusing to start on a broken schema.\n{ex}");
+				throw;
 			}
 
 			Console.WriteLine($"[role] login={runLogin} realm={runRealm}" + (hostRealm != null
@@ -171,7 +181,6 @@ namespace Faolan
 			builder.Services.AddLogging();
 
 			builder.Services.ConfigureFaolanDatabase(builder.Configuration);
-			builder.Services.AddHostedService<DatabaseMigrator>();
 
 			if (runLogin)
 			{

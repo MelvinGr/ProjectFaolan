@@ -51,7 +51,7 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 # EF migrations (context lives in Faolan.Core.Database, migrations in Faolan/Migrations).
 dotnet ef migrations add <Name> --project Faolan
 # GOTCHA: plain `database update` runs with CWD = Faolan/ and creates a stray Faolan/faolan.db.
-# Use the absolute connection override (or just start the server - DatabaseMigrator migrates at startup):
+# Use the absolute connection override (or just start the server - it migrates + seeds at startup, before the host):
 dotnet ef database update --project Faolan --connection "Data Source=$PWD/faolan.db"
 # For pure DATA changes (no schema change) just UPDATE faolan.db directly and commit it - no migration.
 ```
