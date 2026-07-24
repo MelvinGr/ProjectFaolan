@@ -170,38 +170,6 @@ namespace Faolan.Core.Rdb.Assets
 			var glTextures = new List<object>();
 			var textureIndexOf = new Dictionary<byte[], int>(ReferenceEqualityComparer.Instance);
 
-			// Embed a PNG once as an image+texture (deduped by reference) and return its glTF texture index.
-			int EmbedTexture(byte[] png)
-			{
-				if (textureIndexOf.TryGetValue(png, out var existing))
-					return existing;
-
-				Align(bin);
-				var imgOffset = (int)bin.Length;
-				bin.Write(png);
-				var imgBv = bufferViews.Count;
-				bufferViews.Add(new Dictionary<string, object>
-				{
-					["buffer"] = 0,
-					["byteOffset"] = imgOffset,
-					["byteLength"] = png.Length
-				});
-				var imgIdx = images.Count;
-				images.Add(new Dictionary<string, object>
-				{
-					["bufferView"] = imgBv,
-					["mimeType"] = "image/png"
-				});
-				var texIdx = glTextures.Count;
-				glTextures.Add(new Dictionary<string, object>
-				{
-					["source"] = imgIdx,
-					["sampler"] = 0
-				});
-				textureIndexOf[png] = texIdx;
-				return texIdx;
-			}
-
 			foreach (var (basePng, normalPng, alpha) in materialKeys)
 			{
 				var material = new Dictionary<string, object>
@@ -361,6 +329,38 @@ namespace Faolan.Core.Rdb.Assets
 
 			var json = JsonSerializer.SerializeToUtf8Bytes(gltf);
 			return Assemble(json, binBytes);
+
+			// Embed a PNG once as an image+texture (deduped by reference) and return its glTF texture index.
+			int EmbedTexture(byte[] png)
+			{
+				if (textureIndexOf.TryGetValue(png, out var existing))
+					return existing;
+
+				Align(bin);
+				var imgOffset = (int)bin.Length;
+				bin.Write(png);
+				var imgBv = bufferViews.Count;
+				bufferViews.Add(new Dictionary<string, object>
+				{
+					["buffer"] = 0,
+					["byteOffset"] = imgOffset,
+					["byteLength"] = png.Length
+				});
+				var imgIdx = images.Count;
+				images.Add(new Dictionary<string, object>
+				{
+					["bufferView"] = imgBv,
+					["mimeType"] = "image/png"
+				});
+				var texIdx = glTextures.Count;
+				glTextures.Add(new Dictionary<string, object>
+				{
+					["source"] = imgIdx,
+					["sampler"] = 0
+				});
+				textureIndexOf[png] = texIdx;
+				return texIdx;
+			}
 		}
 
 		private static int AddAccessor(MemoryStream bin, List<object> bufferViews, List<object> accessors, int target, int componentType, int count, string type, Action<MemoryStream> write,
@@ -433,11 +433,11 @@ namespace Faolan.Core.Rdb.Assets
 			var min = Enumerable.Repeat(float.MaxValue, comps).ToArray();
 			var max = Enumerable.Repeat(float.MinValue, comps).ToArray();
 			for (var i = 0; i < data.Length; i += comps)
-			for (var c = 0; c < comps; c++)
-			{
-				min[c] = Math.Min(min[c], data[i + c]);
-				max[c] = Math.Max(max[c], data[i + c]);
-			}
+				for (var c = 0; c < comps; c++)
+				{
+					min[c] = Math.Min(min[c], data[i + c]);
+					max[c] = Math.Max(max[c], data[i + c]);
+				}
 
 			return (min, max);
 		}

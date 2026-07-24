@@ -26,25 +26,20 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			var builtIn = idx.BuiltIn;
 			var iirTypes = idx.IirTypes;
 
-			string Level(string iir)
-			{
-				return idx.Level(iir);
-			}
-
 			int v3 = 0, v2 = 0, v1 = 0;
 			foreach (var (name, _) in iirTypes)
 			{
 				switch (Level(name))
 				{
 					case "V3":
-						v3++;
-						break;
+					v3++;
+					break;
 					case "V2":
-						v2++;
-						break;
+					v2++;
+					break;
 					default:
-						v1++;
-						break;
+					v1++;
+					break;
 				}
 			}
 
@@ -105,6 +100,11 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 			sb.AppendLine();
 			return sb.ToString();
+
+			string Level(string iir)
+			{
+				return idx.Level(iir);
+			}
 		}
 
 		private static int Rank(string level)
@@ -113,7 +113,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			{
 				"V3" => 0,
 				"V2" => 1,
-				_    => 2
+				_ => 2
 			};
 		}
 	}

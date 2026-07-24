@@ -2,6 +2,7 @@
 	<s:Boolean x:Key="/Default/CodeEditing/TypingAssist/CSharpAnnotationTypingAssist/IsEnabledAfterTypeName/@EntryValue">False</s:Boolean>
     <s:Boolean x:Key="/Default/CodeEditing/TypingAssist/CSharpAnnotationTypingAssist/IsEnabledAtOtherPositions/@EntryValue">False</s:Boolean>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/GeneratedFilesAndFolders/=45FCEFD5_002D1D97_002D5602_002DD2FB_002DC01016E923E0_002Fd_003AMigrations/@EntryIndexedValue">45FCEFD5-1D97-5602-D2FB-C01016E923E0/d:Migrations</s:String>
+	<s:String x:Key="/Default/CodeInspection/Highlighting/InspectionSeverities/=ConditionalAccessQualifierIsNonNullableAccordingToAPIContract/@EntryIndexedValue">WARNING</s:String>
     <s:Boolean x:Key="/Default/CodeStyle/CodeFormatting/CSharpCodeStyle/APPLY_ON_COMPLETION/@EntryValue">True</s:Boolean>
     <s:Boolean x:Key="/Default/CodeStyle/CodeFormatting/CSharpFormat/INDENT_BRACES_INSIDE_STATEMENT_CONDITIONS/@EntryValue">False</s:Boolean>
     <s:Boolean x:Key="/Default/CodeStyle/CodeFormatting/CSharpFormat/INT_ALIGN_SWITCH_EXPRESSIONS/@EntryValue">True</s:Boolean>

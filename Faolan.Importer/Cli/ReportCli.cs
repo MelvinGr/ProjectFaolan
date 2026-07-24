@@ -359,10 +359,6 @@ namespace Faolan.Importer.Cli
 					Console.WriteLine("=== language histogram (2nd u32 per index entry) ===");
 					foreach (var (lang, n) in langHisto.OrderByDescending(kv => kv.Value).Take(12))
 						Console.WriteLine($"  lang {lang,-6} n={n}");
-					// #291/#300 crib: identify the ENGLISH spell-name page(s) by scoring each cat-50210 page against the
-					// English names our Spells catalog already carries (from the template ExtractName). The page whose
-					// strings match our names is English; the FR/DE/ES/RU/PL/KO copies of the same ids won't.
-					static string Norm(string s) => s.Trim().ToLowerInvariant().Replace('’', '\'').Replace('‘', '\'');
 					await using (var db = OpenDb())
 					{
 						var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "")
@@ -433,6 +429,11 @@ namespace Faolan.Importer.Cli
 						}
 					}
 					return 0;
+
+					// #291/#300 crib: identify the ENGLISH spell-name page(s) by scoring each cat-50210 page against the
+					// English names our Spells catalog already carries (from the template ExtractName). The page whose
+					// strings match our names is English; the FR/DE/ES/RU/PL/KO copies of the same ids won't.
+					static string Norm(string s) => s.Trim().ToLowerInvariant().Replace('’', '\'').Replace('‘', '\'');
 				}
 
 				default:
@@ -534,13 +535,6 @@ namespace Faolan.Importer.Cli
 			var convHave = greetedTalkers.Count - convGaps.Count;
 			var shopHave = vendorsSeen.Count - shopGaps.Count;
 
-			static string Pct(int have, int total)
-			{
-				return total == 0
-					? "n/a"
-					: $"{100.0 * have / total:0.0}%";
-			}
-
 			var block = new StringBuilder();
 			block.AppendLine($"- **NPC conversations** — {convHave}/{greetedTalkers.Count} greeted dialogue NPCs imported ({Pct(convHave, greetedTalkers.Count)})");
 			block.AppendLine($"- **Vendor shops** — {shopHave}/{vendorsSeen.Count} captured vendors imported ({Pct(shopHave, vendorsSeen.Count)})");
@@ -614,6 +608,15 @@ namespace Faolan.Importer.Cli
 				UpdateReadmeSection("coverage", block.ToString().TrimEnd());
 				UpdateReadmeSection("stats", stats);
 				Console.WriteLine("\nREADME.md coverage + stats sections regenerated.");
+			}
+
+			return;
+
+			static string Pct(int have, int total)
+			{
+				return total == 0
+					? "n/a"
+					: $"{100.0 * have / total:0.0}%";
 			}
 		}
 
@@ -876,13 +879,6 @@ namespace Faolan.Importer.Cli
 			var ops2 = opCols.ToList();
 			var subs2 = subCols.ToList();
 
-			static string Csv(string s)
-			{
-				return s.Contains(',') || s.Contains('"')
-					? $"\"{s.Replace("\"", "\"\"")}\""
-					: s;
-			}
-
 			Console.Error.WriteLine($"{ops2.Count} opcode columns + {subs2.Count} sub-opcode columns across {captures.Count} captures");
 			Console.WriteLine("capture," + string.Join(",", ops2.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}")) + "," +
 							  string.Join(",", subs2.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Op:X4}:0x{x.Sub:X8}")));
@@ -895,6 +891,15 @@ namespace Faolan.Importer.Cli
 					: 0)) + "," + string.Join(",", subs2.Select(x => sub.TryGetValue((x.Dl, x.Op, x.Sub), out var n)
 					? n
 					: 0)));
+			}
+
+			return;
+
+			static string Csv(string s)
+			{
+				return s.Contains(',') || s.Contains('"')
+					? $"\"{s.Replace("\"", "\"\"")}\""
+					: s;
 			}
 		}
 
@@ -1386,13 +1391,6 @@ namespace Faolan.Importer.Cli
 
 			var ordered = cols.ToList();
 
-			static string Csv(string s)
-			{
-				return s.Contains(',') || s.Contains('"')
-					? $"\"{s.Replace("\"", "\"\"")}\""
-					: s;
-			}
-
 			Console.Error.WriteLine($"opcode 0x{op:X4}: {ordered.Count} distinct (dir,sub) columns across {captures.Count} captures");
 			Console.WriteLine("capture," + string.Join(",", ordered.Select(x => $"{(x.Dl ? "S2C" : "C2S")} 0x{x.Sub:X8}")));
 			foreach (var c in captures.OrderBy(c => c.Name, StringComparer.Ordinal))
@@ -1401,6 +1399,15 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine(Csv(c.Name) + "," + string.Join(",", ordered.Select(x => counts.TryGetValue((x.Dl, x.Sub), out var n)
 					? n
 					: 0)));
+			}
+
+			return;
+
+			static string Csv(string s)
+			{
+				return s.Contains(',') || s.Contains('"')
+					? $"\"{s.Replace("\"", "\"\"")}\""
+					: s;
 			}
 		}
 

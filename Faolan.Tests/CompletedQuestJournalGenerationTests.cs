@@ -42,121 +42,121 @@ namespace Faolan.Tests
 			var first = "";
 
 			foreach (var (source, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
-			foreach (var rec in sub.Quests.Records)
-			{
-				if (rec.Objectives is not { Goals.Count: > 0 } captured)
-					continue;
-
-				if (!defs.TryGetValue(rec.QuestId, out var def) || def.Goals.Count == 0)
+				foreach (var rec in sub.Quests.Records)
 				{
-					skipped++;
-					continue;
-				}
+					if (rec.Objectives is not { Goals.Count: > 0 } captured)
+						continue;
 
-				// Goals carry the live player's instance; take it from the capture so only CONTENT is compared.
-				var instance = captured.Goals[0].Instance;
-				var built = QuestObjectiveRegion.Build(def, instance).ToArray();
-				var want = captured.ToArray();
-				compared++;
-				if (built.SequenceEqual(want))
-				{
-					exact++;
-					okByQuest.Add(rec.QuestId);
-					continue;
-				}
-
-				failByQuest[rec.QuestId] = failByQuest.GetValueOrDefault(rec.QuestId) + 1;
-
-				// Aggregate WHICH field differs, so the tail can be worked in priority order.
-				var rebuiltGoals = QuestObjectiveRegion.Parse(built, 0).Goals;
-				if (rebuiltGoals.Count != captured.Goals.Count)
-					Bump(fieldDiffs, "GOAL COUNT");
-				else
-				{
-					for (var gi = 0; gi < captured.Goals.Count; gi++)
+					if (!defs.TryGetValue(rec.QuestId, out var def) || def.Goals.Count == 0)
 					{
-						var c = captured.Goals[gi];
-						var b = rebuiltGoals[gi];
-						if (c.GoalId != b.GoalId)
-							Bump(fieldDiffs, "GoalId/order");
-						if (c.N != b.N)
-							Bump(fieldDiffs, "N");
-						if (c.K != b.K)
-							Bump(fieldDiffs, "K/separator");
-						if (c.SubId != b.SubId)
-							Bump(fieldDiffs, "SubId");
-						if (c.MapId != b.MapId)
-							Bump(fieldDiffs, "MapId");
-						if (c.MarkerX != b.MarkerX || c.MarkerY != b.MarkerY)
-							Bump(fieldDiffs, "Marker");
-						if (c.RequiredCount != b.RequiredCount)
-							Bump(fieldDiffs, "RequiredCount");
-						if (c.Unknown1 != b.Unknown1)
-							Bump(fieldDiffs, "Unknown1");
-						if (c.Unknown2 != b.Unknown2)
-							Bump(fieldDiffs, "Zero2");
-						if (c.Lead != b.Lead)
-							Bump(fieldDiffs, "Lead");
-						if (c.GoalIdRepeat != b.GoalIdRepeat)
-							Bump(fieldDiffs, "GoalIdRepeat");
-						if (!c.Reserved.SequenceEqual(b.Reserved))
-							Bump(fieldDiffs, "Reserved");
-						if (!c.Objective.SequenceEqual(b.Objective))
-							Bump(fieldDiffs, "Objective text");
-						if (!c.TextRecord.SequenceEqual(b.TextRecord))
-							Bump(fieldDiffs, "Trailing text");
+						skipped++;
+						continue;
+					}
+
+					// Goals carry the live player's instance; take it from the capture so only CONTENT is compared.
+					var instance = captured.Goals[0].Instance;
+					var built = QuestObjectiveRegion.Build(def, instance).ToArray();
+					var want = captured.ToArray();
+					compared++;
+					if (built.SequenceEqual(want))
+					{
+						exact++;
+						okByQuest.Add(rec.QuestId);
+						continue;
+					}
+
+					failByQuest[rec.QuestId] = failByQuest.GetValueOrDefault(rec.QuestId) + 1;
+
+					// Aggregate WHICH field differs, so the tail can be worked in priority order.
+					var rebuiltGoals = QuestObjectiveRegion.Parse(built, 0).Goals;
+					if (rebuiltGoals.Count != captured.Goals.Count)
+						Bump(fieldDiffs, "GOAL COUNT");
+					else
+					{
+						for (var gi = 0; gi < captured.Goals.Count; gi++)
+						{
+							var c = captured.Goals[gi];
+							var b = rebuiltGoals[gi];
+							if (c.GoalId != b.GoalId)
+								Bump(fieldDiffs, "GoalId/order");
+							if (c.N != b.N)
+								Bump(fieldDiffs, "N");
+							if (c.K != b.K)
+								Bump(fieldDiffs, "K/separator");
+							if (c.SubId != b.SubId)
+								Bump(fieldDiffs, "SubId");
+							if (c.MapId != b.MapId)
+								Bump(fieldDiffs, "MapId");
+							if (c.MarkerX != b.MarkerX || c.MarkerY != b.MarkerY)
+								Bump(fieldDiffs, "Marker");
+							if (c.RequiredCount != b.RequiredCount)
+								Bump(fieldDiffs, "RequiredCount");
+							if (c.Unknown1 != b.Unknown1)
+								Bump(fieldDiffs, "Unknown1");
+							if (c.Unknown2 != b.Unknown2)
+								Bump(fieldDiffs, "Zero2");
+							if (c.Lead != b.Lead)
+								Bump(fieldDiffs, "Lead");
+							if (c.GoalIdRepeat != b.GoalIdRepeat)
+								Bump(fieldDiffs, "GoalIdRepeat");
+							if (!c.Reserved.SequenceEqual(b.Reserved))
+								Bump(fieldDiffs, "Reserved");
+							if (!c.Objective.SequenceEqual(b.Objective))
+								Bump(fieldDiffs, "Objective text");
+							if (!c.TextRecord.SequenceEqual(b.TextRecord))
+								Bump(fieldDiffs, "Trailing text");
+						}
+					}
+
+					if (built.Length != want.Length)
+						lenDiff++;
+					else
+						sameLenDiff++;
+
+					if (shown < 4 && seenQuest.Add(rec.QuestId))
+					{
+						shown++;
+						first = "see log";
+						o.WriteLine($"  MISMATCH {source[..Math.Min(30, source.Length)]} quest {rec.QuestId}: built {built.Length} B vs captured {want.Length} B; " +
+									$"goals db={def.Goals.Count} cap={captured.Goals.Count}; builtGoalIds=[{string.Join(",", QuestObjectiveRegion.Parse(built, 0).Goals.Select(x => x.GoalId))}] capGoalIds=[{string.Join(",", captured.Goals.Select(x => x.GoalId))}]");
+						var rebuilt = QuestObjectiveRegion.Parse(built, 0);
+						for (var gi = 0; gi < captured.Goals.Count; gi++)
+						{
+							var cg = captured.Goals[gi];
+							var bg = rebuilt.Goals[gi];
+							o.WriteLine($"    goal{gi} id cap={cg.GoalId} got={bg.GoalId} | n cap={cg.N} got={bg.N} | k cap={cg.K} got={bg.K} | " +
+										$"sub cap={cg.SubId} got={bg.SubId} | map cap={cg.MapId} got={bg.MapId} | req cap={cg.RequiredCount} got={bg.RequiredCount} | " +
+										$"marker cap=({cg.MarkerX},{cg.MarkerY}) got=({bg.MarkerX},{bg.MarkerY})");
+							o.WriteLine($"      rest cap: lead={cg.Lead} rep={cg.GoalIdRepeat} inst={cg.Instance} z1={cg.Unknown1} z2={cg.Unknown2} res=[{string.Join(",", cg.Reserved)}]");
+							o.WriteLine($"      rest got: lead={bg.Lead} rep={bg.GoalIdRepeat} inst={bg.Instance} z1={bg.Unknown1} z2={bg.Unknown2} res=[{string.Join(",", bg.Reserved)}]");
+							if (!cg.Objective.SequenceEqual(bg.Objective))
+								o.WriteLine($"      OBJ cap={Encoding.Latin1.GetString(cg.Objective)}\n      OBJ got={Encoding.Latin1.GetString(bg.Objective)}");
+							if (!cg.TextRecord.SequenceEqual(bg.TextRecord))
+								o.WriteLine($"      TXT cap={Encoding.Latin1.GetString(cg.TextRecord)}\n      TXT got={Encoding.Latin1.GetString(bg.TextRecord)}");
+						}
 					}
 				}
-
-				if (built.Length != want.Length)
-					lenDiff++;
-				else
-					sameLenDiff++;
-
-				if (shown < 4 && seenQuest.Add(rec.QuestId))
-				{
-					shown++;
-					first = "see log";
-					o.WriteLine($"  MISMATCH {source[..Math.Min(30, source.Length)]} quest {rec.QuestId}: built {built.Length} B vs captured {want.Length} B; " +
-					            $"goals db={def.Goals.Count} cap={captured.Goals.Count}; builtGoalIds=[{string.Join(",", QuestObjectiveRegion.Parse(built, 0).Goals.Select(x => x.GoalId))}] capGoalIds=[{string.Join(",", captured.Goals.Select(x => x.GoalId))}]");
-					var rebuilt = QuestObjectiveRegion.Parse(built, 0);
-					for (var gi = 0; gi < captured.Goals.Count; gi++)
-					{
-						var cg = captured.Goals[gi];
-						var bg = rebuilt.Goals[gi];
-						o.WriteLine($"    goal{gi} id cap={cg.GoalId} got={bg.GoalId} | n cap={cg.N} got={bg.N} | k cap={cg.K} got={bg.K} | " +
-						            $"sub cap={cg.SubId} got={bg.SubId} | map cap={cg.MapId} got={bg.MapId} | req cap={cg.RequiredCount} got={bg.RequiredCount} | " +
-						            $"marker cap=({cg.MarkerX},{cg.MarkerY}) got=({bg.MarkerX},{bg.MarkerY})");
-						o.WriteLine($"      rest cap: lead={cg.Lead} rep={cg.GoalIdRepeat} inst={cg.Instance} z1={cg.Unknown1} z2={cg.Unknown2} res=[{string.Join(",", cg.Reserved)}]");
-						o.WriteLine($"      rest got: lead={bg.Lead} rep={bg.GoalIdRepeat} inst={bg.Instance} z1={bg.Unknown1} z2={bg.Unknown2} res=[{string.Join(",", bg.Reserved)}]");
-						if (!cg.Objective.SequenceEqual(bg.Objective))
-							o.WriteLine($"      OBJ cap={Encoding.Latin1.GetString(cg.Objective)}\n      OBJ got={Encoding.Latin1.GetString(bg.Objective)}");
-						if (!cg.TextRecord.SequenceEqual(bg.TextRecord))
-							o.WriteLine($"      TXT cap={Encoding.Latin1.GetString(cg.TextRecord)}\n      TXT got={Encoding.Latin1.GetString(bg.TextRecord)}");
-					}
-				}
-			}
 
 			// For each goal id, how do the captures spell its trailing record?
 			var spell = new Dictionary<uint, (int Localized, int Remote)>();
 			foreach (var (_, sub2, _) in CompletedQuestJournalTests.SubClassesForProbe())
-			foreach (var rec2 in sub2.Quests.Records)
-			{
-				if (rec2.Objectives is not { Goals.Count: > 0 } o2)
-					continue;
-
-				foreach (var g2 in o2.Goals)
+				foreach (var rec2 in sub2.Quests.Records)
 				{
-					var txt = Encoding.Latin1.GetString(g2.TextRecord);
-					var cur = spell.GetValueOrDefault(g2.GoalId);
-					spell[g2.GoalId] = txt.Contains("<localized")
-						? (cur.Localized + 1, cur.Remote)
-						: (cur.Localized, cur.Remote + 1);
+					if (rec2.Objectives is not { Goals.Count: > 0 } o2)
+						continue;
+
+					foreach (var g2 in o2.Goals)
+					{
+						var txt = Encoding.Latin1.GetString(g2.TextRecord);
+						var cur = spell.GetValueOrDefault(g2.GoalId);
+						spell[g2.GoalId] = txt.Contains("<localized")
+							? (cur.Localized + 1, cur.Remote)
+							: (cur.Localized, cur.Remote + 1);
+					}
 				}
-			}
 
 			o.WriteLine($"goals seen={spell.Count}  always-localized={spell.Count(k => k.Value.Remote == 0)}  " +
-			            $"always-remoteformat={spell.Count(k => k.Value.Localized == 0)}  MIXED={spell.Count(k => k.Value is { Localized: > 0, Remote: > 0 })}");
+						$"always-remoteformat={spell.Count(k => k.Value.Localized == 0)}  MIXED={spell.Count(k => k.Value is { Localized: > 0, Remote: > 0 })}");
 			foreach (var k in spell.Where(x => x.Key is 1448 or 3490))
 				o.WriteLine($"  goal {k.Key}: localized={k.Value.Localized} remoteformat={k.Value.Remote}");
 
@@ -164,33 +164,33 @@ namespace Faolan.Tests
 			// against every capture is impossible by construction and the gate must target the harvested source.
 			var tagVals = new Dictionary<uint, HashSet<string>>();
 			foreach (var (_, sub3, _) in CompletedQuestJournalTests.SubClassesForProbe())
-			foreach (var rec3 in sub3.Quests.Records)
-			{
-				if (rec3.Objectives is not { Goals.Count: > 0 } o3)
-					continue;
-
-				foreach (var g3 in o3.Goals)
+				foreach (var rec3 in sub3.Quests.Records)
 				{
-					var sig = $"{g3.Unknown1}|{g3.Unknown2}|{string.Join(",", g3.Reserved)}|{Encoding.Latin1.GetString(g3.TextRecord)}";
-					(tagVals.TryGetValue(g3.GoalId, out var set)
-						? set
-						: tagVals[g3.GoalId] = []).Add(sig);
+					if (rec3.Objectives is not { Goals.Count: > 0 } o3)
+						continue;
+
+					foreach (var g3 in o3.Goals)
+					{
+						var sig = $"{g3.Unknown1}|{g3.Unknown2}|{string.Join(",", g3.Reserved)}|{Encoding.Latin1.GetString(g3.TextRecord)}";
+						(tagVals.TryGetValue(g3.GoalId, out var set)
+							? set
+							: tagVals[g3.GoalId] = []).Add(sig);
+					}
 				}
-			}
 
 			o.WriteLine($"goals seen across captures={tagVals.Count}; goals whose zero1/zero2/reserved/text VARY: {tagVals.Count(k => k.Value.Count > 1)}");
 			var z1 = new Dictionary<uint, HashSet<uint>>();
 			foreach (var (_, sub4, _) in CompletedQuestJournalTests.SubClassesForProbe())
-			foreach (var rec4 in sub4.Quests.Records)
-			{
-				if (rec4.Objectives is not { Goals.Count: > 0 } o4)
-					continue;
+				foreach (var rec4 in sub4.Quests.Records)
+				{
+					if (rec4.Objectives is not { Goals.Count: > 0 } o4)
+						continue;
 
-				foreach (var g4 in o4.Goals)
-					(z1.TryGetValue(g4.GoalId, out var st)
-						? st
-						: z1[g4.GoalId] = []).Add(g4.Unknown1);
-			}
+					foreach (var g4 in o4.Goals)
+						(z1.TryGetValue(g4.GoalId, out var st)
+							? st
+							: z1[g4.GoalId] = []).Add(g4.Unknown1);
+				}
 
 			o.WriteLine($"  Zero1: nonzero on {z1.Count(k => k.Value.Any(v => v != 0))} of {z1.Count} goals; VARIES across captures on {z1.Count(k => k.Value.Count > 1)}");
 
@@ -204,32 +204,32 @@ namespace Faolan.Tests
 			var rptSamples = new List<string>();
 			var stableRpt = new Dictionary<uint, HashSet<uint>>();
 			foreach (var (_, sub5, _) in CompletedQuestJournalTests.SubClassesForProbe())
-			foreach (var rec5 in sub5.Quests.Records)
-			{
-				if (rec5.Objectives is not { Goals.Count: > 0 } o5)
-					continue;
-
-				foreach (var g5 in o5.Goals)
+				foreach (var rec5 in sub5.Quests.Records)
 				{
-					allGoals++;
-					if (g5.GoalIdRepeat == g5.GoalId)
-						rptEqualsGoal++;
-					else if (g5.GoalIdRepeat == rec5.QuestId)
-						rptEqualsQuest++;
-					else
-					{
-						rptOther++;
-						if (rptSamples.Count < 6)
-							rptSamples.Add($"quest {rec5.QuestId} goal {g5.GoalId}: repeat={g5.GoalIdRepeat} n={g5.N} k={g5.K} req={g5.RequiredCount} z2={g5.Unknown2}");
-					}
+					if (rec5.Objectives is not { Goals.Count: > 0 } o5)
+						continue;
 
-					if (g5.Unknown2 != 0)
-						z2NonZero++;
-					(stableRpt.TryGetValue(g5.GoalId, out var st5)
-						? st5
-						: stableRpt[g5.GoalId] = []).Add(g5.GoalIdRepeat);
+					foreach (var g5 in o5.Goals)
+					{
+						allGoals++;
+						if (g5.GoalIdRepeat == g5.GoalId)
+							rptEqualsGoal++;
+						else if (g5.GoalIdRepeat == rec5.QuestId)
+							rptEqualsQuest++;
+						else
+						{
+							rptOther++;
+							if (rptSamples.Count < 6)
+								rptSamples.Add($"quest {rec5.QuestId} goal {g5.GoalId}: repeat={g5.GoalIdRepeat} n={g5.N} k={g5.K} req={g5.RequiredCount} z2={g5.Unknown2}");
+						}
+
+						if (g5.Unknown2 != 0)
+							z2NonZero++;
+						(stableRpt.TryGetValue(g5.GoalId, out var st5)
+							? st5
+							: stableRpt[g5.GoalId] = []).Add(g5.GoalIdRepeat);
+					}
 				}
-			}
 
 			o.WriteLine(
 				$"GoalIdRepeat: ==GoalId {rptEqualsGoal}, ==QuestId {rptEqualsQuest}, other {rptOther} (of {allGoals}); VARIES per goal on {stableRpt.Count(k => k.Value.Count > 1)} of {stableRpt.Count}");
@@ -243,24 +243,24 @@ namespace Faolan.Tests
 			var u1vals = new HashSet<uint>();
 			var u2vals = new HashSet<uint>();
 			foreach (var (_, sub6, _) in CompletedQuestJournalTests.SubClassesForProbe())
-			foreach (var rec6 in sub6.Quests.Records)
-			{
-				if (rec6.Objectives is not { Goals.Count: > 0 } o6)
-					continue;
-
-				foreach (var g6 in o6.Goals)
+				foreach (var rec6 in sub6.Quests.Records)
 				{
-					seenG++;
-					u1max = Math.Max(u1max, g6.Unknown1);
-					u2max = Math.Max(u2max, g6.Unknown2);
-					if (g6.Unknown1 > 0xFF)
-						u1over++;
-					if (g6.Unknown2 > 0xFF)
-						u2over++;
-					u1vals.Add(g6.Unknown1);
-					u2vals.Add(g6.Unknown2);
+					if (rec6.Objectives is not { Goals.Count: > 0 } o6)
+						continue;
+
+					foreach (var g6 in o6.Goals)
+					{
+						seenG++;
+						u1max = Math.Max(u1max, g6.Unknown1);
+						u2max = Math.Max(u2max, g6.Unknown2);
+						if (g6.Unknown1 > 0xFF)
+							u1over++;
+						if (g6.Unknown2 > 0xFF)
+							u2over++;
+						u1vals.Add(g6.Unknown1);
+						u2vals.Add(g6.Unknown2);
+					}
 				}
-			}
 
 			o.WriteLine($"BYTES? goals={seenG} Unknown1 max={u1max} over255={u1over} distinct={u1vals.Count} [{string.Join(",", u1vals.OrderBy(v => v).Take(10))}]");
 			o.WriteLine($"BYTES? Unknown2 max={u2max} over255={u2over} distinct={u2vals.Count} [{string.Join(",", u2vals.OrderBy(v => v).Take(10))}]");
@@ -303,16 +303,6 @@ namespace Faolan.Tests
 				if (sub.QuestIndex is not { } captured || captured.QuestIds.Count == 0)
 					continue;
 
-				// Since #391 the index parses for EVERY captured journal, including multi-area ones whose per-quest
-				// sequences and trailer words are NOT modelled in the DB (they are carried on the wire, not stored).
-				// QuestIndexRegion.Build can only reproduce the "simple" beach shape - monotonic 1..n area sequences and
-				// a (1,0,0) block trailer - so restrict the byte-exact gate to those; the rest are generation follow-up
-				// (#389), not a builder defect. Their PARSE round-trip is still guarded by the corpus round-trip gate.
-				bool Generatable(QuestIndexRegion.Block b)
-				{
-					return b is { TrailerA: 1, TrailerB: 0, TrailerC: 0 } && (b.AreaQuestSequences.Count == 0 || b.AreaQuestSequences.Select((s, i) => s == (uint)(i + 1)).All(x => x));
-				}
-
 				// Multi-block (multi-quest) indexes are DB-generation follow-up (#389): the per-quest chain of leadArea
 				// ids and the area-catalog cross-references are only partially modelled, so Build does not yet reproduce
 				// them byte-exact even when each block's shape is generatable. Their PARSE round-trip is guarded by the
@@ -328,24 +318,6 @@ namespace Faolan.Tests
 				var ordered = captured.QuestIds.Select(defs.GetValueOrDefault).ToList();
 				if (ordered.Any(d => d == null))
 					continue; // catalog gap, not a builder failure
-
-				// Build reads the area's magic + full quest catalog from the DB. Where the importer has not harvested
-				// those (an area only ever seen through a character's ACTIVE quests), Build cannot reproduce the block -
-				// a DATA gap tracked by #389, not a builder defect. Skip an index unless the DB carries, for every
-				// block, the matching area magic and a catalog of the captured size.
-				bool DbComplete()
-				{
-					foreach (var blk in captured.Blocks)
-					{
-						var def = defs.GetValueOrDefault(blk.TrailerQuestId);
-						if (def == null || !areaRows.TryGetValue(def.AreaId, out var area) || area.Magic != blk.Magic)
-							return false;
-						if (!catalogs.TryGetValue(def.AreaId, out var cat) || cat.Count != blk.AreaQuestIds.Count)
-							return false;
-					}
-
-					return true;
-				}
 
 				if (!DbComplete())
 				{
@@ -366,8 +338,38 @@ namespace Faolan.Tests
 				{
 					var b = QuestIndexRegion.Parse(built, 0, built.Length);
 					first = $"{source}: {built.Length} B built vs {want.Length} B captured; " + $"block0 tf1={b.Blocks[0].TableField1}/{captured.Blocks[0].TableField1} " +
-					        $"tf2={b.Blocks[0].TableField2}/{captured.Blocks[0].TableField2} " + $"chain=0x{b.Blocks[0].ChainWord:X}/0x{captured.Blocks[0].ChainWord:X} " +
-					        $"areaQuests={b.Blocks[0].AreaQuestIds.Count}/{captured.Blocks[0].AreaQuestIds.Count}";
+							$"tf2={b.Blocks[0].TableField2}/{captured.Blocks[0].TableField2} " + $"chain=0x{b.Blocks[0].ChainWord:X}/0x{captured.Blocks[0].ChainWord:X} " +
+							$"areaQuests={b.Blocks[0].AreaQuestIds.Count}/{captured.Blocks[0].AreaQuestIds.Count}";
+				}
+
+				continue;
+
+				// Since #391 the index parses for EVERY captured journal, including multi-area ones whose per-quest
+				// sequences and trailer words are NOT modelled in the DB (they are carried on the wire, not stored).
+				// QuestIndexRegion.Build can only reproduce the "simple" beach shape - monotonic 1..n area sequences and
+				// a (1,0,0) block trailer - so restrict the byte-exact gate to those; the rest are generation follow-up
+				// (#389), not a builder defect. Their PARSE round-trip is still guarded by the corpus round-trip gate.
+				bool Generatable(QuestIndexRegion.Block b)
+				{
+					return b is { TrailerA: 1, TrailerB: 0, TrailerC: 0 } && (b.AreaQuestSequences.Count == 0 || b.AreaQuestSequences.Select((s, i) => s == (uint)(i + 1)).All(x => x));
+				}
+
+				// Build reads the area's magic + full quest catalog from the DB. Where the importer has not harvested
+				// those (an area only ever seen through a character's ACTIVE quests), Build cannot reproduce the block -
+				// a DATA gap tracked by #389, not a builder defect. Skip an index unless the DB carries, for every
+				// block, the matching area magic and a catalog of the captured size.
+				bool DbComplete()
+				{
+					foreach (var blk in captured.Blocks)
+					{
+						var def = defs.GetValueOrDefault(blk.TrailerQuestId);
+						if (def == null || !areaRows.TryGetValue(def.AreaId, out var area) || area.Magic != blk.Magic)
+							return false;
+						if (!catalogs.TryGetValue(def.AreaId, out var cat) || cat.Count != blk.AreaQuestIds.Count)
+							return false;
+					}
+
+					return true;
 				}
 			}
 
@@ -443,7 +445,7 @@ namespace Faolan.Tests
 
 					var g = region.Areas[a];
 					firstMismatch = $"{source}: area[{a}] id={g.AreaId} quests={g.Quests.Count} " + $"magic=0x{g.Magic:X8} seqs=[{string.Join(",", g.Quests.Take(5).Select(q => q.Sequence))}] " +
-					                $"({cap.Length} B captured vs {got.Length} B built)";
+									$"({cap.Length} B captured vs {got.Length} B built)";
 					break;
 				}
 			}

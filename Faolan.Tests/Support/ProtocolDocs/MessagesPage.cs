@@ -18,15 +18,6 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		{
 			var idx = CodecIndex.Build();
 
-			// The golden test method for an IIR type: the one belonging to a golden-backed codec that declares it.
-			string? GoldenMethod(string iir)
-			{
-				if (!idx.IirToCodecs.TryGetValue(iir, out var codecs))
-					return null;
-
-				return codecs.Where(c => idx.CodecGolden.GetValueOrDefault(c)).Select(c => idx.CodecGoldenMethod.GetValueOrDefault(c)).FirstOrDefault(m => m != null);
-			}
-
 			var rows = idx
 				.IirTypes.Select(t => (t.Name, t.Value, Level: idx.Level(t.Name), Golden: GoldenMethod(t.Name)))
 				.OrderBy(x => CodecIndex.Rank(x.Level))
@@ -76,6 +67,15 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("scan could not name to a single method (rare); its codec still has a golden per `coverage.md`.");
 			sb.AppendLine();
 			return sb.ToString();
+
+			// The golden test method for an IIR type: the one belonging to a golden-backed codec that declares it.
+			string? GoldenMethod(string iir)
+			{
+				if (!idx.IirToCodecs.TryGetValue(iir, out var codecs))
+					return null;
+
+				return codecs.Where(c => idx.CodecGolden.GetValueOrDefault(c)).Select(c => idx.CodecGoldenMethod.GetValueOrDefault(c)).FirstOrDefault(m => m != null);
+			}
 		}
 	}
 }

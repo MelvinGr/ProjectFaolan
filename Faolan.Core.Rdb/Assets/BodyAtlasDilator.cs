@@ -156,25 +156,7 @@ namespace Faolan.Core.Rdb.Assets
 			var ci = (2 * w + 2) * 4;
 			int br = rgba[ci], bg = rgba[ci + 1], bb = rgba[ci + 2];
 
-			bool IsGutter(int i)
-			{
-				var o = i * 4;
-				if (Math.Abs(rgba[o] - br) >= BackgroundTolerance || Math.Abs(rgba[o + 1] - bg) >= BackgroundTolerance || Math.Abs(rgba[o + 2] - bb) >= BackgroundTolerance)
-					return false;
-
-				return IsFlat(rgba, i, w, h);
-			}
-
 			var q = new Queue<int>();
-
-			void Seed(int i)
-			{
-				if (!gutter[i] && IsGutter(i))
-				{
-					gutter[i] = true;
-					q.Enqueue(i);
-				}
-			}
 
 			for (var x = 0; x < w; x++)
 			{
@@ -204,6 +186,24 @@ namespace Faolan.Core.Rdb.Assets
 			}
 
 			return gutter;
+
+			bool IsGutter(int i)
+			{
+				var o = i * 4;
+				if (Math.Abs(rgba[o] - br) >= BackgroundTolerance || Math.Abs(rgba[o + 1] - bg) >= BackgroundTolerance || Math.Abs(rgba[o + 2] - bb) >= BackgroundTolerance)
+					return false;
+
+				return IsFlat(rgba, i, w, h);
+			}
+
+			void Seed(int i)
+			{
+				if (!gutter[i] && IsGutter(i))
+				{
+					gutter[i] = true;
+					q.Enqueue(i);
+				}
+			}
 		}
 
 		// A pixel is "flat" when its 4-neighbourhood barely varies (max channel spread below a small threshold) - true of

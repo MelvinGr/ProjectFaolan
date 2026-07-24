@@ -69,7 +69,7 @@ namespace Faolan.GameServer.Economy
 			}
 
 			if (parts.Length is < 2 or > 3 || !parts[0].Equals("add", StringComparison.OrdinalIgnoreCase) ||
-			    !uint.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var itemId))
+				!uint.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var itemId))
 			{
 				await _chat.SendSystemMessage(characterId, "Usage: .claim add &lt;itemId&gt; [count]  |  .claim list");
 				return;
@@ -114,17 +114,17 @@ namespace Faolan.GameServer.Economy
 			switch (sub)
 			{
 				case CoreClaimListCodec.SubRequest: // 0x0007 - "send me my claims"
-					await SendClaimList(client);
-					break;
+				await SendClaimList(client);
+				break;
 
 				case CoreClaimListCodec.SubRedeem: // 0x0003 - redeem the 1-based claim index
-					var index = body.ReadUInt32();
-					await RedeemClaim(client, index);
-					break;
+				var index = body.ReadUInt32();
+				await RedeemClaim(client, index);
+				break;
 
 				default:
-					_logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", sub, body.Length);
-					break;
+				_logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", sub, body.Length);
+				break;
 			}
 		}
 
@@ -210,7 +210,7 @@ namespace Faolan.GameServer.Economy
 		// Push the "new claims available" glow (sub 0x0009) at world entry, but only when the account has UNSEEN claims
 		// (Account.ClaimsAvailable) - retail sends this on a fresh login with new claims and omits it once viewed. The
 		// session account is loaded at login, so the flag is current here.
-		public async Task SendNewClaimsGlowIfAny(INetworkClient client)
+		public static async Task SendNewClaimsGlowIfAny(INetworkClient client)
 		{
 			if (!client.Session.Account.ClaimsAvailable)
 				return;

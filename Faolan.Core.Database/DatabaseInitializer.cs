@@ -4,7 +4,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
-namespace Faolan.Core.Database.Helpers
+namespace Faolan.Core.Database
 {
 	// Brings a database up to a runnable state: migrate to the latest schema for the active provider, then ensure the
 	// default realm + account exist. Shared by the server (DatabaseMigrator) and the importer so a fresh DB is brought

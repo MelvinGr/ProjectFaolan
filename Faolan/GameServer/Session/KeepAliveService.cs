@@ -33,7 +33,7 @@ namespace Faolan.GameServer.Session
 			var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
 
 			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchPong, new byte[] { 0x01 },
+				GameCharInterfaceOpcodes.DispatchPong, (byte[])[0x01],
 				b => b.WriteUInt32(counter).WriteUInt32(0x00000012).WriteUInt32(tick)));
 		}
 

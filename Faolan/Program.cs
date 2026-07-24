@@ -7,8 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.ChatServer;
 using Faolan.Core;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
-using Faolan.Core.Database.Helpers;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
@@ -46,60 +46,7 @@ namespace Faolan
 			Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
 			Console.WriteLine(Global.StartupBanner);
 
-			// Config sources (highest precedence wins): environment variables > command line > faolan.json. faolan.json
-			// is OPTIONAL - a container can be configured entirely by env vars (e.g. DatabaseProvider /
-			// DatabaseConnectionString) with no file baked in. Applied to a throwaway config below (to shape the host)
-			// and to the host builder's own configuration identically.
-			void AddConfigSources(IConfigurationBuilder cfg) => cfg
-				.AddJsonFile(Path.GetFullPath("faolan.json"), optional: true) // absolute (CWD-rooted), so no SetBasePath needed
-				.AddCommandLine(args)
-				.AddEnvironmentVariables();
-
-			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
-			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):
-			//   --role login       -> the shared login/router tier (UniverseAgent + PlayerAgent); owns no world.
-			//   --role realm=<id>  -> a game host for ONE realm (GameServer + realm-local chat + guilds), bound to that
-			//                         realm's ports; the login tier routes players to it (SendGameServer/ChatServer/CsPlayerAgent).
-			//   --role realm       -> the same, for the first realm (id omitted).
-			//   (no --role)        -> all-in-one: login + a game host for the first realm (the historical dev run).
-			// At most ONE realm role per process: co-hosting several realms in one process would share the chat/world
-			// dispatchers + session aggregation across realms (a cross-realm leak) - that's what separate processes avoid.
-			// Parsed from argv up front (before the host is built) because the host SHAPE depends on it - see runMcp below.
-			var roles = CollectRoleArgs(args); // repeated --role values, parsed from argv (config binding keeps only the last)
-			uint? selectedRealmId = null;
-			bool runLogin = false, runRealm = false;
-			if (roles.Count == 0)
-				runLogin = runRealm = true; // default: all-in-one (dev)
-			else
-			{
-				foreach (var role in roles)
-				{
-					if (role.Equals("login", StringComparison.OrdinalIgnoreCase))
-						runLogin = true;
-					else if (role.Equals("realm", StringComparison.OrdinalIgnoreCase) || role.StartsWith("realm=", StringComparison.OrdinalIgnoreCase))
-					{
-						if (runRealm)
-							throw new Exception("at most one 'realm' role per process - co-hosting realms would leak chat/session state across them; run one process per realm.");
-
-						runRealm = true;
-						var eq = role.IndexOf('=');
-						if (eq >= 0)
-							selectedRealmId = uint.Parse(role[(eq + 1)..], CultureInfo.InvariantCulture);
-					}
-					else
-						throw new Exception($"--role must be 'login' or 'realm[=<id>]', got '{role}'.");
-				}
-			}
-
-			// The in-process MCP server (streamable HTTP on a localhost port) is the ONLY thing here that needs a web
-			// server. It runs only for a realm host and only when enabled, so we pick the host shape accordingly: a
-			// WebApplication (Kestrel) when MCP runs - mapping the endpoint straight onto that host, sharing its DI so the
-			// tools resolve the live singletons directly (no nested host, no by-instance re-import) - and a plain generic
-			// host otherwise, so a login-only / MCP-off process stays web-server-free (no stray bound port). McpEnabled is
-			// read from a throwaway config; the builder's own configuration is set up identically just below.
-			var preConfig = new ConfigurationBuilder();
-			AddConfigSources(preConfig);
-			var runMcp = runRealm && preConfig.Build().McpEnabled;
+			var (realmId, runLogin, runRealm, runMcp) = GetRunInfo(args);
 
 			IHostApplicationBuilder builder = runMcp
 				? WebApplication.CreateBuilder(args)
@@ -109,8 +56,8 @@ namespace Faolan
 				builder.Environment.EnvironmentName = "Development";
 
 			// Sources are cleared first so the precedence is exactly env > cmdline > json (no appsettings.json in the mix).
-			builder.Configuration.Sources.Clear();
-			AddConfigSources(builder.Configuration);
+			//builder.Configuration.Sources.Clear();
+			AddConfigSources(builder.Configuration, args);
 
 			// Packet trace bytes: each packet logs on a single line; set Log:PacketBytes false (faolan.json "Log": {
 			// "PacketBytes": false }, or --Log:PacketBytes false) to drop the raw headerData/body hex dump.
@@ -119,8 +66,8 @@ namespace Faolan
 			builder.Logging.SetMinimumLevel(Global.IsDebug
 				? LogLevel.Debug
 				: LogLevel.Information);
-			builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
 
+			builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
 			builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
 			builder.Logging.AddFilter("ModelContextProtocol.Server.McpServer", LogLevel.Warning);
 
@@ -130,18 +77,8 @@ namespace Faolan
 				options.SingleLine = true;
 			});
 
-			// Mirror the console log to a file. LogFile config (env > cmdline > json) sets the location; default is
-			// faolan.log in the CWD (repo root), rewritten each start. Point it at a mounted volume in a container.
 			builder.Logging.AddProvider(new FileLoggerProvider(builder.Configuration.LogFile));
 
-			// Bring the DB up, then resolve the realm this process hosts - both BEFORE the host is built, on one
-			// context, for every role. This is the whole migrate+seed story: there is no migration hosted service,
-			// because a hosted service would be too late for the realm lookup below. The Realm row is the single
-			// source of truth for the bind ports (so the world/chat/guild listeners bind exactly what the login tier
-			// advertises - SendGameServer/ChatServer/CsPlayerAgent), and those ports are needed at listener
-			// CONSTRUCTION (ServerBase builds its TcpListener in the ctor) while the host constructs every hosted
-			// service before starting any. Doing it here instead is strictly stronger than ordering hosted services:
-			// the schema is current before the host object even exists.
 			Realm? hostRealm = null;
 			try
 			{
@@ -157,13 +94,13 @@ namespace Faolan
 
 				if (runRealm)
 				{
-					hostRealm = selectedRealmId.HasValue
-						? db.Realms.FirstOrDefault(r => r.Id == selectedRealmId.Value)
+					hostRealm = realmId.HasValue
+						? db.Realms.FirstOrDefault(r => r.Id == realmId.Value)
 						: db.Realms.OrderBy(r => r.Id).FirstOrDefault();
 					// Only reachable for an explicit id - the no-id branch always finds a realm, since the seed above
 					// inserts the default one when the table is empty.
 					if (hostRealm == null)
-						throw new Exception($"--role realm={selectedRealmId}: no such realm in the DB (add the Realm row, or omit the id to host the first one).");
+						throw new Exception($"--role realm={realmId}: no such realm in the DB (add the Realm row, or omit the id to host the first one).");
 				}
 			}
 			catch (Exception ex)
@@ -220,8 +157,8 @@ namespace Faolan
 					var agentServerDispatcher = provider.GetRequiredService<IChatServerDispatcher>();
 					var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
 
-					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealm!.Id}"), configuration, dataRepository, hostRealm!, agentServerDispatcher,
-						gameServerDispatcher);
+					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealm!.Id}"), configuration, dataRepository, hostRealm!,
+						agentServerDispatcher, gameServerDispatcher);
 				});
 
 				// Registered LAST so it starts after the listeners (Online = the host is up) and, since hosted services
@@ -239,13 +176,40 @@ namespace Faolan
 				await app.RunAsync();
 			}
 			else
-				await ((HostApplicationBuilder)builder).Build().RunAsync();
+			{
+				var app = ((HostApplicationBuilder)builder).Build();
+				await app.RunAsync();
+			}
 		}
 
-		// All --role values from argv (the option is repeatable: `--role login --role realm=2`). The config binder keeps
-		// only the LAST value for a repeated key, so the roles are parsed straight from argv. Handles `--role X` and `--role=X`.
-		private static List<string> CollectRoleArgs(string[] args)
+		private static void AddConfigSources(IConfigurationBuilder cfg, string[] args)
 		{
+			// Config sources (highest precedence wins): environment variables > command line > faolan.json. faolan.json
+			// is OPTIONAL - a container can be configured entirely by env vars (e.g. DatabaseProvider /
+			// DatabaseConnectionString) with no file baked in. Applied to a throwaway config below (to shape the host)
+			// and to the host builder's own configuration identically.
+
+			cfg
+				.AddJsonFile(Path.GetFullPath("faolan.json"), true) // absolute (CWD-rooted), so no SetBasePath needed
+				.AddCommandLine(args)
+				.AddEnvironmentVariables();
+		}
+
+		private static (uint? realmId, bool runLogin, bool runRealm, bool runMcp) GetRunInfo(string[] args)
+		{
+			// Process ROLE (multi-realm / process-per-realm, #324). --role is REPEATABLE, so one process can compose
+			// roles (e.g. `--role login --role realm=2` = login + realm 2 in one process):
+			//   --role login       -> the shared login/router tier (UniverseAgent + PlayerAgent); owns no world.
+			//   --role realm=<id>  -> a game host for ONE realm (GameServer + realm-local chat + guilds), bound to that
+			//                         realm's ports; the login tier routes players to it (SendGameServer/ChatServer/CsPlayerAgent).
+			//   --role realm       -> the same, for the first realm (id omitted).
+			//   (no --role)        -> all-in-one: login + a game host for the first realm (the historical dev run).
+			// At most ONE realm role per process: co-hosting several realms in one process would share the chat/world
+			// dispatchers + session aggregation across realms (a cross-realm leak) - that's what separate processes avoid.
+			// Parsed from argv up front (before the host is built) because the host SHAPE depends on it - see runMcp below.
+
+			// All --role values from argv (the option is repeatable: `--role login --role realm=2`). The config binder keeps
+			// only the LAST value for a repeated key, so the roles are parsed straight from argv. Handles `--role X` and `--role=X`.
 			var roles = new List<string>();
 			for (var i = 0; i < args.Length; i++)
 			{
@@ -255,7 +219,41 @@ namespace Faolan
 					roles.Add(args[i]["--role=".Length..]);
 			}
 
-			return roles;
+			uint? selectedRealmId = null;
+			bool runLogin = false, runRealm = false;
+			if (roles.Count == 0)
+				runLogin = runRealm = true; // default: all-in-one (dev)
+			else
+			{
+				foreach (var role in roles)
+				{
+					if (role.Equals("login", StringComparison.OrdinalIgnoreCase))
+						runLogin = true;
+					else if (role.Equals("realm", StringComparison.OrdinalIgnoreCase) || role.StartsWith("realm=", StringComparison.OrdinalIgnoreCase))
+					{
+						if (runRealm)
+							throw new Exception("At most one 'realm' role per process!");
+
+						runRealm = true;
+						var eq = role.IndexOf('=');
+						if (eq >= 0)
+							selectedRealmId = uint.Parse(role[(eq + 1)..], CultureInfo.InvariantCulture);
+					}
+					else
+						throw new Exception($"--role must be 'login' or 'realm[=<id>]', got '{role}'.");
+				}
+			}
+
+			// The in-process MCP server (streamable HTTP on a localhost port) is the ONLY thing here that needs a web
+			// server. It runs only for a realm host and only when enabled, so we pick the host shape accordingly: a
+			// WebApplication (Kestrel) when MCP runs - mapping the endpoint straight onto that host, sharing its DI so the
+			// tools resolve the live singletons directly (no nested host, no by-instance re-import) - and a plain generic
+			// host otherwise, so a login-only / MCP-off process stays web-server-free (no stray bound port). McpEnabled is
+			// read from a throwaway config; the builder's own configuration is set up identically just below.
+			var preConfig = new ConfigurationBuilder();
+			AddConfigSources(preConfig, args);
+			var runMcp = runRealm && preConfig.Build().McpEnabled;
+			return (selectedRealmId, runLogin, runRealm, runMcp);
 		}
 	}
 }

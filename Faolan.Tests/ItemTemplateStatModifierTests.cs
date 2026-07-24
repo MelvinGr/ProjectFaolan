@@ -38,11 +38,13 @@ namespace Faolan.Tests
 			Assert.Equal(0x35du, mods[2].StatId); // Magic Damage
 			Assert.Equal(5200u, mods[2].WireAmount);
 
-			// ...and each divided by its wire scale reproduces the displayed tooltip value.
-			int Display(uint statId) => (int)(mods.First(m => m.StatId == statId).WireAmount / ((CharacterStatId)statId).GetScale());
 			Assert.Equal(15, Display(0x136)); // +15 Hit Rating (×1)
 			Assert.Equal(30, Display((uint)CharacterStatId.Constitution)); // +30 Constitution (×10)
 			Assert.Equal(52, Display(0x35d)); // +52 Magic Damage (×100)
+			return;
+
+			// ...and each divided by its wire scale reproduces the displayed tooltip value.
+			int Display(uint statId) => (int)(mods.First(m => m.StatId == statId).WireAmount / ((CharacterStatId)statId).GetScale());
 		}
 
 		[Fact]
