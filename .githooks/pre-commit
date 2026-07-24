@@ -3,6 +3,20 @@
 # reviewable mirror of it - and the thing that eventually REPLACES it, when the schema+seed move to a real
 # database and the binary is dropped. Running both in parallel means the migration is a deletion, not a port.
 #
+# DATA ONLY (`.dump --data-only`) - no CREATE TABLE/INDEX/TRIGGER. The SCHEMA has exactly one owner, the EF
+# migrations in Faolan.Core.Database.Migrations.{Sqlite,Postgres}; mirroring it here as well made every column
+# change show up twice in review and invited the dump to drift into a second, unapplied source of truth. So this
+# file answers "what game CONTENT changed", and the migrations answer "what shape is it".
+#
+# ⚠️ CONSEQUENCE - this dump is NOT a portable restore. `.dump --data-only` writes POSITIONAL inserts
+# (`INSERT INTO T VALUES(...)`, no column list), so it only loads into a schema whose column ORDER matches the db
+# it came from. That is not the same as a freshly migrated schema: EF's SQLite table rebuilds re-emit columns
+# alphabetically, so 55 of 73 tables in the committed faolan.db are already ordered differently from what
+# `InitialCreate` produces - loading this into a fresh `dotnet ef database update` db fails on ~26k rows with NOT
+# NULL/CHECK violations as values land in the wrong columns. faolan.db stays the restorable artifact; faolan.sql is
+# the REVIEW artifact. (If it ever has to restore, the fix is emitting a column list per row - correct anywhere,
+# but it doubles the file: 22 MB vs 11 MB.)
+#
 # Regenerates ONLY when faolan.db is actually being committed, so a normal code commit costs nothing and the
 # server's session writes (character positions, timestamps) never churn the dump on their own.
 #
@@ -10,7 +24,7 @@
 # than you are committing, and under WAL it can LAG its -wal sidecar - so dumping the file could silently mirror
 # something that is not what lands in the commit. `git show :faolan.db` is exactly what is being committed.
 #
-# CHARACTERS ARE EXCLUDED - their schema is dumped, their rows are not. They are per-developer play state, not
+# CHARACTERS ARE EXCLUDED - none of their rows are dumped. They are per-developer play state, not
 # reference content: position, vitals, quest progress and inventory move every session, and the imported reference
 # characters are reproducible at any time (`--only characters,character-state,learned-spells,character-abilities,
 # character-quests,character-bank`). Keeping them out is what makes faolan.sql a reviewable diff of game DATA
@@ -26,6 +40,14 @@ git diff --cached --name-only | grep -qx 'faolan.db' || exit 0
 if ! command -v sqlite3 >/dev/null 2>&1; then
 	echo "pre-commit: sqlite3 not found - faolan.sql would go stale against faolan.db. Install sqlite3, or" >&2
 	echo "            commit with --no-verify if you know the dump is already current." >&2
+	exit 1
+fi
+
+# `.dump --data-only` needs sqlite 3.41+ (2023-02). An older CLI treats it as an unknown option and writes
+# NOTHING to stdout, which would silently commit an empty faolan.sql - so fail loudly instead.
+if ! sqlite3 :memory: ".dump --data-only" >/dev/null 2>&1; then
+	echo "pre-commit: this sqlite3 ($(sqlite3 --version | cut -d' ' -f1)) has no '.dump --data-only' - it needs 3.41+," >&2
+	echo "            and older versions emit an EMPTY dump rather than failing. Upgrade sqlite3." >&2
 	exit 1
 fi
 
@@ -57,12 +79,22 @@ for t in $char_tables; do
 	sqlite3 "$tmp" "DELETE FROM sqlite_sequence WHERE name = '$t';"
 done
 
-# Drop `CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq)`: SQLite REJECTS it on restore ("object name reserved
-# for internal use") because it owns that table - it materialises automatically with the first AUTOINCREMENT table.
-# Everything else about it survives (the DELETE/INSERTs that follow restore all 33 counters identically), so this
-# line does nothing but make a restore spit a parse error. Verified: with it gone the dump restores silently to a
-# byte-identical schema and row counts.
-sqlite3 "$tmp" .dump | sed '/^CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq);$/d' > faolan.sql
+# The transaction wrapper is OURS to add: a full `.dump` emits `PRAGMA foreign_keys=OFF; BEGIN TRANSACTION; ...
+# COMMIT;` around itself, `.dump --data-only` emits neither. Both halves matter. The INSERTs come out in
+# sqlite_master order (CharacterAttributes long before Characters), so under an FK-enforcing connection - which
+# is anyone with `PRAGMA foreign_keys = ON` in their ~/.sqliterc - a bare data-only dump fails on its second
+# statement; and one transaction turns ~108k separate commits into one.
+#
+# The one CREATE that survives --data-only is `CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq)`, emitted
+# alongside the AUTOINCREMENT counters. SQLite REJECTS it on restore ("object name reserved for internal use")
+# because it owns that table - it materialises with the first AUTOINCREMENT table - so it is dropped here.
+# The INSERTs into sqlite_sequence that follow it are kept (26 of them - the character tables' counters were deleted above).
+{
+	echo "PRAGMA foreign_keys=OFF;"
+	echo "BEGIN TRANSACTION;"
+	sqlite3 "$tmp" ".dump --data-only" | sed '/^CREATE TABLE IF NOT EXISTS sqlite_sequence(name,seq);$/d'
+	echo "COMMIT;"
+} > faolan.sql
 
 git add faolan.sql
 echo "pre-commit: regenerated faolan.sql from the staged faolan.db, characters excluded ($(wc -l < faolan.sql) lines)"
