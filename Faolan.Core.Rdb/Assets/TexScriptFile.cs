@@ -29,16 +29,14 @@ namespace Faolan.Core.Rdb.Assets
 
 		public static TexScriptFile Parse(uint id, byte[] decompressed)
 		{
-			var text = Encoding.Latin1.GetString(decompressed);
-			var start = text.IndexOf("<texscript", StringComparison.Ordinal);
-			var end = text.LastIndexOf('>');
-			if (start < 0 || end <= start)
+			var xml = RdbXml.Carve(Encoding.Latin1.GetString(decompressed), "texscript");
+			if (xml == null)
 				return new TexScriptFile(id, null, 0, default);
 
 			XElement root;
 			try
 			{
-				root = XElement.Parse(text.Substring(start, end - start + 1));
+				root = XElement.Parse(xml);
 			}
 			catch
 			{

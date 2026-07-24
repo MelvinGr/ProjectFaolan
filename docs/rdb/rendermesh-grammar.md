@@ -1,6 +1,17 @@
 # RenderMesh geometry grammar (RDB type 1010001) — #275 Phase 1
 
-The geometry blob a `MESHINDEXFILE` (type 1010030) points at via `<RenderMesh file="ID"/>`. This is the format the
+The geometry blob a `MESHINDEXFILE` (type 1010030) points at via `<RenderMesh file="ID"/>`.
+
+> ⚠️ **The manifest comes in two forms and its XML must be carved by ROOT TAG.** Of the 29,854 type-1010030
+> records, **28,337** are the `<MeshIndexFile>` XML and **1,501** are an older LINE-ORIENTED export carrying the
+> same fields (`Source: <path>` / `RenderMesh: <id>` / `CollisionMesh: <id>` / `OccluderMesh: <id>`, no materials);
+> the remaining 25 are header-only stubs or binary records misfiled under the type. `MeshIndexFile.Parse` reads
+> both, and anchors the XML on `<MeshIndexFile` via `RdbXml.Carve` — anchoring on the **first `<`** landed inside
+> the binary 12-byte RDB-Id header whenever one of its bytes was `0x3C`, which silently emptied **1,693** manifests
+> (a data-dependent failure: the record parsed or not depending on its own id). Parsed coverage went
+> **26,644 → 29,829**.
+
+This is the format the
 #275 feasibility ticket called the "hard blocker"; it is now **decoded and validated** (decode-first dissector:
 `tools/capture/decode_rendermesh.py`) and ported to C# — `RenderMeshReader`
 (`Faolan.Core.Rdb/Assets/RenderMeshReader.cs`), which drives the `GlbWriter` → glTF pipeline into the Blazor viewer.

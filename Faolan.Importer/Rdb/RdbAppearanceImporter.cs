@@ -37,13 +37,17 @@ namespace Faolan.Importer.Rdb
 			}
 
 			var bytes = rdb.ReadDecompressed(entry);
-			var start = Array.IndexOf(bytes, (byte)'<');
-			var root = XDocument.Parse(Encoding.UTF8.GetString(bytes, start < 0
-					? 0
-					: start, bytes.Length - (start < 0
-					? 0
-					: start)))
-				.Root!;
+
+			// Carve by ROOT TAG, not from the first '<': the 12-byte RDB-Id header ahead of the XML is binary and can
+			// contain a 0x3C byte, which would anchor the parse inside it (see RdbXml).
+			var xml = RdbXml.Carve(Encoding.UTF8.GetString(bytes), "root");
+			if (xml == null)
+			{
+				Console.WriteLine($"RDB appearance: CHARACTERCREATOR {entry.Id} has no <root> element; skipping.");
+				return 0;
+			}
+
+			var root = XElement.Parse(xml);
 
 			// name= of a referenced RDB resource (cached; the same texscript is shared across races).
 			var nameCache = new Dictionary<(uint, uint), string?>();

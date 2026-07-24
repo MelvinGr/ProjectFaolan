@@ -45,7 +45,7 @@ namespace Faolan.Importer.Rdb
 				if (body.Length == 0) // CDN miss (404 / proxy down)
 					continue;
 
-				var xml = CarveComboXml(Encoding.UTF8.GetString(body));
+				var xml = RdbXml.Carve(Encoding.UTF8.GetString(body), "combo");
 				if (xml == null)
 					continue;
 
@@ -90,30 +90,6 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 			logger?.LogInformation("RdbComboImporter: {Seen} combo XML entries parsed, {Imported} combos imported.", seen, imported);
 			return (seen, imported);
-		}
-
-		// Carves the `<combo>` root out of an RDB 1010206 body, or null if there is none. The body carries a header
-		// before the element and padding after it, so a strict parse of the whole text fails.
-		//
-		// BOTH element forms occur and BOTH are real combos: a combo with `<action>` children closes with `</combo>`
-		// (593 entries), one with no actions is written SELF-CLOSING `<combo ... />` (151 entries - the bow attacks
-		// Freefireattack/Sniperattack, firebreath, PowerAttack, Bladestorm, the racial dance emotes). Requiring
-		// `</combo>` dropped those 151 silently, which is what made #313's 0x00416541..49 block look "cataloged
-		// nowhere in faolan.db" and sent that issue looking for a TEA-encrypted RDB type that was never involved.
-		public static string? CarveComboXml(string text)
-		{
-			var start = text.IndexOf("<combo", StringComparison.Ordinal);
-			if (start < 0)
-				return null;
-
-			var close = text.IndexOf("</combo>", start, StringComparison.Ordinal);
-			if (close >= 0)
-				return text[start..(close + "</combo>".Length)];
-
-			var self = text.IndexOf("/>", start, StringComparison.Ordinal);
-			return self < 0
-				? null
-				: text[start..(self + 2)];
 		}
 
 		private static uint ParseUint(XElement el, string attr)

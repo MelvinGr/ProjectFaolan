@@ -14,7 +14,13 @@ namespace Faolan.Core.Rdb.Assets
 	// Gitea #275); this manifest is the plain-XML graph that lets us resolve a model's textures + the geometry id to load.
 	//
 	// Record layout: 12-byte RDB-Id header (type,id,marker) then the raw XML (no <?xml?> decl in most records, and the
-	// file paths carry Windows backslashes inside attribute values, which is valid XML). We parse from the first '<'.
+	// file paths carry Windows backslashes inside attribute values, which is valid XML). The element is carved by ROOT
+	// TAG (RdbXml.Carve) - anchoring on the first '<' latched onto a 0x3C byte inside the binary header and lost 1,693
+	// of the 29,854 manifests.
+	//
+	// A minority of records (1,501) are not XML at all but an older LINE-ORIENTED manifest carrying the same fields
+	// (`Source: <path>` / `RenderMesh: <id>` / `CollisionMesh: <id>` / `OccluderMesh: <id>`); ParseTextForm reads those,
+	// so a caller sees one record shape regardless of which the exporter wrote.
 	public sealed record MeshIndexFile(uint Id, string? SourceFile, uint? RenderMeshId, BoundingBox? Bounds, uint? CollisionMeshId, IReadOnlyList<MeshMaterial> Materials)
 	{
 		// The texture resources referenced anywhere in this model's materials, de-duplicated, in first-seen order.
@@ -26,17 +32,15 @@ namespace Faolan.Core.Rdb.Assets
 
 		public static MeshIndexFile Parse(uint id, ReadOnlySpan<byte> decompressed)
 		{
-			// Strip the 12-byte RDB-Id header (if present) and any trailing padding by clipping to the XML span.
 			var text = Encoding.Latin1.GetString(decompressed);
-			var start = text.IndexOf('<');
-			var end = text.LastIndexOf('>');
-			if (start < 0 || end <= start)
-				return new MeshIndexFile(id, null, null, null, null, []);
+			var xml = RdbXml.Carve(text, "MeshIndexFile");
+			if (xml == null)
+				return ParseTextForm(id, text);
 
 			XElement root;
 			try
 			{
-				root = XElement.Parse(text.Substring(start, end - start + 1));
+				root = XElement.Parse(xml);
 			}
 			catch
 			{
@@ -62,6 +66,38 @@ namespace Faolan.Core.Rdb.Assets
 			{
 				Skinned = skinned
 			};
+		}
+
+		// The older line-oriented manifest form: `Source: <path>`, then one `<Kind>: <rdb id>` line per referenced blob
+		// (RenderMesh / CollisionMesh / OccluderMesh; a record can list several RenderMesh lines - the first is the
+		// model). It carries no bounds and no materials, so the texture graph is simply unavailable for these records
+		// rather than wrong. Returns an empty record when the text is neither form.
+		private static MeshIndexFile ParseTextForm(uint id, string text)
+		{
+			string? source = null;
+			uint? renderMeshId = null;
+			uint? collisionId = null;
+
+			foreach (var raw in text.Split('\n'))
+			{
+				var line = raw.Trim('\r', ' ', '\t', '\0');
+				var colon = line.IndexOf(": ", StringComparison.Ordinal);
+				if (colon <= 0)
+					continue;
+
+				var key = line[..colon];
+				var value = line[(colon + 2)..].Trim();
+
+				// The first line still carries the binary RDB-Id header ahead of "Source", so match on the suffix.
+				if (key.EndsWith("Source", StringComparison.Ordinal))
+					source = value;
+				else if (key.EndsWith("RenderMesh", StringComparison.Ordinal) && renderMeshId == null && uint.TryParse(value, out var rm))
+					renderMeshId = rm;
+				else if (key.EndsWith("CollisionMesh", StringComparison.Ordinal) && collisionId == null && uint.TryParse(value, out var cm))
+					collisionId = cm;
+			}
+
+			return new MeshIndexFile(id, source, renderMeshId, null, collisionId, []);
 		}
 
 		private static MeshMaterial ParseMaterial(XElement el)

@@ -21,18 +21,16 @@ namespace Faolan.Core.Rdb.Assets
 
 		public static MonsterDataFile Parse(uint id, byte[] decompressed)
 		{
-			var text = Encoding.Latin1.GetString(decompressed);
-			var start = text.IndexOf('<', text.IndexOf("<monsterdata", StringComparison.Ordinal) is var i && i >= 0
-				? i
-				: 0);
-			var end = text.LastIndexOf('>');
-			if (start < 0 || end <= start)
+			// A handful of 1010201 entries are a DIFFERENT document (<animsys>); Carve returns null for those rather
+			// than falling back to the first '<' and handing the parser the binary RDB-Id header.
+			var xml = RdbXml.Carve(Encoding.Latin1.GetString(decompressed), "monsterdata");
+			if (xml == null)
 				return new MonsterDataFile(id, null, null, []);
 
 			XElement root;
 			try
 			{
-				root = XElement.Parse(text.Substring(start, end - start + 1));
+				root = XElement.Parse(xml);
 			}
 			catch
 			{

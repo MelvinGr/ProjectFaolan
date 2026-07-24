@@ -33,7 +33,7 @@ resolves the blend + a backlash roll on deactivate.
   (`Freefireattack`, `Sniperattack`), `firebreath`, `PowerAttack`, `Bladestorm`, the racial dance emotes. The carve
   used to require a `</combo>` and skipped them silently, which is what made #313 read the
   `0x00416541..0x00416549` block as "cataloged nowhere in faolan.db" and hunt for a TEA-encrypted RDB type that was
-  never involved. `RdbComboImporter.CarveComboXml` handles both forms (`RdbComboXmlTests`).
+  never involved. `RdbXml.Carve` handles both forms, for every RDB XML reader (`RdbXmlCarveTests`).
 - **`ClassCombo`** access map — `(Class, ComboId, Level)`, derived from the `Combos` name prefix
   (`CaptureAbilityImporter.DeriveClassCombosAsync`): the 8 literal class-name prefixes = the 8 archetypes that have
   combos. Validated by Hakotep's HoX `0x2076` combo book. 292 rows; casters empty.
