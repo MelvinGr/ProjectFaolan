@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Faolan.Core.Network.Server.GameServer
@@ -12,73 +10,41 @@ namespace Faolan.Core.Network.Server.GameServer
 	}
 
 	/// <summary>
-	///     Single-provider dispatcher, mirroring <see cref="ChatServer.ChatServerDispatcher" />: a process hosts
-	///     at most ONE realm (<c>--role realm=&lt;id&gt;</c>, #324) and that realm has exactly one GameServer
-	///     listener, so every call forwards straight to it. Multi-realm is process-per-realm, never
-	///     listener-per-realm - so there is nothing to aggregate or route between here.
+	///     The <see cref="ProviderDispatcher{TProvider}" /> slot for the world listener: every op forwards to the
+	///     one registered GameServer listener, or answers empty when none is running.
 	/// </summary>
-	public sealed class GameServerDispatcher : IGameServerDispatcher
+	public sealed class GameServerDispatcher : ProviderDispatcher<IGameServerProvider>, IGameServerDispatcher
 	{
-		private readonly Lock _lock = new Lock();
-		private IGameServerProvider? _provider;
-
-		public void Register(IGameServerProvider provider)
-		{
-			lock (_lock)
-			{
-				if (_provider != null && _provider != provider)
-					throw new InvalidOperationException("Only one game server provider can be registered at a time.");
-
-				_provider = provider;
-			}
-		}
-
-		public void Unregister(IGameServerProvider provider)
-		{
-			lock (_lock)
-			{
-				if (_provider == provider)
-					_provider = null;
-			}
-		}
-
 		public bool DisconnectCharacter(uint characterId)
 		{
-			return _provider?.DisconnectCharacter(characterId) ?? false;
+			return Provider?.DisconnectCharacter(characterId) ?? false;
 		}
 
 		public CharacterLiveState? GetCharacterLiveState(uint characterId)
 		{
-			return _provider?.GetCharacterLiveState(characterId);
+			return Provider?.GetCharacterLiveState(characterId);
 		}
 
 		public IEnumerable<INetworkClientSession> GetWorldSessions()
 		{
-			lock (_lock)
-			{
-				return _provider?.GetWorldSessions() ?? [];
-			}
+			return Provider?.GetWorldSessions() ?? [];
 		}
 
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)
 		{
-			return _provider?.GetZoneEntities(mapId) ?? [];
+			return Provider?.GetZoneEntities(mapId) ?? [];
 		}
 
 		public async Task<bool> RunGmCommand(uint characterId, string commandText)
 		{
-			if (_provider != null)
-				return await _provider.RunGmCommand(characterId, commandText);
-
-			return false;
+			var provider = Provider;
+			return provider != null && await provider.RunGmCommand(characterId, commandText);
 		}
 
 		public async Task<bool> SendGuildTag(uint characterId, string guildName)
 		{
-			if (_provider != null)
-				return await _provider.SendGuildTag(characterId, guildName);
-
-			return false;
+			var provider = Provider;
+			return provider != null && await provider.SendGuildTag(characterId, guildName);
 		}
 	}
 }

@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Faolan.Core.Network.Server.ChatServer
@@ -11,71 +9,50 @@ namespace Faolan.Core.Network.Server.ChatServer
 		void Unregister(IChatServerProvider provider);
 	}
 
-	public class ChatServerDispatcher : IChatServerDispatcher
+	/// <summary>
+	///     The <see cref="ProviderDispatcher{TProvider}" /> slot for the chat listener: every op forwards to the
+	///     one registered ChatServer listener, or answers empty when none is running.
+	/// </summary>
+	public sealed class ChatServerDispatcher : ProviderDispatcher<IChatServerProvider>, IChatServerDispatcher
 	{
-		private readonly Lock _lock = new Lock();
-		private IChatServerProvider? _provider;
-
-		public void Register(IChatServerProvider provider)
-		{
-			lock (_lock)
-			{
-				if (_provider != null && _provider != provider)
-					throw new InvalidOperationException("Only one agent server provider can be registered at a time.");
-
-				_provider = provider;
-			}
-		}
-
-		public void Unregister(IChatServerProvider provider)
-		{
-			lock (_lock)
-			{
-				if (_provider == provider)
-					_provider = null;
-			}
-		}
-
 		public async Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint>? recipientCharacterIds = null)
 		{
-			if (_provider != null)
-				await _provider.CharacterSay(characterId, message, recipientCharacterIds);
+			var provider = Provider;
+			if (provider != null)
+				await provider.CharacterSay(characterId, message, recipientCharacterIds);
 		}
 
 		public IEnumerable<INetworkClientSession> GetWorldSessions()
 		{
-			lock (_lock)
-			{
-				return _provider?.GetWorldSessions() ?? [];
-			}
+			return Provider?.GetWorldSessions() ?? [];
 		}
 
 		public async Task<int> SendClaudeChannelMessage(string message)
 		{
-			if (_provider != null)
-				return await _provider.SendClaudeChannelMessage(message);
-
-			return 0;
+			var provider = Provider;
+			return provider != null
+				? await provider.SendClaudeChannelMessage(message)
+				: 0;
 		}
 
 		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, string message)
 		{
-			if (_provider != null)
-				return await _provider.SendClaudeWhisper(targetCharacterId, message);
-
-			return false;
+			var provider = Provider;
+			return provider != null && await provider.SendClaudeWhisper(targetCharacterId, message);
 		}
 
 		public async Task SendSystemMessage(uint characterId, string message)
 		{
-			if (_provider != null)
-				await _provider.SendSystemMessage(characterId, message);
+			var provider = Provider;
+			if (provider != null)
+				await provider.SendSystemMessage(characterId, message);
 		}
 
 		public async Task SystemBroadcast(string message)
 		{
-			if (_provider != null)
-				await _provider.SystemBroadcast(message);
+			var provider = Provider;
+			if (provider != null)
+				await provider.SystemBroadcast(message);
 		}
 	}
 }
