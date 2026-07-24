@@ -18,7 +18,7 @@ namespace Faolan.Importer.Extractors
 	// the sequence of option indices the player picked to reach this screen ("" = the greeting, "0" = after picking
 	// option 0, "0>1" = then option 1, ...). Packets are the ordered server responses to replay for that screen.
 	// NpcName is resolved from the same capture's FA015807 spawn for the clicked handle (the stable identity the
-	// runtime routes on; the handle/instance are session-volatile and only used to re-address the replay).
+	// runtime routes on; the handle is session-volatile and only used as a fallback identity when no name resolves).
 	// (Mode/Field3 were the OLD key but both are session-volatile counters, not branch ids - the AnswerPath is the
 	// stable branch key; memory protocol_conversation_routing.)
 	// QuestContextId: the quest that was ACTIVE (last QuestFullUpdate) when the player opened this conversation - the
@@ -29,7 +29,6 @@ namespace Faolan.Importer.Extractors
 		uint TypeId,
 		string AnswerPath,
 		uint CapturedNpcHandle,
-		uint CapturedInstance,
 		List<byte[]> Packets,
 		string NpcName,
 		uint? NpcTemplateId = null,
@@ -158,7 +157,7 @@ namespace Faolan.Importer.Extractors
 			{
 				if (active && screen.Count > 0)
 				{
-					entries.Add(new ConversationEntry(typeId, path, npc, instance, [.. screen], namesByHandle.GetValueOrDefault(npc)!, templatesByHandle.TryGetValue(npc, out var tpl)
+					entries.Add(new ConversationEntry(typeId, path, npc, [.. screen], namesByHandle.GetValueOrDefault(npc)!, templatesByHandle.TryGetValue(npc, out var tpl)
 						? tpl
 						: null, GrantQuestId: grant, QuestContextId: instanceContext));
 				}
@@ -201,8 +200,14 @@ namespace Faolan.Importer.Extractors
 		// Merges screens from many captures/instances, deduped by (NpcName, TypeId, AnswerPath) - the stable branch
 		// key. This is what UNIONS the option tree: each conversation re-walk (a different Mode) explored a different
 		// option at a screen, so it contributes a different answer-path screen; merging them assembles the full tree.
-		// Keyed by NPC NAME (stable), not the session-volatile handle. Prefers an entry whose captured player instance
-		// is a 4-byte varint (re-addresses to any normal character), then the most packets.
+		// Keyed by NPC NAME (stable), not the session-volatile handle. The winner is the MOST COMPLETE capture of the
+		// screen - the one with the most response packets; a truncated capture must never displace a full one.
+		//
+		// It used to also prefer a capture whose player instance was a 4-byte varint, because the runtime SUBSTITUTED
+		// the live instance into the replayed bytes and a shorter captured varint changed the record length. #188
+		// retired that path - every packet is now constructed from typed columns with the live instance - so the term
+		// selected for a property that could no longer affect anything. Measured over the whole corpus before
+		// removing it: 242 merge keys, 29 with more than one candidate, and the winner changed in ZERO of them.
 		public static List<ConversationEntry> Merge(IEnumerable<ConversationEntry> all)
 		{
 			var best = new Dictionary<(string, uint, string, uint?, QuestState?), (int score, ConversationEntry entry)>();
@@ -214,9 +219,7 @@ namespace Faolan.Importer.Extractors
 				// The quest-state gate is part of the key so a NPC's conditioned variants (e.g. Casilda's pre- vs
 				// post-first-quest greeting) stay SEPARATE rows instead of merging into one mixed screen.
 				var key = (identity, e.TypeId, e.AnswerPath, e.ConditionQuestId, e.ConditionQuestState);
-				var score = (VarintLength(e.CapturedInstance) == 4
-					? 1_000_000
-					: 0) + e.Packets.Count;
+				var score = e.Packets.Count;
 				if (!best.TryGetValue(key, out var cur) || score > cur.score)
 				{
 					// Preserve a grant seen in any capture of this screen even if the highest-scoring replay didn't see it.

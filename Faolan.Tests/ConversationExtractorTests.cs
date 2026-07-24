@@ -124,15 +124,16 @@ namespace Faolan.Tests
 			Assert.Equal("Casilda", entries[0].NpcName);
 		}
 
-		// Branches captured across re-walks (different instances) UNION by answer-path: walk 1 contributes "0>0",
-		// walk 2 contributes "0>1". Merge keeps both (distinct paths) and dedupes same-path screens by richer capture.
+		// Branches captured across re-walks UNION by answer-path: walk 1 contributes "0>0", walk 2 contributes
+		// "0>1". Merge keeps both (distinct paths) and dedupes same-path screens by the RICHER capture - the one with
+		// more response packets, which is the whole of the merge rule now that the varint term is gone.
 		[Fact]
 		public void Merge_UnionsBranchesAndDedupesByPath()
 		{
-			var greetingA = new ConversationEntry(42008, "", 0x4DEE9, 0x02000005, [[1]], "Kalanthes");
-			var greetingB = new ConversationEntry(42008, "", 0x81906, 0x02000006, [[1], [2]], "Kalanthes"); // richer
-			var branch0 = new ConversationEntry(42008, "0>0", 0x4DEE9, 0x02000005, [[1]], "Kalanthes");
-			var branch1 = new ConversationEntry(42008, "0>1", 0x81906, 0x02000006, [[1]], "Kalanthes");
+			var greetingA = new ConversationEntry(42008, "", 0x4DEE9, [[1]], "Kalanthes");
+			var greetingB = new ConversationEntry(42008, "", 0x81906, [[1], [2]], "Kalanthes"); // richer
+			var branch0 = new ConversationEntry(42008, "0>0", 0x4DEE9, [[1]], "Kalanthes");
+			var branch1 = new ConversationEntry(42008, "0>1", 0x81906, [[1]], "Kalanthes");
 
 			var merged = ConversationExtractor.Merge([greetingA, greetingB, branch0, branch1]);
 
