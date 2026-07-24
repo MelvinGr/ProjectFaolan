@@ -20,9 +20,23 @@ namespace Faolan.Core.Database.Tables
 	// NULLABLE and inferred by the resolver (name / containment / id-propagation) then confirmed by hand; ResolvedBy
 	// records the provenance so a machine guess is distinguishable from a human-verified assignment.
 	// One area per (map, group ordinal) - the RDB group's slot on that map.
+	// Identified by (map, GroupOrdinal) - already the declared unique index, now the source of the primary key.
+	// A DERIVED single-column id rather than the composite itself: NpcSpawn points here through a NULLABLE FK with
+	// SetNull, and a composite cannot express that (its MapId column is non-nullable, being its own FK to Map).
+	// Keying it stably also stabilises the 23,782 NpcSpawnAreaPoints hanging off it. See DerivedKey.
 	[Index(nameof(MapId), nameof(GroupOrdinal), IsUnique = true)]
-	public class NpcSpawnArea : BaseEntity
+	public class NpcSpawnArea : BaseEntity, IDerivedKey
 	{
+		public static uint ComputeId(uint mapId, int groupOrdinal)
+		{
+			return DerivedKey.From(mapId, groupOrdinal);
+		}
+
+		public uint ComputeId()
+		{
+			return ComputeId(MapId, GroupOrdinal);
+		}
+
 		// The parsed numeric community/faction/family id when GroupKey is numeric; null for "Name"/"no category" groups.
 		public uint? CommunityId { get; set; }
 

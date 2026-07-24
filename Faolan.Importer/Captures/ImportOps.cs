@@ -354,8 +354,12 @@ namespace Faolan.Importer.Captures
 				if (e.TemplateId == 0 || !typeByTemplate.TryGetValue(e.TemplateId, out var npc))
 					continue;
 
+				// The id is DERIVED from the placement (see NpcSpawn/DerivedKey), so a re-harvest reproduces it rather
+				// than renumbering the spawn set and every equipment/morph/patrol row hanging off it. An `existing`
+				// row already carries it.
 				var row = existing ?? new NpcSpawn
 				{
+					Id = NpcSpawn.ComputeId(e.MapId, e.X, e.Y, e.Z),
 					MapId = e.MapId,
 					PositionX = e.X,
 					PositionY = e.Y,
@@ -771,6 +775,10 @@ namespace Faolan.Importer.Captures
 					PositionY = e.Y,
 					PositionZ = e.Z
 				}, e);
+
+				// The id is DERIVED from (map, position, DisplayName) - computed AFTER PopulateObject for the same
+				// reason the dedup keys on the stored value: DisplayName is lifted from the object body here.
+				built.Id = built.ComputeId();
 
 				if (built.DisplayName is { } name)
 				{

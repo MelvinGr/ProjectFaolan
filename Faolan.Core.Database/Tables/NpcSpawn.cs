@@ -15,9 +15,24 @@ namespace Faolan.Core.Database.Tables
 	// The structured columns below are LIFTED from the ProtoCoreCharacterIIR: NPC identity/appearance
 	// (TemplateId/Race/Sex/Level/HeadMesh/...). Transform (PositionX/Y/Z + RotationX/Y/Z/W + the Position/Rotation
 	// accessors) is inherited from Base3DEntity, shared with the player Character and the world objects.
+	// A placement's identity is WHERE it is: (map, position). That was already the declared unique index, and it
+	// is now the source of the primary key via ComputeId - the npcs module wipes and rebuilds the whole spawn set
+	// on every re-harvest, so an AUTOINCREMENT id renumbered all 1086 rows (~15 times over) and dragged the
+	// equipment/morph/patrol children with it. A DERIVED id rather than a composite key because the identity
+	// contains floats and this is the root of a three-level tree - see DerivedKey.
 	[Index(nameof(MapId), nameof(PositionX), nameof(PositionY), nameof(PositionZ), IsUnique = true)]
-	public class NpcSpawn : Base3DEntity
+	public class NpcSpawn : Base3DEntity, IDerivedKey
 	{
+		public static uint ComputeId(uint mapId, float x, float y, float z)
+		{
+			return DerivedKey.From(mapId, x, y, z);
+		}
+
+		public uint ComputeId()
+		{
+			return ComputeId(MapId, PositionX, PositionY, PositionZ);
+		}
+
 		public uint? GuildId { get; set; }
 		public uint MapId { get; set; }
 

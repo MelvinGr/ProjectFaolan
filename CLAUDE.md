@@ -142,9 +142,17 @@ OFF by default — `PRAGMA foreign_keys=ON` before manual deletes or you orphan 
   `.ValueGeneratedNever()`, and the `HasMany`/`WithOne` pairing that names both ends.
 - **A table the importer delete+reinserts must have a natural or derived key, never an AUTOINCREMENT
   surrogate** — a surrogate is reassigned on every re-harvest, so a reimport churns thousands of `faolan.sql`
-  lines for zero semantic change, and cascades into every child FK. Use `[PrimaryKey(...)]` on a plain class
-  (not `BaseEntity`); where the identity is too wide to carry down a tree, derive the root id from it
-  (`ConversationNode.ComputeId`) and key each child by its parent's key + its own `Sequence`.
+  lines for zero semantic change, and cascades into every child FK. Two shapes, in order of preference:
+  1. **Natural composite** — `[PrimaryKey(...)]` on a plain class (not `BaseEntity`), e.g. `ShopItem`
+     `(ShopId, Pos)`, `NpcSpawnEquipment` `(NpcSpawnId, Pos)`. For a tree, each child is keyed by its parent's
+     key plus its own `Sequence` (`ConversationPacket` → `ConversationScreen` → `ConversationScreenParameter`).
+  2. **Derived id** (`DerivedKey` / `IDerivedKey`) when the identity is too wide to carry down a tree, contains
+     floats, or is pointed at by a *nullable* FK (a composite cannot express `SetNull` when one of its columns
+     is non-null). The entity exposes `ComputeId()`; `DatabaseContext` stamps it on insert, and
+     `DatabaseConventionTests` gates the shipped rows on `Id == ComputeId()`. Used by `ConversationNode`,
+     `NpcSpawn`, `NpcSpawnArea`, `WorldObject`.
+  Empirical check for a table that still needs this: `sqlite_sequence.seq / COUNT(*)` is how many times the
+  table has been fully renumbered.
 
 **SQLite is INTERIM (#379).** The goal is a real DB with the schema+seed as a `.sql` file, dropping the binary.
 Two things already run ahead of that move:

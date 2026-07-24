@@ -1629,7 +1629,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawn", b =>
                 {
                     b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("ApprenticeLevel")
@@ -1734,7 +1733,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnArea", b =>
                 {
                     b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
                     b.Property<float>("BoundsMaxX")
@@ -2947,7 +2945,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.WorldObject", b =>
                 {
                     b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
                     b.Property<float>("BoundsMaxX")

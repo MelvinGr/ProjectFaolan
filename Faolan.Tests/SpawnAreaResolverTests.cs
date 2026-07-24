@@ -98,6 +98,7 @@ namespace Faolan.Tests
 		{
 			return new NpcSpawnArea
 			{
+				Id = NpcSpawnArea.ComputeId(map, ord),
 				MapId = map,
 				GroupOrdinal = ord,
 				GroupName = groupName,
@@ -124,8 +125,11 @@ namespace Faolan.Tests
 			await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 			// Two captured Jungle Apes inside the Ape2 area's bounds -> unanimous containment resolution.
+			// These keys are DERIVED from the placement (NpcSpawn.ComputeId), so they must be set here exactly as the
+			// importer sets them - the table has no store-generated key, and two rows left at 0 collide on Add.
 			db.NpcSpawns.AddRange(new NpcSpawn
 			{
+				Id = NpcSpawn.ComputeId(4010, 5, 0, 5),
 				MapId = 4010,
 				NpcTemplateId = 101,
 				PositionX = 5,
@@ -133,6 +137,7 @@ namespace Faolan.Tests
 				PositionZ = 5
 			}, new NpcSpawn
 			{
+				Id = NpcSpawn.ComputeId(4010, 6, 0, 6),
 				MapId = 4010,
 				NpcTemplateId = 101,
 				PositionX = 6,

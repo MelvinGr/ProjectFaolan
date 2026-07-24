@@ -1672,10 +1672,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawn", b =>
                 {
                     b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<long>("ApprenticeLevel")
                         .HasColumnType("bigint");
@@ -1779,10 +1776,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnArea", b =>
                 {
                     b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<float>("BoundsMaxX")
                         .HasColumnType("real");
@@ -3008,10 +3002,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.WorldObject", b =>
                 {
                     b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<float>("BoundsMaxX")
                         .HasColumnType("real");

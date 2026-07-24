@@ -192,6 +192,38 @@ namespace Faolan.Core.Database
 		// unit of work), so lazy-loading proxies are deliberately NOT used - they tether entities to a live context
 		// and break once it is disposed. Navigations are loaded explicitly with Include where needed.
 
+		// Stamp every NEW IDerivedKey row with the id its identity computes to, so what lands in the database always
+		// matches ComputeId even if the caller never set it. Stamping can never be wrong - the id is a pure function
+		// of columns the row already carries - and DatabaseConventionTests gates the shipped data on the two
+		// agreeing. Added only: an existing row keeps its key. The importers upsert by IDENTITY, so a tracked row's
+		// identity columns never change under it; a different identity IS a different row.
+		//
+		// This CANNOT be the only guard: these tables have no store-generated key, so an unset Id is 0, and two new
+		// rows both at 0 collide on the change tracker's identity map at Add - well before SaveChanges. That is a
+		// loud failure rather than a silent one, which is why it is acceptable; a caller adding several rows at once
+		// (the importers, the test fixtures) sets the id itself. What this backstop covers is the single-row case
+		// and any row whose identity columns were filled in after it was added.
+		public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+		{
+			StampDerivedKeys();
+			return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+		}
+
+		public override int SaveChanges(bool acceptAllChangesOnSuccess)
+		{
+			StampDerivedKeys();
+			return base.SaveChanges(acceptAllChangesOnSuccess);
+		}
+
+		private void StampDerivedKeys()
+		{
+			foreach (var entry in ChangeTracker.Entries<IDerivedKey>())
+			{
+				if (entry.State == EntityState.Added)
+					entry.Entity.Id = entry.Entity.ComputeId();
+			}
+		}
+
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
 			// Enum columns marked [ConstrainToEnumValues] get a generated CHECK constraint (the allowed list is built from
@@ -317,6 +349,14 @@ namespace Faolan.Core.Database
 			// id is derived from its identity and never store-generated; each child's key is its parent's key plus
 			// its Sequence, so every FK below the root is composite. Children cascade-delete with their parent.
 			modelBuilder.Entity<ConversationNode>().Property(n => n.Id).ValueGeneratedNever();
+
+			// The other DERIVED-id roots (see DerivedKey): each id is a pure function of the row's identity, so a
+			// re-harvest reproduces it instead of renumbering the table and every child FK under it. Configured
+			// fluently rather than by attribute only because the Id they override is inherited (Base3DEntity/
+			// BaseEntity) - an attribute cannot be applied to an inherited property.
+			modelBuilder.Entity<NpcSpawn>().Property(n => n.Id).ValueGeneratedNever();
+			modelBuilder.Entity<NpcSpawnArea>().Property(a => a.Id).ValueGeneratedNever();
+			modelBuilder.Entity<WorldObject>().Property(o => o.Id).ValueGeneratedNever();
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<ConversationPacket>().HasMany(p => p.Screens).WithOne(s => s.Packet).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<ConversationScreen>().HasMany(s => s.Parameters).WithOne(sp => sp.Screen).OnDelete(DeleteBehavior.Cascade);

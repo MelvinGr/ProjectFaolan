@@ -55,8 +55,11 @@ namespace Faolan.Importer.Rdb
 				for (var gi = 0; gi < layout.Groups.Count; gi++)
 				{
 					var g = layout.Groups[gi];
+					// The id is DERIVED from (map, group ordinal) - see NpcSpawnArea/DerivedKey - so a re-harvest
+					// reproduces it instead of renumbering the areas and their 23,782 points.
 					var area = new NpcSpawnArea
 					{
+						Id = NpcSpawnArea.ComputeId(e.Id, gi),
 						MapId = e.Id,
 						GroupOrdinal = gi,
 						GroupName = g.Name,

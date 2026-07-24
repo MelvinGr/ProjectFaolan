@@ -24,9 +24,24 @@ namespace Faolan.Core.Database.Tables
 	// same coordinates (#222), so position alone would reject the second. (Identity-less classes have a null
 	// DisplayName; SQLite treats NULLs as distinct, so they fall back to position-only dedup, which the importer's
 	// in-memory Merge already enforces.)
+	// Identified by WHERE it is plus WHAT it is - (map, position, DisplayName), the declared unique index, now the
+	// source of the primary key via ComputeId. DisplayName is in the identity because props do share an exact
+	// position (#222: keying on position alone dropped them); CapturedHandle is NOT a candidate, it has only 999
+	// distinct values across 1053 rows. A DERIVED id rather than a composite because the identity contains floats
+	// and this is a parent (WorldObjectWord) - see DerivedKey.
 	[Index(nameof(MapId), nameof(PositionX), nameof(PositionY), nameof(PositionZ), nameof(DisplayName), IsUnique = true)]
-	public class WorldObject : Base3DEntity
+	public class WorldObject : Base3DEntity, IDerivedKey
 	{
+		public static uint ComputeId(uint mapId, float x, float y, float z, string? displayName)
+		{
+			return DerivedKey.From(mapId, x, y, z, displayName);
+		}
+
+		public uint ComputeId()
+		{
+			return ComputeId(MapId, PositionX, PositionY, PositionZ, DisplayName);
+		}
+
 		// The teleport destination (map + arrival position), populated for Teleport/ProxyTeleport. Extracted from the
 		// N3Teleport PlayfieldProxy (dest map) + spawn-position blob in the capture where the door was used; the
 		// arrival matches the destination map's reciprocal zone-line. Null when the object isn't a teleporter or its

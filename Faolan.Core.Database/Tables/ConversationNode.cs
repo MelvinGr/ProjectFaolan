@@ -1,8 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -22,7 +20,7 @@ namespace Faolan.Core.Database.Tables
 	// identities now collide on the PK. The index that remains is the runtime lookup path (GetConversationScreens),
 	// not a uniqueness gate.
 	[Index(nameof(NpcName), nameof(TypeId), nameof(AnswerPath))]
-	public class ConversationNode
+	public class ConversationNode : IDerivedKey
 	{
 		[Key]
 		[DatabaseGenerated(DatabaseGeneratedOption.None)]
@@ -79,24 +77,13 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string NpcName { get; set; } = null!;
 
-		// The node's identity, hashed into its primary key. Every component is part of what makes this screen a
-		// DISTINCT screen, so two nodes agreeing on all of them are the same node and must collide. FNV-1a over a
-		// NUL-separated canonical rendering - neither NpcName (an entity name from a spawn body) nor AnswerPath
-		// (digits and '>') can contain a NUL, so the rendering is unambiguous. The importer asserts the ids it
-		// computes are distinct, so a hash collision fails the import rather than silently dropping a screen.
+		// The node's identity, hashed into its primary key (DerivedKey). Every component is part of what makes this
+		// screen a DISTINCT screen, so two nodes agreeing on all of them are the same node and must collide. The
+		// importer asserts the ids it computes are distinct, so a collision fails the import rather than silently
+		// dropping a screen.
 		public static uint ComputeId(string npcName, uint typeId, string answerPath, uint? conditionQuestId, QuestState? conditionQuestState)
 		{
-			var identity = string.Join('\0', npcName, typeId.ToString(CultureInfo.InvariantCulture), answerPath, conditionQuestId?.ToString(CultureInfo.InvariantCulture) ?? "",
-				conditionQuestState?.ToString() ?? "");
-
-			var hash = 2166136261u;
-			foreach (var b in Encoding.UTF8.GetBytes(identity))
-			{
-				hash ^= b;
-				hash *= 16777619u;
-			}
-
-			return hash;
+			return DerivedKey.From(npcName, typeId, answerPath, conditionQuestId, conditionQuestState);
 		}
 
 		public uint ComputeId()

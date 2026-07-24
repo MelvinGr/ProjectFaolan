@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using Faolan.Core.Database;
 using Faolan.Tests.Support;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Faolan.Tests
@@ -54,6 +57,42 @@ namespace Faolan.Tests
 			Assert.True(offenders.Count == 0,
 				$"Foreign keys must be declared with [ForeignKey] on the navigation property, not fluently. " +
 				$"A composite key takes a comma-separated column list - see ConversationScreen. Offenders: {string.Join(", ", offenders)}");
+		}
+
+		// The DERIVED-id tables (DerivedKey): every stored id must equal the id its own identity computes to.
+		//
+		// This is the gate that makes the whole scheme trustworthy. A derived key is only worth having if the
+		// stored value and the function agree - if they ever drift (someone edits ComputeId, or a row is written
+		// with a store-generated id because a ValueGeneratedNever was dropped), the table silently goes back to
+		// being surrogate-keyed and the next re-import churns every row again. Runs against the fixture built from
+		// faolan.sql, so it gates the seed that actually ships.
+		[Fact]
+		public async Task DerivedIds_EqualTheIdentityTheyAreComputedFrom()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var nodes = await db.ConversationNodes.AsNoTracking().ToListAsync(ct);
+			var spawns = await db.NpcSpawns.AsNoTracking().ToListAsync(ct);
+			var areas = await db.NpcSpawnAreas.AsNoTracking().ToListAsync(ct);
+			var objects = await db.WorldObjects.AsNoTracking().ToListAsync(ct);
+
+			Assert.NotEmpty(nodes);
+			Assert.NotEmpty(spawns);
+			Assert.NotEmpty(areas);
+			Assert.NotEmpty(objects);
+
+			var wrong = new List<string>();
+			foreach (var n in nodes.Where(n => n.Id != n.ComputeId()))
+				wrong.Add($"ConversationNode {n.Id} ('{n.NpcName}' '{n.AnswerPath}') != {n.ComputeId()}");
+			foreach (var s in spawns.Where(s => s.Id != s.ComputeId()))
+				wrong.Add($"NpcSpawn {s.Id} (map {s.MapId} @ {s.Position}) != {s.ComputeId()}");
+			foreach (var a in areas.Where(a => a.Id != a.ComputeId()))
+				wrong.Add($"NpcSpawnArea {a.Id} (map {a.MapId} group {a.GroupOrdinal}) != {a.ComputeId()}");
+			foreach (var o in objects.Where(o => o.Id != o.ComputeId()))
+				wrong.Add($"WorldObject {o.Id} (map {o.MapId} '{o.DisplayName}') != {o.ComputeId()}");
+
+			Assert.True(wrong.Count == 0, $"{wrong.Count} row(s) carry an id that is not derived from their identity: {string.Join("; ", wrong.Take(5))}");
 		}
 	}
 }
