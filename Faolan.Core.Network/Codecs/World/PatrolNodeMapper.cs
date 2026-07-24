@@ -58,11 +58,13 @@ namespace Faolan.Core.Network.Codecs.World
 					n.AnchorX = ToFloat(m.TrailerWords[4]);
 					n.AnchorY = ToFloat(m.TrailerWords[5]);
 					n.AnchorZ = ToFloat(m.TrailerWords[6]);
-					SetWords(n, m.TrailerWords[1], m.TrailerWords[2], m.TrailerWords[3]);
+					n.PathTrailerWord = m.TrailerWords[1];
+					n.PathDirection1 = ToFloat(m.TrailerWords[2]);
+					n.PathDirection2 = ToFloat(m.TrailerWords[3]);
 					break;
 
 				case 2: // Rotate
-					SetWords(n, m.Vec7);
+					SetTransform(n, m.Vec7);
 					n.RotateTail = m.RotateTail;
 					break;
 
@@ -104,7 +106,7 @@ namespace Faolan.Core.Network.Codecs.World
 					break;
 
 				case 10: // SetPos
-					SetWords(n, m.Vec7);
+					SetTransform(n, m.Vec7);
 					break;
 
 				default:
@@ -152,12 +154,15 @@ namespace Faolan.Core.Network.Codecs.World
 					}
 
 					m.TrailerByte = n.TrailerByte!.Value;
-					var mid = Words(n, 3);
-					m.TrailerWords = [ToBits(n.Speed), mid[0], mid[1], mid[2], ToBits(n.AnchorX), ToBits(n.AnchorY), ToBits(n.AnchorZ)];
+					m.TrailerWords =
+					[
+						ToBits(n.Speed), n.PathTrailerWord!.Value, ToBits(n.PathDirection1), ToBits(n.PathDirection2),
+						ToBits(n.AnchorX), ToBits(n.AnchorY), ToBits(n.AnchorZ)
+					];
 					break;
 
 				case 2:
-					m.Vec7 = Words(n, 7);
+					m.Vec7 = Transform(n);
 					m.RotateTail = (ushort)n.RotateTail!.Value;
 					break;
 
@@ -194,7 +199,7 @@ namespace Faolan.Core.Network.Codecs.World
 					break;
 
 				case 10:
-					m.Vec7 = Words(n, 7);
+					m.Vec7 = Transform(n);
 					break;
 
 				default:
@@ -225,8 +230,28 @@ namespace Faolan.Core.Network.Codecs.World
 			}
 		}
 
-		// The node's fixed numeric array, as one PatrolNodeWord row per 32-bit word in wire order (#410 - these used
-		// to be packed into a WordsData blob).
+		// The Vec7 transform of a Rotate/SetPos node: a position and a unit quaternion (#410).
+		private static void SetTransform(PatrolNode n, uint[] vec7)
+		{
+			n.TargetX = ToFloat(vec7[0]);
+			n.TargetY = ToFloat(vec7[1]);
+			n.TargetZ = ToFloat(vec7[2]);
+			n.TargetRotationX = ToFloat(vec7[3]);
+			n.TargetRotationY = ToFloat(vec7[4]);
+			n.TargetRotationZ = ToFloat(vec7[5]);
+			n.TargetRotationW = ToFloat(vec7[6]);
+		}
+
+		private static uint[] Transform(PatrolNode n)
+		{
+			return
+			[
+				ToBits(n.TargetX), ToBits(n.TargetY), ToBits(n.TargetZ),
+				ToBits(n.TargetRotationX), ToBits(n.TargetRotationY), ToBits(n.TargetRotationZ), ToBits(n.TargetRotationW)
+			];
+		}
+
+		// The remaining un-named numeric arrays, one PatrolNodeWord row per 32-bit word in wire order (#410).
 		private static void SetWords(PatrolNode n, params uint[] words)
 		{
 			n.Words.Clear();

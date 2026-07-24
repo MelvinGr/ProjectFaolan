@@ -30,9 +30,9 @@ namespace Faolan.Core.Database.Tables
 		// mode 1 PathMoveTask else-branch waypoints (empty for other modes / the packed branch).
 		public virtual ICollection<PatrolNodeWaypoint> Waypoints { get; set; } = [];
 
-		// The node's fixed numeric array as one row per 32-bit word, in wire order (#410 - this was the packed
-		// WordsData blob). Empty for the modes that have no array. See [[PatrolNodeWord]] for which mode owns which
-		// count; PatrolNodeMapper packs/unpacks them.
+		// The remaining un-named numeric arrays, one row per 32-bit word in wire order (#410). Modes 1/2/10 have
+		// typed columns above now, so this covers only mode 5 Ballistic (7 words) and mode 7 Formation (6) - neither
+		// of which has a single node in the corpus, which is exactly why their words stay unnamed.
 		public virtual ICollection<PatrolNodeWord> Words { get; set; } = [];
 
 		// MoveTaskNode.Mode (0 Wait, 1 Path, 2 Rotate, 3 Jump, 4 List, 5 Ballistic, 7 Formation, 8 Approach, 10 SetPos, 11 GroundAlign).
@@ -62,6 +62,28 @@ namespace Faolan.Core.Database.Tables
 
 		// Path trailer semantic words (the 7-word trailer decodes as [speed, pad, dir, dir, anchorX, anchorY, anchorZ]).
 		public float? Speed { get; set; } // trailer word 0
+
+		// mode 1 Path: the two DIRECTION words of the middle trailer (words 2-3 of the 7-word trailer), decoded as
+		// floats - the corpus has them at 0 in most nodes and small non-zero values elsewhere.
+		public float? PathDirection1 { get; set; }
+		public float? PathDirection2 { get; set; }
+
+		// mode 1 Path: the trailer word BEFORE those two (word 1). The 7-word trailer's shape was written down as
+		// [speed, pad, dir, dir, anchor x/y/z] but this slot is NOT padding - it varies 0..41 across the corpus. It
+		// is not the waypoint count either (checked: it matches on only 17 of 234 nodes), so it keeps a positional
+		// name and its raw bits until something identifies it.
+		public uint? PathTrailerWord { get; set; }
+
+		// modes 2 Rotate / 10 SetPos: the 7-word "Vec7" is a TRANSFORM - a position and a unit quaternion. Verified
+		// on every captured node: e.g. (1147.29, 199.54, 1758.06) + (0, -0.204, 0, 0.979), and both quaternions
+		// normalise to 1.0 (they are rotations about Y, as an NPC facing change would be).
+		public float? TargetX { get; set; }
+		public float? TargetY { get; set; }
+		public float? TargetZ { get; set; }
+		public float? TargetRotationX { get; set; }
+		public float? TargetRotationY { get; set; }
+		public float? TargetRotationZ { get; set; }
+		public float? TargetRotationW { get; set; }
 
 		public int Ordinal { get; set; }
 		public int? PathPacked1 { get; set; } // PathFlags & 1 branch (u16 each)

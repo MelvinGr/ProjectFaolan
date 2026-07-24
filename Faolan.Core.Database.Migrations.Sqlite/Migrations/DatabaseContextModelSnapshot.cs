@@ -2216,6 +2216,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("ParentId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<float?>("PathDirection1")
+                        .HasColumnType("REAL");
+
+                    b.Property<float?>("PathDirection2")
+                        .HasColumnType("REAL");
+
                     b.Property<byte?>("PathFlags")
                         .HasColumnType("INTEGER");
 
@@ -2231,6 +2237,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<int?>("PathPacked2")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("PathTrailerWord")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("PatrolPathId")
                         .HasColumnType("INTEGER");
 
@@ -2241,6 +2250,27 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<float?>("Speed")
+                        .HasColumnType("REAL");
+
+                    b.Property<float?>("TargetRotationW")
+                        .HasColumnType("REAL");
+
+                    b.Property<float?>("TargetRotationX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float?>("TargetRotationY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float?>("TargetRotationZ")
+                        .HasColumnType("REAL");
+
+                    b.Property<float?>("TargetX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float?>("TargetY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float?>("TargetZ")
                         .HasColumnType("REAL");
 
                     b.Property<byte?>("TrailerByte")
