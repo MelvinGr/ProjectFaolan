@@ -159,24 +159,24 @@ namespace Faolan
 			builder.Services.AddLogging();
 
 			builder.Services.ConfigureFaolanDatabase(builder.Configuration);
-			builder.Services.AddScopedHostedService<DatabaseMigrator>();
+			builder.Services.AddHostedService<DatabaseMigrator>();
 
 			if (runLogin)
 			{
-				builder.Services.AddScopedHostedService<UniverseAgentListener>();
-				builder.Services.AddScopedHostedService<PlayerAgentListener>();
+				builder.Services.AddHostedService<UniverseAgentListener>();
+				builder.Services.AddHostedService<PlayerAgentListener>();
 			}
 
 			if (runRealm)
 			{
 				// The realm-local listeners bind THIS realm's ports straight from its Realm row (single source of truth,
 				// #324) - factory-registered so the port is injected, not read from global config.
-				builder.Services.AddScopedHostedService(provider => new CsPlayerAgentListener(hostRealm!.CsPlayerAgentPort, provider.GetRequiredService<ILogger<CsPlayerAgentListener>>(),
+				builder.Services.AddHostedService(provider => new CsPlayerAgentListener(hostRealm!.CsPlayerAgentPort, provider.GetRequiredService<ILogger<CsPlayerAgentListener>>(),
 					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IGameServerDispatcher>()));
 
 				builder.Services.AddSingleton<IChatServerDispatcher, ChatServerDispatcher>();
 				builder.Services.AddSingleton<ClaudeChannel>(); // in-game "Claude" chat channel log, bridged to Claude via the MCP chat tools
-				builder.Services.AddScopedHostedService(provider => new ChatServerListener(hostRealm!.ChatServerPort, provider.GetRequiredService<ILogger<ChatServerListener>>(),
+				builder.Services.AddHostedService(provider => new ChatServerListener(hostRealm!.ChatServerPort, provider.GetRequiredService<ILogger<ChatServerListener>>(),
 					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IChatServerDispatcher>(),
 					provider.GetRequiredService<IGameServerDispatcher>(), provider.GetRequiredService<ClaudeChannel>()));
 
@@ -191,7 +191,7 @@ namespace Faolan
 				if (runMcp)
 					builder.Services.AddFaolanMcp();
 
-				builder.Services.AddScopedHostedService(provider =>
+				builder.Services.AddHostedService(provider =>
 				{
 					var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
 					var configuration = provider.GetRequiredService<IConfiguration>();
@@ -205,7 +205,7 @@ namespace Faolan
 
 				// Registered LAST so it starts after the listeners (Online = the host is up) and, since hosted services
 				// stop in reverse order, flips the realm Offline first as shutdown begins (#324).
-				builder.Services.AddScopedHostedService(provider =>
+				builder.Services.AddHostedService(provider =>
 					new RealmStatusService(provider.GetRequiredService<IRealmRepository>(), provider.GetRequiredService<ILogger<RealmStatusService>>(), hostRealm!.Id));
 			}
 
