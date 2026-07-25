@@ -37,9 +37,12 @@ namespace Faolan.Core.Enums
 		// CLEAR => the param13..15 acceleration vector follows.
 		NoAccelerationVector = 0x08,
 
-		// SET => the post-position move vector collapses to ONE float, which with param6 forms a unit-length 2D facing
-		// (facingX^2 + param6^2 ~= 1.0 in 11,785 of 11,884 collapsed records).
-		CollapsedFacing = 0x10,
+		// SET => the post-position ROTATION QUATERNION is sent as two floats instead of four: (qy, qw), the only
+		// non-zero components of an upright character's yaw-only facing. The client's reader treats the leading part
+		// as a "move vector" and the last float as a scalar, which is what hid this - but the four floats are
+		// unit-length in 100% of the corpus's records in BOTH forms, and the yaw implied by the collapsed pair
+		// (2*atan2(qy, qw)) tracks the direction of travel. See CharDCMove.Rotation.
+		CollapsedRotation = 0x10,
 
 		// Bits 5 and 6 are stored as bools by the reader and their meaning is NOT pinned. Named for what they are
 		// rather than guessed at: the old enum implied "jump"/"mounted" by pairing them with those labels, but 0x52 and

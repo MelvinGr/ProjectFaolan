@@ -542,7 +542,14 @@ namespace Faolan.GameServer.World
 		}
 
 		// After a player's Move: update interest and broadcast the resulting spawns/moves to nearby players.
-		public async Task BroadcastPlayerMove(INetworkClient client, uint moveSubop, uint dataObject, uint dataClientInstance, ushort movingType, Vector3 position, Vector3 rotation, byte[] tail)
+		//
+		// `moveBody` is the mover's own CharDCMove carrier VERBATIM (only the env byte cleared - the caller's echo body),
+		// not a reconstruction. Retail relays a move byte-for-byte: across the corpus 9,438 of 9,932 c2s moves reappear
+		// s2c identical bar that byte, and in xxx_2clients_jumping all 35 do, to BOTH clients. That also spares this end
+		// the flag-gated layout - how many rotation floats flag1 bit4 implies, where a jump's acceleration vector sits
+		// (docs/re/chardcmove-grammar.md) - which the old rebuild-from-parsed-fields had to know and got wrong.
+		// `position` is the ACCEPTED position (the same one the body carries) and drives interest only.
+		public async Task BroadcastPlayerMove(INetworkClient client, byte[] moveBody, Vector3 position)
 		{
 			var entity = _sim.PlayerWorldEntity(client);
 			if (entity == null)
@@ -573,7 +580,7 @@ namespace Faolan.GameServer.World
 					entity.Known.Count);
 			}
 
-			await DispatchInterest(events, new MoveForward(moveSubop, dataObject, dataClientInstance, movingType, position, rotation, tail), client, entity);
+			await DispatchInterest(events, moveBody, client, entity);
 		}
 
 		// Relays a player's ApplySpell (the MagicBuffIIR spell EFFECT - a buff applied, or an offensive cast) to every
@@ -1573,7 +1580,7 @@ namespace Faolan.GameServer.World
 		// the object half into the quest-visibility path only - the two methods have identical three-line bodies, so a
 		// textual edit hit the wrong one and objects never streamed as the player walked. Taking the player here means a
 		// caller cannot dispatch one half without the other.
-		private async Task DispatchInterest(IReadOnlyList<InterestEvent> events, MoveForward? move, INetworkClient? mover = null, WorldEntity? moverEntity = null)
+		private async Task DispatchInterest(IReadOnlyList<InterestEvent> events, byte[]? moveBody, INetworkClient? mover = null, WorldEntity? moverEntity = null)
 		{
 			if (mover != null && moverEntity != null)
 				await StreamWorldObjects(mover, moverEntity);
@@ -1633,9 +1640,9 @@ namespace Faolan.GameServer.World
 						break;
 					}
 
-					case InterestEventType.Move when move.HasValue:
+					case InterestEventType.Move when moveBody != null:
 					{
-						await SendWorldMove(recipient, move.Value);
+						await SendWorldMove(recipient, moveBody);
 						break;
 					}
 
@@ -2152,19 +2159,14 @@ namespace Faolan.GameServer.World
 
 		// Frames a raw 0x2000 IIR body on the world conversation to one recipient (the generic single-recipient send the
 		// dedicated builders share - e.g. the NPC MoveTask chase step).
-		// Forwards a player's Move to `recipient` (same body - the moving entity's handle + transform - only the
-		// receiver differs), so the recipient sees the subject move.
-		private static Task SendWorldMove(INetworkClient recipient, MoveForward move)
+		// Forwards a player's Move to `recipient` - the mover's own carrier bytes, only the frame receiver differs, which
+		// is exactly what retail relays (see BroadcastPlayerMove). The body already names the moving entity's handle, so
+		// there is nothing per-recipient to rebuild; sending it verbatim also carries whatever the flag1 layout implies
+		// (the jump bit and its acceleration vector included) without this end having to understand it.
+		private static Task SendWorldMove(INetworkClient recipient, byte[] moveBody)
 		{
 			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(x => x
-					.WriteUInt32(move.Subop)
-					.WriteUInt32(move.DataObject)
-					.WriteUInt32(move.DataClientInstance)
-					.WriteUInt16(move.MovingType)
-					.WriteVector3(move.Position)
-					.WriteVector3(move.Rotation)
-					.WriteArray(move.Tail))));
+				s => s.WriteArrayUInt32Length(moveBody)));
 		}
 
 		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
@@ -2182,7 +2184,5 @@ namespace Faolan.GameServer.World
 		// UseObject handler switch on the action rather than special-casing one kind.
 		public readonly record struct UsedObjectInteraction(InteractAction Action, ZoneLineDestination Teleport);
 
-		// The components of a player's Move, forwarded verbatim to other viewers (only the receiver differs).
-		private readonly record struct MoveForward(uint Subop, uint DataObject, uint DataClientInstance, ushort MovingType, Vector3 Position, Vector3 Rotation, byte[] Tail);
 	}
 }

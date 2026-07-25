@@ -89,91 +89,69 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.CharDCMoveIIR:
 				{
-					var dataobjdec = body.ReadUInt32();
-					var dataclientinst = body.ReadUInt32();
-					// [u8 env][u8 flag1] - NOT a movement-type enum (docs/re/chardcmove-grammar.md). flag1 is the layout
-					// bitfield the client's reader keys on, so EVERY value is legal and there is nothing to switch on:
-					// this used to be a fall-through list of 11 observed (env, flag1) pairs with a `default:` that logged
-					// and dropped the rest, which silently ignored 4,620 of the corpus's 19,034 moves (24%) - 19 distinct
-					// flag1 values exist over both env bytes. The u16 is still passed through to the echo/relay verbatim.
+					body.ReadUInt32(); // 0xC350 IIR marker
+					body.ReadUInt32(); // the mover's handle - we key off the session, not the client's claim
+
+					// [u8 env][u8 flag1] - a LAYOUT BITFIELD, not a movement-type enum: every value is legal, so there
+					// is nothing to switch on (docs/re/chardcmove-grammar.md; switching dropped 24% of moves).
 					var movingType = body.ReadUInt16();
 					var moveFlags = (MoveFlag)(movingType & 0xFF);
 
-					var sessionCharacter = client.Session.Character;
-					if (sessionCharacter == null)
-					{
-						Logger.LogWarning(
-							"Ignoring movement packet (flags 0x{MovingType:X4} = {MoveFlags}) because no resolved character is attached to the GameServer session yet. dataobjdec=0x{DataObject:X}, dataclientinst=0x{DataClientInstance:X}.",
-							movingType, moveFlags, dataobjdec, dataclientinst);
-						break;
-					}
+					var sessionCharacter = client.Session.Character!;
 
 					var movePosition = body.ReadVector3();
-					var moveRotation = body.ReadVector3();
-					var datadat = body.ReadRemainingArray();
 
-					// The WorldEntity owns the live transform (Gitea #404); the
-					// persisted Character is only the spawn seed (movement is never persisted live). Update the
-					// authoritative entity and broadcast from it; fall back to the Character only if the player
-					// isn't in the world model yet.
+					// The floats after the position are the entity's rotation QUATERNION; bit4 says how many are on the
+					// wire - set (most moves) sends only the (qy, qw) an upright yaw-only facing needs, clear sends all
+					// four. Reading them as Euler degrees pinned every character's facing at ~identity.
+					var moveRotation = moveFlags.HasFlag(MoveFlag.CollapsedRotation)
+						? new Quaternion(0f, body.ReadFloat(), 0f, body.ReadFloat())
+						: body.ReadQuaternion();
+
+					// The WorldEntity owns the live transform (Gitea #404); the persisted Character is only the spawn
+					// seed, so fall back to it only for a player not in the world model yet.
 					var moveEntity = PlayerWorldEntity(client);
 
 					// The pre-move position, so a real TRANSLATION below can interrupt an in-flight cast (#347).
-					var previousPosition = moveEntity?.Position ?? sessionCharacter.Position;
+					var previousPosition = moveEntity?.Position ?? sessionCharacter.Position; // TODO: Is this fallback needed??
 
 					// FALLBACK only: a seated player who leaves the seat WITHOUT asking (a teleport, or a client that
-					// skips the request) still gets stood up. The normal path is the client's own standup request -
-					// behaviour 1, handled in the BCC branch below. Gated on distance from the seat rather than the
-					// packet type, because the client streams position syncs while seated that must not stand it up.
+					// skips the request) still gets stood up - the normal path is the client's own standup request
+					// (behaviour 1, in the BCC branch). Gated on distance, because a seated client streams position
+					// syncs that must not stand it up.
 					await _broadcaster.StandUpIfMoved(client, movePosition);
 
 					// Trance root (#141): the spellweave trance immobilises the caster, so while IsSpellweaving the
 					// server PINS the position (rejects translation) but still accepts rotation - the move handler is
 					// the enforcement point. Others then see the caster rooted; the relay below carries the pinned pos.
 					var acceptedPosition = client.Session.IsSpellweaving
-						? moveEntity?.Position ?? sessionCharacter.Position
+						? moveEntity?.Position ?? sessionCharacter.Position // TODO: Is this fallback needed??
 						: movePosition;
 
 					if (moveEntity != null)
 					{
 						moveEntity.Position = acceptedPosition;
-						moveEntity.Rotation = moveRotation.ToQuaternion();
+						moveEntity.Rotation = moveRotation;
 					}
 					else
 					{
-						// The DB Character stores a quaternion; the move wire carries a Vector3 (Euler) rotation.
 						sessionCharacter.Position = acceptedPosition;
-						sessionCharacter.Rotation = moveRotation.ToQuaternion();
+						sessionCharacter.Rotation = moveRotation;
 					}
 
-					var livePosition = moveEntity?.Position ?? sessionCharacter.Position;
-					var liveRotation = moveEntity?.Rotation.ToVector3() ?? sessionCharacter.Rotation.ToVector3();
+					var livePosition = moveEntity?.Position ?? sessionCharacter.Position; // TODO: Is this fallback needed??
 
 					// #262: a move can satisfy a ReachArea quest goal (e.g. Shipwrecked's "Enter the jungle") - solve
 					// any whose area this position falls in. In-memory distance test (targets cached on the entity).
 					if (moveEntity != null)
 						await CheckPlayerReachGoals(client, moveEntity, livePosition);
 
-					// Moving cancels an in-flight cast (#347): a real translation (the position actually changed -
-					// turning in place leaves it unchanged, so aiming a ground-target reticle like Deadly Blizzard
-					// never self-cancels) bumps the cast token so the deferred Resolve() aborts. Server-side, so it
-					// works for BOTH locked-target and ground casts regardless of whether the client sends its own
-					// cancel BCC (it does for locked casts, not for the ground AoE). While spellweaving the position
-					// is pinned above (delta 0), so an attempted move can't cancel the trance/weave.
-					// A real translation aborts the deferred effect server-side (the Resolve() token check). The
-					// client drives the cast bar itself: it sends its own cancel BCC on the move (handled above,
-					// which sends the state=0x0007 abort back). So here we only invalidate the pending resolve.
+					// Moving cancels an in-flight cast (#347): a real TRANSLATION invalidates the deferred Resolve()
+					// via the cast token. Turning in place leaves the position unchanged, so aiming a ground-target
+					// reticle never self-cancels, and a pinned spellweave (delta 0) can't cancel its own trance. The
+					// cast BAR is the client's own business - it sends the cancel BCC handled above.
 					if (Vector3.DistanceSquared(previousPosition, livePosition) > CastMoveCancelEpsilonSq)
 						client.Session.ActiveCastToken++;
-
-					// The CharDCMove carrier's movingType u16 is [u8 env][u8 flag1] (docs/re/chardcmove-grammar.md):
-					// the client streams its move with env=0x01 (the "I am the controlling client" flag); the
-					// server's echo + relay carry env=0x00. Retail strips it on both directions - verified
-					// byte-exact in the other-players-visible capture, where the c2s move and its s2c twin differ
-					// ONLY in this byte (c2s 0x011e -> s2c 0x001e). Forwarding the client's 0x01 verbatim made
-					// OTHER viewers treat B's move as locally-controlled and over-predict it from the velocity
-					// block, so B drifted/teleported even while standing still (#48). Clear the env byte.
-					var relayMovingType = (ushort)((ushort)movingType & 0x00FF);
 
 					// NB moves are echoed even while SEATED, because retail does: in the sit capture the seated player's
 					// c2s CharDCMove is answered with an s2c one (pkt 6812 -> 6815, 6841 -> 6842) and the standup
@@ -187,31 +165,37 @@ namespace Faolan.GameServer
 					// and stopped sending any, so the threshold could never be reached and only the client's own
 					// local timeout got the player up. (It also skipped BroadcastPlayerMove entirely, so world
 					// objects did not stream while seated either.)
+					// Echo the move back VERBATIM with only the env byte cleared - retail's s2c CharDCMove IS the
+					// c2s move with its env byte flipped 0x01 -> 0x00 (same length, same body), NOT a reconstruction.
+					// Rebuilding it from the parsed pos/rot (round-tripping the rotation through a quaternion)
+					// produced a body the client's CharDCMoveIIR reader REJECTS ("ReadSubClass failed ... Blob data
+					// may be inconsistant" in the client log), so it fell back to prediction -> the movement jitter
+					// (#272). While spellweaving the position is PINNED (trance root #141) - the client does NOT self-root
+					// (verified: without this overwrite you can walk during a weave), so overwrite the echoed position
+					// floats with the accepted (pinned) position; otherwise the client's own move rides back unchanged.
+					var echoBody = rawPayload[4..]; // drop the u32 pbLength: [opcode][c350][inst][env][flag1][pos][...]
+
+					// The movingType u16 is [u8 env][u8 flag1] (docs/re/chardcmove-grammar.md): the client streams
+					// its move with env=0x01 (the "I am the controlling client" flag) and retail's echo AND relay
+					// both carry env=0x00 - verified byte-exact in the other-players-visible capture, where the c2s
+					// move and its s2c twin differ ONLY in this byte (c2s 0x011e -> s2c 0x001e). Forwarding the
+					// client's 0x01 verbatim made OTHER viewers treat B's move as locally-controlled and
+					// over-predict it from the velocity block, so B drifted/teleported even while standing still
+					// (#48). flag1 (the layout bitfield, jump bit included) rides through untouched.
+					echoBody[12] = 0x00;
+					if (client.Session.IsSpellweaving && echoBody.Length >= 26)
 					{
-						// Echo the move back VERBATIM with only the env byte cleared - retail's s2c CharDCMove IS the
-						// c2s move with its env byte flipped 0x01 -> 0x00 (same length, same body), NOT a reconstruction.
-						// Rebuilding it from the parsed pos/rot (round-tripping the rotation through a quaternion)
-						// produced a body the client's CharDCMoveIIR reader REJECTS ("ReadSubClass failed ... Blob data
-						// may be inconsistant" in the client log), so it fell back to prediction -> the movement jitter
-						// (#272). While spellweaving the position is PINNED (trance root #141) - the client does NOT self-root
-						// (verified: without this overwrite you can walk during a weave), so overwrite the echoed position
-						// floats with the accepted (pinned) position; otherwise the client's own move rides back unchanged.
-						var echoBody = rawPayload[4..]; // drop the u32 pbLength: [opcode][c350][inst][movingType][pos][rot][tail]
-						echoBody[12] = 0x00; // clear the env byte (the movingType u16's high byte)
-						if (client.Session.IsSpellweaving && echoBody.Length >= 26)
-						{
-							BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(14, 4), acceptedPosition.X);
-							BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(18, 4), acceptedPosition.Y);
-							BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(22, 4), acceptedPosition.Z);
-						}
-
-						await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-							s => s.WriteArrayUInt32Length(echoBody)));
-
-						// Interest-managed broadcast: spawn this player to newly-near players and forward the move
-						// to players who already see them (Gitea #404). No-op solo.
-						await _broadcaster.BroadcastPlayerMove(client, (uint)pbOpcode, dataobjdec, dataclientinst, relayMovingType, livePosition, liveRotation, datadat);
+						BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(14, 4), acceptedPosition.X);
+						BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(18, 4), acceptedPosition.Y);
+						BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(22, 4), acceptedPosition.Z);
 					}
+
+					await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+						s => s.WriteArrayUInt32Length(echoBody)));
+
+					// Interest-managed broadcast: spawn this player to newly-near players and forward the move to those
+					// who already see them (Gitea #404), carrying the same body the echo just did. No-op solo.
+					await _broadcaster.BroadcastPlayerMove(client, echoBody, livePosition);
 
 					break;
 				}

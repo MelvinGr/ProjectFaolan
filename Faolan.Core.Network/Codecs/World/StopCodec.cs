@@ -4,8 +4,9 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// StopIIR_c (0xD751EBB4) - the move-stop record: final position + a 4-float facing/orientation (FUN_00a34700,
-	// 7 big-endian floats). The trailing rotation is a unit 2D heading embedded in 4 floats.
+	// StopIIR_c (0xD751EBB4) - the move-stop record: final position + orientation (FUN_00a34700, 7 big-endian floats).
+	// The trailing four are the rotation QUATERNION, in full (CharDCMove's bit4 collapse has no counterpart here) -
+	// unit-length for 100% of the corpus's 3,540 records, and yaw-only in shape (qx = qz = 0).
 	public static class StopCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.StopIIR;

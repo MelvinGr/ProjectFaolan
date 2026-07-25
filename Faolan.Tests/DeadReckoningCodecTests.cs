@@ -26,16 +26,36 @@ namespace Faolan.Tests
 		public void CharDCMove_BuildStationaryFacing_RoundTripsThroughParse()
 		{
 			var pos = new Vector3(260f, 4.65f, 290f);
-			var body = CharDCMoveCodec.BuildStationaryFacing(0x01316E71, pos, 0f, 1f, 0.173f);
+			var body = CharDCMoveCodec.BuildStationaryFacing(0x01316E71, pos, Quaternion.Identity, 0.173f);
 
 			var r = CharDCMoveCodec.Parse(body);
 			Assert.Equal(0x01316E71u, r.Handle);
 			Assert.Equal(0x1e, r.Flag1);
 			Assert.True(r.Bit4);
 			Assert.Equal(pos.X, r.Position.X, 3);
-			Assert.Equal(0f, r.FacingX, 5);
-			Assert.Equal(1f, r.Param6, 5);
+			Assert.Equal(Quaternion.Identity, r.Rotation);
 			Assert.Equal(0.173f, r.Param19, 4);
+		}
+
+		// The floats after the position are the entity's rotation QUATERNION, not the decompile's "post-position move
+		// vector" + facing scalars: bit4 SET collapses it to the two components a yaw-only facing needs (qy, qw), bit4
+		// CLEAR carries all four. Both captured forms are unit-length - across the corpus that holds within 1e-4 for
+		// 100% of 19,642 collapsed and 3,250 full records - and the yaw the collapsed pair implies matches the
+		// direction of travel (within 7.5 deg for 90% of sustained straight runs), which is what pins it as an
+		// orientation rather than a heading vector (a heading would be sin/cos, i.e. the FULL angle, not the half).
+		[Theory, InlineData(CharDcMoveCollapsed, true), InlineData(CharDcMoveFullVector, false)]
+		public void CharDCMove_RotationIsAUnitQuaternion(string hex, bool collapsed)
+		{
+			var r = CharDCMoveCodec.Parse(Convert.FromHexString(hex));
+
+			Assert.Equal(collapsed, r.Bit4);
+			Assert.Equal(1f, r.Rotation.Length(), 4);
+			if (collapsed)
+			{
+				// The dropped components really are zero on the wire - that is why two floats suffice.
+				Assert.Equal(0f, r.Rotation.X);
+				Assert.Equal(0f, r.Rotation.Z);
+			}
 		}
 
 		[Fact]

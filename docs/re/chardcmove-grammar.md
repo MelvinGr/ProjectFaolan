@@ -27,9 +27,9 @@ slot 8 → `CharDCMoveIIR_t::ReadSubClass = FUN_007adae0`, which delegates to th
 ```
 [u8 flag1]                       bitfield (see below)
 [float x3]   position            ALWAYS — world (x, y=height, z), big-endian floats
- bit4 set  → [float facingX]        collapsed: ONE float; with param6 = a unit-length 2D facing
- bit4 clear→ [float x3]             full post-position move vector
-[float]      param6              facing/secondary scalar
+ bit4 set  → [float qy]             collapsed rotation: the ONE non-zero vector component of a yaw-only facing
+ bit4 clear→ [float x3]             the full rotation vector part (qx, qy, qz)
+[float]      qw                  the rotation's scalar part (the decompile's `param6`)
 [u8 flag2]                       move mode; the block below is read ONLY when flag2 < 8:
    bit2 clear→ [float x3]        velocity      (param10..12)
    bit3 clear→ [float x3]        acceleration  (param13..15)
@@ -49,7 +49,7 @@ All multi-byte numbers are **big-endian** (`FUN_0048f900` = ReadU32-BE; raw byte
 | 1 | 0x02 | `local_d` | clear ⇒ read the `param7..9` heading vector |
 | 2 | 0x04 | `local_f` | clear ⇒ read the `param10..12` velocity vector |
 | 3 | 0x08 | `local_e` | clear ⇒ read the `param13..15` acceleration vector |
-| 4 | 0x10 | — | set ⇒ collapse the post-position move vector to a single float |
+| 4 | 0x10 | — | set ⇒ send the rotation as `(qy, qw)` instead of `(qx, qy, qz, qw)` |
 | 5 | 0x20 | — | stored as bool `param[0x12]` |
 | 6 | 0x40 | — | stored as bool — **AIRBORNE (a jump)** |
 
@@ -68,12 +68,54 @@ this bit diagnostic on its own — the bits either side of it (`0x20`, and `flag
 `bit0 (0x01)` toggles freely and does not affect the layout (the `0x1a`/`0x1b` twins are the same
 length). When `flag2 >= 8` the velocity/accel/heading block is skipped entirely (the short forms).
 
+## The relay is VERBATIM — the c2s record with its env byte cleared
+
+A move is forwarded to the mover's own client (the echo) **and** to every other client that can see the mover as the
+**same bytes**, changing only `env` (`0x01` → `0x00`, "I am the controlling client"). Measured over the whole corpus:
+**9,438 of 9,932 c2s `CharDCMove` records have an s2c twin identical bar that byte** (the remainder sit in captures
+with partial coverage, e.g. one that has 0/59). In `xxx_2clients_jumping` all 35 do, on both clients' streams — the
+jump at packet idx 1339 reappears at idx 1340 (the jumper's echo) and idx 1342 (the watcher). [V2: xxx_2clients_jumping.tshark.json]
+
+So the server has nothing to re-encode here: it re-frames the mover's own carrier per recipient. That is also what
+makes the flag-gated layout a non-issue on the relay path — a rebuild has to know how many floats bit4 implies and
+where the jump's acceleration vector sits; forwarding does not.
+[V3: CrossPlayerMoveRelayTests.BroadcastPlayerMove_ForwardsTheJumpVerbatim_ToAViewerWhoKnowsTheMover]
+
+## The post-position floats are a ROTATION QUATERNION
+
+The decompile's names for this region — a "post-position move vector" plus the scalars `facingX` / `param6` — are
+what the client's reader calls its locals, and they hide what the field is. The floats are the entity's **orientation
+quaternion**, and bit4 does not "collapse a vector": it drops the two components that are zero for an upright
+character.
+
+| | bit4 clear | bit4 set |
+|---|---|---|
+| on the wire | `[qx][qy][qz]` then `[qw]` | `[qy]` then `[qw]` |
+| records | 3,250 | 19,642 |
+| `\|q\|² = 1` within 1e-4 | **100%** | **100%** |
+
+Unit-length across every captured record in both forms is already decisive (a "move vector" has no reason to be),
+and the yaw it implies confirms the reading: over sustained straight runs (three consecutive collapsed records with a
+consistent travel direction, 1,634 samples), `2·atan2(qy, qw)` matches the direction of travel within **7.5° for 90%**
+of them, and within 22.5° for 97%. The factor of two is the tell — a heading pair would be `(sin θ, cos θ)`, giving
+the angle directly; a quaternion gives the HALF-angle, and reading it as a heading is off by θ/2, which is why an
+earlier attempt at `atan2(facingX, param6)` scattered with a 57° median error and looked unpinnable.
+[V2: Hoxxling_mage-heraldofxotli_login_gameplay.tshark.json]
+[V3: DeadReckoningCodecTests.CharDCMove_RotationIsAUnitQuaternion]
+
+The same four floats close **StopIIR** (below): unit-length for 100% of its 3,540 records too, so its "4-float
+rotation" is this same quaternion, not a heading embedded in four floats.
+
+This is what the move handler feeds the live entity (and, through it, the persisted facing and the spawn record other
+players get). Before it was decoded, the handler read three floats blindly and passed them to a Euler→quaternion
+conversion as DEGREES: in the collapsed form that mixed `qy` and `qw` with the `flag2` byte reinterpreted as a float
+(the captured jump reads 0.479 / 0.878 / 1.5e-36), so every character's facing was pinned within about a degree of
+identity.
+
 ## Semantic validation
 
 - **Position** floats are real world coordinates and drift smoothly tick-to-tick as a character
   walks (e.g. hoxxling `322.50 → 322.22 → 320.94 → 320.14`, height `y ≈ 145`).
-- The `bit4`-collapsed pair `(facingX, param6)` is a **unit-length 2D facing direction**
-  (`facingX² + param6² ≈ 1.0` for 11,785 / 11,884 collapsed records) that rotates as the entity turns.
 
 ## Observed flag distribution — every value, measured
 
@@ -87,19 +129,19 @@ both env bytes (37 pairs)**:
 
 | flag1 | bits | count (env 0x00 + 0x01) | reads |
 |---|---|---|---|
-| `0x1A` | 1,3,4 | 3368 + 2183 | collapsed facing, velocity |
-| `0x1E` | 1,2,3,4 | 3320 + 3036 | collapsed facing only |
-| `0x3A` | 1,3,4,5 | 1687 + 1530 | collapsed facing, velocity, bool5 |
-| `0x0A` | 1,3 | 684 + 653 | full move vector, velocity |
-| `0x2A` | 1,3,5 | 638 + 671 | full move vector, velocity, bool5 |
-| `0x72` | 1,4,5,6 | 244 + 190 | collapsed facing, velocity, accel, bool5+6 |
-| `0x52` | 1,4,6 | 171 + 116 | collapsed facing, velocity, accel, bool6 |
-| `0x0E` | 1,2,3 | 133 + 142 | full move vector |
-| `0x56` | 1,2,4,6 | 40 + 35 | collapsed facing, accel, bool6 |
-| `0x42` | 1,6 | 29 + 29 | full move vector, velocity, accel, bool6 |
-| `0x62` | 1,5,6 | 26 + 26 | full move vector, velocity, accel, bool5+6 |
-| `0x12` | 1,4 | 19 + 17 | collapsed facing, velocity, accel |
-| `0x02` | 1 | 11 + 11 | full move vector, velocity, accel |
+| `0x1A` | 1,3,4 | 3368 + 2183 | collapsed rotation, velocity |
+| `0x1E` | 1,2,3,4 | 3320 + 3036 | collapsed rotation only |
+| `0x3A` | 1,3,4,5 | 1687 + 1530 | collapsed rotation, velocity, bool5 |
+| `0x0A` | 1,3 | 684 + 653 | full rotation, velocity |
+| `0x2A` | 1,3,5 | 638 + 671 | full rotation, velocity, bool5 |
+| `0x72` | 1,4,5,6 | 244 + 190 | collapsed rotation, velocity, accel, bool5+6 |
+| `0x52` | 1,4,6 | 171 + 116 | collapsed rotation, velocity, accel, bool6 |
+| `0x0E` | 1,2,3 | 133 + 142 | full rotation |
+| `0x56` | 1,2,4,6 | 40 + 35 | collapsed rotation, accel, bool6 |
+| `0x42` | 1,6 | 29 + 29 | full rotation, velocity, accel, bool6 |
+| `0x62` | 1,5,6 | 26 + 26 | full rotation, velocity, accel, bool5+6 |
+| `0x12` | 1,4 | 19 + 17 | collapsed rotation, velocity, accel |
+| `0x02` | 1 | 11 + 11 | full rotation, velocity, accel |
 | `0x16`, `0x22`, `0x32`, `0x3E`, `0x46` | — | 1–4 each | rare combinations |
 | `0x00` | none | 4 | reads everything, incl. the heading vector |
 
@@ -120,9 +162,10 @@ Fixed length for all 2,181 captured samples:
 [u32 len=41][u32 0xD751EBB4][u32 0xC350][u32 handle][u8 env=0x00][float x7]
 ```
 
-The 7 floats are `position(x,y,z)` + a 4-float facing/orientation, e.g. hoxxling stops at
-`(294.12, 145.14, 726.28)` facing `(0.0, -0.497, 0.0, 0.868)` — the last pair is again unit length
-(`0.497² + 0.868² ≈ 1.0`), i.e. the final 2D heading. Total wire size = 45 bytes.
+The 7 floats are `position(x,y,z)` + the same rotation QUATERNION the move carries, here always in full: hoxxling
+stops at `(294.12, 145.14, 726.28)` facing `(0.0, -0.497, 0.0, 0.868)` — the `x = z = 0`, `qy² + qw² ≈ 1` shape of a
+yaw-only facing, written out unmasked. Unit length holds for 100% of its 3,540 captured records. Total wire size =
+45 bytes.
 
 ## Status
 

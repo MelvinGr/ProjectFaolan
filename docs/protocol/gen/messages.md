@@ -23,7 +23,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `BankIIR` | `0x0BA1C1CB` | `BankIirCodec` | [V3: BankStorageTests.BuildBankIirRecord_Matches_CapturedBank] |
 | V3 | `BehaviorControlCenterIIR` | `0x642CD3D6` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `BehaviorHeartbeatCodec`, `CombatPacketCodec`, `WorldDeath` | [V3: BehaviorAckTests.UnequipOutOfSlot_AckMatchesCapture] |
 | V3 | `ChainKillIIR` | `0x0EED7068` | `ChainKillCodec` | [V3: V1IirCodecTests.ChainKill_RoundTripsCapturedBody] |
-| V3 | `CharDCMoveIIR` | `0x4517AA81` | `CharDCMoveCodec` | [V3: DeadReckoningCodecTests.CharDCMove_RoundTripsByteExact] |
+| V3 | `CharDCMoveIIR` | `0x4517AA81` | `CharDCMoveCodec` | [V3: CrossPlayerMoveRelayTests.BroadcastPlayerMove_ForwardsTheJumpVerbatim_ToAViewerWhoKnowsTheMover] |
 | V3 | `CharInPlayIIR` | `0x864CFEF8` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `CharacterActionIIR` | `0x6B6FD368` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `ChatTextIIR` | `0xE0B51102` | `ChatTextCodec` | [V3: ChatTextCodecTests.Build_FromParsedFields_MatchesCapture] |
