@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
+using Faolan.Core.Database.Interfaces;
+using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.World
 {
@@ -34,9 +36,31 @@ namespace Faolan.GameServer.World
 		// it via WorldDespawn.TryExtractPlayfieldToken.
 		public uint PlayfieldToken { get; set; }
 
+		// The map's STATIC world objects (props, doors, climbing vines, destructibles), loaded once per zone by
+		// WorldBroadcaster.EnsureZoneWorldObjects rather than re-queried per world entry (#424). They are deliberately
+		// NOT WorldEntities: they do not move, think, fight or tick, so putting ~1000 inert props in _entities would
+		// buy nothing and cost the simulation a pass over all of them. What they DO need is interest streaming, which
+		// is why they live on the zone - see WorldObjectsInRange.
+		//
+		// A loot bag is the exception and IS a WorldEntity: it has a lifecycle (open, expire, fade), which is exactly
+		// the state that earns entity-hood.
+		public IReadOnlyList<WorldObject> WorldObjects { get; set; } = [];
+
 		public Zone(uint mapId)
 		{
 			MapId = mapId;
+		}
+
+		// The static world objects within `range` of `position` - the interest query for streaming props as a player
+		// walks. Same linear scan as the entity queries above, and the same note applies: fine at map scale, a grid is
+		// the optimisation when it stops being.
+		public IEnumerable<WorldObject> WorldObjectsInRange(Vector3 position, float range)
+		{
+			foreach (var obj in WorldObjects)
+			{
+				if (Vector3.Distance(obj.Position, position) <= range)
+					yield return obj;
+			}
 		}
 
 		public void Add(WorldEntity entity)

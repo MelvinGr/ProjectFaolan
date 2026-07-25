@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Faolan.Core.Database.Tables;
 using Faolan.GameServer.World;
 using Xunit;
 
@@ -193,6 +194,94 @@ namespace Faolan.Tests
 		{
 			mover.Position = new Vector3(x, 0, z);
 			return (new WorldEvents(InterestManager.ResolveMove(zone, mover, Range)), zone);
+		}
+
+		// ---- static world objects (#424) -------------------------------------------------------------------------
+		//
+		// Objects are interest-streamed like NPCs but with the OPPOSITE known-set rule, which is the whole point of
+		// these tests: retail despawns an object when the player leaves its range and re-sends the FULL spawn record
+		// when they come back (measured across the login captures - 565 of 648 repeated sends byte-identical, 212
+		// n3ToClientQuit records carrying world-object handles). NPC interest is deliberately sticky (#245); if the two
+		// ever get merged onto one set, these break.
+
+		[Fact]
+		public void WorldObjects_OnlyThoseInRangeSpawn()
+		{
+			var zone = new Zone(2040);
+			zone.WorldObjects = [Obj(1, 0, 0), Obj(2, 10, 0), Obj(3, 500, 0)];
+			var p = Player(9, 0, 0);
+
+			var (spawn, despawn) = InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
+
+			Assert.Equal([1u, 2u], spawn.Select(o => o.CapturedHandle).Order().ToArray());
+			Assert.Empty(despawn);
+			Assert.Equal([1u, 2u], p.KnownObjects.Order().ToArray());
+		}
+
+		[Fact]
+		public void WorldObjects_AlreadyKnown_AreNotResent()
+		{
+			var zone = new Zone(2040);
+			zone.WorldObjects = [Obj(1, 0, 0)];
+			var p = Player(9, 0, 0);
+
+			InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
+			var (spawn, despawn) = InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
+
+			Assert.Empty(spawn); // standing still must not re-spawn what the client already has
+			Assert.Empty(despawn);
+		}
+
+		// The rule that separates objects from NPCs: walk away -> despawn, walk back -> the WHOLE record again.
+		[Fact]
+		public void WorldObjects_LeavingRangeDespawns_AndReturningResends()
+		{
+			var zone = new Zone(2040);
+			zone.WorldObjects = [Obj(7, 0, 0)];
+			var p = Player(9, 0, 0);
+
+			InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
+			Assert.Contains(7u, p.KnownObjects);
+
+			p.Position = new Vector3(500, 0, 0);
+			var (spawn, despawn) = InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
+			Assert.Empty(spawn);
+			Assert.Equal([7u], despawn);
+			Assert.DoesNotContain(7u, p.KnownObjects); // NOT sticky - the opposite of NPC Known (#245)
+
+			p.Position = new Vector3(0, 0, 0);
+			var (back, _) = InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
+			Assert.Equal([7u], back.Select(o => o.CapturedHandle).ToArray()); // full re-send, not a diff
+		}
+
+		// #262: a gated object is absent entirely for a player without the quest, and appears once they hold it.
+		[Fact]
+		public void WorldObjects_QuestGated_SpawnOnlyForTheHolder()
+		{
+			var zone = new Zone(2040);
+			var gated = Obj(5, 0, 0);
+			gated.GateQuestId = 13479;
+			zone.WorldObjects = [gated];
+
+			var without = Player(9, 0, 0);
+			Assert.Empty(InterestManager.ResolveWorldObjects(zone, without, Range, NoQuests).Spawn);
+
+			var with = Player(10, 0, 0);
+			Assert.Equal([5u], InterestManager.ResolveWorldObjects(zone, with, Range, new HashSet<uint> { 13479 }).Spawn.Select(o => o.CapturedHandle).ToArray());
+		}
+
+		private static readonly IReadOnlySet<uint> NoQuests = new HashSet<uint>();
+
+		private static WorldObject Obj(uint handle, float x, float z)
+		{
+			return new WorldObject
+			{
+				MapId = 2040,
+				CapturedHandle = handle,
+				PositionX = x,
+				PositionY = 0,
+				PositionZ = z
+			};
 		}
 
 		private static WorldEntity Player(uint handle, float x, float z)

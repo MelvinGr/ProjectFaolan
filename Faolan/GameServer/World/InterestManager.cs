@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Faolan.Core.Database.Tables;
 using System.Linq;
 using System.Numerics;
 
@@ -20,6 +21,44 @@ namespace Faolan.GameServer.World
 	// scaling step.
 	public static class InterestManager
 	{
+		// Resolves which of the zone's static world objects the player should have rendered right now, updating the
+		// player's non-sticky known set: returns the ones to SPAWN (newly in range) and the handles to DESPAWN (walked
+		// out of range). Shared by the entry pass and the per-move pass so both obey one rule.
+		//
+		// This is retail's model, measured rather than assumed (#424):
+		//   * only a SUBSET arrives at entry - in Hoxxling_..._gameplay2, 58 of 158 object handles, with 100 more
+		//     following as the player walked and the last one 687s in;
+		//   * leaving range DESPAWNS the object - 212 of that capture's n3ToClientQuit records carry world-object
+		//     handles, each with its OWN class word (0xC878 SimpleDynel, 0xC748 ZoneLabel/Door, ...), not Character;
+		//   * returning re-sends the FULL spawn record verbatim - 565 of 648 repeated sends are byte-identical and the
+		//     83 that differ vary only in the optional kdtree field. Nothing stateful is ever pushed on a re-send, so
+		//     there is no diffing to do: in range -> whole record, out of range -> despawn.
+		public static (List<WorldObject> Spawn, List<uint> Despawn) ResolveWorldObjects(Zone zone, WorldEntity player, float range, IReadOnlySet<uint> quests)
+		{
+			var spawn = new List<WorldObject>();
+			var inRange = new HashSet<uint>();
+
+			foreach (var obj in zone.WorldObjectsInRange(player.Position, range))
+			{
+				// #262 quest-gated objects: absent entirely for a player who does not hold the quest. The set is passed in
+				// rather than read off the entity, because at ENTRY the entity's copy is not populated until
+				// BuildEntryNpcBurst runs - which is after this - and reading it there would silently hide every gated
+				// object on login.
+				if (!obj.SpawnsFor(quests))
+					continue;
+
+				inRange.Add(obj.CapturedHandle);
+				if (player.KnownObjects.Add(obj.CapturedHandle))
+					spawn.Add(obj);
+			}
+
+			var despawn = player.KnownObjects.Where(h => !inRange.Contains(h)).ToList();
+			foreach (var handle in despawn)
+				player.KnownObjects.Remove(handle);
+
+			return (spawn, despawn);
+		}
+
 		// Recompute interest after `mover` changed position (or just entered). Updates Known sets and returns the
 		// events to dispatch. Symmetric: handles both what the mover now sees and who now sees the mover.
 		// `includeNonPlayers` widens the mover's own view to NPCs (not just players): a player walking through the

@@ -84,6 +84,7 @@ namespace Faolan.GameServer.World
 		// (mapId, instanceId) zones whose NPCs have been loaded into the world model (once per instance, on first entry
 		// to that copy - each instance gets its own NPC population) (#268).
 		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _npcLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
+		private readonly ConcurrentDictionary<(uint MapId, uint InstanceId), byte> _objectLoadedZones = new ConcurrentDictionary<(uint MapId, uint InstanceId), byte>();
 
 		// Cached loot-bag template (a captured "Bag of loot" world object) per map; null values cache loot-less maps.
 		private readonly IDatabaseRepository _database;
@@ -180,6 +181,61 @@ namespace Faolan.GameServer.World
 			await LoadActiveQuestIds(entity);
 			var events = InterestManager.ResolveMove(_sim.World.ZoneForEntity(entity), entity, WorldSimulation.PlayerInterestRange, true);
 			await DispatchInterest(events, null);
+			await StreamWorldObjects(client, entity);
+		}
+
+		// Loads a map's static world objects into its zone ONCE, the world-object twin of EnsureZoneNpcs (#424). Before
+		// this the entry path re-queried them per world entry, which is also how a missing `Include(o => o.Words)`
+		// managed to ship invisible doors, vines and destructibles (ef9b59de) - one load per zone is one place to get
+		// that right.
+		public async Task EnsureZoneWorldObjects(uint mapId, uint instanceId)
+		{
+			if (!_objectLoadedZones.TryAdd((mapId, instanceId), 0))
+				return;
+
+			_sim.World.ZoneFor(mapId, instanceId).WorldObjects = await _database.GetWorldObjects(mapId);
+		}
+
+		// The world objects within interest range at ENTRY, as ready-to-send records in the position retail puts them -
+		// early in the entry stream, before the snapshot. Mirrors BuildEntryNpcBurst: it seeds the known set so the
+		// per-move pass afterwards streams only the delta. No despawns are possible on a fresh entry (the known set
+		// starts empty), so any that appear would mean stale per-zone state and are returned for the caller to send.
+		public (List<Rpc> Records, int Total) BuildEntryWorldObjects(INetworkClient client, WorldEntity player, IReadOnlySet<uint> quests)
+		{
+			var zone = _sim.World.ZoneForEntity(player);
+			var (spawn, _) = InterestManager.ResolveWorldObjects(zone, player, WorldSimulation.PlayerInterestRange, quests);
+
+			return ([.. spawn.Select(o => WorldObjectRpc(client, o, zone.PlayfieldToken))], zone.WorldObjects.Count);
+		}
+
+		// Brings the player's rendered world objects in line with interest after a move: spawns what came into range,
+		// despawns what left. See ResolveWorldObjectInterest for why re-entry re-sends the whole record.
+		public async Task StreamWorldObjects(INetworkClient client, WorldEntity player)
+		{
+			var zone = _sim.World.ZoneForEntity(player);
+			if (zone.WorldObjects.Count == 0)
+				return;
+
+			// On a move the entity's own set is current - BroadcastPlayerMove refreshes it immediately before this.
+			var (spawn, despawn) = InterestManager.ResolveWorldObjects(zone, player, WorldSimulation.PlayerInterestRange, player.ActiveQuestIds);
+
+			foreach (var obj in spawn)
+				await client.SendAsync(WorldObjectRpc(client, obj, zone.PlayfieldToken));
+
+			foreach (var handle in despawn)
+			{
+				// Despawn with the object's OWN class - a Character-classed quit silently misses a world object (#366).
+				var gone = zone.WorldObjects.FirstOrDefault(o => o.CapturedHandle == handle);
+				await SendWorldDespawn(client, zone.PlayfieldToken, handle, WorldObjectBuilder.TypeTagForClass(gone?.SubOpcode ?? 0));
+			}
+		}
+
+		// One static world object's FullUpdate, built from its columns and stamped with the live playfield token. The
+		// body carries its own [u32 len][u32 subOpcode][record] carrier prefix, so it rides DispatchPassBlob as-is.
+		private static Rpc WorldObjectRpc(INetworkClient client, WorldObject obj, uint playfieldToken)
+		{
+			return new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+				WorldObjectBuilder.Build(obj, obj.CapturedHandle, playfieldToken));
 		}
 
 		// Sends a QuestFullUpdate (one quest's full detail: description, summary, objective + map marker) built from

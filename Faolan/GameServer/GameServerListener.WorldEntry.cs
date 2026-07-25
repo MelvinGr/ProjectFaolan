@@ -676,7 +676,6 @@ namespace Faolan.GameServer
 				? (await Database.GetCharacterTags(character.Id)).Concat(ItemShopSuppressTags).Distinct().OrderBy(t => t).ToArray()
 				: [];
 			var scaffoldCharacter = await EnsureSpawnScaffoldRows(character!);
-			var worldObjectRows = await Database.GetWorldObjects(mapId);
 
 			// #262: the player's ACTIVE quest ids, for quest-gated world objects (WorldObject.GateQuestId / SpawnsFor).
 			// Empty for a null character; ungated objects (the default) ignore it.
@@ -714,6 +713,9 @@ namespace Faolan.GameServer
 			_simulation.RegisterPlayerInWorld(client, map?.InstanceMode ?? MapInstanceMode.Shared, gearBonuses);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId);
+			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them
+			// from there instead of re-querying per entry.
+			await _broadcaster.EnsureZoneWorldObjects(mapId, instanceId);
 
 			// Warm this map's terrain heightmap + collision mesh off the tick (#284) so the first aggro/loot doesn't
 			// stall the game loop with the ~12 MB decompress + grid build. Fire-and-forget; the caches are thread-safe.
@@ -768,11 +770,17 @@ namespace Faolan.GameServer
 			var snapshot = BuildBurstlessSnapshot(client, equipment!, inventoryRows, characterTags, snapshotQuests, primaryQuest!, knownSpellIds, statSheet, playfieldToken, completedJournal,
 				indexAreas, areaCatalog);
 
-			var toSend = new List<Rpc>(worldObjectRows.Length + 5)
+			var toSend = new List<Rpc>
 			{
 				BuildMapChange(client, map!, playfieldToken)
 			};
-			toSend.AddRange(BuildBurstlessWorldObjects(client, worldObjectRows, playfieldToken, activeQuestIds));
+
+			// World objects are INTEREST-STREAMED, not dumped (#424): entry sends the ones within range and movement
+			// streams the rest, which is what retail does - in Hoxxling_..._gameplay2 only 58 of 158 object handles
+			// arrive at entry, the last one 687s later. They keep their retail POSITION here (early in the stream, before
+			// the snapshot); BroadcastPlayerMove takes over from there.
+			var (worldObjectRecords, worldObjectTotal) = _broadcaster.BuildEntryWorldObjects(client, _simulation.PlayerWorldEntity(client)!, activeQuestIds);
+			toSend.AddRange(worldObjectRecords);
 
 			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment!, scaffoldCharacter!, playfieldToken);
 			if (playerSpawn is { } spawn)
@@ -801,8 +809,8 @@ namespace Faolan.GameServer
 
 			await RestoreEntryBuffs(client);
 
-			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs in the burst).", mapId, character?.Name, toSend.Count,
-				entryBurstNpcs.Count);
+			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs, {Objects}/{ObjectTotal} in-range world objects).", mapId,
+				character?.Name, toSend.Count, entryBurstNpcs.Count, worldObjectRecords.Count, worldObjectTotal);
 
 			// The per-NPC quest markers / captive pose for the burst NPCs (separate IIRs, after the spawn records).
 			await _broadcaster.SendEntryNpcFollowups(client, entryBurstNpcs);
@@ -1031,20 +1039,6 @@ namespace Faolan.GameServer
 
 		// The burst-less world-object packets: each WorldObjects row built via WorldObjectBuilder and framed. Built on
 		// the row's captured handle + the live playfield instance (the rewrite the live splice path applies).
-		private static IEnumerable<Rpc> BuildBurstlessWorldObjects(INetworkClient client, IReadOnlyList<WorldObject> rows, uint playfieldInstance, IReadOnlySet<uint> activeQuestIds)
-		{
-			foreach (var row in rows)
-			{
-				// #262: quest-GATED objects (GateQuestId set) spawn only for a player holding that quest active - the
-				// world-object analogue of an NPC's gating (but the object simply isn't sent; it doesn't spawn). Ungated
-				// objects (the default, incl. the bricks for now) always spawn.
-				if (!row.SpawnsFor(activeQuestIds))
-					continue;
-
-				yield return FrameWorldEntryRecord(client, WorldObjectBuilder.Build(row, row.CapturedHandle, playfieldInstance));
-			}
-		}
-
 		// The character-creator (editor) phase: a not-yet-named character is connected. The client instance is
 		// the character's real id now, so the unnamed-character state alone identifies the editor flow.
 
