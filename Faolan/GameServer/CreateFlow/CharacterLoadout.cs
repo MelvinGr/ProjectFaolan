@@ -1,8 +1,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
+using Faolan.Core.Network;
+using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
+using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -53,6 +59,32 @@ namespace Faolan.GameServer
 			}
 
 			return [.. abilities];
+		}
+
+		// Tells the CLIENT what the character has: the class abilities (0x2052) then its spells (0x200A), on `sender`'s
+		// conversation. The client bars each grant itself, answering with an AddShortcut (0x206E) - which is not just
+		// cosmetic during creation: the editor connection keys its enter-world handoff on the first of those, so a
+		// character granted nothing never leaves the character creator.
+		//
+		// That is what made this class-dependent instead of universal: only the spell half was sent, so a necromancer
+		// barred its two spells and entered the world while a barbarian - granted nothing at all - sat on a black
+		// screen after the fade-out, waiting on a signal it had no reason to send. Retail grants both here (Blablabla
+		// guardian create: 7x 0x2052 at fr2886 -> 7 AddShortcut -> the world redirect at fr2911).
+		public static async Task GrantToClient(INetworkClient client, IDatabaseRepository database, ILogger logger, ProtoEndpoint sender)
+		{
+			var character = client.Session.Character;
+
+			var abilities = await ResolveAbilities(database, logger, character);
+			foreach (var ability in abilities)
+				await GameServerListener.SendAddSpecialAbility(client, ability, sender: sender);
+
+			var spells = await database.GetStartingSpells(character.Level, character.Class);
+			foreach (var spellId in spells)
+			{
+				await client.SendAsync(new Rpc(sender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchLearnSpell, s => s.WriteUInt32(spellId)));
+			}
+
+			logger.LogInformation("Loadout: granted '{Name}' (class={Class}) {A} ability(s) + {S} spell(s) for its bar.", character.Name, character.Class, abilities.Length, spells.Length);
 		}
 
 		// Seeds a newly created character's class spells and default action bar. Called once, from the create flow,

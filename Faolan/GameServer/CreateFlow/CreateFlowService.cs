@@ -46,6 +46,9 @@ namespace Faolan.GameServer.CreateFlow
 
 		internal static readonly ProtoEndpoint MorphAckSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x0C);
 
+		// The create-editor's own grant conversation (GameCharAgent 0x0C); the login/world grants ride a different one.
+		private static readonly ProtoEndpoint CreateGrantSender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x0C);
+
 		// Character ids that have just been named in the create-editor and are about to open their FIRST world
 		// connection (the second GameServer connection, after the 0x2002 enter-world handoff). Added when the name is
 		// committed (HandleCommandPacket TheNameIs) and consumed by the listener's world Hello via
@@ -328,7 +331,8 @@ namespace Faolan.GameServer.CreateFlow
 			}
 		}
 
-		// The post-creation world entry: handshake + burst-less live-char world + cutscene start.
+		// The post-creation world entry: handshake + the burst-less live-char world. The intro cutscene follows
+		// separately, on CharInPlayIIR (SendCreateIntroCutscene).
 		internal async Task SendCreateWorldWithCutscene(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
@@ -342,11 +346,23 @@ namespace Faolan.GameServer.CreateFlow
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchAckAuthenticate,
 				(byte[])[0x00, 0x00, 0x00, 0x01]));
 
-			// (b) The live-char world (constructed; same path existing-char logins use).
+			// (b) The live-char world (constructed; same path existing-char logins use). The intro cutscene does NOT
+			// follow here - see SendCreateIntroCutscene for why it waits for CharInPlayIIR.
 			await _sendBurstlessWorldEntry(client, client.Session.Character.MapId);
+		}
 
-			// (c) Start the destiny cutscene (Scry scripts only - the begin marker, the scene-load character_creation
-			// step, and the two opening script groups). The per-callback steps follow via SendCreateCutsceneStep.
+		// (c) Start the destiny cutscene (Scry scripts only - the begin marker, the scene-load character_creation step,
+		// and the two opening script groups). The per-callback steps follow via SendCreateCutsceneStep.
+		//
+		// Sent in RESPONSE to the create-world CharInPlayIIR, after the ready burst - the order retail uses (Blablatest
+		// create: c2s CharInPlayIIR fr317 -> s2c 0x2024 fr324 -> s2c cutscene fr325). Sending it with the world entry
+		// instead put the cutscene FIRST, so the client's CharInPlayIIR - and therefore ReadyForPlayScreen - landed in
+		// the middle of the intro. That is the same failure the 0x2020-poll flush caused, just moved later: the intro
+		// began correctly and then the world snapped back to the un-ready state.
+		internal async Task SendCreateIntroCutscene(INetworkClient client)
+		{
+			var id = client.Session.Account.ClientInstance;
+
 			// EnergyIIR (0x40749B8A) seed on the avatar - constructed via CreateEditorRecordBuilder (byte-exact-locked
 			// by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
 			await SendIir(client, Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameServer0X2000Opcodes.EnergyIIR,
@@ -415,21 +431,6 @@ namespace Faolan.GameServer.CreateFlow
 		// spell counterpart to the world-prep burst's hardcoded 0x2052 ability grants. The client bars each granted
 		// spell, so these MUST arrive before its 0x206E bar drags. The body is just the 4-byte spell id (retail
 		// f239). Melee classes resolve to an empty set (no starting spells).
-		private async Task GrantCreateStartingSpells(INetworkClient client)
-		{
-			var character = client.Session.Character;
-
-			var id = client.Session.Account.ClientInstance;
-			var sender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x0C);
-			var receiver = Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id);
-
-			var spells = await _database.GetStartingSpells(character.Level, character.Class);
-			foreach (var spellId in spells)
-				await client.SendAsync(new Rpc(sender, receiver, GameCharInterfaceOpcodes.DispatchLearnSpell, s => s.WriteUInt32(spellId)));
-
-			_logger.LogInformation("Create: granted {Count} starting spell(s) (0x200A) to '{Name}' (class={Class}) so the client bars them.", spells.Length, character.Name, character.Class);
-		}
-
 		// The live wire handle of the in-zone NPC named `npcName` (the cinematic actor to bind), or `fallback` when
 		// it isn't loaded. Used to re-address the cutscene's actor reference (ThisIsKalanthes f6) to OUR live entity.
 		private uint LiveNpcHandle(INetworkClient client, string npcName, uint fallback)
@@ -712,7 +713,10 @@ namespace Faolan.GameServer.CreateFlow
 			// casters get spells and melee get none (matching the barbarian capture the burst was seeded from).
 			// With the client's bar drags now persisted, these land on the bar (the client only bars what it was
 			// granted); without it a fresh caster's bar has abilities but no spells.
-			await GrantCreateStartingSpells(client);
+			// Hand the client the kit its bar is built from. It answers each grant with an AddShortcut (0x206E), and
+			// the first of those is what the enter-world handoff keys on - so this is not decoration, it is what moves
+			// the flow forward.
+			await CharacterLoadout.GrantToClient(client, _database, _logger, CreateGrantSender);
 
 			// The client will now send 0x206E (enter world); answer it with the 0x2002 world handoff.
 			client.Session.AwaitingEnterWorld = true;

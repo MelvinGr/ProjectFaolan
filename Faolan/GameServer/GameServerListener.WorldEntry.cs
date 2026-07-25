@@ -54,12 +54,62 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			// The CREATE-WORLD connection gets the same burst, but NOT from here. Retail answers its CharInPlayIIR with
+			// 0x2024 + the ability grants (Blablatest create fr317 -> fr324), and that is the only moment it may fire:
+			// this method also runs off the 0x2020 poll, which during the intro means ReadyForPlayScreen landing inside
+			// the cutscene - the blue screen. So the create-world path calls SendWorldReadyBurst directly from
+			// CharInPlayIIR, and this armed-flush path stays out of it.
+			if (client.Session.IsCreateWorldSession)
+			{
+				Logger.LogInformation("Create-world connection: the ready burst belongs to its CharInPlayIIR, not to this poll.");
+				return;
+			}
+
 			// Past the early return the character is always named: the create-editor connection returned above (it
 			// flushes via the retail create handoff, not here), so every connection that reaches this point is a
 			// Login or a TeleportReentry - both of which want the full existing-character burst below. This is the
 			// cleanup the old "Remove ...Name != null checks below" TODO asked for, now that the early return is in
 			// place: the create-vs-named conditionals that used to guard this body were all unreachable dead code.
 			Logger.LogInformation("Flushing pending post-0x205F follow-up on this 0x2020.");
+			await SendWorldReadyBurst(client);
+		}
+
+		// The create-world answer to CharInPlayIIR - retail's, record for record (Blablatest create fr324/325):
+		//   0x2024 ReadyForPlayScreen | the ability grants (0x2052) | CharInPlayIIR echo | RegenIIR | SyncCanSprint
+		// and then the intro cutscene, which the caller starts.
+		//
+		// Deliberately NOT the login burst (SendWorldReadyBurst). Reusing that sent this connection things retail does
+		// not send here - the combo book (12 ComboBookIIR), the deferred stat prompt, a quest marker and the post-0x2024
+		// login record stream - while missing RegenIIR. "It is a world entry, so send the world-entry burst" is what
+		// keeps re-breaking this flow: the create world entry is its OWN sequence, and the captures say so.
+		private async Task SendCreateWorldReadyBurst(INetworkClient client)
+		{
+			var instance = client.Session.Character.Id;
+
+			await SendReadyForPlayScreen(client);
+			await GrantCharacterAbilities(client);
+
+			// The CharInPlayIIR echo (retail fr324: [u32 len][864cfef8][C350][instance][00]).
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
+				b => b.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50).WriteUInt32(instance).WriteArray(0x00)));
+
+			// RegenIIR (retail fr325 carries 0 / 0x8F2 / 0 - the middle pool is the only seeded one).
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(x => x.WriteUInt32(GameServer0X2000Opcodes.RegenIIR).WriteArray(CreateEditorRecordBuilder.BuildRegenIir(instance, 0, 0x8F2, 0)))));
+
+			// SyncCanSprint (0x200C, one byte).
+			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),
+				GameCharInterfaceProjectOpcodes.DispatchSyncCanSprint, b => b.WriteByte(0x01)));
+		}
+
+		// Everything the client needs to LEAVE the loading screen and stand in the world: the deferred stat prompt, the
+		// quest marker, 0x2024 ReadyForPlayScreen, the ability + combo grants and the post-0x2024 record stream.
+		//
+		// Two callers, because two flows reach this moment differently: a login/teleport arms it on the client's 0x205F
+		// and flushes on the next 0x2020 poll, while a create-world connection sends it on CharInPlayIIR - after the
+		// intro cutscene, never during it.
+		private async Task SendWorldReadyBurst(INetworkClient client)
+		{
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				b => b.WriteArrayUInt32Length(s => s
 					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)

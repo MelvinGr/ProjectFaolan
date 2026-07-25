@@ -226,6 +226,23 @@ namespace Faolan.GameServer
 						Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
 						await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
 					}
+					else if (client.Session.IsCreateWorldSession)
+					{
+						// The third sender, and the one this branch used to mislabel as a teleport reconnect: the
+						// post-creation world connection. THIS is where its ready burst belongs - retail answers this
+						// exact CharInPlayIIR with 0x2024 + the ability grants (Blablatest create fr317 -> fr324) -
+						// and nowhere earlier: fired from a 0x2020 poll while the intro was still running, it left the
+						// player on a blue screen. Marking the world entered both records the transition and lets the
+						// flush through (it holds everything back until then).
+						// Retail's order, exactly: this CharInPlayIIR is answered with the ready burst and THEN the intro
+						// cutscene (Blablatest create - c2s CharInPlayIIR fr317 -> s2c 0x2024 fr324 -> s2c cutscene
+						// fr325). Starting the cutscene earlier, with the world entry, meant the client's CharInPlayIIR
+						// arrived mid-intro and the ready burst interrupted what had already begun.
+						Logger.LogInformation("Create-world CharInPlayIIR: sending the create ready burst, then starting the intro cutscene.");
+						client.Session.HasPendingPost205FFollowUp = false;
+						await SendCreateWorldReadyBurst(client);
+						await _createFlow.SendCreateIntroCutscene(client);
+					}
 					else
 					{
 						Logger.LogInformation("Named-character CharInPlayIIR (changemap/teleport reconnect, no 0x205F): flushing the world post-0x205F follow-up.");
@@ -1241,7 +1258,15 @@ namespace Faolan.GameServer
 					{
 						// Force the Tortage intro spawn onto the character (covers resumed characters that
 						// never went through CreateCharacter), so the live SpawnPlayer uses the right position.
+						// SetCreationSpawn is an ExecuteUpdate - it writes the ROW and cannot touch the object in hand, so
+						// the session character must be moved too. Without this the world entry below built from the
+						// stale in-memory transform (the editor's staging spot, 260/4.65/290) instead of the beach
+						// wash-ashore point: the player entered ~440 units from every beach NPC, "0 in-range NPCs, 0/48
+						// in-range world objects", and the intro cutscene had no Kalanthes to bind its actor to - which
+						// the client reports as `Unable to find NPC 66` from its own controlcamera script.
 						var spawnRows = await Database.SetCreationSpawn(client.Session.Character.Id);
+						client.Session.Character.MapId = Map.NewPlayerSpawnSpawnPoint.MapId;
+						client.Session.Character.Position = Map.NewPlayerSpawnSpawnPoint.Position;
 						Logger.LogInformation(
 							"Post-creation world entry (clientInstance={ClientInstance:X8}, character={CharacterId:X8} '{Name}'): set creation spawn (rows={Rows}, pos=({X},{Y},{Z}), map={Map}); sending the creation world SCENE burst.",
 							clientInstance, client.Session.Character.Id, client.Session.Character.Name, spawnRows, client.Session.Character.PositionX, client.Session.Character.PositionY,
@@ -1455,6 +1480,18 @@ namespace Faolan.GameServer
 				{
 					var unk0 = body.ReadUInt32(); // 0xc350
 					var characterId = body.ReadUInt32();
+
+					// 0x205F is the CINEMATIC TRANSITION (its trailing byte is begin/end), which the login flow happens
+					// to use as its ready trigger. The create-world connection is running an actual cinematic - the
+					// beach/Kalanthes intro - so it sends a stream of these, and arming the login follow-up on them
+					// meant the next 0x2020 poll fired ReadyForPlayScreen + the login record burst INTO the middle of
+					// the cutscene. Its ready sequence is the create burst's own (SendCreateWorldWithCutscene +
+					// SendCreateCutsceneStep), so leave the flag alone here.
+					if (client.Session.IsCreateWorldSession)
+					{
+						Logger.LogInformation("0x205F (cinematic transition) on the create-world connection: the intro drives its own ready sequence; not arming the login follow-up.");
+						break;
+					}
 
 					if (client.Session.IsUnnamedCreatePhase)
 					{
