@@ -363,6 +363,7 @@ namespace Faolan.GameServer
 									await SendStatUpdate(client, dismountStats, self);
 									await _broadcaster.BroadcastStatsToViewers(client, dismountStats); // #428: the horse renders from THIS, so viewers need it too
 									playerEntity?.IsMounted = false;
+									playerEntity?.MountRideStat = 0;
 
 									// Voluntary dismount -> forget the mount so it isn't restored on the next world entry.
 									client.Session.Character.MountId = null;
@@ -392,6 +393,7 @@ namespace Faolan.GameServer
 									await SendStatUpdate(client, mountStats, self);
 									await _broadcaster.BroadcastStatsToViewers(client, mountStats); // #428: the horse renders from THIS, so viewers need it too
 									playerEntity?.IsMounted = true;
+									playerEntity?.MountRideStat = mount.RideStat; // so a viewer arriving LATER can be told (#428)
 
 									// Persist the mount so it survives a relog / a trip through a no-mount area (restored on
 									// world entry to a mount-allowed map). Cleared only on a voluntary dismount above.

@@ -223,6 +223,12 @@ namespace Faolan.GameServer.World
 		// and the client gets stuck at the end of the dismount channel.
 		public bool IsMounted { get; set; }
 
+		// The mount's RIDE STAT - the value the Mount stat carries on the wire, not the DB id - so a viewer arriving
+		// after the mount can be told (#428). The player's SpawnBody is the FA015807 captured at their world ENTRY:
+		// frozen, so it can never carry a mount taken later, and the client renders the horse from the Mount/MountSpeed
+		// stats. A late viewer therefore gets that stat block right after the spawn record.
+		public uint MountRideStat { get; set; }
+
 		public bool IsPlayer { get; }
 
 		// #272: true while this entity is mid-move (chasing / returning home / following a player). Drives the segment

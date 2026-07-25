@@ -1606,6 +1606,20 @@ namespace Faolan.GameServer.World
 						}
 
 						await SendWorldSpawn(recipient, ev.Subject);
+
+						// A MOUNTED player's spawn record cannot show the mount: SpawnBody is the FA015807 captured at
+						// their world entry, frozen before they ever mounted. The client renders the horse from the
+						// Mount/MountSpeed stats, so send those straight after the spawn - otherwise walking up to a
+						// mounted player shows them on foot, which is the half of #428 the live relay does not cover.
+						if (ev.Subject is { IsPlayer: true, IsMounted: true, MountRideStat: > 0 })
+						{
+							await recipient.SendAsync(GameServerListener.BuildStatUpdate(recipient, new CharacterStatBlock
+							{
+								[CharacterStatId.Mount] = ev.Subject.MountRideStat,
+								[CharacterStatId.MountSpeed] = 100
+							}, ev.Subject.Handle));
+						}
+
 						// #241: when a quest-giver NPC enters view, set its marker from THIS viewer's quest state
 						// (! available / ? ready-to-turn-in / none active). Recomputed per entry, so it transitions as
 						// the player accepts/completes (e.g. Casilda shows ! then ? after the quest is done).
