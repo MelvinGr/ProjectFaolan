@@ -212,6 +212,16 @@ namespace Faolan.Core.Database.Repositories
 
 				character.MaxStats = CharacterMaxStats.CreateDefaults(character.Class, character.Level);
 
+				// Every character gets its equipment row HERE, with the character itself, so "a character has one" is an
+				// invariant established at creation rather than something each reader has to cope with. The slots are all
+				// empty - the first-login starter gear (#220) fills them - but the ROW exists, which is what the spawn and
+				// equip paths depend on: they now throw on a missing one instead of substituting an empty object, and that
+				// throw is only ever corruption if this holds.
+				character.Equipment = new CharacterEquipment
+				{
+					CharacterId = character.Id
+				};
+
 				ctx.Characters.Add(character);
 				await ctx.SaveChangesAsync();
 			}
