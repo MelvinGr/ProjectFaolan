@@ -319,11 +319,31 @@ ApplySpell packets in it): mount up = self ApplySpell **`0x31EB1500`** + a **54-
 **buff** apply/remove is a real oracle now — distinct from the DemoL80 `0x3BAD7D` summon. The mount **entity
 spawn** is still gated on the mid-session-spawn blocker (#26), so the buff renders but the horse model does not.
 
+**The world-entry mount restore is a FRESH apply, and that is what retail does** (#342). The changemap capture
+`NecroL80_mage-necromancer_login_leave_king_conan_castle-Dismount` shows the whole sequence: riding out of the
+no-mount King Conan castle into a mountable zone, retail emits five adjacent records —
+
+```
+FullPlayerCharacterIIR  ->  GameTimeIIR  ->  ride buff 0x31EB1500  ->  Shield of the Risen 0x3DFA4800
+                                          ->  StatUpd (Mount 0x00BA = 0x313C9B00, MountSpeed 0x00BB = 100)
+```
+
+That entry-restore ride buff is byte-identical to a player-initiated mount cast **except for the per-application
+effect id and the trailing nonce** — 6 bytes of 84, both of which vary per application by definition
+(`NpcSpellCastBuilderTests.MountRideBuff_EntryRestoreMatchesAFreshCast_ExceptThePerApplicationIds`). So there is no
+"already active" or silent variant of the record, and the FullChar snapshot carries no active-buff region for one to
+live in. Reconstructing the mount silently inside the snapshot would be an invention rather than a mirror of retail.
+What retail differs on is **position**: it sends the restore inside the entry stream, immediately after the snapshot
+and `GameTimeIIR`, so `RestoreMount` runs at the end of `SendBurstlessWorldEntry` rather than from the
+post-`0x205F` flush — the same reasoning that moved `GrantCharacterSpells` there to stop it re-toasting.
+
 **Buff persistence across relog (#274).** Self-buffs survive a logout **with their remaining time**. The live
 `WorldEntity.ActiveBuffs` is savegame state, so `PlayerPersistenceService.SavePlayerState` (logout + the 5-min
 autosave) snapshots each self-buff to the `CharacterBuff` table — `BuffId`, the effect `Nonce`, and an absolute
 `ExpiresAt` — and `RestoreBuffs` re-applies them in the post-`0x205F` world-entry flush
-(beside `RestoreMount`). Restore rebuilds the `ApplySpell` payload from those columns via `SelfBuffCodec` (not a
+(`RestoreMount` has since moved earlier, into the entry stream where retail puts it — see the mount buff above;
+the same capture puts the shield and the persisted buffs there too, tracked as its own follow-up). Restore rebuilds
+the `ApplySpell` payload from those columns via `SelfBuffCodec` (not a
 stored blob) with the duration recomputed to the time left, so the client counts down the **remaining** seconds and
 the tick expires it on schedule. Only self-buffs persist (NPC-cast debuffs carry a volatile caster handle + a DoT
 and are dropped); buffs owned by a dedicated re-applier — the login shield and the mount ride buff — are excluded

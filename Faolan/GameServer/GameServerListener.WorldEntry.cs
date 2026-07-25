@@ -275,13 +275,11 @@ namespace Faolan.GameServer
 			// is discarded by the client's identity reconstruction.
 			await GrantCharacterAbilities(client);
 			await GrantCharacterCombos(client);
-			// Re-seat the persisted mount if the player was riding one and this map allows mounts. Runs on login
-			// AND on every teleport/changemap re-entry (this flush is re-armed on both), so riding into a no-mount
-			// area dismounts and riding back re-mounts, and a relog restores the mount.
-			await RestoreMount(client);
+			// NB the persisted MOUNT is no longer re-seated here - it moved into the shared world-entry flush, where
+			// retail puts it (#342, see RestoreMount).
 			// Re-apply the persisted self-buffs with their remaining time (#274) - the buff counterpart to RestoreMount.
 			// Runs BEFORE SendShieldOfTheRisen (which owns the shield buffs, excluded from persistence) so ordering is
-			// moot; the mount ride buff is likewise excluded and owned by RestoreMount above.
+			// moot; the mount ride buff is likewise excluded and owned by RestoreMount.
 			await RestoreBuffs(client);
 			// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here: they ride the FullChar
 			// snapshot's known-spell list (#74/#71) so the client already knows them when it enters the world, and
@@ -601,6 +599,16 @@ namespace Faolan.GameServer
 		// Sends the ride buff + Mount/MountSpeed StatUpd and marks the live entity mounted - the same seat the
 		// SummonMount channel ends with, minus the cast animation. No-op on foot, on a no-mount map (the client
 		// auto-dismounted on entry), or if the stored id no longer resolves.
+		// Re-seats a persisted mount on world entry (login and every teleport/changemap re-entry), only where the map
+		// allows mounts - so riding into a no-mount area dismounts and riding back re-mounts.
+		//
+		// This is a FRESH buff apply, and that is retail-correct rather than a shortcut (#342). The changemap capture
+		// NecroL80_..._login_leave_king_conan_castle-Dismount settles it: riding out of the castle, retail's entry-restore
+		// ride buff is byte-identical to a player-initiated mount cast apart from the per-application effect id and the
+		// trailing nonce - 6 bytes of 84. There is no "already active" or "silent" variant of the record, and the
+		// FullChar snapshot carries no active-buff region for one to live in, so reconstructing the mount silently
+		// inside the snapshot (as #342 originally proposed) would be an invention, not a mirror of retail.
+		// What retail does differ on is WHERE the record sits - see the call site.
 		private async Task RestoreMount(INetworkClient client)
 		{
 			var character = client.Session.Character;
@@ -777,6 +785,16 @@ namespace Faolan.GameServer
 
 			foreach (var rpc in toSend)
 				await client.SendAsync(rpc);
+
+			// Re-seat the persisted mount HERE, immediately after the snapshot + GameTime that end the flush above -
+			// which is exactly where retail puts it (#342). In the changemap capture
+			// NecroL80_..._login_leave_king_conan_castle-Dismount, riding out of the no-mount castle produces
+			// FullChar -> GameTime -> ride buff -> Shield of the Risen -> Mount/MountSpeed StatUpd as five adjacent
+			// records; we used to send ours from the post-0x205F flush instead, long after the client had left the
+			// loading screen. Same reasoning as GrantCharacterSpells above: a re-assert that arrives inside the entry
+			// stream is absorbed silently, while the same record after ready reads as a NEW application and fires the
+			// client's apply feedback.
+			await RestoreMount(client);
 
 			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs in the burst).", mapId, character?.Name, toSend.Count,
 				entryBurstNpcs.Count);

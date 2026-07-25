@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
@@ -62,6 +63,29 @@ namespace Faolan.Tests
 			var built = NpcSpellCastBuilder.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
 
 			Assert.Equal(capturedCarrier, built);
+		}
+
+		// #342: retail's WORLD-ENTRY mount restore is the same record as a fresh mount cast. Riding out of the no-mount
+		// King Conan castle (NecroL80_..._login_leave_king_conan_castle-Dismount, the ride buff two records after the
+		// FullChar snapshot), retail re-seats the mount with an apply that differs from the cast above in only 6 of 84
+		// bytes - the per-application effect id and the trailing nonce, both of which vary per application by
+		// definition. So there is no "already active" / silent variant of this record to prefer, which is what rules out
+		// the snapshot-reconstruction approach the ticket proposed: the snapshot has no buff region, and retail would
+		// not use one if it had.
+		[Fact]
+		public void MountRideBuff_EntryRestoreMatchesAFreshCast_ExceptThePerApplicationIds()
+		{
+			var entryRestore = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15000000c3500802e5d4" +
+			                                         "00000000000000000081d962000100000001000000000031eb15000000500000000000000000000000000000005000000000154bb4d7");
+
+			var built = NpcSpellCastBuilder.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
+
+			Assert.Equal(entryRestore.Length, built.Length);
+			// Only the per-application effect id (the u32 spanning 35..37) and the trailing nonce (77..79) may differ -
+			// both vary per application by definition. Everything else - spell, endpoints, rank, duration, the whole
+			// 54-byte payload shape - has to match retail's entry restore exactly.
+			var differing = Enumerable.Range(0, built.Length).Where(i => built[i] != entryRestore[i]).ToArray();
+			Assert.Equal([35, 36, 37, 77, 78, 79], differing);
 		}
 
 		[Fact]
