@@ -2021,7 +2021,11 @@ namespace Faolan.GameServer.World
 			if (subject.Client?.Session.Character is not { } character)
 				return null;
 
-			var equipment = await _database.GetCharacterEquipment(character.Id);
+			// No equipment row means we cannot describe what the player is WEARING, and a spawn record with invented
+			// gear is worse than none - the caller logs the skip.
+			if (await _database.GetCharacterEquipment(character.Id) is not { } equipment)
+				return null;
+
 			var rotation = character.Rotation.LengthSquared() > 0.0001f
 				? character.Rotation
 				: Quaternion.Identity;
