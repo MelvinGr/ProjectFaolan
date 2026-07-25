@@ -107,3 +107,14 @@ it is identifiable as the level, because the two captured members share every re
 per-character word that reads 2 and 3, and the constants 6 / 354 / 51100 / 40016. A capture with two members of
 DIFFERENT levels settles it in one look; until then we send the level nowhere, so the client's team window may show a
 wrong or blank level even though grouping works.
+
+### The friend/guild state stamp's ONLINE value
+**Tracked: Gitea #426.** [V0: the friend state's online stamp] The chat-tier friend state
+(`[u32 id][u8 online][u8 level][u32 stamp][u8 class]`) carries a u32 whose OFFLINE meaning is solved — a unix last-seen,
+identified because the captured offline friend's `0x6A64AD51` is 2h06 before that capture was taken — while the ONLINE
+value is not decoded. It is not a timestamp (`0x01EDA8B2` reads as 1971-01-10) and not a constant (five captured friends
+carry `0x01EDA8B2`, one carries `0x01EDAF93`, 1761 higher). Its magnitude and high word sit right beside the character
+ids in the same capture (`0x0131xxxx` vs `0x01EDxxxx`), so an id or handle is a better guess than a time, and the
+`0x0025` presence push carries a third value of the same shape. We send the captured constant for every online friend.
+A capture with online friends in DIFFERENT zones would test the location hypothesis in one look.
+

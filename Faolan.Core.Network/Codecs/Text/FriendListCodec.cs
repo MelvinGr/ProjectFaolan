@@ -3,35 +3,56 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
-	// The friend list, which lives on the CHAT server - not the game server. Decoded from
-	// login_2-clients_group-trade-friend, where the player states the design in chat: *"both friends added, friends
-	// are one sided, no accept needed"*. Sweeping that whole capture for a game-tier friend opcode finds only
-	// RequestNewJoinHasHostileInFriends (a team-invite safety check), so this really is a chat-tier subsystem, which
-	// is why the codec sits beside the other chat-text codecs.
+	// The friend list, which lives on the CHAT server - not the game server. First seen in
+	// login_2-clients_group-trade-friend, where the player states the design in chat: *"both friends added, friends are
+	// one sided, no accept needed"*; then pinned by `addfriends` + `login-with-friends`, which is what made the body
+	// readable - six friends of six different levels and classes, one of them offline. Sweeping the corpus for a
+	// game-tier friend opcode finds only RequestNewJoinHasHostileInFriends (a team-invite safety check), so this really
+	// is a chat-tier subsystem, which is why the codec sits beside the other chat-text codecs.
 	//
-	//   c2s 0x0028  [u32 characterId]                                       add
-	//   s2c 0x0028  [u32 characterId][u8 online][u8 5][u32 stamp][u8 classId]  the added friend's state
-	//   c2s 0x0029  [u32 characterId]                                       remove
-	//   s2c 0x0029  [u32 characterId]                                       echoed back
-	//   s2c 0x0025  [u64 0][u32 stamp][u16][u8][u16 len][name]              presence push, BY NAME
+	// An ADD is FOUR packets, and the third is the one that matters most:
+	//   c2s 0x0028  [u32 characterId]                                           add
+	//   s2c 0x0025  [u64 0][u32 stamp][u16 len][u8 0x53][u16 len][name]          presence, BY NAME
+	//   s2c 0x0014  [u32 characterId][u32 0][u16 len][name]                      the id -> NAME binding
+	//   s2c 0x0028  [u32 characterId][u8 online][u8 level][u32 stamp][u8 class]   the friend's state
 	//
-	// One-sided with no accept handshake, so there is no invite state machine: an add is a write plus a presence
-	// subscription. The add reply is also what pins the team member record's LEVEL field - its trailing byte is the
-	// same character's classId (0x2C/44, 0x29/41 for the two captured players).
+	// A REMOVE is c2s 0x0029 answered by s2c 0x0029, the id echoed back verbatim.
+	//
+	// At LOGIN the stored list arrives as 0x0014 + 0x0028 PAIRS, one per friend, and NO presence push.
+	//
+	// ⚠️ Omitting the 0x0014 leaves the client with an id and a state but no NAME for it, and it renders nothing at all -
+	// no entry, no error. That is why the list stayed empty while the other two messages were byte-perfect.
 	public static class FriendListCodec
 	{
-		// Carried in the add reply and the presence push. 0x01EDA8B2 is the same value the team member record has at
-		// field 15, so it is server-wide rather than per-character; 0x01E85C14 is the presence push's. Neither is
-		// derivable from anything we send. [V0]
-		public const uint AddReplyStamp = 0x01EDA8B2;
+		// The tag byte inside the presence push's length-prefixed value.
+		private const byte PresenceTag = 0x53;
+
+		// The state's stamp is a UNION on the online flag:
+		//   OFFLINE -> a unix LAST-SEEN. The captured offline friend's 0x6A64AD51 is 2026-07-25 12:34:25 UTC, 2h06 before
+		//              that capture was taken, which is what identified it. We send Character.LastConnection.
+		//   ONLINE  -> this constant, whose meaning is NOT a time (0x01EDA8B2 reads as 1971). Five of the six captured
+		//              friends carry it and one carries 0x01EDAF93, 1761 higher - so it is not a plain constant either.
+		//              Its magnitude and high word sit right beside the character ids (0x0131xxxx vs 0x01EDxxxx), so an
+		//              id/handle is the better guess than a time. Open: Gitea #426. [V0]
+		//
+		// GuildService's member record already carries the same online/last-seen union off the same column.
+		public const uint OnlineStamp = 0x01EDA8B2;
 
 		public const uint PresenceStamp = 0x01E85C14;
 
-		// s2c 0x0028 - the state of the friend just added. `online` is 1 in every captured reply (you can only add a
-		// character the chat server can resolve); `field` is the same 5 the team member record carries.
-		public static byte[] BuildAddReply(uint characterId, bool online, Class classId, byte field = 5, uint stamp = AddReplyStamp)
+		// s2c 0x0028 - the friend's state. LEVEL and CLASS are BOTH here, which is what the client's hover tooltip
+		// shows. The level byte was read as a constant 0x05 until six friends of differing levels made it obvious, and
+		// that also settled the trailing byte: all six values are valid Class ids (HeraldOfXotli, BearShaman,
+		// Demonologist, TempestOfSet, Demonologist, Barbarian) while the level byte reads 7/10/5/8/10/5.
+		public static byte[] BuildState(uint characterId, bool online, byte level, Class classId, uint stamp)
 		{
-			return new FaolanStream().WriteUInt32(characterId).WriteByte(online).WriteByte(field).WriteUInt32(stamp).WriteByte(classId).ToArray();
+			return new FaolanStream().WriteUInt32(characterId).WriteByte(online).WriteByte(level).WriteUInt32(stamp).WriteByte(classId).ToArray();
+		}
+
+		// s2c 0x0014 - the id -> name binding, the same ChatSenderInfo record a channel post is preceded by.
+		public static byte[] BuildNameBinding(uint characterId, string name)
+		{
+			return new FaolanStream().WriteUInt32(characterId).WriteUInt32(0).WriteString(name).ToArray();
 		}
 
 		// s2c 0x0029 - the removal, echoed back verbatim.
@@ -40,10 +61,13 @@ namespace Faolan.Core.Network.Codecs.Text
 			return new FaolanStream().WriteUInt32(characterId).ToArray();
 		}
 
-		// s2c 0x0025 - the presence push, addressed by NAME rather than id (unlike every other message here).
-		public static byte[] BuildPresence(string name, ushort a = 0x000D, byte b = 0x53, uint stamp = PresenceStamp)
+		// s2c 0x0025 - the presence push, addressed by NAME rather than id (unlike every other message here). The u16 is
+		// the LENGTH of what follows it: the tag byte plus the length-prefixed name, so nameLen + 3. It was read as a
+		// constant 0x000D off a single 10-character name, which left every push for any other name malformed (verified
+		// across five names: 6 -> 9, 10 -> 13, 7 -> 10, 6 -> 9, 8 -> 11).
+		public static byte[] BuildPresence(string name)
 		{
-			return new FaolanStream().WriteUInt64(0).WriteUInt32(stamp).WriteUInt16(a).WriteByte(b).WriteString(name).ToArray();
+			return new FaolanStream().WriteUInt64(0).WriteUInt32(PresenceStamp).WriteUInt16(name.Length + 3).WriteByte(PresenceTag).WriteString(name).ToArray();
 		}
 
 		// c2s 0x0028 / 0x0029 - the character to add or remove.

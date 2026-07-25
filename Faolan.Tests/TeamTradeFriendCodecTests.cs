@@ -176,21 +176,47 @@ namespace Faolan.Tests
 			Assert.Equal("00000073" + snapshot + "00000001", Convert.ToHexString(PlayerTradeCodec.BuildAddedItem(Convert.FromHexString(snapshot), 1)).ToLowerInvariant());
 		}
 
-		// f1687 / f1919 - the chat server's add reply, whose trailing byte is the friend's CLASS. It is the same value
-		// the team member record leads with, which is how the two corroborate each other.
-		[Fact]
-		public void Friend_AddReply_IsByteExact()
+		// The friend-list entries retail restores at login, from `login-with-friends` f150 - SIX friends of six different
+		// levels and classes, one of them offline. This is the data that settled the body: every trailing byte is a valid
+		// Class id while the level byte reads 7/10/5/8/10/5, so the two cannot be confused any more.
+		// The stamp is passed per case because it is NOT constant: five of the six friends carry 0x01EDA8B2 but Llewyl
+		// carries 0x01EDAF93 (1761 higher) and the offline one 0x6A64AD51 - so it is per-character, and the codec's
+		// default is just the value we have nothing better than.
+		[Theory]
+		[InlineData("01318405010701eda8b22b", 0x01318405u, true, 7, Class.HeraldOfXotli, 0x01EDA8B2u)]
+		[InlineData("01318477010a01edaf931d", 0x01318477u, true, 10, Class.BearShaman, 0x01EDAF93u)]
+		[InlineData("013184bb010801eda8b21c", 0x013184BBu, true, 8, Class.TempestOfSet, 0x01EDA8B2u)]
+		[InlineData("013184bd010a01eda8b22c", 0x013184BDu, true, 10, Class.Demonologist, 0x01EDA8B2u)]
+		[InlineData("013184c0010501eda8b212", 0x013184C0u, true, 5, Class.Barbarian, 0x01EDA8B2u)]
+		[InlineData("013184ae00056a64ad512c", 0x013184AEu, false, 5, Class.Demonologist, 0x6A64AD51u)] // the OFFLINE one
+		public void Friend_State_IsByteExact(string hex, uint id, bool online, byte level, Class classId, uint stamp)
 		{
-			Assert.Equal("01317cf8010501eda8b229", Convert.ToHexString(FriendListCodec.BuildAddReply(0x01317CF8, true, Class.Necromancer)).ToLowerInvariant());
-			Assert.Equal("013184ae010501eda8b22c", Convert.ToHexString(FriendListCodec.BuildAddReply(0x013184AE, true, Class.Demonologist)).ToLowerInvariant());
+			Assert.Equal(hex, Convert.ToHexString(FriendListCodec.BuildState(id, online, level, classId, stamp)).ToLowerInvariant());
 		}
 
-		// f1685 / f1911 - the presence push, addressed by name.
-		[Fact]
-		public void Friend_Presence_IsByteExact()
+		// f866 / f949 / f989 / f1038 / f1076 - the id -> NAME binding, the message whose absence renders NOTHING.
+		[Theory]
+		[InlineData("013184bd000000000006586174657061", 0x013184BDu, "Xatepa")]
+		[InlineData("013184c000000000000a54686f7277616c646972", 0x013184C0u, "Thorwaldir")]
+		[InlineData("013184bb0000000000074e6566616c6973", 0x013184BBu, "Nefalis")]
+		[InlineData("013184770000000000064c6c6577796c", 0x01318477u, "Llewyl")]
+		[InlineData("0131840500000000000846656e6978617267", 0x01318405u, "Fenixarg")]
+		public void Friend_NameBinding_IsByteExact(string hex, uint id, string name)
 		{
-			Assert.Equal("000000000000000001e85c14000d53000a4a6e6275657674666b6a", Convert.ToHexString(FriendListCodec.BuildPresence("Jnbuevtfkj")).ToLowerInvariant());
-			Assert.Equal("000000000000000001e85c14000d53000a53747269636b656e6e65", Convert.ToHexString(FriendListCodec.BuildPresence("Strickenne")).ToLowerInvariant());
+			Assert.Equal(hex, Convert.ToHexString(FriendListCodec.BuildNameBinding(id, name)).ToLowerInvariant());
+		}
+
+		// f862 / f944 / f987 / f1032 / f1072 - the presence push. Five different name lengths, which is what exposed the
+		// u16 as `nameLen + 3` rather than the constant 0x000D a single 10-character name suggested.
+		[Theory]
+		[InlineData("000000000000000001e85c140009530006586174657061", "Xatepa")]
+		[InlineData("000000000000000001e85c14000d53000a54686f7277616c646972", "Thorwaldir")]
+		[InlineData("000000000000000001e85c14000a5300074e6566616c6973", "Nefalis")]
+		[InlineData("000000000000000001e85c1400095300064c6c6577796c", "Llewyl")]
+		[InlineData("000000000000000001e85c14000b53000846656e6978617267", "Fenixarg")]
+		public void Friend_Presence_IsByteExact(string hex, string name)
+		{
+			Assert.Equal(hex, Convert.ToHexString(FriendListCodec.BuildPresence(name)).ToLowerInvariant());
 		}
 
 		// f2249 - a removal is echoed back verbatim.

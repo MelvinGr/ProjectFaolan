@@ -139,30 +139,37 @@ everything else uses the character id.
 
 The chat framing is `[u16 opcode][u16 bodyLen][body]`, read from the raw pcap (`0025 001b …`, `0028 000b …`).
 
-### ⚠️ Not working in-client, and the capture cannot say why
+An **add is four packets**, and the third is the one that matters:
 
-Implemented (`CharacterFriends` + the `ChatServerListener` handlers) and **the client shows nothing**, on add or after
-a relog. What has been ruled out:
+```
+c2s 0x0028  [u32 characterId]                                          add
+s2c 0x0025  [u64 0][u32 stamp][u16 len][u8 0x53][u16 len][name]         presence, BY NAME
+s2c 0x0014  [u32 characterId][u32 0][u16 len][name]                     the id -> NAME binding
+s2c 0x0028  [u32 characterId][u8 online][u8 level][u32 stamp][u8 class]  the friend's state
+```
 
-- the **framing** — verified against the raw pcap;
-- the **bodies** — ours reproduce retail's byte-for-byte apart from the id, name and that last byte;
-- the **window** — retail's complete add is exactly those three packets, nothing else passes between them;
-- the **last byte's value** — an add whose target is a Necromancer (`0x29`, retail's own combination) fails exactly
-  like one targeting an Assassin (`0x22`);
-- **login restore** — the stored pair is pushed at `Hello` and changes nothing. (It was briefly hooked to the
-  client's chat-init `0x0064`, which the capture shows at most once across two clients and our client never sends at
-  all, so it never ran.)
+At **login** the stored list arrives as `0x0014` + `0x0028` **pairs**, one per friend, in the same burst as the channel
+subscriptions and the welcome message — and with **no** presence push. [V1: tools/capture/decode_team_trade_friend.py]
 
-So the two messages are not what builds the list, or not sufficient. The list UI is Flash-side — a string sweep of
-`AgeOfConan.exe` for `Friend` finds only Facebook-friend machinery and the team's `hasHostileInFriends` check, no
-friend-list code — so the next step is the CHAT protocol handler in the client, not more capture reading.
+⚠️ **Omitting the `0x0014` renders nothing at all** — no entry, no error. The client is left holding an id and a state
+with no name attached. That was the whole reason the list stayed empty while the other two messages were byte-perfect,
+and it cost several rounds of looking at the wrong things.
 
-⚠️ **What that last byte is remains open.** `0x29`/`0x2C` match `Class.Necromancer`/`Class.Demonologist` exactly, and
-the same value leads the team member record — but they are equally good as **levels 41 and 44**, and nothing in this
-capture states those two characters' classes (the `mage-necromancer` / `mage-demo` captures are different characters).
-The in-client test distinguishes neither. Treated as the class because the member record needs *a* class and the
-client refuses to build a team-invite window without a valid one — which is evidence for the member record's field,
-not for this one.
+**Level and class are both in the state**, which is what the client's hover tooltip shows. Six friends of six different
+levels and classes settled a reading that one capture of two characters could not: every trailing byte is a valid
+`Class` id (`HeraldOfXotli`, `BearShaman`, `Demonologist`, `TempestOfSet`, `Demonologist`, `Barbarian`) while the level
+byte reads 7/10/5/8/10/5. Before that the level had been read as a constant `0x05` and the class byte's identity was
+genuinely ambiguous against levels 41/44.
+
+**The presence push's u16 is a length**, not a constant: it is `nameLen + 3` (the tag byte plus the length-prefixed
+name), verified across five names — 6→9, 10→13, 7→10, 6→9, 8→11. Read off a single 10-character name it looked like a
+fixed `0x000D`, which left every push for any other name malformed.
+
+**The state's stamp is a union on the online flag.** Offline is a unix **last-seen** — the captured offline friend's
+`0x6A64AD51` is 2h06 before that capture was taken — and we send `Character.LastConnection` for it, the same column and
+union `GuildService`'s member record already uses. The online value is **not a time** (`0x01EDA8B2` reads as 1971) and
+not a plain constant either (one online friend carries `0x01EDAF93`); its magnitude sits beside the character ids, so an
+id/handle is the better guess. [V0: the friend state's online stamp]
 
 ## How ours is wired
 

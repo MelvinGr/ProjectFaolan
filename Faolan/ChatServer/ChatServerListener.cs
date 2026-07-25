@@ -107,12 +107,13 @@ namespace Faolan.ChatServer
 
 					// Restore the stored friend list. ⚠️ The MESSAGES are the captured ones (the same pair an add
 					// sends), but this TIMING is not: the captured account had no friends before it added them, so
-					// nothing in the corpus shows how retail delivers an existing list at login. It goes HERE rather
-					// than on the client's chat-init (0x0064) because that arrives at most once across two clients in
-					// the capture and never at all from ours - hooking it there meant the restore never ran. Unverified
-					// - see docs/subsystems/teams-trade-friends.md; a capture of a login WITH friends settles it.
+					// login-with-friends confirms both the shape and the place: 0x0014 + 0x0028 per friend, in the same
+					// burst as the channel subscriptions and the welcome message. It goes HERE rather than on the
+					// client's chat-init (0x0064), which arrives at most once across two clients in the corpus and
+					// never at all from ours - hooking it there meant the restore never ran.
+					// Retail restores the list as 0x0014 + 0x0028 pairs with NO presence push - that belongs to an add.
 					foreach (var friend in await Database.GetFriends(character.Id))
-						await SendFriendState(client, friend);
+						await SendFriendEntry(client, friend, false);
 
 					break;
 				}
@@ -214,7 +215,7 @@ namespace Faolan.ChatServer
 
 					var added = await Database.AddFriend(client.Session.Character.Id, friendId);
 
-					await SendFriendState(client, friend);
+					await SendFriendEntry(client, friend, true);
 					Logger.LogInformation("Friends: {Character} added {Friend}{Already}.", client.Session.Character.Name, friend.Name, added
 						? ""
 						: " (already on the list)");
@@ -255,15 +256,32 @@ namespace Faolan.ChatServer
 		// (isWhisper=true, target=recipient) to the ChatMessages table. Guarded: a DB hiccup must NEVER break the live
 		// chat relay, so any failure is logged and swallowed. The sender identity matches the wire (ClientInstance ==
 		// character id for a player; see player_handle_equals_character_id).
-		// The two s2c messages that describe one friend, in retail's order: the presence push (by NAME) then the
-		// friend's state (by id, ending in its CLASS). ONLINE is whether the character has a live chat connection
-		// here - the only thing this tier can actually know.
-		private async Task SendFriendState(INetworkClient client, Character friend)
+		// One friend's list entry: the id -> NAME binding (0x0014) then its state (0x0028), in retail's order. `presence`
+		// prepends the 0x0025 push, which retail sends on an ADD but NOT when restoring the list at login.
+		//
+		// ⚠️ The 0x0014 is not optional decoration. Without it the client holds an id and a state with no name attached
+		// and renders NOTHING - no entry and no error - which is exactly how this looked while the other two messages
+		// were already byte-perfect. ONLINE is whether the character has a live chat connection here, the only thing
+		// this tier can actually know.
+		private async Task SendFriendEntry(INetworkClient client, Character friend, bool presence)
 		{
+			var name = friend.Name ?? "";
+			if (presence)
+				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendPresence, s => s.WriteArray(FriendListCodec.BuildPresence(name))));
+
+			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteArray(FriendListCodec.BuildNameBinding(friend.Id, name))));
+
+			// The stamp is a UNION on the online flag: an OFFLINE friend gets a real unix LAST-SEEN (the captured offline
+			// friend's value is 2h06 before the capture was taken, which is what identified it), an online one gets the
+			// captured constant, whose meaning is still open (Gitea #426 - it is not a time at all: 0x01EDA8B2 reads as
+			// 1971). Same shape GuildService's member record already uses, and the same column.
 			var online = ClientForCharacter(friend.Id) != null;
-			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendPresence, s => s.WriteArray(FriendListCodec.BuildPresence(friend.Name ?? ""))));
+			var stamp = online || friend.LastConnection == null
+				? FriendListCodec.OnlineStamp
+				: (uint)friend.LastConnection.Value.ToUnixTimeSeconds();
+
 			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendAdded,
-				s => s.WriteArray(FriendListCodec.BuildAddReply(friend.Id, online, friend.Class))));
+				s => s.WriteArray(FriendListCodec.BuildState(friend.Id, online, (byte)friend.Level, friend.Class, stamp))));
 		}
 
 		private async Task PersistChat(INetworkClient client, byte channelType, uint channelId, uint? target, bool isWhisper, string message)
