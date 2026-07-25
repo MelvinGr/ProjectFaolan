@@ -54,6 +54,11 @@ def reshape(frames):
         tcp = layers["tcp"]
         src_port = int(tcp["tcp.srcport"])
         dst_port = int(tcp["tcp.dstport"])
+        # tshark's per-connection index. The (ip, port) pairs already identify a connection, but a single integer is
+        # what makes a MULTI-SESSION capture tractable - two clients on one host (e.g. a player<->player trade traded
+        # with yourself) hit the same server ip:port and differ only in the client's ephemeral port, which is on the
+        # Source side for c2s and the Destination side for s2c. Group by Stream and each session falls out whole.
+        stream = tcp.get("tcp.stream")
 
         for key, value in faolan.items():
             if not (key.startswith("Conan packet") or key.startswith("Chat packet")):
@@ -66,6 +71,7 @@ def reshape(frames):
                 "TimeUtc": time,
                 "Protocol": "ChatServer" if chat else "Conan",
                 "IsDownload": 7000 <= src_port <= 7999,
+                "Stream": int(stream) if stream is not None else None,
                 "Source": {"IpAddress": src_ip, "Port": src_port},
                 "Destination": {"IpAddress": dst_ip, "Port": dst_port},
                 "Opcode": fields.get("faolan.pkt.opcode") or fields.get("faolan.chat.opcode"),

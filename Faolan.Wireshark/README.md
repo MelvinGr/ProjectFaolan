@@ -130,6 +130,25 @@ tshark -r capture.pcapng -o tcp.analyze_sequence_numbers:FALSE -T json \
   | tools/capture/tshark_to_dump.py > capture.tshark.json
 ```
 
+### Capturing TWO clients at once (player<->player interactions)
+
+A capture with two concurrent sessions - two game instances on one machine, e.g. trading with yourself - works
+without any special handling, and this is worth knowing because the alternative (filtering by process) is impossible:
+pcap captures below the process layer, so Wireshark has no PID to filter on.
+
+- **The dissector is fine.** State lives per TCP conversation (`get_or_create_conv_state` ->
+  `conversation_get_proto_data`), so each connection gets its own zlib stream and framer per direction. Two
+  interleaved compressed download streams do not touch each other's inflate state. Port registration is per-port
+  (`dissector_add_uint("tcp.port", ...)`), so both clients dissect off the same handoff-learned ports.
+- **Separate the sessions by `Stream`**, the `tcp.stream` index each record carries. The (ip, port) pairs identify a
+  connection too, but the client's ephemeral port is on the `Source` side for c2s and the `Destination` side for s2c,
+  so a single integer is what makes grouping tractable. `Stream` is null in dumps generated before it was added.
+- To map a stream back to a running client while capturing: `ss -tnp | grep -E ':70[0-9][0-9]'`.
+- Giving each client a different loopback IP does NOT separate them end to end: the handoff hands both clients the
+  realm's advertised address from the DB, so the world/chat connections collapse onto the same IP again.
+- **Capture from before both logins.** The auto-follow learns the world/chat ports from the handoff; start late and
+  those connections dissect as plain TCP.
+
 The reshape pass is python3 (was a jq filter; #106) - same dump, but ~10x faster on large
 captures (131 MB tshark JSON: ~11.7 s jq -> ~1.1 s) and no jq dependency. Not schema-identical
 to the `Faolan.PacketAnalyzer` dumps, but carries the same essentials and additionally includes
