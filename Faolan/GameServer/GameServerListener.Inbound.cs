@@ -1078,7 +1078,6 @@ namespace Faolan.GameServer
 					// Visible gear already arrives with the spawn snapshot, so drop it quietly like the teleport acks
 					// below; answering would diverge from capture. The s2c push itself is unimplemented (see
 					// UpdateInventoryCodec, currently emitted nowhere).
-					//var probe = body.ReadRemainingArray();
 
 					Logger.LogDebug("GameServer 0x2000 inventory probe"); //" {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), probe.Length);
 
@@ -1174,11 +1173,15 @@ namespace Faolan.GameServer
 
 					Logger.LogInformation("GameServer hello: clientInstance={ClientInstance:X8}, clientVersion={ClientVersion}", clientInstance, clientVersion);
 
-					/*if (clientVersion != "v4.00.NoTS@369764")
+					// The build we decoded against, from config (default v5.01.0@602248 - every capture in the corpus is
+					// that one). Not a refusal: the protocol is largely shared across builds, and rejecting on a string
+					// would lock out a working client for a trivial difference. It is a loud warning because otherwise
+					// "the client behaves oddly" and "the client is a different build" look identical in the logs.
+					if (clientVersion != Configuration.ClientVersion)
 					{
-						Logger.Info("Incompatible client connects to the Server");
-						//break;
-					}*/
+						Logger.LogWarning("GameServer hello: client reports build {Reported}, but the protocol was decoded against {Expected}. Unexpected behaviour past this point may be a build difference.",
+							clientVersion, Configuration.ClientVersion);
+					}
 
 					// Character creation has two phases on this GameServer connection:
 					//  1) CREATOR: the client connects on the temp instance 0x021662C8 and we send the
@@ -1657,7 +1660,6 @@ namespace Faolan.GameServer
 				{
 					LogPacketBodyDebug("GameServer 0x207B body", body.ToArray());
 
-					//Logger.Info("Receive opcode 0x207b. Maybe hide object(helmet,...)");
 
 					break;
 				}

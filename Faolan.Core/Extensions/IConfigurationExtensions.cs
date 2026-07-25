@@ -57,6 +57,9 @@ namespace Faolan.Core.Extensions
 			// the bridge runs with no config; McpUrl is the game-server MCP endpoint it connects to, the two Channel*
 			// values tune its poll loop (milliseconds).
 			public string McpUrl => config["Mcp:Url"] ?? "http://127.0.0.1:7099/mcp";
+			// The client build the protocol was decoded against - every capture in the corpus is this one. A client
+			// reporting anything else is not refused.
+			public string ClientVersion => config["ClientVersion"] ?? "v5.01.0@602248";
 			public string ServerIpAddress => Required(config, "ServerIpAddress");
 			public string WelcomeString => Required(config, "WelcomeString");
 
