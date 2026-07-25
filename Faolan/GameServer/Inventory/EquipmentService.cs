@@ -86,10 +86,11 @@ namespace Faolan.GameServer.Inventory
 					return;
 				}
 
-				var equipment = await _database.GetCharacterEquipment(character.Id) ?? new CharacterEquipment
-				{
-					CharacterId = character.Id
-				};
+				// No substitute row: every character has one from creation, so a missing row is corruption. Quietly
+				// equipping into a fresh empty object would persist a row that silently DROPS whatever the character was
+				// already wearing.
+				var equipment = await _database.GetCharacterEquipment(character.Id)
+					?? throw new InvalidOperationException($"Character {character.Id:X8} ({character.Name}) has no CharacterEquipment row - cannot equip.");
 
 				equipment[targetSlot] = item;
 

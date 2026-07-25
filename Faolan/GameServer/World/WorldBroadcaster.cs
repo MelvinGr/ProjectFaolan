@@ -2021,20 +2021,18 @@ namespace Faolan.GameServer.World
 			if (subject.Client?.Session.Character is not { } character)
 				return null;
 
-			// Every character gets an equipment row at creation, so a missing one is a data bug rather than a state to
-			// model - but an unequipped record is still a correct description of a character wearing nothing, and it
-			// beats making the player invisible to everyone. Same substitution EquipmentService and the world-entry path
-			// already make.
-			var equipment = await _database.GetCharacterEquipment(character.Id) ?? new CharacterEquipment
-			{
-				CharacterId = character.Id
-			};
+			// Every character gets an equipment row at creation, so a missing one is CORRUPTION - it throws. Substituting
+			// an empty row would put a character on other people's screens wearing nothing and call that success, which
+			// is exactly the kind of quiet wrong answer that costs hours later.
+			var equipment = await _database.GetCharacterEquipment(character.Id)
+				?? throw new InvalidOperationException($"Character {character.Id:X8} ({character.Name}) has no CharacterEquipment row - cannot build its spawn record.");
 
 			var rotation = character.Rotation.LengthSquared() > 0.0001f
 				? character.Rotation
 				: Quaternion.Identity;
 
-			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIir.Build(character, equipment).ToProtobuf(), character);
+			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIir.Build(character, equipment).ToProtobuf(), character)
+				?? throw new InvalidOperationException($"PlayerSpawnBuilder could not build a spawn record for character {character.Id:X8} ({character.Name}).");
 		}
 
 		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)
