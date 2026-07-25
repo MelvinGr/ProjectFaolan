@@ -233,11 +233,17 @@ namespace Faolan.GameServer
 			return new FaolanStream().WriteUInt32(FullPlayerCharacterBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(statId).WriteUInt32(value).ToArray();
 		}
 
-		// 0x4F57DC08 GameTime - the world clock. Global (no map/player data); the client advances it locally, so a
-		// fixed snapshot is emitted. Live day/night cycle is #351 (advance dayTime at rate; pin its unit in-client).
+		// 0x4F57DC08 GameTime - the world clock. The resync timestamp is generated from `now` (wall-clock derived, see
+		// GameTimeCodec); dayTime is still the captured constant until its unit is pinned in-client (#351). `now` is a
+		// parameter so a golden test can feed the capturing instant and get the captured bytes back.
+		internal static Rpc BuildGameTime(INetworkClient client, DateTimeOffset now)
+		{
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(now)));
+		}
+
 		internal static Rpc BuildGameTime(INetworkClient client)
 		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build()));
+			return BuildGameTime(client, DateTimeOffset.UtcNow);
 		}
 
 		// Frames the GuildUpdateIIR_c (GuildTagBody) on the world conversation: [RpcHeader][DispatchPassBlob]
