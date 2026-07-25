@@ -42,10 +42,10 @@ namespace Faolan.Tests.Support
 		// A drop with no such explanation is the failure this exists to catch - do not just lower the numbers.
 		private static readonly (uint Iir, int Count)[] ExpectedCounts =
 		[
-			((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, 145), ((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, 11423), ((uint)GameServer0X2000Opcodes.MoveTaskIIR, 12259),
+			((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, 147), ((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, 11494), ((uint)GameServer0X2000Opcodes.MoveTaskIIR, 12537),
 			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, 74), ((uint)GameServer0X2000Opcodes.QuestJournalIIR, 38), ((uint)GameServer0X2000Opcodes.QuestLogListIIR, 46),
-			((uint)GameServer0X2000Opcodes.PlayfieldFIIR, 145), ((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, 1),
-			((uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, 5060)
+			((uint)GameServer0X2000Opcodes.PlayfieldFIIR, 147), ((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, 1),
+			((uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, 5186)
 		];
 
 		private static readonly Lazy<List<Entry>> Entries = new(Load);
