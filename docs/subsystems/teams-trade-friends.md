@@ -120,6 +120,26 @@ then the `TradeCompletedSuccessfully` feedback overlay (`0x8D5A8B6B`) to both cl
 two interfaces. The captured container kind is 104 (the backpack) and the owner field is the sender's own character
 id. [V0: the two unnamed trade replies 0x206B and 0x206D]
 
+The capture only exercises the happy path, but the client's recovered method table completes the **c2s** set, and its
+indices line up exactly with the captured ones (`0x2065`/`0x2067`/`0x2068`/`0x206B` all match), so it can be trusted
+here:
+
+```
+c2s 0x2064 RequestTrade(ID32 target)              a dedicated request, alongside the BCC path the capture uses
+c2s 0x2066 DeclineTrade(ID32 target)              refuse before the window opens
+c2s 0x2069 RemoveTradeItem(int destPos)           take an item back off the table
+c2s 0x206A MoveTradeItemInternal(pos1, pos2)      drag an offered item within the window
+c2s 0x206C AbortTrade()                           CANCEL
+```
+
+⚠️ `AddTradeItem`'s signature is `(ID32 inventory, int itemPos, int destPos)` — **the last field is the trade-window
+slot, not a quantity.** There is no count in the message at all: the whole stack moves. Read as a count it happened to
+work only because the capture's one add carried destPos 1 for a stack of 1; a destPos of 0 would have moved nothing.
+
+The matching s2c halves are NOT inferable: the client's catalog names `DispatchTradeRemovedItem` /
+`DispatchTradePartnerRemovedItem` but its s2c numbering is offset against the capture (it puts `DispatchRequestTrade`
+at `0x205F` where retail sends `0x2068`), so their opcodes need a capture. Open work in Gitea #427.
+
 ## Friend list
 
 On the **ChatServer** (`FriendListCodec`). Sweeping the whole capture for a game-tier friend opcode finds only

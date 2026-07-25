@@ -52,13 +52,19 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return new FaolanStream().WriteArrayUInt32Length(itemSnapshot).WriteUInt32(count).ToArray();
 		}
 
-		// c2s AddTradeItem (0x2068): which of the sender's items goes on the table. `Container` is the container kind
-		// (104 = the backpack in both captured adds) and `Owner` the sender's own character id.
+		// c2s AddTradeItem (0x2068): which of the sender's items goes on the table, and where in the trade WINDOW it
+		// lands. The client's own signature is AddTradeItem(const ID32& i_cIventoryID, int i_nItemPos, int i_nDestPos) -
+		// so the ID32 is the source container (104 = the backpack in both captured adds, paired with the sender's own
+		// character id), `ItemPos` the bag slot, and the last u32 is `DestPos`, the slot in the trade window.
+		//
+		// ⚠️ That last field was read as a COUNT, which happened to work only because the capture's single add carried
+		// destPos 1 for a stack of 1. There is no count in the message at all: the whole stack moves, so the quantity
+		// comes from the inventory row. A destPos of 0 read as a count would have moved zero of the item.
 		public static TradeItemRequest ParseAddItem(FaolanStream s)
 		{
 			return new TradeItemRequest(s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32());
 		}
 
-		public readonly record struct TradeItemRequest(uint Container, uint Owner, uint Slot, uint Count);
+		public readonly record struct TradeItemRequest(uint Container, uint Owner, uint ItemPos, uint DestPos);
 	}
 }

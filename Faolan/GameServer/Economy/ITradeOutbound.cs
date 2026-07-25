@@ -37,5 +37,14 @@ namespace Faolan.GameServer.Economy
 
 		/// <summary>The wallet update after cash changes hands (the same 0x2005 the shop and loot paths send).</summary>
 		Task SendWalletUpdate(uint characterId, ulong balanceTin);
+
+		/// <summary>
+		///     The GIVER's bag slot is now empty (DispatchRemoveItem 0x201F). Moving the row in the DB is not enough - the
+		///     client keeps rendering what it last knew, so a traded-away item sits visibly in the giver's bag until relog.
+		/// </summary>
+		Task SendItemRemoved(uint characterId, uint slot);
+
+		/// <summary>The RECEIVER's new bag slot (DispatchAddItem), the same live grant the loot and shop paths use.</summary>
+		Task SendItemGranted(uint characterId, Item item, uint slot, uint count);
 	}
 }

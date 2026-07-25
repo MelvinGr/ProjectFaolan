@@ -138,6 +138,27 @@ namespace Faolan.GameServer
 				: Task.CompletedTask;
 		}
 
+		Task ITradeOutbound.SendItemRemoved(uint characterId, uint slot)
+		{
+			return ClientForCharacter(characterId) is { } client
+				? SendRemoveItem(client, ContainerKind.Bag, slot)
+				: Task.CompletedTask;
+		}
+
+		Task ITradeOutbound.SendItemGranted(uint characterId, Item item, uint slot, uint count)
+		{
+			if (ClientForCharacter(characterId) is not { } client)
+				return Task.CompletedTask;
+
+			var entry = SnapshotItemBuilder.BuildInventoryEntry(FullPlayerCharacterBuilder.ItemId(characterId, FullPlayerCharacterBuilder.BagKind, slot), item, 0,
+			[
+				new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, (uint)FullPlayerCharacterBuilder.RecordId(characterId, FullPlayerCharacterBuilder.BagKind, slot)),
+				new SnapshotItemBuilder.ItemStat(26, count)
+			], item.Level);
+
+			return SendAddItem(client, ContainerKind.Bag, slot, entry);
+		}
+
 		// One place the trade replies are addressed from, so the endpoints cannot drift between them. Silently no-ops for
 		// a character who is not connected here - a partner who vanished mid-trade is TradeService's problem, not the
 		// wire's.

@@ -153,7 +153,9 @@ namespace Faolan.Tests
 			Assert.Equal("0000000000000005", Convert.ToHexString(PlayerTradeCodec.BuildCash(5)).ToLowerInvariant());
 		}
 
-		// f1408 AddTradeItem - slot 5 of the backpack (container 104), one item.
+		// f1408 AddTradeItem - bag slot 5 of the backpack (container 104), into trade-window slot 1. The last field is
+		// the WINDOW slot, not a count: the client's own signature is (ID32 inventory, int itemPos, int destPos), and
+		// there is no quantity in the message at all.
 		[Fact]
 		public void Trade_ParsesAddItem()
 		{
@@ -162,8 +164,8 @@ namespace Faolan.Tests
 
 			Assert.Equal(104u, request.Container);
 			Assert.Equal(0x01317CF8u, request.Owner);
-			Assert.Equal(5u, request.Slot);
-			Assert.Equal(1u, request.Count);
+			Assert.Equal(5u, request.ItemPos);
+			Assert.Equal(1u, request.DestPos);
 		}
 
 		// f1411 DispatchTradePartnerAddedItem - the length-prefixed item snapshot plus the stack count.

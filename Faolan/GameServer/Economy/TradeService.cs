@@ -94,24 +94,55 @@ namespace Faolan.GameServer.Economy
 		// c2s AddTradeItem (0x2068): one of my backpack slots goes on the table. The reply carries the item SNAPSHOT (so
 		// the partner's window can render it), to me as DispatchTradeAddedItem and to them as
 		// DispatchTradePartnerAddedItem - the same body, different opcode per recipient.
-		public async Task AddItem(uint characterId, uint slot, uint count)
+		// Keyed by DESTPOS - the slot in the trade window - because that is what RemoveTradeItem and
+		// MoveTradeItemInternal address, and one bag slot could otherwise be offered into two window slots.
+		public async Task AddItem(uint characterId, uint itemPos, uint destPos)
 		{
 			if (!TryGetSide(characterId, out var session, out var side))
 				return;
 
-			var row = (await _database.GetCharacterInventory(characterId)).FirstOrDefault(r => r.Container == ContainerKind.Bag && r.Slot == (int)slot);
+			var row = (await _database.GetCharacterInventory(characterId)).FirstOrDefault(r => r.Container == ContainerKind.Bag && r.Slot == (int)itemPos);
 			if (row?.Item == null)
 			{
-				_logger.LogWarning("Trade: {Character:X8} offered empty bag slot {Slot}.", characterId, slot);
+				_logger.LogWarning("Trade: {Character:X8} offered empty bag slot {Slot}.", characterId, itemPos);
 				return;
 			}
 
-			side.Items[slot] = new OfferedItem(row.Item, System.Math.Min(count, row.Count));
+			// The message carries no quantity, so the WHOLE stack goes on the table.
+			side.Items[destPos] = new OfferedItem(itemPos, row.Item, row.Count);
 			session.ResetAccepts();
 
 			var partnerId = session.Other(characterId).CharacterId;
-			await _outbound.SendTradeItem(characterId, row.Item, slot, side.Items[slot].Count, true);
-			await _outbound.SendTradeItem(partnerId, row.Item, slot, side.Items[slot].Count, false);
+			await _outbound.SendTradeItem(characterId, row.Item, destPos, row.Count, true);
+			await _outbound.SendTradeItem(partnerId, row.Item, destPos, row.Count, false);
+		}
+
+		// c2s RemoveTradeItem (0x2069): take an item back off the table. State only - the two s2c halves
+		// (DispatchTradeRemovedItem / DispatchTradePartnerRemovedItem) are named in the client's catalog but their
+		// OPCODES are not recoverable from it (its s2c numbering is offset against the capture), so the partner's window
+		// is not updated yet. See Gitea #427.
+		public void RemoveItem(uint characterId, uint destPos)
+		{
+			if (!TryGetSide(characterId, out var session, out var side))
+				return;
+
+			side.Items.Remove(destPos);
+			session.ResetAccepts();
+		}
+
+		// c2s MoveTradeItemInternal (0x206A): the player drags an offered item to another slot of the trade window. Pure
+		// bookkeeping - nothing leaves the offer, so the accepts are NOT reset - but the keys have to follow, or a later
+		// RemoveTradeItem would address the wrong item.
+		public void MoveItem(uint characterId, uint fromPos, uint toPos)
+		{
+			if (!TryGetSide(characterId, out _, out var side) || !side.Items.TryGetValue(fromPos, out var moved))
+				return;
+
+			side.Items.Remove(fromPos);
+			if (side.Items.TryGetValue(toPos, out var displaced))
+				side.Items[fromPos] = displaced; // a swap, not an overwrite - the other item goes where this one came from
+
+			side.Items[toPos] = moved;
 		}
 
 		// c2s AcceptTrade (0x206B, empty): I agree to the table as it stands. Retail acks MY accept (the empty 0x206B),
@@ -156,7 +187,7 @@ namespace Faolan.GameServer.Economy
 			var receiverRows = await _database.GetCharacterInventory(to.CharacterId);
 			var used = receiverRows.Where(r => r.Container == ContainerKind.Bag && r.ItemId != null).Select(r => r.Slot).ToHashSet();
 
-			foreach (var (slot, offered) in from.Items)
+			foreach (var (_, offered) in from.Items)
 			{
 				var free = Enumerable.Range(0, BackpackSlots).FirstOrDefault(s => !used.Contains(s), -1);
 				if (free < 0)
@@ -166,8 +197,14 @@ namespace Faolan.GameServer.Economy
 				}
 
 				used.Add(free);
-				await _database.SetCharacterInventorySlot(from.CharacterId, ContainerKind.Bag, (int)slot, null);
+				await _database.SetCharacterInventorySlot(from.CharacterId, ContainerKind.Bag, (int)offered.ItemPos, null);
 				await _database.SetCharacterInventorySlot(to.CharacterId, ContainerKind.Bag, free, offered.Item.Id, offered.Count);
+
+				// ...and TELL both clients. Moving the rows is not enough: the client renders what it last knew, so
+				// without these the item sits visibly in the giver's bag and never appears in the receiver's until a
+				// relog - the DB was right and the game looked broken.
+				await _outbound.SendItemRemoved(from.CharacterId, offered.ItemPos);
+				await _outbound.SendItemGranted(to.CharacterId, offered.Item, (uint)free, offered.Count);
 			}
 
 			if (from.Cash == 0)
@@ -219,7 +256,8 @@ namespace Faolan.GameServer.Economy
 		// The backpack's slot count, matching BaseBackpackSlots on the listener.
 		private const int BackpackSlots = 32;
 
-		private sealed record OfferedItem(Item Item, uint Count);
+		// ItemPos is the giver's BAG slot; the dictionary key is the window slot it was offered into.
+		private sealed record OfferedItem(uint ItemPos, Item Item, uint Count);
 
 		private sealed class TradeSide(uint characterId)
 		{

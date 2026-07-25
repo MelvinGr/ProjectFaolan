@@ -1355,13 +1355,36 @@ namespace Faolan.GameServer
 				case GameCharAgentOpcodes.AddTradeItem:
 				{
 					var request = PlayerTradeCodec.ParseAddItem(body);
-					await _trade.AddItem(client.Session.Character.Id, request.Slot, request.Count);
+					await _trade.AddItem(client.Session.Character.Id, request.ItemPos, request.DestPos);
 					break;
 				}
 
 				case GameCharAgentOpcodes.AcceptTrade: // 0x206B, empty
 				{
 					await _trade.Accept(client.Session.Character.Id);
+					break;
+				}
+
+				// 0x2069 RemoveTradeItem([int destPos]) - take an item back off the table.
+				case GameCharAgentOpcodes.RemoveTradeItem:
+				{
+					_trade.RemoveItem(client.Session.Character.Id, body.ReadUInt32());
+					break;
+				}
+
+				// 0x206C AbortTrade (empty) and 0x2066 DeclineTrade([ID32]) - the cancel, and refusing the request before
+				// the window opens. Both end the session; neither has moved anything, since the exchange only happens on
+				// the double accept. What the server owes the PARTNER to close THEIR window is not known - see #427.
+				case GameCharAgentOpcodes.AbortTrade:
+				{
+					_trade.Abandon(client.Session.Character.Id);
+					break;
+				}
+
+				case GameCharAgentOpcodes.DeclineTrade:
+				{
+					TeamMessageCodec.ParseCharacterId(body); // the requester, echoed by the client
+					_trade.Abandon(client.Session.Character.Id);
 					break;
 				}
 
@@ -1621,50 +1644,12 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameCharAgentOpcodes.MoveTradeItemInternal: // player-to-player trade window item move; not implemented
+				// 0x206A MoveTradeItemInternal([int pos1][int pos2]): the player drags an offered item to another slot
+				// of the trade window (#101). Signature from the client's own catalog. This case had sat here since the
+				// C++-era port with a commented-out N3Teleport block under it that had nothing to do with trade.
+				case GameCharAgentOpcodes.MoveTradeItemInternal:
 				{
-					/*byte[] sender = { 0x0d, 0x13, 0xce, 0x71, 0xb1, 0x10, 0x14 };
-						    byte[] receiver = { 0x0d, 0x47, 0xc1, 0x67, 0x6c, 0x10, 0x84, 0x80, 0x80, 0x08 };
-
-						    PacketBuffer aBuffer = new PacketBuffer();
-						    aBuffer.WriteHeader(sender, receiver, null, 0x2009, true);
-						    aBuffer.WriteUInt32(0x00000067);
-						    aBuffer.WriteUInt32(GameServer0X2000Opcodes.N3TeleportIIR);
-						    aBuffer.WriteUInt32(0x0000c350);
-						    aBuffer.WriteUInt32(client.client.Account.nClientInst);
-						    aBuffer.WriteByte(0);
-						    aBuffer.WriteUInt64(0);
-						    aBuffer.WriteUInt64(0);
-						    aBuffer.WriteUInt64(0);
-						    aBuffer.WriteUInt32(0x3f800000);
-						    aBuffer.WriteByte(0x62);
-						    aBuffer.WriteUInt32(0x0000c79c);
-						    aBuffer.WriteUInt32(0x00000faa); //map
-						    aBuffer.WriteUInt32(client.client.Account.nClientInst);
-						    aBuffer.WriteUInt32(0x0000000a);
-						    aBuffer.WriteUInt32(0x00009c50);
-						    aBuffer.WriteUInt32(0x00030bde); //instance
-						    aBuffer.WriteUInt64(0);
-						    aBuffer.WriteUInt32(0x00000014);
-						    aBuffer.WriteUInt32(0x00018704);
-						    aBuffer.WriteUInt32(0x43a14000);
-						    aBuffer.WriteUInt32(0x43160000);
-						    aBuffer.WriteUInt32(0x4430399a);
-						    aBuffer.WriteUInt32(0x00000032);
-						    aBuffer.WriteByte(0);
-						    //Log.Warning("Send Packet:\n%s\n\n", String::arrayToHexString(aBuffer.buffer, aBuffer.bufferLength).c_str());
-						    aBuffer.Send(client);
-
-						    aBuffer = new PacketBuffer();
-						    aBuffer.WriteHeader(sender, receiver, null, 0x2002, true);
-						    //aBuffer.WriteUInt32(htonl(inet_addr(realm->worldServerIPAddress)));
-						    //aBuffer.WriteUInt16(realm->worldServerPort);
-						    aBuffer.WriteUInt32(Native.Network.htonl(Native.Network.inet_addr("127.0.0.1")));
-						    aBuffer.WriteUInt16(Program.GameServerPort);
-						    aBuffer.Send(client);*/
-
-					//var packetData = packet.Data?.ToArray().ToHexString();
-
+					_trade.MoveItem(client.Session.Character.Id, body.ReadUInt32(), body.ReadUInt32());
 					break;
 				}
 
