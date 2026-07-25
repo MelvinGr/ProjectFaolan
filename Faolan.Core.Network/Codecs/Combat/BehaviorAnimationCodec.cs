@@ -81,13 +81,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// object-action feedback descriptor (SitRemoteformat, or a captured literal in tests). Byte-exact vs F2795.
 		public static byte[] PlayerSitOnObject(uint actor, uint targetHandle, string remoteformat)
 		{
-			return ObjectActionAnimation(actor, SitAnimAction, 10, 0, EntityClass.SimpleDynel, targetHandle, SitAnimName, 2, 0x86, SitBlend, 0xAA, remoteformat, 0x4C);
+			return ObjectActionAnimation(actor, SitAnimAction, 10, 0, EntityClass.SimpleDynel, targetHandle, SitAnimName, 2, 0x86, SitBlend, remoteformat, 0x4C);
 		}
 
 		// Stand the actor back up (triggered when a seated player moves). Byte-exact vs F2840.
 		public static byte[] PlayerStandUp(uint actor, uint targetHandle, string remoteformat)
 		{
-			return ObjectActionAnimation(actor, StandAnimAction, 12, 20, EntityClass.SimpleDynel, targetHandle, StandAnimName, 0, 0, 0f, 0x84, remoteformat, 0x01);
+			return ObjectActionAnimation(actor, StandAnimAction, 12, 20, EntityClass.SimpleDynel, targetHandle, StandAnimName, 0, 0, 0f, remoteformat, 0x01);
 		}
 
 		// The sit feedback remoteformat: token = startobjectaction(33)|turnon_execute(4)|<objectClass>, category 50026,
@@ -166,7 +166,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// A world-object action animation: the actor plays `animName` aimed at a target object, carrying a feedback
 		// remoteformat. tail = [u32 a][u16 nameLen][animName][u32 b][f32 blend][5×00][u8 flag][remoteformat][u32 trailer].
 		private static byte[] ObjectActionAnimation(uint actor, uint animActionId, uint p3, uint p6, uint targetClass, uint targetHandle, string animName, uint tailA, uint tailB, float blend,
-			byte flag, string remoteformat, uint trailer)
+			string remoteformat, uint trailer)
 		{
 			var message = ArgsPrefix(animActionId, p3, p6);
 			message.Target = Target(targetClass, targetHandle);
@@ -176,9 +176,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteString(animName)
 				.WriteUInt32(tailB)
 				.WriteFloat(blend)
-				.WriteArray(new byte[5])
-				.WriteByte(flag)
-				.WriteArray(Encoding.Latin1.GetBytes(remoteformat))
+				.WriteArray(new byte[4])
+				// The remoteformat is a LENGTH-PREFIXED string, exactly like animName above - not a "flag" byte followed
+				// by loose text, which is how this used to be written. The two captured records prove it: the sit's
+				// prefix is 0xAA (170) and its string is 170 bytes, the standup's is 0x84 (132) for a 132-byte string.
+				// Those lengths were baked in as constants, so every GENERATED remoteformat (ours differ from the capture's
+				// - we emit key="" until the object's localized action key is imported) shipped a prefix that overstated
+				// the string. The client then read past the end and dropped the whole record:
+				//   "Figos ID 0 sent a too short IIR UNKNOWN Key) ... datasize left in stream=141, raw=217"
+				// which is why sitting on a bench played nothing and the character stood straight back up.
+				// WriteString emits [u16 len][latin1], and 4 zeros + a u16 length is byte-identical to the 5 zeros + u8
+				// this replaces for any string under 256 bytes - so the captured goldens still match to the byte.
+				.WriteString(remoteformat)
 				.WriteUInt32(trailer)
 				.ToArray();
 

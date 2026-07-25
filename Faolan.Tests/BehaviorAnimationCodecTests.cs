@@ -1,4 +1,6 @@
 using System;
+using System.Buffers.Binary;
+using System.Text;
 using Faolan.Core.Network.Codecs.Combat;
 using Xunit;
 
@@ -43,6 +45,48 @@ namespace Faolan.Tests
 				"642cd3d60000c3500802e5d400040000002a0000001408c5c802180c28083014520808f8900310f4c2040000000000077374616e64757000000000000000000000000000843c72656d6f7465666f726d61742069643d2230222063617465676f72793d223022206b65793d2243344f3f5e5845262333393b5e5643344f3f5e5845262333393b5e5622206b6e75626f743d22302220203e3c706172616d657465722076616c75653d22373b5374616e64696e6720757022202f3e3c2f72656d6f7465666f726d61743e00000001",
 				Convert.ToHexStringLower(bytes));
 		}
+
+		// The remoteformat's length prefix must describe the string ACTUALLY written, for any string - not just the one
+		// the capture happened to contain.
+		//
+		// This is the gate the two capture goldens above could not be: they feed the captured literal, so a hardcoded
+		// prefix matches it by construction. In production the string is GENERATED (SitRemoteformat emits key="" until the
+		// object's localized action key is imported), so it is a different length - and the baked 0xAA/0x84 prefixes then
+		// overstated it by 33 and 25 bytes. The client read past the end of the record and discarded it whole
+		// ("too short IIR UNKNOWN Key"), so sitting on a bench played nothing and the character stood straight back up.
+		[Theory]
+		[InlineData("")]
+		[InlineData("TavernBenchSimpleDynel")]
+		[InlineData("SomeMuchLongerObjectClassNameThatShiftsEveryFollowingOffset")]
+		public void PlayerSitOnObject_LengthPrefixMatchesTheGeneratedRemoteformat(string objectClass)
+		{
+			var rf = BehaviorAnimationCodec.SitRemoteformat(objectClass);
+
+			AssertRemoteformatLengthPrefix(BehaviorAnimationCodec.PlayerSitOnObject(0x0802E5D4, 0x12174, rf), rf);
+		}
+
+		[Fact]
+		public void PlayerStandUp_LengthPrefixMatchesTheGeneratedRemoteformat()
+		{
+			var rf = BehaviorAnimationCodec.StandRemoteformat();
+
+			AssertRemoteformatLengthPrefix(BehaviorAnimationCodec.PlayerStandUp(0x0802E5D4, 0x12174, rf), rf);
+		}
+
+		// Finds the remoteformat inside the built record and checks the u16 immediately before it equals its length. Also
+		// asserts the string reaches the record's trailer, i.e. nothing was truncated.
+		private static void AssertRemoteformatLengthPrefix(byte[] record, string remoteformat)
+		{
+			var expected = Encoding.Latin1.GetBytes(remoteformat);
+			var at = record.AsSpan().IndexOf(expected);
+			Assert.True(at > 2, $"the remoteformat is not in the record at all (looked for {expected.Length} bytes)");
+
+			var declared = BinaryPrimitives.ReadUInt16BigEndian(record.AsSpan(at - 2, 2));
+			Assert.Equal(expected.Length, declared);
+			// ...and the record really does carry that many bytes after the prefix (the trailer is 4 bytes).
+			Assert.Equal(record.Length, at + expected.Length + 4);
+		}
+
 
 		[Theory, InlineData(false, "642cd3d60000c3500802e5d40004000000040000001508dfb00b180528083000520908d0860310d4cb8b400000000100396ae90100000000000000000000000000"),
 		 InlineData(true, "642cd3d60000c3500802e5d4000a000000040000001508dfb00b180528083000520908d0860310d4cb8b400000000100396ae90100000000000000000000000001")]
