@@ -7,6 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.ChatServer;
 using Faolan.Core.Network.Server.ChatServer;
@@ -104,6 +105,15 @@ namespace Faolan.ChatServer
 					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Global.BuildString));
 					await SendSystemMessage(client, Global.BuildString.Replace("\n", "<br />"));
 
+					// Restore the stored friend list. ⚠️ The MESSAGES are the captured ones (the same pair an add
+					// sends), but this TIMING is not: the captured account had no friends before it added them, so
+					// nothing in the corpus shows how retail delivers an existing list at login. It goes HERE rather
+					// than on the client's chat-init (0x0064) because that arrives at most once across two clients in
+					// the capture and never at all from ours - hooking it there meant the restore never ran. Unverified
+					// - see docs/subsystems/teams-trade-friends.md; a capture of a login WITH friends settles it.
+					foreach (var friend in await Database.GetFriends(character.Id))
+						await SendFriendState(client, friend);
+
 					break;
 				}
 
@@ -187,6 +197,44 @@ namespace Faolan.ChatServer
 					break;
 				}
 
+				// 0x0028 AddFriend([u32 characterId]): the friend list lives HERE, not on the game server, and is
+				// ONE-SIDED - no accept step, so the add is a write plus the two replies retail sends, in this order:
+				// the presence push (0x0025, addressed by NAME) then the friend's state (0x0028, ending in its CLASS).
+				case ChatServerOpcodes.AddFriend:
+				{
+					var friendId = FriendListCodec.ParseCharacterId(body);
+					var friend = await Database.GetCharacter(friendId);
+					if (friend == null)
+					{
+						// Not captured (the capture only ever adds a character that resolves), so say so rather than
+						// leaving the client's list silently short.
+						await SendSystemMessage(client, "No such character.");
+						break;
+					}
+
+					var added = await Database.AddFriend(client.Session.Character.Id, friendId);
+
+					await SendFriendState(client, friend);
+					Logger.LogInformation("Friends: {Character} added {Friend}{Already}.", client.Session.Character.Name, friend.Name, added
+						? ""
+						: " (already on the list)");
+
+					break;
+				}
+
+				// 0x0029 RemoveFriend([u32 characterId]): retail echoes the id straight back.
+				case ChatServerOpcodes.RemoveFriend:
+				{
+					var friendId = FriendListCodec.ParseCharacterId(body);
+					var removed = await Database.RemoveFriend(client.Session.Character.Id, friendId);
+					await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendRemoved, s => s.WriteArray(FriendListCodec.BuildCharacterRef(friendId))));
+					Logger.LogInformation("Friends: {Character} removed {Friend:X8}{Missing}.", client.Session.Character.Name, friendId, removed
+						? ""
+						: " (was not on the list)");
+
+					break;
+				}
+
 				case ChatServerOpcodes.ChatReady:
 				{
 					// Small chat-init handshake (body 00 01 02); retail echoes it back verbatim.
@@ -207,6 +255,17 @@ namespace Faolan.ChatServer
 		// (isWhisper=true, target=recipient) to the ChatMessages table. Guarded: a DB hiccup must NEVER break the live
 		// chat relay, so any failure is logged and swallowed. The sender identity matches the wire (ClientInstance ==
 		// character id for a player; see player_handle_equals_character_id).
+		// The two s2c messages that describe one friend, in retail's order: the presence push (by NAME) then the
+		// friend's state (by id, ending in its CLASS). ONLINE is whether the character has a live chat connection
+		// here - the only thing this tier can actually know.
+		private async Task SendFriendState(INetworkClient client, Character friend)
+		{
+			var online = ClientForCharacter(friend.Id) != null;
+			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendPresence, s => s.WriteArray(FriendListCodec.BuildPresence(friend.Name ?? ""))));
+			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendAdded,
+				s => s.WriteArray(FriendListCodec.BuildAddReply(friend.Id, online, friend.Class))));
+		}
+
 		private async Task PersistChat(INetworkClient client, byte channelType, uint channelId, uint? target, bool isWhisper, string message)
 		{
 			try

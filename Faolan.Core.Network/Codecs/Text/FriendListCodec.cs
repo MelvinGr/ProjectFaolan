@@ -1,4 +1,5 @@
 using Faolan.Core;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
@@ -28,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.Text
 
 		// s2c 0x0028 - the state of the friend just added. `online` is 1 in every captured reply (you can only add a
 		// character the chat server can resolve); `field` is the same 5 the team member record carries.
-		public static byte[] BuildAddReply(uint characterId, bool online, byte classId, byte field = 5, uint stamp = AddReplyStamp)
+		public static byte[] BuildAddReply(uint characterId, bool online, Class classId, byte field = 5, uint stamp = AddReplyStamp)
 		{
 			return new FaolanStream().WriteUInt32(characterId).WriteByte(online).WriteByte(field).WriteUInt32(stamp).WriteByte(classId).ToArray();
 		}

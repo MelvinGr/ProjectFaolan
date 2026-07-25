@@ -79,6 +79,7 @@ namespace Faolan.Core.Database
 		DbSet<Recipe> Recipes { get; }
 		DbSet<RecipeItem> RecipeItems { get; }
 		DbSet<RespawnPoint> RespawnPoints { get; }
+		DbSet<CharacterFriend> CharacterFriends { get; }
 		DbSet<Shop> Shops { get; }
 		DbSet<ShopItem> ShopItems { get; }
 		DbSet<Spell> Spells { get; }
@@ -157,6 +158,7 @@ namespace Faolan.Core.Database
 		public DbSet<Recipe> Recipes { get; set; }
 		public DbSet<RecipeItem> RecipeItems { get; set; }
 		public DbSet<RespawnPoint> RespawnPoints { get; set; }
+		public DbSet<CharacterFriend> CharacterFriends { get; set; }
 		public DbSet<Shop> Shops { get; set; }
 		public DbSet<ShopItem> ShopItems { get; set; }
 		public DbSet<Spell> Spells { get; set; }
@@ -245,6 +247,12 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade); // #367
 
+			// Both ends cascade: deleting a character drops its own list AND its entries in everyone else's, so no
+			// friend row can outlive either character. Fluent because no attribute expresses OnDelete, and NoAction on
+			// the second FK would be needed on a provider that rejects two cascade paths to one table - SQLite and
+			// Postgres both accept it.
+			modelBuilder.Entity<CharacterFriend>().HasOne(f => f.Character).WithMany().OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<CharacterFriend>().HasOne(f => f.Friend).WithMany().OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasOne(c => c.Account).WithMany(r => r.Characters).OnDelete(DeleteBehavior.Cascade);
 			// MapId/RealmId are required, so SetNull is no longer possible - and cascading would delete
 			// characters with their map/realm; a map or realm with characters cannot be deleted instead.

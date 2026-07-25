@@ -181,8 +181,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void Friend_AddReply_IsByteExact()
 		{
-			Assert.Equal("01317cf8010501eda8b229", Convert.ToHexString(FriendListCodec.BuildAddReply(0x01317CF8, true, (byte)Class.Necromancer)).ToLowerInvariant());
-			Assert.Equal("013184ae010501eda8b22c", Convert.ToHexString(FriendListCodec.BuildAddReply(0x013184AE, true, (byte)Class.Demonologist)).ToLowerInvariant());
+			Assert.Equal("01317cf8010501eda8b229", Convert.ToHexString(FriendListCodec.BuildAddReply(0x01317CF8, true, Class.Necromancer)).ToLowerInvariant());
+			Assert.Equal("013184ae010501eda8b22c", Convert.ToHexString(FriendListCodec.BuildAddReply(0x013184AE, true, Class.Demonologist)).ToLowerInvariant());
 		}
 
 		// f1685 / f1911 - the presence push, addressed by name.

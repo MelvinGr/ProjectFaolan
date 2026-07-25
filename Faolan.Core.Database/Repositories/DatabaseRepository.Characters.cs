@@ -14,6 +14,9 @@ namespace Faolan.Core.Database.Repositories
 	{
 		Task<int> AddCharacterFeats(uint characterId, IEnumerable<uint> featIds);
 		Task<bool> AddCharacterSpell(uint characterId, uint spellId);
+		Task<bool> AddFriend(uint characterId, uint friendCharacterId);
+		Task<Character[]> GetFriends(uint characterId);
+		Task<bool> RemoveFriend(uint characterId, uint friendCharacterId);
 		Task AddCharacterTag(uint characterId, uint tagId);
 		Task<int> ClearCharacterFeats(uint characterId);
 		Task<Character> CreateCharacter(uint accountId, uint realmId);
@@ -97,6 +100,36 @@ namespace Faolan.Core.Database.Repositories
 			if (added > 0)
 				await ctx.SaveChangesAsync();
 			return added;
+		}
+
+		// One-sided by design: this writes the caller's row only, never a reciprocal one (see CharacterFriend). Returns
+		// false when the pair is already there, so a re-add is a no-op rather than a duplicate-key throw.
+		public async Task<bool> AddFriend(uint characterId, uint friendCharacterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			if (await ctx.CharacterFriends.AnyAsync(f => f.CharacterId == characterId && f.FriendCharacterId == friendCharacterId))
+				return false;
+
+			ctx.CharacterFriends.Add(new CharacterFriend
+			{
+				CharacterId = characterId,
+				FriendCharacterId = friendCharacterId
+			});
+			await ctx.SaveChangesAsync();
+			return true;
+		}
+
+		// The befriended CHARACTERS, not the join rows - every caller needs the name and class to build the wire record.
+		public async Task<Character[]> GetFriends(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterFriends.Where(f => f.CharacterId == characterId).Include(f => f.Friend).Select(f => f.Friend).AsNoTracking().ToArrayAsync();
+		}
+
+		public async Task<bool> RemoveFriend(uint characterId, uint friendCharacterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterFriends.Where(f => f.CharacterId == characterId && f.FriendCharacterId == friendCharacterId).ExecuteDeleteAsync() > 0;
 		}
 
 		public async Task<bool> AddCharacterSpell(uint characterId, uint spellId)

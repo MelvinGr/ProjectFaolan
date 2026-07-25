@@ -6,6 +6,8 @@ namespace Faolan.Core.Enums
 	{
 		Hello = 0x0000,
 		Whisper = 0x001E, // client sends a tell: [u32 targetCharId][string][00 01 00] (whisper capture 2026-06-12)
+		AddFriend = 0x0028, // [u32 characterId] - the friend list is chat-tier and ONE-SIDED (no accept step)
+		RemoveFriend = 0x0029, // [u32 characterId]
 		ChannelChat = 0x0041, // client posts a message to a chat channel: [byte type][u32 channelId][string][0000]
 		ChatReady = 0x0064 // small chat-init handshake the client sends after the channel subscriptions (000102)
 	}
@@ -17,6 +19,9 @@ namespace Faolan.Core.Enums
 		Whisper = 0x001E, // incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info
 		ChannelChat = 0x0041, // a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000]
 		ChatSenderInfo = 0x0014, // sender id + name; also sent before a ChannelChat so the client can show the speaker
+		FriendPresence = 0x0025, // [u64 0][u32 stamp][u16][u8][string name] - pushed BEFORE the add reply, by NAME
+		FriendAdded = 0x0028, // [u32 characterId][u8 online][u8 5][u32 stamp][u8 class] - the added friend's state
+		FriendRemoved = 0x0029, // [u32 characterId] - the removal echoed back
 		ChannelSubscription = 0x003C,
 		ChatReadyAck = 0x0064 // echo of the client's chat-init handshake
 	}

@@ -4,7 +4,7 @@
 > `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
-16 enums, 821 entries. The 32-bit `GameServer0X2000` IIR sub-opcodes are catalogued separately in [`iir-types.md`](iir-types.md).
+16 enums, 826 entries. The 32-bit `GameServer0X2000` IIR sub-opcodes are catalogued separately in [`iir-types.md`](iir-types.md).
 
 ## What is (and is not) verified here [V1]
 
@@ -389,6 +389,9 @@ ChatServer chat — **no RpcHeader** (raw opcode) · S2C
 | `0x001E` | `Whisper` | incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info |
 | `0x0022` | `CharacterChat` |  |
 | `0x0023` | `SystemMessage` |  |
+| `0x0025` | `FriendPresence` | [u64 0][u32 stamp][u16][u8][string name] - pushed BEFORE the add reply, by NAME |
+| `0x0028` | `FriendAdded` | [u32 characterId][u8 online][u8 5][u32 stamp][u8 class] - the added friend's state |
+| `0x0029` | `FriendRemoved` | [u32 characterId] - the removal echoed back |
 | `0x003C` | `ChannelSubscription` |  |
 | `0x0041` | `ChannelChat` | a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000] |
 | `0x0064` | `ChatReadyAck` | echo of the client's chat-init handshake |
@@ -401,6 +404,8 @@ ChatServer chat — **no RpcHeader** (raw opcode) · C2S
 |--------|------|------|
 | `0x0000` | `Hello` |  |
 | `0x001E` | `Whisper` | client sends a tell: [u32 targetCharId][string][00 01 00] (whisper capture 2026-06-12) |
+| `0x0028` | `AddFriend` | [u32 characterId] - the friend list is chat-tier and ONE-SIDED (no accept step) |
+| `0x0029` | `RemoveFriend` | [u32 characterId] |
 | `0x0041` | `ChannelChat` | client posts a message to a chat channel: [byte type][u32 channelId][string][0000] |
 | `0x0064` | `ChatReady` | small chat-init handshake the client sends after the channel subscriptions (000102) |
 

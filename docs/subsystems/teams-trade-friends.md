@@ -137,6 +137,33 @@ s2c 0x0025  [u64 0][u32 stamp][u16][u8][u16 len][name]               presence pu
 machine: an add is a write plus a presence subscription. Note the presence push is addressed by NAME while
 everything else uses the character id.
 
+The chat framing is `[u16 opcode][u16 bodyLen][body]`, read from the raw pcap (`0025 001b …`, `0028 000b …`).
+
+### ⚠️ Not working in-client, and the capture cannot say why
+
+Implemented (`CharacterFriends` + the `ChatServerListener` handlers) and **the client shows nothing**, on add or after
+a relog. What has been ruled out:
+
+- the **framing** — verified against the raw pcap;
+- the **bodies** — ours reproduce retail's byte-for-byte apart from the id, name and that last byte;
+- the **window** — retail's complete add is exactly those three packets, nothing else passes between them;
+- the **last byte's value** — an add whose target is a Necromancer (`0x29`, retail's own combination) fails exactly
+  like one targeting an Assassin (`0x22`);
+- **login restore** — the stored pair is pushed at `Hello` and changes nothing. (It was briefly hooked to the
+  client's chat-init `0x0064`, which the capture shows at most once across two clients and our client never sends at
+  all, so it never ran.)
+
+So the two messages are not what builds the list, or not sufficient. The list UI is Flash-side — a string sweep of
+`AgeOfConan.exe` for `Friend` finds only Facebook-friend machinery and the team's `hasHostileInFriends` check, no
+friend-list code — so the next step is the CHAT protocol handler in the client, not more capture reading.
+
+⚠️ **What that last byte is remains open.** `0x29`/`0x2C` match `Class.Necromancer`/`Class.Demonologist` exactly, and
+the same value leads the team member record — but they are equally good as **levels 41 and 44**, and nothing in this
+capture states those two characters' classes (the `mage-necromancer` / `mage-demo` captures are different characters).
+The in-client test distinguishes neither. Treated as the class because the member record needs *a* class and the
+client refuses to build a team-invite window without a valid one — which is evidence for the member record's field,
+not for this one.
+
 ## How ours is wired
 
 `TeamService` is a composed collaborator of the **CsPlayerAgent listener**, like `GuildService`: the CS tier owns the

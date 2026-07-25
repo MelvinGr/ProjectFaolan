@@ -664,6 +664,21 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("CharacterFeats");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFriend", b =>
+                {
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("FriendCharacterId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("CharacterId", "FriendCharacterId");
+
+                    b.HasIndex("FriendCharacterId");
+
+                    b.ToTable("CharacterFriends");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterInventory", b =>
                 {
                     b.Property<uint>("CharacterId")
@@ -3462,6 +3477,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("Character");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFriend", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
+                        .WithMany()
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "Friend")
+                        .WithMany()
+                        .HasForeignKey("FriendCharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Character");
+
+                    b.Navigation("Friend");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterInventory", b =>
