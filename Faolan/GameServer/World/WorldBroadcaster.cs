@@ -686,15 +686,29 @@ namespace Faolan.GameServer.World
 
 		// A player closed the loot window (top-level 0x2044): consume the bag - fade it out for nearby players and drop
 		// it from the model.
-		public async Task CloseLootBag(INetworkClient client, uint bagHandle)
+		public Task CloseLootBag(INetworkClient client, uint bagHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) || !bag.IsLootable)
-				return;
+				return Task.CompletedTask;
 
-			await BroadcastEntityFade(bag);
-			_sim.World.Remove(bag);
-			_logger.LogInformation("Loot: {Name} closed loot bag 0x{Handle:X8}; faded + removed.", player.Name, bag.Handle);
+			// Closing the WINDOW is not taking the loot: the bag stays in the world with whatever is left in it, so the
+			// player can walk back and open it again. It used to fade + remove here, which deleted everything the
+			// player had not taken the moment they pressed Escape.
+			//
+			// ⚠️ This is OUR call, not a captured behaviour, and the captures cannot settle it: all 95 closes in the
+			// corpus are of a bag that was just EMPTIED - 89 follow a TryLootAll, and the other 6 (loot-drag-1538)
+			// follow drags that took what the bag had. In those the fade lands ~0.2s after the close and the
+			// n3ToClientQuit ~3.4s after the fade (its duration), which is exactly what the fully-looted teardown in
+			// AfterLootTake already does - so the corpus shows an empty bag being torn down, never a bag with items
+			// left surviving or not surviving a close. A capture that closes a part-looted multi-item bag would decide
+			// it (Gitea #431).
+			//
+			// So: the empty case is torn down by AfterLootTake before this is ever reached, and a bag that still has
+			// contents lives on until it expires off the world tick (WorldEntity.TickExpiry -> LootExpired).
+			_logger.LogInformation("Loot: {Name} closed the window on bag 0x{Handle:X8}; {Items} item(s) + {Cash} tin left in the world until it expires.", player.Name, bag.Handle,
+				bag.LootItems.Count(i => i != 0), bag.CashTin);
+			return Task.CompletedTask;
 		}
 
 		// A dead NPC's death-animation linger elapsed (driven by the world tick): turn its corpse into a lootable bag
