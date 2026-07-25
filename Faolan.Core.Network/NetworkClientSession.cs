@@ -39,8 +39,17 @@ namespace Faolan.Core.Network
 
 		// The role this GameServer connection plays in the world-entry handshake, decided ONCE at
 		// GameAgent.Authenticate2 and the single source of truth for routing every later handshake signal.
-		// See docs/subsystems/world-entry-flow.md. IsCreateEditorConnection / IsCreateWorldSession are derived
-		// views of it (kept for the call sites that only care about one role).
+		// See docs/subsystems/world-entry-flow.md.
+		//
+		// ROUTING SWITCHES ON THIS, EXHAUSTIVELY (#432). A handshake signal that means different things per role -
+		// Authenticate2's world entry, CharInPlayIIR, the 0x205F arming, the post-0x205F flush - covers all four modes
+		// with a default that says so out loud. It used to be if/else chains over the derived booleans below, whose
+		// final `else` was the login path, so any role nobody had thought about silently became a login: that is how a
+		// create-world connection was told it was a "changemap/teleport reconnect" in the middle of character creation,
+		// three times in two weeks.
+		//
+		// IsCreateEditorConnection / IsCreateWorldSession remain as derived views for the call sites that genuinely ask
+		// a single-role CONTENT question ("does this connection get the cutscene records?"), never to route a signal.
 		WorldEntryMode EntryMode { get; set; }
 
 		// Set after CharCreationFinished + the world-prep burst: the creator is now waiting for the client's
@@ -52,6 +61,7 @@ namespace Faolan.Core.Network
 
 		// True on the character-creator (editor) GameServer connection. A derived view of EntryMode (role at
 		// auth); NOT the same as IsUnnamedCreatePhase (name-now) - see that member and WorldEntryMode.
+		// For single-role content checks only - routing switches on EntryMode (#432).
 		bool IsCreateEditorConnection { get; }
 
 		// True on the post-creation WORLD GameServer connection (the second connection, opened after the

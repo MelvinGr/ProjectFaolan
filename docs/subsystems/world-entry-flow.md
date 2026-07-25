@@ -17,8 +17,14 @@ handoff), [`create-editor-bursts.md`](create-editor-bursts.md) (the editor burst
 
 A connection's role is decided **once**, at `GameAgent.Authenticate2` (the Hello), and stored on the session as
 `WorldEntryMode` (`Faolan.Core/Enums/WorldEntryMode.cs`). It is the single source of truth for routing every
-later handshake signal. The legacy booleans `IsCreateEditorConnection` / `IsCreateWorldSession` are now derived
-views of it.
+later handshake signal, and every routing site **switches on it exhaustively** — all four modes plus a `default`
+that logs an error (#432). The legacy booleans `IsCreateEditorConnection` / `IsCreateWorldSession` are derived
+views, kept only for single-role CONTENT questions ("does this connection get the cutscene records?").
+
+That rule is the scar tissue from three regressions in two weeks, all identical in shape: the handlers tested
+overlapping booleans in `if`/`else` chains whose final `else` was the login path, so a role nobody had considered
+silently became a login. A `CreateWorld` connection was told it was a "changemap/teleport reconnect" in the middle
+of character creation; the login ready burst fired into the intro cutscene; and the player got a blue screen.
 
 | Mode | Recognised at Hello by | World entry sent | Ready signal that finishes entry |
 |---|---|---|---|
@@ -54,19 +60,27 @@ routes on `IsCreateEditorConnection` (the role), so a named reconnect flushes th
 
 ## The three handshake signals
 
-1. **`0x205F` (`CinematicTransition`)** — the client's "I'm ready to load" ping on a normal login. Arms
-   `HasPendingPost205FFollowUp`. On the create-editor connection (`IsUnnamedCreatePhase`) it only arms + waits for
-   `CharInPlayIIR`; retail sends no download here.
-2. **`CharInPlayIIR`** — has two senders, told apart by the mode:
+1. **`0x205F` (`CinematicTransition`)** — despite the name the login flow uses it as its "I'm ready to load" ping,
+   which is exactly why it needs per-mode routing: its trailing byte is a cinematic begin/end, and the `CreateWorld`
+   connection sends a STREAM of them while the beach intro plays. `Login` / `TeleportReentry` / `CreateEditor` arm
+   `HasPendingPost205FFollowUp`; `CreateWorld` must not, or the next `0x2020` poll fires the login burst into the
+   cutscene. Retail sends no download in response to it in any mode.
+2. **`CharInPlayIIR`** — three senders, one per role:
    - `CreateEditor` → `CreateFlowService.SendRetailCreateEditorPostReadyBurst` (launches the editor).
-   - any named char (`Login` / `TeleportReentry`) → `FlushPendingPost205FFollowUp`. A `TeleportReentry` carries
-     no `0x205F`, so this is its ready signal.
+   - `CreateWorld` → `SendCreateWorldReadyBurst`, then `CreateFlowService.SendCreateIntroCutscene`. Retail's order
+     exactly (`Blablatest` create: c2s `CharInPlayIIR` fr317 → s2c `0x2024` fr324 → cutscene fr325).
+   - `Login` / `TeleportReentry` → `FlushPendingPost205FFollowUp`. A `TeleportReentry` carries no `0x205F`, so this
+     is its ready signal.
 3. **`0x2020` (`UpdateQuestMarkerNPC`)** — the client polling each spawned entity. Each poll is answered with a
    `0x2008` SpawnCheck (once `WorldEntered` or `IsCreateWorldSession`), and every poll calls
-   `FlushPendingPost205FFollowUp` — which no-ops unless the follow-up is armed and the character is named.
+   `FlushPendingPost205FFollowUp` — which no-ops unless the follow-up is armed and the mode is a named one.
 
-`FlushPendingPost205FFollowUp` is the shared "leave the loading screen" burst for both named modes: it sends the
-deferred prompt + SpawnCheck, then `0x2024` `SendReadyForPlayScreen`, the ability/combo grants, the mount
-re-seat, the Shield-of-the-Risen buff, the post-ready world/quest record stream, and the wallet/guild-tag sync.
-It is armed on a `Login` by the client's `0x205F` and on a `TeleportReentry` at Hello, so the same burst covers
-first login and every changemap/teleport re-entry.
+`FlushPendingPost205FFollowUp` is the "leave the loading screen" burst for `Login` and `TeleportReentry` ONLY: the
+deferred prompt + SpawnCheck, `0x2024` `SendReadyForPlayScreen`, the ability/combo grants, the mount re-seat, the
+Shield-of-the-Risen buff, the post-ready world/quest record stream, and the wallet/guild-tag sync. It is armed on a
+`Login` by the client's `0x205F` and on a `TeleportReentry` at Hello.
+
+`CreateWorld` has its **own** smaller burst, `SendCreateWorldReadyBurst`, because retail's answer there is a
+different set of records — `0x2024`, the `0x2052` ability grants, the `CharInPlayIIR` echo, `RegenIIR` and
+`SyncCanSprint` (`Blablatest` create fr324/325). Sending the login burst instead added a combo book, a stat prompt,
+a quest marker and the post-`0x2024` record stream that retail does not send there, and omitted `RegenIIR`.

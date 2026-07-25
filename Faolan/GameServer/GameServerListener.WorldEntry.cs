@@ -48,21 +48,30 @@ namespace Faolan.GameServer
 			if (!client.Session.HasPendingPost205FFollowUp)
 				return;
 
-			if (client.Session.IsUnnamedCreatePhase)
+			// Whether this connection wants the LOGIN ready burst is a question about its ROLE, so ask EntryMode
+			// directly and cover every mode (#432). Two of them must never flush here:
+			//   CreateEditor - it is showing the character creator; its ready sequence is the editor burst, sent on
+			//                  CharInPlayIIR, and the client keeps polling 0x2020 throughout.
+			//   CreateWorld  - it is running the beach/Kalanthes intro. Retail sends its ready burst in answer to
+			//                  CharInPlayIIR (fr317 -> fr324), so firing it from a poll lands inside the cutscene:
+			//                  the blue screen. SendCreateWorldReadyBurst owns that moment instead.
+			switch (client.Session.EntryMode)
 			{
-				Logger.LogInformation("New-character post-0x205F follow-up remains pending on 0x2020; waiting for the retail create handoff instead of flushing early.");
-				return;
-			}
+				case WorldEntryMode.CreateEditor:
+					Logger.LogInformation("Create-editor connection: the post-0x205F follow-up waits for the create handoff, not for this 0x2020 poll.");
+					return;
 
-			// The CREATE-WORLD connection gets the same burst, but NOT from here. Retail answers its CharInPlayIIR with
-			// 0x2024 + the ability grants (Blablatest create fr317 -> fr324), and that is the only moment it may fire:
-			// this method also runs off the 0x2020 poll, which during the intro means ReadyForPlayScreen landing inside
-			// the cutscene - the blue screen. So the create-world path calls SendWorldReadyBurst directly from
-			// CharInPlayIIR, and this armed-flush path stays out of it.
-			if (client.Session.IsCreateWorldSession)
-			{
-				Logger.LogInformation("Create-world connection: the ready burst belongs to its CharInPlayIIR, not to this poll.");
-				return;
+				case WorldEntryMode.CreateWorld:
+					Logger.LogInformation("Create-world connection: the ready burst belongs to its CharInPlayIIR, not to this poll.");
+					return;
+
+				case WorldEntryMode.Login:
+				case WorldEntryMode.TeleportReentry:
+					break; // the two modes this burst is FOR
+
+				default:
+					Logger.LogError("Post-0x205F flush on an unhandled entry mode {Mode}: sending the login burst by default, which may be wrong for it.", client.Session.EntryMode);
+					break;
 			}
 
 			// Past the early return the character is always named: the create-editor connection returned above (it

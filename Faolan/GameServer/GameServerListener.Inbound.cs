@@ -209,44 +209,55 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.CharInPlayIIR: //peer0_160
 				{
-					// CharInPlayIIR ("ReadyForPlayScreen") has TWO senders, told apart by the connection role:
-					//  - the create-editor (unnamed) connection sends it to launch the editor. Retail answers DIRECTLY
-					//    with the post-ready burst - the 0x2024 ReadyForPlayScreen + CharInPlayIIR + 0xF508F4C1 + the
-					//    creation script that launches the editor (Blablatest necro create: client CharInPlayIIR at f90
-					//    -> server burst at f95).
-					//  - a NAMED character on a changemap/teleport reconnect sends it too: that reconnect carries NO
-					//    0x205F, so the client uses CharInPlayIIR as its ready signal instead of the 0x2020 poll the
-					//    normal login flushes on. Treating it as an editor launch put the create-editor UI in-world
-					//    after a teleport (and on any login that came in via this reconnect shape). So flush the armed
-					//    post-0x205F follow-up here - the same ReadyForPlayScreen (+ abilities/combos) burst the 0x2020
-					//    path sends - which drops the loading screen into the world. (This restores the named-character
-					//    branch dropped in d43dd426 as "dead"; it isn't - the teleport reconnect exercises it.)
-					if (client.Session.IsCreateEditorConnection)
+					// CharInPlayIIR ("ReadyForPlayScreen") means something different per connection ROLE, so it routes on
+					// EntryMode - the role decided once at Authenticate2 - and handles every mode explicitly (#432).
+					// It used to be an if/else chain over derived booleans whose final `else` was the login path, so a
+					// mode nobody thought about became a login: that is how a create-world connection ended up being
+					// told it was a "changemap/teleport reconnect" in the middle of character creation.
+					switch (client.Session.EntryMode)
 					{
-						Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
-						await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
-					}
-					else if (client.Session.IsCreateWorldSession)
-					{
-						// The third sender, and the one this branch used to mislabel as a teleport reconnect: the
-						// post-creation world connection. THIS is where its ready burst belongs - retail answers this
-						// exact CharInPlayIIR with 0x2024 + the ability grants (Blablatest create fr317 -> fr324) -
-						// and nowhere earlier: fired from a 0x2020 poll while the intro was still running, it left the
-						// player on a blue screen. Marking the world entered both records the transition and lets the
-						// flush through (it holds everything back until then).
-						// Retail's order, exactly: this CharInPlayIIR is answered with the ready burst and THEN the intro
-						// cutscene (Blablatest create - c2s CharInPlayIIR fr317 -> s2c 0x2024 fr324 -> s2c cutscene
-						// fr325). Starting the cutscene earlier, with the world entry, meant the client's CharInPlayIIR
-						// arrived mid-intro and the ready burst interrupted what had already begun.
-						Logger.LogInformation("Create-world CharInPlayIIR: sending the create ready burst, then starting the intro cutscene.");
-						client.Session.HasPendingPost205FFollowUp = false;
-						await SendCreateWorldReadyBurst(client);
-						await _createFlow.SendCreateIntroCutscene(client);
-					}
-					else
-					{
-						Logger.LogInformation("Named-character CharInPlayIIR (changemap/teleport reconnect, no 0x205F): flushing the world post-0x205F follow-up.");
-						await FlushPendingPost205FFollowUp(client);
+						case WorldEntryMode.CreateEditor:
+						{
+							// The character-creator connection launches the editor with this. Retail answers directly
+							// with the post-ready burst - 0x2024 + CharInPlayIIR + 0xF508F4C1 + the creation script
+							// (Blablatest necro create: client CharInPlayIIR at f90 -> server burst at f95).
+							Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
+							await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
+							break;
+						}
+
+						case WorldEntryMode.CreateWorld:
+						{
+							// The post-creation world connection. Retail answers THIS CharInPlayIIR with the ready
+							// burst and then the intro (c2s fr317 -> s2c 0x2024 fr324 -> s2c cutscene fr325); earlier
+							// than this - e.g. off a 0x2020 poll while the intro runs - and the player gets a blue
+							// screen instead of a cutscene.
+							Logger.LogInformation("Create-world CharInPlayIIR: sending the create ready burst, then starting the intro cutscene.");
+							client.Session.HasPendingPost205FFollowUp = false;
+							await SendCreateWorldReadyBurst(client);
+							await _createFlow.SendCreateIntroCutscene(client);
+							break;
+						}
+
+						case WorldEntryMode.TeleportReentry:
+						case WorldEntryMode.Login:
+						{
+							// A changemap/teleport reconnect carries NO 0x205F, so the client uses CharInPlayIIR as its
+							// ready signal instead of the 0x2020 poll a normal login flushes on. Flushing the armed
+							// follow-up here is what drops the loading screen into the world; Login shares the branch
+							// because the flush no-ops unless something armed it.
+							Logger.LogInformation("Named-character CharInPlayIIR ({Mode}, no 0x205F): flushing the world post-0x205F follow-up.", client.Session.EntryMode);
+							await FlushPendingPost205FFollowUp(client);
+							break;
+						}
+
+						default:
+						{
+							// A mode added without deciding what this signal means for it. Say so - the old `else`
+							// silently treated it as a login, which is exactly how this handler kept regressing.
+							Logger.LogError("CharInPlayIIR on an unhandled entry mode {Mode}: no ready sequence was sent, so this client will sit on its loading screen.", client.Session.EntryMode);
+							break;
+						}
 					}
 
 					break;
@@ -1252,9 +1263,14 @@ namespace Faolan.GameServer
 					client.Session.PostMorphBurstSent = false;
 					client.Session.AwaitingEnterWorld = false;
 					client.Session.CreateWorldChunkIndex = 0;
-					// IsCreateEditorConnection / IsCreateWorldSession were set above from this connection's role.
+					// EntryMode is set above and is what every later handshake signal routes on (#432).
 
-					if (isCreateWorldEntry) // Post-creation enter-world -> full retail creation world entry (-> scene)
+					// The world entry each ROLE gets. Written as an exhaustive switch over the mode set above rather
+					// than a chain of booleans (#432) - the modes are the routing, so a new one is a compile-time
+					// question here instead of silently inheriting the login path.
+					switch (client.Session.EntryMode)
+					{
+					case WorldEntryMode.CreateWorld: // Post-creation enter-world -> the intro/cutscene world entry
 					{
 						// Force the Tortage intro spawn onto the character (covers resumed characters that
 						// never went through CreateCharacter), so the live SpawnPlayer uses the right position.
@@ -1278,13 +1294,18 @@ namespace Faolan.GameServer
 						// the created char lands on the beach as ITSELF and the cutscene drives to IntroDone. Cutscene
 						// actors stay invisible until #185; SendCreateWorldSceneBurst stays as the golden reference.
 						await _createFlow.SendCreateWorldWithCutscene(client);
+						break;
 					}
-					else if (isNewCharacter) // New character -> show the creator
+
+					case WorldEntryMode.CreateEditor: // New character -> show the creator
 					{
 						Logger.LogInformation("New-character create connection (clientInstance={ClientInstance:X8}): sending the character-creator (editor) burst.", clientInstance);
 						await CreateFlowService.SendRetailCreateEditorInitialBurst(client, Database, logger: Logger);
+						break;
 					}
-					else
+
+					case WorldEntryMode.Login:
+					case WorldEntryMode.TeleportReentry:
 					{
 						// Existing-character login: the DB-driven, burst-less world entry - the character's current-map
 						// world content is CONSTRUCTED from the DB (WorldObject/NpcSpawn tables) and addressed to this
@@ -1305,6 +1326,15 @@ namespace Faolan.GameServer
 								"Teleport re-entry (clientInstance={ClientInstance:X8}): armed the post-0x205F follow-up so 0x2024 ReadyForPlayScreen flushes on the next 0x2020 (no client 0x205F on a changemap reconnect).",
 								clientInstance);
 						}
+
+						break;
+					}
+
+					default:
+					{
+						Logger.LogError("Authenticate2 on an unhandled entry mode {Mode} (clientInstance={ClientInstance:X8}): no world entry was sent.", client.Session.EntryMode, clientInstance);
+						break;
+					}
 					}
 
 					break;
@@ -1481,30 +1511,44 @@ namespace Faolan.GameServer
 					var unk0 = body.ReadUInt32(); // 0xc350
 					var characterId = body.ReadUInt32();
 
-					// 0x205F is the CINEMATIC TRANSITION (its trailing byte is begin/end), which the login flow happens
-					// to use as its ready trigger. The create-world connection is running an actual cinematic - the
-					// beach/Kalanthes intro - so it sends a stream of these, and arming the login follow-up on them
-					// meant the next 0x2020 poll fired ReadyForPlayScreen + the login record burst INTO the middle of
-					// the cutscene. Its ready sequence is the create burst's own (SendCreateWorldWithCutscene +
-					// SendCreateCutsceneStep), so leave the flag alone here.
-					if (client.Session.IsCreateWorldSession)
+					// 0x205F is the CINEMATIC TRANSITION (its trailing byte is begin/end); the LOGIN flow happens to use
+					// it as its ready trigger, which makes "should this arm the follow-up?" a per-mode question rather
+					// than a property of the packet (#432).
+					switch (client.Session.EntryMode)
 					{
-						Logger.LogInformation("0x205F (cinematic transition) on the create-world connection: the intro drives its own ready sequence; not arming the login follow-up.");
-						break;
-					}
+						case WorldEntryMode.CreateWorld:
+						{
+							// This connection is running an actual cinematic - the beach/Kalanthes intro - so it sends a
+							// stream of these. Arming here meant the next 0x2020 poll fired ReadyForPlayScreen into the
+							// middle of the cutscene; its ready sequence is the create burst's own.
+							Logger.LogInformation("0x205F (cinematic transition) on the create-world connection: the intro drives its own ready sequence; not arming the login follow-up.");
+							break;
+						}
 
-					if (client.Session.IsUnnamedCreatePhase)
-					{
-						// Create-editor phase: retail sends no download in response to 0x205F - it just acks the
-						// client's polls and waits for CharInPlayIIR (which triggers the editor-launch burst).
-						client.Session.HasPendingPost205FFollowUp = true;
-						Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Create-editor phase; awaiting CharInPlayIIR.", unk0, characterId);
-						break;
-					}
+						case WorldEntryMode.CreateEditor:
+						{
+							// Retail sends no download in response - it acks the polls and waits for CharInPlayIIR
+							// (which triggers the editor-launch burst).
+							client.Session.HasPendingPost205FFollowUp = true;
+							Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Create-editor phase; awaiting CharInPlayIIR.", unk0, characterId);
+							break;
+						}
 
-					client.Session.HasPendingPost205FFollowUp = true;
-					Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", unk0,
-						characterId, characterId);
+						case WorldEntryMode.Login:
+						case WorldEntryMode.TeleportReentry:
+						{
+							client.Session.HasPendingPost205FFollowUp = true;
+							Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", unk0,
+								characterId, client.Session.Character.Id);
+							break;
+						}
+
+						default:
+						{
+							Logger.LogError("0x205F on an unhandled entry mode {Mode}: not arming the ready follow-up, so this client may sit on its loading screen.", client.Session.EntryMode);
+							break;
+						}
+					}
 
 					break;
 				}
