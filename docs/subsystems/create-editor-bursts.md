@@ -118,10 +118,16 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
 - **Editor-scene `SimpleDynel` props** — the 18 props are `WorldObjects` rows on map
    4000 in `faolan.db` (same localized ids + keys). `SendRetailCreateEditorInitialBurst` now takes the
    `IDatabaseRepository` and SOURCES each scene dynel from its row: `LoadEditorSceneDynels` loads the map-4000
-   `WorldObjects` keyed by `CapturedHandle`, then the burst loops the fixed `EditorSceneDynelHandles` and builds
-   each byte-exact via `WorldObjectBuilder.TryBuild(row, handle, playfieldInstance, out body)` (the
-   playfield-instance overload), re-addressing every prop to the captured handle + the editor playfield instance
+   `WorldObjects` keyed by **display id** — the prop's LDB string reference, which is placement truth and unique
+   across the map — then the burst loops `EditorSceneDynels`, which pairs each captured WIRE handle with the display
+   id that finds its row, and builds each byte-exact via
+   `WorldObjectBuilder.TryBuild(row, handle, playfieldInstance, out body)` (the playfield-instance overload),
+   re-addressing every prop to the captured handle + the editor playfield instance
    (`CreateEditorCharBuilder.EditorPlayfieldInstance`); a no-DB run simply omits them (no verbatim fallback).
+   The lookup used to key on a `WorldObjects.CapturedHandle` column — a session-volatile value as a persistence key.
+   Importing a capture whose session re-observed the editor scene renumbered all 18 and the props silently vanished
+   from the burst (36 frames → 18), which is why the column is gone entirely: a world object's wire handle is now
+   minted by its zone (`LiveWorldObject`).
    `CreateEditorSceneDynelTests` proves **all 18 reconstruct
    byte-for-byte** and that the **full DB-driven burst equals `InitialBurst.bin`**. (Until Gitea #222 the 18th —
    localized `3072626`, handle `0x0002A7FE` — had no DB row: it shares an exact position with `347659` and the

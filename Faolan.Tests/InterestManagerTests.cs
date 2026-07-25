@@ -213,7 +213,7 @@ namespace Faolan.Tests
 
 			var (spawn, despawn) = InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
 
-			Assert.Equal([1u, 2u], spawn.Select(o => o.CapturedHandle).Order().ToArray());
+			Assert.Equal([1u, 2u], spawn.Select(o => o.Handle).Order().ToArray());
 			Assert.Empty(despawn);
 			Assert.Equal([1u, 2u], p.KnownObjects.Order().ToArray());
 		}
@@ -251,7 +251,7 @@ namespace Faolan.Tests
 
 			p.Position = new Vector3(0, 0, 0);
 			var (back, _) = InterestManager.ResolveWorldObjects(zone, p, Range, NoQuests);
-			Assert.Equal([7u], back.Select(o => o.CapturedHandle).ToArray()); // full re-send, not a diff
+			Assert.Equal([7u], back.Select(o => o.Handle).ToArray()); // full re-send, not a diff
 		}
 
 		// #262: a gated object is absent entirely for a player without the quest, and appears once they hold it.
@@ -260,28 +260,29 @@ namespace Faolan.Tests
 		{
 			var zone = new Zone(2040);
 			var gated = Obj(5, 0, 0);
-			gated.GateQuestId = 13479;
+			gated.Row.GateQuestId = 13479;
 			zone.WorldObjects = [gated];
 
 			var without = Player(9, 0, 0);
 			Assert.Empty(InterestManager.ResolveWorldObjects(zone, without, Range, NoQuests).Spawn);
 
 			var with = Player(10, 0, 0);
-			Assert.Equal([5u], InterestManager.ResolveWorldObjects(zone, with, Range, new HashSet<uint> { 13479 }).Spawn.Select(o => o.CapturedHandle).ToArray());
+			Assert.Equal([5u], InterestManager.ResolveWorldObjects(zone, with, Range, new HashSet<uint> { 13479 }).Spawn.Select(o => o.Handle).ToArray());
 		}
 
 		private static readonly IReadOnlySet<uint> NoQuests = new HashSet<uint>();
 
-		private static WorldObject Obj(uint handle, float x, float z)
+		// The handle is the ZONE's, not a column - so it is passed in beside the row, the way EnsureZoneWorldObjects
+		// mints it (see LiveWorldObject).
+		private static LiveWorldObject Obj(uint handle, float x, float z)
 		{
-			return new WorldObject
+			return new LiveWorldObject(handle, new WorldObject
 			{
 				MapId = 2040,
-				CapturedHandle = handle,
 				PositionX = x,
 				PositionY = 0,
 				PositionZ = z
-			};
+			});
 		}
 
 		private static WorldEntity Player(uint handle, float x, float z)

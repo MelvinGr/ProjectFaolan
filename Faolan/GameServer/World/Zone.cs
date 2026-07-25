@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 
@@ -24,6 +25,8 @@ namespace Faolan.GameServer.World
 		// client only ever sees its own instance).
 		public uint InstanceId { get; set; }
 
+		private uint _nextHandle;
+
 		public uint MapId { get; }
 
 		public IReadOnlyCollection<WorldEntity> Entities => _entities.Values.ToArray();
@@ -44,7 +47,7 @@ namespace Faolan.GameServer.World
 		//
 		// A loot bag is the exception and IS a WorldEntity: it has a lifecycle (open, expire, fade), which is exactly
 		// the state that earns entity-hood.
-		public IReadOnlyList<WorldObject> WorldObjects { get; set; } = [];
+		public IReadOnlyList<LiveWorldObject> WorldObjects { get; set; } = [];
 
 		public Zone(uint mapId)
 		{
@@ -54,13 +57,46 @@ namespace Faolan.GameServer.World
 		// The static world objects within `range` of `position` - the interest query for streaming props as a player
 		// walks. Same linear scan as the entity queries above, and the same note applies: fine at map scale, a grid is
 		// the optimisation when it stops being.
-		public IEnumerable<WorldObject> WorldObjectsInRange(Vector3 position, float range)
+		public IEnumerable<LiveWorldObject> WorldObjectsInRange(Vector3 position, float range)
 		{
 			foreach (var obj in WorldObjects)
 			{
 				if (Vector3.Distance(obj.Position, position) <= range)
 					yield return obj;
 			}
+		}
+
+		// The object a client-supplied wire handle refers to. This is the ONLY way back from a handle to a row: the
+		// handle is this zone's, so nothing else can resolve it (it used to be a per-interaction DB query against the
+		// CapturedHandle column - see LiveWorldObject).
+		public bool TryGetWorldObject(uint handle, [MaybeNullWhen(false)] out LiveWorldObject obj)
+		{
+			obj = null;
+			foreach (var candidate in WorldObjects)
+			{
+				if (candidate.Handle != handle)
+					continue;
+
+				obj = candidate;
+				return true;
+			}
+
+			return false;
+		}
+
+		// Forgets a world object (the GM .delete of a prop) so the zone stops streaming it without a reload.
+		public void RemoveWorldObject(uint handle)
+		{
+			WorldObjects = [.. WorldObjects.Where(o => o.Handle != handle)];
+		}
+
+		// Mints the next free wire handle for something this zone streams - an NPC or a static object. ONE counter for
+		// both: they share the client's handle space, so separate sequences could hand the same handle to a prop and a
+		// creature and the second spawn would replace the first. Stays well below 0x02000000, where the client's own
+		// instance handles live (a player's handle IS its character id, e.g. 0x0802E5D4).
+		public uint AllocateHandle()
+		{
+			return Interlocked.Increment(ref _nextHandle);
 		}
 
 		public void Add(WorldEntity entity)

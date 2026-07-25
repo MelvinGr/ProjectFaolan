@@ -78,7 +78,6 @@ namespace Faolan.Core.Database.Tables
 
 		public bool HasEquipment { get; set; }
 		public uint ApprenticeLevel { get; set; }
-		public uint CapturedHandle { get; set; }
 
 		// Per-PLACEMENT stat values (#244), lifted from this spawn's capture, overriding the type-level NpcTemplate.StatCore
 		// when the spawn body is built. A spawn point carries its own LEVEL (the same template can be placed at a range

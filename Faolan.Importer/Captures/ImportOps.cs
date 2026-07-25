@@ -940,7 +940,6 @@ namespace Faolan.Importer.Captures
 
 		public static NpcSpawn Populate(NpcSpawn row, NpcSpawnEntry e)
 		{
-			row.CapturedHandle = e.Handle;
 			row.RotationX = e.RotX;
 			row.RotationY = e.RotY;
 			row.RotationZ = e.RotZ;
@@ -1006,7 +1005,6 @@ namespace Faolan.Importer.Captures
 			row.SubOpcode = e.SubOpcode;
 			row.Name = e.Name;
 			row.ObjectId = e.ObjectId;
-			row.CapturedHandle = e.Handle;
 			row.RotationX = e.RotX;
 			row.RotationY = e.RotY;
 			row.RotationZ = e.RotZ;

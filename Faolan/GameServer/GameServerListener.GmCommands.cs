@@ -705,11 +705,11 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			// Not a live entity - a static WORLD OBJECT (chest/door/dynel) isn't in the entity model; it lives in the DB
-			// keyed by its captured handle. Resolve it there so a selected chest/door still reports.
-			var obj = await Database.GetWorldObject(player.MapId, handle);
-			if (obj != null)
+			// Not a live entity - a static WORLD OBJECT (chest/door/dynel) isn't in the entity model, it hangs off the
+			// loaded zone. Resolve it there so a selected chest/door still reports.
+			if (_simulation.World.ZoneForEntity(player).TryGetWorldObject(handle, out var live))
 			{
+				var obj = live.Row;
 				var oname = WorldObjectDisplay.Build(obj) ?? obj.Name ?? "(unnamed object)";
 				var dest = obj.DestinationPosition is { } dp
 					? $" · teleports to map {obj.DestinationMapId} ({dp.X:F1}, {dp.Y:F1}, {dp.Z:F1})"

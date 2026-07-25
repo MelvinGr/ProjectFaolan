@@ -30,6 +30,7 @@ case "$command" in
         shift
         dotnet run --project ./Faolan.ClientLauncher/Faolan.ClientLauncher.csproj --no-build -- \
             --console \
+            --universeaddr 127.0.0.1:7010 \
             --cdn http://127.0.0.1:7081 \
             --launcher-notes 'http://127.0.0.1:7081/_stats?UniverseName=%s&Language=%s' \
             "$@"
@@ -40,6 +41,7 @@ case "$command" in
         dotnet run --project ./Faolan.ClientLauncher/Faolan.ClientLauncher.csproj --no-build -- \
             --exe '/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan 2/AgeOfConan.exe' \
             --console \
+            --universeaddr 127.0.0.1:7010 \
             --cdn http://127.0.0.1:7081 \
             --launcher-notes 'http://127.0.0.1:7081/_stats?UniverseName=%s&Language=%s' \
             "$@"

@@ -8,7 +8,7 @@ namespace Faolan.Core.Database.Repositories
 {
 	public interface IWorldRepository
 	{
-		Task<int> DeleteWorldObject(uint mapId, uint capturedHandle);
+		Task<int> DeleteWorldObject(uint id);
 		Task<RespawnPoint?> GetDefaultSpawn(uint mapId);
 		Task<Map?> GetMap(uint id);
 		Task<MapArea[]> GetMapAreas(uint mapId);
@@ -19,16 +19,17 @@ namespace Faolan.Core.Database.Repositories
 		Task<QuestDefinition[]> GetQuestDefinitionsByArea(uint areaId);
 		Task<RespawnPoint?> GetRespawnPoint(uint id);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
-		Task<WorldObject?> GetWorldObject(uint mapId, uint captureId);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
 	}
 
 	public partial class DatabaseRepository
 	{
-		public async Task<int> DeleteWorldObject(uint mapId, uint capturedHandle)
+		// By the row's own derived id - the stable key. It used to take (mapId, capturedHandle), which meant a GM
+		// .delete resolved a LIVE wire handle straight against a column (see LiveWorldObject).
+		public async Task<int> DeleteWorldObject(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.CapturedHandle == capturedHandle).ExecuteDeleteAsync();
+			return await ctx.WorldObjects.Where(o => o.Id == id).ExecuteDeleteAsync();
 		}
 
 		public async Task<RespawnPoint?> GetDefaultSpawn(uint mapId)
@@ -102,15 +103,6 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.RespawnPoints.Where(r => r.MapId == mapId).ToArrayAsync();
-		}
-
-		// Words included for the same reason as GetWorldObjects below, even though today's callers only read scalars
-		// (class, position, name, interact action, zone-line destination): this hands back the same entity the record
-		// builder consumes, so a future caller that builds from it would otherwise silently emit a short record.
-		public async Task<WorldObject?> GetWorldObject(uint mapId, uint captureId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.WorldObjects.Include(o => o.Words).FirstOrDefaultAsync(o => o.MapId == mapId && o.DisplayKind != null && o.CapturedHandle == captureId);
 		}
 
 		// Include the WORD rows: they are not decoration, they are part of the wire record. WorldObjectGeometryCodec

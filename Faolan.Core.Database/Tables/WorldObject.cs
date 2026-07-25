@@ -10,7 +10,7 @@ namespace Faolan.Core.Database.Tables
 	// A captured static world object on a map - the decor/props (66AEDD50), interactive containers (F096251E),
 	// zone/city labels (33A56FB0), destructibles (6BD56736) and climbing dynels (1FD6412B) that build the world
 	// alongside the NPC spawns ([[NpcSpawn]]'s sibling). All share the object transform grammar (no pre-IIR block).
-	// Keyed for dedup by (MapId, Position) - the stable spawn point; the handle is session-scoped. Imported from
+	// Keyed for dedup by (MapId, Position) - the stable spawn point. Imported from
 	// captures by Faolan.Importer (WorldObjectExtractor); built into a wire body by WorldObjectBuilder.
 	//
 	// The whole object body is CONSTRUCTED from typed columns (#187): the SubOpcode (object CLASS), the transform
@@ -29,7 +29,6 @@ namespace Faolan.Core.Database.Tables
 	// (same ObjectId, GeometryAssetId, Name, SubOpcode), differing ONLY in which LDB string it displays - dropping
 	// that from the identity collapses them into one row, which is bug #222. What is keyed is the localized
 	// REFERENCE (kind + id/token), not the serialized display string: an id is content identity, a blob is not.
-	// CapturedHandle is NOT a candidate - it is session-volatile and has only 999 distinct values across 1053 rows.
 	// A DERIVED id rather than a composite because the identity contains floats and this is a parent
 	// (WorldObjectWord) - see DerivedKey.
 	public class WorldObject : Base3DEntity, IDerivedKey
@@ -171,7 +170,6 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? Name { get; set; }
 
-		public uint CapturedHandle { get; set; }
 		public uint CarsGroup { get; set; } // proto field 5
 
 		// SimpleDynelFullUpdateIIR (0x66AEDD50) identity, lifted from the opaque Data slice into typed columns so the

@@ -143,10 +143,10 @@ namespace Faolan.GameServer.World
 			if (held.Count == 0)
 				return;
 
-			foreach (var obj in await _database.GetWorldObjects(player.MapId))
+			foreach (var obj in _sim.World.ZoneForEntity(player).WorldObjects)
 			{
-				if (obj.EffectQuestId is { } eq && held.Contains(eq))
-					await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(obj.CapturedHandle, obj.EffectDynelState));
+				if (obj.Row.EffectQuestId is { } eq && held.Contains(eq))
+					await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(obj.Handle, obj.Row.EffectDynelState));
 			}
 		}
 
@@ -196,7 +196,8 @@ namespace Faolan.GameServer.World
 			if (!_objectLoadedZones.TryAdd((mapId, instanceId), 0))
 				return;
 
-			_sim.World.ZoneFor(mapId, instanceId).WorldObjects = await _database.GetWorldObjects(mapId);
+			var zone = _sim.World.ZoneFor(mapId, instanceId);
+			zone.WorldObjects = [.. (await _database.GetWorldObjects(mapId)).Select(row => new LiveWorldObject(zone.AllocateHandle(), row))];
 		}
 
 		// The world objects within interest range at ENTRY, as ready-to-send records in the position retail puts them -
@@ -228,17 +229,19 @@ namespace Faolan.GameServer.World
 			foreach (var handle in despawn)
 			{
 				// Despawn with the object's OWN class - a Character-classed quit silently misses a world object (#366).
-				var gone = zone.WorldObjects.FirstOrDefault(o => o.CapturedHandle == handle);
-				await SendWorldDespawn(client, zone.PlayfieldToken, handle, WorldObjectBuilder.TypeTagForClass(gone?.SubOpcode ?? 0));
+				var classWord = zone.TryGetWorldObject(handle, out var gone)
+					? WorldObjectBuilder.TypeTagForClass(gone.SubOpcode)
+					: WorldObjectBuilder.TypeTagForClass(0);
+				await SendWorldDespawn(client, zone.PlayfieldToken, handle, classWord);
 			}
 		}
 
 		// One static world object's FullUpdate, built from its columns and stamped with the live playfield token. The
 		// body carries its own [u32 len][u32 subOpcode][record] carrier prefix, so it rides DispatchPassBlob as-is.
-		private static Rpc WorldObjectRpc(INetworkClient client, WorldObject obj, uint playfieldToken)
+		private static Rpc WorldObjectRpc(INetworkClient client, LiveWorldObject obj, uint playfieldToken)
 		{
 			return new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				WorldObjectBuilder.Build(obj, obj.CapturedHandle, playfieldToken));
+				WorldObjectBuilder.Build(obj.Row, obj.Handle, playfieldToken));
 		}
 
 		// Sends a QuestFullUpdate (one quest's full detail: description, summary, objective + map marker) built from
@@ -754,23 +757,25 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return null;
 
-			var obj = await _database.GetWorldObject(player.MapId, handle);
-			if (obj == null)
+			var zone = _sim.World.ZoneForEntity(player);
+			if (!zone.TryGetWorldObject(handle, out var live))
 				return null;
+
+			var obj = live.Row;
 
 			// World objects aren't tracked in Known, so we can't use that #245 gate; instead only despawn for viewers
 			// that have ENTERED the world (they received the world-object burst, so the handle is safe to quit for them).
 			// A world object is removed by its OWN class (SimpleDynel / LootBag / ZoneLabel / ...), not Character - a
 			// Character-classed despawn silently misses it (#366). Derive the class from its spawn IIR.
 			var classWord = WorldObjectBuilder.TypeTagForClass(obj.SubOpcode);
-			var zone = _sim.World.ZoneForEntity(player);
 			foreach (var viewer in zone.PlayersInRange(obj.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client.Session.WorldEntered)
 					await SendWorldDespawn(viewer.Client, zone.PlayfieldToken, handle, classWord);
 			}
 
-			var deleted = await _database.DeleteWorldObject(player.MapId, handle);
+			zone.RemoveWorldObject(handle); // stop streaming it without waiting for a zone reload
+			var deleted = await _database.DeleteWorldObject(obj.Id);
 			_logger.LogInformation("Delete: removed world object {Name} 0x{Handle:X8} ({Rows} row(s), by {Player}).", WorldObjectDisplay.Build(obj) ?? obj.Name, handle, deleted, player.Name);
 			return obj;
 		}
@@ -825,13 +830,12 @@ namespace Faolan.GameServer.World
 			// units apart (the Tarantia Noble District line and the Castle of King Conan door pairs). Any genuine
 			// over-density is a data bug fixed in the importer, never hidden here.
 			//
-			// CapturedHandle is session-volatile and NOT guaranteed unique across the merged DB (a handful collide from
-			// different captures); since the zone is handle-keyed, a colliding row would silently overwrite another, so
-			// a collision gets a fresh handle below - the last real dedup this loop still needs, for wire correctness.
-			var usedHandles = new HashSet<uint>();
-			var nextFreeHandle = npcs.Length == 0
-				? 1u
-				: npcs.Max(n => n.CapturedHandle) + 1u;
+			// Wire handles are MINTED here (Zone.AllocateHandle), never read off the row. They used to be the spawn's
+			// CapturedHandle - whichever handle the capture the importer last saw it in happened to assign - which is a
+			// session-volatile value serving as a persistence key, and it was not even unique across the merged DB, so
+			// this loop needed a collision dance to stop one row silently overwriting another in the handle-keyed zone.
+			// The zone's counter is unique by construction and shared with the static objects, which the two separate
+			// captured ranges never guaranteed against each other.
 			var labelledCount = 0; // #363 diagnostic: how many captured spawns got a non-null area label this load
 			string? labelSample = null;
 			foreach (var npc in npcs)
@@ -849,15 +853,9 @@ namespace Faolan.GameServer.World
 					? npc.Health
 					: CombatResolver.NpcMaxHealthForLevel(npc.Level);
 				var vitals = EntityVitals.FromMax(maxHealth, 0, maxHealth);
-				// World entry is burst-less: every NPC streams in on the player's first move (interest) under its own
-				// captured handle. Reassign only on a cross-capture handle collision so both rows still render.
-				var handle = npc.CapturedHandle;
-				if (!usedHandles.Add(handle))
-				{
-					while (!usedHandles.Add(nextFreeHandle))
-						nextFreeHandle++;
-					handle = nextFreeHandle;
-				}
+				// World entry is burst-less: every NPC streams in on the player's first move (interest), under the handle
+				// this zone mints for it.
+				var handle = zone.AllocateHandle();
 
 				var entity = WorldEntity.ForNpc(handle, mapId, npc.Position, npc.Rotation, npcName ?? "NPC", vitals, npc.NpcTemplateId);
 				entity.InstanceId = instanceId; // this NPC belongs to THIS copy of the map (#268)
@@ -974,8 +972,7 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return false;
 
-			var obj = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o => o.CapturedHandle == handle);
-			return obj?.QuestItemEffect is > 0;
+			return _sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var obj) && obj.Row.QuestItemEffect is > 0;
 		}
 
 		// #363 pool maintenance (called on a slow cadence from the sim tick): keep each loaded zone's ambient pools at
@@ -1038,18 +1035,16 @@ namespace Faolan.GameServer.World
 		// A player used a STATIC world object (Interact UseObject) that isn't a loot bag - a DOOR/GATE (e.g. the
 		// "King Conan's Throne Room" gate). Reply with the SimpleDynelVisualChange so the client plays the open
 		// animation + drops the collision: numeric state 5 then the "object_open" state string, matching the
-		// conans-castle capture (rec 1697 -> 1698). The object is looked up by its CapturedHandle - the handle it was
-		// streamed with (WorldObjectBuilder.TryBuild uses row.CapturedHandle) - on the player's map. Returns false if
-		// no such object exists, so the caller can fall through to the loot-bag path.
+		// conans-castle capture (rec 1697 -> 1698). The object is resolved through the ZONE - the handle it was streamed
+		// with is the zone's, not a column. Returns false if no such object exists, so the caller can fall through to
+		// the loot-bag path.
 		public async Task<bool> OpenWorldObject(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			if (player == null)
+			if (player == null || !_sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var live))
 				return false;
 
-			var obj = (await _database.GetWorldObjects(player.MapId)).FirstOrDefault(o => o.CapturedHandle == handle);
-			if (obj == null)
-				return false;
+			var obj = live.Row;
 
 			await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x05));
 			await SendWorldIir(client, WorldLoot.BuildOpenWindowBody(SimpleDynelMessageCodec.VisualChangeTypeTag, handle, "object_open"));
@@ -1106,11 +1101,10 @@ namespace Faolan.GameServer.World
 		public async Task<UsedObjectInteraction> ResolveUseObject(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
-			var obj = player == null
-				? null
-				: await _database.GetWorldObject(player.MapId, handle);
-			if (obj == null)
+			if (player == null || !_sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var live))
 				return new UsedObjectInteraction(InteractAction.None, default);
+
+			var obj = live.Row;
 
 			var name = obj.Name ?? WorldObjectDisplay.Build(obj) ?? "?";
 			var teleport = obj.DestinationMapId is { } destMap
@@ -1434,9 +1428,10 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return false;
 
-			var obj = await _database.GetWorldObject(player.MapId, handle);
-			if (obj == null || !string.Equals(obj.Name, "Bench", StringComparison.OrdinalIgnoreCase))
+			if (!_sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var live) || !string.Equals(live.Row.Name, "Bench", StringComparison.OrdinalIgnoreCase))
 				return false;
+
+			var obj = live.Row;
 
 			// The sit is a TWO-phase handshake (#355, capture sit-bench frames 6805-6813). The client sends the bench
 			// UseObject TWICE: request #1 BEFORE it has the pose, request #2 AFTER it receives the animation. Retail

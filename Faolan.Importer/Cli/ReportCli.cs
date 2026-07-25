@@ -1610,6 +1610,9 @@ namespace Faolan.Importer.Cli
 			File.WriteAllText(path, text[..(s + start.Length)] + "\n" + block + "\n" + text[e..]);
 		}
 
+		// The stand-in wire handle the WorldObj diagnostic builds with - see the note at its use.
+		private const uint DiagnosticHandle = 0x00000001;
+
 		// Build a named world object via the burstless world-entry path and print its hex (render diffing).
 		private static async Task WorldObj(string target)
 		{
@@ -1620,7 +1623,9 @@ namespace Faolan.Importer.Cli
 				var baseOk = false;
 				try
 				{
-					baseBody = WorldObjectBuilder.Build(row, row.CapturedHandle);
+					// Any handle will do: this prints a body for eyeballing/diffing the RENDER, and the handle is live
+					// state the zone mints at spawn (see LiveWorldObject), so no row carries one to be faithful to.
+					baseBody = WorldObjectBuilder.Build(row, DiagnosticHandle);
 					baseOk = true;
 				}
 				catch (InvalidOperationException)
@@ -1630,7 +1635,7 @@ namespace Faolan.Importer.Cli
 				}
 
 				var rewriteOk = baseOk && SpawnPlayfieldRewriter.TryRewrite(baseBody!, 0x01EA985Cu);
-				Console.WriteLine($"map {row.MapId} {row.Name} handle 0x{row.CapturedHandle:X} baseBuild={baseOk} rewrite={rewriteOk} asset={row.GeometryAssetId}/{row.GeometryAssetType} words={row.Words.Count}");
+				Console.WriteLine($"map {row.MapId} {row.Name} baseBuild={baseOk} rewrite={rewriteOk} asset={row.GeometryAssetId}/{row.GeometryAssetType} words={row.Words.Count}");
 				if (baseOk)
 					Console.WriteLine("  BUILT: " + Convert.ToHexString(baseBody!).ToLowerInvariant());
 			}

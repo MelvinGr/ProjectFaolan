@@ -1664,9 +1664,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("ApprenticeLevel")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("CapturedHandle")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint?>("GuildId")
                         .HasColumnType("INTEGER");
 
@@ -2977,9 +2974,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Property<float>("BoundsMinZ")
                         .HasColumnType("REAL");
-
-                    b.Property<uint>("CapturedHandle")
-                        .HasColumnType("INTEGER");
 
                     b.Property<uint>("CarsGroup")
                         .HasColumnType("INTEGER");

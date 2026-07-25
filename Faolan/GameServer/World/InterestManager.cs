@@ -33,9 +33,9 @@ namespace Faolan.GameServer.World
 		//   * returning re-sends the FULL spawn record verbatim - 565 of 648 repeated sends are byte-identical and the
 		//     83 that differ vary only in the optional kdtree field. Nothing stateful is ever pushed on a re-send, so
 		//     there is no diffing to do: in range -> whole record, out of range -> despawn.
-		public static (List<WorldObject> Spawn, List<uint> Despawn) ResolveWorldObjects(Zone zone, WorldEntity player, float range, IReadOnlySet<uint> quests)
+		public static (List<LiveWorldObject> Spawn, List<uint> Despawn) ResolveWorldObjects(Zone zone, WorldEntity player, float range, IReadOnlySet<uint> quests)
 		{
-			var spawn = new List<WorldObject>();
+			var spawn = new List<LiveWorldObject>();
 			var inRange = new HashSet<uint>();
 
 			foreach (var obj in zone.WorldObjectsInRange(player.Position, range))
@@ -47,8 +47,8 @@ namespace Faolan.GameServer.World
 				if (!obj.SpawnsFor(quests))
 					continue;
 
-				inRange.Add(obj.CapturedHandle);
-				if (player.KnownObjects.Add(obj.CapturedHandle))
+				inRange.Add(obj.Handle);
+				if (player.KnownObjects.Add(obj.Handle))
 					spawn.Add(obj);
 			}
 

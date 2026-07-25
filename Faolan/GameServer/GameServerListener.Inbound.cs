@@ -681,10 +681,12 @@ namespace Faolan.GameServer
 										// Unknown object: no bench/door/loot behavior. Surface the gap the same way as an
 										// un-imported vendor/dialogue NPC (notify the player, never a silent no-op).
 										// Float the bubble over the clicked object so the client shows it in place.
-										var usedMapId = PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
-										var usedObj = await Database.GetWorldObject(usedMapId, target);
+										var usedEntity = PlayerWorldEntity(client);
+										var usedName = usedEntity != null && _simulation.World.ZoneForEntity(usedEntity).TryGetWorldObject(target, out var usedObj)
+											? usedObj.Row.Name
+											: null;
 
-										await _agentServerDispatcher.CharacterSay(target, $"({usedObj?.Name ?? "object"}: not imported yet)",
+										await _agentServerDispatcher.CharacterSay(target, $"({usedName ?? "object"}: not imported yet)",
 											[client.Session.Character.Id]); // TODO: Why this this also print when looting the item? check InteractAction value
 
 										break;
