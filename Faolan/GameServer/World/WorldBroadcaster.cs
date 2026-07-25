@@ -180,8 +180,7 @@ namespace Faolan.GameServer.World
 
 			await LoadActiveQuestIds(entity);
 			var events = InterestManager.ResolveMove(_sim.World.ZoneForEntity(entity), entity, WorldSimulation.PlayerInterestRange, true);
-			await DispatchInterest(events, null);
-			await StreamWorldObjects(client, entity);
+			await DispatchInterest(events, null, client, entity);
 		}
 
 		// Loads a map's static world objects into its zone ONCE, the world-object twin of EnsureZoneNpcs (#424). Before
@@ -565,7 +564,7 @@ namespace Faolan.GameServer.World
 					entity.Known.Count);
 			}
 
-			await DispatchInterest(events, new MoveForward(moveSubop, dataObject, dataClientInstance, movingType, position, rotation, tail));
+			await DispatchInterest(events, new MoveForward(moveSubop, dataObject, dataClientInstance, movingType, position, rotation, tail), client, entity);
 		}
 
 		// Relays a player's ApplySpell (the MagicBuffIIR spell EFFECT - a buff applied, or an offensive cast) to every
@@ -1528,8 +1527,17 @@ namespace Faolan.GameServer.World
 
 		// Dispatches interest events. `move` (the mover's Move components) is required to forward Move events and is
 		// null on entry (entry produces only Spawn/Despawn).
-		private async Task DispatchInterest(IReadOnlyList<InterestEvent> events, MoveForward? move)
+		// Dispatches an entity interest pass AND, for the moving/refreshing player, the static world-object pass. The two
+		// are fused into one call on purpose: they are the same concern (bring this player's view in line with what is
+		// near them) but obey different known-set rules, and when they were two separate calls at two call sites I wired
+		// the object half into the quest-visibility path only - the two methods have identical three-line bodies, so a
+		// textual edit hit the wrong one and objects never streamed as the player walked. Taking the player here means a
+		// caller cannot dispatch one half without the other.
+		private async Task DispatchInterest(IReadOnlyList<InterestEvent> events, MoveForward? move, INetworkClient? mover = null, WorldEntity? moverEntity = null)
 		{
+			if (mover != null && moverEntity != null)
+				await StreamWorldObjects(mover, moverEntity);
+
 			foreach (var ev in events)
 			{
 				var recipient = ev.Recipient.Client;
