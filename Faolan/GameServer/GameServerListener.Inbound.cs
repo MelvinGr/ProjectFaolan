@@ -860,6 +860,32 @@ namespace Faolan.GameServer
 							{
 								Logger.LogInformation($"UNKNOWN-{actionType.ToHex()}: {args}");
 
+								// Behaviour 1 while SEATED is the client ASKING to stand up (#355) - getting up is
+								// client-initiated, not movement-inferred as we had it. Retail's sit capture, matched pairs:
+								//   6829 c2s bId=1 seq=0x0003  ->  6837 s2c bId=1 seq=0x0004
+								//   6830 c2s bId=1 seq=0x0002  ->  6838 s2c bId=1 seq=0x000F  ->  6844 s2c STANDUP (bId=0x2A)
+								// i.e. the SAME two-phase confirm the sit runs on behaviour 0x12, then the standup animation.
+								// Because we inferred standup from movement instead, these requests fell into this
+								// un-decoded fallback and got a bare echo - so the client asked to get up, was never
+								// answered, and stayed stuck in the pose until it timed out and stood up on its own.
+								// The seq mapping (3->4, 2->0x0F) lives in BehaviorAckBody.AckSeq.
+								if ((uint)actionType == 1 && client.Session.SeatedOnHandle != 0)
+								{
+									var requestSeq = rawPayload.Length >= 18
+										? (ushort)((rawPayload[16] << 8) | rawPayload[17])
+										: 0;
+									await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
+
+									// The phase-2 confirm is what commits it; the standup animation follows the ack.
+									if (requestSeq == 0x0002)
+									{
+										Logger.LogInformation("Sit: client asked to stand up (behaviour 1 phase 2) - answering and standing.");
+										await _broadcaster.StandUp(client);
+									}
+
+									break;
+								}
+
 								// ...EXCEPT a server-driven object-action ANIMATION while seated (#355). The client re-sends the
 								// sit behaviour (actionType 0x2A, carrying "chair_sit_calm") after we seat it; echoing that back
 								// makes the client play the SIT again, and its 2.6s blend IS the progress bar seen while trying

@@ -1312,6 +1312,17 @@ namespace Faolan.GameServer.World
 			if (Vector3.Distance(newPosition, client.Session.SeatedPosition) < SeatLeaveDistance)
 				return;
 
+			await StandUp(client);
+		}
+
+		// Send the standup animation and clear the seated state, unconditionally. This is the path retail actually uses:
+		// getting up is CLIENT-INITIATED, not movement-inferred - see the behaviour-1 branch in the BCC handler.
+		public async Task StandUp(INetworkClient client)
+		{
+			var handle = client.Session.SeatedOnHandle;
+			if (handle == 0)
+				return;
+
 			client.Session.SeatedOnHandle = 0;
 			client.Session.SeatedHoldConfirmed = false;
 			client.Session.SeatedPositionAnchored = false;

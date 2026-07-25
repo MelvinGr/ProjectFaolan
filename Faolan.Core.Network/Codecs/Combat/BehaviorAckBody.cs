@@ -60,9 +60,17 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The bench-sit records do not come through here - BenchSitState builds SeqBegin / SeqObjectHold explicitly.
 		private static ushort AckSeq(ushort requestSeq)
 		{
-			return requestSeq + 1 == 0x0003
-				? (ushort)0x0004
-				: (ushort)(requestSeq + 1);
+			// Retail's sit capture shows the rule cleanly for BOTH two-phase behaviours - the sit's 0x12 and the
+			// standup's 0x01 - as a matched pair each time:
+			//   c2s seq 0x0003 -> s2c 0x0004      (pkt 6805 -> 6807, 6829 -> 6837)
+			//   c2s seq 0x0002 -> s2c 0x000F      (pkt 6811 -> 6813, 6830 -> 6838)
+			// so 0x0002 is the client CONFIRMING and 0x000F is the commit, not seq+1. That also matches the corpus-wide
+			// counts, where 0x0002 requests are answered with 0x000F far more than anything else (70 of 118).
+			return requestSeq switch
+			{
+				0x0002 => 0x000F,
+				_      => (ushort)(requestSeq + 1)
+			};
 		}
 
 		// The echo-ack: echoes the request with field3 (phase) spliced in, and pads the tail only for the behaviours
