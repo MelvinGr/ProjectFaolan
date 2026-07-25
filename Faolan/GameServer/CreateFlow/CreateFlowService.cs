@@ -399,6 +399,7 @@ namespace Faolan.GameServer.CreateFlow
 			await SeedSpawnScaffold(character);
 			await SeedStarterEquipment(character);
 			await CharacterLoadout.Seed(_database, _logger, character);
+			await SeedBind(character);
 
 			// Grant the beach starter quest (10238) ONCE, here at character creation - retail auto-grants it on first
 			// beach entry; we persist it now so the journal is data-driven from CharacterQuests (delivered live on the
@@ -518,6 +519,29 @@ namespace Faolan.GameServer.CreateFlow
 
 			await _database.SaveCharacterEquipment(equipment);
 			_logger.LogInformation("Dressed new character {CharacterId:X8} ({Class}, {Sex}) in its starting gear.", character.Id, character.Class, character.Sex);
+		}
+
+		// Binds the new character to its starting map's default respawn point, so recalls (Totem of Origin, Path of
+		// Asura, .recall) and death-resurrect have somewhere to send it from the very first login. The bind moves after
+		// this only when the player uses a bindstone/Wayfarer.
+		//
+		// No bind packet is sent here: the "You are now bound here" banner (#346) belongs to a bindstone USE, and this
+		// connection is still the character editor. The client learns the bind with the rest of its state at world
+		// entry.
+		private async Task SeedBind(Character character)
+		{
+			var spawn = await _database.GetDefaultSpawn(character.MapId);
+			if (spawn == null)
+			{
+				// Not fatal, and not silent: a map with no respawn point is a content gap, not corruption - the
+				// character simply has nowhere to recall to until one is imported for that map.
+				_logger.LogWarning("Bind: map {Map} has no default respawn point, so {CharacterId:X8} starts unbound.", character.MapId, character.Id);
+				return;
+			}
+
+			character.BindRespawnPointId = spawn.Id;
+			await _database.SaveCharacterBind(character.Id, spawn.Id);
+			_logger.LogInformation("Bind: {Name} bound to respawn point {Point} on map {Map} at creation.", character.Name, spawn.Id, character.MapId);
 		}
 
 		// The character's own editor appearance choices as weighted scaffold entries, or null when nothing is stored or

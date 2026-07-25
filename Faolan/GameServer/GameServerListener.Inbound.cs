@@ -1872,8 +1872,10 @@ namespace Faolan.GameServer
 			if (character?.BindRespawnPointId is { } bindPointId)
 				bindMapId = (await Database.GetRespawnPoint(bindPointId))?.MapId ?? bindMapId;
 
-			// Reply framing (sender/receiver swapped from the request), unlike the unsolicited push in
-			// SendUpdateBindLocation - retail answers a request on the conversation it arrived on.
+			// Reply framing: sender/receiver swapped from the request, because retail answers a request on the
+			// conversation it arrived on. (An UNSOLICITED bind push - the shape a bindstone use would need, framed on
+			// the login-world conversation instead - has no sender left: the bind is set once at character creation,
+			// and nothing else moves it yet.)
 			await client.SendAsync(new Rpc(packet.Receiver, packet.Sender, GameCharInterfaceOpcodes.DispatchUpdateBindLocation, s => s.WriteUInt32(bindMapId)));
 			Logger.LogDebug("RequestBindLocation({RequesterId:X8}) -> bind playfield {MapId}.", requesterId, bindMapId);
 		}

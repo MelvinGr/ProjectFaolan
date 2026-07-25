@@ -253,7 +253,7 @@ namespace Faolan.GameServer
 				EnsureEnergyLoop); // start the persistent energy tracking/regen loop
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression);
 			_stockConversation = new StockConversationService(logger, database);
-			_loot = new LootService(_broadcaster, this, database, _questProgression, logger);
+			_loot = new LootService(_broadcaster, this, database, _questProgression, agentServerDispatcher, logger);
 			_keepAlive = new KeepAliveService();
 			_shortcutBar = new ShortcutBarService(database, logger);
 			_equipment = new EquipmentService(database, logger);

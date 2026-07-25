@@ -43,29 +43,6 @@ namespace Faolan.GameServer
 		// TODO: Confirm
 		private static readonly uint[] ItemShopSuppressTags = []; //6617, 6618, 6619, 6620, 7316, 7416, 7417, 7418, 7419, 7420, 7421];
 
-		// Bind the character to the map's default respawn point if it has never bound (BindRespawnPointId == null).
-		// Runs once per character - an established bind is left alone (it moves only via a bindstone/Wayfarer, not every
-		// login). Without this, imported/older characters have no bind and every recall (Totem of Origin, Path of Asura,
-		// .recall, death-resurrect) fails. No-op when the map defines no respawn point (nothing to bind to).
-		private async Task EnsureCharacterBound(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			if (character.HasBind)
-				return;
-
-			var spawn = await Database.GetDefaultSpawn(character.MapId);
-			if (spawn == null)
-				return;
-
-			character.BindRespawnPointId = spawn.Id;
-			await Database.SaveCharacterBind(character.Id, spawn.Id);
-			Logger.LogInformation("Bind: {Char} auto-bound to respawn point {Point} on map {Map} (first entry).", character.Name, spawn.Id, character.MapId);
-
-			// Tell the client the bind moved - it is what renders the "You are now bound here" banner (#346), and
-			// without it the client's bind state stays stale until it next asks.
-			await SendUpdateBindLocation(client, character.MapId);
-		}
-
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
 		{
 			if (!client.Session.HasPendingPost205FFollowUp)
@@ -202,8 +179,6 @@ namespace Faolan.GameServer
 			// Origin, the Path of Asura spell, .recall, and the death-resurrect - so an unbound character (imported or
 			// older chars, whose bind was never set) can't recall at all. Bind ONCE to the entry map's default respawn
 			// point + persist; an established bind is left untouched (it only moves via a bindstone/Wayfarer, not login).
-			await EnsureCharacterBound(client);
-
 			Logger.LogInformation("Sent the post-0x2024 login records.");
 
 			// #239/#304 RESOLVED 2026-07-05 - the class force-feed (SetStat 0x43 = Class) was REMOVED as proven

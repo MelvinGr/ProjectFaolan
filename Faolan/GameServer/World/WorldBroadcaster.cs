@@ -1387,6 +1387,26 @@ namespace Faolan.GameServer.World
 			return taken;
 		}
 
+		// Puts an item BACK on the bag after a take whose grant failed (a full backpack, or an item the snapshot cannot
+		// build). Without it the take is destructive: the bag hands each item over exactly once, so a dropped grant
+		// deletes the loot - and the bag is emptied BEFORE the grant is attempted, so this cannot be prevented by
+		// checking first without duplicating the capacity rules the grant already owns. `position` restores a
+		// single-drag take to its original slot (the client keeps survivors at their original Pos - see TakeBagItem);
+		// loot-all appends, having cleared the list.
+		public void ReturnBagItem(INetworkClient client, uint bagHandle, uint itemTemplateId, int? position = null)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag))
+				return;
+
+			if (position is { } pos && pos >= 0 && pos < bag.LootItems.Count)
+				bag.LootItems[pos] = itemTemplateId;
+			else
+				bag.LootItems.Add(itemTemplateId);
+
+			_logger.LogWarning("Loot: item 0x{Item:X} could not be granted to {Player}; returned to bag 0x{Handle:X8}.", itemTemplateId, player.Name, bagHandle);
+		}
+
 		// TryLootCash (0x2045): takes the bag's coins exactly once - returns the amount and zeroes it on the bag
 		// (the caller credits the wallet + pushes the 0x2005 balance update). 0 = no bag / no coins / already taken.
 		public uint TakeLootCash(INetworkClient client, uint bagHandle)

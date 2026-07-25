@@ -4,6 +4,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.Quest;
 using Microsoft.Extensions.Logging;
@@ -23,19 +24,37 @@ namespace Faolan.GameServer.World
 	// persist-only left the items un-takeable), so the server item-grant push is what actually delivers them.
 	public sealed class LootService
 	{
+		private readonly IChatServerDispatcher _chat;
 		private readonly ICharacterRepository _database;
 		private readonly IEconomyOutbound _outbound;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 		private readonly WorldBroadcaster _broadcaster;
 
-		public LootService(WorldBroadcaster broadcaster, IEconomyOutbound outbound, ICharacterRepository database, QuestProgressionService questProgression, ILogger logger)
+		public LootService(WorldBroadcaster broadcaster, IEconomyOutbound outbound, ICharacterRepository database, QuestProgressionService questProgression, IChatServerDispatcher chat,
+			ILogger logger)
 		{
 			_broadcaster = broadcaster;
 			_outbound = outbound;
 			_database = database;
 			_questProgression = questProgression;
+			_chat = chat;
 			_logger = logger;
+		}
+
+		// Grants one looted item, and puts it BACK on the bag if the grant fails (full backpack / an item the snapshot
+		// cannot build). The bag hands each item over exactly once, so discarding the result - which is what this code
+		// did - destroyed the loot and then logged the take as a success. Returns whether the player actually got it.
+		private async Task<bool> GrantLootedItem(INetworkClient client, uint bagHandle, uint itemTemplateId, int? position = null)
+		{
+			if (await _outbound.GrantItemToBackpack(client, itemTemplateId) != null)
+				return true;
+
+			_broadcaster.ReturnBagItem(client, bagHandle, itemTemplateId, position);
+			if (client.Session.Character is { } character)
+				await _chat.SendSystemMessage(character.Id, "You have no room for that - free a slot and loot it again.");
+
+			return false;
 		}
 
 		// CloseLootBag: the client closed the loot window without taking everything.
@@ -57,10 +76,20 @@ namespace Faolan.GameServer.World
 			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
 
 			var items = _broadcaster.TakeBagItems(client, bagHandle);
+			var granted = 0;
 			foreach (var itemTemplateId in items)
-				await _outbound.GrantItemToBackpack(client, itemTemplateId);
+			{
+				if (await GrantLootedItem(client, bagHandle, itemTemplateId))
+					granted++;
+			}
+
 			if (items.Count > 0)
-				_logger.LogInformation("Loot: granted {Count} item(s) from bag 0x{Bag:X8} to {Player}.", items.Count, bagHandle, client.Session.Character?.Name);
+			{
+				// Count what the player actually RECEIVED, not what the bag handed over - the two differ when the
+				// backpack fills up mid-loot, and the returned items keep the bag open (AfterLootTake fades it only
+				// once it is truly empty).
+				_logger.LogInformation("Loot: granted {Granted} of {Count} item(s) from bag 0x{Bag:X8} to {Player}.", granted, items.Count, bagHandle, client.Session.Character?.Name);
+			}
 
 			// Quest chain (#261): looting an NPC's corpse bag completes a LootFromNpc goal targeting it (the scavenger's
 			// key from Tuut's bag). Faithful even though the key item itself is RDB content - the bag's source IS the key.
@@ -98,11 +127,8 @@ namespace Faolan.GameServer.World
 
 			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
 			var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);
-			if (item != null)
-			{
-				await _outbound.GrantItemToBackpack(client, item.Value);
+			if (item != null && await GrantLootedItem(client, bagHandle, item.Value, (int)itemIndex))
 				await _questProgression.AdvanceLootGoals(client, sourceNpc!); // #261 loot-from-NPC goal (the key)
-			}
 
 			// Confirm the take: tell the client to remove the dragged slot (itemIndex) from the open window. AfterLootTake
 			// only consumes/fades the bag once it is fully emptied, so a partial drag leaves it open with the rest.

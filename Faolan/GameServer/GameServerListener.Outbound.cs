@@ -203,11 +203,14 @@ namespace Faolan.GameServer
 		// 3-stat form that renders in-client), and itemId/recordId use FullPlayerCharacterBuilder's deterministic
 		// formula so the live add and the next login's snapshot agree on the entry's identity. Returns the bag
 		// slot it landed in, or null when the item isn't snapshot-buildable or the bag is full.
-		// `pushLiveAdd`: send the live DispatchAddItem so the item appears immediately. LOOT passes false: retail sends
-		// NO inventory-add for normal loot - the client moves the looted item from the bag to the backpack LOCALLY
-		// (confirmed by LootRemoveItems), so a server push would double it. Loot still PERSISTS here (DB write) so the
-		// item survives relog via the world-entry snapshot.
-		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, bool pushLiveAdd = true, bool allowHashless = false)
+		// The live add is UNCONDITIONAL, loot included. This used to carry a `pushLiveAdd` flag that loot passed false,
+		// on the claim that "retail sends NO inventory-add for normal loot - the client moves it from the bag locally".
+		// The captures say the opposite: both a loot-all (Hoxxling gameplay, c2s 0x2043 at fr1487) and a single drag
+		// (loot-drag-1538, c2s 0x2046 at fr619) are answered with three 0x201c DispatchSetItemStat and a 0x2020
+		// DispatchAddItem. Our own client agrees - persist-only left the items un-takeable (see LootService). The flag
+		// went dead when loot moved onto the IEconomyOutbound port, which has no such parameter; removing it here makes
+		// the one live behaviour explicit instead of leaving a false claim next to an unused knob.
+		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, bool allowHashless = false)
 		{
 			var item = await Database.GetItem(itemTemplateId);
 			if (item == null)
@@ -235,9 +238,6 @@ namespace Faolan.GameServer
 				return null;
 
 			await Database.SetCharacterInventorySlot(characterId, kind, slot.Value, itemTemplateId, count);
-
-			if (!pushLiveAdd)
-				return slot;
 
 			// Live DispatchAddItem so the item appears without a relog. Quest items go to the QUEST container (0x71), 			// matching retail's chain-capture delivery; everything else to the backpack (0x68).
 			var containerType = isQuestItem
@@ -305,21 +305,6 @@ namespace Faolan.GameServer
 			}
 
 			await _agentServerDispatcher.SendSystemMessage(characterId, matches.Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
-		}
-
-		// Tells the client WHERE the character is bound (GameCharInterface DispatchUpdateBindLocation, 0x2002 - one
-		// field, the playfield id; recovered method signature `nPlayfieldInstanceID`).
-		//
-		// Sent UNSOLICITED when the server changes the bind, not only in reply to RequestBindLocation. Retail's
-		// "You are now bound here" banner is client-generated - it appears in no capture, and the text is a localized
-		// string in the client's LDB (#346) - so the client has to be told the bind moved for it to render anything.
-		// Without this the client's bind state stays stale until it next asks.
-		private async Task SendUpdateBindLocation(INetworkClient client, uint bindMapId)
-		{
-			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchUpdateBindLocation,
-				s => s.WriteUInt32(bindMapId)));
-
-			Logger.LogInformation("Bind: told {Character} their bind playfield is {MapId}.", client.Session.Character?.Name, bindMapId);
 		}
 
 		// Pushes the character's wallet balance, framed on the same login-world conversation as the 0x201C
