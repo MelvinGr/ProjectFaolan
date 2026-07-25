@@ -860,6 +860,20 @@ namespace Faolan.GameServer
 							{
 								Logger.LogInformation($"UNKNOWN-{actionType.ToHex()}: {args}");
 
+								// ...EXCEPT a server-driven object-action ANIMATION while seated (#355). The client re-sends the
+								// sit behaviour (actionType 0x2A, carrying "chair_sit_calm") after we seat it; echoing that back
+								// makes the client play the SIT again, and its 2.6s blend IS the progress bar seen while trying
+								// to stand - which is also what delayed the standup. Retail emits chair_sit_calm exactly ONCE per
+								// sit, s2c only, and never echoes one back. The guard is scoped to being seated because retail's
+								// client does send 0x2A otherwise (17 across the captures) and those ARE answered, so a blanket
+								// skip would soft-lock other object actions - the very thing the ack below exists to prevent.
+								if ((uint)actionType == BehaviorAnimationCodec.ObjectActionBehaviorId && client.Session.SeatedOnHandle != 0)
+								{
+									Logger.LogInformation("Sit: absorbed the client's re-sent sit behavior (not echoed - it would replay the sit).");
+
+									break;
+								}
+
 								// Robustness (#236 channeled cast 0x15, #238 dodge hop): an un-decoded behavior must
 								// STILL get the generic behavior echo-ack (docs/subsystems/combat.md rule 1), or the client stays
 								// stuck in the action's start state forever (cast bar never finishes / dodge never lands
