@@ -2021,10 +2021,14 @@ namespace Faolan.GameServer.World
 			if (subject.Client?.Session.Character is not { } character)
 				return null;
 
-			// No equipment row means we cannot describe what the player is WEARING, and a spawn record with invented
-			// gear is worse than none - the caller logs the skip.
-			if (await _database.GetCharacterEquipment(character.Id) is not { } equipment)
-				return null;
+			// Every character gets an equipment row at creation, so a missing one is a data bug rather than a state to
+			// model - but an unequipped record is still a correct description of a character wearing nothing, and it
+			// beats making the player invisible to everyone. Same substitution EquipmentService and the world-entry path
+			// already make.
+			var equipment = await _database.GetCharacterEquipment(character.Id) ?? new CharacterEquipment
+			{
+				CharacterId = character.Id
+			};
 
 			var rotation = character.Rotation.LengthSquared() > 0.0001f
 				? character.Rotation
