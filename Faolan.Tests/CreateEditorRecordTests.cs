@@ -83,9 +83,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void GameTimeIir_MatchesCapturedBytes()
 		{
-			// First GameTimeIIR of the editor stream: dayTime=0x0147929b00000000, flag=02,
-			// timestamp=0x000192926a25b9bd, rate=1.0 (3f800000 BE).
-			var bytes = CreateEditorRecordBuilder.BuildGameTimeIir(0x0147929B00000000UL, 0x02, 0x000192926A25B9BDUL);
+			// First GameTimeIIR of the editor stream. The captured bytes are unchanged; the SPLIT is the corrected one
+			// (#351): a bool, then f32 dayTime = 0x47929B00 = 75062s, then the word the apply ignores (2), then the
+			// anchor's two halves (gameDay 0x00019292, unix 0x6A25B9BD), then rate 1.0.
+			var bytes = CreateEditorRecordBuilder.BuildGameTimeIir(BitConverter.UInt32BitsToSingle(0x47929B00), 2u, 0x00019292u, 0x6A25B9BDu);
 			Assert.Equal("00000000000000000147929b0000000002000192926a25b9bd3f800000", Convert.ToHexString(bytes).ToLowerInvariant());
 		}
 

@@ -245,12 +245,12 @@ namespace Faolan.GameServer
 		// and get the captured bytes back.
 		internal static Rpc BuildGameTime(INetworkClient client, DateTimeOffset now, long offsetGameSeconds)
 		{
-			return BuildGameTime(client, GameTimeCodec.DayTime(now, offsetGameSeconds), now);
+			return BuildGameTime(client, GameTimeCodec.TimeOfDay(now, offsetGameSeconds), now);
 		}
 
-		internal static Rpc BuildGameTime(INetworkClient client, ulong dayTime, DateTimeOffset now)
+		internal static Rpc BuildGameTime(INetworkClient client, float dayTimeSeconds, DateTimeOffset now)
 		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(dayTime, now)));
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(dayTimeSeconds, now)));
 		}
 
 		// Frames the GuildUpdateIIR_c (GuildTagBody) on the world conversation: [RpcHeader][DispatchPassBlob]

@@ -764,7 +764,10 @@ namespace Faolan.GameServer.CreateFlow
 			// GameTime: CONSTRUCTED from the captured day-time + rate (#189 item 3). The resync timestamp is generated
 			// from the wall clock the same way the world-entry clock is (GameTimeCodec.ResyncTimestamp) rather than
 			// replaying the capture's; dayTime stays captured until its unit is pinned (#351).
-			await Iir(GameServer0X2000Opcodes.GameTimeIIR, CreateEditorRecordBuilder.BuildGameTimeIir(0x0147_43EB_0000_0000UL, 0x01, GameTimeCodec.ResyncTimestamp(now ?? DateTimeOffset.UtcNow)));
+			// The editor's captured time of day (0x4743EB00 = 50155s = 13:55) with a generated resync anchor. The backdrop
+			// has no day/night to track, so this stays the captured value rather than the live clock.
+			var (editorGameDay, editorUnixSeconds) = GameTimeCodec.ResyncAnchor(now ?? DateTimeOffset.UtcNow);
+			await Iir(GameServer0X2000Opcodes.GameTimeIIR, CreateEditorRecordBuilder.BuildGameTimeIir(BitConverter.UInt32BitsToSingle(0x4743EB00), 1u, editorGameDay, editorUnixSeconds));
 
 			// #189: constructed via BuildStatIir (was verbatim). flag=0 for 0x0F4266, then a flag=1 / value=0 run 0x0F4285..0x0F428C.
 			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(EntityClass.Character, id, 0x00, 0x0F4266, 0x00));

@@ -153,14 +153,37 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).WriteUInt32(a).WriteUInt32(b).WriteUInt32(c).WriteByte(d).ToArray();
 		}
 
-		// GameTimeIIR (0x4F57DC08): the in-game day-time + a wall-clock timestamp + the time rate.
-		// 29 bytes: [u32 0][u32 0][u64 dayTime][u8 flag][u64 timestamp][f32 rate]. Decoded from the create captures
-		// (docs/subsystems/create-editor-bursts.md); dayTime's low 32 bits are the fractional half (0 / 0x80000000), flag is a
-		// small phase byte (00/01/02), and the rate is the day-cycle speed (1.0 in every capture). Raw-body float =
-		// big-endian. Constructing it lets the server drive the sky/lighting time instead of replaying the capture.
-		public static byte[] BuildGameTimeIir(ulong dayTime, byte flag, ulong timestamp, float rate = 1.0f)
+		// GameTimeIIR (0x4F57DC08): the world clock - time of day, the resync anchor, and the clock rate. 29 bytes:
+		//
+		//   [u32 0][u32 0][u8 isToBePassed][f32 dayTimeSeconds][u32 word][u32 gameDay][u32 unixSeconds][f32 rate]
+		//
+		// The field split is CLIENT-CONFIRMED, and it is one byte off from what this used to claim (#351). The old
+		// reading - `[u64 dayTime][u8 flag]` - happens to produce the same bytes for a captured value, so the golden
+		// test could not tell the two apart. The client can: `GameTimeIIR_t::ReadSubClass` reads a BOOL and then five
+		// u32s, so sending a dayTime whose top byte is not 0/1 is rejected outright -
+		//   "ReadSubClass failed for IIR 1331158024 (GameTimeIIR_t)! isToBePassed on bool has value G"
+		// - 'G' being 0x47, the leading byte of a float we had put where the bool belongs.
+		//
+		// So `dayTime` is an IEEE float of GAME SECONDS, not a 32.32 fixed-point integer: the captured 0x472BDD00 is
+		// 43997.0s = 12:13, which is what the client renders (verified in-client). Read as an integer the same word
+		// would be 1.19e9 seconds, and the value we used to send - a plain integer second count - landed in the float's
+		// exponent field as ~1e-38 and rendered as midnight.
+		//
+		// `word` is read into the IIR but never forwarded to the clock by the apply; it holds 0..3 across the corpus.
+		// `gameDay` + `unixSeconds` are the two halves of the resync anchor (see GameTimeCodec.ResyncTimestamp), and
+		// the rate is the day-cycle speed (1.0 in every capture). Raw-body floats are big-endian.
+		public static byte[] BuildGameTimeIir(float dayTimeSeconds, uint word, uint gameDay, uint unixSeconds, bool isToBePassed = true, float rate = 1.0f)
 		{
-			return new FaolanStream().WriteUInt32(0u).WriteUInt32(0u).WriteUInt64(dayTime).WriteByte(flag).WriteUInt64(timestamp).WriteFloat(rate).ToArray();
+			return new FaolanStream()
+				.WriteUInt32(0u)
+				.WriteUInt32(0u)
+				.WriteByte(isToBePassed)
+				.WriteFloat(dayTimeSeconds)
+				.WriteUInt32(word)
+				.WriteUInt32(gameDay)
+				.WriteUInt32(unixSeconds)
+				.WriteFloat(rate)
+				.ToArray();
 		}
 
 		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference

@@ -33,11 +33,14 @@ namespace Faolan.Tests
 			// Both clock fields are generated now (#351), so feed the capture's own values back: the instant it was taken
 			// (its resync anchor read as unix epoch seconds) and the time of day it was showing. The record must then
 			// rebuild byte-for-byte - what this pins is the LAYOUT; the time of day itself is server state.
-			var record = DecodeIir(GameServerListener.BuildGameTime(BeachClient(), 0x01472BDD_00000000UL, DateTimeOffset.FromUnixTimeSeconds(0x6A024E93)).Serialize());
+			var record = DecodeIir(GameServerListener.BuildGameTime(BeachClient(), BitConverter.UInt32BitsToSingle(0x472BDD00), DateTimeOffset.FromUnixTimeSeconds(0x6A024E93)).Serialize());
 
 			Assert.Equal(0x2000u, record.Opcode);
 			Assert.Equal((uint)GameServer0X2000Opcodes.GameTimeIIR, record.IirType);
 			Assert.Equal(0u, record.Handle);
+			// NB "FieldA" is this decoder's generic name for the 4 bytes at that offset, and under the corrected clock
+			// split (#351) they are not one field: 0x01 is the isToBePassed bool and 0x472BDD are the top 3 bytes of the
+			// f32 dayTime. The value is still the right assertion - the captured bytes did not change, only their reading.
 			Assert.Equal(0x01472BDDu, record.FieldA);
 			Assert.Equal(CapturedGameTimeBody, record.Body);
 		}
