@@ -172,6 +172,13 @@ namespace Faolan.Importer.Extractors
 		public static IReadOnlyCollection<string> GreetedNpcNames(IReadOnlyList<CapturedPacket> packets)
 		{
 			var namesByHandle = BuildSpawnNameMap(packets);
+
+			// Only handles that spawned as an NPC count. ActionType 0x16 is the generic "interact with a character", so
+			// aiming it at a PLAYER is a TRADE REQUEST (#101) rather than a greeting - and since the spawn name map
+			// covers players too, the two-client capture had both players counted as dialogue NPCs with missing
+			// dialogue, quietly deflating the coverage figure this feeds (34/37 -> 34/39) and putting player names in
+			// the gap list. A player has no NPC template, which is the cheapest way to tell them apart.
+			var npcHandles = NpcSpawnExtractor.Extract(packets).Where(e => e.Handle != 0 && e.TemplateId != 0).Select(e => e.Handle).ToHashSet();
 			var names = new HashSet<string>();
 			foreach (var p in packets)
 			{
@@ -190,7 +197,7 @@ namespace Faolan.Importer.Extractors
 				if (field3 != 0)
 					continue;
 
-				if (namesByHandle.GetValueOrDefault(parsedNpc) is { Length: > 0 } name)
+				if (npcHandles.Contains(parsedNpc) && namesByHandle.GetValueOrDefault(parsedNpc) is { Length: > 0 } name)
 					names.Add(name);
 			}
 

@@ -22,7 +22,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 586 NPC types / 1,086 placements · 3,245 items · 20,822 spells · 27 abilities · 242 conversation nodes · 29 shops · 2,036 quests · 1,053 world objects · 139 patrol routes
+**Imported content** (the DB is the server's source of truth): 530 maps · 590 NPC types / 1,105 placements · 3,253 items · 20,847 spells · 265 abilities · 242 conversation nodes · 29 shops · 2,036 quests · 1,126 world objects · 138 patrol routes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -33,7 +33,7 @@ we've seen_, and names the gaps). Regenerate with
 <!-- coverage:start -->
 - **NPC conversations** — 34/37 greeted dialogue NPCs imported (91.9%)
 - **Vendor shops** — 21/21 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 3,234/77,631 decrypted, **4.2% of the total encrypted**. Keys held per category: 3,207 items, 27 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 3,480/77,631 decrypted, **4.5% of the total encrypted**. Keys held per category: 3,215 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
@@ -152,8 +152,19 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Chat** — say, channels, system messages, and whispers
 - ✅ **Guilds** — create, invite and accept, guild tag, and renown, with the guild window appearing instantly on
   create (no relog) (#306)
-- 🟡 Member kick / promote / demote (#104)
-- ⬜ Friends list & presence (#99, #100) · player-to-player trade, quest sharing, team quests (#101)
+- ✅ **Groups (teams)** — invite, accept, decline, leave, kick, leader promotion on the leader leaving, and the team
+  dissolving at one member; the `~Team` chat channel appears and disappears with it (#101)
+- ✅ **Friends list** — add, remove, persistence across a relog, and presence: your entry is pushed to everyone
+  watching when you log in or out, which is what makes the list render at all (the client hides offline friends)
+  (#99)
+- ✅ **Player-to-player trade** — request, the window, items and money both ways, rearranging and removing offers,
+  and the exchange committing on the double accept: both inventories and both wallets, with any change to either
+  offer clearing both accepts so nobody can agree to one table and receive another (#101)
+- 🟡 Member kick / promote / demote (#104) · trade **cancel** ends the session but does not close the partner's
+  window — the s2c side of cancel/decline/remove needs a capture (#427) · team loot rules are accepted but not
+  applied (#101)
+- ⬜ Ignore list (opcodes not yet identified) · quest sharing and team quests (#101) · Claude as a virtual friend
+  (#100)
 
 ### Quests & dialogue
 
