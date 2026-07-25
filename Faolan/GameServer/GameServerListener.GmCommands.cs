@@ -135,12 +135,12 @@ namespace Faolan.GameServer
 		{
 			var characterId = client.Session.Character.Id;
 			var arg = (arguments ?? "").Trim();
-			var handle = arg.Length == 0
-				? client.Session.SelectedTargetHandle ?? 0
+			var resolved = arg.Length == 0
+				? client.Session.SelectedTargetHandle
 				: TryParseHandle(arg, out var parsed)
 					? parsed
-					: 0;
-			if (handle == 0)
+					: null;
+			if (resolved is not { } handle)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .delete [&lt;handle&gt;]  (no arg = your selected target). Removes it live AND deletes its spawn row.");
 				return;
@@ -409,18 +409,20 @@ namespace Faolan.GameServer
 			var selfHandle = client.Session.Character.Id;
 			var arg = (arguments ?? "").Trim();
 
-			uint targetHandle;
+			uint? resolved;
 			if (arg.Length == 0)
-				targetHandle = client.Session.SelectedTargetHandle ?? 0;
+				resolved = client.Session.SelectedTargetHandle;
 			else if (arg.Equals("self", StringComparison.OrdinalIgnoreCase) || arg.Equals("me", StringComparison.OrdinalIgnoreCase))
-				targetHandle = selfHandle;
-			else if (!TryParseHandle(arg, out targetHandle))
+				resolved = selfHandle;
+			else if (TryParseHandle(arg, out var parsedHandle))
+				resolved = parsedHandle;
+			else
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .kill [&lt;handle&gt; | self]  (no arg = your selected target)");
 				return;
 			}
 
-			if (targetHandle == 0)
+			if (resolved is not { } targetHandle)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "No target selected.");
 				return;
@@ -609,8 +611,7 @@ namespace Faolan.GameServer
 		{
 			var characterId = client.Session.Character.Id;
 			var player = _simulation.PlayerWorldEntity(client);
-			var handle = client.Session.SelectedTargetHandle ?? 0;
-			if (player == null || handle == 0 || !_simulation.World.ZoneForEntity(player).TryGet(handle, out var npc) || npc.NpcTemplateId == 0)
+			if (player == null || client.Session.SelectedTargetHandle is not { } handle || !_simulation.World.ZoneForEntity(player).TryGet(handle, out var npc) || npc.NpcTemplateId == 0)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Select an NPC first, then .setnpcgroup [&lt;group name&gt;] [clear]  (no arg = the area the NPC stands in).");
 				return;
@@ -670,8 +671,7 @@ namespace Faolan.GameServer
 		private async Task TargetInfoCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
-			var handle = client.Session.SelectedTargetHandle ?? 0;
-			if (handle == 0)
+			if (client.Session.SelectedTargetHandle is not { } handle)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "No target selected - click an NPC/object in-world first, then .target.");
 				return;

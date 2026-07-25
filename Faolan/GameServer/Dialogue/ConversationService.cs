@@ -65,15 +65,17 @@ namespace Faolan.GameServer.Dialogue
 		// the client never hangs. No-op when no conversation is active.
 		public async Task AdvanceConversation(INetworkClient client, uint answerIndex)
 		{
+			// An active conversation means all three slots are set; guarding them here states that invariant once instead
+			// of defaulting each to 0 further down (a 0 handle/type would silently look up the wrong screen).
 			var path = client.Session.ConversationAnswerPath;
-			if (path == null)
+			if (path == null || client.Session.ConversationNpcHandle is not { } npcHandle || client.Session.ConversationTypeId is not { } typeId)
 				return;
 
 			var childPath = path.Length == 0
 				? answerIndex.ToString()
 				: $"{path}>{answerIndex}";
-			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, client.Session.ConversationTypeId ?? 0, childPath,
-				client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(client.Session.ConversationNpcHandle ?? 0));
+			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, typeId, childPath,
+				client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(npcHandle));
 			if (screen == null)
 			{
 				_logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", client.Session.ConversationNpcName, childPath);
@@ -81,7 +83,7 @@ namespace Faolan.GameServer.Dialogue
 				return;
 			}
 
-			await ServeScreen(client, screen, client.Session.ConversationNpcHandle ?? 0);
+			await ServeScreen(client, screen, npcHandle);
 		}
 
 		// Serves `npcName`'s greeting screen through the live CONSTRUCT path (PickConversationScreen -> ServeScreen,
@@ -393,7 +395,7 @@ namespace Faolan.GameServer.Dialogue
 			client.Session.ConversationAgentInstance = null;
 		}
 
-		public static Task SendConversationClose(INetworkClient client, uint npcHandle = 0)
+		public static Task SendConversationClose(INetworkClient client, uint? npcHandle = null)
 		{
 			// #217: the close's KnubotBase header carries the NPC handle the client uses to tear down THAT dialogue
 			// and RELEASE its dialogue camera. We used to re-address only the player instance and keep the captured
@@ -401,8 +403,9 @@ namespace Faolan.GameServer.Dialogue
 			// relog to recover) and the client re-fired TalkToNpc (the conversation re-opened). Retail's close carries
 			// the LIVE NPC handle (e.g. 0x6A0A Kalanthes). Use the active dialogue's NPC (captured BEFORE EndConversation
 			// clears it), or the caller's clicked NPC for the no-node-on-click close.
-			if (npcHandle == 0)
-				npcHandle = client.Session.ConversationNpcHandle ?? 0;
+			// Which window to close: the caller's NPC, else the ACTIVE dialogue's (captured before EndConversation
+			// clears it), else the captured handle as a last resort - one coalescing chain rather than two 0-checks.
+			var target = npcHandle ?? client.Session.ConversationNpcHandle;
 			// The close must ride the SAME GameAgent instance the conversation's screens used (#217); 0x08 is the
 			// fallback when there was no active conversation. Captured BEFORE EndConversation clears it.
 			// 0x08 is the fallback when there was no active conversation.
@@ -413,9 +416,7 @@ namespace Faolan.GameServer.Dialogue
 			// CONSTRUCT the close via KnubotCodec from the captured empty-remoteformat reply, re-addressed to the live
 			// player AND the live NPC (the captured string is reused verbatim), on the same sender (GameAgent:0x08).
 			var captured = KnubotCodec.ParseStringList(KnubotCloseChatWindowBody);
-			var record = KnubotCodec.BuildCloseChatWindow(id, npcHandle != 0
-				? npcHandle
-				: captured.NpcHandle, captured.Strings, captured.Env);
+			var record = KnubotCodec.BuildCloseChatWindow(id, target ?? captured.NpcHandle, captured.Strings, captured.Env);
 			return SendConstructedKnubot(client, agentInstance, id, record);
 		}
 
