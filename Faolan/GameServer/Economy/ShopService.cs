@@ -170,7 +170,7 @@ namespace Faolan.GameServer.Economy
 		{
 			var instance = client.Session.Character.Id;
 			await SendWorldPacket(client, ShopOpenBuilder.BuildTradeSelectEcho(instance, npcHandle));
-			await SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, mode, padTail: false));
+			await SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, mode));
 			await SendShopData(client, shop, npcHandle);
 
 			_logger.LogInformation("Shop: vendor trade-open for \"{Vendor}\" (npc 0x{Handle:X8}) by {Character}.", shop.VendorName, npcHandle, client.Session.Character?.Name);

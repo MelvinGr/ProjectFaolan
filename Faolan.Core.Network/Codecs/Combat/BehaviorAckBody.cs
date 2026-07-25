@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -21,9 +22,29 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// null identity filler.
 		internal static readonly byte[] NullIdentityFiller = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
 
-		// The echo-ack for air swings: echoes the request with field3 (phase) spliced in + 12 zero bytes (or the tail
-		// override / bare tail for the vendor trade-open ack, padTail=false).
-		public static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[]? tailOverride = null, bool padTail = true)
+		// The behaviours whose ECHOED tail takes 12 zero bytes of padding. This is NOT universal, which is what the code
+		// used to assume: measured across every login capture, pairing each c2s request with its s2c ack and diffing the
+		// tail lengths, only the two attack behaviours pad an echoed tail -
+		//   0x0F NormalAttack: +12 in 85 acks   ·   0x11 UnarmedAttack: +12 in 3
+		// while every other behaviour echoes the tail UNCHANGED: +0 across 25 acks for 0x01, 87 for 0x04, 174 for 0x16
+		// (talk), 66 for 0x12 (the bench-sit hold state), 15 for 0x2A (the sit animation), 13 for 0x09/0x0A, and so on.
+		// (0x0F also shows much larger deltas - 53, 94, ... - but those are the separate result-block ack variant for a
+		// targeted hit, not this echo path.)
+		//
+		// Padding unconditionally made every non-attack ack 8-12 bytes too long, and the client REJECTS the record
+		// outright: it parses to the end of what it expects, then reads the leftovers as a fresh IIR and finds a type
+		// hash of 0 - "Entry with hash 0 was not found ... datasize left in stream=8, raw=70". Standing up off a bench
+		// was the case that surfaced it (behaviourId 1, 32-byte tail where retail sends 20), which only became reachable
+		// once sitting itself started working.
+		//
+		// A REPLACED tail (tailOverride) is a different shape and always pads: the equip/unequip acks build a bespoke
+		// identity-block tail whose captured form ends in those 12 zero bytes (BehaviorAckTests, behaviour 0x09). So the
+		// pad follows the tail's PROVENANCE - echoed or replaced - not the behaviour id alone.
+		private static readonly uint[] PaddedTailBehaviors = [0x0F, 0x11];
+
+		// The echo-ack: echoes the request with field3 (phase) spliced in, and pads the tail only for the behaviours
+		// that take a pad (see above). `tailOverride` replaces the echoed tail wholesale.
+		public static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[]? tailOverride = null)
 		{
 			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][tail]
 			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
@@ -41,7 +62,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(behaviorId)
 				.WriteArrayUInt32Length(echoedArgs)
 				.WriteArray(tail);
-			if (padTail)
+			if (tailOverride != null || PaddedTailBehaviors.Contains(behaviorId))
 				s.WriteArray(new byte[12]);
 			return s.ToArray();
 		}
