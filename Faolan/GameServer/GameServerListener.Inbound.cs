@@ -911,7 +911,10 @@ namespace Faolan.GameServer
 						// (#400 sibling - a new chestpiece/weapon on another player) rides the same relay; the weapon-SET switch is
 						// relayed in its own branch above. NEEDS in-client verification for the equip case (no multiplayer capture
 						// contains a remote player equipping - single-player traces only).
-						if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell or ActionType.MoveEquippedToFromInventory)
+						// PlayAnimation (#428): the mounted jump. A standing jump moves the character nowhere, so there is
+						// no CharDCMove for the relay to carry - the client asks for the animation over this channel
+						// instead, and without it in this list the actor animated on their own screen only.
+						if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell or ActionType.MoveEquippedToFromInventory or ActionType.PlayAnimation)
 						{
 							var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Character.Id, rawPayload, args.CommandqueueClientId);
 							if (behaviorRelay != null)

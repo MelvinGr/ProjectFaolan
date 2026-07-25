@@ -20,6 +20,26 @@ namespace Faolan.Tests
 			Assert.Equal(expected, Convert.ToHexStringLower(bytes));
 		}
 
+		// #428 the PlayAnimation (behaviour 0x07) relay - a jump the movement record cannot carry (mounted, or off a
+		// bridge: a standing jump translates nowhere, so there is no CharDCMove to forward). Retail answers the client's
+		// request with the SAME record at the ack seq, with the phase spliced in as f3 - which is precisely what the
+		// generic relay builder produces, so the fix for the missing mounted jump was the relay GATE, not a new codec.
+		//
+		// Ground truth: NecroL80_mage-necromancer_login_falldamage_bridge-toast, c2s fr1318 -> s2c fr1321 (bodies below
+		// with the 0x2000 carrier's u32 length prefix stripped). The args are f1=249527 (the animation-action id),
+		// f2=2 (commandqueue_client_id, echoed back as the f3 phase), f5=10, f6=0, f11=65, f12=43.
+		[Fact]
+		public void PlayAnimationRelay_MatchesCapture()
+		{
+			var request = Convert.FromHexString("00000024642cd3d60000c3500802e5d40003000000070000000e08b79d0f1002280a30005841602b");
+			const string expected = "642cd3d60000c3500802e5d40004000000070000001008b79d0f10021802280a30005841602b";
+
+			var relay = BehaviorAckBody.BuildBehaviorRelayBody(0x0802E5D4, request, 2);
+
+			Assert.NotNull(relay);
+			Assert.Equal(expected, Convert.ToHexStringLower(relay));
+		}
+
 		// Sit / stand on a bench - NecroL80_mage-necromancer_login_path-of-azura_sit-bench (tools/capture/decode_sit.py).
 		// actor = 0x0802E5D4, target bench handle = 0x12174; the remoteformat is passed verbatim (its key is the bench's
 		// captured localized action key).

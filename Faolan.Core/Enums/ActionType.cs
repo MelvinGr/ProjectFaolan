@@ -4,6 +4,14 @@ namespace Faolan.Core.Enums
 	{
 		CastSpell = 0x4,
 		Emote = 0x5,
+
+		// A self-ANIMATION the movement record cannot express, with the animation itself named by the args' f1
+		// (bcc_action_id, the client's animation-action table). Seen for a MOUNTED jump (live, 2026-07-25: f1 249528),
+		// a jump off a bridge (NecroL80 ...falldamage_bridge-toast fr1318: 249527) and 249555 elsewhere - all in one id
+		// cluster. A plain unmounted jump does NOT use it: that is pure CharDCMove with MoveFlag.Airborne, which is why
+		// it relays without this (xxx_2clients_jumping carries no c2s BCC at all). Retail relays it to viewers: the
+		// same capture shows s2c form-4 type-7 records naming OTHER players' handles (0x131830B, f1 249527).
+		PlayAnimation = 0x7,
 		NormalAttack = 0xf, // melee swing / auto-attack behavior (BehaviorControlCenter); the dominant combat action
 		UnarmedAttack = 0x11, // unarmed swing (empty main hand); ability id rides the tail, ack = plain behavior echo (combat capture 2026-06-12)
 		MoveEquippedToFromInventory = 0x9,
