@@ -353,7 +353,10 @@ at save time so they aren't double-applied on entry (`GameServerListener.ShouldP
 **Shield of the Risen (#221) — RESOLVED + in-client verified.** `SendShieldOfTheRisen`
 (`GameServerListener.Buffs.cs`) applies the newbie-protection self-buff from `RestoreEntryBuffs` in the world-entry
 flush (#423 — it used to run from `FlushPendingPost205FFollowUp`), so it re-asserts on login AND every playfield
-change, silently, in the position the changemap capture shows retail using. The real
+change, silently, in the position the changemap capture shows retail using. The one entry that does **not** get it is
+`WorldEntryMode.CreateWorld` — a character's very first arrival is the intro cutscene, where the player has no
+control, so the protection banner would paint over a cinematic and the shield would be spent by the first swing of a
+fight they have not had yet. Every later login, including the first ordinary one after creation, applies it. The real
 ids are bases **`4061768` (1h)** + **`3666828` (10h)**, both named "Shield of the Risen" in `Spells` with real
 durations (`NecroL80_..._conans-castle-exit` rec#165/#736) — the old `0x000B9000` claim was WRONG (that id is the
 "Exhausted" debuff). It uses `SelfBuffCodec.BuildBuffDataLong` — the 54-byte tail that is the only form retail
@@ -385,7 +388,10 @@ invariant):
 - **The cast/attack GESTURE** — the `BehaviorControlCenter` animation (`#48`, `BroadcastBehaviorToViewers`),
   fired for `NormalAttack` / `UnarmedAttack` / `CastSpell` in `GameServerListener.Inbound.cs`.
 - **The spell EFFECT** — the `ApplySpell` (`0x6B87E316`) itself (`BroadcastSpellToViewers`, from
-  `SendMagicBuffIir`), so the buff/effect that lands renders on nearby clients, not just the gesture. The capture
+  `SendMagicBuffIir`), so the buff/effect that lands renders on nearby clients, not just the gesture.
+- **The buff's END** — the rank-1 end twin (`SendBuffRemoval`) relays the same way. A buff other clients were told
+  to start has to be told to stop, or their copy never ends: the spellweave trance made that visible (viewers saw
+  the caster hold the weave pose forever, because only the caster got the removal), but it applied to every buff. The capture
   streams both other-player **self-buffs** (e.g. player `0x01316e68`) and **offensive casts** (player
   `0x01316cee` on NPC targets) to the observer, framed to the observer's endpoint. Verbatim-relay + Known-gating
   locked by `CrossPlayerSpellRelayTests` against the captured body.

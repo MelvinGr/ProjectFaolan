@@ -1227,6 +1227,25 @@ namespace Faolan.GameServer
 					// full retail creation world entry (the verbatim burst with its own 0x200B/0x200C/0x2001
 					// auth + the intro/cutscene), so skip the helper auth for it.
 					var isCreateWorldEntry = !isNewCharacter && CreateFlowService.TryConsumePendingCreateWorldEntry(clientInstance);
+					// ONE live connection per CHARACTER. A second login of a character that is already in the world gives
+					// two sessions writing one character's state - two world entities, two persistence writers, and a
+					// wallet/inventory that depends on which session saved last. The account may hold as many
+					// connections as it likes (that is how a second client on the same account works); the character is
+					// what must be exclusive.
+					//
+					// The two legitimate re-connections are NOT duplicates and must pass: the post-creation world
+					// handoff and a changemap/teleport re-entry both open a fresh connection for a character whose old
+					// one may not have been reaped yet. Both are recognised by their pending set - CreateWorld was
+					// consumed just above, and PendingTeleportReentry is peeked here (the login branch consumes it).
+					var reconnectHandoff = isCreateWorldEntry || PendingTeleportReentry.ContainsKey(clientInstance);
+					if (!reconnectHandoff && ClientForCharacter(client.Session.Character.Id) is { } existingClient && !ReferenceEquals(existingClient, client))
+					{
+						Logger.LogWarning("Duplicate login for character {CharacterId:X8} '{Name}' (account {AccountId:X8}): already in the world on another connection - dropping the new one.",
+							client.Session.Character.Id, client.Session.Character.Name, accountId);
+						client.Stop();
+						return;
+					}
+
 					// The connection's world-entry role, decided ONCE here and the single source of truth for routing
 					// every later handshake signal (docs/subsystems/world-entry-flow.md). CreateWorld/CreateEditor are
 					// known now; the Login-vs-TeleportReentry split is finalised in the existing-login branch below (it

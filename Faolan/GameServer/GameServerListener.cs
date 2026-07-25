@@ -250,7 +250,8 @@ namespace Faolan.GameServer
 				// reactive element list + fire burst (docs/subsystems/combos.md); WorldIir.Send frames the body for you, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
 				(c, record) => WorldIir.Send(c, record), SendBuffRemoval, // trance-buff end-twins on cancel/fire
 				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
-				EnsureEnergyLoop); // start the persistent energy tracking/regen loop
+				EnsureEnergyLoop, // start the persistent energy tracking/regen loop
+				c => _simulation.PlayerWorldEntity(c)?.IsMounted == true); // the trance roots + kneels, so not from the saddle
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression);
 			_stockConversation = new StockConversationService(logger, database);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, agentServerDispatcher, logger);

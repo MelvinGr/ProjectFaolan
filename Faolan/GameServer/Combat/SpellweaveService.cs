@@ -53,11 +53,12 @@ namespace Faolan.GameServer.Combat
 		private readonly Func<INetworkClient, uint, Task>? _sendSprintBar; // DispatchUpdateSprintbar (0x200E) - the energy bar
 		private readonly Func<INetworkClient, uint, uint, uint, Task>? _applySpell; // ApplySpell(client, applyTo, applyFrom, spellId)
 		private readonly Func<INetworkClient, uint, uint, uint, Task>? _removeBuff; // SendBuffRemoval end-twin
+		private readonly Func<INetworkClient, bool>? _isMounted; // is the caster on a mount right now (WorldEntity state)
 		private readonly ILogger _logger;
 
 		public SpellweaveService(ILogger logger, Func<INetworkClient, string, Task> feedback, Func<INetworkClient, uint, uint, uint, Task>? applySpell = null,
 			Func<INetworkClient, byte[], Task>? sendIir = null, Func<INetworkClient, uint, uint, uint, Task>? removeBuff = null, Func<INetworkClient, uint, Task>? sendSprintBar = null,
-			Action<INetworkClient>? ensureEnergyLoop = null)
+			Action<INetworkClient>? ensureEnergyLoop = null, Func<INetworkClient, bool>? isMounted = null)
 		{
 			_logger = logger;
 			_feedback = feedback;
@@ -66,6 +67,7 @@ namespace Faolan.GameServer.Combat
 			_removeBuff = removeBuff;
 			_sendSprintBar = sendSprintBar;
 			_ensureEnergyLoop = ensureEnergyLoop;
+			_isMounted = isMounted;
 		}
 
 		// A component add (CombatReactiveIIR) - only meaningful inside an open trance. componentIndex indexes into the
@@ -258,6 +260,17 @@ namespace Faolan.GameServer.Combat
 		private async Task StartAsync(INetworkClient client, uint param)
 		{
 			var session = client.Session;
+
+			// Not from the saddle. The trance ROOTS the caster (the move handler pins their position while
+			// IsSpellweaving) and plays a kneeling pose, neither of which a mounted character can do - the rider would
+			// be pinned mid-gallop with the horse animating underneath. Refuse the open rather than produce that.
+			if (_isMounted?.Invoke(client) == true)
+			{
+				_logger.LogInformation("Spellweave START refused for '{Name}': mounted.", session.Character.Name);
+				await Feedback(client, "You cannot weave spells while mounted.");
+				return;
+			}
+
 			var profile = SpellweaveCatalog.ForClass(session.Character.Class);
 			if (profile == null)
 			{

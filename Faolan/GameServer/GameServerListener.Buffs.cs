@@ -217,12 +217,20 @@ namespace Faolan.GameServer
 		// only on relog. applyTo/applyFrom MIRROR the apply: equal for a self-buff, applyTo=player + applyFrom=NPC for
 		// an NPC-cast debuff. Byte-exact carrier content (after the IIR [u32 len=0x1A]):
 		//   [ApplySpell][c350][applyTo][u16 0][(base<<8)|1][c350][applyFrom]   (no payload)
-		private Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
+		private async Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
 		{
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // the rank-1 "end" twin of the applied buff id
+			var body = NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, []);
 
-			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, []))));
+			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, b => b.WriteArrayUInt32Length(body)));
+
+			// The removal goes to VIEWERS too, for the same reason the application does (SendMagicBuffIir relays it):
+			// a buff the other clients were told to start must be told to stop, or their copy of it never ends. The
+			// spellweave trance is where this showed: viewers saw the caster enter the weave pose (relayed apply) and
+			// then hold it forever, because the fire/cancel removal only ever reached the caster. It is not weave-
+			// specific - EVERY buff end was stale on other screens, the weave just made it obvious by being a pose
+			// rather than an icon.
+			await _broadcaster.BroadcastSpellToViewers(client, body);
 		}
 
 		// Sends a live spell grant (DispatchLearnSpell, s2c 0x200A) - the retail "learn a spell" packet (#73). Grants a

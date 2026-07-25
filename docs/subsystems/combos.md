@@ -106,7 +106,9 @@ The Necromancer weave is built end-to-end and byte-exact (golden tests `Spellwea
   energy loop. Session state on `NetworkClientSession`: `IsSpellweaving`, `WeaveComponents`, `SpellweaveBuffStack`,
   `Energy`/`EnergyMax`/`IsSprinting`/`EnergyLoopActive`. It reaches the wire through narrow listener seams (ctor
   args): `ApplySpellweaveBuff` (the 54-byte buff blob, via the shared `ApplySpell` path since #274),
-  `SendWorldIir`, `SendBuffRemoval` (rank-1 end-twins), `SendSprintBar` (`0x200E`), `EnsureEnergyLoop`.
+  `SendWorldIir`, `SendBuffRemoval` (rank-1 end-twins, relayed to viewers so the pose ends on their screens too),
+  `SendSprintBar` (`0x200E`), `EnsureEnergyLoop`, and `isMounted` — the trance roots the caster and plays a kneeling
+  pose, so opening one from the saddle is refused with an on-screen line rather than pinning a rider mid-gallop.
 - `SpellweaveCodec` (`Faolan.Core.Network/Codecs/Combat/SpellweaveCodec.cs`) — reactive-list, stat-gauge,
   buff-data and fire-stage builders.
 - `BehaviorAnimationCodec` (`Faolan.Core.Network/Codecs/Combat/BehaviorAnimationCodec.cs`) — the trance /

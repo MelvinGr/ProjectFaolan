@@ -433,6 +433,18 @@ namespace Faolan.GameServer
 		{
 			await RestoreMount(client);
 			await RestoreBuffs(client);
+
+			// NOT on the character's very first entry. Shield of the Risen is newbie protection for someone arriving in
+			// the world, and the create-world entry is not that: it is the intro cutscene, where the character is
+			// washed ashore and the player has no control - so the buff icon and its "you are protected" line appear
+			// over a cinematic, and the shield is then spent by the first swing of a fight the player has not had yet.
+			// Every LATER login gets it as usual, including the first ordinary login after creation.
+			if (client.Session.EntryMode == WorldEntryMode.CreateWorld)
+			{
+				Logger.LogInformation("Create-world entry for '{Name}': skipping Shield of the Risen (it belongs to a login, not to the intro).", client.Session.Character.Name);
+				return;
+			}
+
 			await SendShieldOfTheRisen(client);
 		}
 
