@@ -45,6 +45,16 @@ namespace Faolan.Core.Enums
 		// rather than guessed at: the old enum implied "jump"/"mounted" by pairing them with those labels, but 0x52 and
 		// 0x56 both occur while a player is SEATED, where a jump reading makes no sense.
 		Bool5 = 0x20,
-		Bool6 = 0x40
+
+		// AIRBORNE - a jump. Pinned by xxx_2clients_jumping, a session recorded for nothing else: the bit appears in c2s
+		// moves ONLY there (20 records, none in a comparable non-jumping capture), and retail relays it - both clients
+		// received 0x40 moves naming the OTHER subject, plus five more characters including a passer-by who happened to
+		// jump nearby. Walking is 0x1E; jumping is 0x56, the same minus NoAccelerationVector plus this bit, which fits an
+		// acceleration vector arriving exactly as the character leaves the ground.
+		//
+		// It stayed unnamed until that capture for a good reason: the old invented enum paired 0x52/0x56 with a "jump"
+		// label while those same values occur while SEATED, so the pair was not diagnostic. Isolating a jumping session
+		// is what makes THIS BIT diagnostic on its own.
+		Airborne = 0x40
 	}
 }

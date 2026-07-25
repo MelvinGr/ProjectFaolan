@@ -301,9 +301,9 @@ namespace Faolan.ChatServer
 			// 1971). Same shape GuildService's member record already uses, and the same column.
 			// The logout announce has to say "offline" while the socket is still up, so the caller can override.
 			var online = onlineOverride ?? ClientForCharacter(friend.Id) != null;
-			var stamp = online || friend.LastConnection == null
+			var stamp = online
 				? FriendListCodec.OnlineStamp
-				: (uint)friend.LastConnection.Value.ToUnixTimeSeconds();
+				: (uint)friend.LastConnection!.Value.ToUnixTimeSeconds();
 
 			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendAdded,
 				s => s.WriteArray(FriendListCodec.BuildState(friend.Id, online, (byte)friend.Level, friend.Class, stamp))));

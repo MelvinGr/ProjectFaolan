@@ -51,7 +51,19 @@ All multi-byte numbers are **big-endian** (`FUN_0048f900` = ReadU32-BE; raw byte
 | 3 | 0x08 | `local_e` | clear ⇒ read the `param13..15` acceleration vector |
 | 4 | 0x10 | — | set ⇒ collapse the post-position move vector to a single float |
 | 5 | 0x20 | — | stored as bool `param[0x12]` |
-| 6 | 0x40 | — | stored as bool |
+| 6 | 0x40 | — | stored as bool — **AIRBORNE (a jump)** |
+
+**Bit 6 (`0x40`) is a jump**, pinned by `xxx_2clients_jumping` — a session recorded for nothing else. It appears in
+c2s moves ONLY there (20 records; none in a comparable non-jumping capture), and retail RELAYS it: both clients
+received `0x40` moves naming the *other* subject, plus five further characters including a passer-by who happened to
+jump nearby. Walking is `0x1E`; jumping is `0x56` — the same minus `NoAccelerationVector`, plus this bit, which fits
+an acceleration vector arriving exactly as the character leaves the ground. So a viewer renders someone else's jump
+from the ordinary move record, with no separate animation needed.
+[V1: tools/capture/tshark_dump.sh]
+
+It stayed unnamed until that capture for a good reason: the old invented enum paired `0x52`/`0x56` with a "jump" label
+while those same values occur while SEATED, so the pair was not diagnostic. Isolating a jumping session is what makes
+this bit diagnostic on its own — the bits either side of it (`0x20`, and `flag2`) are still only "stored as bool".
 
 `bit0 (0x01)` toggles freely and does not affect the layout (the `0x1a`/`0x1b` twins are the same
 length). When `flag2 >= 8` the velocity/accel/heading block is skipped entirely (the short forms).
