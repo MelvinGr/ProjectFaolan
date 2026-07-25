@@ -90,11 +90,12 @@ create-specific to decode, only builder wiring to do:
   The position is the map's reference point; the playfield token (live, per-session) is carried twice. `count`,
   `farClip` and `flags` are passed through (not yet semantically pinned). Byte-exact for maps 4000 + 4010.
 - **GameTimeIIR** (`0x4F57DC08`), 29 bytes:
-  `[u32 0][u32 0][u64 dayTime][u8 flag][u64 timestamp][f32 rate=1.0]`. Byte-exact. `dayTime` is a count of game
-  seconds (86400 to a game day, advancing 5 per real second) and `timestamp` is
-  `[u32 unix / 17280][u32 unix epoch seconds]` — see [`../re/gametime-clock.md`](../re/gametime-clock.md). The
-  editor burst keeps a fixed captured `dayTime` (the creation backdrop has no day/night to track, and it keeps
-  the burst golden byte-exact); the world clock is live.
+  `[u32 0][u32 0][u8 isToBePassed][f32 dayTime][u32 word][u32 gameDay][u32 unixSeconds][f32 rate=1.0]`. Byte-exact.
+  `dayTime` is a **float** count of game seconds (86400 to a game day, advancing 5 per real second) and the anchor is
+  `[unix / 17280][unix epoch seconds]` — see [`../re/gametime-clock.md`](../re/gametime-clock.md), including why the
+  earlier `[u64 dayTime][u8 flag]` reading produced the same bytes and still broke the clock. The editor burst keeps
+  its captured `dayTime` (`0x47929B00` = 75062s; the creation backdrop has no day/night to track, and it keeps the
+  burst golden byte-exact); the world clock is live.
 - **SetMorphValueIIR** (`0xBADF5A4B`), 36–37 bytes — `[type][handle]… "hairmesh_207920" … <float weight>`; the
   morph wiring itself is already covered by [[character_appearance_morphs_unused]].
 - **ScryScriptIIR** (`0xA36D3B74`) — the cutscene/editor callback scripts; see `docs/subsystems/create-cutscene-camera-paths.md`.

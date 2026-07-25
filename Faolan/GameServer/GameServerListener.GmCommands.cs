@@ -363,44 +363,15 @@ namespace Faolan.GameServer
 				["togglenpcgroup"] = (client, _) => ToggleNpcGroupCommand(client),
 				["graduatenpcgroup"] = GraduateNpcGroupCommand,
 				["weaponset"] = WeaponSetCommand,
-				["time"] = TimeCommand,
-				["daytime"] = DayTimeRawCommand
+				["time"] = TimeCommand
 			};
 		}
 
-		// .daytime <hex>  - send a RAW dayTime high word, to settle what the client actually does with the field (#351).
-		// The decode says it is a count of game seconds (86400 to a day) and the captured value only makes sense read
-		// that way - 0x01472BDD is 21,441,501 seconds, while as an IEEE float it is 3.7e-38 - but the client's apply
-		// hands the word to a parameter the decompiler types as `float`, and `.time` reportedly leaves the in-game clock
-		// at 00:00, which is exactly what an integer would look like if it WERE read as a float. This sends whatever
-		// word you name so the two readings can be told apart in one session:
-		//   .daytime 0000A8C0   43,200 as an integer      -> 12:00 if the field is game seconds
-		//   .daytime 4728C000   43200.0 as an IEEE float  -> 12:00 if the field is a float
-		//   .daytime 01472BDD   the captured world value  -> 03:58 if our reading is right at retail's magnitude
-		private async Task DayTimeRawCommand(INetworkClient client, string arguments)
-		{
-			var characterId = client.Session.Character.Id;
-			var arg = (arguments ?? "").Trim().Replace("0x", "", StringComparison.OrdinalIgnoreCase);
-
-			if (!uint.TryParse(arg, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var highWord))
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .daytime &lt;hex u32&gt;  (raw dayTime high word; try 0000A8C0, 4728C000, 01472BDD)");
-				return;
-			}
-
-			await client.SendAsync(BuildGameTime(client, BitConverter.UInt32BitsToSingle(highWord), DateTimeOffset.UtcNow));
-
-			var asSeconds = highWord % GameTimeCodec.GameDaySeconds;
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"Sent raw dayTime 0x{highWord:X8} - as game seconds that is {asSeconds / 3600:00}:{asSeconds % 3600 / 60:00}, as a float {BitConverter.UInt32BitsToSingle(highWord):G6}");
-		}
-
-		// .time [<hh:mm> | <hh> | reset]  - report or set the world time of day, then resend the clock so the change is
-		// visible without a relog. The clock runs live off the wall clock at 5 game seconds per real second (#351), so a
-		// game day is 4.8 real hours; this shifts its PHASE rather than stopping it. Exists so the one thing the static
-		// decode cannot settle - whether the sky actually matches the time we send, i.e. that 0 is game-midnight - is a
-		// single command to check instead of a 4.8h wait. The client's own day window is 06:00-18:00
-		// (GameTime_t holds 21600.0 / 64800.0), so `.time 12` and `.time 0` should look unambiguously different.
+		// .time [<hh:mm> | reset]  - report or set the world time of day, then resend the clock so the change shows
+		// without a relog. The clock runs live off the wall clock at 5 game seconds per real second (#351), so a game day
+		// is 4.8 real hours; this shifts its PHASE rather than stopping it. Verified in-client 2026-07-25: the sky follows
+		// the time sent, so game-midnight is 0 and the client's own 06:00-18:00 day window (GameTime_t holds 21600.0 /
+		// 64800.0) lines up with it. No argument reports the current time.
 		private async Task TimeCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
@@ -411,13 +382,12 @@ namespace Faolan.GameServer
 			else if (arg.Length > 0)
 			{
 				var parts = arg.Split(':', StringSplitOptions.TrimEntries);
-				if (!uint.TryParse(parts[0], out var hours) || hours > 23 || parts.Length > 2 || (parts.Length == 2 && (!uint.TryParse(parts[1], out _) || uint.Parse(parts[1]) > 59)))
+				if (parts.Length != 2 || !uint.TryParse(parts[0], out var hours) || hours > 23 || !uint.TryParse(parts[1], out var minutes) || minutes > 59)
 				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .time [&lt;hh:mm&gt; | &lt;hh&gt; | reset]");
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .time [&lt;hh:mm&gt; | reset]  (no argument reports the current time)");
 					return;
 				}
 
-				var minutes = parts.Length == 2 ? uint.Parse(parts[1]) : 0;
 				// Shift the phase so the CURRENT instant reads as the requested time of day.
 				var wanted = (long)(hours * 3600 + minutes * 60);
 				_gameTimeOffset = (_gameTimeOffset + wanted - (long)GameTimeCodec.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset) + GameTimeCodec.GameDaySeconds) % GameTimeCodec.GameDaySeconds;

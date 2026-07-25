@@ -29,7 +29,7 @@ read out with `ReadVals.java` where they are indirect:
 | `+0xA8` / `+0xAC` / `+0xB0` / `+0xB4` | **19** / **4** / **7** / **2** | dusk start hour + length, dawn start hour + length |
 | `+0xBC` / `+0xC0` / `+0xC4` / `+0xD4` | 1.0f | base rate, **day** rate, **night** rate, and the rate the wire sets |
 
-## dayTime is a count of game seconds, 86400 to the day
+## dayTime is a FLOAT count of game seconds, 86400 to the day
 
 `FUN_004ee4f0` (`SetCurrentRealTime`) and `FUN_004ee710` (the IIR handler) both decompose the value the same way:
 
@@ -40,7 +40,8 @@ hours   = t / 3600          # +0xA4
 ```
 
 Only minutes and seconds are taken modulo — **`hours` is not** — so the value is an *absolute running count* of
-game seconds, and the time of day is `dayTime % 86400`. The `+0x78` wrap of 86400.0 is only applied to
+game seconds, and the time of day is `dayTime % 86400`. The value arrives as an **IEEE float**, not an integer
+(see the wire record below). The `+0x78` wrap of 86400.0 is only applied to
 *negative* inputs (`while (t < 0) t += 86400`), i.e. it normalises, it does not clamp.
 
 Both functions end in an assert that prints `Hours: %f Minutes: %f Seconds: %f` — those out-of-line assert
@@ -66,40 +67,65 @@ global. Not modelled by us — recorded because it means "the cycle" is not nece
 
 ## The wire record
 
-`[u32 TypeTag=0][u32 Handle=0][u64 dayTime][u8 flag][u64 timestamp][f32 rate]`, 29 bytes.
+```
+[u32 TypeTag=0][u32 Handle=0][u8 isToBePassed][f32 dayTime][u32 word][u32 gameDay][u32 unixSeconds][f32 rate]
+```
 
-### The reader — `GameTimeIIR_t::ReadSubClass` (`FUN_005bde10`, vtable slot 8)
+29 bytes. **This split is one byte later than the first decode of this record claimed**, and the difference is not
+cosmetic - it is the difference between the clock working and reading midnight forever.
 
-Reached with `CLASS=GameTimeIIR_t … VtReader.java` (the leaf-name searches never find `::vftable`). It is five
-straight big-endian `FUN_0048f900` (ReadU32) calls into the IIR object, and the apply `FUN_005bdf70` (slot 2)
-then forwards four of the five to the clock:
+### How the wrong split survived a byte-exact test
+
+The original reading was `[u64 dayTime][u8 flag][u64 timestamp][f32 rate]`. Over a *captured* value the two
+readings produce **identical bytes** - `[u64][u8]` and `[u8][f32][u32]` cover the same 13 bytes - so a golden test
+that rebuilds the captured record cannot tell them apart. Only the client can, and it does:
+
+| sent | client |
+|---|---|
+| `0000A8C0` - 43,200 as an integer second count | renders **00:00** |
+| `4728C000` - 43200.0 as an IEEE float | **record rejected** |
+| `01472BDD` - retail's own captured word | renders **~12:09** |
+
+The rejection names the field:
+
+```
+ReadSubClass failed for IIR 1331158024 (GameTimeIIR_t)! isToBePassed on bool has value G
+n3Engine::AddNetWorkMessage: an IIR that could not be constructed! datasize left in stream=20, raw=33
+```
+
+`G` is `0x47`, the leading byte of that float, and it failed 13 bytes into a 33-byte record with 20 left - five
+u32s, exactly what `ReadSubClass` reads. So there is a **bool at offset 12**, and `dayTime` is the float after it.
+
+### The reader - `GameTimeIIR_t::ReadSubClass` (`FUN_005bde10`, vtable slot 8)
+
+Reached with `CLASS=GameTimeIIR_t … VtReader.java` (the leaf-name searches never find `::vftable`). Five straight
+big-endian `FUN_0048f900` (ReadU32) calls into the IIR object, and the apply `FUN_005bdf70` (slot 2) forwards four
+of the five to the clock:
 
 | field | wire word | forwarded as |
 |---|---|---|
-| `+0x1C` | dayTime **high** | `newTime` — the game-second count |
-| `+0x20` | dayTime **low** | **not forwarded** — the client discards the fraction |
-| `+0x24` | timestamp **high** | `p3` → stored at `clock+0x64` (the game-day counter) |
-| `+0x28` | timestamp **low** | `p4` → the `- __time64(NULL)` skew |
-| `+0x2C` | rate | `p5` → `clock+0xD4` |
+| `+0x1C` | **`dayTime`** (f32) | `newTime` - the game-second count |
+| `+0x20` | `word` | **not forwarded** - the apply skips it; holds 0..3 across the corpus |
+| `+0x24` | `gameDay` | `p3` → stored at `clock+0x64` |
+| `+0x28` | `unixSeconds` | `p4` → the `- __time64(NULL)` skew |
+| `+0x2C` | `rate` | `p5` → `clock+0xD4` |
 
-Two things fall out of this:
+The bool is read before those five, by the base IIR class - which is why the byte the old decode called a "flag"
+never correlated with anything: it was not a flag at all, but the low byte of `word`.
 
-- **the seconds live in the HIGH word and the fraction is ignored**, so emitting whole seconds with a zero low
-  word is exactly what the client consumes;
-- **`flag` is not a clock field.** `ReadSubClass` consumes only those five u32s, so the mid-record byte is read
-  by the base IIR class and never reaches `GameTime_t` - which is why its 0/1/2/3 spread does not correlate with
-  time of day. It is a generic IIR field, not a day/night selector.
+Decoding the captured record with the corrected split:
 
-Field roles, from the IIR handler `FUN_004ee710(this, float newTime, p3, int p4, p5)`:
+| field | bytes | value |
+|---|---|---|
+| `isToBePassed` | `01` | true |
+| `dayTime` | `472BDD00` | **43997.0 s → 12:13** (as an integer the same word is 1.19e9) |
+| `word` | `00000001` | 1 |
+| `gameDay` | `0001920C` | 102924 = `unixSeconds / 17280` ✓ |
+| `unixSeconds` | `6A024E93` | 1778536083 |
+| `rate` | `3F800000` | 1.0 |
 
-- **`dayTime`** → `newTime`. 32.32 fixed point: game seconds in the high word, a fraction in the low word (19
-  of 141 captured records carry `0x80000000`, i.e. half a second — so the ticket-era claim that the low word is
-  always 0 was wrong). The fraction is read but never forwarded.
-- **`timestamp`** → its two halves split: the low word is `p4`, and the handler does
-  `this[0xD0] = p4 - __time64(NULL)`, comparing the field against **current unix time** and storing the skew;
-  the high word is `p3`, parked at `clock+0x64`. Independent client-side confirmation of the encoding below.
-- **`rate`** → feeds `+0xD4`, one of the multipliers in the tick above.
-- **`flag`** is a base-class field, not the clock's — see the reader table above.
+`43997 < 86400` is a real time of day, and 12:13 is what the client renders. The old integer reading produced no
+such corroboration - and that absence should have been the tell.
 
 ### `timestamp` = `[u32 unix / 17280][u32 unix epoch seconds]`
 
