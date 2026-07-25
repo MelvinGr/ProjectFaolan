@@ -72,8 +72,8 @@ namespace Faolan.GameServer.Dialogue
 			var childPath = path.Length == 0
 				? answerIndex.ToString()
 				: $"{path}>{answerIndex}";
-			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, client.Session.ConversationTypeId, childPath,
-				client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(client.Session.ConversationNpcHandle));
+			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, client.Session.ConversationTypeId ?? 0, childPath,
+				client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(client.Session.ConversationNpcHandle ?? 0));
 			if (screen == null)
 			{
 				_logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", client.Session.ConversationNpcName, childPath);
@@ -81,7 +81,7 @@ namespace Faolan.GameServer.Dialogue
 				return;
 			}
 
-			await ServeScreen(client, screen, client.Session.ConversationNpcHandle);
+			await ServeScreen(client, screen, client.Session.ConversationNpcHandle ?? 0);
 		}
 
 		// Serves `npcName`'s greeting screen through the live CONSTRUCT path (PickConversationScreen -> ServeScreen,
@@ -117,7 +117,7 @@ namespace Faolan.GameServer.Dialogue
 			// targeted and re-talks with no new SelectDeselect). Stays suppressed until the player re-selects the
 			// NPC, so a deliberate re-talk still opens. This is what makes "unknown path -> just exit" actually stay
 			// exited instead of instantly re-triggering.
-			if (clickedNpcHandle != 0 && clickedNpcHandle == client.Session.ConversationEndedNpcHandle)
+			if (clickedNpcHandle != 0 && client.Session.ConversationEndedNpcHandle == clickedNpcHandle)
 			{
 				_logger.LogInformation("Conversation: suppressed the reflexive post-close greeting for NPC 0x{NpcTemplate:X} (#217; re-select to talk again).", clickedNpcHandle);
 				return true;
@@ -383,14 +383,14 @@ namespace Faolan.GameServer.Dialogue
 			// #217: remember which NPC we just closed so the reflexive post-close greeting (the client re-fires one
 			// with no new SelectDeselect) is absorbed rather than re-opening the dialogue. Cleared when the player
 			// re-selects an NPC (SelectDeselect) = genuine intent to talk again.
-			if (client.Session.ConversationNpcHandle != 0)
+			if (client.Session.ConversationNpcHandle is not null)
 				client.Session.ConversationEndedNpcHandle = client.Session.ConversationNpcHandle;
 
 			client.Session.ConversationAnswerPath = null!;
 			client.Session.ConversationNpcName = null!;
-			client.Session.ConversationTypeId = 0;
-			client.Session.ConversationNpcHandle = 0;
-			client.Session.ConversationAgentInstance = 0;
+			client.Session.ConversationTypeId = null;
+			client.Session.ConversationNpcHandle = null;
+			client.Session.ConversationAgentInstance = null;
 		}
 
 		public static Task SendConversationClose(INetworkClient client, uint npcHandle = 0)
@@ -402,12 +402,11 @@ namespace Faolan.GameServer.Dialogue
 			// the LIVE NPC handle (e.g. 0x6A0A Kalanthes). Use the active dialogue's NPC (captured BEFORE EndConversation
 			// clears it), or the caller's clicked NPC for the no-node-on-click close.
 			if (npcHandle == 0)
-				npcHandle = client.Session.ConversationNpcHandle;
+				npcHandle = client.Session.ConversationNpcHandle ?? 0;
 			// The close must ride the SAME GameAgent instance the conversation's screens used (#217); 0x08 is the
 			// fallback when there was no active conversation. Captured BEFORE EndConversation clears it.
-			var agentInstance = client.Session.ConversationAgentInstance != 0
-				? client.Session.ConversationAgentInstance
-				: 0x08;
+			// 0x08 is the fallback when there was no active conversation.
+			var agentInstance = client.Session.ConversationAgentInstance ?? 0x08;
 			EndConversation(client); // end any active conversation
 			var id = client.Session.Character.Id;
 

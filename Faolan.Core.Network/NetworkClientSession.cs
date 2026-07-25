@@ -7,7 +7,8 @@ namespace Faolan.Core.Network
 {
 	public interface INetworkClientSession
 	{
-		uint ConversationTypeId { get; set; }
+		// The active dialogue's NPC type id, or null when no conversation is open.
+		uint? ConversationTypeId { get; set; }
 
 		Account Account { get; set; }
 
@@ -122,14 +123,19 @@ namespace Faolan.Core.Network
 		// The GameAgent sender instance the active conversation's packets use (retail varies it per conversation,
 		// e.g. 0x0a). The close must be sent from this SAME instance or the client won't match it to the dialogue
 		// and re-fires the greeting (#217). Captured from the served screens; 0 = none (fall back to 0x08).
-		uint ConversationAgentInstance { get; set; }
+		// The GameAgent instance the active dialogue's screens ride (#217), or null when there is none - callers fall
+		// back to 0x08.
+		uint? ConversationAgentInstance { get; set; }
 
 		// #217: the NPC whose conversation was just closed. The client keeps the NPC targeted and reflexively
 		// re-fires the greeting TalkToNpc the instant we close (with NO new SelectDeselect) - which would re-open
 		// the dialogue. Suppress greetings for this handle until the player re-selects the NPC (a SelectDeselect
 		// clears it = fresh intent to talk). 0 = nothing suppressed.
-		uint ConversationEndedNpcHandle { get; set; }
-		uint ConversationNpcHandle { get; set; }
+		// The NPC whose dialogue we just closed, so the client's reflexive post-close greeting is absorbed (#217).
+		// Null once the player re-selects an NPC = genuine intent to talk again.
+		uint? ConversationEndedNpcHandle { get; set; }
+		// The NPC of the ACTIVE dialogue, or null when no conversation is open.
+		uint? ConversationNpcHandle { get; set; }
 
 		// The universal ENERGY pool (the yellow sprint bar, DispatchUpdateSprintbar 0x200E). Tracked server-side so
 		// spellweaving drains from the CURRENT value (not always full) and the server can apply Exhausted at 0. The
@@ -155,7 +161,8 @@ namespace Faolan.Core.Network
 		// nothing is selected (deselect sends a zeroed handle). Session-volatile, like every entity handle. Used by
 		// the .kill GM command to target whatever the player is looking at (the player's own ClientInstance when they
 		// select themselves).
-		uint SelectedTargetHandle { get; set; }
+		// The entity the player last clicked (LookAt / SelectDeselect), or null when nothing is selected.
+		uint? SelectedTargetHandle { get; set; }
 
 		// The base id of the Shield of the Risen protection buff currently shown to this client (#221), or null if
 		// none. Tracked so a playfield change removes the prior shield's icon (retail keeps exactly one active at a
@@ -169,7 +176,7 @@ namespace Faolan.Core.Network
 
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
-		public uint ConversationTypeId { get; set; }
+		public uint? ConversationTypeId { get; set; }
 		public Account Account { get; set; } = null!;
 		public Character Character { get; set; } = null!;
 
@@ -212,9 +219,9 @@ namespace Faolan.Core.Network
 		public string ConversationAnswerPath { get; set; } = null!;
 		public string ConversationNpcName { get; set; } = null!;
 		public uint ActiveCastToken { get; set; }
-		public uint ConversationAgentInstance { get; set; }
-		public uint ConversationEndedNpcHandle { get; set; }
-		public uint ConversationNpcHandle { get; set; }
+		public uint? ConversationAgentInstance { get; set; }
+		public uint? ConversationEndedNpcHandle { get; set; }
+		public uint? ConversationNpcHandle { get; set; }
 		public uint Energy { get; set; }
 		public uint EnergyMax { get; set; }
 		public uint MorphAckCounter { get; set; }
@@ -225,7 +232,7 @@ namespace Faolan.Core.Network
 		// interacts with a bench (the sit animation); cleared when they move off it (standup). See WorldBroadcaster
 		// TrySitOnObject / StandUpIfMoved.
 		public uint? SeatedOnHandle { get; set; }
-		public uint SelectedTargetHandle { get; set; }
+		public uint? SelectedTargetHandle { get; set; }
 
 		public uint? ActiveShieldSpellBase { get; set; }
 

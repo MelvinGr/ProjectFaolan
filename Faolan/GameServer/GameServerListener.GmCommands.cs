@@ -136,7 +136,7 @@ namespace Faolan.GameServer
 			var characterId = client.Session.Character.Id;
 			var arg = (arguments ?? "").Trim();
 			var handle = arg.Length == 0
-				? client.Session.SelectedTargetHandle
+				? client.Session.SelectedTargetHandle ?? 0
 				: TryParseHandle(arg, out var parsed)
 					? parsed
 					: 0;
@@ -411,7 +411,7 @@ namespace Faolan.GameServer
 
 			uint targetHandle;
 			if (arg.Length == 0)
-				targetHandle = client.Session.SelectedTargetHandle;
+				targetHandle = client.Session.SelectedTargetHandle ?? 0;
 			else if (arg.Equals("self", StringComparison.OrdinalIgnoreCase) || arg.Equals("me", StringComparison.OrdinalIgnoreCase))
 				targetHandle = selfHandle;
 			else if (!TryParseHandle(arg, out targetHandle))
@@ -609,7 +609,7 @@ namespace Faolan.GameServer
 		{
 			var characterId = client.Session.Character.Id;
 			var player = _simulation.PlayerWorldEntity(client);
-			var handle = client.Session.SelectedTargetHandle;
+			var handle = client.Session.SelectedTargetHandle ?? 0;
 			if (player == null || handle == 0 || !_simulation.World.ZoneForEntity(player).TryGet(handle, out var npc) || npc.NpcTemplateId == 0)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "Select an NPC first, then .setnpcgroup [&lt;group name&gt;] [clear]  (no arg = the area the NPC stands in).");
@@ -670,7 +670,7 @@ namespace Faolan.GameServer
 		private async Task TargetInfoCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
-			var handle = client.Session.SelectedTargetHandle;
+			var handle = client.Session.SelectedTargetHandle ?? 0;
 			if (handle == 0)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "No target selected - click an NPC/object in-world first, then .target.");

@@ -958,7 +958,7 @@ namespace Faolan.GameServer
 					client.Session.SelectedTargetHandle = targetHandle;
 					// #217: a (re-)select is genuine intent to interact - lift the post-close greeting suppression so a
 					// deliberate re-talk opens (the reflexive post-close greeting carries no SelectDeselect).
-					client.Session.ConversationEndedNpcHandle = 0;
+					client.Session.ConversationEndedNpcHandle = null;
 
 					Logger.LogInformation("SelectDeselect: target 0x{Target:X8} ({Data})", targetHandle, data.ToHex());
 

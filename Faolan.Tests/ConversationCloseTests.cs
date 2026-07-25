@@ -38,8 +38,8 @@ namespace Faolan.Tests
 
 			Assert.Null(client.Session.ConversationAnswerPath);
 			Assert.Null(client.Session.ConversationNpcName);
-			Assert.Equal(0u, client.Session.ConversationTypeId);
-			Assert.Equal(0u, client.Session.ConversationNpcHandle);
+			Assert.Null(client.Session.ConversationTypeId);
+			Assert.Null(client.Session.ConversationNpcHandle);
 			Assert.Empty(client.Sent); // a client-initiated close gets NO reply (the window is already closed)
 		}
 	}
