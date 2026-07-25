@@ -11,6 +11,10 @@ namespace Faolan.Core.Enums
 		RightClickItem = 0x0e,
 		SummonMount = 0xa,
 		UseObject = 0x12, // startobjectaction(18): use a world object (e.g. open a loot bag / chest)
-		TalkToNpc = 0x16 // interacting with / talking to an NPC (opens its conversation)
+		// Interacting with a CHARACTER, and the target decides what it means: an NPC opens its conversation (or its shop
+		// window), a PLAYER is a trade request (#101 - capture login_2-clients_group-trade-friend f1251 -> f1260, where
+		// the same 0x16 at another player produces DispatchRequestTrade). Named TalkToNpc until the trade decode showed
+		// the NPC case is only half of it.
+		InteractWithCharacter = 0x16
 	}
 }

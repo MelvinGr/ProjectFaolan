@@ -64,7 +64,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		// s2c 0x0025 - the presence push, addressed by NAME rather than id (unlike every other message here)
 		public static byte[] BuildPresence(string name)
 		{
-			return new FaolanStream().WriteUInt64(0).WriteUInt32(PresenceStamp).WriteArrayUInt32Length(b => b.WriteByte(PresenceTag).WriteString(name)).ToArray();
+			return new FaolanStream().WriteUInt64(0).WriteUInt32(PresenceStamp).WriteArrayUInt16Length(b => b.WriteByte(PresenceTag).WriteString(name)).ToArray();
 		}
 
 		// c2s 0x0028 / 0x0029 - the character to add or remove.

@@ -33,7 +33,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : RpcServer<ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, IGameServerProvider
+	public partial class GameServerListener : RpcServer<ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, ITradeOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -173,6 +173,9 @@ namespace Faolan.GameServer
 		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
+		// Composed collaborator: the live player-trade sessions - see TradeService.
+		private readonly TradeService _trade;
+
 		// Seam into the CsPlayerAgent listener, which owns the team roster (ICsPlayerAgentProvider).
 		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
 
@@ -234,6 +237,7 @@ namespace Faolan.GameServer
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger, terrain);
 			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
+			_trade = new TradeService(database, logger, this); // player<->player trade (#101); reaches the wire via ITradeOutbound
 			// Constructed before the broadcaster (needs only the sim + DB) so the broadcaster's interest stream can call
 			// into it (Casilda's captive pose) without a construction cycle.
 			_questHandler = new QuestHandlerService(database, _simulation, logger);
@@ -361,6 +365,11 @@ namespace Faolan.GameServer
 				client.Session.IsTeleportingOut = false; // one-shot: only suppress this teleport's disconnect save
 				Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
 			}
+
+			// A trade cannot outlive either connection. Nothing has moved at this point - the exchange only happens on the
+			// double accept - so there is nothing to roll back, just state to drop.
+			if (client.Session.Character is { } tradingCharacter)
+				_trade.Abandon(tradingCharacter.Id);
 
 			// A logout also leaves the team - otherwise the roster keeps a member nobody can reach, and the next join
 			// broadcast pushes at a dead connection. Retail dissolves a one-member team, which TeamService does too.

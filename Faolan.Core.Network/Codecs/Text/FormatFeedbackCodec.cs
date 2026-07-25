@@ -65,6 +65,14 @@ namespace Faolan.Core.Network.Codecs.Text
 			return Encoding.Latin1.GetBytes("<remoteformat token=\"LostGraceEffect\" category=\"100\" key=\"RO5SQlZn.h/DvvaH&#36;WGu\" knubot=\"0\"  ></remoteformat>");
 		}
 
+		// The "trade completed" toast both parties get the instant a player trade commits (#101), immediately after the
+		// empty 0x206D. Verbatim from login_2-clients_group-trade-friend f1335/f1337 - the `key` is a client-validated
+		// content hash, so it cannot be derived or edited.
+		public static byte[] BuildTradeCompletedXml()
+		{
+			return Encoding.Latin1.GetBytes("<remoteformat token=\"TradeCompletedSuccessfully\" category=\"100\" key=\"O?&#36;+s,!?Ry4)b+&#39;?h(_n\" knubot=\"0\"  ></remoteformat>");
+		}
+
 		// The "resurrection point discovered" FIFO banner (#372) - retail's toast when a player walks near a point
 		// they had not found yet. Sent alongside the DispatchValidResurrectionSpots re-send that adds the point to the
 		// player's list (ResurrectionSpotsBody); the banner is what the player actually SEES. Send via

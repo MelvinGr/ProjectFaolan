@@ -78,6 +78,76 @@ namespace Faolan.GameServer
 			return true;
 		}
 
+		// --- ITradeOutbound: the wire side of a player trade. TradeService owns the state machine and reaches the wire
+		// only through this port, addressed by character id because a trade always spans two connections. ---------------
+		Task ITradeOutbound.SendTradeRequest(uint targetId, uint requesterId)
+		{
+			return SendTradeRpc(targetId, GameCharInterfaceOpcodes.DispatchRequestTrade, PlayerTradeCodec.BuildCharacterRef(requesterId));
+		}
+
+		Task ITradeOutbound.SendTradeStarted(uint recipientId, uint partnerId)
+		{
+			return SendTradeRpc(recipientId, GameCharInterfaceOpcodes.DispatchStartTrade, PlayerTradeCodec.BuildCharacterRef(partnerId));
+		}
+
+		Task ITradeOutbound.SendPartnerCash(uint recipientId, ulong tin)
+		{
+			return SendTradeRpc(recipientId, GameCharInterfaceOpcodes.DispatchPartnerUpdatedCash, PlayerTradeCodec.BuildCash(tin));
+		}
+
+		// The same body either way; only the opcode says whose side of the table the item is on.
+		Task ITradeOutbound.SendTradeItem(uint recipientId, Item item, uint slot, uint count, bool mine)
+		{
+			var entry = SnapshotItemBuilder.BuildInventoryEntry(FullPlayerCharacterBuilder.ItemId(recipientId, FullPlayerCharacterBuilder.BagKind, slot), item, 0,
+			[
+				new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, (uint)FullPlayerCharacterBuilder.RecordId(recipientId, FullPlayerCharacterBuilder.BagKind, slot)),
+				new SnapshotItemBuilder.ItemStat(26, count)
+			], item.Level);
+
+			return SendTradeRpc(recipientId, mine
+				? GameCharInterfaceOpcodes.DispatchTradeAddedItem
+				: GameCharInterfaceOpcodes.DispatchTradePartnerAddedItem, PlayerTradeCodec.BuildAddedItem(AddItemBody.SerializeInventoryEntry(entry), count));
+		}
+
+		Task ITradeOutbound.SendAcceptAck(uint recipientId)
+		{
+			// Unnamed in the client's recovered catalog, so it keeps the honest Reserved name; the capture shows its role
+			// unambiguously - it lands on the accepter's own connection, empty, right after their AcceptTrade.
+			return SendTradeRpc(recipientId, GameCharInterfaceOpcodes.Reserved0x206B, []);
+		}
+
+		Task ITradeOutbound.SendPartnerAccepted(uint recipientId, uint partnerId)
+		{
+			return SendTradeRpc(recipientId, GameCharInterfaceOpcodes.DispatchPartnerAcceptedTrade, PlayerTradeCodec.BuildCharacterRef(partnerId));
+		}
+
+		// The empty 0x206D then the toast - retail sends both, in that order, to each party.
+		async Task ITradeOutbound.SendTradeCompleted(uint recipientId)
+		{
+			// Also unnamed in the catalog. It lands on BOTH connections, empty, as the trade commits.
+			await SendTradeRpc(recipientId, GameCharInterfaceOpcodes.Reserved0x206D, []);
+			if (ClientForCharacter(recipientId) is { } client)
+				await SendFeedback(client, Encoding.Latin1.GetString(FormatFeedbackCodec.BuildTradeCompletedXml()));
+		}
+
+		Task ITradeOutbound.SendWalletUpdate(uint characterId, ulong balanceTin)
+		{
+			return ClientForCharacter(characterId) is { } client
+				? SendUpdateCash(client, balanceTin, UpdateCashReason.Spend) // a sync, not a celebrated gain - either side may be down money
+				
+				: Task.CompletedTask;
+		}
+
+		// One place the trade replies are addressed from, so the endpoints cannot drift between them. Silently no-ops for
+		// a character who is not connected here - a partner who vanished mid-trade is TradeService's problem, not the
+		// wire's.
+		private Task SendTradeRpc(uint characterId, GameCharInterfaceOpcodes opcode, byte[] body)
+		{
+			return ClientForCharacter(characterId) is { } client
+				? client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType), opcode, (byte[])[0x01], body))
+				: Task.CompletedTask;
+		}
+
 		private async Task<int> BackpackCapacity(uint characterId)
 		{
 			var equipment = await Database.GetCharacterEquipment(characterId);

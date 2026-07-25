@@ -10,6 +10,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Network.Codecs.Team;
@@ -697,12 +698,22 @@ namespace Faolan.GameServer
 								break;
 							}
 
-							case ActionType.TalkToNpc:
+							case ActionType.InteractWithCharacter:
 							{
 								// The clicked NPC's entity handle rides in the interact args (field 10 / field 2);
 								// (TypeId, Mode, Field3) select the conversation node the client is requesting.
 								var npcHandle = args.Target?.Instance ?? 0;
 								Logger.LogInformation("TalkToNpc: from=0x{From:X}, target=0x{Target:X}, npcHandle=0x{NpcHandle:X}, args={Args}", from, target, npcHandle, args);
+
+								// 0x16 is the generic "interact with a character", so the TARGET decides what it means: an NPC
+								// opens its conversation (below), a PLAYER is a TRADE REQUEST (#101, capture f1251 -> f1260).
+								// A player's handle IS its character id, which is what makes the distinction this cheap.
+								if (npcHandle != client.Session.Character.Id && await Database.GetCharacter(npcHandle) is { })
+								{
+									await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
+									await _trade.Request(client.Session.Character.Id, npcHandle);
+									break;
+								}
 
 								// Vendor trade-open (#134): when the clicked NPC is a shop vendor (matched by NAME - the
 								// stable key), retail answers the interact itself with the trade-select echo + bare BCC
@@ -1326,6 +1337,34 @@ namespace Faolan.GameServer
 
 			switch (opcode)
 			{
+				// --- player trade (#101). The request itself arrives as a BCC (ActionType 0x16 at a PLAYER), handled above;
+				// everything from the window opening onward is these five methods. ------------------------------------
+				case GameCharAgentOpcodes.StartTrade: // 0x2065 - the TARGET opens the window, creating the session
+				{
+					await _trade.Start(client.Session.Character.Id, TeamMessageCodec.ParseCharacterId(body));
+					break;
+				}
+
+				case GameCharAgentOpcodes.SetTradeCash: // 0x2067
+				{
+					await _trade.SetCash(client.Session.Character.Id, body.ReadUInt64());
+					break;
+				}
+
+				// 0x2068 - the SAME method index as the s2c DispatchRequestTrade, on the other interface.
+				case GameCharAgentOpcodes.AddTradeItem:
+				{
+					var request = PlayerTradeCodec.ParseAddItem(body);
+					await _trade.AddItem(client.Session.Character.Id, request.Slot, request.Count);
+					break;
+				}
+
+				case GameCharAgentOpcodes.AcceptTrade: // 0x206B, empty
+				{
+					await _trade.Accept(client.Session.Character.Id);
+					break;
+				}
+
 				// 0x2008 LeaveTeam (no body): a DIFFERENT interface's method 0x2008 than the CS tier's AcceptTeamInvite -
 				// method indices are per interface, so the number collision is expected and must not be unified.
 				case GameCharAgentOpcodes.LeaveTeam:
