@@ -29,13 +29,22 @@ namespace Faolan.Tests.Support
 
 		public static string Path => TestPaths.Asset("corpus-extract.bin");
 
-		// Pinned at the counts of the full 349 MB corpus (104 tshark.json). Regenerating against a SMALLER corpus
-		// fails here rather than passing with fewer packets.
+		// Pinned at the counts of the full 350 MB corpus (104 tshark.json, one per capture). Regenerating against a
+		// SMALLER corpus fails here rather than passing with fewer packets.
+		//
+		// Re-pinned 2026-07-25 when the corpus itself changed in both directions, which is the case this guard's error
+		// message sanctions:
+		//   * a byte-identical DUPLICATE dump was removed - `..._leave_king_conan_castle-Dispmount` was the same
+		//     capture as `...-Dismount` under a typo'd name (2583/2583 identical TimeUtc and BodyHex), dumped before the
+		//     plugin emitted Direction. It cost -1 FullPlayerCharacter, -48 SimpleCharFullUpdate, -1 PlayfieldF.
+		//   * `NecroL80_..._login_cast-general-abilities` had a pcapng but NO dump, so it had never been analysed. It
+		//     adds +8 MoveTask.
+		// A drop with no such explanation is the failure this exists to catch - do not just lower the numbers.
 		private static readonly (uint Iir, int Count)[] ExpectedCounts =
 		[
-			((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, 141), ((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, 10975), ((uint)GameServer0X2000Opcodes.MoveTaskIIR, 10241),
+			((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, 140), ((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, 10927), ((uint)GameServer0X2000Opcodes.MoveTaskIIR, 10249),
 			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, 60), ((uint)GameServer0X2000Opcodes.QuestJournalIIR, 26), ((uint)GameServer0X2000Opcodes.QuestLogListIIR, 40),
-			((uint)GameServer0X2000Opcodes.PlayfieldFIIR, 141), ((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, 1)
+			((uint)GameServer0X2000Opcodes.PlayfieldFIIR, 140), ((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, 1)
 		];
 
 		private static readonly Lazy<List<Entry>> Entries = new(Load);
