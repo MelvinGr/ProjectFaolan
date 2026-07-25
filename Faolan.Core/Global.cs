@@ -31,7 +31,7 @@ namespace Faolan.Core
 		public static readonly string BuildString;
 		public static readonly string StartupBanner;
 
-		// Current UTC unix time as the 32-bit seconds value the wire/DB use (mail/listing timestamps, launch token).
+		public const bool EnableTutorialOverlay = false;
 
 		static Global()
 		{

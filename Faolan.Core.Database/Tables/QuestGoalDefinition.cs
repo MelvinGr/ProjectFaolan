@@ -36,10 +36,10 @@ namespace Faolan.Core.Database.Tables
 
 		public uint QuestDefinitionId { get; set; }
 
-		// For a LootFromNpc goal: the quest item (the "key") the TargetName NPC's corpse bag must contain, as an
+		// For a LootFromNpc goal: the QUEST ITEM the TargetName NPC's corpse bag must contain, as an
 		// Items.Id (#261). NULL = no specific item (the goal still completes on looting the bag - it matches on the
 		// source NPC, not contents). When set, the bag-drop guarantees this item so the player can actually SEE and take
-		// the key (e.g. Scavenger Tuut's bag -> 319224 "Scavenger's Key"). Data-driven: any quest's key item drops the same way.
+		// it (e.g. Scavenger Tuut's bag -> 319224 "Scavenger's Key"). Data-driven: any quest's item drops the same way.
 		public uint? QuestItemId { get; set; }
 
 		[ForeignKey(nameof(QuestItemId))]
@@ -53,7 +53,7 @@ namespace Faolan.Core.Database.Tables
 		// What server-side ACTION advances/completes this goal (Gitea #261). The wire output of a completion is
 		// identical for every type (QuestProgressionService); the type only selects which trigger matches:
 		//   Kill       - a kill of the NPC named TargetName (QuestProgressionService.AdvanceKillGoals).
-		//   LootFromNpc- looting the corpse bag of the NPC named TargetName (LootService); the actual key item is a
+		//   LootFromNpc- looting the corpse bag of the NPC named TargetName (LootService); the actual quest item is a
 		//                quest-specific RDB item we don't materialise, so the bag's SOURCE NPC name is the match key.
 		//   TalkToNpc  - opening the greeting of the NPC named TargetName (ConversationService).
 		//   Escort     - escorting the NPC named TargetName to a destination (not yet wired; Gitea sub-ticket).

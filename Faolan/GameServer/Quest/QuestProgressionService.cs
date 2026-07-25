@@ -56,11 +56,13 @@ namespace Faolan.GameServer.Quest
 			return Advance(client, QuestGoalType.Kill, npcName, templateId);
 		}
 
-		// The player looted `sourceNpcName`'s corpse bag: advance any active loot-from-NPC goal targeting it. The quest
-		// item (the scavenger's key) is RDB content we don't materialise, so the bag's SOURCE NPC name is the match key.
-		public Task AdvanceLootGoals(INetworkClient client, string sourceNpcName)
+		// The player RECEIVED `grantedItemId` out of `sourceNpcName`'s corpse bag: advance the loot-from-NPC goal that
+		// asks for exactly that item from exactly that NPC. Called per granted item, not per loot action - the goal is
+		// satisfied by HOLDING the quest item, not by having opened the bag it was in, so a take that failed to reach the
+		// backpack (full bag - the item goes back) advances nothing.
+		public Task AdvanceLootGoals(INetworkClient client, string sourceNpcName, uint grantedItemId)
 		{
-			return Advance(client, QuestGoalType.LootFromNpc, sourceNpcName);
+			return Advance(client, QuestGoalType.LootFromNpc, sourceNpcName, grantedItemId);
 		}
 
 		// The player opened `npcName`'s greeting: advance any active talk goal targeting it (e.g. freeing Casilda).
@@ -189,12 +191,13 @@ namespace Faolan.GameServer.Quest
 					continue;
 
 				// Match the goal to advance: a kill by the STABLE target template id (TrailingRefId), name as fallback; a
-				// collect by its item id (TrailingRefId); loot/talk/escort by name (the corpse bag's source name, the NPC
-				// greeting's name) - #262.
+				// collect by its item id (TrailingRefId); a LOOT by the bag's source NPC AND the item received; talk/escort
+				// by name (the NPC greeting's name) - #262.
 				var goal = triggerType switch
 				{
 					QuestGoalType.Kill        => QuestProgress.MatchingKillGoal(def.Goals, targetTemplateId, targetName),
 					QuestGoalType.CollectItem => QuestProgress.MatchingCollectGoal(def.Goals, targetTemplateId ?? 0),
+					QuestGoalType.LootFromNpc => QuestProgress.MatchingLootGoal(def.Goals, targetName, targetTemplateId ?? 0),
 					_                         => QuestProgress.MatchingGoal(def.Goals, triggerType, targetName)
 				};
 				if (goal == null)

@@ -171,6 +171,43 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
+		public void MatchingLootGoal_NeedsTheItemTheGoalNames_NotJustTheCorpse()
+		{
+			// #261 Scavenger Tuut: the objective is HOLDING the Scavenger's Key (319224), so taking his other drops off
+			// the same corpse must not solve it. Matching on the source NPC alone did exactly that - and also solved the
+			// quest on emptying a bag that never held it.
+			var goals = new[]
+			{
+				new QuestGoalDefinition
+				{
+					Sequence = 1,
+					GoalId = 3500,
+					GoalType = QuestGoalType.LootFromNpc,
+					TargetName = "Scavenger Tuut",
+					QuestItemId = 319224
+				}
+			};
+
+			Assert.Equal(3500u, QuestProgress.MatchingLootGoal(goals, "scavenger tuut", 319224)?.GoalId); // the quest item, case-insensitive
+			Assert.Null(QuestProgress.MatchingLootGoal(goals, "Scavenger Tuut", 42)); // his corpse, some other item
+			Assert.Null(QuestProgress.MatchingLootGoal(goals, "Scavenger Tuut", 0)); // nothing received (an empty bag)
+			Assert.Null(QuestProgress.MatchingLootGoal(goals, "Scavenger Lackey", 319224)); // the quest item, wrong corpse
+		}
+
+		[Fact]
+		public void MatchingLootGoal_WithoutAQuestItem_MatchesNothing()
+		{
+			// A goal seeded from a capture that never showed the item has nothing to gate on, and the objective is
+			// RECEIVING an item - so it matches nothing rather than accepting any item off that corpse. Both goals in
+			// the game data name theirs; one that does not is a data gap, and the loot path logs it as an error.
+			var goals = new[] { GoalSeq(1, 3600, QuestGoalType.LootFromNpc, "Rock Pile") };
+
+			Assert.Null(QuestProgress.MatchingLootGoal(goals, "Rock Pile", 12345));
+			Assert.Null(QuestProgress.MatchingLootGoal(goals, "Rock Pile", 0));
+			Assert.Null(QuestProgress.MatchingLootGoal(goals, "", 12345)); // no source name -> no match
+		}
+
+		[Fact]
 		public void MatchingKillGoal_PrefersTemplateId_FallsBackToName()
 		{
 			// Shipwrecked 10238 (#262): goal 3490 = kill Saddur (TrailingRefId 9500 = his template); goal 1448 =

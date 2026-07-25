@@ -698,7 +698,7 @@ namespace Faolan.GameServer.World
 		//
 		// Nothing is consumed HERE, not even a bag that reads as empty. A no-drop kill leaves no bag at all
 		// (ConvertCorpseToLoot only spawns one for questDrop || items || cash), so the only bag that can be open and
-		// empty is the QUEST one: a LootFromNpc mob whose goal names no key item drops an empty bag deliberately,
+		// empty is the QUEST one: a LootFromNpc mob whose goal names no quest item drops an empty bag deliberately,
 		// because looting it is what completes the goal (the goal matches on the bag's SOURCE NPC, not its contents).
 		// Consuming that on close would make the quest uncompletable - the player closes the window once and the goal
 		// has nowhere left to be satisfied. Letting it expire instead costs nothing and leaves them a way back.
@@ -728,7 +728,7 @@ namespace Faolan.GameServer.World
 				return; // revived (or never died) before the linger fired - nothing to convert
 
 			// A quest mob the killer needs to LOOT (an active LootFromNpc goal targeting this NPC, #261) ALWAYS leaves a
-			// bag - the "key" must be lootable, not a 50/50 roll. The goal may also name a specific key ITEM (QuestItemId).
+			// bag holding the goal's QUEST ITEM - it must be lootable, not a 50/50 roll.
 			var lootGoalItem = deadNpc.LastAttackerHandle is { } looterHandle
 				? await ActiveLootGoalItemFor(looterHandle, deadNpc.Name)
 				: null;
@@ -738,12 +738,10 @@ namespace Faolan.GameServer.World
 			uint cash;
 			if (questDrop)
 			{
-				// Quest loot mob: the bag holds ONLY the quest key (no random gear/cash), so the objective is unambiguous
-				// - e.g. Scavenger Tuut drops just the Scavenger's Key. An empty key id still drops an (empty) bag whose
-				// SOURCE NPC completes the goal on loot-all.
-				items = lootGoalItem is > 0
-					? [lootGoalItem.Value]
-					: [];
+				// Quest loot mob: the bag holds ONLY the goal's quest item (no random gear/cash), so the objective is
+				// unambiguous - e.g. Scavenger Tuut drops just the Scavenger's Key. ActiveLootGoalItemFor only returns a
+				// value when the goal names one, so there is no empty-quest-bag case to model.
+				items = [lootGoalItem!.Value];
 				cash = 0;
 			}
 			else
@@ -1538,11 +1536,10 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// True if the character (by handle == character id) has an ACTIVE LootFromNpc quest goal targeting `npcName` -
-		// i.e. they need to loot this NPC's corpse for a quest (#261). Drives the guaranteed quest drop above.
-		// The killer's active LootFromNpc goal targeting `npcName`, if any (#261): returns its QuestItemId (the key item
-		// to put in the bag; may be 0 = no specific item), or null when there is no such goal. A non-null result both
-		// forces the bag drop (the key must be lootable, not a 50/50 roll) and names the key item to include.
+		// The QUEST ITEM the killer needs off `npcName`'s corpse - the item id of their active LootFromNpc goal targeting
+		// it (#261), or null when they have no such goal. A non-null result forces the bag drop (the item must be
+		// lootable, not a 50/50 roll) and names what to put in it. Both goals in the game data want an actual key:
+		// Saddur -> 193186 "Acheronian Gate Key", Scavenger Tuut -> 319224 "Scavenger's Key", each item type 113 (Quest).
 		private async Task<uint?> ActiveLootGoalItemFor(uint characterId, string npcName)
 		{
 			if (string.IsNullOrEmpty(npcName))
@@ -1555,8 +1552,21 @@ namespace Faolan.GameServer.World
 
 				var def = await _database.GetQuestDefinition(quest.QuestId);
 				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
-				if (goal is { GoalType: QuestGoalType.LootFromNpc } && string.Equals(goal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
-					return goal.QuestItemId ?? 0u; // 0 = goal present but no specific key item (distinct from null = no goal)
+				if (goal is not { GoalType: QuestGoalType.LootFromNpc } || !string.Equals(goal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
+					continue;
+
+				// A goal that names no item cannot be satisfied: the objective is RECEIVING the item, and there is none
+				// to receive or to match a take against (QuestProgress.MatchingLootGoal). Forcing a bag drop for it just
+				// produced an empty bag that looked lootable and advanced nothing. Every LootFromNpc goal in the data
+				// names its item, so this is a gap in the imported quest rather than a shape to support.
+				if (goal.QuestItemId is not { } questItemId || questItemId == 0)
+				{
+					_logger.LogError("Quest {Quest} goal {Goal} loots '{Npc}' but names no QuestItemId, so it can never complete - the goal needs its item harvested.", quest.QuestId, goal.GoalId,
+						npcName);
+					return null;
+				}
+
+				return questItemId;
 			}
 
 			return null;

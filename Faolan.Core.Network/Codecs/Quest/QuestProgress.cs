@@ -31,6 +31,26 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// that type naming that target. Multi-goal quests can have several goals; a trigger fires the one it matches, not
 		// always goal[0]. Returns null if no goal matches (wrong type/target, or an unsourced target). The Sequence order
 		// makes the choice deterministic when two goals share a type+target (rare).
+		// The LootFromNpc goal a looted item advances (#261). BOTH must match: the bag's source NPC (the goal's
+		// TargetName) and the item the player actually RECEIVED (its QuestItemId). Matching the NPC alone made the goal
+		// fire on taking ANY item off that corpse - and on emptying a bag that never held it - so the quest could
+		// be solved without the player ever holding the thing the objective names.
+		//
+		// A goal with no QuestItemId therefore matches NOTHING, deliberately. Every LootFromNpc goal in the game data
+		// names its item (3492 Saddur -> 193186, 5867 Scavenger Tuut -> 319224), so one without is a data gap, not a
+		// shape to support with a wildcard - and the loot path says so out loud when it meets one
+		// (WorldBroadcaster.ActiveLootGoalItemFor) rather than quietly accepting any item in its place.
+		public static QuestGoalDefinition? MatchingLootGoal(IEnumerable<QuestGoalDefinition> goals, string sourceNpcName, uint grantedItemId)
+		{
+			if (goals == null || string.IsNullOrEmpty(sourceNpcName) || grantedItemId == 0)
+				return null;
+
+			return goals
+				.OrderBy(g => g.Sequence)
+				.FirstOrDefault(g => g.GoalType == QuestGoalType.LootFromNpc && g.QuestItemId == grantedItemId && !string.IsNullOrEmpty(g.TargetName)
+				                     && g.TargetName.Equals(sourceNpcName, StringComparison.OrdinalIgnoreCase));
+		}
+
 		public static QuestGoalDefinition? MatchingGoal(IEnumerable<QuestGoalDefinition> goals, QuestGoalType triggerType, string targetName)
 		{
 			if (goals == null || string.IsNullOrEmpty(targetName))
