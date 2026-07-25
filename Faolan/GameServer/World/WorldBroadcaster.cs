@@ -59,7 +59,11 @@ namespace Faolan.GameServer.World
 		// streaming position syncs at (roughly) the seat position - plus a one-time seat-snap of up to ~1 unit - and
 		// those must NOT be read as "left the bench" (that stood the player straight back up). Only a real walk exceeds
 		// this. Capture: the seated position syncs drift < 1 unit; the player is well past this by the time standup fires.
-		private const float SeatLeaveDistance = 2.0f;
+		// How far from the SEAT the player must get before the server stands them up. Retail's sit capture puts it at
+		// ~1.25: the seated player is parked at Z=620.49 (pkt 6812), wobbles 0.10-0.19 while sitting, then reaches
+		// Z=621.74 and the standup goes out immediately (pkt 6841 -> 6844). 2.0 was too generous to ever fire - in
+		// AssassinL23's bench test the walk-off only reached 1.78 from the seat and the server never stood him up at all.
+		private const float SeatLeaveDistance = 1.0f;
 
 		// The object class the sit remoteformat names (capture: startobjectaction(33)|turnon_execute(4)|TavernBenchSimpleDynel).
 		private const string BenchObjectClass = "TavernBenchSimpleDynel";
@@ -1290,11 +1294,27 @@ namespace Faolan.GameServer.World
 		public async Task StandUpIfMoved(INetworkClient client, Vector3 newPosition)
 		{
 			var handle = client.Session.SeatedOnHandle;
-			if (handle == 0 || Vector3.Distance(newPosition, client.Session.SeatedPosition) < SeatLeaveDistance)
+			if (handle == 0)
+				return;
+
+			// Re-anchor to where the client actually PARKED the character. A bench has several seats (3 on the Old
+			// Tarantia ones), so the sit animation snaps the player to a spot up to ~1.3 units from the position they
+			// clicked at - measuring from the click point spends the whole budget on the snap, in an arbitrary
+			// direction, and is why a real walk-off never crossed the threshold. The first move after sitting is the
+			// parked position (retail's pkt 6812), so anchor there and measure from it.
+			if (!client.Session.SeatedPositionAnchored)
+			{
+				client.Session.SeatedPosition = newPosition;
+				client.Session.SeatedPositionAnchored = true;
+				return;
+			}
+
+			if (Vector3.Distance(newPosition, client.Session.SeatedPosition) < SeatLeaveDistance)
 				return;
 
 			client.Session.SeatedOnHandle = 0;
 			client.Session.SeatedHoldConfirmed = false;
+			client.Session.SeatedPositionAnchored = false;
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
 				return;
@@ -1444,8 +1464,9 @@ namespace Faolan.GameServer.World
 			}
 
 			client.Session.SeatedOnHandle = handle;
-			client.Session.SeatedPosition = player.Position;
+			client.Session.SeatedPosition = player.Position; // provisional - re-anchored to the parked spot on the first move
 			client.Session.SeatedHoldConfirmed = false;
+			client.Session.SeatedPositionAnchored = false;
 			_logger.LogInformation("Sit: {Player} sat on '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name, handle);
 			return true;
 		}

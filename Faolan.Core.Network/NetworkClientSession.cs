@@ -75,6 +75,12 @@ namespace Faolan.Core.Network
 		bool PostMorphBurstSent { get; set; }
 		bool SeatedHoldConfirmed { get; set; }
 
+		// Whether SeatedPosition has been re-anchored to the position the CLIENT reports once seated. A bench has
+		// several seats (3 on the Old Tarantia ones), so the client snaps the character to a spot up to ~1.3 units from
+		// where the player clicked - measuring "has he left the seat" from the click point wastes most of the budget in
+		// the wrong direction. Anchored on the first move after sitting; see WorldBroadcaster.StandUpIfMoved.
+		bool SeatedPositionAnchored { get; set; }
+
 		// True once this connection has completed world entry (the burst-less world entry, the only entry path).
 		// Gates the in-world behaviours that must not fire on a connection that hasn't entered the world: the
 		// 0x2020 -> 0x2008 SpawnCheck responder, the NPC conversation system, and the dialogue-close fallback.
@@ -196,6 +202,8 @@ namespace Faolan.Core.Network
 		// double-send) gets the hold-assert that COMMITS the pose - without answering request #2 the sit-down plays
 		// then reverts after the ~2.6s blend. This gates the assert to fire exactly once per sit.
 		public bool SeatedHoldConfirmed { get; set; }
+
+		public bool SeatedPositionAnchored { get; set; }
 		public bool WorldEntered { get; set; }
 		public byte[] PendingCastArgs { get; set; } = null!;
 
