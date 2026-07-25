@@ -605,6 +605,30 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// A player's STAT change that other players must see - the mount being the case that exposed the gap (#428): the
+		// ride buff was already relayed by SendMagicBuffIir, but the StatUpd carrying Mount/MountSpeed was not, and that
+		// is the half the client renders the horse from. So the actor sat on a mount only on their own screen.
+		//
+		// The stat body names the ENTITY, and the client argument only frames the receiver, so the same block is rebuilt
+		// per viewer - exactly what BroadcastSpellToViewers does with the ApplySpell body. Same #245 gate: never relay
+		// for a handle the viewer's client has not built.
+		public async Task BroadcastStatsToViewers(INetworkClient actor, CharacterStatBlock stats)
+		{
+			var entity = _sim.PlayerWorldEntity(actor);
+			if (entity == null)
+				return;
+
+			foreach (var viewer in _sim.World.ZoneForEntity(entity).Entities)
+			{
+				if (!viewer.IsPlayer || viewer.Handle == entity.Handle || viewer.Client == null)
+					continue;
+				if (!viewer.Known.Contains(entity.Handle))
+					continue;
+
+				await viewer.Client.SendAsync(GameServerListener.BuildStatUpdate(viewer.Client, stats, entity.Handle));
+			}
+		}
+
 		// #398: builds the in-range NPC spawns for the world-ENTRY BURST - the close NPCs retail ships in the burst
 		// BEFORE the client's first move (fr64-75 in the Hoxxling beach login capture), instead of dribbling them out
 		// as a post-load interest volley. Each is SEEDED into the entering player's Known set so the interest layer
