@@ -168,9 +168,10 @@ fixed `0x000D`, which left every push for any other name malformed.
 **Presence must be PUSHED on login and logout.** After restoring its own list, a character's entry is re-sent to every
 online character who has it on theirs (`0x0014` + `0x0028`), and again with `online = 0` when it disconnects. Without
 this a friend's status is frozen at whatever it was when the WATCHER logged in - whoever connects first sees the other
-as offline forever, because the restore can only report who is already connected - and a panel that hides offline
-friends then looks empty even though the entry exists (the client's right-click menu offers "remove from friends list"
-for a friend it will not display). The reverse lookup this needs is a genuinely different query from the forward one,
+as offline forever, because the restore can only report who is already connected - and **the client hides offline friends**
+(confirmed in-client), so the panel looks EMPTY even though the entry exists - while the right-click menu still offers
+"remove from friends list" for the friend it will not display. That gap between "the client knows the entry" and "the
+client shows it" is the tell. The reverse lookup this needs is a genuinely different query from the forward one,
 because the list is one-sided. ⚠️ The MESSAGE is the captured one; the TRIGGER is inferred - no capture covers a friend
 logging in or out while someone watches. Verified in-client 2026-07-25.
 

@@ -61,13 +61,10 @@ namespace Faolan.Core.Network.Codecs.Text
 			return new FaolanStream().WriteUInt32(characterId).ToArray();
 		}
 
-		// s2c 0x0025 - the presence push, addressed by NAME rather than id (unlike every other message here). The u16 is
-		// the LENGTH of what follows it: the tag byte plus the length-prefixed name, so nameLen + 3. It was read as a
-		// constant 0x000D off a single 10-character name, which left every push for any other name malformed (verified
-		// across five names: 6 -> 9, 10 -> 13, 7 -> 10, 6 -> 9, 8 -> 11).
+		// s2c 0x0025 - the presence push, addressed by NAME rather than id (unlike every other message here)
 		public static byte[] BuildPresence(string name)
 		{
-			return new FaolanStream().WriteUInt64(0).WriteUInt32(PresenceStamp).WriteUInt16(name.Length + 3).WriteByte(PresenceTag).WriteString(name).ToArray();
+			return new FaolanStream().WriteUInt64(0).WriteUInt32(PresenceStamp).WriteArrayUInt32Length(b => b.WriteByte(PresenceTag).WriteString(name)).ToArray();
 		}
 
 		// c2s 0x0028 / 0x0029 - the character to add or remove.
