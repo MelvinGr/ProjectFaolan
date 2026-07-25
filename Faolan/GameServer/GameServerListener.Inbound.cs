@@ -1346,9 +1346,22 @@ namespace Faolan.GameServer
 				case GameCharAgentOpcodes.RequestTeamInvite:
 				{
 					var subject = TeamMemberRecord.Read(body);
+
 					if (await Database.GetCharacter(subject.CharacterId) is { } character)
-						await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchReplyTeamInvite,
-							TeamMessageCodec.BuildReplyInvite(TeamMessageCodec.MemberOf(character))));
+						// Two things about the header, both of which cost an invite window when missed:
+						//
+						// The SENDER is the GameCharAgent object (f683: class GameCharAgent, instance 0x10), not the
+						// world sender this file usually replies from - a reply belongs to the interface pair its
+						// request arrived on.
+						//
+						// And it carries the trailing headerData 0x01, as KeepAliveService's DispatchPong on this same
+						// interface does. Retail puts it on this reply (f682 and f683 both carry it) while the CS-tier
+						// invite dispatches carry none, and the client DISCARDS the reply without it: it accepted our
+						// invite record, echoed it back in RequestTeamInvite, and then never raised the window - and
+						// still did not when fed retail's own captured bytes, because the bytes were never the problem.
+						await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType),
+							GameCharInterfaceOpcodes.DispatchReplyTeamInvite, (byte[])[0x01],
+							TeamMessageCodec.BuildReplyInvite(TeamMessageCodec.MemberOf(character, GetCharacterLiveState(character.Id)?.MapId ?? character.MapId))));
 
 					break;
 				}

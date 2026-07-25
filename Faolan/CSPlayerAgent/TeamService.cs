@@ -34,11 +34,10 @@ namespace Faolan.CSPlayerAgent
 		// client, only its identity matters.
 		private const uint FirstTeamId = 0x00500000;
 
-		// The s2c endpoints for a CsPlayerAgent PUSH - a team event reaching a member who did not just send a
-		// request, so there is no incoming packet to echo. Same reasoning as GuildService's: every request carries
-		// the same endpoint pair, so a push can reuse what a reply would have echoed.
+		// The SENDER of every CsPlayerAgent s2c packet: the guild/team server object. Instance 0x04 is what retail
+		// stamps (0x04 on the two-client capture and the Hoxxling login, 0x52 on one create session - an arbitrary
+		// server handle, not session data).
 		private static readonly ProtoEndpoint PushSender = Endpoints.Endpoint(Endpoints.CSPlayerAgentType, 0x04);
-		private static readonly ProtoEndpoint PushReceiver = Endpoints.Endpoint(Endpoints.CSPlayerInterfaceType, 0);
 
 		private readonly ConcurrentDictionary<uint, uint> _teamByCharacter = [];
 
@@ -57,11 +56,17 @@ namespace Faolan.CSPlayerAgent
 			_csClientForCharacter = clientForCharacter;
 		}
 
-		// A team member is ONLINE by definition, so its row comes from the live session rather than the DB - which is
-		// also what keeps level and map current without a reload.
+		// A team member is ONLINE by definition, so its row comes from the live session rather than the DB.
 		private Character? CharacterOf(uint characterId)
 		{
 			return _csClientForCharacter(characterId)?.Session.Character;
+		}
+
+		// The member record, stamped with the member's LIVE playfield from the world listener rather than the
+		// Character.MapId column, which only updates at save points - see TeamMessageCodec.MemberOf.
+		private TeamMemberRecord MemberOf(Character character)
+		{
+			return TeamMessageCodec.MemberOf(character, _gameServerDispatcher.GetCharacterLiveState(character.Id)?.MapId ?? character.MapId);
 		}
 
 		// 0x2009 DeclineTeamInvite: forget the pending invite. Retail puts nothing on the wire for it.
@@ -99,8 +104,9 @@ namespace Faolan.CSPlayerAgent
 
 			_pendingInvites[target.Id] = inviter.Id;
 
-			await Send(inviterClient, CSPlayerInterfaceOpcodes.DispatchYouInvitedToTeam, TeamMessageCodec.BuildMemberOnly(TeamMessageCodec.MemberOf(target)));
-			await Push(target.Id, CSPlayerInterfaceOpcodes.DispatchTeamInvite, TeamMessageCodec.BuildInvite(TeamMessageCodec.MemberOf(inviter)));
+			await Send(inviterClient, CSPlayerInterfaceOpcodes.DispatchYouInvitedToTeam, TeamMessageCodec.BuildMemberOnly(MemberOf(target)));
+
+			await Push(target.Id, CSPlayerInterfaceOpcodes.DispatchTeamInvite, TeamMessageCodec.BuildInvite(MemberOf(inviter)));
 			_logger.LogInformation("Team: {Inviter} invited {Target}.", inviter.Name, target.Name);
 		}
 
@@ -125,7 +131,7 @@ namespace Faolan.CSPlayerAgent
 			_teamByCharacter[accepterId] = team.Id;
 
 			await BroadcastRoster(team);
-			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchTeamJoin, TeamMessageCodec.BuildTeamMemberEvent(team.Id, TeamMessageCodec.MemberOf(accepter)));
+			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchTeamJoin, TeamMessageCodec.BuildTeamMemberEvent(team.Id, MemberOf(accepter)));
 			await PushMembership(team, accepterId, true);
 			_logger.LogInformation("Team 0x{Team:X8}: {Character} joined ({Count} member(s), leader {Leader}).", team.Id, accepter.Name, team.Members.Count, inviter.Name);
 		}
@@ -153,7 +159,7 @@ namespace Faolan.CSPlayerAgent
 			}
 
 			if (CharacterOf(targetId) is { } target)
-				await Push(targetId, CSPlayerInterfaceOpcodes.DispatchYouGotKickedFromTeam, TeamMessageCodec.BuildMemberOnly(TeamMessageCodec.MemberOf(target)));
+				await Push(targetId, CSPlayerInterfaceOpcodes.DispatchYouGotKickedFromTeam, TeamMessageCodec.BuildMemberOnly(MemberOf(target)));
 
 			await Remove(targetId, CSPlayerInterfaceOpcodes.DispatchTeamLeave, "was kicked");
 			return true;
@@ -174,7 +180,7 @@ namespace Faolan.CSPlayerAgent
 			{
 				// The leaver is told too - retail sends DispatchTeamLeave to the whole former roster, not just those
 				// remaining, so the leaver's own client closes its team window.
-				var body = TeamMessageCodec.BuildTeamMemberEvent(team.Id, TeamMessageCodec.MemberOf(leaver));
+				var body = TeamMessageCodec.BuildTeamMemberEvent(team.Id, MemberOf(leaver));
 				await Broadcast(team, opcode, body);
 				await Push(characterId, opcode, body);
 			}
@@ -187,7 +193,7 @@ namespace Faolan.CSPlayerAgent
 			{
 				team.LeaderId = team.Members[0];
 				if (CharacterOf(team.LeaderId) is { } newLeader)
-					await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchSetNewTeamLeader, TeamMessageCodec.BuildTeamMemberEvent(team.Id, TeamMessageCodec.MemberOf(newLeader)));
+					await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchSetNewTeamLeader, TeamMessageCodec.BuildTeamMemberEvent(team.Id, MemberOf(newLeader)));
 			}
 
 			_logger.LogInformation("Team 0x{Team:X8}: {Character} {Why} ({Count} member(s) left).", team.Id, leaver?.Name ?? $"0x{characterId:X8}", why, team.Members.Count);
@@ -204,7 +210,7 @@ namespace Faolan.CSPlayerAgent
 				team.Remove(last);
 				_teamByCharacter.TryRemove(last, out _);
 				if (CharacterOf(last) is { } member)
-					await Push(last, CSPlayerInterfaceOpcodes.DispatchTeamLeave, TeamMessageCodec.BuildTeamMemberEvent(team.Id, TeamMessageCodec.MemberOf(member)));
+					await Push(last, CSPlayerInterfaceOpcodes.DispatchTeamLeave, TeamMessageCodec.BuildTeamMemberEvent(team.Id, MemberOf(member)));
 
 				await _gameServerDispatcher.SendGroupMembership(last, last, team.Id, 0, false);
 			}
@@ -217,7 +223,7 @@ namespace Faolan.CSPlayerAgent
 		private async Task BroadcastRoster(LiveTeam team)
 		{
 			var ordered = team.Members.OrderByDescending(id => id == team.LeaderId).ToList();
-			var records = ordered.Select(CharacterOf).OfType<Character>().Select(TeamMessageCodec.MemberOf).ToList();
+			var records = ordered.Select(CharacterOf).OfType<Character>().Select(c => MemberOf(c)).ToList();
 			if (records.Count == 0)
 				return;
 
@@ -266,9 +272,14 @@ namespace Faolan.CSPlayerAgent
 				await Send(client, opcode, body);
 		}
 
+		// ⚠️ The RECEIVER is the recipient's OWN CSPlayerInterface instance - its character id - never instance 0.
+		// Retail addresses every one of these that way (f678 -> the inviter's id, f680 -> the target's), and it is how
+		// the client routes the packet to the right interface object: a push addressed to instance 0 arrives and is
+		// dropped, which is why the invited client received DispatchTeamInvite, answered it with RequestTeamInvite, and
+		// still showed no invite window.
 		private static Task Send(INetworkClient client, CSPlayerInterfaceOpcodes opcode, byte[] body)
 		{
-			return client.SendAsync(new Rpc(PushSender, PushReceiver, (ushort)opcode, body));
+			return client.SendAsync(new Rpc(PushSender, client.Endpoint(Endpoints.CSPlayerInterfaceType), (ushort)opcode, body));
 		}
 
 		// One live team. Members is a snapshot-on-write list so a broadcast can iterate it while another connection

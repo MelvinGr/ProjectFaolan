@@ -9,14 +9,14 @@ namespace Faolan.Core.Network.Codecs.Text
 	// is why the codec sits beside the other chat-text codecs.
 	//
 	//   c2s 0x0028  [u32 characterId]                                       add
-	//   s2c 0x0028  [u32 characterId][u8 online][u8 5][u32 stamp][u8 level]  the added friend's state
+	//   s2c 0x0028  [u32 characterId][u8 online][u8 5][u32 stamp][u8 classId]  the added friend's state
 	//   c2s 0x0029  [u32 characterId]                                       remove
 	//   s2c 0x0029  [u32 characterId]                                       echoed back
 	//   s2c 0x0025  [u64 0][u32 stamp][u16][u8][u16 len][name]              presence push, BY NAME
 	//
 	// One-sided with no accept handshake, so there is no invite state machine: an add is a write plus a presence
 	// subscription. The add reply is also what pins the team member record's LEVEL field - its trailing byte is the
-	// same character's level (0x2C/44, 0x29/41 for the two captured players).
+	// same character's classId (0x2C/44, 0x29/41 for the two captured players).
 	public static class FriendListCodec
 	{
 		// Carried in the add reply and the presence push. 0x01EDA8B2 is the same value the team member record has at
@@ -28,9 +28,9 @@ namespace Faolan.Core.Network.Codecs.Text
 
 		// s2c 0x0028 - the state of the friend just added. `online` is 1 in every captured reply (you can only add a
 		// character the chat server can resolve); `field` is the same 5 the team member record carries.
-		public static byte[] BuildAddReply(uint characterId, bool online, byte level, byte field = 5, uint stamp = AddReplyStamp)
+		public static byte[] BuildAddReply(uint characterId, bool online, byte classId, byte field = 5, uint stamp = AddReplyStamp)
 		{
-			return new FaolanStream().WriteUInt32(characterId).WriteByte(online).WriteByte(field).WriteUInt32(stamp).WriteByte(level).ToArray();
+			return new FaolanStream().WriteUInt32(characterId).WriteByte(online).WriteByte(field).WriteUInt32(stamp).WriteByte(classId).ToArray();
 		}
 
 		// s2c 0x0029 - the removal, echoed back verbatim.

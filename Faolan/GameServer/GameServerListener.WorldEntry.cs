@@ -886,13 +886,13 @@ namespace Faolan.GameServer
 					: thisXp; // only the final level carries partial XP
 				ReadOnlySpan<uint> deltas = [currentXp, thisXp, nextXp, 1u, 8u, 0u];
 
-				await SendWorldIir(client, NewLevelIirCodec.Build(instance, lvl, deltas));
+				await WorldIir.SendFramed(client, NewLevelIirCodec.Build(instance, lvl, deltas));
 
 				// The combos this class unlocks AT this level, from the class<->combo ACCESS map (ClassCombo) - retail
 				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the old
 				// class-independent level-keyed catalog (casters have no rows); empty until populated from dumps.
 				foreach (var combo in await Database.GetClassCombosUnlockedBetween(@class, lvl - 1, lvl))
-					await SendWorldIir(client, ComboBookIirCodec.Build(instance, combo.Id));
+					await WorldIir.SendFramed(client, ComboBookIirCodec.Build(instance, combo.Id));
 			}
 		}
 

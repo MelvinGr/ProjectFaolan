@@ -14,8 +14,13 @@ namespace Faolan.Core.Network.Codecs.Team
 	//   AddToGroupIIR      [ProtoID32 member][u8 0][ProtoID32 team][ProtoID32 leader]   29-byte body
 	//   RemoveFromGroupIIR [ProtoID32 member][u8 0][ProtoID32 team]                     21-byte body
 	//
-	// Both bodies start at the iirType: the carrier's [u32 len] prefix is added by the sender (SendWorldIir), which
-	// is the convention the other world-IIR builders that go out that way follow.
+	// Both builders emit the WHOLE carrier payload - [u32 len][u32 iirType][record] - as WorldObjectBuilder.Build does,
+	// so the bytes here are directly comparable to the captured packet.
+	//
+	// ⚠️ There are TWO SendWorldIir helpers with OPPOSITE contracts: WorldBroadcaster's private one wraps what you give
+	// it in the [u32 len] prefix, while GameServerListener.Outbound's sends the body verbatim. Emitting a prefix-less
+	// record through the listener's one puts the IIR TYPE where the client reads a length - it read 0x0DF44B73 as a
+	// 234 MB payload and dropped the connection, killing BOTH clients in the team the instant the roster went out.
 	public static class GroupMembershipCodec
 	{
 		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.AddToGroupIIR, GameServer0X2000Opcodes.RemoveFromGroupIIR];
@@ -23,15 +28,15 @@ namespace Faolan.Core.Network.Codecs.Team
 		// A member JOINED `teamId`, whose leader is `leaderId`.
 		public static byte[] BuildAdd(uint memberId, uint teamId, uint leaderId)
 		{
-			return new FaolanStream().WriteUInt32((uint)GameServer0X2000Opcodes.AddToGroupIIR).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(memberId).WriteByte(0)
-				.WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(leaderId).ToArray();
+			return new FaolanStream().WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.AddToGroupIIR).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(memberId)
+				.WriteByte(0).WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(leaderId)).ToArray();
 		}
 
 		// A member LEFT `teamId` (left, was kicked, or the team dissolved).
 		public static byte[] BuildRemove(uint memberId, uint teamId)
 		{
-			return new FaolanStream().WriteUInt32((uint)GameServer0X2000Opcodes.RemoveFromGroupIIR).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(memberId).WriteByte(0)
-				.WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId).ToArray();
+			return new FaolanStream().WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.RemoveFromGroupIIR).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(memberId)
+				.WriteByte(0).WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId)).ToArray();
 		}
 	}
 }

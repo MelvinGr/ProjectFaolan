@@ -146,7 +146,7 @@ namespace Faolan.GameServer.World
 			foreach (var obj in _sim.World.ZoneForEntity(player).WorldObjects)
 			{
 				if (obj.Row.EffectQuestId is { } eq && held.Contains(eq))
-					await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(obj.Handle, obj.Row.EffectDynelState));
+					await WorldIir.Send(client, SimpleDynelMessageCodec.BuildVisualChange(obj.Handle, obj.Row.EffectDynelState));
 			}
 		}
 
@@ -303,7 +303,7 @@ namespace Faolan.GameServer.World
 			// (the srcPos it dragged), echoed in the trailing u32 (decoded from loot-drag-1538). The client removes that
 			// slot and compacts; a partial take leaves the bag open with its remaining items - NO re-render (re-sending
 			// the full object stacked a second window). Loot-all passes removedPos 0 (matches the captured loot-all ACK).
-			await SendWorldIir(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle, removedPos));
+			await WorldIir.Send(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle, removedPos));
 
 			if (bag.LootItems.Any(i => i != 0) || bag.CashTin > 0)
 				return; // items/coins remain (0 = a drag-looted slot) - keep the bag open; client drives close (0x2044)
@@ -312,10 +312,10 @@ namespace Faolan.GameServer.World
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchCloseLootBag,
 				b => b.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
-			await SendWorldIir(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle));
-			await SendWorldIir(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewAllowedLooterIIR, bag.Handle));
-			await SendWorldIir(client, WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, bag.Handle, WorldLoot.DefaultFadeSeconds));
-			await SendWorldIir(client, WorldLoot.BuildBagConsumedVisualBody(bag.Handle));
+			await WorldIir.Send(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle));
+			await WorldIir.Send(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewAllowedLooterIIR, bag.Handle));
+			await WorldIir.Send(client, WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, bag.Handle, WorldLoot.DefaultFadeSeconds));
+			await WorldIir.Send(client, WorldLoot.BuildBagConsumedVisualBody(bag.Handle));
 
 			_sim.World.ZoneForEntity(bag).Remove(bag.Handle);
 			_logger.LogInformation("Loot: bag 0x{Handle:X8} fully looted; consumed + faded.", bag.Handle);
@@ -356,7 +356,7 @@ namespace Faolan.GameServer.World
 				if (!viewer.Known.Contains(entity.Handle))
 					continue; // only players who already see the actor (their client has the handle)
 
-				await SendWorldIir(viewer.Client, body);
+				await WorldIir.Send(viewer.Client, body);
 			}
 		}
 
@@ -406,8 +406,8 @@ namespace Faolan.GameServer.World
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
 				{
-					await SendWorldRecord(viewer.Client, hate);
-					await SendWorldRecord(viewer.Client, threat);
+					await WorldIir.SendFramed(viewer.Client, hate);
+					await WorldIir.SendFramed(viewer.Client, threat);
 				}
 			}
 		}
@@ -428,7 +428,7 @@ namespace Faolan.GameServer.World
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
-					await SendWorldIir(viewer.Client, body);
+					await WorldIir.Send(viewer.Client, body);
 			}
 		}
 
@@ -437,7 +437,7 @@ namespace Faolan.GameServer.World
 		public async Task BroadcastNpcHeartbeat(WorldEntity npc)
 		{
 			// The short-form BehaviorControlCenterIIR idle pulse (#225), carrying the NPC's monotonic per-entity tick. The
-			// codec output is the bare IIR record (no length prefix), so it rides SendWorldIir - the same framing as the
+			// codec output is the bare IIR record (no length prefix), so it rides WorldIir.Send - the same framing as the
 			// MoveTask above - which adds the carrier's [u32 length]. Gated on CONFIRMED (not Known) so a still-loading
 			// viewer - which has the handle in Known but not Confirmed - is never sent a pulse for an unbuilt dynel.
 			var record = BehaviorHeartbeatCodec.Build(npc.Handle, ++npc.HeartbeatTick);
@@ -445,7 +445,7 @@ namespace Faolan.GameServer.World
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Confirmed.Contains(npc.Handle))
-					await SendWorldIir(viewer.Client, record);
+					await WorldIir.Send(viewer.Client, record);
 			}
 		}
 
@@ -469,7 +469,7 @@ namespace Faolan.GameServer.World
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
-					await SendWorldIir(viewer.Client, body);
+					await WorldIir.Send(viewer.Client, body);
 			}
 		}
 
@@ -509,7 +509,7 @@ namespace Faolan.GameServer.World
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
-					await SendWorldRecord(viewer.Client, record);
+					await WorldIir.SendFramed(viewer.Client, record);
 			}
 		}
 
@@ -601,7 +601,7 @@ namespace Faolan.GameServer.World
 				if (!viewer.Known.Contains(entity.Handle))
 					continue; // only players who already see the caster (their client has the handle)
 
-				await SendWorldIir(viewer.Client, body);
+				await WorldIir.Send(viewer.Client, body);
 			}
 		}
 
@@ -1046,8 +1046,8 @@ namespace Faolan.GameServer.World
 
 			var obj = live.Row;
 
-			await SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x05));
-			await SendWorldIir(client, WorldLoot.BuildOpenWindowBody(SimpleDynelMessageCodec.VisualChangeTypeTag, handle, "object_open"));
+			await WorldIir.Send(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x05));
+			await WorldIir.Send(client, WorldLoot.BuildOpenWindowBody(SimpleDynelMessageCodec.VisualChangeTypeTag, handle, "object_open"));
 			_logger.LogInformation("Object: {Player} opened '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name ?? WorldObjectDisplay.Build(obj) ?? "object", handle);
 			return true;
 		}
@@ -1323,7 +1323,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			var body = BehaviorAnimationCodec.PlayerStandUp(player.Handle, handle, BehaviorAnimationCodec.StandRemoteformat());
-			await SendWorldIir(client, body);
+			await WorldIir.Send(client, body);
 			await BroadcastBehaviorToViewers(client, body);
 			_logger.LogInformation("Sit: {Player} stood up from 0x{Handle:X8}.", player.Name, handle);
 		}
@@ -1446,7 +1446,7 @@ namespace Faolan.GameServer.World
 				if (!client.Session.SeatedHoldConfirmed)
 				{
 					var assert = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqObjectHold, handle);
-					await SendWorldIir(client, assert);
+					await WorldIir.Send(client, assert);
 					await BroadcastBehaviorToViewers(client, assert);
 					client.Session.SeatedHoldConfirmed = true;
 					_logger.LogInformation("Sit: {Player} hold-confirmed on 0x{Handle:X8}.", player.Name, handle);
@@ -1463,7 +1463,7 @@ namespace Faolan.GameServer.World
 
 			foreach (var body in new[] { holdEcho, sit })
 			{
-				await SendWorldIir(client, body);
+				await WorldIir.Send(client, body);
 				await BroadcastBehaviorToViewers(client, body);
 			}
 
@@ -1854,7 +1854,7 @@ namespace Faolan.GameServer.World
 				// packet is a loot-PERMISSION grant, so it names the bag's OWNER (the killer / spawning player), not the
 				// recipient - a drop belongs to whoever earned it. Fall back to the viewer when there's no owner
 				// so the bag still renders.
-				await SendWorldIir(viewer.Client, WorldLoot.BuildNewAllowedLooterBody(handle, allowedLooterHandle != 0
+				await WorldIir.Send(viewer.Client, WorldLoot.BuildNewAllowedLooterBody(handle, allowedLooterHandle != 0
 					? allowedLooterHandle
 					: viewer.Handle));
 			}
@@ -1867,7 +1867,7 @@ namespace Faolan.GameServer.World
 		// Live-only: the static DB object re-streams on the next zone load (it respawns, retail-style).
 		public static Task HidePickupObject(INetworkClient client, uint handle)
 		{
-			return SendWorldIir(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x09));
+			return WorldIir.Send(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x09));
 		}
 
 		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken
@@ -2040,15 +2040,15 @@ namespace Faolan.GameServer.World
 		// patrol client-side - the server sends the route once per spawn/respawn, not a per-tick step). The anchor /
 		// current position is the NPC's live spawn position (the render-gate requires the MoveTask position to match
 		// the spawn it was just sent); the waypoints are the absolute captured world coords. BuildPatrol emits a
-		// self-contained record (it prepends its own [u32 len]), so it rides SendWorldRecord, not SendWorldIir.
+		// self-contained record (it prepends its own [u32 len]), so it rides WorldIir.SendFramed, not WorldIir.Send.
 		private static Task SendPatrol(INetworkClient recipient, WorldEntity npc)
 		{
 			if (!npc.Patrols)
 				return Task.CompletedTask;
 
 			// Replay the captured MoveTask record (already re-addressed to this NPC's handle + spawn position). Encode
-			// emits a bare 0x2000 body (no length prefix), so it rides SendWorldIir.
-			return SendWorldIir(recipient, npc.PatrolBody);
+			// emits a bare 0x2000 body (no length prefix), so it rides WorldIir.Send.
+			return WorldIir.Send(recipient, npc.PatrolBody);
 		}
 
 		// DispatchSetQuestMarker body: [u32 0xC350][u32 npcHandle][u8 state], on the GameCharInterface dispatch
@@ -2070,12 +2070,6 @@ namespace Faolan.GameServer.World
 
 		// Frames a raw 0x2000 IIR body on the world conversation to one recipient (the generic single-recipient send the
 		// dedicated builders share - e.g. the NPC MoveTask chase step).
-		private static Task SendWorldIir(INetworkClient recipient, byte[] body)
-		{
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(body)));
-		}
-
 		// Forwards a player's Move to `recipient` (same body - the moving entity's handle + transform - only the
 		// receiver differs), so the recipient sees the subject move.
 		private static Task SendWorldMove(INetworkClient recipient, MoveForward move)
@@ -2089,14 +2083,6 @@ namespace Faolan.GameServer.World
 					.WriteVector3(move.Position)
 					.WriteVector3(move.Rotation)
 					.WriteArray(move.Tail))));
-		}
-
-		// Sends a SELF-CONTAINED IIR record (one whose builder already prepends the [u32 len] prefix, e.g. the
-		// ChatText/Knubot/dead-reckoning codecs) - written verbatim, NOT re-wrapped with another length (which would
-		// double-prefix it). Mirrors ChatTextSender. Use SendWorldIir for bare bodies (MoveTask/loot/vitals).
-		private static Task SendWorldRecord(INetworkClient recipient, byte[] record)
-		{
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, record));
 		}
 
 		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.

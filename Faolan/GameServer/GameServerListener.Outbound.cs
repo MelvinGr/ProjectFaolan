@@ -72,7 +72,7 @@ namespace Faolan.GameServer
 			if (client?.Session.Account == null)
 				return false;
 
-			await SendWorldIir(client, joined
+			await WorldIir.SendFramed(client, joined
 				? GroupMembershipCodec.BuildAdd(memberId, teamId, leaderId)
 				: GroupMembershipCodec.BuildRemove(memberId, teamId));
 			return true;
@@ -468,9 +468,5 @@ namespace Faolan.GameServer
 		}
 
 		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
-		private static Task SendWorldIir(INetworkClient client, byte[] body)
-		{
-			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, body));
-		}
 	}
 }

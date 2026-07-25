@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Codecs.Text;
@@ -12,42 +13,43 @@ namespace Faolan.Tests
 	// sides in one file. The hex below is RETAIL's, lifted straight from that capture by frame number; the grammar is
 	// validated independently to each packet's exact end by tools/capture/decode_team_trade_friend.py.
 	//
-	// The two captured players are 0x01317CF8 (level 41) and 0x013184AE (level 44), both in map 4020. Their NAMES
+	// The two captured players are 0x01317CF8 (a Necromancer) and 0x013184AE (a Demonologist), both in map 4020 -
+	// their classes are what the record's leading trailing-field carries, 0x29 and 0x2C. Their NAMES
 	// appear below only because they are inside the bytes being asserted - the same exemption the other
 	// captured-name goldens carry (a pseudonym would change the string length and shift every length prefix).
 	public class TeamTradeFriendCodecTests
 	{
 		// The member descriptor as retail sent it, from DispatchYouInvitedToTeam (f678) and DispatchTeamInvite (f680).
-		private const string LevelFortyFourMemberHex = "0000c350013184ae000a53747269636b656e6e650000002c0000000500000fb400000003000000000000000600000000000001620000c79c00000fb4" +
+		private const string DemonologistMemberHex = "0000c350013184ae000a53747269636b656e6e650000002c0000000500000fb400000003000000000000000600000000000001620000c79c00000fb4" +
 		                                           "0000000000000000000000000000000100009c5001eda8b2000000030159ea5c54000000000000000000";
 
-		private const string LevelFortyOneMemberHex = "0000c35001317cf8000a4a6e6275657674666b6a000000290000000500000fb400000002000000000000000600000000000001620000c79c00000fb4" +
+		private const string NecromancerMemberHex = "0000c35001317cf8000a4a6e6275657674666b6a000000290000000500000fb400000002000000000000000600000000000001620000c79c00000fb4" +
 		                                           "0000000000000000000000000000000100009c5001eda8b200000181813bc035ec000000000000000000";
 
-		private static TeamMemberRecord LevelFortyFour()
+		private static TeamMemberRecord Demonologist()
 		{
 			return new TeamMemberRecord
 			{
 				CharacterId = 0x013184AE,
 				Name = "Strickenne",
-				Level = 44,
+				Class = Class.Demonologist,
 				MapId = 4020,
-				Archetype = 3,
+				PerCharacterWord = 3,
 				OpaqueA = 3,
 				OpaqueB = 0x0159EA5C,
 				OpaqueC = 0x54
 			};
 		}
 
-		private static TeamMemberRecord LevelFortyOne()
+		private static TeamMemberRecord Necromancer()
 		{
 			return new TeamMemberRecord
 			{
 				CharacterId = 0x01317CF8,
 				Name = "Jnbuevtfkj",
-				Level = 41,
+				Class = Class.Necromancer,
 				MapId = 4020,
-				Archetype = 2,
+				PerCharacterWord = 2,
 				OpaqueA = 0x181,
 				OpaqueB = 0x813BC035,
 				OpaqueC = 0xEC
@@ -55,8 +57,8 @@ namespace Faolan.Tests
 		}
 
 		[Theory]
-		[InlineData(LevelFortyFourMemberHex, "Strickenne")] // name = captured bytes
-		[InlineData(LevelFortyOneMemberHex, "Jnbuevtfkj")] // name = captured bytes
+		[InlineData(DemonologistMemberHex, "Strickenne")] // name = captured bytes
+		[InlineData(NecromancerMemberHex, "Jnbuevtfkj")] // name = captured bytes
 		public void MemberRecord_RoundTripsCapturedBytes(string hex, string name)
 		{
 			// Read the captured record and write it back: the codec must reproduce retail's bytes exactly, which is
@@ -73,37 +75,37 @@ namespace Faolan.Tests
 		public void MemberRecord_BuildsFromColumns_ByteExact()
 		{
 			// The DB-source direction: a member built from typed values, not round-tripped, must equal the capture.
-			Assert.Equal(LevelFortyFourMemberHex, Convert.ToHexString(TeamMessageCodec.BuildMemberOnly(LevelFortyFour())).ToLowerInvariant());
-			Assert.Equal(LevelFortyOneMemberHex, Convert.ToHexString(TeamMessageCodec.BuildMemberOnly(LevelFortyOne())).ToLowerInvariant());
+			Assert.Equal(DemonologistMemberHex, Convert.ToHexString(TeamMessageCodec.BuildMemberOnly(Demonologist())).ToLowerInvariant());
+			Assert.Equal(NecromancerMemberHex, Convert.ToHexString(TeamMessageCodec.BuildMemberOnly(Necromancer())).ToLowerInvariant());
 		}
 
 		// f678 DispatchYouInvitedToTeam / f1159 DispatchYouGotKickedFromTeam - the member alone.
 		[Fact]
 		public void MemberOnlyMessages_AreByteExact()
 		{
-			Assert.Equal(LevelFortyFourMemberHex, Convert.ToHexString(TeamMessageCodec.BuildMemberOnly(LevelFortyFour())).ToLowerInvariant());
+			Assert.Equal(DemonologistMemberHex, Convert.ToHexString(TeamMessageCodec.BuildMemberOnly(Demonologist())).ToLowerInvariant());
 		}
 
 		// f682 RequestTeamInvite / f680 DispatchTeamInvite - member + u16 0.
 		[Fact]
 		public void Invite_IsByteExact()
 		{
-			Assert.Equal(LevelFortyOneMemberHex + "0000", Convert.ToHexString(TeamMessageCodec.BuildInvite(LevelFortyOne())).ToLowerInvariant());
+			Assert.Equal(NecromancerMemberHex + "0000", Convert.ToHexString(TeamMessageCodec.BuildInvite(Necromancer())).ToLowerInvariant());
 		}
 
 		// f683 DispatchReplyTeamInvite - member + u16 0 + byte 0.
 		[Fact]
 		public void ReplyInvite_IsByteExact()
 		{
-			Assert.Equal(LevelFortyOneMemberHex + "000000", Convert.ToHexString(TeamMessageCodec.BuildReplyInvite(LevelFortyOne())).ToLowerInvariant());
+			Assert.Equal(NecromancerMemberHex + "000000", Convert.ToHexString(TeamMessageCodec.BuildReplyInvite(Necromancer())).ToLowerInvariant());
 		}
 
 		// f693 DispatchTeamJoin, f917 DispatchTeamLeave and f918 DispatchSetNewTeamLeader share one layout.
 		[Fact]
 		public void TeamMemberEvent_IsByteExact()
 		{
-			Assert.Equal("0000dea90051dd9a" + LevelFortyFourMemberHex, Convert.ToHexString(TeamMessageCodec.BuildTeamMemberEvent(0x0051DD9A, LevelFortyFour())).ToLowerInvariant());
-			Assert.Equal("0000dea90051dd9a" + LevelFortyOneMemberHex, Convert.ToHexString(TeamMessageCodec.BuildTeamMemberEvent(0x0051DD9A, LevelFortyOne())).ToLowerInvariant());
+			Assert.Equal("0000dea90051dd9a" + DemonologistMemberHex, Convert.ToHexString(TeamMessageCodec.BuildTeamMemberEvent(0x0051DD9A, Demonologist())).ToLowerInvariant());
+			Assert.Equal("0000dea90051dd9a" + NecromancerMemberHex, Convert.ToHexString(TeamMessageCodec.BuildTeamMemberEvent(0x0051DD9A, Necromancer())).ToLowerInvariant());
 		}
 
 		// f693 DispatchYouJoinedTeam - the whole roster. The member list is COUNT-FRAMED: retail's 0x00000BD3 is
@@ -111,31 +113,29 @@ namespace Faolan.Tests
 		[Fact]
 		public void Roster_IsByteExact()
 		{
-			var expected = "0000dea90051dd9a" + "0000c35001317cf8" + "00000bd3" + LevelFortyOneMemberHex + LevelFortyFourMemberHex + "000000000100000000000000000000000002";
+			var expected = "0000dea90051dd9a" + "0000c35001317cf8" + "00000bd3" + NecromancerMemberHex + DemonologistMemberHex + "000000000100000000000000000000000002";
 
-			Assert.Equal(expected, Convert.ToHexString(TeamMessageCodec.BuildRoster(0x0051DD9A, 0x01317CF8, [LevelFortyOne(), LevelFortyFour()])).ToLowerInvariant());
+			Assert.Equal(expected, Convert.ToHexString(TeamMessageCodec.BuildRoster(0x0051DD9A, 0x01317CF8, [Necromancer(), Demonologist()])).ToLowerInvariant());
 		}
 
-		// f694 - a join pushes AddToGroupIIR onto the world connection, one per member. The captured packet opens with
-		// the carrier's [u32 len] (0x1D = the 29 bytes after it), which the SENDER writes - hence the prefix here
-		// rather than in the codec.
+		// f694 - a join pushes AddToGroupIIR onto the world connection, one per member. The leading 0x0000001D is the
+		// carrier's own length prefix, and it is part of what the builder emits: without it the client reads the IIR
+		// type as a 234 MB payload length and drops the connection.
 		[Fact]
 		public void AddToGroupIir_IsByteExact()
 		{
-			Assert.Equal("0000001d" + "0df44b730000c35001317cf8000000dea90051dd9a0000c35001317cf8",
-				"0000001d" + Convert.ToHexString(GroupMembershipCodec.BuildAdd(0x01317CF8, 0x0051DD9A, 0x01317CF8)).ToLowerInvariant());
-			Assert.Equal("0000001d" + "0df44b730000c350013184ae000000dea90051dd9a0000c35001317cf8",
-				"0000001d" + Convert.ToHexString(GroupMembershipCodec.BuildAdd(0x013184AE, 0x0051DD9A, 0x01317CF8)).ToLowerInvariant());
-			Assert.Equal(29, GroupMembershipCodec.BuildAdd(0x01317CF8, 0x0051DD9A, 0x01317CF8).Length);
+			Assert.Equal("0000001d0df44b730000c35001317cf8000000dea90051dd9a0000c35001317cf8",
+				Convert.ToHexString(GroupMembershipCodec.BuildAdd(0x01317CF8, 0x0051DD9A, 0x01317CF8)).ToLowerInvariant());
+			Assert.Equal("0000001d0df44b730000c350013184ae000000dea90051dd9a0000c35001317cf8",
+				Convert.ToHexString(GroupMembershipCodec.BuildAdd(0x013184AE, 0x0051DD9A, 0x01317CF8)).ToLowerInvariant());
 		}
 
 		// f919 - and a leave pushes RemoveFromGroupIIR.
 		[Fact]
 		public void RemoveFromGroupIir_IsByteExact()
 		{
-			Assert.Equal("00000015" + "e4ff0c850000c35001317cf8000000dea90051dd9a", "00000015" + Convert.ToHexString(GroupMembershipCodec.BuildRemove(0x01317CF8, 0x0051DD9A)).ToLowerInvariant());
-			Assert.Equal("00000015" + "e4ff0c850000c350013184ae000000dea90051dd9a", "00000015" + Convert.ToHexString(GroupMembershipCodec.BuildRemove(0x013184AE, 0x0051DD9A)).ToLowerInvariant());
-			Assert.Equal(21, GroupMembershipCodec.BuildRemove(0x01317CF8, 0x0051DD9A).Length);
+			Assert.Equal("00000015e4ff0c850000c35001317cf8000000dea90051dd9a", Convert.ToHexString(GroupMembershipCodec.BuildRemove(0x01317CF8, 0x0051DD9A)).ToLowerInvariant());
+			Assert.Equal("00000015e4ff0c850000c350013184ae000000dea90051dd9a", Convert.ToHexString(GroupMembershipCodec.BuildRemove(0x013184AE, 0x0051DD9A)).ToLowerInvariant());
 		}
 
 		// f1260 DispatchRequestTrade, f1268 DispatchStartTrade, f1481 DispatchPartnerAcceptedTrade - one shape.
@@ -176,13 +176,13 @@ namespace Faolan.Tests
 			Assert.Equal("00000073" + snapshot + "00000001", Convert.ToHexString(PlayerTradeCodec.BuildAddedItem(Convert.FromHexString(snapshot), 1)).ToLowerInvariant());
 		}
 
-		// f1687 / f1919 - the chat server's add reply, whose trailing byte is the friend's LEVEL. That is what pins
-		// the same field in the team member record.
+		// f1687 / f1919 - the chat server's add reply, whose trailing byte is the friend's CLASS. It is the same value
+		// the team member record leads with, which is how the two corroborate each other.
 		[Fact]
 		public void Friend_AddReply_IsByteExact()
 		{
-			Assert.Equal("01317cf8010501eda8b229", Convert.ToHexString(FriendListCodec.BuildAddReply(0x01317CF8, true, 41)).ToLowerInvariant());
-			Assert.Equal("013184ae010501eda8b22c", Convert.ToHexString(FriendListCodec.BuildAddReply(0x013184AE, true, 44)).ToLowerInvariant());
+			Assert.Equal("01317cf8010501eda8b229", Convert.ToHexString(FriendListCodec.BuildAddReply(0x01317CF8, true, (byte)Class.Necromancer)).ToLowerInvariant());
+			Assert.Equal("013184ae010501eda8b22c", Convert.ToHexString(FriendListCodec.BuildAddReply(0x013184AE, true, (byte)Class.Demonologist)).ToLowerInvariant());
 		}
 
 		// f1685 / f1911 - the presence push, addressed by name.

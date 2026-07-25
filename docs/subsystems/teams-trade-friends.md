@@ -28,13 +28,18 @@ once it exists (`TeamMemberRecord`):
 [u32 0xC350][u32 characterId][u16 len][name LATIN1]   then twenty u32 and a u16
 ```
 
-102 bytes for a 10-character name. Four trailing fields carry meaning one capture can pin — **level**, the **map
-id** (twice; the client greys out members in another playfield), the per-character **archetype** word, and a 9-byte
-per-character **opaque**. The rest are identical across both characters and every message and are carried as
-captured.
+102 bytes for a 10-character name. The first trailing u32 is the **class**: the two captured members carry `0x29`
+and `0x2C`, which are exactly `Class.Necromancer` and `Class.Demonologist`, and the chat server's friend-add reply
+ends with the same byte for the same character — that is how the two corroborate each other. Then the **map id**
+(twice; the client greys out members in another playfield), one more **per-character word** (2 and 3 in the capture —
+not identifiable from two characters; sex, race and level are all candidates), and a 9-byte per-character
+**opaque**. [V0: the team member record's level] The rest are identical across both characters and every message and are carried as captured.
 
-Level is confirmed *independently*: the chat server's friend-add reply ends with the same character's level, and
-those bytes match the member records exactly — `0x2C`/44 for the one player, `0x29`/41 for the other.
+⚠️ That leading field was first read as the LEVEL, because `0x29`/`0x2C` are plausible levels *and* the friend reply
+appeared to confirm it — two independent sightings of the same wrong field. The enum match settles it, and the client
+agrees: fed a level, it accepted the invite record, answered it with `RequestTeamInvite`, and refused to raise the
+invite window, because it cannot build one for a class that does not exist. Nothing in the capture identifies which
+field carries the level, since both captured members share it.
 
 The 9-byte opaque appears **nowhere else in the capture** — not in login, not in the snapshot — so it is CS-tier
 state that cannot be derived from anything we send, and computing it would be invention. It is read as
@@ -122,7 +127,7 @@ On the **ChatServer** (`FriendListCodec`). Sweeping the whole capture for a game
 
 ```
 c2s 0x0028  [u32 characterId]                                        add
-s2c 0x0028  [u32 characterId][u8 online][u8 5][u32 stamp][u8 level]   the added friend's state
+s2c 0x0028  [u32 characterId][u8 online][u8 5][u32 stamp][u8 class]   the added friend's state
 c2s 0x0029  [u32 characterId]                                        remove
 s2c 0x0029  [u32 characterId]                                        echoed back
 s2c 0x0025  [u64 0][u32 stamp][u16][u8][u16 len][name]               presence push, BY NAME
@@ -150,5 +155,34 @@ connection.
 `TeamServiceTests` gates the roster transitions (accept/leave/kick/promote/dissolve, and that an accept with no
 pending invite does nothing — the inviter is taken from the server's pending-invite table, not the client's body).
 
+Three requests the client sends around a join get **no reply from retail either** — `SetPassOnLootLevel` (`0x204D`)
+and `RequestNewJoinHasHostileInFriends` (`0x2092`) on the game tier, `TeamSetLootOption` (`0x2006`) on the CS tier.
+Checked against the capture: nothing follows them on the same stream. They are fire-and-forget, so leaving them
+unanswered is retail-faithful; what remains is to APPLY the loot settings rather than only accept them.
+
 Still to do: the trade and friend HANDLERS (the codecs and their byte-exact gates are in place; open work in Gitea
 #101 / #99).
+
+### Addressing and the header, which is what actually made the invite work
+
+Verified in-client 2026-07-25: invite, accept, leave and kick all work.
+
+**The reply carries a trailing header byte.** `DispatchReplyTeamInvite` (`0x209F`) must be sent with `headerData`
+`0x01`, the same RpcHeader tail `KeepAliveService`'s `DispatchPong` puts on this interface. Retail carries it on both
+the request and the reply (`f682`, `f683`) while the CS-tier invite dispatches carry none — which is why the invite
+itself was always accepted. Without it the client **discards the reply**, and since the reply is what raises the
+window, the symptom is: the client takes the invite, echoes it back in `RequestTeamInvite`, and nothing happens.
+Replaying retail's own captured bytes for both messages changed nothing, which is what finally pointed at the header
+rather than the body. Across the capture the `0x01` tail appears on `0x2082`, `0x2092`, `0x209F`, `0x20AC`, `0x20AD`,
+`0x20C5` and `0x20D0` — all ≥ `0x2082`, none below.
+
+
+Every CsPlayerAgent s2c packet is addressed to the **recipient's own** `CSPlayerInterface` instance — its character
+id — and sent from the server object (`CSPlayerAgent`, instance `0x04`). Retail does this on every one: `f678` carries
+the inviter's id, `f680` the target's. A push addressed to instance `0` arrives and is dropped, and the failure is
+quiet in exactly the way that costs time: the invited client received `DispatchTeamInvite`, answered it with
+`RequestTeamInvite`, and simply never showed a window.
+
+The game tier's `DispatchReplyTeamInvite` likewise replies from the `GameCharAgent` object (instance `0x10`), not from
+the world sender endpoint the rest of that listener uses — a reply belongs to the interface pair its request arrived
+on.

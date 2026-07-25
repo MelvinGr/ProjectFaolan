@@ -88,7 +88,7 @@ namespace Faolan.GameServer.Quest
 		public Task SendCasildaPose(INetworkClient client, uint casildaHandle, bool captive)
 		{
 			// BuildBehaviorControlCenterIir returns the record BODY ([type][handle][form][slot][protobuf]) WITHOUT the
-			// 0x642CD3D6 sub-opcode (the create-burst Iir helper prepends it), so prepend it here - SendWorldIir only adds
+			// 0x642CD3D6 sub-opcode (the create-burst Iir helper prepends it), so prepend it here - WorldIir.Send only adds
 			// the carrier + length, not the sub-op, and the client drops a BCC record that doesn't start with it.
 			var record = captive
 				? CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 5, 159428, 1, 24, 0)
@@ -97,7 +97,7 @@ namespace Faolan.GameServer.Quest
 			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.", captive
 				? "CAPTIVE"
 				: "freed", casildaHandle, client.Session.Character.Name);
-			return SendWorldIir(client, body);
+			return WorldIir.Send(client, body);
 		}
 
 		// The template id of the escortee the player is (or was) escorting - the Escort goal's TrailingRefId on any
@@ -166,15 +166,8 @@ namespace Faolan.GameServer.Quest
 		// every rendered NPC move goes out on).
 		public static Task SendKalanthesMoveTask(INetworkClient client, byte[] body)
 		{
-			return SendWorldIir(client, body);
+			return WorldIir.Send(client, body);
 		}
 
-		// The world-conversation IIR send (WorldSenderEndpoint + IirCarrier) shared by the scripted sends above - the same
-		// framing WorldBroadcaster uses for every rendered move/pose/visual-change.
-		private static Task SendWorldIir(INetworkClient recipient, byte[] body)
-		{
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(body)));
-		}
 	}
 }

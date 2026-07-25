@@ -22,16 +22,19 @@ namespace Faolan.Core.Network.Codecs.Team
 		private static readonly byte[] RosterLootSettings = [0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02];
 
 		// A member record from a character row. The 9-byte per-character opaque is left at ZERO: it is CS-tier state we
-		// cannot derive (see gaps.md), so we send nothing rather than something invented, and an in-client check will
-		// say whether the client cares.
-		public static TeamMemberRecord MemberOf(Character character)
+		// cannot derive (see gaps.md), so we send nothing rather than something invented.
+		//
+		// `mapId` is passed in so the caller can use the member's LIVE playfield: Character.MapId is only written at
+		// save points, so it lags a player who has since changed map. The client shows the playfield in the team window
+		// and treats members in another one differently, so it is worth taking from the live world where there is one.
+		public static TeamMemberRecord MemberOf(Character character, uint mapId)
 		{
 			return new TeamMemberRecord
 			{
 				CharacterId = character.Id,
 				Name = character.Name,
-				Level = character.Level,
-				MapId = character.MapId
+				Class = character.Class,
+				MapId = mapId
 			};
 		}
 

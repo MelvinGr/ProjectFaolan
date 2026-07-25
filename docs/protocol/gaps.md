@@ -100,3 +100,10 @@ Their ROLE is unambiguous from the capture — `0x206B` acks your own accept, `0
 trade commits (immediately followed by the `TradeCompletedSuccessfully` overlay) — so the flow is implementable; it
 is the client-side NAMES that are missing, which needs the CsPlayerInterface/GameServer dispatch tables in Ghidra.
 
+### Which team-member field carries the LEVEL
+**Tracked: Gitea #101.** [V0: the team member record's level] The 102-byte member descriptor's leading trailing-u32 is
+the CLASS (`0x29` Necromancer / `0x2C` Demonologist, corroborated by the chat server's friend-add reply). No field in
+it is identifiable as the level, because the two captured members share every remaining value: the candidates are the
+per-character word that reads 2 and 3, and the constants 6 / 354 / 51100 / 40016. A capture with two members of
+DIFFERENT levels settles it in one look; until then we send the level nowhere, so the client's team window may show a
+wrong or blank level even though grouping works.

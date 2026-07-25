@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Tests.Support;
@@ -50,7 +51,7 @@ namespace Faolan.Tests
 			{
 				var client = new RecordingNetworkClient(id);
 				client.Session.Character!.Name = $"C{id}";
-				client.Session.Character.Level = 10;
+				client.Session.Character.Class = Class.Necromancer;
 				clients[id] = client;
 			}
 
