@@ -1,6 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Network.Codecs.World;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -73,6 +76,48 @@ namespace Faolan.Tests
 			var empty = await db.ConversationNodes.Where(n => !n.Packets.Any()).CountAsync(TestContext.Current.CancellationToken);
 
 			Assert.True(empty == 0, $"{empty} conversation node(s) carry no packets.");
+		}
+
+		// Every SHIPPED patrol rebuilds into a wire task. This reads the committed ROWS, which is the gap that let a
+		// crash ship: PatrolNodeRoundTripTests converts a captured record in memory (parse -> ToNode -> ToTask) and
+		// never touches a row, so an importer that failed to PERSIST a column looked perfectly healthy. All ten columns
+		// #410 added were NULL in the seed - a hand-written deep copy in the import path had never been taught about
+		// them - and `ToTask` dereferences PathTrailerWord on every mode-1 node, so entering any of the ten maps with a
+		// Path patrol threw inside EnsureZoneNpcs and aborted world entry, leaving a half-built zone with no NPCs.
+		//
+		// ToTask throws loudly on a missing column by design (a patrol that cannot be rebuilt byte-exact must not be
+		// silently emitted short), which makes simply calling it the whole assertion.
+		[Fact]
+		public async Task EveryShippedPatrol_RebuildsIntoAWireTask()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var nodes = await db.PatrolNodes.Include(n => n.Waypoints).Include(n => n.Words).AsNoTracking().ToListAsync(ct);
+			Assert.NotEmpty(nodes);
+
+			// Rebuild the parent/child links from the stored path keys - the same shape the runtime loads.
+			var byKey = nodes.ToDictionary(n => (n.NpcSpawnId, n.OrdinalPath));
+			foreach (var n in nodes.Where(n => n.ParentPath != null))
+			{
+				if (byKey.TryGetValue((n.NpcSpawnId, n.ParentPath!), out var parent))
+					parent.Children.Add(n);
+			}
+
+			var failures = new List<string>();
+			foreach (var root in nodes.Where(n => n.ParentPath == null))
+			{
+				try
+				{
+					PatrolNodeMapper.ToTask(root);
+				}
+				catch (Exception ex)
+				{
+					failures.Add($"spawn {root.NpcSpawnId}: {ex.Message}");
+				}
+			}
+
+			Assert.True(failures.Count == 0, $"{failures.Count} shipped patrol(s) cannot be rebuilt: {string.Join(" | ", failures.Take(5))}");
 		}
 	}
 }

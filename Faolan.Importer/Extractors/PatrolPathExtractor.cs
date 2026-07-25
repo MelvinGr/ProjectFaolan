@@ -11,7 +11,9 @@ namespace Faolan.Importer.Extractors
 {
 	// One captured NPC patrol route: its map + anchor position, the flattened waypoints (for the loop-shape filter),
 	// the capture handle, and the columnarized task tree Root (#316).
-	public sealed record PatrolPathEntry(uint MapId, Vector3 Position, IReadOnlyList<Vector3> Waypoints, uint Handle, PatrolNode Root);
+	// Carries the wire task AST, not a columnarized tree: the importer converts it per spawn via PatrolNodeMapper so
+	// there is exactly one wire->row conversion and no hand-maintained copy to fall behind a new column.
+	public sealed record PatrolPathEntry(uint MapId, Vector3 Position, IReadOnlyList<Vector3> Waypoints, uint Handle, MoveTaskNode Task);
 
 	// Extracts NPC patrol routes from a capture's MoveTask packets (MoveTaskIIR 0x96C46740): tracks the current map
 	// (MapChange 5D85BFC7), parses every MoveTask via the fully-decoded recursive grammar (MoveTaskComposite,
@@ -84,7 +86,7 @@ namespace Faolan.Importer.Extractors
 					continue; // one-way (chase/approach), not an idle patrol loop
 
 				if (!byHandle.TryGetValue(task.Handle, out var existing) || waypoints.Count > existing.Waypoints.Count)
-					byHandle[task.Handle] = new PatrolPathEntry(currentMap, from, waypoints, task.Handle, PatrolNodeMapper.ToNode(task.Task));
+					byHandle[task.Handle] = new PatrolPathEntry(currentMap, from, waypoints, task.Handle, task.Task);
 			}
 
 			return byHandle;

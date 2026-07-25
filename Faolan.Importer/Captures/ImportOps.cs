@@ -181,7 +181,7 @@ namespace Faolan.Importer.Captures
 
 					spawns.Add(e);
 					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
-						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Waypoints, 0, r.Root));
+						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Waypoints, 0, r.Task));
 				}
 			}
 		}
@@ -638,14 +638,14 @@ namespace Faolan.Importer.Captures
 			// spawn (they share a transform), and a per-entry loop cannot see what an earlier iteration already
 			// queued - so the second route's nodes would collide with the first's on the primary key. Last route for
 			// a spawn wins, which is what the old per-entry lookup effectively did once it found the tracked path.
-			var bySpawn = new Dictionary<uint, (NpcSpawn Spawn, PatrolNode Root)>();
+			var bySpawn = new Dictionary<uint, (NpcSpawn Spawn, MoveTaskNode Task)>();
 			foreach (var e in paths)
 			{
 				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.Position.X && n.PositionY == e.Position.Y && n.PositionZ == e.Position.Z);
 				if (spawn == null)
 					continue; // a route with no matching spawn (should not happen for burst-truth patrols) - skip
 
-				bySpawn[spawn.Id] = (spawn, e.Root);
+				bySpawn[spawn.Id] = (spawn, e.Task);
 			}
 
 			// Drop the persisted routes for those spawns BEFORE staging the replacements. The node key is derived
@@ -657,10 +657,14 @@ namespace Faolan.Importer.Captures
 			if (spawnIds.Count > 0)
 				await db.PatrolNodes.Where(n => spawnIds.Contains(n.NpcSpawnId)).ExecuteDeleteAsync();
 
-			// Attach a fresh copy of each task tree, flattened so every node carries its spawn and AddNodeTree stamps
-			// its position key. Clone because a Root can be shared across entries.
-			foreach (var (spawn, root) in bySpawn.Values)
-				AddNodeTree(spawn, CloneNode(root));
+			// Build each spawn's tree from the WIRE AST here rather than reusing the extractor's instance: one entry's
+			// task can be shared across spawns, and EF cannot track the same node object twice. Converting per spawn via
+			// PatrolNodeMapper - the single wire->row authority - is what keeps this complete. The hand-written deep copy
+			// this replaces silently dropped every column #410 added (PathTrailerWord, PathDirection1/2 and the seven
+			// Target*/TargetRotation* slots), because a field-by-field clone has to be updated for each new column and
+			// nothing forced it: the round-trip gate converts in memory and never reads a row back.
+			foreach (var (spawn, task) in bySpawn.Values)
+				AddNodeTree(spawn, PatrolNodeMapper.ToNode(task));
 
 			await db.SaveChangesAsync();
 		}
@@ -1119,63 +1123,6 @@ namespace Faolan.Importer.Captures
 
 			quest.NextQuestId = nextQuestId;
 			await db.SaveChangesAsync();
-		}
-
-		private static PatrolNode CloneNode(PatrolNode n)
-		{
-			var clone = new PatrolNode
-			{
-				Ordinal = n.Ordinal,
-				Mode = n.Mode,
-				HeaderFlags = n.HeaderFlags,
-				Duration = n.Duration,
-				Remaining = n.Remaining,
-				ListMin = n.ListMin,
-				PathFlags = n.PathFlags,
-				PathFloat10 = n.PathFloat10,
-				PathFloat20 = n.PathFloat20,
-				PathPacked1 = n.PathPacked1,
-				PathPacked2 = n.PathPacked2,
-				TrailerByte = n.TrailerByte,
-				Speed = n.Speed,
-				AnchorX = n.AnchorX,
-				AnchorY = n.AnchorY,
-				AnchorZ = n.AnchorZ,
-				Flag = n.Flag,
-				RotateTail = n.RotateTail,
-				ApproachType = n.ApproachType,
-				ApproachTarget = n.ApproachTarget,
-				ApproachFlag = n.ApproachFlag
-			};
-
-			foreach (var w in n.Words)
-			{
-				clone.Words.Add(new PatrolNodeWord
-				{
-					Ordinal = w.Ordinal,
-					Value = w.Value
-				});
-			}
-
-			foreach (var w in n.Waypoints)
-			{
-				clone.Waypoints.Add(new PatrolNodeWaypoint
-				{
-					Ordinal = w.Ordinal,
-					PositionX = w.PositionX,
-					PositionY = w.PositionY,
-					PositionZ = w.PositionZ
-				});
-			}
-
-			foreach (var child in n.Children)
-			{
-				var childClone = CloneNode(child);
-				childClone.Parent = clone;
-				clone.Children.Add(childClone);
-			}
-
-			return clone;
 		}
 
 		private static List<NpcSpawnEntry> DistinctByHandle(IEnumerable<NpcSpawnEntry> entries)

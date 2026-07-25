@@ -722,8 +722,10 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
-				.Characters.Where(c => c.Id == characterId)
-				.ExecuteUpdateAsync(s => s.SetProperty(c => c.MapId, Map.NewPlayerSpawnSpawnPoint.MapId)
+				.Characters
+				.Where(c => c.Id == characterId)
+				.ExecuteUpdateAsync(s => s
+					.SetProperty(c => c.MapId, Map.NewPlayerSpawnSpawnPoint.MapId)
 					.SetProperty(c => c.PositionX, Map.NewPlayerSpawnSpawnPoint.Position.X)
 					.SetProperty(c => c.PositionY, Map.NewPlayerSpawnSpawnPoint.Position.Y)
 					.SetProperty(c => c.PositionZ, Map.NewPlayerSpawnSpawnPoint.Position.Z)) == 1;
@@ -743,9 +745,11 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<bool> UpdateLastInfo(uint characterId, string ipAddress)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.Characters.Where(c => c.Id == characterId)
-				.ExecuteUpdateAsync(s => s.SetProperty(a => a.LastConnection, DateTimeOffset.UtcNow).SetProperty(a => a.LastIpAddress, ipAddress)) == 1;
+			return await ctx.Characters
+				.Where(c => c.Id == characterId)
+				.ExecuteUpdateAsync(s => s
+					.SetProperty(a => a.LastConnection, DateTimeOffset.UtcNow)
+					.SetProperty(a => a.LastIpAddress, ipAddress)) == 1;
 		}
 	}
 }
