@@ -430,7 +430,7 @@ entry count and the tails stay byte-stable - the lowest-risk way to prove the cl
 
 STEP (b) — DRIVEN FROM CharacterEquipment (2026-06-07, pending in-client test). The hardcoded demo is replaced
 by a real DB-driven path keyed off `CharacterEquipment` (which already has the per-slot Item navs - no new table):
-- `EnsureBeachStarterEquipment(character)` loads (or creates) the character's `CharacterEquipment` and seeds
+- `LoadEquipment(character)` loads the character's `CharacterEquipment` (created with the character, dressed at creation by `CreateFlowService`) and reads
   default starter gear if empty: **Wrist = Slave Manacles (3361557)**, **FirstPosBag = Royal Signet (3774542)** -
   both fully buildable and slot-appropriate. Persisted to the DB (re-seeds after a faolan.db revert).
 - `ResolveDbInventory` picks the slots that hold a fully-buildable item; `ApplyDbInventory` replaces those
@@ -454,7 +454,7 @@ EQUIP/UNEQUIP PERSISTENCE (2026-06-07, pending in-client test). The player's equ
   `CharacterEquipment` slot and clears the bag (FirstPosBag) if it held it. `PersistUnequip(fromSlot)` clears the
   slot and parks the item in the bag. Slot<->nav map (`Get/SetEquipmentSlot`) matches `CharacterEquipmentSlot`
   (Chest=5, MainWeapon=6, LeftRing=9, Legs=16, Wrist=18, ...), tested by `EquipmentSlotMappingTests`.
-- `EnsureBeachStarterEquipment` now seeds defaults ONLY for a brand-new equipment row, so persisted player changes
+- The starting gear is seeded ONCE at character creation, so persisted player changes
   are never overwritten on relogin.
 - Non-DB (captured-only) items can't be resolved to a DB row, so their moves are logged and skipped (harmless).
 

@@ -755,7 +755,7 @@ namespace Faolan.Web.Services
 		// Rebuild the character's spawn-scaffold appearance entries from the just-saved resources so the edit shows
 		// in-game on the next login - now possible because PlayerSpawnScaffoldRows lives in Faolan.Core.Spawn (#290),
 		// which the web can reference. No-op when the character has no scaffold yet (first login seeds it from the new
-		// resources via EnsureFreshRows). The game server's login-time RefreshAppearance stays as a safety net.
+		// resources via TrySeedFreshRows). The game server's login-time RefreshAppearance stays as a safety net.
 		private void PropagateToScaffold(uint characterId)
 		{
 			using var db = _dbFactory.CreateDbContext();

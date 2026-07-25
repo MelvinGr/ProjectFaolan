@@ -1155,9 +1155,10 @@ namespace Faolan.GameServer
 
 					client.Session.Account.ClientInstance = clientInstance;
 
-					client.Session.Character = (await Database.GetCharacterForAccount(accountId, clientInstance))!;
-					if (client.Session.Character == null)
-						throw new Exception($"Character not found for account {accountId:X} and client instance {clientInstance:X}");
+					// No `!` here on purpose: GetCharacterForAccount returns null for a character this account does not own,
+					// and forgiving that makes the check look like dead code someone will helpfully delete.
+					client.Session.Character = await Database.GetCharacterForAccount(accountId, clientInstance)
+						?? throw new Exception($"Character not found for account {accountId:X} and client instance {clientInstance:X}");
 
 					Logger.LogInformation("GameServer hello: clientInstance={ClientInstance:X8}, clientVersion={ClientVersion}", clientInstance, clientVersion);
 

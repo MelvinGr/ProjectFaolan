@@ -18,17 +18,20 @@ namespace Faolan.Tests
 	public class PlayerSpawnBuilderTests
 	{
 		[Fact]
-		public void BuildFromScratch_NoScaffoldRows_ReturnsNull()
+		public void BuildFromScratch_NoScaffoldRows_Throws()
 		{
 			var template = Golden.Bytes("SpawnStrieTemplate");
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var scaffold, out _));
 
-			// A character with no scaffold rows -> the builder can't fill the frame and falls back (null).
-			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, Vector3.Zero, Quaternion.Identity, scaffold.CharacterIir, new Character
-			{
-				Id = 1
-			});
-			Assert.Null(built);
+			// A character with no scaffold rows cannot be described, and there is no longer a captured-splice path to
+			// fall back to: the rows are seeded at character creation, so their absence is corruption and it throws.
+			// Returning null instead used to mean a player nobody could see, reported only as a log warning.
+			var ex = Assert.Throws<InvalidOperationException>(() => PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, Vector3.Zero, Quaternion.Identity,
+				scaffold.CharacterIir, new Character
+				{
+					Id = 1
+				}));
+			Assert.Contains("no spawn-scaffold rows", ex.Message);
 		}
 
 		[Fact]

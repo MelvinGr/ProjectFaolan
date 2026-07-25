@@ -9,7 +9,7 @@ verbatim. **Status: `InitialBurst` is fully constructed, and all structured `*II
 > **`WorldPrepBurst` has since been REMOVED entirely** (`0683e84d`). It replayed the guardian capture's
 > starting-kit grants (0x2052 abilities, `ComboBookIIR` combos, `SetItemStat`, `CharacterAction`/`Stat`/`Energy`
 > records) during creation — all proven redundant in-client: a created necromancer is fully functional without
-> it, because every grant is re-emitted class-driven by the SHARED world-entry loadout (`EnsureCharacterLoadout`:
+> it, because every grant is re-emitted class-driven by the creation-time loadout seed (`CharacterLoadout.Seed`:
 > `ClassAbilities` + `GetStartingBarSpells` + `GrantCharacterCombos`), which the create flow already reaches via
 > `SendBurstlessWorldEntry`. Its only unique effect was the live create-session quickbar placement of the 3 basic
 > attacks, which the shared bar-seed covers for a fresh character. The §4/§5 notes below describe the decode work

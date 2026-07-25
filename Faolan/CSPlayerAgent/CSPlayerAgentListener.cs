@@ -90,9 +90,10 @@ namespace Faolan.CSPlayerAgent
 
 					client.Session.Account.ClientInstance = characterId;
 
-					client.Session.Character = (await Database.GetCharacterForAccount(accountId, characterId))!;
-					if (client.Session.Character == null)
-						throw new Exception($"Character not found for account {accountId:X} and client instance {characterId:X}");
+					// No `!` here on purpose: GetCharacterForAccount returns null for a character this account does not own,
+					// and forgiving that makes the check below look like dead code someone will helpfully delete.
+					client.Session.Character = await Database.GetCharacterForAccount(accountId, characterId)
+						?? throw new Exception($"Character not found for account {accountId:X} and client instance {characterId:X}");
 
 					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchAuthenticateAck, b => b.WriteUInt32(authReply)));
 

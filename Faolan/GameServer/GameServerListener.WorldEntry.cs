@@ -43,48 +43,6 @@ namespace Faolan.GameServer
 		// TODO: Confirm
 		private static readonly uint[] ItemShopSuppressTags = []; //6617, 6618, 6619, 6620, 7316, 7416, 7417, 7418, 7419, 7420, 7421];
 
-		// Loads the character's CharacterEquipment (creating it and seeding default starter gear if absent), with the
-		// item navs included so they can be built into the snapshot. Beach characters only.
-		private async Task<CharacterEquipment?> EnsureBeachStarterEquipment(Character character)
-		{
-			try
-			{
-				var equipment = await Database.GetCharacterEquipment(character.Id);
-				if (equipment != null)
-					return equipment;
-
-				// Seed the default starter gear ONLY for a brand-new equipment row. Re-filling emptied slots on every
-				// login would undo the player's own unequips (which persistence writes back), so an existing row is
-				// left exactly as the player left it. Sex-specific slave outfit (#220): both sexes wear the manacles;
-				// males add a loincloth (legs), females a gown (chest) + bottom (legs). See the Starter* constants.
-				var female = character.Sex == Sex.Female;
-				// Retail randomises the female slave-outfit colour per character (males always get the loincloth).
-				var femaleOutfit = StartingData.StartingFemaleOutfits[Random.Shared.Next(StartingData.StartingFemaleOutfits.Length)];
-				equipment = new CharacterEquipment
-				{
-					CharacterId = character.Id,
-					Wrist = await Database.GetItem(StartingData.StartingWristItem),
-					Chest = female
-						? await Database.GetItem(femaleOutfit.Gown)
-						: null,
-					Legs = await Database.GetItem(female
-						? femaleOutfit.Bottom
-						: StartingData.StartingMaleLegsItem), // Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
-					MainHandLeft = StartingData.StartingWeapon.TryGetValue(character.Class, out var weaponId)
-						? await Database.GetItem(weaponId)
-						: null
-				};
-				await Database.SaveCharacterEquipment(equipment);
-
-				return equipment;
-			}
-			catch (Exception ex)
-			{
-				Logger.LogWarning(ex, "Failed to load/seed CharacterEquipment for {CharacterId}; sending inventory verbatim.", character.Id);
-				return null;
-			}
-		}
-
 		// Bind the character to the map's default respawn point if it has never bound (BindRespawnPointId == null).
 		// Runs once per character - an established bind is left alone (it moves only via a bindstone/Wayfarer, not every
 		// login). Without this, imported/older characters have no bind and every recall (Totem of Origin, Path of Asura,
@@ -92,7 +50,7 @@ namespace Faolan.GameServer
 		private async Task EnsureCharacterBound(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character == null || character.HasBind)
+			if (character.HasBind)
 				return;
 
 			var spawn = await Database.GetDefaultSpawn(character.MapId);
@@ -106,131 +64,6 @@ namespace Faolan.GameServer
 			// Tell the client the bind moved - it is what renders the "You are now bound here" banner (#346), and
 			// without it the client's bind state stays stale until it next asks.
 			await SendUpdateBindLocation(client, character.MapId);
-		}
-
-		// Ensures the character's LOADOUT on EVERY world entry (#74/#71), not just at creation:
-		//  (1) ALWAYS makes the class's spells + abilities KNOWN to the client (the client keeps no persistent kit), 		//      so the spellbook fills and every action-bar slot - default OR imported - resolves to an icon; also
-		//      grants whatever spells/abilities the character's existing bar already references.
-		//  (2) Seeds the DEFAULT bar layout ONLY when the character has no bar yet (a fresh character), mirroring the
-		//      retail create-flow beach loadout - a customised or imported bar is left exactly as it is.
-		// Runs at the start of world entry, before GrantCharacterSpells (which re-announces the spells this session);
-		// the bar itself restores to the client via ShortcutBarReply.
-		private async Task EnsureCharacterLoadout(INetworkClient client)
-		{
-			var character = client.Session.Character;
-
-			const uint shortcutTypeAbility = 4;
-			const uint shortcutTypeSpell = 2;
-			const uint specialBarBase = 0x4E20;
-			const uint secondBarBase = 100; // page 2 / "bar 1" (slot = bar position, page 2 = +100; see ShortcutBarBuilder)
-
-			// Seed the class's spells ONLY for a character whose spellbook is EMPTY (a freshly-created one). An
-			// imported character already carries its REAL spellbook from the capture's snapshot known-list, so
-			// re-seeding it would only duplicate work and could reintroduce ids that character never had.
-			//
-			// NB the known-list is NOT a "highest rank only" set - it carries EVERY rank (NecroL80's imported book has
-			// Pestilential Blast R1-R6, Ice Strike R1-R6, ...), which is correct: all ranks are learned and visible,
-			// and showing only the top rank is a CLIENT-side UI option. Never filter a grant to a highest-rank set.
-			// The abilities below are still granted every login (they're never in the snapshot known-list, and the
-			// client keeps no persistent kit), and the bar's own spells are ensured resolvable further down.
-			var spells = (await Database.GetCharacterSpells(character.Id)).Length == 0
-				? await Database.GetStartingSpells(character.Level, character.Class)
-				: [];
-			foreach (var spellId in spells)
-				await Database.AddCharacterSpell(character.Id, spellId);
-
-			// The character's ABILITIES are its authoritative per-character set (CharacterAbility, imported from the
-			// retail 0x2052 grants) - NOT the bar (the bar is only shortcuts). A freshly-created character with no set
-			// gets the class-starting kit. We resolve them here ONLY to seed the default bar layout below; the actual
-			// 0x2052 WIRE grants (+ the combo book) are NOT sent here. Retail sends them AFTER the FullChar snapshot and
-			// after 0x2024 ReadyForPlayScreen (TestAccount necro login capture: abilities at frame 192, snapshot at 81), 			// driven by the 0x205f post-ready flush (FlushPendingPost205FFollowUp -> GrantCharacterAbilities/Combos).
-			// Granting them pre-snapshot (the old behaviour) had the snapshot reconstruction discard them (abilities are
-			// NOT in the snapshot known-list, unlike spells), so the abilities tab + ability-slot shortcuts came up empty.
-			var abilities = await GetLoadoutAbilities(character);
-
-			// The BAR layout is only SEEDED when the character has none. An imported or player-customised bar is left
-			// exactly as it is. NB the bar is only SHORTCUTS - never the source of truth for what the character KNOWS
-			// (that is the snapshot known-list -> CharacterSpells, plus CharacterAbility / CharacterCombo re-granted on
-			// login); we never add a bar target to those sets (it "learned" a spell/ability twice when the bar
-			// referenced a different id than the known set for the same thing - e.g. two "Quell the Ether (Rank 5)" ids).
-			var existingShortcuts = await Database.GetCharacterShortcuts(character.Id);
-
-			if (existingShortcuts.Length > 0)
-			{
-				Logger.LogInformation("EnsureCharacterLoadout: granted {S} spells + {A} abilities to '{Name}' (class={Class}); kept its existing {N}-slot bar.", spells.Length, abilities.Length,
-					character.Name, character.Class, existingShortcuts.Length);
-				return;
-			}
-
-			// Default bar layout: the player's primary visible action bar is bar 1 (the +100 page), so the full usable
-			// kit lands there - the 3 Normal Attacks (left/middle/right) on bar 1 slots 100,101,102, then the class
-			// SPELLS right after them on bar 1 (103+). The other starting abilities (toggle-combat / switch-weapon /
-			// utility) go on the special bar (0x4E20+). Bar 0 is left empty so the attacks/spells are not split across
-			// two bars. The 3 Normal Attacks come back ordered by Ability.Slot, but retail lays them out on bar 1 with
-			// the 2nd and 3rd (bar slots 101/102) the other way round, so swap that pair before placing them (#285).
-			var normalAttacks = abilities.Where(a => a.Id is >= 0xBBC40 and <= 0xBBC60).ToList();
-			if (normalAttacks.Count >= 3)
-				(normalAttacks[1], normalAttacks[2]) = (normalAttacks[2], normalAttacks[1]);
-
-			var secondBarSlot = secondBarBase;
-			foreach (var attack in normalAttacks)
-				await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeAbility, attack.Id);
-
-			var specialSlot = specialBarBase;
-			foreach (var ability in abilities.Where(a => a.Id is < 0xBBC40 or > 0xBBC60))
-				await Database.SetCharacterShortcut(character.Id, specialSlot++, shortcutTypeAbility, ability.Id);
-
-			// Spells go on bar 1 (the +100 page), after the page-2 normal attacks - matching retail (Herald 0x3006FF at
-			// slot 103), so the player sees them on their primary visible bar rather than bar 0. ONE per spell family
-			// (highest known rank) so the bar shows distinct icons, not every rank (Ice Strike R1/R2/R3 share an icon, 			// which made a leveled caster's bar look like it just repeated). All ranks are still learned above.
-			var barSpells = await Database.GetStartingBarSpells(character.Level, character.Class);
-			foreach (var spellId in barSpells)
-				await Database.SetCharacterShortcut(character.Id, secondBarSlot++, shortcutTypeSpell, spellId);
-
-			Logger.LogInformation("EnsureCharacterLoadout: seeded default bar for '{Name}' (class={Class}): {A} abilities + {S} spells (#74/#71).", character.Name, character.Class, abilities.Length,
-				spells.Length);
-		}
-
-		// Loads the character's spawn-scaffold rows, seeding the fresh-character defaults once for characters that
-		// have none (like EnsureBeachStarterEquipment seeds starter gear). Returns null on failure - the spawn
-		// then keeps the captured scaffold frame.
-		private async Task<Character?> EnsureSpawnScaffoldRows(Character character)
-		{
-			try
-			{
-				var scaffoldCharacter = await Database.GetCharacterScaffold(character.Id) ?? character;
-
-				// Resolve the character's chosen appearance resources (editor SetMorphValue refs) to the
-				// weighted entry tags via the imported client registry; null (nothing stored / registry not
-				// imported) falls back to the Dikketest defaults inside EnsureFreshRows.
-				List<ScaffoldEntry>? weighted = null;
-				if (scaffoldCharacter.BodyResources is { Count: > 0 })
-				{
-					var registry = await Database.GetMorphTargets(scaffoldCharacter.BodyResources.Select(r => r.Ref).ToArray());
-					weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(scaffoldCharacter.BodyResources, registry);
-					if (weighted == null)
-					{
-						Logger.LogWarning(
-							"Character {CharacterId} has {Count} chosen appearance resources but none resolved via MorphTargets (registry imported?); using the default weighted entries.",
-							character.Id, scaffoldCharacter.BodyResources.Count);
-					}
-				}
-
-				// Seeds a fresh scaffold on first login; an existing one is left as-is. Propagating a later appearance
-				// EDIT into the scaffold is done at save-time by Faolan.Web (PropagateToScaffold, #290), so there's no
-				// login-time refresh here.
-				if (!PlayerSpawnScaffoldRows.EnsureFreshRows(scaffoldCharacter, weighted))
-					return scaffoldCharacter;
-
-				await Database.SaveCharacterScaffold(scaffoldCharacter);
-				Logger.LogInformation("Seeded fresh spawn-scaffold rows for character {CharacterId}.", character.Id);
-				return scaffoldCharacter;
-			}
-			catch (Exception ex)
-			{
-				Logger.LogWarning(ex, "Failed to load/seed spawn-scaffold rows for {CharacterId}; keeping the captured scaffold frame.", character.Id);
-				return null;
-			}
 		}
 
 		private async Task FlushPendingPost205FFollowUp(INetworkClient client)
@@ -337,7 +170,8 @@ namespace Faolan.GameServer
 			// script) and why the gate never resolves. Gated to the beach so a non-Tortage login isn't steered into
 			// the intro destiny flow.
 
-			// record 3: 0x00002000, 35-byte body - the GameCode script-message (script id 0x5F376, no name string, 			// unlike record 2 StartFixed3d / record 4 WelcomeTutorial) that triggers the on-screen TUTORIAL overlay.
+			// record 3: 0x00002000, 35-byte body - the GameCode script-message (script id 0x5F376, no name string,
+			// unlike record 2 StartFixed3d / record 4 WelcomeTutorial) that triggers the on-screen TUTORIAL overlay.
 			// DISABLED so the tutorial no longer pops on world entry; flip to true to restore it. (Note: this is NOT the
 			// item-shop window - that one is opened client-side and persists even with the whole post-ready burst
 			// removed, so it can't be suppressed from here.)
@@ -375,7 +209,8 @@ namespace Faolan.GameServer
 			// #239/#304 RESOLVED 2026-07-05 - the class force-feed (SetStat 0x43 = Class) was REMOVED as proven
 			// redundant, matching retail (which never sends stat 0x43 either). The in-world class is derived
 			// CLIENT-SIDE from the char data we already deliver. Verified in-client
-			// with the force-feed DISABLED on BOTH paths: an existing lvl80 login read stat 0x43 = Necromancer, // and a freshly-created char read stat 0x43 = HeraldOfXotli - both displayed correctly. The earlier
+			// with the force-feed DISABLED on BOTH paths: an existing lvl80 login read stat 0x43 = Necromancer,
+			// and a freshly-created char read stat 0x43 = HeraldOfXotli - both displayed correctly. The earlier
 			// interim predated the client-derivation working; no server-side class stat is needed.
 
 			// Re-deliver any persisted bag items the world-entry snapshot dropped for lacking an hash
@@ -383,7 +218,8 @@ namespace Faolan.GameServer
 			await RedeliverNonSnapshotBagItems(client);
 
 			// (The post-load second-snapshot delivery was removed 2026-06-12: the client ignores/rejects a
-			// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot, // see BuildBurstlessSnapshotRoot.)
+			// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot,
+			// see BuildBurstlessSnapshotRoot.)
 
 			// Wallet sync: retail does NOT push a 0x2005 at login (the initial balance presumably rides the
 			// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
@@ -409,35 +245,6 @@ namespace Faolan.GameServer
 		// The abilities to grant a character on login: its authoritative per-character set (CharacterAbility, imported
 		// from the retail 0x2052 grants) resolved to Ability rows, or the class-starting kit for a freshly-created
 		// character with no persisted set. NOT derived from the bar (the bar is only shortcuts).
-		private async Task<Ability[]> GetLoadoutAbilities(Character character)
-		{
-			var granted = await Database.GetCharacterAbilities(character.Id);
-			if (granted.Length == 0)
-				return await Database.GetClassAbilities(character.Level, character.Class);
-
-			var abilities = new List<Ability>(granted.Length);
-			foreach (var ga in granted)
-			{
-				var ability = await Database.GetAbility(ga.AbilityId);
-				if (ability == null) // ids we do not have cataloged are skipped (that bar slot stays empty)
-					continue;
-
-				// An identity-only catalog row (named from the client's LDB, never seen granted - #303) has no TEA key,
-				// and the 0x2052 body carries that key. Sending one would be a grant the client cannot resolve, so say
-				// so rather than putting a null key on the wire.
-				if (!ability.IsGrantable)
-				{
-					Logger.LogWarning("GetLoadoutAbilities: ability {Id} '{Name}' has no grant key (catalogued from the client's data, never captured) - not granting it.", ability.Id,
-						ability.Name);
-					continue;
-				}
-
-				abilities.Add(ability);
-			}
-
-			return [.. abilities];
-		}
-
 		// Grants the character's starting abilities so the player has castable attacks in-world (enables the combat
 		// test, TODO #3). The set is the universal starting kit every captured character receives via 0x2052 on
 		// login - the `Abilities` table, imported from the retail grants by CaptureAbilityImporter (3 Normal Attack
@@ -448,7 +255,7 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 
-			var abilities = await GetLoadoutAbilities(character);
+			var abilities = await CharacterLoadout.ResolveAbilities(Database, Logger, character);
 			// Login is a SILENT re-grant: the abilities were already learned (in the create flow / on first learn), so
 			// the announce flag is cleared - otherwise the client pops "You have learned a new ability" for the whole
 			// kit on every login. Retail does exactly this: the create-flow grants carry the announce byte
@@ -657,61 +464,26 @@ namespace Faolan.GameServer
 		private async Task SendBurstlessWorldEntry(INetworkClient client, uint mapId)
 		{
 			var character = client.Session.Character;
-			var equipment = await EnsureBeachStarterEquipment(character);
-
-			// Seed the class starting loadout (#74/#71) here in the SHARED world-entry path so a freshly CREATED character
-			// gets its class spells + default bar too - the create flow (CreateWorldCutsceneScripts) reaches world entry
-			// straight through SendBurstlessWorldEntry, bypassing SendWorldEntry's login-only EnsureCharacterLoadout, so a
-			// new char previously had only its attack abilities and no spells until the first relog. Idempotent (gated on
-			// an empty bar), so this is a no-op on login (already seeded there). Runs BEFORE knownSpellIds is loaded below, 			// so the freshly-seeded spells ride this entry's snapshot known-list (and place on the bar) with no relog.
-			await EnsureCharacterLoadout(client);
+			var equipment = await Database.GetCharacterEquipment(character.Id)
+			                ?? throw new InvalidOperationException($"Character {character.Id:X8} ({character.Name}) has no CharacterEquipment row - cannot enter the world.");
 
 			// The beach starter quest (10238) is granted ONCE at character creation (CommitCharacterName), not re-seeded
 			// here - so a completed/removed quest never reappears. The journal is now driven purely from CharacterQuests.
-			var inventoryRows = character != null
-				? await Database.GetCharacterInventory(character.Id)
-				: [];
+			var inventoryRows = await Database.GetCharacterInventory(character.Id);
 			// Union in the item-shop-suppression flags (see ItemShopSuppressTags) so the client's shop-open Lua sees
 			// HasTag(X)==true and never auto-opens the itemshopbrowser on entry.
-			var characterTags = character != null
-				? (await Database.GetCharacterTags(character.Id)).Concat(ItemShopSuppressTags).Distinct().OrderBy(t => t).ToArray()
-				: [];
-			var scaffoldCharacter = await EnsureSpawnScaffoldRows(character!);
-
+			var characterTags = (await Database.GetCharacterTags(character.Id)).Concat(ItemShopSuppressTags).Distinct().OrderBy(t => t).ToArray();
 			// #262: the player's ACTIVE quest ids, for quest-gated world objects (WorldObject.GateQuestId / SpawnsFor).
 			// Empty for a null character; ungated objects (the default) ignore it.
-			var activeQuestIds = character == null
-				? []
-				: (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).Select(q => q.QuestId).ToHashSet();
-
-			QuestDefinition? beachDef = null;
-			try
-			{
-				beachDef = await Database.GetQuestDefinition(BeachStarterQuestId);
-			}
-			catch (Exception ex)
-			{
-				Logger.LogWarning(ex, "Burst-less entry: beach quest definition load failed.");
-			}
-
-			if (beachDef is not { Goals.Count: > 0 })
-			{
-				// The beach starter quest is always seeded (importer SeedBeachQuestGoals), so this is a broken-DB case.
-				// The legacy captured-burst replay fallback was removed with the rest of the snapshot-splice path;
-				// burst-less entry needs the beach quest definition to author the snapshot, so abort the world entry.
-				Logger.LogError("Burst-less world entry (map={Map}): no beach quest definition; cannot build the world entry.", mapId);
-				return;
-			}
+			var activeQuestIds = (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).Select(q => q.QuestId).ToHashSet();
 
 			// Populate the shared world model BEFORE building so the player entity exists for the spawn build.
 			// Resolve which COPY (instance) of this map the player joins from its instancing mode (#268): register the
 			// player first (which picks/keeps their instance), then populate THAT instance's NPCs.
-			var map = await Database.GetMap(mapId);
+			var map = await Database.GetMap(mapId) ?? throw new  InvalidOperationException();
 			// #3: aggregate the equipped-gear stat bonuses so the player's live vitals seed with gear-boosted maxes.
-			var gearBonuses = character == null
-				? null
-				: MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet));
-			_simulation.RegisterPlayerInWorld(client, map?.InstanceMode ?? MapInstanceMode.Shared, gearBonuses);
+			var gearBonuses = MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet));
+			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, gearBonuses);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId);
 			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them
@@ -720,7 +492,7 @@ namespace Faolan.GameServer
 
 			// Warm this map's terrain heightmap + collision mesh off the tick (#284) so the first aggro/loot doesn't
 			// stall the game loop with the ~12 MB decompress + grid build. Fire-and-forget; the caches are thread-safe.
-			_ = Task.Run(() => _simulation.Terrain?.Warm(mapId));
+			_ = Task.Run(() => _simulation.Terrain?.Warm(mapId)); // TODO: Is this still needed?
 
 			// Mark this connection as having entered the world. The conversation system (ConversationService), the
 			// 0x2020 -> 0x2008 spawn-check (GameServerListener), and the dialogue-close fallback (Handle0x2000) are
@@ -736,16 +508,12 @@ namespace Faolan.GameServer
 				? (new List<QuestDefinition>(), (QuestDefinition?)null)
 				: await LoadSnapshotQuests(character!);
 			// #74/#71: the character's learned spells ride the snapshot's known-list so they survive relog + place on the
-			// action bar (instead of the per-login DispatchLearnSpell band-aid). Loaded after EnsureCharacterLoadout has
-			// seeded a fresh character's class spells.
-			var knownSpellIds = character != null
-				? (await Database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray()
-				: [];
+			// action bar (instead of the per-login DispatchLearnSpell band-aid). Seeded at creation (CharacterLoadout),
+			// so this is a plain read.
+			var knownSpellIds = (await Database.GetCharacterSpells(character.Id)).Select(s => s.SpellId).ToArray();
 			// The character's captured stat sheet (level/vitals/attributes/PvP counters/ratings), authored into the
 			// snapshot's stat block per-character; empty for a freshly-created character (skeleton + patches then).
-			var statSheet = character != null
-				? (await Database.GetCharacterStats(character.Id)).Select(s => (s.StatId, s.Value)).ToArray()
-				: [];
+			var statSheet = (await Database.GetCharacterStats(character.Id)).Select(s => (s.StatId, s.Value)).ToArray();
 			// The playfield-instance token is BeachPlayfieldId - the ONE value already threaded through the map-change, the
 			// player-spawn transform, and the world objects. Thread it into the SNAPSHOT (stat slot 0xBF, via
 			// BuildFromScratch) and the zone as well, so all of them AGREE BY CONSTRUCTION. The client scopes the character
@@ -765,12 +533,30 @@ namespace Faolan.GameServer
 			var completedJournal = isCreateEntry
 				? []
 				: await LoadCompletedJournal(character!);
+
 			// The quest INDEX needs, per active quest, its AREA's 4CC and that area's full quest catalog ordered by
 			// JournalSequence (#390) - neither is per-quest data.
 			var (indexAreas, areaCatalog) = await LoadAreaCatalog(snapshotQuests);
-			var snapshot = BuildBurstlessSnapshot(client, equipment!, inventoryRows, characterTags, snapshotQuests, primaryQuest!, knownSpellIds, statSheet, playfieldToken, completedJournal,
-				indexAreas, areaCatalog);
+			var instance = client.Session.Character.Id;
+			var equipped = new Dictionary<ulong, (Item Item, uint Hash)>();
+			foreach (var slot in InventoryEquippedSlots)
+			{
+				var item = equipment![slot];
+				if (item is { Hash: not 0 })
+					equipped[(ulong)slot] = (item, item.Hash);
+			}
 
+			(Item, uint)? bagFirst = equipment!.FirstPosBag is { Hash: not 0 }
+				? (equipment!.FirstPosBag, equipment!.FirstPosBag.Hash)
+				: null;
+
+			var typedRoot = FullPlayerCharacterBuilder.BuildRoot(characterTags, FullPlayerCharacterBuilder.FullExpansionFlags, FullPlayerCharacterBuilder.FullSubscriptionFlags, false, true,
+				FullPlayerCharacterBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []));
+			var tails = FullCharSnapshotSubClass.BuildFromScratch(snapshotQuests, primaryQuest!, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
+				indexAreas, areaCatalog);
+			var snapshot = BuildWorldEntrySnapshot(client, typedRoot.ToProtobuf(), tails);
+
+			// TODO: Just send all? no need to batch them
 			var toSend = new List<Rpc>
 			{
 				BuildMapChange(client, map!, playfieldToken)
@@ -783,13 +569,7 @@ namespace Faolan.GameServer
 			var (worldObjectRecords, worldObjectTotal) = _broadcaster.BuildEntryWorldObjects(client, _simulation.PlayerWorldEntity(client)!, activeQuestIds);
 			toSend.AddRange(worldObjectRecords);
 
-			var playerSpawn = BuildBurstlessPlayerSpawn(client, equipment!, scaffoldCharacter!, playfieldToken);
-			if (playerSpawn is { } spawn)
-			{
-				toSend.Add(spawn);
-			}
-			else
-				Logger.LogWarning("Burst-less entry (map={Map}, '{Name}'): player spawn not built (no scaffold rows?); avatar may not render.", mapId, character?.Name);
+			toSend.Add(BuildBurstlessPlayerSpawn(client, equipment, playfieldToken));
 
 			toSend.Add(snapshot);
 
@@ -810,7 +590,7 @@ namespace Faolan.GameServer
 			await RestoreEntryBuffs(client);
 
 			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs, {Objects}/{ObjectTotal} in-range world objects).", mapId,
-				character?.Name, toSend.Count, entryBurstNpcs.Count, worldObjectRecords.Count, worldObjectTotal);
+				character.Name, toSend.Count, entryBurstNpcs.Count, worldObjectRecords.Count, worldObjectTotal);
 
 			// The per-NPC quest markers / captive pose for the burst NPCs (separate IIRs, after the spawn records).
 			await _broadcaster.SendEntryNpcFollowups(client, entryBurstNpcs);
@@ -826,8 +606,9 @@ namespace Faolan.GameServer
 			// LIVE exactly as retail does: QuestLogList (J-panel) then QuestFullUpdate (detail). It was persisted at
 			// character creation, so it rides the snapshot on every later login - and nothing re-sends it live there
 			// (#390), so there is no double-send.
-			if (isCreateEntry && character != null)
+			if (isCreateEntry)
 			{
+				var beachDef = await Database.GetQuestDefinition(BeachStarterQuestId);
 				await WorldBroadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
 				await _broadcaster.SendQuestFullUpdate(client, beachDef);
 				Logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", BeachStarterQuestId, character.Name);
@@ -836,19 +617,16 @@ namespace Faolan.GameServer
 			// #262: if the player logs in mid-escort (an escort stage active), resume the escortee's follow now - the
 			// live grant-trigger only fires on the talk itself, so without this a relog leaves her at the cage. Data-
 			// driven off the Escort goal + its escortee template id (no hard-coded quest id / name).
-			if (character != null)
+			foreach (var q in await Database.GetCharacterQuests(character.Id))
 			{
-				foreach (var q in await Database.GetCharacterQuests(character.Id))
-				{
-					if (q.State != QuestState.Active)
-						continue;
+				if (q.State != QuestState.Active)
+					continue;
 
-					var qdef = await Database.GetQuestDefinition(q.QuestId);
-					if (qdef?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
-					{
-						_broadcaster.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Character.Id, true);
-						break;
-					}
+				var qdef = await Database.GetQuestDefinition(q.QuestId);
+				if (qdef?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
+				{
+					_broadcaster.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Character.Id, true);
+					break;
 				}
 			}
 		}
@@ -951,10 +729,6 @@ namespace Faolan.GameServer
 		{
 			await Send0X201C(client);
 
-			// First-entry seeding (#74/#71): a freshly-created character with an empty action bar gets its class's
-			// starting spells (persisted) + the default bar layout, so the spell grant below sends them this session.
-			await EnsureCharacterLoadout(client);
-
 			// #237: re-grant the character's learned SPELLS (DispatchLearnSpell 0x200A) BEFORE the world snapshot, so
 			// the client absorbs them as part of the initial load and stays SILENT - retail sends them pre-entry
 			// (NecroL80 login: grants at frame 59, the 0x737A6DF9 snapshot at frame 152). Granting them post-ready
@@ -984,8 +758,12 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Create-editor: sent enter-world handoff (0x2002) advertising world server {Address}.", address);
 		}
 
-		// The complete burst-less player FA015807 spawn packet, or null when the character has no scaffold rows yet.
-		private static Rpc? BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, Character scaffoldCharacter, uint playfield)
+		// The complete burst-less player FA015807 spawn packet. Entry is a pure READ of the scaffold: the rows are seeded
+		// at CREATION (CreateFlowService.CommitCharacterName), where the class and editor body they are generated from
+		// are first known, and a character without them throws in the builder. One character object throughout - the
+		// session copy carries the scaffold rows (WithSessionNavigations) - so identity, transform and scaffold cannot
+		// disagree.
+		private static Rpc BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, uint playfield)
 		{
 			var character = client.Session.Character;
 			// The CharacterIIR is built from code (PlayerCharacterIir, formerly PlayerCharacterIirTemplate.bin, #258):
@@ -998,43 +776,7 @@ namespace Faolan.GameServer
 				? character.Rotation
 				: Quaternion.Identity;
 
-			var body = PlayerSpawnBuilder.BuildFromScratch(client.Session.Character.Id, playfield, character.Position, rotation, message.ToProtobuf(), scaffoldCharacter);
-			return body == null
-				? null
-				: BuildWorldEntrySpawn(client, body);
-		}
-
-		private static Rpc BuildBurstlessSnapshot(INetworkClient client, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags,
-			IReadOnlyList<QuestDefinition> snapshotQuests, QuestDefinition primaryQuest, IReadOnlyList<uint> knownSpellIds, IReadOnlyList<(CharacterStatId Id, uint Value)> statSheet,
-			uint? playfieldToken, IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> completedJournal, IReadOnlyDictionary<uint, QuestArea> indexAreas,
-			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>> areaCatalog)
-		{
-			var instance = client.Session.Character.Id;
-			var root = BuildBurstlessSnapshotRoot(instance, equipment, inventoryRows, characterTags);
-			var tails = FullCharSnapshotSubClass.BuildFromScratch(snapshotQuests, primaryQuest, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
-				indexAreas, areaCatalog);
-			return BuildWorldEntrySnapshot(client, root, tails);
-		}
-
-		// The FullCharacterIIR root (containers) as protobuf bytes - typed authoring produced standalone (no captured
-		// packet to splice into).
-		private static byte[] BuildBurstlessSnapshotRoot(uint instance, CharacterEquipment equipment, CharacterInventory[] inventoryRows, uint[] characterTags)
-		{
-			var equipped = new Dictionary<ulong, (Item Item, uint Hash)>();
-			foreach (var slot in InventoryEquippedSlots)
-			{
-				var item = equipment[slot];
-				if (item is { Hash: not 0 })
-					equipped[(ulong)slot] = (item, item.Hash);
-			}
-
-			(Item, uint)? bagFirst = equipment.FirstPosBag is { Hash: not 0 }
-				? (equipment.FirstPosBag, equipment.FirstPosBag.Hash)
-				: null;
-
-			var typedRoot = FullPlayerCharacterBuilder.BuildRoot(characterTags, FullPlayerCharacterBuilder.FullExpansionFlags, FullPlayerCharacterBuilder.FullSubscriptionFlags, false, true,
-				FullPlayerCharacterBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []));
-			return typedRoot.ToProtobuf();
+			return BuildWorldEntrySpawn(client, PlayerSpawnBuilder.BuildFromScratch(character.Id, playfield, character.Position, rotation, message.ToProtobuf(), character));
 		}
 
 		// The burst-less world-object packets: each WorldObjects row built via WorldObjectBuilder and framed. Built on

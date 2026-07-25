@@ -35,7 +35,6 @@ namespace Faolan.Core.Database.Repositories
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
-		Task<Character?> GetCharacterScaffold(uint characterId);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
 		Task<CharacterStat[]> GetCharacterStats(uint characterId);
@@ -278,7 +277,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Character?> GetCharacter(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).FirstOrDefaultAsync(c => c.Id == id);
+			return await ctx.Characters.WithSessionNavigations().FirstOrDefaultAsync(c => c.Id == id);
 		}
 
 		public async Task<CharacterAbility[]> GetCharacterAbilities(uint characterId)
@@ -346,12 +345,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-
-			var directMatch = await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).FirstOrDefaultAsync(c => c.AccountId == accountId && c.Id == clientInstance);
-			if (directMatch != null)
-				return directMatch;
-
-			return await ctx.Characters.Include(c => c.Body).Include(c => c.MaxStats).Where(c => c.AccountId == accountId).OrderByDescending(c => c.Id).FirstOrDefaultAsync();
+			return await ctx.Characters.WithSessionNavigations().FirstOrDefaultAsync(c => c.AccountId == accountId && c.Id == clientInstance);
 		}
 
 		public async Task<CharacterInventory[]> GetCharacterInventory(uint characterId)
@@ -370,20 +364,6 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterQuests.Where(q => q.CharacterId == characterId).ToArrayAsync();
-		}
-
-		public async Task<Character?> GetCharacterScaffold(uint characterId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.Characters.Include(c => c.Attributes)
-				.Include(c => c.Skills)
-				.Include(c => c.Feats)
-				.Include(c => c.ScaffoldPairs)
-				.Include(c => c.Body)
-				.Include(c => c.BodyResources)
-				.Include(c => c.Equipment)
-				.FirstOrDefaultAsync(c => c.Id == characterId);
 		}
 
 		public async Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId)
@@ -803,6 +783,27 @@ namespace Faolan.Core.Database.Repositories
 				.ExecuteUpdateAsync(s => s
 					.SetProperty(a => a.LastConnection, DateTimeOffset.UtcNow)
 					.SetProperty(a => a.LastIpAddress, ipAddress)) == 1;
+		}
+	}
+
+	internal static class CharacterQueryExtensions
+	{
+		// The navigations a Character needs to describe itself completely: the transform/appearance rows plus the
+		// spawn-scaffold set the FA015807 record is generated from. Lazy loading is deliberately off, so a navigation
+		// that is not included here reads as EMPTY rather than failing - which makes the include list part of the
+		// contract, not a performance knob. One list, used by every loader that produces a long-lived Character, so
+		// the session copy and the scaffold copy cannot describe the same character differently.
+		public static IQueryable<Character> WithSessionNavigations(this IQueryable<Character> characters)
+		{
+			return characters
+				.Include(c => c.Body)
+				.Include(c => c.BodyResources)
+				.Include(c => c.MaxStats)
+				.Include(c => c.Equipment)
+				.Include(c => c.Attributes)
+				.Include(c => c.Skills)
+				.Include(c => c.Feats)
+				.Include(c => c.ScaffoldPairs);
 		}
 	}
 }

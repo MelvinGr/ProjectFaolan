@@ -43,7 +43,7 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void EnsureFreshRows_UsesTheResolvedWeightedEntries()
+		public void TrySeedFreshRows_UsesTheResolvedWeightedEntries()
 		{
 			var weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(FaolanxRefs), RegistryDict());
 			var character = new Character
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 				Class = Class.Necromancer
 			}; // Faolanx is a mage-necromancer
 
-			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character, weighted));
+			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character, weighted));
 
 			// 7 weighted + no morphs + the closer at idx 8.
 			Assert.Equal(8, character.Attributes.Count);

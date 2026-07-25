@@ -65,9 +65,10 @@ namespace Faolan.ChatServer
 
 					client.Session.Account.ClientInstance = clientInstance;
 
-					client.Session.Character = (await Database.GetCharacterForAccount(accountId, clientInstance))!;
-					if (client.Session.Character == null)
-						throw new Exception($"Character not found for account: {accountId:X} and clientInstance: {clientInstance:X}");
+					// No `!` here on purpose: GetCharacterForAccount returns null for a character this account does not own,
+					// and forgiving that makes the check look like dead code someone will helpfully delete.
+					client.Session.Character = await Database.GetCharacterForAccount(accountId, clientInstance)
+						?? throw new Exception($"Character not found for account: {accountId:X} and clientInstance: {clientInstance:X}");
 
 					Logger.LogInformation("ChatServer hello decoded: unk0={Unk0:X}, clientInstance={ClientInstance:X8}, accountId={AccountId:X8}", unk0, clientInstance, accountId);
 

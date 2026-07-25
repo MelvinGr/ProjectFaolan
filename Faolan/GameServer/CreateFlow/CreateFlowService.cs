@@ -390,6 +390,16 @@ namespace Faolan.GameServer.CreateFlow
 			// Persist the whole accumulated editor graph (name + sex/race/morphs Body + MaxStats) as one unit of work.
 			await _database.SaveCharacter(character);
 
+			// Seed the spawn scaffold and the starter gear HERE, the first moment either can be right: both are
+			// generated from the class (and the scaffold also from the editor body), and those are only known once the
+			// editor's final step commits. (Not at row allocation - CreateCharacter hands out a placeholder Cimmerian
+			// barbarian with no body, which would bake the wrong skill list, appearance and weapon into every
+			// character.) Doing it at creation makes "a character has scaffold rows and its starting gear" an
+			// invariant, so world entry is a pure read.
+			await SeedSpawnScaffold(character);
+			await SeedStarterEquipment(character);
+			await CharacterLoadout.Seed(_database, _logger, character);
+
 			// Grant the beach starter quest (10238) ONCE, here at character creation - retail auto-grants it on first
 			// beach entry; we persist it now so the journal is data-driven from CharacterQuests (delivered live on the
 			// create-world entry, then riding the snapshot on later logins) instead of baked into the snapshot. It is
@@ -445,8 +455,87 @@ namespace Faolan.GameServer.CreateFlow
 		private async Task PersistLateBodyEdit(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			if (character?.Name != null)
-				await _database.SaveCharacter(character);
+			if (character?.Name == null)
+				return;
+
+			await _database.SaveCharacter(character);
+
+			// The scaffold was seeded at name-commit and carries the body's morph entries, so a LATE edit has to reach
+			// it too or the avatar renders the pre-edit face for good. RefreshAppearance rewrites exactly those entries
+			// and leaves progression alone - the same call Faolan.Web makes when an appearance edit is saved there.
+			if (PlayerSpawnScaffoldRows.RefreshAppearance(character, await ResolveWeightedAppearance(character)))
+				await _database.SaveCharacterScaffold(character);
+		}
+
+		// Seeds the fresh-character spawn-scaffold rows onto `character` and persists them. No-op for a character that
+		// already has them (TrySeedFreshRows says so), so a re-commit costs nothing.
+		//
+		// Deliberately NOT wrapped in a catch. "Loud but not fatal" would be a lie here: PlayerSpawnBuilder throws
+		// without these rows, so a character committed without them is one that fails at every world entry and every
+		// spawn broadcast, forever - a create that half-succeeded is worse than one that visibly failed.
+		private async Task SeedSpawnScaffold(Character character)
+		{
+			if (!PlayerSpawnScaffoldRows.TrySeedFreshRows(character, await ResolveWeightedAppearance(character)))
+				return;
+
+			await _database.SaveCharacterScaffold(character);
+			_logger.LogInformation("Seeded fresh spawn-scaffold rows for character {CharacterId:X8}.", character.Id);
+		}
+
+		// Dresses a newly created character in the #220 starting gear: the manacles both sexes wear, the sex-specific
+		// slave outfit (male loincloth / female gown + bottom, colour randomised per character as retail does) and the
+		// class's improvised weapon.
+		//
+		// This used to run on first world entry, keyed on the CharacterEquipment ROW being absent - and it silently
+		// stopped working the moment that row started being created with the character (ce580410): the row now always
+		// exists, so the seeding branch became unreachable and new characters entered the world naked. Keyed on the
+		// SLOTS being empty instead, and run where sex and class are known, which is the same place they became known
+		// for the scaffold.
+		private async Task SeedStarterEquipment(Character character)
+		{
+			var equipment = await _database.GetCharacterEquipment(character.Id)
+				?? throw new InvalidOperationException($"Character {character.Id:X8} has no CharacterEquipment row - it is created with the character, so this is corruption.");
+
+			// Only ever dress an UNDRESSED character. Re-filling emptied slots later would undo the player's own
+			// unequips, which is why this cannot simply run on every login.
+			if (equipment.WristId != null || equipment.ChestId != null || equipment.LegsId != null || equipment.MainHandLeftId != null)
+				return;
+
+			var female = character.Sex == Sex.Female;
+			var femaleOutfit = StartingData.StartingFemaleOutfits[Random.Shared.Next(StartingData.StartingFemaleOutfits.Length)];
+
+			equipment.Wrist = await _database.GetItem(StartingData.StartingWristItem);
+			equipment.Chest = female
+				? await _database.GetItem(femaleOutfit.Gown)
+				: null;
+			equipment.Legs = await _database.GetItem(female
+				? femaleOutfit.Bottom
+				: StartingData.StartingMaleLegsItem);
+			// Class-specific improvised weapon (main-hand-left); only the classes the create dumps cover.
+			equipment.MainHandLeft = StartingData.StartingWeapon.TryGetValue(character.Class, out var weaponId)
+				? await _database.GetItem(weaponId)
+				: null;
+
+			await _database.SaveCharacterEquipment(equipment);
+			_logger.LogInformation("Dressed new character {CharacterId:X8} ({Class}, {Sex}) in its starting gear.", character.Id, character.Class, character.Sex);
+		}
+
+		// The character's own editor appearance choices as weighted scaffold entries, or null when nothing is stored or
+		// nothing resolves - the callers then fall back to the proven default set.
+		private async Task<List<ScaffoldEntry>?> ResolveWeightedAppearance(Character character)
+		{
+			if (character.BodyResources is not { Count: > 0 })
+				return null;
+
+			var registry = await _database.GetMorphTargets(character.BodyResources.Select(r => r.Ref).ToArray());
+			var weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(character.BodyResources, registry);
+			if (weighted == null)
+			{
+				_logger.LogWarning("Character {CharacterId:X8} has {Count} chosen appearance resources but none resolved via MorphTargets (registry imported?); using the defaults.",
+					character.Id, character.BodyResources.Count);
+			}
+
+			return weighted;
 		}
 
 		private void SchedulePostMorphBurst(INetworkClient client)
@@ -569,7 +658,7 @@ namespace Faolan.GameServer.CreateFlow
 			// Step 3 (REMOVED): the world-prep grant burst (SendWorldPrepBurst) used to fire here - the guardian
 			// capture's hardcoded 0x2052 abilities / ComboBookIIR combos / SetItemStat / CharacterAction records.
 			// Proven redundant in-client (a created necro is fully functional without it): every grant is re-emitted
-			// class-driven by the SHARED world-entry loadout (EnsureCharacterLoadout: ClassAbilities + GetStartingBarSpells
+			// class-driven by the creation-time loadout seed (CharacterLoadout.Seed: ClassAbilities + GetStartingBarSpells
 			// + GrantCharacterCombos), which the create flow reaches via SendBurstlessWorldEntry. The only WorldPrep-unique
 			// effect was the live create-session quickbar placement of the 3 basic attacks, which the shared bar-seed
 			// covers for a fresh char (verified: they appear on the quickbar after relog). Removed rather than folded.

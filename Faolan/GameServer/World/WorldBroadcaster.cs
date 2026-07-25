@@ -2017,8 +2017,8 @@ namespace Faolan.GameServer.World
 		// (SendWorldSpawn) and the world-entry burst (#398, BuildEntryNpcBurst) so both produce byte-identical spawn
 		// records - the burst is retail's shape (close NPCs on map enter) with our DB-constructed bodies.
 		// One player's FA015807, built from their CURRENT state - the same two calls the world-entry path makes, so there
-		// is one construction path and no cached blob to go stale. Returns null when the player has no live session
-		// (nothing to describe) so the caller falls back to the old splice rather than sending nothing.
+		// is one construction path and no cached blob to go stale. Returns null only when the player has no live session
+		// left to describe (they disconnected mid-pass); anything else that would stop the build throws.
 		//
 		// The transform: POSITION comes from the live entity (the authoritative one the simulation moves), rotation from
 		// the character row with the same degenerate-quaternion guard world entry uses - the entity carries Euler angles,
@@ -2038,8 +2038,12 @@ namespace Faolan.GameServer.World
 				? character.Rotation
 				: Quaternion.Identity;
 
-			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIir.Build(character, equipment).ToProtobuf(), character)
-				?? throw new InvalidOperationException($"PlayerSpawnBuilder could not build a spawn record for character {character.Id:X8} ({character.Name}).");
+			// The scaffold half of the record is built from the character's own rows (attributes, feats, appearance),
+			// which the session character carries because every loader that produces one applies the same include set
+			// (WithSessionNavigations). It did not, once: the session copy came back with Body + MaxStats only, so the
+			// build failed - and that failure landed on the ENTERING player, hanging them on the loading screen over a
+			// row missing from somebody ELSE's session object.
+			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIir.Build(character, equipment).ToProtobuf(), character);
 		}
 
 		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)

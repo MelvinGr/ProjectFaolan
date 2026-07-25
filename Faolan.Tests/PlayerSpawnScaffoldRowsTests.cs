@@ -71,7 +71,7 @@ namespace Faolan.Tests
 				Id = 0x0200000B,
 				Class = Class.Necromancer
 			};
-			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
+			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 			Assert.Empty(character.Feats);
 
 			Assert.Equal(239, PlayerSpawnScaffoldRows.FreshPreFrame(Class.Necromancer).Length);
@@ -86,7 +86,7 @@ namespace Faolan.Tests
 				Id = 0x02000009,
 				Class = Class.Assassin
 			};
-			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
+			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 
 			var closer = character.Attributes.OrderBy(a => a.Sequence).Last();
 			Assert.Equal(0x3F10, closer.Tag); // 14 feats -> (14+2)*0x3F1
@@ -106,7 +106,7 @@ namespace Faolan.Tests
 				Id = 0x02000008,
 				Class = @class
 			};
-			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
+			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 
 			var closer = character.Attributes.OrderBy(a => a.Sequence).Last();
 			var expectedTag = (ushort)((character.Skills.Count + 2) * 0x3F1);
@@ -152,7 +152,7 @@ namespace Faolan.Tests
 				Id = 0x02000007,
 				Class = @class
 			};
-			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
+			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 
 			var feats = character.Skills.Select(s => s.SkillId).OrderBy(id => id).ToArray();
 			Assert.Equal(professionFeat, feats.First()); // profession feat = class * 100, and it sorts first
@@ -182,8 +182,8 @@ namespace Faolan.Tests
 				// raw = Dikketest's captured wire values; decode as the read side does before storing.
 				Assert.True(CharacterMorphs.TryApply(character.Body, morph, (int)(raw >> 1) ^ -(int)(raw & 1)));
 
-			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
-			Assert.False(PlayerSpawnScaffoldRows.EnsureFreshRows(character)); // idempotent
+			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
+			Assert.False(PlayerSpawnScaffoldRows.TrySeedFreshRows(character)); // idempotent
 			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, scaffold));
 
 			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(scaffold)));
@@ -201,7 +201,7 @@ namespace Faolan.Tests
 				Id = 0x02000006,
 				Class = Class.Barbarian
 			};
-			Assert.True(PlayerSpawnScaffoldRows.EnsureFreshRows(character));
+			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 
 			Assert.Equal(7, character.Attributes.Count);
 			var closer = character.Attributes.Single(a => a.Sequence == 6);

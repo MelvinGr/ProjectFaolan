@@ -267,7 +267,7 @@ byte-exact:
 
   ⚠️ The other **238 are IDENTITY ONLY**. The `0x2052` body is built around the ability's 128-bit **TEA key**, which
   rides the grant itself and is **random** (not derivable from the id — checked), so an ability no capture ever
-  granted has a name and nothing else. `Ability.IsGrantable` is the test; `GetLoadoutAbilities` logs and skips a
+  granted has a name and nothing else. `Ability.IsGrantable` is the test; `CharacterLoadout.ResolveAbilities` logs and skips a
   key-less row rather than putting a null key on the wire. Recovering the rest needs a capture that grants them —
   the same key blocker as the item catalog (Gitea #415). Pinned by `AbilityCatalogTests`.
 - **`0x200A DispatchLearnSpell`** — grants a real **spell**. Body = a bare big-endian `u32` spell id (`i_nSpellID`),
@@ -418,7 +418,7 @@ begin×2 / cancel×1; every cast in the ice-strike/casilda/casting captures is b
   record) and the channel's per-tick DoT is resolved as one hit on completion.
 
 ## Starting gear (#220)
-A brand-new beach character is seeded its slave outfit in `EnsureBeachStarterEquipment`
+A brand-new beach character is seeded its slave outfit in `CreateFlowService.SeedStarterEquipment`
 (`GameServerListener.WorldEntry.cs`), from the `StartingData` constants harvested from the `*create*` captures
 (one row, only if absent — an existing equipment row is left as the player left it):
 - **Wrist:** Slave Manacles (`StartingData.StartingWristItem` = 3361557, universal).

@@ -125,10 +125,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				: null;
 		}
 
-		// Seeds a character that has no scaffold rows yet with the fresh-character defaults. Returns true when it
-		// seeded (caller persists). weightedAppearance (from BuildWeightedEntries) replaces the Dikketest
-		// weighted-attribute defaults when the character's own editor choices are resolvable.
-		public static bool EnsureFreshRows(Character character, IReadOnlyList<ScaffoldEntry>? weightedAppearance = null)
+		// Seeds the fresh-character scaffold defaults onto a character that has none, IN PLACE, and says whether it did
+		// - false means it already had rows and nothing was touched, so the caller can skip the save. Try-named because
+		// that "no" is an ordinary outcome (every login after the first), not a failure.
+		// weightedAppearance (from BuildWeightedEntries) replaces the Dikketest weighted-attribute defaults when the
+		// character's own editor choices are resolvable.
+		public static bool TrySeedFreshRows(Character character, IReadOnlyList<ScaffoldEntry>? weightedAppearance = null)
 		{
 			if (character.Attributes is { Count: > 0 })
 				return false;
@@ -287,7 +289,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// morphs + the closer) from the character's current CharacterBody / CharacterBodyResources, leaving skills,
 		// spawn-frame and scaffold-pairs intact. This propagates a later appearance edit (e.g. the Faolan.Web editor,
 		// which rewrites Body/BodyResources) into the spawn the game sends on the next login, WITHOUT resetting the
-		// character's progression the way a full EnsureFreshRows would. Returns false when there's no scaffold to
+		// character's progression the way a full TrySeedFreshRows would. Returns false when there's no scaffold to
 		// refresh (the caller then seeds a fresh one). For an unedited character it reproduces the same entries it was
 		// seeded with, so it is a no-op in effect.
 		public static bool RefreshAppearance(Character character, IReadOnlyList<ScaffoldEntry>? weightedAppearance = null)
