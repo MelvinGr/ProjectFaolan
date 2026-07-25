@@ -62,7 +62,7 @@ namespace Faolan.GameServer.World
 		// How far from the SEAT the player must get before the server stands them up. Retail's sit capture puts it at
 		// ~1.25: the seated player is parked at Z=620.49 (pkt 6812), wobbles 0.10-0.19 while sitting, then reaches
 		// Z=621.74 and the standup goes out immediately (pkt 6841 -> 6844). 2.0 was too generous to ever fire - in
-		// AssassinL23's bench test the walk-off only reached 1.78 from the seat and the server never stood him up at all.
+		// the in-client bench test the walk-off only reached 1.78 from the seat and the server never stood the player up.
 		private const float SeatLeaveDistance = 1.0f;
 
 		// The object class the sit remoteformat names (capture: startobjectaction(33)|turnon_execute(4)|TavernBenchSimpleDynel).
@@ -1287,29 +1287,28 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
-		// Stand the player back up when they've MOVED away from their seat (called from the move handler: standup is
-		// triggered by movement, per the capture - not a second click). No-op when not seated or still within
+		// FALLBACK standup, for a player who leaves the seat without asking (a teleport, or a client that skips the
+		// request). The normal path is StandUp below, called when the client's own standup request arrives (behaviour 1,
+		// phase 2) - inferring it from movement was our model, not retail's. No-op when not seated or still within
 		// SeatLeaveDistance of the seat. Broadcasts the "standup" animation to the actor + nearby viewers and clears
 		// the seated state.
 		public async Task StandUpIfMoved(INetworkClient client, Vector3 newPosition)
 		{
-			var handle = client.Session.SeatedOnHandle;
-			if (handle == 0)
+			if (client.Session.SeatedOnHandle is null)
 				return;
 
-			// Re-anchor to where the client actually PARKED the character. A bench has several seats (3 on the Old
+			// Anchor to where the client actually PARKED the character. A bench has several seats (3 on the Old
 			// Tarantia ones), so the sit animation snaps the player to a spot up to ~1.3 units from the position they
 			// clicked at - measuring from the click point spends the whole budget on the snap, in an arbitrary
 			// direction, and is why a real walk-off never crossed the threshold. The first move after sitting is the
 			// parked position (retail's pkt 6812), so anchor there and measure from it.
-			if (!client.Session.SeatedPositionAnchored)
+			if (client.Session.SeatedPosition is not { } seat)
 			{
 				client.Session.SeatedPosition = newPosition;
-				client.Session.SeatedPositionAnchored = true;
 				return;
 			}
 
-			if (Vector3.Distance(newPosition, client.Session.SeatedPosition) < SeatLeaveDistance)
+			if (Vector3.Distance(newPosition, seat) < SeatLeaveDistance)
 				return;
 
 			await StandUp(client);
@@ -1319,13 +1318,12 @@ namespace Faolan.GameServer.World
 		// getting up is CLIENT-INITIATED, not movement-inferred - see the behaviour-1 branch in the BCC handler.
 		public async Task StandUp(INetworkClient client)
 		{
-			var handle = client.Session.SeatedOnHandle;
-			if (handle == 0)
+			if (client.Session.SeatedOnHandle is not { } handle)
 				return;
 
-			client.Session.SeatedOnHandle = 0;
+			client.Session.SeatedOnHandle = null;
 			client.Session.SeatedHoldConfirmed = false;
-			client.Session.SeatedPositionAnchored = false;
+			client.Session.SeatedPosition = null;
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
 				return;
@@ -1475,9 +1473,8 @@ namespace Faolan.GameServer.World
 			}
 
 			client.Session.SeatedOnHandle = handle;
-			client.Session.SeatedPosition = player.Position; // provisional - re-anchored to the parked spot on the first move
+			client.Session.SeatedPosition = null; // anchored from the parked spot on the first move after sitting
 			client.Session.SeatedHoldConfirmed = false;
-			client.Session.SeatedPositionAnchored = false;
 			_logger.LogInformation("Sit: {Player} sat on '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name, handle);
 			return true;
 		}

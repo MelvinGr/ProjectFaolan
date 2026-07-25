@@ -84,7 +84,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return ObjectActionAnimation(actor, SitAnimAction, 10, 0, EntityClass.SimpleDynel, targetHandle, SitAnimName, 2, 0x86, SitBlend, remoteformat, 0x4C);
 		}
 
-		// Stand the actor back up (triggered when a seated player moves). Byte-exact vs F2840.
+		// Stand the actor back up. Sent in answer to the CLIENT's standup request (behaviour 1, phase 2) - not inferred
+		// from movement, which is what we used to do; see the behaviour-1 branch in GameServerListener.Inbound.
+		// Byte-exact vs F2840.
 		public static byte[] PlayerStandUp(uint actor, uint targetHandle, string remoteformat)
 		{
 			return ObjectActionAnimation(actor, StandAnimAction, 12, 20, EntityClass.SimpleDynel, targetHandle, StandAnimName, 0, 0, 0f, remoteformat, 0x01);

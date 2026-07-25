@@ -127,9 +127,10 @@ namespace Faolan.GameServer
 							// The pre-move position, so a real TRANSLATION below can interrupt an in-flight cast (#347).
 							var previousPosition = moveEntity?.Position ?? sessionCharacter.Position;
 
-							// A seated player who MOVES AWAY from the bench stands up first (the sit capture triggers standup
-							// on movement, not a second click). Gated on distance from the seat, NOT the packet type: the
-							// client streams position syncs (and a small seat-snap) while seated that must not stand it up.
+							// FALLBACK only: a seated player who leaves the seat WITHOUT asking (a teleport, or a client that
+							// skips the request) still gets stood up. The normal path is the client's own standup request -
+							// behaviour 1, handled in the BCC branch below. Gated on distance from the seat rather than the
+							// packet type, because the client streams position syncs while seated that must not stand it up.
 							await _broadcaster.StandUpIfMoved(client, movePosition);
 
 							// Trance root (#141): the spellweave trance immobilises the caster, so while IsSpellweaving the
@@ -869,7 +870,7 @@ namespace Faolan.GameServer
 								// un-decoded fallback and got a bare echo - so the client asked to get up, was never
 								// answered, and stayed stuck in the pose until it timed out and stood up on its own.
 								// The seq mapping (3->4, 2->0x0F) lives in BehaviorAckBody.AckSeq.
-								if ((uint)actionType == 1 && client.Session.SeatedOnHandle != 0)
+								if ((uint)actionType == 1 && client.Session.SeatedOnHandle is not null)
 								{
 									var requestSeq = rawPayload.Length >= 18
 										? (ushort)((rawPayload[16] << 8) | rawPayload[17])
@@ -893,7 +894,7 @@ namespace Faolan.GameServer
 								// sit, s2c only, and never echoes one back. The guard is scoped to being seated because retail's
 								// client does send 0x2A otherwise (17 across the captures) and those ARE answered, so a blanket
 								// skip would soft-lock other object actions - the very thing the ack below exists to prevent.
-								if ((uint)actionType == BehaviorAnimationCodec.ObjectActionBehaviorId && client.Session.SeatedOnHandle != 0)
+								if ((uint)actionType == BehaviorAnimationCodec.ObjectActionBehaviorId && client.Session.SeatedOnHandle is not null)
 								{
 									Logger.LogInformation("Sit: absorbed the client's re-sent sit behavior (not echoed - it would replay the sit).");
 

@@ -30,7 +30,11 @@ namespace Faolan.Core.Network
 		List<uint> CreateEditorObservedRequestIds { get; }
 
 		List<uint> WeaveComponents { get; }
-		Vector3 SeatedPosition { get; set; }
+		// Where the client PARKED the seated character. Null until the first move after sitting reports it - a bench has
+		// several seats (3 on the Old Tarantia ones) so the sit snaps the character up to ~1.3 units from where the
+		// player clicked, and measuring "has he left the seat" from the click point is wrong. Null also means
+		// "not anchored yet", which is why no separate flag is needed.
+		Vector3? SeatedPosition { get; set; }
 
 		// The role this GameServer connection plays in the world-entry handshake, decided ONCE at
 		// GameAgent.Authenticate2 and the single source of truth for routing every later handshake signal.
@@ -75,11 +79,6 @@ namespace Faolan.Core.Network
 		bool PostMorphBurstSent { get; set; }
 		bool SeatedHoldConfirmed { get; set; }
 
-		// Whether SeatedPosition has been re-anchored to the position the CLIENT reports once seated. A bench has
-		// several seats (3 on the Old Tarantia ones), so the client snaps the character to a spot up to ~1.3 units from
-		// where the player clicked - measuring "has he left the seat" from the click point wastes most of the budget in
-		// the wrong direction. Anchored on the first move after sitting; see WorldBroadcaster.StandUpIfMoved.
-		bool SeatedPositionAnchored { get; set; }
 
 		// True once this connection has completed world entry (the burst-less world entry, the only entry path).
 		// Gates the in-world behaviours that must not fire on a connection that hasn't entered the world: the
@@ -148,7 +147,9 @@ namespace Faolan.Core.Network
 		uint MorphActivitySequence { get; set; }
 		uint PendingCastMode { get; set; }
 
-		uint SeatedOnHandle { get; set; }
+		// The bench the player is sitting on, or null when standing. Nullable rather than a 0 sentinel: 0 is a legal
+		// handle value and "not seated" is a genuinely absent state.
+		uint? SeatedOnHandle { get; set; }
 
 		// The wire handle of the entity the player currently has selected (last LookAtIIR/SelectDeselect), or 0 when
 		// nothing is selected (deselect sends a zeroed handle). Session-volatile, like every entity handle. Used by
@@ -183,7 +184,7 @@ namespace Faolan.Core.Network
 
 		// The player's position at the moment they sat: standup only fires once they've moved away from it (the client
 		// keeps streaming position syncs while seated - and a small seat-snap - which must NOT be read as leaving).
-		public Vector3 SeatedPosition { get; set; }
+		public Vector3? SeatedPosition { get; set; }
 		public WorldEntryMode EntryMode { get; set; } = WorldEntryMode.Login;
 
 		public bool AwaitingEnterWorld { get; set; }
@@ -202,8 +203,6 @@ namespace Faolan.Core.Network
 		// double-send) gets the hold-assert that COMMITS the pose - without answering request #2 the sit-down plays
 		// then reverts after the ~2.6s blend. This gates the assert to fire exactly once per sit.
 		public bool SeatedHoldConfirmed { get; set; }
-
-		public bool SeatedPositionAnchored { get; set; }
 		public bool WorldEntered { get; set; }
 		public byte[] PendingCastArgs { get; set; } = null!;
 
@@ -225,7 +224,7 @@ namespace Faolan.Core.Network
 		// The world-object (bench) handle the player is currently seated on (0 = standing). Set when the player
 		// interacts with a bench (the sit animation); cleared when they move off it (standup). See WorldBroadcaster
 		// TrySitOnObject / StandUpIfMoved.
-		public uint SeatedOnHandle { get; set; }
+		public uint? SeatedOnHandle { get; set; }
 		public uint SelectedTargetHandle { get; set; }
 
 		public uint? ActiveShieldSpellBase { get; set; }
