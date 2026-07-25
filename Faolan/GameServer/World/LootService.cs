@@ -99,7 +99,12 @@ namespace Faolan.GameServer.World
 			await _broadcaster.AfterLootTake(client, bagHandle);
 		}
 
-		// 0x2045 TryLootCash: loot the bag's coins; fires on every loot alongside TryLootAll.
+		// 0x2045 TryLootCash: credit the bag's coins. Coins AUTO-LOOT when the window opens - this is the client's very
+		// first word about a bag, sent before the player takes anything, so it is not a "loot the money" action the
+		// player can decline. Measured over the corpus: 67 of 70 bags open with it, and the canonical sequence is
+		// TryLootCash -> TryLootAll -> CloseLootBag (63 bags), or TryLootCash -> TryLootItem -> CloseLootBag (4).
+		// Nothing to do differently server-side - credit what the client asks for - but it is why a bag that held only
+		// coins is already empty by the time any item take happens.
 		public async Task HandleLootCash(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			body.ReadUInt32(); // loot typetag (0xC87A)

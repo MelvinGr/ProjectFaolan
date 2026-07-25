@@ -684,29 +684,36 @@ namespace Faolan.GameServer.World
 			return (records, npcs);
 		}
 
-		// A player closed the loot window (top-level 0x2044): consume the bag - fade it out for nearby players and drop
-		// it from the model.
+		// A player closed the loot window (top-level 0x2044). What happens to the bag depends on what is LEFT in it, not
+		// on the close: an EMPTY bag is consumed (faded for nearby players and dropped from the model), one that still
+		// holds items or coins stays in the world so the player can come back to it.
+		//
+		// Closing the window is not taking the loot. This used to fade + remove unconditionally, so pressing Escape
+		// deleted everything the player had not taken yet.
+		//
+		// The cases, all ending at "emptied -> gone, not emptied -> stays":
+		//   loot-all           -> bag emptied -> AfterLootTake tears it down; this handler then finds nothing, no-ops
+		//   drag the last item -> same, AfterLootTake
+		//   drag 1 of 2        -> contents remain -> kept, and it expires on its own (TickExpiry -> LootExpired)
+		//
+		// Nothing is consumed HERE, not even a bag that reads as empty. A no-drop kill leaves no bag at all
+		// (ConvertCorpseToLoot only spawns one for questDrop || items || cash), so the only bag that can be open and
+		// empty is the QUEST one: a LootFromNpc mob whose goal names no key item drops an empty bag deliberately,
+		// because looting it is what completes the goal (the goal matches on the bag's SOURCE NPC, not its contents).
+		// Consuming that on close would make the quest uncompletable - the player closes the window once and the goal
+		// has nowhere left to be satisfied. Letting it expire instead costs nothing and leaves them a way back.
+		//
+		// ⚠️ Whether RETAIL keeps a part-looted bag is not something the captures can tell us: all 95 closes in the
+		// corpus are of a bag that was just emptied (89 follow a TryLootAll, 6 follow drags that took what was there),
+		// and what they show - fade ~0.2s after the close, n3ToClientQuit ~3.4s after the fade - is the same empty-bag
+		// teardown AfterLootTake already reproduces. Gitea #431 asks for the capture that would decide it.
 		public Task CloseLootBag(INetworkClient client, uint bagHandle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag) || !bag.IsLootable)
 				return Task.CompletedTask;
 
-			// Closing the WINDOW is not taking the loot: the bag stays in the world with whatever is left in it, so the
-			// player can walk back and open it again. It used to fade + remove here, which deleted everything the
-			// player had not taken the moment they pressed Escape.
-			//
-			// ⚠️ This is OUR call, not a captured behaviour, and the captures cannot settle it: all 95 closes in the
-			// corpus are of a bag that was just EMPTIED - 89 follow a TryLootAll, and the other 6 (loot-drag-1538)
-			// follow drags that took what the bag had. In those the fade lands ~0.2s after the close and the
-			// n3ToClientQuit ~3.4s after the fade (its duration), which is exactly what the fully-looted teardown in
-			// AfterLootTake already does - so the corpus shows an empty bag being torn down, never a bag with items
-			// left surviving or not surviving a close. A capture that closes a part-looted multi-item bag would decide
-			// it (Gitea #431).
-			//
-			// So: the empty case is torn down by AfterLootTake before this is ever reached, and a bag that still has
-			// contents lives on until it expires off the world tick (WorldEntity.TickExpiry -> LootExpired).
-			_logger.LogInformation("Loot: {Name} closed the window on bag 0x{Handle:X8}; {Items} item(s) + {Cash} tin left in the world until it expires.", player.Name, bag.Handle,
+			_logger.LogInformation("Loot: {Name} closed the window on bag 0x{Handle:X8}; {Items} item(s) + {Cash} tin left in it, kept until it expires.", player.Name, bag.Handle,
 				bag.LootItems.Count(i => i != 0), bag.CashTin);
 			return Task.CompletedTask;
 		}
