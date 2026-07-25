@@ -636,14 +636,29 @@ namespace Faolan.Importer.Captures
 		{
 			// Resolve every route to its spawn FIRST, keyed by spawn. Two captured routes can correlate to the same
 			// spawn (they share a transform), and a per-entry loop cannot see what an earlier iteration already
-			// queued - so the second route's nodes would collide with the first's on the primary key. Last route for
-			// a spawn wins, which is what the old per-entry lookup effectively did once it found the tracked path.
+			// queued - so the second route's nodes would collide with the first's on the primary key.
+			//
+			// The RICHEST route wins, not the last one. Last-wins made the shipped path depend on which capture the
+			// corpus happened to iterate last: adding one gameplay capture of a map already covered replaced 36 nodes
+			// worth of patrol with what that run happened to observe (-36 PatrolNodes / -29 waypoints for zero new
+			// information). Two captures of one spawn are two observations of the same asset, so the one carrying more
+			// of the route is the better record of it - the same rule ImportConversations applies when a later capture
+			// is shorter ("replaced by a richer capture").
 			var bySpawn = new Dictionary<uint, (NpcSpawn Spawn, MoveTaskNode Task)>();
 			foreach (var e in paths)
 			{
 				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.Position.X && n.PositionY == e.Position.Y && n.PositionZ == e.Position.Z);
 				if (spawn == null)
-					continue; // a route with no matching spawn (should not happen for burst-truth patrols) - skip
+				{
+					// Say so rather than dropping it quietly: a route is only extracted for a spawn the same capture
+					// saw, so a miss means the placement it belongs to did not survive into the burst-truth set, and
+					// that NPC ships without its patrol.
+					Console.WriteLine($"[npc-patrols] WARNING: route at map {e.MapId} ({e.Position.X}, {e.Position.Y}, {e.Position.Z}) matches no spawn - dropped.");
+					continue;
+				}
+
+				if (bySpawn.TryGetValue(spawn.Id, out var kept) && RouteWeight(kept.Task).CompareTo(RouteWeight(e.Task)) >= 0)
+					continue;
 
 				bySpawn[spawn.Id] = (spawn, e.Task);
 			}
@@ -667,6 +682,22 @@ namespace Faolan.Importer.Captures
 				AddNodeTree(spawn, PatrolNodeMapper.ToNode(task));
 
 			await db.SaveChangesAsync();
+		}
+
+		// How much of a route an observation carries: total nodes, then total waypoints as the tiebreak. Used only to
+		// pick between two captures of the SAME spawn - see ImportPatrolPaths.
+		private static (int Nodes, int Waypoints) RouteWeight(MoveTaskNode task)
+		{
+			var nodes = 1;
+			var waypoints = task.Waypoints.Count;
+			foreach (var child in task.Children)
+			{
+				var (n, w) = RouteWeight(child);
+				nodes += n;
+				waypoints += w;
+			}
+
+			return (nodes, waypoints);
 		}
 
 		// Quest journal-content definitions, refreshed per harvested quest; un-harvested quests untouched.
@@ -848,8 +879,11 @@ namespace Faolan.Importer.Captures
 			// un-saved Adds, so two duplicate entries in THIS batch both fell through to Add and crashed a full import
 			// (#394). Track the rows queued this batch and update the pending/existing one instead of adding a second.
 			// The key is simply the row's DERIVED id, which IS the identity (map + position + display reference) - it
-			// used to be a hand-built tuple mirroring the old unique index. A row with NO display element has no
-			// identity to dedup on (it is un-lifted), so those skip the dedup and always add, as before.
+			// used to be a hand-built tuple mirroring the old unique index. Every row goes through this, INCLUDING one
+			// whose display element did not lift: it was exempted on the reasoning that it has "no identity to dedup
+			// on", which stopped being true when the derived id became the key - map + position identify it fine. The
+			// exemption blind-Added it over its own stored row, so a re-import of the one such capture row (the map
+			// 11040 "Siege Camp") failed with UNIQUE constraint failed: WorldObjects.Id.
 			var pending = new Dictionary<uint, WorldObject>();
 			foreach (var e in objects)
 			{
@@ -867,27 +901,35 @@ namespace Faolan.Importer.Captures
 				}, e);
 
 				built.Id = built.ComputeId();
+				var id = built.Id;
 
-				if (built.DisplayKind != null)
+				if (pending.TryGetValue(id, out var queued))
 				{
-					if (pending.TryGetValue(built.Id, out var queued))
-					{
-						PopulateObject(queued, e); // a duplicate within this batch: fold it into the row already queued
-						continue;
-					}
+					PopulateObject(queued, e); // a duplicate within this batch: fold it into the row already queued
+					continue;
+				}
 
-					var id = built.Id;
+				{
 					var existing = await db.WorldObjects.FirstOrDefaultAsync(o => o.Id == id);
 					if (existing != null)
 					{
+						// Drop the stored word rows BEFORE re-populating. The lift rebuilds them from the captured body
+						// (WorldObjectGeometryCodec.TryParse does row.Words.Clear() then re-adds), but `existing` is loaded
+						// without its Words - lazy loading is off - so that Clear() empties an already-empty collection and
+						// the re-added rows collide with the DB rows nobody loaded:
+						//   UNIQUE constraint failed: WorldObjectWords.WorldObjectId, Kind, Ordinal
+						// which is what a SECOND capture of the same object (an incremental import, #419) hits. Including
+						// the navigation instead would only trade this for the same-key delete+insert race, since the
+						// replacements reuse (WorldObjectId, Kind, Ordinal) - so delete immediately, as the conversation
+						// and patrol trees do.
+						await db.WorldObjectWords.Where(w => w.WorldObjectId == id).ExecuteDeleteAsync();
 						PopulateObject(existing, e);
 						pending[id] = existing;
 						continue;
 					}
-
-					pending[built.Id] = built;
 				}
 
+				pending[id] = built;
 				db.WorldObjects.Add(built);
 			}
 

@@ -3091,6 +3091,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float>("RotationZ")
                         .HasColumnType("REAL");
 
+                    b.Property<bool?>("ShowPopupOnUse")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("SubOpcode")
                         .HasColumnType("INTEGER");
 

@@ -47,6 +47,9 @@ namespace Faolan.Core.Network.Codecs.World
 			WorldObjectDisplay.TryApply(row, message.DisplayName);
 			row.CarsGroup = message.CarsGroup;
 			row.IsClosed = message.IsClosed;
+			row.ShowPopupOnUse = message.ShouldSerializeShowPopupOnUse()
+				? message.ShowPopupOnUse
+				: null;
 			row.QuestItemEffect = message.ShouldSerializeQuestItemEffect()
 				? message.QuestItemEffect
 				: null;
@@ -91,6 +94,8 @@ namespace Faolan.Core.Network.Codecs.World
 				CarsGroup = row.CarsGroup,
 				IsClosed = row.IsClosed
 			};
+			if (row.ShowPopupOnUse.HasValue)
+				message.ShowPopupOnUse = row.ShowPopupOnUse.Value;
 			if (row.QuestItemEffect.HasValue)
 				message.QuestItemEffect = row.QuestItemEffect.Value;
 			if (row.WaypointType.HasValue)

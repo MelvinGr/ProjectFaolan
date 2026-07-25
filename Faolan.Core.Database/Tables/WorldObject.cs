@@ -86,6 +86,11 @@ namespace Faolan.Core.Database.Tables
 			: new Vector3(DestinationX!.Value, DestinationY!.Value, DestinationZ!.Value); // Just throw if any are null, the DB should never have a partial position.
 
 		public bool IsClosed { get; set; } // proto field 12
+
+		// proto field 4 - "using this object opens a popup". Nullable because ABSENT and false are different bytes and
+		// the identity rebuild is byte-compared: exactly one captured object sets it (the map 11040 "Siege Camp"), and
+		// while the column was missing that row failed the all-or-nothing lift and shipped as an un-lifted row.
+		public bool? ShowPopupOnUse { get; set; }
 		public byte EffectDynelState { get; set; }
 
 		// The geometry record AFTER the identity message (the client's shared bounds reader FUN_0080c620), per-object

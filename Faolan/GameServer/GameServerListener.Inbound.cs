@@ -1241,7 +1241,7 @@ namespace Faolan.GameServer
 					else if (isNewCharacter) // New character -> show the creator
 					{
 						Logger.LogInformation("New-character create connection (clientInstance={ClientInstance:X8}): sending the character-creator (editor) burst.", clientInstance);
-						await CreateFlowService.SendRetailCreateEditorInitialBurst(client, Database);
+						await CreateFlowService.SendRetailCreateEditorInitialBurst(client, Database, logger: Logger);
 					}
 					else
 					{

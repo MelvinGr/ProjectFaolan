@@ -39,7 +39,8 @@ namespace Faolan.Importer.Captures
 			((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, "spawn - the protobuf round-trip corpus"), ((uint)GameServer0X2000Opcodes.MoveTaskIIR, "MoveTask"),
 			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, "QuestFullUpdate"), ((uint)GameServer0X2000Opcodes.QuestJournalIIR, "QuestJournal"),
 			((uint)GameServer0X2000Opcodes.QuestLogListIIR, "QuestLogList"), ((uint)GameServer0X2000Opcodes.PlayfieldFIIR, "map change - NpcSpawnExtractor needs it to key spawns to a map"),
-			((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, "the one captured recipe catalog")
+			((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, "the one captured recipe catalog"),
+			((uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, "world objects - the identity+geometry column lift, byte-compared")
 		];
 
 		// Reads the tshark JSON DIRECTLY rather than going through TsharkCaptureReader, because the tests consume the

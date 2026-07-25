@@ -59,13 +59,22 @@ namespace Faolan.GameServer.CreateFlow
 		private static readonly byte[] EditorAvatarSnapshot = Program.LoadEmbeddedResource("Faolan.CreateEditorAvatarSnapshot.bin");
 
 		// The 18 galley scene-prop dynels the create-editor initial burst streams, in retail send order. Each is a
-		// WorldObjects row on the editor map (4000), matched by captured handle and built byte-exact via
-		// WorldObjectBuilder (see LoadEditorSceneDynels + CreateEditorSceneDynelTests). The client also renders the
-		// galley from its own RDB on the MapChange; retail streams these so their handles are server-known.
-		private static readonly uint[] EditorSceneDynelHandles =
+		// WorldObjects row on the editor map (4000), built byte-exact via WorldObjectBuilder (see
+		// LoadEditorSceneDynels + CreateEditorSceneDynelTests). The client also renders the galley from its own RDB on
+		// the MapChange; retail streams these so their handles are server-known.
+		//
+		// Two values per prop, and the distinction matters: the HANDLE is what the burst EMITS (the captured wire
+		// value, re-addressed onto the row), while the DISPLAY ID - the prop's LDB string reference - is what FINDS
+		// the row. This used to be a handle list alone, looked up against the row's own CapturedHandle column, which
+		// made the burst depend on a SESSION-VOLATILE value as a persistence key (the thing the wire-protocol notes in
+		// CLAUDE.md warn against). Importing a capture whose session re-observed the editor scene renumbered all 18
+		// CapturedHandles, every lookup missed, and all 18 props silently dropped out of the burst. The display id is
+		// placement truth and is unique across map 4000.
+		private static readonly (uint Handle, uint DisplayId)[] EditorSceneDynels =
 		[
-			0x0002A7EF, 0x0002A7FA, 0x0002A7ED, 0x0002A7EE, 0x0002A7F0, 0x0002A7F1, 0x0002A7F2, 0x0002A7F3, 0x0002A7F4, 0x0002A7F5, 0x0002A7F6, 0x0002A7F7, 0x0002A7F8, 0x0002A7F9, 0x0002A7FB,
-			0x0002A7FC, 0x0002A7FD, 0x0002A7FE
+			(0x0002A7EF, 347648), (0x0002A7FA, 347660), (0x0002A7ED, 837652), (0x0002A7EE, 347646), (0x0002A7F0, 347650), (0x0002A7F1, 347652), (0x0002A7F2, 347667), (0x0002A7F3, 347670),
+			(0x0002A7F4, 347653), (0x0002A7F5, 347654), (0x0002A7F6, 347655), (0x0002A7F7, 347656), (0x0002A7F8, 347657), (0x0002A7F9, 347659), (0x0002A7FB, 347661), (0x0002A7FC, 347662),
+			(0x0002A7FD, 347663), (0x0002A7FE, 3072626)
 		];
 
 		// The listener's burst-less world entry (GameServerListener.WorldEntry.cs) - the constructed live-char world the
@@ -584,7 +593,7 @@ namespace Faolan.GameServer.CreateFlow
 
 		// `now` feeds the generated GameTime resync anchor (see the GameTime step below); it is a parameter so the
 		// byte-exact burst golden can pass the capturing instant and still match the capture.
-		public static async Task SendRetailCreateEditorInitialBurst(INetworkClient client, IDatabaseRepository? database = null, DateTimeOffset? now = null)
+		public static async Task SendRetailCreateEditorInitialBurst(INetworkClient client, IDatabaseRepository? database = null, DateTimeOffset? now = null, ILogger? logger = null)
 		{
 			var id = client.Session.Account.ClientInstance;
 			var sender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
@@ -604,10 +613,18 @@ namespace Faolan.GameServer.CreateFlow
 
 			// The 18 galley scene props: SPAWNED FROM their map-4000 WorldObjects rows (built byte-exact by
 			// WorldObjectBuilder, re-addressed to the captured handle + editor playfield), in retail send order.
-			foreach (var handle in EditorSceneDynelHandles)
+			foreach (var (handle, displayId) in EditorSceneDynels)
 			{
-				if (dynelRows == null || !dynelRows.TryGetValue(handle, out var dynelRow))
+				if (dynelRows == null)
+					break; // no DB at all (the bare golden run) - documented above, and it omits ALL of them, not some
+
+				if (!dynelRows.TryGetValue(displayId, out var dynelRow))
+				{
+					// Never quietly: a missing prop leaves a visible hole in the editor scene, and the burst that
+					// dropped all 18 of them still looked like a successful send.
+					logger?.LogWarning("Create-editor scene prop {DisplayId} has no map {MapId} WorldObjects row - the burst omits it.", displayId, StartingData.EditorMapId);
 					continue;
+				}
 
 				var dynel = WorldObjectBuilder.Build(dynelRow, handle, CreateEditorCharBuilder.EditorPlayfieldInstance);
 				await Iir(GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, dynel[8..]);
@@ -1002,9 +1019,13 @@ namespace Faolan.GameServer.CreateFlow
 			if (database == null)
 				return null;
 
+			// Keyed by the row's DISPLAY ID, not its CapturedHandle - see EditorSceneDynels for why.
 			var rows = new Dictionary<uint, WorldObject>();
 			foreach (var o in await database.GetWorldObjects(StartingData.EditorMapId))
-				rows.TryAdd(o.CapturedHandle, o);
+			{
+				if (o.DisplayId is { } displayId)
+					rows.TryAdd(displayId, o);
+			}
 
 			return rows;
 		}

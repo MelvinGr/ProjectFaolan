@@ -87,6 +87,25 @@ namespace Faolan.Tests
 		//
 		// ToTask throws loudly on a missing column by design (a patrol that cannot be rebuilt byte-exact must not be
 		// silently emitted short), which makes simply calling it the whole assertion.
+		// A shipped world object with NO display element never lifted, so WorldObjectBuilder refuses to build it and it
+		// silently never spawns - dead weight in the seed. One such row shipped (the map 11040 "Siege Camp", whose
+		// `show_popup_on_use` had no column) and only turned up because a re-import collided with it on the derived key.
+		// The grammar side of this is WorldObjectCorpusLiftTests; this is the seed side, and it also catches a row left
+		// STALE by a lift fix, since lifting changes the derived id and the old row is not deleted.
+		[Fact]
+		public async Task EveryShippedWorldObject_IsLifted()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var unlifted = await db.WorldObjects.Where(o => o.DisplayKind == null)
+				.Select(o => new { o.Id, o.MapId, o.Name }).AsNoTracking().ToListAsync(ct);
+
+			Assert.True(unlifted.Count == 0,
+				$"{unlifted.Count} shipped world object(s) have no display element, so they can never spawn: " +
+				string.Join(" | ", unlifted.Take(5).Select(o => $"{o.Id} map {o.MapId} {o.Name}")));
+		}
+
 		[Fact]
 		public async Task EveryShippedPatrol_RebuildsIntoAWireTask()
 		{
