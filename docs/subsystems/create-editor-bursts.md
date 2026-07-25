@@ -89,7 +89,7 @@ create-specific to decode, only builder wiring to do:
    [f32 nearClip=15.0][f32 farClip][0][0xFFFFFFFFFFFFFFFF][0x00000007][u32 flags]`.
   The position is the map's reference point; the playfield token (live, per-session) is carried twice. `count`,
   `farClip` and `flags` are passed through (not yet semantically pinned). Byte-exact for maps 4000 + 4010.
-- **GameTimeIIR** (`0x4F57DC08`, "SetDayTime"), 29 bytes:
+- **GameTimeIIR** (`0x4F57DC08`), 29 bytes:
   `[u32 0][u32 0][u64 dayTime][u8 flag][u64 timestamp][f32 rate=1.0]`. Byte-exact. `dayTime` is a count of game
   seconds (86400 to a game day, advancing 5 per real second) and `timestamp` is
   `[u32 unix / 17280][u32 unix epoch seconds]` — see [`../re/gametime-clock.md`](../re/gametime-clock.md). The
@@ -128,7 +128,7 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
    `display_name` identity) in the dedup + replay + coverage; `3072626` now has its own row.)
 - **`PlayfieldFIIR`/`GameTimeIIR`** — both are constructed in the burst
    via `CreateEditorRecordBuilder.BuildPlayfieldFiir`/`BuildGameTimeIir`. MapChange is built from the editor
-   map id + the session playfield token (carried twice); SetDayTime from the captured day-time/timestamp/rate.
+   map id + the session playfield token (carried twice); GameTime from the captured day-time/timestamp/rate.
    Wiring `InitialBurst.bin` surfaced an un-pinned u32 at PlayfieldFIIR `[58:62]` (0 in the test capture,
    `0x01000000` here) — added as the `field58` pass-through param. Locked by `BurstGoldenTests`.
 - **Record coverage** — the only record left verbatim is the live `Character…` preview (`IirId`, intentionally

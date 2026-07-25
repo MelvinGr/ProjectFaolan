@@ -1,5 +1,10 @@
 # `GameTime_t` — the day/night clock, and what `GameTimeIIR`'s fields mean
 
+> Naming note: this record used to be annotated `"SetDayTime"` throughout the repo. That name has no source —
+> it is in no RPC catalog and is not a string in the client — and it implies a setter when the client treats it
+> as a resync of a running clock. The client's own names are `GameTimeIIR_t` (the record) and `GameTime_t` /
+> `GameTime_t::Update` (the clock it drives).
+
 Recovered from `AgeOfConan.exe` (Ghidra headless, 2026-07-25) plus a regression over every captured
 `GameTimeIIR` record. The client side settles the **unit**, the corpus settles the **real-time period**, and the
 two agree exactly — which is the only reason either is trustworthy on its own.
@@ -61,17 +66,40 @@ global. Not modelled by us — recorded because it means "the cycle" is not nece
 
 ## The wire record
 
-`[u32 TypeTag=0][u32 Handle=0][u64 dayTime][u8 flag][u64 timestamp][f32 rate]`, 29 bytes. Field roles, from the
-IIR handler `FUN_004ee710(this, float newTime, p3, int p4, p5)`:
+`[u32 TypeTag=0][u32 Handle=0][u64 dayTime][u8 flag][u64 timestamp][f32 rate]`, 29 bytes.
+
+### The reader — `GameTimeIIR_t::ReadSubClass` (`FUN_005bde10`, vtable slot 8)
+
+Reached with `CLASS=GameTimeIIR_t … VtReader.java` (the leaf-name searches never find `::vftable`). It is five
+straight big-endian `FUN_0048f900` (ReadU32) calls into the IIR object, and the apply `FUN_005bdf70` (slot 2)
+then forwards four of the five to the clock:
+
+| field | wire word | forwarded as |
+|---|---|---|
+| `+0x1C` | dayTime **high** | `newTime` — the game-second count |
+| `+0x20` | dayTime **low** | **not forwarded** — the client discards the fraction |
+| `+0x24` | timestamp **high** | `p3` → stored at `clock+0x64` (the game-day counter) |
+| `+0x28` | timestamp **low** | `p4` → the `- __time64(NULL)` skew |
+| `+0x2C` | rate | `p5` → `clock+0xD4` |
+
+Two things fall out of this:
+
+- **the seconds live in the HIGH word and the fraction is ignored**, so emitting whole seconds with a zero low
+  word is exactly what the client consumes;
+- **`flag` is not a clock field.** `ReadSubClass` consumes only those five u32s, so the mid-record byte is read
+  by the base IIR class and never reaches `GameTime_t` - which is why its 0/1/2/3 spread does not correlate with
+  time of day. It is a generic IIR field, not a day/night selector.
+
+Field roles, from the IIR handler `FUN_004ee710(this, float newTime, p3, int p4, p5)`:
 
 - **`dayTime`** → `newTime`. 32.32 fixed point: game seconds in the high word, a fraction in the low word (19
   of 141 captured records carry `0x80000000`, i.e. half a second — so the ticket-era claim that the low word is
-  always 0 was wrong).
-- **`timestamp`** → `p4`, and the handler does `this[0xD0] = p4 - __time64(NULL)`: it compares the field against
-  **current unix time** and stores the skew. Independent client-side confirmation of the encoding below.
+  always 0 was wrong). The fraction is read but never forwarded.
+- **`timestamp`** → its two halves split: the low word is `p4`, and the handler does
+  `this[0xD0] = p4 - __time64(NULL)`, comparing the field against **current unix time** and storing the skew;
+  the high word is `p3`, parked at `clock+0x64`. Independent client-side confirmation of the encoding below.
 - **`rate`** → feeds `+0xD4`, one of the multipliers in the tick above.
-- **`flag`** takes 0/1/2/3 across the corpus (n = 11/37/16/77) and does not partition time-of-day, so it is not
-  a day/night selector. Role still unknown.
+- **`flag`** is a base-class field, not the clock's — see the reader table above.
 
 ### `timestamp` = `[u32 unix / 17280][u32 unix epoch seconds]`
 

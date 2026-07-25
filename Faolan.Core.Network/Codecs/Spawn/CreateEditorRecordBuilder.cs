@@ -153,7 +153,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return new FaolanStream().WriteUInt32(type).WriteUInt32(handle).WriteByte(flag).WriteUInt32(a).WriteUInt32(b).WriteUInt32(c).WriteByte(d).ToArray();
 		}
 
-		// GameTimeIIR (0x4F57DC08, "SetDayTime"): the in-game day-time + a wall-clock timestamp + the time rate.
+		// GameTimeIIR (0x4F57DC08): the in-game day-time + a wall-clock timestamp + the time rate.
 		// 29 bytes: [u32 0][u32 0][u64 dayTime][u8 flag][u64 timestamp][f32 rate]. Decoded from the create captures
 		// (docs/subsystems/create-editor-bursts.md); dayTime's low 32 bits are the fractional half (0 / 0x80000000), flag is a
 		// small phase byte (00/01/02), and the rate is the day-cycle speed (1.0 in every capture). Raw-body float =

@@ -46,7 +46,7 @@ external doc; the enum + the hash function are the whole source.
 | `0x4A3D899A` | `KnubotAppendTextIIR_c` ✓ | `KnubotAppendTextIIR` | KnubotAppendTextIIR_c  (x217) |
 | `0x4B2A47BF` | `KnubotStartTradeIIR_c` ✓ | `KnubotStartTradeIIR` | KnubotStartTradeIIR_c  (x2) |
 | `0x4D7D9123` | `KnubotAnswerIIR_c` ✓ | `KnubotAnswerIIR` | KnubotAnswerIIR_c  (x194) - NPC dialogue ("Knubot" = the NPC dialogue system) |
-| `0x4F57DC08` | `GameTimeIIR_t` ✓ | `GameTimeIIR` | GameTimeIIR_t  (x33) - "SetDayTime" |
+| `0x4F57DC08` | `GameTimeIIR_t` ✓ | `GameTimeIIR` | GameTimeIIR_t  (x33) - the world day/night clock; resyncs the client's GameTime_t |
 | `0x504B7924` | — *(source string not reproduced)* | `QuestLogListIIR` | the active-quest LIST that populates the J-panel (WorldQuest.BuildQuestLogList) |
 | `0x54C02089` | `CombatReactiveIIR_c` ✓ | `CombatReactiveIIR` | CombatReactiveIIR_c  (x17) |
 | `0x5A32F0D7` | `n3TeleportIIR_t` ✓ | `N3TeleportIIR` | n3TeleportIIR_t  (x27) - teleport |

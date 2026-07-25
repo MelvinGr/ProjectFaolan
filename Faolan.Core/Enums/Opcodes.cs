@@ -636,7 +636,7 @@ namespace Faolan.Core.Enums
 		GameActionListIIR = 0xF508F4C1, // GameActionListIIR_t  (x366)
 		TradeskillRequestIIR = 0x06B9CD94, // TradeskillRequestIIR_c - recipe-book REQUEST (client opened Crafting->Recipes); reply = TradeskillReplyIIR
 		TradeskillReplyIIR = 0x9062D559, // TradeskillReplyIIR_c - the recipe-book list (reply to TradeskillRequestIIR 0x06B9CD94)
-		GameTimeIIR = 0x4F57DC08, // GameTimeIIR_t  (x33) - "SetDayTime"
+		GameTimeIIR = 0x4F57DC08, // GameTimeIIR_t  (x33) - the world day/night clock; resyncs the client's GameTime_t
 		GuildUpdateIIR = 0x2550C99A, // GuildUpdateIIR_c  (x3)
 		HateListUpdateIIR = 0x8A01E5A1, // HateListUpdateIIR  (x61)
 		IntendedTeleportIIR = 0x10D27BC0, // IntendedTeleportIIR_c  (x15)

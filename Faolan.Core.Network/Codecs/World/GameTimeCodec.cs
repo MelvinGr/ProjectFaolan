@@ -4,14 +4,18 @@ using Faolan.Core.Network.Codecs.Spawn;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// GameTimeIIR ("SetDayTime") - the world clock that drives the day/night cycle. Record =
+	// GameTimeIIR - the world clock that drives the day/night cycle; it resyncs the client's GameTime_t. Record =
 	// [subop][TypeTag=0][Handle=0][u64 dayTime][u8 flag][u64 timestamp][f32 rate]. The body is the same 29-byte record
 	// CreateEditorRecordBuilder.BuildGameTimeIir builds, so we share that builder (#351 side-cleanup) and just prepend
 	// the subop here.
 	//
-	// `timestamp` is the resync anchor and is a PURE FUNCTION OF WALL-CLOCK TIME (recovered from the corpus - see
-	// ResyncTimestamp), so it is computed live rather than replayed. `dayTime` is the clock the sun/lighting reads and
-	// its unit is still unpinned, so it stays the captured constant - see the comment on CapturedDayTime.
+	// Both live fields are GENERATED rather than replayed (#351), and each rests on a different source that the other
+	// confirms - see docs/re/gametime-clock.md for the full decode:
+	//   * `timestamp`, the resync anchor, is a pure function of wall-clock time (recovered from the corpus).
+	//   * `dayTime`, the clock the sun/lighting reads, is a count of game seconds (recovered from the client's own
+	//     GameTime_t) advancing at 5 per real second - so a game day is 86400/5 = 17280 real seconds, which is exactly
+	//     the anchor period the corpus gives independently.
+	// `flag` is the only field still unaccounted for, and it is not the clock's - see BaseFlag.
 	public static class GameTimeCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameTimeIIR;
@@ -45,7 +49,10 @@ namespace Faolan.Core.Network.Codecs.World
 		// The client says 86400 game seconds at 5x; the wire says 17280 real seconds. They agree exactly.
 		public const uint GameDayRealSeconds = GameDaySeconds / GameSecondsPerRealSecond;
 
-		private const byte ClockFlag = 0x01;
+		// Not a clock field despite sitting inside this record: GameTimeIIR_t::ReadSubClass consumes only the five u32s
+		// around it, so this byte is read by the base IIR class and never reaches GameTime_t. It takes 0/1/2/3 across
+		// the corpus (n = 11/37/16/77) with no relation to time of day. We send the captured world-entry value.
+		private const byte BaseFlag = 0x01;
 		private const float ClockRate = 1.0f;
 
 		// The resync anchor: [u32 game-day number][u32 unix epoch seconds]. Both halves are wall-clock derived, which is
@@ -74,8 +81,9 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 
 		// dayTime on the wire is 32.32 fixed point - the integer game-second count in the high word, a fraction in the
-		// low word (19 of the 141 captured records carry 0x80000000, i.e. half a second). We emit whole seconds; the
-		// client interpolates between resyncs off its own frame delta anyway.
+		// low word (19 of the 141 captured records carry 0x80000000, i.e. half a second). We emit whole seconds, which
+		// is all the client consumes: its reader GameTimeIIR_t::ReadSubClass (FUN_005bde10) loads both words, but the
+		// apply (FUN_005bdf70) forwards only the HIGH one to the clock and drops the fraction.
 		public static ulong DayTime(DateTimeOffset now, long offsetGameSeconds = 0)
 		{
 			return (ulong)TimeOfDay(now, offsetGameSeconds) << 32;
@@ -85,7 +93,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// the time of day is server state (like a position), while the record's LAYOUT is what the capture pins.
 		public static byte[] Build(ulong dayTime, DateTimeOffset now)
 		{
-			return new FaolanStream().WriteUInt32(Opcode).WriteArray(CreateEditorRecordBuilder.BuildGameTimeIir(dayTime, ClockFlag, ResyncTimestamp(now), ClockRate)).ToArray();
+			return new FaolanStream().WriteUInt32(Opcode).WriteArray(CreateEditorRecordBuilder.BuildGameTimeIir(dayTime, BaseFlag, ResyncTimestamp(now), ClockRate)).ToArray();
 		}
 
 		public static byte[] Build(DateTimeOffset now, long offsetGameSeconds = 0)

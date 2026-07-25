@@ -579,10 +579,10 @@ namespace Faolan.GameServer.CreateFlow
 		}
 		// Verbatim replay of the retail create-editor INITIAL download from
 		// Captures/account-stricken998-character-create-no-worldenter.tshark.json (GameServer port 7030),
-		// rows 30-65. This stage front-loads MapChange + SpawnObject/Spawn + AccessWindow + SetDayTime
+		// rows 30-65. This stage front-loads MapChange + SpawnObject/Spawn + AccessWindow + GameTime
 		// + the first 9x 0xF98E10B3 before the client sends its first 0x205F.
 
-		// `now` feeds the generated GameTime resync anchor (see the SetDayTime step below); it is a parameter so the
+		// `now` feeds the generated GameTime resync anchor (see the GameTime step below); it is a parameter so the
 		// byte-exact burst golden can pass the capturing instant and still match the capture.
 		public static async Task SendRetailCreateEditorInitialBurst(INetworkClient client, IDatabaseRepository? database = null, DateTimeOffset? now = null)
 		{
@@ -761,7 +761,7 @@ namespace Faolan.GameServer.CreateFlow
 					.WriteVarint(id)
 					.WriteArray(EditorAvatarSnapshot)));
 
-			// SetDayTime: CONSTRUCTED from the captured day-time + rate (#189 item 3). The resync timestamp is generated
+			// GameTime: CONSTRUCTED from the captured day-time + rate (#189 item 3). The resync timestamp is generated
 			// from the wall clock the same way the world-entry clock is (GameTimeCodec.ResyncTimestamp) rather than
 			// replaying the capture's; dayTime stays captured until its unit is pinned (#351).
 			await Iir(GameServer0X2000Opcodes.GameTimeIIR, CreateEditorRecordBuilder.BuildGameTimeIir(0x0147_43EB_0000_0000UL, 0x01, GameTimeCodec.ResyncTimestamp(now ?? DateTimeOffset.UtcNow)));
