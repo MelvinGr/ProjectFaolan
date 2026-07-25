@@ -22,7 +22,71 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_AtTheCapturedInstant_MatchesCapturedSnapshot()
 		{
-			Assert.Equal(CapturedRecord, Convert.ToHexString(GameTimeCodec.Build(CapturedInstant)).ToLowerInvariant());
+			Assert.Equal(CapturedRecord, Convert.ToHexString(GameTimeCodec.Build(0x01472BDD_00000000UL, CapturedInstant)).ToLowerInvariant());
+		}
+
+		// The unit, from the client's own GameTime_t: 86400 game seconds to a game day, advancing 5 per real second.
+		// Those two are what the corpus-derived 17280s real day has to equal, and the whole model rests on them.
+		[Fact]
+		public void TheClockUnit_MatchesTheClientsOwnConstants()
+		{
+			Assert.Equal(86400u, GameTimeCodec.GameDaySeconds);
+			Assert.Equal(5u, GameTimeCodec.GameSecondsPerRealSecond);
+			Assert.Equal(17280u, GameTimeCodec.GameDayRealSeconds);
+		}
+
+		// The time of day advances at 5x, wraps at 86400, and never leaves the day - a value outside it would put the
+		// sun somewhere the client's `t % 86400` does not expect.
+		[Fact]
+		public void TimeOfDay_Advances5xAndWrapsWithinTheDay()
+		{
+			var start = GameTimeCodec.TimeOfDay(CapturedInstant);
+
+			Assert.Equal(start + 300, GameTimeCodec.TimeOfDay(CapturedInstant.AddSeconds(60)));
+			// A full real day is exactly 5 game days, so it lands back on the same time of day.
+			Assert.Equal(start, GameTimeCodec.TimeOfDay(CapturedInstant.AddSeconds(GameTimeCodec.GameDayRealSeconds)));
+
+			for (var minutes = 0; minutes < 60 * 12; minutes += 7)
+				Assert.InRange(GameTimeCodec.TimeOfDay(CapturedInstant.AddMinutes(minutes)), 0u, GameTimeCodec.GameDaySeconds - 1);
+		}
+
+		// The day rolls over at the same moment the resync anchor's game-day counter ticks. They are separate fields and
+		// nothing forces this - it is the reason the phase is locked to the wall clock rather than to process start.
+		[Fact]
+		public void TimeOfDay_WrapsWhenTheAnchorsGameDayCounterTicks()
+		{
+			// Walk to a real second where the game day is about to roll over.
+			var atMidnight = DateTimeOffset.FromUnixTimeSeconds(1782048203 / GameTimeCodec.GameDayRealSeconds * GameTimeCodec.GameDayRealSeconds + GameTimeCodec.GameDayRealSeconds);
+
+			Assert.Equal(0u, GameTimeCodec.TimeOfDay(atMidnight));
+			Assert.Equal(GameTimeCodec.GameDaySeconds - GameTimeCodec.GameSecondsPerRealSecond, GameTimeCodec.TimeOfDay(atMidnight.AddSeconds(-1)));
+
+			var before = GameTimeCodec.ResyncTimestamp(atMidnight.AddSeconds(-1)) >> 32;
+			Assert.Equal(before + 1, GameTimeCodec.ResyncTimestamp(atMidnight) >> 32);
+		}
+
+		// dayTime is 32.32 fixed point - the seconds go in the HIGH word. Getting this backwards would put the clock
+		// 4 billion game-days out.
+		[Fact]
+		public void DayTime_PutsTheSecondsInTheHighWord()
+		{
+			var dayTime = GameTimeCodec.DayTime(CapturedInstant);
+
+			Assert.Equal(GameTimeCodec.TimeOfDay(CapturedInstant), (uint)(dayTime >> 32));
+			Assert.Equal(0u, (uint)dayTime);
+		}
+
+		// The `.time` GM command shifts the phase by asking for a time of day; the offset must land on it exactly.
+		[Theory]
+		[InlineData(0u)]
+		[InlineData(6 * 3600u)]
+		[InlineData(12 * 3600u)]
+		[InlineData(23 * 3600u + 59 * 60u)]
+		public void TimeOfDay_CanBePhaseShiftedOntoAnyRequestedTime(uint wanted)
+		{
+			var offset = ((long)wanted - GameTimeCodec.TimeOfDay(CapturedInstant) + GameTimeCodec.GameDaySeconds) % GameTimeCodec.GameDaySeconds;
+
+			Assert.Equal(wanted, GameTimeCodec.TimeOfDay(CapturedInstant, offset));
 		}
 
 		// Both halves of the anchor are wall-clock derived, so the whole u64 has to fall out of the instant alone. The

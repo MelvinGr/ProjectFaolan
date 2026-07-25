@@ -233,17 +233,24 @@ namespace Faolan.GameServer
 			return new FaolanStream().WriteUInt32(FullPlayerCharacterBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(statId).WriteUInt32(value).ToArray();
 		}
 
-		// 0x4F57DC08 GameTime - the world clock. The resync timestamp is generated from `now` (wall-clock derived, see
-		// GameTimeCodec); dayTime is still the captured constant until its unit is pinned in-client (#351). `now` is a
-		// parameter so a golden test can feed the capturing instant and get the captured bytes back.
-		internal static Rpc BuildGameTime(INetworkClient client, DateTimeOffset now)
+		// 0x4F57DC08 GameTime - the live world clock (#351). Both fields are generated: the resync anchor from the wall
+		// clock and the time of day from it at 5 game seconds per real second, wrapping every 86400 (see GameTimeCodec
+		// for where those come from). `_gameTimeOffset` shifts the phase for the `.time` GM command.
+		internal Rpc BuildGameTime(INetworkClient client)
 		{
-			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(now)));
+			return BuildGameTime(client, DateTimeOffset.UtcNow, _gameTimeOffset);
 		}
 
-		internal static Rpc BuildGameTime(INetworkClient client)
+		// `now` and the offset are parameters so a golden test can feed the capturing instant and the captured dayTime
+		// and get the captured bytes back.
+		internal static Rpc BuildGameTime(INetworkClient client, DateTimeOffset now, long offsetGameSeconds)
 		{
-			return BuildGameTime(client, DateTimeOffset.UtcNow);
+			return BuildGameTime(client, GameTimeCodec.DayTime(now, offsetGameSeconds), now);
+		}
+
+		internal static Rpc BuildGameTime(INetworkClient client, ulong dayTime, DateTimeOffset now)
+		{
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(dayTime, now)));
 		}
 
 		// Frames the GuildUpdateIIR_c (GuildTagBody) on the world conversation: [RpcHeader][DispatchPassBlob]

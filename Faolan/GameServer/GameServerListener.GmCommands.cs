@@ -362,8 +362,44 @@ namespace Faolan.GameServer
 				["target"] = (client, _) => TargetInfoCommand(client),
 				["togglenpcgroup"] = (client, _) => ToggleNpcGroupCommand(client),
 				["graduatenpcgroup"] = GraduateNpcGroupCommand,
-				["weaponset"] = WeaponSetCommand
+				["weaponset"] = WeaponSetCommand,
+				["time"] = TimeCommand
 			};
+		}
+
+		// .time [<hh:mm> | <hh> | reset]  - report or set the world time of day, then resend the clock so the change is
+		// visible without a relog. The clock runs live off the wall clock at 5 game seconds per real second (#351), so a
+		// game day is 4.8 real hours; this shifts its PHASE rather than stopping it. Exists so the one thing the static
+		// decode cannot settle - whether the sky actually matches the time we send, i.e. that 0 is game-midnight - is a
+		// single command to check instead of a 4.8h wait. The client's own day window is 06:00-18:00
+		// (GameTime_t holds 21600.0 / 64800.0), so `.time 12` and `.time 0` should look unambiguously different.
+		private async Task TimeCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+
+			if (arg.Equals("reset", StringComparison.OrdinalIgnoreCase))
+				_gameTimeOffset = 0;
+			else if (arg.Length > 0)
+			{
+				var parts = arg.Split(':', StringSplitOptions.TrimEntries);
+				if (!uint.TryParse(parts[0], out var hours) || hours > 23 || parts.Length > 2 || (parts.Length == 2 && (!uint.TryParse(parts[1], out _) || uint.Parse(parts[1]) > 59)))
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .time [&lt;hh:mm&gt; | &lt;hh&gt; | reset]");
+					return;
+				}
+
+				var minutes = parts.Length == 2 ? uint.Parse(parts[1]) : 0;
+				// Shift the phase so the CURRENT instant reads as the requested time of day.
+				var wanted = (long)(hours * 3600 + minutes * 60);
+				_gameTimeOffset = (_gameTimeOffset + wanted - GameTimeCodec.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset) + GameTimeCodec.GameDaySeconds) % GameTimeCodec.GameDaySeconds;
+			}
+
+			await client.SendAsync(BuildGameTime(client));
+
+			var timeOfDay = GameTimeCodec.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"World time {timeOfDay / 3600:00}:{timeOfDay % 3600 / 60:00} (game day = {GameTimeCodec.GameDayRealSeconds / 3600.0:0.#} real hours, offset {_gameTimeOffset}s)");
 		}
 
 		// .kill [<handle> | self]  - kill the player's currently SELECTED target (last LookAt/SelectDeselect), or the

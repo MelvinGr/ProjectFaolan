@@ -142,6 +142,10 @@ namespace Faolan.GameServer
 		// client-side effect). Kept in the 0x18xxxxxx neighbourhood of the captured nonces.
 		private static int _spellweaveEffectSeq;
 
+		// Phase shift for the world clock, in game seconds (#351). The clock itself runs off the wall clock
+		// (GameTimeCodec); this is what `.time` moves so a tester can jump to dusk without waiting out a 4.8h game day.
+		private long _gameTimeOffset;
+
 		// Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
 		// See Economy/BankService.cs.
 		private readonly BankService _bank;

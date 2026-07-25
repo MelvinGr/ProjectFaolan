@@ -16,27 +16,37 @@ namespace Faolan.Core.Network.Codecs.World
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameTimeIIR;
 
-		// The real-time length of one game day, in seconds - the period of the resync timestamp's high word. Derived
-		// twice over from the 141 captured GameTimeIIR records, the two derivations independent of each other:
+		// dayTime's UNIT, from the client's own clock class GameTime_t (gametime.cpp). Its ctor FUN_004ed470 sets
+		// hoursPerDay=24 (+0x98), minutesPerHour=60 (+0x9C), secondsPerMinute=60 (+0xA0), secondsPerHour=3600 (+0xA4)
+		// and a wrap period of 86400.0 (+0x78), and its readers decompose the value as
+		//   seconds = t % 60,  minutes = (t / 60) % 60,  hours = t / 3600
+		// (FUN_004ee4f0 SetCurrentRealTime / FUN_004ee710, the IIR handler). So dayTime is a count of GAME SECONDS with
+		// 86400 of them to a game day. Only minutes and seconds are taken modulo - hours is not - so the value is an
+		// absolute running count and the time of day is `dayTime % 86400`.
+		public const uint GameDaySeconds = 86400;
+
+		// How many game seconds pass per REAL second, from the same class: the per-frame tick FUN_004eddb0 advances the
+		// clock by `this[0x74] * dt * rate[0xBC] * wireRate[0xD4] * phaseRate`, and the ctor sets +0x74 = 5 (the rates
+		// all default to 1.0f, and the wire `rate` field feeds +0xD4 directly).
+		//
+		// Two side findings from that tick, not modelled here: +0xC0 / +0xC4 are SEPARATE day and night rate
+		// multipliers (so the two halves of the day can run at different speeds - both default to 1.0), selected by a
+		// dawn/dusk window built from +0xA8=19h, +0xAC=4h, +0xB0=7h, +0xB4=2h; and +0x80 / +0x88 hold 21600.0 (06:00)
+		// and 64800.0 (18:00), the day window itself.
+		public const uint GameSecondsPerRealSecond = 5;
+
+		// ...so one game day takes 86400 / 5 = 17280 real seconds = 4.8 real hours. That number is independently
+		// confirmed by the corpus, which is what makes this whole model trustworthy: it is the period of the resync
+		// timestamp's high word, derived from the 141 captured GameTimeIIR records two separate ways -
 		//   * high == low / P holds exactly for 140/141 samples at P = 17280, and for 0/141 at 3600 / 21600 / 43200 /
 		//     86400. The one miss is a field change, whose two halves straddle a period boundary (its low word is 155s
 		//     past one), so it is not a clock tick.
 		//   * solving for P directly as low/high over every sample lands in 17280.001 .. 17280.169.
-		// 17280s = 4.8 real hours per game day.
-		public const uint GameDayRealSeconds = 17280;
+		// The client says 86400 game seconds at 5x; the wire says 17280 real seconds. They agree exactly.
+		public const uint GameDayRealSeconds = GameDaySeconds / GameSecondsPerRealSecond;
 
 		private const byte ClockFlag = 0x01;
 		private const float ClockRate = 1.0f;
-
-		// The captured world-entry dayTime. Still a constant because its UNIT is the one part of the clock the corpus
-		// cannot settle (#351): dayTime is NOT a global monotonic clock - across captures it moves backwards, and even
-		// within one continuous capture it goes up then down (Hakotep_hox_login_gameplay0: 21459957 -> 21458914), so no
-		// rate can be fitted from it. That fits it being per-playfield (Tortage has separate day and night instances,
-		// #149), which would also make the "global, no map data" reading of this record wrong. Ghidra does not settle it
-		// either: every use of 86400 in the client is real wall-clock (the CRT gmtime helpers, a d/h/m/s countdown
-		// formatter, and a localtime64-based hour-of-day schedule gate), and neither the IIR hash nor its type name
-		// appears as a literal, so the reader is not statically reachable. Pinning it needs the in-client experiment.
-		private const ulong CapturedDayTime = 0x01472BDD_00000000;
 
 		// The resync anchor: [u32 game-day number][u32 unix epoch seconds]. Both halves are wall-clock derived, which is
 		// what makes this generatable rather than replayable:
@@ -49,14 +59,38 @@ namespace Faolan.Core.Network.Codecs.World
 			return ((unixSeconds / GameDayRealSeconds) << 32) | (uint)unixSeconds;
 		}
 
-		public static byte[] Build(DateTimeOffset now)
+		// The live time of day, in game seconds since game-midnight. Phase-locked to the wall clock the same way the
+		// resync anchor is, so it agrees with the game-day counter in that anchor: the day rolls over to 0 exactly when
+		// `unix / GameDayRealSeconds` ticks. `offsetGameSeconds` shifts the phase (the `.time` GM command).
+		//
+		// Retail's own dayTime is NOT phase-locked to unix time - our own corpus check rules that out
+		// ((unix % 17280) * 5 does not reproduce the captured values) - because retail's is per-playfield with its own
+		// epoch (it even runs backwards between captures). The phase is therefore ours to choose; this picks the one
+		// that is deterministic and survives a restart.
+		public static uint TimeOfDay(DateTimeOffset now, long offsetGameSeconds = 0)
 		{
-			return new FaolanStream().WriteUInt32(Opcode).WriteArray(CreateEditorRecordBuilder.BuildGameTimeIir(CapturedDayTime, ClockFlag, ResyncTimestamp(now), ClockRate)).ToArray();
+			var gameSeconds = now.ToUnixTimeSeconds() * GameSecondsPerRealSecond + offsetGameSeconds;
+			return (uint)(((gameSeconds % GameDaySeconds) + GameDaySeconds) % GameDaySeconds);
 		}
 
-		public static byte[] Build()
+		// dayTime on the wire is 32.32 fixed point - the integer game-second count in the high word, a fraction in the
+		// low word (19 of the 141 captured records carry 0x80000000, i.e. half a second). We emit whole seconds; the
+		// client interpolates between resyncs off its own frame delta anyway.
+		public static ulong DayTime(DateTimeOffset now, long offsetGameSeconds = 0)
 		{
-			return Build(DateTimeOffset.UtcNow);
+			return (ulong)TimeOfDay(now, offsetGameSeconds) << 32;
+		}
+
+		// dayTime is passed in rather than read from the clock so a golden test can rebuild a captured record exactly:
+		// the time of day is server state (like a position), while the record's LAYOUT is what the capture pins.
+		public static byte[] Build(ulong dayTime, DateTimeOffset now)
+		{
+			return new FaolanStream().WriteUInt32(Opcode).WriteArray(CreateEditorRecordBuilder.BuildGameTimeIir(dayTime, ClockFlag, ResyncTimestamp(now), ClockRate)).ToArray();
+		}
+
+		public static byte[] Build(DateTimeOffset now, long offsetGameSeconds = 0)
+		{
+			return Build(DayTime(now, offsetGameSeconds), now);
 		}
 	}
 }

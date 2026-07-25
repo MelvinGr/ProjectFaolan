@@ -30,9 +30,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildGameTime_ReproducesCapturedRecord()
 		{
-			// The resync timestamp is generated from the wall clock (#351), so feed the instant the capture was taken -
-			// its own anchor read as unix epoch seconds - and the listener must rebuild the captured record exactly.
-			var record = DecodeIir(GameServerListener.BuildGameTime(BeachClient(), DateTimeOffset.FromUnixTimeSeconds(0x6A024E93)).Serialize());
+			// Both clock fields are generated now (#351), so feed the capture's own values back: the instant it was taken
+			// (its resync anchor read as unix epoch seconds) and the time of day it was showing. The record must then
+			// rebuild byte-for-byte - what this pins is the LAYOUT; the time of day itself is server state.
+			var record = DecodeIir(GameServerListener.BuildGameTime(BeachClient(), 0x01472BDD_00000000UL, DateTimeOffset.FromUnixTimeSeconds(0x6A024E93)).Serialize());
 
 			Assert.Equal(0x2000u, record.Opcode);
 			Assert.Equal((uint)GameServer0X2000Opcodes.GameTimeIIR, record.IirType);
