@@ -76,3 +76,27 @@ scaled by Int/Wis. Tracked in Gitea #401.
 
 Decode it, add a golden test, then promote the fact to `[V3: …]` in the relevant layer page and delete its entry
 here. If it turns out to need a capture we don't have, say so here rather than dropping it.
+
+---
+
+## Teams and player trade
+
+### The team member record's 9-byte per-character opaque
+**Tracked: Gitea #101.** [V0: the team member record's 9-byte per-character opaque] The 102-byte team member
+descriptor ([`../subsystems/teams-trade-friends.md`](../subsystems/teams-trade-friends.md)) ends with nine bytes
+that DIFFER per character — `0x00000003 0x0159EA5C 0x54` and `0x00000181 0x813BC035 0xEC` for the capture's two
+captured players — while every field around them is identical in both. The value appears **nowhere else in the capture**:
+not in login, not in the character snapshot, not in the chat tier, so it is CS-tier state we cannot derive from
+anything we send, and there is no basis for computing it. We carry it (a captured member round-trips byte-exact) and
+send zero for our own members until an in-client check says what breaks. Read as `[u32][u32][u8]` because only that
+last byte varies and the three after it are zero in both records; a second capture with more characters — ideally
+one where the same character appears in two sessions — would settle both the split and whether it is per-character
+or per-session.
+
+### The two unnamed trade replies
+**Tracked: Gitea #101.** [V0: the two unnamed trade replies 0x206B and 0x206D] Both are EMPTY-bodied s2c replies in
+the player-trade flow and both are `Reserved0x…` in our opcode catalog, i.e. the client's string table gave no name.
+Their ROLE is unambiguous from the capture — `0x206B` acks your own accept, `0x206D` lands on both sides as the
+trade commits (immediately followed by the `TradeCompletedSuccessfully` overlay) — so the flow is implementable; it
+is the client-side NAMES that are missing, which needs the CsPlayerInterface/GameServer dispatch tables in Ghidra.
+

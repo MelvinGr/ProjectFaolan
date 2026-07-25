@@ -15,7 +15,7 @@ recomputing the hash over candidates derived from our member name (± `_c`/`_t`,
 so a filled cell is a self-contained proof: `BKDR-31(name) == id`. This holds without parsing any
 external doc; the enum + the hash function are the whole source.
 
-- **76** ids: client type name recovered + BKDR-31-verified.
+- **78** ids: client type name recovered + BKDR-31-verified.
 - **1** ids: 32-bit hash (V1-recovered from the client) whose exact source string our name doesn't reproduce.
 
 | Type id | Recovered client name | Our enum name | Note |
@@ -29,6 +29,7 @@ external doc; the enum + the hash function are the whole source.
 | `0x0BA1C1CB` | `BankIIR_t` ✓ | `BankIIR` | BankIIR_t  (x3) |
 | `0x0D155695` | `LookAtIIR_t` ✓ | `LookAtIIR` | LookAtIIR_t  (x812) - "SelectDeselect" |
 | `0x0D80E7C9` | `TombStoneFullUpdateIIR_c` ✓ | `TombStoneFullUpdateIIR` | TombStoneFullUpdateIIR_c  (x6) |
+| `0x0DF44B73` | `AddToGroupIIR_c` ✓ | `AddToGroupIIR` | AddToGroupIIR_c  (x16) - a member joined a team; pushed to every member's WORLD connection |
 | `0x0EED7068` | `ChainKillIIR_t` ✓ | `ChainKillIIR` | ChainKillIIR_t  (x28) |
 | `0x10D27BC0` | `IntendedTeleportIIR_c` ✓ | `IntendedTeleportIIR` | IntendedTeleportIIR_c  (x15) |
 | `0x1745EF6C` | `ThreatLevelIIR_c` ✓ | `ThreatLevelIIR` | ThreatLevelIIR_c  (x162) |
@@ -89,6 +90,7 @@ external doc; the enum + the hash function are the whole source.
 | `0xD6C1F0CC` | `SetShadowCoverageIIR_c` ✓ | `SetShadowCoverageIIR` | SetShadowCoverageIIR_c (BKDR-31 of "SetShadowCoverageIIR_c") - environment/lighting update |
 | `0xD751EBB4` | `StopIIR_c` ✓ | `StopIIR` | StopIIR_c  (x2097) - stop moving |
 | `0xE0B51102` | `ChatTextIIR_t` ✓ | `ChatTextIIR` | ChatTextIIR_t  (x1) |
+| `0xE4FF0C85` | `RemoveFromGroupIIR_c` ✓ | `RemoveFromGroupIIR` | RemoveFromGroupIIR_c  (x8) - a member left/was kicked; the AddToGroupIIR complement |
 | `0xE7F4F8F8` | `SimpleDynelVisualChangeIIR_c` ✓ | `SimpleDynelVisualChangeIIR` | SimpleDynelVisualChangeIIR_c  (x548) |
 | `0xE9F24184` | `StatDamageIIR_t` ✓ | `StatDamageIIR` | StatDamageIIR_t  (x450) |
 | `0xF096251E` | `LootBagFullUpdateIIR_c` ✓ | `LootBagFullUpdateIIR` | LootBagFullUpdateIIR_c  (x102) - loot bag (NOT the player bag) |

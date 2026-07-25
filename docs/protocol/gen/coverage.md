@@ -8,9 +8,9 @@
 ## Headline
 
 - **821** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **77** IIR carrier types: **73 V3** (byte-exact builder), **3 V2** (built, no golden), **1 V1** (no builder found).
-- **59** codec classes, **56** with a byte-exact test.
-- **9** Python dissectors (`tools/capture/decode_*.py`).
+- **79** IIR carrier types: **75 V3** (byte-exact builder), **3 V2** (built, no golden), **1 V1** (no builder found).
+- **60** codec classes, **57** with a byte-exact test.
+- **10** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
 
@@ -35,6 +35,7 @@ the margins, but never invents a golden that isn't there.
 
 | Level | IIR type | Built by |
 |-------|----------|----------|
+| V3 | `AddToGroupIIR` | `GroupMembershipCodec` |
 | V3 | `AreaFormulaIIR` | `AreaFormulaCodec` |
 | V3 | `BankIIR` | `BankIirCodec` |
 | V3 | `BehaviorControlCenterIIR` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `BehaviorHeartbeatCodec`, `CombatPacketCodec`, `WorldDeath` |
@@ -88,6 +89,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `QuestJournalIIR` | `WorldQuest` |
 | V3 | `QuestLogListIIR` | `WorldQuest` |
 | V3 | `RegenIIR` | `RegenCodec` |
+| V3 | `RemoveFromGroupIIR` | `GroupMembershipCodec` |
 | V3 | `ScryScriptIIR` | `ScryScript` |
 | V3 | `SetMorphValueIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetNameIIR` | `CreateEditorRecordBuilder` |

@@ -12,12 +12,13 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**77** IIR carrier types · **73 V3** (73 with an auto-cited golden). The
+**79** IIR carrier types · **75 V3** (75 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
 | Level | IIR type | Opcode | Codec | Golden (proof of layout) |
 |-------|----------|--------|-------|--------------------------|
+| V3 | `AddToGroupIIR` | `0x0DF44B73` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
 | V3 | `AreaFormulaIIR` | `0xCE30BE4E` | `AreaFormulaCodec` | [V3: V1IirCodecTests.AreaFormula_RoundTripsCapturedBody] |
 | V3 | `BankIIR` | `0x0BA1C1CB` | `BankIirCodec` | [V3: BankStorageTests.BuildBankIirRecord_Matches_CapturedBank] |
 | V3 | `BehaviorControlCenterIIR` | `0x642CD3D6` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `BehaviorHeartbeatCodec`, `CombatPacketCodec`, `WorldDeath` | [V3: BehaviorAckTests.UnequipOutOfSlot_AckMatchesCapture] |
@@ -71,6 +72,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `QuestJournalIIR` | `0x79F8C7A1` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `QuestLogListIIR` | `0x504B7924` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `RegenIIR` | `0x28D0AC99` | `RegenCodec` | [V3: V1IirCodecTests.Regen_RoundTripsCapturedBody] |
+| V3 | `RemoveFromGroupIIR` | `0xE4FF0C85` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
 | V3 | `ScryScriptIIR` | `0xA36D3B74` | `ScryScript` | [V3: ScryScriptCodecTests.BuildStartScriptGroup_MatchesTheHandWrittenBytes] |
 | V3 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `SetNameIIR` | `0xADCE0CDA` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |

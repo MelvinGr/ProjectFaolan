@@ -610,6 +610,7 @@ namespace Faolan.Core.Enums
 	// server doesn't emit yet. The few descriptive aliases the server code uses are at the bottom.
 	public enum GameServer0X2000Opcodes : uint
 	{
+		AddToGroupIIR = 0x0DF44B73, // AddToGroupIIR_c  (x16) - a member joined a team; pushed to every member's WORLD connection
 		AreaFormulaIIR = 0xCE30BE4E, // AreaFormulaIIR_t  (x42)
 		BankIIR = 0x0BA1C1CB, // BankIIR_t  (x3)
 		BehaviorControlCenterIIR = 0x642CD3D6, // BehaviorControlCenterIIR_c  (x22474) - the generic action/behavior channel ("Interact")
@@ -665,6 +666,7 @@ namespace Faolan.Core.Enums
 		QuestJournalIIR = 0x79F8C7A1, // QuestJournalIIR_c  (x17)
 		QuestLogListIIR = 0x504B7924, // the active-quest LIST that populates the J-panel (WorldQuest.BuildQuestLogList)
 		RegenIIR = 0x28D0AC99, // RegenIIR_c  (x554)
+		RemoveFromGroupIIR = 0xE4FF0C85, // RemoveFromGroupIIR_c  (x8) - a member left/was kicked; the AddToGroupIIR complement
 		ScryScriptIIR = 0xA36D3B74, // ScryScriptIIR_c  (x390) - cutscene/scry scripts + char-editor callbacks (IntroDone, TheNameIs, ...)
 		SetMorphValueIIR = 0xBADF5A4B, // SetMorphValueIIR_c  (x101) - character-creator morph ack
 		SetNameIIR = 0xADCE0CDA, // SetNameIIR_t  (x4) - name commit in the create flow
@@ -699,8 +701,7 @@ namespace Faolan.Core.Enums
 		// [unverified] = reader not dumped yet: both candidate BKDR-31 forms (bare / name+"_c") shown - extend
 		// DumpVtableReaders.java to resolve. Add the authoritative one to the enum once dumped or seen on the wire.
 		//
-		// GAMEPLAY (43) - the real backlog of unseen record types:
-		//   AddToGroupIIR                0x0DF44B73  [auth: AddToGroupIIR_c]
+		// GAMEPLAY (41) - the real backlog of unseen record types:
 		//   AutoToggleCombatIIR          0x107E921F  [auth: AutoToggleCombatIIR_c]
 		//   BccIIR                       [alias] = BehaviorControlCenterIIR 0x642CD3D6 (Bcc), already emitted
 		//   ClonedFeatsIIR               0xF7BF33DC  [auth: ClonedFeatsIIR_c]  (candidate: full feat set at login, #251)
@@ -731,7 +732,6 @@ namespace Faolan.Core.Enums
 		//   QuestCooldownIIR             0x9CC129C5  [auth: QuestCooldownIIR]
 		//   QuestRewardNotifyIIR         0x8BB2799C  [auth: QuestRewardNotifyIIR_c]
 		//   QuestRewardSelectionIIR      0x80138D7B  [auth: QuestRewardSelectionIIR_c]
-		//   RemoveFromGroupIIR           0xE4FF0C85  [auth: RemoveFromGroupIIR_c]
 		//   ScriptTextIIR                0xE6C3CCEF  [auth: ScriptTextIIR_t]
 		//   ScryLuaIIR                   0x55ACD7D1  [auth: ScryLuaIIR]
 		//   SkillIIR                     0xD558FF16  [auth: SkillIIR_t]  (candidate: the SKILL record, #251)
