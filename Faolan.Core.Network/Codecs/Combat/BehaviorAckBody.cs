@@ -42,6 +42,29 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// pad follows the tail's PROVENANCE - echoed or replaced - not the behaviour id alone.
 		private static readonly uint[] PaddedTailBehaviors = [0x0F, 0x11];
 
+		// The ack's seq. This was `seq + 1`, which is right for the common case and wrong for the other one.
+		//
+		// Across every login capture the client only ever SENDS seq 0x0003 or 0x0002, and retail's ack is 0x0004 in 739
+		// of the 0x0003 cases (= +1, so that half was fine). For 0x0002 it replies 0x000F / 0x0007 / 0x0004 / 0x0005 /
+		// 0x000A depending on context - and NEVER 0x0003. Meanwhile 0x0004 accounts for 49158 of all s2c BCC seqs, and
+		// 0x0003 appears 3 times in the entire corpus. So `seq + 1` on a 0x0002 request emitted a value the client does
+		// not know, and it said so: "Control.IIR - Unknown Action Command: 3" (a warning, not a rejection - the record
+		// parses, the client just cannot act on it, which left standing up half-working).
+		//
+		// What the RIGHT 0x0002 reply is per context is NOT settled: pairing a request with the next s2c record for the
+		// same actor+behaviour gives a mix for every behaviour (0x16 -> mostly 0x000F but also 0x0005/0x0007/0x0004), so
+		// that pairing is too loose to derive a rule and I am not inventing one. 0x0004 is the safe default: it is the
+		// overwhelmingly dominant ack, it IS a legitimate reply to a 0x0002 request in the captures, and it is what the
+		// proven 0x0003 -> 0x0004 case produces anyway.
+		//
+		// The bench-sit records do not come through here - BenchSitState builds SeqBegin / SeqObjectHold explicitly.
+		private static ushort AckSeq(ushort requestSeq)
+		{
+			return requestSeq + 1 == 0x0003
+				? (ushort)0x0004
+				: (ushort)(requestSeq + 1);
+		}
+
 		// The echo-ack: echoes the request with field3 (phase) spliced in, and pads the tail only for the behaviours
 		// that take a pad (see above). `tailOverride` replaces the echoed tail wholesale.
 		public static byte[] BuildBehaviorEchoAckBody(byte[] rawPayload, uint instance, uint phase, byte[]? tailOverride = null)
@@ -58,7 +81,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(instance)
-				.WriteUInt16(seq + 1)
+				.WriteUInt16(AckSeq(seq))
 				.WriteUInt32(behaviorId)
 				.WriteArrayUInt32Length(echoedArgs)
 				.WriteArray(tail);
