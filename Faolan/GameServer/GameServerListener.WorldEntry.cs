@@ -191,7 +191,7 @@ namespace Faolan.GameServer
 			// #234: SKIP on the create-world connection - the create destiny cutscene overlay (SendCreateCutsceneStep)
 			// already sends StartFixed3d at IntroDone (matching retail, which sends it ONCE there). Sending it here too
 			// (before the cutscene) is a DUPLICATE retail doesn't have (loopback f649) and re-engages the cinematic.
-			if (!client.Session.IsCreateWorldSession)
+			if (client.Session.EntryMode != WorldEntryMode.CreateWorld)
 			{
 				var startFixed3d = ScryScript.BuildStep(instance, "StartFixed3d");
 				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
@@ -360,7 +360,7 @@ namespace Faolan.GameServer
 
 			_simulation.PlayerWorldEntity(client)?.Confirmed.Add(requestId);
 
-			if (client.Session.WorldEntered || client.Session.IsCreateWorldSession)
+			if (client.Session.WorldEntered || client.Session.EntryMode == WorldEntryMode.CreateWorld)
 				await SendSpawnCheckResponse(client, requestId);
 
 			Logger.LogInformation("0x2020 summary: ack0={Ack0:X}, requestId={RequestId:X}, ack1={Ack1:X}, characterId={CharacterId:X8}", ack0, requestId, ack1, characterId);
@@ -520,7 +520,7 @@ namespace Faolan.GameServer
 			// in the snapshot (empty Quest_c region) and grants the starter quest LIVE afterwards; a LOGIN entry carries
 			// the character's held quests in the snapshot. So the snapshot region is data-driven from CharacterQuests on
 			// login, and empty on create.
-			var isCreateEntry = client.Session.IsCreateWorldSession;
+			var isCreateEntry = client.Session.EntryMode == WorldEntryMode.CreateWorld;
 			var (snapshotQuests, primaryQuest) = isCreateEntry
 				? (new List<QuestDefinition>(), (QuestDefinition?)null)
 				: await LoadSnapshotQuests(character);

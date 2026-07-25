@@ -388,7 +388,7 @@ namespace Faolan.GameServer
 		// Guarded to the create-editor customization phase; a no-op for every other connection/batch.
 		protected override Task ReceivedBatchComplete(INetworkClient client)
 		{
-			if (client.Session.IsCreateEditorConnection)
+			if (client.Session.EntryMode == WorldEntryMode.CreateEditor)
 				return CreateFlowService.FlushPostMorphBurstOnBatchDrained(client);
 
 			return Task.CompletedTask;
@@ -418,7 +418,7 @@ namespace Faolan.GameServer
 				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
 				// screen (without the reply the client retries forever + never opens chat). Existing-character world login
 				// only - the create-editor/create-world flows own this class during their own handshake and must not divert.
-				Endpoints.GameCharAgentProjectType => client.Session is { IsCreateEditorConnection: false, IsCreateWorldSession: false, Character.Name: not null }
+				Endpoints.GameCharAgentProjectType => client.Session is { EntryMode: WorldEntryMode.Login or WorldEntryMode.TeleportReentry, Character.Name: not null }
 					? HandleGameCharAgentProject(client, packet, body)
 					: Task.CompletedTask,
 

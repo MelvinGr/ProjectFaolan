@@ -107,7 +107,7 @@ namespace Faolan.GameServer.Dialogue
 		// from captures by Faolan.Importer. (Option picks after the greeting are KnubotAnswers -> AdvanceConversation.)
 		public async Task<bool> TryReplayConversation(INetworkClient client, uint typeId, uint field3, uint clickedNpcHandle)
 		{
-			if (client.Session is { WorldEntered: false, IsCreateWorldSession: false })
+			if (client.Session is { WorldEntered: false, EntryMode: not WorldEntryMode.CreateWorld })
 				return false;
 
 			// The client sends TalkToNpc(field3=0) [greeting] then a TalkToNpc(field3!=0) the same instant (retail

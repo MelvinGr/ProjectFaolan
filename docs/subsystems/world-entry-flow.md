@@ -18,8 +18,8 @@ handoff), [`create-editor-bursts.md`](create-editor-bursts.md) (the editor burst
 A connection's role is decided **once**, at `GameAgent.Authenticate2` (the Hello), and stored on the session as
 `WorldEntryMode` (`Faolan.Core/Enums/WorldEntryMode.cs`). It is the single source of truth for routing every
 later handshake signal, and every routing site **switches on it exhaustively** — all four modes plus a `default`
-that logs an error (#432). The legacy booleans `IsCreateEditorConnection` / `IsCreateWorldSession` are derived
-views, kept only for single-role CONTENT questions ("does this connection get the cutscene records?").
+that logs an error (#432). The derived `IsCreateEditorConnection` / `IsCreateWorldSession` booleans are **gone**:
+two ways to ask one question is what let the routing drift, so every call site now names the mode it means.
 
 That rule is the scar tissue from three regressions in two weeks, all identical in shape: the handlers tested
 overlapping booleans in `if`/`else` chains whose final `else` was the login path, so a role nobody had considered
@@ -42,12 +42,12 @@ consumed on the following world connection. `PendingTeleportReentry` is added by
 
 There are **two different questions** the handlers ask, and confusing them is what broke the reconnect flow:
 
-- **Role at auth** — `WorldEntryMode` / `IsCreateEditorConnection`. Stable for the whole connection.
+- **Role at auth** — `WorldEntryMode`. Stable for the whole connection.
 - **Named right now** — `IsUnnamedCreatePhase` (`Character.Name == null`). **Transient**: the create-editor
   connection names the character mid-connection (`CommitCharacterName`), so `IsUnnamedCreatePhase` flips from
   `true` to `false` while the mode stays `CreateEditor`.
 
-So `IsUnnamedCreatePhase` implies `IsCreateEditorConnection`, but **not** the reverse. Handshake steps that must
+So `IsUnnamedCreatePhase` implies the `CreateEditor` mode, but **not** the reverse. Handshake steps that must
 behave differently before vs after the name is committed (the instance-echo route, the `0x205F` create branch,
 the create-vs-login `SendReadyForPlayScreen` body) key on `IsUnnamedCreatePhase`. Steps that
 care about the connection's role for its whole life (which world entry to send; how `CharInPlayIIR` is routed)
@@ -56,7 +56,7 @@ key on the mode. Both predicates live in one place — `NetworkClientSession.cs`
 The specific regression (#339): a `TeleportReentry` connection's `CharInPlayIIR` was routed on `Name == null`,
 which is false for a named char, so it fell through — but earlier a `d43dd426` refactor had dropped the
 named-char branch as "dead", so it hit the editor path and put the creator UI in-world. `CharInPlayIIR` now
-routes on `IsCreateEditorConnection` (the role), so a named reconnect flushes the world follow-up instead.
+routes on the mode (the role), so a named reconnect flushes the world follow-up instead.
 
 ## The three handshake signals
 
@@ -72,7 +72,7 @@ routes on `IsCreateEditorConnection` (the role), so a named reconnect flushes th
    - `Login` / `TeleportReentry` → `FlushPendingPost205FFollowUp`. A `TeleportReentry` carries no `0x205F`, so this
      is its ready signal.
 3. **`0x2020` (`UpdateQuestMarkerNPC`)** — the client polling each spawned entity. Each poll is answered with a
-   `0x2008` SpawnCheck (once `WorldEntered` or `IsCreateWorldSession`), and every poll calls
+   `0x2008` SpawnCheck (once `WorldEntered` or the mode is `CreateWorld`), and every poll calls
    `FlushPendingPost205FFollowUp` — which no-ops unless the follow-up is armed and the mode is a named one.
 
 `FlushPendingPost205FFollowUp` is the "leave the loading screen" burst for `Login` and `TeleportReentry` ONLY: the

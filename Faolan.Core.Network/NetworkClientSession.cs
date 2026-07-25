@@ -48,8 +48,10 @@ namespace Faolan.Core.Network
 		// create-world connection was told it was a "changemap/teleport reconnect" in the middle of character creation,
 		// three times in two weeks.
 		//
-		// IsCreateEditorConnection / IsCreateWorldSession remain as derived views for the call sites that genuinely ask
-		// a single-role CONTENT question ("does this connection get the cutscene records?"), never to route a signal.
+		// There are no derived IsCreateEditorConnection / IsCreateWorldSession booleans any more: two ways to ask one
+		// question is what let the routing drift in the first place, and every call site - routing or content - now
+		// names the mode it means. IsUnnamedCreatePhase is NOT one of these: it asks a different question (name-now,
+		// which flips mid-connection) and stays.
 		WorldEntryMode EntryMode { get; set; }
 
 		// Set after CharCreationFinished + the world-prep burst: the creator is now waiting for the client's
@@ -58,16 +60,6 @@ namespace Faolan.Core.Network
 		bool EnergyLoopActive { get; set; } // guards against spawning more than one energy-mirror loop
 
 		bool HasPendingPost205FFollowUp { get; set; }
-
-		// True on the character-creator (editor) GameServer connection. A derived view of EntryMode (role at
-		// auth); NOT the same as IsUnnamedCreatePhase (name-now) - see that member and WorldEntryMode.
-		// For single-role content checks only - routing switches on EntryMode (#432).
-		bool IsCreateEditorConnection { get; }
-
-		// True on the post-creation WORLD GameServer connection (the second connection, opened after the
-		// 0x2002 enter-world handoff). Gates the intro/cutscene bursts so they only fire on the first world
-		// entry, not on normal existing-character logins. A derived view of EntryMode.
-		bool IsCreateWorldSession { get; }
 
 		// Spellweaving trance state (docs/subsystems/combos.md): true between the activate and deactivate PerformSpecialAction
 		// (0x205A) toggles; WeaveComponents accumulates the componentIndex of each CombatReactiveIIR add while the
@@ -81,9 +73,9 @@ namespace Faolan.Core.Network
 		bool IsTeleportingOut { get; set; }
 
 		// True ONLY while the character-creator connection is still pre-name (Character.Name == null). This is
-		// the TRANSIENT "the editor UI is active" question, distinct from IsCreateEditorConnection (the role at
+		// the TRANSIENT "the editor UI is active" question, distinct from EntryMode == CreateEditor (the role at
 		// auth): the create connection names the character mid-connection (CommitCharacterName), after which
-		// this flips to false while IsCreateEditorConnection stays true. Handshake steps that must behave
+		// this flips to false while the MODE stays CreateEditor. Handshake steps that must behave
 		// differently before vs after the name is committed (the instance-echo route, the 0x205F create branch,
 		// the create-vs-login SendReadyForPlayScreen body) key on THIS, not the role flag.
 		bool IsUnnamedCreatePhase { get; }
@@ -94,7 +86,7 @@ namespace Faolan.Core.Network
 		// True once this connection has completed world entry (the burst-less world entry, the only entry path).
 		// Gates the in-world behaviours that must not fire on a connection that hasn't entered the world: the
 		// 0x2020 -> 0x2008 SpawnCheck responder, the NPC conversation system, and the dialogue-close fallback.
-		// (The create-world flow uses IsCreateWorldSession alongside this.)
+		// (The create-world flow tests EntryMode == CreateWorld alongside this.)
 		bool WorldEntered { get; set; }
 
 		// The in-flight cast's begin ARGS block + its Mode, held only while a timed cast is pending (#347). The client
@@ -207,8 +199,6 @@ namespace Faolan.Core.Network
 		public bool AwaitingEnterWorld { get; set; }
 		public bool EnergyLoopActive { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }
-		public bool IsCreateEditorConnection => EntryMode == WorldEntryMode.CreateEditor;
-		public bool IsCreateWorldSession => EntryMode == WorldEntryMode.CreateWorld;
 		public bool IsSpellweaving { get; set; }
 		public bool IsSprinting { get; set; }
 		public bool IsTeleportingOut { get; set; }

@@ -784,7 +784,7 @@ namespace Faolan.GameServer
 								// Beach login with no captured node for this (Mode, Field3): close the chat window so the
 								// client doesn't hang waiting for a reply (the "advance a step -> chat locks, can't ESC"
 								// bug). Conversation replay is coverage-bound, so an un-captured branch is expected.
-								if (client.Session.WorldEntered || client.Session.IsCreateWorldSession)
+								if (client.Session.WorldEntered || client.Session.EntryMode == WorldEntryMode.CreateWorld)
 								{
 									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn)
 										? rn
@@ -1833,7 +1833,7 @@ namespace Faolan.GameServer
 					// (IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7) to the Tortage Beach spawn - Blablabla create
 					// capture f444/449 (dest map 0x0FAA, pos 322.5,150,704.9, descriptor 0x32) - else the player stays
 					// at the drowning cutscene's underwater end position. Mirrors GMCommands.DoTeleport (prep -> handoff).
-					if (client.Session is { IsCreateEditorConnection: true, AwaitingEnterWorld: true })
+					if (client.Session is { EntryMode: WorldEntryMode.CreateEditor, AwaitingEnterWorld: true })
 					{
 						client.Session.AwaitingEnterWorld = false;
 						await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
