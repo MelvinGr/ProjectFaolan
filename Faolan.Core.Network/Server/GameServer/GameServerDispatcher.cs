@@ -41,6 +41,12 @@ namespace Faolan.Core.Network.Server.GameServer
 			return provider != null && await provider.RunGmCommand(characterId, commandText);
 		}
 
+		public async Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined)
+		{
+			var provider = Provider;
+			return provider != null && await provider.SendGroupMembership(recipientId, memberId, teamId, leaderId, joined);
+		}
+
 		public async Task<bool> SendGuildTag(uint characterId, string guildName)
 		{
 			var provider = Provider;

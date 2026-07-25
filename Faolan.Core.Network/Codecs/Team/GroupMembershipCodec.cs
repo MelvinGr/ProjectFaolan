@@ -14,7 +14,8 @@ namespace Faolan.Core.Network.Codecs.Team
 	//   AddToGroupIIR      [ProtoID32 member][u8 0][ProtoID32 team][ProtoID32 leader]   29-byte body
 	//   RemoveFromGroupIIR [ProtoID32 member][u8 0][ProtoID32 team]                     21-byte body
 	//
-	// The 0x2000 carrier's [u32 len][u32 iirType] prefix is included, as every other world-IIR builder does.
+	// Both bodies start at the iirType: the carrier's [u32 len] prefix is added by the sender (SendWorldIir), which
+	// is the convention the other world-IIR builders that go out that way follow.
 	public static class GroupMembershipCodec
 	{
 		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.AddToGroupIIR, GameServer0X2000Opcodes.RemoveFromGroupIIR];
@@ -22,15 +23,15 @@ namespace Faolan.Core.Network.Codecs.Team
 		// A member JOINED `teamId`, whose leader is `leaderId`.
 		public static byte[] BuildAdd(uint memberId, uint teamId, uint leaderId)
 		{
-			return new FaolanStream().WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.AddToGroupIIR).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(memberId)
-				.WriteByte(0).WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(leaderId)).ToArray();
+			return new FaolanStream().WriteUInt32((uint)GameServer0X2000Opcodes.AddToGroupIIR).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(memberId).WriteByte(0)
+				.WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(leaderId).ToArray();
 		}
 
 		// A member LEFT `teamId` (left, was kicked, or the team dissolved).
 		public static byte[] BuildRemove(uint memberId, uint teamId)
 		{
-			return new FaolanStream().WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.RemoveFromGroupIIR).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(memberId)
-				.WriteByte(0).WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId)).ToArray();
+			return new FaolanStream().WriteUInt32((uint)GameServer0X2000Opcodes.RemoveFromGroupIIR).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(memberId).WriteByte(0)
+				.WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId).ToArray();
 		}
 	}
 }

@@ -14,6 +14,7 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
@@ -60,6 +61,20 @@ namespace Faolan.GameServer
 
 			await client.SendAsync(BuildGuildTag(client, characterId, guildName ?? ""));
 			Logger.LogInformation("SendGuildTag: set in-world guild tag of {CharacterId:X8} to \"{GuildName}\".", characterId, guildName);
+			return true;
+		}
+
+		// IGameServerProvider seam: the world-connection half of a team change. TeamService owns the roster (it spans
+		// the CS tier and this one); this only puts the record on the wire for a member connected HERE.
+		public async Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined)
+		{
+			var client = ClientForCharacter(recipientId);
+			if (client?.Session.Account == null)
+				return false;
+
+			await SendWorldIir(client, joined
+				? GroupMembershipCodec.BuildAdd(memberId, teamId, leaderId)
+				: GroupMembershipCodec.BuildRemove(memberId, teamId));
 			return true;
 		}
 

@@ -12,6 +12,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Inventory;
+using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
@@ -1325,6 +1326,33 @@ namespace Faolan.GameServer
 
 			switch (opcode)
 			{
+				// 0x2008 LeaveTeam (no body): a DIFFERENT interface's method 0x2008 than the CS tier's AcceptTeamInvite -
+				// method indices are per interface, so the number collision is expected and must not be unified.
+				case GameCharAgentOpcodes.LeaveTeam:
+				{
+					await _csPlayerAgentDispatcher.LeaveTeam(client.Session.Character.Id);
+					break;
+				}
+
+				// 0x2009 KickFromTeam([ID32 target]): the leader removes a member. TeamService checks the leadership.
+				case GameCharAgentOpcodes.KickFromTeam:
+				{
+					await _csPlayerAgentDispatcher.KickFromTeam(client.Session.Character.Id, TeamMessageCodec.ParseCharacterId(body));
+					break;
+				}
+
+				// 0x2091 RequestTeamInvite([member record]): the invited client resolves the inviter's details, the way
+				// ClientRequestGuildInfo resolves a guild banner. Answer with that character's record.
+				case GameCharAgentOpcodes.RequestTeamInvite:
+				{
+					var subject = TeamMemberRecord.Read(body);
+					if (await Database.GetCharacter(subject.CharacterId) is { } character)
+						await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchReplyTeamInvite,
+							TeamMessageCodec.BuildReplyInvite(TeamMessageCodec.MemberOf(character))));
+
+					break;
+				}
+
 				case GameCharAgentOpcodes.RequestBindLocation: // 0x2002 = RequestBindLocation
 				{
 					await HandleRequestBindLocation(client, packet, body);
@@ -1333,10 +1361,7 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.SetTutorialStats: // 0x2003 = SetTutorialStats (Tortage tutorial tracking)
 				{
-					var tutorialStat = body.Length - body.Position >= sizeof(uint)
-						? body.ReadUInt32()
-						: 0;
-					Logger.LogDebug("GameCharAgent.SetTutorialStats(0x{Value:X8}); no reply.", tutorialStat);
+					Logger.LogDebug("GameCharAgent.SetTutorialStats; no reply.");
 					return;
 				}
 

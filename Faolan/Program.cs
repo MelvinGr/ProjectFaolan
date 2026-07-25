@@ -16,14 +16,15 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Helpers;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
-using Faolan.CSPlayerAgent;
 using Faolan.GameServer;
 using Faolan.Helpers;
 using Faolan.Mcp;
 using Faolan.PlayerAgent;
 using Faolan.UniverseAgent;
 using Microsoft.AspNetCore.Builder;
+using Faolan.CSPlayerAgent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -144,8 +145,12 @@ namespace Faolan
 			{
 				// The realm-local listeners bind THIS realm's ports straight from its Realm row (single source of truth,
 				// #324) - factory-registered so the port is injected, not read from global config.
+				// Seam into the CS listener: it owns the team roster, and LeaveTeam/KickFromTeam arrive on the world
+				// connection, so the world listener routes them through here (as it does chat and world actions).
+				builder.Services.AddSingleton<ICsPlayerAgentDispatcher, CsPlayerAgentDispatcher>();
 				builder.Services.AddHostedService(provider => new CsPlayerAgentListener(hostRealm!.CsPlayerAgentPort, provider.GetRequiredService<ILogger<CsPlayerAgentListener>>(),
-					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IGameServerDispatcher>()));
+					provider.GetRequiredService<IConfiguration>(), provider.GetRequiredService<IDatabaseRepository>(), provider.GetRequiredService<IGameServerDispatcher>(),
+					provider.GetRequiredService<ICsPlayerAgentDispatcher>()));
 
 				builder.Services.AddSingleton<IChatServerDispatcher, ChatServerDispatcher>();
 				builder.Services.AddSingleton<ClaudeChannel>(); // in-game "Claude" chat channel log, bridged to Claude via the MCP chat tools
@@ -173,7 +178,7 @@ namespace Faolan
 					var gameServerDispatcher = provider.GetRequiredService<IGameServerDispatcher>();
 
 					return new GameServerListener(loggerFactory.CreateLogger($"{typeof(GameServerListener).FullName}-{hostRealm!.Id}"), configuration, dataRepository, hostRealm!,
-						agentServerDispatcher, gameServerDispatcher);
+						agentServerDispatcher, gameServerDispatcher, provider.GetRequiredService<ICsPlayerAgentDispatcher>());
 				});
 
 				// Registered LAST so it starts after the listeners (Online = the host is up) and, since hosted services

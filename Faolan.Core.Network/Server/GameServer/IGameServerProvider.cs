@@ -50,5 +50,14 @@ namespace Faolan.Core.Network.Server.GameServer
 		///     CsPlayerAgent guild flow so joining/leaving a guild updates the world view without a relog.
 		/// </summary>
 		Task<bool> SendGuildTag(uint characterId, string guildName);
+
+		/// <summary>
+		///     Pushes a group-membership record (AddToGroupIIR / RemoveFromGroupIIR) onto <paramref name="recipientId" />'s
+		///     live world connection, saying that <paramref name="memberId" /> joined or left <paramref name="teamId" />.
+		///     Retail emits these alongside the CsPlayerAgent roster dispatches - the team lives on the CS tier, but the
+		///     world connection is told about membership too (docs/subsystems/teams-trade-friends.md). Returns false when
+		///     the recipient is not connected to this listener.
+		/// </summary>
+		Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined);
 	}
 }

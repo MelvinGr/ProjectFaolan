@@ -1,18 +1,21 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
-	public partial class CsPlayerAgentListener : RpcServer<ConanMessageFramer>
+	public partial class CsPlayerAgentListener : RpcServer<ConanMessageFramer>, ICsPlayerAgentProvider
 	{
 		// Composed collaborator: owns the guild RPC handlers, wire builders, and pending-invite / reply-endpoint
 		// state. The cross-connection lookup (ClientForCharacter, on the Server base) is injected as a delegate seam.
@@ -22,13 +25,45 @@ namespace Faolan.CSPlayerAgent
 		// guild tag (0x2550C99A) onto a character's live GameServer connection on join/leave.
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
+		// Composed collaborator: owns the team roster and its dispatches - see TeamService.
+		private readonly TeamService _teams;
+
+		// Our own registration slot, so the world listener can route LeaveTeam/KickFromTeam here.
+		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
+
 		// `port` is the hosting realm's CsPlayerAgentPort (from its Realm row - the single source of truth for the
 		// realm-local service ports, #324), passed in at registration rather than read from global config.
-		public CsPlayerAgentListener(ushort port, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher) : base(
-			port, logger, configuration, database, new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceOpcodes)))
+		public CsPlayerAgentListener(ushort port, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher,
+			ICsPlayerAgentDispatcher csPlayerAgentDispatcher) : base(port, logger, configuration, database, new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceOpcodes)))
 		{
 			_gameServerDispatcher = gameServerDispatcher;
+			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
 			_guild = new GuildService(database, logger, gameServerDispatcher, ClientForCharacter);
+			_teams = new TeamService(logger, gameServerDispatcher, ClientForCharacter);
+		}
+
+		public override Task StartAsync(CancellationToken cancellationToken)
+		{
+			// Registered here rather than injected, so the world listener can reach the team roster it does not own.
+			_csPlayerAgentDispatcher.Register(this);
+			return base.StartAsync(cancellationToken);
+		}
+
+		public override Task StopAsync(CancellationToken cancellationToken)
+		{
+			_csPlayerAgentDispatcher.Unregister(this);
+			return base.StopAsync(cancellationToken);
+		}
+
+		// --- ICsPlayerAgentProvider: the team ops that arrive on the player's WORLD connection ------------------------
+		public Task<bool> LeaveTeam(uint characterId)
+		{
+			return _teams.Leave(characterId);
+		}
+
+		public Task<bool> KickFromTeam(uint leaderId, uint targetId)
+		{
+			return _teams.Kick(leaderId, targetId);
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
@@ -76,6 +111,34 @@ namespace Faolan.CSPlayerAgent
 								.WriteByte(0x01)));
 					}
 
+					break;
+				}
+
+				// 0x2003 TeamInvite([ID32 target]): the leader (or a solo player) invites someone into a team.
+				case CSPlayerAgentOpcodes.TeamInvite:
+				{
+					var targetId = TeamMessageCodec.ParseInviteTarget(body);
+					if (await Database.GetCharacter(targetId) is { } target)
+						await _teams.Invite(client, client.Session.Character, target);
+					else
+						Logger.LogWarning("TeamInvite for unknown character {TargetId:X8}.", targetId);
+
+					break;
+				}
+
+				// 0x2008 AcceptTeamInvite([ID32 inviter]): the invitee joins. The inviter is taken from OUR pending
+				// invite rather than the body, so a forged body cannot pull someone into a team they never invited to.
+				case CSPlayerAgentOpcodes.AcceptTeamInvite:
+				{
+					TeamMessageCodec.ParseCharacterId(body); // the inviter, echoed by the client
+					await _teams.AcceptInvite(client.Session.Character.Id);
+					break;
+				}
+
+				// 0x2009 DeclineTeamInvite: drop the pending invite. Nothing goes on the wire in the capture.
+				case CSPlayerAgentOpcodes.DeclineTeamInvite:
+				{
+					_teams.Decline(client.Session.Character.Id);
 					break;
 				}
 

@@ -116,22 +116,26 @@ namespace Faolan.Tests
 			Assert.Equal(expected, Convert.ToHexString(TeamMessageCodec.BuildRoster(0x0051DD9A, 0x01317CF8, [LevelFortyOne(), LevelFortyFour()])).ToLowerInvariant());
 		}
 
-		// f694 - a join pushes AddToGroupIIR onto the world connection, one per member.
+		// f694 - a join pushes AddToGroupIIR onto the world connection, one per member. The captured packet opens with
+		// the carrier's [u32 len] (0x1D = the 29 bytes after it), which the SENDER writes - hence the prefix here
+		// rather than in the codec.
 		[Fact]
 		public void AddToGroupIir_IsByteExact()
 		{
-			Assert.Equal("0000001d0df44b730000c35001317cf8000000dea90051dd9a0000c35001317cf8",
-				Convert.ToHexString(GroupMembershipCodec.BuildAdd(0x01317CF8, 0x0051DD9A, 0x01317CF8)).ToLowerInvariant());
-			Assert.Equal("0000001d0df44b730000c350013184ae000000dea90051dd9a0000c35001317cf8",
-				Convert.ToHexString(GroupMembershipCodec.BuildAdd(0x013184AE, 0x0051DD9A, 0x01317CF8)).ToLowerInvariant());
+			Assert.Equal("0000001d" + "0df44b730000c35001317cf8000000dea90051dd9a0000c35001317cf8",
+				"0000001d" + Convert.ToHexString(GroupMembershipCodec.BuildAdd(0x01317CF8, 0x0051DD9A, 0x01317CF8)).ToLowerInvariant());
+			Assert.Equal("0000001d" + "0df44b730000c350013184ae000000dea90051dd9a0000c35001317cf8",
+				"0000001d" + Convert.ToHexString(GroupMembershipCodec.BuildAdd(0x013184AE, 0x0051DD9A, 0x01317CF8)).ToLowerInvariant());
+			Assert.Equal(29, GroupMembershipCodec.BuildAdd(0x01317CF8, 0x0051DD9A, 0x01317CF8).Length);
 		}
 
 		// f919 - and a leave pushes RemoveFromGroupIIR.
 		[Fact]
 		public void RemoveFromGroupIir_IsByteExact()
 		{
-			Assert.Equal("00000015e4ff0c850000c35001317cf8000000dea90051dd9a", Convert.ToHexString(GroupMembershipCodec.BuildRemove(0x01317CF8, 0x0051DD9A)).ToLowerInvariant());
-			Assert.Equal("00000015e4ff0c850000c350013184ae000000dea90051dd9a", Convert.ToHexString(GroupMembershipCodec.BuildRemove(0x013184AE, 0x0051DD9A)).ToLowerInvariant());
+			Assert.Equal("00000015" + "e4ff0c850000c35001317cf8000000dea90051dd9a", "00000015" + Convert.ToHexString(GroupMembershipCodec.BuildRemove(0x01317CF8, 0x0051DD9A)).ToLowerInvariant());
+			Assert.Equal("00000015" + "e4ff0c850000c350013184ae000000dea90051dd9a", "00000015" + Convert.ToHexString(GroupMembershipCodec.BuildRemove(0x013184AE, 0x0051DD9A)).ToLowerInvariant());
+			Assert.Equal(21, GroupMembershipCodec.BuildRemove(0x01317CF8, 0x0051DD9A).Length);
 		}
 
 		// f1260 DispatchRequestTrade, f1268 DispatchStartTrade, f1481 DispatchPartnerAcceptedTrade - one shape.

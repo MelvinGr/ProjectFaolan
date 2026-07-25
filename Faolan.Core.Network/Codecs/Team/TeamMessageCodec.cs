@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Faolan.Core;
+using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
@@ -19,6 +20,20 @@ namespace Faolan.Core.Network.Codecs.Team
 		// The roster's trailing LOOT SETTINGS block, byte-identical in all six captured rosters, and the same shape
 		// the client sends in TeamSetLootOption ([u32][u8][u32]). Carried as captured until a capture varies it.
 		private static readonly byte[] RosterLootSettings = [0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02];
+
+		// A member record from a character row. The 9-byte per-character opaque is left at ZERO: it is CS-tier state we
+		// cannot derive (see gaps.md), so we send nothing rather than something invented, and an in-client check will
+		// say whether the client cares.
+		public static TeamMemberRecord MemberOf(Character character)
+		{
+			return new TeamMemberRecord
+			{
+				CharacterId = character.Id,
+				Name = character.Name,
+				Level = character.Level,
+				MapId = character.MapId
+			};
+		}
 
 		// s2c DispatchYouInvitedToTeam (0x200A) / DispatchYouGotKickedFromTeam (0x2022): the member alone.
 		public static byte[] BuildMemberOnly(TeamMemberRecord member)

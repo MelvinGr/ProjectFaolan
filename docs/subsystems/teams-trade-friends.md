@@ -131,3 +131,24 @@ s2c 0x0025  [u64 0][u32 stamp][u16][u8][u16 len][name]               presence pu
 **One-sided, with no accept handshake** — stated outright in the capture's chat — so there is no invite state
 machine: an add is a write plus a presence subscription. Note the presence push is addressed by NAME while
 everything else uses the character id.
+
+## How ours is wired
+
+`TeamService` is a composed collaborator of the **CsPlayerAgent listener**, like `GuildService`: the CS tier owns the
+roster and every roster dispatch, and takes the cross-connection client lookup as a delegate seam. A team is
+**ephemeral** — nothing is persisted, deliberately, because a retail team does not survive a logout, so a table would
+be state with no owner (and there is no migration to carry).
+
+`LeaveTeam` / `KickFromTeam` arrive on the player's **world** connection, so the world listener reaches the roster
+through `ICsPlayerAgentDispatcher` — the same seam shape as `IGameServerDispatcher` and `IChatServerDispatcher`, and
+for the same reason: the relationship is mutual (the roster pushes group-membership IIRs *back* onto world
+connections via `IGameServerDispatcher.SendGroupMembership`), and a listener only exists once the host starts it.
+
+A logout leaves the team too, or the roster keeps a member nobody can reach and the next broadcast pushes at a dead
+connection.
+
+`TeamServiceTests` gates the roster transitions (accept/leave/kick/promote/dissolve, and that an accept with no
+pending invite does nothing — the inviter is taken from the server's pending-invite table, not the client's body).
+
+Still to do: the trade and friend HANDLERS (the codecs and their byte-exact gates are in place; open work in Gitea
+#101 / #99).

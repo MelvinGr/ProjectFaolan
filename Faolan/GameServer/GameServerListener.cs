@@ -16,6 +16,7 @@ using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
@@ -172,6 +173,9 @@ namespace Faolan.GameServer
 		private readonly IChatServerDispatcher _agentServerDispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
 
+		// Seam into the CsPlayerAgent listener, which owns the team roster (ICsPlayerAgentProvider).
+		private readonly ICsPlayerAgentDispatcher _csPlayerAgentDispatcher;
+
 		// Connection keep-alive / latency replies (LatencyCheck 0x2085 -> Pong, Ping 0x2005 -> GameServerStats).
 		// See Session/KeepAliveService.cs.
 		private readonly KeepAliveService _keepAlive;
@@ -218,10 +222,12 @@ namespace Faolan.GameServer
 		private CancellationTokenSource _loopCts = null!;
 
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, Realm realm, IChatServerDispatcher agentServerDispatcher,
-			IGameServerDispatcher gameServerDispatcher) : base(realm.Port, logger, configuration, database, new GameServerPacketTracer(logger))
+			IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher) : base(realm.Port, logger, configuration, database, new GameServerPacketTracer(logger))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
+			// The team roster lives on the CS tier; LeaveTeam/KickFromTeam arrive HERE, so they are routed over there.
+			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
 			// Server-side terrain (ground-snap + line-of-sight, #284) from the importer-baked terrain files - the game
 			// server does NOT read the client RDB. Degrades gracefully when the dir is unset/absent.
 			var terrain = new TerrainService(configuration["TerrainDir"] ?? DefaultTerrainDir, logger);
@@ -355,6 +361,11 @@ namespace Faolan.GameServer
 				client.Session.IsTeleportingOut = false; // one-shot: only suppress this teleport's disconnect save
 				Logger.LogInformation("World: player {Name} (0x{Handle:X8}) left map {Map}.", entity.Name, entity.Handle, entity.MapId);
 			}
+
+			// A logout also leaves the team - otherwise the roster keeps a member nobody can reach, and the next join
+			// broadcast pushes at a dead connection. Retail dissolves a one-member team, which TeamService does too.
+			if (client.Session.Character is { } character)
+				await _csPlayerAgentDispatcher.LeaveTeam(character.Id);
 
 			await base.ClientDisconnected(client);
 		}
