@@ -115,6 +115,11 @@ namespace Faolan.ChatServer
 					foreach (var friend in await Database.GetFriends(character.Id))
 						await SendFriendEntry(client, friend, false);
 
+					// ...and tell everyone who has US on their list that we are now online. Without this a friend's
+					// status is frozen at whatever it happened to be when the WATCHER logged in: whoever connects first
+					// sees the other as offline forever, because the restore above can only report who is already here.
+					await AnnouncePresenceToWatchers(character.Id, true);
+
 					break;
 				}
 
@@ -256,14 +261,33 @@ namespace Faolan.ChatServer
 		// (isWhisper=true, target=recipient) to the ChatMessages table. Guarded: a DB hiccup must NEVER break the live
 		// chat relay, so any failure is logged and swallowed. The sender identity matches the wire (ClientInstance ==
 		// character id for a player; see player_handle_equals_character_id).
-		// One friend's list entry: the id -> NAME binding (0x0014) then its state (0x0028), in retail's order. `presence`
+		// Re-sends this character's entry to every ONLINE watcher, so their list reflects a login or a logout.
+		//
+		// ⚠️ The MESSAGE is the captured one (the same state an add or a login restore sends), but the TRIGGER is
+		// inferred: no capture covers a friend logging in or out while someone watches. It is hard to see how a friend
+		// list could work without it - presence would never change - so this is the smallest step that makes the feature
+		// coherent, rather than a new packet invented for it.
+		private async Task AnnouncePresenceToWatchers(uint characterId, bool online)
+		{
+			var self = await Database.GetCharacter(characterId);
+			if (self == null)
+				return;
+
+			foreach (var watcherId in await Database.GetFriendWatchers(characterId))
+			{
+				if (ClientForCharacter(watcherId) is { } watcher)
+					await SendFriendEntry(watcher, self, false, online);
+			}
+		}
+
+		// One friend's list entry:		// One friend's list entry: the id -> NAME binding (0x0014) then its state (0x0028), in retail's order. `presence`
 		// prepends the 0x0025 push, which retail sends on an ADD but NOT when restoring the list at login.
 		//
 		// ⚠️ The 0x0014 is not optional decoration. Without it the client holds an id and a state with no name attached
 		// and renders NOTHING - no entry and no error - which is exactly how this looked while the other two messages
 		// were already byte-perfect. ONLINE is whether the character has a live chat connection here, the only thing
 		// this tier can actually know.
-		private async Task SendFriendEntry(INetworkClient client, Character friend, bool presence)
+		private async Task SendFriendEntry(INetworkClient client, Character friend, bool presence, bool? onlineOverride = null)
 		{
 			var name = friend.Name ?? "";
 			if (presence)
@@ -275,13 +299,24 @@ namespace Faolan.ChatServer
 			// friend's value is 2h06 before the capture was taken, which is what identified it), an online one gets the
 			// captured constant, whose meaning is still open (Gitea #426 - it is not a time at all: 0x01EDA8B2 reads as
 			// 1971). Same shape GuildService's member record already uses, and the same column.
-			var online = ClientForCharacter(friend.Id) != null;
+			// The logout announce has to say "offline" while the socket is still up, so the caller can override.
+			var online = onlineOverride ?? ClientForCharacter(friend.Id) != null;
 			var stamp = online || friend.LastConnection == null
 				? FriendListCodec.OnlineStamp
 				: (uint)friend.LastConnection.Value.ToUnixTimeSeconds();
 
 			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendAdded,
 				s => s.WriteArray(FriendListCodec.BuildState(friend.Id, online, (byte)friend.Level, friend.Class, stamp))));
+		}
+
+		// A logout is a presence change for everyone who has this character on their friend list. The chat connection is
+		// the one that knows: it is per-character and lives for the whole session.
+		protected override async Task ClientDisconnected(INetworkClient client)
+		{
+			if (client.Session.Character is { } character)
+				await AnnouncePresenceToWatchers(character.Id, false);
+
+			await base.ClientDisconnected(client);
 		}
 
 		private async Task PersistChat(INetworkClient client, byte channelType, uint channelId, uint? target, bool isWhisper, string message)

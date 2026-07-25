@@ -16,6 +16,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<bool> AddCharacterSpell(uint characterId, uint spellId);
 		Task<bool> AddFriend(uint characterId, uint friendCharacterId);
 		Task<Character[]> GetFriends(uint characterId);
+		Task<uint[]> GetFriendWatchers(uint characterId);
 		Task<bool> RemoveFriend(uint characterId, uint friendCharacterId);
 		Task AddCharacterTag(uint characterId, uint tagId);
 		Task<int> ClearCharacterFeats(uint characterId);
@@ -117,6 +118,15 @@ namespace Faolan.Core.Database.Repositories
 			});
 			await ctx.SaveChangesAsync();
 			return true;
+		}
+
+		// The characters who have `characterId` on THEIR list - the reverse direction, which the one-sided list makes a
+		// genuinely different query. Needed to tell them when this character comes online or goes offline; without it a
+		// friend's status is frozen at whatever it was when the watcher logged in.
+		public async Task<uint[]> GetFriendWatchers(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterFriends.Where(f => f.FriendCharacterId == characterId).Select(f => f.CharacterId).ToArrayAsync();
 		}
 
 		// The befriended CHARACTERS, not the join rows - every caller needs the name and class to build the wire record.
