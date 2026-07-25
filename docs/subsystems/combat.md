@@ -340,18 +340,20 @@ post-`0x205F` flush — the same reasoning that moved `GrantCharacterSpells` the
 **Buff persistence across relog (#274).** Self-buffs survive a logout **with their remaining time**. The live
 `WorldEntity.ActiveBuffs` is savegame state, so `PlayerPersistenceService.SavePlayerState` (logout + the 5-min
 autosave) snapshots each self-buff to the `CharacterBuff` table — `BuffId`, the effect `Nonce`, and an absolute
-`ExpiresAt` — and `RestoreBuffs` re-applies them in the post-`0x205F` world-entry flush
-(`RestoreMount` has since moved earlier, into the entry stream where retail puts it — see the mount buff above;
-the same capture puts the shield and the persisted buffs there too, tracked as its own follow-up). Restore rebuilds
-the `ApplySpell` payload from those columns via `SelfBuffCodec` (not a
+`ExpiresAt` — and `RestoreBuffs` re-applies them **inside the world-entry flush** via `RestoreEntryBuffs`, alongside
+`RestoreMount` and `SendShieldOfTheRisen` (#423). All three used to run from the post-`0x205F` flush, after the client
+had left the loading screen, which reads as a NEW application and fires the client's apply feedback on every login and
+every playfield change — #342 confirmed that for the mount, whose feedback was audible. Restore rebuilds the
+`ApplySpell` payload from those columns via `SelfBuffCodec` (not a
 stored blob) with the duration recomputed to the time left, so the client counts down the **remaining** seconds and
 the tick expires it on schedule. Only self-buffs persist (NPC-cast debuffs carry a volatile caster handle + a DoT
 and are dropped); buffs owned by a dedicated re-applier — the login shield and the mount ride buff — are excluded
 at save time so they aren't double-applied on entry (`GameServerListener.ShouldPersistBuff`).
 
 **Shield of the Risen (#221) — RESOLVED + in-client verified.** `SendShieldOfTheRisen`
-(`GameServerListener.Buffs.cs`) applies the newbie-protection self-buff from `FlushPendingPost205FFollowUp`, which
-is re-armed on each teleport/changemap re-entry, so it re-asserts on login AND every playfield change. The real
+(`GameServerListener.Buffs.cs`) applies the newbie-protection self-buff from `RestoreEntryBuffs` in the world-entry
+flush (#423 — it used to run from `FlushPendingPost205FFollowUp`), so it re-asserts on login AND every playfield
+change, silently, in the position the changemap capture shows retail using. The real
 ids are bases **`4061768` (1h)** + **`3666828` (10h)**, both named "Shield of the Risen" in `Spells` with real
 durations (`NecroL80_..._conans-castle-exit` rec#165/#736) — the old `0x000B9000` claim was WRONG (that id is the
 "Exhausted" debuff). It uses `SelfBuffCodec.BuildBuffDataLong` — the 54-byte tail that is the only form retail

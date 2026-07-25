@@ -275,24 +275,15 @@ namespace Faolan.GameServer
 			// is discarded by the client's identity reconstruction.
 			await GrantCharacterAbilities(client);
 			await GrantCharacterCombos(client);
-			// NB the persisted MOUNT is no longer re-seated here - it moved into the shared world-entry flush, where
-			// retail puts it (#342, see RestoreMount).
-			// Re-apply the persisted self-buffs with their remaining time (#274) - the buff counterpart to RestoreMount.
-			// Runs BEFORE SendShieldOfTheRisen (which owns the shield buffs, excluded from persistence) so ordering is
-			// moot; the mount ride buff is likewise excluded and owned by RestoreMount.
-			await RestoreBuffs(client);
-			// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here: they ride the FullChar
+			// NB the buff re-asserts that used to live here - the persisted mount (#342), the persisted self-buffs (#274)
+			// and Shield of the Risen (#221) - have ALL moved into the shared world-entry flush, where retail sends them
+			// (see RestoreEntryBuffs). Sent from here they arrived after the client had left the loading screen, which
+			// reads as a NEW application and fires the client's apply feedback on every login and every map change.
+			// NB the learned SPELLS (DispatchLearnSpell 0x200A) are NOT re-granted here either: they ride the FullChar
 			// snapshot's known-spell list (#74/#71) so the client already knows them when it enters the world, and
 			// the pre-snapshot GrantCharacterSpells re-send is absorbed silently. (The old PendingSpellLearns
 			// post-ready re-announce - needed only while the snapshot carried an empty known-list - re-toasted "You
 			// have learned a new spell" on every login; the known-list makes it redundant.)
-			// Shield of the Risen (#221): re-applies the persistent protection self-buff every character carries.
-			// This flush is also re-armed on teleport/changemap re-entry, so the buff is re-asserted on each
-			// playfield change too (on every map change / login). RESOLVED 2026-07-11: the old id
-			// 0x000B9000 was the wrong spell (rendered as the "Exhausted" debuff, no DB row -> never cleared).
-			// The capture-proven ids are bases 4061768 (1h) + 3666828 (10h) - both in Spells with real durations,
-			// so #274 arms a matching expiry and they clear on schedule. Rendered top-of-screen by the client.
-			await SendShieldOfTheRisen(client);
 
 			// #348: the area banner is now driven by the world tick's sub-area crossing check (WorldSimulation
 			// .TickAreaBanners) - entering a playfield lands the player inside an area and that IS the first
@@ -599,6 +590,28 @@ namespace Faolan.GameServer
 		// Sends the ride buff + Mount/MountSpeed StatUpd and marks the live entity mounted - the same seat the
 		// SummonMount channel ends with, minus the cast animation. No-op on foot, on a no-mount map (the client
 		// auto-dismounted on entry), or if the stored id no longer resolves.
+		// Every buff the player should already be wearing when they arrive: the persisted mount, the persisted
+		// self-buffs, and the login shield. All of it goes out HERE, immediately after the snapshot + GameTime that end
+		// the entry flush, because that is where retail sends it. In the changemap capture
+		// NecroL80_..._login_leave_king_conan_castle-Dismount, riding out of the no-mount castle produces
+		//   FullChar -> GameTime -> ride buff -> Shield of the Risen -> Mount/MountSpeed StatUpd
+		// as five ADJACENT records. We used to send all three from the post-0x205F flush instead, long after the client
+		// had left the loading screen - and #342 proved what that costs: a re-assert arriving inside the entry stream is
+		// absorbed silently, while the same record after ready reads as a NEW application and fires the client's apply
+		// feedback (the mount's was audible; confirmed gone once it moved here). The same reasoning already moved
+		// GrantCharacterSpells into this path to stop it re-toasting "You have learned a new spell" on every login.
+		//
+		// One deliberate deviation: retail's sample puts the shield BETWEEN the ride buff and the mount StatUpd, while
+		// RestoreMount emits its buff and its stats together. Splitting the mount restore so an unrelated buff can
+		// interleave would couple two subsystems for a single capture's ordering of independent IIRs, so the records go
+		// out mount-then-shield instead. If that interleaving ever turns out to matter, this is the place to fix it.
+		private async Task RestoreEntryBuffs(INetworkClient client)
+		{
+			await RestoreMount(client);
+			await RestoreBuffs(client);
+			await SendShieldOfTheRisen(client);
+		}
+
 		// Re-seats a persisted mount on world entry (login and every teleport/changemap re-entry), only where the map
 		// allows mounts - so riding into a no-mount area dismounts and riding back re-mounts.
 		//
@@ -786,15 +799,7 @@ namespace Faolan.GameServer
 			foreach (var rpc in toSend)
 				await client.SendAsync(rpc);
 
-			// Re-seat the persisted mount HERE, immediately after the snapshot + GameTime that end the flush above -
-			// which is exactly where retail puts it (#342). In the changemap capture
-			// NecroL80_..._login_leave_king_conan_castle-Dismount, riding out of the no-mount castle produces
-			// FullChar -> GameTime -> ride buff -> Shield of the Risen -> Mount/MountSpeed StatUpd as five adjacent
-			// records; we used to send ours from the post-0x205F flush instead, long after the client had left the
-			// loading screen. Same reasoning as GrantCharacterSpells above: a re-assert that arrives inside the entry
-			// stream is absorbed silently, while the same record after ready reads as a NEW application and fires the
-			// client's apply feedback.
-			await RestoreMount(client);
+			await RestoreEntryBuffs(client);
 
 			Logger.LogInformation("Burst-less world entry (map={Map}, '{Name}'): sent {Count} constructed packets ({Npcs} in-range NPCs in the burst).", mapId, character?.Name, toSend.Count,
 				entryBurstNpcs.Count);
