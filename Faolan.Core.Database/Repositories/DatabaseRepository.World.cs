@@ -60,7 +60,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx
 				.MapLootEntries.Where(e => e.MapId == mapId)
 				.Join(ctx.Items, e => e.ItemTemplateId, i => i.Id, (e, i) => i)
-				.Where(i => i.Hash != 0 && i.Name != null && i.Name != "" && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot)
+				.Where(i => i.Hash != 0 && !string.IsNullOrEmpty(i.Name) && i.Type == ItemType.Normal && !i.ExcludeFromRandomLoot)
 				.OrderBy(_ => EF.Functions.Random())
 				.Take(count)
 				.ToArrayAsync();
@@ -104,16 +104,25 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.RespawnPoints.Where(r => r.MapId == mapId).ToArrayAsync();
 		}
 
+		// Words included for the same reason as GetWorldObjects below, even though today's callers only read scalars
+		// (class, position, name, interact action, zone-line destination): this hands back the same entity the record
+		// builder consumes, so a future caller that builds from it would otherwise silently emit a short record.
 		public async Task<WorldObject?> GetWorldObject(uint mapId, uint captureId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.WorldObjects.FirstOrDefaultAsync(o => o.MapId == mapId && o.DisplayKind != null && o.CapturedHandle == captureId);
+			return await ctx.WorldObjects.Include(o => o.Words).FirstOrDefaultAsync(o => o.MapId == mapId && o.DisplayKind != null && o.CapturedHandle == captureId);
 		}
 
+		// Include the WORD rows: they are not decoration, they are part of the wire record. WorldObjectGeometryCodec
+		// writes the geometry-node words and then the per-class trailer (1 u32 for Door and ClimbingDynel, 5 for
+		// Destructible, none for SimpleDynel) straight out of this navigation, and the repo does not lazy-load - so
+		// without the Include those objects go out SHORT and the client's ReadSubClass fails on them and drops them:
+		// "ReadSubClass for IIR 866480048 (DoorFullUpdateIIR_c) failed ... datasize left in stream=0". Doors, climbing
+		// vines and destructibles simply never appeared, while SimpleDynel props - which own no words - looked fine.
 		public async Task<WorldObject[]> GetWorldObjects(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.WorldObjects.Where(o => o.MapId == mapId && o.DisplayKind != null).ToArrayAsync();
+			return await ctx.WorldObjects.Include(o => o.Words).Where(o => o.MapId == mapId && o.DisplayKind != null).ToArrayAsync();
 		}
 	}
 }
