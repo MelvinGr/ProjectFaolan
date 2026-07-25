@@ -180,11 +180,18 @@ namespace Faolan.GameServer
 							// block, so B drifted/teleported even while standing still (#48). Clear the env byte.
 							var relayMovingType = (ushort)((ushort)movingType & 0x00FF);
 
-							// While SEATED (StandUpIfMoved above cleared the seat if the player actually walked off), the
-							// client still streams idle position-syncs on the bench. Echoing those back re-asserts a move
-							// on the seated player and CANCELS the sit pose (the character stands up as the animation ends).
-							// So suppress the move echo + relay while seated in place - there is nothing to render anyway.
-							if (client.Session.SeatedOnHandle == 0)
+							// NB moves are echoed even while SEATED, because retail does: in the sit capture the seated player's
+							// c2s CharDCMove is answered with an s2c one (pkt 6812 -> 6815, 6841 -> 6842) and the standup
+							// follows. This used to be suppressed on the observation that echoing "cancels the sit pose" -
+							// true at the time, but the cause was the sit records themselves being REJECTED by the client
+							// (the hold-assert's remoteformat length prefix, c6e015f3, and the over-padded ack tail,
+							// 063a5a83), so the pose never committed and any move looked like it cancelled the sit.
+							//
+							// Suppressing it also deadlocked standing up: standup needs the player to have moved
+							// SeatLeaveDistance from the seat, but with no echo the client got no answer to its first move
+							// and stopped sending any, so the threshold could never be reached and only the client's own
+							// local timeout got the player up. (It also skipped BroadcastPlayerMove entirely, so world
+							// objects did not stream while seated either.)
 							{
 								// Echo the move back VERBATIM with only the env byte cleared - retail's s2c CharDCMove IS the
 								// c2s move with its env byte flipped 0x01 -> 0x00 (same length, same body), NOT a reconstruction.
