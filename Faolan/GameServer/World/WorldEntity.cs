@@ -259,7 +259,14 @@ namespace Faolan.GameServer.World
 		// players via PlayerSpawnBuilder.BuildFromScratch (stashed by CaptureOwnSpawnBody at entry). This is a RUNTIME,
 		// in-memory cache of that built body - never persisted, never touched by the importer - which the broadcaster
 		// re-frames per recipient (current position + live playfield token) in SendWorldSpawn, so it isn't rebuilt for
-		// every viewer. Null until built / for entities with no spawn.
+
+		// The prepared FA015807 record for an NPC or a loot bag, built once at map load (NpcSpawnBuilder.TryBuildLive)
+		// and re-framed per viewer. A RUNTIME field, never persisted.
+		//
+		// NOT used for players any more (#429): a player's record is BUILT per send from live state
+		// (WorldBroadcaster.BuildPlayerSpawnBody), because a cached one describes them as they were at LOGIN - which is
+		// how a viewer arriving after someone mounted saw them on foot, and would equally have missed an equipment or
+		// level change.
 		public byte[] SpawnBody { get; set; } = null!;
 		public double PatrolCycleSeconds { get; set; }
 

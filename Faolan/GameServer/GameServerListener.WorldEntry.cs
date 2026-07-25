@@ -703,7 +703,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			// Populate the shared world model BEFORE building so the player entity exists for CaptureOwnSpawnBody.
+			// Populate the shared world model BEFORE building so the player entity exists for the spawn build.
 			// Resolve which COPY (instance) of this map the player joins from its instancing mode (#268): register the
 			// player first (which picks/keeps their instance), then populate THAT instance's NPCs.
 			var map = await Database.GetMap(mapId);
@@ -787,7 +787,6 @@ namespace Faolan.GameServer
 			if (playerSpawn is { } spawn)
 			{
 				toSend.Add(spawn);
-				_broadcaster.CaptureOwnSpawnBody(client, spawn); // so other players can be sent this player's spawn
 			}
 			else
 				Logger.LogWarning("Burst-less entry (map={Map}, '{Name}'): player spawn not built (no scaffold rows?); avatar may not render.", mapId, character?.Name);

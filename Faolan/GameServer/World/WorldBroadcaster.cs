@@ -527,8 +527,10 @@ namespace Faolan.GameServer.World
 		// spawn-me-to-viewers fires). Interest remains the sole path for the STREAMED delta as the player then walks.
 		public async Task BroadcastPlayerEntry(INetworkClient client)
 		{
+			// No SpawnBody check any more: a player's record is BUILT per send (#429), so having one was never the real
+			// precondition - having a live entity is.
 			var entity = _sim.PlayerWorldEntity(client);
-			if (entity?.SpawnBody == null)
+			if (entity == null)
 				return;
 
 			var zone = _sim.World.ZoneForEntity(entity);
@@ -673,16 +675,6 @@ namespace Faolan.GameServer.World
 			}
 
 			return (records, npcs);
-		}
-
-		// Stashes the player's own FA015807 body on their world entity, so the broadcaster can re-frame it to spawn this
-		// player on other clients. The spawn Rpc's Body IS that record body (the `packet[bodyStart..]` form
-		// BuildWorldEntrySpawn framed), so it is stored directly - no need to re-parse a serialized packet to find it.
-		public void CaptureOwnSpawnBody(INetworkClient client, in Rpc spawnPacket)
-		{
-			var entity = _sim.PlayerWorldEntity(client);
-			if (entity != null)
-				entity.SpawnBody = spawnPacket.Body.ToArray();
 		}
 
 		// A player closed the loot window (top-level 0x2044): consume the bag - fade it out for nearby players and drop
@@ -1594,7 +1586,9 @@ namespace Faolan.GameServer.World
 
 				switch (ev.Type)
 				{
-					case InterestEventType.Spawn when ev.Subject.SpawnBody != null:
+					// A player is spawnable when it has a live entity (its record is built per send); everything else
+					// still needs its prepared body.
+					case InterestEventType.Spawn when ev.Subject.IsPlayer || ev.Subject.SpawnBody != null:
 					{
 						// Register a streamed-in NPC's handle -> name + template so clicking it routes to the right
 						// conversation/shop by the stable template key (the same map the world-burst spawns use; players
@@ -1775,7 +1769,31 @@ namespace Faolan.GameServer.World
 
 		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
 		{
-			await recipient.SendAsync(BuildWorldSpawnRecord(recipient, subject, _sim.World.ZoneForEntity(subject).PlayfieldToken));
+			var playfieldToken = _sim.World.ZoneForEntity(subject).PlayfieldToken;
+
+			// A PLAYER's record is REBUILT from live state, not spliced out of a cached one (#429). The cached body is
+			// the FA015807 from that player's own world ENTRY, so a viewer arriving later was handed a description of
+			// them as they were at LOGIN - the mount was simply the first thing anyone noticed missing; equipment,
+			// level and vanity have the same hole. Nothing here is replayed: PlayerCharacterIir builds the message
+			// from code (#258) and PlayerSpawnBuilder builds the record from scratch, so calling them per send costs
+			// one equipment load and always describes the player as they are NOW.
+			if (subject.IsPlayer)
+			{
+				var live = await BuildPlayerSpawnBody(subject, playfieldToken);
+				if (live == null)
+				{
+					// No live session to describe. Loudly, not silently: a player we cannot build is a player nobody can
+					// see, and the old code would have papered over it with a stale cached body.
+					_logger.LogWarning("Spawn: cannot build a live record for player 0x{Handle:X8} ({Name}) - not sent.", subject.Handle, subject.Name);
+					return;
+				}
+
+				await recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, live));
+			}
+			else
+			{
+				await recipient.SendAsync(BuildWorldSpawnRecord(recipient, subject, playfieldToken));
+			}
 
 			// #363 dev nameplate: the client draws an NPC's floating name from its template_id LDB name and ignores the
 			// spawn-body `Name`, so overriding the visible name needs a SetNameIIR (0xADCE0CDA). Sent right AFTER the
@@ -1991,6 +2009,26 @@ namespace Faolan.GameServer.World
 		// patched in and the playfield-instance token re-stamped to `playfieldToken`. Shared by the interest send
 		// (SendWorldSpawn) and the world-entry burst (#398, BuildEntryNpcBurst) so both produce byte-identical spawn
 		// records - the burst is retail's shape (close NPCs on map enter) with our DB-constructed bodies.
+		// One player's FA015807, built from their CURRENT state - the same two calls the world-entry path makes, so there
+		// is one construction path and no cached blob to go stale. Returns null when the player has no live session
+		// (nothing to describe) so the caller falls back to the old splice rather than sending nothing.
+		//
+		// The transform: POSITION comes from the live entity (the authoritative one the simulation moves), rotation from
+		// the character row with the same degenerate-quaternion guard world entry uses - the entity carries Euler angles,
+		// and the record wants the quaternion.
+		private async Task<byte[]?> BuildPlayerSpawnBody(WorldEntity subject, uint playfieldToken)
+		{
+			if (subject.Client?.Session.Character is not { } character)
+				return null;
+
+			var equipment = await _database.GetCharacterEquipment(character.Id);
+			var rotation = character.Rotation.LengthSquared() > 0.0001f
+				? character.Rotation
+				: Quaternion.Identity;
+
+			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIir.Build(character, equipment).ToProtobuf(), character);
+		}
+
 		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)
 		{
 			var body = (byte[])subject.SpawnBody.Clone();
