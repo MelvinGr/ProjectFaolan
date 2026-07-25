@@ -63,10 +63,41 @@ length). When `flag2 >= 8` the velocity/accel/heading block is skipped entirely 
 - The `bit4`-collapsed pair `(facingX, param6)` is a **unit-length 2D facing direction**
   (`facingX² + param6² ≈ 1.0` for 11,785 / 11,884 collapsed records) that rotates as the entity turns.
 
-## Observed flag distribution
+## Observed flag distribution — every value, measured
 
-Most traffic is `flag1 ∈ {0x1a, 0x1e, 0x3a}` with `flag2 = 0` (moving, collapsed facing, no
-separate velocity/accel vector). The `flag2 = 4` forms carry the longer velocity block.
+`flag1` is a **bitfield, not a movement type**, and there is no name to recover for it: the client has no
+`MovingType` symbol, and its own reader calls the bits `local_d` / `local_e` / `local_f`. The record carries no
+"walking / mounted / falling" mode at all — the client drives its animation from its own state machine (its warnings
+name states like `sitonitem` / `WalkForwardStart`, which are animations, not wire values).
+
+Counting `[u8 env][u8 flag1]` over every capture — **19,034 CharDCMove records, 19 distinct `flag1` values across
+both env bytes (37 pairs)**:
+
+| flag1 | bits | count (env 0x00 + 0x01) | reads |
+|---|---|---|---|
+| `0x1A` | 1,3,4 | 3368 + 2183 | collapsed facing, velocity |
+| `0x1E` | 1,2,3,4 | 3320 + 3036 | collapsed facing only |
+| `0x3A` | 1,3,4,5 | 1687 + 1530 | collapsed facing, velocity, bool5 |
+| `0x0A` | 1,3 | 684 + 653 | full move vector, velocity |
+| `0x2A` | 1,3,5 | 638 + 671 | full move vector, velocity, bool5 |
+| `0x72` | 1,4,5,6 | 244 + 190 | collapsed facing, velocity, accel, bool5+6 |
+| `0x52` | 1,4,6 | 171 + 116 | collapsed facing, velocity, accel, bool6 |
+| `0x0E` | 1,2,3 | 133 + 142 | full move vector |
+| `0x56` | 1,2,4,6 | 40 + 35 | collapsed facing, accel, bool6 |
+| `0x42` | 1,6 | 29 + 29 | full move vector, velocity, accel, bool6 |
+| `0x62` | 1,5,6 | 26 + 26 | full move vector, velocity, accel, bool5+6 |
+| `0x12` | 1,4 | 19 + 17 | collapsed facing, velocity, accel |
+| `0x02` | 1 | 11 + 11 | full move vector, velocity, accel |
+| `0x16`, `0x22`, `0x32`, `0x3E`, `0x46` | — | 1–4 each | rare combinations |
+| `0x00` | none | 4 | reads everything, incl. the heading vector |
+
+Bit 0 is **never set** — every observed value is even. Bit 1 is set in all but the all-zero form, so the
+`param7..9` heading vector is almost never present.
+
+⚠️ This is why treating the u16 as an enum does not work. A `MovingType` enum with 11 observed pairs matched
+14,414 of the 19,034 records; the other **4,620 (24%)** fell through its `switch` and were logged and dropped -
+that player's movement silently ignored. The handler now reads `[env][flag1]` and processes every record
+(`MoveFlag` carries the bit names).
 
 ## Sibling: StopIIR_c (0xD751EBB4) — movement stop
 
