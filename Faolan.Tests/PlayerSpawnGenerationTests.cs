@@ -128,16 +128,11 @@ namespace Faolan.Tests
 					},
 					Hash = 0x5678
 				},
-				Belt = new Item
-				{
-					Id = 0x99,
-					Hash = 0
-				} // not buildable (no hash) -> skipped
 			};
 
 			var entries = PlayerSpawnEquipment.BuildInventoryEntries(equipment);
 
-			Assert.Equal(2, entries.Count); // Belt skipped
+			Assert.Equal(2, entries.Count);
 			Assert.Equal((uint)CharacterEquipmentSlot.Head, entries[0].Pos); // 2, sorted before Chest (5)
 			Assert.Equal((uint)CharacterEquipmentSlot.Chest, entries[1].Pos);
 
@@ -148,6 +143,26 @@ namespace Faolan.Tests
 			Assert.Equal(0x4C95E6E3u, head.Key1.Key1);
 			Assert.Equal(0x892A0B17u, head.Key1.Key4);
 			Assert.Same(head.Key1, head.Key2); // keys reuse the same quad (matches SnapshotItemBuilder)
+		}
+
+		// A worn item with no hash cannot be described on the wire. It used to be skipped, which showed the piece to its
+		// WEARER (their client rendered it from their own inventory) and to nobody else - a divergence with no error
+		// anywhere. The NPC builder already refuses the same shape.
+		[Fact]
+		public void PlayerSpawnEquipment_WornItemWithoutAHash_Throws()
+		{
+			var equipment = new CharacterEquipment
+			{
+				Belt = new Item
+				{
+					Id = 0x99,
+					Name = "Hashless Belt",
+					Hash = 0
+				}
+			};
+
+			var ex = Assert.Throws<InvalidOperationException>(() => PlayerSpawnEquipment.BuildInventoryEntries(equipment));
+			Assert.Contains("has no hash", ex.Message);
 		}
 
 		// The melee weapons render from the LEFT-hand navs (the wire melee pair is 6/8); the ranged pair

@@ -115,7 +115,13 @@ namespace Faolan.GameServer.World
 			}
 			catch (Exception ex)
 			{
-				_logger.LogDebug(ex, "Terrain: failed to load baked terrain for map {Map}.", mapId);
+				// LOUD, and at Error: a map with no bake at all is a normal, already-handled case (the File.Exists
+				// check above just returns), so everything reaching here is a truncated or corrupt file. The failure is
+				// invisible in its effects - the map simply has no collision, and HasCollisionLineOfSight answers
+				// "clear" for a map it knows nothing about - so line-of-sight silently passes through walls and NPCs
+				// shoot through them. At Debug this looked like a working server.
+				_logger.LogError(ex, "Terrain: baked terrain for map {Map} failed to load, so collision and line-of-sight are OFF for it. The file is present but unreadable - re-bake it.",
+					mapId);
 			}
 		}
 

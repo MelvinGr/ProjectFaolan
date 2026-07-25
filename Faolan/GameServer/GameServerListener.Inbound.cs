@@ -108,12 +108,19 @@ namespace Faolan.GameServer
 						? new Quaternion(0f, body.ReadFloat(), 0f, body.ReadFloat())
 						: body.ReadQuaternion();
 
-					// The WorldEntity owns the live transform (Gitea #404); the persisted Character is only the spawn
-					// seed, so fall back to it only for a player not in the world model yet.
+					// The WorldEntity owns the live transform (Gitea #404); the persisted Character is only the spawn seed.
+					//
+					// The `?? sessionCharacter` fallbacks below are NOT dead (the TODOs asking that are now answered):
+					// they carry the CREATE-EDITOR connection. That connection streams CharDCMove while the player turns
+					// their avatar in the editor - the captures show its first c2s move at fr113/116 (Barbarian-create,
+					// Blablatest), long after its spawn record at fr51/64 - and it never reaches RegisterPlayerInWorld,
+					// which only runs on world entry. So there is no entity to hold the transform, and writing it to the
+					// session Character is right there: for an editor avatar the character row IS the live state, and it
+					// is what the world entry that follows will spawn from.
 					var moveEntity = PlayerWorldEntity(client);
 
 					// The pre-move position, so a real TRANSLATION below can interrupt an in-flight cast (#347).
-					var previousPosition = moveEntity?.Position ?? sessionCharacter.Position; // TODO: Is this fallback needed??
+					var previousPosition = moveEntity?.Position ?? sessionCharacter.Position;
 
 					// FALLBACK only: a seated player who leaves the seat WITHOUT asking (a teleport, or a client that
 					// skips the request) still gets stood up - the normal path is the client's own standup request
@@ -125,7 +132,7 @@ namespace Faolan.GameServer
 					// server PINS the position (rejects translation) but still accepts rotation - the move handler is
 					// the enforcement point. Others then see the caster rooted; the relay below carries the pinned pos.
 					var acceptedPosition = client.Session.IsSpellweaving
-						? moveEntity?.Position ?? sessionCharacter.Position // TODO: Is this fallback needed??
+						? moveEntity?.Position ?? sessionCharacter.Position
 						: movePosition;
 
 					if (moveEntity != null)
@@ -139,7 +146,7 @@ namespace Faolan.GameServer
 						sessionCharacter.Rotation = moveRotation;
 					}
 
-					var livePosition = moveEntity?.Position ?? sessionCharacter.Position; // TODO: Is this fallback needed??
+					var livePosition = moveEntity?.Position ?? sessionCharacter.Position;
 
 					// #262: a move can satisfy a ReachArea quest goal (e.g. Shipwrecked's "Enter the jungle") - solve
 					// any whose area this position falls in. In-memory distance test (targets cached on the entity).

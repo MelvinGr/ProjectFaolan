@@ -74,8 +74,18 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
+			// No `?? 0` on the price: a ware pointing at an item row we do not have is a broken shop, and pricing it at
+			// zero would sell it for free. The grant below happens to fail for the same missing row today, so this only
+			// ever showed up as an aborted purchase - one refactor away from being a free-item exploit.
 			var wareItem = await _database.GetItem(ware.ItemTemplateId);
-			var price = VendorBuyPriceTin(wareItem?.Value ?? 0, ware.Count);
+			if (wareItem == null)
+			{
+				_logger.LogError("BuyItem: shop \"{Vendor}\" slot {Pos} sells item {Template}, which has no Items row - the shop's ware list needs re-importing.", shop.VendorName, pos,
+					ware.ItemTemplateId);
+				return;
+			}
+
+			var price = VendorBuyPriceTin(wareItem.Value, ware.Count);
 			if (character.Money < price)
 			{
 				_logger.LogInformation("BuyItem: {Character} can't afford ware {Template} at slot {Pos} ({Price} tin, has {Balance}).", character.Name, ware.ItemTemplateId, pos, price,

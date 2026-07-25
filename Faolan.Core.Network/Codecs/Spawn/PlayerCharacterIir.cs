@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Protobuf;
 
@@ -89,48 +90,55 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			// Override the player's identity (model) from the DB when set; otherwise keep the captured stats
 			// (a race/sex of 0 would be an invalid model). The remaining CharacterStats fields stay captured.
-			if (message.Stats != null && (uint)character.Race != 0)
+			// The identity ALWAYS applies. This used to be gated on `message.Stats != null && character.Race != 0`, so a
+			// character with either missing kept the TEMPLATE's - meaning Strie's sex, race, LEVEL 1 and 9000/9800/23000
+			// vitals shipped to every client that saw them, presented as that character. Neither is a state a character can
+			// legitimately be in: every one is created with a race (CreateCharacter defaults it) and the template always
+			// carries a stat block, so both are corruption and say so.
+			var stats = message.Stats
+				?? throw new InvalidOperationException($"The CharacterIIR template carries no CharacterStats, so {character.Name}'s identity cannot be applied.");
+			if ((uint)character.Race == 0)
+				throw new InvalidOperationException($"Character {character.Id:X8} ({character.Name}) has no race, so its spawn model cannot be built.");
+
+			stats.Sex = (uint)character.Sex;
+			stats.Race = (uint)character.Race;
+			stats.Level = character.Level;
+
+			// Vitals (cur==max) from the persisted MaxStats, on the ×100 wire scale (Strie's life 9000 = 90).
+			// A DEAD character logs in with CURRENT health = 0 (life/max stays full): this FA015807 is the
+			// SimpleCharFullUpdateIIR that CONSTRUCTS the local SimpleChar whose dead-flag gates the
+			// release/resurrect window (DAT_0297d374->[0x10]). The flag is latched at construction from a 0
+			// current-health, NOT from the 0x737A6DF9 snapshot (a different object) - which is why zeroing only
+			// the snapshot's HealthCurrent (#214 step 2) left the avatar standing. Verified against the retail
+			// login-while-dead capture (Stihetfv FA015807 #50): CharacterStats.health(f7)=0, life(f6)=19600 full,
+			// and can_fall(f20)=0 (alive=1).
+			var maxStats = character.MaxStats;
+			if (maxStats != null)
 			{
-				message.Stats.Sex = (uint)character.Sex;
-				message.Stats.Race = (uint)character.Race;
-				message.Stats.Level = character.Level;
-
-				// Vitals (cur==max) from the persisted MaxStats, on the ×100 wire scale (Strie's life 9000 = 90).
-				// A DEAD character logs in with CURRENT health = 0 (life/max stays full): this FA015807 is the
-				// SimpleCharFullUpdateIIR that CONSTRUCTS the local SimpleChar whose dead-flag gates the
-				// release/resurrect window (DAT_0297d374->[0x10]). The flag is latched at construction from a 0
-				// current-health, NOT from the 0x737A6DF9 snapshot (a different object) - which is why zeroing only
-				// the snapshot's HealthCurrent (#214 step 2) left the avatar standing. Verified against the retail
-				// login-while-dead capture (Stihetfv FA015807 #50): CharacterStats.health(f7)=0, life(f6)=19600 full,
-				// and can_fall(f20)=0 (alive=1).
-				var maxStats = character.MaxStats;
-				if (maxStats != null)
-				{
-					message.Stats.Life = maxStats.Health * 100;
-					message.Stats.Health = character.IsDead
-						? 0
-						: maxStats.Health * 100;
-					message.Stats.MaxStamina = maxStats.Stamina * 100;
-					message.Stats.Stamina = maxStats.Stamina * 100;
-					message.Stats.MaxMana = maxStats.Mana * 100;
-					message.Stats.Mana = maxStats.Mana * 100;
-				}
-				// Remaining CharacterStats fields (looks_package, side, ...) stay captured.
-
-				// THE Dead-substate gate: CharacterStats.bcc_state (the behavior/state-controller state enum).
-				// Across all 15 captured ALIVE player spawns bcc_state==1; the ONLY spawn that carries DeadBccState
-				// (29) is the retail login-while-dead capture. Health=0 and the forced death animation are both
-				// COSMETIC (HP bar / lying-down pose - the avatar could still walk in-client #214); bcc_state is what
-				// locks the controller into the Dead substate and lets the resurrect window paint. Set it for a dead
-				// login (kept captured == alive 1 otherwise).
-				if (character.IsDead)
-					message.Stats.BccState = DeadBccState;
-
-				// Retail's dead SimpleChar also reports can_fall=0 (alive=1) - a corpse is ragdoll/incapacitated, not
-				// gravity-stepped. Match it for a dead login (kept captured when alive).
-				if (character.IsDead)
-					message.CanFall = false;
+				stats.Life = maxStats.Health * 100;
+				stats.Health = character.IsDead
+					? 0
+					: maxStats.Health * 100;
+				stats.MaxStamina = maxStats.Stamina * 100;
+				stats.Stamina = maxStats.Stamina * 100;
+				stats.MaxMana = maxStats.Mana * 100;
+				stats.Mana = maxStats.Mana * 100;
 			}
+			// Remaining CharacterStats fields (looks_package, side, ...) stay captured.
+
+			// THE Dead-substate gate: CharacterStats.bcc_state (the behavior/state-controller state enum).
+			// Across all 15 captured ALIVE player spawns bcc_state==1; the ONLY spawn that carries DeadBccState
+			// (29) is the retail login-while-dead capture. Health=0 and the forced death animation are both
+			// COSMETIC (HP bar / lying-down pose - the avatar could still walk in-client #214); bcc_state is what
+			// locks the controller into the Dead substate and lets the resurrect window paint. Set it for a dead
+			// login (kept captured == alive 1 otherwise).
+			if (character.IsDead)
+				stats.BccState = DeadBccState;
+
+			// Retail's dead SimpleChar also reports can_fall=0 (alive=1) - a corpse is ragdoll/incapacitated, not
+			// gravity-stepped. Match it for a dead login (kept captured when alive).
+			if (character.IsDead)
+				message.CanFall = false;
 
 			// The rendered looks from the editor choices (CharacterBody). CharacterBody now stores the TRUE wire
 			// values (the editor's doubled ChangeHeadMesh/Voice/Size are zigzag-decoded to their real value on read),

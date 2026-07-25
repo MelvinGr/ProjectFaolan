@@ -39,7 +39,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
 		Task<CharacterStat[]> GetCharacterStats(uint characterId);
 		Task<uint[]> GetCharacterTags(uint characterId);
-		Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true);
+		Task<Character[]> GetCharactersByAccount(uint id);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 		Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet);
 		Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId);
@@ -390,14 +390,13 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterTags.Where(t => t.CharacterId == characterId).Select(t => t.TagId).ToArrayAsync();
 		}
 
-		public async Task<Character[]> GetCharactersByAccount(uint id, bool skipUninitialized = true)
+		// The account's PLAYABLE characters - a nameless row is a create in progress, never something to list. That was
+		// a `skipUninitialized = true` parameter no call site ever passed false to, i.e. a switch for a behaviour
+		// nobody wanted.
+		public async Task<Character[]> GetCharactersByAccount(uint id)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var q = ctx.Characters.Where(a => a.AccountId == id);
-			if (skipUninitialized)
-				q = q.Where(c => c.Name != null);
-
-			return await q.ToArrayAsync();
+			return await ctx.Characters.Where(c => c.AccountId == id && c.Name != null).ToArrayAsync();
 		}
 
 		public async Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId)

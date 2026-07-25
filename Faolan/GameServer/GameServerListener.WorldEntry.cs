@@ -156,7 +156,7 @@ namespace Faolan.GameServer
 			// beach chain-wall collision, so the returning player isn't re-blocked by the world-entry burst's chain
 			// dynel), and clear the escortee's captive pose if she's already freed. Both data-driven / no-op when N/A.
 			await _broadcaster.ApplyQuestWorldEffects(client);
-			await _questHandler.ClearCasildaCaptivePose(client);
+			await _questHandler.ClearCasildaCaptivePose(client); // TODO: This should be gated more / moved to 'quest handler service'
 
 			// Bind the character on entry if it has never bound. Every recall targets BindRespawnPointId - the Totem of
 			// Origin, the Path of Asura spell, .recall, and the death-resurrect - so an unbound character (imported or
@@ -173,7 +173,7 @@ namespace Faolan.GameServer
 
 			// Re-deliver any persisted bag items the world-entry snapshot dropped for lacking an hash
 			// (AH-bought items - harvested template, no hash) via the live add path, so they survive relog.
-			await RedeliverNonSnapshotBagItems(client);
+			await RedeliverNonSnapshotBagItems(client); // TODO: Is this still needed??
 
 			// (The post-load second-snapshot delivery was removed 2026-06-12: the client ignores/rejects a
 			// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot,
@@ -182,7 +182,7 @@ namespace Faolan.GameServer
 			// Wallet sync: retail does NOT push a 0x2005 at login (the initial balance presumably rides the
 			// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
 			// show 0 until the first change. Reason 0 = a plain sync, not a gain celebration.
-			if (client.Session.Character.Money > 0)
+			if (client.Session.Character.Money > 0) // TODO: Confirm previous comment, remove this call if not retail
 				await SendUpdateCash(client, client.Session.Character.Money, UpdateCashReason.Spend);
 
 			// Guilded character: set the in-world guild tag (0x2550C99A). Retail sends this once on guild
@@ -464,7 +464,7 @@ namespace Faolan.GameServer
 			var isCreateEntry = client.Session.IsCreateWorldSession;
 			var (snapshotQuests, primaryQuest) = isCreateEntry
 				? (new List<QuestDefinition>(), (QuestDefinition?)null)
-				: await LoadSnapshotQuests(character!);
+				: await LoadSnapshotQuests(character);
 			// #74/#71: the character's learned spells ride the snapshot's known-list so they survive relog + place on the
 			// action bar (instead of the per-login DispatchLearnSpell band-aid). Seeded at creation (CharacterLoadout),
 			// so this is a plain read.
@@ -490,7 +490,7 @@ namespace Faolan.GameServer
 			// The Completed tab rides the snapshot too (#390); a create-world entry has none.
 			var completedJournal = isCreateEntry
 				? []
-				: await LoadCompletedJournal(character!);
+				: await LoadCompletedJournal(character);
 
 			// The quest INDEX needs, per active quest, its AREA's 4CC and that area's full quest catalog ordered by
 			// JournalSequence (#390) - neither is per-quest data.
@@ -566,7 +566,10 @@ namespace Faolan.GameServer
 			// (#390), so there is no double-send.
 			if (isCreateEntry)
 			{
-				var beachDef = await Database.GetQuestDefinition(BeachStarterQuestId);
+				// The starter quest is seed data every database carries; without it a new character enters the world with
+				// no first objective and nothing to explain why, so a missing definition is corruption, not a case.
+				var beachDef = await Database.GetQuestDefinition(BeachStarterQuestId)
+					?? throw new InvalidOperationException($"The beach starter quest {BeachStarterQuestId} has no QuestDefinition - it is seed data, so this database is incomplete.");
 				await WorldBroadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
 				await _broadcaster.SendQuestFullUpdate(client, beachDef);
 				Logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", BeachStarterQuestId, character.Name);
@@ -698,10 +701,10 @@ namespace Faolan.GameServer
 			var mapId = client.Session.Character.MapId;
 
 			// Burst-less entry (#210) is the ONLY world-entry path: the whole world entry is built from
-			// generated/structured pieces - no captured burst. (The FAOLAN_BURSTLESS_ENTRY env toggle + its
-			// captured-burst replay fallback were removed once burstless became the verified default; the
-			// captured-burst replay now survives only as SendBurstlessWorldEntry's internal safety net for a map
-			// with no quest definition.)
+			// generated/structured pieces - no captured burst anywhere. (The FAOLAN_BURSTLESS_ENTRY env toggle and its
+			// captured-burst replay fallback were removed once burstless became the verified default. This comment used
+			// to add "the replay survives as an internal safety net for a map with no quest definition" - it does not:
+			// that case now logs an error and aborts the entry.)
 			await SendBurstlessWorldEntry(client, mapId);
 		}
 

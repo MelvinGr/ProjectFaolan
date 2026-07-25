@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -283,14 +284,13 @@ namespace Faolan.GameServer.Dialogue
 
 			foreach (var p in orderedPackets)
 			{
-				// Every conversation packet is stored STRUCTURED (#188): the importer requires a recognised SubOpcode,
-				// so the columns are the SOLE construction path - no raw-Data fallback. A null SubOpcode would be an
-				// import bug; surface it rather than silently dropping the line.
-				if (p.SubOpcode is not { } subOp)
-				{
-					_logger.LogError("Conversation: packet #{Sequence} (node {Node}) has no SubOpcode; the importer should have columnized it. Skipping.", p.Sequence, node.Id);
-					continue;
-				}
+				// Every conversation packet is stored STRUCTURED (#188): the importer requires a recognised SubOpcode, so
+				// the columns are the SOLE construction path - no raw-Data fallback. A null SubOpcode is an import bug,
+				// and all 596 shipped packets have one. Logging and skipping the line was the worst of both: it claimed
+				// to surface the problem while still handing the player a conversation with a line missing from the
+				// middle of it, which reads as a content bug rather than a broken import.
+				var subOp = p.SubOpcode
+					?? throw new InvalidOperationException($"Conversation packet #{p.Sequence} (node {node.Id}) has no SubOpcode - the importer did not columnize it, so this dialogue cannot be built.");
 
 				if (hasAnswerList && subOp == ConversationSubOpcode.KnubotCloseChatWindow)
 					continue; // skip the spurious close so the option list stays interactive

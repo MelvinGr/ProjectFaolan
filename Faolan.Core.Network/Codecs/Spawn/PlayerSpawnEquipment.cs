@@ -46,8 +46,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			foreach (var slot in Enum.GetValues<CharacterEquipmentSlot>())
 			{
 				var item = equipment[slot];
-				if (item == null || item.Hash == 0) // only fully-buildable items (real identity + hash)
-					continue;
+				if (item == null)
+					continue; // slot not worn
+
+				// An item WITHOUT a hash cannot be described to other clients, and skipping it silently is the worst
+				// half-measure available: the wearer sees the piece (their own client rendered it from their inventory),
+				// while everybody else sees them without it, and nothing says why. The NPC path already refuses this
+				// (NpcSpawnEquipmentBuilder.BuildEntry: "say what's missing"); an equipped item is the same promise -
+				// a hash is harvested content, so a worn item lacking one is a gap in Items, not a state to render around.
+				if (item.Hash == 0)
+				{
+					throw new InvalidOperationException(
+						$"Equipped item {item.Id} '{item.Name}' in slot {slot} has no hash, so it cannot be put on the wire - other players would see the wearer without it. Harvest the item's hash.");
+				}
 
 				// Every worn + vanity item ships - NOTHING is withheld for the vanity filter. Show/hide is driven purely
 				// by the bitmask in the spawn header (CharacterEquipment.VanityShownMask, emitted by
