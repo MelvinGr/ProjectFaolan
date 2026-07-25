@@ -32,7 +32,7 @@ namespace Faolan.Core.Network.Codecs.Team
 			return new TeamMemberRecord
 			{
 				CharacterId = character.Id,
-				Name = character.Name,
+				Name = character.Name ?? "", // a nameless character cannot happen post-create, but the wire needs a string
 				Class = character.Class,
 				MapId = mapId
 			};
