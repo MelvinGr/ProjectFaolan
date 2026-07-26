@@ -35,6 +35,17 @@ namespace Faolan.GameServer.Combat
 	///         the truncating one gives 20.
 	///     </para>
 	///     <para>
+	///         The client computes the sheet's row the same way, from its own copy of the same tweaks (verified live:
+	///         <c>FUN_0111a520</c> for health / <c>FUN_0111a6e0</c> for stamina read <c>0x02D244A0</c>/<c>B0</c> and
+	///         <c>E0</c>/<c>F0</c>/<c>500</c>, all 0.15 in the running process). Its form is
+	///         <c>stat(0x116) + Σ mod × (attr − 10) × 0.1 × 100</c>: the pool's regen stat's own value, plus an attribute
+	///         "trickledown" on top (hence the sheet's <c>HealthOOCRegenTrickledown</c> tooltip). With attributes at the
+	///         ×10 wire scale that reduces to exactly the formulas above -
+	///         <c>2030 + 15 × (Con + Str − 2) = 2000 + 15 × (Con + Str)</c> - so the flat term is not a mystery constant,
+	///         it is that base stat, and 2030 / 1045 are what the wire carries for an entity with no attributes above the
+	///         baseline.
+	///     </para>
+	///     <para>
 	///         ⚠️ The rates need the character's TOTAL attribute scores, which the client computes locally: retail sends
 	///         Strength/Constitution/… as a flat 10 in the snapshot stat sheet, so the class/level attribute BASE is not
 	///         on the wire and is not in any of the client's 10005xx data tables either (open work tracked in Gitea #444).
@@ -45,16 +56,18 @@ namespace Faolan.GameServer.Combat
 	public static class RegenRates
 	{
 		// TWK_OOCHealthRegenConModifier / TWK_OOCHealthRegenStrModifier, and the same 0.15 on all three
-		// TWK_OOCStaminaRegen{Con,Str,Dex}Modifier. The client registers these tweaks but never reads them (their
-		// globals have zero read xrefs), which is what says they are the SERVER's - ours to apply.
+		// TWK_OOCStaminaRegen{Con,Str,Dex}Modifier. The CLIENT reads these too, to compute the character sheet's row -
+		// see the class remark on how its form reduces to this one.
 		public const double OutOfCombatAttributeModifier = 0.15;
 
 		// TWK_OOCManaRegenIntModifier / TWK_OOCManaRegenWisModifier.
 		public const double OutOfCombatManaAttributeModifier = 0.38;
 
 		// The flat term each pool adds on top of its attribute sum. NOT in the tweak table (there is no
-		// TWK_*RegenBase); solved from the captured deltas, where a whole number is the only value that fits all of
-		// them at ×100 precision.
+		// TWK_*RegenBase); it is the pool's regen stat's OWN base value, which the client adds the attribute
+		// "trickledown" onto (see the class remark) - health's is 2030 and stamina's 1045 in the ×100 wire scale, the
+		// bare values that recur as regen deltas all over the corpus for entities whose attributes are all at the
+		// baseline 10. Expressed here in display units, folded with the ×(attr − 1) offset the client's form carries.
 		public const double HealthFlatRate = 20.0;
 		public const double StaminaFlatRate = 10.0;
 		public const double ManaFlatRate = 0.0; // AssassinL23's 2470 = 0.38 x 65 exactly, with nothing added

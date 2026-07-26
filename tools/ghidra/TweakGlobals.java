@@ -1,6 +1,11 @@
 // For each tweakable NAME (TWEAKS env, comma-separated): find its string, walk the static-registration stub that
-// binds it to a global slot, and list every reference to that slot - so you can tell whether the CLIENT actually
-// consumes the tweak or merely registers it (a registered-but-never-read tweak is server-side).
+// binds it to a global slot, and list every reference to that slot AND to slot+8 - so you can tell whether the
+// CLIENT actually consumes the tweak or merely registers it.
+//
+// ⚠️ The slot holds a POINTER to the tweak object; the VALUE lives at slot+8, and that is the address consuming code
+// names. Reporting only the slot's own references produces false "never read" verdicts - it did for
+// TWK_OOCHealthRegen{Con,Str}Modifier, which the client reads at 0x02D244A0/B0 = slot+8 (#442). Hence both are
+// counted, and "never read" now means neither was referenced.
 //
 // The stubs sit in a table of identical 5-instruction thunks:
 //     PUSH EDI / MOV EDX,<name string> / MOV EDI,<global slot> / CALL <register> / PUSH <init fn> ...
@@ -44,19 +49,24 @@ public class TweakGlobals extends GhidraScript {
 
             if (slot == null) { println(name + ": string @" + s + " but no registration stub found"); continue; }
 
+            // Both the slot (the object pointer) and slot+8 (the VALUE the consumer reads) - see the header note.
             int reads = 0, writes = 0, other = 0;
             StringBuilder readers = new StringBuilder();
-            for (Reference r : rm.getReferencesTo(slot)) {
-                Function f = getFunctionContaining(r.getFromAddress());
-                String where = r.getFromAddress() + (f != null ? " (" + f.getName() + ")" : "");
-                if (r.getReferenceType().isWrite()) writes++;
-                else if (r.getReferenceType().isRead()) { reads++; readers.append("\n      READ  ").append(where); }
-                else other++;
+            Address value = slot.add(8);
+            for (Address at : new Address[] { slot, value }) {
+                for (Reference r : rm.getReferencesTo(at)) {
+                    Function f = getFunctionContaining(r.getFromAddress());
+                    String where = r.getFromAddress() + (f != null ? " (" + f.getName() + ")" : "")
+                            + (at.equals(value) ? " [slot+8 = the value]" : "");
+                    if (r.getReferenceType().isWrite()) writes++;
+                    else if (r.getReferenceType().isRead()) { reads++; readers.append("\n      READ  ").append(where); }
+                    else other++;
+                }
             }
 
-            println(String.format("%-44s string@%s slot@%s  reads=%d writes=%d other=%d%s%s",
-                    name, s, slot, reads, writes, other,
-                    reads == 0 ? "   <-- CLIENT NEVER READS IT" : "", readers));
+            println(String.format("%-44s string@%s slot@%s value@%s  reads=%d writes=%d other=%d%s%s",
+                    name, s, slot, value, reads, writes, other,
+                    reads == 0 ? "   <-- no reference to EITHER address (check the disassembly before concluding)" : "", readers));
         }
     }
 }

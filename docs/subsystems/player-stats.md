@@ -107,7 +107,21 @@ Each against the captured delta for that character, exactly [V1: Faolan.Tests/Re
 | DemoL80, L80 Demonologist | Con 345, Str 70 | 82.25 | hp `20353` = `8225` + 12128 |
 | AssassinL23, L23 Assassin | Con 56, Str 20, Dex 79, Int 39, Wis 26 | 31.40 / 33.25 / 24.70 | hp `3140`, stam `3325`, mana `2470` |
 
-Three things worth keeping:
+**The client computes the sheet's row the same way**, from its own copy of the same tweaks — `FUN_0111a520` writes stat
+`0x116` (health) and `FUN_0111a6e0` writes `0x117` (stamina), reading `0x02D244A0`/`B0` and `E0`/`F0`/`500`, all 0.15 in
+the running process. Its form is
+
+```
+stat(0x116) += Σ modifier × (attribute − 10) × 0.1 × 100        // attribute at the ×10 wire scale
+```
+
+i.e. the pool's regen stat's own value plus an attribute **trickledown** on top (hence the sheet's
+`HealthOOCRegenTrickledown` tooltip row). That reduces to exactly the table above:
+`2030 + 15 × (Con + Str − 2) = 2000 + 15 × (Con + Str)`. So the flat term is not a mystery constant — it is that base
+stat, and **2030** (health) / **1045** (stamina) are literally what the wire carries for an entity whose attributes are
+all at the baseline 10, which is why those two values recur as bare regen deltas across dozens of captured NPC handles.
+
+Three more things worth keeping:
 
 - **The cadence is 1 Hz.** Median inter-arrival across all 1502 captured `RegenIIR`s is 1.00 s (min 0.77); the longer
   gaps are pools already full, not a slower tick. So the sheet's "Non Combat Health Regen" row IS the per-second rate.

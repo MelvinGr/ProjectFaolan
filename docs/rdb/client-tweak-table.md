@@ -50,9 +50,14 @@ The regen split we already implement — health and mana halt in combat, stamina
 
 So a pool's regen is driven by ATTRIBUTES, not by a fraction of its maximum. The full rates are **solved and
 confirmed against retail's own wire values** — see [`docs/subsystems/player-stats.md`](../subsystems/player-stats.md)
-for the formulas, the per-character verification and how the flat terms were pinned. The client itself never READS
-these three OOC modifiers (their globals have zero read xrefs, `tools/ghidra/TweakGlobals.java`), which is what
-identifies them as the server's to apply.
+for the formulas, the per-character verification and how the flat terms were pinned.
+
+⚠️ **`TweakGlobals.java` reports these three as "CLIENT NEVER READS IT", and that verdict is a false negative** —
+the client reads all of them. The script reports references to the registration slot, which holds a POINTER to the
+tweak object; the float lives at **slot + 8**, and that is the address the consuming code names. For
+`TWK_OOCHealthRegenStrModifier` the slot is `0x02D24498` and the regen routine (`FUN_0111a520`) reads `0x02D244A0`,
+which reads 0.15 in the running process. So a "never read" verdict from that script means *check slot+8 before
+concluding anything* — several tweaks that look server-only are not.
 
 The `Natural*` modifiers are the in-combat twins and are NOT yet solved: there is no `TWK_NaturalHealthRegen*` at
 all, matching the sheet showing `Natural Health Regen = 0` for every captured character, but the mana/stamina ones
