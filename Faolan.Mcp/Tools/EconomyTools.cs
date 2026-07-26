@@ -35,19 +35,36 @@ namespace Faolan.Mcp.Tools
 			_db = db;
 		}
 
+
 		[McpServerTool(Name = "create_tradepost_listing"),
 		 Description(
 			 "Create an auction-house listing for an item (by faolan.db item id) at a price in tin, on behalf of a seller name. DB-backed - it shows up when a player searches that item id in-game. Unlike imported listings, the ItemId and Template are both the item, so display = delivery. Find item ids with search_items.")]
 		public async Task<string> CreateTradepostListing([Description("Item id to list (see search_items / get_item)")] uint itemId, [Description("Asking price in tin")] ulong priceTin,
-			[Description("Quantity in the stack (default 1)")] uint quantity = 1, [Description("Seller name shown in the listing (default \"Claude\")")] string sellerName = "Claude")
+			[Description("Quantity in the stack (default 1)")] uint quantity = 1, [Description("Seller name shown in the listing (default \"Claude\")")] string sellerName = "Claude",
+			[Description("Realm to list in (0 = the only configured realm; required when there is more than one)")] uint realmId = 0)
 		{
 			var item = await _db.GetItem(itemId);
 			if (item == null)
 				return $"No item with id {itemId}.";
 
+			// Same realm FK as mail below. The seller is a NAME here rather than a character, so there is no character to
+			// take the realm from - with one realm that is unambiguous, with several the caller has to say which.
+			var realms = await _db.GetRealms();
+			if (realmId == 0 && realms.Length == 1)
+				realmId = realms[0].Id;
+
+			if (realms.All(r => r.Id != realmId))
+			{
+				return $"realmId {realmId} is not a configured realm; pass one of: " +
+				       string.Join(", ", realms.Select(r => $"{r.Id} ({r.Name})")) + ".";
+			}
+
 			var listing = new TradepostListing
 			{
-				SaleId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
+				RealmId = realmId,
+				// The realm's next sale id, the same allocator the in-game listing path uses - NOT a random id. The
+				// unique key is (RealmId, SaleId), so a random value collides eventually and is unordered meanwhile.
+				SaleId = await _db.GetNextTradepostSaleId(realmId),
 				Handle = 0,
 				SellerName = sellerName ?? "Claude",
 				BankSlot = 0,
@@ -67,7 +84,7 @@ namespace Faolan.Mcp.Tools
 
 			await _db.CreateTradepostListing(listing);
 			return
-				$"Listed {listing.Quantity}x \"{item.Name}\" (id {itemId}) for {priceTin} tin by \"{listing.SellerName}\" (saleId 0x{listing.SaleId:X16}). Searchable under itemId {itemId} in-game.";
+				$"Listed {listing.Quantity}x \"{item.Name}\" (id {itemId}) for {priceTin} tin by \"{listing.SellerName}\" (saleId 0x{listing.SaleId:X16}) in realm {realmId}. Searchable under itemId {itemId} in-game.";
 		}
 
 		[McpServerTool(Name = "get_mailbox"),
@@ -147,7 +164,13 @@ namespace Faolan.Mcp.Tools
 
 			var mail = new Mail
 			{
-				MailId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
+				// MailId IS the wire id and the primary key (#368), so it comes from the repository's allocator - the
+				// same one the in-game mail path uses - rather than from a random draw.
+				MailId = await _db.GetNextMailId(),
+				// Mail is realm-scoped (#324) and RealmId is an FK to Realms, so leaving it at the default 0 makes the
+				// insert fail on the foreign key. It is the RECIPIENT's realm - the mailbox read path pairs the same two
+				// columns (GetMailsForRecipient(name, realmId)).
+				RealmId = recipient.RealmId,
 				RecipientClass = MailConstants.EndpointClass,
 				RecipientName = recipient.Name,
 				SenderClass = MailConstants.EndpointClass,
@@ -168,7 +191,9 @@ namespace Faolan.Mcp.Tools
 
 				mail.Attachments.Add(new MailAttachment
 				{
-					ItemInstanceId = (ulong)Random.Shared.NextInt64(1, long.MaxValue),
+					// Only has to be unique among this mail's attachments, so the mail id serves - the same choice the
+					// server's mail path makes (GameServerListener.Tradepost.cs).
+					ItemInstanceId = mail.MailId,
 					Quantity = count == 0
 						? 1u
 						: count,
