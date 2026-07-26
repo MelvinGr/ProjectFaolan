@@ -34,7 +34,7 @@ namespace Faolan.GameServer.World
 
 		public bool Available { get; }
 
-		public TerrainService(string terrainDir, ILogger logger)
+		public TerrainService(string? terrainDir, ILogger logger)
 		{
 			_logger = logger;
 			if (string.IsNullOrWhiteSpace(terrainDir) || !Directory.Exists(terrainDir))

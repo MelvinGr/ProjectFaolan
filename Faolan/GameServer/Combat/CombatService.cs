@@ -51,12 +51,12 @@ namespace Faolan.GameServer.Combat
 		// The announced 0x2052 ability grant lives on the listener (GrantAbilitiesBuilder); the XP-driven ding needs
 		// it for level-gated unlocks (#209/#73 - Rest at L2), so it's injected as the single-op delegate seam the
 		// composition pattern prescribes (CLAUDE.md). Null-safe for tests that construct the service without it.
-		private readonly Func<INetworkClient, Ability, Task>? _announceAddSpecialAbility;
+		private readonly Func<INetworkClient, Ability, Task> _announceAddSpecialAbility;
 
 		// The listener's live spell-learn op (DispatchLearnSpell 0x200A), for the level-up spell unlocks (#209). Same
 		// narrow-seam pattern as _announceAddSpecialAbility. Null-safe for tests that construct the service without it.
-		private readonly Func<INetworkClient, uint, Task>? _learnSpell;
-		private readonly FatalityService? _fatality; // #140: the fatality burst on a killing blow
+		private readonly Func<INetworkClient, uint, Task> _learnSpell;
+		private readonly FatalityService _fatality; // #140: the fatality burst on a killing blow
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
@@ -66,7 +66,7 @@ namespace Faolan.GameServer.Combat
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
 		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
-			Func<INetworkClient, Ability, Task>? announceAddSpecialAbility = null, Func<INetworkClient, uint, Task>? learnSpell = null, FatalityService? fatality = null)
+			Func<INetworkClient, Ability, Task> announceAddSpecialAbility, Func<INetworkClient, uint, Task> learnSpell, FatalityService fatality)
 		{
 			_fatality = fatality;
 			_sim = sim;

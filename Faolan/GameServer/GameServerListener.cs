@@ -48,11 +48,6 @@ namespace Faolan.GameServer
 		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).
 		private const int SprintEnergyDrainPerTick = 900; // ~necro 8910 -> ~10s of continuous sprintource.
 
-		// Default baked-terrain dir (#284) when `TerrainDir` isn't set in faolan.json - the repo-root `Terrain/` folder
-		// the importer writes (`--report terrain-export`). The game server reads these small files, NOT the ~28 GB
-		// client RDB; if the dir is absent TerrainService disables itself (ground-snap/LoS off, no error).
-		private const string DefaultTerrainDir = "Terrain";
-
 		private const uint BankFlagListed = 0x401; // flags value while listed for sale
 		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail
 		private const uint BankFlagNormal = 0x001; // flags value once unlisted / mail cancelled
@@ -234,7 +229,8 @@ namespace Faolan.GameServer
 		private CancellationTokenSource _loopCts = null!;
 
 		public GameServerListener(ILogger logger, IConfiguration configuration, IDatabaseRepository database, Realm realm, IChatServerDispatcher agentServerDispatcher,
-			IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher) : base(realm.Port, logger, configuration, database, new GameServerPacketTracer(logger))
+			IGameServerDispatcher gameServerDispatcher, ICsPlayerAgentDispatcher csPlayerAgentDispatcher)
+			: base(realm.Port, logger, configuration, database, new GameServerPacketTracer(logger))
 		{
 			_agentServerDispatcher = agentServerDispatcher;
 			_gameServerDispatcher = gameServerDispatcher;
@@ -242,7 +238,7 @@ namespace Faolan.GameServer
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
 			// Server-side terrain (ground-snap + line-of-sight, #284) from the importer-baked terrain files - the game
 			// server does NOT read the client RDB. Degrades gracefully when the dir is unset/absent.
-			var terrain = new TerrainService(configuration["TerrainDir"] ?? DefaultTerrainDir, logger);
+			var terrain = new TerrainService(configuration["TerrainDir"], logger);
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger, terrain);
 			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
@@ -264,8 +260,10 @@ namespace Faolan.GameServer
 				SendLearnSpell, _fatality); // announced level-up ability + spell unlocks (#209/#73/#74), fatality burst (#140)
 			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Character.Id, msg),
 				ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
-				// reactive element list + fire burst (docs/subsystems/combos.md); WorldIir.Send frames the body for you, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
-				(c, record) => WorldIir.Send(c, record), SendBuffRemoval, // trance-buff end-twins on cancel/fire
+				// reactive element list + fire burst (docs/subsystems/combos.md); WorldIir.Send frames the body for you,
+				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
+				WorldIir.Send,
+				SendBuffRemoval, // trance-buff end-twins on cancel/fire
 				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
 				EnsureEnergyLoop, // start the persistent energy tracking/regen loop
 				c => _simulation.PlayerWorldEntity(c)?.IsMounted == true); // the trance roots + kneels, so not from the saddle
@@ -278,7 +276,7 @@ namespace Faolan.GameServer
 			_shop = new ShopService(database, logger, this);
 			_bank = new BankService(database, logger, this);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
-			_feats = new FeatService(database, logger, agentServerDispatcher, (id, map, pos) => DoTeleport(id, map, pos));
+			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport);
 
 			InitGmCommands();
 		}
