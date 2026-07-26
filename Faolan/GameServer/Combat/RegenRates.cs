@@ -64,18 +64,20 @@ namespace Faolan.GameServer.Combat
 		// TWK_OOCManaRegenIntModifier / TWK_OOCManaRegenWisModifier.
 		public const double OutOfCombatManaAttributeModifier = 0.38;
 
-		// The flat term each pool adds on top of its attribute sum. NOT in the tweak table (there is no
-		// TWK_*RegenBase); it is the pool's regen stat's OWN base value, which the client adds the attribute
-		// "trickledown" onto (see the class remark) - health's is 2030 and stamina's 1045 in the ×100 wire scale, the
-		// bare values that recur as regen deltas all over the corpus for entities whose attributes are all at the
-		// baseline 10. Expressed here in display units, folded with the ×(attr − 1) offset the client's form carries.
+		// The flat term each pool adds on top of its attribute sum. NOT in the tweak table (there is no TWK_*RegenBase);
+		// it is the pool's regen stat's OWN seeded value, which the client adds the attribute "trickledown" onto (see the
+		// class remark). Read straight off the client: stat 278 → 2000 and 279 → 1000 in the ×100 wire scale, i.e. the
+		// display 20.00 / 10.00 below, and identical across all four characters observed - including a Necromancer with
+		// no stamina pool at all.
 		public const double HealthFlatRate = 20.0; // stat 278 seeds to 2000
 		public const double StaminaFlatRate = 10.0; // stat 279 seeds to 1000
 
-		// Mana's is 0, from AssassinL23's captured 2470 = 0.38 × 65 exactly with nothing added. ⚠️ Less safe than the other
-		// two: the client seeds stat 280 to 2000 like health, but a class's base template then MODIFIES it (a level 80
-		// Necromancer's takes it 2000 → 2200), so mana's base looks class-dependent rather than flat. One captured
-		// delta, from a class with a 74-point mana pool, is all that pins this.
+		// Mana's is 0, from AssassinL23's captured 2470 = 0.38 × 65 exactly with nothing added - and its class really has no
+		// mana base: stat 280 is never written at all for that Assassin, while it seeds to 2000 for a Herald of Xotli and
+		// to 2200 for BOTH level 80 mage classes (a 2000 seed plus 200 from their class template).
+		// ⚠️ So a CASTER regenerates ~22.00/s short here. Left at 0 rather than guessed because no captured delta confirms
+		// a caster's OOC mana rate - the two clean level 80 ones are 1% of max mana per second (NecroL80 6523 on a 6523
+		// pool, DemoL80 5830 on 5830), which is a different channel, not this formula.
 		public const double ManaFlatRate = 0.0;
 
 		// Health: Constitution + Strength. Halted in combat by the caller (retail's OOC vs Natural split).

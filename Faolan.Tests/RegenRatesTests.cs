@@ -59,8 +59,10 @@ namespace Faolan.Tests
 		// The zero flat term is not an accident of this one character: the client seeds stat 280 (Non Combat Mana Regen)
 		// to 2000 for a class WITH a mana base (Herald of Xotli, Necromancer - whose class template then takes it to
 		// 2200) and never writes it at all for this Assassin, whose 74-point mana pool therefore regenerates on
-		// trickledown alone. ⚠️ So a CASTER's rate is short by its base here, and we have no captured bare mana delta for
-		// one to source it from - both L80 mana captures are full-pool restores (the delta equals max mana exactly).
+		// trickledown alone. Both L80 mage classes' bases read 2200 (a 2000 seed plus 200 from their class template), so
+		// ⚠️ a CASTER's rate is short by ~22.00/s here. It is left at 0 rather than guessed because no captured mana delta
+		// confirms a caster's rate: the two clean L80 ones are 1% of max mana per second (NecroL80 6523 on a 6523 pool,
+		// DemoL80 5830 on 5830) - a different channel entirely, not this formula.
 		[Fact]
 		public void ManaPerSecond_MatchesTheCapturedRegenIirDelta()
 		{

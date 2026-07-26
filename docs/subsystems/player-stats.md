@@ -129,9 +129,15 @@ raw→display conversion, which is why the trace's AttributeBonus of 140 is `(71
 ⚠️ **Mana's flat term is class-dependent, and ours is the no-mana-class value.** Stat 280 (Non Combat Mana Regen) is
 seeded to 2000 for a class with a mana base — a level 80 Necromancer's class template then takes it `2000 → 2200` —
 and is **never written at all** for a level 23 Assassin, whose 74-point mana pool therefore regenerates on trickledown
-alone. That is exactly why the one captured mana delta (that Assassin's `2470`) has no flat term. A CASTER's rate is
-short by its base here, and there is no captured bare mana delta for one to source it from: both level 80 mana captures
-are full-pool restores, where the delta equals max mana exactly (NecroL80 `6523`, DemoL80 `5830`).
+alone. That is exactly why the one captured mana delta (that Assassin's `2470`) has no flat term. Both level 80 mage
+classes read **2200** — a 2000 seed plus 200 from their class template — so a CASTER's rate is short by ~22.00/s here,
+left at 0 rather than guessed.
+
+⚠️ **Correction to an earlier reading of the level 80 mana captures.** They are *not* full-pool restores. NecroL80's delta
+`6523` is a ×100 wire value (65.23/s) while her 6523 max mana is a DISPLAY value — the same digits at different scales.
+With the scales straight, `delta_raw == max_display` for both mages, i.e. those deltas are exactly **1% of max mana per
+second** (NecroL80 6523 on a 6523 pool, DemoL80 5830 on 5830). That is a separate, still-undecoded mana channel — plausibly
+the `TWK_NaturalManaRegen*` in-combat twin — and it is why no captured delta yet confirms a caster's OOC mana rate.
 
 The health and stamina bases do NOT vary this way in the three characters observed — 2000 and 1000 for all of them,
 including a Necromancer that has no stamina pool at all.
@@ -155,9 +161,20 @@ Three more things worth keeping:
 ⚠️ **The server cannot yet compute these for a real character**, because the attribute scores are client-side (next
 section): retail sends a flat 10 for every attribute, and the class/level base is in no client data table either — of
 the 25 named `CoreTables` tables, `RDBPLAYERCLASSDATA` turns out to read RDB types 1000505–1000508, which are name and
-id maps, and none of 1000509–1000521 has a 12-class × 80-level × attribute shape. So `RegenRates` is fed
-gear + buffs only (`WorldEntity.AttributeScore`) and a geared character regenerates slower than retail. Open work
-tracked in Gitea #444.
+id maps, and none of 1000509–1000521 has a 12-class × 80-level × attribute shape. The base instead arrives as a
+**per-class RDB-1000020 item template**, loaded right after the shared template `115760`:
+
+| class | level | template | applies (raw) |
+|---|---|---|---|
+| Assassin | 23 | `3074050` | Str 200, Con 170, Int 260, Wis 200, **Dex 650** |
+| Herald of Xotli | 24 | `3130655` | Str 210, Con 180, **Int 680**, Wis 330, Dex 330 |
+| Necromancer | 80 | `1173863` | Str 700, Con 600, Int 2300, Wis 1100, Dex 1100 |
+| Demonologist | 80 | `1126759` | Str 700, Con 600, Int 2300, Wis 1100, Dex 1100 |
+
+Each profile suits its class (the Assassin's Dex-primary, the casters' Int-primary), and the two level 80 mage classes
+carry **different template ids with identical values** — so the values are per-archetype even though the id is per
+class. So `RegenRates` is fed gear + buffs only (`WorldEntity.AttributeScore`) and a geared character regenerates slower
+than retail. Open work tracked in Gitea #444.
 
 ## Wrong / unconfirmed ids (now tracked on the `CharacterStatId` enum)
 
