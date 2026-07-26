@@ -45,6 +45,12 @@ namespace Faolan.ClientLauncher
 		// Scry.ScriptcommandsTrace, CommandQueue, Hiding). `strings AgeOfConan.exe | grep '^GameCode/'` lists all ~90.
 		public static readonly string[] Default =
 		[
+			// EVERY stat the client applies, with its PREVIOUS value: "CMsg_StatChange()..(<id> <new> old:<old>)".
+			// Strictly more than GameCode/Stats, which only shows server-driven sets - this also catches what the client
+			// computes or derives itself, which is how the attribute pipeline was found (#442/#444): the five attributes
+			// start at a hardcoded 10, then each loaded item template's contribution lands as its own write, so the log
+			// attributes a delta to an item id. Pairs with GameCode/ItemData, which names the template being loaded.
+			"ClientInterface",
 			"GameCode/Stats", // every stat the server sends, by id and value - "got new stats: 507=291000"
 			"GameCode/ArmorMitigation", // TotalArmorValue / Adjusted / Min+MaxMitigation / Final Mitigation per hit
 			"GameCode/ItemData", // item template load + per-item static data

@@ -40,7 +40,25 @@ INFO1: ClientInterface - ClientInterface_t::CMsg_StatChange()..(18 23085 old:230
 ```
 
 The full channel list is `strings AgeOfConan.exe | grep '^GameCode/'` (~90). Note the sink prints them with a DOT
-(`GameCode.Stats`) while the table and the call sites use a SLASH (`GameCode/Stats`) — install the slash form.
+(`GameCode.Stats`) while the table and the call sites use a SLASH (`GameCode/Stats`) — install the slash form. Not
+every channel is named `GameCode/*`: **`ClientInterface`** is the most useful one outside that prefix.
+
+### `ClientInterface` — every stat the client applies, with its previous value
+
+`ClientInterface_t::CMsg_StatChange()..(<statId> <new> old:<old>)` (`FUN_006dbc30`, level 1). This is strictly more
+than `GameCode/Stats`, which only reports server-driven sets: it also catches everything the client computes or
+derives locally, which is what makes the attribute pipeline readable (#442/#444). A world entry shows:
+
+1. the client seeding the five attributes to a hardcoded **10** (`(804 10 old:0)` …),
+2. then one write per contributing item template, so — read alongside `GameCode/ItemData`, which names the template
+   being loaded — **each delta is attributed to an item id**,
+3. and `278`/`279`/`280` (Non Combat Health/Stamina/Mana Regen) seeded to `2000`/`1000`/`2000`.
+
+Step 2 is a direct instrument for #441: an item whose stats are explicit in its template matches our DB
+(Rejuvenating Coarse Padsoles, Con +7 both sides), while a template-scaled one does not (Malefactor's Claymore is
+Str +18 / Con +11 / Int +18 in-client and Str +1 in ours; Blackwolf Cap is Con +5 / Int +5 in-client and nothing in
+ours). The client also names the mechanism when it fails, on the `GameCode` channel:
+`AcgItemData_t::GetInterpolatedItem: missing item data. Item: InterpolatedItem Level: 0 Templates: (0, 0)`.
 
 **A PE-subsystem GUI→CUI flip is NOT needed.** It was implemented, tried and removed: the channels stayed silent,
 because the stderr branch of the sink only runs when the logger is UNinitialised, and it never is in-world.
