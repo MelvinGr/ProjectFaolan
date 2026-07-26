@@ -11,7 +11,7 @@ namespace Faolan.ChatServer
 {
 	partial class ChatServerListener
 	{
-		public async Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint>? recipientCharacterIds = null)
+		public async Task CharacterSay(uint characterId, ChatMarkup message, IReadOnlyCollection<uint>? recipientCharacterIds = null)
 		{
 			// "say" is proximity chat: the GameServer (which holds the live positions) passes the in-range character
 			// ids in `recipientCharacterIds`; we deliver the CharacterChat (0x0022) only to those clients. A null list
@@ -25,13 +25,13 @@ namespace Faolan.ChatServer
 
 				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.CharacterChat, s => s
 					.WriteUInt32(characterId)
-					.WriteString(message)
+					.WriteString(message.Value)
 					.WriteUInt16(0x0001) // type?
 					.WriteByte(0)));
 			}
 		}
 
-		public async Task<int> SendClaudeChannelMessage(string message)
+		public async Task<int> SendClaudeChannelMessage(ChatMarkup message)
 		{
 			// Claude's post on the Claude channel: the same 0x0014 sender-info + 0x0041 relay pair as a player post
 			// (see BroadcastChannelChat), but under the synthetic Claude identity. Every client is subscribed to the
@@ -43,12 +43,12 @@ namespace Faolan.ChatServer
 					s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName)));
 
 				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChannelChat,
-					s => s.WriteByte(ClaudeChannel.ChannelType).WriteUInt32(ClaudeChannel.ChannelId).WriteUInt32(ClaudeChannel.SenderId).WriteString(message).WriteUInt16(0x0000)));
+					s => s.WriteByte(ClaudeChannel.ChannelType).WriteUInt32(ClaudeChannel.ChannelId).WriteUInt32(ClaudeChannel.SenderId).WriteString(message.Value).WriteUInt16(0x0000)));
 
 				delivered++;
 			}
 
-			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, message, true);
+			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, message.Value, true);
 
 			return delivered;
 		}
@@ -56,7 +56,7 @@ namespace Faolan.ChatServer
 		// Whispers a single character as the synthetic Claude identity: the 0x0014 sender info + the 0x001E tell
 		// (the exact delivery shape of a player tell - see the whisper capture / WhisperTests). Logged on the
 		// Claude channel log so the bridge conversation history stays complete.
-		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, string message)
+		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, ChatMarkup message)
 		{
 			var target = ClientForCharacter(targetCharacterId);
 			if (target == null)
@@ -65,13 +65,13 @@ namespace Faolan.ChatServer
 			await target.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo,
 				s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName)));
 
-			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message));
+			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message.Value));
 
-			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, $"(whisper to {targetCharacterId:X8}) {message}", true, true);
+			_claudeChannel.Append(ClaudeChannel.SenderId, ClaudeChannel.SenderName, $"(whisper to {targetCharacterId:X8}) {message.Value}", true, true);
 			return true;
 		}
 
-		public async Task SendSystemMessage(uint characterId, string message)
+		public async Task SendSystemMessage(uint characterId, ChatMarkup message)
 		{
 			var client = ClientForCharacter(characterId);
 			if (client == null)
@@ -83,7 +83,7 @@ namespace Faolan.ChatServer
 			await SendSystemMessage(client, message);
 		}
 
-		public Task SystemBroadcast(string message)
+		public Task SystemBroadcast(ChatMarkup message)
 		{
 			return Task.WhenAll(NetworkClients.Select(c => SendSystemMessage(c, message)));
 		}
@@ -126,9 +126,9 @@ namespace Faolan.ChatServer
 				s => s.WriteByte(type).WriteUInt32(id).WriteString(name).WriteUInt32(flag).WriteUInt16(0x0000)));
 		}
 
-		private static Task SendSystemMessage(INetworkClient client, string message)
+		private static Task SendSystemMessage(INetworkClient client, ChatMarkup message)
 		{
-			return client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteUInt16(0x0000).WriteString(message).WriteUInt16(0x0000)));
+			return client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteUInt16(0x0000).WriteString(message.Value).WriteUInt16(0x0000)));
 		}
 	}
 }

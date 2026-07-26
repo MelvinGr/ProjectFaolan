@@ -8,7 +8,7 @@ namespace Faolan.Core.Network.Server.ChatServer
 		// Delivers a character's "say" to ChatServer clients as a CharacterChat (0x0022). `recipientCharacterIds`
 		// scopes it to those characters (proximity say - the GameServer computes who is in range, since it holds the
 		// live positions); null = every connected client (server-wide).
-		Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint>? recipientCharacterIds = null);
+		Task CharacterSay(uint characterId, ChatMarkup message, IReadOnlyCollection<uint>? recipientCharacterIds = null);
 
 		/// <summary>
 		///     The COMPLETE live <see cref="INetworkClientSession" /> of every connected client - full session state.
@@ -21,15 +21,15 @@ namespace Faolan.Core.Network.Server.ChatServer
 		///     Posts a message on the Claude channel (<see cref="ClaudeChannel" />) as the synthetic "Claude" sender,
 		///     broadcast to every connected client. Returns the number of clients it was delivered to.
 		/// </summary>
-		Task<int> SendClaudeChannelMessage(string message);
+		Task<int> SendClaudeChannelMessage(ChatMarkup message);
 
 		/// <summary>
 		///     Whispers (0x001E tell) a single character as the synthetic "Claude" sender. Returns false when the
 		///     character has no connected ChatServer client.
 		/// </summary>
-		Task<bool> SendClaudeWhisper(uint targetCharacterId, string message);
+		Task<bool> SendClaudeWhisper(uint targetCharacterId, ChatMarkup message);
 
-		Task SendSystemMessage(uint characterId, string message);
-		Task SystemBroadcast(string message);
+		Task SendSystemMessage(uint characterId, ChatMarkup message);
+		Task SystemBroadcast(ChatMarkup message);
 	}
 }

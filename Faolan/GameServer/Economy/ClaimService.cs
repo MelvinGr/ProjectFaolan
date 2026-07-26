@@ -71,14 +71,14 @@ namespace Faolan.GameServer.Economy
 			if (parts.Length is < 2 or > 3 || !parts[0].Equals("add", StringComparison.OrdinalIgnoreCase) ||
 			    !uint.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var itemId))
 			{
-				await _chat.SendSystemMessage(characterId, "Usage: .claim add &lt;itemId&gt; [count]  |  .claim list");
+				await _chat.SendSystemMessage(characterId, "Usage: .claim add <itemId> [count]  |  .claim list");
 				return;
 			}
 
 			uint count = 1;
 			if (parts.Length == 3 && !uint.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out count))
 			{
-				await _chat.SendSystemMessage(characterId, "Usage: .claim add &lt;itemId&gt; [count]");
+				await _chat.SendSystemMessage(characterId, "Usage: .claim add <itemId> [count]");
 				return;
 			}
 

@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Server.ChatServer
 	/// </summary>
 	public sealed class ChatServerDispatcher : ProviderDispatcher<IChatServerProvider>, IChatServerDispatcher
 	{
-		public async Task CharacterSay(uint characterId, string message, IReadOnlyCollection<uint>? recipientCharacterIds = null)
+		public async Task CharacterSay(uint characterId, ChatMarkup message, IReadOnlyCollection<uint>? recipientCharacterIds = null)
 		{
 			var provider = Provider;
 			if (provider != null)
@@ -27,7 +27,7 @@ namespace Faolan.Core.Network.Server.ChatServer
 			return Provider?.GetWorldSessions() ?? [];
 		}
 
-		public async Task<int> SendClaudeChannelMessage(string message)
+		public async Task<int> SendClaudeChannelMessage(ChatMarkup message)
 		{
 			var provider = Provider;
 			return provider != null
@@ -35,20 +35,20 @@ namespace Faolan.Core.Network.Server.ChatServer
 				: 0;
 		}
 
-		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, string message)
+		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, ChatMarkup message)
 		{
 			var provider = Provider;
 			return provider != null && await provider.SendClaudeWhisper(targetCharacterId, message);
 		}
 
-		public async Task SendSystemMessage(uint characterId, string message)
+		public async Task SendSystemMessage(uint characterId, ChatMarkup message)
 		{
 			var provider = Provider;
 			if (provider != null)
 				await provider.SendSystemMessage(characterId, message);
 		}
 
-		public async Task SystemBroadcast(string message)
+		public async Task SystemBroadcast(ChatMarkup message)
 		{
 			var provider = Provider;
 			if (provider != null)

@@ -19,6 +19,7 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer.Combat;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Server.ChatServer;
 
 namespace Faolan.GameServer
 {
@@ -37,7 +38,7 @@ namespace Faolan.GameServer
 			uint count = 1;
 			if (parts.Length is < 1 or > 2 || !uint.TryParse(parts[0], out var itemId) || (parts.Length == 2 && !uint.TryParse(parts[1], out count)))
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .additem &lt;itemId&gt; [count]");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .additem <itemId> [count]");
 				return;
 			}
 
@@ -62,8 +63,8 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Added {count}x '{item.Name}' (id {itemId}) to bag slot {slot} (live DispatchAddItem).");
 		}
 
-		// .ban &lt;account|character name&gt;   - ban an account (sets State = Banned; login rejects non-Active accounts).
-		// .unban &lt;account|character name&gt; - lift a ban (State = Active). Accepts either the account username OR one of
+		// .ban <account|character name>   - ban an account (sets State = Banned; login rejects non-Active accounts).
+		// .unban <account|character name> - lift a ban (State = Active). Accepts either the account username OR one of
 		// its character names. Banning also kicks the account's live world connections (the State change alone only
 		// blocks the NEXT login). You can't ban your own account.
 		private async Task BanCommand(INetworkClient client, string arguments, bool ban)
@@ -72,7 +73,7 @@ namespace Faolan.GameServer
 			var name = arguments.Trim();
 			if (string.IsNullOrEmpty(name))
 			{
-				await _agentServerDispatcher.SendSystemMessage(gmId, $"Usage: .{(ban ? "ban" : "unban")} &lt;account or character name&gt;");
+				await _agentServerDispatcher.SendSystemMessage(gmId, $"Usage: .{(ban ? "ban" : "unban")} <account or character name>");
 				return;
 			}
 
@@ -83,19 +84,19 @@ namespace Faolan.GameServer
 
 			if (account == null)
 			{
-				await _agentServerDispatcher.SendSystemMessage(gmId, $"<span style=\"color: red;\">No account or character named '{name}'.</span>");
+				await _agentServerDispatcher.SendSystemMessage(gmId, ChatMarkup.Color("red", $"No account or character named '{name}'."));
 				return;
 			}
 
 			if (ban && account.Id == client.Session.Account.Id)
 			{
-				await _agentServerDispatcher.SendSystemMessage(gmId, "<span style=\"color: red;\">You can't ban your own account.</span>");
+				await _agentServerDispatcher.SendSystemMessage(gmId, ChatMarkup.Color("red", "You can't ban your own account."));
 				return;
 			}
 
 			if (account.Type > client.Session.Account.Type)
 			{
-				await _agentServerDispatcher.SendSystemMessage(gmId, "<span style=\"color: red;\">You can't ban an account with a higher rank than yours.</span>");
+				await _agentServerDispatcher.SendSystemMessage(gmId, ChatMarkup.Color("red", "You can't ban an account with a higher rank than yours."));
 				return;
 			}
 
@@ -103,7 +104,7 @@ namespace Faolan.GameServer
 				    ? AccountState.Banned
 				    : AccountState.Active))
 			{
-				await _agentServerDispatcher.SendSystemMessage(gmId, "<span style=\"color: red;\">Error changing account state.</span>");
+				await _agentServerDispatcher.SendSystemMessage(gmId, ChatMarkup.Color("red", "Error changing account state."));
 				return;
 			}
 
@@ -114,7 +115,7 @@ namespace Faolan.GameServer
 				foreach (var c in NetworkClients.Where(nc => nc.Session.Account?.Id == account.Id).ToList())
 				{
 					if (c.Session.Character?.Id is { } cid)
-						await _agentServerDispatcher.SendSystemMessage(cid, "<span style=\"color: red;\">You have been banned by a GM.</span>");
+						await _agentServerDispatcher.SendSystemMessage(cid, ChatMarkup.Color("red", "You have been banned by a GM."));
 					c.Stop();
 					kicked++;
 				}
@@ -142,7 +143,7 @@ namespace Faolan.GameServer
 					: null;
 			if (resolved is not { } handle)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .delete [&lt;handle&gt;]  (no arg = your selected target). Removes it live AND deletes its spawn row.");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .delete [<handle>]  (no arg = your selected target). Removes it live AND deletes its spawn row.");
 				return;
 			}
 
@@ -182,7 +183,7 @@ namespace Faolan.GameServer
 			var map = await Database.GetMap(mapId);
 			if (map == null)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">Unknown map id: {mapId}</span>");
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"Unknown map id: {mapId}"));
 				return;
 			}
 
@@ -202,7 +203,7 @@ namespace Faolan.GameServer
 				if (spawn == null)
 				{
 					await _agentServerDispatcher.SendSystemMessage(characterId,
-						$"<span style=\"color: red;\">No spawn point defined for map {(string.IsNullOrEmpty(map.Name) ? map.Id.ToString() : $"{map.Name} ({map.Id})")}. Give explicit coordinates: .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;.</span>");
+						ChatMarkup.Color("red", $"No spawn point defined for map {(string.IsNullOrEmpty(map.Name) ? map.Id.ToString() : $"{map.Name} ({map.Id})")}. Give explicit coordinates: .teleport <x> <y> <z>."));
 					return;
 				}
 
@@ -250,7 +251,7 @@ namespace Faolan.GameServer
 			var name = (arguments ?? "").Trim();
 			if (name.Length == 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .graduatenpcgroup &lt;group name&gt;  (removes the captured spawns the area's ambient pool replaces).");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .graduatenpcgroup <group name>  (removes the captured spawns the area's ambient pool replaces).");
 				return;
 			}
 
@@ -304,7 +305,7 @@ namespace Faolan.GameServer
 				}
 				catch (Exception e)
 				{
-					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"<span style=\"color: red;\">{e.Message}</span>");
+					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, ChatMarkup.Color("red", $"{e.Message}"));
 				}
 			}
 			else
@@ -385,7 +386,7 @@ namespace Faolan.GameServer
 				var parts = arg.Split(':', StringSplitOptions.TrimEntries);
 				if (parts.Length != 2 || !uint.TryParse(parts[0], out var hours) || hours > 23 || !uint.TryParse(parts[1], out var minutes) || minutes > 59)
 				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .time [&lt;hh:mm&gt; | reset]  (no argument reports the current time)");
+					await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .time [<hh:mm> | reset]  (no argument reports the current time)");
 					return;
 				}
 
@@ -419,7 +420,7 @@ namespace Faolan.GameServer
 				resolved = parsedHandle;
 			else
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .kill [&lt;handle&gt; | self]  (no arg = your selected target)");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .kill [<handle> | self]  (no arg = your selected target)");
 				return;
 			}
 
@@ -453,7 +454,7 @@ namespace Faolan.GameServer
 			var percent = 50u; // default: half of every pool
 			if (arg.Length > 0 && (!uint.TryParse(arg, out percent) || percent > 100))
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .hurt [&lt;percent 0-100&gt;]  (default 50)");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .hurt [<percent 0-100>]  (default 50)");
 				return;
 			}
 
@@ -511,7 +512,7 @@ namespace Faolan.GameServer
 			var point = await Database.GetRespawnPoint(pointId);
 			if (point == null)
 			{
-				await _agentServerDispatcher.SendSystemMessage(character.Id, "<span style=\"color: red;\">Your bind point no longer exists. Re-bind with .bind.</span>");
+				await _agentServerDispatcher.SendSystemMessage(character.Id, ChatMarkup.Color("red", "Your bind point no longer exists. Re-bind with .bind."));
 				return;
 			}
 
@@ -527,7 +528,7 @@ namespace Faolan.GameServer
 			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
 			if (parts.Length != 1 || !int.TryParse(parts[0], out var slot) || slot < 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .removeitem &lt;bagSlot&gt;");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .removeitem <bagSlot>");
 				return;
 			}
 
@@ -560,7 +561,7 @@ namespace Faolan.GameServer
 
 		private Task SendGmHelpText(uint characterId)
 		{
-			return _agentServerDispatcher.SendSystemMessage(characterId, $"Available Commands:<br />{_gmCommandsDict.Keys.JoinAsString("<br />")}");
+			return _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Raw($"Available Commands:<br />{_gmCommandsDict.Keys.JoinAsString("<br />")}"));
 		}
 
 		// .level <n>  - set the player's character level, regenerate its MaxStats from the new class/level, persist, 		// and push the Level stat + refreshed vitals so the change shows without a relog (the persisted level also
@@ -638,7 +639,7 @@ namespace Faolan.GameServer
 			var player = _simulation.PlayerWorldEntity(client);
 			if (player == null || client.Session.SelectedTargetHandle is not { } handle || !_simulation.World.ZoneForEntity(player).TryGet(handle, out var npc) || npc.NpcTemplateId == 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Select an NPC first, then .setnpcgroup [&lt;group name&gt;] [clear]  (no arg = the area the NPC stands in).");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Select an NPC first, then .setnpcgroup [<group name>] [clear]  (no arg = the area the NPC stands in).");
 				return;
 			}
 
@@ -723,7 +724,7 @@ namespace Faolan.GameServer
 					? $"area #{id} (unlabeled)"
 					: "none");
 				await _agentServerDispatcher.SendSystemMessage(characterId,
-					string.Join("<br>", $"<b>{t.Name}</b>  (handle 0x{handle:X8}, {kind})",
+					ChatMarkup.Lines(ChatMarkup.Raw($"{ChatMarkup.Bold(t.Name)}  (handle 0x{handle:X8}, {kind})"),
 						$"template {t.NpcTemplateId} · level {t.Level} · {vitals} · {(t.Hostile ? "hostile" : "friendly")} (disp {t.Disposition})",
 						$"pos ({t.Position.X:F1}, {t.Position.Y:F1}, {t.Position.Z:F1}) · map {t.MapId} / instance 0x{t.InstanceId:X8}", $"spawn group: {group}"));
 				return;
@@ -739,7 +740,7 @@ namespace Faolan.GameServer
 					? $" · teleports to map {obj.DestinationMapId} ({dp.X:F1}, {dp.Y:F1}, {dp.Z:F1})"
 					: "";
 				await _agentServerDispatcher.SendSystemMessage(characterId,
-					string.Join("<br>", $"<b>{oname}</b>  (handle 0x{handle:X8}, world-object)",
+					ChatMarkup.Lines(ChatMarkup.Raw($"{ChatMarkup.Bold(oname)}  (handle 0x{handle:X8}, world-object)"),
 						$"objectId {obj.ObjectId} · item template {obj.TemplateItemId?.ToString() ?? "none"} · subop 0x{obj.SubOpcode:X8} · {(obj.IsClosed ? "closed" : "open")}",
 						$"interact {obj.InteractAction} · carsGroup {obj.CarsGroup}{dest}", $"pos ({obj.Position.X:F1}, {obj.Position.Y:F1}, {obj.Position.Z:F1}) · map {obj.MapId}"));
 				return;
@@ -774,7 +775,7 @@ namespace Faolan.GameServer
 			if (arg.Length == 0)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId,
-					"Usage: .teleport &lt;mapId | name&gt;  or  .teleport &lt;x&gt; &lt;y&gt; &lt;z&gt;  (current map)  or  .teleport &lt;mapId | name&gt; &lt;x&gt; &lt;y&gt; &lt;z&gt;  (see .maps)");
+					"Usage: .teleport <mapId | name>  or  .teleport <x> <y> <z>  (current map)  or  .teleport <mapId | name> <x> <y> <z>  (see .maps)");
 				return;
 			}
 
@@ -798,7 +799,7 @@ namespace Faolan.GameServer
 				var resolved = await ResolveMap(mapArg);
 				if (resolved == null)
 				{
-					await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No map matching '{mapArg}'. Try .maps.</span>");
+					await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"No map matching '{mapArg}'. Try .maps."));
 					return;
 				}
 
@@ -815,7 +816,7 @@ namespace Faolan.GameServer
 			var match = await ResolveMap(arg);
 			if (match == null)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No map matching '{arg}'. Try .maps.</span>");
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"No map matching '{arg}'. Try .maps."));
 				return;
 			}
 
@@ -838,8 +839,8 @@ namespace Faolan.GameServer
 			client.Session.Account.GmGodMode = entity.GodMode;
 			await Database.SaveAccount(client.Session.Account);
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.GodMode
-				? "God mode <span style=\"color: lime;\">ON</span> - you take no damage."
-				: "God mode <span style=\"color: red;\">OFF</span>.");
+				? ChatMarkup.Raw($"God mode {ChatMarkup.Color("lime", "ON")} - you take no damage.")
+				: ChatMarkup.Raw($"God mode {ChatMarkup.Color("red", "OFF")}."));
 		}
 
 		// .invisible  - toggle aggro invisibility on yourself: hostile NPCs won't target/aggro you (skipped in the
@@ -859,8 +860,8 @@ namespace Faolan.GameServer
 			client.Session.Account.GmInvisible = entity.Invisible;
 			await Database.SaveAccount(client.Session.Account);
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.Invisible
-				? "Invisible <span style=\"color: lime;\">ON</span> - NPCs won't aggro you."
-				: "Invisible <span style=\"color: red;\">OFF</span>.");
+				? ChatMarkup.Raw($"Invisible {ChatMarkup.Color("lime", "ON")} - NPCs won't aggro you.")
+				: ChatMarkup.Raw($"Invisible {ChatMarkup.Color("red", "OFF")}."));
 		}
 
 		// .togglenpcgroup  - toggle the dev spawn-area nameplate labels (#363) live for this session: each NPC that

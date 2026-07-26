@@ -24,6 +24,7 @@ using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Server.ChatServer;
 
 namespace Faolan.GameServer
 {
@@ -666,7 +667,7 @@ namespace Faolan.GameServer
 										if (dest.DestMapId == 0)
 										{
 											await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
-												$"<span style=\"color: red;\">Zone-line '{dest.DestinationName}' has no known destination yet.</span>");
+												ChatMarkup.Color("red", $"Zone-line '{dest.DestinationName}' has no known destination yet."));
 										}
 										else if (dest.DestMapId == currentMap && dest.ArrivalPosition is { } samePos)
 											// Same-playfield door (e.g. the Thirsty Dog Inn): relocate in place, no loading screen.

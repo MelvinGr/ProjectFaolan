@@ -24,6 +24,7 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Network.Server.ChatServer;
 
 namespace Faolan.GameServer
 {
@@ -300,11 +301,11 @@ namespace Faolan.GameServer
 			var matches = maps.ToList();
 			if (matches.Count == 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, $"<span style=\"color: red;\">No map matching '{search?.Trim()}'.</span>");
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"No map matching '{search?.Trim()}'."));
 				return;
 			}
 
-			await _agentServerDispatcher.SendSystemMessage(characterId, matches.Select(m => $"{m.Id}: {m.Name}").JoinAsString("<br />"));
+			await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Lines([.. matches.Select(ChatMarkup (m) => $"{m.Id}: {m.Name}")]));
 		}
 
 		// Pushes the character's wallet balance, framed on the same login-world conversation as the 0x201C

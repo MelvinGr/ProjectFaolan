@@ -15,6 +15,7 @@ using Faolan.Core.Network.Server.GameServer;
 using Faolan.GameServer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 
 namespace Faolan.ChatServer
 {
@@ -104,7 +105,7 @@ namespace Faolan.ChatServer
 							: $"Character{character.Id}")));
 
 					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Global.BuildString));
-					await SendSystemMessage(client, Global.BuildString.Replace("\n", "<br />"));
+					await SendSystemMessage(client, ChatMarkup.Lines([.. Global.BuildString.Split('\n').Select(ChatMarkup (l) => l)]));
 
 					// Restore the stored friend list. ⚠️ The MESSAGES are the captured ones (the same pair an add
 					// sends), but this TIMING is not: the captured account had no friends before it added them, so

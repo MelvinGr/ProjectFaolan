@@ -76,7 +76,7 @@ namespace Faolan.GameServer.Feats
 						.ToArray();
 					if (ids.Length == 0)
 					{
-						await _chat.SendSystemMessage(character.Id, "Usage: .feat train &lt;id&gt; [&lt;id&gt; ...]");
+						await _chat.SendSystemMessage(character.Id, "Usage: .feat train <id> [<id> ...]");
 						return;
 					}
 
@@ -100,7 +100,7 @@ namespace Faolan.GameServer.Feats
 				}
 
 				default:
-					await _chat.SendSystemMessage(character.Id, "Usage: .feat list | .feat train &lt;id&gt; ... | .feat reset");
+					await _chat.SendSystemMessage(character.Id, "Usage: .feat list | .feat train <id> ... | .feat reset");
 					return;
 			}
 		}
