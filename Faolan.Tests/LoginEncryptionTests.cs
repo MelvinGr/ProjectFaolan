@@ -1,3 +1,7 @@
+using System;
+using Faolan.ClientLauncher;
+using Faolan.Core.Crypt;
+using System.Text;
 using System.Globalization;
 using System.Numerics;
 using Faolan.Core.Network;
@@ -99,6 +103,41 @@ namespace Faolan.Tests
 				NumberStyles.HexNumber);
 
 			Assert.Equal(expected, LoginEncryption.ServerPublic);
+		}
+
+		// The launcher patches ServerPublicHex into the exe and the server decrypts with the matching private key, so
+		// the two must be ONE keypair. They used to be two hand-copied literals in different assemblies (the private in
+		// Faolan.Core.Network, the public in Faolan.ClientLauncher), which fails SILENTLY: change one and every login
+		// falls back to accept-any while patched clients still carry the old key. Both now derive from DhKeys; this
+		// pins the derivation itself.
+		[Fact]
+		public void LauncherPublicKey_IsDerivedFromTheServerPrivateKey()
+		{
+			Assert.Equal(DhKeys.ServerPublicHex, Encoding.ASCII.GetString(ClientExePatcher.NewPublicKey));
+			Assert.Equal(256, DhKeys.ServerPublicHex.Length);
+			Assert.Equal(BigInteger.ModPow(DhKeys.G, DhKeys.ServerPrivate, DhKeys.N), DhKeys.ServerPublic);
+		}
+
+		// Configure() must fail LOUDLY on junk rather than quietly keeping the default - a mistyped key that silently
+		// falls back would look like a working server whose every login is accept-any.
+		[Fact]
+		public void Configure_RejectsJunk_AndEmptyKeepsTheDefault()
+		{
+			var original = DhKeys.ServerPublicHex;
+			try
+			{
+				Assert.False(DhKeys.Configure(null)); // unset -> built-in default, reported as "not configured"
+				Assert.Equal(original, DhKeys.ServerPublicHex);
+				Assert.Throws<ArgumentException>(() => DhKeys.Configure("not-hex"));
+				Assert.Throws<ArgumentException>(() => DhKeys.Configure("1")); // <= 1 is not a usable exponent
+
+				Assert.True(DhKeys.Configure("a3f1c2")); // a different key changes the public half
+				Assert.NotEqual(original, DhKeys.ServerPublicHex);
+			}
+			finally
+			{
+				DhKeys.Configure(null); // static: restore so test order cannot matter
+			}
 		}
 	}
 }

@@ -17,6 +17,11 @@
 		"FreeCharSlots": 4
 	},
 
+	// Login DH keypair (docs/protocol/01-crypto.md). Unset = the built-in CellAO key, which is public and is what
+	// Faolan.ClientLauncher patches into a client by default. Set your own PRIVATE key here and the launcher derives
+	// and patches the matching PUBLIC one - the pair cannot drift. Env override: Login__PrivateKey.
+	// "Login": { "PrivateKey": "7ad852c6..." },
+
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 
 	"Mcp": {

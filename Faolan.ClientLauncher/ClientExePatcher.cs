@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Faolan.Core.Crypt;
 
 namespace Faolan.ClientLauncher
 {
@@ -14,17 +15,20 @@ namespace Faolan.ClientLauncher
 	internal static class ClientExePatcher
 	{
 		// Both 256-char ASCII hex DH public keys (g^priv mod N over the 1024-bit prime).
-		public static readonly byte[] NewPublicKey =
-			"26b5a3b4ac1177f24a2d9de44bafef477ff23ef1cb5f646919b1be26516053030b65d5afb60cef6f49de539958ba0b7922a099319b8016a8673cb27a696ae4b60fdece25ddcdad42e7f0056b87fc35687fe033b242e17e960d79806fd46c4a79cbc64f558660a50cabc1c242dace70de6af452e3433f97e30e202567f187de70"u8
-				.ToArray();
+		//
+		// DERIVED from the shared keypair in Faolan.Core (DhKeys), not a literal. This used to be a hand-copied hex
+		// string while the private key lived in Faolan.Core.Network - two copies of one keypair, which fails silently:
+		// change the private key and every login falls back to accept-any while the patched client still carries the
+		// old public key. Deriving it means a configured Login:PrivateKey automatically patches the matching public key.
+		public static byte[] NewPublicKey => Encoding.ASCII.GetBytes(DhKeys.ServerPublicHex);
 
 		// The client's hardcoded launcher-notes URL - a printf FORMAT string with two %s (UniverseName + Language),
 		// null-terminated in a fixed 73-byte region (offset 0x1C4D4C0). See memory client_launcher_notes_url.
 		private static readonly byte[] OriginalNotesUrl = "http://msgs.ageofconan.com/launchernotes2.php?UniverseName=%s&Language=%s"u8.ToArray();
 
-		private static readonly byte[] OriginalPublicKey =
-			"9c32cc23d559ca90fc31be72df817d0e124769e809f936bc14360ff4bed758f260a0d596584eacbbc2b88bdd410416163e11dbf62173393fbc0c6fefb2d855f1a03dec8e9f105bbad91b3437d8eb73fe2f44159597aa4053cf788d2f9d7012fb8d7c4ce3876f7d6cd5d0c31754f4cd96166708641958de54a6def5657b9f2e92"u8
-				.ToArray();
+		// The key the RETAIL exe ships with - what we search for and replace. Also in DhKeys, so the launcher and any
+		// other consumer agree on what "unpatched" looks like.
+		private static readonly byte[] OriginalPublicKey = Encoding.ASCII.GetBytes(DhKeys.FuncomPublicHex);
 
 		public enum Result
 		{
