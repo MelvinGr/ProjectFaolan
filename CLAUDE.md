@@ -89,7 +89,8 @@ guild/AH/mail/character-name are realm-scoped (`RealmId`), routed by the charact
 **Projects:** `Faolan/` server
 host · `Faolan.Core/` BASE shared types + crypto + the `Protobuf/` schema (the layer everything builds on) ·
 `Faolan.Core.Database/` EF Core DB — `DatabaseContext`, `Tables/`, `DatabaseRepository` · `Faolan.Core.Network/`
-networking + the byte-exact packet CODECS (`Codecs/` by domain: `Spawn/`, `World/`, …) + `Constants/Opcodes.cs`
+networking + the byte-exact packet CODECS (`Codecs/` by domain: `Spawn/`, `World/`, …); the opcode/IIR catalogs
+themselves live one layer down in `Faolan.Core/Enums/Opcodes.cs`
 · `Faolan.Core.Rdb/` client RDB extraction · `Faolan.Importer/` tshark-dump+RDB -> DB CLI ·
 `Faolan.ClientLauncher/` unattended retail client · `Faolan.Mcp/` in-process MCP server (DB + live-session +
 GM-command tools) · `Faolan.Web/` + `Faolan.Web.Content/` Blazor armory/3D-viewer + GM tools + CDN proxy ·
@@ -206,7 +207,7 @@ Two things already run ahead of that move:
   Both directions are recovered from the client (`docs/re/aoc-rpc-method-opcodes.md`, scripts in
   `tools/ghidra/`): c2s order == `docs/re/aoc-client-rpc-methods.json`; the s2c "Dispatch" tables are the
   per-class dispatcher switches (the old "drift" was just extra no-arg dispatch methods the string catalog
-  missed). Full per-class catalogs are in `Faolan.Core.Network/Constants/Opcodes.cs`. 32-bit sub-opcodes
+  missed). Full per-class catalogs are in `Faolan.Core/Enums/Opcodes.cs`. 32-bit sub-opcodes
   inside 0x2000 are BKDR-31 hashes of the client's IIR type names (`docs/re/aoc-opcode-ids.md`).
 - Session-volatile values (entity handles, shop ids, conversation ids) must never be persistence keys;
   the stable key is the NPC/vendor NAME (conversations, shops) or the character id.

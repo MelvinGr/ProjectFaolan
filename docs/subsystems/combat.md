@@ -454,9 +454,44 @@ so a character rolls the best tier its level qualifies for — `FatalityService.
    Tower executioner, the Warmonk unarmed, Conan killing Thoth-Amon). Each names a paired `selftargetanimation` /
    `targetanimation` (e.g. `fighting_fatality_weapon_1he_decap_attacker` / `_victim`) with
    `poptargetonattractor="yes"` — the client snaps the corpse to an attractor and plays both halves itself.
-   **[V0]** how a SPELL kill selects its finisher is not resolved: 1010219 has no caster group, yet every captured
-   fatality is a caster kill. Either it lives outside this table or the paired-animation path is melee-only while
-   the spell case shows something else.
+   **[V0]** how a SPELL kill selects its finisher is not fully resolved, but it is NOT this table: 1010219 has no
+   caster group, yet every captured fatality is a caster kill. The client's own `Magic/Animation` channel answers
+   the "where else" half — on a spell kill it looks the finisher up as an **effectset**, by name:
+
+   ```
+   Magic.Animation - Effectset <searching> : fighting_fatality_magic_and_ranged_frost
+   ```
+
+   So the spell case is keyed `fighting_fatality_<weapon-class-family>_<damage-school>` (here the `magic_and_ranged`
+   family + `frost`) through the same `Effectset <searching>` path every ordinary cast animation uses — not through
+   1010219's paired `selftargetanimation`/`targetanimation`.
+
+   **The finisher renders through the EFFECT layer, not the animation layer** — which is why it is invisible to
+   `AnimSys`, the channel that names every base/action animation the client plays. One retail caster fatality, whole
+   frame (`#244580`, level-6 necromancer, spell kill; the finisher did play on screen):
+
+   | in the frame | line |
+   |---|---|
+   | the trigger | `RECEIVED IIR: class BehaviorControlCenterIIR_c` |
+   | the buffs | `RECEIVED IIR: class MagicBuffIIR_c` ×3 |
+   | the buff's stat effect | stat `840` `0 → 20`, stat `536` `10000 → 12000` (+20%) |
+   | the finisher lookup | `Magic.Animation - Effectset <searching> : fighting_fatality_magic_and_ranged_frost` |
+   | **the finisher itself** | `GameCode.Effects - Starting 7 visual effect [ResourceID 1010207:3667002] on attractor 10 shutoff=1` and `[1010207:3667001] on attractor 35` |
+   | the proc | `RECEIVED IIR: class PetIIR_c` + `[Frozen Hatred]::PlayBaseAnim` |
+   | the victim | ordinary `combat_death` — `Die_fatality` (movementset actions 3108/2915, `Set:12509`) never ran |
+
+   Both effect resources fire **exactly once** in the whole session, only here, and their ids sit far above the
+   session's ordinary effect range — they are the fatality's own content. Meanwhile stat `840`/`536` revert at
+   `18:12:10`, exactly **10 s** after the burst, which independently confirms the `791221` 10-second buff above from
+   the client side.
+
+   So the shape is: BCC action → two self-buffs (state) → an effectset named
+   `fighting_fatality_<class-family>_<school>` → the effectset's resources started on attractors. `AnimSys` naming
+   no `*fatality*` animation is not evidence of absence; the base-animation layer is simply not where it lives.
+   What is still open is the mapping from the effectset NAME to those resource ids, and whether a melee fatality
+   instead uses 1010219's paired `selftargetanimation`/`targetanimation` — open work in Gitea #440.
+
+   (The client's rig also carries a bone named `rig_bone_decapitationhelp`.)
 
 ## Spell cast FSM (#236)
 A player spell cast is a `BehaviorControlCenter` (`0x642CD3D6`) `CastSpell` action (`ActionType 4`), handled in

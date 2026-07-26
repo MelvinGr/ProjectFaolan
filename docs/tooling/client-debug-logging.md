@@ -58,8 +58,10 @@ threshold 0 opens **that channel and nothing else**.
 cannot contain a space or `=` (the parser's tokenizer would split it). ⚠️ A name that is not a real channel opens
 nothing at all, silently — the sink prints channels with a DOT (`GameCode.Stats`) while the call sites and the
 table use a SLASH, so **install the slash form** and check it exists:
-`strings AgeOfConan.exe | grep -xF 'N3/IIR'`. (`N3.IIR` shipped in the default set for one commit and logged
-nothing; only `N3/IIR` exists.)
+`strings -n 3 AgeOfConan.exe | grep -xF 'N3/IIR'`. (`N3.IIR` shipped in the default set for one commit and logged
+nothing; only `N3/IIR` exists.) ⚠️ Pass `-n 3`: `strings` prints runs of **4+** printable characters by default, so a
+three-character channel name is invisible to it — `BCC` is a real channel (6 sites) that a plain `strings` search
+reports as missing. The call-site scan below has no such blind spot.
 
 Output goes to `AgeOfConan.log`; `PrintFlush=true` (→ `0x029864E0`) flushes per line, so `--console` shows it live.
 
@@ -130,11 +132,16 @@ The remaining candidates registered but stayed silent, because nothing triggered
 that drives them (a cast, a fatality, opening the auction house, talking to an NPC, dying) — same rule that made
 `GameCode/ArmorMitigation` look dead until someone opened the character sheet.
 
-Notable per-task channels beyond the default set: `Control/Data/Fatality` (9 sites, level 1) for #140/#440,
-`GameCode/Magic/Metaline` for spellweaving, `GameCode/Magic/Recast` for #271, `Tradepost`/`Mail`/`GuildBank`/
-`GameCode/Shops` for the economy subsystems, `Knubot` + `GameCode/Criteria` + `CharacterTag` for dialogue gating,
-`GameCode/Pets` for #307, and `BassiNet/Proxy` (every RPC through the proxy, 768 sites) when the question is which
-call the client made.
+Notable per-task channels beyond the default set: `GameCode/Magic/Metaline` for spellweaving,
+`GameCode/Magic/Recast` for #271, `Tradepost`/`Mail`/`GuildBank`/`GameCode/Shops` for the economy subsystems,
+`Knubot` + `GameCode/Criteria` + `CharacterTag` for dialogue gating, `GameCode/Pets` for #307, and
+`BassiNet/Proxy` (every RPC through the proxy, 768 sites) when the question is which call the client made.
+
+⚠️ **`Control/*` and `Control/Data/*` are the client's DATA-LOADING layer, not runtime traces.**
+`Control/Data/Movementset` emits all 106 of its lines during startup and never again, and `Control/Data/Fatality`
+(9 sites, level 1) stayed silent through a live retail session that included a kill which DID enter the fatality
+path — so its emit sites are edge/error branches in fatality data parsing rather than a per-fatality trace. Do not
+read the name as "a channel that reports fatalities"; measured against a live session it reports nothing about one.
 
 **A PE-subsystem GUI→CUI flip is NOT needed.** It was implemented, tried and removed: the channels stayed silent,
 because the stderr branch of the sink only runs when the logger is UNinitialised, and it never is in-world.

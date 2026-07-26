@@ -5,6 +5,7 @@ set -eu
 command="${1:-}"
 
 # Default UniverseAddr: dm09-nj4.ageofconan.com:7010
+# --debug-channels
 
 case "$command" in
     --faolan)
@@ -35,7 +36,6 @@ case "$command" in
             --universeaddr 127.0.0.1:7010 \
             --cdn http://127.0.0.1:7081 \
             --launcher-notes 'http://127.0.0.1:7081/_stats?UniverseName=%s&Language=%s' \
-            --debug-channels \
             "$@"
         ;;
 
