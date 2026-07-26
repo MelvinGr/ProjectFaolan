@@ -6,6 +6,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Progression;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -37,7 +38,11 @@ namespace Faolan.Tests
 			var strie = new Character
 			{
 				Level = 1,
-				Experience = 10, // the template's captured XP slot [80]=100 (=×10); matching it isolates the VITALS authoring
+				// Strie is a fresh level-1 character with no experience. This used to read `Experience = 10`, chosen so
+				// the old CurrentXp setter's `value * 10` would land 100 in word [80] - but [80] is MaxExp's slot, not
+				// experience, and 100 is simply the level-1 to-next-level cost (#447). Authoring MaxExp from the curve
+				// reproduces the same byte with the character's real, zero, experience.
+				Experience = 0,
 				Class = Class.Assassin,
 				MaxStats = CharacterMaxStats.CreateDefaults(Class.Assassin, 1)
 			};
@@ -163,7 +168,25 @@ namespace Faolan.Tests
 			Assert.Equal(4321u, tails.PostAccessBlock!.CurrentHp);
 			Assert.Equal(765u, tails.PostAccessBlock.CurrentMana);
 			Assert.Equal(543u, tails.PostAccessBlock.CurrentStamina);
-			Assert.Equal(98760u, tails.PostAccessBlock.CurrentXp);
+
+			// The XP bar is authored as a consistent triple by stat id (#447): within-level progress in 0x34, the
+			// curve's to-next-level cost in 0x15E - word [80] - and a zero base for the current level.
+			Assert.Equal(LevelingResolver.XpForNextLevel(7), tails.PostAccessBlock.MaxExp);
+			Assert.Equal(98760u, StatValue(tails.PostAccessBlock, CharacterStatId.Exp));
+			Assert.Equal(0u, StatValue(tails.PostAccessBlock, CharacterStatId.ExpCurrentLevelBase));
+		}
+
+		// A stat's value out of the built block: the sheet is [statId, value] pairs, so the value is the word after the
+		// id. Reads the FIRST occurrence - the overrides write every one, so any of them will do.
+		private static uint StatValue(SubClassPostAccessBlock block, CharacterStatId stat)
+		{
+			for (var i = 0; i + 1 < block.Values.Count; i++)
+			{
+				if (block.Values[i] == (uint)stat)
+					return block.Values[i + 1];
+			}
+
+			return uint.MaxValue;
 		}
 
 		private static bool Contains(byte[] hay, byte[] needle)

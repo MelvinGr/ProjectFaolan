@@ -11,15 +11,19 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// tools/capture/decode_statblock.py: of the 338 values, only ~14 distinct slots are character/map-derived (class
 	// HP/Mana/Stamina + hash, XP, the playfield token + position, one session slot) - the other 313 are this
 	// FIXED baseline, identical for every fresh character. CreateFreshBlock() returns a PostAccessBlock seeded with
-	// the skeleton; the caller patches the character-derived slots via the existing setters (CurrentHp/Mana/Stamina/
-	// CurrentXp + Level), exactly as FullCharSnapshotSubClass already does on the parsed block - so generating == relocating
+	// the skeleton; SnapshotStatSheet authors the character-derived slots by stat id before the block is built, and
+	// the per-class vitals ride the positional setters after it - so generating == relocating
 	// this baseline (the genuinely-fixed fresh-char stats) + the already-computed patches.
 	public static class SubClassStatBlock
 	{
 		public const int RepeatedRunLength = 148;
 		public const int RepeatedRunStart = 35; // the 35..182 sub-block is copied to 183..330 (Length 148)
-		public const uint BlockType = 0x46F2;
 		public const uint Marker = ListFrame.Unit; // an EMPTY count-framed list, twice
+
+		// StatList#1's count word - and the field the parser scans for. It is NOT a type tag: it is
+		// `(displayedStats + 1) * 0x3F1` (0x46F2 for 17), the ordinary ListFrame count. Written as the arithmetic so
+		// resizing StatList1 moves the scan target with it instead of silently looking for the old list's length.
+		public static uint BlockType => ListFrame.ForCount(StatList1.Length);
 
 		// The stat slot whose VALUE is the playfield-instance token: in the snapshot the token is framed by the stat ids
 		// 0xBF..0x40B (see WorldDespawn). This is SESSION/MAP state, NOT a character stat - the snapshot is BUILT with the
@@ -93,7 +97,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				values.Add(sheet[i].Value);
 			}
 
-			values.Add(((uint)sheetCount * 2 + 1) * StatList.Frame); // StatList#2 count = 0x24B45 for 74 pairs
+			values.Add(ListFrame.ForCount(sheetCount * 2)); // StatList#2 count - it carries BOTH copies (0x24B45 for 74 pairs)
 			for (var copy = 0; copy < 2; copy++)
 			for (var i = displayedCount; i < sheet.Count; i++)
 			{
@@ -116,7 +120,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			{
 				Marker0 = Marker, // the two preceding empty framed lists (List E / F)
 				Marker1 = Marker,
-				BlockType = ((uint)displayedCount + 1) * StatList.Frame, // StatList#1 count word = 0x46F2
+				BlockType = ListFrame.ForCount(displayedCount), // StatList#1 count word = 0x46F2 for its 17 pairs
 				Values = values,
 				Trailer = [0x00],
 				// True so HasKnownRepeatedStatTable is, and the caller's vitals patches (which write the +148 copy too)
@@ -215,11 +219,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			list = null;
 			end = off;
-			var count = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(off, 4));
-			if (count == 0 || count % StatList.Frame != 0)
+			if (!ListFrame.TryCountOf(BinaryPrimitives.ReadUInt32BigEndian(body.Slice(off, 4)), out var n))
 				return false;
 
-			var n = (int)(count / StatList.Frame) - 1;
 			if (off + 4 + n * 8 > body.Length)
 				return false;
 

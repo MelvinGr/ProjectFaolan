@@ -264,6 +264,34 @@ The stat records are **count-prefixed**: a 1-byte record count, then N × 8-byte
 is clearest in the `0x96B8DC59` entity-vitals packet (`...<entityHandle><00000000><count:1><records>`, see
 `docs/re/quests-and-combat.md`); the same record encoding is embedded in the larger `0x737A6DF9` snapshot.
 
+## Who authors the login snapshot's sheet (#447)
+
+`SnapshotStatSheet` — one place, for every character. It picks the baseline from provenance (an imported
+character's real captured sheet, else `SubClassStatBlock.FreshSheet()`) and then applies the **same** override
+table either way, by stat id:
+
+| stat | source |
+|---|---|
+| `0xBF` PlayfieldToken | the live zone's minted token — session state, never the captured one |
+| `0x0D7` GmLevel | the account type's GM privilege mask ([gm-commands.md](gm-commands.md)) |
+| `0x36` Level | the character (a captured sheet's level is stale the moment it dings) |
+| `0x34` Exp / `0x15E` MaxExp / `0x39` ExpCurrentLevelBase | the character's within-level progress and `LevelingResolver`'s to-next-level cost, with a zero base |
+
+Before that there were two authoring paths patching different slots, so an override added to one silently did
+nothing on the other — which is how the GM Level stat came to be set on the static fresh list and never reach
+the wire for a single real login.
+
+⚠️ **Word 80 of the stat block is `MaxExp`, not experience.** It carried a `CurrentXp` accessor with a "factor
+10", written from the character's experience, which produced the right bytes for exactly one case by
+coincidence: the beach template is a level-1 character whose MaxExp is 100, and the golden test carried
+`Experience = 10` so `10 × 10` landed on it. The same golden now passes with that character's real, zero,
+experience and MaxExp authored from the curve.
+
+The per-class vitals are still positional (`ApplyClassVitals`, slots 21/23/54/56/60/62/64/66/68 with their +148
+copies) because several of them share a stat id within one list and the id alone cannot say which is which. That
+`CharacterValueIndex` map and the `(statId, value)` sheet are two models of the same words, and where they have
+been checked against each other they have disagreed — reconciling the rest is the remaining half of Gitea #447.
+
 ## Open follow-ups
 > Tracked as Gitea issues (see the `area:combat` / `area:aoc-systems` labels). The notes below are the technical context.
 

@@ -4,11 +4,9 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -19,12 +17,15 @@ using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network.Server.ChatServer;
+using Faolan.Core.Network;
+using Faolan.Core.Progression;
 using Faolan.Core.Protobuf;
+using Faolan.Core;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Server.ChatServer;
 
 namespace Faolan.GameServer
 {

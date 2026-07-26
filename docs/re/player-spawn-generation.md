@@ -197,8 +197,8 @@ The same playbook applied to the FullChar/inventory snapshot:
   fallback when the captured root doesn't decode).
 
 - **Live tail values PATCHED from the character** (same session): world entry now writes the LIVE level
-  (tails header), current HP/mana/stamina (`TailsPostAccessBlock`, ×100 slots 54/64/68) and XP
-  (`CurrentXp`, slot 80, ×10) into the snapshot tails before sending — the captured player's values no
+  (tails header), current HP/mana/stamina (`TailsPostAccessBlock`, ×100 slots 54/64/68) and the XP bar
+  into the snapshot tails before sending — the captured player's values no
   longer ride along. Best-effort with the captured values as fallback; locked by the bigboy round-trip in
   `FullPlayerCharacterBuilderTests` (the stat table MUST be recognized on the reference fixture).
   Smoke-verified in-client 16/16: generated containers + patched tails live in the same session, no

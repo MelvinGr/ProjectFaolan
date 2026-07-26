@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Progression;
 
 namespace Faolan.GameServer.Combat
 {

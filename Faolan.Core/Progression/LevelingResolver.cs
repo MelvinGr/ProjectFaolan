@@ -1,4 +1,4 @@
-namespace Faolan.GameServer.Combat
+namespace Faolan.Core.Progression
 {
 	// Per-level experience curve, anchored on REAL retail values harvested from the captures (#297): the server sends
 	// MaxExp (stat 0x15E) per character level, and pairing it with Level (stat 0x36) in the same stat block gives the

@@ -207,16 +207,16 @@ namespace Faolan.Tests
 			Assert.Equal(42u, patched.Level);
 			Assert.Equal(original.Length, parts.SubClass.ToArray().Length); // fixed-width patch, no resize
 
-			// The live-vitals/XP patch slots round-trip too. The bigboy capture is the tails model's reference
+			// The live-vitals patch slots round-trip too. The bigboy capture is the tails model's reference
 			// fixture, so its stat table MUST be recognized - a silent skip here would mean the world-entry
-			// patch never fires.
+			// patch never fires. (MaxExp is read-only: it is authored by stat id on the SHEET, not positionally - #447.)
 			Assert.True(parts.SubClass.HasKnownRepeatedStatTable);
 			{
-				parts.SubClass.PostAccessBlock!.CurrentHp = 1234;
-				parts.SubClass.PostAccessBlock.CurrentXp = 5678;
+				var maxExp = parts.SubClass.PostAccessBlock!.MaxExp;
+				parts.SubClass.PostAccessBlock.CurrentHp = 1234;
 				var statPatched = FullCharSnapshotSubClass.Deserialize(parts.SubClass.ToArray());
 				Assert.Equal(1234u, statPatched.PostAccessBlock!.CurrentHp);
-				Assert.Equal(5678u, statPatched.PostAccessBlock.CurrentXp);
+				Assert.Equal(maxExp, statPatched.PostAccessBlock.MaxExp);
 			}
 		}
 	}

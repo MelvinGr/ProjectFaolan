@@ -188,52 +188,19 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			var imported = statSheet is { Count: > 0 };
 
-			// Build the full stat SHEET and apply every BY-ID override to IT, THEN construct the block (with the known-
-			// list) in one pass. The overrides MUST NOT be post-hoc SetStat calls on the built block: SetStat scans ALL
-			// Values, which now include the inline known-list records, so a spell id colliding with an override stat id
-			// would corrupt a record -> malformed known-list -> the client drops the connection. (The positional
-			// SetValue ops below - CurrentXp/vitals/CurrentHp - stay in the stat region and never scan, so they are safe.)
-			List<(uint Id, uint Value)> sheet;
-			if (imported)
-			{
-				// The character's REAL captured sheet, with the character-derived XP-companion slots (0x15E MaxExp and
-				// 0x39 ExpCurrentLevelBase - the current level's base XP, decoded #393) reset to baseline. XP (0x34) is
-				// authored positionally below; the playfield-token slot (0xBF) is set for BOTH paths just below (from the
-				// live zone token, not the stale captured one). NB this leaves the snapshot's XP bar internally
-				// inconsistent for an imported char (base 0 / MaxExp 100 vs real Exp) - harmless only if the client reads
-				// XP from the live StatIIR rather than this baseline sheet; preserving the captured MaxExp/base is a
-				// candidate fix pending in-client check (the sheet is a baseline skeleton, see CharacterStatId).
-				sheet = [.. statSheet!.Select(s => ((uint)s.Id, s.Value))];
-				SetSheet(sheet, (uint)CharacterStatId.MaxExp, SubClassStatBlock.SkeletonValueOf((uint)CharacterStatId.MaxExp));
-				SetSheet(sheet, (uint)CharacterStatId.ExpCurrentLevelBase, SubClassStatBlock.SkeletonValueOf((uint)CharacterStatId.ExpCurrentLevelBase));
-			}
-			else
-			{
-				// No captured sheet (a freshly-created character): the fresh skeleton with its LEVEL patched (the
-				// skeleton hardcodes 1, so without this the client blocks every level-gated spell/item).
-				sheet = SubClassStatBlock.FreshSheet();
-				if (character != null)
-					SetSheet(sheet, (uint)CharacterStatId.Level, character.Level);
-			}
-
-			// The playfield-instance token (stat slot 0xBF) is SESSION/MAP state, not a character stat: write the LIVE
-			// zone token into it - so the client, the world objects, and the despawns all scope to the SAME token by
-			// construction (no post-hoc patch). Falls back to the fresh/beach value when no live token is given (golden).
-			SetSheet(sheet, SubClassStatBlock.PlayfieldTokenStatId, playfieldToken ?? SubClassStatBlock.SkeletonValueOf(SubClassStatBlock.PlayfieldTokenStatId));
-
-			// GM Level stat (0x0D7): drive it from the character's account type so GM/Admin accounts flip the retail
-			// client into GM mode (the GM-Level-gated /help command set), normal accounts stay 0. Set here (not the
-			// static skeleton) so it reaches the wire for BOTH imported and fresh chars - the slot already exists in
-			// the sheet, so this just overwrites its value. Account may be unloaded (create-editor / broadcast) -> 0.
-			SetSheet(sheet, (uint)CharacterStatId.GmLevel, character?.Account?.Type.ToClientGmLevel() ?? 0);
+			// The stat sheet has ONE author (#447): SnapshotStatSheet picks the baseline from provenance and then
+			// applies the SAME override table either way, so a modelled stat reaches the wire for an imported character
+			// and a freshly-created one alike. The overrides land on the SHEET rather than on the built block, because
+			// SubClassPostAccessBlock.SetStat scans ALL Values - which now include the inline known-spell records - so a
+			// spell id colliding with an override stat id would corrupt a record and the client would drop the
+			// connection. (The positional SetValue ops below stay inside the stat region and never scan.)
+			var sheet = SnapshotStatSheet.For(character, playfieldToken, statSheet);
 
 			var block = SubClassStatBlock.CreateBlock(sheet, knownList);
 
 			// Positional post-ops (SetValue-based, confined to the stat region - they do NOT scan the inline known-list).
 			if (character != null)
 			{
-				block.CurrentXp = character.Experience;
-
 				// A fresh character's per-class vitals (displayed + base/secondary slots) so the sheet is internally
 				// consistent (#4/#186); an imported character already carries its real vitals in the sheet.
 				if (!imported && character.MaxStats != null)
@@ -693,18 +660,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		private static uint Remaining(FaolanStream stream)
 		{
 			return stream.Length - stream.Position;
-		}
-
-		// Sets a stat id's value at EVERY occurrence in the sheet (a few ids appear in both StatList#1 and StatList#2).
-		// Applied to the sheet BEFORE the block is built, so - unlike SubClassPostAccessBlock.SetStat - it never scans the
-		// inline known-list records.
-		private static void SetSheet(List<(uint Id, uint Value)> sheet, uint statId, uint value)
-		{
-			for (var i = 0; i < sheet.Count; i++)
-			{
-				if (sheet[i].Id == statId)
-					sheet[i] = (statId, value);
-			}
 		}
 
 

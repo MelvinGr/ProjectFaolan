@@ -47,11 +47,19 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			set => SetValue(CharacterValueIndex.CurrentStamina, value * 100);
 		}
 
-		public uint CurrentXp
-		{
-			get => GetValue(CharacterValueIndex.CurrentXp) / 10;
-			set => SetValue(CharacterValueIndex.CurrentXp, value * 10);
-		}
+		/// <summary>
+		///     Word 80 - which is <b>MaxExp</b>'s value slot, not experience (#447). The pair at that position is
+		///     StatList#2's <c>(0x15E MaxExp, value)</c>, and the value is the raw to-next-level cost, unscaled.
+		/// </summary>
+		/// <remarks>
+		///     It used to be a <c>CurrentXp</c> accessor with a "factor 10", written from the character's experience.
+		///     That produced the right bytes for exactly one case and by coincidence: the beach template is a level-1
+		///     character whose MaxExp is 100, and the golden test carried <c>Experience = 10</c> so <c>10 * 10</c> hit it.
+		///     Experience itself is stat 0x34, in both lists, and is authored by id in <see cref="SnapshotStatSheet" />
+		///     along with MaxExp and the level base - so nothing writes this positionally any more. Kept as a READER
+		///     because the round-trip tests assert on it.
+		/// </remarks>
+		public uint MaxExp => GetValue(CharacterValueIndex.MaxExp);
 
 		public uint Marker0 { get; init; }
 
@@ -135,7 +143,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			Unknown77 = 77,
 			Unknown78 = 78,
 			Unknown79 = 79,
-			CurrentXp = 80, // factor 10
+			MaxExp = 80, // StatList#2 pair 22: (0x15E MaxExp, value) - the value slot, unscaled
 			Unknown81 = 81,
 			Unknown82 = 82,
 			Unknown83 = 83,
