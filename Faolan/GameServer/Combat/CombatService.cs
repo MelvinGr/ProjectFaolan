@@ -156,8 +156,8 @@ namespace Faolan.GameServer.Combat
 			caster?.LastCombatAt = DateTimeOffset.UtcNow; // casting at a target -> in combat
 			var casterLevel = client.Session.Character.Level;
 			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, caster?.MagicDamage ?? 0);
-			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}");
-			await SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId);
+			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}",
+				() => SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId));
 		}
 
 		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the
@@ -362,7 +362,12 @@ namespace Faolan.GameServer.Combat
 			}
 		}
 
-		private async Task ApplyNpcDamage(INetworkClient client, uint targetHandle, int damage, string cause)
+		// `onDamaged` is the caller's own damage RECORD (the floating number) - the spell path's StatDamage. It runs
+		// between the fatality roll and the vitals/death records because that is where retail puts it: in Stickienecro's
+		// ice-strike fatality the victim's StatDamage is idx 542, after the burst (535-538) and before the death pose
+		// (546) and BccIIR (549). Sending it after the corpse was already posed put the killing blow's own number
+		// behind the death.
+		private async Task ApplyNpcDamage(INetworkClient client, uint targetHandle, int damage, string cause, Func<Task>? onDamaged = null)
 		{
 			var target = ResolveNpcVitals(client, targetHandle, out var npcEntity);
 			if (target.IsDead)
@@ -378,6 +383,9 @@ namespace Faolan.GameServer.Combat
 			// dead - and had to choose how it dies - before it knew the kill was a fatality.
 			if (target.IsDead && _fatality != null && npcEntity != null)
 				await _fatality.OnKill(client, _sim.PlayerWorldEntity(client), npcEntity);
+
+			if (onDamaged != null)
+				await onDamaged();
 
 			await SendStatUpdate(client, target.ToVitalsBlock(), targetHandle);
 
@@ -458,6 +466,9 @@ namespace Faolan.GameServer.Combat
 				// carries exactly this pair (and NO SimpleCharKilledBy: that record is player-death-only, driving the
 				// local release/resurrect UI). Send both to the killer right after the killing-blow vitals so the
 				// lingering corpse plays its death anim.
+				// The dying mob drops its target first (retail sends this LookAtIIR on 95% of captured kills, Stickienecro
+				// idx 545, between the killing damage and the pose); then the pose freezes the corpse.
+				await SendWorldPacket(killer, WorldDeath.BuildDeathDeselect(targetHandle));
 				await SendWorldPacket(killer, WorldDeath.BuildDeathPose(targetHandle, npcEntity.Position));
 				await SendWorldPacket(killer, WorldDeath.BuildDeathBcc(targetHandle, npcEntity.DeathBehaviorId, WorldDeath.NpcDeathVariant));
 

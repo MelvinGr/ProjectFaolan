@@ -64,7 +64,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// single Opcode (same contract as DynelFullUpdateCodec/SimpleDynelMessageCodec).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes =
 		[
-			GameServer0X2000Opcodes.SimpleCharKilledByUpdateIIR, GameServer0X2000Opcodes.BehaviorControlCenterIIR, GameServer0X2000Opcodes.MagicBuffIIR, GameServer0X2000Opcodes.MoveTaskIIR
+			GameServer0X2000Opcodes.SimpleCharKilledByUpdateIIR, GameServer0X2000Opcodes.BehaviorControlCenterIIR, GameServer0X2000Opcodes.MagicBuffIIR, GameServer0X2000Opcodes.MoveTaskIIR,
+			GameServer0X2000Opcodes.LookAtIIR
 		];
 
 		private static readonly byte[] DeathEffectPayload =
@@ -116,6 +117,25 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(dyingHandle) // applyFrom = self
 				.WriteArray(DeathEffectPayload)
+				.ToArray();
+		}
+
+		// The dying entity DROPS ITS TARGET (LookAtIIR 0x0D155695 with a null look target), sent between the killing
+		// damage and the death pose. Retail sends it on 95% of captured kills - Stickienecro idx 545 is the worked
+		// example: [iir][C350][dying handle][u8 0][class 0][handle 0][u32 2][u32 2], i.e. the same select/deselect
+		// record ShopOpenBuilder uses to BIND a vendor, with both target words nulled. We were never sending it, so a
+		// corpse died still holding the aggro target it had a frame earlier.
+		public static byte[] BuildDeathDeselect(uint dyingHandle)
+		{
+			return new FaolanStream()
+				.WriteUInt32((uint)GameServer0X2000Opcodes.LookAtIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(dyingHandle)
+				.WriteByte(0)
+				.WriteUInt32(0) // no look-at class
+				.WriteUInt32(0) // no look-at handle
+				.WriteUInt32(2)
+				.WriteUInt32(2)
 				.ToArray();
 		}
 
