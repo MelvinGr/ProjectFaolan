@@ -8,8 +8,8 @@
 ## Headline
 
 - **826** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **79** IIR carrier types: **75 V3** (byte-exact builder), **3 V2** (built, no golden), **1 V1** (no builder found).
-- **60** codec classes, **57** with a byte-exact test.
+- **80** IIR carrier types: **75 V3** (byte-exact builder), **4 V2** (built, no golden), **1 V1** (no builder found).
+- **61** codec classes, **57** with a byte-exact test.
 - **10** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -111,6 +111,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `UpdateInventoryIIR` | `UpdateInventoryCodec` |
 | V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
 | V2 | `DeleteItemIIR` | `InventoryDeleteCodec` |
+| V2 | `FanaticCommandIir` | `FanaticCommandCodec` |
 | V2 | `MoveInventoryItemIIR` | `InventoryMoveCodec` |
 | V2 | `PlayfieldFIIR` | `MapChangeCodec` |
 | V1 | `SetShadowCoverageIIR` | — |

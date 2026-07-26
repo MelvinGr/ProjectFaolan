@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**79** IIR carrier types · **75 V3** (75 with an auto-cited golden). The
+**80** IIR carrier types · **75 V3** (75 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -94,6 +94,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventoryCodec` | [V3: V1IirCodecTests.UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf] |
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `InventoryDeleteCodec` |  |
+| V2 | `FanaticCommandIir` | `0xEE4AA85C` | `FanaticCommandCodec` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `InventoryMoveCodec` |  |
 | V2 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` |  |
 | V1 | `SetShadowCoverageIIR` | `0xD6C1F0CC` | — |  |

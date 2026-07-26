@@ -645,6 +645,12 @@ namespace Faolan.Core.Enums
 		GameTimeIIR = 0x4F57DC08, // GameTimeIIR_t  (x33) - the world day/night clock; resyncs the client's GameTime_t
 		GuildUpdateIIR = 0x2550C99A, // GuildUpdateIIR_c  (x3)
 		HateListUpdateIIR = 0x8A01E5A1, // HateListUpdateIIR  (x61)
+		// FanaticCommandIIR_t - what the client sends on `/gm`. "Fanatic" is its own name for the GM/admin command
+		// channel. Body decoded from the client's reader (FUN_00663860): [u32 command][u32 targetA][u32 targetB][string].
+		// Seen on the wire from our own client, never in the corpus (the retail traces are ordinary play, not GM
+		// sessions), so the server's REPLY is still undecoded - #448/#449.
+		FanaticCommandIir = 0xEE4AA85C,
+
 		IntendedTeleportIIR = 0x10D27BC0, // IntendedTeleportIIR_c  (x15)
 		KnubotAnswerIIR = 0x4D7D9123, // KnubotAnswerIIR_c  (x194) - NPC dialogue ("Knubot" = the NPC dialogue system)
 		KnubotAnswerListIIR = 0xF164A4A5, // KnubotAnswerListIIR_c  (x177)

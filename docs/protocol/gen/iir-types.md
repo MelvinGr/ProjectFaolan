@@ -16,7 +16,7 @@ so a filled cell is a self-contained proof: `BKDR-31(name) == id`. This holds wi
 external doc; the enum + the hash function are the whole source.
 
 - **78** ids: client type name recovered + BKDR-31-verified.
-- **1** ids: 32-bit hash (V1-recovered from the client) whose exact source string our name doesn't reproduce.
+- **2** ids: 32-bit hash (V1-recovered from the client) whose exact source string our name doesn't reproduce.
 
 | Type id | Recovered client name | Our enum name | Note |
 |---------|-----------------------|---------------|------|
@@ -93,6 +93,7 @@ external doc; the enum + the hash function are the whole source.
 | `0xE4FF0C85` | `RemoveFromGroupIIR_c` ✓ | `RemoveFromGroupIIR` | RemoveFromGroupIIR_c  (x8) - a member left/was kicked; the AddToGroupIIR complement |
 | `0xE7F4F8F8` | `SimpleDynelVisualChangeIIR_c` ✓ | `SimpleDynelVisualChangeIIR` | SimpleDynelVisualChangeIIR_c  (x548) |
 | `0xE9F24184` | `StatDamageIIR_t` ✓ | `StatDamageIIR` | StatDamageIIR_t  (x450) |
+| `0xEE4AA85C` | — *(source string not reproduced)* | `FanaticCommandIir` |  |
 | `0xF096251E` | `LootBagFullUpdateIIR_c` ✓ | `LootBagFullUpdateIIR` | LootBagFullUpdateIIR_c  (x102) - loot bag (NOT the player bag) |
 | `0xF164A4A5` | `KnubotAnswerListIIR_c` ✓ | `KnubotAnswerListIIR` | KnubotAnswerListIIR_c  (x177) |
 | `0xF508F4C1` | `GameActionListIIR_t` ✓ | `GameActionListIIR` | GameActionListIIR_t  (x366) |
