@@ -458,10 +458,13 @@ namespace Faolan.GameServer
 				return;
 			}
 
+			// Only ever LOWER a pool. This used to SET each one to `percent` of max, which topped UP anything already
+			// below that - .hurt 50 on a character sitting at 0/74 mana handed it 37 mana. Min() keeps it a damage
+			// command whatever state the pools are in.
 			var vitals = _combat.GetOrAddPlayerVitals(client);
-			vitals.Health = Math.Max(1, vitals.MaxHealth * percent / 100);
-			vitals.Mana = vitals.MaxMana * percent / 100;
-			vitals.Stamina = vitals.MaxStamina * percent / 100;
+			vitals.Health = Math.Max(1, Math.Min(vitals.Health, vitals.MaxHealth * percent / 100));
+			vitals.Mana = Math.Min(vitals.Mana, vitals.MaxMana * percent / 100);
+			vitals.Stamina = Math.Min(vitals.Stamina, vitals.MaxStamina * percent / 100);
 			await SendStatUpdate(client, vitals.ToVitalsBlock(), characterId);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
 				$"Hurt to {percent}%: health {vitals.Health}/{vitals.MaxHealth}, mana {vitals.Mana}/{vitals.MaxMana}, stamina {vitals.Stamina}/{vitals.MaxStamina}.");
