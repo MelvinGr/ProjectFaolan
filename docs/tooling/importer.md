@@ -85,7 +85,8 @@ Opt-in capture-sourced (run only when named via `--only`): `mounts`, `pets`, `re
 
 RDB-sourced (require `--rdb`, **not** in the default group — opt-in via `--only`):
 `rdb-inventory` (read-only type-count report), `rdb-morphs`, `rdb-appearance`, `rdb-spells`, `rdb-abilities`,
-`rdb-combos`, `rdb-maps`, `rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt).
+`rdb-combos`, `rdb-maps`, `rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt),
+`class-attributes` (the per-class/level attribute + health BASE, #444 — see below).
 
 TSV-sourced (default group; each self-skips if its `.tsv` is absent): `ellatha-levels`, `ellatha-combos`,
 `wiki-class-spells`, `wiki-spell-levels`. Plus `starter-spells` — capture-sourced but registered late
@@ -179,10 +180,25 @@ else        await tx.CommitAsync();
   `--dry-run`: the CDN-fetching `rdb-respawns` (writing blobs to the CDN mirror store) and `rdb-items` (dumping decrypted
   templates to `--dump-templates`). These are the only two places a module reads the dry-run flag.
 
+### `class-attributes` — the class/level attribute base (#444)
+
+Fills `ClassAttributeBases` from RDB type 1000020, where the base lives as PLAINTEXT templates, one per class per
+level: `templateId = classBase + (level − 1)`.
+
+⚠️ **The twelve `classBase` ids are hardcoded CLIENT OBSERVATIONS, not something the module derives** — see the
+remarks on `ClassAttributeBaseModule`. Re-deriving one means re-observing it (a level-1 character of that class,
+in-game, with the `GameCode/ItemData` + `ClientInterface` channels on). Both structural shortcuts were tried and
+fail; the details are in the module and in [`docs/subsystems/player-stats.md`](../subsystems/player-stats.md).
+
+⚠️ Coverage is **incomplete for some classes** and the module prints it per class with an `⚠ INCOMPLETE` marker — the
+run does not always reach level 80 (the Ranger's stops at 10). A missing `(class, level)` is treated as unknown, not
+zero, and world entry logs a warning naming the character.
+
 ## Diagnostics (`--report`)
 
 Read-only inspection modes are **not** imports and don't share the import runner. They are routed through
-`--report <name>` (`conversation-states`, `anim`, `worldobj`, `spell-fields`, `rdb-assets`, … — the report's
+`--report <name>` (`conversation-states`, `anim`, `worldobj`, `spell-fields`, `rdb-assets`,
+`class-attribute-runs`, `item-stat-scaling`, `rdb-dump` (takes `<type>` or `<type>:<id>`), … — the report's
 target comes from `--report-arg`), read captures or the DB, and never write — independent of `--dry-run`.
 
 ## Decisions

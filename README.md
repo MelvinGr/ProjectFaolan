@@ -84,7 +84,9 @@ we've seen_, and names the gaps). Regenerate with
   each tagged with the correct damage school (physical, fire, cold, …) the way retail sends it
 - ✅ **Interrupts** — moving mid-cast cancels the spell and shows the "Interrupted" message, exactly like retail (#347)
 - ✅ **Health, mana & stamina regen** — your pools refill smoothly out of combat over retail's own per-tick regen
-  channel (RegenIIR), and stop the moment a fight starts (retail's out-of-combat-only regen)
+  channel (RegenIIR), and stop the moment a fight starts (retail's out-of-combat-only regen). The RATES are retail's
+  own: driven by your attributes with the client's own tweak constants, and each one confirmed against the per-second
+  deltas retail sent in the captures — those carry the rate ×100, so they pin the formulas to two decimals (#442)
 - ✅ **Death & resurrection** — the release screen lists the resurrection points you've discovered, nearest first,
   and each revives you at its own strength (10/50/100%) rather than always full (#372, #375)
 - ✅ **Discovering resurrection points** — walking near a new point pops retail's "point discovered" banner and adds
@@ -125,6 +127,11 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Feat trees** — training, resetting, the untrain confirmation, and the feat-point budget all work against the
   live protocol (driven by a GM command for now); what's missing is the feat *catalog* itself — which feats exist,
   their tiers and prerequisites, per-feat costs, and each class's tree layout (#251)
+- 🟡 **Attributes** — your Strength/Constitution/Intelligence/Wisdom/Dexterity now come from the real per-class,
+  per-level base plus your gear and buffs, so the formulas that read them (regen, armour mitigation) get real inputs.
+  Retail never sends these — the client computes them locally from its own asset files — so the base had to be decoded
+  and then anchored one class at a time against a live client. Some classes' higher levels are not located yet, and a
+  character there is reported at world entry rather than silently given a zero base (#444)
 - 🟡 XP curve is a provisional ramp; the real thresholds are partly harvested (#297)
 - 🟡 Class spell / combo / ability catalogs are still filling in; empty spell and item names were backfilled from the
   client's own English string table (LDB), so far fewer entries render nameless (#291, #296, #303, #300)
@@ -144,8 +151,11 @@ we've seen_, and names the gaps). Regenerate with
   RDB template (validated against in-game tooltips, ~17 rating types named): a +HP/+Mana ring fills your bar past the
   class base, better weapons hit harder (min–max per swing), armour and magical Protection reduce incoming damage,
   Critical Rating / Critical Damage Rating drive crits, Magic Damage boosts spells, Combat Rating boosts melee, and
-  Natural Mana/Stamina Regen speed the bars. The exact per-hit damage/mitigation/crit formulas are provisional
-  (server-side in retail) pending in-client tuning (#3, #395, #401)
+  Natural Mana/Stamina Regen speed the bars. High-level gear used to come out blank — its stats were assumed to be
+  derived from item level and quality, when in fact the parser simply could not see them (the records are not 4-byte
+  aligned, and the scan was); reading them byte-granular took the corpus from 1398 to **4223** stat rows over 1705
+  items, matching the client's own per-item values (#441). The exact per-hit damage/mitigation/crit formulas are
+  provisional (server-side in retail) pending in-client tuning (#3, #395, #401)
 - 🟡 Guild bank (#132)
 - ⬜ Tradeskills — gathering and crafting professions (#148) · gem socketing for attribute bonuses (#311)
 
@@ -205,6 +215,9 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Client launcher** — drives the game client unattended, straight into the world
 - ✅ **Content-CDN mirror** — serves the client's streamed assets so it loads cleanly offline
 - ✅ **In-process MCP server** — live database + session inspection for tooling
+- ✅ **Client debug channels** — switches on the retail client's OWN logging (`--debug-channels`), so it reports what
+  it computed instead of us inferring it from screenshots: every stat it applies with the previous value, each one
+  attributable to the item or template that caused it (#443)
 - ✅ **Web armory & 3D viewer** — browser character/equipment viewer plus GM tools
 - 🟡 **Importer** — rebuilds the game database from captures + the client's asset files
 
