@@ -48,10 +48,15 @@ The regen split we already implement — health and mana halt in combat, stamina
 | `TWK_NaturalStaminaRegenStrModifier` / `DexModifier` / `ConModifier` | 0.05 each |
 | `Energy_RegenDelayTimer` | 1.0 |
 
-So a pool's regen is driven by ATTRIBUTES, not by a fraction of its maximum. The exact combination is not yet
-pinned: for NecroL80 (L80, Con 375, Str 70) the client's Physical tab shows **Non Combat Health Regen = 86**, while
-`0.15 × (Con + Str)` = 66.75 — the ingredients are right, a term is missing. A second character's Physical tab
-gives the second equation needed to solve it (open work tracked in Gitea #442).
+So a pool's regen is driven by ATTRIBUTES, not by a fraction of its maximum. The full rates are **solved and
+confirmed against retail's own wire values** — see [`docs/subsystems/player-stats.md`](../subsystems/player-stats.md)
+for the formulas, the per-character verification and how the flat terms were pinned. The client itself never READS
+these three OOC modifiers (their globals have zero read xrefs, `tools/ghidra/TweakGlobals.java`), which is what
+identifies them as the server's to apply.
+
+The `Natural*` modifiers are the in-combat twins and are NOT yet solved: there is no `TWK_NaturalHealthRegen*` at
+all, matching the sheet showing `Natural Health Regen = 0` for every captured character, but the mana/stamina ones
+(0.07 / 0.05) have no captured delta to check against, since every captured `RegenIIR` is out of combat.
 
 ## Armour and protection targets
 

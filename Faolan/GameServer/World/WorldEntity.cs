@@ -131,6 +131,21 @@ namespace Faolan.GameServer.World
 		// fields themselves.
 		public Dictionary<CharacterStatId, uint> BuffedStats { get; } = [];
 
+		// This entity's score for one of the five attributes, in DISPLAY units - the buffed value once BuffStatEffects has
+		// synced, else gear alone (its baseline). Used by the attribute-driven formulas: regen (RegenRates) and armour /
+		// protection mitigation (CombatResolver, which wants the ×10 wire scale - multiply there).
+		//
+		// ⚠️ This is gear + buffs ONLY. It does NOT include the class/level attribute BASE, because that is computed
+		// CLIENT-side and never sent: retail's snapshot stat sheet carries a flat 10 for every attribute (#393) and no
+		// client 10005xx data table holds the curve either (open work tracked in Gitea #444). So a geared character's
+		// score here is short by its base, and the formulas fed from it read low until that is decoded.
+		public uint AttributeScore(CharacterStatId attribute)
+		{
+			return BuffedStats.TryGetValue(attribute, out var buffed)
+				? buffed
+				: (uint)Math.Max(0, GearBonuses.GetValueOrDefault(attribute));
+		}
+
 		// UTC time this player last dealt or took damage. HP/mana regen is OUT-OF-COMBAT only in retail (the client's
 		// OOCHealth/ManaRegeneration stats), so while within WorldSimulation.CombatRegenPause of this the HP+mana regen
 		// is halted; stamina (the action resource) keeps regenerating. MinValue = never in combat (fresh player regens).

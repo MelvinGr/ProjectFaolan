@@ -328,8 +328,10 @@ namespace Faolan.GameServer.World
 			// #401: the NPC's swing is physical, so the player's worn-gear armor rating mitigates it. LEVEL and STRENGTH
 			// are part of the client's own curve - it normalises armour against a per-level target and adds Strength at
 			// 0.1/point above 10 - so both are passed rather than mitigating on the raw rating alone.
+			// The curve wants the attribute at the ×10 WIRE scale (its `(attribute - 10) / 10` term), while AttributeScore
+			// is in display units - hence the ×10.
 			var damage = CombatResolver.ApplyPhysicalMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.ArmorRating, character.Level,
-				(uint)Math.Max(0, target.GearBonuses.GetValueOrDefault(CharacterStatId.Strength)));
+				target.AttributeScore(CharacterStatId.Strength) * 10);
 			// Play the NPC's swing animation (the decoded attack-animation ack) BEFORE the HP move lands, so the
 			// hit reads as "swing -> damage". Visual only; the authoritative health change is the PushVitals below.
 			// The swing ALWAYS plays - .godmode mobs still visibly attack, they just deal no damage.
@@ -381,7 +383,7 @@ namespace Faolan.GameServer.World
 			// #401: an NPC cast is magic damage, so the player's worn-gear Protection mitigates it (the magical mirror
 			// of armor mitigating melee) - same level-normalised curve, against TWK_TargetPerLevelProtection.
 			var damage = CombatResolver.ApplyMagicMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.Protection, character.Level,
-				(uint)Math.Max(0, target.GearBonuses.GetValueOrDefault(CharacterStatId.Intelligence)));
+				target.AttributeScore(CharacterStatId.Intelligence) * 10); // ×10: display units -> the curve's wire scale
 			await _output.SendNpcSpellCast(client!, npc.Handle, spell);
 
 			// Track the NPC's cast as a timed DEBUFF on the player so it counts down and clears its icon at 0, like a
@@ -515,8 +517,8 @@ namespace Faolan.GameServer.World
 		}
 
 		// Regenerates each connected player's vitals by `elapsedSeconds` worth and pushes a 0x96B8DC59 update only when
-		// a pool actually rose (a player at full HP/stamina/mana costs nothing). Rates are provisional fractions of max
-		// per second, scaled by the elapsed time so the cadence is independent of the base tick rate.
+		// a pool actually rose (a player at full HP/stamina/mana costs nothing). The rates are ATTRIBUTE-driven and
+		// corpus-verified (RegenRates, #442) - they replaced flat fractions of the pool max, which retail does not use.
 		private async Task RegenerateConnectedPlayers(double elapsedSeconds)
 		{
 			foreach (var pair in Players)
@@ -533,12 +535,21 @@ namespace Faolan.GameServer.World
 				var entity = pair.Value;
 				var inCombat = (DateTimeOffset.UtcNow - entity.LastCombatAt).TotalSeconds < CombatRegenPause;
 				uint beforeH = vitals.Health, beforeM = vitals.Mana, beforeS = vitals.Stamina;
+
+				// Retail's rates, from the character's attribute scores (RegenRates: the tweak table's own 0.15/0.38
+				// modifiers, each confirmed against a captured RegenIIR delta at ×100 precision). Stamina keeps its
+				// worn-gear Natural Stamina Regen on top - that item stat (0x385) is additive to the OOC rate.
+				uint strength = entity.AttributeScore(CharacterStatId.Strength),
+					constitution = entity.AttributeScore(CharacterStatId.Constitution),
+					dexterity = entity.AttributeScore(CharacterStatId.Dexterity),
+					intelligence = entity.AttributeScore(CharacterStatId.Intelligence),
+					wisdom = entity.AttributeScore(CharacterStatId.Wisdom);
 				var changed = vitals.Regenerate(inCombat
 						? 0u
-						: RegenAmount(vitals.MaxHealth, 0.05, elapsedSeconds), // ~5% hp / sec out of combat (provisional)
-					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds) + (uint)(entity.NaturalStaminaRegen * elapsedSeconds), inCombat
+						: RegenRates.Gain(RegenRates.HealthPerSecond(constitution, strength), elapsedSeconds),
+					RegenRates.Gain(RegenRates.StaminaPerSecond(constitution, strength, dexterity), elapsedSeconds) + (uint)(entity.NaturalStaminaRegen * elapsedSeconds), inCombat
 						? 0u
-						: RegenAmount(vitals.MaxMana, 0.05, elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));
+						: RegenRates.Gain(RegenRates.ManaPerSecond(intelligence, wisdom), elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));
 				if (!changed)
 					continue;
 
@@ -1066,14 +1077,5 @@ namespace Faolan.GameServer.World
 			       p.Y >= area.MinY - AreaBannerVerticalSlack && p.Y <= area.MaxY + AreaBannerVerticalSlack;
 		}
 
-		// The per-`elapsedSeconds` regen for one pool: `fraction` of max per second, scaled by elapsed. Rounds up to at
-		// least 1 so a pool below max always ticks toward it (never stalls on rounding).
-		private static uint RegenAmount(uint max, double fraction, double elapsedSeconds)
-		{
-			var amount = (uint)(max * fraction * elapsedSeconds);
-			return amount > 0
-				? amount
-				: 1;
-		}
 	}
 }

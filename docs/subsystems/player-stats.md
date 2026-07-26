@@ -87,6 +87,45 @@ tick sends the delta and then the block on **every** tick (delta first, so the a
 client can never double-apply); trimming that to retail's top-off-only shape needs the delta channel confirmed
 in-client — Gitea #2.
 
+## The regen RATES — attribute-driven, and confirmed against the captured deltas
+
+A `RegenIIR` delta is the per-second rate ×100, so the corpus states retail's rate for a known character to two
+decimals. That is what pins these formulas; they use the coefficients out of the client's own tweak table (RDB
+1000516, [`docs/rdb/client-tweak-table.md`](../rdb/client-tweak-table.md)), in DISPLAY units, per second:
+
+| pool | rate | attributes |
+|---|---|---|
+| health | `0.15 × (Con + Str) + 20` | Constitution, Strength |
+| stamina | `0.15 × (Con + Str + Dex) + 10` | + Dexterity |
+| mana | `0.38 × (Int + Wis)` | Intelligence, Wisdom (no flat term) |
+
+Each against the captured delta for that character, exactly [V1: Faolan.Tests/RegenRatesTests.cs]:
+
+| character | scores | rate | captured `RegenIIR` |
+|---|---|---|---|
+| NecroL80, L80 Necromancer | Con 375, Str 70 | 86.75 | hp `8675` |
+| DemoL80, L80 Demonologist | Con 345, Str 70 | 82.25 | hp `20353` = `8225` + 12128 |
+| AssassinL23, L23 Assassin | Con 56, Str 20, Dex 79, Int 39, Wis 26 | 31.40 / 33.25 / 24.70 | hp `3140`, stam `3325`, mana `2470` |
+
+Three things worth keeping:
+
+- **The cadence is 1 Hz.** Median inter-arrival across all 1502 captured `RegenIIR`s is 1.00 s (min 0.77); the longer
+  gaps are pools already full, not a slower tick. So the sheet's "Non Combat Health Regen" row IS the per-second rate.
+- **The flat terms come from TRUNCATION, and reading the sheet as rounded gets them wrong.** The sheet prints the stat
+  with an integer divide by 100 (client `FUN_016d9cb0`, case `0x116` = stat 278 `Non Combat Health Regen`), so 86.75
+  and 82.25 both display as their floor. Solving the three displayed integers as *rounded* values yields 19.5 and
+  fits all of them; solving them as *truncated* yields 20 — and only 20 reproduces the captured deltas.
+- **DemoL80's bare rate was never captured**, only `20353`. It is identified as `8225` because NecroL80's boosted
+  `20803` exceeds her bare `8675` by exactly the same 12128 — one shared additive term (a buff or rest bonus, not
+  decoded), not a per-character rate.
+
+⚠️ **The server cannot yet compute these for a real character**, because the attribute scores are client-side (next
+section): retail sends a flat 10 for every attribute, and the class/level base is in no client data table either — of
+the 25 named `CoreTables` tables, `RDBPLAYERCLASSDATA` turns out to read RDB types 1000505–1000508, which are name and
+id maps, and none of 1000509–1000521 has a 12-class × 80-level × attribute shape. So `RegenRates` is fed
+gear + buffs only (`WorldEntity.AttributeScore`) and a geared character regenerates slower than retail. Open work
+tracked in Gitea #444.
+
 ## Wrong / unconfirmed ids (now tracked on the `CharacterStatId` enum)
 
 - ✅ **RESOLVED (2026-06-14, in-client): the vitals current/max ids are `0x001B`/`0x01F8`/`0x01FA` =
