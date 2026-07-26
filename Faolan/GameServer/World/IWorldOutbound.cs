@@ -58,9 +58,6 @@ namespace Faolan.GameServer.World
 		// takes buffs OFF a player - expiry, death - so a stat a buff raised comes back down.
 		Task SyncBuffStats(INetworkClient client);
 
-		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
-		Task ReenterWorld(INetworkClient client);
-
 		// The revive action (BccIIR 0x642CD3D6) retail sends on RespawnMe to transition the player out of the Dead
 		// substate (bcc_state 29→1) - closes the release window + revives IN PLACE, NOT a world re-entry (#214).
 		// #348: the sub-area name banner, fired by the tick when a player crosses into a MapArea.
@@ -81,10 +78,6 @@ namespace Faolan.GameServer.World
 		// the dead state (bcc_state 29) so the release window shows - the in-session analogue of the login spawn's
 		// bcc_state=29. Sent at the end of the death sequence (#214).
 		Task SendDeathBcc(INetworkClient client, uint dyingHandle);
-
-		// The self-applied death-state effect (ApplySpell 0x6B87E316, spell 0x0009F000) retail sends right after the
-		// release screen (#214). Without it the SimpleCharKilledBy + 0x2024 still left the client alive in-client.
-		Task SendDeathEffect(INetworkClient client, uint dyingHandle);
 
 		// The death-pose MoveTask (0x96C46740 movement-type 0x06) retail forces onto the dying player just before the
 		// kill record (#214); puts the avatar into the dead/incapacitated state at the death position.

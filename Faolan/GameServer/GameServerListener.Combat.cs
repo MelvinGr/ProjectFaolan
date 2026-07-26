@@ -29,12 +29,6 @@ namespace Faolan.GameServer
 				b => b.WriteArrayUInt32Length(WorldDeath.BuildDeathBcc(dyingHandle))));
 		}
 
-		Task IWorldOutbound.SendDeathEffect(INetworkClient client, uint dyingHandle)
-		{
-			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(WorldDeath.BuildDeathEffect(dyingHandle))));
-		}
-
 		Task IWorldOutbound.SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition)
 		{
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,

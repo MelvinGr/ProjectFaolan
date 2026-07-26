@@ -106,6 +106,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.ToArray();
 		}
 
+		// ⚠️ DECODED BUT DELIBERATELY NOT SENT. Retail's AssassinL23 (map 2010) death carries this self-applied
+		// death-state effect, but the retail BEACH death does NOT (proven by live gdb 2026-06-20), and the spell's
+		// client RDB effect sets stat 0x546 - the WAVE-RESPAWN timer - to 15. Sending it puts the client into the
+		// dreaded wave countdown, which is exactly the #214 bug the death sequence was fixed to avoid. The builder and
+		// its golden test stay because the bytes are proven and the record is part of the decoded death grammar; the
+		// IWorldOutbound seam that used to expose it was removed, so there is no longer a one-call path to the
+		// regression. If a capture ever justifies sending it, gate it on the map/death kind, not on "retail has it".
 		public static byte[] BuildDeathEffect(uint dyingHandle)
 		{
 			return new FaolanStream()

@@ -70,11 +70,6 @@ namespace Faolan.GameServer
 			return SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Character.Id);
 		}
 
-		Task IWorldOutbound.ReenterWorld(INetworkClient client)
-		{
-			return SendWorldEntry(client);
-		}
-
 		// #348: the sub-area crossing banner the world tick fires - forwards to the Outbound partial's sender.
 		Task IWorldOutbound.SendAreaNameBanner(INetworkClient client, uint areaNameId)
 		{
