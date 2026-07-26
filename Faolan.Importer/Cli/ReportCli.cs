@@ -26,7 +26,7 @@ namespace Faolan.Importer.Cli
 {
 	// Read-only diagnostics (the old --dump-*/--burst-coverage flags), routed through `--report <name>`.
 	// These inspect captures or the DB and print; they never write, so they bypass the import runner entirely.
-	public static class ReportCli
+	public static partial class ReportCli
 	{
 		private static (FaolanDbProvider Provider, string Connection)? _db;
 
@@ -188,6 +188,12 @@ namespace Faolan.Importer.Cli
 				case "item-stat-scaling":
 				{
 					ItemStatScaling(RdbDir(), _options.Out);
+					return 0;
+				}
+
+				case "class-attribute-runs":
+				{
+					ClassAttributeRuns(RdbDir(), _options.Out);
 					return 0;
 				}
 
@@ -1439,6 +1445,132 @@ namespace Faolan.Importer.Cli
 		// Each record is keyed [race][class]; fields 2..4 are the L1 BASE health/mana/stamina (/100) and 5..7 their
 		// per-level growth (/1000), so `base/100 + (level-1) * growth/1000` reproduces the captured snapshot sheet's stat
 		// 1 / 507 / 505 exactly for every captured character. See docs/rdb/client-tweak-table.md. Gitea #3.
+		// #444: the class attribute BASE. It lives in RDB type 1000020 - the ITEM-template type - as PLAINTEXT templates
+		// (no TEA key), one per class per level, each NAMING itself "<Class> Class Feat <NNN>". Their stat records are
+		// read by the ordinary item parser, so this only became readable once that scan went byte-granular (#441).
+		//
+		// ⚠️ What this report does NOT establish is the id -> LEVEL mapping. `templateId = base + (level - 1)` is
+		// verified against all four client-observed anchors (Assassin L23 = 3074028+22, Herald of Xotli L24 =
+		// 3130632+23, Necromancer L80 = 1173784+79, Demonologist L80 = 1126680+79), but the per-class BASE cannot be
+		// recovered structurally: entries sharing the class name from other feat series are interleaved inside the id
+		// range, so neither "lowest id" nor "longest monotonic contiguous window" finds it (the latter truncates the
+		// Assassin's real 80 to 70). The name's <NNN> is not the level either - three consecutive Assassin templates
+		// are all "Class Feat 021" - and no property field carries the level (field 33 is a per-CLASS code: Assassin
+		// 23, Herald of Xotli 30, Necromancer 26, Demonologist 27).
+		//
+		// So a class's base needs ONE client observation to anchor it: log a character of that class in with the
+		// ClientInterface + GameCode/ItemData channels on and read the template id it loads. This report gives the
+		// candidate set and their values; the anchor gives the offset.
+		private static void ClassAttributeRuns(string rdbDir, string? outDir)
+		{
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			var byClass = new Dictionary<string, List<(uint Id, List<ItemTemplateStatModifiers.Modifier> Mods)>>(StringComparer.Ordinal);
+			int scanned = 0, plaintext = 0;
+
+			foreach (var e in rdb.EntriesOfType(1000020).Where(rdb.CanRead))
+			{
+				scanned++;
+				byte[] blob;
+				try
+				{
+					blob = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue;
+				}
+
+				// Plaintext check: the canonical 12-byte RDB-Id header survives only when the entry is NOT TEA-encrypted.
+				if (blob.Length < 24 || BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(0, 4)) != 1000020 ||
+				    BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(4, 4)) != e.Id || BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(8, 4)) != 1000000)
+					continue;
+
+				plaintext++;
+				var name = AsciiRuns(blob).FirstOrDefault(r => r.EndsWith("Class Feat", StringComparison.Ordinal) || ClassFeatName().IsMatch(r));
+				if (name == null)
+					continue;
+
+				var m = ClassFeatName().Match(name);
+				if (!m.Success)
+					continue;
+
+				// Keep only a genuine class-base template: all FIVE attributes present, with sane amounts. The name alone
+				// is not enough - "<Class> Class Feat <NNN>" is a coarse label shared by several ids (three consecutive
+				// Assassin templates are all "Class Feat 021"), and other entries carrying it match the record signature
+				// only on garbage (amounts in the hundreds of millions). Without this the runs pick up strays and stop
+				// looking contiguous.
+				var mods = ItemTemplateStatModifiers.Parse(blob.AsSpan(12))
+					.Where(x => x.WireAmount < 100_000)
+					.ToList();
+				if (!Attributes.All(a => mods.Any(x => x.StatId == (uint)a)))
+					continue;
+
+				(byClass.TryGetValue(m.Groups[1].Value, out var list)
+					? list
+					: byClass[m.Groups[1].Value] = []).Add((e.Id, mods));
+			}
+
+			Console.WriteLine($"class-attribute-runs: scanned {scanned} type-1000020 entries, {plaintext} plaintext, {byClass.Count} class run(s).\n");
+			var csv = new StringBuilder("class,level,templateId,statId,amount\n");
+			foreach (var (cls, list) in byClass.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+			{
+				// ⚠️ Ordered by id, NOT by level - see the type comment. Strays sharing the class name are interleaved
+				// inside the id range, so position here is only the level once the run's base is anchored from a client
+				// observation.
+				var run = list.OrderBy(x => x.Id).ToList();
+				var first = run[0];
+				var last = run[^1];
+				var contiguous = last.Id - first.Id + 1 == (uint)run.Count;
+				Console.WriteLine($"{cls,-18} base={first.Id} count={run.Count,3} {(contiguous ? "contiguous" : "⚠ GAPS")}  " +
+				                  $"first[{Fmt(first.Mods)}]  last[{Fmt(last.Mods)}]");
+
+				for (var i = 0; i < run.Count; i++)
+				foreach (var mod in run[i].Mods)
+					csv.Append($"{cls},{i + 1},{run[i].Id},{mod.StatId},{mod.WireAmount}\n"); // ordinal, NOT level
+			}
+
+			if (outDir == null)
+				return;
+
+			Directory.CreateDirectory(outDir);
+			var path = Path.Combine(outDir, "class-attribute-runs.csv");
+			File.WriteAllText(path, csv.ToString());
+			Console.WriteLine($"\nwrote {path}");
+		}
+
+		private static readonly CharacterStatId[] Attributes =
+			[CharacterStatId.Strength, CharacterStatId.Constitution, CharacterStatId.Intelligence, CharacterStatId.Wisdom, CharacterStatId.Dexterity];
+
+		private static string Fmt(List<ItemTemplateStatModifiers.Modifier> mods)
+		{
+			return string.Join(" ", mods.Select(x => $"{(CharacterStatId)x.StatId}={x.WireAmount}"));
+		}
+
+		// Printable ASCII runs of 4+ chars in a blob - the item name is one of them.
+		private static IEnumerable<string> AsciiRuns(byte[] blob)
+		{
+			var sb = new StringBuilder();
+			foreach (var b in blob)
+			{
+				if (b is >= 32 and < 127)
+				{
+					sb.Append((char)b);
+					continue;
+				}
+
+				if (sb.Length >= 4)
+					yield return sb.ToString();
+
+				sb.Clear();
+			}
+
+			if (sb.Length >= 4)
+				yield return sb.ToString();
+		}
+
+		[GeneratedRegex(@"^(.+?) Class Feat \d+$")]
+		private static partial Regex ClassFeatName();
+
 		private static void RdbClassVitals(string rdbDir, string? filter)
 		{
 			const uint tableType = 1000511;
