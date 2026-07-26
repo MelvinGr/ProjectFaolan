@@ -159,6 +159,7 @@ namespace Faolan.GameServer
 		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
 		// collaborator; uses the broadcaster for quest pushes + C# ConditionQuestId/State gates for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
+		private readonly FatalityService _fatality;
 
 		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
 		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
@@ -243,8 +244,13 @@ namespace Faolan.GameServer
 			_questHandler = new QuestHandlerService(database, _simulation, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler);
 			_questProgression = new QuestProgressionService(database, _broadcaster, _questHandler, agentServerDispatcher, logger);
+			// #140: the fatality burst + the buffs that key off it. Reaches the wire through the same narrow seams the
+			// other combat services use - apply a self buff, ask whether one is live, summon a timed pet.
+			_fatality = new FatalityService(logger, (c, wireSpellId) => ApplySpell(c, c.Session.Character.Id, c.Session.Character.Id, wireSpellId),
+				(c, wireSpellId) => _simulation.PlayerWorldEntity(c)?.ActiveBuffs.ContainsKey(wireSpellId) == true,
+				(c, template, duration) => SummonTimedPetForPlayer(c, template, duration, FatalityService.FrozenHatredPetCap));
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a),
-				SendLearnSpell); // announced level-up ability + spell unlocks (#209/#73/#74)
+				SendLearnSpell, _fatality); // announced level-up ability + spell unlocks (#209/#73/#74), fatality burst (#140)
 			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Character.Id, msg),
 				ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
 				// reactive element list + fire burst (docs/subsystems/combos.md); WorldIir.Send frames the body for you, 				// the codec returns the bare record (PetIirCodec convention), so prefix it here.

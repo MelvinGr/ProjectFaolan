@@ -188,6 +188,14 @@ namespace Faolan.GameServer.World
 					if (entity.IsPlayer)
 						continue;
 
+					// A summon with a lifetime (the Frozen Hatred fatality pet, #140). Checked before the dead/respawn
+					// logic so an expiring pet leaves cleanly rather than lingering as a corpse.
+					if (entity.DespawnAt is { } despawnAt && DateTimeOffset.UtcNow >= despawnAt)
+					{
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.TimedDespawn));
+						continue;
+					}
+
 					// A dead NPC first lingers as the dying creature (death animation), then its corpse becomes a
 					// lootable bag, then it respawns. The corpse-linger and respawn timers run independently off the
 					// same death; the linger (~3s) elapses well before the respawn (~15s) so the bag is lootable in

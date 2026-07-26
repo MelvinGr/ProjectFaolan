@@ -695,6 +695,7 @@ namespace Faolan.GameServer.World
 								}
 
 								case WorldTickEffectType.LootExpired:
+								case WorldTickEffectType.TimedDespawn: // a summon's lifetime ran out (#140) - same teardown
 								{
 									await _output.BroadcastEntityFade(effect.Entity); // graceful fade-out (n3ToClientFade)
 									World.Remove(effect.Entity);

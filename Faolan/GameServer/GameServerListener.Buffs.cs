@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -75,6 +76,45 @@ namespace Faolan.GameServer
 
 			_broadcaster.SetNpcFollow(client, entity.Handle, true);
 			return entity;
+		}
+
+		// Summons a pet that lives for `duration`, or EXTENDS the one already out. Frozen Hatred's fatality pet is the
+		// shape this serves (#140): "the Frozen Hatred pet appears and is under your control for 60 seconds. If you
+		// already have a Frozen Hatred pet, the duration of the pet will increase by another 60 seconds. This timer is
+		// capped at 5 minutes." (in-client tooltip). One field carries both halves - DespawnAt is pushed out on each
+		// fatality and clamped to the cap, and the world tick fades whatever it finds expired.
+		internal async Task SummonTimedPetForPlayer(INetworkClient client, string petTemplate, TimeSpan duration, TimeSpan cap)
+		{
+			var owner = _simulation.PlayerWorldEntity(client);
+			if (owner == null)
+				return;
+
+			var now = DateTimeOffset.UtcNow;
+			var existing = _simulation.World.ZoneForEntity(owner).Entities.FirstOrDefault(e => e.OwnerHandle == owner.Handle && e.Name == petTemplate && e.DespawnAt != null);
+			if (existing != null)
+			{
+				var extended = (existing.DespawnAt!.Value > now
+					? existing.DespawnAt.Value
+					: now) + duration;
+				existing.DespawnAt = extended > now + cap
+					? now + cap
+					: extended;
+				Logger.LogInformation("Timed pet '{Pet}' for '{Player}' extended to {Seconds:F0}s remaining (cap {Cap:F0}s).", petTemplate, client.Session.Character?.Name,
+					(existing.DespawnAt.Value - now).TotalSeconds, cap.TotalSeconds);
+				return;
+			}
+
+			var pet = await SummonPetForPlayer(client, petTemplate, true);
+			if (pet == null)
+			{
+				// No creature type by that name: say so rather than silently granting nothing - the buff that asked for
+				// it is already on the player, so a missing template is a content gap, not a state.
+				Logger.LogWarning("Timed pet '{Pet}' could not be summoned for '{Player}': no NPC type by that name.", petTemplate, client.Session.Character?.Name);
+				return;
+			}
+
+			pet.DespawnAt = now + duration;
+			Logger.LogInformation("Timed pet '{Pet}' summoned for '{Player}' for {Seconds:F0}s.", petTemplate, client.Session.Character?.Name, duration.TotalSeconds);
 		}
 
 		// Applies a self-buff (or an offensive MagicBuff cast) by CONSTRUCTING its 54-byte MagicBuffIIR payload from

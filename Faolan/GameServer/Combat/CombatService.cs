@@ -56,6 +56,7 @@ namespace Faolan.GameServer.Combat
 		// The listener's live spell-learn op (DispatchLearnSpell 0x200A), for the level-up spell unlocks (#209). Same
 		// narrow-seam pattern as _announceAddSpecialAbility. Null-safe for tests that construct the service without it.
 		private readonly Func<INetworkClient, uint, Task>? _learnSpell;
+		private readonly FatalityService? _fatality; // #140: the fatality burst on a killing blow
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
@@ -65,8 +66,9 @@ namespace Faolan.GameServer.Combat
 		// Quest kill-goals route through the QuestProgressionService (#261), which owns the broadcaster + system-message
 		// seams; combat packets frame themselves directly (SendWorldPacket), so this service no longer needs either.
 		public CombatService(WorldSimulation sim, IDatabaseRepository database, QuestProgressionService questProgression, ILogger logger,
-			Func<INetworkClient, Ability, Task>? announceAddSpecialAbility = null, Func<INetworkClient, uint, Task>? learnSpell = null)
+			Func<INetworkClient, Ability, Task>? announceAddSpecialAbility = null, Func<INetworkClient, uint, Task>? learnSpell = null, FatalityService? fatality = null)
 		{
+			_fatality = fatality;
 			_sim = sim;
 			_database = database;
 			_questProgression = questProgression;
@@ -445,6 +447,14 @@ namespace Faolan.GameServer.Combat
 				await SendWorldPacket(killer, WorldDeath.BuildDeathBcc(targetHandle, npcEntity.DeathBehaviorId, WorldDeath.NpcDeathVariant));
 
 				await AwardKillXp(killer, npcEntity.Level);
+
+				// #140: the fatality burst. Retail rolls a chance from the weapon/level tables; ours fires on every
+				// kill for now, which is the honest interim - the ROLL is client-content we have not lifted, while the
+				// server side of a fatality is exactly what the captures show (both Fatality self-buffs, plus the
+				// Frozen Hatred proc + pet when that buff is up). Over-firing means the buff shows too often; not
+				// firing at all meant Frozen Hatred could never do anything.
+				if (_fatality != null)
+					await _fatality.OnKill(killer, npcEntity.Name);
 
 				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.", npcEntity.Name, targetHandle, cause,
 					WorldEntity.CorpseLingerSeconds, npcEntity.NoRespawn

@@ -396,6 +396,41 @@ invariant):
   `0x01316cee` on NPC targets) to the observer, framed to the observer's endpoint. Verbatim-relay + Known-gating
   locked by `CrossPlayerSpellRelayTests` against the captured body.
 
+## Fatalities (#140)
+
+A killing blow makes the server apply a **fatality burst** to the KILLER — two self-buffs, plus anything that keys
+off them. Long treated as un-pinnable ("no capture shows a fatality"), which was true only of the **melee**
+finishers: the corpus carries the server side of a **caster's** fatality in seven captures.
+
+Worked example, `xxx_mage-necromancer_login_play_beach-to-enter-tortage_city` fr1267 — one frame, right after the
+killing cast completes (`BccIIR seq=0x000A action=4`):
+
+```
+ApplySpell 5070797 "Fatality"        self, 0.1s
+ApplySpell  791221 "Fatality"        self, 10s
+StatDamage
+ApplySpell 3666099 "Frozen Hatred"   self, 6s   - only when that buff is up
+```
+
+36 bursts across the corpus carry both `Fatality` ids; 21 also carry the Frozen Hatred proc. Every payload is the
+ordinary 54-byte self-buff form (`SelfBuffCodec.BuildBuffDataLong`) with magnitude **1** — a fatality needs no new
+wire shape, which is why `FatalityService` is three ApplySpell sends and not a bespoke record
+(`FatalityBurstTests` locks all three against the captured bytes).
+
+**Frozen Hatred's pet.** The necro spell `4377207` applies buff `4377209` (#436), and its tooltip reads: *"When you
+or your group perform a fatality and this buff is active, the Frozen Hatred pet appears and is under your control
+for 60 seconds. If you already have a Frozen Hatred pet, the duration of the pet will increase by another 60
+seconds. This timer is capped at 5 minutes."* That is implemented as `SummonTimedPetForPlayer` + the world model's
+`WorldEntity.DespawnAt`, which the tick fades (`TimedDespawn`) — one field carrying both the lifetime and its
+extension, clamped to the cap. The pet is NPC template **14580 "Frozen Hatred"**.
+
+**Two things are deliberately NOT implemented.** The fatality **animation** — the decapitation finishers live in
+the client's own combo / `1010219` tables keyed by weapon and level, the server does not drive them, and inventing
+an emission on the high-traffic kill path is what the earlier RE notes warned against. And the **roll**: retail
+gates a fatality on weapon criteria + `fatalitychance` + level, which is client content we have not lifted, so
+ours fires on every kill. Over-firing shows the buff too often; not firing at all left Frozen Hatred unable to do
+anything, which is the state this replaced.
+
 ## Spell cast FSM (#236)
 A player spell cast is a `BehaviorControlCenter` (`0x642CD3D6`) `CastSpell` action (`ActionType 4`), handled in
 `GameServerListener.Inbound.cs`. The real spell id rides the action **trailer** (`[u32 from][u32 spellId]`), not

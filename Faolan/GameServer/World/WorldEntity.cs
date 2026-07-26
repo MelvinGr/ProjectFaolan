@@ -240,6 +240,12 @@ namespace Faolan.GameServer.World
 		// corpse for RespawnDelaySeconds, then the tick fades + removes it instead of respawning it.
 		public bool NoRespawn { get; set; }
 
+		// When a TIMED summon should disappear, or null for anything that lives until killed/dismissed. The Frozen
+		// Hatred fatality pet is the case it exists for (#140): it is granted for 60s, each further fatality pushes the
+		// moment out by another 60s, and the total is capped 5 minutes ahead. Checked by the world tick (TimedDespawn),
+		// so one field carries both the lifetime and its extension - there is no separate timer to keep in sync.
+		public DateTimeOffset? DespawnAt { get; set; }
+
 		// #266 retail wander: a beach NPC with captured anchor points drifts between them - capture-measured as a SINGLE
 		// short 2-point MoveTask to a nearby anchor every ~25-60s (NOT a continuous route, NOT client-driven). The server
 		// owns the position (every client sees the same spot; a chase begins from where it actually is, not its spawn).
