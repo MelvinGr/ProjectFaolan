@@ -160,5 +160,35 @@ namespace Faolan.Tests
 			Assert.Equal(0, CombatResolver.MitigationFraction(0, 80, 710));
 			Assert.Equal(0, CombatResolver.MitigationFraction(2017, 0, 710));
 		}
+
+		// The MAGICAL twin, pinned to the two magical lookups in the same client trace. NecroL80, level 80, so the target
+		// is 80 * 46.0625 = 3685; the client logs no intermediates on this branch, so these were solved from the final
+		// fraction and cross-checked against the logged AdjustedRoll - and both `adjusted` values land on EXACTLY the
+		// Protection scores from her character sheet, which is what confirms the branch and the target.
+		[Theory]
+		[InlineData(342u, 0.0464043, 90.7191)] // Protection Cold / Electrical / Fire
+		[InlineData(55u, 0.00746269, 98.5075)] // Protection Holy / Unholy
+		public void ProtectionMitigationFraction_ReproducesTheClientsMagicalLookups(uint protection, double expectedFraction, double expectedAdjustedRoll)
+		{
+			var fraction = CombatResolver.ProtectionMitigationFraction(protection, 80);
+
+			Assert.Equal(expectedFraction, fraction, 6);
+			// the client's AdjustedRoll is 100 - (adjusted / target * 100), which the same numbers must reproduce
+			// 4 decimals, matching the precision the client PRINTS: the exact value is 98.507462686..., logged as 98.5075.
+			Assert.Equal(expectedAdjustedRoll, 100.0 - protection / (80 * CombatResolver.TargetProtectionPerLevel) * 100.0, 4);
+		}
+
+		[Fact]
+		public void ProtectionMitigatesHarderThanArmourAtEqualRating_BecauseItsPerLevelTargetIsLower()
+		{
+			// 46.0625 vs 137.225: the same rating is worth ~3x as much against magic as against melee.
+			Assert.True(CombatResolver.ProtectionMitigationFraction(500, 80) > CombatResolver.MitigationFraction(500, 80));
+		}
+
+		[Fact]
+		public void ApplyMagicMitigation_WithNoLevel_KeepsTheOldCurve()
+		{
+			Assert.Equal(50, CombatResolver.ApplyMagicMitigation(100, CombatResolver.ProtectionHalfMitigation));
+		}
 	}
 }

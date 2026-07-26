@@ -602,6 +602,28 @@ Verified to seven decimals at both trace points: `(2157 / 10978) * 0.5` = **0.09
 `Final Mitigation`, and the broken-apprentice run's 0.938747 comes out of the same expression with adjusted = −168246.
 `CombatResolver.MitigationFraction` implements this, pinned by `CombatResolverTests`.
 
+### The MAGICAL branch, from the same trace
+
+The magical branch logs no intermediates — only the shared `Roll` / `Final Mitigation` — but the same trace carried
+two magical lookups, and they solve exactly against `target = level × TWK_TargetPerLevelProtection` (80 × 46.0625 =
+**3685**):
+
+| ArmorType | AdjustedRoll | Final Mitigation | ⇒ adjusted | NecroL80's sheet |
+|---|---|---|---|---|
+| 1 (physical) | 80.3516 | 0.0982419 | 2157 | armour 2017 + 140 |
+| 2 (magical) | 90.7191 | 0.0464043 | **342** | Protection Cold / Electrical / Fire = **342** |
+| 2 (magical) | 98.5075 | 0.00746269 | **55** | Protection Holy / Unholy = **55** |
+
+Each `adjusted` is EXACTLY a Protection score off her character sheet, and `100 − adjusted/target × 100` reproduces
+both logged rolls to the precision the client prints. So `ArmorType` is the branch (1 = physical, 2 = magical), and
+the magical curve is the armour curve with a different per-level target — implemented as
+`CombatResolver.ProtectionMitigationFraction`.
+
+The attribute term (`TWK_ProtectionAbilityModifier` = 0.5 on Intelligence for damage types 4/5/10, Wisdom for 6/7)
+contributed **zero** in both points: the client's stat store carries the BASELINE 10 for those attributes rather than
+the sheet's computed totals (#393), so the term is real in the client's code but nil in practice today. It is
+implemented anyway, because that is what the client computes.
+
 ⚠️ The table's DATA has not been located yet, and on this build it does not matter. It is `ARMOR_MITIGATION`, one of the client's 25 named data tables
 (`docs/rdb/client-tweak-table.md`), parsed by `ArmorMitigation_c` — but unlike `HitsManaAndStamina_c` it carries no
 record-size assert to identify the RDB entry by shape, it is in none of the ~55 RDB types dumped so far, and a

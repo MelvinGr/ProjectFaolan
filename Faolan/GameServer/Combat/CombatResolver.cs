@@ -59,6 +59,10 @@ namespace Faolan.GameServer.Combat
 		public const double ArmorAbilityModifier = 2.0;
 		public const double TargetArmorPerLevel = 137.225;
 
+		// The magical twins, from the same tweak table: TWK_ProtectionAbilityModifier / TWK_TargetPerLevelProtection.
+		public const double ProtectionAbilityModifier = 0.5;
+		public const double TargetProtectionPerLevel = 46.0625;
+
 		// Never let armour fully negate a hit. The client's closed form cannot reach 1.0 on its own (its high branch is
 		// asymptotic), so this only guards a pathological input.
 		public const double MaxMitigationFraction = 0.95;
@@ -91,9 +95,12 @@ namespace Faolan.GameServer.Combat
 
 		// Reduces incoming MAGIC damage by the defender's aggregated Protection rating - the magical mirror of armor
 		// mitigation (same diminishing-returns curve, its own half-point).
-		public static int ApplyMagicMitigation(int rawDamage, uint protection)
+		public static int ApplyMagicMitigation(int rawDamage, uint protection, uint level = 0, uint attribute = 0)
 		{
-			return Mitigate(rawDamage, protection, ProtectionHalfMitigation);
+			if (level == 0)
+				return Mitigate(rawDamage, protection, ProtectionHalfMitigation); // no level known: the old curve, unchanged
+
+			return Math.Max(1, (int)Math.Round(rawDamage * (1.0 - ProtectionMitigationFraction(protection, level, attribute))));
 		}
 
 		// Reduces incoming PHYSICAL damage by the defender's armour, using the CLIENT'S OWN curve (#401) rather than the
@@ -108,22 +115,45 @@ namespace Faolan.GameServer.Combat
 		// the same armour rating mitigates progressively less as the defender levels.
 		public static double MitigationFraction(uint armorRating, uint level, uint strength = 0, double bonusArmorPercent = 0)
 		{
-			if (armorRating == 0 || level == 0)
+			return MitigationFraction(armorRating, level, strength, bonusArmorPercent, TargetArmorPerLevel, ArmorAbilityModifier);
+		}
+
+		// The MAGICAL twin of the armour curve (#401), same shape against a different per-level target. Verified against
+		// the same client trace, on the two magical lookups it logged for NecroL80 at level 80 (target = 80 x 46.0625 =
+		// 3685). The magical branch does NOT log its intermediates - only the shared Roll / Final Mitigation - so these
+		// were solved back from the final fraction and then cross-checked against the logged AdjustedRoll:
+		//   Protection 342 (Cold/Electrical/Fire): final 0.0464043,   AdjustedRoll 90.7191
+		//   Protection  55 (Holy/Unholy):          final 0.00746269,  AdjustedRoll 98.5075
+		// Both `adjusted` values come out as EXACTLY the Protection scores on her character sheet, and both rolls match
+		// `100 - adjusted/target*100` to six figures - so the branch, the target and the curve are all pinned.
+		//
+		// `attribute` is Intelligence for damage types 4/5/10 and Wisdom for 6/7 (which of the two the client reads is
+		// per damage type). It contributed ZERO in both trace points because the client's stat store carries the
+		// BASELINE 10 for those attributes, not the sheet's computed totals (#393) - so the term is real but currently
+		// always nil in practice. Kept because it is what the client computes, not because it changes today's numbers.
+		public static double ProtectionMitigationFraction(uint protection, uint level, uint attribute = 0, double bonusProtectionPercent = 0)
+		{
+			return MitigationFraction(protection, level, attribute, bonusProtectionPercent, TargetProtectionPerLevel, ProtectionAbilityModifier);
+		}
+
+		private static double MitigationFraction(uint rating, uint level, uint attribute, double bonusPercent, double targetPerLevel, double abilityModifier)
+		{
+			if (rating == 0 || level == 0)
 				return 0;
 
 			// Strength adds armour at 0.1 per point above the baseline 10, scaled by TWK_ArmorAbilityModifier = 2.0. The
 			// attribute is at the ×10 RAW wire scale, so a displayed 71 is 710 - that is what makes the trace's
 			// AttributeBonus 140 come out exactly: ((710 - 10) / 10) × 2.
-			var attributeBonus = strength > 10
-				? (strength - 10) / 10.0 * ArmorAbilityModifier
+			var attributeBonus = attribute > 10
+				? (attribute - 10) / 10.0 * abilityModifier
 				: 0;
-			var total = (bonusArmorPercent * 0.01 + 1.0) * armorRating + attributeBonus;
+			var total = (bonusPercent * 0.01 + 1.0) * rating + attributeBonus;
 
 			// (2.0 - level / apprenticeLevel) × total. An un-mentored character's apprentice level IS its level, so the
 			// term is 1.0 - we send ApprenticeLevel = level for exactly this reason (leaving it unset made the client
 			// compute 2 - 80/1 = -78).
 			var adjusted = total;
-			var target = level * TargetArmorPerLevel;
+			var target = level * targetPerLevel;
 
 			// The client's closed form, taken when its ARMOR_MITIGATION table has no matching row - which on this build
 			// is ALWAYS: the table loads but the vector the lookup walks is empty, so it logs

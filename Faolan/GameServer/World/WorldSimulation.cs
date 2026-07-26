@@ -379,8 +379,9 @@ namespace Faolan.GameServer.World
 
 			npc.AttackSwingCounter++;
 			// #401: an NPC cast is magic damage, so the player's worn-gear Protection mitigates it (the magical mirror
-			// of armor mitigating melee).
-			var damage = CombatResolver.ApplyMagicMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.Protection);
+			// of armor mitigating melee) - same level-normalised curve, against TWK_TargetPerLevelProtection.
+			var damage = CombatResolver.ApplyMagicMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.Protection, character.Level,
+				(uint)Math.Max(0, target.GearBonuses.GetValueOrDefault(CharacterStatId.Intelligence)));
 			await _output.SendNpcSpellCast(client!, npc.Handle, spell);
 
 			// Track the NPC's cast as a timed DEBUFF on the player so it counts down and clears its icon at 0, like a
