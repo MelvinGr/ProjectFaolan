@@ -581,7 +581,28 @@ The trace also pins `AttributeBonus`: `((rawStrength − 10) / 10) × TWK_ArmorA
 And it quantifies #441 independently: the client's own gear armour is **2017**, where our `ItemStatModifiers` model
 only **369** — because 9 of the 13 equipped pieces are template-scaled and carry no records.
 
-⚠️ The table's DATA has not been located yet. It is `ARMOR_MITIGATION`, one of the client's 25 named data tables
+### The table is EMPTY on this build — so the closed form IS the client's behaviour
+
+With `ApprenticeLevel` fixed, the adjusted roll lands at **80.35** (inside 0..100) and the lookup STILL reports
+`No mitigation entry found`, with **zero** `[TABLE]` lines. Since the lookup logs a `[TABLE]` line for every row whose
+selector+branch match — on both the range-hit and range-miss paths — zero lines means no row matched
+`[Player:1][ArmorType:1]` at all. `ARMOR_MITIGATION` *is* loaded (the client logs `Loaded ARMOR_MITIGATION`), so the
+vector the lookup walks is empty. That also explains why a content scan of 1.8 GB of the client's writable memory for
+the 28-byte record pattern found nothing.
+
+So on this build the closed-form fallback is not a degraded path — it is what the client always does:
+
+```
+target = level * TWK_TargetPerLevelArmor            (137.225)
+final  = adjusted >= target ? adjusted / (target + adjusted)
+                            : (adjusted / target) * 0.5
+```
+
+Verified to seven decimals at both trace points: `(2157 / 10978) * 0.5` = **0.0982419**, exactly the client's
+`Final Mitigation`, and the broken-apprentice run's 0.938747 comes out of the same expression with adjusted = −168246.
+`CombatResolver.MitigationFraction` implements this, pinned by `CombatResolverTests`.
+
+⚠️ The table's DATA has not been located yet, and on this build it does not matter. It is `ARMOR_MITIGATION`, one of the client's 25 named data tables
 (`docs/rdb/client-tweak-table.md`), parsed by `ArmorMitigation_c` — but unlike `HitsManaAndStamina_c` it carries no
 record-size assert to identify the RDB entry by shape, it is in none of the ~55 RDB types dumped so far, and a
 content scan of the live client's 1.8 GB of writable memory for the 28-byte pattern above found nothing. The likely

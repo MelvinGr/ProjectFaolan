@@ -103,5 +103,62 @@ namespace Faolan.Tests
 			Assert.Equal((2393 + 13559) / 2 / CombatResolver.WeaponDamageScale + 1, greatsword);
 			Assert.True(greatsword > dagger); // the whole point: the weapon drives the damage
 		}
+
+		// The CLIENT'S OWN mitigation curve, pinned to its GameCode/ArmorMitigation trace (2026-07-26). NecroL80: level 80,
+		// gear armour 2017, raw Strength 710 (displayed 71). Both trace points are reproduced, which is what makes this a
+		// verification rather than a plausible formula:
+		//   with ApprenticeLevel unset (the bug): adjusted -168246 -> Final Mitigation 0.938747
+		//   with ApprenticeLevel = level (fixed):  adjusted    2157 -> Final Mitigation 0.0982419
+		[Fact]
+		public void MitigationFraction_ReproducesTheClientsOwnTrace()
+		{
+			// TotalArmorValue 2157 = armour 2017 + AttributeBonus 140, where 140 = ((710 - 10) / 10) * 2.0
+			var fraction = CombatResolver.MitigationFraction(2017, 80, 710);
+
+			Assert.Equal(0.0982419, fraction, 6);
+		}
+
+		[Fact]
+		public void MitigationFraction_IsLevelNormalised_SoTheSameArmourMitigatesLessAsYouLevel()
+		{
+			// This is the property the old `K / (armor + K)` constant could not express at all.
+			var atL20 = CombatResolver.MitigationFraction(2017, 20, 710);
+			var atL80 = CombatResolver.MitigationFraction(2017, 80, 710);
+
+			Assert.True(atL20 > atL80, $"L20 {atL20:F4} should mitigate more than L80 {atL80:F4}");
+		}
+
+		[Fact]
+		public void MitigationFraction_SwitchesToTheAsymptoticBranchOnceArmourPassesTheLevelTarget()
+		{
+			// target = level * 137.225; below it the client uses (adjusted/target) * 0.5, at/above it
+			// adjusted/(target+adjusted) - which is continuous at the boundary (both give 0.5).
+			const uint level = 10;
+			var target = (uint)(level * CombatResolver.TargetArmorPerLevel);
+
+			Assert.Equal(0.5, CombatResolver.MitigationFraction(target, level), 3);
+			Assert.True(CombatResolver.MitigationFraction(target * 4, level) > 0.5);
+			Assert.True(CombatResolver.MitigationFraction(target * 4, level) < CombatResolver.MaxMitigationFraction + 1e-9);
+		}
+
+		[Fact]
+		public void ApplyPhysicalMitigation_WithNoLevel_KeepsTheOldCurve()
+		{
+			// Callers that do not know the defender's level (NPC-on-NPC, tests) must not silently get 0 mitigation.
+			Assert.Equal(50, CombatResolver.ApplyPhysicalMitigation(100, CombatResolver.ArmorHalfMitigation));
+		}
+
+		[Fact]
+		public void ApplyPhysicalMitigation_NeverFullyNegatesAHit()
+		{
+			Assert.True(CombatResolver.ApplyPhysicalMitigation(10, 999999, 80, 5000) >= 1);
+		}
+
+		[Fact]
+		public void MitigationFraction_ZeroArmourOrZeroLevel_IsNoMitigation()
+		{
+			Assert.Equal(0, CombatResolver.MitigationFraction(0, 80, 710));
+			Assert.Equal(0, CombatResolver.MitigationFraction(2017, 0, 710));
+		}
 	}
 }

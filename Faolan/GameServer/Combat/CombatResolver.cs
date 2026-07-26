@@ -54,6 +54,15 @@ namespace Faolan.GameServer.Combat
 		// tuned so a geared set mitigates ~half and a starter's few hundred armor little. Tune in-client (gaps.md / #401).
 		public const uint ArmorHalfMitigation = 2000;
 
+		// TWK_ArmorAbilityModifier / TWK_TargetPerLevelArmor from the client's own tweak table (RDB 1000516,
+		// docs/rdb/client-tweak-table.md). NOT tunable guesses - these are retail's values.
+		public const double ArmorAbilityModifier = 2.0;
+		public const double TargetArmorPerLevel = 137.225;
+
+		// Never let armour fully negate a hit. The client's closed form cannot reach 1.0 on its own (its high branch is
+		// asymptotic), so this only guards a pathological input.
+		public const double MaxMitigationFraction = 0.95;
+
 		// Fallback NPC max health for a creature with NO captured spawn HP. The real per-creature HP is the captured
 		// NpcSpawn.Health (the wire value retail sent); this is only used when that's absent (a GM-spawned template,
 		// future content). It is NOT in the client RDB - the NpcSpawnDataExport stat tables aren't shipped (#76, see
@@ -87,12 +96,53 @@ namespace Faolan.GameServer.Combat
 			return Mitigate(rawDamage, protection, ProtectionHalfMitigation);
 		}
 
-		// Reduces incoming PHYSICAL damage by the defender's aggregated armor rating (#401), diminishing-returns:
-		// mitigated = raw × K / (armor + K), so armor == K halves it and it never fully negates a hit (floor 1). Armor 0
-		// (unarmored, or a type with no armor data) returns the raw damage unchanged.
-		public static int ApplyPhysicalMitigation(int rawDamage, uint armorRating)
+		// Reduces incoming PHYSICAL damage by the defender's armour, using the CLIENT'S OWN curve (#401) rather than the
+		// invented `K / (armor + K)` one this replaced.
+		//
+		// Verified against the live client's GameCode/ArmorMitigation trace, which prints every intermediate. Two
+		// independent data points reproduce to SEVEN decimals - NecroL80, level 80, armour 2017 + 140 attribute bonus:
+		//   apprentice level 1  (the bug in 6d8c7227): adjusted -168246 -> Final Mitigation 0.938747
+		//   apprentice level 80 (correct):              adjusted    2157 -> Final Mitigation 0.0982419
+		//
+		// The curve is LEVEL-NORMALISED against a per-level target, which is the part the old constant could not express:
+		// the same armour rating mitigates progressively less as the defender levels.
+		public static double MitigationFraction(uint armorRating, uint level, uint strength = 0, double bonusArmorPercent = 0)
 		{
-			return Mitigate(rawDamage, armorRating, ArmorHalfMitigation);
+			if (armorRating == 0 || level == 0)
+				return 0;
+
+			// Strength adds armour at 0.1 per point above the baseline 10, scaled by TWK_ArmorAbilityModifier = 2.0. The
+			// attribute is at the ×10 RAW wire scale, so a displayed 71 is 710 - that is what makes the trace's
+			// AttributeBonus 140 come out exactly: ((710 - 10) / 10) × 2.
+			var attributeBonus = strength > 10
+				? (strength - 10) / 10.0 * ArmorAbilityModifier
+				: 0;
+			var total = (bonusArmorPercent * 0.01 + 1.0) * armorRating + attributeBonus;
+
+			// (2.0 - level / apprenticeLevel) × total. An un-mentored character's apprentice level IS its level, so the
+			// term is 1.0 - we send ApprenticeLevel = level for exactly this reason (leaving it unset made the client
+			// compute 2 - 80/1 = -78).
+			var adjusted = total;
+			var target = level * TargetArmorPerLevel;
+
+			// The client's closed form, taken when its ARMOR_MITIGATION table has no matching row - which on this build
+			// is ALWAYS: the table loads but the vector the lookup walks is empty, so it logs
+			// "No mitigation entry found" and falls through. Hence this IS the client's effective behaviour, not a
+			// degraded path. If a build ever ships rows, they interpolate a (Min,Max) pair instead (docs/subsystems/combat.md).
+			var fraction = adjusted >= target
+				? adjusted / (target + adjusted)
+				: adjusted / target * 0.5;
+
+			return Math.Clamp(fraction, 0, MaxMitigationFraction);
+		}
+
+		// Applies MitigationFraction to a hit. Floors at 1 so a hit is never fully negated.
+		public static int ApplyPhysicalMitigation(int rawDamage, uint armorRating, uint level = 0, uint strength = 0)
+		{
+			if (level == 0)
+				return Mitigate(rawDamage, armorRating, ArmorHalfMitigation); // no level known: the old curve, unchanged
+
+			return Math.Max(1, (int)Math.Round(rawDamage * (1.0 - MitigationFraction(armorRating, level, strength))));
 		}
 
 		// Crit chance from the attacker's aggregated Critical Rating: base + rating/10 (geared Critical Rating ~ 30-75

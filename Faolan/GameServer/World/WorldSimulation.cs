@@ -325,8 +325,11 @@ namespace Faolan.GameServer.World
 			if (vitals.IsDead)
 				return;
 
-			// #401: the NPC's swing is physical, so the player's worn-gear armor rating mitigates it.
-			var damage = CombatResolver.ApplyPhysicalMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.ArmorRating);
+			// #401: the NPC's swing is physical, so the player's worn-gear armor rating mitigates it. LEVEL and STRENGTH
+			// are part of the client's own curve - it normalises armour against a per-level target and adds Strength at
+			// 0.1/point above 10 - so both are passed rather than mitigating on the raw rating alone.
+			var damage = CombatResolver.ApplyPhysicalMitigation((int)CombatResolver.ResolveNpcAttackDamage(npc.Level), target.ArmorRating, character.Level,
+				(uint)Math.Max(0, target.GearBonuses.GetValueOrDefault(CharacterStatId.Strength)));
 			// Play the NPC's swing animation (the decoded attack-animation ack) BEFORE the HP move lands, so the
 			// hit reads as "swing -> damage". Visual only; the authoritative health change is the PushVitals below.
 			// The swing ALWAYS plays - .godmode mobs still visibly attack, they just deal no damage.
