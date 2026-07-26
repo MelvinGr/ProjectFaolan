@@ -51,7 +51,12 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 # Lossy captures in the Wireshark GUI: set TCP pref analyze_sequence_numbers off (the script does).
 
 # EF migrations (context lives in Faolan.Core.Database; the migrations themselves are PER PROVIDER, in
-# Faolan.Core.Database.Migrations.{Sqlite,Postgres}/Migrations - scaffold into the one matching the provider).
+# Faolan.Core.Database.Migrations.{Sqlite,Postgres}/Migrations).
+# ⚠️ SQLITE ONLY - scaffold the Sqlite one and STOP. Melvin's standing call (2026-07-26): do not scaffold Postgres
+# migrations. It is not a new divergence - Postgres was already 16 migrations behind (8 vs 24) when the rule was set,
+# so it has not been migratable for a long time. The Postgres PROVIDER code stays (Faolan.Core.Database is
+# provider-agnostic and faolan.sql loads into both), but its migration chain is dead: bringing Postgres back means
+# deleting its Migrations/ and scaffolding ONE fresh initial migration from the current model, not replaying 16.
 # GOTCHA: the EF tools run design time with CWD = the PROJECT dir, so the design-time factory can't see the
 # repo-root faolan.json - point FAOLAN_CONFIG at it (every exe reads Global.ConfigPath: "faolan.json" beside
 # the exe / in the CWD, or whatever FAOLAN_CONFIG names):
