@@ -124,7 +124,11 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var (seen, inserted) = await CaptureSpellImporter.ImportAsync(ctx.Db, ctx.RawPackets);
-			return new ImportResult($"{seen} spells seen, {inserted} new.");
+
+			// #436: a cast whose effect lives on a different record (Frozen Hatred). Needs the packets IN ORDER per
+			// capture - the pairing is "the self-buff that answered this cast" - so it takes the per-capture lists.
+			var (pairs, linked) = await CaptureSpellImporter.ImportCastEffectsAsync(ctx.Db, ctx.Captures.Select(c => (IReadOnlyList<byte[]>)[.. c.Packets.Select(x => x.Bytes)]).ToList());
+			return new ImportResult($"{seen} spells seen, {inserted} new, {linked} cast->effect links ({pairs} candidate pairs).");
 		}
 	}
 

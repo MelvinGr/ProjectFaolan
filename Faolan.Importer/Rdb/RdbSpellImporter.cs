@@ -53,6 +53,7 @@ namespace Faolan.Importer.Rdb
 		private const uint CastTimeField = 0x126; // 294 - cast time in centiseconds (value * 10 = milliseconds)
 		private const uint DamageRatingField = 0x15C; // 348 - spell damage rating * 100 (Ice 3000 -> 30.00%)
 		private const uint DurationField = 0x008; // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
+
 		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
 
 		// 125 - the level requirement. Verified against the independent wiki scrape: identical for every rank >= 2

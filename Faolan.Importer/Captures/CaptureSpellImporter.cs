@@ -24,7 +24,13 @@ namespace Faolan.Importer.Captures
 		// How many packets after its ding a grant may still be attributed to that level (#376). Real ones land in the
 		// SAME packet or ~3-4 later; the window keeps an unrelated later grant (a quest/claim reward) off the last ding.
 		private const int GrantWindow = 40;
+
+		// How many packets after a cast may still carry its effect buff (#436). The answer lands within a handful of
+		// packets (Frozen Hatred: cast fr5393 -> ApplySpell fr5400); the window only has to outlast the acks between.
+		private const int CastEffectWindow = 40;
 		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
+		private const uint BehaviorSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
+		private const uint CastSpellActionType = 4; // ActionType.CastSpell
 		private const uint GameCharAgentType = 0xA9ECB95D;
 		private const uint GameCharInterfaceType = 0x8B87F791;
 		private const uint MaxLevel = 80;
@@ -70,6 +76,70 @@ namespace Faolan.Importer.Captures
 
 			logger?.LogInformation("CaptureSpellImporter: {Seen} cast spell ids seen, {Inserted} new cataloged.", ids.Count, inserted);
 			return (ids.Count, inserted);
+		}
+
+		// A cast whose EFFECT lives on a DIFFERENT spell record (#436). Some castables carry nothing themselves: the
+		// necro's Frozen Hatred (4377207) has no duration, no damage, no stat effects - casting it applied a record the
+		// client renders as nothing. Retail answers that cast with an ApplySpell for 4377209: same NAME, its own 27.7h
+		// duration and the cold-effect resource (xxx_mage-necromancer beach->city, cast fr5393 -> ApplySpell fr5400).
+		//
+		// The pairing needs BOTH halves of the evidence, because either alone is noise:
+		//   * ADJACENCY - the first self-ApplySpell after the cast, within the same capture. On its own this pairs a
+		//     cast with whatever happened next: the corpus offers "Ice Strike -> Fatality" (x19), "-> Successful
+		//     Knockback", "-> Sidestep", "-> Crouching" - all unrelated events that merely followed.
+		//   * The applied spell carrying the SAME NAME as the cast. On its own this is worse: the RDB groups spells in
+		//     coarse buckets (field 0x4F), and the "Frozen Hatred" bucket alone holds THREE durationed records with
+		//     that exact name (3666099, 3666100, 4377209) plus Frozen Aura 1-5 and Altar of Hatred, so a name match
+		//     inside a bucket picks one of three at random.
+		// Together they are specific: the cast is answered, on the wire, by a buff that names itself the same spell.
+		public static async Task<(int Pairs, int Linked)> ImportCastEffectsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> captures, ILogger? logger = null)
+		{
+			var pairs = new Dictionary<uint, uint>();
+			foreach (var capture in captures)
+			{
+				for (var i = 0; i < capture.Count; i++)
+				{
+					if (!TryReadCastSpellId(capture[i], out var castId))
+						continue;
+
+					for (var j = i + 1; j < Math.Min(i + CastEffectWindow, capture.Count); j++)
+					{
+						if (!TryReadSelfBuffSpellId(capture[j], out var appliedId))
+							continue;
+
+						if (appliedId != castId)
+							pairs[castId] = appliedId; // first self-buff after the cast; the name check gates it below
+						break;
+					}
+				}
+			}
+
+			if (pairs.Count == 0)
+				return (0, 0);
+
+			var ids = pairs.Keys.Concat(pairs.Values).Distinct().ToList();
+			var rows = (await db.Spells.Where(s => ids.Contains(s.Id)).ToListAsync()).ToDictionary(s => s.Id);
+
+			var linked = 0;
+			foreach (var (castId, effectId) in pairs)
+			{
+				if (!rows.TryGetValue(castId, out var cast) || !rows.TryGetValue(effectId, out var effect))
+					continue;
+
+				// Same name, and the cast really has no effect of its own - otherwise this is just the next thing that
+				// happened to be applied (a fatality, a knockback, a stance).
+				if (string.IsNullOrEmpty(cast.Name) || !string.Equals(cast.Name, effect.Name, StringComparison.Ordinal) || cast.DurationMs != 0 || cast.EffectSpell == effectId)
+					continue;
+
+				cast.EffectSpell = effectId;
+				linked++;
+				logger?.LogInformation("CaptureSpellImporter: cast {Cast} '{Name}' carries no effect; linked to {Effect} (duration {Duration} ms).", cast.Id, cast.Name, effect.Id, effect.DurationMs);
+			}
+
+			if (linked > 0)
+				await db.SaveChangesAsync();
+
+			return (pairs.Count, linked);
 		}
 
 		// Harvests each CLASS's spell ACCESS from the create-flow captures into ClassSpell (#74) - the spell analogue of
@@ -525,6 +595,68 @@ namespace Faolan.Importer.Captures
 			catch
 			{
 				return false;
+			}
+		}
+
+		// The c2s cast: a BehaviorControlCenter (0x642CD3D6) with actionType 4, whose real spell id rides the TRAILER
+		// after the protobuf args as [u32 from][u32 spellId] - not the args message (docs/subsystems/combat.md).
+		// inner: [subop 4][c350 4][instance 4][u16 seq][u32 actionType][u32 argsLen][args][trailer].
+		private static bool TryReadCastSpellId(byte[] packetBytes, out uint spellId)
+		{
+			spellId = 0;
+			try
+			{
+				var packet = Rpc.Parse(packetBytes);
+				if (packet.Opcode != WorldOpcode)
+					return false;
+
+				var inner = packet.BodyReader().ReadArrayUInt32Length();
+				if (inner.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != BehaviorSubOpcode)
+					return false;
+
+				if (BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(14, 4)) != CastSpellActionType)
+					return false;
+
+				var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(18, 4));
+				var trailer = 22 + argsLen;
+				if (trailer + 8 > inner.Length)
+					return false;
+
+				spellId = BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(trailer + 4, 4)); // [from][spellId]
+				return spellId != 0;
+			}
+			catch
+			{
+				return false; // not a parseable behaviour packet
+			}
+		}
+
+		// The s2c answer: an ApplySpell applied to the caster BY the caster (a self buff). Returns the BASE spell id.
+		// inner: [subop 4][c350 4][applyTo 4][u16 0][spellId 4][c350 4][applyFrom 4][payload].
+		private static bool TryReadSelfBuffSpellId(byte[] packetBytes, out uint spellBaseId)
+		{
+			spellBaseId = 0;
+			try
+			{
+				var packet = Rpc.Parse(packetBytes);
+				if (packet.Opcode != WorldOpcode)
+					return false;
+
+				var inner = packet.BodyReader().ReadArrayUInt32Length();
+				if (inner.Length < 26 || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != ApplySpellSubOpcode)
+					return false;
+
+				if (BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(8, 4)) != BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(22, 4)))
+					return false; // applyTo != applyFrom: a cast ON something, not a self buff
+
+				// Reading at 13 lands on the id's high zero byte + its three significant bytes, i.e. the BASE id
+				// ((base<<8)|rank >> 8) - the same trick TryReadSpellId uses.
+				spellBaseId = BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(13, 4));
+				return spellBaseId != 0;
+			}
+			catch
+			{
+				return false; // not a parseable ApplySpell packet
 			}
 		}
 

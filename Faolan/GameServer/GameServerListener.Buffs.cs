@@ -89,6 +89,21 @@ namespace Faolan.GameServer
 		private async Task ApplySpell(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
 		{
 			var spell = await Database.GetSpell(spellId) ?? await Database.GetSpell(spellId >> 8);
+
+			// A cast spell can carry no effect of its own and name a SEPARATE record that is the actual buff - the
+			// castable is the trigger, the EffectSpell is what lands. Frozen Hatred is the proven case (#436): the
+			// necro casts 4377207, whose row has no duration at all, and retail answers with an ApplySpell for
+			// 4377209 - a distinct id, same name, carrying the 27.7h duration and the cold-effect resource
+			// (xxx_mage-necromancer beach->city, cast fr5393 -> ApplySpell 0x42CA7900 fr5400). Applying the CAST id
+			// meant a zero-duration record that renders no icon and tracks no buff, i.e. casting it did nothing.
+			if (spell is { DurationMs: 0, EffectSpell: > 0 } && await Database.GetSpell(spell.EffectSpell) is { } effect)
+			{
+				var effectWireId = effect.Id << 8;
+				Logger.LogInformation("Cast {Cast} ('{Name}') carries no effect of its own; applying its effect spell {Effect} ('{EffectName}').", spell.Id, spell.Name, effect.Id, effect.Name);
+				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, SelfBuffCodec.BuildBuffDataLong(effect.Id, effect.DurationMs / 10, DefaultSelfBuffEffectNonce));
+				return;
+			}
+
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce));
 		}
