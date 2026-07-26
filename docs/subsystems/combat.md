@@ -433,13 +433,27 @@ straight **percent**, and its tiers map 1:1 onto `minlevel`:
 | fatalitychance | 5% | 10% | 15% | 20% | 20% | 30% |
 
 so a character rolls the best tier its level qualifies for — `FatalityService.FatalityChancePercent`, gated by
-`FatalityBurstTests`. The `criteria` field (23 = 1H-Sword family, 24 = 1H-Axe, 27 = stealth 1hb, 30 = stealth
-dual-dagger, …) selects which *animation* group plays and is **not** lifted: it is client-side, and the captures
-show casters getting fatalities with no weapon group at all.
+`FatalityBurstTests`.
 
-**Deliberately NOT implemented: the fatality ANIMATION.** The decapitation finishers live in those same client
-tables, the server does not drive them, and inventing an emission on the high-traffic kill path is what the
-earlier RE notes warned against.
+**The ANIMATION is entirely client-side, and it is WEAPON-gated.** Two independent checks:
+
+1. *The server sends nothing extra.* Across the 8 corpus captures that contain a fatality, comparing the s2c
+   packet types in a window around **37 fatal** kills against **98 normal** ones: no IIR type is unique to a
+   fatality. The only difference is the `ApplySpell` (`0x6B87E316`) carrying the two Fatality buffs themselves.
+   The victim's death record is byte-for-byte the ordinary kind — its `field1` is always the creature's own death
+   behaviour (41877 humanoid / 215333 quadruped / 17036 demon) and `field3`/`field12` spread identically on fatal
+   and non-fatal kills. There is no server-side fatality-animation emission to reproduce.
+2. *All 59 `<fatalitygroup>` records are keyed to a WEAPON.* Their `criteria` values are 23 (1H-Sword family),
+   24 (1H-Axe), 25 (2H-Polearm), 26 (Ranged-Bow), 27 (1H-Blunt + stealth 1hb), 28 (2H-Sword/Axe), 29 (2H-Blunt),
+   30 (1H-Dagger + stealth piercing), 32 (Ranged-Crossbow) and 53 (three scripted specials: the Iron Tower
+   executioner, the Warmonk unarmed, Conan killing Thoth-Amon). **There is no caster/spell group at all.** Each
+   entry names a paired `selftargetanimation` / `targetanimation` (attacker + victim, e.g.
+   `fighting_fatality_weapon_1he_decap_attacker` / `_victim`) plus `poptargetonattractor="yes"` — the client snaps
+   the corpse onto an attractor and plays both halves itself.
+
+So a SPELL kill produces the buff burst and an ordinary death animation — in retail as here, which is what every
+captured fatality (all of them caster kills) shows. A finisher requires a melee killing blow with one of the
+weapon types above.
 
 ## Spell cast FSM (#236)
 A player spell cast is a `BehaviorControlCenter` (`0x642CD3D6`) `CastSpell` action (`ActionType 4`), handled in
