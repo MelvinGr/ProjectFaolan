@@ -5,8 +5,8 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Constants;
 using Faolan.Importer.Extractors;
+using Faolan.Importer.Modules;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -16,14 +16,14 @@ namespace Faolan.Importer.Captures
 	// Like mounts (CaptureMountImporter, which is also lifted onto the creature TYPE since #307/#244), a
 	// pet is done the RIGHT way (#244): its captured FA015807 stat core + equipment + morphs are lifted onto the creature TYPE,
 	// and the server spawns it FROM THE TYPE at the summoner's position (NpcSpawnBuilder.TryBuildFromType) - no world
-	// placement at all. Resolved at summon time by NAME (SummonPetForPlayer -> GetNpcByName), the name PetSummonCatalog
-	// maps each summon-spell id to. Isolated: only touches the NpcTemplate rows for the wanted pet creatures.
+	// placement at all. Resolved at summon time by NAME (SummonPetForPlayer -> GetNpcByName), the name the
+	// SummonPet effect rows map each summon-spell id to. Isolated: only touches the NpcTemplate rows for the wanted pet creatures.
 	public static class CapturePetImporter
 	{
 		public static async Task<(int Seen, int Seeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, ILogger? logger = null)
 		{
-			// The pet creature names we need (the PetSummonCatalog targets), lower-cased for matching.
-			var wanted = PetSummonCatalog.All.Select(p => p.PetTemplate.ToLowerInvariant()).ToHashSet();
+			// The pet creature names we need - the SpellEffect SummonPet templates, lower-cased for matching.
+			var wanted = await SpellEffectsModule.PetTemplateNames(db);
 
 			// Every FA015807 spawn across the captures whose name is one of the wanted pets; keep the first (most
 			// complete) per creature name.

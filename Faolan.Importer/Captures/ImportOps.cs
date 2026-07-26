@@ -70,8 +70,9 @@ namespace Faolan.Importer.Captures
 		}
 
 		// The clean burst-truth NPC spawn set (#266): per capture one entry per distinct mob (dedup by handle),
-		// each type taken from its single authoritative session.
-		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures)
+		// each type taken from its single authoritative session. `petNames` are the summonable pet creature types
+		// (the SpellEffect summons) - they are excluded from the placements, see below.
+		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures, IReadOnlySet<string> petNames)
 		{
 			var perCap = captures
 				.Select(c => (All: DistinctByHandle(NpcSpawnExtractor.Extract(c.Packets)), Burst: DistinctByHandle(NpcSpawnExtractor.ExtractLoginBurst(c.Packets)),
@@ -133,8 +134,8 @@ namespace Faolan.Importer.Captures
 			// Pets are content of the creature TYPE (lifted onto the type columns by CapturePetImporter, spawned from the type
 			// at summon time - #307/#244), NEVER world placements. A captured session's SUMMONED pets otherwise leak in
 			// here as permanent NpcSpawns and stand around forever where the player summoned them (the necro pet cluster
-			// on Old Tarantia). Drop the PetSummonCatalog creatures from the placement set.
-			var petNames = PetSummonCatalog.All.Select(p => p.PetTemplate.ToLowerInvariant()).ToHashSet();
+			// on Old Tarantia). Drop the summonable pet creatures (the SpellEffect SummonPet templates) from the
+			// placement set.
 			var placements = spawns.Where(e => !petNames.Contains((e.Name ?? string.Empty).ToLowerInvariant())).ToList();
 
 			return (NpcSpawnExtractor.Merge(placements), patrols);

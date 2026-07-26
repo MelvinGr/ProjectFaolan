@@ -33,7 +33,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : RpcServer<ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, ITradeOutbound, IGameServerProvider
+	public partial class GameServerListener : RpcServer<ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, ISpellEffectOutbound, ITradeOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -165,6 +165,10 @@ namespace Faolan.GameServer
 		private readonly ConversationService _conversation;
 		private readonly FatalityService _fatality;
 
+		// #439: the spell effects the server acts on itself - pet summons and triggered procs, from the SpellEffect
+		// table. See Combat/SpellEffectService.cs.
+		private readonly SpellEffectService _spellEffects;
+
 		// The character-creation -> editor -> destiny-cutscene -> enter-world flow, extracted off this partial into its
 		// own collaborator (CreateFlow/CreateFlowService.cs). The inbound create-flow handlers forward to it; the
 		// burst-less world entry it needs is injected as a Func seam. SendWorldHandoff stays here (enter-world handoff).
@@ -248,11 +252,13 @@ namespace Faolan.GameServer
 			_questHandler = new QuestHandlerService(database, _simulation, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler);
 			_questProgression = new QuestProgressionService(database, _broadcaster, _questHandler, agentServerDispatcher, logger);
-			// #140: the fatality burst + the buffs that key off it. Reaches the wire through the same narrow seams the
-			// other combat services use - apply a self buff, ask whether one is live, summon a timed pet.
-			_fatality = new FatalityService(logger, (c, wireSpellId) => ApplySpell(c, c.Session.Character.Id, c.Session.Character.Id, wireSpellId),
-				(c, wireSpellId) => _simulation.PlayerWorldEntity(c)?.ActiveBuffs.ContainsKey(wireSpellId) == true,
-				(c, template, duration) => SummonTimedPetForPlayer(c, template, duration, FatalityService.FrozenHatredPetCap));
+			// #439: what a spell makes the SERVER do (summon a pet, arm a proc) - dispatched from the SpellEffect rows
+			// instead of from spell ids hardcoded into the cast path. Reaches the wire through ISpellEffectOutbound,
+			// which this listener implements (GameServerListener.Buffs.cs).
+			_spellEffects = new SpellEffectService(database, this, logger);
+			// #140: the fatality burst. The buffs that PROC on a fatality are SpellEffect rows now, so this owns only
+			// the roll + the two Fatality ids every captured burst carries.
+			_fatality = new FatalityService(logger, this, _spellEffects);
 			_buffStats = new BuffStatEffects(database, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a),
 				SendLearnSpell, _fatality); // announced level-up ability + spell unlocks (#209/#73/#74), fatality burst (#140)

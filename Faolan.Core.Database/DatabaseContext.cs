@@ -83,6 +83,7 @@ namespace Faolan.Core.Database
 		DbSet<Shop> Shops { get; }
 		DbSet<ShopItem> ShopItems { get; }
 		DbSet<Spell> Spells { get; }
+		DbSet<SpellEffect> SpellEffects { get; }
 		DbSet<SpellStatEffect> SpellStatEffects { get; }
 		DbSet<StockPhrase> StockPhrases { get; }
 		DbSet<TradepostListing> TradepostListings { get; }
@@ -162,6 +163,7 @@ namespace Faolan.Core.Database
 		public DbSet<Shop> Shops { get; set; }
 		public DbSet<ShopItem> ShopItems { get; set; }
 		public DbSet<Spell> Spells { get; set; }
+		public DbSet<SpellEffect> SpellEffects { get; set; }
 		public DbSet<SpellStatEffect> SpellStatEffects { get; set; }
 		public DbSet<StockPhrase> StockPhrases { get; set; }
 		public DbSet<TradepostListing> TradepostListings { get; set; }
@@ -246,6 +248,7 @@ namespace Faolan.Core.Database
 			// The item's equipped stat bonuses (#3); cascade-delete with the item.
 			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade); // #367
+			modelBuilder.Entity<Spell>().HasMany<SpellEffect>().WithOne(e => e.Spell).OnDelete(DeleteBehavior.Cascade);
 
 			// Both ends cascade: deleting a character drops its own list AND its entries in everyone else's, so no
 			// friend row can outlive either character. Fluent because no attribute expresses OnDelete, and NoAction on

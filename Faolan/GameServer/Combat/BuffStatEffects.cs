@@ -33,8 +33,9 @@ namespace Faolan.GameServer.Combat
 	// evidence; the percent kinds need a modifier model (they scale a TOTAL, which the server does not compute yet).
 	//
 	// ⚠️ NOT a general spell-effect dispatcher. Pet summons, mounts, the Shield of the Risen, spellweave trances and the
-	// fatality proc are their own id-keyed paths (PetSummonCatalog / MountCatalog / FatalityService / …). This owns one
-	// question - "what does an active buff add to its carrier's stats" - and answers it from data.
+	// fatality proc are their own paths (SpellEffectService for the data-driven ones, MountCatalog / SpellweaveCatalog
+	// for the mount- and class-keyed ones). This owns one question - "what does an active buff add to its carrier's
+	// stats" - and answers it from data.
 	public sealed class BuffStatEffects
 	{
 		// The PERCENT kind, counted separately in the load summary because it is the biggest known gap: those buffs

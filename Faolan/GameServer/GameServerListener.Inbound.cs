@@ -1,5 +1,6 @@
 using System;
 using System.Buffers.Binary;
+using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -561,17 +562,17 @@ namespace Faolan.GameServer
 
 									await CombatService.SendBehaviorEchoAck(client, completePayload, 3);
 
-									// #307: a PET-SUMMON spell spawns the pet (creature + PetIIR owner-assign + follow) instead
-									// of applying a target effect - this is what hooks pet summoning to real spell casts, not
-									// just the .pet GM command. Decoded from the necro-pet capture (docs/subsystems/summon-pet-decode.md):
-									// cast (CastSpell) -> after the channel -> FA015807 pet spawn + PetIIR. PetSummonCatalog maps
-									// the summon spell id -> pet template + kind.
-									if (PetSummonCatalog.ForSpell(spellId) is { } petSummon)
+									// #439/#307: a cast whose effect is something the SERVER does - today a PET SUMMON (creature +
+									// PetIIR owner-assign + follow) - resolves as that instead of applying a target effect. This
+									// is what hooks pet summoning to real spell casts, not just the .pet GM command. Decoded
+									// from the necro-pet capture (docs/subsystems/summon-pet-decode.md): cast (CastSpell) ->
+									// after the channel -> FA015807 pet spawn + PetIIR. The spell -> effect mapping is a
+									// SpellEffect row, so a new summon is an imported row rather than a branch here.
+									var castEffects = await _spellEffects.ForCast(spellId);
+									if (await _spellEffects.RunAll(client, castEffects))
 									{
-										var pet = await SummonPetForPlayer(client, petSummon.PetTemplate, petSummon.Combat);
-										Logger.LogInformation("CastSpell 0x{Spell:X} pet-summon '{Template}' -> {Result}.", spellId, petSummon.PetTemplate, pet != null
-											? $"0x{pet.Handle:X8}"
-											: "no spawnable template (pet-creature import needed)");
+										Logger.LogInformation("CastSpell 0x{Spell:X} resolved {Count} server-side effect(s): {Kinds}.", spellId, castEffects.Count,
+											string.Join(", ", castEffects.Select(e => e.Kind)));
 										return;
 									}
 

@@ -2903,6 +2903,46 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.ToTable("Spells");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>
+                {
+                    b.Property<long>("SpellId")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte>("Trigger")
+                        .HasColumnType("smallint");
+
+                    b.Property<byte>("Sequence")
+                        .HasColumnType("smallint");
+
+                    b.Property<bool>("Combat")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("DurationMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<byte>("Kind")
+                        .HasColumnType("smallint");
+
+                    b.Property<long?>("MaxDurationMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("TargetSpellId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Template")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("SpellId", "Trigger", "Sequence");
+
+                    b.ToTable("SpellEffects", t =>
+                        {
+                            t.HasCheckConstraint("CK_SpellEffect_Kind", "\"Kind\" IN (0, 1)");
+
+                            t.HasCheckConstraint("CK_SpellEffect_Trigger", "\"Trigger\" IN (0, 1)");
+                        });
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellStatEffect", b =>
                 {
                     b.Property<long>("SpellId")
@@ -4203,6 +4243,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("Item");
 
                     b.Navigation("Shop");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Spell", "Spell")
+                        .WithMany()
+                        .HasForeignKey("SpellId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Spell");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellStatEffect", b =>

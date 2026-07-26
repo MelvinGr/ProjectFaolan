@@ -95,8 +95,9 @@ pets spawn from the creature **TYPE**, not a placement (the #244 stat-core lift)
   necro pets (lvl 80); **Pleasurable Company** (tpl 17756) — the social companion (lvl 5).
 
 **Naming gotcha:** "Deathless Acolyte" is the SPELL/UI name; the summoned pet CREATURES are named
-`Arcanist` / `Magus`. `PetSummonCatalog` maps summon-spell → creature name: `0x5E2F5`→Arcanist,
-`0x5E2F0`→Magus, `0x4105E9`→Pleasurable Company (all `CastSpell` 0x4, spell id in the cast trailer).
+`Arcanist` / `Magus`. The mapping lives in the `SpellEffects` table as `SummonPet` rows keyed by the summon
+spell id (seeded by the importer's `spell-effects` module): `0x5E2F5`→Arcanist, `0x5E2F0`→Magus,
+`0x4105E9`→Pleasurable Company (all `CastSpell` 0x4, spell id in the cast trailer).
 
 ## Follow-up (#307) to make it retail-accurate
 

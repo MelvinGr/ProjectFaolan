@@ -17,13 +17,18 @@ namespace Faolan.Tests
 		private const string FatalityBPayload = "0000000000000000000003e800010000000100000000000c12b500000001000000000000000000000000000000010000000014370110";
 		private const string FrozenHatredProcPayload = "000000000000000000000258000100000001000000000037f0b30000000100000000000000000000000000000001000000001436f170";
 
+		// The third buff of the burst is not a fatality CONSTANT any more - it is what Frozen Hatred arms on a fatality,
+		// a SpellEffect row (#439). Named here only so the captured payload above can be checked against it;
+		// SpellEffectSeedTests owns the assertion that this is what the seed ships.
+		private const uint FrozenHatredProc = 3666099;
+
 		// Every captured fatality payload is the ordinary 54-byte self-buff form: its own duration, magnitude 1, and a
 		// per-application nonce. Nothing about a fatality needs a new wire shape - which is why the burst is three
 		// ApplySpell sends and not a bespoke record.
 		[Theory]
 		[InlineData(FatalityService.FatalityBuffA, 10u, 0x1436DA64u, FatalityAPayload)] // 0.1s
 		[InlineData(FatalityService.FatalityBuffB, 1000u, 0x14370110u, FatalityBPayload)] // 10s
-		[InlineData(FatalityService.FrozenHatredProc, 600u, 0x1436F170u, FrozenHatredProcPayload)] // 6s
+		[InlineData(FrozenHatredProc, 600u, 0x1436F170u, FrozenHatredProcPayload)] // 6s
 		public void FatalityBuffPayload_MatchesCapture(uint spellBase, uint durationCs, uint nonce, string expected)
 		{
 			var payload = SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce, 1);
@@ -37,10 +42,6 @@ namespace Faolan.Tests
 		{
 			Assert.Equal(5070797u, FatalityService.FatalityBuffA);
 			Assert.Equal(791221u, FatalityService.FatalityBuffB);
-			Assert.Equal(3666099u, FatalityService.FrozenHatredProc);
-
-			// The proc keys off the buff the CASTABLE Frozen Hatred (4377207) applies - not off the castable itself.
-			Assert.Equal(4377209u, FatalityService.FrozenHatredBuff);
 		}
 
 		// The roll, from the client's own fatality groups (RDB 1010219): fatalitychance is a PERCENT and its tiers map
@@ -59,14 +60,6 @@ namespace Faolan.Tests
 		public void FatalityChance_FollowsTheClientTiers(uint level, int expected)
 		{
 			Assert.Equal(expected, FatalityService.FatalityChancePercent(level));
-		}
-
-		// The tooltip's rule, as constants: 60s per fatality, capped 5 minutes out.
-		[Fact]
-		public void FrozenHatredPet_LivesSixtySecondsCappedAtFive()
-		{
-			Assert.Equal(TimeSpan.FromSeconds(60), FatalityService.FrozenHatredPetDuration);
-			Assert.Equal(TimeSpan.FromMinutes(5), FatalityService.FrozenHatredPetCap);
 		}
 	}
 }

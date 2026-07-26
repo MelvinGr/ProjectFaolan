@@ -439,7 +439,9 @@ namespace Faolan.Importer.Modules
 		// harvested by ItemHashHarvester's spawn source over the same FA015807 packets). NOT on `characters`: the old
 		// "characters" dep was spurious - it only dragged the characters module in and added stray captured player
 		// characters (e.g. Ranochar) as a side effect. RunAsync itself FKs to Map/NpcTemplate/Items, never to Characters.
-		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule)];
+		// Also on `spell-effects`: the summonable pet creatures are excluded from the world PLACEMENTS (a captured
+		// session's summoned pets would otherwise become permanent spawns), and the SummonPet rows are what names them.
+		public IReadOnlyList<string> DependsOn => [nameof(ItemsModule), nameof(SpellEffectsModule)];
 
 		// Overwrite ONLY (wipe + rebuild), like conversations. NpcSpawns is a fully-derived burst-truth set with no
 		// hand-edits, so UPSERT is wrong: it keeps stale rows whose position changed between imports (a walked NPC like
@@ -457,7 +459,8 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var (spawns, patrols) = ImportOps.BuildBurstTruthSpawns(ctx.Captures);
+			var petNames = await SpellEffectsModule.PetTemplateNames(ctx.Db);
+			var (spawns, patrols) = ImportOps.BuildBurstTruthSpawns(ctx.Captures, petNames);
 
 			// SCOPED overwrite (#419): the wipe covers only the MAPS this run actually saw. The spawn set is
 			// burst-truth, so it cannot be row-merged - a walked NPC accretes a second row at its new spot, and the

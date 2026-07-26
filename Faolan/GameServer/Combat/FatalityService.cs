@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
 {
-	// The FATALITY burst a killing blow produces (#140), and the one buff known to hang off it.
+	// The FATALITY burst a killing blow produces (#140).
 	//
 	// Long tracked as un-pinnable: the RE notes concluded the trigger wire was unknown and that no capture showed a
 	// fatality. That was true only of MELEE finishers - the animated decapitations from the combo tables. What the
@@ -22,13 +22,33 @@ namespace Faolan.GameServer.Combat
 	// (xxx_mage-necromancer beach->city fr1267 is the worked example; 36 bursts carry both Fatality ids and 21 carry
 	// the Frozen Hatred proc.) Both Fatality ids are applied together and always to the KILLER, never to the corpse.
 	//
+	// The two Fatality ids are what a fatality IS, so they are constants here. What RIDES a fatality is not: the
+	// Frozen Hatred proc + its pet were four more constants and an `if` on this path, and are now SpellEffect rows
+	// with an OnFatality trigger (#439) - so the next buff that procs on a fatality is an imported row rather than an
+	// edit to this file.
+	//
 	// The ROLL is the client's own: RDB 1010219 gives fatalitychance as a percent, tiered by minlevel (see
-	// FatalityChancePercent). What is deliberately NOT here: the fatality ANIMATION. The finisher anims live in the client's own combo /
-	// 1010219 tables keyed by weapon and level, the server does not drive them, and inventing an emission on the
-	// high-traffic kill path is exactly what the earlier RE notes warned against. This is the state + buff half,
-	// which is what the wire shows and what gameplay (Frozen Hatred's pet) actually reads.
+	// FatalityChancePercent). What is deliberately NOT here: the fatality ANIMATION. The finisher anims live in the
+	// client's own combo / 1010219 tables keyed by weapon and level, the server does not drive them, and inventing an
+	// emission on the high-traffic kill path is exactly what the earlier RE notes warned against. This is the state +
+	// buff half, which is what the wire shows and what gameplay (Frozen Hatred's pet) actually reads.
 	public sealed class FatalityService
 	{
+		// The two self-buffs every captured fatality applies, in wire order.
+		public const uint FatalityBuffA = 5070797; // 0.1s - the instantaneous "a fatality happened" marker
+		public const uint FatalityBuffB = 791221; // 10s
+
+		private readonly ILogger _logger;
+		private readonly ISpellEffectOutbound _outbound;
+		private readonly SpellEffectService _spellEffects;
+
+		public FatalityService(ILogger logger, ISpellEffectOutbound outbound, SpellEffectService spellEffects)
+		{
+			_logger = logger;
+			_outbound = outbound;
+			_spellEffects = spellEffects;
+		}
+
 		// How often a killing blow IS a fatality. Retail gates it on the client's fatality groups (RDB 1010219): each
 		// <fatalitygroup criteria="..."> lists <fatality fatalitychance="N" minlevel="M" .../> entries, and the chance
 		// is a straight PERCENT. Across the 58 groups / 205 real entries (3 dev rows at 9980% excluded) minlevel maps
@@ -53,59 +73,29 @@ namespace Faolan.GameServer.Combat
 			};
 		}
 
-		// The two self-buffs every captured fatality applies, in wire order.
-		public const uint FatalityBuffA = 5070797; // 0.1s - the instantaneous "a fatality happened" marker
-		public const uint FatalityBuffB = 791221; // 10s
-
-		// The necromancer's Frozen Hatred proc: the 6s buff retail applies on a fatality while the character carries
-		// the Frozen Hatred self-buff (4377209, the effect record its castable 4377207 points at - #434).
-		public const uint FrozenHatredProc = 3666099;
-		public const uint FrozenHatredBuff = 4377209;
-
-		// "the Frozen Hatred pet appears and is under your control for 60 seconds. If you already have a Frozen Hatred
-		// pet, the duration of the pet will increase by another 60 seconds. This timer is capped at 5 minutes."
-		// (in-client tooltip). The pet is NPC template "Frozen Hatred" (14580).
-		public const string FrozenHatredPetTemplate = "Frozen Hatred";
-		public static readonly TimeSpan FrozenHatredPetDuration = TimeSpan.FromSeconds(60);
-		public static readonly TimeSpan FrozenHatredPetCap = TimeSpan.FromMinutes(5);
-
-		private readonly Func<INetworkClient, uint, Task> _applySelfBuff; // ApplySpell(client, wireSpellId) on the killer
-		private readonly Func<INetworkClient, uint, bool> _hasBuff; // is this buff live on the killer's entity
-		private readonly ILogger _logger;
-		private readonly Func<INetworkClient, string, TimeSpan, Task> _summonTimedPet; // pet template + how long it lives
-
-		public FatalityService(ILogger logger, Func<INetworkClient, uint, Task> applySelfBuff, Func<INetworkClient, uint, bool> hasBuff,
-			Func<INetworkClient, string, TimeSpan, Task> summonTimedPet)
-		{
-			_logger = logger;
-			_applySelfBuff = applySelfBuff;
-			_hasBuff = hasBuff;
-			_summonTimedPet = summonTimedPet;
-		}
-
 		// A killing blow landed. Rolls the fatality chance for the killer's level and, when it hits, emits the burst on
-		// the KILLER (both Fatality buffs) plus anything that keys off it.
-		public async Task OnKill(INetworkClient killer, WorldEntity victim)
+		// the KILLER (both Fatality buffs) plus whatever the killer's own live buffs arm on a fatality. `killerEntity`
+		// is what carries those buffs - the proc reads the killer's state, never the corpse's.
+		public async Task OnKill(INetworkClient killer, WorldEntity? killerEntity, WorldEntity victim)
 		{
 			var level = killer.Session.Character.Level;
 			var chance = FatalityChancePercent(level);
 			if (Random.Shared.Next(100) >= chance)
 				return;
 
-			await _applySelfBuff(killer, FatalityBuffA << 8);
-			await _applySelfBuff(killer, FatalityBuffB << 8);
+			await _outbound.ApplySelfBuff(killer, FatalityBuffA << 8);
+			await _outbound.ApplySelfBuff(killer, FatalityBuffB << 8);
 
-			if (!_hasBuff(killer, FrozenHatredBuff << 8))
-			{
-				_logger.LogInformation("Fatality on {Victim} by '{Killer}' (level {Level}, {Chance}% chance).", victim.Name, killer.Session.Character?.Name, level, chance);
-				return;
-			}
+			// Whatever the killer is carrying that procs on a fatality rides the SAME burst in the capture (fr1267:
+			// both Fatality ids then Frozen Hatred's 3666099, one frame).
+			var procs = killerEntity != null
+				? await _spellEffects.ForFatality(killerEntity)
+				: [];
+			await _spellEffects.RunAll(killer, procs);
 
-			// The proc rides the same burst in the capture (fr1267: both Fatality ids then 3666099, one frame).
-			await _applySelfBuff(killer, FrozenHatredProc << 8);
-			await _summonTimedPet(killer, FrozenHatredPetTemplate, FrozenHatredPetDuration);
-			_logger.LogInformation("Fatality on {Victim} by '{Killer}' with Frozen Hatred up: proc applied, pet summoned for {Seconds}s.", victim.Name, killer.Session.Character?.Name,
-				FrozenHatredPetDuration.TotalSeconds);
+			_logger.LogInformation("Fatality on {Victim} by '{Killer}' (level {Level}, {Chance}% chance){Procs}.", victim.Name, killer.Session.Character?.Name, level, chance, procs.Count > 0
+				? $", {procs.Count} triggered effect(s)"
+				: "");
 		}
 	}
 }

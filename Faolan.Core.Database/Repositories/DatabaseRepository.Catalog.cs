@@ -25,6 +25,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Item[]> GetRandomLootExcludedItems();
 		Task<Recipe[]> GetRecipes();
 		Task<Spell?> GetSpell(uint id);
+		Task<SpellEffect[]> GetSpellEffects();
 		Task<Spell[]> GetSpells();
 		Task<SpellStatEffect[]> GetSpellStatEffects();
 		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
@@ -153,6 +154,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Spells.OrderBy(s => s.Id).ToArrayAsync();
+		}
+
+		// The server-acted spell effects (pet summons, triggered procs). Read whole in run order - a few dozen rows,
+		// cached in memory by SpellEffectService, and the lookup sits on the cast-resolve path.
+		public async Task<SpellEffect[]> GetSpellEffects()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.SpellEffects.OrderBy(e => e.SpellId).ThenBy(e => e.Trigger).ThenBy(e => e.Sequence).ToArrayAsync();
 		}
 
 		// Every spell's [2][9] stat effects (#367). Read whole - it is 1.7k rows over 866 spells, cached in memory by

@@ -39,6 +39,7 @@ namespace Faolan.Importer.Cli
 
 		// Permits Overwrite on guarded modules (e.g. characters, which cascades to live player data).
 		public bool Force { get; init; }
+		// The corpus directory the run loaded, or EMPTY when no module in the plan needed it (a Db-source-only run).
 		public required string CapturesDir { get; init; }
 		public string RdbProxyBase { get; init; } = DefaultProxyBase;
 		public string? DumpTemplatesDir { get; init; }

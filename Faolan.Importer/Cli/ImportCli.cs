@@ -59,15 +59,6 @@ namespace Faolan.Importer.Cli
 				}
 			}
 
-			if (!Directory.Exists(capturesDir))
-			{
-				await Console.Error.WriteLineAsync($"Captures directory not found: {capturesDir}");
-				await Console.Error.WriteLineAsync("  The corpus lives in the private ProjectFaolan-Data repo, not here. Point at it with");
-				await Console.Error.WriteLineAsync("  The corpus is NOT in this repo - it lives in the private ProjectFaolan-Data repo");
-				await Console.Error.WriteLineAsync("  (see CLAUDE.md \"Capture data\"). Pass --captures <dir> pointing at its Captures/ folder.");
-				return 1;
-			}
-
 			// Resolve the requested module set: --only X,Y | --skip X,Y | (default = all non-RDB).
 			IReadOnlyList<IImportModule> requested;
 			var only = options.Only;
@@ -105,13 +96,31 @@ namespace Faolan.Importer.Cli
 				return 1;
 			}
 
-			Console.WriteLine($"Faolan.Importer: {provider} [{connection}]  captures={capturesDir}  rdb={rdbDir ?? "(none)"}");
-			var captures = LoadCaptures(capturesDir);
+			// The corpus is needed by the modules that READ it, and only by those: a plan of nothing but Db-source
+			// modules (`--only spell-effects`, whose rows are decoded facts) runs on a plain clone with no data repo.
+			var capturesPath = capturesDir != null && Directory.Exists(capturesDir)
+				? capturesDir
+				: null;
+			if (capturesPath == null && plan.Any(m => m.Source == ImportSource.Captures))
+			{
+				await Console.Error.WriteLineAsync($"Captures directory not found: {capturesDir}");
+				await Console.Error.WriteLineAsync("  The corpus is NOT in this repo - it lives in the private ProjectFaolan-Data repo");
+				await Console.Error.WriteLineAsync("  (see CLAUDE.md \"Capture data\"). Pass --captures <dir> pointing at its Captures/ folder.");
+				return 1;
+			}
+
+			Console.WriteLine($"Faolan.Importer: {provider} [{connection}]  captures={capturesPath ?? "(none - no module needs them)"}  rdb={rdbDir ?? "(none)"}");
+			var captures = capturesPath != null
+				? LoadCaptures(capturesPath)
+				: [];
 
 			// Raw packet bytes across every capture PLUS the loose *.bin files (the `itemPackets` source).
 			var rawPackets = captures.SelectMany(c => c.Packets.Select(p => p.Bytes)).ToList();
-			foreach (var bin in Directory.EnumerateFiles(capturesDir, "*.bin"))
-				rawPackets.Add(await File.ReadAllBytesAsync(bin));
+			if (capturesPath != null)
+			{
+				foreach (var bin in Directory.EnumerateFiles(capturesPath, "*.bin"))
+					rawPackets.Add(await File.ReadAllBytesAsync(bin));
+			}
 
 			// Per create-flow capture (filename contains "creat"), its packet bytes - the starting-kit source.
 			var createCaptures = captures.Where(c => c.Name.Contains("creat", StringComparison.OrdinalIgnoreCase)).Select(c => (IReadOnlyList<byte[]>)c.Packets.Select(p => p.Bytes).ToList()).ToList();
@@ -134,7 +143,7 @@ namespace Faolan.Importer.Cli
 			{
 				Db = db,
 				Captures = captures,
-				CapturesDir = capturesDir,
+				CapturesDir = capturesPath ?? "",
 				RdbDir = rdbDir,
 				RawPackets = rawPackets,
 				CreateCaptures = createCaptures,

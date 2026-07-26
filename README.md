@@ -104,16 +104,18 @@ we've seen_, and names the gaps). Regenerate with
   same viewer-relay, so other players see your gear change too. Pending in-client verification (#400)
 - 🟡 **Ground-targeted AoE** (e.g. Deathly Blizzard) — ticks damage with floating numbers; the per-spell radius and
   cadence are still approximate (#349)
-- 🟡 **Buff stat effects** — buffs show as icon + timer, and each one's per-stat bonus/penalty magnitudes are now
-  decoded from the spell templates; feeding those deltas into your live stats is the remaining step (damage-over-time
-  already works) (#367)
+- 🟡 **Buff stat effects** — a buff's flat per-stat bonuses/penalties (armour, ratings, attributes) are decoded from
+  the spell templates and applied to your live stats, coming back off when it expires, is cancelled or you die; the
+  percentage-based ones need a modifier model first (#367, #435, #436)
 - 🟡 **Spell cooldowns** — fully reverse-engineered; the client runs the recast timer from its own data (retail
   sends nothing), pending an in-client confirm of the server-override case (#271)
 - 🟡 **Spellweaving** (necromancer) — built and playable; the energy-bar drain is the last piece (#141)
 - 🟡 **Combat shields** — the guard-arc render is not yet decoded (#20)
+- 🟡 **Fatalities** — a killing blow rolls the client's own chance table (5% at level 1 up to 30% at 80) and sends the
+  buff burst retail sends, including the necromancer's Frozen Hatred proc and its 60-second pet; the finishing-move
+  *animation* stays client-side (#140)
 - ⬜ **Real directional combat** with defensive shield arcs (#20) · **combos** — the client already drives the whole
-  combo chain; the finisher's bonus damage needs server-side data not present in the client (#139) · **fatalities**
-  — the finishing-move animations are catalogued, but their trigger needs a capture we don't yet have (#140)
+  combo chain; the finisher's bonus damage needs server-side data not present in the client (#139)
 
 ### Character progression
 
@@ -176,7 +178,8 @@ we've seen_, and names the gaps). Regenerate with
 
 ### Mounts & pets
 
-- ✅ **Necromancer pets** — summon minions by type and have them follow
+- ✅ **Necromancer pets** — summon minions by type and have them follow; which spell summons which minion is
+  imported content, not code, so a newly decoded summon is a database row
 - 🟡 **Mounts** — working; importing more from captures
 - ⬜ Mounted combat (#142)
 

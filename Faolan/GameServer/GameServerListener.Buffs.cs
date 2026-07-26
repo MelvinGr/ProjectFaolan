@@ -26,6 +26,25 @@ namespace Faolan.GameServer
 		// buff persistence must skip them or the client would render a duplicate icon on relog (#274/#221).
 		private static readonly HashSet<uint> DedicatedRestoreBuffIds = [ShieldOfTheRisenBase1 << 8, ShieldOfTheRisenBase2 << 8, MountCatalog.RideSpell];
 
+		// ISpellEffectOutbound (#439) - the three wire ops a SpellEffect row needs, so SpellEffectService dispatches
+		// data-driven effects without holding the listener. All three already existed for their original callers; this
+		// only names them as one seam.
+		Task ISpellEffectOutbound.ApplySelfBuff(INetworkClient client, uint wireSpellId)
+		{
+			var self = client.Session.Character.Id;
+			return ApplySpell(client, self, self, wireSpellId);
+		}
+
+		async Task<bool> ISpellEffectOutbound.SummonPet(INetworkClient client, string template, bool combat)
+		{
+			return await SummonPetForPlayer(client, template, combat) != null;
+		}
+
+		Task ISpellEffectOutbound.SummonTimedPet(INetworkClient client, string template, TimeSpan duration, TimeSpan? cap)
+		{
+			return SummonTimedPetForPlayer(client, template, duration, cap);
+		}
+
 		// The buff-removal end-twin (#274/#253): the same ApplySpell carrier as the apply, rank byte -> 1, empty
 		// payload. Routes the private SendBuffRemoval used by .cancelbuff so the world-tick expiry and the GM cancel
 		// share one builder.
@@ -54,7 +73,7 @@ namespace Faolan.GameServer
 
 		// Shared pet-summon (#307, docs/subsystems/summon-pet-decode.md): spawn the creature, bind it as a REAL pet by emitting
 		// PetIIR owner-assign (so the client shows the pet bar + sends QueuePetCommand 0x205b), make it follow, and
-		// mark the owner. Used by BOTH the .pet GM command AND the CastSpell hook (casting a PetSummonCatalog spell).
+		// mark the owner. Used by BOTH the .pet GM command AND the CastSpell hook (casting a spell with a SummonPet effect).
 		// `combat` picks the PetIIR kind triple (combat vs social). Returns null if no spawnable template matches.
 		internal async Task<WorldEntity?> SummonPetForPlayer(INetworkClient client, string petTemplate, bool combat)
 		{
@@ -84,7 +103,7 @@ namespace Faolan.GameServer
 		// already have a Frozen Hatred pet, the duration of the pet will increase by another 60 seconds. This timer is
 		// capped at 5 minutes." (in-client tooltip). One field carries both halves - DespawnAt is pushed out on each
 		// fatality and clamped to the cap, and the world tick fades whatever it finds expired.
-		internal async Task SummonTimedPetForPlayer(INetworkClient client, string petTemplate, TimeSpan duration, TimeSpan cap)
+		internal async Task SummonTimedPetForPlayer(INetworkClient client, string petTemplate, TimeSpan duration, TimeSpan? cap)
 		{
 			var owner = _simulation.PlayerWorldEntity(client);
 			if (owner == null)
@@ -97,11 +116,13 @@ namespace Faolan.GameServer
 				var extended = (existing.DespawnAt!.Value > now
 					? existing.DespawnAt.Value
 					: now) + duration;
-				existing.DespawnAt = extended > now + cap
-					? now + cap
+				existing.DespawnAt = cap is { } ceiling && extended > now + ceiling
+					? now + ceiling
 					: extended;
-				Logger.LogInformation("Timed pet '{Pet}' for '{Player}' extended to {Seconds:F0}s remaining (cap {Cap:F0}s).", petTemplate, client.Session.Character?.Name,
-					(existing.DespawnAt.Value - now).TotalSeconds, cap.TotalSeconds);
+				Logger.LogInformation("Timed pet '{Pet}' for '{Player}' extended to {Seconds:F0}s remaining (cap {Cap}).", petTemplate, client.Session.Character?.Name,
+					(existing.DespawnAt.Value - now).TotalSeconds, cap is { } c
+						? $"{c.TotalSeconds:F0}s"
+						: "none");
 				return;
 			}
 

@@ -64,6 +64,7 @@ Capture-sourced (default group, run in dependency order):
 | `maps` | — |
 | `spells` | — |
 | `dot-effects` | `spells` |
+| `spell-effects` (pet summons + the fatality proc; DB-sourced, needs no captures) | — |
 | `abilities` (+ the rehomed ability-slot seed) | — |
 | `class-spells` | — |
 | `characters` | `items` |
@@ -74,7 +75,7 @@ Capture-sourced (default group, run in dependency order):
 | `character-quests` | `characters`, `quests` |
 | `character-bank` | `characters`, `items` |
 | `shops` | — |
-| `npcs` (spawns + types + patrol + npc-spells + spell links) | `characters` |
+| `npcs` (spawns + types + patrol + npc-spells + spell links) | `items`, `spell-effects` |
 | `world-objects` | — |
 | `world-teleports` (zone-line door destinations, from captured use→teleport sequences) | — |
 | `map-loot` (per-map loot pool, overwrite-only) | `items` |
@@ -95,8 +96,8 @@ so it overrides the scraped spell levels with the level-1 create truth.
 The hand-decoded constants the extractors can't recover live **inside their owning module** as commented code
 constants: the quest seeds (`SeedBeachQuestGoals`, `SeedCasildaChain`, `SeedCasildaQuestSnapshot`) run as
 sub-steps in the `quests` module; `UniqueNpcHomes` lives in `npcs`; the 6 ability-slot constants live in
-`abilities` (rehomed from the deleted archive importer). Externalising them to `data/seeds/*.json` is a
-possible later refinement, not done.
+`abilities` (rehomed from the deleted archive importer); the pet-summon roster and Frozen Hatred's fatality
+proc live in `spell-effects`. Externalising them to `data/seeds/*.json` is a possible later refinement, not done.
 
 ## Write modes (`--mode`)
 
