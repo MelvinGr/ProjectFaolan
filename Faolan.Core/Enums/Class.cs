@@ -3,7 +3,7 @@ namespace Faolan.Core.Enums
 	public enum Class : byte
 	{
 		PriestOfMitra = 0x18,
-		TempestOfSet = 0x1C,
+		TempestOfSet = 0x1C, // Stormcaller
 		BearShaman = 0x1D,
 		Conqueror = 0x16,
 		DarkTemplar = 0x1F,

@@ -512,7 +512,16 @@ namespace Faolan.GameServer
 			var map = await Database.GetMap(mapId) ?? throw new  InvalidOperationException();
 			// #3: aggregate the equipped-gear stat bonuses so the player's live vitals seed with gear-boosted maxes.
 			var gearBonuses = MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet));
-			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, gearBonuses);
+			// #444: the class/level BASE the character's attributes start from. The client computes this locally (retail
+			// sends a flat 10 for every attribute), so it is decoded data, not wire data - see ClassAttributeBaseModule.
+			var classBase = await Database.GetClassAttributeBase(character.Class, character.Level);
+			if (classBase.Count == 0)
+			{
+				Logger.LogWarning("World entry: no class attribute base for {Class} at level {Level} (#444) - {Name}'s attributes are gear+buffs only, so regen and mitigation will read low.",
+					character.Class, character.Level, character.Name);
+			}
+
+			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, gearBonuses, classBase);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId);
 			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them

@@ -51,6 +51,13 @@ namespace Faolan.Core.Enums
 		AnnihilationLose = 0x029B,
 		CaptureSkullWin = 0x029C,
 		CaptureSkullLose = 0x029D,
+		// The out-of-combat regen rows the character sheet shows (#442). The client SEEDS 278 -> 2000 and 279 -> 1000
+		// (display 20.00 / 10.00) and adds an attribute "trickledown" on top at display time; 280's base is CLASS data,
+		// carried by the class-feat template (0 for a class with no mana base, 2000/2200 for the casters).
+		NonCombatHealthRegen = 0x0116,
+		NonCombatStaminaRegen = 0x0117,
+		NonCombatManaRegen = 0x0118,
+
 		Strength = 0x0324,
 		Constitution = 0x0326,
 		Intelligence = 0x0328,

@@ -206,10 +206,33 @@ The same templates also carry **MaxHealth** and, for the caster classes, stat **
 +200 that takes the mana-regen base from its 2000 seed to the 2200 those classes show, closing the last open question
 in the regen rates above.
 
-Remaining: the other eight classes' `classBaseId`. Mechanical now — scan plaintext 1000020 entries for a run whose
-records are exactly the five attributes. Until that is wired into an importer module,
-`WorldEntity.AttributeScore` stays gear + buffs only and a geared character regenerates below retail. Open work:
-Gitea #444.
+**All twelve `classBaseId`s are now client-observed** (a level-1 character of each class, brought in-game with the
+`GameCode/ItemData` + `ClientInterface` channels on — the template loaded before the five attribute writes IS the base):
+
+| class | base | | class | base |
+|---|---|---|---|---|
+| Barbarian | 1083955 | | Dark Templar | 793759 |
+| Guardian | 871090 | | Assassin | 3074028 |
+| Conqueror | 873357 | | Ranger | 3115334 |
+| Priest of Mitra | 3192040 | | Necromancer | 1173784 |
+| Tempest of Set | 3067820 | | Herald of Xotli | 3130632 |
+| Bear Shaman | 1102716 | | Demonologist | 1126680 |
+
+⚠️ **None of these can be derived** — two cheaper rules were tried and both fail. The lowest id of the name-matched run
+is wrong for **7 of the 12** (Ranger by −70, Priest of Mitra by −60, and in both directions), and the name is neither
+unique nor level-aligned: the Demonologist has three templates called "Class Feat 001", and the Necromancer's base is
+called "Class Feat 011". Re-derive one only by re-observing it.
+
+`Tempest of Set` is stored in the RDB under the class's old name, **Stormcaller**.
+
+Shipped as the `class-attributes` importer module into `ClassAttributeBases`, and `WorldEntity.AttributeScore` now
+returns `classBase + gear + buffs`.
+
+⚠️ **Coverage is incomplete for some classes and the module reports it per class.** `templateId = base + (level − 1)`
+holds from each anchor, but the run does not always continue to level 80 — the Ranger's stops dead at level 10
+(`3115334 + 10` simply does not exist as an RDB entry) and the Priest of Mitra's at 20, so those classes' higher levels
+live in an id block we have not located. A `(class, level)` with no row is treated as **unknown, not zero**: world entry
+logs a warning naming the character, and that character's attributes are gear + buffs only. Open work: Gitea #444.
 
 ## Wrong / unconfirmed ids (now tracked on the `CharacterStatId` enum)
 

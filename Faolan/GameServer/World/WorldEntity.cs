@@ -120,6 +120,12 @@ namespace Faolan.GameServer.World
 			return expired;
 		}
 
+		// The class/level BASE this entity's stats start from (#444), by wire stat id, in the WIRE scale - the five
+		// attributes, MaxHealth, and the casters' Non Combat Mana Regen base. Loaded once at world entry from
+		// ClassAttributeBases. EMPTY means "not decoded for this (class, level)", NOT "no base": some classes' higher
+		// levels are still unlocated, and a character there regenerates and mitigates below retail until they are.
+		public IReadOnlyDictionary<CharacterStatId, int> ClassBase { get; set; } = new Dictionary<CharacterStatId, int>();
+
 		// The GEAR-derived stat bonuses this entity entered the world with, in display units by wire stat id
 		// (MaxStatAggregator over its equipped items). Kept, rather than only folded into the rating fields below, so
 		// the buff engine can recompute `gear + active buffs` from a fixed baseline instead of adding and subtracting
@@ -141,9 +147,14 @@ namespace Faolan.GameServer.World
 		// score here is short by its base, and the formulas fed from it read low until that is decoded.
 		public uint AttributeScore(CharacterStatId attribute)
 		{
-			return BuffedStats.TryGetValue(attribute, out var buffed)
-				? buffed
-				: (uint)Math.Max(0, GearBonuses.GetValueOrDefault(attribute));
+			var geared = BuffedStats.TryGetValue(attribute, out var buffed)
+				? (int)buffed
+				: GearBonuses.GetValueOrDefault(attribute);
+
+			// The class/level BASE (#444) is in the same WIRE scale as the gear bonus, so they add directly. It is
+			// empty for a (class, level) we have not decoded, in which case this is gear + buffs only and reads LOW -
+			// the honest shortfall, not a silent zero base.
+			return (uint)Math.Max(0, ClassBase.GetValueOrDefault(attribute) + geared);
 		}
 
 		// The same score at the ×10 WIRE scale the client's stat store holds: `raw = display × 10 + 10`. The +10 is the

@@ -138,6 +138,24 @@ namespace Faolan.Tests
 			Assert.Equal(0u, RegenRates.Gain(0, 10));
 		}
 
+		// #444: the decoded class BASE, at the scale the rates consume. A level-23 Assassin's base records are Str 200 /
+		// Con 170 / Dex 650 at the WIRE scale; the client adds them to its seeded 10, so the display score contributed by
+		// the base is record / 10.
+		//
+		// ⚠️ Deliberately NOT asserting base + gear == the character sheet. For our level-23 Assassin that gives Dex
+		// 65 + 16 = 81 where the sheet read 79, a 2-point gap - most likely because the sheet screenshot and the current
+		// CharacterEquipment rows are from different moments, but it is NOT established, so it is written down rather
+		// than encoded as an expectation. The rates themselves are pinned against retail's captured deltas below and do
+		// not depend on resolving it.
+		[Theory]
+		[InlineData(200, 20u)] // Strength
+		[InlineData(170, 17u)] // Constitution
+		[InlineData(650, 65u)] // Dexterity - the Assassin's primary
+		public void TheDecodedClassBase_ConvertsToDisplayUnits(int wireRecord, uint displayContribution)
+		{
+			Assert.Equal(displayContribution, (uint)(wireRecord / 10));
+		}
+
 		// A character with NO attribute scores still regenerates: the flat terms alone. This is today's live behaviour for
 		// an ungeared character, and the shape that keeps a pool from stalling (Gitea #444 - the class/level attribute
 		// base is client-side and not yet modelled, so the scores the server knows are gear + buffs only).

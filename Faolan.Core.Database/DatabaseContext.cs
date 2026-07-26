@@ -49,6 +49,7 @@ namespace Faolan.Core.Database
 		DbSet<ConversationScreenParameter> ConversationScreenParameters { get; }
 		DbSet<Guild> Guilds { get; }
 		DbSet<Item> Items { get; }
+		DbSet<ClassAttributeBase> ClassAttributeBases { get; }
 		DbSet<ItemStatModifier> ItemStatModifiers { get; }
 		DbSet<Mail> Mails { get; }
 		DbSet<MailAttachment> MailAttachments { get; }
@@ -129,6 +130,7 @@ namespace Faolan.Core.Database
 		public DbSet<ConversationScreenParameter> ConversationScreenParameters { get; set; }
 		public DbSet<Guild> Guilds { get; set; }
 		public DbSet<Item> Items { get; set; }
+		public DbSet<ClassAttributeBase> ClassAttributeBases { get; set; }
 		public DbSet<ItemStatModifier> ItemStatModifiers { get; set; }
 		public DbSet<Mail> Mails { get; set; }
 		public DbSet<MailAttachment> MailAttachments { get; set; }

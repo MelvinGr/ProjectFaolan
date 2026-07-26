@@ -42,6 +42,11 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character[]> GetCharactersByAccount(uint id);
 		Task<uint[]> GetDiscoveredRespawnPointIds(uint characterId);
 		Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet);
+
+		// The class/level BASE stats (#444): what a character of this class and level starts with before gear and buffs.
+		// Empty when that (class, level) has no decoded row - see ClassAttributeBaseModule, some classes' higher levels
+		// are not located yet - and the caller must treat empty as UNKNOWN, not as zero.
+		Task<IReadOnlyDictionary<CharacterStatId, int>> GetClassAttributeBase(Class characterClass, uint level);
 		Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task RemoveCharacterShortcut(uint characterId, uint slot);
@@ -409,6 +414,16 @@ namespace Faolan.Core.Database.Repositories
 		// occupied slot (two identical rings -> the item twice), for server-side gear-stat aggregation (#3). Reads the
 		// equipment's *Id columns (no nav load), then fetches only those Items + their modifiers. Empty when the
 		// character has no equipment row or no stat-bearing gear.
+		// The class/level BASE stats (#444). Empty when that (class, level) has no decoded row - some classes' higher
+		// levels are not located yet - and the caller MUST treat empty as unknown rather than as zero.
+		public async Task<IReadOnlyDictionary<CharacterStatId, int>> GetClassAttributeBase(Class characterClass, uint level)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ClassAttributeBases.AsNoTracking()
+				.Where(r => r.Class == characterClass && r.Level == level)
+				.ToDictionaryAsync(r => r.StatId, r => r.Amount);
+		}
+
 		public async Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
