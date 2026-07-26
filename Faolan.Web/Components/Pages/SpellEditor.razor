@@ -1,0 +1,217 @@
+@page "/admin/spells"
+@rendermode InteractiveServer
+@inject IDbContextFactory<DatabaseContext> DbFactory
+@inject NavigationManager Nav
+@using Faolan.Core.Database
+@using Faolan.Core.Enums
+@using Microsoft.EntityFrameworkCore
+@implements IDisposable
+
+<PageTitle>Spells — Admin</PageTitle>
+
+<div class="se">
+	<div class="se-head">
+		<h1>Spell editor</h1>
+		<span class="warn">⚠ edits the live game DB — restart the server to pick up changes</span>
+	</div>
+
+	@if (!_authorized)
+	{
+		<p class="muted">Checking access…</p>
+	}
+	else
+	{
+		@if (_status != null)
+		{
+			<p class="se-status @(_error
+				                    ? "err"
+				                    : "")">
+				@_status
+			</p>
+		}
+
+		<div class="se-grid">
+			<aside class="se-list">
+				<input class="filter" placeholder="Filter by id / name…" @bind="_filter" @bind:event="oninput"/>
+				<label class="onlyfx">
+					<input type="checkbox" @bind="_onlyWithEffects"/> only spells with effects
+				</label>
+				<div class="rowlist">
+					@foreach (var s in Filtered())
+					{
+						<button class="@(ReferenceEquals(s, _spell)
+							               ? "sel"
+							               : "")" @onclick="() => Select(s)">
+							<span class="sid">@s.Id</span>
+							<span class="sname">@(string.IsNullOrEmpty(s.Name)
+								                     ? "(unnamed)"
+								                     : s.Name)</span>
+							@if (EffectCount(s.Id) is > 0 and var fx)
+							{
+								<span class="badge fx">@fx fx</span>
+							}
+							@if (StatEffectCount(s.Id) is > 0 and var sfx)
+							{
+								<span class="badge sfx">@sfx stat</span>
+							}
+						</button>
+					}
+				</div>
+				<span class="count">@_shown of @_spells.Count</span>
+			</aside>
+
+			<section class="se-detail">
+				@if (_spell == null)
+				{
+					<p class="muted">Select a spell.</p>
+				}
+				else
+				{
+					<div class="se-fields">
+						<label>Id<input value="@_spell.Id" disabled/></label>
+						<label>Name<input @bind="_spell.Name"/></label>
+						<label title="RDB field 123">Level<input class="n" @bind="_spell.Level"/></label>
+						<label title="milliseconds — RDB field 0x126 × 10">Cast time (ms)<input class="n" @bind="_spell.CastTime"/></label>
+						<label title="SECONDS, not ms — matches the source that carries it">Cooldown (s)<input class="n" @bind="_spell.Cooldown"/></label>
+						<label>Mana cost<input class="n" @bind="_spell.ManaCost"/></label>
+						<label title="metres — RDB field 0x11F / 100">Range (m)<input class="n" @bind="_spell.Range"/></label>
+						<label title="percent — RDB field 0x15C / 100">Damage rating<input class="n" @bind="_spell.DamageRating"/></label>
+						<label title="0 = no self-duration. Drives buff expiry: a timed self-buff gets its end-twin sent at 0 so the icon disappears.">
+							Duration (ms)<input class="n" @bind="_spell.DurationMs"/>
+						</label>
+						<label title="per-tick HealthCurrent delta while the debuff is active; negative = a bleed">DoT delta<input class="n" @bind="_spell.DotDelta"/></label>
+						<label title="the +45 damage-school flag carried into the rebuilt StatDamageIIR">DoT type<input class="n" @bind="_spell.DotType"/></label>
+						<label>Effect spell<input class="n" @bind="_spell.EffectSpell"/></label>
+					</div>
+
+					@if (_spell.DurationMs == 0 && StatEffectCount(_spell.Id) > 0)
+					{
+						<p class="chainhint warnhint">
+							This spell carries stat effects but <b>no duration</b>, so it is applied as an INSTANT and never tracked —
+							nothing will ever expire it or send its removal twin. If the client renders an icon for it, that icon sticks.
+						</p>
+					}
+
+					<div class="se-fx-head">
+						<h2>Server-acted effects</h2>
+						<button class="add" @onclick="AddEffect">+ Add effect</button>
+					</div>
+					<div class="tablewrap">
+						<table class="se-fx">
+							<thead>
+							<tr>
+								<th title="WHEN it fires. OnCast = this spell is cast. OnFatality = a fatality lands while this spell is a LIVE buff on the killer.">Trigger</th>
+								<th title="run order within one (spell, trigger)">Seq</th>
+								<th title="WHAT it does — each kind reads a different subset of the columns">Kind</th>
+								<th title="ApplySpell: the BASE id of the spell to apply">TargetSpellId</th>
+								<th title="SummonPet: the creature TYPE name (NpcTemplate.Name)">Template</th>
+								<th title="SummonPet: combat pet (targetable, takes commands) vs social companion">Combat</th>
+								<th title="SummonPet: pet lifetime. Empty = until dismissed.">Duration (ms)</th>
+								<th title="SummonPet: ceiling a re-summon may extend a timed pet to">Max duration (ms)</th>
+								<th></th>
+							</tr>
+							</thead>
+							<tbody>
+							@foreach (var fx in Effects())
+							{
+								<tr>
+									<td>
+										<select @bind="fx.Trigger">
+											@foreach (var t in Triggers)
+											{
+												<option value="@t">@t</option>
+											}
+										</select>
+									</td>
+									<td>
+										<input class="n" @bind="fx.Sequence"/>
+									</td>
+									<td>
+										<select @bind="fx.Kind">
+											@foreach (var k in Kinds)
+											{
+												<option value="@k">@k</option>
+											}
+										</select>
+									</td>
+									<td>
+										<input class="n" @bind="fx.TargetSpellId" placeholder="—" disabled="@(fx.Kind != SpellEffectKind.ApplySpell)"/>
+									</td>
+									<td>
+										<input @bind="fx.Template" placeholder="—" disabled="@(fx.Kind != SpellEffectKind.SummonPet)"/>
+									</td>
+									<td>
+										<input type="checkbox" @bind="fx.Combat" disabled="@(fx.Kind != SpellEffectKind.SummonPet)"/>
+									</td>
+									<td>
+										<input class="n" @bind="fx.DurationMs" placeholder="∞" disabled="@(fx.Kind != SpellEffectKind.SummonPet)"/>
+									</td>
+									<td>
+										<input class="n" @bind="fx.MaxDurationMs" placeholder="—" disabled="@(fx.Kind != SpellEffectKind.SummonPet)"/>
+									</td>
+									<td>
+										<button class="del" title="Remove effect" @onclick="() => RemoveEffect(fx)">✕</button>
+									</td>
+								</tr>
+							}
+							@if (!Effects().Any())
+							{
+								<tr>
+									<td colspan="9" class="empty">No server-acted effects — this spell resolves through the generic wire path.</td>
+								</tr>
+							}
+							</tbody>
+						</table>
+					</div>
+					<p class="hint">
+						These are the effects the server has to act on ITSELF, as data rather than an id hardcoded into a dispatch
+						chain: a pet summon, or a proc armed on a later event. The generic path (ApplySpell + the duration above +
+						the stat deltas below) already covers a buff that only modifies its carrier, so most spells need no row here.
+					</p>
+
+					<div class="se-fx-head">
+						<h2>Stat effects <span class="ro">read-only</span></h2>
+					</div>
+					<div class="tablewrap">
+						<table class="se-fx statfx">
+							<thead>
+							<tr>
+								<th>Stat</th>
+								<th title="the ~53000-range word that opens the template record — flat vs percent vs health">Effect kind</th>
+								<th title="RAW template value; the scale is PER-STAT and is not the item scale">Amount (raw)</th>
+							</tr>
+							</thead>
+							<tbody>
+							@foreach (var sfx in StatEffects())
+							{
+								<tr>
+									<td>@sfx.StatId (0x@(((uint)sfx.StatId).ToString("X")))</td>
+									<td>@sfx.EffectKind</td>
+									<td class="n">@sfx.Amount</td>
+								</tr>
+							}
+							@if (!StatEffects().Any())
+							{
+								<tr>
+									<td colspan="3" class="empty">No stat effects extracted for this spell.</td>
+								</tr>
+							}
+							</tbody>
+						</table>
+					</div>
+					<p class="hint">
+						Deliberately NOT editable: this table is the client's own <code>[2][9]</code> template region, machine-extracted
+						per spell and re-derived wholesale on every RDB re-import — an edit here would be silently overwritten by the
+						next import. It is shown because it is what a buff actually modifies. Its <b>Amount</b> scale is per-stat and is
+						<i>not</i> the item scale (attributes store display units, movement/percentage stats store large scaled
+						magnitudes), which is why the server honours only what it can justify.
+					</p>
+
+					<div class="se-actions">
+						<button class="save" @onclick="Save">Save</button>
+					</div>
+				}
+			</section>
+		</div>
+	}
+</div>
