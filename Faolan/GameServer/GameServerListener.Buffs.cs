@@ -131,7 +131,7 @@ namespace Faolan.GameServer
 			var spell = await Database.GetSpell(spellId) ?? await Database.GetSpell(spellId >> 8);
 
 			// A cast spell can carry no effect of its own and name a SEPARATE record that is the actual buff - the
-			// castable is the trigger, the EffectSpell is what lands. Frozen Hatred is the proven case (#436): the
+			// castable is the trigger, the EffectSpell is what lands. Frozen Hatred is the proven case (#434): the
 			// necro casts 4377207, whose row has no duration at all, and retail answers with an ApplySpell for
 			// 4377209 - a distinct id, same name, carrying the 27.7h duration and the cold-effect resource
 			// (xxx_mage-necromancer beach->city, cast fr5393 -> ApplySpell 0x42CA7900 fr5400). Applying the CAST id

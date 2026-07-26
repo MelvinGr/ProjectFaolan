@@ -43,6 +43,24 @@ namespace Faolan.Tests
 			Assert.Equal(4377209u, FatalityService.FrozenHatredBuff);
 		}
 
+		// The roll, from the client's own fatality groups (RDB 1010219): fatalitychance is a PERCENT and its tiers map
+		// 1:1 onto minlevel - 1 -> 5%, 5 -> 10%, 30 -> 15%, 40/60 -> 20%, 80 -> 30% across the 58 groups / 205 real
+		// entries. A character rolls the best tier its level qualifies for.
+		[Theory]
+		[InlineData(1u, 5)]
+		[InlineData(4u, 5)]
+		[InlineData(5u, 10)]
+		[InlineData(29u, 10)]
+		[InlineData(30u, 15)]
+		[InlineData(40u, 20)]
+		[InlineData(60u, 20)]
+		[InlineData(79u, 20)]
+		[InlineData(80u, 30)]
+		public void FatalityChance_FollowsTheClientTiers(uint level, int expected)
+		{
+			Assert.Equal(expected, FatalityService.FatalityChancePercent(level));
+		}
+
 		// The tooltip's rule, as constants: 60s per fatality, capped 5 minutes out.
 		[Fact]
 		public void FrozenHatredPet_LivesSixtySecondsCappedAtFive()

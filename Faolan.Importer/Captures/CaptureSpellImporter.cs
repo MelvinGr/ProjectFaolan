@@ -25,7 +25,7 @@ namespace Faolan.Importer.Captures
 		// SAME packet or ~3-4 later; the window keeps an unrelated later grant (a quest/claim reward) off the last ding.
 		private const int GrantWindow = 40;
 
-		// How many packets after a cast may still carry its effect buff (#436). The answer lands within a handful of
+		// How many packets after a cast may still carry its effect buff (#434). The answer lands within a handful of
 		// packets (Frozen Hatred: cast fr5393 -> ApplySpell fr5400); the window only has to outlast the acks between.
 		private const int CastEffectWindow = 40;
 		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
@@ -78,7 +78,7 @@ namespace Faolan.Importer.Captures
 			return (ids.Count, inserted);
 		}
 
-		// A cast whose EFFECT lives on a DIFFERENT spell record (#436). Some castables carry nothing themselves: the
+		// A cast whose EFFECT lives on a DIFFERENT spell record (#434). Some castables carry nothing themselves: the
 		// necro's Frozen Hatred (4377207) has no duration, no damage, no stat effects - casting it applied a record the
 		// client renders as nothing. Retail answers that cast with an ApplySpell for 4377209: same NAME, its own 27.7h
 		// duration and the cold-effect resource (xxx_mage-necromancer beach->city, cast fr5393 -> ApplySpell fr5400).

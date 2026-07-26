@@ -21,18 +21,43 @@ namespace Faolan.GameServer.Combat
 	// (xxx_mage-necromancer beach->city fr1267 is the worked example; 36 bursts carry both Fatality ids and 21 carry
 	// the Frozen Hatred proc.) Both Fatality ids are applied together and always to the KILLER, never to the corpse.
 	//
-	// What is deliberately NOT here: the fatality ANIMATION. The finisher anims live in the client's own combo /
+	// The ROLL is the client's own: RDB 1010219 gives fatalitychance as a percent, tiered by minlevel (see
+	// FatalityChancePercent). What is deliberately NOT here: the fatality ANIMATION. The finisher anims live in the client's own combo /
 	// 1010219 tables keyed by weapon and level, the server does not drive them, and inventing an emission on the
 	// high-traffic kill path is exactly what the earlier RE notes warned against. This is the state + buff half,
 	// which is what the wire shows and what gameplay (Frozen Hatred's pet) actually reads.
 	public sealed class FatalityService
 	{
+		// How often a killing blow IS a fatality. Retail gates it on the client's fatality groups (RDB 1010219): each
+		// <fatalitygroup criteria="..."> lists <fatality fatalitychance="N" minlevel="M" .../> entries, and the chance
+		// is a straight PERCENT. Across the 58 groups / 205 real entries (3 dev rows at 9980% excluded) minlevel maps
+		// onto chance exactly:
+		//
+		//   minlevel  1 -> 5%     minlevel 30 -> 15%     minlevel 80 -> 30%
+		//   minlevel  5 -> 10%    minlevel 40/60 -> 20%
+		//
+		// so the best a character qualifies for rises with level, which is what this returns. The GROUP is chosen by
+		// `criteria` (weapon/stance: 23 = 1H-Sword family, 24 = 1H-Axe, 27 = stealth 1hb, 30 = stealth dual-dagger, ...)
+		// and that mapping is not lifted yet - it only picks WHICH animation plays, which is client-side anyway, and
+		// the captures show casters getting fatalities with no weapon group at all. So level alone drives the roll.
+		public static int FatalityChancePercent(uint level)
+		{
+			return level switch
+			{
+				>= 80 => 30,
+				>= 40 => 20,
+				>= 30 => 15,
+				>= 5 => 10,
+				_ => 5
+			};
+		}
+
 		// The two self-buffs every captured fatality applies, in wire order.
 		public const uint FatalityBuffA = 5070797; // 0.1s - the instantaneous "a fatality happened" marker
 		public const uint FatalityBuffB = 791221; // 10s
 
 		// The necromancer's Frozen Hatred proc: the 6s buff retail applies on a fatality while the character carries
-		// the Frozen Hatred self-buff (4377209, the effect record its castable 4377207 points at - #436).
+		// the Frozen Hatred self-buff (4377209, the effect record its castable 4377207 points at - #434).
 		public const uint FrozenHatredProc = 3666099;
 		public const uint FrozenHatredBuff = 4377209;
 
@@ -57,15 +82,21 @@ namespace Faolan.GameServer.Combat
 			_summonTimedPet = summonTimedPet;
 		}
 
-		// A killing blow landed. Emits the burst on the KILLER (both Fatality buffs), then any buff that keys off it.
+		// A killing blow landed. Rolls the fatality chance for the killer's level and, when it hits, emits the burst on
+		// the KILLER (both Fatality buffs) plus anything that keys off it.
 		public async Task OnKill(INetworkClient killer, string victimName)
 		{
+			var level = killer.Session.Character?.Level ?? 1;
+			var chance = FatalityChancePercent(level);
+			if (Random.Shared.Next(100) >= chance)
+				return;
+
 			await _applySelfBuff(killer, FatalityBuffA << 8);
 			await _applySelfBuff(killer, FatalityBuffB << 8);
 
 			if (!_hasBuff(killer, FrozenHatredBuff << 8))
 			{
-				_logger.LogInformation("Fatality on {Victim} by '{Killer}'.", victimName, killer.Session.Character?.Name);
+				_logger.LogInformation("Fatality on {Victim} by '{Killer}' (level {Level}, {Chance}% chance).", victimName, killer.Session.Character?.Name, level, chance);
 				return;
 			}
 

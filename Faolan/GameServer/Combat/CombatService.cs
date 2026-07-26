@@ -448,11 +448,8 @@ namespace Faolan.GameServer.Combat
 
 				await AwardKillXp(killer, npcEntity.Level);
 
-				// #140: the fatality burst. Retail rolls a chance from the weapon/level tables; ours fires on every
-				// kill for now, which is the honest interim - the ROLL is client-content we have not lifted, while the
-				// server side of a fatality is exactly what the captures show (both Fatality self-buffs, plus the
-				// Frozen Hatred proc + pet when that buff is up). Over-firing means the buff shows too often; not
-				// firing at all meant Frozen Hatred could never do anything.
+				// #140: roll for a fatality. The chance comes from the client's own fatality groups (RDB 1010219 -
+				// a percent, tiered by level: 5% at 1, 30% at 80), and a hit sends the burst the captures show.
 				if (_fatality != null)
 					await _fatality.OnKill(killer, npcEntity.Name);
 

@@ -417,19 +417,29 @@ ordinary 54-byte self-buff form (`SelfBuffCodec.BuildBuffDataLong`) with magnitu
 wire shape, which is why `FatalityService` is three ApplySpell sends and not a bespoke record
 (`FatalityBurstTests` locks all three against the captured bytes).
 
-**Frozen Hatred's pet.** The necro spell `4377207` applies buff `4377209` (#436), and its tooltip reads: *"When you
+**Frozen Hatred's pet.** The necro spell `4377207` applies buff `4377209` (#434), and its tooltip reads: *"When you
 or your group perform a fatality and this buff is active, the Frozen Hatred pet appears and is under your control
 for 60 seconds. If you already have a Frozen Hatred pet, the duration of the pet will increase by another 60
 seconds. This timer is capped at 5 minutes."* That is implemented as `SummonTimedPetForPlayer` + the world model's
 `WorldEntity.DespawnAt`, which the tick fades (`TimedDespawn`) — one field carrying both the lifetime and its
 extension, clamped to the cap. The pet is NPC template **14580 "Frozen Hatred"**.
 
-**Two things are deliberately NOT implemented.** The fatality **animation** — the decapitation finishers live in
-the client's own combo / `1010219` tables keyed by weapon and level, the server does not drive them, and inventing
-an emission on the high-traffic kill path is what the earlier RE notes warned against. And the **roll**: retail
-gates a fatality on weapon criteria + `fatalitychance` + level, which is client content we have not lifted, so
-ours fires on every kill. Over-firing shows the buff too often; not firing at all left Frozen Hatred unable to do
-anything, which is the state this replaced.
+**The roll comes from the client's data.** RDB **1010219** holds 58 `<fatalitygroup criteria="…">` records with 205
+real `<fatality fatalitychance="N" minlevel="M" …/>` entries (plus 3 dev rows at 9980%). `fatalitychance` is a
+straight **percent**, and its tiers map 1:1 onto `minlevel`:
+
+| minlevel | 1 | 5 | 30 | 40 | 60 | 80 |
+|---|---|---|---|---|---|---|
+| fatalitychance | 5% | 10% | 15% | 20% | 20% | 30% |
+
+so a character rolls the best tier its level qualifies for — `FatalityService.FatalityChancePercent`, gated by
+`FatalityBurstTests`. The `criteria` field (23 = 1H-Sword family, 24 = 1H-Axe, 27 = stealth 1hb, 30 = stealth
+dual-dagger, …) selects which *animation* group plays and is **not** lifted: it is client-side, and the captures
+show casters getting fatalities with no weapon group at all.
+
+**Deliberately NOT implemented: the fatality ANIMATION.** The decapitation finishers live in those same client
+tables, the server does not drive them, and inventing an emission on the high-traffic kill path is what the
+earlier RE notes warned against.
 
 ## Spell cast FSM (#236)
 A player spell cast is a `BehaviorControlCenter` (`0x642CD3D6`) `CastSpell` action (`ActionType 4`), handled in
