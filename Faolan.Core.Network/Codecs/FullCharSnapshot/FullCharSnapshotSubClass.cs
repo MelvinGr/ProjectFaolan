@@ -221,6 +221,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// construction (no post-hoc patch). Falls back to the fresh/beach value when no live token is given (golden).
 			SetSheet(sheet, SubClassStatBlock.PlayfieldTokenStatId, playfieldToken ?? SubClassStatBlock.SkeletonValueOf(SubClassStatBlock.PlayfieldTokenStatId));
 
+			// GM Level stat (0x0D7): drive it from the character's account type so GM/Admin accounts flip the retail
+			// client into GM mode (the GM-Level-gated /help command set), normal accounts stay 0. Set here (not the
+			// static skeleton) so it reaches the wire for BOTH imported and fresh chars - the slot already exists in
+			// the sheet, so this just overwrites its value. Account may be unloaded (create-editor / broadcast) -> 0.
+			SetSheet(sheet, (uint)CharacterStatId.GmLevel, character?.Account?.Type.ToClientGmLevel() ?? 0);
+
 			var block = SubClassStatBlock.CreateBlock(sheet, knownList);
 
 			// Positional post-ops (SetValue-based, confined to the stat region - they do NOT scan the inline known-list).

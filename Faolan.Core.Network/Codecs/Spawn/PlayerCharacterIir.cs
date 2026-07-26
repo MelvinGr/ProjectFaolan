@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
@@ -77,6 +78,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			if (character != null)
 				ApplyCharacter(message, character, equipment);
+
+			// GM Level: drive player_stats.gm_level from the account type (GM/Admin -> non-zero -> retail GM mode).
+			// Only set when non-zero so the bare template (character == null) and normal players don't serialize the
+			// field - keeps the byte-exact golden template intact. Account may be unloaded on a broadcast spawn -> 0.
+			var gmLevel = character?.Account?.Type.ToClientGmLevel() ?? 0;
+			if (gmLevel > 0)
+				message.player_stats.GmLevel = gmLevel;
 
 			return message;
 		}

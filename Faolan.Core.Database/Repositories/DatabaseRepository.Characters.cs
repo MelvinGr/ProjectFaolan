@@ -795,6 +795,7 @@ namespace Faolan.Core.Database.Repositories
 		public static IQueryable<Character> WithSessionNavigations(this IQueryable<Character> characters)
 		{
 			return characters
+				.Include(c => c.Account)
 				.Include(c => c.Body)
 				.Include(c => c.BodyResources)
 				.Include(c => c.MaxStats)
