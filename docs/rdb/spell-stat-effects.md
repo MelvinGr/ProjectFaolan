@@ -36,11 +36,24 @@ Attributes are the one place the spell and item regions disagree on SCALE: a spe
 1. the kind is one of the flat kinds, and
 2. the stat is one whose wire scale we verified against a real in-client tooltip - which is exactly the set the
    server already consumes from gear (Armor, Protection, Hit/Critical/Critical-Damage/Combat Rating, Magic
-   Damage, the two Natural Regens) plus the five attributes.
+   Damage, the two Natural Regens) plus the five attributes and the three max pools.
 
 Everything else is imported but inert, and counted in the engine's load summary. Applying a percent record as
 flat would turn "+2% Critical Rating" into "+200"; applying a flat record on a stat whose scale is unverified
 (`Absorb`, `Retributive Damage`) would be a guess with no way to notice it was wrong.
+
+### The max pools (#450)
+
+Stats 1 / 505 / 507 (`HealthMax` / `StaminaMax` / `ManaMax`) are stored at the ordinary **×100 vitals scale**, which
+the rank ladders force: Sustaining Wrath's nine ranks step `108000 … 180000` in 9000s, i.e. **+1080 … +1800 health**
+in 90-point steps - read flat it would be +108,000. Focused Mind carries stat 507 across its whole ladder the same
+way. Both are class buffs whose descriptions say only "increases maximum health/mana", so the ladder is the evidence,
+not the text.
+
+These do not land in a rating field. A pool is `base + gear + buffs`, so `BuffStatEffects` re-applies the whole bonus
+through `EntityVitals.SetMaxFromBonus`, which also clamps CURRENT when the max comes back down - a player left above
+their own bar would never regen and would read as permanently full. It is also the one honored stat where the value
+pushed to the client is not the buffed total: the wire's `HealthMax` is the whole pool, not the bonus.
 
 ## What this region is NOT
 

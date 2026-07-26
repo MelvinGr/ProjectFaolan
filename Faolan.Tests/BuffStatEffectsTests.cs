@@ -156,6 +156,62 @@ namespace Faolan.Tests
 			Assert.Equal(0u, entity.ArmorRating);
 		}
 
+		// #450: a buff that raises a max pool has to move the POOL, and the client has to be told the whole pool rather
+		// than the bonus - otherwise the bar stops at the unbuffed max and out-of-combat regen visibly stalls there.
+		[Fact]
+		public void MaxPoolBuff_RaisesThePoolAndPushesTheWholePool()
+		{
+			// Sustaining Wrath (Rank 9): stat 1 = 180000 at the ×100 vitals scale -> +1800 health.
+			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]).BySpellBase;
+			var entity = Player();
+			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = Class.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } });
+
+			entity.ActiveBuffs[4239610 << 8] = new ActiveBuff(4239610 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			var applied = BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal([(CharacterStatId.HealthMax, 8141u)], applied); // 6341 + 1800, not the bare 1800
+			Assert.Equal(8141u, entity.Vitals.MaxHealth);
+		}
+
+		// …and when it ends the pool comes back down, taking CURRENT with it: a player left above their own bar would
+		// never regen and would read as permanently full.
+		[Fact]
+		public void MaxPoolBuffEnding_LowersThePoolAndClampsCurrent()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]).BySpellBase;
+			var entity = Player();
+			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = Class.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } });
+
+			entity.ActiveBuffs[4239610 << 8] = new ActiveBuff(4239610 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+			entity.Vitals.Health = 8141;
+
+			entity.ActiveBuffs.Clear();
+			var removed = BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal([(CharacterStatId.HealthMax, 6341u)], removed);
+			Assert.Equal(6341u, entity.Vitals.MaxHealth);
+			Assert.Equal(6341u, entity.Vitals.Health); // clamped down with the max, not left above the bar
+		}
+
+		// A max pool is `base + gear + buffs`, and the buff is added to the gear-inclusive base rather than replacing it.
+		[Fact]
+		public void MaxPoolBuff_StacksOnTopOfGear()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]).BySpellBase;
+			var entity = Player();
+			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 584 };
+			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = Class.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } },
+				entity.GearBonuses);
+
+			Assert.Equal(6925u, entity.Vitals.MaxHealth); // gear alone, before any buff
+
+			entity.ActiveBuffs[4239610 << 8] = new ActiveBuff(4239610 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(8725u, entity.Vitals.MaxHealth); // 6341 + 584 gear + 1800 buff
+		}
+
 		private static WorldEntity Player()
 		{
 			return new WorldEntity(0x1000, 2040, true, "Tester", null!);

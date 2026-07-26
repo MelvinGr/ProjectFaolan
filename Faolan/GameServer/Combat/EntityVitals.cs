@@ -22,6 +22,47 @@ namespace Faolan.GameServer.Combat
 		public uint MaxStamina { get; set; }
 		public uint Stamina { get; set; }
 
+		/// <summary>
+		///     The part of each max pool that does NOT come from gear or buffs - the character's persisted
+		///     <c>CharacterMaxStats</c> plus its class/level base (#444). Kept so a bonus can be RE-applied as a total
+		///     rather than added and subtracted: a buff that raises max health has to give it back when it ends, and an
+		///     add/subtract pair drifts the moment the buff is refreshed, re-applied on relog or cleared by death.
+		/// </summary>
+		public uint BaseMaxHealth { get; private set; }
+
+		public uint BaseMaxMana { get; private set; }
+		public uint BaseMaxStamina { get; private set; }
+
+		/// <summary>
+		///     Sets one max pool to <c>base + bonus</c>, where the bonus is the gear + active-buff total for that stat in
+		///     DISPLAY units. Returns the new max so the caller can push exactly what the client should show - a buff sync
+		///     reports the stat's buffed VALUE, but the wire's <c>HealthMax</c> is the whole pool, not the bonus.
+		///     <para>
+		///         A shrinking max clamps current down with it, so a buff ending cannot leave a player above their bar; a
+		///         growing one leaves current where it is, so it fills by regen rather than jumping.
+		///     </para>
+		/// </summary>
+		public uint SetMaxFromBonus(CharacterStatId stat, int bonus)
+		{
+			switch (stat)
+			{
+				case CharacterStatId.HealthMax:
+					MaxHealth = Add(BaseMaxHealth, bonus);
+					Health = ClampToMax(Health, MaxHealth);
+					return MaxHealth;
+				case CharacterStatId.ManaMax:
+					MaxMana = Add(BaseMaxMana, bonus);
+					Mana = ClampToMax(Mana, MaxMana);
+					return MaxMana;
+				case CharacterStatId.StaminaMax:
+					MaxStamina = Add(BaseMaxStamina, bonus);
+					Stamina = ClampToMax(Stamina, MaxStamina);
+					return MaxStamina;
+				default:
+					throw new ArgumentOutOfRangeException(nameof(stat), stat, "not one of the three max-pool stats");
+			}
+		}
+
 		/// <summary>Applies a health delta (negative = damage, positive = heal), clamped to <c>[0, MaxHealth]</c>.</summary>
 		public void ApplyHealthDelta(int delta)
 		{
@@ -145,12 +186,19 @@ namespace Faolan.GameServer.Combat
 			// ClassAttributeBases and were not using, which is why the server clamped regen 386 low and the bar visibly
 			// stalled short. Both terms are folded in here.
 			//
-			// ⚠️ This does NOT close the whole gap: that client reached 10311 against the 7311 these three terms give.
-			// The remaining 3000 arrives with no template source in the log - almost certainly buffs, which the server
-			// tracks separately (BuffStatEffects) and does not feed into max vitals. Deliberately not guessed at.
-			var vitals = FromMax(AddGear(AddGear(max.Health, gearBonuses, CharacterStatId.HealthMax), classBase, CharacterStatId.HealthMax),
-				AddGear(AddGear(max.Mana, gearBonuses, CharacterStatId.ManaMax), classBase, CharacterStatId.ManaMax),
-				AddGear(AddGear(max.Stamina, gearBonuses, CharacterStatId.StaminaMax), classBase, CharacterStatId.StaminaMax));
+			// The fourth term - buffs that raise a max pool (Focused Mind's +mana, Sustaining Wrath's +health) - is not
+			// here because it is not fixed at world entry: BuffStatEffects re-applies it through SetMaxFromBonus on every
+			// change to the entity's live buffs, on top of the base these two terms establish.
+			var vitals = FromMax(AddGear(max.Health, classBase, CharacterStatId.HealthMax),
+				AddGear(max.Mana, classBase, CharacterStatId.ManaMax),
+				AddGear(max.Stamina, classBase, CharacterStatId.StaminaMax));
+			vitals.BaseMaxHealth = vitals.MaxHealth;
+			vitals.BaseMaxMana = vitals.MaxMana;
+			vitals.BaseMaxStamina = vitals.MaxStamina;
+			foreach (var stat in MaxPools)
+				vitals.SetMaxFromBonus(stat, gearBonuses?.GetValueOrDefault(stat) ?? 0);
+
+			vitals.ReviveToFull();
 			// #214: a character that logged out dead is still dead - seed current health at 0 (max stays full) so the
 			// world model agrees with the dead login snapshot and RespawnMe/TryRespawnNow (which gate on IsDead) work.
 			if (character.IsDead)
@@ -170,6 +218,19 @@ namespace Faolan.GameServer.Combat
 				Stamina = stamina,
 				MaxStamina = stamina
 			};
+		}
+
+		/// <summary>The three max-pool stats, in the order <see cref="SetMaxFromBonus" /> accepts.</summary>
+		public static readonly CharacterStatId[] MaxPools =
+			[CharacterStatId.HealthMax, CharacterStatId.ManaMax, CharacterStatId.StaminaMax];
+
+		// base + bonus, floored at 0: a debuff can empty a pool but never take it negative.
+		private static uint Add(uint baseMax, int bonus)
+		{
+			var total = baseMax + bonus;
+			return total < 0
+				? 0
+				: (uint)total;
 		}
 
 		// Adds the gear bonus for one vital stat onto its base max, clamped at 0 (a bonus never drops a pool below zero).

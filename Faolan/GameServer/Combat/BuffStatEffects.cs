@@ -48,10 +48,11 @@ namespace Faolan.GameServer.Combat
 		// +62 Hit Rating, "Augmente la Dextérité de 1" for the 0x32E=1 record).
 		private static readonly HashSet<uint> FlatKinds = [53045, 53189, 53220, 53221];
 
-		// The stats a flat record is applied for, and where the live value lands. A stat is here only if its wire scale
-		// is verified (see the type comment); the action is null for the ones the server does not model yet, which are
-		// still pushed to the client so the character sheet reflects the buff.
-		private static readonly Dictionary<CharacterStatId, Action<WorldEntity, uint>?> HonoredStats = new()
+		// The stats a flat record is applied for: where the live value lands, and what the client is TOLD. A stat is here
+		// only if its wire scale is verified (see the type comment). The apply is null for the ones the server does not
+		// model yet, which are still pushed so the character sheet reflects the buff; when it returns a value, that value
+		// is pushed instead of the buffed total (the max pools, where the wire wants the whole pool, not the bonus).
+		private static readonly Dictionary<CharacterStatId, Func<WorldEntity, uint, uint>?> HonoredStats = new()
 		{
 			// Gear-consumed ratings (#3/#399/#401) - scales proven against in-client item tooltips.
 			[CharacterStatId.Armor] = (e, v) => e.ArmorRating = v,
@@ -63,6 +64,18 @@ namespace Faolan.GameServer.Combat
 			[CharacterStatId.MagicDamage] = (e, v) => e.MagicDamage = v,
 			[CharacterStatId.NaturalManaRegen] = (e, v) => e.NaturalManaRegen = v,
 			[CharacterStatId.NaturalStaminaRegen] = (e, v) => e.NaturalStaminaRegen = v,
+
+			// The three MAX POOLS (#450). A buff really does raise them - Focused Mind carries stat 507 across its whole
+			// rank ladder, Sustaining Wrath stat 1 in 9000-wire steps - and the values are stored at the ordinary x100
+			// vitals scale, which the rank ladder forces (Sustaining Wrath's 108000..180000 is +1080..+1800 health; read
+			// flat it would be +108000). Until this they were imported and inert, so a buffed player's bar stopped at
+			// their unbuffed max and out-of-combat regen visibly stalled there.
+			//
+			// These go through EntityVitals.SetMaxFromBonus rather than a field write because the pool is
+			// `base + gear + buffs` and current has to be clamped when a buff ENDS and the max comes back down.
+			[CharacterStatId.HealthMax] = (e, v) => e.Vitals?.SetMaxFromBonus(CharacterStatId.HealthMax, (int)v) ?? v,
+			[CharacterStatId.ManaMax] = (e, v) => e.Vitals?.SetMaxFromBonus(CharacterStatId.ManaMax, (int)v) ?? v,
+			[CharacterStatId.StaminaMax] = (e, v) => e.Vitals?.SetMaxFromBonus(CharacterStatId.StaminaMax, (int)v) ?? v,
 
 			// The five attributes: display-unit amounts (see SpellScale), pushed for the sheet. No server model reads
 			// them yet - the attribute-driven formulas (armor from Strength, …) are still client-side.
@@ -165,8 +178,7 @@ namespace Faolan.GameServer.Combat
 					continue;
 
 				entity.BuffedStats[stat] = value;
-				apply?.Invoke(entity, value);
-				changed.Add((stat, value));
+				changed.Add((stat, apply?.Invoke(entity, value) ?? value));
 			}
 
 			return changed;
