@@ -624,6 +624,24 @@ contributed **zero** in both points: the client's stat store carries the BASELIN
 the sheet's computed totals (#393), so the term is real in the client's code but nil in practice today. It is
 implemented anyway, because that is what the client computes.
 
+### Confirmed again on a SECOND character, after the fix
+
+DemoL80 (Demonologist, level 80) on a fresh login with `ApprenticeLevel` now sent — note the adjusted value is no
+longer inverted, and all three lookups reproduce the implemented curve exactly:
+
+```
+TotalArmorValue:2043 (Armor:1903, AttributeBonus:140, Strength:70, Penetration:0)
+ApprenticeLevel Adjusted ArmorValue:2043      <- was garbage before the fix
+Mitigation Modification:18.6099
+No mitigation entry found for [Player:1][ArmorType:1][AdjustedRoll:81.3901]  -> Final Mitigation 0.0930497
+No mitigation entry found for [Player:1][ArmorType:2][AdjustedRoll:92.673]   -> Final Mitigation 0.036635
+No mitigation entry found for [Player:1][ArmorType:2][AdjustedRoll:96.7707]  -> Final Mitigation 0.0161465
+```
+
+`(2043 / 10978) × 0.5` = 0.0930497 and `2043 / 10978 × 100` = 18.6099; solving the magical rolls back gives
+Protection 270 and 119, whose fractions are 0.036635 and 0.0161465. **Six verification points across two characters
+now**, all exact — pinned in `CombatResolverTests`.
+
 ⚠️ The table's DATA has not been located yet, and on this build it does not matter. It is `ARMOR_MITIGATION`, one of the client's 25 named data tables
 (`docs/rdb/client-tweak-table.md`), parsed by `ArmorMitigation_c` — but unlike `HitsManaAndStamina_c` it carries no
 record-size assert to identify the RDB entry by shape, it is in none of the ~55 RDB types dumped so far, and a

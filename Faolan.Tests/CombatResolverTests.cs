@@ -109,13 +109,14 @@ namespace Faolan.Tests
 		// verification rather than a plausible formula:
 		//   with ApprenticeLevel unset (the bug): adjusted -168246 -> Final Mitigation 0.938747
 		//   with ApprenticeLevel = level (fixed):  adjusted    2157 -> Final Mitigation 0.0982419
-		[Fact]
-		public void MitigationFraction_ReproducesTheClientsOwnTrace()
+		// TWO characters, independently: TotalArmorValue = armour + AttributeBonus, where the bonus is
+		// ((rawStrength - 10) / 10) * 2.0 = 140 for both (each has raw Strength 710 / displayed 71).
+		[Theory]
+		[InlineData(2017u, 0.0982419)] // NecroL80      - client: TotalArmorValue 2157, Final Mitigation 0.0982419
+		[InlineData(1903u, 0.0930497)] // DemoL80      - client: TotalArmorValue 2043, Final Mitigation 0.0930497
+		public void MitigationFraction_ReproducesTheClientsOwnTrace(uint armour, double expected)
 		{
-			// TotalArmorValue 2157 = armour 2017 + AttributeBonus 140, where 140 = ((710 - 10) / 10) * 2.0
-			var fraction = CombatResolver.MitigationFraction(2017, 80, 710);
-
-			Assert.Equal(0.0982419, fraction, 6);
+			Assert.Equal(expected, CombatResolver.MitigationFraction(armour, 80, 710), 6);
 		}
 
 		[Fact]
@@ -166,8 +167,10 @@ namespace Faolan.Tests
 		// fraction and cross-checked against the logged AdjustedRoll - and both `adjusted` values land on EXACTLY the
 		// Protection scores from her character sheet, which is what confirms the branch and the target.
 		[Theory]
-		[InlineData(342u, 0.0464043, 90.7191)] // Protection Cold / Electrical / Fire
-		[InlineData(55u, 0.00746269, 98.5075)] // Protection Holy / Unholy
+		[InlineData(342u, 0.0464043, 90.7191)] // NecroL80 - Protection Cold / Electrical / Fire
+		[InlineData(55u, 0.00746269, 98.5075)] // NecroL80 - Protection Holy / Unholy
+		[InlineData(270u, 0.036635, 92.673)] // DemoL80 - a second character, different Protection entirely
+		[InlineData(119u, 0.0161465, 96.7707)] // DemoL80
 		public void ProtectionMitigationFraction_ReproducesTheClientsMagicalLookups(uint protection, double expectedFraction, double expectedAdjustedRoll)
 		{
 			var fraction = CombatResolver.ProtectionMitigationFraction(protection, 80);
