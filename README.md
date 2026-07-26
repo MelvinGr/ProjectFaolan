@@ -106,9 +106,11 @@ we've seen_, and names the gaps). Regenerate with
   same viewer-relay, so other players see your gear change too. Pending in-client verification (#400)
 - 🟡 **Ground-targeted AoE** (e.g. Deathly Blizzard) — ticks damage with floating numbers; the per-spell radius and
   cadence are still approximate (#349)
-- 🟡 **Buff stat effects** — a buff's flat per-stat bonuses/penalties (armour, ratings, attributes) are decoded from
-  the spell templates and applied to your live stats, coming back off when it expires, is cancelled or you die; the
-  percentage-based ones need a modifier model first (#367, #435, #436)
+- 🟡 **Buff stat effects** — a buff's per-stat bonuses and penalties are decoded from the spell templates and applied
+  to your live stats, coming back off when it expires, is cancelled or you die. Flat ones (armour, ratings,
+  attributes) add; percentage ones ("+2% Critical Rating") scale the total; and one that raises a max pool now moves
+  the *pool*, so a buffed bar fills to where the buff put it instead of stalling at your unbuffed max. Awaiting an
+  in-client check of the applied values (#367, #435, #436, #450)
 - 🟡 **Spell cooldowns** — fully reverse-engineered; the client runs the recast timer from its own data (retail
   sends nothing), pending an in-client confirm of the server-override case (#271)
 - 🟡 **Spellweaving** (necromancer) — built and playable; the energy-bar drain is the last piece (#141)
@@ -127,11 +129,11 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Feat trees** — training, resetting, the untrain confirmation, and the feat-point budget all work against the
   live protocol (driven by a GM command for now); what's missing is the feat *catalog* itself — which feats exist,
   their tiers and prerequisites, per-feat costs, and each class's tree layout (#251)
-- 🟡 **Attributes** — your Strength/Constitution/Intelligence/Wisdom/Dexterity now come from the real per-class,
+- ✅ **Attributes** — your Strength/Constitution/Intelligence/Wisdom/Dexterity come from the real per-class,
   per-level base plus your gear and buffs, so the formulas that read them (regen, armour mitigation) get real inputs.
   Retail never sends these — the client computes them locally from its own asset files — so the base had to be decoded
-  and then anchored one class at a time against a live client. Some classes' higher levels are not located yet, and a
-  character there is reported at world entry rather than silently given a zero base (#444)
+  out of the client's own data and checked against a live client, one class at a time. All twelve classes at all
+  eighty levels (#444)
 - 🟡 XP curve is a provisional ramp; the real thresholds are partly harvested (#297)
 - 🟡 Class spell / combo / ability catalogs are still filling in; empty spell and item names were backfilled from the
   client's own English string table (LDB), so far fewer entries render nameless (#291, #296, #303, #300)
@@ -219,6 +221,12 @@ we've seen_, and names the gaps). Regenerate with
   it computed instead of us inferring it from screenshots: every stat it applies with the previous value, each one
   attributable to the item or template that caused it (#443)
 - ✅ **Web armory & 3D viewer** — browser character/equipment viewer plus GM tools
+- 🟡 **GM mode in the retail client** — a GameMaster or Administrator account flips the stock client into GM mode,
+  unlocking its own built-in command set (`/teleport`, `/summon`, `/kill`, `/cloak`, `/setname`, … 133 of them) and
+  its GM/Debug hotkeys, flying included. The one wire field that does it turned out to be a *bitmask* of 25 named
+  privileges rather than a level — decoded from the client along with what each command requires (#449,
+  [docs](docs/subsystems/gm-commands.md)). What the server should send back when one of those commands is used is
+  still undecoded
 - 🟡 **Importer** — rebuilds the game database from captures + the client's asset files
 
 ## Build
