@@ -100,9 +100,74 @@ are tunable guesses and this is what retail used.
 ## Sibling tables (same single-entry family, NOT this grammar)
 
 Types 1000505–1000521 are all single-entry tables; only **1000516** uses the named `[len][name][f64]` shape. The
-others are fixed-width numeric records, e.g. **1000513** = 960 records × 24 bytes = **12 classes × 80 levels**,
+others are fixed-width numeric records. **1000511** is `CHARACTER_HP_MANA_STAMINA`, decoded below. **1000513** is a
+DIFFERENT per-class/level curve, still undecoded: 960 records × 24 bytes = **12 classes × 80 levels**,
 each `[u32 classId][u32 level][0][u32 value][0][u32 tag]`. Its class ids are exactly the 12 AoC classes
 (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44) and its `value` column is **0 for all 80 levels of classes 24,
 28, 41 and 44** — precisely the four classes with no stamina pool — while the other eight grow linearly with
-level (class 34: 90 at L1 → 25082 at L80, ~316/level). The column is therefore stamina-gated, but its scale does
-not match any stored value yet, so it stays undecoded.
+level (class 34: 90 at L1 → 25082 at L80, ~316/level). Its L1 value for the Assassin is even 90, exactly the
+`HpBaseL1` anchor — which is why it looked like the vitals table. It is NOT: 56 does not divide its payload, and the
+real one (1000511) reproduces the captured sheet exactly. Check a parser's record-size assert before believing a
+shape; that is what disproved this one.
+
+## `CHARACTER_HP_MANA_STAMINA` = RDB type 1000511 — DECODED
+
+One of the 25 named data tables (see the section above). The parser names itself and states its own record size,
+which is what pins the format without guesswork — `HitsManaAndStamina_c::ReadFromRDB` (`Data\HitsManaAndStamina.cpp`,
+`FUN_0113e220`) asserts:
+
+```
+((cData.GetRemainingSize() % (14 * sizeof(int32))) == 0)
+```
+
+### Grammar
+
+```
+[12-byte header (skipped)][i32 version][i32 count][count × 14 × i32]
+```
+
+`version` is 2 in the shipped file; the 14th field of each record is read only when `version > 1` (else 0). Type
+1000511 is exactly `20 + 95 × 56` = 5340 bytes, which is what identifies it — no other RDB entry matches that shape.
+
+Each record is keyed `[race][class]`, and all 95 are `5 races × 19 class slots` with every pair unique:
+
+| field | meaning |
+|---|---|
+| 0 | race (1, 2, 3, 4, 10) |
+| 1 | class — all 12 AoC class ids, plus 0–4 and 26/42 (archetype / unused slots) |
+| 2, 3, 4 | **base** health, mana, stamina — ÷100 |
+| 5, 6, 7 | **per-level growth** of the same three — ÷1000 |
+| 8–13 | further per-class constants (8 is always 8000; 9/10 are 0 or 3000; 11–13 are 0 or 2000) |
+
+The coefficients depend only on CLASS — except class 20 (Guardian), which has two race-dependent variants.
+
+### The formula, verified byte-exact against four captured characters
+
+```
+value(level) = field/100 + (level - 1) × growth/1000
+```
+
+reproduces the imported snapshot sheet's stat **1** (Health), **507** (Mana) and **505** (Stamina) EXACTLY for every
+captured character — at four different levels across four classes:
+
+| character | level | class | formula (hp/mana/stam) | captured sheet 1/507/505 |
+|---|---|---|---|---|
+| AssassinL23 | 23 | Assassin | 772 / 0 / 736 | 772 / 0 / 736 |
+| NecroL80 | 80 | Necromancer | 2371 / 2610 / 0 | 2371 / 2610 / 0 |
+| DemoL80 | 80 | class 44 | 2371 / 2610 / 0 | 2371 / 2610 / 0 |
+| Hakotep | 24 | class 43 | 839 / 930 / 414 | 839 / 930 / 414 |
+
+### What it fixes, and what it does NOT
+
+It settles the **base curve** `CharacterMaxStats.Archetype` only guessed at. Its L1 base health matches our
+retail-anchored `HpBaseL1` for all 12 classes, and its mana/stamina bases are our displayed L1 values **minus 6** —
+independently confirming `SnapshotVitals`'s "mana base = displayed − 6". But the **per-level growth we invented is
+wrong across the board**, e.g. (ours → real) Guardian hp 60 → 40, Assassin hp 53 → 31, Priest of Mitra hp 45 → 10,
+Bear Shaman stamina 39 → 17.
+
+⚠️ It is **not** the displayed maximum. The curve yields the sheet's `1`/`505`/`507`; the per-character values at
+`27`/`504`/`506` are larger (NecroL80 6518 health vs the curve's 2371) and vary between two level-80 characters of
+different classes, so the remaining factor is per-character — gear, which is Gitea #441. Wiring this curve straight
+into `CharacterMaxStats` would LOWER a geared character's maximum, so the mapping needs #441 first. Open work: #3.
+
+Dump it with `--report rdb-dump --report-arg 1000511`.

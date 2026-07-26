@@ -191,6 +191,14 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "rdb-class-vitals":
+				{
+					RdbClassVitals(RdbDir(), string.IsNullOrWhiteSpace(arg)
+						? null
+						: arg);
+					return 0;
+				}
+
 				case "rdb-tweaks":
 				{
 					RdbTweaks(RdbDir(), string.IsNullOrWhiteSpace(arg)
@@ -1401,6 +1409,51 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine(read == count
 					? $"  ({read} parsed{(filter != null ? $", {shown} matching '{filter}'" : "")})"
 					: $"  ⚠ parsed only {read} of the declared {count} - the grammar breaks at byte {off}");
+			}
+		}
+
+		// `CHARACTER_HP_MANA_STAMINA` (RDB type 1000511) - the client's per-class BASE vitals curve, decoded from its own
+		// parser (`HitsManaAndStamina_c::ReadFromRDB`, whose assert states the record size: 14 x int32).
+		//
+		//   [12-byte header][i32 version][i32 count][count x 14 x i32]
+		//
+		// Each record is keyed [race][class]; fields 2..4 are the L1 BASE health/mana/stamina (/100) and 5..7 their
+		// per-level growth (/1000), so `base/100 + (level-1) * growth/1000` reproduces the captured snapshot sheet's stat
+		// 1 / 507 / 505 exactly for every captured character. See docs/rdb/client-tweak-table.md. Gitea #3.
+		private static void RdbClassVitals(string rdbDir, string? filter)
+		{
+			const uint tableType = 1000511;
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			foreach (var entry in rdb.EntriesOfType(tableType))
+			{
+				var blob = rdb.ReadDecompressed(entry);
+				if (blob.Length < 20)
+				{
+					Console.WriteLine($"entry {entry.Id}: {blob.Length} B - too short");
+					continue;
+				}
+
+				var version = BinaryPrimitives.ReadInt32LittleEndian(blob.AsSpan(12, 4));
+				var count = BinaryPrimitives.ReadInt32LittleEndian(blob.AsSpan(16, 4));
+				var expected = 20 + count * 56;
+				Console.WriteLine($"type={tableType} id={entry.Id}: {blob.Length} B, version={version}, {count} record(s)" +
+				                  (blob.Length == expected
+					                  ? " (size matches 20 + count x 56 exactly)"
+					                  : $" ⚠ expected {expected} B"));
+				Console.WriteLine($"  {"race",4} {"class",5} {"hpBase",7} {"hpGrow",7} {"manaBase",9} {"manaGrow",9} {"stamBase",9} {"stamGrow",9}   trailing");
+				for (var i = 0; i < count && 20 + (i + 1) * 56 <= blob.Length; i++)
+				{
+					var r = new int[14];
+					for (var k = 0; k < 14; k++)
+						r[k] = BinaryPrimitives.ReadInt32LittleEndian(blob.AsSpan(20 + i * 56 + k * 4, 4));
+
+					var cls = ((Class)r[1]).ToString();
+					if (filter != null && !cls.Contains(filter, StringComparison.OrdinalIgnoreCase) && !r[1].ToString().Contains(filter))
+						continue;
+
+					Console.WriteLine($"  {r[0],4} {cls,5} {r[2] / 100.0,7:0.##} {r[5] / 1000.0,7:0.###} {r[3] / 100.0,9:0.##} {r[6] / 1000.0,9:0.###} " +
+					                  $"{r[4] / 100.0,9:0.##} {r[7] / 1000.0,9:0.###}   {string.Join(",", r[8..])}");
+				}
 			}
 		}
 
