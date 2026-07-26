@@ -116,10 +116,19 @@ stat(0x116) += Σ modifier × (attribute − 10) × 0.1 × 100        // attribu
 ```
 
 i.e. the pool's regen stat's own value plus an attribute **trickledown** on top (hence the sheet's
-`HealthOOCRegenTrickledown` tooltip row). That reduces to exactly the table above:
-`2030 + 15 × (Con + Str − 2) = 2000 + 15 × (Con + Str)`. So the flat term is not a mystery constant — it is that base
-stat, and **2030** (health) / **1045** (stamina) are literally what the wire carries for an entity whose attributes are
-all at the baseline 10, which is why those two values recur as bare regen deltas across dozens of captured NPC handles.
+`HealthOOCRegenTrickledown` tooltip row). That **is** the table above, not merely close to it, once the attribute scale
+is right: the wire value is `display × 10 + 10`, because the client seeds every attribute to 10 before applying
+anything, so its `(raw − 10) × 0.1` is just a conversion back to display units. The `ClientInterface` channel shows
+both halves directly at world entry — `(804 10 old:0)` then `(804 710 old:10)` for a display Strength of 70, and stats
+`278`/`279`/`280` seeded to **2000** / **1000** / **2000** = display 20.00 / 10.00 / 20.00.
+
+So the flat terms are those seeded stat values, and the server's formula and the client's displayed row are the same
+computation. It also explains the `(attribute − 10) / 10` term in the armour curve (`CombatResolver`): that is the same
+raw→display conversion, which is why the trace's AttributeBonus of 140 is `(710 − 10) / 10 × 2.0` for a display 70.
+
+⚠️ **Mana's flat term is the shaky one.** Stat 280 seeds to 2000 like health, but a class's base template then modifies
+it — a level 80 Necromancer's takes it `2000 → 2200` — so mana's base looks class-dependent rather than flat. Our 0
+reproduces the single captured mana delta (an Assassin with a 74-point pool) and nothing more.
 
 Three more things worth keeping:
 

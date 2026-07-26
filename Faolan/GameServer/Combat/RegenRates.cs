@@ -40,10 +40,11 @@ namespace Faolan.GameServer.Combat
 	///         <c>E0</c>/<c>F0</c>/<c>500</c>, all 0.15 in the running process). Its form is
 	///         <c>stat(0x116) + Σ mod × (attr − 10) × 0.1 × 100</c>: the pool's regen stat's own value, plus an attribute
 	///         "trickledown" on top (hence the sheet's <c>HealthOOCRegenTrickledown</c> tooltip). With attributes at the
-	///         ×10 wire scale that reduces to exactly the formulas above -
-	///         <c>2030 + 15 × (Con + Str − 2) = 2000 + 15 × (Con + Str)</c> - so the flat term is not a mystery constant,
-	///         it is that base stat, and 2030 / 1045 are what the wire carries for an entity with no attributes above the
-	///         baseline.
+	///         ×10 wire scale that is exactly the formulas above, because the wire scale is <c>display × 10 + 10</c> - the
+	///         client seeds every attribute to 10 before applying anything, so its <c>(raw − 10) × 0.1</c> is just a
+	///         conversion back to display units. And <c>stat(0x116)</c> is the flat term: the client seeds stat 278 to
+	///         <b>2000</b> and 279 to <b>1000</b>, i.e. display 20.00 and 10.00. So neither the modifiers nor the flat
+	///         terms are fitted - the server's formula and the client's display are the same computation.
 	///     </para>
 	///     <para>
 	///         ⚠️ The rates need the character's TOTAL attribute scores, which the client computes locally: retail sends
@@ -68,9 +69,14 @@ namespace Faolan.GameServer.Combat
 		// "trickledown" onto (see the class remark) - health's is 2030 and stamina's 1045 in the ×100 wire scale, the
 		// bare values that recur as regen deltas all over the corpus for entities whose attributes are all at the
 		// baseline 10. Expressed here in display units, folded with the ×(attr − 1) offset the client's form carries.
-		public const double HealthFlatRate = 20.0;
-		public const double StaminaFlatRate = 10.0;
-		public const double ManaFlatRate = 0.0; // AssassinL23's 2470 = 0.38 x 65 exactly, with nothing added
+		public const double HealthFlatRate = 20.0; // stat 278 seeds to 2000
+		public const double StaminaFlatRate = 10.0; // stat 279 seeds to 1000
+
+		// Mana's is 0, from AssassinL23's captured 2470 = 0.38 × 65 exactly with nothing added. ⚠️ Less safe than the other
+		// two: the client seeds stat 280 to 2000 like health, but a class's base template then MODIFIES it (a level 80
+		// Necromancer's takes it 2000 → 2200), so mana's base looks class-dependent rather than flat. One captured
+		// delta, from a class with a 74-point mana pool, is all that pins this.
+		public const double ManaFlatRate = 0.0;
 
 		// Health: Constitution + Strength. Halted in combat by the caller (retail's OOC vs Natural split).
 		public static double HealthPerSecond(uint constitution, uint strength)

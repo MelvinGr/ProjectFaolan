@@ -146,6 +146,16 @@ namespace Faolan.GameServer.World
 				: (uint)Math.Max(0, GearBonuses.GetValueOrDefault(attribute));
 		}
 
+		// The same score at the ×10 WIRE scale the client's stat store holds: `raw = display × 10 + 10`. The +10 is the
+		// baseline the client seeds every attribute to before applying anything (observed on the ClientInterface channel:
+		// `(804 10 old:0)` at world entry, then `(804 710 old:10)` for a display 70) - which is exactly why the client's
+		// formulas read `(raw − 10) / 10`: that converts back to display units. Verified against the armour trace, whose
+		// AttributeBonus 140 = (710 − 10) / 10 × 2.0 for NecroL80's display Strength of 70.
+		public uint AttributeWireScore(CharacterStatId attribute)
+		{
+			return AttributeScore(attribute) * 10 + 10;
+		}
+
 		// UTC time this player last dealt or took damage. HP/mana regen is OUT-OF-COMBAT only in retail (the client's
 		// OOCHealth/ManaRegeneration stats), so while within WorldSimulation.CombatRegenPause of this the HP+mana regen
 		// is halted; stamina (the action resource) keeps regenerating. MinValue = never in combat (fresh player regens).
