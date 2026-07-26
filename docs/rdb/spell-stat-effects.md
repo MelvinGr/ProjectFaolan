@@ -42,6 +42,26 @@ Everything else is imported but inert, and counted in the engine's load summary.
 flat would turn "+2% Critical Rating" into "+200"; applying a flat record on a stat whose scale is unverified
 (`Absorb`, `Retributive Damage`) would be a guess with no way to notice it was wrong.
 
+### Percent records (#436)
+
+The percent kind is honored too, on the same stat gate — it just needs its own arithmetic, because a percentage
+scales a total rather than adding to one:
+
+```
+value = (gear + flat buffs) × (1 + Σ percents / 10000)
+```
+
+- **The denominator is 10000.** Retail keeps a percentage in a stat the same way: a live read of the fatality buff
+  shows stat `536` *Magic Damage Modifier* moving `10000 → 12000` for a +20% effect, so `10000` is `1.00`.
+- **Percentages ADD rather than compound** — two +2% buffs are +4%, not +4.04% — and are applied **after** the flat
+  deltas, on their total. A flat +50 and a +2% on 250 gear is 306, not 305.
+- **Truncated**, like every other client-side percentage read (the regen sheet's integer divide, #442). A percentage
+  of 0 leaves the value bit-identical either way.
+
+The whole shipped set is 13 records over 6 spells, and only three of the six stats they touch are modelled —
+`Hit Rating` (310), `Critical Rating` (312) and `Combat Rating` (875). `PvP Hit Rating` (311), `Evade Rating` (308)
+and `Immunity Rating` (490) stay counted-but-inert, exactly as an unverified flat record would.
+
 ### The max pools (#450)
 
 Stats 1 / 505 / 507 (`HealthMax` / `StaminaMax` / `ManaMax`) are stored at the ordinary **×100 vitals scale**, which

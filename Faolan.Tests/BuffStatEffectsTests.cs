@@ -49,9 +49,10 @@ namespace Faolan.Tests
 			Assert.Equal(10u, CharacterStatId.Strength.GetScale()); // …while an ITEM's Strength really is ×10
 		}
 
-		// A percent record must never be read as a flat one: Philtre of Guile's 200 is "+2% Critical Rating".
+		// A percent record must never be read as a flat one: Philtre of Guile's 200 is "+2% Critical Rating", not +200.
+		// It is kept apart from the flat deltas, and a health-effect kind is not a buff stat at all.
 		[Fact]
-		public void PercentAndHealthKinds_AreNotApplied()
+		public void PercentRecords_AreKeptApartFromFlatOnes()
 		{
 			var catalog = BuffStatEffects.BuildCatalog([
 				Row(4331123, CharacterStatId.CriticalRating, BuffStatEffects.PercentKind, 200), // +2%, not +200
@@ -59,8 +60,79 @@ namespace Faolan.Tests
 			]);
 
 			Assert.Empty(catalog.BySpellBase);
-			Assert.Equal(1, catalog.PercentSkipped);
+			Assert.Equal([(CharacterStatId.CriticalRating, 200)], catalog.PercentBySpellBase[4331123]);
 			Assert.Equal(1, catalog.KindSkipped);
+		}
+
+		// A percent on a stat whose scale we have NOT verified is counted, not applied - the same gate the flat kinds
+		// pass through, because a percentage of an unknown quantity is no more usable than a flat amount of it.
+		[Fact]
+		public void PercentOnAnUnmodelledStat_IsCountedNotApplied()
+		{
+			// "Absolute Pharmacon of Nullification": Evade Rating (308) and Immunity Rating (490), neither modelled.
+			var catalog = BuffStatEffects.BuildCatalog([
+				Row(5003553, (CharacterStatId)308, BuffStatEffects.PercentKind, 750),
+				Row(5003553, (CharacterStatId)490, BuffStatEffects.PercentKind, 750)
+			]);
+
+			Assert.Empty(catalog.PercentBySpellBase);
+			Assert.Equal(2, catalog.PercentSkipped);
+		}
+
+		// #436: a percentage SCALES the flat total rather than adding to it - "+2% Critical Rating" is worth more on a
+		// well-geared character, which is the whole reason it needed a model of its own.
+		[Fact]
+		public void PercentBuff_ScalesTheFlatTotal()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([Row(4331123, CharacterStatId.CriticalRating, BuffStatEffects.PercentKind, 200)]);
+			var entity = Player();
+			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.CriticalRating] = 250 };
+
+			entity.ActiveBuffs[4331123 << 8] = new ActiveBuff(4331123 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			var applied = BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal([(CharacterStatId.CriticalRating, 255u)], applied); // 250 x 1.02
+			Assert.Equal(255u, entity.CriticalRating);
+
+			entity.ActiveBuffs.Clear();
+			BuffStatEffects.Recompute(entity, catalog);
+			Assert.Equal(250u, entity.CriticalRating); // and it comes back off
+		}
+
+		// A percentage applies AFTER the flat deltas, on their total - so a flat +50 and a +2% are 306, not 305.
+		[Fact]
+		public void PercentBuff_AppliesToTheFlatTotalNotToGearAlone()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Row(4331123, CharacterStatId.CriticalRating, BuffStatEffects.PercentKind, 200),
+				Row(145213, CharacterStatId.CriticalRating, FlatKind, 50)
+			]);
+			var entity = Player();
+			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.CriticalRating] = 250 };
+
+			entity.ActiveBuffs[4331123 << 8] = new ActiveBuff(4331123 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			entity.ActiveBuffs[145213 << 8] = new ActiveBuff(145213 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(306u, entity.CriticalRating); // (250 + 50) x 1.02
+		}
+
+		// Two percentages ADD rather than compounding: +2% and +5% is +7%, not 1.02 x 1.05.
+		[Fact]
+		public void TwoPercentBuffs_AddRatherThanCompound()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([
+				Row(4331123, CharacterStatId.CriticalRating, BuffStatEffects.PercentKind, 200), // Philtre of Guile
+				Row(4331122, CharacterStatId.CriticalRating, BuffStatEffects.PercentKind, 500) // Refined Philtre of Guile
+			]);
+			var entity = Player();
+			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.CriticalRating] = 1000 };
+
+			entity.ActiveBuffs[4331123 << 8] = new ActiveBuff(4331123 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			entity.ActiveBuffs[4331122 << 8] = new ActiveBuff(4331122 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(1070u, entity.CriticalRating); // 1000 x 1.07, not 1071
 		}
 
 		// A flat record on a stat whose scale we have not verified is imported but inert - counted, not guessed at.
@@ -80,7 +152,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuffRaisesTheLiveStat_AndEndingItRestoresTheGearBaseline()
 		{
-			var catalog = BuffStatEffects.BuildCatalog([Row(4239529, CharacterStatId.Armor, FlatKind, 1000)]).BySpellBase;
+			var catalog = BuffStatEffects.BuildCatalog([Row(4239529, CharacterStatId.Armor, FlatKind, 1000)]);
 			var entity = Player();
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.Armor] = 250 };
 			entity.ArmorRating = 250;
@@ -103,7 +175,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ReapplyingTheSameBuff_DoesNotStack()
 		{
-			var catalog = BuffStatEffects.BuildCatalog([Row(4239529, CharacterStatId.Armor, FlatKind, 1000)]).BySpellBase;
+			var catalog = BuffStatEffects.BuildCatalog([Row(4239529, CharacterStatId.Armor, FlatKind, 1000)]);
 			var entity = Player();
 
 			entity.ActiveBuffs[4239529 << 8] = new ActiveBuff(4239529 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
@@ -119,9 +191,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void SeparateBuffsOnTheSameStat_Sum()
 		{
-			var catalog = BuffStatEffects
-				.BuildCatalog([Row(4239529, CharacterStatId.Armor, FlatKind, 1000), Row(4121992, CharacterStatId.Armor, FlatKind, 2000)])
-				.BySpellBase;
+			var catalog = BuffStatEffects.BuildCatalog([
+				Row(4239529, CharacterStatId.Armor, FlatKind, 1000), Row(4121992, CharacterStatId.Armor, FlatKind, 2000)
+			]);
 			var entity = Player();
 
 			entity.ActiveBuffs[4239529 << 8] = new ActiveBuff(4239529 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
@@ -140,14 +212,14 @@ namespace Faolan.Tests
 			var entity = Player();
 			entity.ActiveBuffs[4061768 << 8] = new ActiveBuff(4061768 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 3600f); // Shield of the Risen
 
-			Assert.Empty(BuffStatEffects.Recompute(entity, new Dictionary<uint, (CharacterStatId Stat, int Amount)[]>()));
+			Assert.Empty(BuffStatEffects.Recompute(entity, BuffStatEffects.BuildCatalog([])));
 		}
 
 		// A debuff can take a stat to zero but never below it (the wire value is unsigned).
 		[Fact]
 		public void DebuffBelowZero_ClampsAtZero()
 		{
-			var catalog = BuffStatEffects.BuildCatalog([Row(999, CharacterStatId.Armor, FlatKind, -500)]).BySpellBase;
+			var catalog = BuffStatEffects.BuildCatalog([Row(999, CharacterStatId.Armor, FlatKind, -500)]);
 			var entity = Player();
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.Armor] = 100 };
 
@@ -162,7 +234,7 @@ namespace Faolan.Tests
 		public void MaxPoolBuff_RaisesThePoolAndPushesTheWholePool()
 		{
 			// Sustaining Wrath (Rank 9): stat 1 = 180000 at the ×100 vitals scale -> +1800 health.
-			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]).BySpellBase;
+			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
 			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = Class.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } });
 
@@ -178,7 +250,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void MaxPoolBuffEnding_LowersThePoolAndClampsCurrent()
 		{
-			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]).BySpellBase;
+			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
 			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = Class.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } });
 
@@ -198,7 +270,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void MaxPoolBuff_StacksOnTopOfGear()
 		{
-			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]).BySpellBase;
+			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 584 };
 			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = Class.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } },

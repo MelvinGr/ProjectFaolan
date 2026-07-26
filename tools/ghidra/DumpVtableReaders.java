@@ -40,6 +40,23 @@ public class DumpVtableReaders extends GhidraScript {
         "KnubotBaseIIR::vftable", "KnubotBaseIIR_c::vftable", "KnubotBaseIIR_t::vftable",
     };
 
+    // CLASSES=Foo,Bar overrides the batch above with a comma-separated list of BARE class names - each is expanded
+    // into the three suffix forms, since which of `Foo`, `Foo_c` and `Foo_t` the RTTI carries is not predictable.
+    String[] targets() {
+        String env = System.getenv("CLASSES");
+        if (env == null || env.isBlank()) return TARGETS;
+
+        List<String> out = new ArrayList<>();
+        for (String c : env.split(",")) {
+            String name = c.trim().replaceAll("(_[ct])?(::vftable)?$", "");
+            if (name.isEmpty()) continue;
+            for (String suffix : new String[] { "", "_c", "_t" })
+                out.add(name + suffix + "::vftable");
+        }
+
+        return out.toArray(new String[0]);
+    }
+
     Address vtableAddr(String full) {
         for (Symbol s : currentProgram.getSymbolTable().getAllSymbols(false)) {
             if (s.getName(true).equals(full)) return s.getAddress();
@@ -66,7 +83,7 @@ public class DumpVtableReaders extends GhidraScript {
         out.println();
         if (slot < 0) { out.println("could not locate slot; abort"); out.close(); return; }
 
-        for (String t : TARGETS) {
+        for (String t : targets()) {
             Address vt = vtableAddr(t);
             out.println("################## " + t + " -> " + vt);
             if (vt == null) { out.println("  <no vtable symbol>"); out.println(); continue; }

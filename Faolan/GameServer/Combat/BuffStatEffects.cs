@@ -38,9 +38,15 @@ namespace Faolan.GameServer.Combat
 	// stats" - and answers it from data.
 	public sealed class BuffStatEffects
 	{
-		// The PERCENT kind, counted separately in the load summary because it is the biggest known gap: those buffs
-		// scale a computed TOTAL (+2% Critical Rating), which needs a modifier model the server does not have yet.
+		// The PERCENT kind: the Amount is a percentage x100, so 200 is "+2%" - confirmed against the client's own elixir
+		// descriptions, whose 2%/5% tiers carry 200/500 and 10%/20% carry 1000/2000. It scales a computed TOTAL rather
+		// than adding to it, which is why it needed a model of its own (#436).
 		internal const uint PercentKind = 53067;
+
+		// A percentage's denominator: 10000 == +100%. Retail uses the same x10000 scale for the multiplier STATS it
+		// keeps a percentage in - a live read of the fatality buff shows stat 536 "Magic Damage Modifier" moving
+		// 10000 -> 12000 for a +20% effect, i.e. 10000 IS 1.00.
+		private const int PercentScale = 10000;
 
 		// The kinds whose Amount is a FLAT addition (as opposed to a percent modifier or a health effect). Classified
 		// empirically over all 1714 imported records: these carry values that read as flat in their own units against
@@ -90,8 +96,8 @@ namespace Faolan.GameServer.Combat
 		private readonly SemaphoreSlim _loadLock = new(1, 1);
 		private readonly ILogger _logger;
 
-		// spell BASE id -> its honored deltas, in DISPLAY units. Loaded once (1.7k rows) on first use.
-		private IReadOnlyDictionary<uint, (CharacterStatId Stat, int Amount)[]>? _catalog;
+		// The honored flat + percent deltas per spell BASE id. Loaded once (1.7k rows) on first use.
+		private Catalog? _catalog;
 
 		public BuffStatEffects(IDatabaseRepository database, ILogger logger)
 		{
@@ -104,7 +110,7 @@ namespace Faolan.GameServer.Combat
 		public async Task<IReadOnlyList<(CharacterStatId Stat, int Amount)>> ForSpellBase(uint spellBase)
 		{
 			var catalog = await EnsureLoaded();
-			return catalog.TryGetValue(spellBase, out var deltas)
+			return catalog.BySpellBase.TryGetValue(spellBase, out var deltas)
 				? deltas
 				: [];
 		}
@@ -122,51 +128,71 @@ namespace Faolan.GameServer.Combat
 		internal static Catalog BuildCatalog(IEnumerable<SpellStatEffect> rows)
 		{
 			var honored = new Dictionary<uint, List<(CharacterStatId Stat, int Amount)>>();
+			var percent = new Dictionary<uint, List<(CharacterStatId Stat, int Amount)>>();
 			int percentSkipped = 0, kindSkipped = 0, statSkipped = 0;
 			foreach (var row in rows)
 			{
-				if (!FlatKinds.Contains(row.EffectKind))
+				var isPercent = row.EffectKind == PercentKind;
+				if (!isPercent && !FlatKinds.Contains(row.EffectKind))
 				{
-					if (row.EffectKind == PercentKind)
-						percentSkipped++;
-					else
-						kindSkipped++;
+					kindSkipped++;
 					continue;
 				}
 
+				// The stat gate is the same for both kinds: a percentage of a stat whose scale we have not verified is
+				// no more usable than a flat amount of it.
 				if (!HonoredStats.ContainsKey(row.StatId))
 				{
-					statSkipped++;
+					if (isPercent)
+						percentSkipped++;
+					else
+						statSkipped++;
 					continue;
 				}
 
-				(honored.TryGetValue(row.SpellId, out var list)
-					? list
-					: honored[row.SpellId] = []).Add((row.StatId, row.Amount / (int)SpellScale(row.StatId)));
+				// A percentage is NOT in the stat's units - it is x100 of a percent - so it is carried raw, while a flat
+				// amount converts to display units here.
+				(isPercent
+					? percent.TryGetValue(row.SpellId, out var list)
+						? list
+						: percent[row.SpellId] = []
+					: honored.TryGetValue(row.SpellId, out list)
+						? list
+						: honored[row.SpellId] = []).Add((row.StatId, isPercent
+					? row.Amount
+					: row.Amount / (int)SpellScale(row.StatId)));
 			}
 
-			return new Catalog(honored.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()), percentSkipped, kindSkipped, statSkipped);
+			return new Catalog(honored.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()),
+				percent.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()), percentSkipped, kindSkipped, statSkipped);
 		}
 
-		// The recompute, as a pure function over an entity + a catalog: `gear + buffs` per honored stat, written to the
-		// live fields, returning only what changed. Separate from Sync so it is testable without a database.
-		internal static IReadOnlyList<(CharacterStatId Stat, uint Value)> Recompute(WorldEntity entity, IReadOnlyDictionary<uint, (CharacterStatId Stat, int Amount)[]> catalog)
+		// The recompute, as a pure function over an entity + a catalog: `(gear + flat buffs) x (1 + percent buffs)` per
+		// honored stat, written to the live fields, returning only what changed. Separate from Sync so it is testable
+		// without a database.
+		internal static IReadOnlyList<(CharacterStatId Stat, uint Value)> Recompute(WorldEntity entity, Catalog catalog)
 		{
-			// Sum the honored deltas of every live buff. The ActiveBuffs key is the WIRE id ((base << 8) | rank).
-			var totals = new Dictionary<CharacterStatId, int>();
+			// Sum each kind of delta over every live buff. The ActiveBuffs key is the WIRE id ((base << 8) | rank).
+			var flat = new Dictionary<CharacterStatId, int>();
+			var percent = new Dictionary<CharacterStatId, int>();
 			foreach (var buffId in entity.ActiveBuffs.Keys)
 			{
-				if (!catalog.TryGetValue(buffId >> 8, out var deltas))
-					continue;
-
-				foreach (var (stat, amount) in deltas)
-					totals[stat] = totals.GetValueOrDefault(stat) + amount;
+				Sum(catalog.BySpellBase, buffId >> 8, flat);
+				Sum(catalog.PercentBySpellBase, buffId >> 8, percent);
 			}
 
 			var changed = new List<(CharacterStatId Stat, uint Value)>();
 			foreach (var (stat, apply) in HonoredStats)
 			{
-				var buffed = entity.GearBonuses.GetValueOrDefault(stat) + totals.GetValueOrDefault(stat);
+				// The percentage scales the flat total, which is what "+2% Critical Rating" means - the elixir is worth
+				// more on a well-geared character. Percentages ADD to each other rather than compounding: two +2% buffs
+				// are +4%, not +4.04%. Truncated, like every other client-side percentage read (see the regen sheet's
+				// integer divide in #442) - a percentage of 0 leaves the value bit-identical either way.
+				var buffed = entity.GearBonuses.GetValueOrDefault(stat) + flat.GetValueOrDefault(stat);
+				var pct = percent.GetValueOrDefault(stat);
+				if (pct != 0)
+					buffed = (int)((long)buffed * (PercentScale + pct) / PercentScale);
+
 				var value = buffed > 0
 					? (uint)buffed
 					: 0u; // a debuff can only take a stat to 0, never negative
@@ -174,7 +200,7 @@ namespace Faolan.GameServer.Combat
 				// First sync seeds the baseline: nothing has changed if the stat is still what gear alone gives.
 				if (entity.BuffedStats.TryGetValue(stat, out var previous)
 					    ? previous == value
-					    : totals.GetValueOrDefault(stat) == 0)
+					    : flat.GetValueOrDefault(stat) == 0 && pct == 0)
 					continue;
 
 				entity.BuffedStats[stat] = value;
@@ -182,6 +208,15 @@ namespace Faolan.GameServer.Combat
 			}
 
 			return changed;
+
+			static void Sum(IReadOnlyDictionary<uint, (CharacterStatId Stat, int Amount)[]> from, uint spellBase, Dictionary<CharacterStatId, int> into)
+			{
+				if (!from.TryGetValue(spellBase, out var deltas))
+					return;
+
+				foreach (var (stat, amount) in deltas)
+					into[stat] = into.GetValueOrDefault(stat) + amount;
+			}
 		}
 
 		// The scale a FLAT spell amount is stored at. It is the stat's wire scale - the same one item modifiers use -
@@ -196,24 +231,25 @@ namespace Faolan.GameServer.Combat
 				: stat.GetScale();
 		}
 
-		private async Task<IReadOnlyDictionary<uint, (CharacterStatId Stat, int Amount)[]>> EnsureLoaded()
+		private async Task<Catalog> EnsureLoaded()
 		{
 			if (_catalog != null)
-				return _catalog;
+				return _catalog.Value;
 
 			await _loadLock.WaitAsync();
 			try
 			{
 				if (_catalog != null)
-					return _catalog;
+					return _catalog.Value;
 
 				var rows = await _database.GetSpellStatEffects();
 				var catalog = BuildCatalog(rows);
-				_catalog = catalog.BySpellBase;
+				_catalog = catalog;
 				_logger.LogInformation(
-					"BuffStatEffects: {Spells} spell(s) with applicable stat effects out of {Rows} imported records ({Percent} percent-kind, {Kind} other kinds, {Stat} unmodelled stats - see #367).",
-					_catalog.Count, rows.Length, catalog.PercentSkipped, catalog.KindSkipped, catalog.StatSkipped);
-				return _catalog;
+					"BuffStatEffects: {Spells} spell(s) with flat stat effects and {PercentSpells} with percent ones, out of {Rows} imported records " +
+					"({Percent} percent-kind on unmodelled stats, {Kind} other kinds, {Stat} unmodelled stats - see #367).",
+					catalog.BySpellBase.Count, catalog.PercentBySpellBase.Count, rows.Length, catalog.PercentSkipped, catalog.KindSkipped, catalog.StatSkipped);
+				return catalog;
 			}
 			finally
 			{
@@ -221,9 +257,11 @@ namespace Faolan.GameServer.Combat
 			}
 		}
 
-		// The honored deltas per spell base id, plus what the filter dropped and why.
+		// The honored deltas per spell base id - flat ones in DISPLAY units, percent ones raw (x100 of a percent) -
+		// plus what the filter dropped and why.
 		internal readonly record struct Catalog(
 			IReadOnlyDictionary<uint, (CharacterStatId Stat, int Amount)[]> BySpellBase,
+			IReadOnlyDictionary<uint, (CharacterStatId Stat, int Amount)[]> PercentBySpellBase,
 			int PercentSkipped,
 			int KindSkipped,
 			int StatSkipped);
