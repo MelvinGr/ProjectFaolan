@@ -17,10 +17,14 @@
 		"FreeCharSlots": 4
 	},
 
-	// Login DH keypair (docs/protocol/01-crypto.md). Unset = the built-in CellAO key, which is public and is what
-	// Faolan.ClientLauncher patches into a client by default. Set your own PRIVATE key here and the launcher derives
-	// and patches the matching PUBLIC one - the pair cannot drift. Env override: Login__PrivateKey.
-	// "Login": { "PrivateKey": "7ad852c6..." },
+	// Login DH keys (docs/protocol/01-crypto.md). Unset = the built-in CellAO key, which is public and is what
+	// Faolan.ClientLauncher patches into a client by default. Set your own PRIVATE key here and the launcher - which
+	// reads THIS file too - derives and patches the matching PUBLIC one, so the pair cannot drift.
+	// PublicKey overrides what the launcher patches IN, for the one case where it is not ours: patching a client to
+	// talk to somebody else's server, whose private key you must not need. RetailPublicKey is what it searches FOR in
+	// an unpatched exe, for a client build shipping a key other than retail's.
+	// Env overrides: Login__PrivateKey / Login__PublicKey / Login__RetailPublicKey.
+	// "Login": { "PrivateKey": "7ad852c6...", "PublicKey": "", "RetailPublicKey": "" },
 
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 

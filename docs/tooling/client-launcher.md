@@ -69,8 +69,13 @@ Faolan.ClientLauncher [options]
   --launcher-notes <url>  redirect the client's dead hardcoded launcher-notes URL to <url> (keep the two %s;
                       http:// only - the client's libcurl has no SSL). Required value; on-disk exe patch,
                       covered by the .bak
-  --patch-login       patch the DH key (Funcom -> CELLAO) on disk before launch so the server can validate the
-                      real password. Cross-platform; the exe is backed up to .bak
+  --patch-login       patch the DH key (retail's -> ours) on disk before launch so the server can validate the
+                      real password. Cross-platform; the exe is backed up to .bak. The key comes from the same
+                      faolan.json/environment the server reads (see below)
+  --Login:PrivateKey <hex>       one-off override of that key; the patched public half is derived from it
+  --Login:PublicKey <hex>        patch THIS public key in instead of our derived one - for a client that should
+                      talk to somebody else's server
+  --Login:RetailPublicKey <hex>  the key to search for in an unpatched exe (default: retail's)
   --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml from their .bak, then exit
   --console           foreground; tail AgeOfConan.log into THIS terminal (no separate wineconsole window); also
                       drops -noconsole
@@ -107,14 +112,18 @@ races the client's read of the config.
 AoC login is **Diffie-Hellman (g=5, 1024-bit prime) + TEA-CBC** (see [01-crypto.md](../protocol/01-crypto.md)).
 By default any password is accepted. To enforce the real password, the client must use **our** DH public key:
 
-- **`--patch-login`** overwrites the client's embedded Funcom DH pubkey with
-  CELLAO_PUB in the `AgeOfConan.exe` file — a plain byte swap, cross-platform (no ptrace/process memory). The exe is
+- **`--patch-login`** overwrites the client's embedded retail DH pubkey with **ours** in the `AgeOfConan.exe`
+  file — a plain byte swap, cross-platform (no ptrace/process memory). The exe is
   backed up to `.bak` first, so `--restore` puts it back. `--launcher-notes <url>` similarly redirects the client's
   dead hardcoded launcher-notes URL (keep the two `%s`; **http:// only** — the exe's statically-linked
   libcurl 7.19.7 has no SSL backend, so an https URL fails in-client with cURL error 1
   `CURLE_UNSUPPORTED_PROTOCOL`; front https content with a plain-http proxy such as `Faolan.Web.Content`).
 - Server side: `Faolan.Core.Network/LoginEncryption.cs` decrypts the block and, for a patched client, enforces
   `password == Account.Password` (else falls back to accept-any). Set a real `Account.Password` to test rejection.
+- **The launcher reads the same `faolan.json` (and the same environment) the server does**, so a deployment that
+  overrides `Login:PrivateKey` gets the matching public key patched in by derivation — there is no second setting
+  to keep in step. `Login:PublicKey` / `Login:RetailPublicKey` cover the two cases where the launcher's key is not
+  ours; see [01-crypto.md](../protocol/01-crypto.md#configuring-the-keypair).
 
 ---
 

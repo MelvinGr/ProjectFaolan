@@ -21,7 +21,13 @@ namespace Faolan.Core.Crypt
 	///     <para>
 	///         ⚠️ The default private key is the historical CellAO one. It is public - in this repo's history and in
 	///         every patched client - so it is a DEFAULT, not a secret. Override it with <c>Login:PrivateKey</c>
-	///         (env <c>Login__PrivateKey</c> / faolan.json) and re-patch your clients; the two must move together.
+	///         (env <c>Login__PrivateKey</c> / faolan.json) and re-patch your clients; the two must move together. The
+	///         launcher reads the SAME key out of the SAME config, so re-patching is all that is needed.
+	///     </para>
+	///     <para>
+	///         Three settings, one per role: <c>Login:PrivateKey</c> is the server's, <c>Login:PublicKey</c> is what the
+	///         launcher patches in (defaulting to the derived half of the private one, so it never has to be set), and
+	///         <c>Login:RetailPublicKey</c> is the key the launcher searches for in an unpatched exe.
 	///     </para>
 	/// </remarks>
 	public static class DhKeys
@@ -33,27 +39,47 @@ namespace Faolan.Core.Crypt
 
 		public static readonly BigInteger G = 5;
 
-		// The key the RETAIL exe ships with - what the launcher searches for and replaces.
-		public const string FuncomPublicHex =
+		private const string DefaultRetailPublicHex =
 			"9c32cc23d559ca90fc31be72df817d0e124769e809f936bc14360ff4bed758f260a0d596584eacbbc2b88bdd410416163e11dbf62173393fbc0c6fefb2d855f1a03dec8e9f105bbad91b3437d8eb73fe2f44159597aa4053cf788d2f9d7012fb8d7c4ce3876f7d6cd5d0c31754f4cd96166708641958de54a6def5657b9f2e92";
 
 		private const string DefaultPrivateHex = "7ad852c6494f664e8df21446285ecd6f400cf20e1d872ee96136d7744887424b";
 
+		/// <summary>The hex length the exe stores a DH public key at - a fixed 256-char ASCII field.</summary>
+		public const int PublicHexLength = 256;
+
 		private static BigInteger _private = ParseHex(DefaultPrivateHex);
+		private static string? _publicOverride;
+		private static string _retailPublic = DefaultRetailPublicHex;
 
 		/// <summary>Our DH private key. Server-side only; never patched into a client.</summary>
 		public static BigInteger ServerPrivate => _private;
 
-		/// <summary>Our DH public key (<c>g^ServerPrivate mod N</c>) - the value the launcher patches in.</summary>
+		/// <summary>Our DH public key (<c>g^ServerPrivate mod N</c>).</summary>
 		// Computed per access, NOT a `{ get; } =` initializer: static initializers run in textual order, so one placed
 		// above N/G/_private would see N = 0 and ModPow throws DivideByZeroException. That broke every login once,
 		// when a formatting pass reordered the members.
 		public static BigInteger ServerPublic => BigInteger.ModPow(G, ServerPrivate, N);
 
 		/// <summary>
-		///     <see cref="ServerPublic" /> as the 256-char lowercase ASCII hex the exe stores it in.
+		///     <see cref="ServerPublic" /> as the <see cref="PublicHexLength" />-char lowercase ASCII hex the exe stores
+		///     it in. Always the DERIVED value, so nothing on the server side can be confused by a configured
+		///     <see cref="ClientPatchPublicHex" />.
 		/// </summary>
-		public static string ServerPublicHex => ServerPublic.ToString("x").TrimStart('0').PadLeft(256, '0');
+		public static string ServerPublicHex => ToPublicHex(ServerPublic);
+
+		/// <summary>
+		///     The public key the launcher writes INTO a client exe. Normally <see cref="ServerPublicHex" /> - the client
+		///     must use our public key for the server to reproduce the shared secret - but settable on its own with
+		///     <c>Login:PublicKey</c> for the one case where they differ: patching a client to talk to somebody ELSE's
+		///     server, whose private key you do not have and must not need.
+		/// </summary>
+		public static string ClientPatchPublicHex => _publicOverride ?? ServerPublicHex;
+
+		/// <summary>
+		///     The key an unpatched client ships with - what the launcher searches for and replaces. Retail's by default;
+		///     <c>Login:RetailPublicKey</c> overrides it for a client build that ships a different one.
+		/// </summary>
+		public static string RetailPublicHex => _retailPublic;
 
 		/// <summary>Whether a private key other than the built-in default is in force.</summary>
 		public static bool IsConfigured { get; private set; }
@@ -73,6 +99,35 @@ namespace Faolan.Core.Crypt
 				return false;
 			}
 
+			_private = ParseExponent(hex, "Login:PrivateKey");
+			IsConfigured = true;
+			return true;
+		}
+
+		/// <summary>
+		///     Applies the two LAUNCHER-side public keys from config: the one to patch IN (<c>Login:PublicKey</c>, default
+		///     = our derived public key) and the one to search FOR (<c>Login:RetailPublicKey</c>, default = the key retail
+		///     ships). Null/empty restores the default for either. Returns true if <c>Login:PublicKey</c> is overriding
+		///     the derived key, so the caller can say so - a client patched with someone else's key cannot log in here.
+		/// </summary>
+		/// <exception cref="ArgumentException">Not parseable hex, or out of range - fail loudly.</exception>
+		public static bool ConfigurePublic(string? publicKeyHex, string? retailPublicKeyHex = null)
+		{
+			_retailPublic = string.IsNullOrWhiteSpace(retailPublicKeyHex)
+				? DefaultRetailPublicHex
+				: ToPublicHex(ParseExponent(retailPublicKeyHex.Trim(), "Login:RetailPublicKey"));
+
+			var hex = publicKeyHex?.Trim();
+			_publicOverride = string.IsNullOrEmpty(hex)
+				? null
+				: ToPublicHex(ParseExponent(hex, "Login:PublicKey"));
+			return _publicOverride != null;
+		}
+
+		// A DH exponent/element from hex: parseable, and strictly inside (1, N). Anything else is a typo or a truncated
+		// paste, and both fail SILENTLY at login time (accept-any fallback) if they are let through here.
+		private static BigInteger ParseExponent(string hex, string key)
+		{
 			BigInteger parsed;
 			try
 			{
@@ -80,15 +135,18 @@ namespace Faolan.Core.Crypt
 			}
 			catch (Exception e)
 			{
-				throw new ArgumentException($"Login:PrivateKey is not valid hex ({e.Message}). Leave it unset to use the built-in key.", nameof(privateKeyHex));
+				throw new ArgumentException($"{key} is not valid hex ({e.Message}). Leave it unset to use the built-in key.", nameof(hex));
 			}
 
 			if (parsed <= BigInteger.One || parsed >= N)
-				throw new ArgumentException("Login:PrivateKey must be a positive hex integer between 1 and the DH prime.", nameof(privateKeyHex));
+				throw new ArgumentException($"{key} must be a positive hex integer between 1 and the DH prime.", nameof(hex));
 
-			_private = parsed;
-			IsConfigured = true;
-			return true;
+			return parsed;
+		}
+
+		private static string ToPublicHex(BigInteger value)
+		{
+			return value.ToString("x").TrimStart('0').PadLeft(PublicHexLength, '0');
 		}
 
 		// Hex -> BigInteger, forced POSITIVE (a leading high bit would otherwise read as a negative two's-complement

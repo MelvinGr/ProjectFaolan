@@ -139,5 +139,50 @@ namespace Faolan.Tests
 				DhKeys.Configure(null); // static: restore so test order cannot matter
 			}
 		}
+
+		// The launcher patches ClientPatchPublicHex, which is the derived key UNLESS Login:PublicKey names another one -
+		// the only case being a client that should talk to somebody else's server. Setting it must not disturb
+		// ServerPublicHex, which the server side derives, or the two roles would share one mutable value.
+		[Fact]
+		public void ConfigurePublic_OverridesOnlyWhatTheLauncherPatchesIn()
+		{
+			var derived = DhKeys.ServerPublicHex;
+			try
+			{
+				Assert.False(DhKeys.ConfigurePublic(null)); // unset -> patch our own derived key
+				Assert.Equal(derived, DhKeys.ClientPatchPublicHex);
+
+				Assert.True(DhKeys.ConfigurePublic("a3f1c2"));
+				Assert.Equal(derived, DhKeys.ServerPublicHex); // the server's own key is untouched…
+				Assert.NotEqual(derived, DhKeys.ClientPatchPublicHex); // …but the exe gets the configured one
+				Assert.Equal(DhKeys.PublicHexLength, DhKeys.ClientPatchPublicHex.Length); // left-padded to the exe's field
+				Assert.Equal(DhKeys.ClientPatchPublicHex, Encoding.ASCII.GetString(ClientExePatcher.NewPublicKey));
+
+				Assert.Throws<ArgumentException>(() => DhKeys.ConfigurePublic("not-hex"));
+				Assert.Throws<ArgumentException>(() => DhKeys.ConfigurePublic(null, "not-hex"));
+			}
+			finally
+			{
+				DhKeys.ConfigurePublic(null);
+			}
+		}
+
+		// The key the launcher SEARCHES for defaults to retail's and is overridable for a client build shipping another.
+		[Fact]
+		public void RetailPublicKey_DefaultsToRetailsAndIsOverridable()
+		{
+			try
+			{
+				Assert.StartsWith("9c32cc23d559ca90", DhKeys.RetailPublicHex);
+				Assert.Equal(DhKeys.PublicHexLength, DhKeys.RetailPublicHex.Length);
+
+				DhKeys.ConfigurePublic(null, "a3f1c2");
+				Assert.EndsWith("a3f1c2", DhKeys.RetailPublicHex);
+			}
+			finally
+			{
+				DhKeys.ConfigurePublic(null);
+			}
+		}
 	}
 }

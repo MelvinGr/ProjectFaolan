@@ -31,6 +31,30 @@ ours.
 The server's public key is exactly `g^ServerPrivate mod N` for the baked-in keypair — this is the value the
 launcher patches into the client. [V3: LoginEncryptionTests.ServerPublic_IsCellaoPublicKey]
 
+## Configuring the keypair
+
+All three keys live in `Faolan.Core/Crypt/DhKeys.cs` and come from the shared config (`faolan.json` < command
+line < environment), one setting per role:
+
+| key | who reads it | default |
+|---|---|---|
+| `Login:PrivateKey` | the **server** — the only half it needs | the historical CellAO key |
+| `Login:PublicKey` | the **launcher**, as what to patch IN | `g^PrivateKey mod N`, i.e. derived |
+| `Login:RetailPublicKey` | the **launcher**, as what to search FOR | the key retail's exe ships |
+
+The launcher reads the same `faolan.json` the server does, so overriding `Login:PrivateKey` is enough — it
+patches the matching public key by derivation and the pair cannot drift.
+[V3: LoginEncryptionTests.LauncherPublicKey_IsDerivedFromTheServerPrivateKey]
+
+`Login:PublicKey` exists for the one case where the two genuinely differ: patching a client to talk to somebody
+else's server, whose private key you must not need. Setting it does not touch `ServerPublicHex`, which the server
+side derives. [V3: LoginEncryptionTests.ConfigurePublic_OverridesOnlyWhatTheLauncherPatchesIn]
+
+⚠️ The default private key is **not a secret** — it is in this repo's history and in every patched client. It is
+a default, not a credential. A malformed value throws at startup rather than falling back, because a silent
+fallback looks exactly like a working server whose every login is accept-any.
+[V3: LoginEncryptionTests.Configure_RejectsJunk_AndEmptyKeepsTheDefault]
+
 The whole exchange is validated end-to-end against a reference Python implementation and a recorded fixture.
 [V3: LoginEncryptionTests.Decrypt_MatchesKeyProducedByReferencePython]
 

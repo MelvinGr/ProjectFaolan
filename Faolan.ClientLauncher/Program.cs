@@ -5,6 +5,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading;
+using Faolan.Core.Cli;
 using Faolan.Core.Crypt;
 
 namespace Faolan.ClientLauncher
@@ -146,6 +147,7 @@ namespace Faolan.ClientLauncher
 			var restore = false;
 			string? cdnUrl = null;
 			string? launcherNotes = null;
+			var loginKeys = new Dictionary<string, string?>();
 
 			for (var i = 0; i < args.Length; i++)
 			{
@@ -270,6 +272,16 @@ namespace Faolan.ClientLauncher
 						break;
 					}
 
+					// The DH keys, named EXACTLY as they are in faolan.json and the environment (the one-name-per-setting
+					// rule - see Faolan.Core/Cli/FaolanCommandLine.cs). Passing them here is only for a one-off patch; the
+					// normal path is that the launcher reads the same faolan.json the server does, so a configured
+					// Login:PrivateKey automatically patches its own matching public key and the pair cannot drift.
+					case "--Login:PrivateKey" or "--Login:PublicKey" or "--Login:RetailPublicKey":
+					{
+						loginKeys[args[i][2..]] = args[++i];
+						break;
+					}
+
 					case "--restore":
 					{
 						restore = true;
@@ -356,6 +368,16 @@ namespace Faolan.ClientLauncher
 			// LocalConfig redirects (undo with --restore). Idempotent - a no-op if already patched.
 			if (patchLogin && !dryRun)
 			{
+				// Load the DH keys from the SAME config the server reads (faolan.json < these flags < environment), so a
+				// deployment that overrides Login:PrivateKey patches the matching public key without a second setting to
+				// keep in step. A malformed key throws here rather than producing an exe that silently cannot log in.
+				var config = FaolanCommandLine.Build(loginKeys);
+				DhKeys.Configure(config["Login:PrivateKey"]);
+				if (DhKeys.ConfigurePublic(config["Login:PublicKey"], config["Login:RetailPublicKey"]))
+					Console.WriteLine("login-key : using the configured Login:PublicKey - this client will NOT log in to a server holding a different private key");
+				else if (DhKeys.IsConfigured)
+					Console.WriteLine("login-key : deriving the public key from the configured Login:PrivateKey");
+
 				switch (ClientExePatcher.PatchPublicKey(exe, ClientExePatcher.NewPublicKey))
 				{
 					case ClientExePatcher.Result.Patched:
@@ -550,7 +572,13 @@ namespace Faolan.ClientLauncher
 			                    --console           run in the foreground and tail AgeOfConan.log into THIS terminal (same content
 			                                        as the client console, no separate wineconsole window); also drops -noconsole
 			                    --patch-login       patch the client's DH key ON DISK before launch so the
-			                                        server can validate the real password
+			                                        server can validate the real password. The key comes from the SAME
+			                                        faolan.json/environment the server reads, so overriding
+			                                        Login:PrivateKey there patches the matching public key automatically.
+			                    --Login:PrivateKey <hex>       one-off override of that key (the public half is derived)
+			                    --Login:PublicKey <hex>        patch THIS public key in instead of our derived one - for a
+			                                        client that should talk to somebody else's server
+			                    --Login:RetailPublicKey <hex>  the key to search for in an unpatched exe (default: retail's)
 			                    --debug-channels [a,b]  enable the client's OWN debug channels (it then logs what it computed:
 			                                        "GameCode.Stats - got new stats: 507=291000", ArmorMitigation's per-hit
 			                                        mitigation maths, RECEIVED IIR, ...) by writing its logger config file

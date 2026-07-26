@@ -16,19 +16,19 @@ namespace Faolan.ClientLauncher
 	{
 		// Both 256-char ASCII hex DH public keys (g^priv mod N over the 1024-bit prime).
 		//
-		// DERIVED from the shared keypair in Faolan.Core (DhKeys), not a literal. This used to be a hand-copied hex
-		// string while the private key lived in Faolan.Core.Network - two copies of one keypair, which fails silently:
-		// change the private key and every login falls back to accept-any while the patched client still carries the
-		// old public key. Deriving it means a configured Login:PrivateKey automatically patches the matching public key.
-		public static byte[] NewPublicKey => Encoding.ASCII.GetBytes(DhKeys.ServerPublicHex);
+		// DERIVED from the shared keypair in Faolan.Core (DhKeys), not a literal, and the launcher loads the same
+		// Login:* config the server does. This used to be a hand-copied hex string while the private key lived in
+		// Faolan.Core.Network - two copies of one keypair, which fails silently: change the private key and every login
+		// falls back to accept-any while the patched client still carries the old public key.
+		public static byte[] NewPublicKey => Encoding.ASCII.GetBytes(DhKeys.ClientPatchPublicHex);
 
 		// The client's hardcoded launcher-notes URL - a printf FORMAT string with two %s (UniverseName + Language),
 		// null-terminated in a fixed 73-byte region (offset 0x1C4D4C0). See memory client_launcher_notes_url.
 		private static readonly byte[] OriginalNotesUrl = "http://msgs.ageofconan.com/launchernotes2.php?UniverseName=%s&Language=%s"u8.ToArray();
 
-		// The key the RETAIL exe ships with - what we search for and replace. Also in DhKeys, so the launcher and any
-		// other consumer agree on what "unpatched" looks like.
-		private static readonly byte[] OriginalPublicKey = Encoding.ASCII.GetBytes(DhKeys.FuncomPublicHex);
+		// The key the exe ships with - what we search for and replace. In DhKeys (settable as Login:RetailPublicKey),
+		// so the launcher and any other consumer agree on what "unpatched" looks like.
+		private static byte[] OriginalPublicKey => Encoding.ASCII.GetBytes(DhKeys.RetailPublicHex);
 
 		public enum Result
 		{
@@ -71,8 +71,9 @@ namespace Faolan.ClientLauncher
 		{
 			var bytes = File.ReadAllBytes(exePath);
 
+			var original = OriginalPublicKey;
 			var replaced = 0;
-			for (var i = IndexOf(bytes, OriginalPublicKey, 0); i >= 0; i = IndexOf(bytes, OriginalPublicKey, i + OriginalPublicKey.Length))
+			for (var i = IndexOf(bytes, original, 0); i >= 0; i = IndexOf(bytes, original, i + original.Length))
 			{
 				newBytes.CopyTo(bytes, i);
 				replaced++;
