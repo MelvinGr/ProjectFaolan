@@ -451,7 +451,7 @@ namespace Faolan.GameServer.Combat
 				// #140: roll for a fatality. The chance comes from the client's own fatality groups (RDB 1010219 -
 				// a percent, tiered by level: 5% at 1, 30% at 80), and a hit sends the burst the captures show.
 				if (_fatality != null)
-					await _fatality.OnKill(killer, npcEntity.Name);
+					await _fatality.OnKill(killer, npcEntity);
 
 				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.", npcEntity.Name, targetHandle, cause,
 					WorldEntity.CorpseLingerSeconds, npcEntity.NoRespawn

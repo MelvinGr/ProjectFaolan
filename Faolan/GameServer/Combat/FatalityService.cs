@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Faolan.Core.Network;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Combat
@@ -84,9 +85,9 @@ namespace Faolan.GameServer.Combat
 
 		// A killing blow landed. Rolls the fatality chance for the killer's level and, when it hits, emits the burst on
 		// the KILLER (both Fatality buffs) plus anything that keys off it.
-		public async Task OnKill(INetworkClient killer, string victimName)
+		public async Task OnKill(INetworkClient killer, WorldEntity victim)
 		{
-			var level = killer.Session.Character?.Level ?? 1;
+			var level = killer.Session.Character.Level;
 			var chance = FatalityChancePercent(level);
 			if (Random.Shared.Next(100) >= chance)
 				return;
@@ -96,14 +97,14 @@ namespace Faolan.GameServer.Combat
 
 			if (!_hasBuff(killer, FrozenHatredBuff << 8))
 			{
-				_logger.LogInformation("Fatality on {Victim} by '{Killer}' (level {Level}, {Chance}% chance).", victimName, killer.Session.Character?.Name, level, chance);
+				_logger.LogInformation("Fatality on {Victim} by '{Killer}' (level {Level}, {Chance}% chance).", victim.Name, killer.Session.Character?.Name, level, chance);
 				return;
 			}
 
 			// The proc rides the same burst in the capture (fr1267: both Fatality ids then 3666099, one frame).
 			await _applySelfBuff(killer, FrozenHatredProc << 8);
 			await _summonTimedPet(killer, FrozenHatredPetTemplate, FrozenHatredPetDuration);
-			_logger.LogInformation("Fatality on {Victim} by '{Killer}' with Frozen Hatred up: proc applied, pet summoned for {Seconds}s.", victimName, killer.Session.Character?.Name,
+			_logger.LogInformation("Fatality on {Victim} by '{Killer}' with Frozen Hatred up: proc applied, pet summoned for {Seconds}s.", victim.Name, killer.Session.Character?.Name,
 				FrozenHatredPetDuration.TotalSeconds);
 		}
 	}
