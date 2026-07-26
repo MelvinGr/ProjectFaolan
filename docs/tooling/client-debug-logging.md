@@ -1,9 +1,52 @@
-# Client debug logging — the 2026-06-15 "dead end" was the patch pointing the wrong way
+# Client debug logging — SOLVED (the channels work; the 2026-06-15 "dead end" was the wrong knob)
 
-**Status:** REOPENED 2026-07-26. The 2026-06-15 investigation below is accurate about the gate and about
-`AgeOfConan.log` staying quiet — but its conclusion ("the verbose sites don't fire on this build") is **wrong**.
-The sites do fire; setting `DAT_029864f8 = 0` routes their output to **stderr**, which a GUI-subsystem process
-under Wine discards. The patch was pointing the wrong way. See "What the sink actually does" below.
+**Status:** SOLVED 2026-07-26, verified live. The 2026-06-15 conclusion below ("the verbose sites don't fire on
+this build") is **wrong** — they fire fine. The knob is not the log gate at all: it is the logger's **per-channel
+level threshold**. Enable it with `Faolan.ClientLauncher --debug-channels`, which configures the running client
+(`ClientDebugChannels`) and needs no exe change.
+
+Measured proof: dropping the default threshold produced **117,044 log lines in seconds**, including the
+`RECEIVED IIR: class MoveTaskIIR_c` trace this doc previously recorded as never firing.
+
+**The mechanism** (client is PE32 with no ASLR, so Ghidra addresses are runtime addresses):
+
+| address | meaning | ships as |
+|---|---|---|
+| `0x02984AC0` | default level threshold | **3** |
+| `0x02984ADC` | output mode | **2** = per-channel thresholds |
+| `0x02984AE0` | 0x80 channel names, 48 B each, NUL-padded | `CallTrace`, `AssertMode`, `PrintModule` |
+| `0x029862E0` | parallel `i32` threshold per name | 0, 0, 0 |
+
+A line is emitted when `threshold <= level`. The debug sites log at level **0–2** and ERROR is 4, so the shipped
+default of 3 is exactly what hides them — and a channel absent from the table falls back to that default. Adding a
+name with threshold 0 opens **that channel and nothing else**.
+
+⚠️ Do NOT simply drop the default to 0: `GameCode.Movement` alone logs per entity per frame (99k lines of the
+117k). Per-channel is the usable form. ⚠️ The mode-2 lookup stops at the first EMPTY name, so entries must stay
+contiguous. ⚠️ The mode is **0 early in startup** and only becomes 2 once the client applies its logging config,
+so an installer has to wait for the steady state (`ClientDebugChannels` polls for it).
+
+Output goes to `AgeOfConan.log`; `0x029864E0` is already 1, so it is flushed per line and `--console` shows it live.
+
+**What it gives us** — the client stating what it computed, e.g.
+
+```
+INFO1: GameCode.Stats - Character 134407636 got 6 stats from server
+INFO0: GameCode.Stats - Character 134407636 got new stats: 507=291000
+INFO2: GameCode.Stats - 2:134407636 stat 19 old 0 new 0
+INFO2: BassiNet.Dispatcher - Dispatcher_t 'GameInterface:134407636:0' calling 'PassBlob' from 'GameAgent:1000002:0'
+INFO2: N3.IIR - n3infoitemremote::Construct. RECEIVED IIR: class MoveTaskIIR_c
+INFO1: ClientInterface - ClientInterface_t::CMsg_StatChange()..(18 23085 old:23080)
+```
+
+The full channel list is `strings AgeOfConan.exe | grep '^GameCode/'` (~90). Note the sink prints them with a DOT
+(`GameCode.Stats`) while the table and the call sites use a SLASH (`GameCode/Stats`) — install the slash form.
+
+**A PE-subsystem GUI→CUI flip is NOT needed.** It was implemented, tried and removed: the channels stayed silent,
+because the stderr branch of the sink only runs when the logger is UNinitialised, and it never is in-world.
+
+Everything below is the original 2026-06-15 write-up, kept because its measurements are sound and only its
+conclusion was wrong.
 
 ## What we tried
 

@@ -142,6 +142,7 @@ namespace Faolan.ClientLauncher
 			var noConsole = true;
 			var streamOutput = false;
 			var patchLogin = false;
+			List<string>? debugChannels = null;
 			var restore = false;
 			string? cdnUrl = null;
 			string? launcherNotes = null;
@@ -247,6 +248,19 @@ namespace Faolan.ClientLauncher
 							return 2;
 						}
 
+						break;
+					}
+
+					// Enable the client's OWN debug channels by configuring its logger in the live process
+					// (ClientDebugChannels; docs/tooling/client-debug-logging.md). Optional comma-separated list,
+					// else a useful low-noise default set. Implies --console, since the point is to read the output.
+					case "--debug-channels":
+					{
+						debugChannels = i + 1 < args.Length && !args[i + 1].StartsWith('-')
+							? [.. args[++i].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)]
+							: [.. ClientDebugChannels.Default];
+						noConsole = false;
+						streamOutput = true;
 						break;
 					}
 
@@ -475,6 +489,12 @@ namespace Faolan.ClientLauncher
 				return 1;
 			}
 
+			// Configure the client's own logger once its PE process exists (ClientDebugChannels). Fire-and-forget: it
+			// polls for the process, writes the channel table and reports through Console, while the log tail below
+			// runs. Deliberately not awaited - the client takes ~30 s to load and the tail should start immediately.
+			if (debugChannels is { Count: > 0 })
+				_ = ClientDebugChannels.InstallAsync(debugChannels, Console.WriteLine);
+
 			// With --console, stay in the foreground and tail the log until the client exits. Otherwise launch and return
 			if (streamOutput)
 			{
@@ -526,6 +546,11 @@ namespace Faolan.ClientLauncher
 			                                        as the client console, no separate wineconsole window); also drops -noconsole
 			                    --patch-login       patch the client's DH key ON DISK before launch so the
 			                                        server can validate the real password
+			                    --debug-channels [a,b]  enable the client's OWN debug channels (it then logs what it computed:
+			                                        "GameCode.Stats - got new stats: 507=291000", ArmorMitigation's per-hit
+			                                        mitigation maths, RECEIVED IIR, ...). Configures the live client's logger;
+			                                        no exe change. Default set if no list given; implies --console. Full list:
+			                                        strings AgeOfConan.exe | grep '^GameCode/'
 			                    --proton <path>     (Linux only) Proton 'proton' script or set PROTON (default: auto-detected -
 			                                        the build Steam runs AoC with). Ignored on Windows, which runs the exe directly.
 			                    --wine <cmd>        (Linux only) use this runner instead of Proton (e.g. 'wine').
