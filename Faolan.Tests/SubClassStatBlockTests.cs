@@ -25,7 +25,7 @@ namespace Faolan.Tests
 			Assert.Equal(parsed.BlockType, fresh.BlockType);
 			Assert.True(parsed.Values.SequenceEqual(fresh.Values), "skeleton values must equal the template stat block");
 			Assert.True(parsed.Trailer.SequenceEqual(fresh.Trailer), "trailer must match");
-			Assert.NotNull(fresh.LargestAdjacentRepeatedRun); // so the caller's vitals patches fire
+			Assert.True(fresh.HasRepeatedStatTable); // so the caller's vitals patches fire (they write the +148 copy too)
 		}
 	}
 }

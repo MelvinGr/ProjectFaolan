@@ -119,14 +119,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				BlockType = ((uint)displayedCount + 1) * StatList.Frame, // StatList#1 count word = 0x46F2
 				Values = values,
 				Trailer = [0x00],
-				// Non-null so HasKnownRepeatedStatTable is true and the caller's vitals patches (which write the +148
-				// copy too) fire; the run mirrors RepeatedBlockStartIndex/Offset on SubClassPostAccessBlock.
-				LargestAdjacentRepeatedRun = new SubClassRepeatedUInt32Run
-				{
-					StartIndex = RepeatedRunStart,
-					Length = RepeatedRunLength,
-					RepeatCount = 2
-				}
+				// True so HasKnownRepeatedStatTable is, and the caller's vitals patches (which write the +148 copy too)
+				// fire. A FRESH sheet is built with the doubled region by construction, so this is a statement of fact
+				// about what was just assembled, not a detection.
+				HasRepeatedStatTable = true
 			};
 		}
 
