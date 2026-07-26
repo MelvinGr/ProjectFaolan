@@ -148,3 +148,23 @@ property table of only 9 fields. The scaling inputs those items DO carry are
 scaling (level-12 `Pictish Armbands` carry +35 health, level-40 `Canvas Pants` only +25). The per-level targets in
 [`client-tweak-table.md`](client-tweak-table.md) (`TWK_TargetPerLevelArmor` 137.225,
 `TWK_TargetPerLevelProtection` 46.0625) are the retail-authored side of the same scaling. Open work: Gitea #441.
+
+## An item identity can be INTERPOLATED or COMBINED (client-side, #441)
+
+`FUN_005d52a0` — the describe/`ToString` for an item reference — shows the client's item identity is not always a
+single template id. The struct is `[u32 templateA][u32 templateB][u32 templateC][i32 itemLevel]` and it renders as
+one of two shapes:
+
+```
+itemLevel == -1  ->  "CombinedItem Templates: (A, B, C)"
+otherwise        ->  "InterpolatedItem Level: <itemLevel> Templates: (A, B)"
+```
+
+So a procedurally-scaled item is expressed as **two bracketing reference templates plus an item level**, and the
+client interpolates between them — which is the mechanism behind template-scaled gear carrying no stat records of
+its own. `FUN_008cb620` (channel `GameCode/ItemData`) is the loader that reads and validates the item level
+(property field `0x36` = 54), rejecting a template with level 0 (*"has item level 0! Reexport in the tool, need a
+minimum of 1"*).
+
+What this does NOT yet give us: which reference templates bracket a given item, and how the interpolation weights
+the two. Until that is decoded the per-item numbers have to come from the client's own tooltips. Open work: #441.

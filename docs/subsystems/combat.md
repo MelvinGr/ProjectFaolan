@@ -498,3 +498,37 @@ A brand-new beach character is seeded its slave outfit in `CreateFlowService.See
   NOT per-archetype** (Conqueror + Guardian are both Soldiers and do
   not share a weapon). Coverage is only the classes the create dumps contain; the rest start unarmed. The Fleshy
   Club (a level-2 char) and Broken Oar (a login capture) are NOT create-flow starters and are excluded.
+
+## Armour mitigation: the client's own pipeline (decoded 2026-07-26)
+
+`FUN_0113ba00` (log channel `GameCode/ArmorMitigation`) is the client's mitigation computation, and it is the
+authority for #401. Reading it, with stat ids as `CharacterStatId`:
+
+```
+armor        = stat 0x1C0 (Armor)            + stat 0x1C6 (PvP Armor)     when the PvP flag is set
+protection   = stat 0x1C3 (Protection)       + stat 0x1CA (PvP Protection) likewise, for the magical branch
+attrBonus    = (stat 0x324 (Strength) - 10) * 0.1        physical branch
+             = (stat 0x328 (Intelligence) - 10) * 0.1    magical branch (0x32A Wisdom for damage types 6/7)
+totalArmor   = (percentBonus * 0.01 + 1.0) * armor + attrBonus * TWK_ArmorAbilityModifier
+adjusted     = (2.0 - level / stat 0x3C5) * totalArmor          level = stat 0x36
+mitigationMod= (adjusted / (level * TWK_TargetPerLevelArmor)) * 100
+roll         = 100.0 - mitigationMod
+```
+
+`roll` then indexes a **mitigation table** (`FUN_0145f050(table, 1, armorType, roll)`) which returns a
+`(MinMitigation, MaxMitigation)` pair, and the final percentage interpolates between them:
+`final = (max - min) * roll * 0.01 + min` (with a sign-flipped branch when `min < 0`). If the table has no entry
+the client falls back to a closed form: `final = a / (base + a)` when `a >= base`, else `(a / base) * 0.5`, where
+`base = level * TWK_TargetPerLevelArmor`.
+
+Key consequences for our implementation:
+
+- Mitigation is **level-normalised**: the same armour rating mitigates less as the character levels, because the
+  denominator is `level * 137.225` (`TWK_TargetPerLevelArmor`, see [`../rdb/client-tweak-table.md`](../rdb/client-tweak-table.md)).
+- **Strength adds armour** (Intelligence adds protection), scaled by `TWK_ArmorAbilityModifier` = 2.0 — attributes
+  above the baseline 10, at 0.1 per point.
+- The physical branch covers damage types 1/2/3/8; types 4/5/10 and 6/7 take the magical branch with
+  `TWK_TargetPerLevelProtection` = 46.0625 and their own per-type stats (0x39E/0x39F/0x9D, 0x3A0/0x3A1).
+- The `(2.0 - level/stat 0x3C5)` term is an apprentice/mentor adjustment - it is 1.0 when `stat 0x3C5 == level`.
+
+The mitigation TABLE itself (its per-armour-type min/max rows) is not decoded; open work tracked in Gitea #401.
