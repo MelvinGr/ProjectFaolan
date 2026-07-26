@@ -11,8 +11,11 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpConstruct extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/construct.txt");
+        PrintWriter out = new PrintWriter(OUT + "construct.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         String needle = "ReadSubClass for IIR";
         Set<Function> seen = new LinkedHashSet<>();
@@ -37,6 +40,6 @@ public class DumpConstruct extends GhidraScript {
             out.println(res != null && res.decompileCompleted() ? res.getDecompiledFunction().getC() : "<fail>");
         }
         out.close();
-        println("done -> Captures/ghidra/output/construct.txt");
+        println("done -> " + OUT + "construct.txt");
     }
 }

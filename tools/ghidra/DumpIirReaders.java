@@ -9,6 +9,9 @@ import ghidra.program.model.symbol.ReferenceManager;
 import java.io.PrintWriter;
 import java.util.*;
 public class DumpIirReaders extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final String[] ANCHORS = {
         "simpledynelfullupdateiir.cpp", "lootbagfullupdateiir.cpp",
         "KnubotAnswerListIIR_c::ReadSubClass", "KnubotBaseIIR_c::ReadSubClass",
@@ -18,7 +21,7 @@ public class DumpIirReaders extends GhidraScript {
         return currentProgram.getMemory().findBytes(currentProgram.getMinAddress(), s.getBytes("US-ASCII"), null, true, monitor);
     }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/iir_readers.txt");
+        PrintWriter out = new PrintWriter(OUT + "iir_readers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         ReferenceManager rm = currentProgram.getReferenceManager();
         Set<Long> dumped = new HashSet<>();
@@ -37,6 +40,6 @@ public class DumpIirReaders extends GhidraScript {
                 if (++g>3) break;
             }
         }
-        out.close(); println("done -> Captures/ghidra/output/iir_readers.txt");
+        out.close(); println("done -> " + OUT + "iir_readers.txt");
     }
 }

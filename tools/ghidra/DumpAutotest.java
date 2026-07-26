@@ -9,13 +9,16 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpAutotest extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     String readStr(Address a, int max) {
         StringBuilder sb = new StringBuilder();
         try { for (int i=0;i<max;i++){int b=getByte(a.add(i))&0xFF; if(b==0)break; sb.append(b>=0x20&&b<0x7F?(char)b:'.');} } catch(Exception e){}
         return sb.toString();
     }
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/autotest.txt");
+        PrintWriter out = new PrintWriter(OUT + "autotest.txt");
         Memory mem = currentProgram.getMemory();
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
@@ -53,6 +56,6 @@ public class DumpAutotest extends GhidraScript {
             }
         }
         out.close();
-        println("done -> Captures/ghidra/output/autotest.txt");
+        println("done -> " + OUT + "autotest.txt");
     }
 }

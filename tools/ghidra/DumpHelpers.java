@@ -4,9 +4,12 @@ import ghidra.app.decompiler.*;
 import ghidra.program.model.listing.Function;
 import java.io.PrintWriter;
 public class DumpHelpers extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long[] ADDRS = { 0x0080c620L, 0x00cbfb80L, 0x00870500L, 0x00cbf5d0L };
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/helpers.txt");
+        PrintWriter out = new PrintWriter(OUT + "helpers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long a : ADDRS) {
             Function f = getFunctionContaining(toAddr(a));
@@ -16,6 +19,6 @@ public class DumpHelpers extends GhidraScript {
                 out.println(r!=null&&r.decompileCompleted()?r.getDecompiledFunction().getC():"  <fail>"); } catch(Exception e){ out.println(e); }
             out.println();
         }
-        out.close(); println("done -> Captures/ghidra/output/helpers.txt");
+        out.close(); println("done -> " + OUT + "helpers.txt");
     }
 }

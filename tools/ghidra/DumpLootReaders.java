@@ -4,8 +4,8 @@
 // The ReadSubClass slot index is the slot in the KNOWN SimpleCharFullUpdateIIR_t vtable whose pointer == its
 // reader (FUN_01121c00); read that slot in each target vtable. Decompile each reader + its direct callees.
 // Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpLootReaders.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpLootReaders.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
@@ -15,6 +15,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpLootReaders extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long KNOWN_READER = 0x01121c00L;
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
     static final String[] TARGETS = {
@@ -44,7 +47,7 @@ public class DumpLootReaders extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/loot_readers.txt");
+        PrintWriter out = new PrintWriter(OUT + "loot_readers.txt");
         di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address knownVt = symbolAddr(KNOWN_VTABLE);
@@ -75,6 +78,6 @@ public class DumpLootReaders extends GhidraScript {
             }
         }
         out.close();
-        println("DumpLootReaders done -> Captures/ghidra/output/loot_readers.txt");
+        println("DumpLootReaders done -> " + OUT + "loot_readers.txt");
     }
 }

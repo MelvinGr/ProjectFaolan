@@ -1,6 +1,6 @@
 // Decompiles a fixed list of functions by entry address (hex, comma-separated in FNS env var).
-//   FNS=005230b0,00515420 /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc \
-//     -process AgeOfConan.exe -noanalysis -scriptPath Captures/ghidra -postScript DecompileFns.java
+//   FNS=005230b0,00515420 /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc \
+//     -process AgeOfConan.exe -noanalysis -scriptPath tools/ghidra -postScript DecompileFns.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;

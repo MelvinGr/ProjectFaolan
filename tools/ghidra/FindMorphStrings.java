@@ -1,8 +1,8 @@
 // Locate the body-morph / cluster-deform code: search a batch of needle strings (CLUS/DPPM chunk tags,
 // CHARACTERCREATOR MorphNode XML attrs, CLUS cluster names) and report each string's address + the
 // functions that reference it. One project load for the whole batch.
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe \
-//     -noanalysis -scriptPath Captures/ghidra -postScript FindMorphStrings.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe \
+//     -noanalysis -scriptPath tools/ghidra -postScript FindMorphStrings.java
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Function;

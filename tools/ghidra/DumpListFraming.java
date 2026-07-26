@@ -3,10 +3,10 @@
 // GameActionListIIR frames carry head=0x7E2, which is equally consistent with "a constant" and "a 1-element count
 // with variable-length tails". The client's own reader is the oracle: it either divides by 0x3F1 or compares.
 //
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpListFraming.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpListFraming.java
 //
-// Output: Captures/ghidra/output/list_framing.txt
+// Output: $FAOLAN_GHIDRA_OUT/list_framing.txt
 //   PART A — every function whose CODE references the scalar 1009 (0x3F1), with the decompiled body. These are the
 //            list readers/writers; what they do with it (== compare, / divide, * multiply) is the answer.
 //   PART B — the GameActionList reader, found by anchoring on its type-name strings, decompiled in full.
@@ -21,6 +21,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpListFraming extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long UNIT = 0x3F1L;   // 1009 - the framing unit
     static final long ONE_ELEM = 0x7E2L; // 2018 - a 1-element list; the value that keeps passing for a constant
 
@@ -41,7 +44,7 @@ public class DumpListFraming extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/list_framing.txt");
+        PrintWriter out = new PrintWriter(OUT + "list_framing.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -92,6 +95,6 @@ public class DumpListFraming extends GhidraScript {
         }
 
         out.close();
-        println("wrote Captures/ghidra/output/list_framing.txt");
+        println("wrote " + OUT + "list_framing.txt");
     }
 }

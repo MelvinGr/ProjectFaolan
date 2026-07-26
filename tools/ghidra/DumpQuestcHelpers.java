@@ -7,9 +7,12 @@ import ghidra.program.model.listing.*;
 import java.io.PrintWriter;
 
 public class DumpQuestcHelpers extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long[] FNS = { 0x00cc0540L, 0x0048f840L, 0x0091ff80L };
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/questc_helpers.txt");
+        PrintWriter out = new PrintWriter(OUT + "questc_helpers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long a : FNS) {
             Function f = getFunctionContaining(toAddr(a));
@@ -25,6 +28,6 @@ public class DumpQuestcHelpers extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpQuestcHelpers done -> Captures/ghidra/output/questc_helpers.txt");
+        println("DumpQuestcHelpers done -> " + OUT + "questc_helpers.txt");
     }
 }

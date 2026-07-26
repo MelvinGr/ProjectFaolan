@@ -1,7 +1,7 @@
 // Recover SetNameIIR_t::ReadSubClass (the in-world n3 IIR name reader) via the vtable slot-8 xref (#363).
 // Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpSetNameReader.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpSetNameReader.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
@@ -10,6 +10,9 @@ import ghidra.program.model.symbol.*;
 import java.io.PrintWriter;
 
 public class DumpSetNameReader extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long KNOWN_READER = 0x01121c00L;            // SimpleCharFullUpdateIIR_t::ReadSubClass
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
     static final String[] TARGETS = {
@@ -29,7 +32,7 @@ public class DumpSetNameReader extends GhidraScript {
         return -1;
     }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/setname_reader.txt");
+        PrintWriter out = new PrintWriter(OUT + "setname_reader.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         Address knownVt = vtableAddr(KNOWN_VTABLE);
         int slot = knownVt == null ? -1 : findSlot(knownVt, KNOWN_READER);
@@ -50,6 +53,6 @@ public class DumpSetNameReader extends GhidraScript {
             out.println();
         }
         out.close();
-        println("done -> Captures/ghidra/output/setname_reader.txt");
+        println("done -> " + OUT + "setname_reader.txt");
     }
 }

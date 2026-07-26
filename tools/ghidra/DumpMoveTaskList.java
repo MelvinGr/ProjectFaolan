@@ -2,10 +2,13 @@ import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.listing.Function;
 public class DumpMoveTaskList extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     // ListMoveTask reader + its header helper; PathMoveTask ctor; the mode 5/6/7 object readers (#53).
     static final long[] FNS = { 0x00a3fcd0L, 0x00a48820L, 0x00a479f0L, 0x00a461d0L, 0x00a46340L, 0x00a46440L };
     @Override public void run() throws Exception {
-        java.io.PrintWriter out = new java.io.PrintWriter("Captures/ghidra/output/movetask_list.txt");
+        java.io.PrintWriter out = new java.io.PrintWriter(OUT + "movetask_list.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long p : FNS) {
             Function f = getFunctionContaining(toAddr(p));

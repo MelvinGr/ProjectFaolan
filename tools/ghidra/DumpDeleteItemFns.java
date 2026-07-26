@@ -1,12 +1,10 @@
 // Follow-up to DumpDeleteItemIir.java: decompiles the two IIR constructors that PART A's string xrefs pointed at,
 // which is what actually settles which protobuf message DeleteItemIIR_t carries.
 //
-//   ln -sfn "$PWD/Captures/ghidra/output" /tmp/aoc_gh          # Ghidra rejects the repo path's '#'
-//   mkdir -p /tmp/aoc_ghscripts && cp Captures/ghidra/*.java /tmp/aoc_ghscripts/
-//   /opt/ghidra/support/analyzeHeadless /tmp/aoc_gh aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath /tmp/aoc_ghscripts -postScript DumpDeleteItemFns.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpDeleteItemFns.java
 //
-// Output: Captures/ghidra/output/delete_item_fns.txt. The answer:
+// Output: $FAOLAN_GHIDRA_OUT/delete_item_fns.txt. The answer:
 //   FUN_008d62f0 "DeleteItemIIR_t"        -> unaff_ESI[7] = ProtoDeleteItemIIR::vftable,        3 fields
 //   FUN_008d6090 "MoveInventoryItemIIR_t" -> unaff_ESI[7] = ProtoMoveInventoryItemIIR::vftable, 4 fields
 // so the drop carries ProtoDeleteItemIIR - see Faolan.Core.Network/Codecs/Inventory/InventoryDeleteCodec.cs.
@@ -18,6 +16,9 @@ import ghidra.program.model.symbol.Reference;
 import java.io.PrintWriter;
 
 public class DumpDeleteItemFns extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final String[] FNS = { "008d62f0", "008d6090", "004e4c20" };
     static final String[] DESC = { "0220f80c", "0220f7e4" }; // ProtoDeleteItemIIR / ProtoMoveInventoryItemIIR
 

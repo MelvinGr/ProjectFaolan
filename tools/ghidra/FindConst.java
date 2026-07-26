@@ -1,7 +1,7 @@
 // Scans all instructions for a scalar immediate operand (CONST env, hex) and reports the containing
 // functions. Used to locate the TEA cipher by its delta 0x9E3779B9 (or the decrypt sum 0xC6EF3720).
-//   CONST=9e3779b9 /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc \
-//     -process AgeOfConan.exe -noanalysis -scriptPath Captures/ghidra -postScript FindConst.java
+//   CONST=9e3779b9 /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc \
+//     -process AgeOfConan.exe -noanalysis -scriptPath tools/ghidra -postScript FindConst.java
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.*;

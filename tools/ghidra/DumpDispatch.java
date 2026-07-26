@@ -9,6 +9,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpDispatch extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     Address findNext(Address start, byte[] needle) throws Exception {
         return currentProgram.getMemory().findBytes(start, needle, null, true, monitor);
     }
@@ -30,7 +33,7 @@ public class DumpDispatch extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/dispatch.txt");
+        PrintWriter out = new PrintWriter(OUT + "dispatch.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -65,6 +68,6 @@ public class DumpDispatch extends GhidraScript {
         }
         out.flush();
         out.close();
-        println("WROTE Captures/ghidra/output/dispatch.txt (" + dumped.size() + " dispatchers)");
+        println("WROTE " + OUT + "dispatch.txt (" + dumped.size() + " dispatchers)");
     }
 }

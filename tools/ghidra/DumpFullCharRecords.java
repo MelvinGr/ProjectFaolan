@@ -3,8 +3,8 @@
 // the 112-byte record list (FUN_00922c90), the StatList_t entry (FUN_0139d210), the FUN_0077d220/d5b0
 // list records (FUN_0077db70), and the length-prefixed string/blob reader (FUN_00cbfb80). #91 / .bin removal.
 // Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpFullCharRecords.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpFullCharRecords.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
@@ -13,6 +13,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpFullCharRecords extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long[] FNS = {
         0x0091cf10L, 0x0091df50L, // first 0x3F1 object list (0x120-byte objects)
         0x00922c90L,              // FUN_00798c70's 112-byte record reader
@@ -23,7 +26,7 @@ public class DumpFullCharRecords extends GhidraScript {
     };
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/fullchar_records.txt");
+        PrintWriter out = new PrintWriter(OUT + "fullchar_records.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long a : FNS) {
             Function f = getFunctionContaining(toAddr(a));
@@ -39,6 +42,6 @@ public class DumpFullCharRecords extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpFullCharRecords done -> Captures/ghidra/output/fullchar_records.txt");
+        println("DumpFullCharRecords done -> " + OUT + "fullchar_records.txt");
     }
 }

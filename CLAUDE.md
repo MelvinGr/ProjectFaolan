@@ -305,8 +305,12 @@ that ground-snap and line-of-sight are DISABLED and carries on, so check that li
   - **Runtime code / config:** take the location from a CLI flag or env var, falling back to a clear error —
     the client RDB dir is the `RdbDir` key (`--RdbDir` / `RdbDir` env / faolan.json), blank in `Faolan.Web`'s
     committed `appsettings.json` and set in the gitignored `appsettings.Development.json` or the env.
-  - **RE / tool scripts:** write outputs under a repo-relative dir (Ghidra → `Captures/ghidra/output/`) or the
-    system temp dir (`tempfile.gettempdir()`, `Path.GetTempPath()`) — never a hardcoded scratchpad path.
+  - **RE / tool scripts:** write outputs to an env-var dir falling back to the system temp dir, never a
+    hardcoded scratchpad path and never a repo dir. Every `tools/ghidra/*.java` script resolves
+    `static final String OUT = getenv("FAOLAN_GHIDRA_OUT", java.io.tmpdir) + "/"` and writes `OUT + "<name>.txt"`
+    — copy that line into a new script. (The old `Captures/ghidra/output/` is gone: `Captures/` belongs to the
+    private data repo, so it does not exist in a fresh clone.) Python/C# equivalents:
+    `tempfile.gettempdir()`, `Path.GetTempPath()`.
   - **Docs / prose:** use a placeholder — `<data-repo>/Captures`, `<rdb-dir>`, `$PWD/faolan.db`. Concrete local
     paths belong in agent memory only (under `~/.claude`), not the repo. See the `no_local_paths_in_repo` memory.
   - `run.sh` is the one deliberate exception (personal dev launcher, kept local); its Windows twin `run.bat`

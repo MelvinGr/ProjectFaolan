@@ -4,8 +4,8 @@
 //      (FUN_01121c00) -> that's the ReadSubClass vtable slot index (same for every IIR subclass).
 //   2. For each target <Class>::vftable, read that same slot -> the class's ReadSubClass -> decompile.
 // Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpVtableReaders.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpVtableReaders.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
@@ -15,6 +15,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpVtableReaders extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long KNOWN_READER = 0x01121c00L;            // SimpleCharFullUpdateIIR_t::ReadSubClass (FUN_01121c00)
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
     // #251 batch: the remaining backlog gameplay IIRs (all suffix forms - vtableAddr returns null for the wrong ones).
@@ -53,7 +56,7 @@ public class DumpVtableReaders extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/vtable_readers.txt");
+        PrintWriter out = new PrintWriter(OUT + "vtable_readers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address knownVt = vtableAddr(KNOWN_VTABLE);
@@ -79,6 +82,6 @@ public class DumpVtableReaders extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpVtableReaders done -> Captures/ghidra/output/vtable_readers.txt");
+        println("DumpVtableReaders done -> " + OUT + "vtable_readers.txt");
     }
 }

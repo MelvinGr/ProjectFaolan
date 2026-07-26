@@ -5,8 +5,8 @@
 //   2. enumerate every <Class>FullUpdateIIR*::vftable / *Character*::vftable symbol,
 //   3. for the FullCharacter one, read slot[8] -> its ReadSubClass -> decompile (and list its callees).
 // Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpFullCharReader.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpFullCharReader.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
@@ -16,6 +16,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpFullCharReader extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long KNOWN_READER = 0x01121c00L;            // SimpleCharFullUpdateIIR_t::ReadSubClass
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
 
@@ -43,7 +46,7 @@ public class DumpFullCharReader extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/fullchar_reader.txt");
+        PrintWriter out = new PrintWriter(OUT + "fullchar_reader.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address knownVt = vtableAddr(KNOWN_VTABLE);
@@ -94,6 +97,6 @@ public class DumpFullCharReader extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpFullCharReader done -> Captures/ghidra/output/fullchar_reader.txt");
+        println("DumpFullCharReader done -> " + OUT + "fullchar_reader.txt");
     }
 }

@@ -7,9 +7,12 @@ import ghidra.program.model.listing.Function;
 import java.io.PrintWriter;
 
 public class DumpSetNameVtable extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long VT = 0x01fca6a0L;
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/setname_vtable.txt");
+        PrintWriter out = new PrintWriter(OUT + "setname_vtable.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         Address vt = toAddr(VT);
         for (int i = 0; i < 24; i++) {
@@ -23,6 +26,6 @@ public class DumpSetNameVtable extends GhidraScript {
             out.println(res != null && res.decompileCompleted() ? res.getDecompiledFunction().getC() : "<fail>");
         }
         out.close();
-        println("done -> Captures/ghidra/output/setname_vtable.txt");
+        println("done -> " + OUT + "setname_vtable.txt");
     }
 }

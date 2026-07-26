@@ -8,6 +8,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpGameActionTypes extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     long TABLE = 0x025077c8L;   // descriptor table base
     long STATKEYS = 0x025073c0L; // byte-index -> real stat key
     int STRIDE = 0x41;
@@ -17,7 +20,7 @@ public class DumpGameActionTypes extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/gameaction_types.txt");
+        PrintWriter out = new PrintWriter(OUT + "gameaction_types.txt");
         // stat-key table: byte index -> real key (0..255)
         int[] keyTable = new int[256];
         for (int i = 0; i < 256; i++) keyTable[i] = u32(STATKEYS + i * 4L);
@@ -41,6 +44,6 @@ public class DumpGameActionTypes extends GhidraScript {
             out.println(String.format("type=0x%04x (idx %3d) keys=[ %s]%s", t, t - FIRST, sb.toString(), flag));
         }
         out.flush(); out.close();
-        println("WROTE Captures/ghidra/output/gameaction_types.txt");
+        println("WROTE " + OUT + "gameaction_types.txt");
     }
 }

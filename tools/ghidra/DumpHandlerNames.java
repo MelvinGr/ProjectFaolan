@@ -1,4 +1,4 @@
-// For each handler function address in Captures/ghidra/output/handler_addrs.txt, scan its instructions for
+// For each handler function address in $FAOLAN_GHIDRA_OUT/handler_addrs.txt, scan its instructions for
 // data pointers into string memory and print the "<Class>Dispatch_t::<Method>" name string it references.
 // Output: one "FUN_xxxxxxxx <tab> <best name string>" line per handler -> resolves s2c case -> method name.
 import ghidra.app.script.GhidraScript;
@@ -9,6 +9,9 @@ import java.io.*;
 import java.util.*;
 
 public class DumpHandlerNames extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     String readStr(Address a, int max) {
         StringBuilder sb = new StringBuilder();
         try { for (int i = 0; i < max; i++) { int b = getByte(a.add(i)) & 0xFF; if (b == 0) break;
@@ -21,14 +24,14 @@ public class DumpHandlerNames extends GhidraScript {
     @Override
     public void run() throws Exception {
         List<Long> addrs = new ArrayList<>();
-        BufferedReader br = new BufferedReader(new FileReader("Captures/ghidra/output/handler_addrs.txt"));
+        BufferedReader br = new BufferedReader(new FileReader(OUT + "handler_addrs.txt"));
         String ln;
         while ((ln = br.readLine()) != null) {
             ln = ln.trim().replace("L,", "").replace(",", "").replace("L", "");
             if (ln.startsWith("0x")) addrs.add(Long.parseLong(ln.substring(2), 16));
         }
         br.close();
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/handler_names.txt");
+        PrintWriter out = new PrintWriter(OUT + "handler_names.txt");
         Listing lst = currentProgram.getListing();
         for (long off : addrs) {
             Function f = getFunctionAt(toAddr(off));
@@ -64,6 +67,6 @@ public class DumpHandlerNames extends GhidraScript {
             out.println(String.format("FUN_%08x\t%s", off, best));
         }
         out.flush(); out.close();
-        println("WROTE Captures/ghidra/output/handler_names.txt (" + addrs.size() + " handlers)");
+        println("WROTE " + OUT + "handler_names.txt (" + addrs.size() + " handlers)");
     }
 }

@@ -7,12 +7,15 @@ import ghidra.program.model.symbol.ReferenceManager;
 import java.io.PrintWriter;
 import java.util.*;
 public class DumpMoveTask extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final String[] ANCHORS = { "iir\\movetaskiir.cpp", "MoveTaskIIR_c::Activate[%d:%u], moving to position", "MoveTaskIIR_c::PollStatus" };
     Address findStr(String s) throws Exception {
         return currentProgram.getMemory().findBytes(currentProgram.getMinAddress(), s.getBytes("US-ASCII"), null, true, monitor);
     }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/movetask.txt");
+        PrintWriter out = new PrintWriter(OUT + "movetask.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         ReferenceManager rm = currentProgram.getReferenceManager();
         Set<Long> dumped = new HashSet<>();

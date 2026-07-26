@@ -1,8 +1,8 @@
 // The spell-cast validation: CoreMagicHolder::CastMagicSpell + the YouCanNotUseYet / FeatLevelRequirement /
 // CanNotUse checks. Decompile the functions that reference these strings/symbols to see the requirement check and
 // which PLAYER level field/stat the spell's required level is compared against.
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpCastMagic.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpCastMagic.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.*;
@@ -12,11 +12,14 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpCastMagic extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final String[] STR = {"YouCanNotUseYet", "YouCanNotUse", "FeatLevelRequirement", "CanNotUse",
         "CoreMagicHolder::CastMagicSpell", "CastMagicSpell"};
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/cast_magic.txt");
+        PrintWriter out = new PrintWriter(OUT + "cast_magic.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -61,7 +64,7 @@ public class DumpCastMagic extends GhidraScript {
             dump(di, out, f);
         }
         out.close();
-        println("wrote Captures/ghidra/output/cast_magic.txt");
+        println("wrote " + OUT + "cast_magic.txt");
     }
 
     void dump(DecompInterface di, PrintWriter out, Function f) {

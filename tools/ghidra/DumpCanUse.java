@@ -2,8 +2,8 @@
 // from a field that is NOT stat 0x36. Find the "CanUse" / requirement-check functions and decompile them (+ the
 // functions that read the GameAction MinLevel param via the known param-reader FUN_0089bd80) to see which player
 // field/stat the level requirement is compared against.
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpCanUse.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpCanUse.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.*;
@@ -13,12 +13,15 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpCanUse extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final String[] NEEDLES = {"CanUse", "can not use", "cannot use", "not high enough level", "level required",
         "RequiredLevel", "MinLevel", "Requirement not met", "IndexMinLevel", "not_high_enough"};
     static final long PARAM_READER = 0x0089bd80L; // GameAction param getter (from #271 recast RE)
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/can_use.txt");
+        PrintWriter out = new PrintWriter(OUT + "can_use.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -66,6 +69,6 @@ public class DumpCanUse extends GhidraScript {
             }
         }
         out.close();
-        println("wrote Captures/ghidra/output/can_use.txt");
+        println("wrote " + OUT + "can_use.txt");
     }
 }

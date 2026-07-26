@@ -6,12 +6,15 @@ import ghidra.program.model.listing.Function;
 import java.io.PrintWriter;
 
 public class DecompAddrs extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     @Override
     public void run() throws Exception {
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/decomp_addrs.txt");
+        PrintWriter out = new PrintWriter(OUT + "decomp_addrs.txt");
         for (String s : System.getenv("ADDRS").split(",")) {
             long off = Long.parseLong(s.trim(), 16);
             Function f = getFunctionAt(toAddr(off));
@@ -24,6 +27,6 @@ public class DecompAddrs extends GhidraScript {
             out.println();
         }
         out.flush(); out.close();
-        println("WROTE Captures/ghidra/output/decomp_addrs.txt");
+        println("WROTE " + OUT + "decomp_addrs.txt");
     }
 }

@@ -3,8 +3,8 @@
 //   the Activate method whose format string is "MagicBuffIIR_c::Activate, UpdateBuff with parameters: BuffTemplate "
 //     - it names the decoded fields (BuffTemplate, duration, magnitude, ...).
 // Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpMagicBuffReader.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpMagicBuffReader.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
@@ -14,6 +14,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpMagicBuffReader extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long KNOWN_READER = 0x01121c00L;
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
 
@@ -55,7 +58,7 @@ public class DumpMagicBuffReader extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/magicbuff_reader.txt");
+        PrintWriter out = new PrintWriter(OUT + "magicbuff_reader.txt");
         di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address knownVt = symbolAddr(KNOWN_VTABLE);
@@ -88,6 +91,6 @@ public class DumpMagicBuffReader extends GhidraScript {
             } else out.println("  (no function references the string)");
         }
         out.close();
-        println("DumpMagicBuffReader done -> Captures/ghidra/output/magicbuff_reader.txt");
+        println("DumpMagicBuffReader done -> " + OUT + "magicbuff_reader.txt");
     }
 }

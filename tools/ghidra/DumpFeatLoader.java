@@ -6,12 +6,15 @@ import ghidra.program.model.symbol.*;
 import java.io.PrintWriter;
 import java.util.*;
 public class DumpFeatLoader extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     // Find the feat-table loader/decrypt: FeatClassTable_c::LoadStaticData + any func referencing the feat error
     // strings, decompile them (+ callees) to expose the RDB read + the TEA/decrypt key.
     static final String[] STR = {"FeatClassTable_c::LoadStaticData","No RDB FeatClass data found for FeatID",
         "GDB and RDB data for feat","FeatPointsTable_c","pcFeat->GetCategory","LoadStaticData"};
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/feat_loader.txt");
+        PrintWriter out = new PrintWriter(OUT + "feat_loader.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         Set<Address> addrs = new HashSet<>();
         DataIterator data = currentProgram.getListing().getDefinedData(true);

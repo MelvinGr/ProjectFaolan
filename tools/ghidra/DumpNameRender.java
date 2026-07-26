@@ -9,12 +9,15 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpNameRender extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final String[] NEEDLES = {
         "GetDisplayName doesnt have a valid name for hash",
         "could not create OverheadText_c",
     };
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/name_render.txt");
+        PrintWriter out = new PrintWriter(OUT + "name_render.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         Set<Function> seen = new LinkedHashSet<>();
         DataIterator it = currentProgram.getListing().getDefinedData(true);
@@ -39,6 +42,6 @@ public class DumpNameRender extends GhidraScript {
             out.println(res != null && res.decompileCompleted() ? res.getDecompiledFunction().getC() : "<fail>");
         }
         out.close();
-        println("done -> Captures/ghidra/output/name_render.txt");
+        println("done -> " + OUT + "name_render.txt");
     }
 }

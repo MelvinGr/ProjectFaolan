@@ -9,6 +9,9 @@ import ghidra.program.model.symbol.*;
 import java.io.PrintWriter;
 
 public class DumpV1IirReaders extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long KNOWN_READER = 0x01121c00L;            // SimpleCharFullUpdateIIR_t::ReadSubClass
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
     static final String[] TARGETS = {
@@ -39,7 +42,7 @@ public class DumpV1IirReaders extends GhidraScript {
         return -1;
     }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/v1_readers.txt");
+        PrintWriter out = new PrintWriter(OUT + "v1_readers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         Address knownVt = vtableAddr(KNOWN_VTABLE);
         int slot = knownVt == null ? -1 : findSlot(knownVt, KNOWN_READER);
@@ -60,6 +63,6 @@ public class DumpV1IirReaders extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpV1IirReaders done -> Captures/ghidra/output/v1_readers.txt");
+        println("DumpV1IirReaders done -> " + OUT + "v1_readers.txt");
     }
 }

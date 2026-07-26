@@ -14,10 +14,10 @@
 // container. InventoryMoveCodec asserts "despite the name it carries the same ProtoMoveInventoryItemIIR body" -
 // an unverified claim that the client's own schema argues against.
 //
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpDeleteItemIir.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpDeleteItemIir.java
 //
-// Output: Captures/ghidra/output/delete_item_iir.txt
+// Output: $FAOLAN_GHIDRA_OUT/delete_item_iir.txt
 //   PART A - every occurrence of the type-name strings ("DeleteItemIIR_t", "ProtoDeleteItemIIR",
 //            "ProtoMoveInventoryItemIIR", "MoveInventoryItemIIR_t") and the functions referencing them.
 //   PART B - every function whose code references the IIR opcode constant 0x72491DE9, decompiled.
@@ -35,6 +35,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpDeleteItemIir extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long DELETE_OPCODE = 0x72491DE9L;
     static final long MOVE_OPCODE = 0x2A8A1B49L;
 

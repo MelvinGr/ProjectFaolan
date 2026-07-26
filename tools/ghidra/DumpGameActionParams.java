@@ -2,8 +2,8 @@
 // function, so we can find the GameAction_MinLevel usability check (reads MinLevel, compares to a player level).
 // Also decompile the small functions that read a param AND reference a "level"/"Level"/requirement so we can see
 // which player field the requirement is compared against.
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpGameActionParams.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpGameActionParams.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.*;
@@ -14,6 +14,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpGameActionParams extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long PARAM_READER = 0x0089bd80L;
 
     // Walk backwards from a call site to find the immediate pushed as the 2nd integer arg (the param id).
@@ -35,7 +38,7 @@ public class DumpGameActionParams extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/gameaction_params.txt");
+        PrintWriter out = new PrintWriter(OUT + "gameaction_params.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -77,6 +80,6 @@ public class DumpGameActionParams extends GhidraScript {
             out.println();
         }
         out.close();
-        println("wrote Captures/ghidra/output/gameaction_params.txt");
+        println("wrote " + OUT + "gameaction_params.txt");
     }
 }

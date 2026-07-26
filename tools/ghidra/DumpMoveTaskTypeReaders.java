@@ -8,6 +8,9 @@ import ghidra.program.model.symbol.*;
 import java.io.PrintWriter;
 
 public class DumpMoveTaskTypeReaders extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final String[] TARGETS = { "WaitMoveTask::vftable","RotateMoveTask::vftable","JumpMoveTask::vftable","SetPosMoveTask::vftable","GroundAlignMoveTask::vftable" };
     Address vtableAddr(String full) {
         for (Symbol s : currentProgram.getSymbolTable().getAllSymbols(false))
@@ -15,7 +18,7 @@ public class DumpMoveTaskTypeReaders extends GhidraScript {
         return null;
     }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/movetask_type_readers.txt");
+        PrintWriter out = new PrintWriter(OUT + "movetask_type_readers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (String t : TARGETS) {
             Address vt = vtableAddr(t);

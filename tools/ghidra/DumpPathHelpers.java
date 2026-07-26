@@ -2,9 +2,12 @@ import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.listing.Function;
 public class DumpPathHelpers extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long[] FNS = { 0x00a31ec0L, 0x0079f1c0L, 0x0079e910L, 0x0048f550L };
     @Override public void run() throws Exception {
-        java.io.PrintWriter out=new java.io.PrintWriter("Captures/ghidra/output/path_helpers.txt");
+        java.io.PrintWriter out=new java.io.PrintWriter(OUT + "path_helpers.txt");
         DecompInterface di=new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long p: FNS){
             Function f=getFunctionContaining(toAddr(p));

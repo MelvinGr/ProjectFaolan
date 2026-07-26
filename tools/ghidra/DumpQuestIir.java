@@ -2,8 +2,8 @@
 // field layout the captures can't pin (the per-quest "stat" fields + objective records). These methods
 // reference unique error strings (e.g. "QuestFullUpdateIIR::ReadSubClass() Wrong IIR_t version"), so we find
 // the string, find the function that references its address, and decompile it. Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpQuestIir.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpQuestIir.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
@@ -14,6 +14,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpQuestIir extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     // Unique strings inside the methods whose field layout we want.
     static final String[] ANCHORS = {
         "QuestFullUpdateIIR::ReadSubClass",
@@ -28,7 +31,7 @@ public class DumpQuestIir extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/quest_iir.txt");
+        PrintWriter out = new PrintWriter(OUT + "quest_iir.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -55,6 +58,6 @@ public class DumpQuestIir extends GhidraScript {
             }
         }
         out.close();
-        println("DumpQuestIir done -> Captures/ghidra/output/quest_iir.txt");
+        println("DumpQuestIir done -> " + OUT + "quest_iir.txt");
     }
 }

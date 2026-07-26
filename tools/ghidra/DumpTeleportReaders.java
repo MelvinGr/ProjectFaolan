@@ -5,14 +5,17 @@
 //   FUN_005d1ae0  n3TeleportIIR_t::ReadSubClass       (0x5A32F0D7, "destination announce")
 //   FUN_00a6a600  PlayfieldProxy stream reader
 // Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpTeleportReaders.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpTeleportReaders.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Function;
 
 public class DumpTeleportReaders extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long[] FNS = { 0x005bfce0L, 0x005d1ae0L, 0x00a6a600L };
 
     DecompInterface di;
@@ -23,7 +26,7 @@ public class DumpTeleportReaders extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        java.io.PrintWriter out = new java.io.PrintWriter("Captures/ghidra/output/teleport_readers.txt");
+        java.io.PrintWriter out = new java.io.PrintWriter(OUT + "teleport_readers.txt");
         di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         for (long p : FNS) {
@@ -34,6 +37,6 @@ public class DumpTeleportReaders extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpTeleportReaders done -> Captures/ghidra/output/teleport_readers.txt");
+        println("DumpTeleportReaders done -> " + OUT + "teleport_readers.txt");
     }
 }

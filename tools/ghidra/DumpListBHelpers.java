@@ -7,13 +7,16 @@ import ghidra.program.model.listing.*;
 import java.io.PrintWriter;
 
 public class DumpListBHelpers extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long[] FNS = {
         0x00799040L, // List B prologue (FUN_00798c70 calls before the loop)
         0x005d7190L, // called inside FUN_00922c90 between the 3 strings and the trailing u32/count
         0x004d55b0L, 0x0079b760L, 0x00922eb0L, // the per-entry inner-loop constructors/readers
     };
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/listb_helpers.txt");
+        PrintWriter out = new PrintWriter(OUT + "listb_helpers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         for (long a : FNS) {
             Function f = getFunctionContaining(toAddr(a));
@@ -28,6 +31,6 @@ public class DumpListBHelpers extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpListBHelpers done -> Captures/ghidra/output/listb_helpers.txt");
+        println("DumpListBHelpers done -> " + OUT + "listb_helpers.txt");
     }
 }

@@ -13,6 +13,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpRpcTables extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     Memory mem;
 
     Address findNext(Address start, byte[] needle) throws Exception {
@@ -42,7 +45,7 @@ public class DumpRpcTables extends GhidraScript {
     @Override
     public void run() throws Exception {
         mem = currentProgram.getMemory();
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/rpc_tables.txt");
+        PrintWriter out = new PrintWriter(OUT + "rpc_tables.txt");
 
         // 1) Collect every proxy/dispatch method string, sorted by address (= registration order).
         String[] markers = { "Proxy_t::", "InterfaceDispatch_t::DispatchMethod", "Dispatch_t::DispatchMethod" };
@@ -101,6 +104,6 @@ public class DumpRpcTables extends GhidraScript {
         }
         out.flush();
         out.close();
-        println("WROTE Captures/ghidra/output/rpc_tables.txt (" + byAddr.size() + " strings)");
+        println("WROTE " + OUT + "rpc_tables.txt (" + byAddr.size() + " strings)");
     }
 }

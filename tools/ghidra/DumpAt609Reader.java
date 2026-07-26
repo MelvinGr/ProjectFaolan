@@ -10,6 +10,9 @@ import ghidra.program.model.symbol.*;
 import java.io.PrintWriter;
 
 public class DumpAt609Reader extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long KNOWN_READER = 0x01121c00L;
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
 
@@ -31,7 +34,7 @@ public class DumpAt609Reader extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/at609_reader.txt");
+        PrintWriter out = new PrintWriter(OUT + "at609_reader.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address kv = vtableAddr(KNOWN_VTABLE);
@@ -65,6 +68,6 @@ public class DumpAt609Reader extends GhidraScript {
         out.println("\n################## List B record FUN_00922c90");
         dump(di, out, getFunctionContaining(toAddr(0x00922c90L)));
         out.close();
-        println("DumpAt609Reader done -> Captures/ghidra/output/at609_reader.txt");
+        println("DumpAt609Reader done -> " + OUT + "at609_reader.txt");
     }
 }

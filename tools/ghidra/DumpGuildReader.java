@@ -4,8 +4,8 @@
 // GuildUpdateIIR_c::vftable -> the guild reader. Decompile it + its directly-called functions (the
 // counter-region framing is likely a sub-reader), so the 220-byte renown counter region can be decoded.
 // Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpGuildReader.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpGuildReader.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
@@ -15,6 +15,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpGuildReader extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final long KNOWN_READER = 0x01121c00L;            // SimpleCharFullUpdateIIR_t::ReadSubClass
     static final String KNOWN_VTABLE = "SimpleCharFullUpdateIIR_t::vftable";
 
@@ -47,7 +50,7 @@ public class DumpGuildReader extends GhidraScript {
     }
 
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/guild_reader.txt");
+        PrintWriter out = new PrintWriter(OUT + "guild_reader.txt");
         di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         Address knownVt = symbolAddr(KNOWN_VTABLE);
@@ -87,6 +90,6 @@ public class DumpGuildReader extends GhidraScript {
             out.println(decomp(c));
         }
         out.close();
-        println("DumpGuildReader done -> Captures/ghidra/output/guild_reader.txt");
+        println("DumpGuildReader done -> " + OUT + "guild_reader.txt");
     }
 }

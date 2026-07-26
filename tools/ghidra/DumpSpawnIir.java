@@ -1,8 +1,8 @@
 // Decompile SimpleCharFullUpdateIIR_t::ReadSubClass (the FA015807 reader) to recover the 227-byte pre-IIR
 // scaffold block layout (the last un-lifted part of the NPC spawn, Gitea #185). Anchors on the unique error
 // strings inside the method. Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpSpawnIir.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpSpawnIir.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
@@ -13,6 +13,9 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class DumpSpawnIir extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final String[] ANCHORS = {
         "SimpleCharFullUpdateIIR_t::ReadSubClass() Received a bad stream",
         "Wrong client version of SimpleCharFullupdateIIR",
@@ -25,7 +28,7 @@ public class DumpSpawnIir extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/spawn_iir.txt");
+        PrintWriter out = new PrintWriter(OUT + "spawn_iir.txt");
         DecompInterface di = new DecompInterface();
         di.setOptions(new DecompileOptions());
         di.openProgram(currentProgram);
@@ -51,6 +54,6 @@ public class DumpSpawnIir extends GhidraScript {
             }
         }
         out.close();
-        println("DumpSpawnIir done -> Captures/ghidra/output/spawn_iir.txt");
+        println("DumpSpawnIir done -> " + OUT + "spawn_iir.txt");
     }
 }

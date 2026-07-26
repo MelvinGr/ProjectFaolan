@@ -1,8 +1,8 @@
 // Recover RegenIIR::ReadSubClass (IIR type 0x28D0AC99) via the vtable-xref method (slot 8), to pin the
 // 13-byte payload field boundaries decoded statistically from the captures ([u32 a][u8 f][u32 b][u32 c]).
 // Run:
-//   /opt/ghidra/support/analyzeHeadless Captures/ghidra/output aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath Captures/ghidra -postScript DumpRegenReader.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpRegenReader.java
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.*;
 import ghidra.program.model.address.Address;
@@ -10,10 +10,13 @@ import ghidra.program.model.listing.Function;
 import ghidra.program.model.symbol.*;
 
 public class DumpRegenReader extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final int SLOT = 8; // ReadSubClass vtable slot (proven in DumpVtableReaders)
 
     @Override public void run() throws Exception {
-        java.io.PrintWriter out = new java.io.PrintWriter("Captures/ghidra/output/regen_reader.txt");
+        java.io.PrintWriter out = new java.io.PrintWriter(OUT + "regen_reader.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
         // 1. find every symbol mentioning Regen (locate the exact vtable name + the constructor that sets the type id)
@@ -38,6 +41,6 @@ public class DumpRegenReader extends GhidraScript {
             out.println();
         }
         out.close();
-        println("DumpRegenReader done -> Captures/ghidra/output/regen_reader.txt");
+        println("DumpRegenReader done -> " + OUT + "regen_reader.txt");
     }
 }

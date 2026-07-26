@@ -7,12 +7,10 @@
 //      codebase mixes Encoding.ASCII (58 sites), Latin1 (23) and UTF8 (12); every decodable captured string is
 //      pure ASCII, so again the corpus cannot decide.
 //
-//   ln -sfn "$PWD/Captures/ghidra/output" /tmp/aoc_gh
-//   mkdir -p /tmp/aoc_ghscripts && cp Captures/ghidra/*.java /tmp/aoc_ghscripts/
-//   /opt/ghidra/support/analyzeHeadless /tmp/aoc_gh aoc -process AgeOfConan.exe -noanalysis \
-//     -scriptPath /tmp/aoc_ghscripts -postScript DumpStringPrimitive.java
+//   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \
+//     -scriptPath tools/ghidra -postScript DumpStringPrimitive.java
 //
-// Output: Captures/ghidra/output/string_primitive.txt
+// Output: $FAOLAN_GHIDRA_OUT/string_primitive.txt
 import ghidra.app.decompiler.*;
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
@@ -20,6 +18,9 @@ import ghidra.program.model.listing.*;
 import java.io.PrintWriter;
 
 public class DumpStringPrimitive extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     // FUN_0048f840 = ReadString (docs/re/fullplayer-snapshot-reader.md: "the only string reader in the tails").
     // FUN_00922c90 = the List B / @609 per-record reader ("u32 + 3x ReadString + ACGHash").
     // FUN_0091df50 = the Quest_c per-record reader, for comparison (known to use ReadString for its 5 headers).

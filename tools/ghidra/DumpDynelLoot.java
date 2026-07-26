@@ -8,6 +8,9 @@ import ghidra.program.model.listing.Function;
 import java.io.PrintWriter;
 import java.util.*;
 public class DumpDynelLoot extends GhidraScript {
+    // Output dir: $FAOLAN_GHIDRA_OUT if set, else the system temp dir (no machine/repo path in the repo).
+    static final String OUT = System.getenv().getOrDefault("FAOLAN_GHIDRA_OUT", System.getProperty("java.io.tmpdir")) + "/";
+
     static final String[] ANCHORS = {
         "simpledynelfullupdateiir.cpp", "lootbagfullupdateiir.cpp", "climbingdynelfullupdateiir.cpp",
         "GameCodeDynelFullUpdateIIR.cpp",
@@ -17,7 +20,7 @@ public class DumpDynelLoot extends GhidraScript {
     }
     byte[] le(long v){ return new byte[]{(byte)v,(byte)(v>>8),(byte)(v>>16),(byte)(v>>24)}; }
     @Override public void run() throws Exception {
-        PrintWriter out = new PrintWriter("Captures/ghidra/output/dynel_loot.txt");
+        PrintWriter out = new PrintWriter(OUT + "dynel_loot.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
         Set<Long> dumped = new HashSet<>();
         for (String anchor : ANCHORS) {
@@ -38,6 +41,6 @@ public class DumpDynelLoot extends GhidraScript {
                 a = currentProgram.getMemory().findBytes(a.add(1), needle, null, true, monitor);
             }
         }
-        out.close(); println("done -> Captures/ghidra/output/dynel_loot.txt");
+        out.close(); println("done -> " + OUT + "dynel_loot.txt");
     }
 }
