@@ -59,15 +59,38 @@ namespace Faolan.Tests
 		// The zero flat term is not an accident of this one character: the client seeds stat 280 (Non Combat Mana Regen)
 		// to 2000 for a class WITH a mana base (Herald of Xotli, Necromancer - whose class template then takes it to
 		// 2200) and never writes it at all for this Assassin, whose 74-point mana pool therefore regenerates on
-		// trickledown alone. Both L80 mage classes' bases read 2200 (a 2000 seed plus 200 from their class template), so
-		// ⚠️ a CASTER's rate is short by ~22.00/s here. It is left at 0 rather than guessed because no captured mana delta
-		// confirms a caster's rate: the two clean L80 ones are 1% of max mana per second (NecroL80 6523 on a 6523 pool,
-		// DemoL80 5830 on 5830) - a different channel entirely, not this formula.
+		// trickledown alone. Both L80 mage classes' bases read 2200 (a 2000 seed plus 200 from their class template).
 		[Fact]
 		public void ManaPerSecond_MatchesTheCapturedRegenIirDelta()
 		{
 			Assert.Equal(2470, (int)(RegenRates.ManaPerSecond(39, 26) * 100));
 			Assert.Equal(0.0, RegenRates.ManaFlatRate);
+		}
+
+		// The SECOND, independent confirmation of the mana branch - and the one that shows its base is class data rather
+		// than universally zero. Hakotep, a level 24 Herald of Xotli: the client computes raw Int 1190 / Wis 340, i.e.
+		// display 118 / 33, and its class mana base (stat 280) is 2000 = display 20.00. Retail's captured mana delta for
+		// that character is 7738, and 0.38 × 151 + 20 = 77.38 hits it exactly.
+		//
+		// Two characters, two different class bases (0 and 20.00), both exact - so the 0.38 modifier and the
+		// base-plus-trickledown shape are pinned for mana the same way they are for health and stamina.
+		[Fact]
+		public void ManaPerSecond_WithAClassBase_MatchesTheHeraldOfXotliCapture()
+		{
+			Assert.Equal(7738, (int)(RegenRates.ManaPerSecond(118, 33, 20.0) * 100));
+		}
+
+		// ⚠️ NOT the OOC rate: the level 80 casters' most common mana deltas are exactly 1% and 2% of their max mana per
+		// second (NecroL80 6523 and 13046 on a 6523 pool; DemoL80 5830 on 5830), and none of their deltas inverts to a whole
+		// attribute sum under any observed class base. Those belong to some other mana channel - plausibly the
+		// TWK_NaturalManaRegen* in-combat twin - and must not be read as evidence about this formula.
+		[Theory]
+		[InlineData(6523, 6523, 1.0)]
+		[InlineData(13046, 6523, 2.0)]
+		[InlineData(5830, 5830, 1.0)]
+		public void TheLevel80CasterManaDeltas_AreAPercentageOfMaxMana_NotThisFormula(int wireDelta, int maxManaDisplay, double percentOfMax)
+		{
+			Assert.Equal(percentOfMax, wireDelta / 100.0 / maxManaDisplay * 100, 2);
 		}
 
 		// The attribute scores every expectation above is built on are the CLIENT'S OWN, read back off the

@@ -23,7 +23,12 @@ namespace Faolan.GameServer.Combat
 	///         <item>
 	///             <term>AssassinL23 (L23 Assassin, Con 56 / Str 20 / Dex 79)</term>
 	///             <description>health 0.15 × 76 + 20 = 31.40 → <c>3140</c>; stamina 0.15 × 155 + 10 = 33.25 → <c>3325</c>;
-	///                 mana 0.38 × (Int 39 + Wis 26) = 24.70 → <c>2470</c></description>
+	///                 mana 0.38 × (Int 39 + Wis 26) + 0 = 24.70 → <c>2470</c></description>
+	///         </item>
+	///         <item>
+	///             <term>Hakotep (L24 Herald of Xotli, Int 118 / Wis 33, class mana base 20.00)</term>
+	///             <description>mana 0.38 × 151 + 20 = 77.38 → captured <c>7738</c> - the second, independent
+	///                 confirmation of the mana branch, and the one that pins its base as class data rather than 0</description>
 	///         </item>
 	///     </list>
 	///     <para>
@@ -72,12 +77,10 @@ namespace Faolan.GameServer.Combat
 		public const double HealthFlatRate = 20.0; // stat 278 seeds to 2000
 		public const double StaminaFlatRate = 10.0; // stat 279 seeds to 1000
 
-		// Mana's is 0, from AssassinL23's captured 2470 = 0.38 × 65 exactly with nothing added - and its class really has no
-		// mana base: stat 280 is never written at all for that Assassin, while it seeds to 2000 for a Herald of Xotli and
-		// to 2200 for BOTH level 80 mage classes (a 2000 seed plus 200 from their class template).
-		// ⚠️ So a CASTER regenerates ~22.00/s short here. Left at 0 rather than guessed because no captured delta confirms
-		// a caster's OOC mana rate - the two clean level 80 ones are 1% of max mana per second (NecroL80 6523 on a 6523
-		// pool, DemoL80 5830 on 5830), which is a different channel, not this formula.
+		// Mana has NO universal flat term - unlike health and stamina, its base is CLASS data, the class's own value for
+		// stat 280 (Non Combat Mana Regen). Observed: never written at all for a level 23 Assassin (so 0), 2000 for a
+		// level 24 Herald of Xotli, and 2200 for both level 80 mage classes (a 2000 seed plus 200 from their class
+		// template). Callers pass it; 0 is the no-mana-base default, NOT a claim that every class has none.
 		public const double ManaFlatRate = 0.0;
 
 		// Health: Constitution + Strength. Halted in combat by the caller (retail's OOC vs Natural split).
@@ -93,10 +96,11 @@ namespace Faolan.GameServer.Combat
 			return OutOfCombatAttributeModifier * (constitution + strength + dexterity) + StaminaFlatRate;
 		}
 
-		// Mana: Intelligence + Wisdom, at the higher 0.38 modifier.
-		public static double ManaPerSecond(uint intelligence, uint wisdom)
+		// Mana: Intelligence + Wisdom, at the higher 0.38 modifier, plus the CLASS's mana-regen base in display units
+		// (see ManaFlatRate - the class's stat 280, which the server cannot source yet, so it is 0 in practice today).
+		public static double ManaPerSecond(uint intelligence, uint wisdom, double classManaBase = ManaFlatRate)
 		{
-			return OutOfCombatManaAttributeModifier * (intelligence + wisdom) + ManaFlatRate;
+			return OutOfCombatManaAttributeModifier * (intelligence + wisdom) + classManaBase;
 		}
 
 		// A per-second display rate turned into the whole DISPLAY points gained over `elapsedSeconds`. The wire scale is

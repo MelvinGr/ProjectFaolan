@@ -97,7 +97,7 @@ decimals. That is what pins these formulas; they use the coefficients out of the
 |---|---|---|
 | health | `0.15 × (Con + Str) + 20` | Constitution, Strength |
 | stamina | `0.15 × (Con + Str + Dex) + 10` | + Dexterity |
-| mana | `0.38 × (Int + Wis)` | Intelligence, Wisdom (no flat term) |
+| mana | `0.38 × (Int + Wis) + class base` | Intelligence, Wisdom (the base is CLASS data, not a constant) |
 
 Each against the captured delta for that character, exactly [V1: Faolan.Tests/RegenRatesTests.cs]:
 
@@ -106,6 +106,7 @@ Each against the captured delta for that character, exactly [V1: Faolan.Tests/Re
 | NecroL80, L80 Necromancer | Con 375, Str 70 | 86.75 | hp `8675` |
 | DemoL80, L80 Demonologist | Con 345, Str 70 | 82.25 | hp `20353` = `8225` + 12128 |
 | AssassinL23, L23 Assassin | Con 56, Str 20, Dex 79, Int 39, Wis 26 | 31.40 / 33.25 / 24.70 | hp `3140`, stam `3325`, mana `2470` |
+| Hakotep, L24 Herald of Xotli | Int 118, Wis 33, class mana base 20.00 | 77.38 | mana `7738` |
 
 **The client computes the sheet's row the same way**, from its own copy of the same tweaks — `FUN_0111a520` writes stat
 `0x116` (health) and `FUN_0111a6e0` writes `0x117` (stamina), reading `0x02D244A0`/`B0` and `E0`/`F0`/`500`, all 0.15 in
@@ -126,18 +127,26 @@ So the flat terms are those seeded stat values, and the server's formula and the
 computation. It also explains the `(attribute − 10) / 10` term in the armour curve (`CombatResolver`): that is the same
 raw→display conversion, which is why the trace's AttributeBonus of 140 is `(710 − 10) / 10 × 2.0` for a display 70.
 
-⚠️ **Mana's flat term is class-dependent, and ours is the no-mana-class value.** Stat 280 (Non Combat Mana Regen) is
-seeded to 2000 for a class with a mana base — a level 80 Necromancer's class template then takes it `2000 → 2200` —
-and is **never written at all** for a level 23 Assassin, whose 74-point mana pool therefore regenerates on trickledown
-alone. That is exactly why the one captured mana delta (that Assassin's `2470`) has no flat term. Both level 80 mage
-classes read **2200** — a 2000 seed plus 200 from their class template — so a CASTER's rate is short by ~22.00/s here,
-left at 0 rather than guessed.
+**Mana's base is CLASS data, and that is now confirmed rather than assumed.** Stat 280 (Non Combat Mana Regen) is
+**never written at all** for the level 23 Assassin (base 0), is **2000** for the level 24 Herald of Xotli, and **2200**
+for both level 80 mage classes (a 2000 seed plus 200 from their class template). Two captured deltas confirm the branch
+with two *different* bases, both exactly:
 
-⚠️ **Correction to an earlier reading of the level 80 mana captures.** They are *not* full-pool restores. NecroL80's delta
-`6523` is a ×100 wire value (65.23/s) while her 6523 max mana is a DISPLAY value — the same digits at different scales.
-With the scales straight, `delta_raw == max_display` for both mages, i.e. those deltas are exactly **1% of max mana per
-second** (NecroL80 6523 on a 6523 pool, DemoL80 5830 on 5830). That is a separate, still-undecoded mana channel — plausibly
-the `TWK_NaturalManaRegen*` in-combat twin — and it is why no captured delta yet confirms a caster's OOC mana rate.
+| character | Int + Wis | class base | rate | captured |
+|---|---|---|---|---|
+| AssassinL23, L23 Assassin | 39 + 26 = 65 | 0 | 24.70 | `2470` |
+| Hakotep, L24 Herald of Xotli | 118 + 33 = 151 | 20.00 | 77.38 | `7738` |
+
+So the 0.38 modifier and the base-plus-trickledown shape are pinned for mana the same way they are for health and
+stamina. `RegenRates.ManaPerSecond` takes the base as an argument; it is 0 in practice today only because the server
+cannot source a class's stat 280 yet (same blocker as the attributes — #444).
+
+⚠️ **The level 80 casters' mana deltas belong to a DIFFERENT channel — do not fit this formula to them.** They are not
+full-pool restores either (an earlier reading of ours, from a scale confusion: NecroL80's delta `6523` is a ×100 wire
+value, 65.23/s, while her 6523 max mana is a DISPLAY value — same digits, different quantities). Lined up properly,
+their most common deltas are exactly **1% and 2% of max mana per second** — NecroL80 `6523` and `13046` on a 6523 pool,
+DemoL80 `5830` on 5830 — and *none* of their deltas inverts to a whole attribute sum under any observed class base.
+Plausibly the `TWK_NaturalManaRegen*` in-combat twin; undecoded either way.
 
 The health and stamina bases do NOT vary this way in the three characters observed — 2000 and 1000 for all of them,
 including a Necromancer that has no stamina pool at all.
