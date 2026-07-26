@@ -1220,9 +1220,25 @@ namespace Faolan.Importer.Cli
 		// <type>_<id>.bin for offline inspection. Used to crack new RDB record formats (e.g. CHARACTERCREATOR 1010700).
 		private static void RdbDump(string rdbDir, string arg, string? outDir)
 		{
+			// `<type>` dumps every entry of that type; `<type>:<id>` dumps just one - which is the only usable form for
+			// a huge type like 1000020 (98k item templates).
+			var colon = arg.IndexOf(':');
+			uint? onlyId = null;
+			if (colon >= 0)
+			{
+				if (!uint.TryParse(arg[(colon + 1)..], out var parsedId))
+				{
+					Console.WriteLine($"rdb-dump: '{arg[(colon + 1)..]}' is not a numeric id (expected <type> or <type>:<id>)");
+					return;
+				}
+
+				onlyId = parsedId;
+				arg = arg[..colon];
+			}
+
 			if (!uint.TryParse(arg, out var type))
 			{
-				Console.WriteLine($"rdb-dump needs a numeric type in --report-arg, got '{arg}'");
+				Console.WriteLine($"rdb-dump needs a numeric type in --report-arg, got '{arg}' (expected <type> or <type>:<id>)");
 				return;
 			}
 
@@ -1232,6 +1248,9 @@ namespace Faolan.Importer.Cli
 
 			foreach (var e in rdb.EntriesOfType(type).Where(rdb.CanRead))
 			{
+				if (onlyId != null && e.Id != onlyId)
+					continue;
+
 				var body = rdb.ReadDecompressed(e);
 				if (body.Length == 0) // CDN miss
 					continue;

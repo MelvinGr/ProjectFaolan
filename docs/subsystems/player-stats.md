@@ -167,23 +167,49 @@ Three more things worth keeping:
   `20803` exceeds her bare `8675` by exactly the same 12128 — one shared additive term (a buff or rest bonus, not
   decoded), not a per-character rate.
 
-⚠️ **The server cannot yet compute these for a real character**, because the attribute scores are client-side (next
-section): retail sends a flat 10 for every attribute, and the class/level base is in no client data table either — of
-the 25 named `CoreTables` tables, `RDBPLAYERCLASSDATA` turns out to read RDB types 1000505–1000508, which are name and
-id maps, and none of 1000509–1000521 has a 12-class × 80-level × attribute shape. The base instead arrives as a
-**per-class RDB-1000020 item template**, loaded right after the shared template `115760`:
+### The class attribute BASE — decoded (#444)
 
-| class | level | template | applies (raw) |
-|---|---|---|---|
-| Assassin | 23 | `3074050` | Str 200, Con 170, Int 260, Wis 200, **Dex 650** |
-| Herald of Xotli | 24 | `3130655` | Str 210, Con 180, **Int 680**, Wis 330, Dex 330 |
-| Necromancer | 80 | `1173863` | Str 700, Con 600, Int 2300, Wis 1100, Dex 1100 |
-| Demonologist | 80 | `1126759` | Str 700, Con 600, Int 2300, Wis 1100, Dex 1100 |
+The scores the formulas need are computed client-side (retail sends a flat 10 for every attribute), and the base is
+**not** in any of the 25 named `CoreTables` data tables — `RDBPLAYERCLASSDATA` reads RDB types 1000505–1000508, which
+are name/id maps, and nothing in 1000509–1000521 has a 12-class × 80-level shape.
 
-Each profile suits its class (the Assassin's Dex-primary, the casters' Int-primary), and the two level 80 mage classes
-carry **different template ids with identical values** — so the values are per-archetype even though the id is per
-class. So `RegenRates` is fed gear + buffs only (`WorldEntity.AttributeScore`) and a geared character regenerates slower
-than retail. Open work tracked in Gitea #444.
+It is in **RDB type 1000020**, the item-template type, as a run of one template per class per LEVEL:
+
+```
+templateId = <classBaseId> + (level - 1)
+```
+
+Those templates are **plaintext** — no TEA key, unlike ordinary item templates — and their stat records ARE the base
+attributes, read by the same `ItemTemplateStatModifiers.Parse` as any item (which is why this only became readable
+after the byte-alignment fix, #441). The Assassin run, `classBaseId` 3074028:
+
+| level | id | Str | Con | Int | Wis | Dex |
+|---|---|---|---|---|---|---|
+| 1 | 3074028 | 10 | 10 | 10 | 10 | 10 |
+| 2 | 3074029 | 20 | 20 | 20 | 20 | 40 |
+| 23 | 3074050 | 200 | 170 | 260 | 200 | **650** |
+| 80 | 3074107 | 690 | 590 | 890 | 690 | **2270** |
+
+Level 1 is the neutral 10 across the board (display 0), the curve is monotonic, and Dexterity leads throughout — the
+right shape for the class. The level-23 row is exactly what the client applied for our level-23 Assassin.
+
+Verified for four classes, each against the template the client actually loaded for that character:
+
+| class | `classBaseId` | checked at |
+|---|---|---|
+| Assassin (34) | 3074028 | L23 → 3074050 ✓ |
+| Herald of Xotli (43) | 3130632 | L24 → 3130655 ✓ |
+| Necromancer (41) | 1173784 | L80 → 1173863 ✓ |
+| Demonologist (44) | 1126680 | L80 → 1126759 ✓ |
+
+The same templates also carry **MaxHealth** and, for the caster classes, stat **280 = 200** — which is precisely the
++200 that takes the mana-regen base from its 2000 seed to the 2200 those classes show, closing the last open question
+in the regen rates above.
+
+Remaining: the other eight classes' `classBaseId`. Mechanical now — scan plaintext 1000020 entries for a run whose
+records are exactly the five attributes. Until that is wired into an importer module,
+`WorldEntity.AttributeScore` stays gear + buffs only and a geared character regenerates below retail. Open work:
+Gitea #444.
 
 ## Wrong / unconfirmed ids (now tracked on the `CharacterStatId` enum)
 
