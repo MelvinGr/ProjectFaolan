@@ -45,9 +45,14 @@ namespace Faolan.Importer.Rdb
 	//
 	// Field map (dumped over all 21,502 records, #367): 8=duration, 123=rank, 125=level, 287=range, 294=cast,
 	// 347/129/349=splash radius/percent/max-targets, 348=damage rating, 551=a rank-scaling MAGNITUDE, 79=icon (an id
-	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only). The record carries NO
-	// stat IDs: 551 says "400" but never "400 of WHAT", so a buff's stat identity is server-GDB-only, same as
-	// mana/damage/recast (docs/subsystems/stat-engine.md). Don't hunt stat deltas in here again.
+	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only). This FIELD RUN carries
+	// no stat ids - 551 says "400" but never "400 of WHAT" - so a buff's magnitudes are server-GDB-only here, same as
+	// mana/damage/recast (docs/subsystems/stat-engine.md). Don't hunt stat deltas among the fields again.
+	//
+	// The `[2][9]` REGION of the same record is the exception, and is imported below: explicit (kind, statId, amount)
+	// records, the same shape item templates carry (docs/rdb/spell-stat-effects.md). It covers potions/elixirs and a
+	// slice of the class buffs - 866 of 20,847 spells - not the buffs seen in retail captures, which carry no region
+	// at all.
 	public static class RdbSpellImporter
 	{
 		private const uint CastTimeField = 0x126; // 294 - cast time in centiseconds (value * 10 = milliseconds)
@@ -113,7 +118,7 @@ namespace Faolan.Importer.Rdb
 			var toAdd = new List<Spell>();
 			// #367: (spellId -> stat deltas) from the [2][9] region, synced into SpellStatEffects after the spells save.
 			// Inner map dedups a stat the region lists twice (last == authoritative write wins, as for items).
-			var statEffects = new Dictionary<uint, Dictionary<uint, int>>();
+			var statEffects = new Dictionary<uint, Dictionary<uint, (uint Kind, int Amount)>>();
 
 			var seen = 0;
 			var inserted = 0;
@@ -169,13 +174,15 @@ namespace Faolan.Importer.Rdb
 					? (byte)lv
 					: (byte)0;
 
-				// #367: buff/debuff stat deltas live in the same [2][9] region as item templates.
+				// #367: buff/debuff stat deltas live in the same [2][9] region as item templates. The record's KIND is
+				// carried through, not dropped: a spell mixes flat and PERCENT records in one region, and reading a
+				// percent one as flat turns "+2% Critical Rating" into "+200" (ItemTemplateStatModifiers).
 				var mods = ItemTemplateStatModifiers.Parse(body.AsSpan(12));
 				if (mods.Count > 0)
 				{
-					var deltas = new Dictionary<uint, int>();
+					var deltas = new Dictionary<uint, (uint Kind, int Amount)>();
 					foreach (var m in mods)
-						deltas[m.StatId] = (int)m.WireAmount; // last write wins on a repeated stat
+						deltas[m.StatId] = (m.Kind, (int)m.WireAmount); // last write wins on a repeated stat
 					statEffects[entry.Id] = deltas;
 				}
 
@@ -241,13 +248,14 @@ namespace Faolan.Importer.Rdb
 				db.SpellStatEffects.RemoveRange(stale);
 			var effectRows = 0;
 			foreach (var (spellId, deltas) in statEffects)
-			foreach (var (statId, amount) in deltas)
+			foreach (var (statId, effect) in deltas)
 			{
 				db.SpellStatEffects.Add(new SpellStatEffect
 				{
 					SpellId = spellId,
 					StatId = (CharacterStatId)statId,
-					Amount = amount
+					EffectKind = effect.Kind,
+					Amount = effect.Amount
 				});
 				effectRows++;
 			}

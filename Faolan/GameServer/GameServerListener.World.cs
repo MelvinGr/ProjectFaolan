@@ -59,6 +59,12 @@ namespace Faolan.GameServer
 			return _broadcaster.MaintainAmbientPools();
 		}
 
+		// #367: the tick's seam onto the buff stat engine (expiry / death clear), same body as the listener's own calls.
+		Task IWorldOutbound.SyncBuffStats(INetworkClient client)
+		{
+			return SyncBuffStats(client);
+		}
+
 		Task IWorldOutbound.PushVitals(INetworkClient client, EntityVitals vitals)
 		{
 			return SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Character.Id);

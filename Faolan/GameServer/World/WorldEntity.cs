@@ -94,6 +94,17 @@ namespace Faolan.GameServer.World
 		// land with the same spell-def work.
 		public ConcurrentDictionary<uint, ActiveBuff> ActiveBuffs { get; } = new ConcurrentDictionary<uint, ActiveBuff>();
 
+		// The GEAR-derived stat bonuses this entity entered the world with, in display units by wire stat id
+		// (MaxStatAggregator over its equipped items). Kept, rather than only folded into the rating fields below, so
+		// the buff engine can recompute `gear + active buffs` from a fixed baseline instead of adding and subtracting
+		// deltas as buffs come and go (BuffStatEffects.Sync). Empty for NPCs and for a player with no stat gear.
+		public IReadOnlyDictionary<CharacterStatId, int> GearBonuses { get; set; } = new Dictionary<CharacterStatId, int>();
+
+		// The last value BuffStatEffects computed for each stat it owns (gear + buffs, display units). Its purpose is
+		// to answer "did this change?" so a sync pushes only what moved; the authoritative live values are the rating
+		// fields themselves.
+		public Dictionary<CharacterStatId, uint> BuffedStats { get; } = [];
+
 		// UTC time this player last dealt or took damage. HP/mana regen is OUT-OF-COMBAT only in retail (the client's
 		// OOCHealth/ManaRegeneration stats), so while within WorldSimulation.CombatRegenPause of this the HP+mana regen
 		// is halted; stamina (the action resource) keeps regenerating. MinValue = never in combat (fresh player regens).

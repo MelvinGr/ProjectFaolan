@@ -25,6 +25,10 @@ namespace Faolan.Importer.Rdb
 	//           items, so this recovers a catalog-CONSISTENT name for items whose own template yielded none. (The
 	//           polished localized item names in cat 50220 are keyed by a SEPARATE name-id, not the item id, so they
 	//           need the item record's name-id field decoded first - a follow-up, see docs/rdb/ldb-string-index.md.)
+	//   50201 = item descriptions (id == item id, #414).
+	//   50211 = SPELL descriptions (id == spell id, #367) - the client's own tooltip text for a spell or buff. The one
+	//           source that says what an effect DOES in words, so it is what an effect implementation is written and
+	//           checked against; ~3.6k of the 20k spells carry one.
 	public static class RdbLdbNameImporter
 	{
 		internal const int EnglishMatchPercent = 80;
@@ -38,10 +42,11 @@ namespace Faolan.Importer.Rdb
 			var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "").ToDictionaryAsync(s => s.Id, s => Norm(s.Name!));
 			var itemNames = await db.Items.Where(i => i.Name != null && i.Name != "").ToDictionaryAsync(i => i.Id, i => Norm(i.Name!));
 
-			// One pass over the LDB: bucket the name-category pages we care about as id->string.
+			// One pass over the LDB: bucket the categories we care about as id->string, per page.
 			var spellPages = new List<Dictionary<uint, string>>();
 			var itemPages = new List<Dictionary<uint, string>>();
 			var descriptionPages = new List<Dictionary<uint, string>>();
+			var spellDescriptionPages = new List<Dictionary<uint, string>>();
 			foreach (var e in rdb.EntriesOfType(LdbType).Where(x => x.IsLocal))
 			{
 				byte[] body;
@@ -55,7 +60,15 @@ namespace Faolan.Importer.Rdb
 				}
 
 				var cat = LdbStringIndex.CategoryOf(body);
-				if (cat != LdbStringIndex.SpellNameCategory && cat != LdbStringIndex.ItemNameCategory && cat != LdbStringIndex.ItemDescriptionCategory)
+				var bucket = cat switch
+				{
+					LdbStringIndex.SpellNameCategory        => spellPages,
+					LdbStringIndex.ItemNameCategory         => itemPages,
+					LdbStringIndex.ItemDescriptionCategory  => descriptionPages,
+					LdbStringIndex.SpellDescriptionCategory => spellDescriptionPages,
+					_                                       => null
+				};
+				if (bucket == null)
 					continue;
 
 				var ids = new Dictionary<uint, string>();
@@ -64,11 +77,7 @@ namespace Faolan.Importer.Rdb
 				if (ids.Count == 0)
 					continue;
 
-				(cat == LdbStringIndex.SpellNameCategory
-					? spellPages
-					: cat == LdbStringIndex.ItemDescriptionCategory
-						? descriptionPages
-						: itemPages).Add(ids);
+				bucket.Add(ids);
 			}
 
 			var spellEnglish = EnglishNames(spellPages, spellNames);
@@ -77,18 +86,23 @@ namespace Faolan.Importer.Rdb
 			var spellsFilled = await BackfillAsync(db.Spells, s => s.Id, (s, n) => s.Name = n, spellEnglish);
 			var itemsFilled = await BackfillAsync(db.Items, i => i.Id, (i, n) => i.Name = n, itemEnglish);
 
-			// Descriptions (#414) cannot be language-picked the same way: EnglishNames cribs each page against names
-			// we already hold, and we hold no descriptions to crib against. They ARE full sentences though ("Deals
-			// piercing damage over time."), so the language is detectable directly - pick the page with the highest
-			// ratio of English function words.
+			// Descriptions (#414 items, #367 spells) cannot be language-picked the same way: EnglishNames cribs each page
+			// against names we already hold, and we hold no descriptions to crib against. They ARE full sentences though
+			// ("Deals piercing damage over time."), so the language is detectable directly - take every page whose prose
+			// reads as English.
 			var descriptionEnglish = EnglishProse(descriptionPages);
-			var descriptionsFilled = await BackfillDescriptionsAsync(db, descriptionEnglish);
+			var descriptionsFilled = await BackfillDescriptionsAsync(await db.Items.ToListAsync(), i => i.Id, i => i.Description, (i, d) => i.Description = d, descriptionEnglish);
+
+			var spellDescriptionEnglish = EnglishProse(spellDescriptionPages);
+			var spellDescriptionsFilled =
+				await BackfillDescriptionsAsync(await db.Spells.ToListAsync(), s => s.Id, s => s.Description, (s, d) => s.Description = d, spellDescriptionEnglish);
 
 			await db.SaveChangesAsync();
 			logger?.LogInformation(
-				"RdbLdbNameImporter: spell English={SpellEng} (filled {SpellFill}); item English={ItemEng} (filled {ItemFill}); item descriptions English={DescEng} (filled {DescFill}).",
-				spellEnglish.Count, spellsFilled, itemEnglish.Count, itemsFilled, descriptionEnglish.Count, descriptionsFilled);
-			return new Result(spellEnglish.Count, spellsFilled, itemEnglish.Count, itemsFilled, descriptionEnglish.Count, descriptionsFilled);
+				"RdbLdbNameImporter: spell English={SpellEng} (filled {SpellFill}); item English={ItemEng} (filled {ItemFill}); item descriptions English={DescEng} (filled {DescFill}); spell descriptions English={SpellDescEng} (filled {SpellDescFill}).",
+				spellEnglish.Count, spellsFilled, itemEnglish.Count, itemsFilled, descriptionEnglish.Count, descriptionsFilled, spellDescriptionEnglish.Count, spellDescriptionsFilled);
+			return new Result(spellEnglish.Count, spellsFilled, itemEnglish.Count, itemsFilled, descriptionEnglish.Count, descriptionsFilled, spellDescriptionEnglish.Count,
+				spellDescriptionsFilled);
 		}
 
 		private static async Task<int> BackfillAsync<T>(DbSet<T> set, Func<T, uint> idOf, Action<T, string> setName, Dictionary<uint, string> english) where T : class
@@ -172,26 +186,28 @@ namespace Faolan.Importer.Rdb
 			return english;
 		}
 
-		// Fills Description for the items we hold a row for. Only ever ADDS - never overwrites a description already
-		// stored, so a re-run is idempotent and a hand-edit survives.
-		private static async Task<int> BackfillDescriptionsAsync(DatabaseContext db, Dictionary<uint, string> english)
+		// Fills Description on the rows we hold, from the English page set. Only ever ADDS - never overwrites a
+		// description already stored, so a re-run is idempotent and a hand-edit survives. Shared by items and spells:
+		// both carry a 512-char Description keyed by their own id, from their own LDB category.
+		private static Task<int> BackfillDescriptionsAsync<T>(List<T> rows, Func<T, uint> idOf, Func<T, string?> descriptionOf, Action<T, string> setDescription,
+			Dictionary<uint, string> english)
 		{
 			if (english.Count == 0)
-				return 0;
+				return Task.FromResult(0);
 
 			var filled = 0;
-			foreach (var item in await db.Items.ToListAsync())
+			foreach (var row in rows)
 			{
-				if (string.IsNullOrEmpty(item.Description) && english.TryGetValue(item.Id, out var text) && !string.IsNullOrWhiteSpace(text))
-				{
-					item.Description = text.Length > 512
-						? text[..512]
-						: text;
-					filled++;
-				}
+				if (!string.IsNullOrEmpty(descriptionOf(row)) || !english.TryGetValue(idOf(row), out var text) || string.IsNullOrWhiteSpace(text))
+					continue;
+
+				setDescription(row, text.Length > 512
+					? text[..512]
+					: text);
+				filled++;
 			}
 
-			return filled;
+			return Task.FromResult(filled);
 		}
 
 		private static bool IsEmptyName(object row)
@@ -212,6 +228,7 @@ namespace Faolan.Importer.Rdb
 			return s.Trim().ToLowerInvariant().Replace('’', '\'').Replace('‘', '\'');
 		}
 
-		public readonly record struct Result(int SpellEnglish, int SpellsFilled, int ItemEnglish, int ItemsFilled, int DescriptionEnglish, int DescriptionsFilled);
+		public readonly record struct Result(int SpellEnglish, int SpellsFilled, int ItemEnglish, int ItemsFilled, int DescriptionEnglish, int DescriptionsFilled, int SpellDescriptionEnglish,
+			int SpellDescriptionsFilled);
 	}
 }

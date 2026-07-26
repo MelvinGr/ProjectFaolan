@@ -150,6 +150,10 @@ namespace Faolan.GameServer
 		// Personal bank storage (kind 105) delivered on-demand. The withdraw item-grant op is an injected seam.
 		// See Economy/BankService.cs.
 		private readonly BankService _bank;
+
+		// #367: what an active buff adds to its carrier's stats (armor/ratings/attributes), from the imported RDB
+		// [2][9] stat effects. Recomputes `gear + buffs` whenever a buff lands or ends; see Combat/BuffStatEffects.cs.
+		private readonly BuffStatEffects _buffStats;
 		private readonly ClaimService _claims;
 
 		// Combat domain logic: melee/spell damage, NPC kill lifecycle, XP/leveling, kill-quest tracking + the combat
@@ -249,6 +253,7 @@ namespace Faolan.GameServer
 			_fatality = new FatalityService(logger, (c, wireSpellId) => ApplySpell(c, c.Session.Character.Id, c.Session.Character.Id, wireSpellId),
 				(c, wireSpellId) => _simulation.PlayerWorldEntity(c)?.ActiveBuffs.ContainsKey(wireSpellId) == true,
 				(c, template, duration) => SummonTimedPetForPlayer(c, template, duration, FatalityService.FrozenHatredPetCap));
+			_buffStats = new BuffStatEffects(database, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a),
 				SendLearnSpell, _fatality); // announced level-up ability + spell unlocks (#209/#73/#74), fatality burst (#140)
 			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Character.Id, msg),

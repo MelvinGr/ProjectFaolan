@@ -43,30 +43,30 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// baseline (armour/resists/... we do not model yet, so carried as their fixed defaults). No opaque blob.
 		private static readonly (CharacterStatId Id, uint Value)[] StatList1 =
 		[
-			(CharacterStatId.Unknown0, 0x0), (CharacterStatId.Unknown1, 0x0), (CharacterStatId.Unknown2, 0x0), (CharacterStatId.Unknown3, 0x0), (CharacterStatId.Unknown4, 0x1),
-			(CharacterStatId.Unknown5, 0x0), (CharacterStatId.Unknown6, 0x2), (CharacterStatId.Unknown7, 0x2), (CharacterStatId.PlayfieldToken, 0x4FE428), (CharacterStatId.Unknown9, 0x0),
+			(CharacterStatId.TempSaveTeamId, 0x0), (CharacterStatId.TempSavePlayfield, 0x0), (CharacterStatId.TempSaveX, 0x0), (CharacterStatId.TempSaveY, 0x0), (CharacterStatId.Flags, 0x1),
+			(CharacterStatId.Features, 0x0), (CharacterStatId.PreviousMovementMode, 0x2), (CharacterStatId.CurrentMovementMode, 0x2), (CharacterStatId.PlayfieldToken, 0x4FE428), (CharacterStatId.DeathEffectXp, 0x0),
 			(CharacterStatId.HealthMax, 0x2328), (CharacterStatId.HealthCurrent, 0x2648), (CharacterStatId.Level, 0x1), (CharacterStatId.Exp, 0x0), (CharacterStatId.MaxExp, 0x64),
-			(CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.Unknown11, 0x0)
+			(CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.ChosenGod, 0x0)
 		];
 
 		// One half of StatList#2; the client carries it twice (base + current). Its last two slots (Unknown63 then
 		// KillingBlows) are the tail the known-spell list is built right after (CreateBlock).
 		private static readonly (CharacterStatId Id, uint Value)[] StatList2Half =
 		[
-			(CharacterStatId.Unknown12, 0x0), (CharacterStatId.Unknown13, 0x0), (CharacterStatId.Timestamp, 0x0), (CharacterStatId.Unknown15, 0x0), (CharacterStatId.PvpMaxExp, 0xDAC),
-			(CharacterStatId.Unknown16, 0x0), (CharacterStatId.Unknown17, 0x6F), (CharacterStatId.Unknown18, 0x0), (CharacterStatId.Unknown19, 0x8), (CharacterStatId.HealthCurrent, 0x2648),
+			(CharacterStatId.Unknown12, 0x0), (CharacterStatId.NanoInterval, 0x0), (CharacterStatId.Timestamp, 0x0), (CharacterStatId.Unknown15, 0x0), (CharacterStatId.PvpMaxExp, 0xDAC),
+			(CharacterStatId.MurderPoints, 0x0), (CharacterStatId.ShieldAllocation, 0x6F), (CharacterStatId.FeatResets, 0x0), (CharacterStatId.XpKillRange, 0x8), (CharacterStatId.HealthCurrent, 0x2648),
 			(CharacterStatId.HealthMax, 0x2328), (CharacterStatId.Intelligence, 0xA), (CharacterStatId.ManaCurrent, 0x0), (CharacterStatId.ManaMax, 0x0), (CharacterStatId.ManaCurrent, 0x0),
-			(CharacterStatId.StaminaMax, 0x59D8), (CharacterStatId.StaminaCurrent, 0x5C30), (CharacterStatId.Strength, 0xA), (CharacterStatId.Unknown20, 0x0), (CharacterStatId.Unknown21, 0x0),
-			(CharacterStatId.Unknown22, 0x0), (CharacterStatId.Unknown23, 0x3), (CharacterStatId.MaxExp, 0x64), (CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.Level, 0x1),
-			(CharacterStatId.PvpLevel, 0x0), (CharacterStatId.PvpExp, 0x0), (CharacterStatId.Exp, 0x0), (CharacterStatId.Unknown24, 0x3E8), (CharacterStatId.Unknown25, 0xBA),
-			(CharacterStatId.Unknown26, 0x0), (CharacterStatId.Unknown27, 0x0), (CharacterStatId.Unknown28, 0x0), (CharacterStatId.Unknown29, 0x0), (CharacterStatId.Unknown30, 0x59EA506E),
-			(CharacterStatId.Unknown31, 0x14), (CharacterStatId.Unknown32, 0x0), (CharacterStatId.Unknown33, 0x0), (CharacterStatId.Unknown34, 0x0), (CharacterStatId.Unknown35, 0x0),
-			(CharacterStatId.Unknown36, 0x0), (CharacterStatId.Unknown37, 0x0), (CharacterStatId.Unknown38, 0x0), (CharacterStatId.Unknown39, 0x0), (CharacterStatId.Unknown40, 0x64),
-			(CharacterStatId.Unknown41, 0x64), (CharacterStatId.AttackRating, 0x64), (CharacterStatId.DefenseRating, 0x64), (CharacterStatId.Unknown44, 0x0), (CharacterStatId.Unknown45, 0x0),
-			(CharacterStatId.Unknown46, 0x0), (CharacterStatId.Unknown47, 0x0), (CharacterStatId.Unknown48, 0x0), (CharacterStatId.Unknown49, 0x0), (CharacterStatId.Unknown50, 0x0),
-			(CharacterStatId.Unknown51, 0x0), (CharacterStatId.Unknown52, 0x0), (CharacterStatId.Unknown53, 0x0), (CharacterStatId.Unknown54, 0x0), (CharacterStatId.Unknown55, 0x0),
+			(CharacterStatId.StaminaMax, 0x59D8), (CharacterStatId.StaminaCurrent, 0x5C30), (CharacterStatId.Strength, 0xA), (CharacterStatId.Icon, 0x0), (CharacterStatId.Mesh, 0x0),
+			(CharacterStatId.DeadTimer, 0x0), (CharacterStatId.Sex, 0x3), (CharacterStatId.MaxExp, 0x64), (CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.Level, 0x1),
+			(CharacterStatId.PvpLevel, 0x0), (CharacterStatId.PvpExp, 0x0), (CharacterStatId.Exp, 0x0), (CharacterStatId.PreviousHealth, 0x3E8), (CharacterStatId.Played, 0xBA),
+			(CharacterStatId.Side, 0x0), (CharacterStatId.AwardedOmniTekTokens, 0x0), (CharacterStatId.GmLevel, 0x0), (CharacterStatId.Expansions, 0x0), (CharacterStatId.PlayerId, 0x59EA506E),
+			(CharacterStatId.LastKillNumber, 0x14), (CharacterStatId.Unknown32, 0x0), (CharacterStatId.Skulk, 0x0), (CharacterStatId.RunSpeed, 0x0), (CharacterStatId.PerceptionSkill, 0x0),
+			(CharacterStatId.Hiding, 0x0), (CharacterStatId.Resilence, 0x0), (CharacterStatId.TrapDisarm, 0x0), (CharacterStatId.Climbing, 0x0), (CharacterStatId.MagicalResist, 0x64),
+			(CharacterStatId.MagicRating, 0x64), (CharacterStatId.AttackRating, 0x64), (CharacterStatId.DefenseRating, 0x64), (CharacterStatId.MemorizeDelay, 0x0), (CharacterStatId.ElderFrostSpecialization, 0x0),
+			(CharacterStatId.Unknown46, 0x0), (CharacterStatId.PetPoints, 0x0), (CharacterStatId.Unknown48, 0x0), (CharacterStatId.Money, 0x0), (CharacterStatId.Unknown50, 0x0),
+			(CharacterStatId.MinigamesAbandoned, 0x0), (CharacterStatId.Unknown52, 0x0), (CharacterStatId.SiegeLosses, 0x0), (CharacterStatId.Unknown54, 0x0), (CharacterStatId.SiegeWins, 0x0),
 			(CharacterStatId.Unknown56, 0x0), (CharacterStatId.CaptureSkullLose, 0x0), (CharacterStatId.Unknown57, 0x0), (CharacterStatId.CaptureSkullWin, 0x0), (CharacterStatId.Unknown58, 0x0),
-			(CharacterStatId.AnnihilationLose, 0x0), (CharacterStatId.Unknown59, 0x0), (CharacterStatId.AnnihilationWin, 0x0), (CharacterStatId.Unknown60, 0x0), (CharacterStatId.Unknown61, 0x0),
+			(CharacterStatId.AnnihilationLose, 0x0), (CharacterStatId.Unknown59, 0x0), (CharacterStatId.AnnihilationWin, 0x0), (CharacterStatId.Unknown60, 0x0), (CharacterStatId.Fatalities, 0x0),
 			(CharacterStatId.Unknown62, 0x0), (CharacterStatId.Death, 0x0), (CharacterStatId.Unknown63, 0x0), (CharacterStatId.KillingBlows, 0x0)
 		];
 

@@ -26,6 +26,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Recipe[]> GetRecipes();
 		Task<Spell?> GetSpell(uint id);
 		Task<Spell[]> GetSpells();
+		Task<SpellStatEffect[]> GetSpellStatEffects();
 		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
 		Task<uint[]> GetStartingSpells(uint level, Class @class);
 		Task<Dictionary<string, StockPhrase>> GetStockPhrases();
@@ -152,6 +153,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Spells.OrderBy(s => s.Id).ToArrayAsync();
+		}
+
+		// Every spell's [2][9] stat effects (#367). Read whole - it is 1.7k rows over 866 spells, cached in memory by
+		// BuffStatEffects, and a per-spell query on the buff-apply path would hit the DB on every cast.
+		public async Task<SpellStatEffect[]> GetSpellStatEffects()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.SpellStatEffects.OrderBy(e => e.SpellId).ThenBy(e => e.StatId).ToArrayAsync();
 		}
 
 		public async Task<uint[]> GetStartingBarSpells(uint level, Class @class)

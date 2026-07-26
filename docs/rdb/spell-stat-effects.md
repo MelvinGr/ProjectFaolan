@@ -1,0 +1,57 @@
+# Spell stat effects: the `[2][9]` region of a spell template (#367)
+
+A spell's RDB template (type `1040005`) carries the same `[2][9]` stat-modifier region item templates do, parsed
+by the same code (`ItemTemplateStatModifiers`, see [item-template-stats.md](item-template-stats.md)) and imported
+per spell as `SpellStatEffect` rows: **866 spells, 1714 records**.
+
+The record is ten `u32` LE words:
+
+```
+[kind][0][4][0][1][0][2][9][statId][amount]
+          └────── signature ──────┘
+```
+
+`statId` is a wire stat id - the ids named by the client's own table, see
+[ldb-stat-names.md](../re/ldb-stat-names.md). What makes the spell region different from the item one is `kind`,
+the word that OPENS the record: item templates use one kind throughout, spells mix several, and **the kind says
+how to read `amount`**.
+
+## The kinds
+
+| kind | reading | evidence |
+| --- | --- | --- |
+| 53045, 53189, 53220, 53221 | **flat** addition, in the stat's own wire scale | Fend `0x1C0`=1000 / `0x1C3`=500 (Armor/Protection, the same units a ring uses); Battle Cry: Marshal the Ranks `0x136`=44/62/80 across its rank ladder; a regen formation's `0x1F2`=500 → +5/s, matching the item-tooltip-proven ×100 |
+| 53067 | **percent × 100** | Philtre of Guile `0x138`=200, Refined Philtre of Guile `0x138`=500 - and the client's own elixir descriptions read "boost the Character's total Critical Rating by an additional **2%** / **5%**". The same 2/5 and 10/20 tiering recurs across every 53067 consumable |
+| 53219, 53002, 53007, 53013 | a **health effect**, not a buff stat | they only ever carry `0x1B` (Health): Lifestrike R1-R5 = 3400…33700 (an instant heal, `DurationMs` 0), and the `-100000000` drain/kill sentinel on non-buff spells |
+| 53110, 53162, … | unclassified | no evidence either way yet |
+
+Attributes are the one place the spell and item regions disagree on SCALE: a spell stores **display units**
+(`Potion of Strength (4h)` carries `0x324`=2, and the client's description for the sibling `0x32E` records reads
+"Augmente la Dextérité de 1/2"), while an item stores the same attribute ×10.
+
+## What the server applies
+
+`BuffStatEffects` honors a record only when **both** halves are justified:
+
+1. the kind is one of the flat kinds, and
+2. the stat is one whose wire scale we verified against a real in-client tooltip - which is exactly the set the
+   server already consumes from gear (Armor, Protection, Hit/Critical/Critical-Damage/Combat Rating, Magic
+   Damage, the two Natural Regens) plus the five attributes.
+
+Everything else is imported but inert, and counted in the engine's load summary. Applying a percent record as
+flat would turn "+2% Critical Rating" into "+200"; applying a flat record on a stat whose scale is unverified
+(`Absorb`, `Retributive Damage`) would be a guess with no way to notice it was wrong.
+
+## What this region is NOT
+
+It is **not** how the buffs that actually occur in retail play express themselves. Across the whole capture
+corpus, 187 distinct spells are applied to a player, and **none of them carries a `[2][9]` region at all** -
+Stagger, Shield of the Risen, Weakened Protection, Exhausted, Flesh to Worms and Fatality have none, and the only
+stat updates retail sends around those applies are vitals (health/mana/stamina current), never stat deltas. So
+this region covers potions, elixirs and a slice of the class buffs; the rest of a buff's behaviour is
+server-side content we do not have, exactly as with mana cost, recast and damage
+(see [stat-engine.md](../subsystems/stat-engine.md)).
+
+Spell **descriptions** (LDB category 50211, keyed by spell id → `Spells.Description`) are the useful
+counterweight: they state in words what an effect does, which is how an effect gets identified before it is
+implemented and how a decoded magnitude gets sanity-checked.

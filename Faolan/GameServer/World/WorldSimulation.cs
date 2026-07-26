@@ -163,7 +163,10 @@ namespace Faolan.GameServer.World
 				NaturalStaminaRegen = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.NaturalStaminaRegen) ?? 0),
 				// #400: seed the live drawn weapon set from the persisted value so a mid-session swap starts from the set
 				// the character last had out (and the gearBonuses above were aggregated for that same set).
-				ActiveWeaponSet = character.ActiveWeaponSet
+				ActiveWeaponSet = character.ActiveWeaponSet,
+				// #367: keep the gear bonuses themselves, not just their sum into the fields above - they are the
+				// baseline a buff's stat delta is added to (and removed from) by BuffStatEffects.
+				GearBonuses = gearBonuses ?? new Dictionary<CharacterStatId, int>()
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.
@@ -945,6 +948,8 @@ namespace Faolan.GameServer.World
 						// Mirror the apply: applyTo = the affected player, applyFrom = the caster (self for a self-buff,
 						// the NPC for an NPC-cast debuff). CasterHandle carries the applyFrom (#274).
 						await _output.SendBuffRemoval(pair.Key, pair.Value.Handle, buff.Value.CasterHandle, buff.Key);
+						// #367: the buff's stat deltas (if any) come off with it.
+						await _output.SyncBuffStats(pair.Key);
 					}
 				}
 			}
@@ -1015,6 +1020,7 @@ namespace Faolan.GameServer.World
 					foreach (var buff in pair.Value.ActiveBuffs)
 						await _output.SendBuffRemoval(client, pair.Value.Handle, buff.Value.CasterHandle, buff.Key);
 					pair.Value.ActiveBuffs.Clear();
+					await _output.SyncBuffStats(client); // #367: death strips the buffs, so it strips their stats too
 					// Persist the dead state (#214) so a logout-while-dead returns dead - the login snapshot then
 					// carries current-health = 0 and the client shows the release window at world entry.
 					character.IsDead = true;

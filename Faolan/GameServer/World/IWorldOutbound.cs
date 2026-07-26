@@ -54,6 +54,10 @@ namespace Faolan.GameServer.World
 		// Push a 0x96B8DC59 vitals update for the player (regen tick, NPC-attack damage).
 		Task PushVitals(INetworkClient client, EntityVitals vitals);
 
+		// Re-derive the player's buff-modified stats and push whatever changed (#367). The tick calls it wherever it
+		// takes buffs OFF a player - expiry, death - so a stat a buff raised comes back down.
+		Task SyncBuffStats(INetworkClient client);
+
 		// Re-run the world-entry render path for the player (used to respawn them at a resurrection point).
 		Task ReenterWorld(INetworkClient client);
 

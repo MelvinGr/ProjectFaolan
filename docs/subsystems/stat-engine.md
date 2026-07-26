@@ -65,6 +65,14 @@ final           = + a stat-0x17d scaling layer            // FUN_008d7080, vtabl
 `0x126` cast (centiseconds, ×10 = ms) · `0x11F` range (×100) · `0x15C` damage rating (×100). Many more
 (`0x36 0x4B 0x7B 0x80 0x81 0x93 0x227 0x34C …`) are unmapped.
 
+### The one place a spell template DOES name a stat
+The increasing field run carries magnitudes without saying what they modify (`551` is "400", never "400 of
+WHAT"). The `[2][9]` region in the same record is the exception: it carries explicit `(kind, statId, amount)`
+records, which is where a buff's armour/rating/attribute deltas come from -
+[spell-stat-effects.md](../rdb/spell-stat-effects.md), applied by `BuffStatEffects` (#367). It covers potions,
+elixirs and a slice of the class buffs; it is *not* how the buffs seen in retail captures express themselves, so
+it does not make this page's headline finding any less true.
+
 ## Open (the remaining engine decode)
 1. **Recast base** — recast is NOT a field-table value (proven). It is computed or uses a **cooldown-category**
    (a small index → a global time table), or a separate path not yet found. Likely needs **dynamic analysis**

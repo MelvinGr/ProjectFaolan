@@ -4,23 +4,25 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	// One stat entry a spell carries in its RDB template's [2][9] region - a (wire stat id, amount) pair, decoded by
-	// the SAME parser as item templates (RdbSpellImporter -> ItemTemplateStatModifiers, docs/rdb/item-template-stats.md,
-	// #367). This region IS the client's own source for a buff's tooltip stat lines, so our stored Amount matches what
-	// the client renders. 863 spells carry it (1708 rows).
+	// One stat entry a spell carries in its RDB template's [2][9] region - a (kind, wire stat id, amount) record,
+	// decoded by the SAME parser as item templates (RdbSpellImporter -> ItemTemplateStatModifiers,
+	// docs/rdb/item-template-stats.md, #367). 866 spells carry it (1714 rows).
 	//
-	// ⚠️ The region is HETEROGENEOUS and PER-STAT SCALED - NOT a clean "buff = +N stat" list, and NOT the item scale:
-	//   - attributes store DISPLAY units directly (Dexterity Buff 1/2 = 0x32E +1/+2; items store the SAME attribute
-	//     ×10, so ItemStatModifier's GetScale does NOT transfer to spells);
-	//   - movement/percentage/rank stats store large scaled magnitudes (0x1 = 190000 on the "Mounted" mount-speed
-	//     buffs; "Sustaining Wrath" ranks 108000..180000), and a health entry (0x1B) even carries a -100000000
-	//     drain/kill sentinel on non-buff spells.
-	// So a live apply/revert engine needs a per-stat scale table VERIFIED against in-client buff tooltips before it can
-	// honor these server-side (a blind apply would corrupt combat/vitals). Kept as a decoded FOUNDATION; the apply
-	// engine is deferred to that verification (#367).
+	// ⚠️ The region is HETEROGENEOUS - NOT a clean "buff = +N stat" list - and EffectKind is what resolves that: the
+	// word opening each record is an effect-kind tag, and it says how to read Amount (flat vs percent vs a health
+	// effect). See docs/rdb/spell-stat-effects.md for the classification and its evidence. Consequences worth knowing
+	// before consuming this table:
+	//   - a PERCENT record (kind 53067) stores percent ×100 - Philtre of Guile 0x138 = 200 is "+2% Critical Rating",
+	//     not +200;
+	//   - a health record (kind 53219/53002/…) is an instant heal or the -100000000 drain/kill sentinel, not a buff;
+	//   - attributes on a FLAT record store DISPLAY units (Dexterity Buff 1/2 = 0x32E +1/+2, confirmed by the client's
+	//     own description strings), while items store the same attribute ×10 - so ItemStatModifier's GetScale does not
+	//     transfer to spell attributes.
+	// The server therefore applies only the (kind, stat) pairs it can justify - see BuffStatEffects, which honors flat
+	// records on the stats whose wire scale we verified against in-client tooltips, and logs the rest.
 	//
 	// KEY is the natural (SpellId, StatId): a spell never lists a stat twice (last wire write wins on a repeat).
-	// Amount is the RAW template value at whatever scale that stat id uses.
+	// Amount is the RAW template value at whatever scale that stat id / kind uses.
 	[PrimaryKey(nameof(SpellId), nameof(StatId))]
 	public class SpellStatEffect
 	{
@@ -30,6 +32,10 @@ namespace Faolan.Core.Database.Tables
 		public virtual Spell Spell { get; set; } = null!;
 
 		public CharacterStatId StatId { get; set; }
+
+		// The record's effect-KIND tag, verbatim from the template (the ~53000-range word that opens the record).
+		// 0 for a record that starts the body, where the tag would sit before it - unreadable, so never honored.
+		public uint EffectKind { get; set; }
 
 		public int Amount { get; set; }
 	}

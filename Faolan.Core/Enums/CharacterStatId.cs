@@ -130,87 +130,87 @@ namespace Faolan.Core.Enums
 		// the epoch decode is the grounded part.
 		Timestamp = 0x044A,
 
-		// Undecoded slots of the 0x737A6DF9 tails stat sheet, numbered Unknown{i} so the whole block is enumerable.
-		// Values are the raw wire stat ids; rename to a real name as each is decoded.
+		// The remaining slots of the 0x737A6DF9 tails stat sheet. These were numbered Unknown{i} until the client's own
+		// stat-name table was found: LDB (RDB 1030002) **category 615** is an id -> name map keyed by the WIRE STAT ID
+		// (891 ids, in 7 localized pages - the English one is cribbed against the names we already had, not picked by
+		// order). It agrees with every id we had already named the hard way (310 Hit Rating, 312 Critical Rating,
+		// 0x324 Strength, 0x398 Attack Rating from Ghidra…), so the names below are the client's, not a guess.
+		// Regenerate with
+		// `dotnet run --project Faolan.Importer -- --report ldb-stat-names`; the full table is docs/re/ldb-stat-names.md.
+		// A few ids remain Unknown##: the client's table has no entry for them at all.
+		//
+		// The Anarchy Online leftovers (Nano Interval, Awarded Omni-Tek Tokens, Memorize Delay) are named as the client
+		// names them - they are dead slots in Conan, and a made-up "better" name would not match the client's table.
 		//
 		// ⚠️ #393 finding: this sheet is a BASELINE SKELETON, not the character's live stats. The attributes are the
 		// fixed base (Strength 0x324 / Intelligence 0x328 == 10 for EVERY char, L1 through L80), and ~two-thirds of the
 		// slots are 0/constant across all 29 archetype captures. Only vitals (HP/mana/stamina), XP/level, the PvP
 		// counters, PlayfieldToken and a handful below actually vary per character - the real leveled stats arrive via
-		// the live StatIIR (0xF98E10B3) / vitals (0x96B8DC59) updates, not here. So the remaining Unknown## are mostly
-		// not worth chasing from captures; the few that vary need in-client .setstat probing (the method that pinned
-		// HP/mana/stamina) to name. Two more are characterised across a character's MANY captures - TYPE pinned, meaning
-		// not (still Unknown):
-		//   0x025F (Unknown30) - a per-character CONSTANT (byte-identical across NecroL80's 42 captures), only 3 distinct
-		//                        values corpus-wide. NOT a scalar, and NOT race: two Stygian-only necros (Faolanx,
-		//                        Stickienecro) carry different values. An appearance/creation bucket or identity hash.
-		//   0x0398/0x039A/0x039B/0x039D (Unknown42/43/41/40) - four SIGNED values, base -300 (0xFFFFFED4) fresh, all four
-		//                        EQUAL per char, and they scale WITH LEVEL (Hoxxling's quad tracks her ExpCurrentLevelBase
-		//                        across captures, 100->9300 as base 0->263640). A level-scaled rating quad; exact stat
-		//                        needs .setstat probing.
-		Unknown0 = 0x252,
-		Unknown1 = 0x253,
-		Unknown2 = 0x254,
-		Unknown3 = 0x255,
-		Unknown4 = 0x000,
-		Unknown5 = 0x0E0,
-		Unknown6 = 0x0AE,
-		Unknown7 = 0x0AD,
-		Unknown9 = 0x40B,
-		Unknown11 = 0x0A9,
+		// the live StatIIR (0xF98E10B3) / vitals (0x96B8DC59) updates, not here. Naming a slot does NOT mean the server
+		// fills it; what varies per character is characterised there.
+		TempSaveTeamId = 0x252,
+		TempSavePlayfield = 0x253,
+		TempSaveX = 0x254,
+		TempSaveY = 0x255,
+		Flags = 0x000,
+		Features = 0x0E0,
+		PreviousMovementMode = 0x0AE,
+		CurrentMovementMode = 0x0AD,
+		DeathEffectXp = 0x40B,
+		ChosenGod = 0x0A9,
 		Unknown12 = 0x534,
-		Unknown13 = 0x16B,
+		NanoInterval = 0x16B,
 		Unknown15 = 0x163,
-		Unknown16 = 0x449,
-		Unknown17 = 0x0A5,
-		Unknown18 = 0x241,
-		Unknown19 = 0x113,
-		Unknown20 = 0x04F,
-		Unknown21 = 0x00C,
-		Unknown22 = 0x022,
-		Unknown23 = 0x03B,
-		Unknown24 = 0x00B,
-		Unknown25 = 0x03A,
-		Unknown26 = 0x021,
-		Unknown27 = 0x04B,
-		Unknown28 = 0x0D7,
-		Unknown29 = 0x185,
-		Unknown30 = 0x25F,
-		Unknown31 = 0x06A,
+		MurderPoints = 0x449,
+		ShieldAllocation = 0x0A5,
+		FeatResets = 0x241,
+		XpKillRange = 0x113,
+		Icon = 0x04F,
+		Mesh = 0x00C,
+		DeadTimer = 0x022,
+		Sex = 0x03B,
+		PreviousHealth = 0x00B,
+		Played = 0x03A,
+		Side = 0x021,
+		AwardedOmniTekTokens = 0x04B,
+		GmLevel = 0x0D7,
+		Expansions = 0x185,
+		PlayerId = 0x25F,
+		LastKillNumber = 0x06A,
 		Unknown32 = 0x0F3,
-		Unknown33 = 0x445,
-		Unknown34 = 0x43D,
-		Unknown35 = 0x33E,
-		Unknown36 = 0x33C,
-		Unknown37 = 0x08C,
-		Unknown38 = 0x338,
-		Unknown39 = 0x332,
-		Unknown40 = 0x39D,
-		Unknown41 = 0x39B,
+		Skulk = 0x445,
+		RunSpeed = 0x43D,
+		Hiding = 0x33C,
+		Resilence = 0x08C,
+		TrapDisarm = 0x338,
+		Climbing = 0x332,
+		MagicalResist = 0x39D,
+		MagicRating = 0x39B,
 
-		// Two of the level-scaled rating quad (0x398/0x39A/0x39B/0x39D) pinned via the client (Ghidra 2026-07-21):
-		// CoreCombatManager::GetAttackRating() reads 0x398, GetDefenseRating() reads 0x39A. The other two
-		// (Unknown40/41 = 0x39D/0x39B) are the quad's remaining members (_rating/_effect or melee/ranged - Unknown).
+		// The level-scaled rating quad (0x398/0x39A/0x39B/0x39D), now named end to end: two came from the client's code
+		// (Ghidra 2026-07-21 - CoreCombatManager::GetAttackRating() reads 0x398, GetDefenseRating() reads 0x39A) and the
+		// other two from its stat-name table (0x39B Magic Rating, 0x39D Magical Resist, declared just above). So the
+		// quad is attack/defense/magic-attack/magic-defense - which is why all four move together with level.
 		AttackRating = 0x398,
 		DefenseRating = 0x39A,
-		Unknown44 = 0x07F,
-		Unknown45 = 0x05B,
+		MemorizeDelay = 0x07F,
+		ElderFrostSpecialization = 0x05B,
 		Unknown46 = 0x03C,
-		Unknown47 = 0x1C8,
+		PetPoints = 0x1C8,
 		Unknown48 = 0x14B,
-		Unknown49 = 0x03D,
+		Money = 0x03D,
 		Unknown50 = 0x575,
-		Unknown51 = 0x560,
+		MinigamesAbandoned = 0x560,
 		Unknown52 = 0x573,
-		Unknown53 = 0x29F,
+		SiegeLosses = 0x29F,
 		Unknown54 = 0x56E,
-		Unknown55 = 0x29E,
+		SiegeWins = 0x29E,
 		Unknown56 = 0x571,
 		Unknown57 = 0x56B,
 		Unknown58 = 0x570,
 		Unknown59 = 0x56A,
 		Unknown60 = 0x569,
-		Unknown61 = 0x564,
+		Fatalities = 0x564,
 		Unknown62 = 0x567,
 		Unknown63 = 0x566
 	}

@@ -47,6 +47,13 @@ namespace Faolan.Importer.Cli
 			if (report == "apply-seed")
 				return ApplySeed();
 
+			// RDB-only, no corpus: the client's stat-name table (LDB cat 615).
+			if (report == "ldb-stat-names")
+			{
+				LdbStatNames(RdbDir(), options.Out);
+				return 0;
+			}
+
 			// Every report below reads the corpus. It is NOT in this repo (private ProjectFaolan-Data), so say where
 			// to point rather than letting Directory.EnumerateFiles throw a bare path error.
 			if (!Directory.Exists(capturesDir))
@@ -312,91 +319,39 @@ namespace Faolan.Importer.Cli
 
 				case "ldb-resolve":
 				{
-					// #291: parse the LDB (RDB 1030002) TDC2 pages with the CORRECT grammar recovered from the client
-					// loader FUN_0060e5c0 - each page carries an EXPLICIT per-string id index (the earlier RE mis-read
-					// the string blob as a flat NUL-separated positional array and missed the trailing id table). Build a
-					// global id -> string map and print lookups for the pins + any --report-arg ids, to verify offline.
-					//   body: [12 RDB-Id][u32 "TDC2"][u32 category][u32 flags][u32 size][u32 count][16 MD5]
-					//         [size string-blob][count x { u32 id, u32 unk, u32 offset, u32 length }]
+					// #291: walk the LDB's TDC2 pages (LdbStringIndex owns that grammar) and build a global id -> string
+					// map, then print lookups for the pins + any --report-arg ids, to verify offline.
 					var rdbDir = RdbDir();
 					using var rdb = new RdbReader(rdbDir);
 					var map = new Dictionary<uint, string>();
 					var byCat = new Dictionary<(uint cat, uint id), string>();
-					var byLang = new Dictionary<(uint cat, uint id, uint lang), string>();
-					var langHisto = new Dictionary<uint, int>();
 					var perCategory = new Dictionary<uint, int>();
 					// Per-page id->string for name categories, so we can crib-identify the ENGLISH page(s) against the
 					// names our catalog already carries (#291/#300): 50210 spell names, 50200/50220 item names.
 					var spellNamePages = new List<(uint page, Dictionary<uint, string> ids)>();
 					var itemNamePages = new List<(uint cat, uint page, Dictionary<uint, string> ids)>();
-					int pages = 0, badMagic = 0;
-					foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
+					var pages = 0;
+					foreach (var (pageId, category, strings) in LdbPagesOf(rdb))
 					{
-						byte[] b;
-						try
-						{
-							b = rdb.ReadDecompressed(e);
-						}
-						catch
-						{
-							continue;
-						}
-
-						if (b.Length < 48)
-							continue;
-
-						var span = b.AsSpan(12);
-						if (BinaryPrimitives.ReadUInt32LittleEndian(span) != 0x32434454u)
-						{
-							badMagic++;
-							continue;
-						}
-
-						var category = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(4, 4));
-						var size = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(12, 4));
-						var count = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(16, 4));
-						var blobStart = 36; // span: TDC2(4) + cat/flags/size/count(16) + MD5(16) = 36
-						var indexStart = blobStart + (int)size;
-						if (indexStart + (long)count * 16 > span.Length)
-							continue; // grammar mismatch for this page
-
 						pages++;
-						var thisPage = category is 50210 or 50200 or 50220
-							? new Dictionary<uint, string>()
-							: null;
-						for (var i = 0; i < count; i++)
+						foreach (var (id, str) in strings)
 						{
-							var rec = span.Slice(indexStart + i * 16, 16);
-							var id = BinaryPrimitives.ReadUInt32LittleEndian(rec);
-							var lang = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(4, 4)); // 2nd u32 = language (loader arg3)
-							var off = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(8, 4));
-							var len = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(12, 4));
-							if (off + len > size)
-								continue;
-
-							var strBytes = span.Slice(blobStart + (int)off, (int)len);
-							var nul = strBytes.IndexOf((byte)0);
-							if (nul >= 0)
-								strBytes = strBytes.Slice(0, nul);
-							var str = Encoding.UTF8.GetString(strBytes);
 							map[id] = str;
 							byCat[(category, id)] = str;
-							langHisto[lang] = langHisto.GetValueOrDefault(lang) + 1;
-							byLang[(category, id, lang)] = str;
-							perCategory[category] = perCategory.GetValueOrDefault(category) + 1;
-							thisPage?[id] = str;
 						}
 
-						if (thisPage is { Count: > 0 })
-						{
-							if (category == 50210)
-								spellNamePages.Add((e.Id, thisPage));
-							else
-								itemNamePages.Add((category, e.Id, thisPage));
-						}
+						perCategory[category] = perCategory.GetValueOrDefault(category) + strings.Count;
+
+						if (strings.Count == 0)
+							continue;
+
+						if (category == LdbStringIndex.SpellNameCategory)
+							spellNamePages.Add((pageId, strings));
+						else if (category is LdbStringIndex.ItemNameCategory or 50220)
+							itemNamePages.Add((category, pageId, strings));
 					}
 
-					Console.WriteLine($"LDB: {pages} pages parsed, {map.Count} unique ids, {badMagic} bad-magic, {perCategory.Count} categories.");
+					Console.WriteLine($"LDB: {pages} pages parsed, {map.Count} unique ids, {perCategory.Count} categories.");
 					// Per-category: count + an ASCII-ratio on a sample so English (high ASCII) is distinguishable from CJK.
 					Console.WriteLine("=== categories (id, count, asciiPct, sample) ===");
 					foreach (var (cat, cnt) in perCategory.OrderByDescending(kv => kv.Value).Take(30))
@@ -408,9 +363,9 @@ namespace Faolan.Importer.Cli
 						Console.WriteLine($"  cat {cat,-8} n={cnt,-6} ascii={ascii,3}%  '{sample.Substring(0, Math.Min(40, sample.Length))}'");
 					}
 
-					Console.WriteLine("=== language histogram (2nd u32 per index entry) ===");
-					foreach (var (lang, n) in langHisto.OrderByDescending(kv => kv.Value).Take(12))
-						Console.WriteLine($"  lang {lang,-6} n={n}");
+					// (No language histogram: language is per-PAGE, not per-entry - the index entry's 2nd u32 is
+					// langOrFlags and the shared parser deliberately ignores it. The crib below is how a page's language
+					// is actually determined.)
 					await using (var db = OpenDb())
 					{
 						var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "").ToDictionaryAsync(s => s.Id, s => Norm(s.Name!));
@@ -862,6 +817,113 @@ namespace Faolan.Importer.Cli
 						Console.WriteLine($"  @{i,5} {v} -> type {t} ({(re.File == 0xff ? "CDN" : "local")} {re.Size} B)");
 				}
 			}
+		}
+
+		// Every LDB page (RDB 1030002) in the client, as (page id, category, id -> string). Thin wrapper over the shared
+		// LdbStringIndex grammar that adds only the per-PAGE grouping the crib reports need - language is a property of
+		// the page, so a report that merges every page of a category ends up with whichever language sorted last.
+		private static IEnumerable<(uint PageId, uint Category, Dictionary<uint, string> Strings)> LdbPagesOf(RdbReader rdb)
+		{
+			foreach (var e in rdb.EntriesOfType(1030002).Where(x => x.IsLocal))
+			{
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue; // not a readable record (CDN-only / not zlib)
+				}
+
+				var category = LdbStringIndex.CategoryOf(body);
+				if (category == 0)
+					continue; // not a TDC2 page
+
+				var strings = new Dictionary<uint, string>();
+				foreach (var entry in LdbStringIndex.Parse(body))
+					strings[entry.Id] = entry.Value;
+
+				yield return (e.Id, category, strings);
+			}
+		}
+
+		// The client's own STAT-NAME table: LDB category 615 is an id -> name map keyed by the WIRE STAT ID (the same
+		// id space as the 0x96B8DC59 vitals block, the FullChar snapshot stat sheet, the item [2][9] modifier region and
+		// the spell stat effects).
+		//
+		// Like every LDB category it is LOCALIZED - one page per language, all carrying the same ids - so the page must
+		// be CRIBBED, not picked by order (taking the last page yields Korean). The crib is the same one the spell/item
+		// name reports use (#291/#300), against the ids we had already named the hard way: the English page is the one
+		// whose text matches CharacterStatId's own names. That cross-check is also what makes this a linter and not just
+		// a dump - a name we invented that disagrees with the client's is a bug, and an enum id absent from the table is
+		// one we named from somewhere else (Ghidra, tooltips) and should stay justified in its comment.
+		private static void LdbStatNames(string rdbDir, string? outDir)
+		{
+			using var rdb = new RdbReader(rdbDir);
+
+			// Our own names, normalized to letters+digits, as the crib key set.
+			static string Key(string s)
+			{
+				return Regex.Replace(s, "[^A-Za-z0-9]", "").ToLowerInvariant();
+			}
+
+			var ourNames = Enum.GetValues<CharacterStatId>().Distinct().ToDictionary(id => (uint)id, id => Key(Enum.GetName(id)!));
+
+			var scored = LdbPagesOf(rdb)
+				.Where(p => p.Category == LdbStringIndex.StatNameCategory)
+				.Select(p => (p.PageId, p.Strings, Match: p.Strings.Count(kv => ourNames.TryGetValue(kv.Key, out var ours) && Key(kv.Value) == ours)))
+				.OrderByDescending(x => x.Match)
+				.ToList();
+
+			if (scored.Count == 0)
+			{
+				Console.WriteLine($"LDB cat {LdbStringIndex.StatNameCategory}: no pages found - is this RDB dir complete?");
+				return;
+			}
+
+			Console.WriteLine($"LDB cat {LdbStringIndex.StatNameCategory}: {scored.Count} page(s); cribbed against {ourNames.Count} named CharacterStatId members:");
+			foreach (var (pageId, strings, match) in scored)
+				Console.WriteLine($"  page {pageId,-9} ids={strings.Count,-5} crib-match={match,-4} {(pageId == scored[0].PageId ? "<-- ENGLISH" : "")}");
+
+			var names = scored[0].Strings;
+
+			var lines = names.OrderBy(kv => kv.Key).Select(kv => $"{kv.Key}\t0x{kv.Key:X4}\t{kv.Value}").ToList();
+			foreach (var line in lines)
+				Console.WriteLine("  " + line);
+
+			// Cross-check: every CharacterStatId member against the client's name for that id.
+			int agree = 0, absent = 0;
+			var disagree = new List<string>();
+			foreach (var id in Enum.GetValues<CharacterStatId>().Distinct())
+			{
+				var member = Enum.GetName(id)!;
+				if (!names.TryGetValue((uint)id, out var ldb))
+				{
+					absent++;
+					continue;
+				}
+
+				// Compare on letters+digits only: our names are PascalCase, the client's are spaced/parenthesised.
+				var ours = Regex.Replace(member, "[^A-Za-z0-9]", "").ToLowerInvariant();
+				var theirs = Regex.Replace(ldb, "[^A-Za-z0-9]", "").ToLowerInvariant();
+				if (ours == theirs)
+					agree++;
+				else
+					disagree.Add($"  0x{(uint)id:X4} {member} != '{ldb}'");
+			}
+
+			Console.WriteLine($"CharacterStatId: {agree} names match the client's, {disagree.Count} differ, {absent} have no entry in the table.");
+			foreach (var d in disagree)
+				Console.WriteLine(d);
+
+			if (string.IsNullOrEmpty(outDir))
+				return;
+
+			Directory.CreateDirectory(outDir);
+			var path = Path.Combine(outDir, "ldb-stat-names.tsv");
+			File.WriteAllLines(path, lines);
+			Console.WriteLine($"wrote {path}");
 		}
 
 		private static List<NamedCapture> LoadCaptures(string capturesDir)

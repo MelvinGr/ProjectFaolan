@@ -29,7 +29,14 @@ namespace Faolan.Core.Rdb
 		public const uint ItemDescriptionCategory = 50201; // tooltip descriptions, keyed by item template id
 		public const uint ItemNameCategory = 50200;
 		public const uint Magic = 0x32434454; // "TDC2" little-endian
+		public const uint SpellDescriptionCategory = 50211; // spell tooltip descriptions, keyed by SPELL id
 		public const uint SpellNameCategory = 50210;
+
+		// The client's STAT-NAME table: id -> name keyed by the WIRE stat id (1 "Health", 310 "Hit Rating", 975
+		// "Absorb", …) - the same id space as the 0x96B8DC59 vitals block, the FullChar snapshot stat sheet, the item
+		// [2][9] modifier region and the spell stat effects. Localized like every other category, so crib the page
+		// (ReportCli's ldb-stat-names does it against CharacterStatId's own names).
+		public const uint StatNameCategory = 615;
 
 		// The page's category, or 0 if the body is not a TDC2 page (too short / wrong magic).
 		public static uint CategoryOf(ReadOnlySpan<byte> body)

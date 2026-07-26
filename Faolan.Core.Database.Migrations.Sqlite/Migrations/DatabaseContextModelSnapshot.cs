@@ -2830,6 +2830,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float>("DamageRating")
                         .HasColumnType("REAL");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("DotDelta")
                         .HasColumnType("INTEGER");
 
@@ -2870,6 +2874,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Amount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("EffectKind")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("SpellId", "StatId");

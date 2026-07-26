@@ -8,6 +8,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -183,6 +184,7 @@ namespace Faolan.GameServer
 			await SendBuffRemoval(client, self, self, appliedId);
 
 			_simulation.PlayerWorldEntity(client)?.ActiveBuffs.TryRemove(appliedId, out _);
+			await SyncBuffStats(client);
 			client.Session.ActiveShieldSpellBase = null;
 			Logger.LogInformation("Shield of the Risen broken by aggressive action for {Name}.", client.Session.Character?.Name);
 		}
@@ -340,9 +342,36 @@ namespace Faolan.GameServer
 							// Preserve the effect nonce so the buff can be reconstructed byte-compatibly on relog (#274).
 							Nonce = ActiveBuff.NonceFromPayload(payload)
 						};
+						// #367: the buff may carry stat deltas (armor/ratings/attributes) - fold them into the live stats.
+						await SyncBuffStats(client);
 					}
 				}
 			}
+		}
+
+		// Re-derives the player's buffed stats (#367) after ANY change to their live buffs - applied, expired, cancelled,
+		// broken, cleared on death - and pushes the ones that moved. Called at every ActiveBuffs mutation rather than
+		// folded into the apply path, because a stat a buff raised has to come back DOWN when it ends, and the end
+		// happens in four different places (tick expiry, .cancelbuff, shield break, death).
+		//
+		// Cheap and quiet by design: most buffs carry no honored stat delta, so Sync returns nothing and no packet is
+		// sent. Only a real change reaches the wire.
+		private async Task SyncBuffStats(INetworkClient client)
+		{
+			var entity = _simulation.PlayerWorldEntity(client);
+			if (entity == null)
+				return;
+
+			var changed = await _buffStats.Sync(entity);
+			if (changed.Count == 0)
+				return;
+
+			var block = new CharacterStatBlock();
+			foreach (var (stat, value) in changed)
+				block.Set(stat, value);
+
+			await SendStatUpdate(client, block, entity.Handle);
+			Logger.LogInformation("Buff stats for {Name}: {Stats}.", client.Session.Character?.Name, string.Join(", ", changed.Select(c => $"{c.Stat}={c.Value}")));
 		}
 
 		private async Task SendShieldBuff(INetworkClient client, uint self, uint spellBase)

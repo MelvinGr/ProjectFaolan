@@ -1727,7 +1727,10 @@ namespace Faolan.GameServer
 					await SendBuffRemoval(client, self, self, appliedId);
 
 					if (entity != null && entity.ActiveBuffs.TryRemove(appliedId, out _))
+					{
+						await SyncBuffStats(client); // #367: drop whatever stats the cancelled buff was granting
 						Logger.LogInformation("CancelBuff: buff 0x{Buff:X8} removed from {CharId:X8}.", appliedId, charId);
+					}
 					else
 						Logger.LogDebug("CancelBuff: buff 0x{Buff:X8} was not tracked for {CharId:X8} (cast before the registry, or an aura).", appliedId, charId);
 

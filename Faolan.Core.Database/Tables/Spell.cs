@@ -19,6 +19,18 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;
 
+		// The tooltip description, from LDB category 50211 keyed by the SPELL id - the same text the client shows in a
+		// spell/buff tooltip ("When you or your group perform a fatality and this buff is active, the Frozen Hatred pet
+		// appears…"). NULL when the LDB has none for this spell (only ~3.6k of the 20k spells carry one), or when the
+		// RDB-backed rdb-ldb-names module has not been run (it is opt-in, needing --RdbDir).
+		//
+		// This is the one source that states an effect in WORDS, which is why it is worth storing: the spell record
+		// itself carries magnitudes but not their meaning, so the description is how an effect gets identified (it is
+		// what pinned Frozen Hatred's fatality proc, #434) and how a decoded magnitude gets sanity-checked. Some carry
+		// the client's inline gender markup (#name{m:…|f:…}) verbatim - stored as-is, it is the client's own text.
+		[MaxLength(512)]
+		public string? Description { get; set; }
+
 		public uint DotType { get; set; }
 
 		// Buff/effect duration in milliseconds. Imported from RDB field 0x008, which is in CENTISECONDS (×10ms - the
