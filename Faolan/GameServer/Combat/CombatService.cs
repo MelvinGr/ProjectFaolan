@@ -437,6 +437,20 @@ namespace Faolan.GameServer.Combat
 				// range - retail's NewAllowedLooterIIR is a loot-PERMISSION grant (#263).
 				npcEntity.LastAttackerHandle = killer.Session.Character.Id;
 
+				// #140: roll for a fatality FIRST. The chance comes from the client's own fatality groups (RDB 1010219 -
+				// a percent, tiered by level: 5% at 1, 30% at 80), and a hit sends the burst the captures show.
+				//
+				// ⚠️ ORDER IS LOAD-BEARING: retail sends the fatality burst BEFORE the victim's death records, in
+				// 37 out of 37 captured fatalities - the Fatality ApplySpells land 7-20 packets ahead of the death-pose
+				// MoveTask and ahead of the death BccIIR every time, usually in the same frame as the killing blow
+				// (xxx_mage-necromancer fr1267: burst -> victim StatDamage -> pose -> BccIIR). The client can only pick
+				// a FINISHER death for the corpse if it already knows the kill was a fatality, and nothing else in the
+				// burst distinguishes one (the death record itself is byte-identical in kind on fatal and normal kills:
+				// same creature death-behaviour id, same variant spread). Rolling it after the death records - which is
+				// what this did - gave the buffs, the proc and the pet with an ordinary death animation.
+				if (_fatality != null)
+					await _fatality.OnKill(killer, _sim.PlayerWorldEntity(killer), npcEntity);
+
 				// #204/#349: the health=0 StatUpdate alone does NOT play the death animation. Retail drives an NPC
 				// death with a death-pose MoveTask (type 0x06, freezes the corpse in place) + a death-behavior BccIIR
 				// (behaviorId 41877) on the dying handle - decoded from NecroL80_..._casting-combat, where EVERY NPC kill
@@ -447,11 +461,6 @@ namespace Faolan.GameServer.Combat
 				await SendWorldPacket(killer, WorldDeath.BuildDeathBcc(targetHandle, npcEntity.DeathBehaviorId, WorldDeath.NpcDeathVariant));
 
 				await AwardKillXp(killer, npcEntity.Level);
-
-				// #140: roll for a fatality. The chance comes from the client's own fatality groups (RDB 1010219 -
-				// a percent, tiered by level: 5% at 1, 30% at 80), and a hit sends the burst the captures show.
-				if (_fatality != null)
-					await _fatality.OnKill(killer, _sim.PlayerWorldEntity(killer), npcEntity);
 
 				_logger.LogInformation("Combat: NPC {Name} 0x{Target:X8} killed ({Cause}); corpse lingers {Linger}s then becomes lootable, {Fate}.", npcEntity.Name, targetHandle, cause,
 					WorldEntity.CorpseLingerSeconds, npcEntity.NoRespawn

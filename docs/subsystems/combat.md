@@ -435,25 +435,28 @@ straight **percent**, and its tiers map 1:1 onto `minlevel`:
 so a character rolls the best tier its level qualifies for — `FatalityService.FatalityChancePercent`, gated by
 `FatalityBurstTests`.
 
-**The ANIMATION is entirely client-side, and it is WEAPON-gated.** Two independent checks:
+**The ANIMATION is client-side — the server's only lever is ORDER.** Three things the corpus establishes:
 
-1. *The server sends nothing extra.* Across the 8 corpus captures that contain a fatality, comparing the s2c
-   packet types in a window around **37 fatal** kills against **98 normal** ones: no IIR type is unique to a
-   fatality. The only difference is the `ApplySpell` (`0x6B87E316`) carrying the two Fatality buffs themselves.
-   The victim's death record is byte-for-byte the ordinary kind — its `field1` is always the creature's own death
-   behaviour (41877 humanoid / 215333 quadruped / 17036 demon) and `field3`/`field12` spread identically on fatal
-   and non-fatal kills. There is no server-side fatality-animation emission to reproduce.
-2. *All 59 `<fatalitygroup>` records are keyed to a WEAPON.* Their `criteria` values are 23 (1H-Sword family),
-   24 (1H-Axe), 25 (2H-Polearm), 26 (Ranged-Bow), 27 (1H-Blunt + stealth 1hb), 28 (2H-Sword/Axe), 29 (2H-Blunt),
-   30 (1H-Dagger + stealth piercing), 32 (Ranged-Crossbow) and 53 (three scripted specials: the Iron Tower
-   executioner, the Warmonk unarmed, Conan killing Thoth-Amon). **There is no caster/spell group at all.** Each
-   entry names a paired `selftargetanimation` / `targetanimation` (attacker + victim, e.g.
-   `fighting_fatality_weapon_1he_decap_attacker` / `_victim`) plus `poptargetonattractor="yes"` — the client snaps
-   the corpse onto an attractor and plays both halves itself.
-
-So a SPELL kill produces the buff burst and an ordinary death animation — in retail as here, which is what every
-captured fatality (all of them caster kills) shows. A finisher requires a melee killing blow with one of the
-weapon types above.
+1. *No packet type is unique to a fatality.* Comparing the s2c packet types in a window around **37 fatal** kills
+   against **98 normal** ones: the only difference is the `ApplySpell` (`0x6B87E316`) carrying the Fatality buffs.
+   The victim's death record is the ordinary kind — `field1` is always the creature's own death behaviour (41877
+   humanoid / 215333 quadruped / 17036 demon) and `field3`/`field12` spread identically on fatal and non-fatal
+   kills. So there is no separate "play the finisher" emission to reproduce.
+2. **The burst comes BEFORE the victim's death records, 37/37.** The Fatality `ApplySpell`s land 7–20 packets
+   ahead of the death-pose MoveTask *and* ahead of the death `BccIIR`, usually in the same frame as the killing
+   blow: `xxx_mage-necromancer` fr1267 is burst → victim `StatDamage` → death pose → (fr1270) death BccIIR. Since
+   the death record carries no fatality marker, this ordering is the only thing that can tell the client the kill
+   *was* a fatality before it picks the corpse's animation — so `CombatService.OnNpcKilled` rolls and sends the
+   burst first, then the death records.
+3. *The finisher tables are weapon-keyed.* All 59 `<fatalitygroup>` records carry a `criteria` of 23 (1H-Sword
+   family), 24 (1H-Axe), 25 (2H-Polearm), 26 (Ranged-Bow), 27 (1H-Blunt + stealth 1hb), 28 (2H-Sword/Axe),
+   29 (2H-Blunt), 30 (1H-Dagger + stealth piercing), 32 (Ranged-Crossbow) or 53 (three scripted specials: the Iron
+   Tower executioner, the Warmonk unarmed, Conan killing Thoth-Amon). Each names a paired `selftargetanimation` /
+   `targetanimation` (e.g. `fighting_fatality_weapon_1he_decap_attacker` / `_victim`) with
+   `poptargetonattractor="yes"` — the client snaps the corpse to an attractor and plays both halves itself.
+   **[V0]** how a SPELL kill selects its finisher is not resolved: 1010219 has no caster group, yet every captured
+   fatality is a caster kill. Either it lives outside this table or the paired-animation path is melee-only while
+   the spell case shows something else.
 
 ## Spell cast FSM (#236)
 A player spell cast is a `BehaviorControlCenter` (`0x642CD3D6`) `CastSpell` action (`ActionType 4`), handled in
