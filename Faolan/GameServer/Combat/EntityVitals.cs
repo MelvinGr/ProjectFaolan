@@ -133,11 +133,24 @@ namespace Faolan.GameServer.Combat
 		///     combat and by the world simulation when a player is registered. <paramref name="gearBonuses" /> is the
 		///     MaxStatAggregator output (display-unit totals by stat); null/absent = no gear bonus.
 		/// </summary>
-		public static EntityVitals FromCharacter(Character character, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses = null)
+		public static EntityVitals FromCharacter(Character character, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses = null,
+			IReadOnlyDictionary<CharacterStatId, int>? classBase = null)
 		{
 			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
-			var vitals = FromMax(AddGear(max.Health, gearBonuses, CharacterStatId.HealthMax), AddGear(max.Mana, gearBonuses, CharacterStatId.ManaMax),
-				AddGear(max.Stamina, gearBonuses, CharacterStatId.StaminaMax));
+
+			// The client builds its max the same way and we can read its arithmetic straight off the ClientInterface
+			// channel (#450). For a level-80 Necromancer it took OUR snapshot value as the base and added its own terms:
+			//     634100 (our CharacterMaxStats, = 6341)  +  38600 class-feat HealthMax  +  58400 item HealthMax
+			// The item term matched our gear aggregate exactly; the class-feat term is the #444 data we already store in
+			// ClassAttributeBases and were not using, which is why the server clamped regen 386 low and the bar visibly
+			// stalled short. Both terms are folded in here.
+			//
+			// ⚠️ This does NOT close the whole gap: that client reached 10311 against the 7311 these three terms give.
+			// The remaining 3000 arrives with no template source in the log - almost certainly buffs, which the server
+			// tracks separately (BuffStatEffects) and does not feed into max vitals. Deliberately not guessed at.
+			var vitals = FromMax(AddGear(AddGear(max.Health, gearBonuses, CharacterStatId.HealthMax), classBase, CharacterStatId.HealthMax),
+				AddGear(AddGear(max.Mana, gearBonuses, CharacterStatId.ManaMax), classBase, CharacterStatId.ManaMax),
+				AddGear(AddGear(max.Stamina, gearBonuses, CharacterStatId.StaminaMax), classBase, CharacterStatId.StaminaMax));
 			// #214: a character that logged out dead is still dead - seed current health at 0 (max stays full) so the
 			// world model agrees with the dead login snapshot and RespawnMe/TryRespawnNow (which gate on IsDead) work.
 			if (character.IsDead)

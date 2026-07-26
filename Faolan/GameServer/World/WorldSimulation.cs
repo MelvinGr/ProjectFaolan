@@ -148,7 +148,7 @@ namespace Faolan.GameServer.World
 			// fresh-entry seed uses it; a re-entry keeps its existing (already gear-aware) vitals via GetOrAdd.
 			var entity = Players.GetOrAdd(client, _ => new WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client)
 			{
-				Vitals = EntityVitals.FromCharacter(character, gearBonuses),
+				Vitals = EntityVitals.FromCharacter(character, gearBonuses, classBase),
 				// #401: cache the worn-gear physical armor + magical Protection for incoming-damage mitigation.
 				ArmorRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.Armor) ?? 0),
 				Protection = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.Protection) ?? 0),
@@ -323,7 +323,7 @@ namespace Faolan.GameServer.World
 			if (character == null)
 				return;
 
-			var vitals = target!.Vitals ??= EntityVitals.FromCharacter(character);
+			var vitals = target!.Vitals ??= EntityVitals.FromCharacter(character, target.GearBonuses, target.ClassBase);
 			if (vitals.IsDead)
 				return;
 
@@ -363,7 +363,7 @@ namespace Faolan.GameServer.World
 			if (character == null || npc.Spells.Count == 0)
 				return;
 
-			var vitals = target!.Vitals ??= EntityVitals.FromCharacter(character);
+			var vitals = target!.Vitals ??= EntityVitals.FromCharacter(character, target.GearBonuses, target.ClassBase);
 			if (vitals.IsDead)
 				return;
 
@@ -528,7 +528,7 @@ namespace Faolan.GameServer.World
 				var client = pair.Key;
 				var character = client.Session.Character;
 
-				var vitals = pair.Value.Vitals ??= EntityVitals.FromCharacter(character);
+				var vitals = pair.Value.Vitals ??= EntityVitals.FromCharacter(character, pair.Value.GearBonuses, pair.Value.ClassBase);
 				if (vitals.IsDead)
 					continue; // corpses don't regen - the respawn timer revives them
 
@@ -1043,7 +1043,7 @@ namespace Faolan.GameServer.World
 				var client = pair.Key;
 				var character = client.Session.Character;
 
-				var vitals = pair.Value.Vitals ??= EntityVitals.FromCharacter(character);
+				var vitals = pair.Value.Vitals ??= EntityVitals.FromCharacter(character, pair.Value.GearBonuses, pair.Value.ClassBase);
 				if (!vitals.IsDead)
 				{
 					_playerRespawnRemaining.TryRemove(client, out _);
