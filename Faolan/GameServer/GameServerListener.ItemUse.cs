@@ -40,7 +40,7 @@ namespace Faolan.GameServer
 
 			var durationCs = spell.DurationMs / 10;
 			var nonce = 0x14000000u | (spellBase & 0x00FFFFFF);
-			await SendMagicBuffIir(client, self, self, wireSpellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
+			await SendMagicBuffIir(client, self, self, wireSpellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce, CasterLevel(client)));
 			await RemoveItemFromBackpack(client, slot, 1);
 		}
 

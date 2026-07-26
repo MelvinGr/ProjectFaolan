@@ -66,9 +66,11 @@ namespace Faolan.Core.Network.Constants
 
 		// The mount RIDE buff's 54-byte MagicBuffIIR payload (the generic LONG form), CONSTRUCTED from its base spell
 		// id + captured duration and nonce (byte-identical to the mount-capture frame 520, proven by MountCatalogTests).
-		public static byte[] RideBuffPayload()
+		// `riderLevel` fills the payload's @26/@42 words - the mount capture is a level-80 character, which is where the
+		// old hardcoded 80 came from (#438).
+		public static byte[] RideBuffPayload(uint riderLevel)
 		{
-			return SelfBuffCodec.BuildBuffDataLong(RideSpell >> 8, RideBuffDurationCentiseconds, RideBuffEffectNonce);
+			return SelfBuffCodec.BuildBuffDataLong(RideSpell >> 8, RideBuffDurationCentiseconds, RideBuffEffectNonce, riderLevel);
 		}
 
 		private static Dictionary<uint, MountDef> BuildById()

@@ -22,7 +22,7 @@ namespace Faolan.Tests
 		// Passing the captured effect nonce makes each byte-exact; at runtime the server assigns a unique nonce per buff.
 		public void BuildBuffDataLong_MatchesSpellweaveCapture(uint spellBase, uint durationCs, uint nonce, string expected)
 		{
-			var bytes = SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce);
+			var bytes = SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce, 80); // the spellweave capture is a level-80 necro
 			Assert.Equal(expected.Replace(" ", ""), Convert.ToHexStringLower(bytes));
 		}
 
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PayloadExtractors_RecoverNonce_FromBuffPayload()
 		{
-			var payload = SelfBuffCodec.BuildBuffDataLong(0x37F298, 640000, 0x195DA1FE);
+			var payload = SelfBuffCodec.BuildBuffDataLong(0x37F298, 640000, 0x195DA1FE, 80);
 			Assert.Equal(54, payload.Length);
 			Assert.Equal(0x195DA1FEu, ActiveBuff.NonceFromPayload(payload));
 			Assert.Equal(6400000u, ActiveBuff.DurationMsFromPayload(payload)); // 640000 cs -> ms

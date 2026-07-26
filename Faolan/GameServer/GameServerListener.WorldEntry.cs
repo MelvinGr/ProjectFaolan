@@ -473,7 +473,7 @@ namespace Faolan.GameServer
 				return;
 
 			var self = character.Id;
-			await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
+			await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(CasterLevel(client)));
 			await SendStatUpdate(client, new CharacterStatBlock
 			{
 				[CharacterStatId.Mount] = mount.RideStat,

@@ -60,7 +60,7 @@ namespace Faolan.Tests
 			var capturedCarrier = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15000000c3500802e5d4" +
 			                                            "00000000000000000083d600000100000001000000000031eb150000005000000000000000000000000000000050000000001560f9bb");
 
-			var built = NpcSpellCastBuilder.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
+			var built = NpcSpellCastBuilder.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(80));
 
 			Assert.Equal(capturedCarrier, built);
 		}
@@ -78,7 +78,7 @@ namespace Faolan.Tests
 			var entryRestore = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15000000c3500802e5d4" +
 			                                         "00000000000000000081d962000100000001000000000031eb15000000500000000000000000000000000000005000000000154bb4d7");
 
-			var built = NpcSpellCastBuilder.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload());
+			var built = NpcSpellCastBuilder.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(80));
 
 			Assert.Equal(entryRestore.Length, built.Length);
 			// Only the per-application effect id (the u32 spanning 35..37) and the trailing nonce (77..79) may differ -

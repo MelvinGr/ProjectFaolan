@@ -22,8 +22,10 @@ namespace Faolan.Tests
 		// SpellEffectSeedTests owns the assertion that this is what the seed ships.
 		private const uint FrozenHatredProc = 3666099;
 
-		// Every captured fatality payload is the ordinary 54-byte self-buff form: its own duration, magnitude 1, and a
-		// per-application nonce. Nothing about a fatality needs a new wire shape - which is why the burst is three
+		// Every captured fatality payload is the ordinary 54-byte self-buff form: its own duration, a per-application
+		// nonce, and the caster's LEVEL in the @26/@42 words - 1 here, because this burst is the first fatality of a
+		// fresh character's beach run (the same words walk 1->2->3->4->5 as it levels, and read 80 in the L80 sessions;
+		// see SelfBuffCodec, #438). Nothing about a fatality needs a new wire shape - which is why the burst is three
 		// ApplySpell sends and not a bespoke record.
 		[Theory]
 		[InlineData(FatalityService.FatalityBuffA, 10u, 0x1436DA64u, FatalityAPayload)] // 0.1s

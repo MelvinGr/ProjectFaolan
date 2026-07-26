@@ -26,6 +26,13 @@ namespace Faolan.GameServer
 		// buff persistence must skip them or the client would render a duplicate icon on relog (#274/#221).
 		private static readonly HashSet<uint> DedicatedRestoreBuffIds = [ShieldOfTheRisenBase1 << 8, ShieldOfTheRisenBase2 << 8, MountCatalog.RideSpell];
 
+		// The level that fills a buff payload's @26/@42 words (SelfBuffCodec): the CASTER's, which for every path here
+		// is the player. Was a hardcoded 80 - right only for a level-80 character (#438).
+		private static uint CasterLevel(INetworkClient client)
+		{
+			return client.Session.Character?.Level ?? 1;
+		}
+
 		// ISpellEffectOutbound (#439) - the three wire ops a SpellEffect row needs, so SpellEffectService dispatches
 		// data-driven effects without holding the listener. All three already existed for their original callers; this
 		// only names them as one seam.
@@ -162,12 +169,12 @@ namespace Faolan.GameServer
 			{
 				var effectWireId = effect.Id << 8;
 				Logger.LogInformation("Cast {Cast} ('{Name}') carries no effect of its own; applying its effect spell {Effect} ('{EffectName}').", spell.Id, spell.Name, effect.Id, effect.Name);
-				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, SelfBuffCodec.BuildBuffDataLong(effect.Id, effect.DurationMs / 10, DefaultSelfBuffEffectNonce));
+				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, SelfBuffCodec.BuildBuffDataLong(effect.Id, effect.DurationMs / 10, DefaultSelfBuffEffectNonce, CasterLevel(client)));
 				return;
 			}
 
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce, CasterLevel(client)));
 		}
 
 		// Applies a spellweave buff (trance buff on activate, or a component's own spell on add) with the CORRECT
@@ -181,7 +188,7 @@ namespace Faolan.GameServer
 			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			var nonce = 0x18000000u | ((uint)Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce, CasterLevel(client)));
 		}
 
 		// Shield of the Risen also drops the instant the player commits an AGGRESSIVE action - an offensive cast, a
@@ -243,7 +250,7 @@ namespace Faolan.GameServer
 				}
 
 				var spellBase = buff.BuffId >> 8;
-				await SendMagicBuffIir(client, self, self, buff.BuffId, SelfBuffCodec.BuildBuffDataLong(spellBase, remainingCs, buff.Nonce));
+				await SendMagicBuffIir(client, self, self, buff.BuffId, SelfBuffCodec.BuildBuffDataLong(spellBase, remainingCs, buff.Nonce, CasterLevel(client)));
 				restored++;
 			}
 
@@ -400,7 +407,7 @@ namespace Faolan.GameServer
 			var spell = await Database.GetSpell(spellBase);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			var nonce = 0x14000000u | (spellBase & 0x00FFFFFF);
-			await SendMagicBuffIir(client, self, self, spellBase << 8, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce));
+			await SendMagicBuffIir(client, self, self, spellBase << 8, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce, CasterLevel(client)));
 		}
 
 		// Shield of the Risen (#221): retail applies TWO persistent self-buffs on every world entry - both on a fresh
