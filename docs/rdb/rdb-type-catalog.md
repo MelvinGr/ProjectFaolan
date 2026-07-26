@@ -66,10 +66,10 @@ fields (compressed on-disk bytes).
 | 1000510 | Game data/enum table (1000500x) | 1 | 1 | 0 | 1.1 KB |
 | 1000511 | Game data/enum table (1000500x) | 1 | 1 | 0 | 5.3 KB |
 | 1000512 | Game data/enum table (1000500x) | 1 | 1 | 0 | 56 B |
-| 1000513 | Game data/enum table (1000500x) | 1 | 1 | 0 | 23.1 KB |
+| 1000513 | Per-class/level table: 12 classes x 80 levels, 24-byte records ([`client-tweak-table.md`](client-tweak-table.md)) | 1 | 1 | 0 | 23.1 KB |
 | 1000514 | Game data/enum table (1000500x) | 1 | 1 | 0 | 16 B |
 | 1000515 | UI/GUI element defs | 1 | 1 | 0 | 17.4 KB |
-| 1000516 | Tweak (TWK_) tuning table | 1 | 1 | 0 | 11.3 KB |
+| 1000516 | Tweak (TWK_) tuning table - DECODED, 294 named f64 constants ([`client-tweak-table.md`](client-tweak-table.md)) | 1 | 1 | 0 | 11.3 KB |
 | 1000517 | Race/nation name table | 1 | 1 | 0 | 137 B |
 | 1000518 | Relation-title table | 1 | 1 | 0 | 1.1 KB |
 | 1000519 | DECALPROJECTORS | 496 | 8 | 488 | 47.4 KB |

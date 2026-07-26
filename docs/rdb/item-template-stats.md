@@ -127,3 +127,24 @@ its scale is NOT the item scale.**
 A blind apply would corrupt combat/vitals, because the spell region's per-stat scale is not the item
 `CharacterStatId.GetScale()`. The decoded `SpellStatEffect` table is the foundation. Open work is tracked in
 Gitea #367.
+
+## Template-scaled items carry no region at all
+
+High-level gear is **template-scaled**: its stats are derived from item level + quality + slot + armour class
+rather than stored per-item, so `Parse` correctly returns nothing. Confirmed by dumping the whole 605-byte
+`Talons of Dark Terror` template (`--report item-template --report-arg 3763061`): zero signature hits, and a
+property table of only 9 fields. The scaling inputs those items DO carry are
+
+| field | meaning |
+|---|---|
+| 54 | item level (80, or 63 for `Cloak of Hugin`) |
+| 499 | quality tier (also the `ItemQuality` value) |
+| 496 | per-item budget; tracks quality (1000 at tier 1, 2500/2000 at 2, 3250/3000/3500 at 3, 4000/5000 at 4, 6000 at 5) |
+| 41 | slot mask - the same set differs only here: `Tanned Gauntlets` 1, `Tanned Boots` 2, `Tanned Tunic` 24 |
+| category | armour class (30000 cloth, 30001 light, 30002/30003 heavier, 30020 neck, 30023 cloak) |
+
+`--report item-stat-scaling` writes all of those next to each item's explicit records as CSV, for fitting.
+⚠️ The explicit-stat items CANNOT be used as the fit's ground truth: they are hand-authored and do not follow the
+scaling (level-12 `Pictish Armbands` carry +35 health, level-40 `Canvas Pants` only +25). The per-level targets in
+[`client-tweak-table.md`](client-tweak-table.md) (`TWK_TargetPerLevelArmor` 137.225,
+`TWK_TargetPerLevelProtection` 46.0625) are the retail-authored side of the same scaling. Open work: Gitea #441.

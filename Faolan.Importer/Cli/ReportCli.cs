@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -181,6 +182,20 @@ namespace Faolan.Importer.Cli
 				case "item-template":
 				{
 					ItemTemplate(RdbDir(), arg ?? "", _options.Out);
+					return 0;
+				}
+
+				case "item-stat-scaling":
+				{
+					ItemStatScaling(RdbDir(), _options.Out);
+					return 0;
+				}
+
+				case "rdb-tweaks":
+				{
+					RdbTweaks(RdbDir(), string.IsNullOrWhiteSpace(arg)
+						? null
+						: arg);
 					return 0;
 				}
 
@@ -1328,6 +1343,215 @@ namespace Faolan.Importer.Cli
 		// Decrypt one item's RDB template (type 1000020/1000620) with its stored Data1..4 TEA key and surface everything
 		// that could be a worn-appearance mesh ref: every ASCII string, the property table, and every u32 that resolves
 		// to a MESHINDEXFILE (1010030) / MonsterData (1010201) / RenderMesh (1010001) entry in the RDB (#275 gear).
+		// The client's BALANCE-TWEAK table: RDB type 1000516, a single entry holding 294 named `double` constants
+		// ("tweakables"). This is the game's own tuning sheet, and it is the authority for a pile of numbers we have so far
+		// been guessing at - the out-of-combat regen attribute modifiers (TWK_OOCHealthRegenConModifier = 0.15,
+		// TWK_OOCManaRegenIntModifier = 0.38, ...), the armour/protection targets per level
+		// (TWK_TargetPerLevelArmor = 137.225), combat behaviour (TWK_GlancingHitBaseChance = 5,
+		// TWK_InterruptChance = 30, TWK_OffhandDamagePercent = 0.5) and a set of spell/buff ids the server is expected
+		// to cast itself (TWK_NanoExhaustedEffect, TWK_StaggeringBuffID, TWK_GM_Res_SpellID, ...).
+		//
+		// Grammar: [u32 type][u32 0][u32 1][u32 count] then count × ([u32 nameLen][nameLen ASCII][f64 value LE]).
+		// It is NOT self-referential validation: TWK_NanoExhaustedEffect = 2960 is the exact spell id we independently
+		// decoded as the energy-depletion "Exhausted" debuff, and TWK_Selection_Radius = 10 matches the interaction range.
+		//
+		// `--report-arg <substring>` filters by name (case-insensitive), e.g. `--report-arg regen`.
+		private static void RdbTweaks(string rdbDir, string? filter)
+		{
+			const uint tweakType = 1000516;
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			var entries = rdb.EntriesOfType(tweakType).ToList();
+			if (entries.Count == 0)
+			{
+				Console.WriteLine($"no RDB entries of type {tweakType} (the tweak table) - is this a full client install?");
+				return;
+			}
+
+			foreach (var entry in entries)
+			{
+				var blob = rdb.ReadDecompressed(entry);
+				if (blob.Length < 16)
+				{
+					Console.WriteLine($"tweak entry {entry.Id}: {blob.Length} B - too short");
+					continue;
+				}
+
+				var count = BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(12, 4));
+				Console.WriteLine($"tweak table type={tweakType} id={entry.Id}: {blob.Length} B, declares {count} tweak(s)");
+				var off = 16;
+				var read = 0;
+				var shown = 0;
+				while (off + 4 <= blob.Length && read < count)
+				{
+					var len = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(off, 4));
+					if (len <= 0 || off + 4 + len + 8 > blob.Length)
+						break;
+
+					var name = Encoding.ASCII.GetString(blob, off + 4, len);
+					var value = BitConverter.ToDouble(blob, off + 4 + len);
+					off += 4 + len + 8;
+					read++;
+					if (filter != null && !name.Contains(filter, StringComparison.OrdinalIgnoreCase))
+						continue;
+
+					Console.WriteLine($"  {name,-52} {value.ToString("0.######", CultureInfo.InvariantCulture)}");
+					shown++;
+				}
+
+				Console.WriteLine(read == count
+					? $"  ({read} parsed{(filter != null ? $", {shown} matching '{filter}'" : "")})"
+					: $"  ⚠ parsed only {read} of the declared {count} - the grammar breaks at byte {off}");
+			}
+		}
+
+		// Gitea #441: every keyed item's TEMPLATE-SCALING inputs next to its EXPLICIT [2][9] stat records, as CSV, so the
+		// scaling formula can be FITTED on the items that carry both and then applied to the ones that carry none.
+		//
+		// Why this exists: only ~24% of items carry explicit stat records. The rest are "template-scaled" - a high-level
+		// piece like Talons of Dark Terror has a rich in-client tooltip but ZERO records, so its armor/health never
+		// reaches the server and a geared character's bars cap far below what the client draws (#3). The scaling inputs
+		// are the property-table fields every one of them DOES carry: 54 = item level, 499 = quality tier, 496 = the
+		// per-item budget that tracks quality (3250/3500 at tier 3, 4000/5000 at tier 4), 360, 41, 21, plus the search
+		// CATEGORY (30000 armor / 30020 neck / 30023 cloak) which stands in for the slot.
+		//
+		// Writing BOTH sides in one row is the point: an item with an explicit Armor/HealthMax record is ground truth for
+		// what the same inputs must produce, and there is no need to ask the client for a tooltip to fit against.
+		private static void ItemStatScaling(string rdbDir, string? outPath)
+		{
+			using var db = OpenDb();
+			var items = db.Items.Include(i => i.StatModifiers)
+				.Where(i => i.Key.Key1 != 0 || i.Key.Key2 != 0 || i.Key.Key3 != 0 || i.Key.Key4 != 0)
+				.OrderBy(i => i.Id)
+				.ToList();
+
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			uint[] fields = [54, 499, 496, 360, 41, 21, 644, 645, 74];
+			CharacterStatId[] stats = [CharacterStatId.Armor, CharacterStatId.HealthMax, CharacterStatId.ManaMax, CharacterStatId.StaminaMax, CharacterStatId.Constitution];
+
+			var rows = new List<string>
+			{
+				"id,name,category,quality,regionRecords," + string.Join(",", fields.Select(f => $"f{f}")) + "," + string.Join(",", stats.Select(s => $"explicit_{s}"))
+			};
+			int noEntry = 0, failed = 0, scanned = 0, withRegion = 0;
+			foreach (var item in items)
+			{
+				var key = new[] { item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4 };
+				byte[]? template = null;
+				foreach (var type in new uint[] { 1000020, 1000620 })
+				{
+					if (!rdb.TryGet(type, item.Id, out var e) || e.Size == 0 || !rdb.CanRead(e))
+						continue;
+					try
+					{
+						template = rdb.ReadDecrypted(e, key);
+						break;
+					}
+					catch
+					{
+						// a wrong/stale key - counted below, not fatal to the sweep
+					}
+				}
+
+				if (template == null)
+				{
+					noEntry++;
+					continue;
+				}
+
+				if (template.Length < 16)
+				{
+					failed++;
+					continue;
+				}
+
+				scanned++;
+				var body = template.AsSpan(12);
+				var region = ItemTemplateStatModifiers.Parse(body);
+				if (region.Count > 0)
+					withRegion++;
+
+				var cells = new List<string>
+				{
+					item.Id.ToString(),
+					"\"" + (item.Name ?? "").Replace("\"", "'") + "\"",
+					item.SearchCategory.ToString(),
+					item.Quality is { } q
+						? ((uint)q).ToString()
+						: "",
+					region.Count.ToString()
+				};
+				foreach (var f in fields)
+				{
+					cells.Add(TryReadTemplateField(body, f, out var v)
+						? v.ToString()
+						: "");
+				}
+
+				// The explicit side: the region record for each stat we care about, at RAW wire scale (the fit divides).
+				cells.AddRange(stats.Select(s =>
+				{
+					var hit = region.FirstOrDefault(m => m.StatId == (uint)s);
+					return hit.StatId == (uint)s
+						? hit.WireAmount.ToString()
+						: "";
+				}));
+				rows.Add(string.Join(",", cells));
+			}
+
+			var path = outPath ?? Path.Combine(Path.GetTempPath(), "item-stat-scaling.csv");
+			File.WriteAllLines(path, rows);
+			Console.WriteLine($"item-stat-scaling: {scanned} templates decrypted ({withRegion} with explicit records, {scanned - withRegion} template-scaled), {noEntry} without a readable/decryptable entry, {failed} too short.");
+			Console.WriteLine($"wrote {path} ({rows.Count - 1} rows)");
+		}
+
+		// The strictly-decreasing [fieldId][value] property table, same parse as RdbItemImporter.TryReadPropertyField
+		// (kept local so the report stays read-only and independent of the importer's internals).
+		private static bool TryReadTemplateField(ReadOnlySpan<byte> body, uint fieldId, out uint value)
+		{
+			value = 0;
+			var words = body.Length / 4;
+			var bestLen = 0;
+			var bestValue = 0u;
+			var bestFound = false;
+			for (var start = 0; start + 1 < words; start++)
+			{
+				uint last = 0;
+				var haveLast = false;
+				var len = 0;
+				var found = false;
+				var fv = 0u;
+				for (var j = start; j + 1 < words; j++)
+				{
+					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					if (fid == 0 || fid > 2000 || (haveLast && fid >= last))
+						break;
+
+					var val = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
+					if (fid == fieldId)
+					{
+						found = true;
+						fv = val;
+					}
+
+					last = fid;
+					haveLast = true;
+					len++;
+					j++; // consumed the value word too
+				}
+
+				if (len > bestLen)
+				{
+					bestLen = len;
+					bestFound = found;
+					bestValue = fv;
+				}
+			}
+
+			if (bestFound)
+				value = bestValue;
+			return bestFound;
+		}
+
 		// type -> (entry count, local count) histogram of the whole RDB index, to spot candidate record families.
 		private static void RdbTypes(string rdbDir)
 		{
