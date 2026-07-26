@@ -41,29 +41,37 @@ namespace Faolan.Core.Rdb
 		public static IReadOnlyList<Modifier> Parse(ReadOnlySpan<byte> body)
 		{
 			var mods = new List<Modifier>();
-			var words = body.Length / 4;
 			// The full record is [kind][0][4][0][1][0][2][9][statId][amount]; anchor on the 6-word signature
-			// (4,0,1,0,2,9) at i..i+5 with the preceding [.. ][0] word, then statId at i+6, amount at i+7. The kind sits
-			// two words BEFORE the signature, so it is unreadable for a record that starts the body (i < 2) - those
-			// report kind 0, which no policy honors.
-			for (var i = 1; i + 8 <= words; i++)
+			// (4,0,1,0,2,9) at off..off+20 with the preceding [.. ][0] word, then statId at off+24, amount at off+28.
+			// The kind sits two words BEFORE the signature, so it is unreadable for a record that starts the body
+			// (off < 8) - those report kind 0, which no policy honors.
+			//
+			// ⚠️ Scan BYTE by byte, not word by word (#441). The region is NOT 4-byte aligned to the body in most
+			// templates - Blackwolf Cap's records start at body offset 297 - and a word-aligned scan simply cannot see
+			// those, silently returning zero records. That was 2873 of 3248 templates reporting "no stats" while the
+			// client happily applied a full list from the very same bytes. Byte-granular scanning recovers them exactly
+			// (Blackwolf Cap 0 -> 4 records, Con 50 / Int 50 = what the client applies) and changes nothing for the
+			// templates that were already aligned (Royal Signet stays 3, Fine Steelsilk Pants stays 6).
+			for (var off = 4; off + 32 <= body.Length; off++)
 			{
-				if (W(body, i - 1) != 0 || W(body, i) != 4 || W(body, i + 1) != 0 || W(body, i + 2) != 1 || W(body, i + 3) != 0 || W(body, i + 4) != 2 || W(body, i + 5) != 9)
+				if (W(body, off - 4) != 0 || W(body, off) != 4 || W(body, off + 4) != 0 || W(body, off + 8) != 1 || W(body, off + 12) != 0 || W(body, off + 16) != 2 ||
+				    W(body, off + 20) != 9)
 					continue;
 
-				var statId = W(body, i + 6);
+				var statId = W(body, off + 24);
 				if (statId == 0 || statId >= MaxStatId)
 					continue;
 
-				mods.Add(new Modifier(i >= 2 ? W(body, i - 2) : 0, statId, W(body, i + 7)));
+				mods.Add(new Modifier(off >= 8 ? W(body, off - 8) : 0, statId, W(body, off + 28)));
 			}
 
 			return mods;
 		}
 
-		private static uint W(ReadOnlySpan<byte> body, int wordIndex)
+		// Reads a u32 at a BYTE offset - deliberately not word-indexed, see the scan note in Parse.
+		private static uint W(ReadOnlySpan<byte> body, int byteOffset)
 		{
-			return BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(wordIndex * 4, 4));
+			return BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(byteOffset, 4));
 		}
 
 		// One record: its effect KIND (the opening word - see the type comment), the wire stat id, and the amount as it

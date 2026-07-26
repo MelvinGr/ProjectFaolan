@@ -251,7 +251,7 @@ namespace Faolan.ClientLauncher
 						break;
 					}
 
-					// Enable the client's OWN debug channels by configuring its logger in the live process
+					// Enable the client's OWN debug channels by writing its logger config file, dbDebug.conf
 					// (ClientDebugChannels; docs/tooling/client-debug-logging.md). Optional comma-separated list,
 					// else a useful low-noise default set. Implies --console, since the point is to read the output.
 					case "--debug-channels":
@@ -325,10 +325,11 @@ namespace Faolan.ClientLauncher
 			if (restore)
 			{
 				// Copy each <file>.bak back over the modified file: the pristine exe carries the Funcom DH pubkey +
-				// GUI subsystem, the pristine LocalConfig.xml the retail UniverseAddr + CDN URLs. Restore BOTH exe
+				// GUI subsystem, the pristine LocalConfig.xml the retail UniverseAddr + CDN URLs, the pristine
+				// dbDebug.conf retail's three logger channels. Restore BOTH exe
 				// variants (DX9 + DX10) regardless of the --dx10 flag, so whichever was patched is undone.
 				var dir = Path.GetDirectoryName(exe)!;
-				foreach (var name in new[] { "AgeOfConan.exe", "AgeOfConanDX10.exe", "LocalConfig.xml" })
+				foreach (var name in new[] { "AgeOfConan.exe", "AgeOfConanDX10.exe", "LocalConfig.xml", ClientDebugChannels.ConfName })
 				{
 					Console.WriteLine(RestoreFromBackup(Path.Combine(dir, name))
 						? $"restored {name} from .bak"
@@ -339,12 +340,14 @@ namespace Faolan.ClientLauncher
 				return 0;
 			}
 
-			// Back up the pristine exe + LocalConfig.xml to <file>.bak (once - only if no .bak exists yet) before we
-			// modify either, so --restore is a straight copy-back of both instead of a reverse-transform.
+			// Back up the pristine exe + LocalConfig.xml + dbDebug.conf to <file>.bak (once - only if no .bak exists
+			// yet) before we modify any of them, so --restore is a straight copy-back instead of a reverse-transform.
 			if (!dryRun)
 			{
 				BackupOnce(exe);
 				BackupOnce(Path.Combine(Path.GetDirectoryName(exe)!, "LocalConfig.xml"));
+				if (debugChannels is { Count: > 0 })
+					BackupOnce(Path.Combine(Path.GetDirectoryName(exe)!, ClientDebugChannels.ConfName));
 			}
 
 			// Patch the client's embedded Funcom DH pubkey -> CELLAO on disk so the server can validate the password
@@ -424,6 +427,13 @@ namespace Faolan.ClientLauncher
 			if (cdnUrl is { } murl && SetCdnConfig(gameDir, murl))
 				Console.WriteLine($"redirected CDN keys -> {murl}");
 
+			// Open the client's own debug channels by writing its logger config (dbDebug.conf). BEFORE the launch: the
+			// client reads that file once, during startup, so the channels are live from its first line - and it needs
+			// no process memory access, which is what makes it work on Windows too. Persists like the other redirects;
+			// `--restore` puts retail's file back.
+			if (debugChannels is { Count: > 0 })
+				ClientDebugChannels.Configure(gameDir, debugChannels, Console.WriteLine);
+
 			var psi = new ProcessStartInfo
 			{
 				WorkingDirectory = gameDir,
@@ -489,12 +499,6 @@ namespace Faolan.ClientLauncher
 				return 1;
 			}
 
-			// Configure the client's own logger once its PE process exists (ClientDebugChannels). Fire-and-forget: it
-			// polls for the process, writes the channel table and reports through Console, while the log tail below
-			// runs. Deliberately not awaited - the client takes ~30 s to load and the tail should start immediately.
-			if (debugChannels is { Count: > 0 })
-				_ = ClientDebugChannels.InstallAsync(debugChannels, Console.WriteLine);
-
 			// With --console, stay in the foreground and tail the log until the client exits. Otherwise launch and return
 			if (streamOutput)
 			{
@@ -540,16 +544,18 @@ namespace Faolan.ClientLauncher
 			                                        ControlHttpPatchAddr) at <url> - each becomes <url>/<tag>/upm
 			                    --launcher-notes <url>  redirect the client's hardcoded launcher-notes URL to <url> - 
 			                                        keep the two %s (UniverseName, Language)
-			                    --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml from their .bak
-			                                        (undoes the login/notes exe patch + the CDN/UniverseAddr redirects) and exit
+			                    --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf
+			                                        from their .bak (undoes the login/notes exe patch, the CDN/UniverseAddr
+			                                        redirects and the debug channels) and exit
 			                    --console           run in the foreground and tail AgeOfConan.log into THIS terminal (same content
 			                                        as the client console, no separate wineconsole window); also drops -noconsole
 			                    --patch-login       patch the client's DH key ON DISK before launch so the
 			                                        server can validate the real password
 			                    --debug-channels [a,b]  enable the client's OWN debug channels (it then logs what it computed:
 			                                        "GameCode.Stats - got new stats: 507=291000", ArmorMitigation's per-hit
-			                                        mitigation maths, RECEIVED IIR, ...). Configures the live client's logger;
-			                                        no exe change. Default set if no list given; implies --console. Full list:
+			                                        mitigation maths, RECEIVED IIR, ...) by writing its logger config file
+			                                        dbDebug.conf; no exe change, no process memory. Default set if no list
+			                                        given; implies --console. Full list:
 			                                        strings AgeOfConan.exe | grep '^GameCode/'
 			                    --proton <path>     (Linux only) Proton 'proton' script or set PROTON (default: auto-detected -
 			                                        the build Steam runs AoC with). Ignored on Windows, which runs the exe directly.

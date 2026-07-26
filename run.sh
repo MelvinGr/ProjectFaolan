@@ -45,6 +45,7 @@ case "$command" in
             --universeaddr 127.0.0.1:7010 \
             --cdn http://127.0.0.1:7081 \
             --launcher-notes 'http://127.0.0.1:7081/_stats?UniverseName=%s&Language=%s' \
+            --debug-channels \
             "$@"
         ;;
 

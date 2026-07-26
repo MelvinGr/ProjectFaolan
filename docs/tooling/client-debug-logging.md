@@ -2,31 +2,70 @@
 
 **Status:** SOLVED 2026-07-26, verified live. The 2026-06-15 conclusion below ("the verbose sites don't fire on
 this build") is **wrong** — they fire fine. The knob is not the log gate at all: it is the logger's **per-channel
-level threshold**. Enable it with `Faolan.ClientLauncher --debug-channels`, which configures the running client
-(`ClientDebugChannels`) and needs no exe change.
+level threshold**, and the client takes it from a plain config FILE. Enable it with
+`Faolan.ClientLauncher --debug-channels`, which writes `dbDebug.conf` (`ClientDebugChannels`) — no exe change, no
+process memory.
 
 Measured proof: dropping the default threshold produced **117,044 log lines in seconds**, including the
 `RECEIVED IIR: class MoveTaskIIR_c` trace this doc previously recorded as never firing.
 
-**The mechanism** (client is PE32 with no ASLR, so Ghidra addresses are runtime addresses):
+## `dbDebug.conf` — the client's logger config
+
+The client reads `dbDebug.conf` from its install dir during startup (the path is built at `0x004130C7`, the parser
+is `FUN_004AB950`), and it ships with one:
+
+```
+DebugLevel=3      CallTrace=false     PrintFlush=true       PrefixLevel=3
+TypeMode=select   AssertMode=abort    PrintType=true        PrefixColors=false
+                  PrintModule=false   DateStamp=true        Log4cxxFormat=true
+                                      LogFile=AgeOfConan.log
+```
+
+The parser skips blank and `#` lines, then full-line-matches each line against a fixed table of SETTINGS keys at
+`0x01F847C4` — `DebugLevel=%7s`, `TypeMode=inclusive|exclusive|select`, `PrefixLevel=%d`, `LogFile=%s`,
+`PrintFlush=`, `DateStamp=`, `PrefixColors=`, `PrintType=`, `Log4cxxFormat=true`, `ShowImportant=false`,
+`UseCallback=false`, `Win32Debug=` — and **every line matching none of them is registered as a CHANNEL**:
+
+```c
+name  = tok(line);                    // delimiters " =\n\r"
+value = tok();
+FUN_004B2A40(name, value != NULL ? atoi(value) : defaultLevel);   // the add-channel routine
+```
+
+That is why the shipped file yields exactly three live channels: `CallTrace`, `AssertMode` and `PrintModule` are
+not settings keys, so they are added at `atoi("false") == atoi("abort") == 0`. **So a `GameCode/Stats=0` line opens
+that channel** — the whole mechanism is a text file.
+
+`TypeMode=select` is what selects per-channel thresholds (it is the call to the mode-2 setter `FUN_004B2C90`);
+`inclusive`/`exclusive` are a name whitelist/blacklist with no thresholds, where per-channel entries do nothing.
+It ships as `select`, and `ClientDebugChannels` enforces both it and `PrintFlush=true`.
+
+**Where those lines land at runtime** (client is PE32 with no ASLR, so Ghidra addresses are runtime addresses):
 
 | address | meaning | ships as |
 |---|---|---|
-| `0x02984AC0` | default level threshold | **3** |
-| `0x02984ADC` | output mode | **2** = per-channel thresholds |
+| `0x02984AC0` | default level threshold (`DebugLevel`) | **3** |
+| `0x02984ADC` | output mode (`TypeMode`) | **2** = per-channel thresholds |
 | `0x02984AE0` | 0x80 channel names, 48 B each, NUL-padded | `CallTrace`, `AssertMode`, `PrintModule` |
 | `0x029862E0` | parallel `i32` threshold per name | 0, 0, 0 |
 
 A line is emitted when `threshold <= level`. The debug sites log at level **0–2** and ERROR is 4, so the shipped
-default of 3 is exactly what hides them — and a channel absent from the table falls back to that default. Adding a
-name with threshold 0 opens **that channel and nothing else**.
+default of 3 is exactly what hides them — and a channel absent from the table falls back to that default. A name at
+threshold 0 opens **that channel and nothing else**.
 
-⚠️ Do NOT simply drop the default to 0: `GameCode.Movement` alone logs per entity per frame (99k lines of the
-117k). Per-channel is the usable form. ⚠️ The mode-2 lookup stops at the first EMPTY name, so entries must stay
-contiguous. ⚠️ The mode is **0 early in startup** and only becomes 2 once the client applies its logging config,
-so an installer has to wait for the steady state (`ClientDebugChannels` polls for it).
+⚠️ Do NOT simply drop `DebugLevel` to 0: `GameCode.Movement` alone logs per entity per frame (99k lines of the
+117k). Per-channel is the usable form. ⚠️ The table holds `0x80` names of at most 47 characters, and a channel name
+cannot contain a space or `=` (the parser's tokenizer would split it). ⚠️ A name that is not a real channel opens
+nothing at all, silently — the sink prints channels with a DOT (`GameCode.Stats`) while the call sites and the
+table use a SLASH, so **install the slash form** and check it exists:
+`strings AgeOfConan.exe | grep -xF 'N3/IIR'`. (`N3.IIR` shipped in the default set for one commit and logged
+nothing; only `N3/IIR` exists.)
 
-Output goes to `AgeOfConan.log`; `0x029864E0` is already 1, so it is flushed per line and `--console` shows it live.
+Output goes to `AgeOfConan.log`; `PrintFlush=true` (→ `0x029864E0`) flushes per line, so `--console` shows it live.
+
+Configuring the file rather than the live process is what makes this work on Windows as well as Linux, needs no
+ptrace, and has the channels open from the client's **first** log line — measured, `GameCode/ItemData` output
+appears 3 s after launch, at log line 82, long before world entry.
 
 **What it gives us** — the client stating what it computed, e.g.
 
@@ -54,11 +93,11 @@ derives locally, which is what makes the attribute pipeline readable (#442/#444)
    being loaded — **each delta is attributed to an item id**,
 3. and `278`/`279`/`280` (Non Combat Health/Stamina/Mana Regen) seeded to `2000`/`1000`/`2000`.
 
-Step 2 is a direct instrument for #441: an item whose stats are explicit in its template matches our DB
-(Rejuvenating Coarse Padsoles, Con +7 both sides), while a template-scaled one does not (Malefactor's Claymore is
-Str +18 / Con +11 / Int +18 in-client and Str +1 in ours; Blackwolf Cap is Con +5 / Int +5 in-client and nothing in
-ours). The client also names the mechanism when it fails, on the `GameCode` channel:
-`AcgItemData_t::GetInterpolatedItem: missing item data. Item: InterpolatedItem Level: 0 Templates: (0, 0)`.
+Step 2 is what **solved #441**. Comparing the client's per-item stats against ours showed a clean split — items whose
+region our parser found agreed exactly, items where it found nothing were empty on our side while the client applied a
+full list. That looked like a missing scaling formula, and it was not: the stats were in the template all along, and
+the parser could not see them because it scanned only 4-byte-aligned offsets while most regions are unaligned. The
+channel is what made the discrepancy measurable per item, which is how the real cause was found.
 
 **A PE-subsystem GUI→CUI flip is NOT needed.** It was implemented, tried and removed: the channels stayed silent,
 because the stderr branch of the sink only runs when the logger is UNinitialised, and it never is in-world.
@@ -165,7 +204,11 @@ The alternative route — flipping the PE subsystem GUI→CUI so Wine gives the 
 becomes valid — also works in principle and needs no live memory writes, but it changes the exe (and so the
 `-clienthash` md5, which `Faolan.ClientLauncher` already recomputes after patching).
 
-**Not yet verified in-client.** Open work tracked in Gitea #443.
+Both of those were superseded: point 2's table is written from `dbDebug.conf` at startup, per the top of this doc,
+so nothing has to be timed against world entry and no memory is written at all. A note on why a *static* patch of
+those tables is impossible, should anyone try: they are in the BSS tail of `.data` (raw bytes end at VA
+`0x02238200`, the tables are at `0x02984AC0`), so there is nothing on disk to edit, and the client memsets and
+fills them at startup regardless.
 
 ## Takeaways
 
@@ -181,3 +224,6 @@ becomes valid — also works in principle and needs no live memory writes, but i
   ([[frida_under_wine_client_re]]) is now the live-RE tool.
 - The patch *mechanism* (find the client pid, write+verify `/proc/<pid>/mem`) is sound and still lives in
   `ClientExePatcher` for the DH-key patch; it was only the debug-log *target* that was useless.
+- Before reaching for memory or exe patching, look for a config file the client already parses. `dbDebug.conf`
+  had been sitting in the install dir the whole time, and its `DebugLevel=3` is literally the default threshold
+  the first working patch wrote by hand.

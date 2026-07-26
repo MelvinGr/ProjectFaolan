@@ -1,43 +1,47 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Faolan.ClientLauncher
 {
 	/// <summary>
 	///     Turns on the retail client's OWN debug channels (`GameCode/Stats`, `GameCode/ArmorMitigation`,
-	///     `GameCode/ItemData`, `N3.IIR`, …) by configuring its logger in the live process, so the client tells us what
-	///     it computed instead of us inferring it from screenshots.
+	///     `GameCode/ItemData`, `ClientInterface`, `N3.IIR`, …) by writing its logger config file, so the client tells us
+	///     what it computed instead of us inferring it from screenshots.
 	/// </summary>
 	/// <remarks>
-	///     Verified live 2026-07-26 (see docs/tooling/client-debug-logging.md). The logger's config object sits at
-	///     <c>0x02984AC0</c> and the client is PE32 with no ASLR, so Ghidra's addresses ARE the runtime ones:
-	///     <list type="bullet">
-	///         <item><c>0x02984AC0</c> — the DEFAULT level threshold. Ships as <b>3</b>.</item>
-	///         <item><c>0x02984ADC</c> — output mode. Ships as <b>2</b> = per-channel thresholds.</item>
-	///         <item><c>0x02984AE0</c> — 0x80 channel names, 48 bytes each, NUL-padded.</item>
-	///         <item><c>0x029862E0</c> — the parallel i32 threshold per name.</item>
-	///     </list>
-	///     A line is emitted when <c>threshold &lt;= level</c>. The debug sites log at level <b>0–2</b> while ERROR is 4,
-	///     so the shipped default of 3 is exactly what silences them — and it ships with only
-	///     <c>CallTrace</c>/<c>AssertMode</c>/<c>PrintModule</c> in the table. Adding a channel with threshold 0 opens
-	///     that channel and nothing else.
+	///     The client reads <c>dbDebug.conf</c> from its install dir at startup (the path is built at
+	///     <c>0x004130C7</c>, the parser is <c>FUN_004AB950</c>). The parser skips blank and <c>#</c> lines, then
+	///     full-line-matches each line against a fixed table of SETTINGS keys at <c>0x01F847C4</c> — and every line that
+	///     matches NONE of them is registered as a debug CHANNEL:
+	///     <code>
+	///     name  = tok(line)                                  ; delimiters " =\n\r"
+	///     value = tok()
+	///     FUN_004B2A40(name, value != null ? atoi(value) : defaultLevel)
+	///     </code>
+	///     <c>FUN_004B2A40</c> is the same "add channel" routine that fills the live name table at <c>0x02984AE0</c> and
+	///     its parallel i32 thresholds at <c>0x029862E0</c>. A line is emitted when <c>threshold &lt;= level</c>; the debug
+	///     sites log at level <b>0–2</b> and ERROR is 4, so a channel at threshold <b>0</b> is fully open while
+	///     <c>DebugLevel=3</c> (the fallback for every channel NOT in the table) keeps everything else quiet.
 	///     <para>
-	///         ⚠️ Do NOT just drop the default to 0: measured, that produces ~117k lines in seconds
-	///         (<c>GameCode.Movement</c> alone logs per entity per frame). Per-channel is the usable form.
+	///         That is why retail's shipped file already produces exactly three live entries: <c>CallTrace=false</c>,
+	///         <c>AssertMode=abort</c> and <c>PrintModule=false</c> are not settings keys, so they become channels at
+	///         <c>atoi("false") == 0</c>.
 	///     </para>
 	///     <para>
-	///         ⚠️ The mode-2 lookup walks the name table and STOPS at the first empty entry, so names must stay
-	///         CONTIGUOUS - a gap hides everything after it.
+	///         ⚠️ Do NOT lower <c>DebugLevel</c> to open everything at once: measured, that produces ~117k lines in
+	///         seconds (<c>GameCode/Movement</c> alone logs per entity per frame). Per-channel is the usable form.
 	///     </para>
-	///     Output goes to <c>AgeOfConan.log</c> (the logger is initialised, and <c>0x029864E0</c> already forces a flush
-	///     per line, so <c>--console</c> tails it live). A PE-subsystem GUI→CUI flip is NOT needed: that was tried and
-	///     the channels stayed silent, because the stderr branch of the sink only runs when the logger is UNinitialised.
+	///     <para>
+	///         <c>TypeMode=select</c> is what puts the logger in per-channel-threshold mode (it is the call to the mode-2
+	///         setter <c>FUN_004B2C90</c>); the other two values, <c>inclusive</c>/<c>exclusive</c>, are a name whitelist
+	///         and blacklist with no thresholds, where our entries would not take effect. It ships as <c>select</c>, and
+	///         this writer enforces it.
+	///     </para>
+	///     Output goes to <c>AgeOfConan.log</c> (<c>PrintFlush=true</c> flushes per line, so <c>--console</c> tails it
+	///     live). Configuring the FILE rather than the live process is what makes this work on Windows as well as Linux,
+	///     and it is in force from the client's first line instead of only from world entry.
 	/// </remarks>
 	internal static class ClientDebugChannels
 	{
@@ -56,208 +60,197 @@ namespace Faolan.ClientLauncher
 			"GameCode/ItemData", // item template load + per-item static data
 			"GameCode/Magic/Calculation", // spell magnitude computation
 			"GameCode/Effects", // visual effect start/stop, by resource id
-			"N3.IIR" // "RECEIVED IIR: class <Name>IIR_c" - the inbound IIR trace
+			// "RECEIVED IIR: class <Name>IIR_c" - the inbound IIR trace. SLASH, not the "N3.IIR" the sink prints:
+			// only `N3/IIR` exists in the exe (`strings AgeOfConan.exe | grep -xF N3/IIR`), and a name that is not a
+			// real channel is simply never asked about, so it opens nothing.
+			"N3/IIR"
 		];
 
-		private const long ConfigBase = 0x02984AC0; // [0] default threshold, [7] output mode
-		private const long NameTable = 0x02984AE0; // 0x80 x 48-byte NUL-padded channel names
-		private const long ThresholdTable = 0x029862E0; // 0x80 x i32, parallel to NameTable
-		private const int NameStride = 48;
-		private const int MaxEntries = 0x80;
-		private const int ModeOffset = 0x1C; // ConfigBase + 7*4
+		public const string ConfName = "dbDebug.conf";
+
+		// The client's live channel table is 0x80 entries of 48 bytes (0x02984AE0; the 0x1800 memset and the strncmp
+		// width 0x30 both confirm the stride), so a longer name cannot be stored and a 0x81st channel is dropped.
+		private const int MaxChannels = 0x80;
+		private const int MaxNameLength = 47;
+
+		// The SETTINGS keys FUN_004AB950 recognizes (the string table at 0x01F847C4). Anything else in the file is a
+		// channel - which also means a channel must not be NAMED one of these, or the parser eats it as a setting.
+		private static readonly string[] SettingKeys =
+		[
+			"DebugLevel", "TypeMode", "UseCallback", "ShowImportant", "Log4cxxFormat", "PrefixLevel",
+			"PrintFlush", "DateStamp", "PrefixColors", "PrintType", "LogFile", "Win32Debug"
+		];
+
+		// Retail's shipped dbDebug.conf, used only if the install has none - so a missing file yields a known-good
+		// config (default threshold 3, per-channel mode, per-line flush) rather than whatever the logger defaults to.
+		private static readonly string[] Template =
+		[
+			"DebugLevel=3",
+			"CallTrace=false",
+			"TypeMode=select",
+			"AssertMode=abort",
+			"DateStamp=true",
+			"PrefixLevel=3",
+			"PrefixColors=false",
+			"PrintModule=false",
+			"PrintFlush=true",
+			"PrintType=true",
+			"LogFile=AgeOfConan.log",
+			"Log4cxxFormat=true"
+		];
 
 		/// <summary>
-		///     Waits for the client's PE process to appear, then installs <paramref name="channels" /> with threshold 0.
-		///     Reports what it did through <paramref name="log" />; never throws - a failed probe leaves the client running
-		///     with logging simply not enabled.
+		///     Writes <paramref name="channels" /> into the client's <c>dbDebug.conf</c> (in <paramref name="gameDir" />) at
+		///     threshold 0, enforcing the <c>TypeMode=select</c> / <c>PrintFlush=true</c> the per-channel path needs.
+		///     Idempotent: a file that already says this is left untouched. Must run BEFORE the client starts - the file is
+		///     read once, during startup. Never throws; reports what it did through <paramref name="log" />.
 		/// </summary>
-		public static async Task InstallAsync(IReadOnlyCollection<string> channels, Action<string> log, CancellationToken cancellationToken = default)
+		public static void Configure(string gameDir, IReadOnlyCollection<string> channels, Action<string> log)
 		{
-			if (!OperatingSystem.IsLinux())
-			{
-				log("debug-log  : only implemented on Linux (needs /proc/<pid>/mem).");
-				return;
-			}
-
-			// The client is launched through proton -> steam.exe -> AgeOfConan.exe, so the PE process shows up a few
-			// seconds after Process.Start.
-			var pid = await WaitForClientAsync(TimeSpan.FromSeconds(90), cancellationToken);
-			if (pid == null)
-			{
-				log("debug-log  : the client's PE process never appeared; channels not enabled.");
-				return;
-			}
+			var path = Path.Combine(gameDir, ConfName);
 
 			try
 			{
-				// The logger's output mode is not its final value when the PE process first appears: measured, it reads
-				// 0 early in startup and only becomes 2 (per-channel thresholds) once the client applies its logging
-				// config. There are three setters for it in the client (FUN_004b2c30/60/90 -> mode 0/1/2), so waiting
-				// for the steady state is what makes the install stick instead of being configured over.
-				if (!await WaitForModeAsync(pid.Value, 2, TimeSpan.FromMinutes(3), cancellationToken))
+				var existed = File.Exists(path);
+
+				// Build from the PRISTINE file when the launcher has backed one up, not from our own last write -
+				// otherwise every run with a different --debug-channels list leaves its old entries behind, and the
+				// 0x80-entry table fills with channels nobody asked for. Same principle as the exe patch: transform the
+				// original, don't re-transform the output. (So this file is launcher-owned, like LocalConfig.xml.)
+				var backup = path + ".bak";
+				var lines = File.Exists(backup)
+					? File.ReadAllLines(backup).ToList()
+					: existed
+						? File.ReadAllLines(path).ToList()
+						: [.. Template];
+
+				var wanted = channels.Select(c => c.Trim()).Where(c => c.Length > 0).Distinct(StringComparer.Ordinal).ToList();
+				var rejected = wanted.Where(c => !IsValidName(c, out _)).ToList();
+				foreach (var channel in rejected)
 				{
-					log("debug-log  : the client logger never reached output mode 2 (per-channel thresholds); channels not enabled.");
+					IsValidName(channel, out var why);
+					log($"debug-log  : channel '{channel}' skipped - {why}.");
+				}
+
+				wanted = wanted.Except(rejected, StringComparer.Ordinal).ToList();
+
+				// Everything the file already declares, keyed by name: settings stay put and channels are matched so a
+				// re-run neither duplicates nor renumbers anything.
+				var known = new HashSet<string>(StringComparer.Ordinal);
+				var channelCount = 0;
+				for (var i = 0; i < lines.Count; i++)
+				{
+					if (KeyOf(lines[i]) is not { } key)
+						continue;
+
+					known.Add(key);
+					if (!SettingKeys.Contains(key, StringComparer.Ordinal))
+						channelCount++;
+
+					// The per-channel thresholds only exist in mode 2, and a stale inclusive/exclusive would silently
+					// drop every channel we add, so rewrite the mode rather than warning about it.
+					if (key == "TypeMode" && ValueOf(lines[i]) != "select")
+						lines[i] = "TypeMode=select";
+
+					// Without the per-line flush the log lags behind the client by a buffer, which makes --console
+					// useless for watching a cast or a hit land.
+					if (key == "PrintFlush" && ValueOf(lines[i]) != "true")
+						lines[i] = "PrintFlush=true";
+
+					// A channel we want that is already listed with a different threshold: reopen it.
+					if (wanted.Contains(key, StringComparer.Ordinal) && ValueOf(lines[i]) != "0")
+						lines[i] = $"{key}=0";
+				}
+
+				var added = wanted.Where(c => !known.Contains(c)).ToList();
+				if (channelCount + added.Count > MaxChannels)
+				{
+					var room = Math.Max(0, MaxChannels - channelCount);
+					log($"debug-log  : the client's channel table holds {MaxChannels} entries and {channelCount} are already " +
+					    $"declared; dropping {added.Count - room} channel(s): {string.Join(", ", added.Skip(room))}");
+					added = added.Take(room).ToList();
+				}
+
+				if (!known.Contains("TypeMode"))
+					lines.Add("TypeMode=select");
+				if (!known.Contains("PrintFlush"))
+					lines.Add("PrintFlush=true");
+
+				lines.AddRange(added.Select(c => $"{c}=0"));
+
+				var content = string.Join(Environment.NewLine, lines) + Environment.NewLine;
+				if (existed && File.ReadAllText(path) == content)
+				{
+					log($"debug-log  : {ConfName} already enables {wanted.Count} channel(s): {string.Join(", ", wanted)}");
 					return;
 				}
 
-				Install(pid.Value, channels, log);
-			}
-			catch (UnauthorizedAccessException)
-			{
-				log($"debug-log  : cannot write /proc/{pid}/mem. This launcher is an ANCESTOR of the client so " +
-				    "ptrace_scope=1 should allow it; if it does not, set kernel.yama.ptrace_scope=0.");
+				File.WriteAllText(path, content);
+				log($"debug-log  : {(existed ? "updated" : "created")} {ConfName} - {wanted.Count} channel(s) at threshold 0: " +
+				    string.Join(", ", wanted));
+				log("debug-log  : output goes to AgeOfConan.log - it is flushed per line, so --console shows it live.");
 			}
 			catch (Exception ex)
 			{
-				log($"debug-log  : failed to configure the client logger: {ex.Message}");
+				log($"debug-log  : failed to write {path}: {ex.Message}");
 			}
 		}
 
-		// Polls the client's logger output mode until it reaches `mode`. Cheap (one 4-byte read per poll) and the only
-		// way to know the config has settled - the client offers no signal for it.
-		private static async Task<bool> WaitForModeAsync(int pid, int mode, TimeSpan timeout, CancellationToken cancellationToken)
+		// A channel name has to survive the client's tokenizer (delimiters " =\n\r"), fit a 48-byte table slot, and not
+		// collide with a settings key - the parser would consume that line as the setting instead.
+		private static bool IsValidName(string channel, out string why)
 		{
-			var deadline = DateTime.UtcNow + timeout;
-			while (DateTime.UtcNow < deadline && !cancellationToken.IsCancellationRequested)
+			if (channel.Any(c => c is ' ' or '=' or '\t' || c > 0x7E || c < 0x21))
 			{
-				try
-				{
-					using var mem = new FileStream($"/proc/{pid}/mem", FileMode.Open, FileAccess.Read);
-					if (ReadInt32(mem, ConfigBase + ModeOffset) == mode)
-						return true;
-				}
-				catch (IOException)
-				{
-					return false; // the process went away
-				}
-
-				await Task.Delay(1000, cancellationToken);
+				why = "the client tokenizes on \" =\\n\\r\", so a channel name cannot contain a space, '=' or non-printable ASCII";
+				return false;
 			}
 
-			return false;
-		}
-
-		private static void Install(int pid, IReadOnlyCollection<string> channels, Action<string> log)
-		{
-			using var mem = new FileStream($"/proc/{pid}/mem", FileMode.Open, FileAccess.ReadWrite);
-
-			var mode = ReadInt32(mem, ConfigBase + ModeOffset);
-			var defaultThreshold = ReadInt32(mem, ConfigBase);
-			if (mode != 2)
+			if (channel.Length > MaxNameLength)
 			{
-				// Mode 0 is a whitelist by NAME (no thresholds) and mode 1 a blacklist; the per-channel threshold path
-				// this writes only exists in mode 2. Should not happen - the caller waited for mode 2 - so report it
-				// rather than writing something that has no effect.
-				log($"debug-log  : client logger is in output mode {mode}, expected 2 (per-channel thresholds); not touching it.");
-				return;
+				why = $"it is longer than the client's {MaxNameLength}-character channel slot";
+				return false;
 			}
 
-			// Existing names must stay contiguous, so append after the last used slot.
-			var used = 0;
-			while (used < MaxEntries && ReadByte(mem, NameTable + used * NameStride) != 0)
-				used++;
-
-			var installed = new List<string>();
-			foreach (var channel in channels.Select(c => c.Trim()).Where(c => c.Length > 0).Distinct())
+			if (channel.StartsWith('#'))
 			{
-				var bytes = Encoding.ASCII.GetBytes(channel);
-				if (bytes.Length >= NameStride)
-				{
-					log($"debug-log  : channel '{channel}' is too long for the client's {NameStride}-byte slot; skipped.");
-					continue;
-				}
-
-				if (used >= MaxEntries)
-				{
-					log($"debug-log  : the client's channel table is full ({MaxEntries}); '{channel}' skipped.");
-					break;
-				}
-
-				var slot = new byte[NameStride];
-				bytes.CopyTo(slot, 0);
-				Write(mem, NameTable + used * NameStride, slot);
-				Write(mem, ThresholdTable + used * 4, BitConverter.GetBytes(0));
-				used++;
-				installed.Add(channel);
+				why = "a line starting with '#' is a comment to the client";
+				return false;
 			}
 
-			if (installed.Count == 0)
+			if (SettingKeys.Contains(channel, StringComparer.Ordinal))
 			{
-				log("debug-log  : no channels installed.");
-				return;
+				why = $"'{channel}' is one of the client's logger SETTINGS keys, so that line configures the logger instead of opening a channel";
+				return false;
 			}
 
-			// Read back so a silent failure (a write that lands nowhere) cannot be mistaken for success.
-			var verified = installed.Where((c, i) => ReadName(mem, used - installed.Count + i) == c).ToList();
-			log($"debug-log  : {verified.Count}/{installed.Count} channel(s) enabled in the live client (default threshold {defaultThreshold} " +
-			    $"left alone, so nothing else got louder): {string.Join(", ", verified)}");
-			log("debug-log  : output goes to AgeOfConan.log - it is flushed per line, so --console shows it live.");
+			why = "";
+			return true;
 		}
 
-		private static string ReadName(FileStream mem, int index)
+		// The key of a `Name=Value` line, or null for a blank/comment line the client skips.
+		private static string? KeyOf(string line)
 		{
-			var buf = new byte[NameStride];
-			mem.Seek(NameTable + index * NameStride, SeekOrigin.Begin);
-			mem.ReadExactly(buf);
-			var end = Array.IndexOf(buf, (byte)0);
-			return Encoding.ASCII.GetString(buf, 0, end < 0
-				? buf.Length
-				: end);
+			var trimmed = line.Trim();
+			if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+				return null;
+
+			var eq = trimmed.IndexOf('=');
+			var key = (eq < 0
+				? trimmed
+				: trimmed[..eq]).Trim();
+
+			return key.Length == 0
+				? null
+				: key;
 		}
 
-		private static byte ReadByte(FileStream mem, long address)
+		private static string ValueOf(string line)
 		{
-			var buf = new byte[1];
-			mem.Seek(address, SeekOrigin.Begin);
-			mem.ReadExactly(buf);
-			return buf[0];
-		}
-
-		private static int ReadInt32(FileStream mem, long address)
-		{
-			var buf = new byte[4];
-			mem.Seek(address, SeekOrigin.Begin);
-			mem.ReadExactly(buf);
-			return BinaryPrimitives.ReadInt32LittleEndian(buf);
-		}
-
-		private static void Write(FileStream mem, long address, byte[] bytes)
-		{
-			mem.Seek(address, SeekOrigin.Begin);
-			mem.Write(bytes);
-			mem.Flush();
-		}
-
-		// The AgeOfConan.exe PE process is the one whose maps carry the image at its 0x400000 base - proton and the
-		// wine steam.exe shim both match on cmdline, and only this one has the PE mapped.
-		private static async Task<int?> WaitForClientAsync(TimeSpan timeout, CancellationToken cancellationToken)
-		{
-			var deadline = DateTime.UtcNow + timeout;
-			while (DateTime.UtcNow < deadline && !cancellationToken.IsCancellationRequested)
-			{
-				foreach (var dir in Directory.EnumerateDirectories("/proc"))
-				{
-					if (!int.TryParse(Path.GetFileName(dir), out var pid))
-						continue;
-
-					try
-					{
-						foreach (var line in File.ReadLines($"/proc/{pid}/maps"))
-						{
-							if (line.StartsWith("00400000-", StringComparison.Ordinal) && line.Contains("AgeOfConan", StringComparison.OrdinalIgnoreCase))
-								return pid;
-						}
-					}
-					catch
-					{
-						// the process exited, or is not ours - just skip it
-					}
-				}
-
-				await Task.Delay(500, cancellationToken);
-			}
-
-			return null;
+			var eq = line.IndexOf('=');
+			return eq < 0
+				? ""
+				: line[(eq + 1)..].Trim();
 		}
 	}
 }

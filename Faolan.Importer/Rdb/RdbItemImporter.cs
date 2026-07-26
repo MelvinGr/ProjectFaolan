@@ -233,8 +233,13 @@ namespace Faolan.Importer.Rdb
 						mods[m.StatId] = (int)m.WireAmount; // region is authoritative; last (== only) write wins
 				}
 
-				if (TryReadPropertyField(template.AsSpan(12), 972, out var primaryStat) && AttributeStatIds.Contains(primaryStat) &&
-				    TryReadPropertyField(template.AsSpan(12), 971, out var primaryAmount) && primaryAmount is > 0 and <= 100 && !mods.ContainsKey(primaryStat))
+				// ⚠️ Only when the region gave us NOTHING (#441). It used to fill in whenever that one stat was absent,
+				// which - now that the region actually parses - invents bonuses the client does not apply: Obliteratus'
+				// records are Con 360 / Int 800 and the client applies exactly those, while field 972 added a phantom
+				// Str +1 on top. So 971/972 is the last resort for a template whose region is genuinely empty, not a
+				// per-stat top-up.
+				if (mods.Count == 0 && TryReadPropertyField(template.AsSpan(12), 972, out var primaryStat) && AttributeStatIds.Contains(primaryStat) &&
+				    TryReadPropertyField(template.AsSpan(12), 971, out var primaryAmount) && primaryAmount is > 0 and <= 100)
 					mods[primaryStat] = (int)(primaryAmount * 10); // 971 is the DISPLAY value (+1/+2/+3); attributes scale ×10
 
 				if (SyncStatModifiers(item, mods))

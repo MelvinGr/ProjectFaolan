@@ -128,26 +128,39 @@ A blind apply would corrupt combat/vitals, because the spell region's per-stat s
 `CharacterStatId.GetScale()`. The decoded `SpellStatEffect` table is the foundation. Open work is tracked in
 Gitea #367.
 
-## Template-scaled items carry no region at all
+## ~~Template-scaled items carry no region at all~~ — WRONG: the scan was word-aligned (#441, SOLVED)
 
-High-level gear is **template-scaled**: its stats are derived from item level + quality + slot + armour class
-rather than stored per-item, so `Parse` correctly returns nothing. Confirmed by dumping the whole 605-byte
-`Talons of Dark Terror` template (`--report item-template --report-arg 3763061`): zero signature hits, and a
-property table of only 9 fields. The scaling inputs those items DO carry are
+**This section previously claimed high-level gear stored no stat records and derived its stats from level + quality +
+slot. That was wrong, and the evidence for it was an artefact.** The records were in the templates the whole time;
+`Parse` could not see them because it scanned only **4-byte-aligned** offsets, and most regions are not aligned to the
+body — `Blackwolf Cap`'s first record starts at body offset **297**. An unaligned region yields *zero* hits from an
+aligned scan, which reads exactly like "this item has no stats".
+
+The doc even cited `Talons of Dark Terror` (3763061) as having "zero signature hits". Byte-granular, it has six
+records — `312=30, 448=191, 507=13000, 806=380, 808=490, 861=1500` — and the client applies Con 380 / Int 490, exactly
+those. Scanning byte by byte (`ItemTemplateStatModifiers.Parse`) took the corpus from **1398 to 4223** stat rows across
+**1705 items**, and changed nothing for templates that were already aligned (`Royal Signet` stays 3 records, `Fine
+Steelsilk Pants` stays 6).
+
+Verified against the client's own applied stats for **18/18** items observed on the `ClientInterface` channel
+(`docs/tooling/client-debug-logging.md`) across four characters. Regression gate:
+`ItemTemplateStatModifierTests.FindsARecordAtEveryByteAlignment`, which builds the record at all four byte phases.
+
+One consequence: the **field-972/971 primary attribute is now a last resort**, applied only when the region is
+genuinely empty. It used to fill in whenever that one stat was missing, which — with the region parsing properly —
+invents bonuses the client does not apply (`Obliteratus` records Con 360 / Int 800, and 972 added a phantom Str +1).
+
+The property fields below are still real and still worth knowing, they are simply not a stat *source*:
 
 | field | meaning |
 |---|---|
-| 54 | item level (80, or 63 for `Cloak of Hugin`) |
+| 54 | item level |
 | 499 | quality tier (also the `ItemQuality` value) |
 | 496 | per-item budget; tracks quality (1000 at tier 1, 2500/2000 at 2, 3250/3000/3500 at 3, 4000/5000 at 4, 6000 at 5) |
 | 41 | slot mask - the same set differs only here: `Tanned Gauntlets` 1, `Tanned Boots` 2, `Tanned Tunic` 24 |
 | category | armour class (30000 cloth, 30001 light, 30002/30003 heavier, 30020 neck, 30023 cloak) |
 
-`--report item-stat-scaling` writes all of those next to each item's explicit records as CSV, for fitting.
-⚠️ The explicit-stat items CANNOT be used as the fit's ground truth: they are hand-authored and do not follow the
-scaling (level-12 `Pictish Armbands` carry +35 health, level-40 `Canvas Pants` only +25). The per-level targets in
-[`client-tweak-table.md`](client-tweak-table.md) (`TWK_TargetPerLevelArmor` 137.225,
-`TWK_TargetPerLevelProtection` 46.0625) are the retail-authored side of the same scaling. Open work: Gitea #441.
+`--report item-stat-scaling` still writes them next to each item's records as CSV.
 
 ## An item identity can be INTERPOLATED or COMBINED (client-side, #441)
 
@@ -167,4 +180,6 @@ its own. `FUN_008cb620` (channel `GameCode/ItemData`) is the loader that reads a
 minimum of 1"*).
 
 What this does NOT yet give us: which reference templates bracket a given item, and how the interpolation weights
-the two. Until that is decoded the per-item numbers have to come from the client's own tooltips. Open work: #441.
+the two. That is no longer needed for item STATS — those are read straight out of each template's own record region
+(above) — but it is still the mechanism behind the class attribute BASE, which arrives as a per-class template the
+client interpolates at the character's level. Open work: Gitea #444.

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
@@ -17,6 +18,32 @@ namespace Faolan.Tests
 		                                             "AABkAAAASgAAAORxAAA2AAAASAAAAAwAAAAGkjEAFQAAACEAAAAMAAAAUm95YWwgU2lnbmV0AgAAAA4AAADEDwAANc8AAAAAAAAEAAAA" +
 		                                             "AAAAAAEAAAAAAAAAAgAAAAkAAAA2AQAADwAAADXPAAAAAAAABAAAAAAAAAABAAAAAAAAAAIAAAAJAAAAJgMAACwBAAA1zwAAAAAAAAQA" +
 		                                             "AAAAAAAAAQAAAAAAAAACAAAACQAAAF0DAABQFAAAFgAAACQAAADiBwAABgAAAOIHAAAAAAAApB8AAF0AAAA=";
+
+		// #441: the region is NOT 4-byte aligned to the body in most templates, and a word-aligned scan cannot see an
+		// unaligned record at all - it silently returns ZERO, which is why 2873 of 3248 templates read as "no stats" while
+		// the client applied a full list from the same bytes. This builds the exact 10-word record the parser anchors on,
+		// at every possible byte phase, and requires it to be found in all four.
+		[Theory]
+		[InlineData(0)]
+		[InlineData(1)]
+		[InlineData(2)]
+		[InlineData(3)]
+		public void FindsARecordAtEveryByteAlignment(int phase)
+		{
+			const uint kind = 53045, statId = (uint)CharacterStatId.Constitution, amount = 580;
+			uint[] record = [0, kind, 0, 4, 0, 1, 0, 2, 9, statId, amount];
+
+			var body = new byte[phase + record.Length * 4 + 8];
+			for (var i = 0; i < record.Length; i++)
+				BinaryPrimitives.WriteUInt32LittleEndian(body.AsSpan(phase + i * 4), record[i]);
+
+			var mods = ItemTemplateStatModifiers.Parse(body);
+
+			var mod = Assert.Single(mods);
+			Assert.Equal(statId, mod.StatId);
+			Assert.Equal(amount, mod.WireAmount);
+			Assert.Equal(kind, mod.Kind);
+		}
 
 		[Fact]
 		public void IgnoresGarbageAndResourceRefSignatureHits()
