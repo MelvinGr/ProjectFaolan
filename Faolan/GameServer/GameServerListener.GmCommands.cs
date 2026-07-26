@@ -351,6 +351,7 @@ namespace Faolan.GameServer
 				["invisible"] = (client, _) => ToggleInvisibleCommand(client),
 				["delete"] = DeleteCommand,
 				["kill"] = KillCommand,
+				["hurt"] = HurtCommand,
 				["additem"] = AddItemCommand,
 				["removeitem"] = RemoveItemCommand,
 				["claim"] = _claims.ClaimCommand,
@@ -439,6 +440,30 @@ namespace Faolan.GameServer
 
 			await _combat.KillNpc(client, targetHandle);
 			await _agentServerDispatcher.SendSystemMessage(characterId, $"Killed target 0x{targetHandle:X8}.");
+		}
+
+		// .hurt [<percent>]  - drop the caller's three pools to `percent` of their max (default 50) and push the
+		// authoritative vitals. The test bootstrap for the regen tick (Gitea #2): losing HP/mana to a mob or to casting
+		// is unreliable to stage, and the pools have to end up BELOW max for the tick to emit anything at all. Never
+		// kills - health floors at 1 - so this exercises regen rather than the death/release path (.kill self does that).
+		private async Task HurtCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? "").Trim();
+			var percent = 50u; // default: half of every pool
+			if (arg.Length > 0 && (!uint.TryParse(arg, out percent) || percent > 100))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .hurt [&lt;percent 0-100&gt;]  (default 50)");
+				return;
+			}
+
+			var vitals = _combat.GetOrAddPlayerVitals(client);
+			vitals.Health = Math.Max(1, vitals.MaxHealth * percent / 100);
+			vitals.Mana = vitals.MaxMana * percent / 100;
+			vitals.Stamina = vitals.MaxStamina * percent / 100;
+			await SendStatUpdate(client, vitals.ToVitalsBlock(), characterId);
+			await _agentServerDispatcher.SendSystemMessage(characterId,
+				$"Hurt to {percent}%: health {vitals.Health}/{vitals.MaxHealth}, mana {vitals.Mana}/{vitals.MaxMana}, stamina {vitals.Stamina}/{vitals.MaxStamina}.");
 		}
 
 		// .ah  - open the auction house at the player's position (PoC bootstrap for the Tradepost; the real trigger

@@ -65,6 +65,28 @@ screenshot anchor (taken at full) and the spawn-capture test both match those id
 old code sent the delta under the *max* id, so a heal/damage grew the player's MAX bar instead of moving
 current). See `CharacterStatBlockTests`.
 
+## Regen moves the SAME stats, through the same client setter (`RegenIIR` 0x28D0AC99)
+
+Retail does not push a full `0x96B8DC59` block per regen tick — it sends `RegenIIR`, a 12-byte
+`[+health][+mana][+stamina]` signed delta in the same ×100 scale, which the client ADDS to the three **current**
+ids above. Both applies end in the same virtual call, so a client that renders one renders the other:
+
+| IIR | apply | what it does |
+|---|---|---|
+| `StatUpdateIIR` `0x96B8DC59` | `FUN_007a00e0` | per record: `(entity+0x10c)->vt[0xc](statId, value)` |
+| `RegenIIR` `0x28D0AC99` | `FUN_0079dd10` | per pool: `v = vt[8](statId)`, then `vt[0xc](statId, v + delta)` for `0x1B`, `0x1FA`, `0x1F8` in field order |
+
+Both resolve the target from the carrier's `[0xC350][handle]` and bail to a log channel (`GameCode/Regen`,
+`GameCode/Stats`) when the handle names no character. All 1502 captured `RegenIIR`s are 29-byte bodies with
+`env == 0`, so there is no conditional field [V3: V1IirCodecTests.Regen_RoundTripsCapturedBody].
+
+Retail pins the endpoint with an authoritative block on the tick a pool **tops off** — in
+`Hoxxling_mage-heraldofxotli_login_gameplay` at 18:49:49.912 a `RegenIIR(2060, 1992, 882)` ships in the same frame
+as a stat block setting stamina `0x1F8` = 14000 and mana `0x1FA` = 28800 (their maxes). `WorldSimulation`'s regen
+tick sends the delta and then the block on **every** tick (delta first, so the absolute value lands last and the
+client can never double-apply); trimming that to retail's top-off-only shape needs the delta channel confirmed
+in-client — Gitea #2.
+
 ## Wrong / unconfirmed ids (now tracked on the `CharacterStatId` enum)
 
 - ✅ **RESOLVED (2026-06-14, in-client): the vitals current/max ids are `0x001B`/`0x01F8`/`0x01FA` =

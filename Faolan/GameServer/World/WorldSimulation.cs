@@ -535,12 +535,24 @@ namespace Faolan.GameServer.World
 					RegenAmount(vitals.MaxStamina, 0.10, elapsedSeconds) + (uint)(entity.NaturalStaminaRegen * elapsedSeconds), inCombat
 						? 0u
 						: RegenAmount(vitals.MaxMana, 0.05, elapsedSeconds) + (uint)(entity.NaturalManaRegen * elapsedSeconds));
-				if (changed)
-					// Send retail's compact RegenIIR delta (the client adds it to its bars) instead of a full 0x96B8DC59
-					// push - the per-tick rise per pool, ×100 to the wire vitals scale.
-				{
-					await _output.SendRegen(client, entity.Handle, (int)(vitals.Health - beforeH) * 100, (int)(vitals.Mana - beforeM) * 100, (int)(vitals.Stamina - beforeS) * 100);
-				}
+				if (!changed)
+					continue;
+
+				// Retail's compact RegenIIR delta (0x28D0AC99): the per-tick rise per pool, ×100 to the wire vitals
+				// scale. The client's apply (FUN_0079dd10) reads stat -> adds the delta -> writes it back through the
+				// SAME setter StatUpdateIIR's apply uses (entity+0x10c vtable +0xc), so this is retail's own channel
+				// for moving the bars without a full stat block.
+				await _output.SendRegen(client, entity.Handle, (int)(vitals.Health - beforeH) * 100, (int)(vitals.Mana - beforeM) * 100, (int)(vitals.Stamina - beforeS) * 100);
+				// ...and then the AUTHORITATIVE 0x96B8DC59 block, which is what actually makes regen visible (#2, the
+				// in-client-verified channel). Sending the delta ALONE was a regression: 2026-07-22 replaced this push
+				// with the RegenIIR and regen stopped ticking in-client, even though the packet is byte-identical in
+				// shape to all 1502 captured retail RegenIIRs (len 29, env 0, class 0xC350, three BE i32). Order
+				// matters: the delta goes FIRST so the absolute value lands last and wins - the client can never
+				// double-apply, and any client/server drift is corrected every tick. Retail is lighter (it pins a pool
+				// with a StatUpdate only on the tick that tops it off - Hoxxling_mage-heraldofxotli_login_gameplay
+				// 18:49:49.912 sends REGEN(2060,1992,882) + a StatUpdate setting stamina/mana to their max); thinning
+				// ours down to that shape needs the delta channel proven in-client first (Gitea #2).
+				await _output.PushVitals(client, vitals);
 			}
 		}
 

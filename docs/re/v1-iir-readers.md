@@ -26,7 +26,16 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
   (2026-07-22, `FUN_0079dd10`): the three fields are per-tick `[+health][+mana][+stamina]` deltas (×100 wire
   scale, signed - can drain) that the client ADDS to the current vitals (stats 0x1B/0x1FA/0x1F8). So retail
   regenerates the bars smoothly with a compact 12-byte delta instead of pushing a full 0x96B8DC59 stat block;
-  `RegenCodec` now models this and the `WorldSimulation` regen can emit it (delta = the per-tick rise).
+  `RegenCodec` models this and the `WorldSimulation` regen tick emits it (delta = the per-tick rise).
+  The delta lands through the **same setter as a full stat block** — `StatUpdateIIR_c`'s apply (`FUN_007a00e0`)
+  calls `entity+0x10c` vtable `+0xc` with `(statId, value)`, and `FUN_0079dd10` calls `+8` (get) then that same
+  `+0xc` with `(statId, current + delta)` — so a client that renders one renders the other; both resolve the
+  target from the carrier's `[0xC350][handle]` and log to `GameCode/…` when it can't be found. Retail pairs the
+  stream with an authoritative `0x96B8DC59` on the tick a pool TOPS OFF: `Hoxxling_mage-heraldofxotli_login_gameplay`
+  18:49:49.912 sends `RegenIIR(2060, 1992, 882)` and, in the same frame, a stat block setting stamina `0x1F8` =
+  14000 and mana `0x1FA` = 28800 (their maxes) — the delta stream moves the bar, the block pins the endpoint.
+  Our regen tick sends the block on EVERY tick, not just at top-off (delta first so the absolute value wins);
+  see Gitea #2. [V3: V1IirCodecTests.Regen_RoundTripsCapturedBody]
 - **KnubotStartTradeIIR** is the vendor/shop item list (per-item: name + four u32s = template/price/stock/flags,
   TBD). It's constructible once those four fields are named. (Our shops already open from the captured burst; this
   is the from-scratch path.)
