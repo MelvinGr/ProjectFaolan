@@ -2,9 +2,13 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// FanaticCommandIIR_t (0xEE4AA85C) - what the client sends when a GM types `/gm`. "Fanatic" is the client's own
-	// name for its GM/admin command channel (it also names the `Fanatic` debug channel and the tweak table's
+	// FanaticCommandIIR_t (0xEE4AA85C) - what the client sends when a GM runs one of its ~133 GM commands. "Fanatic" is
+	// the client's own name for its GM/admin subsystem (it also names the `Fanatic` debug channel and the tweak table's
 	// TWK_karma_Fanatic* entries), not anything to do with the player-facing game.
+	//
+	// `/gm` specifically is FanaticGMLevelCommand_c - the command that reads and sets the privilege MASK the whole
+	// surface is gated on, and the one command registered without a permission record so anyone can reach it. The mask,
+	// the 133-command catalog and each command's required bit are in docs/subsystems/gm-commands.md.
 	//
 	// GRAMMAR from the client's ReadSubClass (Ghidra FUN_00663860, the vtable slot-8 reader named in
 	// docs/re/iir-readers-binary-only.md): three u32 reads into obj+0x2C/0x30/0x34, then a std::string into obj+0x48.
