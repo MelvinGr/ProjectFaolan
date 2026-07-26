@@ -369,6 +369,16 @@ namespace Faolan.GameServer.Combat
 				return; // already dead this life; ignore overkill until it respawns
 
 			target.ApplyHealthDelta(-damage);
+
+			// #140/#440: a lethal blow's fatality burst goes out BEFORE the client is told the target is dead - not
+			// merely before the death records. Retail's kill window never carries a health-to-zero update ahead of the
+			// burst: in Stickienecro's ice-strike fatality the victim's only damage record is the StatDamage at idx 542,
+			// AFTER the three ApplySpells at 535-538, and the death pose (546) and death BccIIR (549) follow that. Ours
+			// pushed the victim's vitals at health 0 one packet ahead of the burst, so the client learned the mob was
+			// dead - and had to choose how it dies - before it knew the kill was a fatality.
+			if (target.IsDead && _fatality != null && npcEntity != null)
+				await _fatality.OnKill(client, _sim.PlayerWorldEntity(client), npcEntity);
+
 			await SendStatUpdate(client, target.ToVitalsBlock(), targetHandle);
 
 			if (target.IsDead)
@@ -437,19 +447,10 @@ namespace Faolan.GameServer.Combat
 				// range - retail's NewAllowedLooterIIR is a loot-PERMISSION grant (#263).
 				npcEntity.LastAttackerHandle = killer.Session.Character.Id;
 
-				// #140: roll for a fatality FIRST. The chance comes from the client's own fatality groups (RDB 1010219 -
-				// a percent, tiered by level: 5% at 1, 30% at 80), and a hit sends the burst the captures show.
-				//
-				// ⚠️ ORDER IS LOAD-BEARING: retail sends the fatality burst BEFORE the victim's death records, in
-				// 37 out of 37 captured fatalities - the Fatality ApplySpells land 7-20 packets ahead of the death-pose
-				// MoveTask and ahead of the death BccIIR every time, usually in the same frame as the killing blow
-				// (xxx_mage-necromancer fr1267: burst -> victim StatDamage -> pose -> BccIIR). The client can only pick
-				// a FINISHER death for the corpse if it already knows the kill was a fatality, and nothing else in the
-				// burst distinguishes one (the death record itself is byte-identical in kind on fatal and normal kills:
-				// same creature death-behaviour id, same variant spread). Rolling it after the death records - which is
-				// what this did - gave the buffs, the proc and the pet with an ordinary death animation.
-				if (_fatality != null)
-					await _fatality.OnKill(killer, _sim.PlayerWorldEntity(killer), npcEntity);
+				// ⚠️ The FATALITY burst is NOT sent here. It goes out in ApplyNpcDamage, ahead of the killing blow's own
+				// vitals push - see the comment there. Retail's ordering is burst -> the victim's damage -> death pose ->
+				// death BccIIR, in 37 of 37 captured fatalities; the client cannot pick a finisher for a corpse it was
+				// already told is dead (#140/#440).
 
 				// #204/#349: the health=0 StatUpdate alone does NOT play the death animation. Retail drives an NPC
 				// death with a death-pose MoveTask (type 0x06, freezes the corpse in place) + a death-behavior BccIIR
