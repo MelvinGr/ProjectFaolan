@@ -14,10 +14,17 @@ namespace Faolan.Importer.Rdb
 	//
 	// The LDB grammar (LdbStringIndex) gives id->string keyed by an EXPLICIT id. For both categories the id == the
 	// record id (verified: spell 222675 -> "Set's Cold Hatred"; item names in cat 50200 crib 99% against our catalog).
-	// LANGUAGE is per-PAGE and this client bundles several (FR/EN/DE/ES/RU/PL/KO), so the English page is picked by
-	// CRIBBING each page against the names the catalog ALREADY carries from the template: English matches ~97-99%,
-	// every other language <30% - unambiguous, no hard-coded page id. Only EMPTY names are filled, so a wrong page
-	// could never overwrite a good name; and if no page cribs clean, nothing is written.
+	//
+	// LANGUAGE is per-PAGE and this client bundles seven (EN/FR/DE/ES/PL/RU/KO). The page's language is DECLARED by the
+	// client - `LdbLanguageIndex` reads the language records (RDB 1030001) that list each language's pages - so this
+	// reads English pages and nothing else. The name crib (EnglishNames) is kept on top as a CHECK, not as the way the
+	// language is chosen; only EMPTY names are filled, so nothing can overwrite a good value either way.
+	//
+	// It used to sniff the language from the text, which is wrong on this data and was caught in-client: whole pages
+	// ship UNTRANSLATED (the Polish and Korean 50211 pages are English sentences), so a prose test scores them as
+	// English, the pages get unioned, and the last write per id wins - which is how 1991 of 3380 spell descriptions
+	// came out Spanish ("Aumenta en 1 la Fuerza"). We only support English; take the client's word for which page that
+	// is.
 	//
 	// Categories:
 	//   50210 = spell names (id == spell id).
@@ -42,6 +49,13 @@ namespace Faolan.Importer.Rdb
 			var spellNames = await db.Spells.Where(s => s.Name != null && s.Name != "").ToDictionaryAsync(s => s.Id, s => Norm(s.Name!));
 			var itemNames = await db.Items.Where(i => i.Name != null && i.Name != "").ToDictionaryAsync(i => i.Id, i => Norm(i.Name!));
 
+			// Which page is in which language - stated by the client's own language records (LdbLanguageIndex), not
+			// guessed from the text. Everything below reads ENGLISH pages only.
+			var languageByPage = LdbLanguageIndex.LanguageByPage(rdb);
+			var englishPages = languageByPage.Count(kv => kv.Value == LdbLanguageIndex.English);
+			if (englishPages == 0)
+				logger?.LogWarning("RdbLdbNameImporter: no English LDB pages found (language records missing?) - nothing will be backfilled.");
+
 			// One pass over the LDB: bucket the categories we care about as id->string, per page.
 			var spellPages = new List<Dictionary<uint, string>>();
 			var itemPages = new List<Dictionary<uint, string>>();
@@ -49,6 +63,10 @@ namespace Faolan.Importer.Rdb
 			var spellDescriptionPages = new List<Dictionary<uint, string>>();
 			foreach (var e in rdb.EntriesOfType(LdbType).Where(x => x.IsLocal))
 			{
+				// Not English (or claimed by no language record at all) - skip it outright.
+				if (!languageByPage.TryGetValue(e.Id, out var language) || language != LdbLanguageIndex.English)
+					continue;
+
 				byte[] body;
 				try
 				{
@@ -80,20 +98,22 @@ namespace Faolan.Importer.Rdb
 				bucket.Add(ids);
 			}
 
+			// The pages are already English-only, so the crib is now a CHECK rather than the selection mechanism: it
+			// verifies each page still matches the names our catalog carries (97-99% on a real English page), and a
+			// page that fails contributes nothing. Belt and braces - if the language index ever mis-attributes a page,
+			// names still cannot be filled from the wrong language.
 			var spellEnglish = EnglishNames(spellPages, spellNames);
 			var itemEnglish = EnglishNames(itemPages, itemNames);
 
 			var spellsFilled = await BackfillAsync(db.Spells, s => s.Id, (s, n) => s.Name = n, spellEnglish);
 			var itemsFilled = await BackfillAsync(db.Items, i => i.Id, (i, n) => i.Name = n, itemEnglish);
 
-			// Descriptions (#414 items, #367 spells) cannot be language-picked the same way: EnglishNames cribs each page
-			// against names we already hold, and we hold no descriptions to crib against. They ARE full sentences though
-			// ("Deals piercing damage over time."), so the language is detectable directly - take every page whose prose
-			// reads as English.
-			var descriptionEnglish = EnglishProse(descriptionPages);
+			// Descriptions (#414 items, #367 spells) cannot use the name crib - we hold no descriptions to crib against -
+			// which is exactly why they need the language index: they are taken from the English pages, full stop.
+			var descriptionEnglish = Merge(descriptionPages);
 			var descriptionsFilled = await BackfillDescriptionsAsync(await db.Items.ToListAsync(), i => i.Id, i => i.Description, (i, d) => i.Description = d, descriptionEnglish);
 
-			var spellDescriptionEnglish = EnglishProse(spellDescriptionPages);
+			var spellDescriptionEnglish = Merge(spellDescriptionPages);
 			var spellDescriptionsFilled =
 				await BackfillDescriptionsAsync(await db.Spells.ToListAsync(), s => s.Id, s => s.Description, (s, d) => s.Description = d, spellDescriptionEnglish);
 
@@ -152,38 +172,16 @@ namespace Faolan.Importer.Rdb
 			return english;
 		}
 
-		// Common English function/domain words. A description page in another language scores near zero on these, and
-		// the winning page in a 7-language install wins by a wide margin - this is not a close call.
-		// A genuinely English page of sentences clears this comfortably; a wrong-language page is nowhere near it.
-		private const double EnglishProseRatio = 0.30;
-
-		private static readonly string[] EnglishMarkers = ["the ", " and ", " of ", " to ", " a ", " your ", "damage", "increase", "target", "seconds"];
-
-		// Merges EVERY description page that reads as English, not just the best one - a category is split across
-		// several pages per language, so picking a single winner returns only a fraction of the ids (226 of the ~420
-		// items we hold, when the whole English set covers far more). This mirrors EnglishNames, which also unions all
-		// pages that pass its test rather than choosing one.
-		//
-		// A page that fails the threshold contributes NOTHING, so a mis-detection stores no description rather than
-		// storing the wrong language.
-		internal static Dictionary<uint, string> EnglishProse(List<Dictionary<uint, string>> pages)
+		// The union of the (already English-only) pages of a category. A category is split across several pages per
+		// language, so a category's English strings are the union of ITS pages - there is no winner to pick.
+		private static Dictionary<uint, string> Merge(List<Dictionary<uint, string>> pages)
 		{
-			var english = new Dictionary<uint, string>();
+			var merged = new Dictionary<uint, string>();
 			foreach (var page in pages)
-			{
-				var sampled = page.Values.Where(v => !string.IsNullOrWhiteSpace(v)).Take(400).ToList();
-				if (sampled.Count == 0)
-					continue;
+			foreach (var (id, str) in page)
+				merged[id] = str;
 
-				var hits = sampled.Count(v => EnglishMarkers.Any(m => v.Contains(m, StringComparison.OrdinalIgnoreCase)));
-				if ((double)hits / sampled.Count < EnglishProseRatio)
-					continue;
-
-				foreach (var (id, str) in page)
-					english[id] = str;
-			}
-
-			return english;
+			return merged;
 		}
 
 		// Fills Description on the rows we hold, from the English page set. Only ever ADDS - never overwrites a

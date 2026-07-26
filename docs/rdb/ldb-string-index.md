@@ -48,10 +48,36 @@ bundles several — the one at hand carries seven for the spell-name category:
 | Korean | 3987257 |
 
 The per-entry second u32 (`langOrFlags`) is *not* a clean language selector (it is `0` for almost every entry),
-so the language must be resolved at the page level. The importer identifies the **English** page by **cribbing**:
-score each cat-50210 page's strings against the English names the `Spells` catalog already carries from the
-template `ExtractName`. The English page matches ~**97 %**; every other language scores **< 30 %**, so the winner
-is unambiguous and self-calibrating (no hard-coded page id).
+and the page header's `flags` word is `0` on every page — so neither says the language.
+
+### The client declares it: the language record (RDB type `1030001`, `TDL1`)
+
+The install ships **exactly one language record per bundled language** (seven here), each naming itself in plain
+ASCII and listing **the 152 LDB pages that belong to it**:
+
+```
+[0..12)   RDB-Id header
+[12..16)  magic "TDL1"
+...       the language name in ASCII, twice (English name, then localized: "French" then "Français"),
+          a plural-form rule ("(N == 1) /? 1 /: -1"),
+          then a table of { u32 pageId, u32 } pairs — this language's pages
+```
+
+⚠️ **The page table is not word-aligned in every record.** The leading strings differ in length per language, so
+the table starts at a byte offset that is a multiple of 4 only sometimes (it is in the French and Spanish records;
+it is *not* in the English one). Read it byte-granularly, anchored on "this value is a real `1030002` page id".
+`LdbLanguageIndex` does exactly that and returns page → language; 1,064 of the 1,103 local pages are claimed.
+
+### Do not sniff the language from the text
+
+An earlier version scored each page's prose for English function words. That is not merely approximate — it is
+**wrong on this data**: whole pages ship **untranslated**, so the Polish and Korean pages of the spell-description
+category (`50211`) contain English sentences and score as English. Unioning every "English-looking" page then lets
+the last write per id win, which is how **1,991 of 3,380** imported spell descriptions came out Spanish
+(`Aumenta en 1 la Fuerza`), caught in-client. Take the client's word for it.
+
+The name **crib** (score a page against the names the catalog already holds — English matches ~97 %, every other
+language < 30 %) is kept on top of the language index as a *check*, not as the way the language is chosen.
 
 ## What each name category keys
 
@@ -88,10 +114,11 @@ an asset file is the one direction this project doesn't take.
 
 ## Importer
 
-`RdbLdbNameImporter` (module `rdb-ldb-names`, runs after `rdb-spells`) parses the name-category pages, crib-picks
-the English page per category, and backfills **only EMPTY** names — `Spells.Name` from `LDB[50210][spell.Id]` and
-`Items.Name` from `LDB[50200][item.Id]`. Filling only empties means a wrong page could never overwrite a good
-template name, and if no page cribs clean (`≥ 80 %` over `≥ 50` shared ids) nothing is written. Run:
+`RdbLdbNameImporter` (module `rdb-ldb-names`, runs after `rdb-spells`) reads the **English pages only** — selected
+by `LdbLanguageIndex` from the client's language records — and backfills **only EMPTY** values: `Spells.Name` from
+`LDB[50210][spell.Id]`, `Items.Name` from `LDB[50200][item.Id]`, and the two description columns from `50211` /
+`50201`. Filling only empties means a wrong page could never overwrite a good template name; the name crib
+(`≥ 80 %` over `≥ 50` shared ids) still runs on top as a check, and a page that fails it contributes nothing. Run:
 
 ```zsh
 dotnet run --project Faolan.Importer -- --only rdb-ldb-names --rdb <RDB> --captures <data-repo>/Captures
@@ -104,8 +131,9 @@ the spell + item crib scores.
 
 ## Still open
 
-- **Item descriptions** — cat `50201` is keyed by item id and holds the tooltip text (4,006 templates, 421 of
-  them ours). Nothing reads it yet; `Items` has no description column.
+- **Descriptions are imported, nothing reads them** — cat `50201` (item id → tooltip text) fills
+  `Items.Description` and cat `50211` (spell id → tooltip text) fills `Spells.Description`, but no armory,
+  tooltip or MCP path queries either (Gitea #414).
 - **Catalog coverage** — the LDB names **76,546** item templates but the catalog holds **3,245** rows, because an
   item only enters it when a capture yields its TEA key quad. The 73,339 named-but-uncataloged templates are a
   name source for whatever fills that gap.
