@@ -4,6 +4,8 @@ set -eu
 
 command="${1:-}"
 
+# Default UniverseAddr: dm09-nj4.ageofconan.com:7010
+
 case "$command" in
     --faolan)
         shift

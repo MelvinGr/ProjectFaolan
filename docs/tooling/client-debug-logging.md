@@ -99,6 +99,43 @@ full list. That looked like a missing scaling formula, and it was not: the stats
 the parser could not see them because it scanned only 4-byte-aligned offsets while most regions are unaligned. The
 channel is what made the discrepancy measurable per item, which is how the real cause was found.
 
+## The channel catalog, and which ones pay
+
+There are **339** channel names in the exe, recovered from the call sites rather than from `strings`: every site
+compiles to `push <channelPtr>; push <level>; call FUN_004A8B90`, so scanning `.text` for `68 <ptr> 6A <imm8>` where
+the pointer resolves to a printable name yields each channel with its site count and the levels it logs at. (A few
+hits are assert filenames — `*.pb.cc`, `*.cpp` — not channels.) The loudest are `BassiNet/Proxy` (768 sites),
+`Scaleform` (531), `GameCode/Cars` (176), `GameCode/Criteria` (141), `GameCode/Movement` (140), `Lua` (117).
+
+Measured in-world (L24 character, Tortage, world entry + idle), 34 candidates at threshold 0:
+
+| channel | lines | what it says |
+|---|---|---|
+| `GameCode/Criteria` | 4337 | `50000:102 Criteria result: 0`, `stat Sex equal success 2 == 2!` — per-NPC criteria evaluation, i.e. quest/dialogue gating. Keeps firing while idle. |
+| `GameCode/GameActions` | 880 | `Streaming in spell list with 12 elements` |
+| `GameCode/Feats` | 195 | `FeatPointsTable_c have information up to level 80`, `New FeatPoints: 1 TSFeatPoints: 0 at level: 10` — the per-level feat-point table (load only) |
+| `GameCode/QuestMarker` | 180 | `CoreCharacterFullUpdateIIR NPC( [Identity 50000:102] )` — which NPCs the client evaluates as quest givers |
+| `Control/Data/Movementset` | 106 | `BCTAction with movementset: Group:begging, Action:41237/beghungrylook, Set:137475` — BCT action → animation ids (load only) |
+| `GameCode/Skills` | 88 | `CoreSkillHolder::AddSkill 2:285324533(Hakotep) 1037 from 0 to 500` |
+| `GameCode/Inplay` | 86 | `FlowControlModule_t::ClientCharacterReadyToSendInPlay()`, `TeleportEndedMessage()`, `Got inplay from client character <name>` |
+| `GameCode/GameAction/Modify` | 18 | `GetOnCasterModifyPercent: 0`, `Value after percent modification : 10000` |
+| `GameCode/Combat/DPS` | 10 | `CalcBaseDPS: Base DPS:2960.00` → `DPS after abilitybonus:3868.45 (stat:804)` → `after genericdamagemodifier:4086.76` |
+| `GameActionData/GetStat` | 2 | `Tried to GetStringStat for GameActionStat_e 1241 but it did not exist` — a stat the client wanted and we never sent |
+
+The remaining candidates registered but stayed silent, because nothing triggered their code path: `Control/IIR`,
+`Control/Data/Fatality`, `GameCode/BCC`, `BCC`, `GameCode/Quest`, `GameCode/Quests`,
+`GameCode/Quests/QuestJournal`, `CharacterTag`, `GameCode/FeatData`, `GameCode/Magic/Recast`,
+`GameCode/Magic/Metaline`, `GameCode/Combat`, `GameCode/Death`, `GameCode/SwapAlternateEquipment`, `Tradepost`,
+`Mail`, `GameCode/Shops`, `GameCode/Pets`, `Knubot`, `GameCode/Scry`, `EffectTimeline`. Enable those with the action
+that drives them (a cast, a fatality, opening the auction house, talking to an NPC, dying) — same rule that made
+`GameCode/ArmorMitigation` look dead until someone opened the character sheet.
+
+Notable per-task channels beyond the default set: `Control/Data/Fatality` (9 sites, level 1) for #140/#440,
+`GameCode/Magic/Metaline` for spellweaving, `GameCode/Magic/Recast` for #271, `Tradepost`/`Mail`/`GuildBank`/
+`GameCode/Shops` for the economy subsystems, `Knubot` + `GameCode/Criteria` + `CharacterTag` for dialogue gating,
+`GameCode/Pets` for #307, and `BassiNet/Proxy` (every RPC through the proxy, 768 sites) when the question is which
+call the client made.
+
 **A PE-subsystem GUI→CUI flip is NOT needed.** It was implemented, tried and removed: the channels stayed silent,
 because the stderr branch of the sink only runs when the logger is UNinitialised, and it never is in-world.
 

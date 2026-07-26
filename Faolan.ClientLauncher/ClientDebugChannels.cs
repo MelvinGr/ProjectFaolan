@@ -59,7 +59,24 @@ namespace Faolan.ClientLauncher
 			"GameCode/ArmorMitigation", // TotalArmorValue / Adjusted / Min+MaxMitigation / Final Mitigation per hit
 			"GameCode/ItemData", // item template load + per-item static data
 			"GameCode/Magic/Calculation", // spell magnitude computation
+			"GameCode/GameAction/Modify", // the magnitude AFTER modification - "GetOnCasterModifyPercent", "Value after percent modification"
 			"GameCode/Effects", // visual effect start/stop, by resource id
+
+			// The client's weapon-damage maths, step by step, naming the stat it read at each one:
+			// "CalcBaseDPS: Base DPS:2960.00" -> "DPS after abilitybonus:3868.45 (stat:804)" -> "after
+			// genericdamagemodifier:4086.76". Ten lines a fight and it is the whole formula (#395).
+			"GameCode/Combat/DPS",
+
+			// "Tried to GetStringStat for GameActionStat_e 1241 but it did not exist" - the client naming a stat it
+			// wanted and we never sent. A missing-data detector rather than a trace, and near-silent when we are right.
+			"GameActionData/GetStat",
+
+			// The world-entry / teleport handshake as a state machine ("ClientCharacterReadyToSendInPlay",
+			// "TeleportEndedMessage", "Got inplay from client character <name>"), which is what turns "the client just
+			// sits there" into a named step it did not get past.
+			"GameCode/Inplay",
+
+			"GameCode/Skills", // "CoreSkillHolder::AddSkill 2:<id>(<name>) 1037 from 0 to 500" - the skill baseline
 			// "RECEIVED IIR: class <Name>IIR_c" - the inbound IIR trace. SLASH, not the "N3.IIR" the sink prints:
 			// only `N3/IIR` exists in the exe (`strings AgeOfConan.exe | grep -xF N3/IIR`), and a name that is not a
 			// real channel is simply never asked about, so it opens nothing.
