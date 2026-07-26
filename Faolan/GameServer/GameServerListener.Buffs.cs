@@ -338,6 +338,24 @@ namespace Faolan.GameServer
 		// BCC cast (#69/#274). Offensive casts (applyTo != applyFrom) are damage, handled by ResolveOffensiveCast.
 		private async Task SendMagicBuffIir(INetworkClient client, uint applyTo, uint applyFrom, uint spellId, byte[] payload)
 		{
+			// RE-APPLY = REPLACE, not stack. The client accumulates one icon per ApplySpell it receives (#274 saw this
+			// with an NPC debuff re-cast every swing: copies piling up at 0s with no countdown), but our registry is a
+			// dictionary keyed by the wire spell id, so N applications of the SAME spell collapse to ONE entry. The tick
+			// then expires that one entry and sends ONE end-twin, and every other icon of that spell is orphaned - it
+			// counts to 0 and sticks there forever, with nothing left server-side that could ever remove it. That is the
+			// "some of the buffs got removed, others didn't - of the same spell" report.
+			//
+			// Rather than teach the registry to hold N stacks of one id (which would also need the end-twin to identify
+			// WHICH stack, and the twin carries an empty payload, so it cannot), keep the invariant the registry already
+			// assumes: at most one live instance per spell id. Clearing the old icon first means a refresh looks like a
+			// refresh - one icon with a restarted countdown - and there is never an orphan to strand. Retail's own NPC
+			// debuff cadence agrees: it re-applies only AFTER the previous one has ended (#274).
+			if (applyTo == applyFrom && _simulation.PlayerWorldEntity(client) is { } live && live.Handle == applyTo && live.ActiveBuffs.TryRemove(spellId, out var previous))
+			{
+				await SendBuffRemoval(client, applyTo, previous.CasterHandle, spellId);
+				Logger.LogDebug("Buff 0x{Buff:X8} re-applied to {Target:X8} - cleared the previous instance first so the client shows one icon, not a stack.", spellId, applyTo);
+			}
+
 			// The ApplySpell carrier body - the SAME layout for player and NPC casts, byte-exact via NpcSpellCastBuilder
 			// (NpcSpellCastBuilderTests). Built once so the identical bytes go to the caster AND to nearby viewers below.
 			var body = NpcSpellCastBuilder.Build(applyTo, applyFrom, spellId, payload);
@@ -360,7 +378,17 @@ namespace Faolan.GameServer
 				// the old "lives until cancelled" (null) path. This mirrors the NPC-debuff path (WorldSimulation), which
 				// already tracks only when duration > 0.
 				var durationMs = ActiveBuff.DurationMsFromPayload(payload);
-				if (durationMs > 0)
+				if (durationMs == 0)
+				{
+					// An UNTRACKED apply: nothing will ever expire this id, so if the client DOES render an icon for it
+					// the icon sticks at 0s forever. #371 concluded a zero-duration spell is an instant that renders no
+					// icon - if a stuck icon is ever seen, this line names the culprit and disproves that. It is the
+					// first thing to check for "an effect reached 0s and was not removed": the payload's duration comes
+					// from Spell.DurationMs (RDB field 0x008) and 9217 of our 20848 spell rows carry none, 69 of them
+					// while still carrying stat effects.
+					Logger.LogDebug("Buff 0x{Buff:X8} applied to {Target:X8} with NO duration - not tracked, so it will never be expired or removed.", spellId, applyTo);
+				}
+				else
 				{
 					var entity = _simulation.PlayerWorldEntity(client);
 					if (entity != null && entity.Handle == applyTo)

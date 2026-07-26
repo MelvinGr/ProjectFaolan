@@ -94,6 +94,32 @@ namespace Faolan.GameServer.World
 		// land with the same spell-def work.
 		public ConcurrentDictionary<uint, ActiveBuff> ActiveBuffs { get; } = new ConcurrentDictionary<uint, ActiveBuff>();
 
+		// Removes every buff that has expired at `now` and returns them, so the caller can send each one's end-twin.
+		//
+		// ⚠️ The SNAPSHOT is load-bearing, not a style choice. The world tick used to `foreach (var b in ActiveBuffs)`
+		// and `TryRemove` inside that loop; a ConcurrentDictionary enumerator walks the live buckets, so removing the
+		// node it is standing on can skip the NEXT node in the same bucket. With one buff active that is invisible -
+		// with several expiring together it silently left some behind, and because the client never self-expires an
+		// icon (#274) those stayed on the bar at 0s forever. `ToArray()` takes a real snapshot first, so every expired
+		// buff is considered exactly once no matter what the removals do to the bucket chains.
+		//
+		// It also closes a second hole: the tick awaited network sends INSIDE that enumeration, leaving a wide window
+		// for a concurrent apply/cancel (Buffs.cs, the CancelBuff handler) to reshape the dictionary mid-walk. Deciding
+		// and removing up front means an await can no longer invalidate the iteration, and TryRemove's return value
+		// keeps the removal itself the single winner - a buff cancelled by the player in that window is not reported
+		// here as well.
+		public List<KeyValuePair<uint, ActiveBuff>> TakeExpiredBuffs(DateTimeOffset now)
+		{
+			var expired = new List<KeyValuePair<uint, ActiveBuff>>();
+			foreach (var buff in ActiveBuffs.ToArray())
+			{
+				if (buff.Value.Expired(now) && ActiveBuffs.TryRemove(buff.Key, out _))
+					expired.Add(buff);
+			}
+
+			return expired;
+		}
+
 		// The GEAR-derived stat bonuses this entity entered the world with, in display units by wire stat id
 		// (MaxStatAggregator over its equipped items). Kept, rather than only folded into the rating fields below, so
 		// the buff engine can recompute `gear + active buffs` from a fixed baseline instead of adding and subtracting

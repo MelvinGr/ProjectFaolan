@@ -952,18 +952,32 @@ namespace Faolan.GameServer.World
 			var now = DateTimeOffset.UtcNow;
 			foreach (var pair in Players)
 			{
-				foreach (var buff in pair.Value.ActiveBuffs)
+				// Decide and remove in one snapshot pass BEFORE sending anything (WorldEntity.TakeExpiredBuffs). The old
+				// shape - TryRemove inside a foreach over the live ConcurrentDictionary, with awaits in the body - could
+				// skip a buff whose bucket neighbour had just been removed, so several buffs expiring in the same tick
+				// left some behind with their icon stuck at 0s.
+				var expired = pair.Value.TakeExpiredBuffs(now);
+				if (expired.Count == 0)
+					continue;
+
+				// Log the BATCH before sending any of it: "several expired together and only some icons cleared" is the
+				// reported failure mode, so the count here vs the per-buff lines below says immediately whether the tick
+				// missed one (server side) or sent all of them and the client kept an icon (client side).
+				if (expired.Count > 1)
+					_logger.LogInformation("Buffs: {Count} expired together on {Player} ({Ids}).", expired.Count, pair.Key.Session.Character?.Name, string.Join(", ", expired.Select(b => $"0x{b.Key:X8}")));
+
+				foreach (var buff in expired)
 				{
-					if (buff.Value.Expired(now) && pair.Value.ActiveBuffs.TryRemove(buff.Key, out _))
-					{
-						_logger.LogInformation("Buff 0x{Buff:X8} expired on {Player}.", buff.Key, pair.Key.Session.Character?.Name);
-						// Mirror the apply: applyTo = the affected player, applyFrom = the caster (self for a self-buff,
-						// the NPC for an NPC-cast debuff). CasterHandle carries the applyFrom (#274).
-						await _output.SendBuffRemoval(pair.Key, pair.Value.Handle, buff.Value.CasterHandle, buff.Key);
-						// #367: the buff's stat deltas (if any) come off with it.
-						await _output.SyncBuffStats(pair.Key);
-					}
+					_logger.LogInformation("Buff 0x{Buff:X8} expired on {Player}.", buff.Key, pair.Key.Session.Character?.Name);
+					// Mirror the apply: applyTo = the affected player, applyFrom = the caster (self for a self-buff,
+					// the NPC for an NPC-cast debuff). CasterHandle carries the applyFrom (#274).
+					await _output.SendBuffRemoval(pair.Key, pair.Value.Handle, buff.Value.CasterHandle, buff.Key);
 				}
+
+				// #367: the buffs' stat deltas (if any) come off with them. ONE sync after the batch - it recomputes
+				// `gear + all remaining buffs` from scratch, so per-buff syncs were redundant work pushing the same
+				// end state several times.
+				await _output.SyncBuffStats(pair.Key);
 			}
 		}
 
