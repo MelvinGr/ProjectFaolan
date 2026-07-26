@@ -406,6 +406,12 @@ namespace Faolan.GameServer
 				.Set(CharacterStatId.StaminaCurrent, stats.Stamina)
 				.Set(CharacterStatId.ManaCurrent, stats.Mana)
 				.Set(CharacterStatId.Level, character.Level)
+				// The client DIVIDES BY this when it normalises armour mitigation by level, so leaving it unset (it
+				// defaults to 1) makes `2.0 - Level/ApprenticeLevel` = -78 for a level-80 character and the whole
+				// computation goes negative - measured in the client's own trace as
+				// `Mitigation Modification:-1532.57` and a table lookup that missed every row. An un-mentored
+				// character's apprentice level IS its level, which makes the term 1.0. See CharacterStatId.
+				.Set(CharacterStatId.ApprenticeLevel, character.Level)
 				.Set(CharacterStatId.Exp, character.Experience)
 				.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 

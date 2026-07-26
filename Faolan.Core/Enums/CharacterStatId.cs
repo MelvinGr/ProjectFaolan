@@ -27,6 +27,17 @@ namespace Faolan.Core.Enums
 		PvpExp = 0x0033,
 		Exp = 0x0034,
 		Level = 0x0036,
+
+		// "Apprentice Level" (LDB 965). The apprentice/mentor system's effective level, and it is NOT cosmetic: the
+		// client divides BY it when it normalises armour mitigation by level - `(2.0 - Level / ApprenticeLevel) *
+		// totalArmor` (FUN_0113ba00, docs/subsystems/combat.md). Unset it defaults to 1, so a level-80 character gets
+		// `2 - 80/1` = -78 and the whole mitigation computation goes hugely negative. Proven from the client's own
+		// GameCode/ArmorMitigation trace (2026-07-26): with it unset, NecroL80 logged
+		// `ApprenticeLevel Adjusted ArmorValue:-168246`, `Mitigation Modification:-1532.57`, then
+		// `No mitigation entry found ... [AdjustedRoll:1632.57]` - so the table lookup missed entirely and the client
+		// fell through to a closed-form fallback. Sending it EQUAL TO the character's level makes the term 1.0, which
+		// is what an un-mentored character should have.
+		ApprenticeLevel = 0x03C5,
 		PvpLevel = 0x0046,
 		MaxExp = 0x015E,
 		PvpMaxExp = 0x0161,
@@ -100,6 +111,24 @@ namespace Faolan.Core.Enums
 		CombatRatingBow = 0x0368,
 		CombatRatingPolearm = 0x0367,
 		ProtectionElectrical = 0x039F,
+
+		// The remaining inputs of the client's ARMOUR-MITIGATION pipeline (FUN_0113ba00), all named by LDB category 615
+		// and all confirmed by reading which stat the client asks for on each branch - so these are consumed ids, not
+		// speculative ones. See docs/subsystems/combat.md.
+		//
+		// The two "Bonus" ids are PERCENT modifiers, not flat: the client computes
+		// `(bonus * 0.01 + 1.0) * <armour|protection>`, so a value of 25 means +25%. BonusArmor feeds the physical
+		// branch and BonusProtection the magical one - which is what identifies them, since the LDB names alone do not
+		// say they are percentages.
+		BonusArmor = 0x01C2, // LDB 450 "Bonus Armor" - percent, physical branch
+		BonusProtection = 0x014E, // LDB 334 "Bonus Protection" - percent, magical branch
+
+		// Per-element Protection completing the 0x39x family already begun above. The mitigation function selects one
+		// of these by the incoming damage type (Cold on type 10, Fire on 4, Holy/Unholy on the 6/7 branch).
+		ProtectionCold = 0x009D, // LDB 157
+		ProtectionFire = 0x039E, // LDB 926
+		ProtectionHoly = 0x03A0, // LDB 928
+		ProtectionUnholy = 0x03A1, // LDB 929
 		PerceptionSkill = 0x033E,
 		OutOfCombatMovementSpeed = 0x00F1,
 		BowRangeModifier = 0x0123,

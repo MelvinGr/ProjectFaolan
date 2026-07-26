@@ -531,4 +531,60 @@ Key consequences for our implementation:
   `TWK_TargetPerLevelProtection` = 46.0625 and their own per-type stats (0x39E/0x39F/0x9D, 0x3A0/0x3A1).
 - The `(2.0 - level/stat 0x3C5)` term is an apprentice/mentor adjustment - it is 1.0 when `stat 0x3C5 == level`.
 
-The mitigation TABLE itself (its per-armour-type min/max rows) is not decoded; open work tracked in Gitea #401.
+### The mitigation table lookup (`FUN_0145f050`) — record layout decoded, contents not yet located
+
+The lookup walks a `std::vector` (begin/end at table `+0x54`/`+0x58`) of **28-byte records** (stride `0x1C`), and its
+own debug line names the fields:
+
+```
+[TABLE][MinMitigation: +0x0C][MaxMitigation: +0x10] [Range: +0x14 .. +0x18] [AdjustedRange: ...]
+```
+
+| offset | meaning |
+|---|---|
+| `+0x00` | byte selector — the call site always passes **1** |
+| `+0x04` | i32 branch: **1 = physical, 2 = magical** (the caller's damage-kind, not an armour type) |
+| `+0x0C` | **MinMitigation** |
+| `+0x10` | **MaxMitigation** |
+| `+0x14`, `+0x18` | the roll RANGE this row covers, both offset by an adjustment passed in `XMM0` |
+
+A row matches when `+0x00 == selector`, `+0x04 == branch`, and `range.lo + adj <= roll < range.hi + adj`; the caller
+then interpolates between Min and Max. Worth noting: the "roll" the caller passes is the **constant 50.0**
+(`0x42480000`, which is also what its `Roll:` log prints), so at this call site the roll is not randomised.
+
+### ⚠️ We were breaking this ourselves: stat `0x3C5` (Apprentice Level)
+
+Captured live from the client's own `GameCode/ArmorMitigation` channel (2026-07-26) with the character sheet open,
+which is what triggers the computation — the client does NOT run it on incoming damage, so opening the sheet is the
+only way to see it:
+
+```
+[NecroL80] TotalArmorValue:2157 (Armor:2017, AttributeBonus:140, Strength:70, Penetration:0)
+[NecroL80] ApprenticeLevel Adjusted ArmorValue:-168246
+[NecroL80] Mitigation Modification:-1532.57
+[NecroL80] Roll:50
+No mitigation entry found for [Player:1][ArmorType:1][AdjustedRoll:1632.57]
+[NecroL80] [Final Mitigation:0.938747]
+```
+
+Every number confirms the formula above to two decimals — and exposes a server bug. `ApprenticeLevel` (stat `0x3C5`,
+LDB 965) defaults to **1** when unsent, so `(2.0 − level/1)` = **−78** for a level-80 character: the adjusted armour
+goes to −168246, the mitigation modification to −1532.57, the adjusted roll lands at 1632.57 — far outside any table
+row — and the client falls through to its closed-form fallback, which is where the sheet's 93.9% actually comes from.
+Sending `ApprenticeLevel = level` makes the term 1.0 and the numbers land at `adjusted = 2157`,
+`mitigationMod = 19.65`, `adjustedRoll = 80.35`, inside the table's range. Fixed by pushing it in the world-entry
+stat block.
+
+The trace also pins `AttributeBonus`: `((rawStrength − 10) / 10) × TWK_ArmorAbilityModifier` = `((710 − 10)/10) × 2`
+= 140, using the ×10 RAW attribute scale (the sheet's displayed "Strength: 70" is the rounded display value).
+
+And it quantifies #441 independently: the client's own gear armour is **2017**, where our `ItemStatModifiers` model
+only **369** — because 9 of the 13 equipped pieces are template-scaled and carry no records.
+
+⚠️ The table's DATA has not been located yet. It is `ARMOR_MITIGATION`, one of the client's 25 named data tables
+(`docs/rdb/client-tweak-table.md`), parsed by `ArmorMitigation_c` — but unlike `HitsManaAndStamina_c` it carries no
+record-size assert to identify the RDB entry by shape, it is in none of the ~55 RDB types dumped so far, and a
+content scan of the live client's 1.8 GB of writable memory for the 28-byte pattern above found nothing. The likely
+reason is that the 28-byte struct above is the IN-MEMORY form; the parser may expand or reorder the file records, so
+matching the file by this stride was never guaranteed. Next: decode `ArmorMitigation_c`'s own read method, or read
+the vector by following the table singleton (`FUN_0113d9a0`) rather than by scanning for a pattern. Gitea #401.
