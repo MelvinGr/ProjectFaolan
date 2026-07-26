@@ -19,6 +19,7 @@ using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
+using Faolan.Importer.Modules;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 
@@ -1464,69 +1465,34 @@ namespace Faolan.Importer.Cli
 		private static void ClassAttributeRuns(string rdbDir, string? outDir)
 		{
 			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
-			var byClass = new Dictionary<string, List<(uint Id, List<ItemTemplateStatModifiers.Modifier> Mods)>>(StringComparer.Ordinal);
-			int scanned = 0, plaintext = 0;
+			var csv = new StringBuilder("class,block,level,templateId,statId,amount\n");
+			var byClass = ClassAttributeBaseModule.ScanRuns(rdb);
 
-			foreach (var e in rdb.EntriesOfType(1000020).Where(rdb.CanRead))
+			foreach (var (cls, candidates) in byClass.OrderBy(kv => kv.Key.ToString(), StringComparer.Ordinal))
 			{
-				scanned++;
-				byte[] blob;
-				try
+				var byLevel = ClassAttributeBaseModule.LevelsOf(candidates);
+				var checks = ClassAttributeBaseModule.ClientObservations.Where(o => o.Class == cls)
+					.Select(o => byLevel.GetValueOrDefault(o.Level).Id == o.TemplateId
+						? $"L{o.Level}={o.TemplateId} ✓"
+						: $"⚠ L{o.Level} resolved to {byLevel.GetValueOrDefault(o.Level).Id}, client observed {o.TemplateId}");
+				Console.WriteLine($"{cls,-16} {byLevel.Count,3}/{ClassAttributeBaseModule.MaxLevel} levels from {candidates.Count,3} candidates   " +
+				                  string.Join("  ", checks));
+
+				// Every candidate, by the block its NAME declares - so a block carrying more than its ten levels (a
+				// stray from another feat series sharing the class name) is visible rather than silently truncated.
+				foreach (var block in candidates.GroupBy(t => t.BlockFirstLevel).OrderBy(g => g.Key))
 				{
-					blob = rdb.ReadDecompressed(e);
+					var ordered = block.OrderBy(t => t.AttributeSum).ThenBy(t => t.Id).ToList();
+					Console.WriteLine($"    L{block.Key,2}-{block.Key + 9,2}  {ordered.Count,2} candidates  " +
+					                  $"{string.Join(" ", ordered.Select(t => t.Id))}");
+					if (ordered.Count != 10)
+						foreach (var t in ordered)
+							Console.WriteLine($"        {t.Id}  [{Fmt(t.Mods)}]");
 				}
-				catch
-				{
-					continue;
-				}
 
-				// Plaintext check: the canonical 12-byte RDB-Id header survives only when the entry is NOT TEA-encrypted.
-				if (blob.Length < 24 || BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(0, 4)) != 1000020 ||
-				    BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(4, 4)) != e.Id || BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(8, 4)) != 1000000)
-					continue;
-
-				plaintext++;
-				var name = AsciiRuns(blob).FirstOrDefault(r => r.EndsWith("Class Feat", StringComparison.Ordinal) || ClassFeatName().IsMatch(r));
-				if (name == null)
-					continue;
-
-				var m = ClassFeatName().Match(name);
-				if (!m.Success)
-					continue;
-
-				// Keep only a genuine class-base template: all FIVE attributes present, with sane amounts. The name alone
-				// is not enough - "<Class> Class Feat <NNN>" is a coarse label shared by several ids (three consecutive
-				// Assassin templates are all "Class Feat 021"), and other entries carrying it match the record signature
-				// only on garbage (amounts in the hundreds of millions). Without this the runs pick up strays and stop
-				// looking contiguous.
-				var mods = ItemTemplateStatModifiers.Parse(blob.AsSpan(12))
-					.Where(x => x.WireAmount < 100_000)
-					.ToList();
-				if (!Attributes.All(a => mods.Any(x => x.StatId == (uint)a)))
-					continue;
-
-				(byClass.TryGetValue(m.Groups[1].Value, out var list)
-					? list
-					: byClass[m.Groups[1].Value] = []).Add((e.Id, mods));
-			}
-
-			Console.WriteLine($"class-attribute-runs: scanned {scanned} type-1000020 entries, {plaintext} plaintext, {byClass.Count} class run(s).\n");
-			var csv = new StringBuilder("class,level,templateId,statId,amount\n");
-			foreach (var (cls, list) in byClass.OrderBy(kv => kv.Key, StringComparer.Ordinal))
-			{
-				// ⚠️ Ordered by id, NOT by level - see the type comment. Strays sharing the class name are interleaved
-				// inside the id range, so position here is only the level once the run's base is anchored from a client
-				// observation.
-				var run = list.OrderBy(x => x.Id).ToList();
-				var first = run[0];
-				var last = run[^1];
-				var contiguous = last.Id - first.Id + 1 == (uint)run.Count;
-				Console.WriteLine($"{cls,-18} base={first.Id} count={run.Count,3} {(contiguous ? "contiguous" : "⚠ GAPS")}  " +
-				                  $"first[{Fmt(first.Mods)}]  last[{Fmt(last.Mods)}]");
-
-				for (var i = 0; i < run.Count; i++)
-				foreach (var mod in run[i].Mods)
-					csv.Append($"{cls},{i + 1},{run[i].Id},{mod.StatId},{mod.WireAmount}\n"); // ordinal, NOT level
+				foreach (var t in candidates.OrderBy(x => x.BlockFirstLevel).ThenBy(x => x.AttributeSum))
+				foreach (var mod in t.Mods)
+					csv.Append($"{cls},{t.BlockFirstLevel},{byLevel.FirstOrDefault(kv => kv.Value.Id == t.Id).Key},{t.Id},{mod.StatId},{mod.WireAmount}\n");
 			}
 
 			if (outDir == null)

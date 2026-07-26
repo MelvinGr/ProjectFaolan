@@ -122,8 +122,8 @@ namespace Faolan.GameServer.World
 
 		// The class/level BASE this entity's stats start from (#444), by wire stat id, in the WIRE scale - the five
 		// attributes, MaxHealth, and the casters' Non Combat Mana Regen base. Loaded once at world entry from
-		// ClassAttributeBases. EMPTY means "not decoded for this (class, level)", NOT "no base": some classes' higher
-		// levels are still unlocated, and a character there regenerates and mitigates below retail until they are.
+		// ClassAttributeBases, which covers all 12 classes at all 80 levels. EMPTY means "no row for this (class,
+		// level)" - UNKNOWN, not "no base" - and a character there regenerates and mitigates below retail.
 		public IReadOnlyDictionary<CharacterStatId, int> ClassBase { get; set; } = new Dictionary<CharacterStatId, int>();
 
 		// The GEAR-derived stat bonuses this entity entered the world with, in display units by wire stat id
@@ -137,14 +137,14 @@ namespace Faolan.GameServer.World
 		// fields themselves.
 		public Dictionary<CharacterStatId, uint> BuffedStats { get; } = [];
 
-		// This entity's score for one of the five attributes, in DISPLAY units - the buffed value once BuffStatEffects has
-		// synced, else gear alone (its baseline). Used by the attribute-driven formulas: regen (RegenRates) and armour /
-		// protection mitigation (CombatResolver, which wants the ×10 wire scale - multiply there).
+		// This entity's score for one of the five attributes, in DISPLAY units: the class/level BASE plus the buffed value
+		// once BuffStatEffects has synced (else gear alone, its baseline). Used by the attribute-driven formulas: regen
+		// (RegenRates) and armour / protection mitigation (CombatResolver, which wants the ×10 wire scale - multiply
+		// there).
 		//
-		// ⚠️ This is gear + buffs ONLY. It does NOT include the class/level attribute BASE, because that is computed
-		// CLIENT-side and never sent: retail's snapshot stat sheet carries a flat 10 for every attribute (#393) and no
-		// client 10005xx data table holds the curve either (open work tracked in Gitea #444). So a geared character's
-		// score here is short by its base, and the formulas fed from it read low until that is decoded.
+		// The base is decoded data rather than wire data: retail's snapshot stat sheet carries a flat 10 for every
+		// attribute (#393) because the client computes the rest locally off its own class-feat templates, which the
+		// class-attributes importer module reads out of the RDB (#444).
 		public uint AttributeScore(CharacterStatId attribute)
 		{
 			var geared = BuffedStats.TryGetValue(attribute, out var buffed)

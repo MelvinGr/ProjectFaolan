@@ -173,66 +173,77 @@ The scores the formulas need are computed client-side (retail sends a flat 10 fo
 **not** in any of the 25 named `CoreTables` data tables — `RDBPLAYERCLASSDATA` reads RDB types 1000505–1000508, which
 are name/id maps, and nothing in 1000509–1000521 has a 12-class × 80-level shape.
 
-It is in **RDB type 1000020**, the item-template type, as a run of one template per class per LEVEL:
-
-```
-templateId = <classBaseId> + (level - 1)
-```
-
-Those templates are **plaintext** — no TEA key, unlike ordinary item templates — and their stat records ARE the base
-attributes, read by the same `ItemTemplateStatModifiers.Parse` as any item (which is why this only became readable
-after the byte-alignment fix, #441). The Assassin run, `classBaseId` 3074028:
+It is in **RDB type 1000020**, the item-template type, as **80 templates per class — one per LEVEL**. They are
+**plaintext** — no TEA key, unlike ordinary item templates — and their stat records ARE the base attributes, read by the
+same `ItemTemplateStatModifiers.Parse` as any item (which is why this only became readable after the byte-alignment fix,
+#441). The Assassin's:
 
 | level | id | Str | Con | Int | Wis | Dex |
 |---|---|---|---|---|---|---|
 | 1 | 3074028 | 10 | 10 | 10 | 10 | 10 |
 | 2 | 3074029 | 20 | 20 | 20 | 20 | 40 |
 | 23 | 3074050 | 200 | 170 | 260 | 200 | **650** |
-| 80 | 3074107 | 690 | 590 | 890 | 690 | **2270** |
+| 80 | 3074108 | 700 | 600 | 900 | 700 | **2300** |
 
 Level 1 is the neutral 10 across the board (display 0), the curve is monotonic, and Dexterity leads throughout — the
 right shape for the class. The level-23 row is exactly what the client applied for our level-23 Assassin.
-
-Verified for four classes, each against the template the client actually loaded for that character:
-
-| class | `classBaseId` | checked at |
-|---|---|---|
-| Assassin (34) | 3074028 | L23 → 3074050 ✓ |
-| Herald of Xotli (43) | 3130632 | L24 → 3130655 ✓ |
-| Necromancer (41) | 1173784 | L80 → 1173863 ✓ |
-| Demonologist (44) | 1126680 | L80 → 1126759 ✓ |
 
 The same templates also carry **MaxHealth** and, for the caster classes, stat **280 = 200** — which is precisely the
 +200 that takes the mana-regen base from its 2000 seed to the 2200 those classes show, closing the last open question
 in the regen rates above.
 
-**All twelve `classBaseId`s are now client-observed** (a level-1 character of each class, brought in-game with the
-`GameCode/ItemData` + `ClientInterface` channels on — the template loaded before the five attribute writes IS the base):
+#### The level comes from the template, not from its id
 
-| class | base | | class | base |
-|---|---|---|---|---|
-| Barbarian | 1083955 | | Dark Templar | 793759 |
-| Guardian | 871090 | | Assassin | 3074028 |
-| Conqueror | 873357 | | Ranger | 3115334 |
-| Priest of Mitra | 3192040 | | Necromancer | 1173784 |
-| Tempest of Set | 3067820 | | Herald of Xotli | 3130632 |
-| Bear Shaman | 1102716 | | Demonologist | 1126680 |
+Each template **names itself** `"<Class> Class Feat <NNN>"`, and `NNN` is the first level of a **ten-level block**:
+001, 011, 021 … 071. Inside a block the ten members are ordered by their values — the five attributes rise strictly
+with level — so:
 
-⚠️ **None of these can be derived** — two cheaper rules were tried and both fail. The lowest id of the name-matched run
-is wrong for **7 of the 12** (Ranger by −70, Priest of Mitra by −60, and in both directions), and the name is neither
-unique nor level-aligned: the Demonologist has three templates called "Class Feat 001", and the Necromancer's base is
-called "Class Feat 011". Re-derive one only by re-observing it.
+```
+level = NNN + rank-inside-the-block-by-attribute-sum
+```
+
+⚠️ **`id = base + (level − 1)` is wrong**, and was the first cut of this decode. A class's 80 ids are consecutive, but
+the eight blocks sit inside that range in an **arbitrary, per-class order**. The Ranger's run is
+`[31-40][41-50][11-20][71-80][61-70][51-60][21-30][1-10]` — which is why its levels looked like they "stopped dead at
+10" (the level-1 block is *last*), and why the Priest of Mitra was importing level 61–70's values as levels 11–20.
+
+Two adjacent traps the block rule also clears up:
+
+- **The `<NNN>` is the level DECADE, not the level.** "Three consecutive Assassin templates are all `Class Feat 021`"
+  is not noise — they are levels 21, 22 and 23.
+- **Some blocks carry strays** from another feat series that shares the class name (5 in the Ranger's block 001, 10 in
+  the Herald of Xotli's block 021). They are told apart by the stat ids they write: a class-base template only ever
+  writes the five even attribute ids, `MaxHealth` and stat 280, never the **odd-id twins** `805/807/809/811/813/815`
+  (which the client seeds to 100 — a percentage, not a score). Their attribute amounts are single digits rather than
+  the base's multiples of ten.
 
 `Tempest of Set` is stored in the RDB under the class's old name, **Stormcaller**.
 
-Shipped as the `class-attributes` importer module into `ClassAttributeBases`, and `WorldEntity.AttributeScore` now
-returns `classBase + gear + buffs`.
+#### Coverage and verification
 
-⚠️ **Coverage is incomplete for some classes and the module reports it per class.** `templateId = base + (level − 1)`
-holds from each anchor, but the run does not always continue to level 80 — the Ranger's stops dead at level 10
-(`3115334 + 10` simply does not exist as an RDB entry) and the Priest of Mitra's at 20, so those classes' higher levels
-live in an id block we have not located. A `(class, level)` with no row is treated as **unknown, not zero**: world entry
-logs a warning naming the character, and that character's attributes are gear + buffs only. Open work: Gitea #444.
+**All 12 classes × all 80 levels** resolve, out of exactly 80 candidates each. Nothing about the layout is assumed: the
+scan is driven by the name and the values, and the client observations are the *acceptance test*, all thirteen of which
+it reproduces —
+
+| class | observed | | class | observed |
+|---|---|---|---|---|
+| Barbarian | L1 → 1083955 ✓ | | Dark Templar | L1 → 793759 ✓ |
+| Guardian | L1 → 871090 ✓ | | Assassin | L1 → 3074028 ✓, L23 → 3074050 ✓ |
+| Conqueror | L1 → 873357 ✓ | | Ranger | L1 → 3115334 ✓ |
+| Priest of Mitra | L1 → 3192040 ✓ | | Necromancer | L80 → 1173863 ✓ |
+| Tempest of Set | L1 → 3067820 ✓ | | Herald of Xotli | L24 → 3130655 ✓ |
+| Bear Shaman | L1 → 1102716 ✓ | | Demonologist | L80 → 1126759 ✓ |
+
+⚠️ Three level-1 ids that an earlier pass listed here (Herald of Xotli 3130632, Necromancer 1173784, Demonologist
+1126680) were **back-computed** as `observed − (level − 1)` under the disproved id rule, not observed, and all three are
+wrong — the arithmetic silently absorbed the unreadable ids in between (the Herald's by 2) or crossed into another block
+entirely (the Necromancer's landed on level 15, in a block whose ids are 111,000 away from the rest of its run). Never
+re-derive an observation; re-observe it — a level-1 character of the class brought in-game with the `GameCode/ItemData`
++ `ClientInterface` channels on, where the template loaded before the five attribute writes IS the base.
+
+Shipped as the `class-attributes` importer module into `ClassAttributeBases`, and `WorldEntity.AttributeScore` returns
+`classBase + gear + buffs`. A `(class, level)` with no row is treated as **unknown, not zero**: world entry logs a
+warning naming the character, and that character's attributes are gear + buffs only.
 
 ## Wrong / unconfirmed ids (now tracked on the `CharacterStatId` enum)
 

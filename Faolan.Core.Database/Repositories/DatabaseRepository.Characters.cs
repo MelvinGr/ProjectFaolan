@@ -44,8 +44,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<Item[]> GetEquippedStatItems(uint characterId, WeaponSet activeSet);
 
 		// The class/level BASE stats (#444): what a character of this class and level starts with before gear and buffs.
-		// Empty when that (class, level) has no decoded row - see ClassAttributeBaseModule, some classes' higher levels
-		// are not located yet - and the caller must treat empty as UNKNOWN, not as zero.
+		// Empty when that (class, level) has no decoded row - all 12 classes x 80 levels are shipped, so this means a
+		// level outside 1..80 or an unimported database - and the caller must treat empty as UNKNOWN, not as zero.
 		Task<IReadOnlyDictionary<CharacterStatId, int>> GetClassAttributeBase(Class characterClass, uint level);
 		Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId);
 		Task RemoveCharacterQuest(uint characterId, uint questId);

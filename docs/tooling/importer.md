@@ -182,17 +182,19 @@ else        await tx.CommitAsync();
 
 ### `class-attributes` — the class/level attribute base (#444)
 
-Fills `ClassAttributeBases` from RDB type 1000020, where the base lives as PLAINTEXT templates, one per class per
-level: `templateId = classBase + (level − 1)`.
+Fills `ClassAttributeBases` from RDB type 1000020, where the base lives as 80 PLAINTEXT templates per class — one per
+level. The level comes from the template, not from its id: each names itself `"<Class> Class Feat <NNN>"` where `NNN`
+is the first level of a ten-level block, and rank-by-attribute-sum inside the block gives the rest.
 
-⚠️ **The twelve `classBase` ids are hardcoded CLIENT OBSERVATIONS, not something the module derives** — see the
-remarks on `ClassAttributeBaseModule`. Re-deriving one means re-observing it (a level-1 character of that class,
-in-game, with the `GameCode/ItemData` + `ClientInterface` channels on). Both structural shortcuts were tried and
-fail; the details are in the module and in [`docs/subsystems/player-stats.md`](../subsystems/player-stats.md).
+⚠️ **`templateId = classBase + (level − 1)` is wrong** — the eight blocks sit inside a class's id range in an
+arbitrary per-class order. That rule was the first cut and it silently imported the Priest of Mitra's level 61–70
+values as levels 11–20. The full decode is in the remarks on `ClassAttributeBaseModule` and in
+[`docs/subsystems/player-stats.md`](../subsystems/player-stats.md).
 
-⚠️ Coverage is **incomplete for some classes** and the module prints it per class with an `⚠ INCOMPLETE` marker — the
-run does not always reach level 80 (the Ranger's stops at 10). A missing `(class, level)` is treated as unknown, not
-zero, and world entry logs a warning naming the character.
+All 12 classes resolve at all 80 levels, and the module verifies its result against every hardcoded **client
+observation** (`ClientObservations`: a class, a level, and the template that character was seen loading) rather than
+using them as an input. A missing `(class, level)` is treated as unknown, not zero, and world entry logs a warning
+naming the character. `--report class-attribute-runs` prints the per-class block layout and the observation checks.
 
 ## Diagnostics (`--report`)
 
