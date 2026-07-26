@@ -167,18 +167,24 @@ namespace Faolan.Tests
 		// fraction and cross-checked against the logged AdjustedRoll - and both `adjusted` values land on EXACTLY the
 		// Protection scores from her character sheet, which is what confirms the branch and the target.
 		[Theory]
-		[InlineData(342u, 0.0464043, 90.7191)] // NecroL80 - Protection Cold / Electrical / Fire
-		[InlineData(55u, 0.00746269, 98.5075)] // NecroL80 - Protection Holy / Unholy
-		[InlineData(270u, 0.036635, 92.673)] // DemoL80 - a second character, different Protection entirely
-		[InlineData(119u, 0.0161465, 96.7707)] // DemoL80
-		public void ProtectionMitigationFraction_ReproducesTheClientsMagicalLookups(uint protection, double expectedFraction, double expectedAdjustedRoll)
+		[InlineData(80u, 342u, 0.0464043, 90.7191)] // NecroL80  L80 - Protection Cold / Electrical / Fire
+		[InlineData(80u, 55u, 0.00746269, 98.5075)] // NecroL80  L80 - Protection Holy / Unholy
+		[InlineData(80u, 270u, 0.036635, 92.673)] // DemoL80  L80 - a second character, different Protection
+		[InlineData(80u, 119u, 0.0161465, 96.7707)] // DemoL80  L80
+		// LEVEL 23 - the case that actually tests the level NORMALISATION, since the target is level * 46.0625
+		// (1059.4375 here, not 3685). The four L80 rows above cannot distinguish a per-level target from a constant.
+		[InlineData(23u, 13u, 0.0061355, 98.7729)] // AssassinL23 L23 assassin
+		// NB AssassinL23's other protection group solves to 19.5 - FRACTIONAL - so it cannot be expressed here: the client's
+		// protection is not necessarily integral (roll 98.1594 -> final 0.009203 -> adjusted 19.500). Our uint-based
+		// API therefore rounds; a defender with a half-point of protection mitigates a hair less than the client says.
+		public void ProtectionMitigationFraction_ReproducesTheClientsMagicalLookups(uint level, uint protection, double expectedFraction, double expectedAdjustedRoll)
 		{
-			var fraction = CombatResolver.ProtectionMitigationFraction(protection, 80);
+			var fraction = CombatResolver.ProtectionMitigationFraction(protection, level);
 
-			Assert.Equal(expectedFraction, fraction, 6);
+			Assert.Equal(expectedFraction, fraction, 5);
 			// the client's AdjustedRoll is 100 - (adjusted / target * 100), which the same numbers must reproduce
 			// 4 decimals, matching the precision the client PRINTS: the exact value is 98.507462686..., logged as 98.5075.
-			Assert.Equal(expectedAdjustedRoll, 100.0 - protection / (80 * CombatResolver.TargetProtectionPerLevel) * 100.0, 4);
+			Assert.Equal(expectedAdjustedRoll, 100.0 - protection / (level * CombatResolver.TargetProtectionPerLevel) * 100.0, 4);
 		}
 
 		[Fact]

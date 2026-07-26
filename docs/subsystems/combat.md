@@ -642,6 +642,15 @@ No mitigation entry found for [Player:1][ArmorType:2][AdjustedRoll:96.7707]  -> 
 Protection 270 and 119, whose fractions are 0.036635 and 0.0161465. **Six verification points across two characters
 now**, all exact — pinned in `CombatResolverTests`.
 
+The level normalisation itself is confirmed at **level 23** (AssassinL23, assassin), where the protection target is
+`23 × 46.0625` = 1059.4375 rather than 3685: logged roll 98.7729 / final 0.00613533 solves to protection 13, and
+`(13 / 1059.4375) × 0.5` = 0.0061355. Four level-80 points could not distinguish a per-level target from a constant
+one; this one can. `ApprenticeLevel` also arrives correctly at a non-80 level (`965=23`).
+
+One modelling caveat found the same way: the client's protection is **not necessarily integral** — AssassinL23's other
+group solves to exactly **19.5** (roll 98.1594 → final 0.009203). `CombatResolver`'s `uint` rating therefore rounds,
+so a defender with a half point of protection mitigates a hair less than the client would say.
+
 ⚠️ The table's DATA has not been located yet, and on this build it does not matter. It is `ARMOR_MITIGATION`, one of the client's 25 named data tables
 (`docs/rdb/client-tweak-table.md`), parsed by `ArmorMitigation_c` — but unlike `HitsManaAndStamina_c` it carries no
 record-size assert to identify the RDB entry by shape, it is in none of the ~55 RDB types dumped so far, and a
