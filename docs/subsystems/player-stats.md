@@ -126,9 +126,19 @@ So the flat terms are those seeded stat values, and the server's formula and the
 computation. It also explains the `(attribute − 10) / 10` term in the armour curve (`CombatResolver`): that is the same
 raw→display conversion, which is why the trace's AttributeBonus of 140 is `(710 − 10) / 10 × 2.0` for a display 70.
 
-⚠️ **Mana's flat term is the shaky one.** Stat 280 seeds to 2000 like health, but a class's base template then modifies
-it — a level 80 Necromancer's takes it `2000 → 2200` — so mana's base looks class-dependent rather than flat. Our 0
-reproduces the single captured mana delta (an Assassin with a 74-point pool) and nothing more.
+⚠️ **Mana's flat term is class-dependent, and ours is the no-mana-class value.** Stat 280 (Non Combat Mana Regen) is
+seeded to 2000 for a class with a mana base — a level 80 Necromancer's class template then takes it `2000 → 2200` —
+and is **never written at all** for a level 23 Assassin, whose 74-point mana pool therefore regenerates on trickledown
+alone. That is exactly why the one captured mana delta (that Assassin's `2470`) has no flat term. A CASTER's rate is
+short by its base here, and there is no captured bare mana delta for one to source it from: both level 80 mana captures
+are full-pool restores, where the delta equals max mana exactly (NecroL80 `6523`, DemoL80 `5830`).
+
+The health and stamina bases do NOT vary this way in the three characters observed — 2000 and 1000 for all of them,
+including a Necromancer that has no stamina pool at all.
+
+Note also that the trickledown is **not written back into the stat**: 278/279 stay at their seeded values in the stat
+store for the whole session (one write each), which matches the disassembly — the routine returns `base + trickledown`
+to its caller rather than storing it, so the sheet computes the row at display time.
 
 Three more things worth keeping:
 

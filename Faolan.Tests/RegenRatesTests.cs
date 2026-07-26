@@ -54,13 +54,34 @@ namespace Faolan.Tests
 			Assert.Equal(wireDelta, (int)(RegenRates.StaminaPerSecond(attributeSum, 0, 0) * 100));
 		}
 
-		// AssassinL23's captured mana delta is 2470 = 0.38 × (Int 39 + Wis 26) exactly, with NOTHING added - the one pool
-		// whose flat term is zero.
+		// AssassinL23's captured mana delta is 2470 = 0.38 × (Int 39 + Wis 26) exactly, with NOTHING added.
+		//
+		// The zero flat term is not an accident of this one character: the client seeds stat 280 (Non Combat Mana Regen)
+		// to 2000 for a class WITH a mana base (Herald of Xotli, Necromancer - whose class template then takes it to
+		// 2200) and never writes it at all for this Assassin, whose 74-point mana pool therefore regenerates on
+		// trickledown alone. ⚠️ So a CASTER's rate is short by its base here, and we have no captured bare mana delta for
+		// one to source it from - both L80 mana captures are full-pool restores (the delta equals max mana exactly).
 		[Fact]
 		public void ManaPerSecond_MatchesTheCapturedRegenIirDelta()
 		{
 			Assert.Equal(2470, (int)(RegenRates.ManaPerSecond(39, 26) * 100));
 			Assert.Equal(0.0, RegenRates.ManaFlatRate);
+		}
+
+		// The attribute scores every expectation above is built on are the CLIENT'S OWN, read back off the
+		// ClientInterface channel for this same character (raw = display × 10 + 10): Str 210, Con 570, Int 400, Wis 270,
+		// Dex 800. That is what makes the three matches above verifications rather than a fit through assumed inputs -
+		// the inputs are retail-independent client computations, the outputs are retail's captured deltas.
+		[Theory]
+		[InlineData(210, 20u)]
+		[InlineData(570, 56u)]
+		[InlineData(400, 39u)]
+		[InlineData(270, 26u)]
+		[InlineData(800, 79u)]
+		public void TheAttributeInputs_AreTheClientsOwnValues_AtTheWireScale(int wire, uint display)
+		{
+			Assert.Equal(display, (uint)((wire - 10) / 10)); // the client's (raw - 10) / 10 IS the display score
+			Assert.Equal(wire, (int)(display * 10 + 10)); // and back, which is WorldEntity.AttributeWireScore
 		}
 
 		// The flat terms are what a naive reading of the character sheet gets wrong: the sheet prints the stat with an
