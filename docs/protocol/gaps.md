@@ -62,6 +62,11 @@ load from runtime BALANCE CONFIG (server-GDB, same class as the weapon scale abo
 Frida dump of those globals or in-client tuning. `CombatResolver.ApplyPhysicalMitigation` uses a provisional
 `raw·K/(armor+K)` curve (`K=2000`) as a stand-in. The magical branch (damage types 4/5/10) uses `0x14e`+`0x1c3`/`0x1ca`
 scaled by Int/Wis. Tracked in Gitea #401.
+The client's own **ARMOR_MITIGATION table is RDB type 1000514, and it is EMPTY on this build** - 16 bytes,
+a valid header declaring zero entries (`docs/rdb/client-data-tables.md`). So the table lookup the client
+prefers can never match and the closed form is always taken, which closes the one route that would have
+avoided the coefficients. They really do need a live dump.
+
 `[V0: exact armor mitigation coefficients — C1/C3/C4 are runtime GDB config, not static in the exe]`
 
 ---
