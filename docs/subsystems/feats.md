@@ -28,9 +28,21 @@ and don't contain.
   the block count and the name - no header word tracks tree depth. The client's own
   `"**Error: GDB and RDB data for feat "` says why: it JOINS server-side GDB data with the RDB record, and the tree's
   SHAPE lives on the GDB side. So the RDB gives what a feat DOES, not where it sits.
-- ⚠️ **The catalog cannot be joined to a character yet.** The wire's unlocked-feat ids and the catalog's ids are
-  disjoint id spaces - 0 of the 56 captured `CharacterFeat` ids exist in `Feats`, and `FeatId/100` does not bridge
-  them either. Tracked in Gitea #467.
+- **The wire<->catalog id map is SOLVED** (#467): the client does not derive it, it LOADS it.
+  `FeatTable_t::LoadStaticData()` (`FUN_00788e20`) reads **RDB type 1000042, id 1** - a 20-byte header
+  `[type][id][1][count][version]` then `count` 48-byte entries whose first two words are `(wireId, templateId)`.
+  Imported as `FeatIdMap` (6,593 rows); it resolves **56 of 56** captured `CharacterFeat` ids.
+- **The id encodes the class.** Each entry's 11th word is `wireId / 100`, and for the ROOT feats that value is the
+  `ConanClass` enum value: wire 1800 = Barbarian (0x12), 2000 = Guardian (0x14), 2200 = Conqueror (0x16),
+  2900 = BearShaman (0x1D), 3100 = DarkTemplar (0x1F). Below them sit the four ARCHETYPE roots -
+  100 `Core Soldier Knowledge`, 200 `Priest`, 300 `Rogue`, 400 `Mage`.
+- ⚠️ **No captured character carries its own class-root feat** (NecroL80/Necromancer has no 4100, Hakotep/HeraldOfXotli
+  no 4300), and every id they DO carry is rank-bearing. So the roots look **auto-granted rather than trained** -
+  which is what `ClassAutotrainLevelMap` (33,830 entries, via the client's `GameCode/Feats` debug channel) would
+  encode. Not yet verified.
+- A resolved `TemplateId` is not always a `Feat` row: the catalog holds only the plaintext ~21% of type 1000020, and
+  the captured characters' feats resolve largely into the TEA-encrypted remainder (id 1173628 is a real 217-byte
+  record we cannot read). The MAPPING is complete; the catalog is not.
 
 ## Feats vs. skills — the key distinction
 

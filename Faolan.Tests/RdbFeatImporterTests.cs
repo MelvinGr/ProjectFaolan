@@ -88,5 +88,57 @@ namespace Faolan.Tests
 			Assert.Empty(RdbFeatImporter.ParseEffects([0x54, 0x42, 0x0F, 0x00]));
 			Assert.Empty(RdbFeatImporter.ParseEffects(new byte[64]));
 		}
+
+		// The wire-id -> template-id map (#467), built from a synthetic resource in the real layout: a 20-byte header
+		// [type][id][1][count][version] then 48-byte entries whose first two words are the pair and whose 11th is the
+		// base index. Synthetic rather than captured because the real resource is 316 KB.
+		[Fact]
+		public void ParseIdMap_ReadsThePairsAndTheBaseIndex()
+		{
+			var body = new byte[20 + (2 * 48)];
+			BitConverter.GetBytes(1000042u).CopyTo(body, 0);
+			BitConverter.GetBytes(1u).CopyTo(body, 4);
+			BitConverter.GetBytes(1u).CopyTo(body, 8);
+			BitConverter.GetBytes(2u).CopyTo(body, 12); // count
+			BitConverter.GetBytes(2u).CopyTo(body, 16); // version
+			BitConverter.GetBytes(100u).CopyTo(body, 20);
+			BitConverter.GetBytes(7336u).CopyTo(body, 24);
+			BitConverter.GetBytes(1u).CopyTo(body, 20 + 40);
+			BitConverter.GetBytes(1800u).CopyTo(body, 68);
+			BitConverter.GetBytes(7353u).CopyTo(body, 72);
+			BitConverter.GetBytes(18u).CopyTo(body, 68 + 40);
+
+			var map = RdbFeatImporter.ParseIdMap(body);
+
+			Assert.Equal(2, map.Count);
+			Assert.Equal((100u, 7336u, 1u), map[0]);
+			Assert.Equal((1800u, 7353u, 18u), map[1]);
+		}
+
+		// A blank slot must not become a 0 -> 0 row: the table is a lookup, and a zero key would collide.
+		[Fact]
+		public void ParseIdMap_SkipsBlankSlots()
+		{
+			var body = new byte[20 + 48];
+			BitConverter.GetBytes(1000042u).CopyTo(body, 0);
+			BitConverter.GetBytes(1u).CopyTo(body, 12);
+
+			Assert.Empty(RdbFeatImporter.ParseIdMap(body));
+		}
+
+		// Wrong resource, or a count that overruns the body: yield nothing rather than read past the end.
+		[Fact]
+		public void ParseIdMap_RejectsAResourceThatIsNotTheFeatTable()
+		{
+			var wrongType = new byte[20 + 48];
+			BitConverter.GetBytes(1000020u).CopyTo(wrongType, 0);
+			BitConverter.GetBytes(1u).CopyTo(wrongType, 12);
+			Assert.Empty(RdbFeatImporter.ParseIdMap(wrongType));
+
+			var overrun = new byte[20 + 10];
+			BitConverter.GetBytes(1000042u).CopyTo(overrun, 0);
+			BitConverter.GetBytes(99u).CopyTo(overrun, 12);
+			Assert.Empty(RdbFeatImporter.ParseIdMap(overrun));
+		}
 	}
 }

@@ -1323,6 +1323,23 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("FeatEffects");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatIdMap", b =>
+                {
+                    b.Property<uint>("WireFeatId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("BaseIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("TemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("WireFeatId");
+
+                    b.ToTable("FeatIdMaps");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.Guild", b =>
                 {
                     b.Property<uint>("Id")

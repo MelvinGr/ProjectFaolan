@@ -1,0 +1,36 @@
+using Microsoft.EntityFrameworkCore;
+
+namespace Faolan.Core.Database.Tables
+{
+	// THE MISSING LINK between the wire's feat ids and the RDB feat catalog (Gitea #467).
+	//
+	// The two id spaces are disjoint: a character's unlocked feats (CharacterFeat, from the player spawn's pre-IIR
+	// list) and the FeatIIR train handshake carry ids like 80004/112700, while the catalog (Feat) is keyed by RDB
+	// 1000020 template ids like 7336/115338. Nothing arithmetic bridges them - FeatId/100 does not.
+	//
+	// The client does not derive it either: it LOADS a table. `FeatTable_t::LoadStaticData()` (`FUN_00788e20`) reads
+	// **RDB type 1000042, id 1**, whose per-entry parser (`FUN_00788ef0`) hands (wireId, templateId, +8 fields) to the
+	// table builder. That resource is this map: a 20-byte header `[type][id][1][count][version]` then `count` 48-byte
+	// entries whose first two words are the pair.
+	//
+	// It resolves EVERY captured id - 56 of 56 - which is what makes it the answer rather than a lead.
+	//
+	// ⚠️ A resolved TemplateId is not necessarily a row in Feat: the catalog only holds the ~21% of 1000020 records
+	// that are plaintext, and a captured character's feats land largely in the TEA-encrypted remainder (id 1173628 is
+	// a real 217-byte 1000020 record we cannot read). So this table deliberately carries NO foreign key to Feat - the
+	// mapping is complete, the catalog is not.
+	[PrimaryKey(nameof(WireFeatId))]
+	public class FeatIdMap
+	{
+		// The id as it appears ON THE WIRE (CharacterFeat.FeatId, FeatIIR's list).
+		public uint WireFeatId { get; set; }
+
+		// The RDB 1000020 template id the client resolves it to - Feat.Id where the template is plaintext.
+		public uint TemplateId { get; set; }
+
+		// The entry's 11th word, which is exactly WireFeatId / 100 on every row: the client's own base index, and the
+		// same "base" the featBase*100+rank hypothesis was reaching for. Carried because it is the client's value,
+		// not ours - if it ever diverges from the division, the division was the wrong model.
+		public uint BaseIndex { get; set; }
+	}
+}

@@ -36,6 +36,13 @@ namespace Faolan.Importer.Rdb
 		private const uint PlaintextMagic = 0x000F4254;
 		private const uint TemplateType = 1000020;
 
+		// The client's own feat TABLE: FeatTable_t::LoadStaticData reads this resource and its entries carry the
+		// wire-id -> template-id pair (#467).
+		private const uint FeatTableId = 1;
+		private const uint FeatTableType = 1000042;
+		private const int MapEntryLength = 48;
+		private const int MapHeaderLength = 20;
+
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? proxyBase = null, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
@@ -82,6 +89,24 @@ namespace Faolan.Importer.Rdb
 					BaseName = parsed.BaseName,
 					Rank = parsed.Rank
 				});
+			}
+
+			// The wire-id -> template-id map (#467). Delete+reinsert: it is wholly derived from one RDB resource.
+			var mapRows = 0;
+			var map = ReadIdMap(rdb);
+			if (map.Count > 0)
+			{
+				db.FeatIdMaps.RemoveRange(await db.FeatIdMaps.ToListAsync());
+				foreach (var (wire, template, baseIndex) in map)
+				{
+					db.FeatIdMaps.Add(new FeatIdMap
+					{
+						WireFeatId = wire,
+						TemplateId = template,
+						BaseIndex = baseIndex
+					});
+					mapRows++;
+				}
 			}
 
 			var existing = await db.Feats.ToDictionaryAsync(f => f.Id);
@@ -131,13 +156,13 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0)
+			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0)
 				await db.SaveChangesAsync();
 
-			logger?.LogInformation("RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects.",
-				found.Count, skippedUnnamed, added, updated, effectRows);
+			logger?.LogInformation("RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows.",
+				found.Count, skippedUnnamed, added, updated, effectRows, mapRows);
 
-			return new Result(found.Count, added, updated, skippedUnnamed, effectRows);
+			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows);
 		}
 
 		// Splits a catalog name into its tree / group / base / rank. The client encodes all four in the string:
@@ -201,6 +226,55 @@ namespace Faolan.Importer.Rdb
 			return "";
 		}
 
+		// Reads the wire-id -> template-id map out of RDB 1000042 id 1 - the resource FeatTable_t::LoadStaticData
+		// loads. Header [u32 type][u32 id][u32 1][u32 count][u32 version], then `count` 48-byte entries whose first
+		// two words are (wireId, templateId) and whose 11th is the base index.
+		public static List<(uint Wire, uint Template, uint BaseIndex)> ReadIdMap(RdbReader rdb)
+		{
+			var map = new List<(uint, uint, uint)>();
+			var matches = rdb.EntriesOfType(FeatTableType).Where(e => e.Id == FeatTableId).ToList();
+			if (matches.Count == 0)
+				return map;
+
+			var entry = matches[0];
+			byte[] body;
+			try
+			{
+				body = rdb.ReadDecompressed(entry);
+			}
+			catch
+			{
+				return map;
+			}
+
+			return ParseIdMap(body);
+		}
+
+		// Split out from the RDB read so it can be tested against bytes without the client install.
+		public static List<(uint Wire, uint Template, uint BaseIndex)> ParseIdMap(byte[] body)
+		{
+			var map = new List<(uint, uint, uint)>();
+			if (body.Length < MapHeaderLength || Word(body, 0) != FeatTableType)
+				return map;
+
+			var count = (int)Word(body, 12);
+			if (count <= 0 || MapHeaderLength + ((long)count * MapEntryLength) > body.Length)
+				return map;
+
+			for (var i = 0; i < count; i++)
+			{
+				var at = MapHeaderLength + (i * MapEntryLength);
+				var wire = Word(body, at);
+				var template = Word(body, at + 4);
+				if (wire == 0 || template == 0)
+					continue; // a blank slot, not a mapping - carrying it would put a 0 -> 0 row in the table
+
+				map.Add((wire, template, Word(body, at + 40)));
+			}
+
+			return map;
+		}
+
 		// The record's TAIL, after the name: [u32 2][u32 14][u32 ListFrame(n)] then n x 40-byte effect elements whose
 		// last two words are (StatId, Value). The eight leading words of an element are a fixed descriptor.
 		// Returns an empty list when the tail is not this shape - some records carry no effect block at all.
@@ -262,6 +336,6 @@ namespace Faolan.Importer.Rdb
 
 		public readonly record struct Parsed(string? Tree, string? Group, string BaseName, int Rank);
 
-		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects);
+		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows);
 	}
 }
