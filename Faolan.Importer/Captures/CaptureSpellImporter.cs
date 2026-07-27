@@ -13,6 +13,8 @@ using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Captures
 {
 	// Harvests spell ids the character actually cast, from ApplySpell packets (0x2000 / 0x6B87E316; spell id at
@@ -31,10 +33,7 @@ namespace Faolan.Importer.Captures
 		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
 		private const uint BehaviorSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
 		private const uint CastSpellActionType = 4; // ActionType.CastSpell
-		private const uint GameCharAgentType = 0xA9ECB95D;
-		private const uint GameCharInterfaceType = 0x8B87F791;
 		private const uint MaxLevel = 80;
-		private const uint WorldOpcode = 0x2000;
 
 		// MoveItemToBar / AddShortcut. The client's first one ends the create starting-kit phase (its bar drags
 		// follow the grants); any DispatchLearnSpell after it is in-session leveling, not a starter.
@@ -433,7 +432,7 @@ namespace Faolan.Importer.Captures
 			var classByHandle = new Dictionary<uint, byte>();
 			foreach (var p in packets)
 			{
-				if (p.Opcode != WorldOpcode)
+				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
 				// Only PLAYER spawns parse with the scaffold codec - an NPC's FA015807 body has a different shape - so
@@ -515,7 +514,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != GameCharAgentType || packet.Receiver.Type != GameCharInterfaceType)
+				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != Endpoints.GameCharAgentType || packet.Receiver.Type != Endpoints.GameCharInterfaceType)
 					return;
 
 				var body = packet.BodyReader().ReadRemainingArray();
@@ -542,7 +541,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != GameCharAgentType || packet.Receiver.Type != GameCharInterfaceType)
+				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != Endpoints.GameCharAgentType || packet.Receiver.Type != Endpoints.GameCharInterfaceType)
 					return;
 
 				var body = packet.BodyReader().ReadRemainingArray();
@@ -607,7 +606,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != WorldOpcode)
+				if (packet.Opcode != RpcOpcode.IirCarrier)
 					return false;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
@@ -639,7 +638,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != WorldOpcode)
+				if (packet.Opcode != RpcOpcode.IirCarrier)
 					return false;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();

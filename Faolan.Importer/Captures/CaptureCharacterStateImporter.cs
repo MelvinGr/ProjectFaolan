@@ -10,6 +10,8 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Captures
 {
 	// Seeds captured characters' live STATE from their session traffic - the pieces that aren't part of the
@@ -24,7 +26,6 @@ namespace Faolan.Importer.Captures
 	public static class CaptureCharacterStateImporter
 	{
 		private const int ShortcutEntrySize = 24; // [u32 slot][u32 type][u32 target][u32 0][u32 0][u32 0]
-		private const uint GameCharInterfaceType = 0x8B87F791;
 
 		public static CaptureState Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -46,7 +47,7 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				if (packet.Receiver.Type != GameCharInterfaceType)
+				if (packet.Receiver.Type != Endpoints.GameCharInterfaceType)
 					continue;
 
 				var character = packet.Receiver.Instance;

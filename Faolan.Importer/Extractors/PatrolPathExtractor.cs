@@ -7,6 +7,8 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Extractors
 {
 	// One captured NPC patrol route: its map + anchor position, the flattened waypoints (for the loop-shape filter),
@@ -25,7 +27,6 @@ namespace Faolan.Importer.Extractors
 		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles (a player isn't a patrol)
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint MoveTaskSubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
-		private const uint Opcode2000 = 0x2000;
 
 		// One patrol route per NPC HANDLE in a capture (#266 patrol). The real route is the mode-1 PathMoveTask
 		// waypoint list, usually nested in a mode-4 ListMoveTask; the whole tree is parsed and columnarized. Keyed by
@@ -38,7 +39,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				if (p.Opcode != Opcode2000)
+				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
 				var body = GetBody(p.Bytes);

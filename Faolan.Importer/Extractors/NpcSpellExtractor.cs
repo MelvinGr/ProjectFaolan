@@ -6,6 +6,8 @@ using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Extractors
 {
 	// Harvests the spells caster NPCs cast at the player, for the NpcSpell table (#232). Retail NPC casts are
@@ -22,7 +24,6 @@ namespace Faolan.Importer.Extractors
 		// PayloadOffset (30) is the fixed header length used as the minimum-body guard.
 		private const int PayloadOffset = 30;
 		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
-		private const uint Opcode2000 = 0x2000;
 
 		public static List<NpcSpellEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -37,7 +38,7 @@ namespace Faolan.Importer.Extractors
 			var entries = new List<NpcSpellEntry>();
 			foreach (var p in packets)
 			{
-				if (p.Opcode != Opcode2000)
+				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
 				var body = GetBody(p.Bytes);

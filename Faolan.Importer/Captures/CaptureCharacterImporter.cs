@@ -14,6 +14,8 @@ using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Captures
 {
 	// Materializes the CAPTURED characters (NecroL80, DemoL80, Strie, ...) as playable DB characters: every
@@ -33,7 +35,6 @@ namespace Faolan.Importer.Captures
 		private const uint InventorySnapshotSubOpcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 
-		private const uint Opcode2000 = 0x2000;
 
 		// The account imported characters are attached to. 0 = find-or-create ImportAccountName, which is the normal
 		// PLAY account ("faolan"), so the reference characters are reachable from the same login as everything else.
@@ -69,7 +70,7 @@ namespace Faolan.Importer.Captures
 						continue;
 					}
 
-					if (p.Opcode != Opcode2000)
+					if (p.Opcode != RpcOpcode.IirCarrier)
 						continue;
 
 					var body = GetBody(p.Bytes);

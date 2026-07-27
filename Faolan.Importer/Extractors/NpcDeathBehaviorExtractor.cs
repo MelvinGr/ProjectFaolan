@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Extractors
 {
 	// A harvested creature death animation: an NPC TYPE (by name) and the death-animation behaviorId retail sent in
@@ -21,7 +23,6 @@ namespace Faolan.Importer.Extractors
 	{
 		private const uint DeathBccSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR; // 0x642CD3D6
 		private const uint DeathSlot = 0x0000001F; // the slot the death behavior lands in
-		private const uint Opcode2000 = 0x2000;
 		private const ushort DeathForm = 0x0004; // BccIIR form for a slotted behavior record
 
 		public static List<NpcDeathBehavior> Extract(IReadOnlyList<CapturedPacket> packets)
@@ -38,7 +39,7 @@ namespace Faolan.Importer.Extractors
 			var results = new List<NpcDeathBehavior>();
 			foreach (var p in packets)
 			{
-				if (p.Opcode != Opcode2000 || !p.IsDownload || p.SubOpcode != DeathBccSubOpcode)
+				if (p.Opcode != RpcOpcode.IirCarrier || !p.IsDownload || p.SubOpcode != DeathBccSubOpcode)
 					continue;
 
 				var body = WorldObjectExtractor.GetBody(p.Bytes);

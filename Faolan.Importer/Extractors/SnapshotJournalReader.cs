@@ -6,6 +6,8 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Extractors
 {
 	// Reads the Quest_c JOURNAL region out of a captured FullChar snapshot (0x737A6DF9) - the character's live
@@ -28,12 +30,11 @@ namespace Faolan.Importer.Extractors
 	// per-record objective interleaving was fixed (Gitea #384).
 	public static class SnapshotJournalReader
 	{
-		private const uint CarrierOpcode = 0x2000;
 
 		// True when the packet is a 0x2000 carrier at all - a cheap pre-filter for callers scanning every packet.
 		public static bool IsCarrier(uint opcode)
 		{
-			return opcode == CarrierOpcode;
+			return opcode == RpcOpcode.IirCarrier;
 		}
 
 		// The journal records a snapshot packet carries, with the character they belong to. Returns false for any

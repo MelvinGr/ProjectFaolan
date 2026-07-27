@@ -5,6 +5,8 @@ using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Extractors
 {
 	// One item template observed in a captured loot bag on a given map (#273).
@@ -19,7 +21,6 @@ namespace Faolan.Importer.Extractors
 	{
 		private const uint LootBagSubOpcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR;
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
-		private const uint Opcode2000 = 0x2000;
 
 		public static List<MapLootPoolEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -28,7 +29,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				if (p.Opcode != Opcode2000)
+				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
 				if (p.SubOpcode == MapChangeSubOpcode)

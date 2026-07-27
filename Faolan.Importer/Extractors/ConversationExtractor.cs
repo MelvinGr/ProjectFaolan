@@ -8,6 +8,8 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Extractors
 {
 	// A captured on-wire packet with the metadata the extractors need, uniform across the .json dumps and the
@@ -48,7 +50,6 @@ namespace Faolan.Importer.Extractors
 	{
 		private const uint InteractSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
 		private const uint KnubotAnswerSubOpcode = (uint)GameServer0X2000Opcodes.KnubotAnswerIIR;
-		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2015 = 0x2015; // GameCharInterfaceOpcodes.DispatchSetDialogueCamera
 
 		// A quest GRANT signal seen mid-conversation: the full journal record (0x63268258) the retail server sends when
@@ -87,7 +88,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				if (p is { IsDownload: false, Opcode: Opcode2000, SubOpcode: InteractSubOpcode })
+				if (p is { IsDownload: false, Opcode: RpcOpcode.IirCarrier, SubOpcode: InteractSubOpcode })
 				{
 					var body = GetBody(p.Bytes);
 					if (body.Length < 26 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)) != TalkToNpcActionType)
@@ -112,7 +113,7 @@ namespace Faolan.Importer.Extractors
 					grant = 0;
 					instanceContext = currentQuest; // the quest active WHEN the player opened this conversation (#264)
 				}
-				else if (p is { IsDownload: false, Opcode: Opcode2000, SubOpcode: KnubotAnswerSubOpcode } && active)
+				else if (p is { IsDownload: false, Opcode: RpcOpcode.IirCarrier, SubOpcode: KnubotAnswerSubOpcode } && active)
 				{
 					// The player picked option `idx`: the current screen is complete (emit it), and the responses that
 					// follow belong to the child screen reached by that option.
@@ -128,7 +129,7 @@ namespace Faolan.Importer.Extractors
 					screen = [];
 					grant = 0;
 				}
-				else if (p is { IsDownload: true, Opcode: Opcode2000, SubOpcode: QuestFullUpdateSubOpcode })
+				else if (p is { IsDownload: true, Opcode: RpcOpcode.IirCarrier, SubOpcode: QuestFullUpdateSubOpcode })
 				{
 					// A quest full-update. body @16 = [00000000][01][u32 questId]. It's a GRANT (vs a login restore or a
 					// re-display) only if: a conversation is active, the player has navigated past the greeting (path !=
@@ -146,7 +147,7 @@ namespace Faolan.Importer.Extractors
 							questsSeen.Add(questId);
 					}
 				}
-				else if (p.IsDownload && active && (p.Opcode == Opcode2015 || (p.Opcode == Opcode2000 && ResponseSubOpcodes.Contains(p.SubOpcode))))
+				else if (p.IsDownload && active && (p.Opcode == Opcode2015 || (p.Opcode == RpcOpcode.IirCarrier && ResponseSubOpcodes.Contains(p.SubOpcode))))
 					screen.Add(p.Bytes);
 			}
 
@@ -182,7 +183,7 @@ namespace Faolan.Importer.Extractors
 			var names = new HashSet<string>();
 			foreach (var p in packets)
 			{
-				if (p is not { IsDownload: false, Opcode: Opcode2000, SubOpcode: InteractSubOpcode })
+				if (p is not { IsDownload: false, Opcode: RpcOpcode.IirCarrier, SubOpcode: InteractSubOpcode })
 					continue;
 
 				var body = GetBody(p.Bytes);
@@ -257,7 +258,7 @@ namespace Faolan.Importer.Extractors
 			var map = new Dictionary<uint, string>();
 			foreach (var p in packets)
 			{
-				if (!p.IsDownload || p.Opcode != Opcode2000 || p.SubOpcode != SpawnSubOpcode)
+				if (!p.IsDownload || p.Opcode != RpcOpcode.IirCarrier || p.SubOpcode != SpawnSubOpcode)
 					continue;
 
 				var body = GetBody(p.Bytes);

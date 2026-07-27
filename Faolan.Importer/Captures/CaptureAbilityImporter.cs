@@ -12,6 +12,8 @@ using Faolan.Core.Network.Protocol;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Captures
 {
 	// Harvests the player's starting abilities from the retail 0x2052 ability-grant packets (the real wire format,
@@ -31,7 +33,6 @@ namespace Faolan.Importer.Captures
 		private const uint ChangeClassSubOpcode = (uint)GameServer0X2000Opcodes.ScryScriptIIR; // client->server character-editor script callback
 		private const uint ComboBookSubOpcode = (uint)GameServer0X2000Opcodes.ComboBookIIR;
 		private const ushort AddSpecialAbilityOpcode = (ushort)GameCharInterfaceOpcodes.DispatchAddSpecialAbility;
-		private const ushort IirCarrierOpcode = 0x2000; // ComboBookIIR rides the 0x2000 world-conversation carrier
 
 		// The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive
 		// from (retail never re-emits a ComboBookIIR on login - the combo book rides the 0x2076 world-entry snapshot
@@ -597,7 +598,7 @@ namespace Faolan.Importer.Captures
 				uint id;
 				if (isCombo)
 				{
-					if (packet.Opcode != IirCarrierOpcode || body.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ComboBookSubOpcode)
+					if (packet.Opcode != RpcOpcode.IirCarrier || body.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ComboBookSubOpcode)
 						return;
 
 					id = ComboBookIirCodec.Message.Read(new FaolanStream(body)).ComboId;

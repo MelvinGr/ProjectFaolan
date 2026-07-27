@@ -50,6 +50,10 @@ namespace Faolan.Tests
 		// The entity object-class ids, in the 4- and 8-digit spellings both have been written in.
 		private static readonly Regex EntityClassLiteral = new(@"\b0x0*(C350|C748|C75B|C878|C879|C87A|C87D|DEB7)\b", RegexOptions.IgnoreCase);
 
+		// The RPC endpoint class ids - BKDR-31 hashes of the client class names, all 32-bit, all in Endpoints.cs.
+		private static readonly Regex EndpointClassLiteral = new(
+			@"\b0x(0C384054|1D359116|28377648|3D744981|5B9756FC|604DDBA0|6C67C147|6DD55614|7D155738|82F20484|8B87F791|A9ECB95D|B171CE13|BBD560C8|F2C2D5B5)\b", RegexOptions.IgnoreCase);
+
 		private static IEnumerable<Type> CodecTypes => typeof(ICodec<>).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith(CodecsNamespace, StringComparison.Ordinal));
 
 		// (6) The two codec SHAPES keep distinct names. A `*Codec`/`*Builder` is a static MODULE of stateless ops; a
@@ -72,6 +76,43 @@ namespace Faolan.Tests
 
 			Assert.True(bad.Count == 0,
 				"a type implementing ICodec<T> is a wire VALUE - name it after the value, not `*Codec`/`*Builder` (those suffixes mean a static codec module):\n  " + string.Join("\n  ", bad));
+		}
+
+		// (7) The RPC ENDPOINT class ids come from Endpoints, never a hand-rolled hash. Same rule as EntityClass
+		// below, for the other id namespace: these are BKDR-31 hashes of the client's class names
+		// (0xA9ECB95D = hash("GameCharAgent")), and Endpoints.cs is where all fifteen are recovered and named.
+		// CaptureSpellImporter and CaptureCharacterStateImporter had re-declared two of them locally.
+		//
+		// Faolan.Tests is deliberately NOT scanned: Support/ProtocolDocs/OpcodesPage.cs holds the name -> hash table
+		// the docs are generated from and must spell the hashes out, and it is what proves Endpoints right
+		// (ProtocolDocsTests recomputes each one through Bkdr31).
+		[Fact]
+		public void EndpointClassIdsComeFromEndpoints_NotAHandRolledHash()
+		{
+			string[] roots = [TestPaths.Repo("Faolan.Core.Network"), TestPaths.Repo("Faolan"), TestPaths.Repo("Faolan.Importer"), TestPaths.Repo("Faolan.Core")];
+			var offenders = new List<string>();
+
+			foreach (var file in roots
+				         .Where(Directory.Exists)
+				         .SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
+				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")))
+			{
+				if (Path.GetFileName(file) is "Endpoints.cs") // the registry itself
+					continue;
+
+				var lines = File.ReadAllLines(file);
+				for (var i = 0; i < lines.Length; i++)
+				{
+					var code = StringLiteral.Replace(LineComment.Replace(BlockComment.Replace(lines[i], ""), ""), "");
+					if (code.Contains("Endpoints.", StringComparison.Ordinal))
+						continue; // it comes from Endpoints on this line - that IS the convention
+
+					if (EndpointClassLiteral.IsMatch(code))
+						offenders.Add($"{Path.GetFileName(file)}:{i + 1}  {code.Trim()}");
+				}
+			}
+
+			Assert.True(offenders.Count == 0, "RPC endpoint class ids must come from Endpoints (GameCharAgentType = 0xA9ECB95D, ...):\n  " + string.Join("\n  ", offenders));
 		}
 
 		// (5) The entity object-CLASS word comes from EntityClass, never a hand-rolled 0xC350. Same disease as the

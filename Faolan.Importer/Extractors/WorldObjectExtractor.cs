@@ -7,6 +7,8 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Extractors
 {
 	public sealed record WorldObjectEntry(uint MapId, uint SubOpcode, uint Handle, float X, float Y, float Z, byte[] Data)
@@ -30,7 +32,6 @@ namespace Faolan.Importer.Extractors
 	public static class WorldObjectExtractor
 	{
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
-		private const uint Opcode2000 = 0x2000;
 
 		private static readonly HashSet<uint> ObjectSubOpcodes =
 		[
@@ -45,7 +46,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				if (p.Opcode != Opcode2000)
+				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
 				var body = GetBody(p.Bytes);

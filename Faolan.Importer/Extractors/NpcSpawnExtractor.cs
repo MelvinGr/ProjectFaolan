@@ -7,6 +7,8 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Extractors
 {
 	public sealed record NpcSpawnEntry(uint MapId, string Name, uint Handle, float X, float Y, float Z, byte[] Data)
@@ -48,7 +50,6 @@ namespace Faolan.Importer.Extractors
 	{
 		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles live in the instance range
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
-		private const uint Opcode2000 = 0x2000;
 		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the pre-poll login burst window
 		private const uint SpawnSubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 
@@ -62,7 +63,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				if (p.Opcode != Opcode2000)
+				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
 				var body = GetBody(p.Bytes);
@@ -104,7 +105,7 @@ namespace Faolan.Importer.Extractors
 					? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
 					: 0;
 
-				if (p is { Opcode: Opcode2000, IsDownload: true } && subop == MapChangeSubOpcode && body.Length >= 38)
+				if (p is { Opcode: RpcOpcode.IirCarrier, IsDownload: true } && subop == MapChangeSubOpcode && body.Length >= 38)
 				{
 					currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
 					sawPoll = false;
@@ -120,7 +121,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
-				if (sawPoll || p.Opcode != Opcode2000 || !p.IsDownload || subop != SpawnSubOpcode)
+				if (sawPoll || p.Opcode != RpcOpcode.IirCarrier || !p.IsDownload || subop != SpawnSubOpcode)
 					continue;
 				if (allowedMaps != null && !allowedMaps.Contains(currentMap))
 					continue;

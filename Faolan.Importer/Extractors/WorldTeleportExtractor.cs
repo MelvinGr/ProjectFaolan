@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Extractors
 {
 	// A harvested door->destination link: a zone-line world object (SourceMap + Name + spawn position) that, when
@@ -34,7 +36,6 @@ namespace Faolan.Importer.Extractors
 		private const uint IntendedTeleportSubOpcode = (uint)GameServer0X2000Opcodes.IntendedTeleportIIR; // 0x10D27BC0
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR; // 0x5D85BFC7
 		private const uint N3TeleportSubOpcode = (uint)GameServer0X2000Opcodes.N3TeleportIIR; // 0x5A32F0D7
-		private const uint Opcode2000 = 0x2000;
 
 		private const uint UseObjectActionType = (uint)ActionType.UseObject; // 0x12
 		private const uint UseObjectSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR; // 0x642CD3D6
@@ -67,7 +68,7 @@ namespace Faolan.Importer.Extractors
 			for (var i = 0; i < packets.Count; i++)
 			{
 				var p = packets[i];
-				if (p.Opcode != Opcode2000)
+				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
 				var body = WorldObjectExtractor.GetBody(p.Bytes);
@@ -119,7 +120,7 @@ namespace Faolan.Importer.Extractors
 				for (var j = i + 1; j < packets.Count && j <= i + LookaheadPackets; j++)
 				{
 					var q = packets[j];
-					if (q.Opcode != Opcode2000 || !q.IsDownload)
+					if (q.Opcode != RpcOpcode.IirCarrier || !q.IsDownload)
 						continue;
 
 					var qbody = WorldObjectExtractor.GetBody(q.Bytes);

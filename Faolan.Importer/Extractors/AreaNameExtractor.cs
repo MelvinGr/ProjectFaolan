@@ -8,6 +8,8 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
 
+using Faolan.Core.Network.Constants;
+
 namespace Faolan.Importer.Extractors
 {
 	// A harvested map area name: the client localized-string id of the top-of-screen FIFO banner, plus the player
@@ -34,7 +36,6 @@ namespace Faolan.Importer.Extractors
 		private const uint FeedbackSubOpcode = (uint)GameServer0X2000Opcodes.FormatFeedbackIIR; // 0x8D5A8B6B
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR; // 0x5D85BFC7
 		private const uint MoveSubOpcode = (uint)GameServer0X2000Opcodes.CharDCMoveIIR; // 0x4517AA81
-		private const uint Opcode2000 = 0x2000;
 		private static readonly Regex AreaId = new("GenericDisplayAreaName[|/](\\d+)", RegexOptions.Compiled);
 
 		public static List<MapAreaName> Extract(IReadOnlyList<CapturedPacket> packets)
@@ -53,7 +54,7 @@ namespace Faolan.Importer.Extractors
 			{
 				// NB both directions: the banner is s2c but the POSITION comes from the client's own c2s move, so
 				// this can't filter to downloads the way it did when it only read banners.
-				if (p.Opcode != Opcode2000)
+				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
 				var body = WorldObjectExtractor.GetBody(p.Bytes);
