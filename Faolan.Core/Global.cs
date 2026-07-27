@@ -19,12 +19,43 @@ namespace Faolan.Core
 		// The shared config file, for every exe that reads it (server, importer, web, CDN mirror, MCP bridge). It sits
 		// next to the exe - or at the solution root when debugging, where the CWD is set to the same place - so the
 		// plain relative name resolves in both cases; FAOLAN_CONFIG overrides it (container / one-off run).
-		public static string ConfigPath => Environment.GetEnvironmentVariable("FAOLAN_CONFIG") ?? Path.GetFullPath("faolan.json");
+		public static string ConfigPath => Environment.GetEnvironmentVariable("FAOLAN_CONFIG") ?? FindUpwards("faolan.json");
+
+		// The directory ConfigPath resolves to. A RELATIVE path inside the config - the SQLite `Data Source` above
+		// all - means "beside faolan.json", not "in whatever directory this process happened to be started from".
+		// Reading it against the CWD is the trap CLAUDE.md documents for `dotnet ef database update` and the one that
+		// made every DB-backed Faolan.Web page 500 (#456): the app resolved `Data Source=faolan.db` against
+		// Faolan.Web/ and quietly created an empty database there.
+		public static string ConfigDirectory => Path.GetDirectoryName(ConfigPath) is { Length: > 0 } directory
+			? directory
+			: Directory.GetCurrentDirectory();
 
 		// The game-data seed (#412) and its per-dialect counter sidecar, found the same way as the config: beside the
-		// exe / in the CWD, or wherever FAOLAN_SEED points. DatabaseInitializer loads these into a database that comes
-		// up with no content, which is what lets a clone run without the committed faolan.db.
-		public static string SeedPath => Environment.GetEnvironmentVariable("FAOLAN_SEED") ?? Path.GetFullPath("faolan.sql");
+		// exe / in the CWD / up the tree, or wherever FAOLAN_SEED points. DatabaseInitializer loads these into a
+		// database that comes up with no content, which is what lets a clone run without the committed faolan.db.
+		public static string SeedPath => Environment.GetEnvironmentVariable("FAOLAN_SEED") ?? FindUpwards("faolan.sql");
+
+		// The first `name` at or above the CWD, else at or above the exe's own directory, else the CWD-relative path
+		// (today's behaviour, so a genuinely missing file still reports the place you would look first).
+		//
+		// Walking UP is what lets `dotnet run --project Faolan.Web` work: it sets the CWD to the PROJECT directory,
+		// and the config lives at the repo root above it. Every exe in the solution is run either from the root or
+		// from a directory beneath it, so the first hit going up is always the repo's own file - there is no
+		// ambiguity to resolve, and an explicit FAOLAN_CONFIG still wins over the search.
+		private static string FindUpwards(string name)
+		{
+			foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+			{
+				for (var directory = new DirectoryInfo(start); directory != null; directory = directory.Parent)
+				{
+					var candidate = Path.Combine(directory.FullName, name);
+					if (File.Exists(candidate))
+						return candidate;
+				}
+			}
+
+			return Path.GetFullPath(name);
+		}
 
 		public static readonly string BuildConfiguration;
 		public static readonly DateTime BuildDateTimeUtc;

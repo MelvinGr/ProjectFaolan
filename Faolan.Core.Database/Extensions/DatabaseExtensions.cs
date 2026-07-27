@@ -1,7 +1,10 @@
 using System;
+using System.IO;
+using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -67,10 +70,28 @@ namespace Faolan.Core.Database.Extensions
 			{
 				FaolanDbProvider.Postgres => builder.UseNpgsql(connection,
 					x => x.MigrationsAssembly("Faolan.Core.Database.Migrations.Postgres").UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery)),
-				FaolanDbProvider.Sqlite => builder.UseSqlite(connection,
+				FaolanDbProvider.Sqlite => builder.UseSqlite(ResolveSqliteDataSource(connection),
 					x => x.MigrationsAssembly("Faolan.Core.Database.Migrations.Sqlite").UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery)),
 				_ => throw new ArgumentOutOfRangeException(nameof(provider), provider, "Unknown database provider.")
 			};
+		}
+
+		// A RELATIVE SQLite `Data Source` means "beside faolan.json", not "in the process CWD" (#456). Resolved here
+		// because this is already the one place the provider is chosen, so every entry point - server, importer,
+		// Faolan.Web, the EF design-time factories - gets it from one edit.
+		//
+		// Left alone: an absolute path, `:memory:`, a `file:` URI, and an empty source. Those either mean something
+		// other than a file beside the config or are already unambiguous, and rewriting them would be the kind of
+		// helpfulness that breaks a shared temp-file fixture.
+		internal static string ResolveSqliteDataSource(string connection)
+		{
+			var builder = new SqliteConnectionStringBuilder(connection);
+			var source = builder.DataSource;
+			if (string.IsNullOrEmpty(source) || source == ":memory:" || source.StartsWith("file:", StringComparison.OrdinalIgnoreCase) || Path.IsPathRooted(source))
+				return connection;
+
+			builder.DataSource = Path.GetFullPath(Path.Combine(Global.ConfigDirectory, source));
+			return builder.ConnectionString;
 		}
 	}
 }
