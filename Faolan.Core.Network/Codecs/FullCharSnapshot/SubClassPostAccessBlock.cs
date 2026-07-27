@@ -65,18 +65,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public uint Marker1 { get; init; }
 
-		//public uint PvpXpTillNextLevel
-		//{
-		//	get => GetValue(CharacterValueIndex.PvpXpTillNextLevel);
-		//	set => SetValue(CharacterValueIndex.PvpXpTillNextLevel, value);
-		//}
-
-		/*public uint PvpKillsOverall
-		{
-			get => GetValue(CharacterValueIndex.PvpKillsOverall);
-			set => SetValue(CharacterValueIndex.PvpKillsOverall, value);
-		}*/
-
+		// PvpXpTillNextLevel and PvpKillsOverall had accessors here, commented out. Nothing needs them: the block is
+		// addressed positionally through GetValue/SetValue, so a named accessor is a convenience for a value some
+		// caller actually reads, and no caller ever read those two. Their CharacterValueIndex slots are still in the
+		// enum below, which is where the positional knowledge belongs - add the accessor back when something reads it.
 		public uint PvpDeathsOverall
 		{
 			get => GetValue(CharacterValueIndex.PvpDeathsOverall);

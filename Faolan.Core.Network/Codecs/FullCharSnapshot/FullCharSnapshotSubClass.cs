@@ -29,8 +29,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// captures: a freshly created character's snapshot has ZERO quest blocks (the starter quest is delivered LIVE
 		// instead - QuestLogList + QuestFullUpdate - then rides the snapshot only on later logins). Words:
 		//   version 0x18 ; empty Quest_c list 0x3F1 ; index tag 0x3F1 ; index marker (0+1)*0x3F1 ; count 0 ;
-		//   terminal 0x000156E7 (constant). See tools/capture/decode_snapshot_quests.py + the *-create captures.
-		private const uint EmptyQuestTerminal = 0x000156E7;
+		//   terminal QuestIndexRegion.IndexTerminalWord. See tools/capture/decode_snapshot_quests.py + the *-create captures.
+		// The terminal is the SAME word the populated index chain ends on, so it has one owner - QuestIndexRegion -
+		// rather than a second private copy here that could drift from it.
 
 		// #255: the multi-quest journal portion from the player's held quests. One QuestcRecord per quest (journal
 		// entries), but the objective (@609) region + the quest index belong to the PRIMARY (tracked) quest only -
@@ -138,7 +139,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			w.WriteUInt32(ListFrame.Empty); // 0x3F1 - empty completed-journal frame (0 areas); NOT an "index tag" (#391)
 			w.WriteUInt32(QuestcRegion.Frame); // 0x3F1 - empty index marker ((0+1)*0x3F1)
 			w.WriteUInt32(0); // index count = 0
-			w.WriteUInt32(EmptyQuestTerminal); // 0x000156E7
+			w.WriteUInt32(QuestIndexRegion.IndexTerminalWord);
 			return w.ToArray();
 		}
 
