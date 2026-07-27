@@ -6,9 +6,9 @@ All three decoded from one capture: `login_2-clients_group-trade-friend`, two re
 *"kick"*, *"trade"*, *";both friends added, friends are one sided, no accept needed"*, *"%set lootoptions, pass on
 loot to rare"*.
 
-`tools/capture/decode_team_trade_friend.py` reads all **97** of the capture's team/trade/friend packets to their
-exact end — no short or long reads — and `TeamTradeFriendCodecTests` gates every message we build against retail's
-bytes. [V1: tools/capture/decode_team_trade_friend.py]
+`TeamTradeFriendCodecTests` gates every message we build against retail's bytes, with the captured hex pinned inline —
+so the whole subsystem is re-proven on every test run rather than by a tool someone has to remember to point at the
+corpus. [V3: TeamTradeFriendCodecTests.MemberRecord_RoundTripsCapturedBytes]
 
 Each subsystem's three tiers matter, because they are not the same tier:
 
@@ -169,7 +169,10 @@ s2c 0x0028  [u32 characterId][u8 online][u8 level][u32 stamp][u8 class]  the fri
 ```
 
 At **login** the stored list arrives as `0x0014` + `0x0028` **pairs**, one per friend, in the same burst as the channel
-subscriptions and the welcome message — and with **no** presence push. [V1: tools/capture/decode_team_trade_friend.py]
+subscriptions and the welcome message — and with **no** presence push. Both message SHAPES are byte-gated
+[V3: TeamTradeFriendCodecTests.Friend_NameBinding_IsByteExact]; the burst PLACEMENT is not, and cannot be read out of
+the two-client capture — that account had no friends before it added them, so the restore-on-login timing comes from a
+later login-with-friends session (see the note on it in `ChatServerListener`).
 
 ⚠️ **Omitting the `0x0014` renders nothing at all** — no entry, no error. The client is left holding an id and a state
 with no name attached. That was the whole reason the list stayed empty while the other two messages were byte-perfect,

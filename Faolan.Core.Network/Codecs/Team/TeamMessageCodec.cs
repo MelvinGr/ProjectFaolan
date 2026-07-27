@@ -6,8 +6,8 @@ using Faolan.Core.Network.Constants;
 namespace Faolan.Core.Network.Codecs.Team
 {
 	// The team (group) messages, all of them built from TeamMemberRecord plus a ProtoID32 or two. Decoded from
-	// login_2-clients_group-trade-friend; see tools/capture/decode_team_trade_friend.py, which reads every one of
-	// them to its exact end, and docs/subsystems/teams.md for the sequence.
+	// login_2-clients_group-trade-friend and gated byte-exact by TeamTradeFriendCodecTests; see
+	// docs/subsystems/teams-trade-friends.md for the sequence.
 	//
 	// No `Opcode` constant: these are RPC METHODS on the CsPlayerInterface (16-bit method indices), not 0x2000 IIR
 	// types, so there is nothing for CodecConventionTests' IIR rule to attribute. The group MEMBERSHIP records that

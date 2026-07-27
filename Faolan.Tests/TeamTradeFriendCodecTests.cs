@@ -10,8 +10,9 @@ namespace Faolan.Tests
 {
 	// Byte-exact gates for the team/group, player-trade and friend-list messages against
 	// login_2-clients_group-trade-friend - two retail clients on one host, so every exchange is captured from BOTH
-	// sides in one file. The hex below is RETAIL's, lifted straight from that capture by frame number; the grammar is
-	// validated independently to each packet's exact end by tools/capture/decode_team_trade_friend.py.
+	// sides in one file. The hex below is RETAIL's, lifted straight from that capture by frame number. The Python
+	// dissector that first read all 97 packets to their exact end was retired once these gates existed - it proved the
+	// same bytes, but by hand and against a corpus a plain clone does not have.
 	//
 	// The two captured players are 0x01317CF8 (a Necromancer) and 0x013184AE (a Demonologist), both in map 4020 -
 	// their classes are what the record's leading trailing-field carries, 0x29 and 0x2C. Their NAMES

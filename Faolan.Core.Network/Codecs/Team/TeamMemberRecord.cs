@@ -7,8 +7,8 @@ namespace Faolan.Core.Network.Codecs.Team
 	// The TEAM MEMBER descriptor: the one repeating record almost every team message carries, and the reason the
 	// whole team subsystem is a small amount of code once this exists. Decoded byte-exact from
 	// login_2-clients_group-trade-friend (two retail clients on one host, so both sides of every exchange are on
-	// tape) by tools/capture/decode_team_trade_friend.py, which validates all 97 team/trade/friend packets to their
-	// exact end.
+	// tape); TeamTradeFriendCodecTests pins both players' records against that captured hex and gates every message
+	// built from it.
 	//
 	//   [u32 0xC350][u32 characterId][u16 len][name LATIN1] then twenty u32 and a u16.
 	//
