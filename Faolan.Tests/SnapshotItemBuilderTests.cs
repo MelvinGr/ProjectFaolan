@@ -79,8 +79,7 @@ namespace Faolan.Tests
 			}
 			finally
 			{
-				if (File.Exists(dbPath))
-					File.Delete(dbPath);
+				TestDb.Delete(dbPath);
 			}
 		}
 
@@ -143,8 +142,7 @@ namespace Faolan.Tests
 			}
 			finally
 			{
-				if (File.Exists(dbPath))
-					File.Delete(dbPath);
+				TestDb.Delete(dbPath);
 			}
 		}
 

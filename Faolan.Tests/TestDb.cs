@@ -123,6 +123,32 @@ namespace Faolan.Tests
 			return DatabaseExtensions.BuildOptions(FaolanDbProvider.Sqlite, $"Data Source={path};Mode=ReadOnly");
 		}
 
+		// Deletes a throwaway test database AND its sidecars.
+		//
+		// ⚠️ `File.Delete(path)` alone LEAKS. These databases run in WAL mode, so SQLite writes `<path>-wal` and
+		// `<path>-shm` beside the main file, and deleting only the file leaves those behind - 3,856 orphaned `-wal`
+		// files totalling 2.0 GB had accumulated in /tmp, which is a RAMDISK here, and filled it until the whole
+		// suite failed with ENOSPC. The pool is cleared first because disposing a context RETURNS its connection to
+		// Microsoft.Data.Sqlite's pool rather than closing it, so the files stay open and the delete silently fails.
+		//
+		// BuildFixture above already does this dance; the per-test cleanups did not.
+		public static void Delete(string path)
+		{
+			SqliteConnection.ClearAllPools();
+			foreach (var file in new[] { path, $"{path}-wal", $"{path}-shm" })
+			{
+				try
+				{
+					if (File.Exists(file))
+						File.Delete(file);
+				}
+				catch (IOException)
+				{
+					// a database another test still holds open is not worth failing a passing test over
+				}
+			}
+		}
+
 		// Seeds the world rows a Character depends on - Account, Realm, Map - and SAVES. Character has non-null FKs to
 		// all three, plus NOT NULL columns on Realm, so nothing character-shaped inserts without them. Six tests had
 		// each hand-rolled this same trio.

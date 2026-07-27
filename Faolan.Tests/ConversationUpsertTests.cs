@@ -155,8 +155,7 @@ namespace Faolan.Tests
 			}
 			finally
 			{
-				if (File.Exists(path))
-					File.Delete(path);
+				TestDb.Delete(path);
 			}
 		}
 

@@ -83,7 +83,7 @@ namespace Faolan.Tests
 			}
 			finally
 			{
-				File.Delete(dbPath);
+				TestDb.Delete(dbPath);
 				File.Delete(tsv);
 			}
 		}
@@ -147,7 +147,7 @@ namespace Faolan.Tests
 			}
 			finally
 			{
-				File.Delete(dbPath);
+				TestDb.Delete(dbPath);
 				File.Delete(tsv);
 			}
 		}

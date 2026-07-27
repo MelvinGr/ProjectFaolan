@@ -419,8 +419,19 @@ namespace Faolan.Importer.Rdb
 		{
 			return body.Length <= 12
 				? []
-				: ItemTemplateStatModifiers.Parse(body.AsSpan(12));
+				: [.. ItemTemplateStatModifiers.Parse(body.AsSpan(12)).Where(m => m.Kind != TagRecordKind)];
 		}
+
+		// Kind 53182 is NOT a stat modifier and must not be imported as one. Its element has the same signature, so
+		// the shared parser returns it, but the payload is (index, FOURCC) rather than (statId, amount): the "amount"
+		// decodes to four ASCII characters, identical across a whole feat family - 0x4450434E "DPCN" on every
+		// Perception feat, 0x5633534D "V3SM" on every Hide In Shadows, 0x454F4854 "EOHT" on the crafting ranks - and
+		// the "statId" is a small index (12, 13, 14, 100, 102, 104, 255).
+		//
+		// It was 1625 of 24946 rows and 480 of the 561 that landed on stats the client cannot name - 86% of all the
+		// noise. The other 1145 looked fine only because a small index happens to be a valid stat id; they are just as
+		// bogus, which is why the whole KIND is dropped rather than the rows that failed a stat lookup.
+		private const uint TagRecordKind = 53182;
 
 		// The effect block's start (past the [2][14][frame] header) and its element COUNT, or (0, 0) when the record
 		// carries no effect list. Exposed so `--report feat-effect-widths` measures exactly the bytes the importer

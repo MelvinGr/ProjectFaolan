@@ -86,8 +86,7 @@ namespace Faolan.Tests
 
 		private static void Cleanup(string path)
 		{
-			if (File.Exists(path))
-				File.Delete(path);
+			TestDb.Delete(path);
 		}
 
 		private static (DatabaseRepository Repo, DbContextOptions<DatabaseContext> Options, string Path) NewDb()
