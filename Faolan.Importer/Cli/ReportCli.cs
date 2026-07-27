@@ -199,6 +199,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "feat-effect-widths":
+				{
+					FeatEffectWidths(RdbDir());
+					return 0;
+				}
+
 				case "feat-catalog":
 				{
 					FeatCatalog(RdbDir(), arg, _options.Out);
@@ -1258,6 +1264,61 @@ namespace Faolan.Importer.Cli
 		// The feat/ability catalog's RDB type, and the magic a PLAINTEXT record opens with (`TB\x0f\x00`).
 		private const uint FeatPlaintextMagic = 0x000F4254;
 		private const uint FeatTemplateType = 1000020;
+
+		// Harvests the feat EFFECT element's kind -> width table empirically (#251).
+		//
+		// The element opens with a KIND tag (0xCF..) and its width VARIES with that kind, which is what defeats a
+		// fixed-stride walk and left 3.1% of effect rows on stats the client cannot name. The widths are not
+		// guessable, but they ARE measurable: in a record whose effect list holds exactly ONE element, that element
+		// runs to the end of the record, so `recordLength - elementStart` IS the kind's width. Single-element records
+		// hand the table over directly; multi-element records then become the check.
+		private static void FeatEffectWidths(string rdbDir)
+		{
+			using var rdb = new RdbReader(rdbDir);
+			var widths = new Dictionary<uint, Dictionary<int, int>>();
+			var singles = 0;
+			var multi = 0;
+
+			foreach (var e in rdb.EntriesOfType(FeatTemplateType))
+			{
+				if (e.Size == 0)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue;
+				}
+
+				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != FeatPlaintextMagic)
+					continue;
+
+				var (start, count) = RdbFeatImporter.EffectTail(body);
+				if (count <= 0 || start + 4 > body.Length)
+					continue;
+
+				if (count > 1)
+				{
+					multi++;
+					continue;
+				}
+
+				singles++;
+				var kind = BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(start));
+				var width = body.Length - start;
+				widths.TryAdd(kind, new Dictionary<int, int>());
+				widths[kind][width] = widths[kind].GetValueOrDefault(width) + 1;
+			}
+
+			Console.WriteLine($"single-element records: {singles}   multi-element: {multi}");
+			Console.WriteLine("kind -> width(s) observed in single-element records:");
+			foreach (var (kind, seen) in widths.OrderByDescending(k => k.Value.Values.Sum()))
+				Console.WriteLine($"  0x{kind:X4}  {string.Join(", ", seen.OrderByDescending(w => w.Value).Select(w => $"{w.Key}B x{w.Value}"))}");
+		}
 
 		// Classify the RDB feat/ability catalog (type 1000020) into PLAINTEXT vs TEA-ENCRYPTED records, and dump the
 		// plaintext ones (Gitea #251). A plaintext record opens with the `TB\x0f\x00` magic (u32 LE 0x000f4254) - the

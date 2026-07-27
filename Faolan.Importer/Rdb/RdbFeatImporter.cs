@@ -429,6 +429,23 @@ namespace Faolan.Importer.Rdb
 			return effects;
 		}
 
+		// The effect block's start (past the [2][14][frame] header) and its element COUNT, or (0, 0) when the record
+		// carries no effect list. Exposed so `--report feat-effect-widths` measures exactly the bytes the importer
+		// walks, rather than a second opinion about where the list begins.
+		public static (int Start, int Count) EffectTail(byte[] body)
+		{
+			var tail = TailStart(body);
+			if (tail + 12 > body.Length)
+				return (0, 0);
+
+			var frame = Word(body, tail + 8);
+			if (frame == 0 || frame % ListUnit != 0)
+				return (0, 0);
+
+			var count = (int)(frame / ListUnit) - 1;
+			return count <= 0 ? (0, 0) : (tail + 12, count);
+		}
+
 		// Where the tail begins: just past the u32-length-prefixed name.
 		private static int TailStart(byte[] body)
 		{
