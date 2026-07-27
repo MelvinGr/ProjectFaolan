@@ -4,8 +4,9 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Unit tests for the shared password hashing used by BOTH the web login and the game-server UniverseAgent login
-	// (Faolan.Core.Crypt.PasswordHashing). Covers the PBKDF2 round-trip, the legacy-plaintext fallback, the
-	// "no password set" (-/empty) accept-any sentinels, and the migrate-on-login (NeedsRehash) signal.
+	// (Faolan.Core.Crypt.PasswordHashing). Covers the PBKDF2 round-trip, the "no password set" (-/empty) accept-any
+	// sentinels, and - since the legacy plaintext path was removed - that a plaintext stored value authenticates
+	// NOTHING, which is the case that used to pass.
 	public class PasswordHashingTests
 	{
 		[Fact]
