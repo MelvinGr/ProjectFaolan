@@ -10,8 +10,7 @@ source of truth: where the emulator and a retail capture disagree, the emulator 
 decoded and working; others are partially implemented or gated on further reverse-engineering.
 
 > **Disclaimer.** This is an independent, non-commercial research project for interoperability and game
-> preservation. _Age of Conan_ is a trademark of Funcom; this project is not affiliated with or endorsed by
-> Funcom. No game client, assets, or copyrighted content are distributed here.
+> preservation. _Age of Conan_ is a trademark of Funcom; this project is not affiliated with or endorsed by Funcom.
 
 ## Feature status
 
