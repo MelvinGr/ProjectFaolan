@@ -89,6 +89,18 @@ namespace Faolan.Tests
 			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(s.ToArray()));
 		}
 
+		// #463: DispatchGuildName (0x2041) - the reply to ClientRequestGuildName. Capture-verified as a PAIR in
+		// xxx_2clients_jumping: frame 1120 asks for guild 0x00075E9A ([0000deb7][00075e9a]) and frame 1131 answers
+		// with these bytes. Note the reply carries a BARE guild id, not the ID32 the request used.
+		[Fact]
+		public void GuildNameBody_Matches_CapturedBytes()
+		{
+			var s = new FaolanStream();
+			GuildService.WriteGuildNameBody(s, 0x00075E9A, "the chickas");
+
+			Assert.Equal("00075e9a000b" + Convert.ToHexStringLower(Encoding.Latin1.GetBytes("the chickas")), Convert.ToHexStringLower(s.ToArray()));
+		}
+
 		[Fact]
 		public void GuildTagBody_Matches_ExpectedLayout()
 		{

@@ -199,6 +199,29 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
+				// 0x201F ClientRequestGuildName([ID32 guild]): resolve a guild id to its display name (#463).
+				case CSPlayerAgentOpcodes.ClientRequestGuildName:
+				{
+					await _guild.HandleClientRequestGuildName(client, packet, body);
+
+					break;
+				}
+
+				// 0x2006 TeamSetLootOption(int i_eLootMode, bool i_bUseNeedGreed, int i_nNewLootThreshold) - the
+				// leader changes the group's loot rules (#463). Echoed to every member as
+				// DispatchTeamLootOptionChanged; NEEDS in-client verification.
+				case CSPlayerAgentOpcodes.TeamSetLootOption:
+				{
+					var lootMode = body.ReadUInt32();
+					var useNeedGreed = body.ReadByte() != 0;
+					var lootThreshold = body.ReadUInt32();
+
+					if (!await _teams.SetLootOption(client.Session.Character.Id, lootMode, useNeedGreed, lootThreshold))
+						Logger.LogDebug("TeamSetLootOption from {Character:X8} with no team; ignored.", client.Session.Character.Id);
+
+					break;
+				}
+
 				case CSPlayerAgentOpcodes.AcceptGuildInvitation:
 				{
 					await _guild.HandleAcceptGuildInvitation(client, packet, body);

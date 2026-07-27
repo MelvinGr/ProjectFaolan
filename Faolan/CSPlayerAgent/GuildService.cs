@@ -152,6 +152,38 @@ namespace Faolan.CSPlayerAgent
 					.WriteUInt32(0)));
 		}
 
+		// 0x201F ClientRequestGuildName([ID32 guild]): the client resolving a guild id it has seen (a roster entry,
+		// a renown ranking row) to a display name. Body is [u32 EntityClass.Guild][u32 guildId], reply is
+		// DispatchGuildName [u32 guildId][string name] - NOT an ID32 on the way back, matching the field's `n`
+		// prefix (`i_nGuildInstance`). Both directions are capture-verified as a PAIR in xxx_2clients_jumping:
+		// the request at frame 1120 asks for guild 0x00075E9A and frame 1131 answers `00075e9a 000b "the chickas"`.
+		// [V2: xxx_2clients_jumping.tshark.json frame 1131]
+		public async Task HandleClientRequestGuildName(INetworkClient client, Rpc packet, FaolanStream body)
+		{
+			body.ReadUInt32(); // ID32 type (0x0000DEB7)
+			var guildId = body.ReadUInt32();
+
+			var guild = await _database.GetGuild(guildId);
+			if (guild == null)
+			{
+				// Retail sends nothing for a guild it cannot resolve, and the client keeps showing the raw id. Say so
+				// rather than inventing a placeholder name that would look like real data in the UI.
+				_logger.LogWarning("ClientRequestGuildName for unknown guild 0x{GuildId:X8}; no reply.", guildId);
+				return;
+			}
+
+			using var reply = new FaolanStream();
+			WriteGuildNameBody(reply, guildId, guild.Name);
+			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildName, reply.ToArray()));
+		}
+
+		// The DispatchGuildName (0x2041) body: [u32 guildId][name s16]. Byte-exact against the capture
+		// (GuildPacketTests).
+		internal static void WriteGuildNameBody(FaolanStream s, uint guildId, string name)
+		{
+			s.WriteUInt32(guildId).WriteString(name);
+		}
+
 		// 0x2021 CreateGuild. Body decoded from DemoL80_..._create-guild.pcapng (docs/subsystems/create-guild-decode.md):
 		//   [name s16][u8 form][u16 0]   e.g. `0006 "faolan" 06 0000`. The `form` is the government/guild-form the
 		// player picked in the registrar window (the blind impl used to drop it). NOTE: retail's IMMEDIATE reply is

@@ -894,6 +894,87 @@ namespace Faolan.GameServer
 					return;
 				}
 
+				// --- #463: opcodes that used to fall through to the unhandled default. Each one's grammar is the
+				// client's own signature (docs/re/aoc-client-rpc-methods.json), confirmed against the corpus. ------
+
+				// 0x2001 RequestCharName(ID32::InstanceType nCharID): resolve a bare character INSTANCE (no class word -
+				// that is what `ID32::InstanceType` means, and the captured body is 4 bytes) to a display name. Reply is
+				// DispatchCharacterNameReply(i_cCharID, i_cName); the `i_c` prefix makes cCharID a full ID32, so it goes
+				// back out as [class][instance]. No capture of the reply - built from the signature, NEEDS in-client
+				// verification. Silence for an unknown id, rather than a placeholder name that would look real.
+				case GameCharAgentOpcodes.RequestCharName:
+				{
+					var subjectId = body.ReadUInt32();
+
+					if (await Database.GetCharacter(subjectId) is { Name: { } name })
+						await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchCharacterNameReply,
+							(byte[])[0x01], new FaolanStream().WriteUInt32(EntityClass.Character).WriteUInt32(subjectId).WriteString(name).ToArray()));
+					else
+						Logger.LogWarning("RequestCharName for unknown character {CharacterId:X8}; no reply.", subjectId);
+
+					break;
+				}
+
+				// 0x203B ScryMessageBoxAnswer(int nAnswer, int nScriptThreadCtxId, uint64 nCtxCookie): the player
+				// answered a scry-script message box. Capture-verified as a pure ECHO pair - in all six captures the
+				// answer repeats the DispatchScryShowMessageBox (0x205E) context word-for-word and adds the button
+				// index, e.g. show `...0024f5f7 0000 000000005a4db7a0` -> answer `00000001 0024f5f7 000000005a4db7a0`.
+				// Every captured box is a zone-transition confirm (enter/leave King Conan's castle, changemap) and
+				// every answer is 1.
+				//
+				// We never RAISE one (the script VM is gone - see the lua_vm notes), so there is no thread to resume;
+				// consumed and logged so a stray answer is visible rather than reported as an unknown opcode.
+				case GameCharAgentOpcodes.ScryMessageBoxAnswer:
+				{
+					var answer = body.ReadUInt32();
+					var scriptThreadCtxId = body.ReadUInt32();
+					var ctxCookie = body.ReadUInt64();
+
+					Logger.LogInformation("ScryMessageBoxAnswer {Answer} for script thread 0x{Thread:X8} (cookie 0x{Cookie:X16}) - no script thread to resume.", answer, scriptThreadCtxId, ctxCookie);
+
+					break;
+				}
+
+				// 0x204D SetPassOnLootLevel(int i_Level): the "automatically pass on loot below this quality" setting.
+				// Captured values are -1 (off) and 3. Session-scoped: the server does not arbitrate loot rolls yet, so
+				// persisting it would store a setting nothing consults.
+				case GameCharAgentOpcodes.SetPassOnLootLevel:
+				{
+					var passOnLootLevel = unchecked((int)body.ReadUInt32());
+
+					Logger.LogInformation("SetPassOnLootLevel {Level} ({State}) - held for this session only.", passOnLootLevel, passOnLootLevel < 0 ? "off" : "on");
+
+					break;
+				}
+
+				// 0x2054 RequestTeamQuestList() / 0x208D RequestMassivePvPScoreData(): both take NO arguments (the
+				// captured bodies are empty) and both ask for state we do not model - shared team quests and the
+				// massive-PvP scoreboard. Retail answers with DispatchUpdateTeamQuestList / the MassivePvPScore
+				// dispatches; we have nothing to put in either, and an EMPTY list is a claim ("there are none") we
+				// cannot make byte-exactly without a capture of the reply. Consume so they are not logged as unknown.
+				case GameCharAgentOpcodes.RequestTeamQuestList:
+				case GameCharAgentOpcodes.RequestMassivePvPScoreData:
+				{
+					Logger.LogDebug("{Opcode}: no data to answer with (not modelled); no reply.", opcode);
+
+					break;
+				}
+
+				// 0x2092 RequestNewJoinHasHostileInFriends(const GroupElement_c& i_cWho): before a team join, the
+				// client asks whether the joiner has a HOSTILE on their friends list. `GroupElement_c` is the same
+				// 102-byte member record RequestTeamInvite carries (which is that record plus a trailing u16), so it
+				// parses with TeamMemberRecord. The reply DispatchReplyNewJoinHasHostileInFriends carries only the
+				// subject and no boolean, i.e. sending it IS the "yes" - so answering nothing is the correct "no",
+				// which is also the only answer we can give: we model no hostility between players.
+				case GameCharAgentOpcodes.RequestNewJoinHasHostileInFriends:
+				{
+					var who = TeamMemberRecord.Read(body);
+
+					Logger.LogDebug("RequestNewJoinHasHostileInFriends for {Name} ({CharacterId:X8}) - no hostility modelled, so no reply.", who.Name, who.CharacterId);
+
+					break;
+				}
+
 				// 0x207E SetHideInspectOption(bool): the "hide my gear from inspect" privacy toggle. One byte.
 				case GameCharAgentOpcodes.SetHideInspectOption:
 				{

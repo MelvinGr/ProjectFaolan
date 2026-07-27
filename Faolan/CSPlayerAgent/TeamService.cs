@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
@@ -250,6 +251,34 @@ namespace Faolan.CSPlayerAgent
 			}
 		}
 
+		// 0x2006 TeamSetLootOption(int i_eLootMode, bool i_bUseNeedGreed, int i_nNewLootThreshold): the leader changes
+		// how the group splits loot. Body is [u32 mode][u8 needGreed][u32 threshold] - 9 bytes, matching the captured
+		// `00000000 01 00000002` (free-for-all, need/greed on, threshold 2) - and the s2c
+		// DispatchTeamLootOptionChanged carries the same three fields, so the change echoes back unchanged to every
+		// member. Held on the live team only: nothing reads it yet (the server does not arbitrate loot rolls), so
+		// persisting it would be storing a setting no code consults. NEEDS in-client verification of the echo.
+		public async Task<bool> SetLootOption(uint leaderId, uint lootMode, bool useNeedGreed, uint lootThreshold)
+		{
+			if (TeamOf(leaderId) is not { } teamId || !_teams.TryGetValue(teamId, out var team))
+				return false;
+
+			if (team.LeaderId != leaderId)
+			{
+				_logger.LogWarning("TeamSetLootOption from {Character:X8}, who is not the leader of team 0x{Team:X8}; ignored.", leaderId, team.Id);
+				return false;
+			}
+
+			team.LootMode = lootMode;
+			team.UseNeedGreed = useNeedGreed;
+			team.LootThreshold = lootThreshold;
+
+			var body = new FaolanStream().WriteUInt32(lootMode).WriteByte(useNeedGreed).WriteUInt32(lootThreshold).ToArray();
+			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchTeamLootOptionChanged, body);
+
+			_logger.LogInformation("Team 0x{Team:X8}: loot mode {Mode}, need/greed {NeedGreed}, threshold {Threshold}.", team.Id, lootMode, useNeedGreed, lootThreshold);
+			return true;
+		}
+
 		private LiveTeam TeamFor(uint characterId)
 		{
 			if (TeamOf(characterId) is { } existing && _teams.TryGetValue(existing, out var team))
@@ -288,6 +317,11 @@ namespace Faolan.CSPlayerAgent
 		{
 			public uint Id { get; } = id;
 			public uint LeaderId { get; set; } = leaderId;
+
+			// The group's loot settings (TeamSetLootOption). Defaults are the ones every captured roster carries.
+			public uint LootMode { get; set; }
+			public bool UseNeedGreed { get; set; } = true;
+			public uint LootThreshold { get; set; } = 2;
 			public IReadOnlyList<uint> Members { get; private set; } = [leaderId];
 
 			public void Add(uint characterId)
