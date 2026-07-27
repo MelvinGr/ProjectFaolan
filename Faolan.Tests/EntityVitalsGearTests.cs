@@ -92,6 +92,7 @@ namespace Faolan.Tests
 		[InlineData(CharacterStatId.ChanceOfOffhandAttack, 100u)]
 		[InlineData(CharacterStatId.Immunity, 100u)]
 		[InlineData(CharacterStatId.SpellFatalityChance, 100u)]
+		[InlineData(CharacterStatId.BonusProtection, 100u)]
 		[InlineData(CharacterStatId.FatalityChance, 1u)]        // ...while its near-namesake is x1
 		[InlineData(CharacterStatId.HateModifier, 1u)]
 		public void GetScale_KeepsTheInClientProvenScales(CharacterStatId stat, uint expected)

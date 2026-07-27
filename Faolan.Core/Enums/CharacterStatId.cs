@@ -452,7 +452,13 @@ namespace Faolan.Core.Enums
 				CharacterStatId.EvadeChance or CharacterStatId.ChanceOfOffhandAttack
 					// 326 Immunity: the sheet's Immunity Chance moved 105.0% -> 205.0%, i.e. +100 points from 10000
 					// wire. 380 Spell Fatality Chance: 0.0% -> 100%.
-					or CharacterStatId.Immunity or CharacterStatId.SpellFatalityChance => 100,
+					or CharacterStatId.Immunity or CharacterStatId.SpellFatalityChance
+					// 334 Bonus Protection is a MULTIPLIER, and proving that needed a second probe: at 10000 wire it
+					// took the Protection score 10000 -> 20000, which fits a flat +10000 exactly as well as a +100%.
+					// Re-probed against an UNEQUAL base (451 = 4000) it drew 8000, i.e. x2 - so it is a percent. It
+					// also confirms the "percent, magical branch" note this member already carried from the item
+					// tooltips (2026-07-22), by an independent method.
+					or CharacterStatId.BonusProtection => 100,
 
 				// Attributes: proven on a freshly created Necromancer's sheet (2026-07-27) - a 10-wire class base
 				// renders as 1. Ferocity is the sixth attribute and shares their scale: `.setstat 1403 10000` draws as
