@@ -121,15 +121,13 @@ namespace Faolan.Importer.Captures
 				}
 			}
 
-			// Every file in the corpus, not just the ones we extracted bodies from. The doc linters only need NAMES -
-			// ProtocolCitationTests checks a [V2:] citation names a real capture, DocReferenceTests resolves
-			// Captures/... paths - so carrying the list lets them run without the capture repo too.
-			var files = Directory.EnumerateFiles(capturesDir, "*", SearchOption.AllDirectories).Select(Path.GetFileName).OrderBy(f => f, StringComparer.Ordinal).ToList();
-
+			// NB the manifest deliberately carries NO capture file-name list. It used to, so the doc linters could
+			// resolve [V2:] citations and Captures/... paths without the capture repo; that made every checkout carry
+			// an index of the private corpus for no gain in what the linters can actually prove. They now check the
+			// citation FORM instead (ProtocolCitationTests.V2Citations_AreWellFormed).
 			var manifest = JsonSerializer.SerializeToUtf8Bytes(new
 			{
 				counts,
-				files,
 				entries
 			});
 
@@ -145,7 +143,6 @@ namespace Faolan.Importer.Captures
 				bodies.CopyTo(deflate);
 
 			Console.WriteLine($"Corpus extract -> {outputPath}");
-			Console.WriteLine($"  {files.Count} capture file names recorded (for the doc linters)");
 			Console.WriteLine($"  {entries.Count} packet bodies from {sources} captures, " + $"{bodies.Length / 1048576.0:F1} MB raw -> {new FileInfo(outputPath).Length / 1048576.0:F1} MB on disk");
 			foreach (var (iir, name) in WantedIirs)
 				Console.WriteLine($"    {counts.GetValueOrDefault($"0x{iir:x8}"),6}  0x{iir:X8}  {name}");

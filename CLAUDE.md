@@ -96,7 +96,7 @@ themselves live one layer down in `Faolan.Core/Enums/Opcodes.cs`
 GM-command tools) · `Faolan.Web/` + `Faolan.Web.Content/` Blazor armory/3D-viewer + GM tools + CDN proxy ·
 `Faolan.Tests/` the test suite · `Faolan.Wireshark/` full Conan-protocol dissector plugin - framing + zlib +
 RpcHeader endpoints + named opcodes/IIR types (generated from `Opcodes.cs`) + handoff auto-follow (ground truth, TCP-reassembled; use
-`-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) · `Captures/` reference traces - NOT in this repo (they live in the private ProjectFaolan-Data repo; the suite reads `Faolan.Tests/Assets/corpus-extract.bin` instead, see **Capture data** below) ·
+`-o tcp.analyze_sequence_numbers:FALSE` on lossy captures) · `Captures/` reference traces - NOT in this repo (they live in the private ProjectFaolan-Data repo; the suite reads committed fixtures under `Faolan.Tests/Assets` instead, see **Capture data** below) ·
 `tools/` the tooling that reads them: `capture/` Python dissectors + `tshark_dump.sh`, `ghidra/` RE scripts,
 `frida/` live-client scripts.
 (The old C# `Faolan.PacketAnalyzer` GUI/CLI was retired in #82 - it had no TCP reassembly and dropped ~2/3 of
@@ -272,10 +272,17 @@ The 349 MB of retail traces, the Ghidra project and the baked terrain live in a 
 (and can go public). Clone it near this repo (it holds `Captures/`, `Ghidra/`, `Terrain/`) and pass its
 `Captures/` dir to importer commands as `--captures <data-repo>/Captures` (and `--RdbDir` likewise).
 
-**The test suite does NOT need it.** All 1046 tests read `Faolan.Tests/Assets/corpus-extract.bin` (12 MB,
-committed): the eight IIR types the gates need, pulled out of the corpus and deflated, with each
-packet's source file, index and tshark frame preserved so a byte-exact failure still names one packet in one
-capture. Regenerate it with the data repo present:
+**The test suite does NOT need it.** Every test runs from a plain clone, off committed fixtures in
+`Faolan.Tests/Assets`. There are two kinds, and the difference decides which one a new gate belongs in:
+
+- **Named fixtures** (`recipe-book-reply.bin`, `mount-spawns.bin`, `casilda-quest-*.bin`,
+  `snapshot-login-*.bin`, …) - a specific packet or one capture's worth, read via `CapturedFixture` (whole
+  Conan packets concatenated; a packet self-frames, so no container format) or `TestPaths.AssetBytes`. This is
+  what a gate that only ever wanted ONE packet should use.
+- **`corpus-extract.bin`** (14 MB) - the whole-corpus slice, read via `CorpusExtract`. Reserved for gates whose
+  assertion IS breadth: the snapshot round-trips (#384/#390/#391), the protobuf re-encode oracle (#385), the
+  world-object column lift. These would go vacuous on a fixture, which is exactly why they read the corpus.
+  Regenerate it with the data repo present:
 
 ```zsh
 dotnet run --project Faolan.Importer -- --report corpus-extract --captures <data-repo>/Captures
@@ -286,9 +293,12 @@ dotnet run --project Faolan.Importer -- --report corpus-extract --captures <data
 
 ⚠️ The extract is DERIVED. A regeneration against a partial corpus would quietly WEAKEN every whole-corpus
 gate while they all still pass - the exact failure mode those gates exist to catch. Its manifest pins the
-per-IIR counts and `CorpusExtract` throws on a short extract rather than letting coverage narrow. It also
-records all 213 capture FILE NAMES so the doc linters (`DocReferenceTests`, `ProtocolCitationTests`) can
-verify `[Vn:]` citations without the data.
+per-IIR counts and `CorpusExtract` throws on a short extract rather than letting coverage narrow.
+
+The extract carries **no capture file-name index**. It used to, so `ProtocolCitationTests` and
+`DocReferenceTests` could resolve `[V2:]` citations and `Captures/…` paths without the data - which meant every
+checkout shipped a listing of the private corpus. `V2Citations_AreWellFormed` now checks the citation's FORM
+instead, and `Captures/…` paths in docs are not linted at all. Don't reintroduce the list.
 
 You only need the real corpus to regenerate the extract, or to run `Faolan.Importer` / its `--report` tools.
 `Terrain/` needs no symlink - it is the `TerrainDir` key in `faolan.json`; if it is missing the server logs

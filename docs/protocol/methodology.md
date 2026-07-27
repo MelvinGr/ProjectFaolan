@@ -101,8 +101,14 @@ Both live in `Faolan.Tests`:
 
 1. **Regeneration test** — regenerate the `gen/` pages; fail if they differ from what's committed. Changing
    `Opcodes.cs` then *forces* a doc update in the same commit.
-2. **Citation linter** — every `[V3: …]` must name a real test method; every `[V2: …]` a real capture file;
-   every `[V1: …]` a real Ghidra script. A bogus citation fails the build.
+2. **Citation linter** — every `[V3: …]` must name a real test method; every `[V1: …]` a real Ghidra script;
+   every `[V2: …]` must be a well-formed capture file name. A bogus citation fails the build.
+
+   V2 is the weaker check of the three, on purpose: the corpus lives in the private data repo, so the suite has
+   nothing to resolve a capture name *against*. It used to resolve them against a name index carried in
+   `corpus-extract.bin`, which meant shipping a listing of the private corpus in every clone. Whether a named
+   capture exists is checked by whoever holds it; the linter catches the shape that actually rotted — a payload
+   that is not a capture file name at all.
 
 The linter is the whole difference between a doc that *claims* to be verified and one that *is*.
 

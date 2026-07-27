@@ -12,9 +12,9 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// The crafting recipe-book list (TradeskillReplyIIR_c 0x9062D559) the server sends when the client opens the
-	// Recipes window. Grammar decoded from AgeOfConan.exe (docs/subsystems/tradeskill-recipes.md) and gated byte-exact against
-	// NecroL80_..._open-crrafting-receipies frame 2926 (603 recipes): parsing the captured reply into Recipe records
-	// and rebuilding it via the codec must reproduce the wire body exactly.
+	// Recipes window. Grammar decoded from AgeOfConan.exe (docs/subsystems/tradeskill-recipes.md) and gated byte-exact
+	// against the one captured reply (603 recipes, Assets/recipe-book-reply.bin): parsing it into Recipe records and
+	// rebuilding it via the codec must reproduce the wire body exactly.
 	public class TradeskillRecipeCodecTests
 	{
 		private static readonly byte[] ReplySubOpBe = [0x90, 0x62, 0xD5, 0x59];
@@ -107,12 +107,13 @@ namespace Faolan.Tests
 			return -1;
 		}
 
-		// The one captured recipe catalog, from the committed corpus extract. Both tests below used to `return`
-		// silently when the capture was absent, so they asserted NOTHING on a checkout without the capture repo.
+		// The one captured recipe catalog, committed as its own fixture. There is exactly ONE TradeskillReplyIIR in
+		// the whole corpus, so this never wanted the corpus - it wanted that packet.
 		private static CapturedPacket Reply()
 		{
-			var entry = CorpusExtract.PacketsOfType((uint)GameServer0X2000Opcodes.TradeskillReplyIIR).Single();
-			return new CapturedPacket(0, true, entry.Opcode, entry.Iir, entry.Full);
+			var packet = CapturedFixture.Packets("recipe-book-reply.bin").Single();
+			Assert.Equal((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, packet.Iir);
+			return new CapturedPacket(0, true, (uint)GameInterfaceOpcodes.DispatchPassBlob, packet.Iir, packet.Full);
 		}
 
 		// Mirrors CaptureRecipeImporter.BuildRow + item harvest, in-memory: a Recipe row whose RecipeItems each carry

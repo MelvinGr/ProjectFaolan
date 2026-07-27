@@ -13,10 +13,16 @@ using Xunit.Sdk;
 
 namespace Faolan.Tests
 {
-	// Quest state packets (docs/re/quests-and-combat.md), byte-verified against the hoxxling-login-gameplay capture
-	// (quest 0x34A7 = 13479, player 0x01316E71).
+	// Quest state packets (docs/re/quests-and-combat.md), byte-verified against the captured Casilda quest
+	// (0x34A7 = 13479, player 0x01316E71).
 	public class QuestTests
 	{
+		// The two committed slices these gates are pinned on. Both carry a QuestFullUpdate for quest 13479 - one from
+		// the moment it is OFFERED, one from a later session's journal - so which fixture a builder is compared
+		// against is part of the assertion, not an accident of search order (it used to be the latter).
+		private const string OfferFixture = "casilda-quest-offer.bin";
+		private const string JournalFixture = "casilda-quest-packets.bin";
+
 		[Fact]
 		public void AllGoalsComplete_EmptyIsComplete_ZeroRequiredClampsToOne()
 		{
@@ -43,7 +49,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildQuestFullUpdate_MatchesCasildaCapture()
 		{
-			// stricken997 randochar capture, frame 687 (fresh Casilda offer, player 0x0131720B).
+			// The fresh Casilda offer (player 0x0131720B), from Assets/casilda-quest-offer.bin.
 			var textRefs = new[]
 			{
 				WorldQuest.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"), WorldQuest.RemoteFormat(13479, 50302, "iHLlH81PhqeCC&#36;cD0VwJ"),
@@ -54,7 +60,7 @@ namespace Faolan.Tests
 			var objectiveLocalized = WorldQuest.Localized(11561, 51000, "m", "I!,pP8[uf?E5+a&#36;1uQ6O");
 
 			var body = WorldQuest.BuildQuestFullUpdate(0x0131720B, 0x34A7, 3, 1054, textRefs, 0x1670, 0x000111D354375554UL, 4010, 0x147, 0x2A6, objectiveText, objectiveLocalized);
-			Assert.Equal(CaptureBody("63268258"), Convert.ToHexString(body).ToLowerInvariant());
+			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestFullUpdateIIR), Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]
@@ -77,7 +83,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildQuestJournal_MatchesCasildaCapture()
 		{
-			// stricken998 strickenbla capture, frame 9947 (single-quest journal for 13479).
+			// A single-quest journal for 13479, from Assets/casilda-quest-packets.bin.
 			var areaHeader = new[]
 			{
 				WorldQuest.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"), WorldQuest.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/"),
@@ -90,11 +96,11 @@ namespace Faolan.Tests
 			var trailing = WorldQuest.BuildTrackedQuestPointer();
 
 			var body = WorldQuest.BuildQuestJournal(0x01316D8A, 1054, areaHeader, entries, trailing);
-			Assert.Equal(CaptureBody("79f8c7a1"), Convert.ToHexString(body).ToLowerInvariant());
+			Assert.Equal(CaptureBody(JournalFixture, GameServer0X2000Opcodes.QuestJournalIIR), Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		// The RICH creation step (mode 7) - "NEW_character_creation Slave Galley": an f4 <remoteformat> token, an f5
-		// resource-preload list, and a non-zero f6 pair. Golden vs strickenbla frame 2207 (780 B), proving BuildStep
+		// resource-preload list, and a non-zero f6 pair. Golden vs the captured 780 B step, proving BuildStep
 		// covers the full grammar (#191). The big token/resource strings are the captured creation-step content (their
 		// LIVE authoring rides the create-burst construction, #189); here they're the test oracle.
 		[Fact]
@@ -113,7 +119,7 @@ namespace Faolan.Tests
 		}
 
 		// ScryScript (0xA36D3B74) destiny/tutorial step driver, built from scratch (#191). Golden vs the
-		// strickenbla capture: "IntroDone" (mode 2, flag 0) frame 2237 and "ChangeSex" (flag 6) frame 2333.
+		// captured steps: "IntroDone" (mode 2, flag 0) and "ChangeSex" (flag 6).
 		[Fact]
 		public void BuildScryStep_MatchesCapture()
 		{
@@ -256,10 +262,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void QuestDefinitionExtractor_RoundTripsCasilda()
 		{
-			// Full packets from the committed corpus extract: QuestDefinitionExtractor takes CapturedPacket and strips
-			// the framing itself, so bodies alone would not do.
-			const string casildaCapture = "Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json#";
-			var packets = CorpusExtract.All().Where(e => e.Source.StartsWith(casildaCapture, StringComparison.Ordinal)).Select(e => new CapturedPacket(0, true, e.Opcode, e.Iir, e.Full)).ToList();
+			// The extractor's inputs from one capture, committed whole: QuestDefinitionExtractor takes CapturedPacket
+			// and strips the framing itself, so bodies alone would not do, and it dispatches on each packet's own
+			// sub-opcode - which CapturedFixture reads back out of the bytes rather than the caller asserting it.
+			var packets = QuestPackets("casilda-quest-packets.bin");
 			var def = QuestDefinitionExtractor.Extract(packets).Single(d => d.QuestId == 0x34A7);
 
 			Assert.Equal(1054u, def.AreaId);
@@ -273,18 +279,18 @@ namespace Faolan.Tests
 			var entries = new[] { new WorldQuest.JournalEntry(0x34A7, Rec(QuestTextSlot.Title), Rec(QuestTextSlot.ListSubLine)) };
 			var trailing = WorldQuest.BuildTrackedQuestPointer();
 			var journal = WorldQuest.BuildQuestJournal(0x01316D8A, def.AreaId, areaHeader, entries, trailing);
-			Assert.Equal(CaptureBody("79f8c7a1"), Convert.ToHexString(journal).ToLowerInvariant());
+			Assert.Equal(CaptureBody(JournalFixture, GameServer0X2000Opcodes.QuestJournalIIR), Convert.ToHexString(journal).ToLowerInvariant());
 
 			// Full update - byte-exact against frame 687 when fed the captured accept timestamp.
 			var textRefs = new[] { Rec(QuestTextSlot.Title), Rec(QuestTextSlot.Summary), Rec(QuestTextSlot.AreaTitle), Rec(QuestTextSlot.RegionName), Rec(QuestTextSlot.MapName) };
 			var full = WorldQuest.BuildQuestFullUpdate(0x0131720B, def.QuestId, 3, def.AreaId, textRefs, def.GoalId, WorldQuest.SnapshotQuestAcceptTime, def.MapId, def.MarkerX, def.MarkerY,
 				Rec(QuestTextSlot.Objective), Rec(QuestTextSlot.ObjectiveLocalized));
-			Assert.Equal(CaptureBody("63268258"), Convert.ToHexString(full).ToLowerInvariant());
+			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestFullUpdateIIR), Convert.ToHexString(full).ToLowerInvariant());
 
 			// Quest-log LIST (the packet that POPULATES the J-panel) - byte-exact against frame 687. The captured
-			// randochar had four active quests (tracked 13479 first); the area-title slot is the 13479 def's AreaTitle.
+			// captured character had four active quests (tracked 13479 first); the area-title slot is the 13479 def's AreaTitle.
 			var logList = WorldQuest.BuildQuestLogList(0x0131720B, def.AreaId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], Rec(QuestTextSlot.AreaTitle));
-			Assert.Equal(CaptureBody("504b7924"), Convert.ToHexString(logList).ToLowerInvariant());
+			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestLogListIIR), Convert.ToHexString(logList).ToLowerInvariant());
 
 			// Inverse: TryParseQuestLogList recovers the handle, tracked id, and the exact quest-id list (the
 			// CaptureQuestImporter path that harvests each character's held-quest set from the J-panel log).
@@ -294,14 +300,14 @@ namespace Faolan.Tests
 			Assert.Equal([0x34A7u, 0x34FBu, 0x34A8u, 0x3077u], logIds);
 
 			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00.
-			// Proven byte-identical to the SAME quest's block embedded in a real login snapshot (xxx-login's 13479
+			// Proven byte-identical to the SAME quest's block embedded in a real login snapshot (the conqueror's 13479
 			// tails block) EXCEPT the 3 explained spots: quest PROGRESS @577 (just-accepted 0x64 vs in-progress 0x50)
 			// and @585 (0 vs 7), and the player INSTANCE @606-609 - i.e. a freshly-accepted quest generates the exact
 			// retail block (decode_snapshot_quests.py). Validates BuildQuestFullUpdate's content shape (the basis the
 			// from-DB quest-region generation builds on).
 			var block = full[WorldQuest.QuestFullUpdateContentOffset..^1];
 			Assert.Equal(879, block.Length);
-			var tailsBlock = SnapshotQuestBlock(0x34A7); // the 13479 block from xxx-login's login snapshot (879 B)
+			var tailsBlock = SnapshotQuestBlock(0x34A7); // the 13479 block from the conqueror's login snapshot (879 B)
 			for (var i = 0; i < 879; i++)
 			{
 				if (i is 577 or 585 || i is >= 606 and <= 609)
@@ -353,27 +359,29 @@ namespace Faolan.Tests
 			Assert.False(WorldQuest.TryParseQuestIir(corrupt, out _, out _, out _));
 		}
 
-		// Pull the body (subopcode onward, dropping the 4-byte length prefix) of the named captured
-		// packet, to assert builders byte-for-byte.
-		private static string CaptureBody(string subOpHex)
+		// The extractor's inputs, as CapturedPacket. The RPC opcode is the same IIR mux for every one of them; the
+		// sub-opcode it dispatches on comes from the packet itself.
+		private static List<CapturedPacket> QuestPackets(string asset)
 		{
-			foreach (var (file, frame) in new[]
-			{
-				("Ranochar_mage-necromancer_login_get-casilda-quest.tshark.json", 687), ("Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json", 9947)
-			})
-			{
-				foreach (var e in CorpusExtract.All())
-				{
-					if (e.Frame != frame || !e.Source.StartsWith(file + "#", StringComparison.Ordinal))
-						continue;
+			return CapturedFixture.Packets(asset).Select(p => new CapturedPacket(0, true, (uint)GameInterfaceOpcodes.DispatchPassBlob, p.Iir, p.Full)).ToList();
+		}
 
-					var bh = Convert.ToHexString(e.Body).ToLowerInvariant();
-					if (bh.Length >= 16 && bh.Substring(8, 8) == subOpHex)
-						return bh.Substring(8); // drop the 4-byte (8 hex) length prefix
-				}
+		// The body (sub-opcode onward, dropping the 4-byte length prefix) of the captured packet of type `iir`, to
+		// assert builders byte-for-byte. `asset` picks WHICH capture: the fresh Casilda offer and the single-quest
+		// journal come from two different characters, and both carry a QuestFullUpdate for quest 13479 - the offer's
+		// is the one these gates are pinned on.
+		private static string CaptureBody(string asset, GameServer0X2000Opcodes iir)
+		{
+			foreach (var p in CapturedFixture.Packets(asset))
+			{
+				if (p.Iir != (uint)iir)
+					continue;
+
+				var headerLength = (int)p.Full.ReadU32Be(8);
+				return Convert.ToHexString(p.Full[(12 + headerLength + 4)..]).ToLowerInvariant(); // past the body's u32 length
 			}
 
-			throw new XunitException($"no captured packet for sub-op {subOpHex}");
+			throw new XunitException($"{asset} carries no {iir} packet");
 		}
 
 		private static QuestGoalDefinition GoalReq(uint goalId, uint required)
@@ -396,24 +404,21 @@ namespace Faolan.Tests
 			};
 		}
 
-		// The per-quest detail block (questId onward, 879 B) for `questId` from xxx-login's 0x737A6DF9 login snapshot.
+		// The per-quest detail block (questId onward, 879 B) for `questId`, carved out of a captured 0x737A6DF9 login
+		// snapshot - the conqueror's, which holds quest 13479 in progress.
 		private static byte[] SnapshotQuestBlock(uint questId)
 		{
-			Span<byte> needle = stackalloc byte[12];
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
-			{
-				if (!source.StartsWith("Stihetfv_soldier-conqueror_login.tshark.json#", StringComparison.Ordinal))
-					continue;
+			var body = TestPaths.AssetBytes("snapshot-login-conqueror.bin");
 
-				// block header = [questId][1][questId]; find it and take 879 bytes.
-				needle.WriteU32Be(0, questId);
-				needle.WriteU32Be(4, 1);
-				needle.WriteU32Be(8, questId);
-				for (var i = 0; i + 879 <= body.Length; i++)
-				{
-					if (body.AsSpan(i, 12).SequenceEqual(needle))
-						return body[i..(i + 879)];
-				}
+			// block header = [questId][1][questId]; find it and take 879 bytes.
+			Span<byte> needle = stackalloc byte[12];
+			needle.WriteU32Be(0, questId);
+			needle.WriteU32Be(4, 1);
+			needle.WriteU32Be(8, questId);
+			for (var i = 0; i + 879 <= body.Length; i++)
+			{
+				if (body.AsSpan(i, 12).SequenceEqual(needle))
+					return body[i..(i + 879)];
 			}
 
 			throw new XunitException($"no snapshot block for quest {questId}");

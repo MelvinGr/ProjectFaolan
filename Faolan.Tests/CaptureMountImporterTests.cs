@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Enums;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
@@ -19,12 +20,14 @@ namespace Faolan.Tests
 		[Fact]
 		public async Task Import_HarvestsTheFadingBlackHorse_UnderTheMountMap()
 		{
-			// From the committed corpus extract - it used to `return` silently when the capture was absent, which
-			// meant this test asserted NOTHING on any checkout without the capture repo.
-			const string capture = "AssassinL23_rogue-assassin_login_randomActions-resurect.tshark.json#";
-			var packets = CorpusExtract.All().Where(e => e.Source.StartsWith(capture, StringComparison.Ordinal)).Select(e => new CapturedPacket(0, true, e.Opcode, e.Iir, e.Full)).ToList();
+			// A committed slice of one capture: the Fading Black Horse plus a stride sample of the other creatures
+			// spawned around it, so the importer still has to SELECT the wanted mount by name out of a crowd of
+			// unwanted ones rather than being handed it alone. The leading MapChange is load-bearing - NpcSpawnExtractor
+			// tracks the current map and drops every spawn it sees before one.
+			var packets = CapturedFixture.Packets("mount-spawns.bin").Select(p => new CapturedPacket(0, true, (uint)GameInterfaceOpcodes.DispatchPassBlob, p.Iir, p.Full)).ToList();
 
-			Assert.NotEmpty(packets);
+			Assert.Equal((uint)GameServer0X2000Opcodes.PlayfieldFIIR, packets[0].SubOpcode);
+			Assert.All(packets.Skip(1), p => Assert.Equal((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, p.SubOpcode));
 
 			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-mount-{Guid.NewGuid():N}.db");
 			try

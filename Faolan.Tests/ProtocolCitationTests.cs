@@ -13,9 +13,9 @@ namespace Faolan.Tests
 	// verified and one that IS: every verification tag in the protocol reference must name an artifact that exists.
 	//
 	//   [V3: BurstGoldenTests.CreationScriptBurst_IsByteStable]   -> a real xUnit test method
-	//   [V2: DemoL80_..._create-guild.tshark.json frame 366]         -> a real file under Captures/
-	//   [V1: tools/ghidra/DumpRpcTables.java]                    -> a real repo path
-	//   [V0: ...]                                                   -> must be listed in docs/protocol/gaps.md
+	//   [V2: <character>_<scenario>.tshark.json frame 366]        -> a well-formed capture file name (see below)
+	//   [V1: tools/ghidra/DumpRpcTables.java]                     -> a real repo path
+	//   [V0: ...]                                                 -> must be listed in docs/protocol/gaps.md
 	//
 	// A stale citation is worse than none - it looks authoritative. This test already caught three: methodology.md's own
 	// examples cited a test method deleted with SendWorldPrepBurst, a capture filename with a literal "...", and a
@@ -64,20 +64,24 @@ namespace Faolan.Tests
 			Assert.True(bad.Count == 0, "V1 citations must name a real repo path:\n  " + string.Join("\n  ", bad));
 		}
 
-		// V2 = capture-observed: the payload starts with a real file under Captures/ (optionally "... frame N").
+		// V2 = capture-observed: the payload names a capture file (optionally "... frame N").
+		//
+		// This checks the citation's FORM, not that the file exists. It used to resolve the name against a list of all
+		// 227 corpus file names carried in the committed extract's manifest - which meant every checkout shipped an
+		// index of the private capture repo. The names are gone; the corpus lives only in the data repo, and the tests
+		// no longer reach for it. What survives is what this linter actually caught: a payload that is not a capture
+		// filename at all (methodology.md once cited a literal "..."), which is the stale-citation shape that matters.
+		// Whether the named capture exists is verified by whoever has the corpus, not by the suite.
 		[Fact]
-		public void V2Citations_NameARealCaptureFile()
+		public void V2Citations_AreWellFormed()
 		{
-			// Names come from the committed corpus extract's manifest, so this linter runs without the capture repo.
-			var captures = CorpusExtract.CaptureFileNames;
-
 			var bad = (from c in Citations()
 				where c.Level == 2
 				let name = c.Payload.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0]
-				where !captures.Contains(name)
-				select $"{c.File}:{c.Line}  [V2: {c.Payload}] - no capture named {name}").ToList();
+				where !IsCaptureFileName(name)
+				select $"{c.File}:{c.Line}  [V2: {c.Payload}] - {name} is not a capture file name").ToList();
 
-			Assert.True(bad.Count == 0, "V2 citations must name a real file under Captures/:\n  " + string.Join("\n  ", bad));
+			Assert.True(bad.Count == 0, "V2 citations must open with a capture file name (*.tshark.json / *.pcap / *.pcapng):\n  " + string.Join("\n  ", bad));
 		}
 
 		// V3 = byte-exact: the payload names a real xUnit test method (`ClassName.MethodName`).
@@ -137,6 +141,13 @@ namespace Faolan.Tests
 					}
 				}
 			}
+		}
+
+		// A capture file name: one of the corpus' extensions, and no ellipsis standing in for the real name.
+		private static bool IsCaptureFileName(string name)
+		{
+			return (name.EndsWith(".tshark.json", StringComparison.Ordinal) || name.EndsWith(".pcapng", StringComparison.Ordinal) || name.EndsWith(".pcap", StringComparison.Ordinal)) &&
+			       !name.Contains("...", StringComparison.Ordinal) && !name.Contains('…', StringComparison.Ordinal);
 		}
 
 		// Prose that documents the citation FORM rather than making a claim.

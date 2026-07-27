@@ -58,7 +58,11 @@ namespace Faolan.Tests
 			var defined = DefinedTypeNames(repo);
 
 			var symbolRe = new Regex(@"`([A-Z]\w*(?:" + string.Join("|", TypeSuffixes) + @"))`", RegexOptions.Compiled);
-			var pathRe = new Regex(@"((?:Faolan[\w.]*|docs|Captures)/[\w./+-]+\.(?:cs|md|py|json|proto|bin|sh|slnx))", RegexOptions.Compiled);
+			// Captures/ is deliberately NOT matched: those files live in the private data repo, so there is nothing here
+			// to resolve them against. They used to be checked against a name list carried in the corpus extract's
+			// manifest, which meant shipping an index of the private corpus in every checkout - see
+			// ProtocolCitationTests.V2Citations_AreWellFormed for what replaced it.
+			var pathRe = new Regex(@"((?:Faolan[\w.]*|docs)/[\w./+-]+\.(?:cs|md|py|json|proto|bin|sh|slnx))", RegexOptions.Compiled);
 
 			var docsDir = Path.Combine(repo, "docs");
 			var failures = new List<string>();
@@ -86,13 +90,7 @@ namespace Faolan.Tests
 						if (Allowlist.Contains(path))
 							continue;
 
-						// Captures/ is a symlink to the (private) capture repo and may not be present. Its file NAMES
-						// are recorded in the committed corpus extract, so citations still get verified either way.
-						var exists = path.StartsWith("Captures/", StringComparison.Ordinal)
-							? CorpusExtract.CaptureFileNames.Contains(Path.GetFileName(path))
-							: File.Exists(Path.Combine(repo, path));
-
-						if (!exists)
+						if (!File.Exists(Path.Combine(repo, path)))
 							failures.Add($"{rel}:{i + 1}  {path} - path does not exist");
 					}
 				}

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Tests.Support;
@@ -27,23 +26,20 @@ namespace Faolan.Tests
 		[Fact]
 		public void AliveLoginSnapshots_AllHaveNonZeroHealthCurrent()
 		{
-			// Every normal login snapshot carries full current health - the dead==0 signal is unambiguous.
-			foreach (var capture in new[]
+			// Every normal login snapshot carries full current health - the dead==0 signal is unambiguous. Four
+			// classes, so the reading is not pinned to one archetype's stat block.
+			foreach (var snapshot in new[] { "snapshot-login-assassin.bin", "snapshot-login-conqueror.bin", "snapshot-login-guardian.bin", "snapshot-login-necromancer.bin" })
 			{
-				"Strie_rogue-assassin_login.tshark.json", "Stihetfv_soldier-conqueror_login.tshark.json", "Fwfnwfjwk_soldier-guardian_login.tshark.json",
-				"Faolanx_mage-necromancer_login.tshark.json"
-			})
-			{
-				var pairs = StatBlockPairs(capture);
-				Assert.True(pairs.TryGetValue(HealthCurrentStatId, out var current), $"{capture}: HealthCurrent present");
-				Assert.True(current > 0u, $"{capture}: alive snapshot has non-zero HealthCurrent (got {current})");
+				var pairs = StatBlockPairs(snapshot);
+				Assert.True(pairs.TryGetValue(HealthCurrentStatId, out var current), $"{snapshot}: HealthCurrent present");
+				Assert.True(current > 0u, $"{snapshot}: alive snapshot has non-zero HealthCurrent (got {current})");
 			}
 		}
 
 		[Fact]
 		public void DeadLoginSnapshot_HasHealthCurrentZero_WhileMaxStaysFull()
 		{
-			var pairs = StatBlockPairs("retail_login-while-dead_resurrect-window.tshark.json");
+			var pairs = StatBlockPairs("snapshot-login-while-dead.bin");
 
 			Assert.True(pairs.TryGetValue(HealthCurrentStatId, out var current), "HealthCurrent (0x1B) present");
 			Assert.True(pairs.TryGetValue(HealthMaxStatId, out var max), "HealthMax (0x01) present");
@@ -88,33 +84,19 @@ namespace Faolan.Tests
 			return -1;
 		}
 
-		// The FIRST snapshot body from one capture, taken from the committed corpus extract (provenance is
-		// "<file>#<index>", so the capture name still selects it) - no capture repo needed.
-		private static byte[]? SnapshotBody(string captureFileName)
+		// --- helper: read the tails stat block ([statId,value] pairs) out of a captured snapshot body ---
+
+		private static Dictionary<uint, uint> StatBlockPairs(string snapshotAsset)
 		{
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
-			{
-				if (source.StartsWith(captureFileName + "#", StringComparison.Ordinal))
-					return body;
-			}
-
-			return null;
-		}
-
-		// --- helpers: read the tails stat block ([statId,value] pairs) straight from a tshark capture ---
-
-		private static Dictionary<uint, uint> StatBlockPairs(string captureFileName)
-		{
-			var body = SnapshotBody(captureFileName);
-			Assert.NotNull(body);
+			var body = TestPaths.AssetBytes(snapshotAsset);
 
 			// Stat-block frame: two empty 0x3F1 StatList counts then the 0x46F2 block-type word.
 			ReadOnlySpan<byte> marker = [0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x46, 0xF2];
 			var idx = IndexOf(body, marker);
-			Assert.True(idx >= 0, $"{captureFileName}: stat-block marker found");
+			Assert.True(idx >= 0, $"{snapshotAsset}: stat-block marker found");
 
 			var pairs = new Dictionary<uint, uint>();
-			for (var o = idx + marker.Length; o + 8 <= body!.Length; o += 8)
+			for (var o = idx + marker.Length; o + 8 <= body.Length; o += 8)
 			{
 				var statId = body.ReadU32Be(o);
 				var value = body.ReadU32Be(o + 4);

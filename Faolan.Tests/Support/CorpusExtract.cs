@@ -23,10 +23,6 @@ namespace Faolan.Tests.Support
 	// per-IIR counts and Load() asserts them. A short extract throws instead of narrowing coverage.
 	public static class CorpusExtract
 	{
-		// Every file name in the capture corpus - including the .pcapng the tests never read. The doc linters verify
-		// that [V2:] citations and Captures/... paths name something REAL, which needs the names but not the data.
-		public static IReadOnlySet<string> CaptureFileNames => Files.Value;
-
 		public static string Path => TestPaths.Asset("corpus-extract.bin");
 
 		// Pinned at the counts of the full 350 MB corpus (104 tshark.json, one per capture). Regenerating against a
@@ -49,7 +45,6 @@ namespace Faolan.Tests.Support
 		];
 
 		private static readonly Lazy<List<Entry>> Entries = new(Load);
-		private static readonly Lazy<HashSet<string>> Files = new(LoadFileNames);
 
 		// Every extracted packet, in capture order.
 		public static IEnumerable<Entry> All()
@@ -130,33 +125,6 @@ namespace Faolan.Tests.Support
 
 			AssertCoverage(result);
 			return result;
-		}
-
-		private static HashSet<string> LoadFileNames()
-		{
-			using var doc = JsonDocument.Parse(ReadManifest());
-			return doc.RootElement.TryGetProperty("files", out var files)
-				? files.EnumerateArray().Select(f => f.GetString()!).ToHashSet(StringComparer.Ordinal)
-				: [];
-		}
-
-		private static byte[] ReadManifest()
-		{
-			if (!File.Exists(Path))
-			{
-				throw new FileNotFoundException(
-					$"Corpus extract not found at {Path}. Regenerate it with the capture repo present: " + "dotnet run --project Faolan.Importer -- --report corpus-extract", Path);
-			}
-
-			using var file = File.OpenRead(Path);
-			Span<byte> head = stackalloc byte[8];
-			file.ReadExactly(head);
-			if (Encoding.ASCII.GetString(head[..4]) != "FCX1")
-				throw new InvalidDataException($"{Path} is not a corpus extract (bad magic).");
-
-			var manifest = new byte[head.ReadU32Le(4)];
-			file.ReadExactly(manifest);
-			return manifest;
 		}
 
 		// One extracted packet: the FULL rebuilt wire packet, plus the provenance and frame the gates report.
