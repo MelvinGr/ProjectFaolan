@@ -63,13 +63,15 @@ namespace Faolan.Tests
 			// Pinned to the FULL corpus: a regeneration against a partial one, or an extractor that quietly stops finding
 			// the list, lands here rather than passing with fewer spawns.
 			Assert.Equal(11632, withFeats + empty + notPlayerScaffold);
-			Assert.Equal(76, withFeats);
-			Assert.Equal(127, empty);
-			// 86 distinct ids over the 203 spawns TryParse accepts. NOT the whole story, and deliberately pinned rather
-			// than rounded: a landmark scan of the same 11632 bodies finds the feat frame in 232 of them, so ~29 captured
-			// player spawns are in a pre-IIR shape TryParse rejects, carrying feat ids this path never reaches. That is a
-			// PARSER gap, not an extractor one - the ids it does reach are all correct (the length invariant above).
-			Assert.Equal(86, distinct.Count);
+			Assert.Equal(91, withFeats);
+			Assert.Equal(135, empty);
+
+			// 141 distinct ids over the 226 spawns TryParse accepts - up from 86 over 203 when the ID-list terminator's
+			// rank byte stopped being asserted to zero. Still NOT the whole corpus: ~27 captured player spawns remain
+			// unparsed, 17 of them because the ID list's "0x3F1 terminator" is really the count word of a FOLLOWING list
+			// (ListFrame.ForCount(2) is observed), so the walk consumes into it. That is a decode task, not an assertion
+			// to relax - see the Gitea issue. Pinned exactly so the next fix shows up here as a number going UP.
+			Assert.Equal(141, distinct.Count);
 		}
 
 		// The create-editor pre-IIR variant: a different shape with no feat region.

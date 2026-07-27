@@ -84,7 +84,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				foreach (var entry in s.IdList)
 					b.WriteByte(entry.Rank).WriteUInt32(entry.Id);
 
-				b.WriteByte(0).WriteUInt32(Marker);
+				b.WriteByte(s.IdListTerminatorRank).WriteUInt32(Marker);
 			}
 			else
 				b.WriteUInt32(Marker);
@@ -203,12 +203,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					var id = U32(b, ref i);
 					if (id == Marker)
 					{
-						if (rank != 0)
-							throw new FormatException("ID-list terminator with non-zero rank");
-
+						// The terminator's rank byte is USUALLY zero and used to be asserted as such; 23 captured
+						// spawns carry a non-zero one and still consume to exactly the body's end, so it is carried.
+						s.IdListTerminatorRank = rank;
 						break;
 					}
 
+					// Ids ascend. This is NOT decoration: 17 captured spawns trip it, and dropping it does not make
+					// them parse - the walk runs off the end instead. So a descending id means the walk diverged
+					// EARLIER and this is where it becomes provable, which is exactly what it should report.
 					if (s.IdList.Count > 0 && id < s.IdList[^1].Id)
 						throw new FormatException("ID list not ascending");
 

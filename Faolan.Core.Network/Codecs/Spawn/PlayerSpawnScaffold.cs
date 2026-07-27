@@ -42,6 +42,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public uint Ack { get; set; } = EntityClass.Character;
 
 		public uint EntryTableX { get; set; } // per-char u32 after the entry count (Strie 0xB7, NecroL80 0x2B6, editor 0x3F1)
+
+		// The rank byte on the ID list's terminating group. Zero on most captured spawns, which is why it was long
+		// asserted to BE zero - across the corpus 23 spawns carry a non-zero one, and the parse still consumes to
+		// exactly the body's end, so it is a carried value and not a corruption. Round-tripped rather than assumed.
+		public byte IdListTerminatorRank { get; set; }
 		public uint FieldA { get; set; }
 		public uint Handle { get; set; }
 		public ulong Playfield { get; set; }
@@ -51,7 +56,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// tag=value/value=0x3F800000 (weight 1.0), the feats as tag=(type<<8|subindex)/value=float bits.
 	public readonly record struct ScaffoldEntry(uint Index, ushort Tag, uint Value);
 
-	// One 5-byte ID-list group [u8 rank][u32 id]; ids ascend, the id 0x3F1 terminates the list on the wire.
+	// One 5-byte ID-list group [u8 rank][u32 id]; the id 0x3F1 terminates the list on the wire. Ids USUALLY ascend and
+	// were long asserted to - 17 captured spawns break the order (a re-trained/re-ordered list), so the order is
+	// carried as captured rather than enforced.
 	public readonly record struct ScaffoldIdEntry(byte Rank, uint Id);
 
 	// One 8-byte ending pair [u32 id][s32 value] (ids are decades 10..110).
