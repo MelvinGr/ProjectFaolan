@@ -21,7 +21,16 @@ and don't contain.
   character's **ability/skill** presence list — the spawn's **post-IIR** id-list, a different region *and* a
   different id-space. It gates spell *usability* (see #298) but is unrelated to the feat tree. An earlier RE
   conflated the two; that has been corrected across code + memories.
-- **No feat model exists yet** (no table, no tree, no training protocol). `CharacterSkill` is the skills scaffold, not feats.
+- **The feat CATALOG now exists** (#251): `Feat` (15,834 rows from the RDB 1000020 plaintext templates - id, name, tree,
+  group, rank) + `FeatEffect` (22,486 stat modifiers across 12,316 feats, 158 distinct stats). Built by
+  `RdbFeatImporter` (the `rdb-feats` module), no TEA key and no capture needed.
+- **Tier, prerequisites and cost are NOT in the RDB.** Diffing records across four different trees moves only the id,
+  the block count and the name - no header word tracks tree depth. The client's own
+  `"**Error: GDB and RDB data for feat "` says why: it JOINS server-side GDB data with the RDB record, and the tree's
+  SHAPE lives on the GDB side. So the RDB gives what a feat DOES, not where it sits.
+- ⚠️ **The catalog cannot be joined to a character yet.** The wire's unlocked-feat ids and the catalog's ids are
+  disjoint id spaces - 0 of the 56 captured `CharacterFeat` ids exist in `Feats`, and `FeatId/100` does not bridge
+  them either. Tracked in Gitea #467.
 
 ## Feats vs. skills — the key distinction
 

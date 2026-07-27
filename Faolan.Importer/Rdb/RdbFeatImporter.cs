@@ -29,6 +29,10 @@ namespace Faolan.Importer.Rdb
 		// the catalog is a sub-650-row rump of TEST/debug entries.
 		public const uint FeatFlags = 0x10000005;
 
+		// One effect element: 8 fixed descriptor words then (StatId, Value).
+		private const int EffectElementLength = 40;
+		private const uint ListUnit = 0x3F1;
+
 		private const uint PlaintextMagic = 0x000F4254;
 		private const uint TemplateType = 1000020;
 
@@ -36,6 +40,7 @@ namespace Faolan.Importer.Rdb
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
 			var found = new List<Feat>();
+			var featEffects = new Dictionary<uint, List<(uint StatId, uint Value)>>();
 			var skippedUnnamed = 0;
 
 			foreach (var e in rdb.EntriesOfType(TemplateType))
@@ -64,6 +69,8 @@ namespace Faolan.Importer.Rdb
 				}
 
 				var parsed = ParseName(name);
+				var effects = ParseEffects(body);
+				featEffects[e.Id] = effects;
 				found.Add(new Feat
 				{
 					Id = e.Id,
@@ -103,13 +110,34 @@ namespace Faolan.Importer.Rdb
 				updated++;
 			}
 
-			if (added > 0 || updated > 0)
+			// Effects are delete+reinsert per feat: the list is wholly derived from the record, so reconciling element
+			// by element would only risk leaving a stale tail behind.
+			var effectRows = 0;
+			var wanted = featEffects.Where(kv => kv.Value.Count > 0).ToDictionary(kv => kv.Key, kv => kv.Value);
+			var stale = await db.FeatEffects.Where(fe => wanted.Keys.Contains(fe.FeatId)).ToListAsync();
+			db.FeatEffects.RemoveRange(stale);
+			foreach (var (featId, list) in wanted)
+			{
+				for (var i = 0; i < list.Count; i++)
+				{
+					db.FeatEffects.Add(new FeatEffect
+					{
+						FeatId = featId,
+						Sequence = i,
+						StatId = list[i].StatId,
+						Value = list[i].Value
+					});
+					effectRows++;
+				}
+			}
+
+			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0)
 				await db.SaveChangesAsync();
 
-			logger?.LogInformation("RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated.",
-				found.Count, skippedUnnamed, added, updated);
+			logger?.LogInformation("RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects.",
+				found.Count, skippedUnnamed, added, updated, effectRows);
 
-			return new Result(found.Count, added, updated, skippedUnnamed);
+			return new Result(found.Count, added, updated, skippedUnnamed, effectRows);
 		}
 
 		// Splits a catalog name into its tree / group / base / rank. The client encodes all four in the string:
@@ -173,6 +201,60 @@ namespace Faolan.Importer.Rdb
 			return "";
 		}
 
+		// The record's TAIL, after the name: [u32 2][u32 14][u32 ListFrame(n)] then n x 40-byte effect elements whose
+		// last two words are (StatId, Value). The eight leading words of an element are a fixed descriptor.
+		// Returns an empty list when the tail is not this shape - some records carry no effect block at all.
+		public static List<(uint StatId, uint Value)> ParseEffects(byte[] body)
+		{
+			var effects = new List<(uint StatId, uint Value)>();
+			var tail = TailStart(body);
+			if (tail + 12 > body.Length)
+				return effects;
+
+			var frame = Word(body, tail + 8);
+			if (frame == 0 || frame % ListUnit != 0)
+				return effects;
+
+			var count = (int)(frame / ListUnit) - 1;
+			var first = tail + 12;
+			if (count <= 0 || first + (count * EffectElementLength) > body.Length)
+				return effects;
+
+			for (var i = 0; i < count; i++)
+			{
+				var at = first + (i * EffectElementLength);
+				effects.Add((Word(body, at + 32), Word(body, at + 36)));
+			}
+
+			return effects;
+		}
+
+		// Where the tail begins: just past the u32-length-prefixed name.
+		private static int TailStart(byte[] body)
+		{
+			for (var i = 8; i + 4 < body.Length; i += 4)
+			{
+				var len = Word(body, i);
+				if (len is < 2 or > 96 || i + 4 + len > body.Length)
+					continue;
+
+				var printable = true;
+				foreach (var b in body.AsSpan(i + 4, (int)len))
+				{
+					if (b is < 0x20 or > 0x7E)
+					{
+						printable = false;
+						break;
+					}
+				}
+
+				if (printable)
+					return i + 4 + (int)len;
+			}
+
+			return body.Length;
+		}
+
 		private static uint Word(byte[] body, int offset)
 		{
 			return offset + 4 <= body.Length ? BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(offset)) : 0;
@@ -180,6 +262,6 @@ namespace Faolan.Importer.Rdb
 
 		public readonly record struct Parsed(string? Tree, string? Group, string BaseName, int Rank);
 
-		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed);
+		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects);
 	}
 }

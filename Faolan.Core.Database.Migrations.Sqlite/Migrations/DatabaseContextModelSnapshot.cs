@@ -1304,6 +1304,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("Feats");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatEffect", b =>
+                {
+                    b.Property<uint>("FeatId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("StatId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Value")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("FeatId", "Sequence");
+
+                    b.ToTable("FeatEffects");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.Guild", b =>
                 {
                     b.Property<uint>("Id")
@@ -3849,6 +3868,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("Screen");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatEffect", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
+                        .WithMany()
+                        .HasForeignKey("FeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Guild", b =>

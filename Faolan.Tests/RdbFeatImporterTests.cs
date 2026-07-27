@@ -1,3 +1,4 @@
+using System;
 using Faolan.Importer.Rdb;
 using Xunit;
 
@@ -56,6 +57,36 @@ namespace Faolan.Tests
 
 			Assert.Equal("Wood T9_10", parsed.BaseName);
 			Assert.Equal(0, parsed.Rank);
+		}
+
+		// The RECORD's effect tail, against the real bytes of RDB 1000020 id 115338 ("Soldier: 1HB and 1HE 1") - the
+		// two-effect record that proved the list is count-framed rather than a single fixed slot. Kept as inline hex
+		// because it is one small record: a fixture file would need the client install to regenerate.
+		private const string TwoEffectRecordHex =
+			"54420F008AC2010040420F003DC70000030000000F00000017000000971B00004C000000020000001E000000050000100000000001000000" +
+			"2A0100000000000058000000000000003600000001000000150000002100000016000000536F6C646965723A2031484220616E6420314845" +
+			"2031020000000E000000D30B000035CF000000000000040000000000000001000000000000000200000009000000AA030000D0020000" +
+			"35CF000000000000040000000000000001000000000000000200000009000000AC030000D0020000";
+
+		[Fact]
+		public void ParseEffects_ReadsTheCountFramedEffectList()
+		{
+			var effects = RdbFeatImporter.ParseEffects(Convert.FromHexString(TwoEffectRecordHex));
+
+			// ListFrame(2) = 3027 in the tail, so exactly two elements - NOT one fixed slot, which is what the
+			// single-effect records alone would have suggested.
+			Assert.Equal(2, effects.Count);
+			Assert.Equal((938u, 720u), effects[0]);
+			Assert.Equal((940u, 720u), effects[1]);
+		}
+
+		// A record whose tail is not the effect shape must yield an EMPTY list rather than a garbage pair - the
+		// importer writes what this returns straight into FeatEffect rows.
+		[Fact]
+		public void ParseEffects_YieldsNothing_WhenTheTailIsNotAnEffectList()
+		{
+			Assert.Empty(RdbFeatImporter.ParseEffects([0x54, 0x42, 0x0F, 0x00]));
+			Assert.Empty(RdbFeatImporter.ParseEffects(new byte[64]));
 		}
 	}
 }

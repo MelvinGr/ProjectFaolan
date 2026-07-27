@@ -1317,10 +1317,12 @@ namespace Faolan.Importer.Cli
 			var named = plain.Where(p => p.Name.Length > 0).ToList();
 			Console.WriteLine($"  plaintext WITH a name: {named.Count}");
 
-			// --report-arg <id>[,<id>...]: dump those records' header words side by side, to find what discriminates
-			// a FEAT from an ITEM (type 1000020 carries both).
+			// --report-arg <id>[,<id>...]: dump those records' FULL word arrays and then the offsets where they
+			// DIFFER. Handed a rank series (same feat, consecutive ranks) the diff isolates the rank/tier/prereq
+			// fields directly, which is how #251 step 2 cross-correlates same-tree feats.
 			if (!string.IsNullOrWhiteSpace(filter) && filter.Split(',').All(x => uint.TryParse(x.Trim(), out _)))
 			{
+				var picked = new List<(uint Id, string Name, byte[] Body)>();
 				foreach (var want in filter.Split(',').Select(x => uint.Parse(x.Trim())))
 				{
 					var rec = plain.FirstOrDefault(x => x.Id == want);
@@ -1330,12 +1332,38 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
+					picked.Add(rec);
 					var words = new List<string>();
-					for (var o = 0; o + 4 <= Math.Min(rec.Body.Length, 92); o += 4)
+					for (var o = 0; o + 4 <= rec.Body.Length; o += 4)
 						words.Add($"[{o,3}]={BinaryPrimitives.ReadUInt32LittleEndian(rec.Body.AsSpan(o))}");
 
 					Console.WriteLine($"    id={rec.Id} len={rec.Body.Length} name='{rec.Name}'");
 					Console.WriteLine($"      {string.Join(" ", words)}");
+					Console.WriteLine($"      hex={Convert.ToHexString(rec.Body)}");
+				}
+
+				if (picked.Count > 1)
+				{
+					// Two alignments, because the NAME sits in the middle and its length varies: absolute offsets are
+					// comparable only for equal-length names, while everything after the name lines up when measured
+					// from the tail's start. Cross-FEAT comparison needs the tail view; a rank series can use either.
+					Console.WriteLine("  HEADER diffs (absolute offset, valid while the names are the same length):");
+					var headWords = picked.Min(p => TailStart(p.Body)) / 4;
+					for (var wi = 0; wi < headWords; wi++)
+					{
+						var vals = picked.Select(p => BinaryPrimitives.ReadUInt32LittleEndian(p.Body.AsSpan(wi * 4))).ToList();
+						if (vals.Distinct().Count() > 1)
+							Console.WriteLine($"    [{wi * 4,3}] {string.Join(" -> ", vals)}");
+					}
+
+					Console.WriteLine("  TAIL words (offset RELATIVE to the end of the name; '=' means identical across the set):");
+					var tailWords = picked.Min(p => (p.Body.Length - TailStart(p.Body)) / 4);
+					for (var wi = 0; wi < tailWords; wi++)
+					{
+						var vals = picked.Select(p => BinaryPrimitives.ReadUInt32LittleEndian(p.Body.AsSpan(TailStart(p.Body) + (wi * 4)))).ToList();
+						var same = vals.Distinct().Count() == 1;
+						Console.WriteLine($"    +{wi * 4,-3} {(same ? "=" : " ")} {string.Join(" -> ", vals)}");
+					}
 				}
 
 				return;
@@ -1366,6 +1394,33 @@ namespace Faolan.Importer.Cli
 				w.WriteLine($"{p.Id}\t{p.Body.Length}\t{Word(p.Body, 28)}\t0x{Word(p.Body, 44):X8}\t{p.Name}");
 
 			Console.WriteLine($"WROTE {path} ({named.Count} rows)");
+		}
+
+		// Where the record's TAIL begins: just past the name. Everything before it is the fixed header, everything
+		// after is the variable part, and only the tail lines up between records whose names differ in length.
+		private static int TailStart(byte[] body)
+		{
+			for (var i = 8; i + 4 < body.Length; i += 4)
+			{
+				var len = Word(body, i);
+				if (len is < 2 or > 96 || i + 4 + len > body.Length)
+					continue;
+
+				var printable = true;
+				foreach (var b in body.AsSpan(i + 4, (int)len))
+				{
+					if (b is < 0x20 or > 0x7E)
+					{
+						printable = false;
+						break;
+					}
+				}
+
+				if (printable)
+					return i + 4 + (int)len;
+			}
+
+			return body.Length;
 		}
 
 		// One little-endian u32 of a record, or 0 past its end.
