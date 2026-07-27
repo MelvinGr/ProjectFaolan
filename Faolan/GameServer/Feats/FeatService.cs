@@ -190,16 +190,28 @@ namespace Faolan.GameServer.Feats
 				await _teleport(character.Id, character.MapId, character.Position);
 		}
 
-		// Trains `requested` onto the character iff the resulting feat set stays within its feat-point budget
-		// (FeatRules). Returns the number of feats added, or -1 when the train is rejected as over-budget.
+		// Trains `requested` onto the character iff the resulting feat set is legal: within the feat-point budget AND
+		// with every PREREQUISITE satisfied (FeatPrereq, the client's own feat-tree edges - #251). Returns the number
+		// of feats added, or -1 when the train is rejected.
 		private async Task<int> TrainWithinBudget(uint characterId, ushort level, IReadOnlyList<uint> requested)
 		{
 			var existing = await _database.GetCharacterFeats(characterId);
-			var after = existing.Concat(requested.Where(id => !existing.Contains(id)));
+			var after = existing.Concat(requested.Where(id => !existing.Contains(id))).ToList();
 			if (!FeatRules.WithinBudget(level, after))
 			{
 				_logger.LogWarning("Character {CharacterId} feat train rejected: {Spent} points > budget {Budget} (level {Level}).", characterId, FeatRules.TotalCost(existing.Concat(requested)),
 					FeatRules.PointBudget(level), level);
+				return -1;
+			}
+
+			// Checked against the RESULTING set, not against `requested`: training a feat and its prerequisite in one
+			// request is legal, and so is a prerequisite the character already holds.
+			var prereqs = await _database.GetFeatPrereqs(after);
+			var missing = FeatRules.MissingPrerequisites(after, prereqs);
+			if (missing.Count > 0)
+			{
+				_logger.LogWarning("Character {CharacterId} feat train rejected: {Count} unmet prerequisite(s), first {Feat} requires {Requires}.",
+					characterId, missing.Count, missing[0].Feat, missing[0].Requires);
 				return -1;
 			}
 

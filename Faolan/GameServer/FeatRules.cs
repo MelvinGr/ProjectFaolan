@@ -36,6 +36,49 @@ namespace Faolan.GameServer
 		// A feat's point cost = max(1, encoded rank). The composite feat id bakes the rank into its low two digits
 		// (featBase*100 + rank), so every feat costs at least 1 (the unlock) plus one per rank above the first. This
 		// keeps rank-0 unlock feats from being "free" (which would let a char train unlimited feats).
+		// Whether holding `held` satisfies a prerequisite on `required`.
+		//
+		// NOT equality, and that is the whole subtlety. The prerequisite graph links ADJACENT RANKS (80004 requires
+		// 80003), but a character's wire feat list carries only the HIGHEST rank it holds per base - none of the three
+		// captured retail characters stores the intermediate ranks. Requiring the exact id would reject all of them:
+		// NecroL80 19 unsatisfied edges, DemoL80 18, Hakotep 3. Same base at an equal-or-higher rank clears all three at
+		// zero, which is what says this is the rule rather than a workaround.
+		public static bool Satisfies(uint held, uint required)
+		{
+			return held / 100 == required / 100 && held % 100 >= required % 100;
+		}
+
+		// The prerequisite edges `featIds` does NOT satisfy, as (feat, missing requirement) pairs. Empty means the set
+		// is legal. `prereqs` maps a feat to the ids it depends on (FeatPrereq, from the client's own feat table).
+		public static IReadOnlyList<(uint Feat, uint Requires)> MissingPrerequisites(
+			IReadOnlyCollection<uint> featIds, IReadOnlyDictionary<uint, uint[]> prereqs)
+		{
+			var missing = new List<(uint, uint)>();
+			foreach (var feat in featIds)
+			{
+				if (!prereqs.TryGetValue(feat, out var required))
+					continue;
+
+				foreach (var requirement in required)
+				{
+					var satisfied = false;
+					foreach (var held in featIds)
+					{
+						if (Satisfies(held, requirement))
+						{
+							satisfied = true;
+							break;
+						}
+					}
+
+					if (!satisfied)
+						missing.Add((feat, requirement));
+				}
+			}
+
+			return missing;
+		}
+
 		public static int PointCost(uint featId)
 		{
 			return Math.Max(1, (int)(featId % 100));

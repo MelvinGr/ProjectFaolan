@@ -32,6 +32,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		Task<CharacterEquipment?> GetCharacterEquipment(uint characterId);
 		Task<uint[]> GetCharacterFeats(uint characterId);
+		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId);
@@ -345,6 +346,20 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArrayAsync();
+		}
+
+		// The prerequisite edges for `featIds` (FeatPrereq, imported from the client's own feat table), as
+		// feat -> the ids it depends on. Only the requested feats are loaded: the whole graph is 5501 edges and a
+		// train touches a handful.
+		public async Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds)
+		{
+			var wanted = featIds.Distinct().ToArray();
+			if (wanted.Length == 0)
+				return [];
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var rows = await ctx.FeatPrereqs.Where(p => wanted.Contains(p.WireFeatId)).OrderBy(p => p.Sequence).ToArrayAsync();
+			return rows.GroupBy(p => p.WireFeatId).ToDictionary(g => g.Key, g => g.Select(p => p.RequiresWireFeatId).ToArray());
 		}
 
 		public async Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance)

@@ -29,6 +29,13 @@ and don't contain.
   chains resolve end to end (`Equip: One Handed Edged Weapons 2` requires `... 1`). Together with `FeatIdMap` this is
   the tree's shape. (An earlier pass concluded prereqs were not in the RDB at all - that was true of the 1000020
   TEMPLATE, which is what it diffed, and wrong about the client's data as a whole.)
+- **Training ENFORCES the tree.** `FeatService` rejects a train whose resulting set leaves a prerequisite unmet
+  (`FeatRules.MissingPrerequisites`), alongside the existing point-budget check.
+  ⚠️ A prerequisite is satisfied by the **same base at an equal-or-higher rank**, not by the exact id. The graph
+  links adjacent ranks (`80004` requires `80003`) while a character's wire list carries only the HIGHEST rank per
+  base - retail never stores the intermediate ones. An exact-id check would reject every captured retail character
+  (NecroL80 19 unmet, DemoL80 18, Hakotep 3); the same-base rule clears all three at zero. The lower ranks are not
+  missing data to backfill: rank 4 IS ranks 1-4.
 - **Feat POINTS per level: RDB type 1000044 id 1**, 71 entries of `[level 10..80][points][tsPoints]`. Levels
   20/30/40/50/60/70/75/80 grant **two** points, so the level-80 budget is **79**, not the 71 that `1 per level from
   10` implies. `FeatRules.PointBudget` was wrong until it was checked against this table.
