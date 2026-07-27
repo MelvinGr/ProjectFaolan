@@ -131,194 +131,21 @@ namespace Faolan.ClientLauncher
 
 		private static int Main(string[] args)
 		{
-			string? exe = null; // --exe overrides; else Steam auto-detect (SteamPaths) after the arg loop
-			string? username = null;
-			string? password = null;
-			string? charname = null;
-			string? wine = null;
-			string? universeAddr = null;
-			string? proton = null; // --proton/PROTON overrides; else Steam auto-detect (SteamPaths) at launch
-			var dx10 = false;
-			var dryRun = false;
-			var noConsole = true;
-			var streamOutput = false;
-			var patchLogin = false;
-			List<string>? debugChannels = null;
-			var restore = false;
-			string? cdnUrl = null;
-			string? launcherNotes = null;
-			var loginKeys = new Dictionary<string, string?>();
-
-			for (var i = 0; i < args.Length; i++)
-			{
-				switch (args[i])
-				{
-					case "--exe":
-					{
-						exe = args[++i];
-						break;
-					}
-
-					case "--username" or "-u":
-					{
-						username = args[++i];
-						break;
-					}
-
-					case "--password" or "-p":
-					{
-						password = args[++i];
-						break;
-					}
-
-					case "--charname" or "-c":
-					{
-						charname = args[++i];
-						break;
-					}
-
-					// --wine / --proton pick the LINUX runner for the Windows client (Proton by default, or a plain wine
-					// command). Both are ignored on Windows, where the exe runs directly (see the runner selection below).
-					case "--wine":
-					{
-						wine = args[++i];
-						break;
-					}
-
-					case "--proton":
-					{
-						proton = args[++i];
-						break;
-					}
-
-					case "--dx10":
-					{
-						dx10 = true;
-						break;
-					}
-
-					// Redirect LocalConfig.xml <UniverseAddr> (the login server) to `a`. Required value, no default.
-					case "--universeaddr":
-					{
-						if (i + 1 >= args.Length || args[i + 1].StartsWith('-'))
-						{
-							Console.Error.WriteLine("--universeaddr requires an address (e.g. --universeaddr <host:port>).");
-							return 2;
-						}
-
-						universeAddr = args[++i];
-						break;
-					}
-
-					// Run in the foreground and stream the client's stdout/stderr into THIS terminal (no separate
-					// wineconsole window). Also drops -noconsole so the client doesn't suppress its own logging.
-					case "--console":
-					{
-						noConsole = false;
-						streamOutput = true;
-						break;
-					}
-
-					// Redirect LocalConfig.xml's three CDN keys to the mirror base URL (each -> <base>/<tag>/upm) so
-					// loading-screen content pulls hit the store-and-forward mirror. Required value, no default.
-					case "--cdn":
-					{
-						if (i + 1 >= args.Length || args[i + 1].StartsWith('-'))
-						{
-							Console.Error.WriteLine("--cdn requires a base URL (e.g. --cdn http://host:port).");
-							return 2;
-						}
-
-						cdnUrl = args[++i];
-						break;
-					}
-
-					// Redirect the client's hardcoded launcher-notes URL (retail's msgs.ageofconan.com is dead). Required
-					// value, no default; keep the two %s (UniverseName, Language).
-					case "--launcher-notes":
-					{
-						if (i + 1 >= args.Length || args[i + 1].StartsWith('-'))
-						{
-							Console.Error.WriteLine("--launcher-notes requires a URL (keep the two %s, e.g. http://host/notes.php?UniverseName=%s&Language=%s).");
-							return 2;
-						}
-
-						launcherNotes = args[++i];
-						if (!ClientExePatcher.ValidateNotesUrl(launcherNotes, out var notesErr))
-						{
-							Console.Error.WriteLine($"--launcher-notes URL invalid: {notesErr}.");
-							return 2;
-						}
-
-						break;
-					}
-
-					// Enable the client's OWN debug channels by writing its logger config file, dbDebug.conf
-					// (ClientDebugChannels; docs/tooling/client-debug-logging.md). Optional comma-separated list,
-					// else a useful low-noise default set. Implies --console, since the point is to read the output.
-					case "--debug-channels":
-					{
-						debugChannels = i + 1 < args.Length && !args[i + 1].StartsWith('-')
-							? [.. args[++i].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)]
-							: [.. ClientDebugChannels.Default];
-						noConsole = false;
-						streamOutput = true;
-						break;
-					}
-
-					case "--patch-login":
-					{
-						patchLogin = true;
-						break;
-					}
-
-					// The DH keys, named EXACTLY as they are in faolan.json and the environment (the one-name-per-setting
-					// rule - see Faolan.Core/Cli/FaolanCommandLine.cs). Passing them here is only for a one-off patch; the
-					// normal path is that the launcher reads the same faolan.json the server does, so a configured
-					// Login:PrivateKey automatically patches its own matching public key and the pair cannot drift.
-					case "--Login:PrivateKey" or "--Login:PublicKey" or "--Login:RetailPublicKey":
-					{
-						loginKeys[args[i][2..]] = args[++i];
-						break;
-					}
-
-					case "--restore":
-					{
-						restore = true;
-						break;
-					}
-
-					case "--dry-run" or "-n":
-					{
-						dryRun = true;
-						break;
-					}
-
-					case "--help" or "-h":
-					{
-						PrintHelp();
-						return 0;
-					}
-
-					default:
-					{
-						Console.Error.WriteLine($"Unknown option: {args[i]}");
-						PrintHelp();
-						return 2;
-					}
-				}
-			}
+			// The whole command line, declared and parsed in one place (LauncherCommand) - an unknown or misspelled
+			// option is an error here, not a flag that quietly did nothing.
+			if (LauncherCommand.Parse(args, out var parseExit) is not { } options)
+				return parseExit;
 
 			// Resolve the client exe: --exe wins, else auto-detect the Steam install (app 217750, Linux + Windows).
 			// No hardcoded fallback - error out if neither yields a path.
-			exe ??= SteamPaths.FindExe();
+			var exe = options.Exe ?? SteamPaths.FindExe();
 			if (exe == null)
 			{
 				Console.Error.WriteLine("Could not find AgeOfConan.exe via Steam (app 217750 not installed, or a non-standard Steam path). Pass --exe <path>.");
 				return 1;
 			}
 
-			if (dx10)
+			if (options.Dx10)
 			{
 				var dx10Exe = Path.Combine(Path.GetDirectoryName(exe) ?? ".", "AgeOfConanDX10.exe");
 				if (File.Exists(dx10Exe))
@@ -334,7 +161,7 @@ namespace Faolan.ClientLauncher
 			// --restore: undo every LocalConfig.xml redirect the launcher applies - put the retail Funcom
 			// <UniverseAddr> and CDN URLs back - and exit. No backup file is used; the retail values are the
 			// constants above.
-			if (restore)
+			if (options.Restore)
 			{
 				// Copy each <file>.bak back over the modified file: the pristine exe carries the Funcom DH pubkey +
 				// GUI subsystem, the pristine LocalConfig.xml the retail UniverseAddr + CDN URLs, the pristine
@@ -354,11 +181,11 @@ namespace Faolan.ClientLauncher
 
 			// Back up the pristine exe + LocalConfig.xml + dbDebug.conf to <file>.bak (once - only if no .bak exists
 			// yet) before we modify any of them, so --restore is a straight copy-back instead of a reverse-transform.
-			if (!dryRun)
+			if (!options.DryRun)
 			{
 				BackupOnce(exe);
 				BackupOnce(Path.Combine(Path.GetDirectoryName(exe)!, "LocalConfig.xml"));
-				if (debugChannels is { Count: > 0 })
+				if (options.DebugChannels.Length > 0)
 					BackupOnce(Path.Combine(Path.GetDirectoryName(exe)!, ClientDebugChannels.ConfName));
 			}
 
@@ -366,12 +193,12 @@ namespace Faolan.ClientLauncher
 			// (ClientExePatcher). Cross-platform (a byte swap, no ptrace/process memory - the old in-memory patch was
 			// Linux-only). Done here, before the md5, so -clienthash matches the launched file; persists like the
 			// LocalConfig redirects (undo with --restore). Idempotent - a no-op if already patched.
-			if (patchLogin && !dryRun)
+			if (options.PatchLogin && !options.DryRun)
 			{
 				// Load the DH keys from the SAME config the server reads (faolan.json < these flags < environment), so a
 				// deployment that overrides Login:PrivateKey patches the matching public key without a second setting to
 				// keep in step. A malformed key throws here rather than producing an exe that silently cannot log in.
-				var config = FaolanCommandLine.Build(loginKeys);
+				var config = FaolanCommandLine.Build(options.LoginKeys);
 				DhKeys.Configure(config["Login:PrivateKey"]);
 				if (DhKeys.ConfigurePublic(config["Login:PublicKey"], config["Login:RetailPublicKey"]))
 					Console.WriteLine("login-key : using the configured Login:PublicKey - this client will NOT log in to a server holding a different private key");
@@ -394,7 +221,7 @@ namespace Faolan.ClientLauncher
 
 			// Redirect the client's hardcoded launcher-notes URL (retail's msgs.ageofconan.com is dead) - same on-disk
 			// swap, covered by the exe .bak. Done before the md5 so -clienthash matches the launched file.
-			if (launcherNotes != null && !dryRun)
+			if (options.LauncherNotes is { } launcherNotes && !options.DryRun)
 			{
 				switch (ClientExePatcher.PatchLauncherNotes(exe, launcherNotes))
 				{
@@ -415,22 +242,22 @@ namespace Faolan.ClientLauncher
 			var key = ConanLaunchToken.Now();
 
 			var launchArgs = new List<string>();
-			if (noConsole)
+			if (!options.Console)
 				launchArgs.Add("-noconsole");
 			launchArgs.AddRange(["-clienthash", clientHash, "-key", key]);
-			if (username != null)
-				launchArgs.AddRange(["-username", username]);
-			if (password != null)
-				launchArgs.AddRange(["-password", password]);
-			if (charname != null)
-				launchArgs.AddRange(["-charname", charname]);
+			if (options.Username != null)
+				launchArgs.AddRange(["-username", options.Username]);
+			if (options.Password != null)
+				launchArgs.AddRange(["-password", options.Password]);
+			if (options.Charname != null)
+				launchArgs.AddRange(["-charname", options.Charname]);
 
 			Console.WriteLine($"exe        : {exe}");
 			Console.WriteLine($"clienthash : {clientHash}");
 			Console.WriteLine($"key        : {key}  (token time = {ConanLaunchToken.GetUnixTime(key)})");
 			Console.WriteLine($"args       : {string.Join(' ', launchArgs)}");
 
-			if (dryRun)
+			if (options.DryRun)
 				return 0;
 
 			// Kill a client already running from THIS exe path first (so repeated test launches start clean) - a client
@@ -441,20 +268,20 @@ namespace Faolan.ClientLauncher
 
 			// Point the client's login server (LocalConfig.xml <UniverseAddr>) at ours. The redirect PERSISTS after
 			// this run - it is NOT reverted on exit and no backup/sidecar file is written. Run `--restore` to undo it.
-			if (universeAddr != null && SetUniverseAddr(gameDir, universeAddr) != null)
+			if (options.UniverseAddr is { } universeAddr && SetUniverseAddr(gameDir, universeAddr) != null)
 				Console.WriteLine($"redirected UniverseAddr -> {universeAddr}");
 
 			// Point the three LocalConfig.xml CDN keys at the local ContentMirror. Same deal: persists, no revert,
 			// no backup file; `--restore` undoes it.
-			if (cdnUrl is { } murl && SetCdnConfig(gameDir, murl))
+			if (options.Cdn is { } murl && SetCdnConfig(gameDir, murl))
 				Console.WriteLine($"redirected CDN keys -> {murl}");
 
 			// Open the client's own debug channels by writing its logger config (dbDebug.conf). BEFORE the launch: the
 			// client reads that file once, during startup, so the channels are live from its first line - and it needs
 			// no process memory access, which is what makes it work on Windows too. Persists like the other redirects;
 			// `--restore` puts retail's file back.
-			if (debugChannels is { Count: > 0 })
-				ClientDebugChannels.Configure(gameDir, debugChannels, Console.WriteLine);
+			if (options.DebugChannels.Length > 0)
+				ClientDebugChannels.Configure(gameDir, options.DebugChannels, Console.WriteLine);
 
 			var psi = new ProcessStartInfo
 			{
@@ -466,14 +293,14 @@ namespace Faolan.ClientLauncher
 			// command; otherwise launch through Proton (`proton run <exe> <args>`) with the Steam compat env.
 			if (OperatingSystem.IsWindows())
 				psi.FileName = exe;
-			else if (wine != null)
+			else if (options.Wine is { } wine)
 			{
 				psi.FileName = wine;
 				psi.ArgumentList.Add(exe);
 			}
 			else
 			{
-				proton ??= Environment.GetEnvironmentVariable("PROTON") ?? SteamPaths.FindProton();
+				var proton = options.Proton ?? Environment.GetEnvironmentVariable("PROTON") ?? SteamPaths.FindProton();
 				if (proton == null)
 				{
 					Console.Error.WriteLine("Could not find Proton via Steam. Pass --proton <path> (or --wine <cmd>).");
@@ -505,7 +332,7 @@ namespace Faolan.ClientLauncher
 			// (proton's own messages still inherit our stdio). Record the log's pre-launch size so we only show this
 			// session (the client truncates/rotates it on start).
 			var logPath = Path.Combine(gameDir, "AgeOfConan.log");
-			var logStart = streamOutput && File.Exists(logPath)
+			var logStart = options.Console && File.Exists(logPath)
 				? new FileInfo(logPath).Length
 				: 0;
 
@@ -522,7 +349,7 @@ namespace Faolan.ClientLauncher
 			}
 
 			// With --console, stay in the foreground and tail the log until the client exits. Otherwise launch and return
-			if (streamOutput)
+			if (options.Console)
 			{
 				Console.WriteLine($"tailing {logPath} (Ctrl+C to stop) ...");
 				var pos = logStart;
@@ -549,55 +376,6 @@ namespace Faolan.ClientLauncher
 		private static string NormalizePath(string path)
 		{
 			return path.Replace('\\', '/').ToLowerInvariant();
-		}
-
-		private static void PrintHelp()
-		{
-			Console.WriteLine("""
-			                  Faolan.ClientLauncher - launch AgeOfConan.exe directly (bypassing ConanPatcher).
-
-			                    --exe <path>        path to AgeOfConan.exe (default: auto-detected from your Steam install, app 217750)
-			                    --dx10              launch AgeOfConanDX10.exe instead
-			                    -u, --username <s>  auto-login account name
-			                    -p, --password <s>  auto-login password
-			                    -c, --charname <s>  auto-enter this character
-			                    --universeaddr <a>  point LocalConfig.xml <UniverseAddr> (the login server) at (host:port)
-			                    --cdn <url>			point LocalConfig.xml's three CDN keys (HttpPatchAddr/ClientHttpPatchAddr/
-			                                        ControlHttpPatchAddr) at <url> - each becomes <url>/<tag>/upm
-			                    --launcher-notes <url>  redirect the client's hardcoded launcher-notes URL to <url> - 
-			                                        keep the two %s (UniverseName, Language)
-			                    --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf
-			                                        from their .bak (undoes the login/notes exe patch, the CDN/UniverseAddr
-			                                        redirects and the debug channels) and exit
-			                    --console           run in the foreground and tail AgeOfConan.log into THIS terminal (same content
-			                                        as the client console, no separate wineconsole window); also drops -noconsole
-			                    --patch-login       patch the client's DH key ON DISK before launch so the
-			                                        server can validate the real password. The key comes from the SAME
-			                                        faolan.json/environment the server reads, so overriding
-			                                        Login:PrivateKey there patches the matching public key automatically.
-			                    --Login:PrivateKey <hex>       one-off override of that key (the public half is derived)
-			                    --Login:PublicKey <hex>        patch THIS public key in instead of our derived one - for a
-			                                        client that should talk to somebody else's server
-			                    --Login:RetailPublicKey <hex>  the key to search for in an unpatched exe (default: retail's)
-			                    --debug-channels [a,b]  enable the client's OWN debug channels (it then logs what it computed:
-			                                        "GameCode.Stats - got new stats: 507=291000", ArmorMitigation's per-hit
-			                                        mitigation maths, RECEIVED IIR, ...) by writing its logger config file
-			                                        dbDebug.conf; no exe change, no process memory. Default set if no list
-			                                        given; implies --console. Full list:
-			                                        strings AgeOfConan.exe | grep '^GameCode/'
-			                    --proton <path>     (Linux only) Proton 'proton' script or set PROTON (default: auto-detected -
-			                                        the build Steam runs AoC with). Ignored on Windows, which runs the exe directly.
-			                    --wine <cmd>        (Linux only) use this runner instead of Proton (e.g. 'wine').
-			                    -n, --dry-run       print the computed clienthash/key/args without launching
-			                    -h, --help          this help
-
-			                  --console keeps the client in the foreground and tails AgeOfConan.log here (its console output also
-			                  goes to that file). The exe stays GUI-subsystem so no separate wineconsole window is spawned.
-			                  Kills any already-running client first (clean test launches). Off Windows it launches via Proton
-			                  ('proton run <exe>') with the Steam compat env (mirroring launchClient.sh); pass --wine to use a
-			                  plain wine runner instead. Computes -clienthash (md5 of the exe) and -key (TEA-encrypted timestamp;
-			                  see Faolan.Core.Crypt.ConanLaunchToken).
-			                  """);
 		}
 
 		// Copy path.bak back over path (if the backup exists). Leaves the .bak in place so it stays the pristine

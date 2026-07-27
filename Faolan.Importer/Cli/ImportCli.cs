@@ -159,14 +159,6 @@ namespace Faolan.Importer.Cli
 			return await ImportRunner.RunAsync(ctx, plan);
 		}
 
-		private static string? GetOption(string[] args, string name)
-		{
-			var i = Array.IndexOf(args, name);
-			return i >= 0 && i + 1 < args.Length
-				? args[i + 1]
-				: null;
-		}
-
 		private static List<NamedCapture> LoadCaptures(string capturesDir)
 		{
 			var captures = new List<NamedCapture>();

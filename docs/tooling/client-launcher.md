@@ -53,7 +53,8 @@ character/playfield), `-clienthash`, `-key`, `-loginkey`, `-logindata`, `-statin
 ## 2. The launcher (`Faolan.ClientLauncher`)
 
 A drop-in stand-in for ConanPatcher: computes the two gate flags and launches the client. `Program.cs` +
-`ClientExePatcher.cs`.
+`ClientExePatcher.cs`; the command line itself is declared in `LauncherCommand.cs` (System.CommandLine, like every
+other executable here), so **`--help` prints the authoritative list** — the one below is the same set in prose.
 
 ```
 Faolan.ClientLauncher [options]
@@ -76,9 +77,13 @@ Faolan.ClientLauncher [options]
   --Login:PublicKey <hex>        patch THIS public key in instead of our derived one - for a client that should
                       talk to somebody else's server
   --Login:RetailPublicKey <hex>  the key to search for in an unpatched exe (default: retail's)
-  --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml from their .bak, then exit
+  --restore           restore AgeOfConan.exe / AgeOfConanDX10.exe / LocalConfig.xml / dbDebug.conf from their
+                      .bak, then exit
   --console           foreground; tail AgeOfConan.log into THIS terminal (no separate wineconsole window); also
                       drops -noconsole
+  --debug-channels [a,b]  enable the client's OWN debug channels by writing its logger config file dbDebug.conf
+                      (see client-debug-logging.md). Optional value: a comma-separated list, or the default
+                      low-noise set if given bare. Implies --console
   --proton <path>     (Linux only) Proton 'proton' script or PROTON env (default: auto-detected - the build Steam
                       runs AoC with). Ignored on Windows, which runs the exe directly
   --wine <cmd>        (Linux only) use a plain wine runner instead of Proton. Ignored on Windows
@@ -188,6 +193,7 @@ the `UniverseAddr` redirect — all with **no manual interaction**.
 
 ## File map
 - `Faolan.ClientLauncher/Program.cs`, `ClientExePatcher.cs` — the launcher.
+- `Faolan.ClientLauncher/LauncherCommand.cs` — its command line (System.CommandLine), and the `--help` text.
 - `Faolan.Core/Crypt/ConanLaunchToken.cs` (the `-key` generator), `Tea.cs` (shared cipher).
 - `Faolan.Core.Network/LoginEncryption.cs` — server-side DH+TEA login decrypt.
 - `Faolan.ClientLauncher/ClientExePatcher.cs` — the on-disk DH-key + launcher-notes patcher, invoked by `--patch-login` / `--launcher-notes`.

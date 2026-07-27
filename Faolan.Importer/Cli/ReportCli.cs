@@ -707,14 +707,6 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		private static string? GetOption(string[] args, string name)
-		{
-			var i = Array.IndexOf(args, name);
-			return i >= 0 && i + 1 < args.Length
-				? args[i + 1]
-				: null;
-		}
-
 		private static void ItemTemplate(string rdbDir, string? arg, string? outDir = null)
 		{
 			if (!uint.TryParse(arg, out var itemId))
