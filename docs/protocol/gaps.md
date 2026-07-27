@@ -40,12 +40,6 @@ harvestable via the same Frida technique. Remove this V0 once all 17 interfaces 
 
 ---
 
-## IIR bodies
-
-### FeedbackIIR and RegenIIR are still verbatim blobs
-Both are replayed from captured bytes rather than constructed (they show **V1** in the coverage matrix, correctly).
-Tracked as the create-burst verbatim residue in Gitea #223.
-
 ---
 
 ## Combat
@@ -112,9 +106,19 @@ wrong or blank level even though grouping works.
 **Tracked: Gitea #426.** [V0: the friend state's online stamp] The chat-tier friend state
 (`[u32 id][u8 online][u8 level][u32 stamp][u8 class]`) carries a u32 whose OFFLINE meaning is solved — a unix last-seen,
 identified because the captured offline friend's `0x6A64AD51` is 2h06 before that capture was taken — while the ONLINE
-value is not decoded. It is not a timestamp (`0x01EDA8B2` reads as 1971-01-10) and not a constant (five captured friends
-carry `0x01EDA8B2`, one carries `0x01EDAF93`, 1761 higher). Its magnitude and high word sit right beside the character
-ids in the same capture (`0x0131xxxx` vs `0x01EDxxxx`), so an id or handle is a better guess than a time, and the
-`0x0025` presence push carries a third value of the same shape. We send the captured constant for every online friend.
-A capture with online friends in DIFFERENT zones would test the location hypothesis in one look.
+value's id SPACE is not.
+
+What the client does with it is no longer a guess. `FriendListNode_c`'s buddy-apply (`FUN_006ca170`, anchored on its
+own `m_nCharacterId == cBuddy.nUserId` assert in `FriendListNode.cpp:118`) copies three of the `ppj::Buddy_t` dwords
+straight through and treats this one differently: it uses it as a **key into a global id→string map**
+(`FUN_0043ac00`, an rbtree find on the singleton at `DAT_03c03100`) and renders the hit's string — falling back to the
+literal `"unknown"` on a miss. So it is an **id whose NAME the client displays**, not a time (which also explains why
+`0x01EDA8B2` reading as 1971-01-10 never made sense), and five friends sharing one value with a sixth 1761 apart is
+five people in one named place and one elsewhere.
+
+What is left is naming the map: identify what fills `DAT_03c03100` (populated via `FUN_01389630` / `FUN_0138b7c0`)
+and the id space follows. ⚠️ Note the magnitude while doing it — `0x01EDA8B2` is ~32M, the same order as a
+**playfield token** (`0x004FE428`, `0x0802ABCD`) and nothing like a `Maps.Id` (4000, 4010, 11040); if it is the
+playfield table, the key is the token rather than the map id. We send the captured constant for every online friend,
+so today every online friend renders as whatever that id happens to name.
 
