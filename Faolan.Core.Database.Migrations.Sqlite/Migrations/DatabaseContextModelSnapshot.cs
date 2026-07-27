@@ -1018,6 +1018,31 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ClassComboScaling", b =>
+                {
+                    b.Property<byte>("Class")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Level")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("DpsModifier")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("SecondaryModifier")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("StaminaDivisor")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Class", "Level");
+
+                    b.ToTable("ClassComboScalings", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClassComboScaling_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                        });
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.ClassSpell", b =>
                 {
                     b.Property<byte>("Class")

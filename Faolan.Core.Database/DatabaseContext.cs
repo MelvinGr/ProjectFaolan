@@ -45,6 +45,7 @@ namespace Faolan.Core.Database
 		DbSet<ChatMessage> ChatMessages { get; }
 		DbSet<ClassAbility> ClassAbilities { get; }
 		DbSet<ClassCombo> ClassCombos { get; }
+		DbSet<ClassComboScaling> ClassComboScalings { get; }
 		DbSet<ClassSpell> ClassSpells { get; }
 		DbSet<Combo> Combos { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
@@ -130,6 +131,7 @@ namespace Faolan.Core.Database
 		public DbSet<ChatMessage> ChatMessages { get; set; }
 		public DbSet<ClassAbility> ClassAbilities { get; set; }
 		public DbSet<ClassCombo> ClassCombos { get; set; }
+		public DbSet<ClassComboScaling> ClassComboScalings { get; set; }
 		public DbSet<ClassSpell> ClassSpells { get; set; }
 		public DbSet<Combo> Combos { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
