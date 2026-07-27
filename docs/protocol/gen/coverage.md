@@ -8,8 +8,8 @@
 ## Headline
 
 - **826** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **80** IIR carrier types: **75 V3** (byte-exact builder), **4 V2** (built, no golden), **1 V1** (no builder found).
-- **61** codec classes, **57** with a byte-exact test.
+- **80** IIR carrier types: **76 V3** (byte-exact builder), **4 V2** (built, no golden), **0 V1** (no builder found).
+- **62** codec classes, **58** with a byte-exact test.
 - **10** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -94,6 +94,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `SetMorphValueIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetNameIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetPosIIR` | `SetPosCodec` |
+| V3 | `SetShadowCoverageIIR` | `SetShadowCoverageCodec` |
 | V3 | `SimpleCharFullUpdateIIR` | `PlayerSpawnScaffoldCodec` |
 | V3 | `SimpleCharKilledByUpdateIIR` | `WorldDeath` |
 | V3 | `SimpleDynelFullUpdateIIR` | `SimpleDynelMessageCodec` |
@@ -114,4 +115,3 @@ the margins, but never invents a golden that isn't there.
 | V2 | `FanaticCommandIir` | `FanaticCommandCodec` |
 | V2 | `MoveInventoryItemIIR` | `InventoryMoveCodec` |
 | V2 | `PlayfieldFIIR` | `MapChangeCodec` |
-| V1 | `SetShadowCoverageIIR` | — |

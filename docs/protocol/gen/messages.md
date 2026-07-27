@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**80** IIR carrier types · **75 V3** (75 with an auto-cited golden). The
+**80** IIR carrier types · **76 V3** (76 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -77,6 +77,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `SetNameIIR` | `0xADCE0CDA` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `SetPosIIR` | `0x04B80B24` | `SetPosCodec` | [V3: DeadReckoningCodecTests.SetPos_RoundTripsByteExact] |
+| V3 | `SetShadowCoverageIIR` | `0xD6C1F0CC` | `SetShadowCoverageCodec` | [V3: V1IirCodecTests.ChainKill_RoundTripsCapturedBody] |
 | V3 | `SimpleCharFullUpdateIIR` | `0xFA015807` | `PlayerSpawnScaffoldCodec` | [V3: PlayerSpawnScaffoldCodecTests.Generate_AfterCharacterIirSwap_StaysParseable] |
 | V3 | `SimpleCharKilledByUpdateIIR` | `0xB066AFC2` | `WorldDeath` | [V3: WorldDeathTests.BuildDeathBcc_ReproducesCapturedNpcDeath_ByteExact] |
 | V3 | `SimpleDynelFullUpdateIIR` | `0x66AEDD50` | `SimpleDynelMessageCodec` | [V3: SimpleDynelMessageTests.BuildMessage_RoundTripsByteExact] |
@@ -97,7 +98,6 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `FanaticCommandIir` | `0xEE4AA85C` | `FanaticCommandCodec` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `InventoryMoveCodec` |  |
 | V2 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` |  |
-| V1 | `SetShadowCoverageIIR` | `0xD6C1F0CC` | — |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see
 [`gaps.md`](../gaps.md)). A V3 row with an empty golden column is byte-exact via a codec whose test the

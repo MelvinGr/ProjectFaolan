@@ -14,6 +14,7 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 | **FeedbackIIR** | `0xBA1FD222` | `FUN_0079f8e0` | `[u32][u32][u32]` + uses the env byte | 21/21 = 13 B (3×u32 + 1) |
 | **CrimeIIR** | `0xC7954504` | `FUN_0148c9f0` | env-gated: `[u32]` **iff** env==1, else empty | 3/3 = 5 B (env==1) ✓ |
 | **SpellBookIIR** | `0x6BA10936` | `FUN_00795ba0` | `[u32]` (triggers a spellbook refresh on the handle) | 8/8 = 4 B ✓ |
+| **SetShadowCoverageIIR** | `0xD6C1F0CC` | `FUN_007a8910` | `[u32 percent]` — how much SHADOW the character stands in, **client-sent**; the env byte is the direction (c2s `0x01` / s2c echo `0x00`) | 4/4 = 4 B ✓ |
 | **KnubotFinishTradeIIR** | `0x7446F3FA` | `FUN_009a7c20` | base-prefix + `[u32 flag][u64 id]` | 3/3 = 22 B (base reads 10) |
 | **KnubotStartTradeIIR** | `0x4B2A47BF` | `FUN_009a63a0` | `[u64][u32 count][ count × { std::string name, u32, u32, u32, u32 } ][std::string …]` — the **shop item list** | 1676–1772 B (variable) ✓ |
 | **AreaFormulaIIR** | `0xCE30BE4E` | `FUN_0079e330` | `[0x3F1-list {u32 class, u32 instance}][u32][0x3F1-list {float x, y, z}][u32]` — an entity ref + a world **position** (the AoE centre); `0x3F1` list framing à la GameActionList | 28–52 B (variable) ✓ |
@@ -48,8 +49,9 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 
 ## Status
 
-Grammar decoded + a byte-exact codec with a captured round-trip for **all eleven** (`V1IirCodecTests`) — the IIR
-coverage matrix is now **0 V1** (48 V3 / 27 V2). Codecs: `RegenCodec`, `LockedToChangedCodec`, `ChainKillCodec`,
+Grammar decoded + a byte-exact codec with a captured round-trip for **all twelve** (`V1IirCodecTests`) — the IIR
+coverage matrix is now **0 V1**. Codecs: `RegenCodec`, `LockedToChangedCodec`, `ChainKillCodec`,
+`SetShadowCoverageCodec`,
 `SpellBookCodec`, `FeedbackIirCodec`, `CrimeCodec`, `UpdateInventoryCodec` (frames `[handle][env][u32 pbLen]
 [ProtoInventoryGame protobuf]`), `TemplateActionCodec` (`[68-B item struct][u32×6]`), `KnubotFinishTradeCodec`,
 `AreaFormulaCodec` (the two `0x3F1` ref+position lists, fully modelled), and `KnubotStartTradeCodec`.

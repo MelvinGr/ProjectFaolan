@@ -1113,40 +1113,54 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				// After we relocate the player on resurrect (IntendedTeleport + n3Teleport, #214), the client echoes the
+				// teleport records back. Benign acks with no reply owed - handled here purely so they do not reach the
+				// default branch's "Unknown 0x2000 Opcode" system message.
+				case GameServer0X2000Opcodes.N3TeleportIIR:
+				case GameServer0X2000Opcodes.IntendedTeleportIIR:
+				{
+					Logger.LogDebug("GameServer 0x2000 client teleport-ack {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
+					break;
+				}
+
+				// The client REPORTS how much shadow it is standing in - only it can compute that, since it owns the
+				// lighting and the geometry, and its own `GameCode/Hiding` channel logs the same number as
+				// `ShadowCoverage = <n>`. Retail echoes the record straight back with the env byte cleared, which is
+				// what both captured exchanges show (client env 0x01 -> server env 0x00), so that is what we do.
+				// Nothing consumes the value yet; stealth detection is where it will.
+				case GameServer0X2000Opcodes.SetShadowCoverageIIR:
+				{
+					var shadow = SetShadowCoverageCodec.Parse(rawPayload);
+					Logger.LogDebug("GameServer shadow coverage {Percent}% for handle {Handle}.", shadow.Percent, shadow.Handle);
+					await WorldIir.SendFramed(client, SetShadowCoverageCodec.Build(shadow.Handle, shadow.Percent));
+					break;
+				}
+
+				// A GM command in the client sends FanaticCommandIIR ("Fanatic" is its own name for the GM subsystem).
+				// We can read what it asked for, but what to send BACK is not decoded - no corpus capture contains one -
+				// so report the parsed command rather than inventing a reply (#448/#449).
+				case GameServer0X2000Opcodes.FanaticCommandIir:
+				{
+					var fanatic = FanaticCommandCodec.TryParse(rawPayload);
+					Logger.LogInformation("GameServer FanaticCommandIIR: text='{Text}' word0={Word0} targets=({TargetA},{TargetB}) ({RawLength} bytes)",
+						fanatic?.Text, fanatic?.Word0, fanatic?.TargetA, fanatic?.TargetB, rawPayload.Length);
+					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, fanatic is { } f
+						? $"GM command received: '{f.Text}' (word0 {f.Word0}, targets {f.TargetA}/{f.TargetB}). The server's reply is not decoded yet (#448)."
+						: $"GM command received but the FanaticCommandIIR body did not parse ({rawPayload.Length} bytes).");
+					break;
+				}
+
 				default:
 				{
 					var data = body.ReadRemainingArray();
 
-					// In-world the client streams 0x2000 packets whose sub-opcode is its OWN instance id
-					// (the client-instance ack/keepalive stream). With the create flow now using the real
-					// character id, that id is dynamic (not a fixed enum value like the old 0x021662C8), so
-					// it lands here. Treat it as a benign ping: log quietly, don't spam system messages.
+					// The ONE sub-opcode that cannot be a case label: in-world the client streams 0x2000 packets whose
+					// sub-opcode is its OWN instance id (the client-instance ack/keepalive stream). Since the create flow
+					// started using the real character id that value is DYNAMIC, not a constant, so it can only be
+					// matched here. Treat it as a benign ping: log quietly, don't spam system messages.
 					if ((uint)pbOpcode == client.Session.Character.Id)
 					{
 						Logger.LogDebug("GameServer 0x2000 client-instance ping {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
-						break;
-					}
-
-					// After we relocate the player on resurrect (IntendedTeleport + n3Teleport, #214), the client echoes
-					// the teleport records back; benign acks, no reply needed - log quietly instead of spamming a system
-					// message into chat.
-					if ((uint)pbOpcode == (uint)GameServer0X2000Opcodes.N3TeleportIIR || (uint)pbOpcode == (uint)GameServer0X2000Opcodes.IntendedTeleportIIR)
-					{
-						Logger.LogDebug("GameServer 0x2000 client teleport-ack {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
-						break;
-					}
-
-					// A GM command in the client sends FanaticCommandIIR ("Fanatic" is its own name for the GM subsystem).
-					// We can read what it asked for, but what to send BACK is not decoded - no corpus capture contains
-					// one - so report the parsed command rather than inventing a reply (#448/#449).
-					if ((uint)pbOpcode == FanaticCommandCodec.Opcode)
-					{
-						var fanatic = FanaticCommandCodec.TryParse(rawPayload);
-						Logger.LogInformation("GameServer FanaticCommandIIR: text='{Text}' word0={Word0} targets=({TargetA},{TargetB}) ({RawLength} bytes)",
-							fanatic?.Text, fanatic?.Word0, fanatic?.TargetA, fanatic?.TargetB, rawPayload.Length);
-						await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, fanatic is { } f
-							? $"GM command received: '{f.Text}' (word0 {f.Word0}, targets {f.TargetA}/{f.TargetB}). The server's reply is not decoded yet (#448)."
-							: $"GM command received but the FanaticCommandIIR body did not parse ({rawPayload.Length} bytes).");
 						break;
 					}
 

@@ -34,6 +34,35 @@ namespace Faolan.Tests
 			Assert.Equal(body, c.ToArray());
 		}
 
+		// SetShadowCoverageIIR (0xD6C1F0CC) - the last V1 IIR type. Both captured pairs are the same exchange: the
+		// CLIENT reports its shadow coverage (env 0x01) and the server echoes it back (env 0x00). Two characters on
+		// two maps, both carrying 100.
+		[Theory]
+		[InlineData("00000011d6c1f0cc0000c3501101b4f50100000064", 0x1101b4f5u, 0x01)] // Hakotep, c2s
+		[InlineData("00000011d6c1f0cc0000c3501101b4f50000000064", 0x1101b4f5u, 0x00)] // …and the server's echo
+		[InlineData("00000011d6c1f0cc0000c3500802e5d40100000064", 0x0802e5d4u, 0x01)] // NecroL80, c2s
+		[InlineData("00000011d6c1f0cc0000c3500802e5d40000000064", 0x0802e5d4u, 0x00)] // …and the server's echo
+		public void SetShadowCoverage_RoundTripsCapturedBody(string hex, uint handle, byte env)
+		{
+			var body = Convert.FromHexString(hex);
+			var c = SetShadowCoverageCodec.Parse(body);
+
+			Assert.Equal(handle, c.Handle);
+			Assert.Equal(env, c.Env);
+			Assert.Equal(100u, c.Percent);
+			Assert.Equal(body, c.ToArray());
+		}
+
+		// The direction lives in the env byte, and Build defaults to the SERVER's - sending the client's value back at
+		// it would be reporting the client's own reading as if it were ours.
+		[Fact]
+		public void SetShadowCoverage_BuildDefaultsToTheServerEnv()
+		{
+			Assert.Equal(Convert.FromHexString("00000011d6c1f0cc0000c3500802e5d40000000064"), SetShadowCoverageCodec.Build(0x0802e5d4, 100));
+			Assert.Equal(Convert.FromHexString("00000011d6c1f0cc0000c3500802e5d40100000064"),
+				SetShadowCoverageCodec.Build(0x0802e5d4, 100, SetShadowCoverageCodec.ClientEnv));
+		}
+
 		[Fact]
 		public void Crime_RoundTripsCapturedBody()
 		{
