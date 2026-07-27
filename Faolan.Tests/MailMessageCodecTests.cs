@@ -27,7 +27,7 @@ namespace Faolan.Tests
 		                                      "201204081a10051a530a140d274a93cb1564da8ff71d166eedda25bf045b3b12140d274a93cb1564da8ff71d166eedda25bf" +
 		                                      "045b3b1a140d274a93cb1564da8ff71d166eedda25bf045b3b252e7d02002d2e7d0200380a45000000000000007208006f31" + "00000000";
 
-		// DispatchMailMessage body (bytes after the 0x2002 opcode), system mail to "AssassinL23", attachCount=0. The
+		// DispatchMailMessage body (bytes after the 0x2002 opcode), system mail to the captured recipient, attachCount=0. The
 		// recipient is the captured character - it is IN these bytes (and in the body XML), so the assertions spell it
 		// out; a pseudonym belongs anywhere the name is free input, not where it is what the dump says (#417).
 		private const string BaseBody = "20d82b631c0c578f08006f3100074d656c6c69656a08006f31000002403c72656d6f7465666f726d617420746f6b656e3d22" +
@@ -82,7 +82,7 @@ namespace Faolan.Tests
 			var mail = MailMessageCodec.Parse(Convert.FromHexString(AttachmentBody));
 
 			Assert.Equal(0x20d82b631c0c578ful, mail.MailId);
-			Assert.Equal("AssassinL23", mail.RecipientName);
+			Assert.Equal("AssassinL23", mail.RecipientName); // the capture's recipient - must match the blob
 			Assert.Equal(0x08006f31u, mail.RecipientClass);
 			Assert.Equal("", mail.SenderName); // system mail - empty sender name
 			Assert.Equal(0ul, mail.Money);

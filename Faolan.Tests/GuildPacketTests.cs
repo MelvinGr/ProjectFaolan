@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			var creator = new Character
 			{
 				Id = 0x110099BD,
-				Name = "DemoL80",
+				Name = "DemoL80", // the capture's creator name - must match the golden bytes
 				GuildRank = GuildRank.Leader,
 				Level = 80,
 				Class = (ConanClass)0x2C
