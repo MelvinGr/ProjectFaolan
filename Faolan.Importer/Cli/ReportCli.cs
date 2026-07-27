@@ -538,7 +538,19 @@ namespace Faolan.Importer.Cli
 				var name = RdbItemImporter.ExtractName(body);
 				var fields = ReadIncreasingFields(body.AsSpan(12));
 				var fieldStr = string.Join(" ", fields.OrderBy(f => f.Key).Select(f => $"{f.Key}={f.Value}"));
-				Console.WriteLine($"0x{a.Id:X8} slot={a.Slot,-5} \"{name}\"  | {fieldStr}");
+
+				// Abilities are the SAME 1000020 template layout as items, spells and feats, so the shared parser
+				// applies - but the answer is that they carry NO stat-modifier region. Of the 27 decryptable
+				// abilities only 10 yield anything and all 10 are the parser's documented false-positive mode: the
+				// "stats" are the directional ids the field table already shows (Upper Left Attack -> 201, Overhead
+				// -> 203), or zero-valued (the four pet commands -> stats 1..4 = 0), or a kind-range number as an
+				// amount (a mount ability -> 1890 = 53202). Their kinds (53043, 53251) are none of the flat/percent
+				// tags either. Shown here so the emptiness is visible rather than assumed - do NOT import these.
+				var mods = ItemTemplateStatModifiers.Parse(body.AsSpan(12));
+				var modStr = mods.Count == 0
+					? ""
+					: "  | MODS " + string.Join(" ", mods.Select(m => $"{m.StatId}={m.WireAmount}(k{m.Kind})"));
+				Console.WriteLine($"0x{a.Id:X8} slot={a.Slot,-5} \"{name}\"  | {fieldStr}{modStr}");
 			}
 		}
 
