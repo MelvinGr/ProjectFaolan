@@ -5,7 +5,7 @@
 @inject AccountAdminService AdminSvc
 @inject LiveSessionService Live
 @inject CharacterModelService Models
-@inject NavigationManager Nav
+@inherits AdminPage
 
 <PageTitle>Admin — Project Faolan</PageTitle>
 
@@ -15,7 +15,7 @@
 		<button class="abtn" @onclick="ClearCache">Clear render cache</button>
 	</div>
 
-	@if (!_authorized)
+	@if (!Authorized)
 	{
 		<p class="muted">Checking access…</p>
 	}
@@ -40,7 +40,7 @@
 			<tbody>
 			@foreach (var a in _accounts)
 			{
-				var isSelf = a.Id == _selfId;
+				var isSelf = a.Id == SelfId;
 				<tr class="@(a.State == AccountState.Banned
 					           ? "banned"
 					           : "")">

@@ -19,26 +19,12 @@ namespace Faolan.Web.Components.Pages
 		private readonly Dictionary<uint, uint> _tpTarget = [];
 		private IReadOnlyList<LiveSession>? _online;
 
-		private bool _authorized;
 		private bool _busy;
 		private string _broadcast = "";
 		private string? _notice;
 
-		[CascadingParameter]
-		private Task<AuthenticationState>? AuthState { get; set; }
-
-		protected override async Task OnInitializedAsync()
+		protected override async Task LoadAsync()
 		{
-			var user = AuthState == null
-				? null
-				: (await AuthState).User;
-			if (user == null || !user.IsInRole("Admin"))
-			{
-				Nav.NavigateTo("/", true);
-				return;
-			}
-
-			_authorized = true;
 			await Refresh();
 		}
 

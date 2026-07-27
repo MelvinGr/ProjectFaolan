@@ -1,0 +1,48 @@
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+
+namespace Faolan.Web.Components.Pages
+{
+	// The admin gate, in one place. Every /admin page had its own copy: resolve the cascading auth state, bounce to /
+	// unless the user is in the "Admin" role (stamped at sign-in from the account type), then read the caller's own
+	// account id out of the NameIdentifier claim.
+	//
+	// Five pages carried it - Admin, AccountDetail, DbEditor, QuestEditor, SpellEditor. That is a security check
+	// whose failure mode is SILENT: a page that drifted, or a new page whose author copied an older version, would
+	// simply stop being protected while still looking correct. So OnInitializedAsync is SEALED here and a subclass
+	// gets LoadAsync instead, which is only reached once the gate has passed - a page cannot forget the gate, and
+	// cannot replace it with its own variant.
+	public abstract class AdminPage : ComponentBase
+	{
+		[Inject] protected NavigationManager Nav { get; set; } = null!;
+
+		[CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+		protected bool Authorized { get; private set; }
+
+		// The signed-in admin's OWN account id, so a page can refuse to let them change their own privileges.
+		protected uint SelfId { get; private set; }
+
+		protected sealed override async Task OnInitializedAsync()
+		{
+			var user = AuthState == null
+				? null
+				: (await AuthState).User;
+			if (user == null || !user.IsInRole("Admin"))
+			{
+				Nav.NavigateTo("/", true);
+				return;
+			}
+
+			uint.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var selfId);
+			SelfId = selfId;
+			Authorized = true;
+			await LoadAsync();
+		}
+
+		// The page's own load, run only after the gate has passed.
+		protected abstract Task LoadAsync();
+	}
+}

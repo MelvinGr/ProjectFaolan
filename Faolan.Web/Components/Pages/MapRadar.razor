@@ -3,18 +3,18 @@
 @inject IDbContextFactory<DatabaseContext> DbFactory
 @inject LiveSessionService Live
 @inject IJSRuntime JS
-@inject NavigationManager Nav
 @using Faolan.Core.Database
 @using Faolan.Web.Services
 @using Microsoft.EntityFrameworkCore
 @implements IAsyncDisposable
+@inherits AdminPage
 
 <PageTitle>Live Map — Admin</PageTitle>
 
 <div class="radar-page">
 	<div class="radar-head">
 		<h1>Live Map</h1>
-		@if (_authorized)
+		@if (Authorized)
 		{
 			<select class="map-select" @bind="MapId" @bind:after="OnMapChanged">
 				@foreach (var m in _maps)
@@ -25,7 +25,7 @@
 		}
 	</div>
 
-	@if (!_authorized)
+	@if (!Authorized)
 	{
 		<p class="muted">Checking access…</p>
 	}

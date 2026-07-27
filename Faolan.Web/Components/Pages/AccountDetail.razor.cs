@@ -12,30 +12,14 @@ namespace Faolan.Web.Components.Pages
 	{
 		private Services.AccountDetail? _account;
 
-		private bool _authorized;
 		private bool _isSelf;
 		private string? _notice;
-		private uint _selfId;
 
 		[Parameter]
 		public int Id { get; set; }
 
-		[CascadingParameter]
-		private Task<AuthenticationState>? AuthState { get; set; }
-
-		protected override async Task OnInitializedAsync()
+		protected override async Task LoadAsync()
 		{
-			var user = AuthState == null
-				? null
-				: (await AuthState).User;
-			if (user == null || !user.IsInRole("Admin"))
-			{
-				Nav.NavigateTo("/", true);
-				return;
-			}
-
-			uint.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out _selfId);
-			_authorized = true;
 			await Reload();
 		}
 
@@ -56,7 +40,7 @@ namespace Faolan.Web.Components.Pages
 		private async Task Reload()
 		{
 			_account = await AdminSvc.GetAccountAsync((uint)Id);
-			_isSelf = _account != null && _account.Id == _selfId;
+			_isSelf = _account != null && _account.Id == SelfId;
 		}
 
 		private async Task SetBan(bool banned)

@@ -4,14 +4,14 @@
 @rendermode InteractiveServer
 @inject AccountAdminService AdminSvc
 @inject LiveSessionService Live
-@inject NavigationManager Nav
+@inherits AdminPage
 
 <PageTitle>Account — Admin</PageTitle>
 
 <div class="adetail">
 	<a class="back" href="/admin">‹ All accounts</a>
 
-	@if (!_authorized)
+	@if (!Authorized)
 	{
 		<p class="muted">Checking access…</p>
 	}

@@ -2,7 +2,7 @@
 @using Faolan.Web.Services
 @rendermode InteractiveServer
 @inject LiveSessionService Live
-@inject NavigationManager Nav
+@inherits AdminPage
 
 <PageTitle>GM Console — Project Faolan</PageTitle>
 
@@ -12,7 +12,7 @@
 		<button class="btn ghost" @onclick="Refresh" disabled="@_busy">Refresh</button>
 	</div>
 
-	@if (!_authorized)
+	@if (!Authorized)
 	{
 		<p class="muted">Checking access…</p>
 	}

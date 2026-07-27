@@ -12,12 +12,8 @@ namespace Faolan.Web.Components.Pages
 	{
 		private IJSObjectReference? _module;
 		private List<(uint Id, string Name)> _maps = [];
-		private bool _authorized;
 
 		private uint MapId { get; set; } = 4010; // Tortage Island default
-
-		[CascadingParameter]
-		private Task<AuthenticationState>? AuthState { get; set; }
 
 		public async ValueTask DisposeAsync()
 		{
@@ -37,26 +33,15 @@ namespace Faolan.Web.Components.Pages
 
 		protected override async Task OnAfterRenderAsync(bool firstRender)
 		{
-			if (firstRender && _authorized)
+			if (firstRender && Authorized)
 			{
 				_module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/radar.js");
 				await _module.InvokeVoidAsync("start", "radar-canvas", MapId);
 			}
 		}
 
-		protected override async Task OnInitializedAsync()
+		protected override async Task LoadAsync()
 		{
-			var user = AuthState == null
-				? null
-				: (await AuthState).User;
-			if (user == null || !user.IsInRole("Admin"))
-			{
-				Nav.NavigateTo("/", true);
-				return;
-			}
-
-			_authorized = true;
-
 			await using var db = await DbFactory.CreateDbContextAsync();
 			_maps = (await db
 					.Maps.OrderBy(m => m.Id)

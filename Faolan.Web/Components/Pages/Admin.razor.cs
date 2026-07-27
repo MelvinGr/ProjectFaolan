@@ -13,33 +13,16 @@ namespace Faolan.Web.Components.Pages
 	public partial class Admin
 	{
 		private List<AccountRow> _accounts = [];
-		private bool _authorized;
 		private string? _notice;
-		private uint _selfId;
 
-		[CascadingParameter]
-		private Task<AuthenticationState>? AuthState { get; set; }
-
-		protected override async Task OnInitializedAsync()
+		protected override async Task LoadAsync()
 		{
-			// Gate: GM/Administrator only (the "Admin" role is stamped at sign-in from the account type).
-			var user = AuthState == null
-				? null
-				: (await AuthState).User;
-			if (user == null || !user.IsInRole("Admin"))
-			{
-				Nav.NavigateTo("/", true);
-				return;
-			}
-
-			uint.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out _selfId);
-			_authorized = true;
 			await Reload();
 		}
 
 		private async Task ChangeType(uint id, string? value)
 		{
-			if (id == _selfId)
+			if (id == SelfId)
 				return; // don't change your own privileges
 			if (!Enum.TryParse<AccountType>(value, out var type))
 				return;
@@ -69,7 +52,7 @@ namespace Faolan.Web.Components.Pages
 
 		private async Task SetBan(uint id, bool banned)
 		{
-			if (banned && id == _selfId)
+			if (banned && id == SelfId)
 				return; // never ban yourself
 
 			var state = await AdminSvc.SetBannedAsync(id, banned);
