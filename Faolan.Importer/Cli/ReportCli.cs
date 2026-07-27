@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -195,6 +196,12 @@ namespace Faolan.Importer.Cli
 				case "class-attribute-runs":
 				{
 					ClassAttributeRuns(RdbDir(), _options.Out);
+					return 0;
+				}
+
+				case "feat-catalog":
+				{
+					FeatCatalog(RdbDir(), arg, _options.Out);
 					return 0;
 				}
 
@@ -1248,6 +1255,156 @@ namespace Faolan.Importer.Cli
 
 		// List every (type, id) entry in the RDB index that has the given id, with availability. Used to discover what
 		// id-space a cross-reference lives in (e.g. a character's HeadMesh / *hairmesh resource id) (#275).
+		// The feat/ability catalog's RDB type, and the magic a PLAINTEXT record opens with (`TB\x0f\x00`).
+		private const uint FeatPlaintextMagic = 0x000F4254;
+		private const uint FeatTemplateType = 1000020;
+
+		// Classify the RDB feat/ability catalog (type 1000020) into PLAINTEXT vs TEA-ENCRYPTED records, and dump the
+		// plaintext ones (Gitea #251). A plaintext record opens with the `TB\x0f\x00` magic (u32 LE 0x000f4254) - the
+		// same decisive marker the key-crack used as its validation - while an encrypted one opens with `RDBH`.
+		// The plaintext share needs NO key, so it is a feat catalog we can build today.
+		// --report-arg <substring>  filters the dumped names   --out <dir>  writes feat-catalog.tsv
+		private static void FeatCatalog(string rdbDir, string? filter, string? outDir)
+		{
+			using var rdb = new RdbReader(rdbDir);
+			var plain = new List<(uint Id, string Name, byte[] Body)>();
+			var encrypted = 0;
+			var unreadable = 0;
+			var other = 0;
+
+			foreach (var e in rdb.EntriesOfType(FeatTemplateType))
+			{
+				if (e.Size == 0)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					unreadable++;
+					continue;
+				}
+
+				if (body.Length < 8)
+				{
+					other++;
+					continue;
+				}
+
+				if (BinaryPrimitives.ReadUInt32LittleEndian(body) != FeatPlaintextMagic)
+				{
+					// `RDBH` is the TEA-encrypted template header; anything else is a shape we have not seen.
+					if (body[0] == (byte)'R' && body[1] == (byte)'D' && body[2] == (byte)'B' && body[3] == (byte)'H')
+						encrypted++;
+					else
+						other++;
+
+					continue;
+				}
+
+				plain.Add((e.Id, FeatName(body), body));
+			}
+
+			var total = plain.Count + encrypted + other + unreadable;
+			Console.WriteLine($"RDB type {FeatTemplateType}: {total} records");
+			Console.WriteLine($"  plaintext (TB magic) : {plain.Count} ({(total == 0 ? 0 : 100.0 * plain.Count / total):F1}%)");
+			Console.WriteLine($"  TEA-encrypted (RDBH) : {encrypted}");
+			Console.WriteLine($"  other / unreadable   : {other} / {unreadable}");
+
+			var named = plain.Where(p => p.Name.Length > 0).ToList();
+			Console.WriteLine($"  plaintext WITH a name: {named.Count}");
+
+			// --report-arg <id>[,<id>...]: dump those records' header words side by side, to find what discriminates
+			// a FEAT from an ITEM (type 1000020 carries both).
+			if (!string.IsNullOrWhiteSpace(filter) && filter.Split(',').All(x => uint.TryParse(x.Trim(), out _)))
+			{
+				foreach (var want in filter.Split(',').Select(x => uint.Parse(x.Trim())))
+				{
+					var rec = plain.FirstOrDefault(x => x.Id == want);
+					if (rec.Body == null)
+					{
+						Console.WriteLine($"    id={want}: not a plaintext 1000020 record");
+						continue;
+					}
+
+					var words = new List<string>();
+					for (var o = 0; o + 4 <= Math.Min(rec.Body.Length, 92); o += 4)
+						words.Add($"[{o,3}]={BinaryPrimitives.ReadUInt32LittleEndian(rec.Body.AsSpan(o))}");
+
+					Console.WriteLine($"    id={rec.Id} len={rec.Body.Length} name='{rec.Name}'");
+					Console.WriteLine($"      {string.Join(" ", words)}");
+				}
+
+				return;
+			}
+
+			// Type 1000020 carries ITEMS and FEATS in one type, so the catalog is only useful with the discriminating
+			// words alongside each name. Two look decisive on inspection - [28] (a category id: 7063 on feats,
+			// 9081/10090 on the item templates checked) and [44] (0x10000005 vs 512) - but the rule is NOT hardcoded
+			// here: the words go out as columns and the distribution is printed, so the split is chosen from the whole
+			// catalog rather than from a handful of samples.
+			var byFlags = named.GroupBy(p => Word(p.Body, 44)).OrderByDescending(g => g.Count()).ToList();
+			Console.WriteLine("  [44] distribution (named records):");
+			foreach (var g in byFlags.Take(8))
+				Console.WriteLine($"    0x{g.Key:X8} x{g.Count(),-6} e.g. {g.First().Name}");
+
+			var shown = named.Where(p => string.IsNullOrWhiteSpace(filter) || p.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)).Take(20).ToList();
+			foreach (var p in shown)
+				Console.WriteLine($"    {p.Id,-9} cat={Word(p.Body, 28),-6} flags=0x{Word(p.Body, 44):X8} {p.Name}");
+
+			if (string.IsNullOrWhiteSpace(outDir))
+				return;
+
+			Directory.CreateDirectory(outDir);
+			var path = Path.Combine(outDir, "feat-catalog.tsv");
+			using var w = new StreamWriter(path);
+			w.WriteLine("id\tlength\tcategory\tflags\tname");
+			foreach (var p in named.OrderBy(p => p.Id))
+				w.WriteLine($"{p.Id}\t{p.Body.Length}\t{Word(p.Body, 28)}\t0x{Word(p.Body, 44):X8}\t{p.Name}");
+
+			Console.WriteLine($"WROTE {path} ({named.Count} rows)");
+		}
+
+		// One little-endian u32 of a record, or 0 past its end.
+		private static uint Word(byte[] body, int offset)
+		{
+			return offset + 4 <= body.Length ? BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(offset)) : 0;
+		}
+
+		// The record's NAME: a u32-length-prefixed ASCII run. The fixed header is [magic][id][1000000][...u32 fields]
+		// and the name closes it - for the 96-byte form the length sits at offset 88 and the string ends the record
+		// exactly. Scanned u32-aligned rather than pinned to 88, because the header is longer on the other record
+		// shape (the field at offset 16 is 2 for the short form and 3 for the long one). Returns "" when nothing
+		// there parses as a name, so a wrong guess shows up as an empty column rather than as mojibake.
+		private static string FeatName(byte[] body)
+		{
+			for (var i = 8; i + 4 < body.Length; i += 4)
+			{
+				var len = BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i));
+				if (len is < 2 or > 96 || i + 4 + len > body.Length)
+					continue;
+
+				var span = body.AsSpan(i + 4, (int)len);
+				var printable = true;
+				foreach (var b in span)
+				{
+					if (b is < 0x20 or > 0x7E)
+					{
+						printable = false;
+						break;
+					}
+				}
+
+				if (printable)
+					return Encoding.ASCII.GetString(span);
+			}
+
+			return "";
+		}
+
 		private static void RdbId(string rdbDir, string arg)
 		{
 			if (!uint.TryParse(arg, out var id))
