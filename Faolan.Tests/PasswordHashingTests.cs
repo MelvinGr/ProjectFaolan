@@ -4,9 +4,9 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Unit tests for the shared password hashing used by BOTH the web login and the game-server UniverseAgent login
-	// (Faolan.Core.Crypt.PasswordHashing). Covers the PBKDF2 round-trip, the "no password set" (-/empty) accept-any
-	// sentinels, and - since the legacy plaintext path was removed - that a plaintext stored value authenticates
-	// NOTHING, which is the case that used to pass.
+	// (Faolan.Core.Crypt.PasswordHashing). Covers the PBKDF2 round-trip, the seeded default account, and
+	// - since both the legacy plaintext path and the "no password set" sentinels were removed - that a stored value
+	// which is not a real hash authenticates NOTHING, which are the cases that used to pass.
 	public class PasswordHashingTests
 	{
 		[Fact]
@@ -50,13 +50,26 @@ namespace Faolan.Tests
 			Assert.False(PasswordHashing.Matches(stored, supplied));
 		}
 
-		// NOT a fallback and deliberately kept: an account with no password set accepts anything. The shipped seed
-		// account stores exactly this, so it is what a fresh clone logs in with.
-		[Theory, InlineData(null), InlineData(""), InlineData(PasswordHashing.NoPassword)]
-		public void Matches_NoPasswordSet_AcceptsAnything(string? stored)
+		// The "no password set" sentinels are GONE too: empty / null / "-" used to accept ANY password, which is how
+		// the default account worked before it seeded a real hash. They now authenticate nothing, like any other
+		// non-hash value.
+		[Theory, InlineData(null), InlineData(""), InlineData("-")]
+		public void Matches_NoPasswordSentinels_NoLongerAcceptAnything(string? stored)
 		{
-			Assert.True(PasswordHashing.Matches(stored, "anything"));
-			Assert.True(PasswordHashing.Matches(stored, ""));
+			Assert.False(PasswordHashing.Matches(stored, "anything"));
+			Assert.False(PasswordHashing.Matches(stored, ""));
+		}
+
+		// The default account a fresh database is seeded with must actually log in with the documented password -
+		// that is the whole reason DatabaseInitializer stopped storing an empty string.
+		[Fact]
+		public void TheSeededDefaultAccount_LogsInWithTheDocumentedPassword()
+		{
+			var stored = PasswordHashing.Hash(PasswordHashing.DefaultSeedPassword);
+
+			Assert.True(PasswordHashing.Matches(stored, PasswordHashing.DefaultSeedPassword));
+			Assert.False(PasswordHashing.Matches(stored, ""));
+			Assert.False(PasswordHashing.Matches(stored, "Faolan")); // case-sensitive, unlike the username
 		}
 
 		[Fact]

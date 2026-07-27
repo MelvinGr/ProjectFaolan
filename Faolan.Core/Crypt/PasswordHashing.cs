@@ -9,15 +9,16 @@ namespace Faolan.Core.Crypt
 	///     <c>pbkdf2_sha256$&lt;iterations&gt;$&lt;base64 salt&gt;$&lt;base64 hash&gt;</c> (~90 chars, fits the 128-char
 	///     column).
 	///     <para>
-	///         An empty / <c>"-"</c> stored value means <b>no password set</b> and accepts anything — that is a
-	///         deliberate dev convenience, not a fallback, and it is what the shipped seed account uses.
+	///         <b>A stored value that is not a PBKDF2 hash authenticates nothing.</b> Two fallbacks used to live here
+	///         and both are gone: a verbatim compare against a legacy plaintext value, and an empty / <c>"-"</c>
+	///         "no password set" sentinel that accepted <i>any</i> password. The second is why the default
+	///         <c>faolan</c> account now seeds a real hash (<see cref="DefaultSeedPassword" />) instead of an empty
+	///         string — see <c>DatabaseInitializer.EnsureDefaultAccountAsync</c>.
 	///     </para>
 	///     <para>
-	///         There is no plaintext path. <see cref="Matches" /> used to compare a non-hash stored value to the
-	///         supplied password verbatim, so a row that had never been migrated authenticated on a string compare —
-	///         and only the WEB login ever re-hashed after such a match, so a plaintext account logging in through the
-	///         game server stayed plaintext forever. Anything that is neither a hash nor the "no password" sentinel is
-	///         now simply rejected.
+	///         An UNPATCHED game client is a separate matter and still bypasses this entirely, gated by
+	///         <c>Login:AllowUnpatchedClients</c> — its login block cannot be decrypted, so there is no password to
+	///         check in the first place.
 	///     </para>
 	/// </summary>
 	public static class PasswordHashing
@@ -27,8 +28,10 @@ namespace Faolan.Core.Crypt
 		private const int SaltSize = 16;
 		private const string Prefix = "pbkdf2_sha256$";
 
-		// The "this account has no password" sentinel, as stored in Account.Password.
-		public const string NoPassword = "-";
+		// The password the default `faolan` account is seeded with on a fresh database. A known dev default, not a
+		// secret: it exists so a fresh clone can log in at all now that an empty Account.Password no longer means
+		// "accept anything". Each install hashes it with its own salt.
+		public const string DefaultSeedPassword = "faolan";
 
 		public static string Hash(string password)
 		{
@@ -42,13 +45,10 @@ namespace Faolan.Core.Crypt
 			return stored != null && stored.StartsWith(Prefix, StringComparison.Ordinal);
 		}
 
-		// Does the supplied password match the stored value? Either the account has no password set, or the stored
-		// value is a PBKDF2 hash - a stored value that is neither is malformed and matches nothing.
+		// Does the supplied password match the stored value? Only a real PBKDF2 hash can match - an empty, "-",
+		// plaintext or otherwise malformed stored value matches NOTHING rather than everything.
 		public static bool Matches(string? stored, string supplied)
 		{
-			if (string.IsNullOrEmpty(stored) || stored == NoPassword)
-				return true; // no password configured -> accept anything (deliberate dev convenience)
-
 			return Verify(supplied, stored);
 		}
 

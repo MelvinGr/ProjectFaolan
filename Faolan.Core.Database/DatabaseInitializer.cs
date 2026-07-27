@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
+using Faolan.Core.Crypt;
 
 namespace Faolan.Core.Database
 {
@@ -15,8 +16,10 @@ namespace Faolan.Core.Database
 	// what happened so the caller logs in its own style (ILogger on the server, Console in the importer).
 	public static class DatabaseInitializer
 	{
-		// The default admin login (game login validation is stubbed to accept any password, see the login_encryption
-		// notes, so the value is a placeholder). Administrator + Active mirrors the committed reference account.
+		// The default admin login. The password is a REAL hash of PasswordHashing.DefaultSeedPassword ("faolan"):
+		// it used to be an empty string, which PasswordHashing.Matches treated as "no password set, accept
+		// anything" - that sentinel is gone, so an empty value would now authenticate nothing and a fresh clone
+		// could not log in. Administrator + Active mirrors the committed reference account.
 		public static async Task<bool> EnsureDefaultAccountAsync(DatabaseContext db, CancellationToken cancellationToken = default)
 		{
 			if (await db.Accounts.AnyAsync(cancellationToken))
@@ -25,7 +28,7 @@ namespace Faolan.Core.Database
 			db.Accounts.Add(new Account
 			{
 				UserName = "faolan",
-				Password = "",
+				Password = PasswordHashing.Hash(PasswordHashing.DefaultSeedPassword),
 				Type = AccountType.Administrator,
 				State = AccountState.Active,
 				AuthChallenge = "",

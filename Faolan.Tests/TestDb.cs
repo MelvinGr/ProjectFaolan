@@ -48,7 +48,14 @@ namespace Faolan.Tests
 		private static string BuildFixture()
 		{
 			var seed = TestPaths.Repo("faolan.sql");
-			var hash = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(seed)))[..16];
+
+			// Keyed on the seed AND on the assembly that builds from it. Seed content alone is not enough: the fixture
+			// is migrations + faolan.sql + DatabaseInitializer's non-seed rows (the default account and realm), and
+			// those come from CODE. Changing the default account's password left every cached fixture stale while the
+			// key stayed identical, so the suite kept asserting against the old row and passed.
+			var initializer = typeof(DatabaseInitializer).Assembly.Location;
+			var key = SHA256.HashData([.. File.ReadAllBytes(seed), .. File.ReadAllBytes(initializer)]);
+			var hash = Convert.ToHexStringLower(key)[..16];
 			var directory = Path.Combine(Path.GetTempPath(), "faolan-tests");
 			Directory.CreateDirectory(directory);
 
