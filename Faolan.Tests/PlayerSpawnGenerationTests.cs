@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -290,7 +289,7 @@ namespace Faolan.Tests
 		public void PlayerSpawnReader_LocatesCharacterMessage_OnTemplate()
 		{
 			var body = Golden.Bytes("SpawnStrieTemplate");
-			var innerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(SpawnPacketBuilder.NameInnerLengthOffset, 4));
+			var innerLen = (int)body.ReadU32Be(SpawnPacketBuilder.NameInnerLengthOffset);
 
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var result));
 			Assert.Equal(SpawnPacketBuilder.NameTagOffset, result.Offset);
@@ -310,7 +309,7 @@ namespace Faolan.Tests
 			var rebuilt = SpawnPacketBuilder.SetCharacterMessage(body, message);
 
 			Assert.Equal(body.Length + 1, rebuilt.Length);
-			Assert.Equal((uint)(rebuilt.Length - 4), BinaryPrimitives.ReadUInt32BigEndian(rebuilt.AsSpan(0, 4)));
+			Assert.Equal((uint)(rebuilt.Length - 4), rebuilt.ReadU32Be(0));
 			var back = CharacterMessage(rebuilt).FromProtobuf<ProtoCoreCharacterIIR>();
 			Assert.Equal("Tester", back.Name);
 			Assert.NotNull(back.Bcc); // the tail (after the name) survived the splice
@@ -332,7 +331,7 @@ namespace Faolan.Tests
 		// the 4-byte length prefix at NameInnerLengthOffset.
 		private static byte[] CharacterMessage(byte[] template)
 		{
-			var length = (int)BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.NameInnerLengthOffset, 4));
+			var length = (int)template.ReadU32Be(SpawnPacketBuilder.NameInnerLengthOffset);
 			Assert.Equal(0x0A, template[SpawnPacketBuilder.NameTagOffset]); // field 1 (name)
 			return template.AsSpan(SpawnPacketBuilder.NameTagOffset, length).ToArray();
 		}

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -75,8 +74,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 		{
 			// rawPayload = [bodyLen u32][subop u32][c350 u32][instance u32][seq u16][behaviorId u32][argsLen u32][args][tail]
 			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
-			var behaviorId = BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(18, 4));
-			var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
+			var behaviorId = rawPayload.ReadU32Be(18);
+			var argsLen = (int)rawPayload.ReadU32Be(22);
 			var echoedArgs = InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
 			var tail = tailOverride ?? rawPayload[(26 + argsLen)..];
 
@@ -119,8 +118,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 		{
 			var echoedArgs = InsertBehaviorPhaseField(beginArgs, phase);
 
-			var behaviorId = BinaryPrimitives.ReadUInt32BigEndian(cancelPayload.AsSpan(18, 4));
-			var cancelArgsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(cancelPayload.AsSpan(22, 4));
+			var behaviorId = cancelPayload.ReadU32Be(18);
+			var cancelArgsLen = (int)cancelPayload.ReadU32Be(22);
 			var tail = cancelPayload[(26 + cancelArgsLen)..]; // the range copy is fresh - safe to mutate
 			if (tail.Length > 0)
 				tail[^1] = 0x00; // s2c direction byte (the c2s cancel carried 0x01)
@@ -142,7 +141,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// twice (equip), or the null filler six times (unequip). Byte-exact against the capture (BehaviorAckTests).
 		public static byte[] BuildEquipMoveAckBody(byte[] rawPayload, uint instance, uint phase, Item item)
 		{
-			var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
+			var argsLen = (int)rawPayload.ReadU32Be(22);
 			var reqTail = rawPayload[(26 + argsLen)..];
 
 			using var tail = new FaolanStream();

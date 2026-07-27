@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Cli;
 using Microsoft.EntityFrameworkCore;
@@ -232,8 +232,8 @@ namespace Faolan.Importer.Modules
 				return false;
 			}
 
-			if (blob.Length < 24 || BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(0, 4)) != 1000020 ||
-			    BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(4, 4)) != entry.Id)
+			if (blob.Length < 24 || blob.ReadU32Le(0) != 1000020 ||
+			    blob.ReadU32Le(4) != entry.Id)
 				return false;
 
 			var name = AsciiRuns(blob).Select(r => ClassFeatName().Match(r)).FirstOrDefault(m => m.Success);

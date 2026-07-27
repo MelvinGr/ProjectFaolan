@@ -1,9 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -110,11 +110,11 @@ namespace Faolan.Core.Rdb.Assets
 			if (blob.Length < 24)
 				return [];
 
-			var count = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(16, 4));
+			var count = (int)blob.ReadU32Le(16);
 			if (count is < 1 or > 64 || 20 + count * 4 > blob.Length)
 				return [];
 
-			var first = BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(20, 4));
+			var first = blob.ReadU32Le(20);
 			var pairs = Array.IndexOf(TextureTypes, first) >= 0; // [type,id] vs bare [id]
 			var refs = new List<(uint, uint)>();
 
@@ -124,12 +124,12 @@ namespace Faolan.Core.Rdb.Assets
 					return [];
 
 				for (var i = 0; i < count; i++)
-					refs.Add((BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(20 + i * 8, 4)), BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(24 + i * 8, 4))));
+					refs.Add((blob.ReadU32Le(20 + i * 8), blob.ReadU32Le(24 + i * 8)));
 			}
 			else
 			{
 				for (var i = 0; i < count; i++)
-					refs.Add((1010004, BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(20 + i * 4, 4))));
+					refs.Add((1010004, blob.ReadU32Le(20 + i * 4)));
 			}
 
 			return refs;
@@ -224,8 +224,8 @@ namespace Faolan.Core.Rdb.Assets
 			var p = anchor - 8;
 			while (p >= 0)
 			{
-				var stream = BinaryPrimitives.ReadUInt16LittleEndian(blob.Slice(p, 2));
-				var offset = BinaryPrimitives.ReadUInt16LittleEndian(blob.Slice(p + 2, 2));
+				var stream = blob.ReadU16Le(p);
+				var offset = blob.ReadU16Le(p + 2);
 				var type = blob[p + 4];
 				var usage = blob[p + 6];
 				if (stream != 0 || type > 17 || usage > 13 || offset > 256)
@@ -239,10 +239,6 @@ namespace Faolan.Core.Rdb.Assets
 			return els;
 		}
 
-		private static float ReadFloat(ReadOnlySpan<byte> v, int offset)
-		{
-			return BinaryPrimitives.ReadSingleLittleEndian(v.Slice(offset, 4));
-		}
 
 		private static SubMesh? TryReadSection(ReadOnlySpan<byte> blob, int anchor, out int next)
 		{
@@ -253,8 +249,8 @@ namespace Faolan.Core.Rdb.Assets
 			if (basePos + 8 > blob.Length)
 				return null;
 
-			var stride = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(basePos, 4));
-			var count = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(basePos + 4, 4));
+			var stride = (int)blob.ReadU32Le(basePos);
+			var count = (int)blob.ReadU32Le(basePos + 4);
 			if (stride < 12 || stride > 256 || stride % 4 != 0 || count < 1 || count > 2_000_000)
 				return null;
 
@@ -292,9 +288,9 @@ namespace Faolan.Core.Rdb.Assets
 			for (var i = 0; i < count; i++)
 			{
 				var v = blob.Slice(vbase + i * stride, stride);
-				positions[i * 3 + 0] = ReadFloat(v, posEl.Value.Offset + 0);
-				positions[i * 3 + 1] = ReadFloat(v, posEl.Value.Offset + 4);
-				positions[i * 3 + 2] = ReadFloat(v, posEl.Value.Offset + 8);
+				positions[i * 3 + 0] = v.ReadF32Le(posEl.Value.Offset + 0);
+				positions[i * 3 + 1] = v.ReadF32Le(posEl.Value.Offset + 4);
+				positions[i * 3 + 2] = v.ReadF32Le(posEl.Value.Offset + 8);
 
 				if (normals != null)
 				{
@@ -309,16 +305,16 @@ namespace Faolan.Core.Rdb.Assets
 					var o = uvEl!.Value.Offset;
 					if (uvEl.Value.Type == DeclType.Float2)
 					{
-						uvs[i * 2 + 0] = ReadFloat(v, o + 0);
-						uvs[i * 2 + 1] = ReadFloat(v, o + 4);
+						uvs[i * 2 + 0] = v.ReadF32Le(o + 0);
+						uvs[i * 2 + 1] = v.ReadF32Le(o + 4);
 					}
 					else // Short2N - genuine signed D3D SHORT2N in [-1,1] (short/32767), mapped to [0,1] texture space
 						// via the standard *0.5+0.5 bias. Decoding it unsigned (/65535) is a half-texel shift that LOOKS
 						// plausible mid-torso but tears every triangle crossing the centerline u=0 (verified: 130 torn
 						// tris unsigned vs 0 biased), smearing the texture across the body. The bias keeps it continuous.
 					{
-						uvs[i * 2 + 0] = BinaryPrimitives.ReadInt16LittleEndian(v.Slice(o + 0, 2)) / 32767f * 0.5f + 0.5f;
-						uvs[i * 2 + 1] = BinaryPrimitives.ReadInt16LittleEndian(v.Slice(o + 2, 2)) / 32767f * 0.5f + 0.5f;
+						uvs[i * 2 + 0] = v.ReadI16Le(o + 0) / 32767f * 0.5f + 0.5f;
+						uvs[i * 2 + 1] = v.ReadI16Le(o + 2) / 32767f * 0.5f + 0.5f;
 					}
 				}
 
@@ -335,14 +331,14 @@ namespace Faolan.Core.Rdb.Assets
 			}
 
 			var ibase = vbase + count * stride;
-			var tri = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(ibase, 4));
+			var tri = (int)blob.ReadU32Le(ibase);
 			if (tri < 1 || tri > 2_000_000 || (long)ibase + 4 + (long)tri * 6 > blob.Length)
 				return null;
 
 			var indices = new int[tri * 3];
 			for (var i = 0; i < indices.Length; i++)
 			{
-				var idx = BinaryPrimitives.ReadUInt16LittleEndian(blob.Slice(ibase + 4 + i * 2, 2));
+				var idx = blob.ReadU16Le(ibase + 4 + i * 2);
 				if (idx >= count)
 					return null; // not a real section - bail so the caller keeps scanning
 

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
@@ -65,7 +64,7 @@ namespace Faolan.GameServer
 					// [u32 len][u32 sub][u32 senderType][u32 handle][u32 0][u8 tag][u32 componentIndex?].
 					if (rawPayload.Length >= 25 && rawPayload[20] == 0x03)
 					{
-						var componentIndex = BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(21, 4));
+						var componentIndex = rawPayload.ReadU32Be(21);
 						await _spellweave.AddComponentAsync(client, componentIndex);
 					}
 
@@ -195,9 +194,9 @@ namespace Faolan.GameServer
 					echoBody[12] = 0x00;
 					if (client.Session.IsSpellweaving && echoBody.Length >= 26)
 					{
-						BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(14, 4), acceptedPosition.X);
-						BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(18, 4), acceptedPosition.Y);
-						BinaryPrimitives.WriteSingleBigEndian(echoBody.AsSpan(22, 4), acceptedPosition.Z);
+						echoBody.WriteF32Be(14, acceptedPosition.X);
+						echoBody.WriteF32Be(18, acceptedPosition.Y);
+						echoBody.WriteF32Be(22, acceptedPosition.Z);
 					}
 
 					await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
@@ -316,7 +315,7 @@ namespace Faolan.GameServer
 
 					uint targetHandle = 0;
 					if (data.Length >= 17)
-						targetHandle = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(13, 4));
+						targetHandle = data.ReadU32Be(13);
 					client.Session.SelectedTargetHandle = targetHandle;
 					// #217: a (re-)select is genuine intent to interact - lift the post-close greeting suppression so a
 					// deliberate re-talk opens (the reflexive post-close greeting carries no SelectDeselect).
@@ -1625,7 +1624,7 @@ namespace Faolan.GameServer
 							// Hold the begin's args (only) so the cast-cancel handler can build the state=0x0007 abort that
 							// stops the client's cast bar (#347). The rest of the abort comes from the cancel packet.
 							// Cleared on resolve/cancel.
-							var castArgsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4)); // TODO: just read the packet with FaolanStream instead of rawPayload
+							var castArgsLen = (int)rawPayload.ReadU32Be(22); // TODO: just read the packet with FaolanStream instead of rawPayload
 							client.Session.PendingCastArgs = rawPayload[26..(26 + castArgsLen)];
 							client.Session.PendingCastMode = args.CommandqueueClientId;
 
@@ -1935,7 +1934,7 @@ namespace Faolan.GameServer
 								// The trailing struct (after from/target) carries the item's template handle as a
 								// big-endian uint32; persist the equip into CharacterEquipment.
 								var equipHandle = unk2.Length >= 4
-									? BinaryPrimitives.ReadUInt32BigEndian(unk2.AsSpan(0, 4))
+									? unk2.ReadU32Be(0)
 									: 0;
 								var movedItem = equipHandle != 0
 									? await Database.GetItem(equipHandle)

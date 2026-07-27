@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
@@ -107,8 +107,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			for (var i = 0; i < count; i++)
 			{
 				var off = 1 + i * 8;
-				var statId = (CharacterStatId)BinaryPrimitives.ReadUInt32BigEndian(data.Slice(off, 4));
-				var rawValue = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(off + 4, 4));
+				var statId = (CharacterStatId)data.ReadU32Be(off);
+				var rawValue = data.ReadU32Be(off + 4);
 				block._records.Add((statId, rawValue));
 			}
 

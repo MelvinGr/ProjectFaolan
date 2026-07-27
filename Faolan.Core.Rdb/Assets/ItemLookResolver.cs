@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -30,10 +31,10 @@ namespace Faolan.Core.Rdb.Assets
 			// Byte-packed sub-record, so scan every byte offset (not word-aligned): a field-9 tag followed by the value.
 			for (var i = 4; i + 4 <= decrypted.Length; i++)
 			{
-				if (ReadU32(decrypted, i - 4) != WornMeshField)
+				if (decrypted.ReadU32Le(i - 4) != WornMeshField)
 					continue;
 
-				var meshId = ReadU32(decrypted, i);
+				var meshId = decrypted.ReadU32Le(i);
 				if (meshId is < 1000 or > 20_000_000 || !seen.Add(meshId))
 					continue;
 
@@ -109,10 +110,6 @@ namespace Faolan.Core.Rdb.Assets
 			return Regex.Replace(name, @"\s+", " ").Trim();
 		}
 
-		private static uint ReadU32(ReadOnlySpan<byte> d, int i)
-		{
-			return (uint)(d[i] | (d[i + 1] << 8) | (d[i + 2] << 16) | (d[i + 3] << 24));
-		}
 
 		public readonly record struct WornMesh(uint MeshIndexId, string SourcePath, bool Skinned)
 		{

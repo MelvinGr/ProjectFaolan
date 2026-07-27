@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Importer.Extractors
 {
@@ -37,7 +37,7 @@ namespace Faolan.Importer.Extractors
 				if (Bytes.Length < 12)
 					return [];
 
-				var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(Bytes.AsSpan(8, 4));
+				var headerLen = (int)Bytes.ReadU32Be(8);
 				var bodyStart = 12 + headerLen;
 				return bodyStart <= Bytes.Length
 					? Bytes[bodyStart..]

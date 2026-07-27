@@ -1,5 +1,5 @@
-using System.Buffers.Binary;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
@@ -51,8 +51,8 @@ namespace Faolan.Core.Network.Logging
 			if (body.Length < sizeof(uint) * 2)
 				return false;
 
-			payloadLength = BinaryPrimitives.ReadUInt32BigEndian(body);
-			iir = BinaryPrimitives.ReadUInt32BigEndian(body[sizeof(uint)..]);
+			payloadLength = body.ReadU32Be(0);
+			iir = body.ReadU32Be(sizeof(uint));
 			return true;
 		}
 	}

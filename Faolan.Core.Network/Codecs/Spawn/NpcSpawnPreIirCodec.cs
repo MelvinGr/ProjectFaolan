@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -60,7 +60,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			{
 				if (isSublist)
 				{
-					if (o + 4 > coreCharOffset || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(o, 4)) != ListFrame.Unit)
+					if (o + 4 > coreCharOffset || body.ReadU32Be(o) != ListFrame.Unit)
 						return false; // count>0 sublist - variable-width, out of scope
 
 					result.Sublist = body[o..(o + 4)];
@@ -70,7 +70,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					result.Flags[bi++] = body[o++];
 				else
 				{
-					result.Words[wi++] = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(o, 4));
+					result.Words[wi++] = body.ReadU32Be(o);
 					o += 4;
 				}
 			}

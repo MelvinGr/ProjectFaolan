@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using Faolan.Core;
@@ -32,7 +31,7 @@ namespace Faolan.Tests
 			foreach (var newRoot in new[] { rootLen, rootLen - 370, 65, 0, rootLen + 2000 })
 			{
 				var p = FullCharSnapshotCodec.BuildPrefix(newRoot);
-				Assert.Equal((uint)newRoot, BinaryPrimitives.ReadUInt32BigEndian(p.AsSpan(1, 4)));
+				Assert.Equal((uint)newRoot, p.ReadU32Be(1));
 				Assert.Equal(prefix[0], p[0]); // flag
 			}
 
@@ -45,13 +44,13 @@ namespace Faolan.Tests
 		public void CapturedPrefix_EncodesBe32BlobLength(string bin, uint expectedBlobLen)
 		{
 			var (prefix, rootLen, tails) = Split(bin);
-			var be32 = BinaryPrimitives.ReadUInt32BigEndian(prefix.AsSpan(1, 4));
+			var be32 = prefix.ReadU32Be(1);
 			Assert.Equal(expectedBlobLen, be32); // matches the byte-level capture
 			Assert.Equal((uint)rootLen, be32); // blobLen == rootLen (the prefix carries no payload of its own)
 			Assert.Equal((byte)0x00, prefix[0]); // flag
 			// The blob ends exactly at the root's end; the version 0x18 sits at tails offset 0 (= blob end).
 			Assert.True(tails.Length >= 4);
-			Assert.Equal(0x18u, BinaryPrimitives.ReadUInt32BigEndian(tails.AsSpan(0, 4)));
+			Assert.Equal(0x18u, tails.ReadU32Be(0));
 		}
 
 		// End-to-end: a DB-generated root with a DIFFERENT length than the capture, reassembled with the
@@ -96,7 +95,7 @@ namespace Faolan.Tests
 			// BuildSnapshotPrefix is the production path (the old SetSnapshotBlobLength patched a CAPTURED prefix and
 			// was retired when the prefix started being built from scratch).
 			var newPrefix = FullCharSnapshotCodec.BuildPrefix(genRoot.Length);
-			Assert.Equal((uint)genRoot.Length, BinaryPrimitives.ReadUInt32BigEndian(newPrefix.AsSpan(1, 4)));
+			Assert.Equal((uint)genRoot.Length, newPrefix.ReadU32Be(1));
 
 			// Reassemble [subop][c350][instance][newPrefix][genRoot][tails] and re-split.
 			using var content = new FaolanStream();

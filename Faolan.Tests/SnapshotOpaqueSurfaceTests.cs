@@ -1,9 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Tests.Support;
 using Xunit;
@@ -87,7 +87,7 @@ namespace Faolan.Tests
 		{
 			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
 			{
-				var declared = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
+				var declared = body.ReadU32Be(0);
 				if (declared + 4 > body.Length)
 					continue; // truncated capture - the TCP-reassembly gap on compressed downloads
 

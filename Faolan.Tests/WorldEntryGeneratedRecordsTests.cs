@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.GameServer;
 using Faolan.GameServer.World;
 using Faolan.Tests.Support;
@@ -80,9 +80,9 @@ namespace Faolan.Tests
 		// [u32 TypeTag][u32 Handle][u32 FieldA][payload]. Test-local so these assert the generated body field-by-field.
 		private static (uint Opcode, uint IirType, uint Handle, uint FieldA, byte[] Body) DecodeIir(byte[] packet)
 		{
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			return (BinaryPrimitives.ReadUInt16BigEndian(packet.AsSpan(bodyStart - 2, 2)), BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 4, 4)),
-				BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 12, 4)), BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(bodyStart + 16, 4)), packet[(bodyStart + 20)..]);
+			var bodyStart = 12 + (int)packet.ReadU32Be(8);
+			return (packet.ReadU16Be(bodyStart - 2), packet.ReadU32Be(bodyStart + 4),
+				packet.ReadU32Be(bodyStart + 12), packet.ReadU32Be(bodyStart + 16), packet[(bodyStart + 20)..]);
 		}
 	}
 }

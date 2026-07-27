@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -32,14 +32,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			// Frame as the [u32 len][u32 FA015807][record] template SpawnPacketBuilder consumes/produces.
 			var template = new byte[8 + record.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(template.AsSpan(0, 4), (uint)(4 + record.Length));
-			BinaryPrimitives.WriteUInt32BigEndian(template.AsSpan(4, 4), 0xFA015807u);
+			template.WriteU32Be(0, (uint)(4 + record.Length));
+			template.WriteU32Be(4, 0xFA015807u);
 			record.CopyTo(template, 8);
 
 			if (!PlayerSpawnReader.TryReadCharacterMessage(record, out var read))
 				return record;
 
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(4, 4));
+			var handle = record.ReadU32Be(4);
 			var full = SpawnPacketBuilder.BuildSpawn(template, handle, PositionOf(template), RotationOf(template), read.Message);
 			SpawnPlayfieldRewriter.TryRewrite(full, playfieldInstance); // best-effort: keeps the captured token if it can't
 			return full[8..];
@@ -47,15 +47,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		private static Vector3 PositionOf(byte[] template)
 		{
-			return new Vector3(BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.PosXOffset, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.PosYOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.PosZOffset, 4)));
+			return new Vector3(template.ReadF32Le(SpawnPacketBuilder.PosXOffset),
+				template.ReadF32Le(SpawnPacketBuilder.PosYOffset), template.ReadF32Le(SpawnPacketBuilder.PosZOffset));
 		}
 
 		private static Quaternion RotationOf(byte[] template)
 		{
-			return new Quaternion(BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.RotXOffset, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.RotYOffset, 4)), BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.RotZOffset, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(template.AsSpan(SpawnPacketBuilder.RotWOffset, 4)));
+			return new Quaternion(template.ReadF32Le(SpawnPacketBuilder.RotXOffset),
+				template.ReadF32Le(SpawnPacketBuilder.RotYOffset), template.ReadF32Le(SpawnPacketBuilder.RotZOffset),
+				template.ReadF32Le(SpawnPacketBuilder.RotWOffset));
 		}
 	}
 }

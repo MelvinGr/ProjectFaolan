@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Extensions;
 using Faolan.Importer.Rdb;
 using Xunit;
 
@@ -50,9 +50,9 @@ namespace Faolan.Tests
 		{
 			var bytes = Encoding.ASCII.GetBytes(text);
 			var buf = new byte[8 + bytes.Length];
-			BinaryPrimitives.WriteUInt32LittleEndian(buf.AsSpan(0, 4), 0x21);
-			BinaryPrimitives.WriteUInt16LittleEndian(buf.AsSpan(4, 2), (ushort)bytes.Length);
-			BinaryPrimitives.WriteUInt16LittleEndian(buf.AsSpan(6, 2), flags);
+			buf.WriteU32Le(0, 0x21);
+			buf.WriteU16Le(4, (ushort)bytes.Length);
+			buf.WriteU16Le(6, flags);
 			bytes.CopyTo(buf.AsSpan(8));
 			return buf;
 		}

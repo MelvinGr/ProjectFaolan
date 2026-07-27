@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Enums;
@@ -44,7 +43,7 @@ namespace Faolan.Tests
 			// used to be read as a trailing "field5" (28 81 06) are the ROOT's own subscription_flags varint.
 			Assert.Equal(5, prefix.Length);
 			Assert.Equal((byte)0x00, prefix[0]); // flag
-			Assert.Equal(root.Length, (int)BinaryPrimitives.ReadUInt32BigEndian(prefix.AsSpan(1, 4)));
+			Assert.Equal(root.Length, (int)prefix.ReadU32Be(1));
 			Assert.Equal(0x28, root[0]); // root leads with field 5 (subscription_flags) on this beach capture
 		}
 

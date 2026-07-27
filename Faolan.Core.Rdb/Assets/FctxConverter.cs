@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using System.Text;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -32,10 +32,10 @@ namespace Faolan.Core.Rdb.Assets
 				return Result.Fail("FCTX payload shorter than its 24-byte header");
 
 			// FCTX header: magic[4], unknown1 u32, unknown2 u32, width u16, height u16, mip1 u8, mip2 u8, unk3 u16, fourcc[4].
-			var unknown1 = BinaryPrimitives.ReadUInt32LittleEndian(payload.Slice(4, 4));
-			var unknown2 = BinaryPrimitives.ReadUInt32LittleEndian(payload.Slice(8, 4));
-			int width = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(12, 2));
-			int height = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(14, 2));
+			var unknown1 = payload.ReadU32Le(4);
+			var unknown2 = payload.ReadU32Le(8);
+			int width = payload.ReadU16Le(12);
+			int height = payload.ReadU16Le(14);
 			int mip = payload[16];
 			var fourCc = Encoding.ASCII.GetString(payload.Slice(20, 4));
 			if (mip < 1)
@@ -93,8 +93,8 @@ namespace Faolan.Core.Rdb.Assets
 			if (!IsFctx(payload) || payload.Length < 24)
 				return false;
 
-			width = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(12, 2));
-			height = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(14, 2));
+			width = payload.ReadU16Le(12);
+			height = payload.ReadU16Le(14);
 			var mip = Math.Max(1, (int)payload[16]);
 			if (Encoding.ASCII.GetString(payload.Slice(20, 4)) != "MIXD")
 				return false;
@@ -120,8 +120,8 @@ namespace Faolan.Core.Rdb.Assets
 			if (!IsFctx(payload) || payload.Length < 24)
 				return false;
 
-			width = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(12, 2));
-			height = BinaryPrimitives.ReadUInt16LittleEndian(payload.Slice(14, 2));
+			width = payload.ReadU16Le(12);
+			height = payload.ReadU16Le(14);
 			var mip = Math.Max(1, (int)payload[16]);
 			var fourCc = Encoding.ASCII.GetString(payload.Slice(20, 4));
 			var blockSize = BlockSizeFor(fourCc);
@@ -169,33 +169,28 @@ namespace Faolan.Core.Rdb.Assets
 		{
 			var dds = new byte[128 + body.Length];
 
-			U32(0, DdsMagic);
-			U32(4, 124); // header size
-			U32(8, DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT | DDSD_MIPMAPCOUNT);
-			U32(12, (uint)height);
-			U32(16, (uint)width);
+			dds.WriteU32Le(0, DdsMagic);
+			dds.WriteU32Le(4, 124); // header size
+			dds.WriteU32Le(8, DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_PIXELFORMAT | DDSD_MIPMAPCOUNT);
+			dds.WriteU32Le(12, (uint)height);
+			dds.WriteU32Le(16, (uint)width);
 			// pitchOrLinearSize (20), depth (24) left 0; mipMapCount:
-			U32(28, (uint)mip);
+			dds.WriteU32Le(28, (uint)mip);
 			// reserved1[11] @32..76 left 0.
 			// DDS_PIXELFORMAT @76:
-			U32(76, 32); // pixelformat size
-			U32(80, DDPF_FOURCC);
+			dds.WriteU32Le(76, 32); // pixelformat size
+			dds.WriteU32Le(80, DDPF_FOURCC);
 			Encoding.ASCII.GetBytes(fourCc).CopyTo(dds.AsSpan(84, 4)); // fourCC
-			U32(88, 0x18); // RGBBitCount (vestigial under fourcc, mirrors the C++ guess)
-			U32(92, 0x00ff0000); // R mask
-			U32(96, 0x0000ff00); // G mask
-			U32(100, 0x000000ff); // B mask
+			dds.WriteU32Le(88, 0x18); // RGBBitCount (vestigial under fourcc, mirrors the C++ guess)
+			dds.WriteU32Le(92, 0x00ff0000); // R mask
+			dds.WriteU32Le(96, 0x0000ff00); // G mask
+			dds.WriteU32Le(100, 0x000000ff); // B mask
 			// A mask (104) left 0.
-			U32(108, DDSCAPS_COMPLEX | DDSCAPS_MIPMAP | DDSCAPS_TEXTURE); // caps
+			dds.WriteU32Le(108, DDSCAPS_COMPLEX | DDSCAPS_MIPMAP | DDSCAPS_TEXTURE); // caps
 			// caps2..4 (112,116,120) + reserved2 (124) left 0.
 
 			body.CopyTo(dds.AsSpan(128));
 			return dds;
-
-			void U32(int off, uint v)
-			{
-				BinaryPrimitives.WriteUInt32LittleEndian(dds.AsSpan(off, 4), v);
-			}
 		}
 
 		// Extract + decode the full-res mip of the trailing ATI1/BC4 detail map from a MIXD container's pixel bytes (the

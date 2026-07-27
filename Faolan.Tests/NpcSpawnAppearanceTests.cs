@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
 using Faolan.Core;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
@@ -56,7 +56,7 @@ namespace Faolan.Tests
 			var runtimeBody = new byte[postStart + runtimePost.Length];
 			Array.Copy(body, runtimeBody, postStart);
 			runtimePost.CopyTo(runtimeBody, postStart);
-			BinaryPrimitives.WriteUInt32BigEndian(runtimeBody, (uint)(runtimeBody.Length - 4));
+			runtimeBody.WriteU32Be(0, (uint)(runtimeBody.Length - 4));
 
 			Assert.False(NpcSpawnAppearanceCodec.TryDecodeAppearance(runtimeBody, out _));
 			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(runtimeBody, out var lenientMorphs));

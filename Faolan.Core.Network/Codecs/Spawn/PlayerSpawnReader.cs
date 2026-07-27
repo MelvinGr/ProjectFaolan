@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
@@ -34,7 +33,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				if (!IsPrintableAscii(body, i + 2, nameLen))
 					continue;
 
-				var messageLength = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i - 4, 4));
+				var messageLength = (int)body.ReadU32Be(i - 4);
 				if (messageLength < nameLen + 2 || i + messageLength > body.Length)
 					continue;
 

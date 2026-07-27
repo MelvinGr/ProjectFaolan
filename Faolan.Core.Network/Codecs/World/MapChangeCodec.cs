@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
@@ -36,7 +36,7 @@ namespace Faolan.Core.Network.Codecs.World
 			parsed = null;
 			if (iirContent.Length < 4 + MapIdBodyOffset + 4)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(iirContent[..4]) != Opcode)
+			if (iirContent.ReadU32Be(0) != Opcode)
 				return false;
 
 			parsed = new Parsed(Word(iirContent, MapIdBodyOffset)!.Value, Word(iirContent, FlagsBodyOffset),
@@ -49,7 +49,7 @@ namespace Faolan.Core.Network.Codecs.World
 		private static uint? Word(ReadOnlySpan<byte> iirContent, int bodyOffset)
 		{
 			return iirContent.Length >= 4 + bodyOffset + 4
-				? BinaryPrimitives.ReadUInt32BigEndian(iirContent.Slice(4 + bodyOffset, 4))
+				? iirContent.ReadU32Be(4 + bodyOffset)
 				: null;
 		}
 

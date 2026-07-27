@@ -1,9 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Importer.Extractors;
@@ -406,9 +406,9 @@ namespace Faolan.Tests
 					continue;
 
 				// block header = [questId][1][questId]; find it and take 879 bytes.
-				BinaryPrimitives.WriteUInt32BigEndian(needle[..4], questId);
-				BinaryPrimitives.WriteUInt32BigEndian(needle.Slice(4, 4), 1);
-				BinaryPrimitives.WriteUInt32BigEndian(needle.Slice(8, 4), questId);
+				needle.WriteU32Be(0, questId);
+				needle.WriteU32Be(4, 1);
+				needle.WriteU32Be(8, questId);
 				for (var i = 0; i + 879 <= body.Length; i++)
 				{
 					if (body.AsSpan(i, 12).SequenceEqual(needle))

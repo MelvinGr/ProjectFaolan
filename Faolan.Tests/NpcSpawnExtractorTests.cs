@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Extensions;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
@@ -64,8 +64,8 @@ namespace Faolan.Tests
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			var content = new byte[34];
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(0, 4), 0x5D85BFC7);
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(30, 4), mapId);
+			content.WriteU32Be(0, 0x5D85BFC7);
+			content.WriteU32Be(30, mapId);
 			return Packet(content);
 		}
 
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 		private static CapturedPacket Packet(byte[] content)
 		{
 			var body = new byte[4 + content.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)content.Length);
+			body.WriteU32Be(0, (uint)content.Length);
 			content.CopyTo(body, 4);
 
 			var full = new byte[12 + body.Length]; // headerLen (full[8..12]) stays 0
@@ -94,11 +94,11 @@ namespace Faolan.Tests
 		{
 			var nameBytes = Encoding.ASCII.GetBytes(name);
 			var content = new byte[Math.Max(56, 42 + nameBytes.Length)]; // >= the transform end (body offset 60)
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(0, 4), 0xFA015807);
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(8, 4), handle); // body@12
-			BinaryPrimitives.WriteSingleLittleEndian(content.AsSpan(20, 4), x); // body@24
-			BinaryPrimitives.WriteSingleLittleEndian(content.AsSpan(25, 4), y); // body@29
-			BinaryPrimitives.WriteSingleLittleEndian(content.AsSpan(30, 4), z); // body@34
+			content.WriteU32Be(0, 0xFA015807);
+			content.WriteU32Be(8, handle); // body@12
+			content.WriteF32Le(20, x); // body@24
+			content.WriteF32Le(25, y); // body@29
+			content.WriteF32Le(30, z); // body@34
 			content[40] = 0x0A; // body@44: name marker (>40)
 			content[41] = (byte)nameBytes.Length;
 			nameBytes.CopyTo(content.AsSpan(42));

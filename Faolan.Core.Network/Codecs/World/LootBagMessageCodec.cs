@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
 
@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.World
 			var protobuf = ms.ToArray();
 
 			var outBytes = new byte[4 + protobuf.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(outBytes.AsSpan(0, 4), (uint)protobuf.Length);
+			outBytes.WriteU32Be(0, (uint)protobuf.Length);
 			protobuf.CopyTo(outBytes, 4);
 			return outBytes;
 		}
@@ -83,7 +83,7 @@ namespace Faolan.Core.Network.Codecs.World
 			contentsStart = 0;
 			for (var k = 0; k + 4 <= record.Length; k++)
 			{
-				var len = BinaryPrimitives.ReadUInt32BigEndian(record.Slice(k, 4));
+				var len = record.ReadU32Be(k);
 				if (len == 0 || k + 4 + len != record.Length)
 					continue;
 

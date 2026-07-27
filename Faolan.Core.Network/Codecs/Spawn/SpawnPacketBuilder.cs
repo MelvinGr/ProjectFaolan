@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
@@ -60,10 +59,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// SpawnStrieTemplate golden).
 		public static byte[] BuildSpawnBody(byte[] template, uint handle, ProtoVec3 position, ProtoQuat rotation)
 		{
-			var bodyLength = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(0, 4));
-			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(4, 4));
-			var ack = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(8, 4));
-			var fieldA = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(16, 4));
+			var bodyLength = template.ReadU32Be(0);
+			var subOpcode = template.ReadU32Be(4);
+			var ack = template.ReadU32Be(8);
+			var fieldA = template.ReadU32Be(16);
 
 			return new FaolanStream()
 				.WriteUInt32(bodyLength)
@@ -121,8 +120,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// (PlayerSpawnScaffoldRows) is superseding - kept while CreateEditorCharBuilder still rides SetCharacterMessage.
 		private static void AddBigEndian(byte[] buffer, int offset, int delta)
 		{
-			var value = (uint)(BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan(offset, 4)) + delta);
-			BinaryPrimitives.WriteUInt32BigEndian(buffer.AsSpan(offset, 4), value);
+			var value = (uint)(buffer.ReadU32Be(offset) + delta);
+			buffer.WriteU32Be(offset, value);
 		}
 	}
 }

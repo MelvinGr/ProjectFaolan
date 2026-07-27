@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,12 +6,12 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-
-using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Captures
 {
@@ -598,7 +597,7 @@ namespace Faolan.Importer.Captures
 				uint id;
 				if (isCombo)
 				{
-					if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob || body.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ComboBookSubOpcode)
+					if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob || body.Length < 22 || body.ReadU32Be(4) != ComboBookSubOpcode)
 						return;
 
 					id = ComboBookIirCodec.Message.Read(new FaolanStream(body)).ComboId;

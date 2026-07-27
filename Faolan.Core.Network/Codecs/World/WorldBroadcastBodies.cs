@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 
@@ -56,7 +56,7 @@ namespace Faolan.Core.Network.Codecs.World
 			var result = new byte[8 + newRecordLen];
 			body.AsSpan(0, 8 + contentsStart).CopyTo(result); // [u32 len][u32 subOpcode][identity + kd-tree]
 			newContents.CopyTo(result.AsSpan(8 + contentsStart)); // the new [u32 len][ProtoLootBagIIR] tail
-			BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(0, 4), (uint)(4 + newRecordLen)); // carrier len = subOpcode + record
+			result.WriteU32Be(0, (uint)(4 + newRecordLen)); // carrier len = subOpcode + record
 			return result;
 		}
 	}

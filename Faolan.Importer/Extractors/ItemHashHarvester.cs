@@ -1,9 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
@@ -242,10 +242,10 @@ namespace Faolan.Importer.Extractors
 				if (claim.ItemTemplateId == 0 || key.Length < ClaimEntry.KeyLength)
 					continue;
 
-				var d1 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(0));
-				var d2 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(4));
-				var d3 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(8));
-				var d4 = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(12));
+				var d1 = key.ReadU32Be(0);
+				var d2 = key.ReadU32Be(4);
+				var d3 = key.ReadU32Be(8);
+				var d4 = key.ReadU32Be(12);
 				if ((d1 | d2 | d3 | d4) == 0)
 					continue;
 
@@ -341,7 +341,7 @@ namespace Faolan.Importer.Extractors
 			if (packetBytes.Length < 12 + 32)
 				return;
 
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packetBytes.AsSpan(8, 4));
+			var headerLen = (int)packetBytes.ReadU32Be(8);
 			var bodyStart = 12 + headerLen;
 			if (bodyStart >= packetBytes.Length)
 				return;
@@ -364,7 +364,7 @@ namespace Faolan.Importer.Extractors
 			if (packetBytes == null || packetBytes.Length < 12)
 				return;
 
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(packetBytes.AsSpan(8, 4));
+			var headerLen = (int)packetBytes.ReadU32Be(8);
 			var bodyStart = 12 + headerLen;
 			if (bodyStart >= packetBytes.Length)
 				return;

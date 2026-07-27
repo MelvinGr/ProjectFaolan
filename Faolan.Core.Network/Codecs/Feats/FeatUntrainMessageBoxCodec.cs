@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Feats
 {
@@ -31,7 +31,7 @@ namespace Faolan.Core.Network.Codecs.Feats
 				return false;
 
 			answer = body[0];
-			token = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(1 + 12, 4));
+			token = body.ReadU32Be(1 + 12);
 			return true;
 		}
 	}

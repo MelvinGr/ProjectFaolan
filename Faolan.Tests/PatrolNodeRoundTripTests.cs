@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Tests.Support;
 using Xunit;
@@ -38,11 +38,11 @@ namespace Faolan.Tests
 		public static IEnumerable<object[]> Bodies()
 		{
 			var blob = Golden.Bytes("PatrolBodies");
-			var count = BinaryPrimitives.ReadUInt32BigEndian(blob.AsSpan(0, 4));
+			var count = blob.ReadU32Be(0);
 			var offset = 4;
 			for (var i = 0; i < count; i++)
 			{
-				var len = (int)BinaryPrimitives.ReadUInt32BigEndian(blob.AsSpan(offset, 4));
+				var len = (int)blob.ReadU32Be(offset);
 				offset += 4;
 				yield return [blob[offset..(offset + len)], i];
 

@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -174,8 +174,8 @@ namespace Faolan.Core.Rdb.Assets
 			if (vCountOff + 8 > body.Length)
 				return false;
 
-			var nVerts = (int)BinaryPrimitives.ReadUInt32LittleEndian(body[vCountOff..]);
-			var nTris = (int)BinaryPrimitives.ReadUInt32LittleEndian(body[(vCountOff + 4)..]);
+			var nVerts = (int)body.ReadU32Le(vCountOff);
+			var nTris = (int)body.ReadU32Le(vCountOff + 4);
 			if (nVerts <= 0 || nTris <= 0 || nVerts > 5_000_000 || nTris > 10_000_000)
 				return false;
 
@@ -187,7 +187,7 @@ namespace Faolan.Core.Rdb.Assets
 			var baseVert = verts.Count / 3;
 			var vSpan = body.Slice(vStart, (int)vBytes);
 			for (var i = 0; i < nVerts * 3; i++)
-				verts.Add(BinaryPrimitives.ReadSingleLittleEndian(vSpan[(i * 4)..]));
+				verts.Add(vSpan.ReadF32Le(i * 4));
 
 			// Index width = the smallest that indexes nVerts (matches the PhysX cooker).
 			var width = nVerts <= 256
@@ -209,8 +209,8 @@ namespace Faolan.Core.Rdb.Assets
 				var idx = width switch
 				{
 					1 => body[o],
-					2 => BinaryPrimitives.ReadUInt16LittleEndian(body[o..]),
-					_ => (int)BinaryPrimitives.ReadUInt32LittleEndian(body[o..])
+					2 => body.ReadU16Le(o),
+					_ => (int)body.ReadU32Le(o)
 				};
 
 				if (idx >= nVerts)

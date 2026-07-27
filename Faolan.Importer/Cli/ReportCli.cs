@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -12,6 +11,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
@@ -254,9 +254,9 @@ namespace Faolan.Importer.Cli
 						var w = new uint[b.Length / 4];
 						for (var i = 3; i + 1 < w.Length; i += 2)
 						{
-							var f = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(i * 4, 4));
+							var f = b.ReadU32Le(i * 4);
 							if (f == 551)
-								mag = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan((i + 1) * 4, 4));
+								mag = b.ReadU32Le((i + 1) * 4);
 						}
 
 						var modStr = string.Join(", ", mods.Select(m => $"0x{m.StatId:x}={m.WireAmount}"));
@@ -536,7 +536,7 @@ namespace Faolan.Importer.Cli
 			foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
 			{
 				var body = e.Data is { Length: >= 12 }
-					? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
+					? e.Data[(12 + (int)e.Data.ReadU32Be(8))..]
 					: null;
 				var anim = body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read)
 					? read.Message?.Bcc?.AnimIdleId.ToString() ?? "(no bcc)"
@@ -686,7 +686,7 @@ namespace Faolan.Importer.Cli
 			foreach (var e in NpcSpawnExtractor.Extract(c.Packets).Where(e => e.Name == target))
 			{
 				var body = e.Data is { Length: >= 12 }
-					? e.Data[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(e.Data.AsSpan(8, 4)))..]
+					? e.Data[(12 + (int)e.Data.ReadU32Be(8))..]
 					: null;
 				if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 				{
@@ -784,7 +784,7 @@ namespace Faolan.Importer.Cli
 				var len = 0;
 				for (var j = start; j + 1 < words; j += 2)
 				{
-					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					var fid = body.ReadU32Le(j * 4);
 					if (fid == 0 || fid > 2000 || (have && fid >= last))
 						break;
 
@@ -806,11 +806,11 @@ namespace Faolan.Importer.Cli
 				var have = false;
 				for (var j = bestStart; j + 1 < words; j += 2)
 				{
-					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					var fid = body.ReadU32Le(j * 4);
 					if (fid == 0 || fid > 2000 || (have && fid >= last))
 						break;
 
-					var val = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
+					var val = body.ReadU32Le((j + 1) * 4);
 					var resolves = "";
 					foreach (var t in new uint[] { 1010030, 1010201, 1010001, 1010200, 1000700, 1010700 })
 					{
@@ -829,7 +829,7 @@ namespace Faolan.Importer.Cli
 			var refTypes = new uint[] { 1010030, 1010201, 1010001, 1010200 };
 			for (var i = 0; i + 4 <= body.Length; i += 4)
 			{
-				var v = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4));
+				var v = body.ReadU32Le(i);
 				if (v < 1000)
 					continue;
 
@@ -962,11 +962,11 @@ namespace Faolan.Importer.Cli
 				if (p.Opcode != 0x2000u || p.SubOpcode != (uint)GameServer0X2000Opcodes.PlayfieldFIIR || p.Bytes.Length < 16)
 					continue;
 
-				var body = p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..];
+				var body = p.Bytes[(12 + (int)p.Bytes.ReadU32Be(8))..];
 				if (body.Length < 79)
 					continue;
 
-				var map = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+				var map = body.ReadU32Be(34);
 				var masked = (byte[])body.Clone();
 				Array.Clear(masked, 42, 4); // instance
 				Array.Clear(masked, 58, 4); // playfield token
@@ -1388,14 +1388,14 @@ namespace Faolan.Importer.Cli
 					continue;
 				}
 
-				var count = BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(12, 4));
+				var count = blob.ReadU32Le(12);
 				Console.WriteLine($"tweak table type={tweakType} id={entry.Id}: {blob.Length} B, declares {count} tweak(s)");
 				var off = 16;
 				var read = 0;
 				var shown = 0;
 				while (off + 4 <= blob.Length && read < count)
 				{
-					var len = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.AsSpan(off, 4));
+					var len = (int)blob.ReadU32Le(off);
 					if (len <= 0 || off + 4 + len + 8 > blob.Length)
 						break;
 
@@ -1503,8 +1503,8 @@ namespace Faolan.Importer.Cli
 					continue;
 				}
 
-				var version = BinaryPrimitives.ReadInt32LittleEndian(blob.AsSpan(12, 4));
-				var count = BinaryPrimitives.ReadInt32LittleEndian(blob.AsSpan(16, 4));
+				var version = blob.ReadI32Le(12);
+				var count = blob.ReadI32Le(16);
 				var expected = 20 + count * 56;
 				Console.WriteLine($"type={tableType} id={entry.Id}: {blob.Length} B, version={version}, {count} record(s)" +
 				                  (blob.Length == expected
@@ -1515,7 +1515,7 @@ namespace Faolan.Importer.Cli
 				{
 					var r = new int[14];
 					for (var k = 0; k < 14; k++)
-						r[k] = BinaryPrimitives.ReadInt32LittleEndian(blob.AsSpan(20 + i * 56 + k * 4, 4));
+						r[k] = blob.ReadI32Le(20 + i * 56 + k * 4);
 
 					var cls = ((Class)r[1]).ToString();
 					if (filter != null && !cls.Contains(filter, StringComparison.OrdinalIgnoreCase) && !r[1].ToString().Contains(filter))
@@ -1656,11 +1656,11 @@ namespace Faolan.Importer.Cli
 				var cur = new Dictionary<uint, uint>();
 				for (var j = start; j + 1 < words; j++)
 				{
-					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					var fid = body.ReadU32Le(j * 4);
 					if (fid == 0 || fid > 2000 || (haveLast && fid <= last))
 						break;
 
-					cur[fid] = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
+					cur[fid] = body.ReadU32Le((j + 1) * 4);
 					last = fid;
 					haveLast = true;
 					j++;
@@ -1701,7 +1701,7 @@ namespace Faolan.Importer.Cli
 					continue;
 
 				var body = p.Bytes.Length >= 16
-					? p.Bytes[(12 + (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4)))..]
+					? p.Bytes[(12 + (int)p.Bytes.ReadU32Be(8))..]
 					: [];
 				if (body.Length >= 16)
 					snaps.Add((c.Name, body));
@@ -1716,7 +1716,7 @@ namespace Faolan.Importer.Cli
 						positions.Add(i);
 				}
 
-				var instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+				var instance = body.ReadU32Be(12);
 				Console.WriteLine(
 					$"{cap[..Math.Min(46, cap.Length)],-46} size={body.Length,8} instance=0x{instance:X8} 0x{(uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR:X8}@[{string.Join(",", positions)}]");
 				Console.WriteLine($"    first48: {Convert.ToHexString(body.AsSpan(0, Math.Min(48, body.Length)))}");

@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -79,10 +79,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				return false;
 
 			var post = body.AsSpan(read.Offset + read.Length);
-			if (post.Length < 12 || BinaryPrimitives.ReadUInt32BigEndian(post) != HeaderWord0)
+			if (post.Length < 12 || post.ReadU32Be(0) != HeaderWord0)
 				return false;
 
-			recordCount = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(8, 4));
+			recordCount = post.ReadU32Be(8);
 			return recordCount is MinimalRecordCount or MinimalHumanoidRecordCount;
 		}
 	}

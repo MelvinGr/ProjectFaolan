@@ -1,9 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
@@ -76,7 +76,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			var prefix = new byte[PrefixLength];
 			prefix[0] = 0x00; // flag
-			BinaryPrimitives.WriteUInt32BigEndian(prefix.AsSpan(1, 4), (uint)rootLength);
+			prefix.WriteU32Be(1, (uint)rootLength);
 			return prefix;
 		}
 

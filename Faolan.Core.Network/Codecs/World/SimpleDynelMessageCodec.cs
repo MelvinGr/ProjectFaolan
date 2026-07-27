@@ -1,9 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
@@ -69,7 +69,7 @@ namespace Faolan.Core.Network.Codecs.World
 			var protobuf = ms.ToArray();
 
 			var outBytes = new byte[4 + protobuf.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(outBytes.AsSpan(0, 4), (uint)protobuf.Length);
+			outBytes.WriteU32Be(0, (uint)protobuf.Length);
 			protobuf.CopyTo(outBytes, 4);
 			return outBytes;
 		}
@@ -164,7 +164,7 @@ namespace Faolan.Core.Network.Codecs.World
 			if (!TryLocateMessage(record, out var offset))
 				return false;
 
-			var blobLen = (int)BinaryPrimitives.ReadUInt32BigEndian(record.Slice(offset, 4));
+			var blobLen = (int)record.ReadU32Be(offset);
 			if (offset + 4 + blobLen > record.Length)
 				return false;
 

@@ -1,14 +1,13 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
-
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -46,11 +45,11 @@ namespace Faolan.Importer.Extractors
 				if (body.Length < 8)
 					continue;
 
-				var subop = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4));
+				var subop = body.ReadU32Be(4);
 				if (subop == MapChangeSubOpcode)
 				{
 					if (body.Length >= 38)
-						currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+						currentMap = body.ReadU32Be(34);
 					continue;
 				}
 

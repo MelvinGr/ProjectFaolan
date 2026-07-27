@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 
@@ -64,7 +64,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 			Span<uint> f = stackalloc uint[20];
 			for (var i = 0; i < 20; i++)
-				f[i] = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(i * 4, 4));
+				f[i] = body.ReadU32Be(i * 4);
 
 			var slot = f[0];
 			var id = f[1];

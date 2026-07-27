@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Tests.Support;
@@ -25,7 +25,7 @@ namespace Faolan.Tests
 		{
 			var capturedBody = Golden.Bytes(golden);
 			var row = RowFromCapturedBody(capturedBody);
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(capturedBody.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
+			var handle = capturedBody.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 
 			var body = WorldObjectBuilder.Build(row, handle, ReadToken(capturedBody));
 			Assert.Equal(capturedBody, body);
@@ -39,7 +39,7 @@ namespace Faolan.Tests
 		{
 			var capturedBody = Golden.Bytes("WorldObjChest");
 			var row = RowFromCapturedBody(capturedBody);
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(capturedBody.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
+			var handle = capturedBody.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 
 			var body = WorldObjectBuilder.Build(row, handle, ReadToken(capturedBody));
 
@@ -49,7 +49,7 @@ namespace Faolan.Tests
 			// From byte 4: the body-length word at [0] legitimately differs, since an empty contents scaffold is
 			// shorter than the captured chest's loot. Everything the columns own must still match to the byte.
 			Assert.Equal(capturedBody[4..contentsStart], body[4..contentsStart]);
-			Assert.Equal((uint)(body.Length - 4), BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4)));
+			Assert.Equal((uint)(body.Length - 4), body.ReadU32Be(0));
 		}
 
 		[Fact]
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			var body = WorldObjectBuilder.Build(row, 0x000B5678u, ReadToken(capturedBody));
 
 			Assert.Equal(capturedBody.Length, body.Length);
-			Assert.Equal(0x000B5678u, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(SpawnPacketBuilder.HandleOffset, 4)));
+			Assert.Equal(0x000B5678u, body.ReadU32Be(SpawnPacketBuilder.HandleOffset));
 			for (var i = 0; i < body.Length; i++)
 			{
 				var inHandleField = i is >= SpawnPacketBuilder.HandleOffset and < SpawnPacketBuilder.HandleOffset + 4;
@@ -72,10 +72,6 @@ namespace Faolan.Tests
 			}
 		}
 
-		private static float ReadLE(byte[] b, int offset)
-		{
-			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
-		}
 
 		// The playfield token: a 4-byte LEB128 varint at [0x18] right after the transform (offset 60).
 		private static uint ReadToken(byte[] body)
@@ -88,14 +84,14 @@ namespace Faolan.Tests
 		{
 			var row = new WorldObject
 			{
-				SubOpcode = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)),
-				PositionX = ReadLE(body, SpawnPacketBuilder.PosXOffset),
-				PositionY = ReadLE(body, SpawnPacketBuilder.PosYOffset),
-				PositionZ = ReadLE(body, SpawnPacketBuilder.PosZOffset),
-				RotationX = ReadLE(body, SpawnPacketBuilder.RotXOffset),
-				RotationY = ReadLE(body, SpawnPacketBuilder.RotYOffset),
-				RotationZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
-				RotationW = ReadLE(body, SpawnPacketBuilder.RotWOffset)
+				SubOpcode = body.ReadU32Be(4),
+				PositionX = body.ReadF32Le(SpawnPacketBuilder.PosXOffset),
+				PositionY = body.ReadF32Le(SpawnPacketBuilder.PosYOffset),
+				PositionZ = body.ReadF32Le(SpawnPacketBuilder.PosZOffset),
+				RotationX = body.ReadF32Le(SpawnPacketBuilder.RotXOffset),
+				RotationY = body.ReadF32Le(SpawnPacketBuilder.RotYOffset),
+				RotationZ = body.ReadF32Le(SpawnPacketBuilder.RotZOffset),
+				RotationW = body.ReadF32Le(SpawnPacketBuilder.RotWOffset)
 			};
 			// Lift the identity + geometry columns from the captured body (as the importer does from the dump).
 			Assert.True(SimpleDynelMessageCodec.TryLiftColumns(row, body), $"lift failed for {row.SubOpcode:X8}");

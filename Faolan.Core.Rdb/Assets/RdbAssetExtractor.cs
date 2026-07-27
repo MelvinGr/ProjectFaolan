@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -7,6 +6,7 @@ using System.Numerics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -498,7 +498,7 @@ namespace Faolan.Core.Rdb.Assets
 				var len = 0;
 				for (var j = start; j + 1 < words; j += 2)
 				{
-					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					var fid = body.ReadU32Le(j * 4);
 					if (fid == 0 || fid > 2000 || (have && fid >= last))
 						break;
 
@@ -521,11 +521,11 @@ namespace Faolan.Core.Rdb.Assets
 			var haveF = false;
 			for (var j = bestStart; j + 1 < words; j += 2)
 			{
-				var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+				var fid = body.ReadU32Le(j * 4);
 				if (fid == 0 || fid > 2000 || (haveF && fid >= lastF))
 					break;
 
-				var val = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
+				var val = body.ReadU32Le((j + 1) * 4);
 				if (fid == 12 && val > 1000 && rdb.TryGet(MeshIndexFileType, val, out var me) && me.Size > 0)
 					return val;
 

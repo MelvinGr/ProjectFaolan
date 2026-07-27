@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
@@ -29,8 +29,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 				return false;
 
 			var span = trailer.AsSpan(PositionOffset);
-			position = new Vector3(BinaryPrimitives.ReadSingleBigEndian(span), BinaryPrimitives.ReadSingleBigEndian(span[sizeof(float)..]),
-				BinaryPrimitives.ReadSingleBigEndian(span[(2 * sizeof(float))..]));
+			position = new Vector3(span.ReadF32Be(0), span.ReadF32Be(sizeof(float)),
+				span.ReadF32Be(2 * sizeof(float)));
 
 			return position != Vector3.Zero;
 		}

@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Protocol;
 using Microsoft.EntityFrameworkCore;
@@ -71,7 +71,7 @@ namespace Faolan.Importer.Captures
 					return;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
-				if (inner.Length < 65 || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != StatDamageSubOpcode)
+				if (inner.Length < 65 || inner.ReadU32Be(0) != StatDamageSubOpcode)
 					return;
 
 				seen++;

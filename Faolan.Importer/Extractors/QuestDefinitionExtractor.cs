@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.Importer.Extractors
@@ -105,7 +105,7 @@ namespace Faolan.Importer.Extractors
 			if (bytes == null || bytes.Length < 12)
 				return null;
 
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(8, 4));
+			var headerLen = (int)bytes.ReadU32Be(8);
 			var start = 12 + headerLen;
 			return start < bytes.Length
 				? bytes[start..]
@@ -115,7 +115,7 @@ namespace Faolan.Importer.Extractors
 		private static void MergeFullUpdate(byte[] body, Dictionary<uint, QuestDefinition> byQuest)
 		{
 			// content @16: [00000000][01][u32 questId]...
-			var questId = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(21, 4));
+			var questId = body.ReadU32Be(21);
 			var records = Records(body, 16).ToList();
 
 			var objective = records.FirstOrDefault(r => r is { Tag: "remoteformat", Category: 50304 });
@@ -135,7 +135,7 @@ namespace Faolan.Importer.Extractors
 			// body[33..37] (subop 4, ack 4, player 4, [len 4] all counted). Harvested straight off the wire, see
 			// QuestDefinition.Level (the values track quest level, not the seeded Level).
 			if (body.Length >= 37)
-				def.Level = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(33, 4));
+				def.Level = body.ReadU32Be(33);
 
 			// The two 52000 refs are region (smaller id, e.g. 4) then map (the map id). Map id also gates the marker.
 			var region = region52000.OrderBy(r => r.Id).FirstOrDefault();
@@ -145,10 +145,10 @@ namespace Faolan.Importer.Extractors
 				def.MapId = map.Id;
 				// Marker block sits right before the objective record: [mapId][markerX][markerY] then 10 zero bytes.
 				var mx = objective.Offset - 18;
-				if (mx >= 0 && BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(objective.Offset - 22, 4)) == map.Id)
+				if (mx >= 0 && body.ReadU32Be(objective.Offset - 22) == map.Id)
 				{
-					def.MarkerX = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(objective.Offset - 18, 4));
-					def.MarkerY = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(objective.Offset - 14, 4));
+					def.MarkerX = body.ReadU32Be(objective.Offset - 18);
+					def.MarkerY = body.ReadU32Be(objective.Offset - 14);
 				}
 			}
 
@@ -180,12 +180,12 @@ namespace Faolan.Importer.Extractors
 			if (off + 4 > body.Length)
 				return;
 
-			var count = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(off, 4));
+			var count = body.ReadU32Be(off);
 			off += 4;
 
 			for (uint i = 0; i < count && off + 12 <= body.Length; i++)
 			{
-				var questId = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(off + 4, 4));
+				var questId = body.ReadU32Be(off + 4);
 				off += 12; // idx + questId + chapter
 				var title = ReadRecord(body, off);
 				if (title == null)

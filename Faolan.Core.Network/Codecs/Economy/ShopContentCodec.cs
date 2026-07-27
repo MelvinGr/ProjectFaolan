@@ -1,10 +1,10 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
@@ -46,8 +46,8 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// type + a content length that lands exactly on the body end.
 		public static bool LooksLikeShopData(ReadOnlySpan<byte> body)
 		{
-			return body.Length > 20 && BinaryPrimitives.ReadUInt32BigEndian(body) == EntityClass.Shop && BinaryPrimitives.ReadUInt32BigEndian(body[8..]) == EntityClass.Character &&
-			       BinaryPrimitives.ReadUInt32BigEndian(body[16..]) == body.Length - 20;
+			return body.Length > 20 && body.ReadU32Be(0) == EntityClass.Shop && body.ReadU32Be(8) == EntityClass.Character &&
+			       body.ReadU32Be(16) == body.Length - 20;
 		}
 
 		public static ShopContent Parse(byte[] body)

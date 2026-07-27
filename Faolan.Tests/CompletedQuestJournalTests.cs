@@ -1,10 +1,10 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Faolan.Core;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
@@ -38,7 +38,7 @@ namespace Faolan.Tests
 
 				// Only snapshots that actually carry it: the word at the boundary is the region frame, and the region
 				// opens with an areaId rather than the 0x3F1 index tag.
-				var lead = BinaryPrimitives.ReadUInt32BigEndian(tails.AsSpan(start, 4));
+				var lead = tails.ReadU32Be(start);
 				if (lead == QuestIndexRegion.IndexTag || lead == 0 || lead % ListFrame.Unit != 0)
 					continue;
 
@@ -195,7 +195,7 @@ namespace Faolan.Tests
 			// Reads the committed CORPUS EXTRACT rather than the capture repo, so the suite runs from a plain clone.
 			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
 			{
-				var declared = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
+				var declared = body.ReadU32Be(0);
 				if (declared + 4 > body.Length)
 					continue; // truncated capture - the TCP-reassembly gap on compressed downloads
 

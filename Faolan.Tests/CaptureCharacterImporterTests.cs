@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,6 +6,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
@@ -111,9 +111,9 @@ namespace Faolan.Tests
 		private static byte[] MapChangePacket(uint mapId)
 		{
 			var body = new byte[40];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length - 4);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x5D85BFC7);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(34, 4), mapId);
+			body.WriteU32Be(0, (uint)body.Length - 4);
+			body.WriteU32Be(4, 0x5D85BFC7);
+			body.WriteU32Be(34, mapId);
 			return WrapBody(body);
 		}
 
@@ -123,9 +123,9 @@ namespace Faolan.Tests
 		private static byte[] SnapshotPacket(uint instance)
 		{
 			var body = new byte[40];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length - 4);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), instance);
+			body.WriteU32Be(0, (uint)body.Length - 4);
+			body.WriteU32Be(4, (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR);
+			body.WriteU32Be(12, instance);
 			return WrapBody(body);
 		}
 
@@ -134,7 +134,7 @@ namespace Faolan.Tests
 		private static byte[] WrapBody(byte[] body)
 		{
 			var packet = new byte[12 + body.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(0, 4), (uint)(packet.Length - 4));
+			packet.WriteU32Be(0, (uint)(packet.Length - 4));
 			body.CopyTo(packet, 12);
 			return packet;
 		}

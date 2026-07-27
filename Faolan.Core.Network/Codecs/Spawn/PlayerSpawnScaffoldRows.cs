@@ -1,9 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -175,7 +175,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (preFrame == null || preFrame.Length < PreFrameHead)
 				return feats;
 
-			var marker = BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(FeatMarkerOffset, 4));
+			var marker = preFrame.ReadU32Be(FeatMarkerOffset);
 			if (!ListFrame.TryCountOf(marker, out var signedCount))
 				return feats;
 
@@ -184,7 +184,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				return feats;
 
 			for (var k = 0; k < count; k++)
-				feats.Add(BinaryPrimitives.ReadUInt32BigEndian(preFrame.AsSpan(PreFrameHead + 4 * k, 4)));
+				feats.Add(preFrame.ReadU32Be(PreFrameHead + 4 * k));
 
 			return feats;
 		}
@@ -232,7 +232,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var featCount = feats?.Count ?? 0;
 			var f = new byte[PreFrameHead + 4 * featCount + PreFrameTail];
 			f[0] = 0x05;
-			BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(VanityShownMaskOffset, 4), vanityShownMask); // vanity shown mask (#336)
+			f.WriteU32Be(VanityShownMaskOffset, vanityShownMask); // vanity shown mask (#336)
 			f[70] = FrameArchetype(@class); // @135 hi byte = archetype (Soldier1/Priest2/Rogue3/Mage4)
 			f[71] = (byte)@class; // @136 = the class byte (0x12 Barbarian .. 0x2c Demonologist)
 			f[76] = 0x6F; // constant marker
@@ -244,9 +244,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			// Feat list: [u32 (count+1)*0x3F1] then count x u32 feat id (train order). Empty (count 0) writes the bare
 			// 0x3F1 marker and no ids - byte-identical to the old constant-239 fresh frame.
-			BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(FeatMarkerOffset, 4), ListFrame.ForCount(featCount));
+			f.WriteU32Be(FeatMarkerOffset, ListFrame.ForCount(featCount));
 			for (var k = 0; k < featCount; k++)
-				BinaryPrimitives.WriteUInt32BigEndian(f.AsSpan(PreFrameHead + 4 * k, 4), feats![k]);
+				f.WriteU32Be(PreFrameHead + 4 * k, feats![k]);
 
 			var tail = PreFrameHead + 4 * featCount;
 			f[tail + 108] = 0x41; // closer 41 00 00 82 08
@@ -281,7 +281,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		{
 			var preFrame = scaffold?.PreFrame;
 			return preFrame is { Length: >= VanityShownMaskOffset + 4 } f
-				? BinaryPrimitives.ReadUInt32BigEndian(f.AsSpan(VanityShownMaskOffset, 4))
+				? f.ReadU32Be(VanityShownMaskOffset)
 				: 0u;
 		}
 

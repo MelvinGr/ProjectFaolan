@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,14 +6,14 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
-
-using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Captures
 {
@@ -77,7 +76,7 @@ namespace Faolan.Importer.Captures
 					if (body.Length < 38)
 						continue;
 
-					var subop = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4));
+					var subop = body.ReadU32Be(4);
 					if (subop == MapChangeSubOpcode)
 					{
 						// body is [u32 len][subop][PlayfieldFiir]; MapChangeCodec parses [subop][body], so skip the length.
@@ -88,7 +87,7 @@ namespace Faolan.Importer.Captures
 
 					if (subop == InventorySnapshotSubOpcode)
 					{
-						var instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+						var instance = body.ReadU32Be(12);
 						if (!snapshots.TryGetValue(instance, out var list))
 							snapshots[instance] = list = [];
 						list.Add(body);
@@ -229,7 +228,7 @@ namespace Faolan.Importer.Captures
 			{
 				for (var i = 0; i + 5 <= scaffold.Vec3.Length; i += 5)
 				{
-					var value = BinaryPrimitives.ReadSingleLittleEndian(scaffold.Vec3.AsSpan(i + 1, 4));
+					var value = scaffold.Vec3.ReadF32Le(i + 1);
 					switch (scaffold.Vec3[i])
 					{
 						case 0x0D:
@@ -260,7 +259,7 @@ namespace Faolan.Importer.Captures
 			{
 				for (var i = 0; i + 5 <= scaffold.Quat.Length; i += 5)
 				{
-					var value = BinaryPrimitives.ReadSingleLittleEndian(scaffold.Quat.AsSpan(i + 1, 4));
+					var value = scaffold.Quat.ReadF32Le(i + 1);
 					switch (scaffold.Quat[i])
 					{
 						case 0x0D:
@@ -453,7 +452,7 @@ namespace Faolan.Importer.Captures
 		{
 			try
 			{
-				var headerLen = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+				var headerLen = packet.ReadU32Be(8);
 				var stream = new FaolanStream(packet[(12 + (int)headerLen)..]);
 				stream.ReadUInt32(); // client instance
 				var count = (int)(stream.ReadUInt32() / 1009) - 1;

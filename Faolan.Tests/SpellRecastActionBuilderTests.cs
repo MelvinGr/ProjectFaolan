@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.World;
 using Xunit;
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 		{
 			var b = new byte[words.Length * 4];
 			for (var i = 0; i < words.Length; i++)
-				BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(i * 4, 4), words[i]);
+				b.WriteU32Be(i * 4, words[i]);
 			return b;
 		}
 	}

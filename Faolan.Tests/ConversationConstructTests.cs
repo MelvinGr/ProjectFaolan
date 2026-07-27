@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Constants;
 using Faolan.GameServer.Dialogue;
@@ -34,9 +35,9 @@ namespace Faolan.Tests
 			Assert.Equal(0x58u, cols.SenderInstance);
 
 			// The captured body's two handles: [0xC350][npc][0xC350][player] at 12 + headerLen.
-			var body = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(8, 4));
-			var npc = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(body + 4, 4));
-			var player = BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(body + 12, 4));
+			var body = 12 + (int)captured.ReadU32Be(8);
+			var npc = captured.ReadU32Be(body + 4);
+			var player = captured.ReadU32Be(body + 12);
 
 			var rebuilt = DialogueCameraBody.BuildDialogueCameraPacket(cols.SenderInstance!.Value, player, npc, DialogueCameraBody.BuildParams(new ConversationPacket
 			{
@@ -143,7 +144,7 @@ namespace Faolan.Tests
 			Buffer.BlockCopy(sender, 0, header, 2, sender.Length);
 
 			var packet = new byte[12 + header.Length + record.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(8, 4), (uint)header.Length);
+			packet.WriteU32Be(8, (uint)header.Length);
 			Buffer.BlockCopy(header, 0, packet, 12, header.Length);
 			Buffer.BlockCopy(record, 0, packet, 12 + header.Length, record.Length);
 
@@ -156,7 +157,7 @@ namespace Faolan.Tests
 		// gates against the captures), for comparison with the from-columns build.
 		private static byte[] ExpectedConstruct(byte[] record)
 		{
-			var sub = BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(4, 4));
+			var sub = record.ReadU32Be(4);
 			if (sub == (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR)
 			{
 				var a = KnubotCodec.ParseAppendText(record);
@@ -178,7 +179,7 @@ namespace Faolan.Tests
 			{
 				if (outp.AsSpan(i, 4).SequenceEqual(needle))
 				{
-					BinaryPrimitives.WriteUInt32BigEndian(outp.AsSpan(i, 4), newVal);
+					outp.WriteU32Be(i, newVal);
 					i += 3;
 				}
 			}
@@ -190,7 +191,7 @@ namespace Faolan.Tests
 		{
 			var header = new byte[12];
 			var packet = new byte[12 + header.Length + record.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(8, 4), (uint)header.Length);
+			packet.WriteU32Be(8, (uint)header.Length);
 			Buffer.BlockCopy(record, 0, packet, 12 + header.Length, record.Length);
 			return packet;
 		}

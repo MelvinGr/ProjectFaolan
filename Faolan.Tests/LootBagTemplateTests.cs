@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Tests.Support;
@@ -32,11 +32,11 @@ namespace Faolan.Tests
 		public void BuildFromScratch_ReproducesIdentityAndGeometry_WithCleanScaffold()
 		{
 			var golden = Golden.Bytes("LootBagBody");
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(golden.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
-			var typeTag = BinaryPrimitives.ReadUInt32BigEndian(golden.AsSpan(8, 4)); // the loot typetag (0xC87A)
-			var pos = new Vector3(ReadLE(golden, SpawnPacketBuilder.PosXOffset), ReadLE(golden, SpawnPacketBuilder.PosYOffset), ReadLE(golden, SpawnPacketBuilder.PosZOffset));
-			var rot = new Quaternion(ReadLE(golden, SpawnPacketBuilder.RotXOffset), ReadLE(golden, SpawnPacketBuilder.RotYOffset), ReadLE(golden, SpawnPacketBuilder.RotZOffset),
-				ReadLE(golden, SpawnPacketBuilder.RotWOffset));
+			var handle = golden.ReadU32Be(SpawnPacketBuilder.HandleOffset);
+			var typeTag = golden.ReadU32Be(8); // the loot typetag (0xC87A)
+			var pos = new Vector3(golden.ReadF32Le(SpawnPacketBuilder.PosXOffset), golden.ReadF32Le(SpawnPacketBuilder.PosYOffset), golden.ReadF32Le(SpawnPacketBuilder.PosZOffset));
+			var rot = new Quaternion(golden.ReadF32Le(SpawnPacketBuilder.RotXOffset), golden.ReadF32Le(SpawnPacketBuilder.RotYOffset), golden.ReadF32Le(SpawnPacketBuilder.RotZOffset),
+				golden.ReadF32Le(SpawnPacketBuilder.RotWOffset));
 			const uint playfieldToken = 0x01EA9852; // the captured bag's transform playfield varint (d2 b0 aa 0f)
 
 			Assert.True(LootBagMessageCodec.TryParse(golden.AsSpan(8), out _, out var contentsStart));
@@ -53,9 +53,5 @@ namespace Faolan.Tests
 			Assert.Equal(0u, contents.OwnerId.Instance);
 		}
 
-		private static float ReadLE(byte[] b, int offset)
-		{
-			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
-		}
 	}
 }

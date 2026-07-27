@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Importer.Extractors;
 
@@ -32,7 +32,7 @@ namespace Faolan.Importer.Captures
 				if (p.Bytes.Length < 12)
 					continue;
 
-				var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4));
+				var headerLen = (int)p.Bytes.ReadU32Be(8);
 				var bodyStart = 12 + headerLen;
 				if (headerLen <= 0 || bodyStart > p.Bytes.Length)
 					continue;
@@ -45,12 +45,12 @@ namespace Faolan.Importer.Captures
 					if (body.Length < 8 + 2 + 4)
 						continue;
 
-					int strLen = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(8, 2));
+					int strLen = body.ReadU16Be(8);
 					if (10 + strLen + 4 > body.Length)
 						continue;
 
 					var key = Encoding.Latin1.GetString(body.Slice(10, strLen));
-					var tc = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(10 + strLen, 4));
+					var tc = body.ReadU32Be(10 + strLen);
 					pending[tc] = key;
 				}
 				else if (p.Opcode == ReceivedStockPhraseText)
@@ -59,8 +59,8 @@ namespace Faolan.Importer.Captures
 					if (body.Length < 6)
 						continue;
 
-					var tc = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4));
-					int textLen = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(4, 2));
+					var tc = body.ReadU32Be(0);
+					int textLen = body.ReadU16Be(4);
 					if (6 + textLen <= body.Length && pending.TryGetValue(tc, out var key))
 						found[key] = body.Slice(6, textLen).ToArray();
 				}

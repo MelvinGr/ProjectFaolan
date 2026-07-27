@@ -121,7 +121,7 @@ namespace Faolan.Tests
 			BinaryPrimitives.WriteUInt32BigEndian(newRaw, newInstance);
 			ReplaceAll(substituted, oldRaw, newRaw);
 			var crc = Crc32.Calculate(substituted[8..]);
-			BinaryPrimitives.WriteUInt32BigEndian(substituted.AsSpan(4, 4), crc);
+			substituted.WriteU32Be(4, crc);
 
 			var packet = Rpc.Parse(substituted);
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());

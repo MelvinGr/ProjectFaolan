@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
@@ -33,7 +33,7 @@ namespace Faolan.Importer.Captures
 				if (!p.IsDownload || p.Opcode != 0x2005 || p.Bytes.Length < 16)
 					continue;
 
-				var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4));
+				var headerLen = (int)p.Bytes.ReadU32Be(8);
 				var bodyStart = 12 + headerLen;
 				if (headerLen <= 0 || bodyStart >= p.Bytes.Length)
 					continue;

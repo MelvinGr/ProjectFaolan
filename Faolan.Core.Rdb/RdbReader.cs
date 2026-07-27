@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using Faolan.Core.Crypt;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
 {
@@ -96,7 +96,7 @@ namespace Faolan.Core.Rdb
 			if (!IsRdbh(raw))
 				return UnwrapIOz1(raw);
 
-			var plainLen = (int)BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(12, 4));
+			var plainLen = (int)raw.ReadU32Le(12);
 			var decrypted = Tea.DecryptEcb(raw.AsSpan(20), teaKey);
 			var inner = plainLen >= 0 && plainLen <= decrypted.Length
 				? decrypted[..plainLen]
@@ -160,8 +160,8 @@ namespace Faolan.Core.Rdb
 			if (b.Length < 28 || b[0] != (byte)'I' || b[1] != (byte)'B' || b[2] != (byte)'D' || b[3] != (byte)'R')
 				throw new InvalidDataException($"le.idx magic mismatch (expected IBDR) at {path}");
 
-			var version = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(4, 4));
-			var numEntries = (int)BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(24, 4));
+			var version = b.ReadU32Le(4);
+			var numEntries = (int)b.ReadU32Le(24);
 
 			// Detail record: v5 = 11 u32 (44 B), v7 = 28 B. Both put file at byte 0 (low byte), offset at byte 4,
 			// size at byte 8 - only the stride differs.
@@ -175,13 +175,13 @@ namespace Faolan.Core.Rdb
 			_entries.Capacity = numEntries;
 			for (var i = 0; i < numEntries; i++)
 			{
-				var type = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(indexOff + i * 8, 4));
-				var id = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(indexOff + i * 8 + 4, 4));
+				var type = b.ReadU32Le(indexOff + i * 8);
+				var id = b.ReadU32Le(indexOff + i * 8 + 4);
 
 				var d = detailOff + i * detailStride;
 				var file = b[d] & 0xff; // unk0 & 0xff
-				var offset = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(d + 4, 4));
-				var size = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(d + 8, 4));
+				var offset = b.ReadU32Le(d + 4);
+				var size = b.ReadU32Le(d + 8);
 
 				var hash = b.AsSpan(d + 28, 16).ToArray(); // 16-byte content hash = CDN path md5 for file==0xFF resources
 				_entries.Add(new Entry(type, id, file, offset, size, hash));
@@ -235,7 +235,7 @@ namespace Faolan.Core.Rdb
 		{
 			if (raw.Length >= 8 && raw[0] == (byte)'I' && raw[1] == (byte)'O' && raw[2] == (byte)'z' && raw[3] == (byte)'1')
 			{
-				var uncompressed = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(4, 4));
+				var uncompressed = raw.ReadU32Le(4);
 				try
 				{
 					return Inflate(raw, 8, (int)uncompressed);

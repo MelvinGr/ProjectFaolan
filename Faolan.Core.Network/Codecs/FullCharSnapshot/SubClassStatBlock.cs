@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
@@ -145,7 +145,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			for (var i = 0; i + 8 <= body.Length; i++)
 			{
-				if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(i, 4)) != BlockType)
+				if (body.ReadU32Be(i) != BlockType)
 					continue; // not a StatList#1 count word (0x46F2)
 
 				if (!TryReadStatList(body, i, out var displayed, out var afterDisplayed) || displayed.Count != StatList1.Length)
@@ -219,7 +219,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			list = null;
 			end = off;
-			if (!ListFrame.TryCountOf(BinaryPrimitives.ReadUInt32BigEndian(body.Slice(off, 4)), out var n))
+			if (!ListFrame.TryCountOf(body.ReadU32Be(off), out var n))
 				return false;
 
 			if (off + 4 + n * 8 > body.Length)
@@ -229,7 +229,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			var p = off + 4;
 			for (var i = 0; i < n; i++)
 			{
-				list.Add((BinaryPrimitives.ReadUInt32BigEndian(body.Slice(p, 4)), BinaryPrimitives.ReadUInt32BigEndian(body.Slice(p + 4, 4))));
+				list.Add((body.ReadU32Be(p), body.ReadU32Be(p + 4)));
 				p += 8;
 			}
 

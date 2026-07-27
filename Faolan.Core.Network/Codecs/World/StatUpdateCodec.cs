@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Constants;
 
@@ -36,12 +36,12 @@ namespace Faolan.Core.Network.Codecs.World
 			stats = new CharacterStatBlock();
 			if (body.Length < 16)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(0, 4)) != (uint)GameServer0X2000Opcodes.StatUpdateIIR)
+			if (body.ReadU32Be(0) != (uint)GameServer0X2000Opcodes.StatUpdateIIR)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4)) != EntityClass.Character)
+			if (body.ReadU32Be(4) != EntityClass.Character)
 				return false;
 
-			entityHandle = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
+			entityHandle = body.ReadU32Be(8);
 			// body[12..16] is the constant 0x00000000 padding word; the stat block follows.
 			return CharacterStatBlock.TryParse(body.Slice(16), out stats, out _);
 		}

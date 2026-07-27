@@ -1,10 +1,10 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
@@ -76,8 +76,8 @@ namespace Faolan.Core.Network.Codecs.World
 			if (tail.Length < 8)
 				return false;
 
-			row.GeometryAssetId = BinaryPrimitives.ReadUInt32BigEndian(tail[..4]);
-			row.GeometryAssetType = BinaryPrimitives.ReadUInt32BigEndian(tail.Slice(4, 4));
+			row.GeometryAssetId = tail.ReadU32Be(0);
+			row.GeometryAssetType = tail.ReadU32Be(4);
 
 			var offset = 8;
 			if (!TryReadUInt32(tail, ref offset, out var nameLength) || nameLength > 256 || offset + (int)nameLength > tail.Length)
@@ -165,14 +165,14 @@ namespace Faolan.Core.Network.Codecs.World
 				return false;
 			}
 
-			value = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(offset, 4));
+			value = data.ReadU32Be(offset);
 			offset += 4;
 			return true;
 		}
 
 		private static float ReadFloat(ReadOnlySpan<byte> data, ref int offset)
 		{
-			var value = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32BigEndian(data.Slice(offset, 4)));
+			var value = BitConverter.Int32BitsToSingle(data.ReadI32Be(offset));
 			offset += 4;
 			return value;
 		}

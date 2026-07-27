@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Packets.ChatServer
 {
@@ -53,8 +53,8 @@ namespace Faolan.Core.Network.Packets.ChatServer
 		public byte[] Serialize()
 		{
 			var frame = new byte[HeaderSize + Body.Length];
-			BinaryPrimitives.WriteUInt16BigEndian(frame, Opcode);
-			BinaryPrimitives.WriteUInt16BigEndian(frame.AsSpan(sizeof(ushort)), (ushort)Body.Length);
+			frame.WriteU16Be(0, Opcode);
+			frame.WriteU16Be(sizeof(ushort), (ushort)Body.Length);
 			Body.Span.CopyTo(frame.AsSpan(HeaderSize));
 
 			return frame;
@@ -66,8 +66,8 @@ namespace Faolan.Core.Network.Packets.ChatServer
 		// complete frames, so this clamp is a backstop, not the normal path.
 		public static ChatServerMessage Parse(byte[] frame)
 		{
-			var opcode = BinaryPrimitives.ReadUInt16BigEndian(frame);
-			var declared = BinaryPrimitives.ReadUInt16BigEndian(frame.AsSpan(sizeof(ushort)));
+			var opcode = frame.ReadU16Be(0);
+			var declared = frame.ReadU16Be(sizeof(ushort));
 
 			return new ChatServerMessage(opcode, frame.AsMemory(HeaderSize, Math.Min(declared, frame.Length - HeaderSize)))
 			{

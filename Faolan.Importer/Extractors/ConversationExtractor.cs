@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -87,10 +86,10 @@ namespace Faolan.Importer.Extractors
 				if (p is { IsDownload: false, IsIirCarrier: true, SubOpcode: InteractSubOpcode })
 				{
 					var body = p.Body;
-					if (body.Length < 26 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)) != TalkToNpcActionType)
+					if (body.Length < 26 || body.ReadU32Be(18) != TalkToNpcActionType)
 						continue;
 
-					var argLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(22, 4));
+					var argLen = (int)body.ReadU32Be(22);
 					if (26 + argLen > body.Length)
 						continue;
 
@@ -103,7 +102,7 @@ namespace Faolan.Importer.Extractors
 					active = true;
 					typeId = parsedTypeId;
 					npc = parsedNpc;
-					instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+					instance = body.ReadU32Be(12);
 					path = "";
 					screen = [];
 					grant = 0;
@@ -117,7 +116,7 @@ namespace Faolan.Importer.Extractors
 					if (body.Length < 4)
 						continue;
 
-					var idx = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(body.Length - 4, 4));
+					var idx = body.ReadU32Be(body.Length - 4);
 					Flush();
 					path = path.Length == 0
 						? idx.ToString()
@@ -135,7 +134,7 @@ namespace Faolan.Importer.Extractors
 					var body = p.Body;
 					if (body.Length >= 25)
 					{
-						var questId = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(21, 4));
+						var questId = body.ReadU32Be(21);
 						currentQuest = questId; // track the active quest for the per-greeting QuestContextId (#264)
 						if (active && path.Length != 0 && questsSeen.Add(questId))
 							grant = questId;
@@ -183,10 +182,10 @@ namespace Faolan.Importer.Extractors
 					continue;
 
 				var body = p.Body;
-				if (body.Length < 26 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)) != TalkToNpcActionType)
+				if (body.Length < 26 || body.ReadU32Be(18) != TalkToNpcActionType)
 					continue;
 
-				var argLen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(22, 4));
+				var argLen = (int)body.ReadU32Be(22);
 				if (26 + argLen > body.Length)
 					continue;
 
@@ -261,7 +260,7 @@ namespace Faolan.Importer.Extractors
 				if (body.Length < 16)
 					continue;
 
-				var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+				var handle = body.ReadU32Be(12);
 				var name = ReadSpawnName(body);
 				if (name != null)
 					map[handle] = name;

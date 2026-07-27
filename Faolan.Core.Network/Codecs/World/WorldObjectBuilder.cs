@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
@@ -79,7 +78,7 @@ namespace Faolan.Core.Network.Codecs.World
 			identity.CopyTo(body, head.Length);
 			geometry.CopyTo(body, head.Length + identity.Length);
 			contents.CopyTo(body, head.Length + identity.Length + geometry.Length);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(body.Length - 4));
+			body.WriteU32Be(0, (uint)(body.Length - 4));
 			return body;
 		}
 
@@ -91,7 +90,7 @@ namespace Faolan.Core.Network.Codecs.World
 			if (data == null || data.Length < 12)
 				return null;
 
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(8, 4));
+			var headerLen = (int)data.ReadU32Be(8);
 			var bodyStart = 12 + headerLen;
 			return bodyStart <= data.Length
 				? data[bodyStart..]
@@ -110,7 +109,7 @@ namespace Faolan.Core.Network.Codecs.World
 			if (carrierBody.Length <= 8)
 				return string.Empty;
 
-			var subOpcode = BinaryPrimitives.ReadUInt32BigEndian(carrierBody.Slice(4, 4));
+			var subOpcode = carrierBody.ReadU32Be(4);
 			return subOpcode == SimpleDynelMessageCodec.Opcode && SimpleDynelMessageCodec.TryParse(carrierBody.Slice(8), out var message, out _, out _)
 				? message.DisplayName ?? string.Empty
 				: string.Empty;

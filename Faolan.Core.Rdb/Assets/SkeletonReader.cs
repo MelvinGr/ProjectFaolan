@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -20,12 +20,12 @@ namespace Faolan.Core.Rdb.Assets
 			if (blob.Length < 20)
 				return [];
 
-			var count = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(16, 4));
+			var count = (int)blob.ReadU32Le(16);
 			var bones = new List<Bone>(count);
 			var p = 20;
 			for (var i = 0; i < count && p + 4 <= blob.Length; i++)
 			{
-				var nameLen = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(p, 4));
+				var nameLen = (int)blob.ReadU32Le(p);
 				p += 4;
 				if (nameLen < 0 || p + nameLen + 32 > blob.Length)
 					break;
@@ -38,11 +38,11 @@ namespace Faolan.Core.Rdb.Assets
 				var t = new Vector3(F(blob, p), F(blob, p + 4), F(blob, p + 8));
 				p += 12;
 
-				var childCount = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(p, 4));
+				var childCount = (int)blob.ReadU32Le(p);
 				p += 4;
 				var children = new int[Math.Max(0, childCount)];
 				for (var c = 0; c < children.Length && p + 4 <= blob.Length; c++, p += 4)
-					children[c] = (int)BinaryPrimitives.ReadUInt32LittleEndian(blob.Slice(p, 4));
+					children[c] = (int)blob.ReadU32Le(p);
 
 				bones.Add(new Bone(name, q, t, children));
 			}
@@ -87,7 +87,7 @@ namespace Faolan.Core.Rdb.Assets
 
 		private static float F(ReadOnlySpan<byte> b, int off)
 		{
-			return BinaryPrimitives.ReadSingleLittleEndian(b.Slice(off, 4));
+			return b.ReadF32Le(off);
 		}
 
 		private static Quaternion NormalizeOrIdentity(Quaternion q)

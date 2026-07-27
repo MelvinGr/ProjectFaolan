@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core.Extensions;
 using Faolan.Importer.Extractors;
 using Xunit;
 
@@ -61,8 +61,8 @@ namespace Faolan.Tests
 		private static CapturedPacket LootBag(byte[] record)
 		{
 			var payload = new byte[8 + record.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(payload.AsSpan(0, 4), (uint)(4 + record.Length)); // payload len
-			BinaryPrimitives.WriteUInt32BigEndian(payload.AsSpan(4, 4), 0xF096251E); // sub-opcode
+			payload.WriteU32Be(0, (uint)(4 + record.Length)); // payload len
+			payload.WriteU32Be(4, 0xF096251E); // sub-opcode
 			record.CopyTo(payload, 8);
 			return new CapturedPacket(0, true, 0x2000, 0xF096251E, FramePacket(payload));
 		}
@@ -70,8 +70,8 @@ namespace Faolan.Tests
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			var content = new byte[38];
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(4, 4), 0x5D85BFC7); // body@4 = subop
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(34, 4), mapId); // body@34 = map
+			content.WriteU32Be(4, 0x5D85BFC7); // body@4 = subop
+			content.WriteU32Be(34, mapId); // body@34 = map
 			return Wrap(0x5D85BFC7, content);
 		}
 

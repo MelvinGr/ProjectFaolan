@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
@@ -77,7 +77,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// the records run past the buffer - so a mis-located slot is rejected rather than yielding garbage.
 		public static KnownSpellList Parse(ReadOnlySpan<byte> data, int offset, out int consumed)
 		{
-			var count = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(offset, 4));
+			var count = data.ReadU32Be(offset);
 			if (count == 0 || count % Frame != 0)
 				throw new InvalidOperationException($"known-list count 0x{count:X} at 0x{offset:X} is not a positive multiple of 0x{Frame:X}.");
 
@@ -86,12 +86,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			var pos = offset + 4;
 			for (var i = 0; i < recordCount; i++)
 			{
-				var id = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(pos, 4));
-				var unbound = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(pos + 4, 4));
+				var id = data.ReadU32Be(pos);
+				var unbound = data.ReadU32Be(pos + 4);
 				if (unbound != Unbound)
 					throw new InvalidOperationException($"known-list record {i} at 0x{pos:X} has slot word 0x{unbound:X}, expected 0x{Unbound:X}.");
 
-				var type = (byte)BinaryPrimitives.ReadUInt32BigEndian(data.Slice(pos + 8, 4));
+				var type = (byte)data.ReadU32Be(pos + 8);
 				records.Add(new KnownSpellRecord(id, type));
 				pos += 12;
 			}
@@ -115,11 +115,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			list = null;
 			for (var i = 0; i + 4 + RecordSize <= body.Length; i++)
 			{
-				var count = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(i, 4));
+				var count = body.ReadU32Be(i);
 				if (count <= Frame || count % Frame != 0)
 					continue; // not a framed list with at least one record
 
-				if (BinaryPrimitives.ReadUInt32BigEndian(body.Slice(i + 4 + 4, 4)) != Unbound)
+				if (body.ReadU32Be(i + 4 + 4) != Unbound)
 					continue; // first record's slot word isn't the known-list marker
 
 				try

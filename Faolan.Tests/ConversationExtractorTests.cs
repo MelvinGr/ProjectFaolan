@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Faolan.Core.Extensions;
 using Faolan.Importer.Extractors;
 using Xunit;
 
@@ -147,9 +147,9 @@ namespace Faolan.Tests
 		private static CapturedPacket Answer(uint index)
 		{
 			var body = new byte[12];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x4D7D9123);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), index);
+			body.WriteU32Be(0, (uint)body.Length);
+			body.WriteU32Be(4, 0x4D7D9123);
+			body.WriteU32Be(8, index);
 			return new CapturedPacket(0, false, 0x2000, 0x4D7D9123, Frame(body));
 		}
 
@@ -181,10 +181,10 @@ namespace Faolan.Tests
 		private static CapturedPacket QuestFullUpdate(uint questId)
 		{
 			var body = new byte[25];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x63268258);
+			body.WriteU32Be(0, (uint)body.Length);
+			body.WriteU32Be(4, 0x63268258);
 			body[20] = 0x01;
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(21, 4), questId);
+			body.WriteU32Be(21, questId);
 			return new CapturedPacket(0, true, 0x2000, 0x63268258, Frame(body));
 		}
 
@@ -197,10 +197,10 @@ namespace Faolan.Tests
 		{
 			var nb = Encoding.ASCII.GetBytes(name);
 			var body = new byte[20 + 2 + nb.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0xFA015807);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), 0x0000C350);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), handle);
+			body.WriteU32Be(0, (uint)body.Length);
+			body.WriteU32Be(4, 0xFA015807);
+			body.WriteU32Be(8, 0x0000C350);
+			body.WriteU32Be(12, handle);
 			body[20] = 0x0A;
 			body[21] = (byte)nb.Length;
 			nb.CopyTo(body, 22);
@@ -212,12 +212,12 @@ namespace Faolan.Tests
 			var args = BuildInteractArgs(typeId, mode, field3, npc);
 
 			var body = new byte[26 + args.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x642CD3D6);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), 0x0000C350);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(12, 4), instance);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(18, 4), 0x16);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(22, 4), (uint)args.Length);
+			body.WriteU32Be(0, (uint)body.Length);
+			body.WriteU32Be(4, 0x642CD3D6);
+			body.WriteU32Be(8, 0x0000C350);
+			body.WriteU32Be(12, instance);
+			body.WriteU32Be(18, 0x16);
+			body.WriteU32Be(22, (uint)args.Length);
 			args.CopyTo(body, 26);
 
 			return new CapturedPacket(0, false, 0x2000, 0x642CD3D6, Frame(body));

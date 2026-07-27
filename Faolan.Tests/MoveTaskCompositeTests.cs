@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Tests.Support;
 using Xunit;
@@ -68,7 +68,7 @@ namespace Faolan.Tests
 					if (j < 4)
 						continue;
 
-					var len = (int)BinaryPrimitives.ReadUInt32BigEndian(raw.AsSpan(j - 4, 4));
+					var len = (int)raw.ReadU32Be(j - 4);
 					if (len is >= 8 and <= 512 && j + len <= raw.Length)
 						yield return raw[j..(j + len)];
 				}

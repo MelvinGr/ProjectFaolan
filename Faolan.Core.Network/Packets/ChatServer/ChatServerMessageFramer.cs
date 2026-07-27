@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Interfaces;
 
 namespace Faolan.Core.Network.Packets.ChatServer
@@ -79,7 +79,7 @@ namespace Faolan.Core.Network.Packets.ChatServer
 		// sends via ChatServerMessage.Build and the retail captures).
 		private static int FrameLength(ReadOnlySpan<byte> frame)
 		{
-			return BinaryPrimitives.ReadUInt16BigEndian(frame[sizeof(ushort)..]) + HeaderSize;
+			return frame.ReadU16Be(sizeof(ushort)) + HeaderSize;
 		}
 	}
 }

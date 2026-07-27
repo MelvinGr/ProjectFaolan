@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -42,9 +42,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			scaffold = new NpcSpawnPostIir
 			{
-				Word0 = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(start, 4)),
-				FirstRecordLen = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(start + 4, 4)),
-				RecordCount = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(start + 8, 4)),
+				Word0 = body.ReadU32Be(start),
+				FirstRecordLen = body.ReadU32Be(start + 4),
+				RecordCount = body.ReadU32Be(start + 8),
 				Records = body[(start + HeaderLength)..]
 			};
 			return true;

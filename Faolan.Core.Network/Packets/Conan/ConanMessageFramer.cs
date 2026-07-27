@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Interfaces;
 
 namespace Faolan.Core.Network.Packets.Conan
@@ -111,7 +112,7 @@ namespace Faolan.Core.Network.Packets.Conan
 				// Allocate the whole frame ([length][payload]) once and stamp the header, so the completed packet is
 				// emitted directly - no per-packet Concat/copy.
 				_frame = new byte[LengthPrefixSize + (int)raw];
-				BinaryPrimitives.WriteUInt32BigEndian(_frame, raw);
+				_frame.WriteU32Be(0, raw);
 				_payloadBytesRead = 0;
 			}
 

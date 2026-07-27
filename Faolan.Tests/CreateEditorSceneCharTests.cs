@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
@@ -73,10 +73,10 @@ namespace Faolan.Tests
 					break;
 
 				i = at + 1;
-				if (BinaryPrimitives.ReadUInt32BigEndian(burst.AsSpan(at + 4, 4)) != 0x0000C350u)
+				if (burst.ReadU32Be(at + 4) != 0x0000C350u)
 					continue; // body must open with the character entity-class tag
 
-				var bodyLen = (int)BinaryPrimitives.ReadUInt32BigEndian(burst.AsSpan(at - 4, 4)) - 4;
+				var bodyLen = (int)burst.ReadU32Be(at - 4) - 4;
 				var body = burst.AsSpan(at + 4, bodyLen).ToArray();
 				PlayerSpawnReader.TryReadCharacterMessage(body, out var read);
 				result.Add((read.Message?.Name ?? "?", body));

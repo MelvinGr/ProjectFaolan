@@ -1,11 +1,10 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
-
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -56,7 +55,7 @@ namespace Faolan.Importer.Extractors
 				return false;
 
 			var body = Body(packet);
-			if (body.Length < 20 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
+			if (body.Length < 20 || body.ReadU32Be(4) != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
 				return false;
 
 			try
@@ -94,7 +93,7 @@ namespace Faolan.Importer.Extractors
 				return false;
 
 			var body = Body(packet);
-			if (body.Length < 20 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
+			if (body.Length < 20 || body.ReadU32Be(4) != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
 				return false;
 
 			try
@@ -117,7 +116,7 @@ namespace Faolan.Importer.Extractors
 		// The 0x2000 body within a full on-wire packet: [len4][crc4][headerLen4][header][body].
 		private static byte[] Body(byte[] full)
 		{
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
+			var headerLen = (int)full.ReadU32Be(8);
 			var start = 12 + headerLen;
 			return start > 0 && start < full.Length
 				? full[start..]

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -7,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
@@ -54,11 +54,11 @@ namespace Faolan.Tests
 
 			// It opens with the 0x00000BD3 chapter tag, NOT a Quest_c/QuestFullUpdate header (which would open with
 			// the questId), and the first goal carries questId 10238 + goalId 1448 right after the [1][k] separator.
-			Assert.Equal(0x00000BD3u, U32(t, RegionStart)); // chapterTag
-			Assert.Equal(1u, U32(t, RegionStart + 4)); // [1]
-			Assert.Equal(0x02165EFFu, U32(t, RegionStart + 12)); // instance (template's baked-in)
-			Assert.Equal(10238u, U32(t, RegionStart + 16)); // questId
-			Assert.Equal(1448u, U32(t, RegionStart + 20)); // goal 1 id
+			Assert.Equal(0x00000BD3u, t.ReadU32Be(RegionStart)); // chapterTag
+			Assert.Equal(1u, t.ReadU32Be(RegionStart + 4)); // [1]
+			Assert.Equal(0x02165EFFu, t.ReadU32Be(RegionStart + 12)); // instance (template's baked-in)
+			Assert.Equal(10238u, t.ReadU32Be(RegionStart + 16)); // questId
+			Assert.Equal(1448u, t.ReadU32Be(RegionStart + 20)); // goal 1 id
 		}
 
 		[Fact]
@@ -90,10 +90,6 @@ namespace Faolan.Tests
 				: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText ?? "");
 		}
 
-		private static uint U32(byte[] b, int o)
-		{
-			return BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(o, 4));
-		}
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
 		{

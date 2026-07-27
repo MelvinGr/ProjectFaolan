@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -304,11 +304,11 @@ namespace Faolan.Importer.Rdb
 				var cur = new Dictionary<uint, uint>();
 				for (var j = start; j + 1 < words; j++)
 				{
-					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					var fid = body.ReadU32Le(j * 4);
 					if (fid == 0 || fid > 2000 || (haveLast && fid <= last))
 						break;
 
-					cur[fid] = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
+					cur[fid] = body.ReadU32Le((j + 1) * 4);
 					last = fid;
 					haveLast = true;
 					j++; // consumed the value word too

@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,16 +50,16 @@ namespace Faolan.Importer.Rdb
 			var i = 24;
 			while (i + 4 <= payload.Length)
 			{
-				var nameLen = (int)BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(i, 4));
+				var nameLen = (int)payload.ReadU32Le(i);
 				if (nameLen <= 0 || nameLen > 64 || i + 4 + nameLen + 16 > payload.Length)
 					break;
 
 				var name = Encoding.ASCII.GetString(payload, i + 4, nameLen);
 				i += 4 + nameLen;
 
-				var category = BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(i, 4));
-				var weight = BitConverter.UInt32BitsToSingle(BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(i + 8, 4)));
-				var id = BinaryPrimitives.ReadUInt32LittleEndian(payload.AsSpan(i + 12, 4));
+				var category = payload.ReadU32Le(i);
+				var weight = BitConverter.UInt32BitsToSingle(payload.ReadU32Le(i + 8));
+				var id = payload.ReadU32Le(i + 12);
 				i += 16;
 
 				if (id == 0)

@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -60,8 +60,8 @@ namespace Faolan.Core.Rdb.Assets
 
 			// [0]=levels (1), [4]=W, [8]=H, then W*H float32. The [type][id] RDB-Id header other resources carry is
 			// absent here - the floats begin at offset 12 (validated in-play).
-			var width = (int)BinaryPrimitives.ReadUInt32LittleEndian(body[4..]);
-			var height = (int)BinaryPrimitives.ReadUInt32LittleEndian(body[8..]);
+			var width = (int)body.ReadU32Le(4);
+			var height = (int)body.ReadU32Le(8);
 			if (width <= 0 || height <= 0 || (long)width * height > 64_000_000)
 				return false;
 
@@ -72,7 +72,7 @@ namespace Faolan.Core.Rdb.Assets
 			var heights = new float[width * height];
 			var grid = body.Slice(12, (int)floatBytes);
 			for (var i = 0; i < heights.Length; i++)
-				heights[i] = BinaryPrimitives.ReadSingleLittleEndian(grid[(i * 4)..]);
+				heights[i] = grid.ReadF32Le(i * 4);
 
 			var cellSize = tilemapExtent > 0f
 				? tilemapExtent / width

@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
 {
@@ -68,7 +68,7 @@ namespace Faolan.Core.Rdb
 		// name for a body that is not a TDL1 record (or names nothing), and then claims nothing.
 		public static (string? Language, IReadOnlyList<uint> Pages) ParseRecord(ReadOnlySpan<byte> body, IReadOnlyCollection<uint> knownPages)
 		{
-			if (body.Length < 16 || BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(12, 4)) != Magic)
+			if (body.Length < 16 || body.ReadU32Le(12) != Magic)
 				return (null, []);
 
 			var name = NameOf(body);
@@ -80,7 +80,7 @@ namespace Faolan.Core.Rdb
 			var claimed = new List<uint>();
 			for (var off = 16; off + 4 <= body.Length; off++)
 			{
-				var value = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(off, 4));
+				var value = body.ReadU32Le(off);
 				if (knownPages.Contains(value) && !claimed.Contains(value))
 					claimed.Add(value);
 			}

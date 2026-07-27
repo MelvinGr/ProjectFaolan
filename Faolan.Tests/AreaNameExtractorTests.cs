@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Importer.Extractors;
 using Xunit;
 
@@ -65,8 +65,8 @@ namespace Faolan.Tests
 			// in a <remoteformat>/<parameter> pair whose surroundings this harvest ignores.
 			var xml = Encoding.Latin1.GetBytes($"<localized category='50025' token='DisplayedText(3)|GenericDisplayAreaName|{areaNameId}'>");
 			var body = new byte[8 + xml.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), (uint)GameServer0X2000Opcodes.FormatFeedbackIIR);
+			body.WriteU32Be(0, (uint)body.Length);
+			body.WriteU32Be(4, (uint)GameServer0X2000Opcodes.FormatFeedbackIIR);
 			xml.CopyTo(body, 8);
 			return Packet(true, (uint)GameServer0X2000Opcodes.FormatFeedbackIIR, body);
 		}
@@ -82,9 +82,9 @@ namespace Faolan.Tests
 		{
 			// MapChangeCodec reads the map id at body offset 26 after the sub-opcode word.
 			var body = new byte[4 + 4 + 99 + 4];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), (uint)GameServer0X2000Opcodes.PlayfieldFIIR);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8 + 26, 4), mapId);
+			body.WriteU32Be(0, (uint)body.Length);
+			body.WriteU32Be(4, (uint)GameServer0X2000Opcodes.PlayfieldFIIR);
+			body.WriteU32Be(8 + 26, mapId);
 			return Packet(true, (uint)GameServer0X2000Opcodes.PlayfieldFIIR, body);
 		}
 
@@ -92,11 +92,11 @@ namespace Faolan.Tests
 		{
 			// The c2s CharDCMove carries the position as three big-endian floats at body offset 18.
 			var body = new byte[18 + 12];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)body.Length);
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), (uint)GameServer0X2000Opcodes.CharDCMoveIIR);
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(18, 4), x);
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(22, 4), y);
-			BinaryPrimitives.WriteSingleBigEndian(body.AsSpan(26, 4), z);
+			body.WriteU32Be(0, (uint)body.Length);
+			body.WriteU32Be(4, (uint)GameServer0X2000Opcodes.CharDCMoveIIR);
+			body.WriteF32Be(18, x);
+			body.WriteF32Be(22, y);
+			body.WriteF32Be(26, z);
 			return Packet(false, (uint)GameServer0X2000Opcodes.CharDCMoveIIR, body);
 		}
 

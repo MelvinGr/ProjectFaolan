@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
@@ -23,10 +22,10 @@ namespace Faolan.Tests
 		{
 			var template = Golden.Bytes(golden);
 
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
-			var position = new Vector3(ReadLE(template, SpawnPacketBuilder.PosXOffset), ReadLE(template, SpawnPacketBuilder.PosYOffset), ReadLE(template, SpawnPacketBuilder.PosZOffset));
-			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset), ReadLE(template, SpawnPacketBuilder.RotYOffset), ReadLE(template, SpawnPacketBuilder.RotZOffset),
-				ReadLE(template, SpawnPacketBuilder.RotWOffset));
+			var handle = template.ReadU32Be(SpawnPacketBuilder.HandleOffset);
+			var position = new Vector3(template.ReadF32Le(SpawnPacketBuilder.PosXOffset), template.ReadF32Le(SpawnPacketBuilder.PosYOffset), template.ReadF32Le(SpawnPacketBuilder.PosZOffset));
+			var rotation = new Quaternion(template.ReadF32Le(SpawnPacketBuilder.RotXOffset), template.ReadF32Le(SpawnPacketBuilder.RotYOffset), template.ReadF32Le(SpawnPacketBuilder.RotZOffset),
+				template.ReadF32Le(SpawnPacketBuilder.RotWOffset));
 
 			var built = SpawnPacketBuilder.BuildSpawnBody(template, handle, position, rotation);
 
@@ -41,9 +40,9 @@ namespace Faolan.Tests
 			var built = SpawnPacketBuilder.BuildSpawnBody(template, 0x00088888u, new Vector3(1f, 2f, 3f), Quaternion.Identity);
 
 			Assert.Equal(template.Length, built.Length);
-			Assert.Equal(0x00088888u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(SpawnPacketBuilder.HandleOffset, 4)));
-			Assert.Equal(1f, ReadLE(built, SpawnPacketBuilder.PosXOffset));
-			Assert.Equal(3f, ReadLE(built, SpawnPacketBuilder.PosZOffset));
+			Assert.Equal(0x00088888u, built.ReadU32Be(SpawnPacketBuilder.HandleOffset));
+			Assert.Equal(1f, built.ReadF32Le(SpawnPacketBuilder.PosXOffset));
+			Assert.Equal(3f, built.ReadF32Le(SpawnPacketBuilder.PosZOffset));
 		}
 
 		// The full construction oracle: rebuilding the whole NPC body from its own transform AND its own decoded
@@ -56,10 +55,10 @@ namespace Faolan.Tests
 			var template = Golden.Bytes(golden);
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(template, out var read));
 
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(template.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
-			var position = new Vector3(ReadLE(template, SpawnPacketBuilder.PosXOffset), ReadLE(template, SpawnPacketBuilder.PosYOffset), ReadLE(template, SpawnPacketBuilder.PosZOffset));
-			var rotation = new Quaternion(ReadLE(template, SpawnPacketBuilder.RotXOffset), ReadLE(template, SpawnPacketBuilder.RotYOffset), ReadLE(template, SpawnPacketBuilder.RotZOffset),
-				ReadLE(template, SpawnPacketBuilder.RotWOffset));
+			var handle = template.ReadU32Be(SpawnPacketBuilder.HandleOffset);
+			var position = new Vector3(template.ReadF32Le(SpawnPacketBuilder.PosXOffset), template.ReadF32Le(SpawnPacketBuilder.PosYOffset), template.ReadF32Le(SpawnPacketBuilder.PosZOffset));
+			var rotation = new Quaternion(template.ReadF32Le(SpawnPacketBuilder.RotXOffset), template.ReadF32Le(SpawnPacketBuilder.RotYOffset), template.ReadF32Le(SpawnPacketBuilder.RotZOffset),
+				template.ReadF32Le(SpawnPacketBuilder.RotWOffset));
 
 			var built = SpawnPacketBuilder.BuildSpawn(template, handle, position, rotation, read.Message);
 
@@ -92,25 +91,21 @@ namespace Faolan.Tests
 			var body = Golden.Bytes("SpawnNpcCrocodile");
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
 			var iirLenOffset = read.Offset - 4;
-			var oldBodyLen = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
-			var oldIirLen = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(iirLenOffset, 4));
+			var oldBodyLen = body.ReadU32Be(0);
+			var oldIirLen = body.ReadU32Be(iirLenOffset);
 
 			read.Message.Name = "Ancient Crocodile"; // +8 chars
 			var rebuilt = SpawnPacketBuilder.SetCharacterMessage(body, read.Message);
 
 			var delta = rebuilt.Length - body.Length;
 			Assert.Equal(8, delta);
-			Assert.Equal((uint)(oldBodyLen + delta), BinaryPrimitives.ReadUInt32BigEndian(rebuilt.AsSpan(0, 4)));
-			Assert.Equal((uint)(oldIirLen + delta), BinaryPrimitives.ReadUInt32BigEndian(rebuilt.AsSpan(iirLenOffset, 4)));
+			Assert.Equal((uint)(oldBodyLen + delta), rebuilt.ReadU32Be(0));
+			Assert.Equal((uint)(oldIirLen + delta), rebuilt.ReadU32Be(iirLenOffset));
 
 			// Re-reading the rebuilt body yields the new name (the splice is structurally valid).
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(rebuilt, out var reread));
 			Assert.Equal("Ancient Crocodile", reread.Message.Name);
 		}
 
-		private static float ReadLE(byte[] b, int offset)
-		{
-			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
-		}
 	}
 }

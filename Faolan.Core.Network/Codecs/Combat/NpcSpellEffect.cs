@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
@@ -30,14 +30,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public byte[] ToArray()
 		{
 			var b = new byte[Length];
-			BinaryPrimitives.WriteUInt16BigEndian(b.AsSpan(10), Duration);
+			b.WriteU16Be(10, Duration);
 			b[13] = FlagA;
 			b[17] = FlagB;
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(23), SpellId);
+			b.WriteU32Be(23, SpellId);
 			b[29] = Magnitude;
 			b[33] = FlagC;
 			b[45] = Rank;
-			BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(50), Counter);
+			b.WriteU32Be(50, Counter);
 			return b;
 		}
 
@@ -46,8 +46,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 			if (b.Length != Length)
 				throw new ArgumentException($"NpcSpellEffect payload must be {Length} bytes, got {b.Length}.", nameof(b));
 
-			return new NpcSpellEffect(BinaryPrimitives.ReadUInt32BigEndian(b[23..]), BinaryPrimitives.ReadUInt16BigEndian(b[10..]), b[29], b[45], b[13], b[17], b[33],
-				BinaryPrimitives.ReadUInt32BigEndian(b[50..]));
+			return new NpcSpellEffect(b.ReadU32Be(23), b.ReadU16Be(10), b[29], b[45], b[13], b[17], b[33],
+				b.ReadU32Be(50));
 		}
 	}
 }

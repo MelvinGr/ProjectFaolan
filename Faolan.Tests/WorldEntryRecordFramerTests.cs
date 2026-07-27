@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using Faolan.Core;
 using Faolan.Core.Extensions;
@@ -58,7 +57,7 @@ namespace Faolan.Tests
 		public void BuildWorldEntrySpawn_ReproducesCapturedPlayerSpawnPacket()
 		{
 			var captured = File.ReadAllBytes(PlayerSpawnCap);
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(8, 4));
+			var bodyStart = 12 + (int)captured.ReadU32Be(8);
 			var spawnBody = captured[bodyStart..];
 
 			var built = GameServerListener.BuildWorldEntrySpawn(BeachClient(), spawnBody).Serialize();
@@ -73,7 +72,7 @@ namespace Faolan.Tests
 		public void FrameWorldEntryRecord_ReproducesCapturedWorldObjectPacket()
 		{
 			var captured = File.ReadAllBytes(WorldObjectCap);
-			var bodyStart = 12 + (int)BinaryPrimitives.ReadUInt32BigEndian(captured.AsSpan(8, 4));
+			var bodyStart = 12 + (int)captured.ReadU32Be(8);
 			var objectBody = captured[bodyStart..];
 
 			var built = GameServerListener.FrameWorldEntryRecord(BeachClient(), objectBody).Serialize();

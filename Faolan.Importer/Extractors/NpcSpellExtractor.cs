@@ -1,11 +1,10 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
-
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -44,13 +43,13 @@ namespace Faolan.Importer.Extractors
 				var body = p.Body;
 				if (body.Length < PayloadOffset)
 					continue;
-				if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ApplySpellSubOpcode)
+				if (body.ReadU32Be(4) != ApplySpellSubOpcode)
 					continue;
 
 				// The ApplySpell content is [subop][c350][applyTo][u16 0][spellId][c350][applyFrom][payload] - the same
 				// shape NpcSpellCastBuilder builds, so parse it with that codec (applyTo@12 / spellId@18 / applyFrom@26
 				// as before). Bound the stream to the declared IIR length so Payload matches the old len-bounded slice.
-				var len = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
+				var len = (int)body.ReadU32Be(0);
 				var end = Math.Min(body.Length, 4 + len);
 				if (end < PayloadOffset) // a length shorter than the fixed header: the old code yielded an empty payload -> skip
 					continue;

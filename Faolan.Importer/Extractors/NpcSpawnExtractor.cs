@@ -1,14 +1,13 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
-
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -70,11 +69,11 @@ namespace Faolan.Importer.Extractors
 				if (body.Length < 38)
 					continue;
 
-				var subop = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4));
+				var subop = body.ReadU32Be(4);
 
 				if (subop == MapChangeSubOpcode)
 				{
-					currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+					currentMap = body.ReadU32Be(34);
 					continue;
 				}
 
@@ -102,12 +101,12 @@ namespace Faolan.Importer.Extractors
 			{
 				var body = p.Body;
 				var subop = body.Length >= 8
-					? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
+					? body.ReadU32Be(4)
 					: 0;
 
 				if (p is { IsIirCarrier: true, IsDownload: true } && subop == MapChangeSubOpcode && body.Length >= 38)
 				{
-					currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+					currentMap = body.ReadU32Be(34);
 					sawPoll = false;
 					continue;
 				}
@@ -233,7 +232,7 @@ namespace Faolan.Importer.Extractors
 
 		private static float ReadLE(byte[] body, int offset)
 		{
-			return BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset, 4));
+			return body.ReadF32Le(offset);
 		}
 
 		// Builds one NPC spawn entry from an FA015807 body (transform + lifted identity/appearance/equipment). Returns
@@ -244,7 +243,7 @@ namespace Faolan.Importer.Extractors
 			if (body.Length < SpawnPacketBuilder.RotWOffset + 4)
 				return false; // too short to hold the transform (position + rotation)
 
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+			var handle = body.ReadU32Be(12);
 			if (handle >= EntityHandles.CharacterInstanceBase)
 				return false; // the player's own spawn
 

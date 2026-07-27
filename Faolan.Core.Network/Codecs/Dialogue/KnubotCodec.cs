@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 
@@ -68,7 +68,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		public static uint ParseAnswerIndex(byte[] body)
 		{
 			return body is { Length: >= 4 }
-				? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(body.Length - 4, 4))
+				? body.ReadU32Be(body.Length - 4)
 				: 0u;
 		}
 

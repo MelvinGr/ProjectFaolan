@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Rdb;
 using Xunit;
 
@@ -35,7 +35,7 @@ namespace Faolan.Tests
 
 			var body = new byte[phase + record.Length * 4 + 8];
 			for (var i = 0; i < record.Length; i++)
-				BinaryPrimitives.WriteUInt32LittleEndian(body.AsSpan(phase + i * 4), record[i]);
+				body.WriteU32Le(phase + i * 4, record[i]);
 
 			var mods = ItemTemplateStatModifiers.Parse(body);
 

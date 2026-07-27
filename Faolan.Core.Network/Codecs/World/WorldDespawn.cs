@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
@@ -85,7 +85,7 @@ namespace Faolan.Core.Network.Codecs.World
 				var start = i + 4;
 				if (snapshotBody.Slice(start + 4, 4).SequenceEqual(TokenSuffixMarker))
 				{
-					token = BinaryPrimitives.ReadUInt32BigEndian(snapshotBody.Slice(start, 4));
+					token = snapshotBody.ReadU32Be(start);
 					tokenStart = start;
 					return true;
 				}

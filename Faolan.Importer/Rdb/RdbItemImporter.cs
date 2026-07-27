@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,6 +7,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 
@@ -86,10 +86,10 @@ namespace Faolan.Importer.Rdb
 			var i = 0;
 			while (i + 8 <= body.Length)
 			{
-				if (BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4)) == StringTag)
+				if (body.ReadU32Le(i) == StringTag)
 				{
 					// length is a u16; body[i+6..i+8] is a flags word (escaping marker) we don't need.
-					var len = BinaryPrimitives.ReadUInt16LittleEndian(body.Slice(i + 4, 2));
+					var len = body.ReadU16Le(i + 4);
 					if (len is >= 1 and <= 1024 && i + 8 + len <= body.Length)
 					{
 						var s = body.Slice(i + 8, len);
@@ -176,8 +176,8 @@ namespace Faolan.Importer.Rdb
 				}
 
 				// Validate the 12-byte RDB-Id header: type + id must match what we asked for, marker == 1000000.
-				if (template.Length < 12 || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(0, 4)) != matchedType ||
-				    BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(4, 4)) != item.Id || BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(8, 4)) != MarkerItem)
+				if (template.Length < 12 || template.ReadU32Le(0) != matchedType ||
+				    template.ReadU32Le(4) != item.Id || template.ReadU32Le(8) != MarkerItem)
 				{
 					headerMismatch++;
 					continue;
@@ -188,7 +188,7 @@ namespace Faolan.Importer.Rdb
 				// The AH search CATEGORY is the first u32 of the template body (right after the 12-byte RDB-Id header).
 				// Validated byte-for-byte against 170 captured AH listings (#181). Lets a player's listing be filed
 				// under the item-type search node the client queries by, for EVERY item - not just captured ones.
-				var category = BinaryPrimitives.ReadUInt32LittleEndian(template.AsSpan(12, 4));
+				var category = template.ReadU32Le(12);
 				if (category != item.SearchCategory)
 				{
 					item.SearchCategory = category;
@@ -373,10 +373,10 @@ namespace Faolan.Importer.Rdb
 			slots = 0;
 			for (var i = 0; i + 8 <= body.Length; i += 4)
 			{
-				if (BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4)) != fieldId)
+				if (body.ReadU32Le(i) != fieldId)
 					continue;
 
-				var v = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i + 4, 4));
+				var v = body.ReadU32Le(i + 4);
 				if (v is >= 1 and <= 512)
 				{
 					slots = v;
@@ -413,11 +413,11 @@ namespace Faolan.Importer.Rdb
 				var fv = 0u;
 				for (var j = start; j + 1 < words; j++)
 				{
-					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
+					var fid = body.ReadU32Le(j * 4);
 					if (fid == 0 || fid > 2000 || (haveLast && fid >= last))
 						break;
 
-					var val = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
+					var val = body.ReadU32Le((j + 1) * 4);
 					if (fid == fieldId)
 					{
 						found = true;
@@ -451,10 +451,10 @@ namespace Faolan.Importer.Rdb
 			value = 0;
 			for (var i = 0; i + 8 <= body.Length; i += 4)
 			{
-				if (BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i, 4)) != 499)
+				if (body.ReadU32Le(i) != 499)
 					continue;
 
-				var v = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(i + 4, 4));
+				var v = body.ReadU32Le(i + 4);
 				if (v <= MaxQualityFieldValue)
 				{
 					value = v;

@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
 {
@@ -71,7 +71,7 @@ namespace Faolan.Core.Rdb
 		// Reads a u32 at a BYTE offset - deliberately not word-indexed, see the scan note in Parse.
 		private static uint W(ReadOnlySpan<byte> body, int byteOffset)
 		{
-			return BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(byteOffset, 4));
+			return body.ReadU32Le(byteOffset);
 		}
 
 		// One record: its effect KIND (the opening word - see the type comment), the wire stat id, and the amount as it

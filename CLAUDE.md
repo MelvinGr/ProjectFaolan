@@ -202,6 +202,14 @@ Two things already run ahead of that move:
   `PacketStream`/`FaolanStream` helpers. Integers are big-endian; protobuf fixed32 floats are
   little-endian while raw-body floats are big-endian (`WriteFloatLittleEndian` / `WriteFloat` BE are both
   intentional).
+- **Offset-addressed reads/writes over a buffer go through `SpanExtensions`** (`Faolan.Core/Extensions`):
+  `body.ReadU32Be(4)` / `template.WriteF32Le(PosXOffset, x)`, NOT `BinaryPrimitives.<Op>(body.AsSpan(4, 4))`
+  and never a local `U32`/`ReadLE`/`WriteLe` helper (a dozen files had re-declared their own). `byte[]`,
+  `Span<byte>` and `ReadOnlySpan<byte>` all bind directly — no `.AsSpan()` at the call site. The set covers
+  both endiannesses of every width, so there is never a reason to reach past it. What legitimately stays on
+  raw `BinaryPrimitives` is the case where the span IS the value, not a field at an offset: a fixed-width
+  scratch buffer flushed to a stream (`FaolanStream`, `GlbWriter`, `FctxEncoder`) or a 4-byte length prefix
+  accumulated across recv boundaries (`ConanMessageFramer._lengthBuffer`).
 - 16-bit RPC opcodes are **method indices**: `wire = 0x2000 + registration index`, per interface, base
   0x2000 for every interface except PlayerAgent/PlayerInterface (32-bit hash dispatch — login, still open).
   Both directions are recovered from the client (`docs/re/aoc-rpc-method-opcodes.md`, scripts in

@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Crypt
 {
@@ -36,11 +36,11 @@ namespace Faolan.Core.Crypt
 			var outBuf = data.ToArray();
 			for (var i = 0; i + 8 <= outBuf.Length; i += 8)
 			{
-				var v0 = BinaryPrimitives.ReadUInt32LittleEndian(outBuf.AsSpan(i, 4));
-				var v1 = BinaryPrimitives.ReadUInt32LittleEndian(outBuf.AsSpan(i + 4, 4));
+				var v0 = outBuf.ReadU32Le(i);
+				var v1 = outBuf.ReadU32Le(i + 4);
 				DecryptBlock(ref v0, ref v1, key);
-				BinaryPrimitives.WriteUInt32LittleEndian(outBuf.AsSpan(i, 4), v0);
-				BinaryPrimitives.WriteUInt32LittleEndian(outBuf.AsSpan(i + 4, 4), v1);
+				outBuf.WriteU32Le(i, v0);
+				outBuf.WriteU32Le(i + 4, v1);
 			}
 
 			return outBuf;

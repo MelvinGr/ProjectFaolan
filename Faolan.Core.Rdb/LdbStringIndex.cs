@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
 {
@@ -45,9 +45,9 @@ namespace Faolan.Core.Rdb
 				return 0;
 
 			var span = body[12..];
-			return BinaryPrimitives.ReadUInt32LittleEndian(span) != Magic
+			return span.ReadU32Le(0) != Magic
 				? 0u
-				: BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(4, 4));
+				: span.ReadU32Le(4);
 		}
 
 		// Yields every (category, id, value) entry in the page. Empty if the body is not a well-formed TDC2 page.
@@ -61,12 +61,12 @@ namespace Faolan.Core.Rdb
 			uint category, size;
 			{
 				var span = body.AsSpan(12);
-				if (BinaryPrimitives.ReadUInt32LittleEndian(span) != Magic)
+				if (span.ReadU32Le(0) != Magic)
 					yield break;
 
-				category = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(4, 4));
-				size = BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(12, 4));
-				count = (int)BinaryPrimitives.ReadUInt32LittleEndian(span.Slice(16, 4));
+				category = span.ReadU32Le(4);
+				size = span.ReadU32Le(12);
+				count = (int)span.ReadU32Le(16);
 				blobStart = 12 + 36; // RDB-Id(12) + TDC2(4) + cat/flags/size/count(16) + MD5(16)
 				indexStart = blobStart + (int)size;
 			}
@@ -77,9 +77,9 @@ namespace Faolan.Core.Rdb
 			for (var i = 0; i < count; i++)
 			{
 				var rec = body.AsSpan(indexStart + i * 16, 16);
-				var id = BinaryPrimitives.ReadUInt32LittleEndian(rec);
-				var off = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(8, 4));
-				var len = BinaryPrimitives.ReadUInt32LittleEndian(rec.Slice(12, 4));
+				var id = rec.ReadU32Le(0);
+				var off = rec.ReadU32Le(8);
+				var len = rec.ReadU32Le(12);
 				if ((long)off + len > size)
 					continue;
 

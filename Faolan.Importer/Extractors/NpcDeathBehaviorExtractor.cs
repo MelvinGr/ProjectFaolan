@@ -1,9 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
-
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -88,14 +87,14 @@ namespace Faolan.Importer.Extractors
 			behaviorId = 0;
 			if (body.Length < 27)
 				return false;
-			if (BinaryPrimitives.ReadUInt16BigEndian(body.AsSpan(16, 2)) != DeathForm)
+			if (body.ReadU16Be(16) != DeathForm)
 				return false;
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)) != DeathSlot)
+			if (body.ReadU32Be(18) != DeathSlot)
 				return false;
 			if (body[26] != 0x08) // protobuf field 1 (the behaviorId)
 				return false;
 
-			handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+			handle = body.ReadU32Be(12);
 			var offset = 27;
 			behaviorId = (uint)ReadVarint(body, ref offset);
 			return behaviorId != 0;

@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
@@ -60,8 +60,8 @@ namespace Faolan.GameServer.Dialogue
 		internal static byte[] BuildReceivedStockPhraseBody(uint threadContext, byte[] textBytes)
 		{
 			var body = new byte[4 + 2 + textBytes.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), threadContext);
-			BinaryPrimitives.WriteUInt16BigEndian(body.AsSpan(4, 2), (ushort)textBytes.Length);
+			body.WriteU32Be(0, threadContext);
+			body.WriteU16Be(4, (ushort)textBytes.Length);
 			textBytes.CopyTo(body.AsSpan(6));
 			return body;
 		}
@@ -76,13 +76,13 @@ namespace Faolan.GameServer.Dialogue
 			if (body.Length < 8 + 2 + 4)
 				return false;
 
-			int strLen = BinaryPrimitives.ReadUInt16BigEndian(body.Slice(8, 2));
+			int strLen = body.ReadU16Be(8);
 			var tcOffset = 10 + strLen;
 			if (tcOffset + 4 > body.Length)
 				return false;
 
 			stockKey = Encoding.Latin1.GetString(body.Slice(10, strLen));
-			threadContext = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(tcOffset, 4));
+			threadContext = body.ReadU32Be(tcOffset);
 			return true;
 		}
 	}

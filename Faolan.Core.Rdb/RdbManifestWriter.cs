@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
 {
@@ -41,7 +41,7 @@ namespace Faolan.Core.Rdb
 				if (e.OldMd5.Length < 16)
 					continue;
 
-				var prefix = BinaryPrimitives.ReadUInt64LittleEndian(e.OldMd5.AsSpan(0, 8));
+				var prefix = e.OldMd5.ReadU64Le(0);
 				if (!byPrefix.TryGetValue(prefix, out var list))
 				{
 					list = [];
@@ -54,7 +54,7 @@ namespace Faolan.Core.Rdb
 			var patched = 0;
 			for (var pos = 0; pos + 16 <= man.Length; pos++)
 			{
-				var prefix = BinaryPrimitives.ReadUInt64LittleEndian(man.AsSpan(pos, 8));
+				var prefix = man.ReadU64Le(pos);
 				if (!byPrefix.TryGetValue(prefix, out var candidates))
 					continue;
 
@@ -65,7 +65,7 @@ namespace Faolan.Core.Rdb
 
 					e.NewMd5.CopyTo(man.AsSpan(pos, 16));
 					if (pos - SizeOffBeforeMd5 >= 0)
-						BinaryPrimitives.WriteUInt32LittleEndian(man.AsSpan(pos - SizeOffBeforeMd5, 4), e.Size);
+						man.WriteU32Le(pos - SizeOffBeforeMd5, e.Size);
 					patched++;
 					break;
 				}

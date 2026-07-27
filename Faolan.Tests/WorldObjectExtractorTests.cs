@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
+using Faolan.Core.Extensions;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
@@ -48,8 +48,8 @@ namespace Faolan.Tests
 		private static CapturedPacket MapChange(uint mapId)
 		{
 			var content = new byte[38];
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(4, 4), 0x5D85BFC7); // body@4 = subop
-			BinaryPrimitives.WriteUInt32BigEndian(content.AsSpan(34, 4), mapId); // body@34 = map
+			content.WriteU32Be(4, 0x5D85BFC7); // body@4 = subop
+			content.WriteU32Be(34, mapId); // body@34 = map
 			var full = new byte[12 + content.Length]; // headerLen = 0
 			content.CopyTo(full, 12);
 			return new CapturedPacket(0, true, 0x2000, 0, full);

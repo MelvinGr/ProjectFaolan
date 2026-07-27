@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json.Serialization;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
 
@@ -481,10 +481,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (offset < 0 || offset + minimumPrefixLength > data.Length)
 				return false;
 
-			var playfieldId = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4));
+			var playfieldId = data.ReadU32Be(offset);
 			var sectionOrTier = data[offset + 4];
-			var kind = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset + 5, 4));
-			var nameLength = BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset + 13, 2));
+			var kind = data.ReadU32Be(offset + 5);
+			var nameLength = data.ReadU16Be(offset + 13);
 
 			if (playfieldId is 0 or > 200_000)
 				return false;
@@ -676,7 +676,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (offset + 4 > data.Length || endOffset < offset)
 				return null;
 
-			var lead = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4));
+			var lead = data.ReadU32Be(offset);
 			if (lead == 0 || lead % ListFrame.Unit != 0)
 				return null;
 
@@ -699,7 +699,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (offset + 4 > data.Length || endOffset < offset)
 				return null;
 
-			var marker = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4));
+			var marker = data.ReadU32Be(offset);
 			if (marker == 0 || marker % ListFrame.Unit != 0)
 				return null;
 
@@ -775,9 +775,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (data.Length < 12)
 				return null;
 
-			var marker0 = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(0, 4));
-			var marker1 = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(4, 4));
-			var blockType = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(8, 4));
+			var marker0 = data.ReadU32Be(0);
+			var marker1 = data.ReadU32Be(4);
+			var blockType = data.ReadU32Be(8);
 
 			// Observed post-access block starts with:
 			// 0x000003F1, 0x000003F1, 0x000046F2
@@ -810,7 +810,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			for (var index = 0; index < valueCount; index++)
 			{
-				values.Add(BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset, 4)));
+				values.Add(data.ReadU32Be(offset));
 				offset += 4;
 			}
 

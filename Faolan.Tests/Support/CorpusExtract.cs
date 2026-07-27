@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -7,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Tests.Support
 {
@@ -100,7 +100,7 @@ namespace Faolan.Tests.Support
 			if (Encoding.ASCII.GetString(head[..4]) != "FCX1")
 				throw new InvalidDataException($"{Path} is not a corpus extract (bad magic).");
 
-			var manifest = new byte[BinaryPrimitives.ReadUInt32LittleEndian(head[4..])];
+			var manifest = new byte[head.ReadU32Le(4)];
 			file.ReadExactly(manifest);
 
 			using var doc = JsonDocument.Parse(manifest);
@@ -120,8 +120,8 @@ namespace Faolan.Tests.Support
 				Array.Copy(payload, offset, full, 0, length);
 				offset += length;
 
-				var headerLength = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-				var iir = BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(12 + headerLength + 4, 4));
+				var headerLength = (int)full.ReadU32Be(8);
+				var iir = full.ReadU32Be(12 + headerLength + 4);
 				result.Add(new Entry($"{e.GetProperty("s").GetString()}#{e.GetProperty("i").GetInt32()}", iir, e.GetProperty("f").GetInt32(), e.GetProperty("o").GetUInt32(), full));
 			}
 
@@ -154,7 +154,7 @@ namespace Faolan.Tests.Support
 			if (Encoding.ASCII.GetString(head[..4]) != "FCX1")
 				throw new InvalidDataException($"{Path} is not a corpus extract (bad magic).");
 
-			var manifest = new byte[BinaryPrimitives.ReadUInt32LittleEndian(head[4..])];
+			var manifest = new byte[head.ReadU32Le(4)];
 			file.ReadExactly(manifest);
 			return manifest;
 		}
@@ -168,7 +168,7 @@ namespace Faolan.Tests.Support
 			{
 				get
 				{
-					var headerLength = (int)BinaryPrimitives.ReadUInt32BigEndian(Full.AsSpan(8, 4));
+					var headerLength = (int)Full.ReadU32Be(8);
 					return Full[(12 + headerLength)..];
 				}
 			}

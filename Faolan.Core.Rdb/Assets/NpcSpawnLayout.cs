@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -112,7 +112,7 @@ namespace Faolan.Core.Rdb.Assets
 			if (o + 2 > b.Length)
 				return false;
 
-			int len = BinaryPrimitives.ReadUInt16LittleEndian(b.Slice(o, 2));
+			int len = b.ReadU16Le(o);
 			o += 2;
 			if (o + len > b.Length)
 				return false;
@@ -130,7 +130,7 @@ namespace Faolan.Core.Rdb.Assets
 				return false;
 			}
 
-			v = BinaryPrimitives.ReadUInt32LittleEndian(b.Slice(o, 4));
+			v = b.ReadU32Le(o);
 			o += 4;
 			return true;
 		}
@@ -143,8 +143,8 @@ namespace Faolan.Core.Rdb.Assets
 				return false;
 			}
 
-			v = new Vector3(BinaryPrimitives.ReadSingleLittleEndian(b.Slice(o, 4)), BinaryPrimitives.ReadSingleLittleEndian(b.Slice(o + 4, 4)),
-				BinaryPrimitives.ReadSingleLittleEndian(b.Slice(o + 8, 4)));
+			v = new Vector3(b.ReadF32Le(o), b.ReadF32Le(o + 4),
+				b.ReadF32Le(o + 8));
 			o += 12;
 			return true;
 		}

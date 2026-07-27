@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
@@ -17,10 +17,10 @@ namespace Faolan.Tests
 		{
 			var post = NpcSpawnScaffold.BuildMinimalPostIir();
 
-			Assert.Equal(0u, BinaryPrimitives.ReadUInt32BigEndian(post.AsSpan(0, 4))); // word0 == 0 (player has 2)
-			Assert.Equal((uint)(post.Length - 36), BinaryPrimitives.ReadUInt32BigEndian(post.AsSpan(4, 4))); // self-length
-			Assert.Equal(1u, BinaryPrimitives.ReadUInt32BigEndian(post.AsSpan(8, 4))); // single record group
-			Assert.Equal(0x03F1u, BinaryPrimitives.ReadUInt32BigEndian(post.AsSpan(post.Length - 4, 4))); // final 0x3F1 marker
+			Assert.Equal(0u, post.ReadU32Be(0)); // word0 == 0 (player has 2)
+			Assert.Equal((uint)(post.Length - 36), post.ReadU32Be(4)); // self-length
+			Assert.Equal(1u, post.ReadU32Be(8)); // single record group
+			Assert.Equal(0x03F1u, post.ReadU32Be(post.Length - 4)); // final 0x3F1 marker
 		}
 
 		[Fact]
@@ -64,7 +64,7 @@ namespace Faolan.Tests
 			var body = new byte[postStart + post.Length];
 			Array.Copy(animal, body, postStart);
 			post.CopyTo(body, postStart);
-			BinaryPrimitives.WriteUInt32BigEndian(body, (uint)(body.Length - 4));
+			body.WriteU32Be(0, (uint)(body.Length - 4));
 
 			Assert.True(NpcSpawnScaffold.TryReadNoMorphRecordCount(body, out var rc));
 			Assert.Equal(2u, rc);

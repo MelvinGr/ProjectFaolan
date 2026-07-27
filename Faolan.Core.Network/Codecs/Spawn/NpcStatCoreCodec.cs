@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
@@ -176,7 +176,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (hdr < 0 || body[hdr] != 0x41)
 				return null;
 
-			return BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(hdr + 1, 4));
+			return body.ReadU32Be(hdr + 1);
 		}
 
 		// Typed columns -> CharacterBcc (build side).

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -88,11 +87,11 @@ namespace Faolan.Importer.Captures
 					return;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
-				if (inner.Length < BlobOffset || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != BankIirSubOpcode)
+				if (inner.Length < BlobOffset || inner.ReadU32Be(0) != BankIirSubOpcode)
 					return;
 
-				var charInstance = BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(8, 4));
-				var blobLen = (int)BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(13, 4));
+				var charInstance = inner.ReadU32Be(8);
+				var blobLen = (int)inner.ReadU32Be(13);
 				if (charInstance == 0 || blobLen <= 0 || BlobOffset + blobLen > inner.Length)
 					return;
 

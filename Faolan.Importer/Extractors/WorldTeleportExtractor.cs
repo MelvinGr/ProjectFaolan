@@ -1,9 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
-
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -77,7 +76,7 @@ namespace Faolan.Importer.Extractors
 
 				if (p is { IsDownload: true, SubOpcode: MapChangeSubOpcode })
 				{
-					var map = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+					var map = body.ReadU32Be(34);
 					if (map != currentMap)
 					{
 						currentMap = map;
@@ -92,7 +91,7 @@ namespace Faolan.Importer.Extractors
 					if (body.Length < SpawnPacketBuilder.PosZOffset + 4)
 						continue;
 
-					var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+					var handle = body.ReadU32Be(12);
 					var (_, name) = WorldObjectExtractor.ReadMessage(body);
 					zoneLines[handle] = (name, WorldObjectExtractor.ReadLE(body, SpawnPacketBuilder.PosXOffset), WorldObjectExtractor.ReadLE(body, SpawnPacketBuilder.PosYOffset),
 						WorldObjectExtractor.ReadLE(body, SpawnPacketBuilder.PosZOffset));
@@ -104,7 +103,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 				if (body.Length < ActionTypeOffset + 4)
 					continue;
-				if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(ActionTypeOffset, 4)) != UseObjectActionType)
+				if (body.ReadU32Be(ActionTypeOffset) != UseObjectActionType)
 					continue;
 
 				if (!TryFindUsedZoneLine(body, zoneLines, out var used))
@@ -202,7 +201,7 @@ namespace Faolan.Importer.Extractors
 			if (body.Length < 26)
 				return false;
 
-			var pblen = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(22, 4));
+			var pblen = (int)body.ReadU32Be(22);
 			if (pblen < 0)
 				return false;
 
@@ -210,7 +209,7 @@ namespace Faolan.Importer.Extractors
 			if (targetOffset + 4 > body.Length)
 				return false;
 
-			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(targetOffset, 4));
+			var handle = body.ReadU32Be(targetOffset);
 			return zoneLines.TryGetValue(handle, out used);
 		}
 
@@ -226,9 +225,9 @@ namespace Faolan.Importer.Extractors
 			if (pos >= 0 && pos + PositionBlobTag.Length + 12 <= body.Length)
 			{
 				var o = pos + PositionBlobTag.Length;
-				x = BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(o, 4));
-				y = BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(o + 4, 4));
-				z = BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(o + 8, 4));
+				x = body.ReadF32Be(o);
+				y = body.ReadF32Be(o + 4);
+				z = body.ReadF32Be(o + 8);
 				return true;
 			}
 
@@ -236,9 +235,9 @@ namespace Faolan.Importer.Extractors
 			if (inlineOffset + 12 > body.Length)
 				return false;
 
-			x = BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(inlineOffset, 4));
-			y = BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(inlineOffset + 4, 4));
-			z = BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(inlineOffset + 8, 4));
+			x = body.ReadF32Be(inlineOffset);
+			y = body.ReadF32Be(inlineOffset + 4);
+			z = body.ReadF32Be(inlineOffset + 8);
 			return x != 0 || y != 0 || z != 0;
 		}
 
@@ -252,7 +251,7 @@ namespace Faolan.Importer.Extractors
 			if (proxy < 0 || proxy + ProxyMarker.Length + 4 > body.Length)
 				return false;
 
-			destMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(proxy + ProxyMarker.Length, 4));
+			destMap = body.ReadU32Be(proxy + ProxyMarker.Length);
 			return destMap != 0;
 		}
 	}

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -7,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.GameServer.CreateFlow;
 using Faolan.Tests.Support;
@@ -91,8 +91,8 @@ namespace Faolan.Tests
 					continue;
 
 				// the carrier length [u32] sits 4 bytes before the subOpcode (8 bytes before the body): len = 4 + body
-				var bodyLen = (int)BinaryPrimitives.ReadUInt32BigEndian(burst.AsSpan(at - 8, 4)) - 4;
-				var handle = BinaryPrimitives.ReadUInt32BigEndian(burst.AsSpan(at + 4, 4));
+				var bodyLen = (int)burst.ReadU32Be(at - 8) - 4;
+				var handle = burst.ReadU32Be(at + 4);
 				result.Add((handle, burst.AsSpan(at, bodyLen).ToArray()));
 			}
 

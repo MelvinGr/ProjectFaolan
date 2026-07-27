@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Text;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
 using Xunit;
 
@@ -30,8 +30,8 @@ namespace Faolan.Tests
 			var xml = Encoding.ASCII.GetBytes("<remoteformat id=\"0\" ></remoteformat>");
 			var body = ChatTextCodec.Build(0x00ABCDEFu, xml);
 
-			Assert.Equal(ChatTextCodec.Opcode, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)));
-			Assert.Equal((uint)(body.Length - 4), BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4)));
+			Assert.Equal(ChatTextCodec.Opcode, body.ReadU32Be(4));
+			Assert.Equal((uint)(body.Length - 4), body.ReadU32Be(0));
 			Assert.Equal(0x00ABCDEFu, ChatTextCodec.Parse(body).Instance);
 		}
 

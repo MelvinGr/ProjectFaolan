@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
 {
@@ -39,10 +39,10 @@ namespace Faolan.Core.Rdb
 			var idx = File.ReadAllBytes(idxPath);
 			if (idx.Length < 28 || idx[0] != (byte)'I' || idx[1] != (byte)'B' || idx[2] != (byte)'D' || idx[3] != (byte)'R')
 				throw new InvalidDataException("not an IBDR le.idx");
-			if (BinaryPrimitives.ReadUInt32LittleEndian(idx.AsSpan(4, 4)) != 5)
+			if (idx.ReadU32Le(4) != 5)
 				throw new NotSupportedException("only le.idx v5 is supported");
 
-			var numEntries = (int)BinaryPrimitives.ReadUInt32LittleEndian(idx.AsSpan(24, 4));
+			var numEntries = (int)idx.ReadU32Le(24);
 			const int indexOff = 28;
 			var detailOff = indexOff + numEntries * 8;
 
@@ -50,8 +50,8 @@ namespace Faolan.Core.Rdb
 			var byKey = new Dictionary<(uint, uint), int>(numEntries);
 			for (var i = 0; i < numEntries; i++)
 			{
-				var t = BinaryPrimitives.ReadUInt32LittleEndian(idx.AsSpan(indexOff + i * 8, 4));
-				var id = BinaryPrimitives.ReadUInt32LittleEndian(idx.AsSpan(indexOff + i * 8 + 4, 4));
+				var t = idx.ReadU32Le(indexOff + i * 8);
+				var id = idx.ReadU32Le(indexOff + i * 8 + 4);
 				byKey.TryAdd((t, id), i);
 			}
 
@@ -75,8 +75,8 @@ namespace Faolan.Core.Rdb
 					var oldMd5 = idx.AsSpan(d + Md5Off, 16).ToArray(); // manifest key (the resource's pre-edit content hash)
 					var newMd5 = MD5.HashData(blob); // the edited blob's content hash
 					idx[d] = dataFileNumber; // file
-					BinaryPrimitives.WriteUInt32LittleEndian(idx.AsSpan(d + 4, 4), (uint)offset); // offset
-					BinaryPrimitives.WriteUInt32LittleEndian(idx.AsSpan(d + 8, 4), (uint)blob.Length); // size
+					idx.WriteU32Le(d + 4, (uint)offset); // offset
+					idx.WriteU32Le(d + 8, (uint)blob.Length); // size
 					newMd5.CopyTo(idx.AsSpan(d + Md5Off, 16)); // content md5 (client validates local data against this)
 					results.Add(new InlineResult(type, id, oldMd5, newMd5, (uint)blob.Length));
 				}

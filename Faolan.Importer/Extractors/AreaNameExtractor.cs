@@ -1,13 +1,12 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
-
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -146,7 +145,7 @@ namespace Faolan.Importer.Extractors
 
 		private static float ReadFloat(byte[] b, int at)
 		{
-			return BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32BigEndian(b.AsSpan(at, 4)));
+			return BitConverter.Int32BitsToSingle(b.ReadI32Be(at));
 		}
 
 		// CharDCMoveIIR body: [u32 subop][u32 0xC350][u32 handle][u8 env][u8 flag1][float x][float y][float z] -

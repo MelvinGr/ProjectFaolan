@@ -1,10 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
-
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -36,7 +35,7 @@ namespace Faolan.Importer.Extractors
 				{
 					var body = p.Body;
 					if (body.Length >= 38)
-						currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+						currentMap = body.ReadU32Be(34);
 					continue;
 				}
 
@@ -63,7 +62,7 @@ namespace Faolan.Importer.Extractors
 		// codec parses starts at offset 8 (after the length + sub-opcode words).
 		private static IEnumerable<uint> ReadLootTemplates(byte[] body)
 		{
-			if (body.Length < 8 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != LootBagSubOpcode)
+			if (body.Length < 8 || body.ReadU32Be(4) != LootBagSubOpcode)
 				yield break;
 
 			if (!LootBagMessageCodec.TryParse(body.AsSpan(8), out var contents, out _) || contents?.Inventory?.Items == null)

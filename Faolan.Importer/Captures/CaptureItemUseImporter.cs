@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Protocol;
 using Microsoft.EntityFrameworkCore;
@@ -122,8 +122,8 @@ namespace Faolan.Importer.Captures
 		{
 			for (var i = 0; i + 8 <= body.Length; i++)
 			{
-				var a = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i));
-				if (a != 0 && a == BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 4)))
+				var a = body.ReadU32Be(i);
+				if (a != 0 && a == body.ReadU32Be(i + 4))
 				{
 					template = a;
 					return true;

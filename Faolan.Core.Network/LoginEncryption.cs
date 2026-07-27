@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using Faolan.Core.Crypt;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network
 {
@@ -55,8 +56,8 @@ namespace Faolan.Core.Network
 			uint prev0 = 0, prev1 = 0;
 			for (var i = 0; i < body.Length; i += 8)
 			{
-				var x0 = ReadLe(body, i) ^ prev0;
-				var x1 = ReadLe(body, i + 4) ^ prev1;
+				var x0 = body.ReadU32Le(i) ^ prev0;
+				var x1 = body.ReadU32Le(i + 4) ^ prev1;
 				Tea.EncryptBlock(ref x0, ref x1, key);
 				cipher.Append(ToLeHex(x0)).Append(ToLeHex(x1));
 				prev0 = x0;
@@ -128,8 +129,8 @@ namespace Faolan.Core.Network
 				d0 ^= prev0;
 				d1 ^= prev1;
 
-				WriteLe(output, b * 8, d0);
-				WriteLe(output, b * 8 + 4, d1);
+				output.WriteU32Le(b * 8, d0);
+				output.WriteU32Le(b * 8 + 4, d1);
 				prev0 = c0;
 				prev1 = c1;
 			}
@@ -155,11 +156,6 @@ namespace Faolan.Core.Network
 		private static BigInteger ParseHex(string hex)
 		{
 			return BigInteger.Parse("0" + hex, NumberStyles.HexNumber);
-		}
-
-		private static uint ReadLe(byte[] b, int o)
-		{
-			return (uint)(b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24));
 		}
 
 		// The TEA key is the low 128 bits of the shared secret: its lowercase hex, left-padded with '0' to (or
@@ -193,14 +189,6 @@ namespace Faolan.Core.Network
 		private static string ToLeHex(uint v)
 		{
 			return $"{(byte)v:x2}{(byte)(v >> 8):x2}{(byte)(v >> 16):x2}{(byte)(v >> 24):x2}";
-		}
-
-		private static void WriteLe(byte[] b, int o, uint v)
-		{
-			b[o] = (byte)v;
-			b[o + 1] = (byte)(v >> 8);
-			b[o + 2] = (byte)(v >> 16);
-			b[o + 3] = (byte)(v >> 24);
 		}
 	}
 }

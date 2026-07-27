@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -33,7 +33,7 @@ namespace Faolan.Importer.Extractors
 				if (!p.IsDownload || p.Opcode != (uint)GameCharInterfaceProjectOpcodes.DispatchUpdateAggroStatus || p.Bytes.Length < 12)
 					continue;
 
-				var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4));
+				var headerLen = (int)p.Bytes.ReadU32Be(8);
 				var bodyStart = 12 + headerLen;
 				if (bodyStart + 12 != p.Bytes.Length) // the reply body is exactly 12 bytes
 					continue;
@@ -45,11 +45,11 @@ namespace Faolan.Importer.Extractors
 					continue;
 
 				var body = p.Bytes.AsSpan(bodyStart);
-				if (BinaryPrimitives.ReadUInt32BigEndian(body[..4]) != EntityClass.Character)
+				if (body.ReadU32Be(0) != EntityClass.Character)
 					continue;
 
-				var target = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4));
-				var category = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(8, 4));
+				var target = body.ReadU32Be(4);
+				var category = body.ReadU32Be(8);
 				if (category > 2)
 					continue;
 

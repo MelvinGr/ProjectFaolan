@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -10,6 +9,7 @@ using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
@@ -286,10 +286,10 @@ namespace Faolan.GameServer.Economy
 			if (item?.Key is not { } k)
 				return key;
 
-			BinaryPrimitives.WriteUInt32BigEndian(key.AsSpan(0), k.Key1);
-			BinaryPrimitives.WriteUInt32BigEndian(key.AsSpan(4), k.Key2);
-			BinaryPrimitives.WriteUInt32BigEndian(key.AsSpan(8), k.Key3);
-			BinaryPrimitives.WriteUInt32BigEndian(key.AsSpan(12), k.Key4);
+			key.WriteU32Be(0, k.Key1);
+			key.WriteU32Be(4, k.Key2);
+			key.WriteU32Be(8, k.Key3);
+			key.WriteU32Be(12, k.Key4);
 			return key;
 		}
 

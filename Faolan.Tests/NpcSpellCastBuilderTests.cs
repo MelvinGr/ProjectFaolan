@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
 using Faolan.Core;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
@@ -34,9 +34,9 @@ namespace Faolan.Tests
 		{
 			var golden = Golden.Bytes("NpcSpellCast");
 
-			var applyTo = BinaryPrimitives.ReadUInt32BigEndian(golden.AsSpan(8, 4));
-			var spellId = BinaryPrimitives.ReadUInt32BigEndian(golden.AsSpan(14, 4));
-			var applyFrom = BinaryPrimitives.ReadUInt32BigEndian(golden.AsSpan(22, 4));
+			var applyTo = golden.ReadU32Be(8);
+			var spellId = golden.ReadU32Be(14);
+			var applyFrom = golden.ReadU32Be(22);
 			var payload = golden[26..];
 
 			var built = NpcSpellCastBuilder.Build(applyTo, applyFrom, spellId, payload);
@@ -94,9 +94,9 @@ namespace Faolan.Tests
 			// applyFrom = the NPC handle (the caster), applyTo = the player handle - the tell of an NPC cast.
 			var built = NpcSpellCastBuilder.Build(0x1316E71, 0x00017E29, 0x316AA600, []);
 
-			Assert.Equal(0x1316E71u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(8, 4))); // applyTo = player
-			Assert.Equal(0x316AA600u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(14, 4))); // spellId
-			Assert.Equal(0x00017E29u, BinaryPrimitives.ReadUInt32BigEndian(built.AsSpan(22, 4))); // applyFrom = NPC
+			Assert.Equal(0x1316E71u, built.ReadU32Be(8)); // applyTo = player
+			Assert.Equal(0x316AA600u, built.ReadU32Be(14)); // spellId
+			Assert.Equal(0x00017E29u, built.ReadU32Be(22)); // applyFrom = NPC
 		}
 	}
 }

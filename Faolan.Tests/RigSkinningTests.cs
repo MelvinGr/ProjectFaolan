@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using Faolan.Core.Extensions;
 using Faolan.Core.Rdb.Assets;
 using Xunit;
 
@@ -53,13 +54,13 @@ namespace Faolan.Tests
 
 		private static (JsonElement Gltf, byte[] Bin) ParseGlb(byte[] glb)
 		{
-			Assert.Equal(0x46546C67u, BinaryPrimitives.ReadUInt32LittleEndian(glb.AsSpan(0, 4)));
+			Assert.Equal(0x46546C67u, glb.ReadU32Le(0));
 			var p = 12;
 			byte[]? json = null, bin = null;
 			while (p < glb.Length)
 			{
-				var len = (int)BinaryPrimitives.ReadUInt32LittleEndian(glb.AsSpan(p, 4));
-				var type = BinaryPrimitives.ReadUInt32LittleEndian(glb.AsSpan(p + 4, 4));
+				var len = (int)glb.ReadU32Le(p);
+				var type = glb.ReadU32Le(p + 4);
 				var chunk = glb[(p + 8)..(p + 8 + len)];
 				if (type == 0x4E4F534A)
 					json = chunk;

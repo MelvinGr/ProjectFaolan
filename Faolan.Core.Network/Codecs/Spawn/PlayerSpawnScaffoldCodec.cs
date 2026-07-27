@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Spawn
@@ -104,16 +104,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		{
 			if (body == null || body.Length < 24)
 				throw new FormatException("body too short");
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR)
+			if (body.ReadU32Be(4) != (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR)
 				throw new FormatException("not an FA015807 body");
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4)) != (uint)(body.Length - 4))
+			if (body.ReadU32Be(0) != (uint)(body.Length - 4))
 				throw new FormatException("body length field mismatch");
 
 			var s = new PlayerSpawnScaffold
 			{
-				Ack = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(8, 4)),
-				Handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4)),
-				FieldA = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(16, 4))
+				Ack = body.ReadU32Be(8),
+				Handle = body.ReadU32Be(12),
+				FieldA = body.ReadU32Be(16)
 			};
 
 			var i = 20;
@@ -143,7 +143,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// Anchor the CharacterIIR by its name signature + length prefix (PlayerSpawnReader's proven scan).
 			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var iir))
 				throw new FormatException("CharacterIIR not found");
-			if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(iir.Offset - 4, 4)) != (uint)iir.Length)
+			if (body.ReadU32Be(iir.Offset - 4) != (uint)iir.Length)
 				throw new FormatException("CharacterIIR length prefix mismatch");
 
 			s.PreFrame = body.AsSpan(i, iir.Offset - 4 - i).ToArray();
@@ -167,7 +167,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			for (var n = key / Marker - 1; n > 0; n--)
 			{
-				if (BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(i + 32, 4)) != EntityClass.Character)
+				if (b.ReadU32Be(i + 32) != EntityClass.Character)
 					throw new FormatException("buff record shape mismatch");
 
 				s.BuffRecords.Add(b.AsSpan(i, BuffRecordSize).ToArray());
@@ -188,7 +188,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				if (U32(b, ref i) != 0)
 					throw new FormatException($"entry[{n}] zero field mismatch");
 
-				var tag = BinaryPrimitives.ReadUInt16BigEndian(b.AsSpan(i, 2));
+				var tag = b.ReadU16Be(i);
 				i += 2;
 				s.Entries.Add(new ScaffoldEntry(index, tag, U32(b, ref i)));
 			}
@@ -258,7 +258,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		private static uint U32(byte[] b, ref int i)
 		{
-			var v = BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(i, 4));
+			var v = b.ReadU32Be(i);
 			i += 4;
 			return v;
 		}

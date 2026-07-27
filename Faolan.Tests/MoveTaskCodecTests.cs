@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
@@ -74,7 +73,7 @@ namespace Faolan.Tests
 			var body = MoveTaskCodec.BuildPathBody(0x00017E45, from, wps);
 
 			// trailer = [byte][f32 pathLength][12x00][from(12)] = 29 B; the float is at len-28. Assert it's the distance.
-			var pathLen = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32BigEndian(body.AsSpan(body.Length - 28, 4)));
+			var pathLen = BitConverter.Int32BitsToSingle(body.ReadI32Be(body.Length - 28));
 			Assert.Equal(5f, pathLen, 3);
 		}
 

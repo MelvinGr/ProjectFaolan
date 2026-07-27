@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Text;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Xunit;
 
@@ -101,7 +101,7 @@ namespace Faolan.Tests
 			var at = record.AsSpan().IndexOf(expected);
 			Assert.True(at > 2, $"the remoteformat is not in the record at all (looked for {expected.Length} bytes)");
 
-			var declared = BinaryPrimitives.ReadUInt16BigEndian(record.AsSpan(at - 2, 2));
+			var declared = record.ReadU16Be(at - 2);
 			Assert.Equal(expected.Length, declared);
 			// ...and the record really does carry that many bytes after the prefix (the trailer is 4 bytes).
 			Assert.Equal(record.Length, at + expected.Length + 4);

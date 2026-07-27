@@ -1,16 +1,15 @@
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
-
-using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Captures
 {
@@ -64,7 +63,7 @@ namespace Faolan.Importer.Captures
 				if (body.Length < 4)
 					continue;
 
-				var framing = BinaryPrimitives.ReadUInt32BigEndian(body);
+				var framing = body.ReadU32Be(0);
 				if (framing < ListFrame.Unit || framing % ListFrame.Unit != 0)
 					continue; // not a shortcut-bar reply (0x2076 collides across classes; the framing disambiguates)
 

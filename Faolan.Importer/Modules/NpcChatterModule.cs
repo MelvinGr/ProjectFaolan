@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Importer.Cli;
 using Faolan.Importer.Extractors;
@@ -76,8 +76,8 @@ namespace Faolan.Importer.Modules
 						if (Str(p, "Protocol") != "ChatServer" || Str(p, "Opcode") != "0x0022" || Body(p) is not { } body || body.Length < 6)
 							continue;
 
-						var sender = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(0, 4));
-						var len = BinaryPrimitives.ReadUInt16BigEndian(body.AsSpan(4, 2));
+						var sender = body.ReadU32Be(0);
+						var len = body.ReadU16Be(4);
 						if (6 + len > body.Length)
 							continue;
 

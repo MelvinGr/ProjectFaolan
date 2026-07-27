@@ -1,10 +1,10 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb.Assets
 {
@@ -43,7 +43,7 @@ namespace Faolan.Core.Rdb.Assets
 			var bones = new List<BoneTrack>();
 			while (pos + 4 <= d.Length)
 			{
-				var nameLen = (int)BinaryPrimitives.ReadUInt32LittleEndian(d.AsSpan(pos, 4));
+				var nameLen = (int)d.ReadU32Le(pos);
 				if (nameLen <= 0 || nameLen >= 64 || pos + 4 + nameLen > d.Length || d[pos + 4] != (byte)'r')
 					break; // tracks are 'rig_bone_*'; anything else = end (or a variant layout we skip)
 
@@ -111,7 +111,7 @@ namespace Faolan.Core.Rdb.Assets
 			if (p + 4 > d.Length)
 				return false;
 
-			var count = (int)BinaryPrimitives.ReadUInt32LittleEndian(d.AsSpan(p, 4));
+			var count = (int)d.ReadU32Le(p);
 			p += 4;
 			if (count < 0 || p + count * 4 * (1 + width) > d.Length)
 				return false;
@@ -155,8 +155,8 @@ namespace Faolan.Core.Rdb.Assets
 				var b = Base + (int)n.AttrPtr;
 				for (var i = 0; i < n.AttrCount; i++)
 				{
-					var nameOff = U32(b + i * 8);
-					var valOff = U32(b + i * 8 + 4);
+					var nameOff = _d.ReadU32Le(b + i * 8);
+					var valOff = _d.ReadU32Le(b + i * 8 + 4);
 					outp[Str(nameOff)] = Str(valOff);
 				}
 
@@ -185,7 +185,7 @@ namespace Faolan.Core.Rdb.Assets
 
 			private Node NodeAt(int off)
 			{
-				return new Node(U32(off), U32(off + 4), U32(off + 8), U16(off + 0xc), U16(off + 0xe));
+				return new Node(_d.ReadU32Le(off), _d.ReadU32Le(off + 4), _d.ReadU32Le(off + 8), _d.ReadU16Le(off + 0xc), _d.ReadU16Le(off + 0xe));
 			}
 
 			private string Str(uint rel)
@@ -195,16 +195,6 @@ namespace Faolan.Core.Rdb.Assets
 				return Encoding.ASCII.GetString(_d, o, (end < 0
 					? _d.Length
 					: end) - o);
-			}
-
-			private ushort U16(int o)
-			{
-				return BinaryPrimitives.ReadUInt16LittleEndian(_d.AsSpan(o, 2));
-			}
-
-			private uint U32(int o)
-			{
-				return BinaryPrimitives.ReadUInt32LittleEndian(_d.AsSpan(o, 4));
 			}
 
 			public readonly record struct Node(uint ChildOff, uint AttrPtr, uint NameOff, ushort ChildCount, ushort AttrCount);

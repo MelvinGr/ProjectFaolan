@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Numerics;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
@@ -22,7 +22,7 @@ namespace Faolan.Tests
 
 			Assert.Empty(morphs); // an animal carries no appearance table
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
-			Assert.Equal(handle, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(SpawnPacketBuilder.HandleOffset, 4)));
+			Assert.Equal(handle, body.ReadU32Be(SpawnPacketBuilder.HandleOffset));
 			Assert.Equal(NpcSpawnScaffold.BuildMinimalPostIir(), body[(read.Offset + read.Length)..]);
 		}
 
@@ -45,20 +45,16 @@ namespace Faolan.Tests
 		// morphs) and reassemble from scratch - the same decomposition TryBuildLive performs off the DB columns.
 		private static byte[] BuildFromGolden(byte[] golden, out uint handle, out List<NpcAppearanceMorph> morphs, uint minimalRc)
 		{
-			handle = BinaryPrimitives.ReadUInt32BigEndian(golden.AsSpan(SpawnPacketBuilder.HandleOffset, 4));
+			handle = golden.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(golden, out var read));
 			var x = NpcStatCoreCodec.ReadIirHeaderWord(golden)!.Value;
-			var pos = new Vector3(ReadLE(golden, SpawnPacketBuilder.PosXOffset), ReadLE(golden, SpawnPacketBuilder.PosYOffset), ReadLE(golden, SpawnPacketBuilder.PosZOffset));
-			var rot = new Quaternion(ReadLE(golden, SpawnPacketBuilder.RotXOffset), ReadLE(golden, SpawnPacketBuilder.RotYOffset), ReadLE(golden, SpawnPacketBuilder.RotZOffset),
-				ReadLE(golden, SpawnPacketBuilder.RotWOffset));
+			var pos = new Vector3(golden.ReadF32Le(SpawnPacketBuilder.PosXOffset), golden.ReadF32Le(SpawnPacketBuilder.PosYOffset), golden.ReadF32Le(SpawnPacketBuilder.PosZOffset));
+			var rot = new Quaternion(golden.ReadF32Le(SpawnPacketBuilder.RotXOffset), golden.ReadF32Le(SpawnPacketBuilder.RotYOffset), golden.ReadF32Le(SpawnPacketBuilder.RotZOffset),
+				golden.ReadF32Le(SpawnPacketBuilder.RotWOffset));
 			NpcSpawnAppearanceCodec.TryDecodeAppearance(golden, out morphs);
 			return NpcSpawnBuilder.BuildBody(handle, x, pos, rot, ReadPlayfieldToken(golden), read.Message, morphs, minimalRc);
 		}
 
-		private static float ReadLE(byte[] b, int offset)
-		{
-			return BinaryPrimitives.ReadSingleLittleEndian(b.AsSpan(offset, 4));
-		}
 
 		// The playfield token: a 4-byte LEB128 varint at [0x18] right after the constructed transform (offset 60).
 		private static uint ReadPlayfieldToken(byte[] body)

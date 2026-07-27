@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using System.Numerics;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Xunit;
 
@@ -32,8 +32,8 @@ namespace Faolan.Tests
 		{
 			var body = TeleportCodec.BuildBegin(0x0200ABCD, 0x0FAA);
 			// clientInstance @8, destMap @18 (both big-endian u32)
-			Assert.Equal(0x0200ABCDu, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(8, 4)));
-			Assert.Equal(0x0FAAu, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)));
+			Assert.Equal(0x0200ABCDu, body.ReadU32Be(8));
+			Assert.Equal(0x0FAAu, body.ReadU32Be(18));
 		}
 
 		[Fact]
@@ -60,10 +60,10 @@ namespace Faolan.Tests
 		public void BuildTeleportDestBody_SubstitutesMapAndPosition()
 		{
 			var body = TeleportCodec.BuildDestination(0x0200ABCD, 0x0FAA, new Vector3(322.5f, 145.31f, 704.9f));
-			Assert.Equal(0x0FAAu, BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(46, 4)));
-			Assert.Equal(322.5f, BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(91, 4)));
-			Assert.Equal(145.31f, BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(95, 4)));
-			Assert.Equal(704.9f, BinaryPrimitives.ReadSingleBigEndian(body.AsSpan(99, 4)));
+			Assert.Equal(0x0FAAu, body.ReadU32Be(46));
+			Assert.Equal(322.5f, body.ReadF32Be(91));
+			Assert.Equal(145.31f, body.ReadF32Be(95));
+			Assert.Equal(704.9f, body.ReadF32Be(99));
 		}
 	}
 }

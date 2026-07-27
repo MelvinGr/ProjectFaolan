@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
@@ -210,7 +210,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 
 		private static uint ReadU32(ReadOnlySpan<byte> b, ref int o)
 		{
-			var v = BinaryPrimitives.ReadUInt32BigEndian(b.Slice(o, 4));
+			var v = b.ReadU32Be(o);
 			o += 4;
 			return v;
 		}
@@ -225,7 +225,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 
 		private static ulong ReadU64(ReadOnlySpan<byte> b, ref int o)
 		{
-			var v = BinaryPrimitives.ReadUInt64BigEndian(b.Slice(o, 8));
+			var v = b.ReadU64Be(o);
 			o += 8;
 			return v;
 		}

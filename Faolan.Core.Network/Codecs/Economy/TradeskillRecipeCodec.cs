@@ -1,9 +1,9 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Economy
@@ -132,7 +132,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		private static uint Read(ReadOnlySpan<byte> data, ref int p)
 		{
-			var v = BinaryPrimitives.ReadUInt32BigEndian(data.Slice(p, 4));
+			var v = data.ReadU32Be(p);
 			p += 4;
 			return v;
 		}

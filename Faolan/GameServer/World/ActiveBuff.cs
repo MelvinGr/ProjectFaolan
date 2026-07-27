@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using Faolan.Core.Extensions;
 
 namespace Faolan.GameServer.World
 {
@@ -41,7 +41,7 @@ namespace Faolan.GameServer.World
 		public static uint DurationMsFromPayload(byte[] payload)
 		{
 			return payload is { Length: >= 12 }
-				? BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(8, 4)) * 10
+				? payload.ReadU32Be(8) * 10
 				: 0;
 		}
 
@@ -51,7 +51,7 @@ namespace Faolan.GameServer.World
 		public static uint NonceFromPayload(byte[] payload)
 		{
 			return payload is { Length: >= 4 }
-				? BinaryPrimitives.ReadUInt32BigEndian(payload.AsSpan(payload.Length - 4, 4))
+				? payload.ReadU32Be(payload.Length - 4)
 				: 0;
 		}
 	}

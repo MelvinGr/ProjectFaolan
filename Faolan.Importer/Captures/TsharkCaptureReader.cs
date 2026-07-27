@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using Faolan.Core.Crypt;
+using Faolan.Core.Extensions;
 using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Captures
@@ -65,7 +66,7 @@ namespace Faolan.Importer.Captures
 					var opcode = ParseHex(p, "Opcode");
 					// IIR sub-opcode = body[4:8] (after the IIR [u32 len][u32 subop] prefix).
 					var subOpcode = body.Length >= 8
-						? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
+						? body.ReadU32Be(4)
 						: 0u;
 
 					// Real capture timestamp so packets sort in true wall-clock order ACROSS captures, not just within
@@ -117,14 +118,14 @@ namespace Faolan.Importer.Captures
 
 			// payload = [u32 headerLen][header][body]; crc32 covers it; totalLen = crc + payload.
 			var payload = new byte[4 + headerBytes.Length + body.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(payload.AsSpan(0, 4), (uint)headerBytes.Length);
+			payload.WriteU32Be(0, (uint)headerBytes.Length);
 			headerBytes.CopyTo(payload, 4);
 			body.CopyTo(payload, 4 + headerBytes.Length);
 
 			var crc = Crc32.Calculate(payload);
 			var full = new byte[8 + payload.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(full.AsSpan(0, 4), (uint)(4 + payload.Length));
-			BinaryPrimitives.WriteUInt32BigEndian(full.AsSpan(4, 4), crc);
+			full.WriteU32Be(0, (uint)(4 + payload.Length));
+			full.WriteU32Be(4, crc);
 			payload.CopyTo(full, 8);
 			return full;
 		}

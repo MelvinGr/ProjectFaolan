@@ -1,12 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
-
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -53,11 +52,11 @@ namespace Faolan.Importer.Extractors
 				if (body.Length < 38)
 					continue;
 
-				var subop = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4));
+				var subop = body.ReadU32Be(4);
 
 				if (subop == MapChangeSubOpcode)
 				{
-					currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
+					currentMap = body.ReadU32Be(34);
 					continue;
 				}
 
@@ -66,7 +65,7 @@ namespace Faolan.Importer.Extractors
 				if (body.Length < SpawnPacketBuilder.RotWOffset + 4)
 					continue; // too short to hold the transform
 
-				var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
+				var handle = body.ReadU32Be(12);
 				// For a SimpleDynel the identity message is a ProtoSimpleDynelIIR that SimpleDynelMessageCodec parses -
 				// the SAME message ReadIdentity below reads for DisplayName - so take the id (kdtree) + name from it
 				// instead of the hand-rolled protobuf walker. LootBag and the Door/Destructible/Climbing trio keep
@@ -128,7 +127,7 @@ namespace Faolan.Importer.Extractors
 
 		internal static float ReadLE(byte[] body, int offset)
 		{
-			return BinaryPrimitives.ReadSingleLittleEndian(body.AsSpan(offset, 4));
+			return body.ReadF32Le(offset);
 		}
 
 		// The object message is [u32 BE length][message] right after the 0x2C transform group (no pre-IIR block).
@@ -139,7 +138,7 @@ namespace Faolan.Importer.Extractors
 			if (start < 0 || start + 4 > body.Length)
 				return (0, string.Empty);
 
-			var len = (int)BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(start, 4));
+			var len = (int)body.ReadU32Be(start);
 			var i = start + 4;
 			var end = i + len;
 			if (len <= 0 || end > body.Length)

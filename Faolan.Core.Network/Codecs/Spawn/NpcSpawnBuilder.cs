@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -71,7 +70,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteArray(postIir)
 				.ToArray();
 
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), (uint)(body.Length - 4));
+			body.WriteU32Be(0, (uint)(body.Length - 4));
 			return body;
 		}
 

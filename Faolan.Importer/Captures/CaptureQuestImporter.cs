@@ -1,11 +1,11 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Extractors;
@@ -166,7 +166,7 @@ namespace Faolan.Importer.Captures
 				// SnapshotJournalReader.TryReadCompleted (as CompletedQuestExtractor does) instead of regex-scanning the
 				// whole packet for category-50301 titles: the regex also swept up the ACTIVE journal's titles (the reason
 				// journalByChar had to override them back), whereas the typed region returns ONLY the completed archive.
-				if (inner.Length >= 4 && BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) == SnapshotSubOpcode)
+				if (inner.Length >= 4 && inner.ReadU32Be(0) == SnapshotSubOpcode)
 				{
 					var charId = packet.Receiver.Instance;
 					if (charId == 0)

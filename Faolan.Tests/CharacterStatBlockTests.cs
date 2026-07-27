@@ -1,6 +1,6 @@
 using System;
-using System.Buffers.Binary;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Xunit;
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 		public void StatUpdateCodec_Body_RejectsWrongSubOpcode()
 		{
 			var body = new byte[17];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x0000C350u);
+			body.WriteU32Be(4, 0x0000C350u);
 			Assert.False(StatUpdateCodec.TryParseBody(body, out _, out _));
 		}
 
@@ -72,9 +72,9 @@ namespace Faolan.Tests
 
 			var statBytes = stats.ToArray();
 			var body = new byte[16 + statBytes.Length];
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(0, 4), 0x96B8DC59u); // StatUpdateIIR
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(4, 4), 0x0000C350u); // VitalsMarker
-			BinaryPrimitives.WriteUInt32BigEndian(body.AsSpan(8, 4), handle);
+			body.WriteU32Be(0, 0x96B8DC59u); // StatUpdateIIR
+			body.WriteU32Be(4, 0x0000C350u); // VitalsMarker
+			body.WriteU32Be(8, handle);
 			// body[12..16] left zero (the constant padding word)
 			statBytes.CopyTo(body, 16);
 

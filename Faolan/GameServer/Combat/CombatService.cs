@@ -1,18 +1,18 @@
 using System;
-using System.Buffers.Binary;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Network;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
@@ -184,7 +184,7 @@ namespace Faolan.GameServer.Combat
 			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
 			// argsLen is the u32 at offset 22 (the request args length). The old code read it as a u16 at 22 (= the
 			// high half = 0), so the ack echoed EMPTY args and the client's behaviour FSM desynced after one swing.
-			var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4));
+			var argsLen = (int)rawPayload.ReadU32Be(22);
 			if (26 + argsLen > rawPayload.Length)
 				return;
 
@@ -296,9 +296,9 @@ namespace Faolan.GameServer.Combat
 			if (!hasEnemyTarget)
 				return;
 
-			var reqTail = rawPayload[(26 + (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4)))..];
+			var reqTail = rawPayload[(26 + (int)rawPayload.ReadU32Be(22))..];
 			var abilityId = reqTail.Length >= 4
-				? BinaryPrimitives.ReadUInt32BigEndian(reqTail.AsSpan(reqTail.Length - 4, 4))
+				? reqTail.ReadU32Be(reqTail.Length - 4)
 				: 0u;
 			var damage = (uint)CombatResolver.ResolveSpellDamage(abilityId, client.Session.Character.Level);
 			await SendSwingDamage(client, instance, targetHandle, damage);

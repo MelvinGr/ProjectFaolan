@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -2106,9 +2105,9 @@ namespace Faolan.GameServer.World
 			var body = (byte[])subject.SpawnBody.Clone();
 			if (body.Length >= SpawnPacketBuilder.PosZOffset + 4)
 			{
-				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosXOffset, 4), subject.Position.X);
-				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosYOffset, 4), subject.Position.Y);
-				BinaryPrimitives.WriteSingleLittleEndian(body.AsSpan(SpawnPacketBuilder.PosZOffset, 4), subject.Position.Z);
+				body.WriteF32Le(SpawnPacketBuilder.PosXOffset, subject.Position.X);
+				body.WriteF32Le(SpawnPacketBuilder.PosYOffset, subject.Position.Y);
+				body.WriteF32Le(SpawnPacketBuilder.PosZOffset, subject.Position.Z);
 			}
 
 			// Re-stamp the playfield-instance token to the LIVE value at send time. The token baked into SpawnBody at

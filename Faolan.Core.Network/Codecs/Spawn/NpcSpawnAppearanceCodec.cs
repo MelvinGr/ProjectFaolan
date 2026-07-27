@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -53,7 +53,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				return false;
 
 			var post = body.AsSpan(read.Offset + read.Length);
-			if (post.Length < 21 || BinaryPrimitives.ReadUInt32BigEndian(post) != HeaderWord0)
+			if (post.Length < 21 || post.ReadU32Be(0) != HeaderWord0)
 				return false;
 			if (!post.Slice(12, Record1.Length).SequenceEqual(Record1))
 				return false;
@@ -76,10 +76,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				return false;
 
 			var post = body.AsSpan(read.Offset + read.Length);
-			if (post.Length < 12 || BinaryPrimitives.ReadUInt32BigEndian(post) != HeaderWord0)
+			if (post.Length < 12 || post.ReadU32Be(0) != HeaderWord0)
 				return false;
 
-			var firstRecordLen = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(4, 4));
+			var firstRecordLen = post.ReadU32Be(4);
 			var tableStart = 12L + firstRecordLen;
 			if (tableStart + 4 > post.Length)
 				return false;
@@ -94,7 +94,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		private static bool TryDecodeMorphTable(ReadOnlySpan<byte> post, int o, out List<NpcAppearanceMorph> morphs)
 		{
 			morphs = [];
-			var count = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(o, 4));
+			var count = post.ReadU32Be(o);
 			o += 4;
 			if (count is 0 or > 0x100)
 				return false;
@@ -105,9 +105,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				if (o + EntryFixedLength + 1 > post.Length)
 					return false;
 
-				var morphId = BinaryPrimitives.ReadUInt32BigEndian(post.Slice(o, 4));
-				var value = BinaryPrimitives.ReadSingleBigEndian(post.Slice(o + 4, 4));
-				if (BinaryPrimitives.ReadUInt32BigEndian(post.Slice(o + 8, 4)) != 0 || post[o + 12] != 0)
+				var morphId = post.ReadU32Be(o);
+				var value = post.ReadF32Be(o + 4);
+				if (post.ReadU32Be(o + 8) != 0 || post[o + 12] != 0)
 					return false; // not the clean appearance shape (field2/field3 carry runtime state)
 
 				var strLen = post[o + 13];

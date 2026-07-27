@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
@@ -38,7 +38,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			if (data == null || data.Length < 12)
 				return null;
 
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(8, 4));
+			var headerLen = (int)data.ReadU32Be(8);
 			var start = 12 + headerLen;
 			if (start + 8 > data.Length)
 				return null;
@@ -94,12 +94,12 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 
 			uint U32(int rel)
 			{
-				return BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(start + rel, 4));
+				return data.ReadU32Be(start + rel);
 			}
 
 			ushort U16(int rel)
 			{
-				return BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(start + rel, 2));
+				return data.ReadU16Be(start + rel);
 			}
 
 			void ReadScreen()
@@ -119,11 +119,11 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		private static Columns? DecodeCamera(byte[] data, int headerLen, int start)
 		{
 			// opcode is the 16-bit word ending the rpcHeader (at headerLen-2 from the header start @ offset 12).
-			if (10 + headerLen + 2 > data.Length || BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(10 + headerLen, 2)) != SetDialogueCamera)
+			if (10 + headerLen + 2 > data.Length || data.ReadU16Be(10 + headerLen) != SetDialogueCamera)
 				return null;
 
 			// Body must be [0xC350][npc][0xC350][player][>=0 params].
-			if (start + 16 > data.Length || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(start, 4)) != EntityClass.Character || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(start + 8, 4)) != EntityClass.Character)
+			if (start + 16 > data.Length || data.ReadU32Be(start) != EntityClass.Character || data.ReadU32Be(start + 8) != EntityClass.Character)
 				return null;
 
 			var agentInstance = RpcCallerInstance(data);
@@ -135,7 +135,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				return null;
 
 			var camera = new CameraArgs(paramsBytes[0], paramsBytes[1], paramsBytes[2], paramsBytes[3], paramsBytes[4], paramsBytes[5] != 0,
-				BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32BigEndian(paramsBytes.Slice(6, 4))));
+				BitConverter.Int32BitsToSingle(paramsBytes.ReadI32Be(6)));
 
 			return new Columns((ConversationSubOpcode)SetDialogueCamera, null, null, null, null, agentInstance, camera);
 		}

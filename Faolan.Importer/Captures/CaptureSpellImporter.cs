@@ -1,19 +1,18 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-
-using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Captures
 {
@@ -500,7 +499,7 @@ namespace Faolan.Importer.Captures
 			if (packet.Length < 16)
 				return [];
 
-			var headerLen = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
+			var headerLen = packet.ReadU32Be(8);
 			var bodyStart = 12 + (int)headerLen;
 			return bodyStart >= packet.Length
 				? []
@@ -521,7 +520,7 @@ namespace Faolan.Importer.Captures
 				if (body.Length != 4)
 					return;
 
-				var spellId = BinaryPrimitives.ReadUInt32BigEndian(body);
+				var spellId = body.ReadU32Be(0);
 				if (spellId == 0)
 					return;
 
@@ -548,7 +547,7 @@ namespace Faolan.Importer.Captures
 				if (body.Length != 4)
 					return;
 
-				var spellId = BinaryPrimitives.ReadUInt32BigEndian(body);
+				var spellId = body.ReadU32Be(0);
 				if (spellId != 0)
 					ids.Add(spellId);
 			}
@@ -567,11 +566,11 @@ namespace Faolan.Importer.Captures
 			var body = PacketBody(packetBytes);
 			for (var i = 0; i + 25 <= body.Length; i++)
 			{
-				if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i, 4)) != NewLevelIirCodec.Opcode)
+				if (body.ReadU32Be(i) != NewLevelIirCodec.Opcode)
 					continue;
 
-				instance = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 8, 4));
-				var level = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(i + 13, 4));
+				instance = body.ReadU32Be(i + 8);
+				var level = body.ReadU32Be(i + 13);
 				if (level == 0 || level > MaxLevel)
 					return false;
 
@@ -610,18 +609,18 @@ namespace Faolan.Importer.Captures
 					return false;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
-				if (inner.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != BehaviorSubOpcode)
+				if (inner.Length < 22 || inner.ReadU32Be(0) != BehaviorSubOpcode)
 					return false;
 
-				if (BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(14, 4)) != CastSpellActionType)
+				if (inner.ReadU32Be(14) != CastSpellActionType)
 					return false;
 
-				var argsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(18, 4));
+				var argsLen = (int)inner.ReadU32Be(18);
 				var trailer = 22 + argsLen;
 				if (trailer + 8 > inner.Length)
 					return false;
 
-				spellId = BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(trailer + 4, 4)); // [from][spellId]
+				spellId = inner.ReadU32Be(trailer + 4); // [from][spellId]
 				return spellId != 0;
 			}
 			catch
@@ -642,15 +641,15 @@ namespace Faolan.Importer.Captures
 					return false;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
-				if (inner.Length < 26 || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != ApplySpellSubOpcode)
+				if (inner.Length < 26 || inner.ReadU32Be(0) != ApplySpellSubOpcode)
 					return false;
 
-				if (BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(8, 4)) != BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(22, 4)))
+				if (inner.ReadU32Be(8) != inner.ReadU32Be(22))
 					return false; // applyTo != applyFrom: a cast ON something, not a self buff
 
 				// Reading at 13 lands on the id's high zero byte + its three significant bytes, i.e. the BASE id
 				// ((base<<8)|rank >> 8) - the same trick TryReadSpellId uses.
-				spellBaseId = BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(13, 4));
+				spellBaseId = inner.ReadU32Be(13);
 				return spellBaseId != 0;
 			}
 			catch
@@ -669,10 +668,10 @@ namespace Faolan.Importer.Captures
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
 				// inner: [subop4][c350 4][casterHandle4][flag byte][spellId4] -> spell id at offset 13.
-				if (inner.Length < 17 || BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(0, 4)) != ApplySpellSubOpcode)
+				if (inner.Length < 17 || inner.ReadU32Be(0) != ApplySpellSubOpcode)
 					return;
 
-				var spellId = BinaryPrimitives.ReadUInt32BigEndian(inner.AsSpan(13, 4));
+				var spellId = inner.ReadU32Be(13);
 				if (spellId != 0)
 					ids.Add(spellId);
 			}

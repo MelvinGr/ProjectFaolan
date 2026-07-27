@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Tests.Support;
 using Xunit;
@@ -116,8 +116,8 @@ namespace Faolan.Tests
 			var pairs = new Dictionary<uint, uint>();
 			for (var o = idx + marker.Length; o + 8 <= body!.Length; o += 8)
 			{
-				var statId = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(o, 4));
-				var value = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(o + 4, 4));
+				var statId = body.ReadU32Be(o);
+				var value = body.ReadU32Be(o + 4);
 				pairs.TryAdd(statId, value); // first id wins (mirrors the client's map insert)
 			}
 

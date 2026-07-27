@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Xunit;
 
@@ -77,7 +77,7 @@ namespace Faolan.Tests
 
 			// [u32 subop][u32 typeTag][u32 handle][u8 bool][f32 dayTime]...
 			Assert.Equal(1, record[12]);
-			Assert.Equal(0x472BDD00u, BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(13, 4)));
+			Assert.Equal(0x472BDD00u, record.ReadU32Be(13));
 
 			var seconds = BitConverter.UInt32BitsToSingle(0x472BDD00);
 			Assert.Equal(43997f, seconds);                                       // 12:13, which is what the client renders
