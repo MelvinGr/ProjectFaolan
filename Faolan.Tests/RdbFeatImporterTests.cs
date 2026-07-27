@@ -103,6 +103,7 @@ namespace Faolan.Tests
 			BitConverter.GetBytes(2u).CopyTo(body, 16); // version
 			BitConverter.GetBytes(100u).CopyTo(body, 20);
 			BitConverter.GetBytes(7336u).CopyTo(body, 24);
+			BitConverter.GetBytes(1u).CopyTo(body, 20 + 32); // word 8 = the ROOT marker
 			BitConverter.GetBytes(1u).CopyTo(body, 20 + 40);
 			BitConverter.GetBytes(1800u).CopyTo(body, 68);
 			BitConverter.GetBytes(7353u).CopyTo(body, 72);
@@ -111,8 +112,10 @@ namespace Faolan.Tests
 			var map = RdbFeatImporter.ParseIdMap(body);
 
 			Assert.Equal(2, map.Count);
-			Assert.Equal((100u, 7336u, 1u), map[0]);
-			Assert.Equal((1800u, 7353u, 18u), map[1]);
+			// (wire, template, baseIndex, rootFlag) - 100 is "Core Soldier Knowledge", an archetype ROOT, so its word 8
+			// is 1; 1800 "Barbarian" here is left 0 to prove the flag is read per-entry and not assumed.
+			Assert.Equal((100u, 7336u, 1u, 1u), map[0]);
+			Assert.Equal((1800u, 7353u, 18u, 0u), map[1]);
 		}
 
 		// A blank slot must not become a 0 -> 0 row: the table is a lookup, and a zero key would collide.

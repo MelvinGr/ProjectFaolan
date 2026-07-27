@@ -59,7 +59,7 @@ and don't contain.
   `ConanClass` enum value: wire 1800 = Barbarian (0x12), 2000 = Guardian (0x14), 2200 = Conqueror (0x16),
   2900 = BearShaman (0x1D), 3100 = DarkTemplar (0x1F). Below them sit the four ARCHETYPE roots -
   100 `Core Soldier Knowledge`, 200 `Priest`, 300 `Rogue`, 400 `Mage`.
-- **Root feats are AUTO-GRANTED, never sent.** Word 8 of a 1000042 entry marks a ROOT feat - 1 for all twelve
+- **Root feats are AUTO-GRANTED, never sent.** `FeatIdMap.RootFlag` (word 8 of a 1000042 entry) marks a ROOT feat - 1 for all twelve
   archetype/class roots (100 `Core Soldier Knowledge`, 1800 `Barbarian`, 4100 `Necromancer`, ...) and for the feat
   TREE roots (`Lich`, `Scion of Set`); 563 entries carry it. `ClassAutotrainLevelMap` is COMPUTED by the client
   (`FUN_0078d6a0`) from that table plus the character's class - it is not an RDB resource, which is why searching

@@ -107,13 +107,14 @@ namespace Faolan.Importer.Rdb
 				db.FeatPrereqs.RemoveRange(await db.FeatPrereqs.ToListAsync());
 				db.FeatIdMaps.RemoveRange(await db.FeatIdMaps.ToListAsync());
 				await db.SaveChangesAsync();
-				foreach (var (wire, template, baseIndex) in map)
+				foreach (var (wire, template, baseIndex, rootFlag) in map)
 				{
 					db.FeatIdMaps.Add(new FeatIdMap
 					{
 						WireFeatId = wire,
 						TemplateId = template,
-						BaseIndex = baseIndex
+						BaseIndex = baseIndex,
+						RootFlag = rootFlag
 					});
 					mapRows++;
 				}
@@ -256,10 +257,10 @@ namespace Faolan.Importer.Rdb
 		// Reads the wire-id -> template-id map out of RDB 1000042 id 1 - the resource FeatTable_t::LoadStaticData
 		// loads. Header [u32 type][u32 id][u32 1][u32 count][u32 version], then `count` 48-byte entries whose first
 		// two words are (wireId, templateId) and whose 11th is the base index.
-		public static (List<(uint Wire, uint Template, uint BaseIndex)> Map, List<(uint Wire, int Sequence, uint Requires)> Prereqs)
+		public static (List<(uint Wire, uint Template, uint BaseIndex, uint RootFlag)> Map, List<(uint Wire, int Sequence, uint Requires)> Prereqs)
 			ReadIdMapAndPrereqs(RdbReader rdb)
 		{
-			var map = new List<(uint, uint, uint)>();
+			var map = new List<(uint, uint, uint, uint)>();
 			var prereqs = new List<(uint, int, uint)>();
 			var matches = rdb.EntriesOfType(FeatTableType).Where(e => e.Id == FeatTableId).ToList();
 			if (matches.Count == 0)
@@ -280,9 +281,9 @@ namespace Faolan.Importer.Rdb
 		}
 
 		// Split out from the RDB read so it can be tested against bytes without the client install.
-		public static List<(uint Wire, uint Template, uint BaseIndex)> ParseIdMap(byte[] body)
+		public static List<(uint Wire, uint Template, uint BaseIndex, uint RootFlag)> ParseIdMap(byte[] body)
 		{
-			var map = new List<(uint, uint, uint)>();
+			var map = new List<(uint, uint, uint, uint)>();
 			if (body.Length < MapHeaderLength || Word(body, 0) != FeatTableType)
 				return map;
 
@@ -298,7 +299,7 @@ namespace Faolan.Importer.Rdb
 				if (wire == 0 || template == 0)
 					continue; // a blank slot, not a mapping - carrying it would put a 0 -> 0 row in the table
 
-				map.Add((wire, template, Word(body, at + 40)));
+				map.Add((wire, template, Word(body, at + 40), Word(body, at + 32)));
 			}
 
 			return map;

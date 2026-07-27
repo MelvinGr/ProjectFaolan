@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -28,9 +29,27 @@ namespace Faolan.Core.Database.Tables
 		// The RDB 1000020 template id the client resolves it to - Feat.Id where the template is plaintext.
 		public uint TemplateId { get; set; }
 
+		// The entry's 9th word. **1 marks a ROOT feat** - the archetype, class and feat-TREE roots (100 "Core Soldier
+		// Knowledge", 1800 "Barbarian", 4100 "Necromancer", "Lich", "Scion of Set", ...), 563 of the 6593 entries.
+		// Those are AUTO-GRANTED by the client, which computes ClassAutotrainLevelMap from this table plus the
+		// character's class and never receives them on the wire - which is why no captured character carries its own
+		// class root in the spawn's feat list.
+		//
+		// Stored RAW rather than as a bool because the word is not fully decoded: 0 on 4669 entries, 1 on 563,
+		// 262144 on 1346 and 2 on 15. Only the ==1 case is understood, so reducing it to IsRoot would throw away the
+		// two values we cannot yet explain.
+		public uint RootFlag { get; set; }
+
 		// The entry's 11th word, which is exactly WireFeatId / 100 on every row: the client's own base index, and the
 		// same "base" the featBase*100+rank hypothesis was reaching for. Carried because it is the client's value,
 		// not ours - if it ever diverges from the division, the division was the wrong model.
 		public uint BaseIndex { get; set; }
+
+		// True for an archetype/class/tree root - see RootFlag. A convenience over the raw word, not a column.
+		[NotMapped]
+		public bool IsRoot => RootFlag == RootFlagValue;
+
+		// The RootFlag value that marks a root feat.
+		public const uint RootFlagValue = 1;
 	}
 }
