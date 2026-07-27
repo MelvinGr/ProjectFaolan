@@ -49,7 +49,14 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.GetStartupData:
 				{
-					var unk1 = body.ReadUInt16();
+					// PlayerAgent.GetStartupData(const String& md5) - a single wire string (u16 length + LATIN1), NOT a
+					// bare u16: the client's checksum over its CACHED startup data, so the server can skip resending
+					// what the client already has. Empty on a first login / after a character create (`0000` in the
+					// corpus), a 32-char lowercase hex md5 once a cache exists. We always resend the full list, so it
+					// is read for the log only - but it must be read as a STRING or the 32 bytes stay in the body.
+					var startupDataMd5 = body.ReadString();
+
+					Logger.LogDebug("GetStartupData: client startup-data md5 '{Md5}' (we always resend the full list).", startupDataMd5);
 
 					await SendSmallCharList(client, packet.Sender);
 
@@ -58,6 +65,11 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.FinishGetStartupData:
 				{
+					// PlayerAgent.FinishGetStartupData(const CharacterCheckSumMap& characterMap) - the client reporting
+					// the md5 it has cached PER CHARACTER, the entry-level twin of GetStartupData's whole-list md5.
+					// Wire: [ListFrame count][ u32 characterId, string md5 ]*. Same "we always resend" story, so the
+					// entries only get logged.
+					//
 					// The client's own count-framed list (ListFrame): a malformed word means we would loop on garbage,
 					// so reject it rather than trusting inbound arithmetic.
 					var word = body.ReadUInt32();
@@ -69,10 +81,10 @@ namespace Faolan.PlayerAgent
 
 					for (var i = 0; i < charCount; i++)
 					{
-						var unk1 = body.ReadUInt32();
-						var unk2 = body.ReadString();
+						var characterId = body.ReadUInt32();
+						var characterDataMd5 = body.ReadString();
 
-						Logger.LogDebug("RequestCharRealmData entry: characterId={CharacterId:X8}, authChallenge={AuthChallenge}", unk1, unk2);
+						Logger.LogDebug("FinishGetStartupData entry: characterId={CharacterId:X8}, cached md5={Md5}", characterId, characterDataMd5);
 					}
 
 					await SendCharacterList(client, packet.Sender);
@@ -93,14 +105,38 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.LoginCharacter:
 				{
+					// PlayerAgent.LoginCharacter(ID32::InstanceType nCharInstance, const StrStrMap& dataMap,
+					//   const std::string& cClientLanguage, const uint16 regionCode, const uint16 ageCode,
+					//   const uint16 genderCode, const String& igrID, const uint32 userType, const uint32 serviceType)
+					// The client's own signature (docs/re/aoc-client-rpc-methods.json). The old u32/u8 run read the
+					// right characterId and then walked the rest misaligned - the tail below is the real grammar, and
+					// it is byte-identical in all 88 captured logins:
+					//   [charId][ListFrame 0][string "en"][0][0][0][string "_"][0][0]
+					// i.e. everything after the id is a constant the retail client always sends: an EMPTY dataMap, the
+					// UI language, zeroed region/age/gender (the age-gate fields the launcher never fills), the "_"
+					// placeholder IGR (internet-gaming-room / cafe) id, and account userType/serviceType 0.
 					var characterId = body.ReadUInt32();
-					var unk0 = body.ReadUInt32();
-					var unk1 = body.ReadUInt32();
-					var unk2 = body.ReadUInt32();
-					var unk3 = body.ReadByte();
-					var unk4 = body.ReadUInt32();
-					var unk5 = body.ReadUInt32();
-					var unk6 = body.ReadUInt32();
+
+					var dataMapWord = body.ReadUInt32();
+					if (!ListFrame.TryCountOf(dataMapWord, out var dataMapCount))
+					{
+						Logger.LogWarning("LoginCharacter: 0x{Word:X} is not a count-framed list word; ignoring dataMap.", dataMapWord);
+						dataMapCount = 0;
+					}
+
+					for (var i = 0; i < dataMapCount; i++)
+						Logger.LogDebug("LoginCharacter dataMap[{Index}]: {Key}={Value}", i, body.ReadString(), body.ReadString());
+
+					var clientLanguage = body.ReadString();
+					var regionCode = body.ReadUInt16();
+					var ageCode = body.ReadUInt16();
+					var genderCode = body.ReadUInt16();
+					var igrId = body.ReadString();
+					var userType = body.ReadUInt32();
+					var serviceType = body.ReadUInt32();
+
+					Logger.LogDebug("LoginCharacter {CharacterId:X8}: language={Language}, region={Region}, age={Age}, gender={Gender}, igr={Igr}, userType={UserType}, serviceType={ServiceType}", characterId,
+						clientLanguage, regionCode, ageCode, genderCode, igrId, userType, serviceType);
 
 					client.Session.Account.ClientInstance = characterId;
 					client.Session.Character = (await Database.GetCharacter(characterId))!;

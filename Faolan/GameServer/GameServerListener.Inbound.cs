@@ -294,7 +294,10 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.CharacterActionIIR: // Also received when Activating feat point ??
 				{
-					var unk0 = body.ReadUInt32();
+					// Standard IIR carrier head: [u32 entity class][u32 handle]. Corpus (21 c2s CharacterActionIIRs,
+					// every one on quit) continues [u32 0][u8 0x21][24 zero bytes] - the same [u32 0][u8 code] slot
+					// QuestIIR below uses, with the action code 0x21 = the client's "CloseGame".
+					body.ReadUInt32(); // EntityClass.Character (0xC350)
 					var clientInst = body.ReadUInt32();
 
 					Logger.LogInformation("GameServer close request for character {CharacterId}", clientInst.ToHex());
@@ -373,30 +376,24 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.QuestIIR:
 				{
-					var unk0 = body.ReadUInt32();
+					// The client's OWN copy of the record the server sends as QuestIIR (WorldQuest.BuildQuestIir) - same
+					// grammar, other direction: [u32 entity class][u32 handle][u32 0][u8 0x01][u32 state][u32 questId][u32 0].
+					// The client names this method "DeleteQuest" (QuestIIR_c, docs/protocol/gen/iir-types.md) and sends it
+					// with state = WorldQuest.StateCompleted when the player drops a quest from the journal - both corpus
+					// instances are in the Hakotep "delete-quests" capture (quest 0x388F and 0x3919).
+					//
+					// NB the old read was [u32][u32][u8][u32][u32] - one byte early from the [u32 0][u8 01] pair onward. It
+					// still landed on the right questId (the misalignment is self-cancelling across those five bytes), which
+					// is exactly why it went unnoticed.
+					body.ReadUInt32(); // EntityClass.Character (0xC350)
 					var clientInst = body.ReadUInt32();
-					var unk1 = body.ReadByte();
-					var unk2 = body.ReadUInt32();
-					var unk3 = body.ReadUInt32();
-					var questId = body.ReadUInt32(); // probably
-					var unk4 = body.ReadUInt32();
+					body.ReadUInt32(); // [12..16] = 0, as in BuildQuestIir
+					body.ReadByte(); // 0x01 record marker
+					var state = body.ReadUInt32();
+					var questId = body.ReadUInt32();
+					body.ReadUInt32(); // trailing 0
 
-					/*
-						// Shadows of the past
-						0x00, 0x00, 0xC3, 0x50, 						0x11, 0x01, 0xB4, 0xF5, // clientInst
-						0x00, 						0x00, 0x00, 0x00, 0x01, 						0x00, 0x00, 0x00, 0x04, 						0x00, 0x00, 0x4B, 0xA4, // questId?
-						0x00, 0x00, 0x00, 0x00
-
-						// Summoned
-						0x00, 0x00, 0xC3, 0x50, 						0x11, 0x01, 0xB4, 0xF5, // clientInst
-						0x00, 						0x00, 0x00, 0x00, 0x01, 						0x00, 0x00, 0x00, 0x04, 						0x00, 0x00, 0x46, 0x20, // questId?
-						0x00, 0x00, 0x00, 0x00
-
-						// Storming the gate
-						0x00, 0x00, 0xC3, 0x50, 						0x11, 0x01, 0xB4, 0xF5, // clientInst
-						0x00, 						0x00, 0x00, 0x00, 0x01, 						0x00, 0x00, 0x00, 0x04, 						0x00, 0x00, 0x36, 0x47, // questId?
-						0x00, 0x00, 0x00, 0x00
-					 */
+					Logger.LogInformation("QuestIIR (DeleteQuest) from character {CharacterId}: questId={QuestId}, state={State} - not acted on yet (Gitea #457).", clientInst.ToHex(), questId, state);
 
 					break;
 				}
@@ -746,11 +743,20 @@ namespace Faolan.GameServer
 					// collision on this opcode is resolved by the class-first route above (HandleRequestBindLocation).
 					LogPacketBodyDebug("GameServer ChatCommand body", body.ToArray());
 
-					var unk0 = body.ReadUInt32();
-					var unk1 = body.ReadUInt32();
-					var unk2 = body.ReadUInt32();
-					var unk3 = body.ReadUInt32();
+					// GameAgent.ChatVicinity(const ID32& cSenderID, int nMode, BinaryStream& cMsg) - the client's own
+					// signature (docs/re/aoc-client-rpc-methods.json), matched against the corpus:
+					//   [u32 senderClass][u32 senderHandle]   the ID32; USUALLY {0,0} (the client leaves the sender for
+					//                                         the server to fill), occasionally {0xC350, ownHandle}
+					//   [u32 nMode]                           chat mode; 0 for plain /say in every captured packet
+					//   [u32 msgLen][ string text ][u8 0]     the BinaryStream, u32-length-framed, holding the wire
+					//                                         string plus a trailing 0 - so msgLen == 2 + text + 1
+					var senderClass = body.ReadUInt32();
+					var senderHandle = body.ReadUInt32();
+					var mode = body.ReadUInt32();
+					var messageLength = body.ReadUInt32();
 					var text = body.ReadString();
+
+					Logger.LogDebug("ChatVicinity from ID32 {{{SenderClass:X}, {SenderHandle:X8}}}, mode {Mode}, {Length} message bytes.", senderClass, senderHandle, mode, messageLength);
 
 					if (text.Length > 2 && text[0] == '.' && text[1] != '.' && client.Session.Account.Type >= AccountType.GameMaster)
 						await HandleGmCommand(client, text);
@@ -894,7 +900,11 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.CinematicTransition:
 				{
-					var unk0 = body.ReadUInt32(); // 0xc350
+					// GameCharAgent.CinematicTransition(const ID32& i_cClientId, const bool i_bEntering) - body is
+					// [u32 0xC350][u32 handle][u8 bEntering], that exact 9-byte shape in all 402 captured packets
+					// (255x bEntering=0, 147x bEntering=1). We route purely on EntryMode below and never read the
+					// bool - if a branch ever needs enter-vs-leave, it is the trailing byte, not a new field.
+					body.ReadUInt32(); // EntityClass.Character (0xC350)
 					var characterId = body.ReadUInt32();
 
 					// 0x205F is the CINEMATIC TRANSITION (its trailing byte is begin/end); the LOGIN flow happens to use
@@ -916,7 +926,7 @@ namespace Faolan.GameServer
 							// Retail sends no download in response - it acks the polls and waits for CharInPlayIIR
 							// (which triggers the editor-launch burst).
 							client.Session.HasPendingPost205FFollowUp = true;
-							Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}. Create-editor phase; awaiting CharInPlayIIR.", unk0, characterId);
+							Logger.LogInformation("0x205F decoded: characterId={CharacterId:X8}. Create-editor phase; awaiting CharInPlayIIR.", characterId);
 							break;
 						}
 
@@ -924,8 +934,8 @@ namespace Faolan.GameServer
 						case WorldEntryMode.TeleportReentry:
 						{
 							client.Session.HasPendingPost205FFollowUp = true;
-							Logger.LogInformation("0x205F decoded: unk0={Unk0:X}, characterId={CharacterId:X8}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", unk0,
-								characterId, client.Session.Character.Id);
+							Logger.LogInformation("0x205F decoded: characterId={CharacterId:X8}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", characterId,
+								client.Session.Character.Id);
 							break;
 						}
 
@@ -1174,13 +1184,20 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.SplitInventoryItem:
 				{
-					var unk0 = body.ReadUInt32();
-					var unk1 = body.ReadUInt32();
+					// GameCharAgent.SplitInventoryItem(const ID32& i_cInventory, int i_nSrcPos, int i_nSplitSize,
+					// int i_nDstPos) - the client's own signature. The leading ID32 is the CONTAINER being split in:
+					// {type = the container kind (0x68 backpack, same value as CharacterInventory.Container), instance =
+					// the owning character's handle}. Both captured splits are backpack-internal, which is why
+					// PersistSplitStack assumes the bag.
+					var containerKind = body.ReadUInt32();
+					var containerOwner = body.ReadUInt32();
 					var sourceSlot = body.ReadUInt32();
-					var targetStackSize = body.ReadUInt32();
+					var targetStackSize = body.ReadUInt32(); // i_nSplitSize - how many units move to the new stack
 					var targetSlot = body.ReadUInt32();
 
-					// 0x00, 0x00, 0x00, 0x68, 					// 0x11, 0x01, 0xB4, 0xF5, 					// 0x00, 0x00, 0x00, 0x09, // source slot
+					Logger.LogDebug("SplitInventoryItem in container {{{Kind:X2}, {Owner:X8}}}: slot {Source} -> {Target}, {Size} units.", containerKind, containerOwner, sourceSlot, targetSlot, targetStackSize);
+
+					// 0x00, 0x00, 0x00, 0x68,					// 0x11, 0x01, 0xB4, 0xF5, 					// 0x00, 0x00, 0x00, 0x09, // source slot
 					// 0x00, 0x00, 0x00, 0x29, // 41 (target stack size)
 					// 0x00, 0x00, 0x00, 0x13  // target Slot
 
@@ -1399,14 +1416,21 @@ namespace Faolan.GameServer
 			// Representative samples split into a small object/position block, a 125-byte metadata block, 					// and a variable nested entry block that currently decodes as 2, 3, or 4 repeated entries.
 			// New random-actions evidence suggests the player bag is more likely part of the giant 0x737A6DF9
 			// initial-state dump, while 0xF096251E still looks like remote chest/container data.
-			var unk0 = body.ReadUInt32();
+			// [u32 entity class][u32 handle][u16 behaviorType] - the same head the REGISTRATION form of this IIR
+			// uses (docs/re/behaviorcontrolcenter-grammar.md calls that u16 `form`; it is 0x0004/0x0007 there). The u16
+			// is really [u8 0][u8 behaviorType] feeding the client's own `BehaviorControlCenterIIR_c::ReadSubClass`
+			// switch (FUN_005e24e0): types 2,3,4,5,7,10,0xF,0x10,0x12 go on to read [u32 commandId], while 6,8,9,0xD,0x11
+			// are TERMINAL and read nothing more. c2s census across the corpus: 1282x 0x0003, 187x 0x0002, 1x 0x0008 -
+			// and that single 0x0008 packet is exactly 18 bytes, i.e. the head and nothing else. So the "short body"
+			// bail below is not a defensive guess, it is the terminal half of the client's own switch.
+			body.ReadUInt32(); // EntityClass.Character (0xC350)
 			var clientInst = body.ReadUInt32();
-			var unk1 = body.ReadUInt16();
-			// Some Interact variants are short and carry NO actionType/args (observed: a 10-byte trailer ending
-			// `00 08` the client sends around loot/kill). Reading actionType unconditionally threw EndOfStreamException, 					// which ReceivedPacket turns into a hard client.Stop() (disconnect). Bail gracefully on a short body.
+			var behaviorType = body.ReadUInt16();
+			// Reading actionType unconditionally threw EndOfStreamException on the terminal forms, which ReceivedPacket
+			// turns into a hard client.Stop() (disconnect). Bail gracefully on a short body.
 			if (body.Length - body.Position < sizeof(uint))
 			{
-				Logger.LogDebug("Interact: short body (unk1=0x{Unk1:X4}), no actionType - ignoring.", unk1);
+				Logger.LogDebug("Interact: terminal behaviorType 0x{BehaviorType:X4}, no commandId - ignoring.", behaviorType);
 				return; // was a `break` out of the Handle0X2000 switch - same exit, now from this method
 			}
 
@@ -1440,7 +1464,8 @@ namespace Faolan.GameServer
 				var target = body.Length - body.Position >= sizeof(uint)
 					? body.ReadUInt32()
 					: 0;
-				var unk2 = body.ReadRemainingArray();
+				// Whatever the command form left over, decoded per actionType below (ground-target vec3, equip handle, ...).
+				var actionTrailer = body.ReadRemainingArray();
 
 				switch (actionType)
 				{
@@ -1547,13 +1572,13 @@ namespace Faolan.GameServer
 
 					case ActionType.CastSpell:
 					{
-						// The BCC "state" word (unk1) tells begin from cancel: 3 = begin, 2 = CANCEL. The client sends
+						// The BCC behaviorType tells begin from cancel: 3 = begin, 2 = CANCEL. The client sends
 						// the cancel when the cast is interrupted (moving mid-cast - "move cancels the cast", #346/#347),
 						// so honor it by invalidating any in-flight resolve (bump the token so the deferred Resolve below
 						// aborts) and acking the cancel. State values are capture-derived (actions-described-in-chat:
 						// begin=3 x2, cancel=2 x1; every cast in the ice-strike/casilda/casting captures is begin=3).
 						const ushort castStateCancel = 2;
-						if (unk1 == castStateCancel)
+						if (behaviorType == castStateCancel)
 						{
 							client.Session.ActiveCastToken++; // a pending Resolve() now sees a mismatched token and aborts
 							var beginArgs = client.Session.PendingCastArgs;
@@ -1587,7 +1612,7 @@ namespace Faolan.GameServer
 						// A GROUND-TARGETED AoE (e.g. Deathly Blizzard) is aimed at a reticle POSITION carried in the
 						// trailer instead of a locked entity: it has NO SpellTarget and the trailer's kind byte is 0.
 						// CastGroundTarget reads the reticle; SpellTarget == null confirms there's no locked entity. (#236)
-						var isGroundCast = CastGroundTarget.TryParse(unk2, out var groundTarget) && args.Target == null;
+						var isGroundCast = CastGroundTarget.TryParse(actionTrailer, out var groundTarget) && args.Target == null;
 
 						// This cast's invalidation token: a later cancel (or a new cast) bumps ActiveCastToken so the
 						// deferred Resolve below aborts if the cast was interrupted before its cast time elapsed.
@@ -1761,7 +1786,7 @@ namespace Faolan.GameServer
 								// The client sends a door-use as TWO BCC phases (begin 0x0003 then release 0x0002); retail teleports
 								// only on the begin phase (Hoxxling inn: the IntendedTeleport follows the 0x0003 record). Acting on
 								// both double-fires the teleport - a redundant relocation / extra loading flash. Ignore the release.
-								if (unk1 != 0x0003)
+								if (behaviorType != 0x0003)
 									break;
 
 								// Hand the player off to the destination playfield - or, if this teleporter's
@@ -1933,8 +1958,8 @@ namespace Faolan.GameServer
 
 								// The trailing struct (after from/target) carries the item's template handle as a
 								// big-endian uint32; persist the equip into CharacterEquipment.
-								var equipHandle = unk2.Length >= 4
-									? unk2.ReadU32Be(0)
+								var equipHandle = actionTrailer.Length >= 4
+									? actionTrailer.ReadU32Be(0)
 									: 0;
 								var movedItem = equipHandle != 0
 									? await Database.GetItem(equipHandle)

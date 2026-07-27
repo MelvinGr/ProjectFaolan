@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.Conan;
@@ -145,7 +146,12 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.StartVoteRetreat:
 				{
-					var unk0 = body.ReadUInt32(); // 0x00, 0x00, 0xC3, 0x50
+					// ⚠️ The name and the body DISAGREE, and neither is settled. Index 0x19 on CSPlayerAgent is
+					// StartVoteRetreat() - which takes NO parameters (docs/re/aoc-client-rpc-methods.json) - yet the
+					// body noted here is an ID32 {EntityClass.Character, handle}. 0x2019 c2s appears ZERO times in the
+					// 213-capture corpus, so the observation cannot be re-checked and the name cannot be confirmed
+					// against traffic. Left reading the two words that were observed; see Gitea #458.
+					body.ReadUInt32(); // EntityClass.Character (0xC350)
 					var nClientInst = body.ReadUInt32();
 
 					break;
@@ -310,8 +316,13 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.EchoGroupFinderUpdateFeaturedActivities:
 				{
-					var unk0 = body.ReadUInt32();
-					// { 0x00, 0x00, 0x03, 0xF1 } // Same data that we send in Authenticate
+					// The echoed body is the activities list itself, and 0x000003F1 is a ListFrame count word, not a
+					// constant: the client is handing back an EMPTY list (count 0), which is what we sent it.
+					var word = body.ReadUInt32();
+					if (ListFrame.TryCountOf(word, out var activityCount))
+						Logger.LogDebug("EchoGroupFinderUpdateFeaturedActivities: {Count} featured activities echoed back.", activityCount);
+					else
+						Logger.LogWarning("EchoGroupFinderUpdateFeaturedActivities: 0x{Word:X} is not a count-framed list word.", word);
 
 					break;
 				}

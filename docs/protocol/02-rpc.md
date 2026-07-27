@@ -86,6 +86,49 @@ cross-listener actions go through dispatcher seams rather than direct references
 Direction convention: `*Agent` classes receive client→server calls; `*Interface` classes receive server→client
 dispatches.
 
+## Reading a c2s body from the client's own signature
+
+The client logs its proxy method **signatures** — name, parameter names and C++ types — and those strings are
+recovered in [`../re/aoc-client-rpc-methods.json`](../re/aoc-client-rpc-methods.json) (376 client→server methods
+across 14 interfaces). Combined with the `wire = 0x2000 + index` mapping above, that turns a client→server body
+from "some u32s" into a typed record: look the opcode's index up in the interface's method list, and the params
+are the fields in wire order. The C++ types map onto the encodings in [`04-encoding.md`](04-encoding.md):
+
+| C++ in the signature | on the wire |
+|---|---|
+| `uint32` / `int` / `unsigned int` / `ID32::InstanceType` | 4 bytes BE |
+| `uint16` | 2 bytes BE |
+| `bool` | 1 byte |
+| `std::string` / `String` | `[u16 length][LATIN1 bytes]` (§04) |
+| `const ID32&` | **two** words: `[u32 class][u32 instance]` (§05) |
+| a map / vector (`StrStrMap`, `CharacterCheckSumMap`, …) | a `ListFrame` count word, then that many entries |
+| `BinaryStream&` | `[u32 byte length][bytes]` |
+
+The whole login chain reads out of it directly, and each body below is byte-identical across every capture that
+contains it:
+
+| method | body |
+|---|---|
+| `UniverseAgent.InitiateAuthentication(username, nGameID)` | `[string username][u32 nGameID]` — `nGameID` is **1** in all 116 captured logins (3 accounts) [V2: Barbarian-login.tshark.json frame 4] |
+| `PlayerAgent.GetStartupData(md5)` | one `[u16][LATIN1]` string, the md5 of the client's CACHED startup data (empty on a first login, a 32-char hex digest once a cache exists) — not the bare u16 it looks like [V2: Barbarian-login.tshark.json frame 22] |
+| `PlayerAgent.FinishGetStartupData(characterMap)` | `[ListFrame count]` then per entry `[u32 characterId][string md5]` — the same checksum, per character [V2: Barbarian-login.tshark.json frame 24] |
+| `PlayerAgent.LoginCharacter(nCharInstance, dataMap, cClientLanguage, regionCode, ageCode, genderCode, igrID, userType, serviceType)` | `[u32 charId][ListFrame 0][string "en"][u16 0][u16 0][u16 0][string "_"][u32 0][u32 0]` — everything after the id is a constant the retail client always sends: empty dataMap, UI language, zeroed age-gate fields, the `"_"` placeholder IGR (internet-gaming-room) id, `userType`/`serviceType` 0 [V2: Barbarian-login.tshark.json frame 33] |
+| `CSPlayerAgent.Authenticate(nCharacterInstance, nCookie, communityVersion)` | `[u32 charInstance][u32 cookie][u32 1]` — `cookie` is the `uCookie` from `UniverseInterface.DispatchAckAuthenticate` [V2: Barbarian-login.tshark.json frame 95] |
+| ChatServer `Hello` | `[u32 1][u32 charInstance][u32 cookie][string "English"]` — the same instance+cookie pair as the CSPlayerAgent `Authenticate`, byte for byte [V2: Barbarian-login.tshark.json frame 94] |
+
+And the in-world ones that had unnamed reads:
+
+| method | body |
+|---|---|
+| `GameAgent.ChatVicinity(cSenderID, nMode, cMsg)` | `[ID32 sender][u32 mode][u32 msgLen][string text][u8 0]` — the sender ID32 is usually `{0,0}` (the client leaves it for the server), the `BinaryStream` length counts the string's own u16 plus its bytes plus the trailing zero [V2: Barbarian-login.tshark.json frame 138] |
+| `GameCharAgent.CinematicTransition(i_cClientId, i_bEntering)` | `[ID32 {0xC350, handle}][u8 entering]` — 9 bytes in all 402 captured packets [V2: Barbarian-login.tshark.json frame 71] |
+| `GameCharAgent.SplitInventoryItem(i_cInventory, i_nSrcPos, i_nSplitSize, i_nDstPos)` | `[ID32 {container kind, owner handle}][u32 src][u32 size][u32 dst]` — the leading ID32 is the CONTAINER, `0x68` = the backpack, i.e. the same value as `CharacterInventory.Container` [V2: DemoL80_mage-demonologist_login_randomActions.tshark.json frame 704] |
+| `GameCharAgent.AddShortcut(i_eType, i_nPosition, i_nData, i_nInventoryType)` | `[u32 type][u32 position][u32 data][u32 inventoryType]` — the trailing word is 0 in all 192 captured AddShortcuts [V2: Barbarian-create.tshark.json frame 235] |
+
+The same reading applies to `0x2000` IIR bodies once the carrier (§03) is stripped: the client→server `QuestIIR`
+(`0x97E02314`, the client's `DeleteQuest`) is byte-for-byte the record the server sends back down —
+`[u32 class][u32 handle][u32 0][u8 0x01][u32 state][u32 questId][u32 0]` [V3: QuestTests.BuildQuestIir_MatchesCapture].
+
 ## See also
 
 - [`03-iir-carrier.md`](03-iir-carrier.md) — opcode `0x2000` is itself a carrier for a second, 32-bit-hashed

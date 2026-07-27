@@ -56,9 +56,18 @@ namespace Faolan.ChatServer
 			{
 				case ChatServerOpcodes.Hello:
 				{
-					var unk0 = body.ReadUInt32();
+					// Body = [u32 version][u32 clientInstance][u32 cookie][string language]. The three-field head is the
+					// same shape the client sends to the CSPlayerAgent as Authenticate(nCharacterInstance, nCookie,
+					// communityVersion) - capture-confirmed: in every trace the chat cookie is byte-identical to the
+					// CSPlayerAgent one, which is the `uCookie` the UniverseAgent handed out in DispatchAckAuthenticate.
+					// ⚠️ We look the account up BY that cookie, which only works because SendPlayerAgentRealm issues
+					// Account.Id AS the cookie (Faolan/UniverseAgent/Packets.cs) - if the cookie ever becomes a real
+					// opaque token, this lookup has to go through a cookie->account map instead.
+					// Version is 1 in all 5239 captured Hellos; language is the client's UI language ("English").
+					var protocolVersion = body.ReadUInt32();
 					var clientInstance = body.ReadUInt32();
 					var accountId = body.ReadUInt32();
+					var language = body.ReadString();
 
 					client.Session.Account = (await Database.GetAccount(accountId))!;
 					if (client.Session.Account == null)
@@ -71,7 +80,7 @@ namespace Faolan.ChatServer
 					client.Session.Character = await Database.GetCharacterForAccount(accountId, clientInstance)
 						?? throw new Exception($"Character not found for account: {accountId:X} and clientInstance: {clientInstance:X}");
 
-					Logger.LogInformation("ChatServer hello decoded: unk0={Unk0:X}, clientInstance={ClientInstance:X8}, accountId={AccountId:X8}", unk0, clientInstance, accountId);
+					Logger.LogInformation("ChatServer hello decoded: version={Version}, clientInstance={ClientInstance:X8}, cookie/accountId={AccountId:X8}, language={Language}", protocolVersion, clientInstance, accountId, language);
 
 					// Retail sends the full chat-channel subscription list FIRST (one 0x003C per channel), then the
 					// 0x0005 ready marker, the 0x0014 character info, and finally the welcome message. Verified from

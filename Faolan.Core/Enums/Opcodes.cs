@@ -57,7 +57,7 @@ namespace Faolan.Core.Enums
 		SetCommunityServerOptions = 0x2016,
 		StartVoteKick = 0x2017,
 		VoteKickAnswer = 0x2018,
-		StartVoteRetreat = 0x2019, // observed body [u32 0xC350][u32 clientInstance] at login - semantics unconfirmed
+		StartVoteRetreat = 0x2019, // NAME AND BODY DISAGREE: index 0x19 is StartVoteRetreat() (no params) but the observed body is [u32 0xC350][u32 clientInstance]; 0 packets in the corpus - Gitea #458
 		VoteRetreatAccept = 0x201A,
 		VoteRetreatReject = 0x201B,
 		AcceptGuildInvitation = 0x201C,

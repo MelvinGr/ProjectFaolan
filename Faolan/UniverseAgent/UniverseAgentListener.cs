@@ -30,8 +30,14 @@ namespace Faolan.UniverseAgent
 			{
 				case UniverseAgentOpcodes.InitiateAuthentication:
 				{
+					// UniverseAgent.InitiateAuthentication(const std::string& username, const uint32 nGameID) - the
+					// client's own signature (docs/re/aoc-client-rpc-methods.json). nGameID is the product/title id
+					// the login is FOR; the retail client hardcodes 1 (all 116 captured logins across the corpus,
+					// three different accounts). Read and ignored - we serve exactly one game.
 					var accountName = body.ReadString();
-					var unk0 = body.ReadUInt32();
+					var gameId = body.ReadUInt32();
+					if (gameId != 1)
+						Logger.LogWarning("UniverseAgent login: unexpected nGameID {GameId} for '{Account}' (retail always sends 1).", gameId, accountName);
 
 					client.Session.Account = (await Database.GetAccount(accountName))!;
 					if (client.Session.Account == null)

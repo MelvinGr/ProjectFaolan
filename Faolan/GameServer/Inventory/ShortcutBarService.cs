@@ -36,15 +36,19 @@ namespace Faolan.GameServer.Inventory
 		// (upsert - re-dragging overwrites); the login RESTORE is rebuilt from these rows (SendRestoredBar).
 		public async Task HandleAddShortcut(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var type = body.ReadUInt32(); // observed 4 = ability (ids match the 0x2052 grants), 2/3 = other
-			var slotId = body.ReadUInt32(); // client slot id (ranges 0x64.. and 0x4E20.. = bar pages)
-			var sourceId = body.ReadUInt32(); // ability id or item ref
-			var unk = body.ReadUInt32();
+			// GameCharAgent.AddShortcut(int i_eType, int i_nPosition, uint32 i_nData, uint32 i_nInventoryType) - the
+			// client's own signature (docs/re/aoc-client-rpc-methods.json).
+			var type = body.ReadUInt32(); // i_eType: observed 4 = ability (ids match the 0x2052 grants), 2/3 = other
+			var slotId = body.ReadUInt32(); // i_nPosition: client slot id (ranges 0x64.. and 0x4E20.. = bar pages)
+			var sourceId = body.ReadUInt32(); // i_nData: ability id or item ref
+			// i_nInventoryType: which container i_nData indexes into. Zero in all 192 captured AddShortcuts (types
+			// 4 x156, 2 x30, 3 x6) - no capture drags an ITEM onto the bar, which is presumably what would set it.
+			var inventoryType = body.ReadUInt32();
 
 			if (client.Session.Character != null)
 				await _database.SetCharacterShortcut(client.Session.Character.Id, slotId, type, sourceId);
 
-			_logger.LogInformation("AddShortcut: type {Type}, slot 0x{Slot:X4}, target 0x{Target:X8} (unk {Unk:X8}).", type, slotId, sourceId, unk);
+			_logger.LogInformation("AddShortcut: type {Type}, slot 0x{Slot:X4}, target 0x{Target:X8} (inventoryType {InventoryType:X8}).", type, slotId, sourceId, inventoryType);
 		}
 
 		// RemoveShortcut: body = [u32 slot].
