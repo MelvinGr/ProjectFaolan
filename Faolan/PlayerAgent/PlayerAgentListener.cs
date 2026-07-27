@@ -203,9 +203,31 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
+				// PlayerAgent.CreateCharacter(uint i_nDimID, const std::string& cRDBDSN, const uint16 regionCode,
+				// const uint16 ageCode, const uint16 genderCode, const String& igrID, const uint32 userType,
+				// const uint32 serviceType). `i_nDimID` is the DIMENSION = the realm the character is created on (1 or
+				// 2 across the captures, matching the realm the player picked). Everything after it is the same
+				// constant tail LoginCharacter carries - an empty count-framed field where `cRDBDSN` sits, zeroed
+				// region/age/gender, the "_" placeholder IGR id, and userType/serviceType 0 - so it is read to keep the
+				// body fully consumed, not because any of it varies.
 				case PlayerAgentOpcodes.CreateCharacter:
 				{
 					var realmId = body.ReadUInt32();
+
+					var rdbWord = body.ReadUInt32();
+					if (!ListFrame.TryCountOf(rdbWord, out var rdbCount) || rdbCount != 0)
+						Logger.LogWarning("CreateCharacter: expected an empty count-framed cRDBDSN field, got 0x{Word:X}.", rdbWord);
+
+					var regionCode = body.ReadUInt16();
+					var ageCode = body.ReadUInt16();
+					var genderCode = body.ReadUInt16();
+					var igrId = body.ReadString();
+					var userType = body.ReadUInt32();
+					var serviceType = body.ReadUInt32();
+
+					Logger.LogDebug("CreateCharacter on realm {RealmId}: region={Region}, age={Age}, gender={Gender}, igr={Igr}, userType={UserType}, serviceType={ServiceType}", realmId, regionCode, ageCode, genderCode,
+						igrId, userType, serviceType);
+
 					var newCharacter = await Database.CreateCharacter(client.Session.Account.Id, realmId);
 
 					client.Session.Character = newCharacter;

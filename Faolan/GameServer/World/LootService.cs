@@ -129,9 +129,21 @@ namespace Faolan.GameServer.World
 		// 0x2046 TryLootItem: a single drag of one item out of the loot window.
 		public async Task HandleLootItem(INetworkClient client, Rpc packet, FaolanStream body)
 		{
+			// TryLootItem(const ID32& i_cLootBagID, int i_nItemPos, const ID32& i_cCharID, int i_nDesiredPosition) -
+			// the client's own signature (docs/re/aoc-client-rpc-methods.json). The handler used to stop after
+			// i_nItemPos and leave 12 bytes on the body, which hid i_nDesiredPosition entirely: the player DRAGS the
+			// item onto a specific backpack slot and that word is the slot they dropped it on. We still grant into the
+			// first free slot (GrantItemToBackpack), so a deliberate drop position is ignored - Gitea #462. The two
+			// captured multi-loot sequences make the meaning unambiguous: i_nItemPos runs over the bag's display
+			// indices while i_nDesiredPosition tracks the player's own filling backpack (0,1,2,...,5,6).
 			body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = body.ReadUInt32();
-			var itemIndex = body.ReadUInt32(); // which item (display index) the player dragged
+			var itemIndex = body.ReadUInt32(); // i_nItemPos - which item (display index) the player dragged
+			body.ReadUInt32(); // EntityClass.Character (0xC350)
+			var looterHandle = body.ReadUInt32(); // i_cCharID - the looter; we key off the session instead
+			var desiredPosition = body.ReadUInt32();
+
+			_logger.LogDebug("TryLootItem: bag {Bag:X8} index {Index} -> looter {Looter:X8} slot {Slot} (desired slot not honoured, #462).", bagHandle, itemIndex, looterHandle, desiredPosition);
 
 			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
 			var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);

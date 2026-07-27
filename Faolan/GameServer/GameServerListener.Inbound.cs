@@ -883,17 +883,23 @@ namespace Faolan.GameServer
 					return;
 				}
 
-				case GameCharAgentOpcodes.SetTutorialStats: // 0x2003 = SetTutorialStats (Tortage tutorial tracking)
+				// 0x2003 SetTutorialStats(int nValue): the Tortage tutorial reporting which step the player reached.
+				// 22 distinct values across 147 captures (0x1D, 0x1E, 0x1F, 0x2D, ...), i.e. a STEP ORDINAL, not a
+				// flag. Nothing persists it, so the tutorial restarts from the client's own state on relog (#461).
+				case GameCharAgentOpcodes.SetTutorialStats:
 				{
-					Logger.LogDebug("GameCharAgent.SetTutorialStats; no reply.");
+					var tutorialStep = body.ReadUInt32();
+
+					Logger.LogDebug("GameCharAgent.SetTutorialStats step {Step}; not persisted (#461), no reply.", tutorialStep);
 					return;
 				}
 
+				// 0x207E SetHideInspectOption(bool): the "hide my gear from inspect" privacy toggle. One byte.
 				case GameCharAgentOpcodes.SetHideInspectOption:
 				{
-					LogPacketBodyDebug("GameServer 0x207E body", body.ToArray());
-					if (body.Length > 0)
-						Logger.LogInformation("0x207E decoded: value0={Value0:X2}", body.ToArray()[0]);
+					var hideFromInspect = body.ReadByte() != 0;
+
+					Logger.LogInformation("SetHideInspectOption {Hide}; not persisted - inspect is not implemented.", hideFromInspect);
 
 					break;
 				}
@@ -902,10 +908,12 @@ namespace Faolan.GameServer
 				{
 					// GameCharAgent.CinematicTransition(const ID32& i_cClientId, const bool i_bEntering) - body is
 					// [u32 0xC350][u32 handle][u8 bEntering], that exact 9-byte shape in all 402 captured packets
-					// (255x bEntering=0, 147x bEntering=1). We route purely on EntryMode below and never read the
-					// bool - if a branch ever needs enter-vs-leave, it is the trailing byte, not a new field.
+					// (255x bEntering=0, 147x bEntering=1). The routing below is on EntryMode, not on the bool - the
+					// login flow uses this opcode as a ready trigger regardless of direction - but the bool IS the
+					// enter-vs-leave discriminator if a branch ever needs one.
 					body.ReadUInt32(); // EntityClass.Character (0xC350)
 					var characterId = body.ReadUInt32();
+					var entering = body.ReadByte() != 0;
 
 					// 0x205F is the CINEMATIC TRANSITION (its trailing byte is begin/end); the LOGIN flow happens to use
 					// it as its ready trigger, which makes "should this arm the follow-up?" a per-mode question rather
@@ -926,7 +934,7 @@ namespace Faolan.GameServer
 							// Retail sends no download in response - it acks the polls and waits for CharInPlayIIR
 							// (which triggers the editor-launch burst).
 							client.Session.HasPendingPost205FFollowUp = true;
-							Logger.LogInformation("0x205F decoded: characterId={CharacterId:X8}. Create-editor phase; awaiting CharInPlayIIR.", characterId);
+							Logger.LogInformation("0x205F decoded: characterId={CharacterId:X8}, entering={Entering}. Create-editor phase; awaiting CharInPlayIIR.", characterId, entering);
 							break;
 						}
 
@@ -934,8 +942,8 @@ namespace Faolan.GameServer
 						case WorldEntryMode.TeleportReentry:
 						{
 							client.Session.HasPendingPost205FFollowUp = true;
-							Logger.LogInformation("0x205F decoded: characterId={CharacterId:X8}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", characterId,
-								client.Session.Character.Id);
+							Logger.LogInformation("0x205F decoded: characterId={CharacterId:X8}, entering={Entering}, expectedCharacterId={ExpectedCharacterId:X8}. Marked post-0x205F follow-up as pending.", characterId,
+								entering, client.Session.Character.Id);
 							break;
 						}
 
@@ -1009,9 +1017,15 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				// 0x2032 CloseShop(const ID32& i_cShopID): the player closed the vendor window. The ID32 is the VENDOR
+				// (class 0xC350 - a shop's owner is a character, not the 0xC75B shop-content class), but we close
+				// whatever shop this session has open, so it is read for the log only.
 				case GameCharAgentOpcodes.CloseShop:
 				{
-					Logger.LogInformation("Shop closed by {Character}.", client.Session.Character?.Name);
+					body.ReadUInt32(); // EntityClass.Character (0xC350)
+					var vendorHandle = body.ReadUInt32();
+
+					Logger.LogInformation("Shop {Vendor:X8} closed by {Character}.", vendorHandle, client.Session.Character?.Name);
 
 					break;
 				}

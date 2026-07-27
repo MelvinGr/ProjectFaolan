@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
@@ -116,14 +117,25 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				// 0x2003 TeamInvite([ID32 target]): the leader (or a solo player) invites someone into a team.
+				// 0x2003 TeamInvite(const ID32& i_cTargetID, const std::string& i_cMessage, bool i_bCheckCriminalStatus):
+				// the leader (or a solo player) invites someone into a team. Body is 11 B in all 4 captures - the ID32,
+				// an EMPTY message and the flag - which is why only the first 8 read for so long.
 				case CSPlayerAgentOpcodes.TeamInvite:
 				{
 					var targetId = TeamMessageCodec.ParseInviteTarget(body);
+					var inviteMessage = body.ReadString();
+					var checkCriminalStatus = body.ReadByte() != 0;
+
 					if (await Database.GetCharacter(targetId) is { } target)
+						// The invite MESSAGE is decoded but not yet delivered - TeamService.Invite has no message
+						// parameter, so a typed invite note is silently dropped (Gitea #459). Same for the
+						// criminal-status check, which is a PvP rule we do not model.
 						await _teams.Invite(client, client.Session.Character, target);
 					else
 						Logger.LogWarning("TeamInvite for unknown character {TargetId:X8}.", targetId);
+
+					if (inviteMessage.Length > 0 || checkCriminalStatus)
+						Logger.LogInformation("TeamInvite extras not acted on: message='{Message}', checkCriminalStatus={Check} (#459).", inviteMessage, checkCriminalStatus);
 
 					break;
 				}
@@ -268,7 +280,19 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.SearchForGuilds:
 				{
-					// The guild-finder browse window (0x2043 -> 0x205C). Return the realm's guilds.
+					// SearchForGuilds(uint16 i_nMinMembers, uint16 i_nMaxMembers, uint8 i_nMinLevel, uint8 i_nMaxLevel,
+					// const String& i_cNameSearch) - the guild-finder browse window (0x2043 -> 0x205C). The 8-byte
+					// captured body is exactly that, with an empty name. We return the realm's guilds UNFILTERED
+					// (Gitea #460); read the criteria so the body is fully consumed and the gap is visible in the log.
+					var minMembers = body.ReadUInt16();
+					var maxMembers = body.ReadUInt16();
+					var minLevel = body.ReadByte();
+					var maxLevel = body.ReadByte();
+					var nameSearch = body.ReadString();
+
+					Logger.LogDebug("SearchForGuilds members {MinMembers}..{MaxMembers}, level {MinLevel}..{MaxLevel}, name '{Name}' - criteria NOT applied (#460).", minMembers, maxMembers, minLevel, maxLevel,
+						nameSearch);
+
 					await SendGuildSearchResult(client, packet);
 
 					break;
@@ -276,7 +300,23 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.CharacterSearch:
 				{
-					// Character/"who" search (0x200A -> 0x2010). Empty result (no search index yet).
+					// CharacterSearch(int i_eSearchmode, const InstanceVec_t& i_cPlayfieldVec, int i_nMinLevel,
+					// int i_nMaxLevel, const IntVec_t& i_nClassVec, const IntVec_t& i_nRaceVec, uint32 i_nSkipResults,
+					// const String& i_cNameSearch) - the "who" window (0x200A -> 0x2010). The captured 30-byte body is
+					// that exactly: mode 1, three EMPTY ListFrame vectors, levels 5..10, skip 0, empty name. We still
+					// answer with an empty result (no search index yet, Gitea #460) - read it so nothing is left over.
+					var searchMode = body.ReadUInt32();
+					var playfields = ReadListFrameOfUInt32(body, "CharacterSearch.playfields");
+					var minLevel = body.ReadUInt32();
+					var maxLevel = body.ReadUInt32();
+					var classes = ReadListFrameOfUInt32(body, "CharacterSearch.classes");
+					var races = ReadListFrameOfUInt32(body, "CharacterSearch.races");
+					var skipResults = body.ReadUInt32();
+					var nameSearch = body.ReadString();
+
+					Logger.LogDebug("CharacterSearch mode {Mode}, level {MinLevel}..{MaxLevel}, {Playfields} playfields / {Classes} classes / {Races} races, skip {Skip}, name '{Name}' - empty result (#460).", searchMode,
+						minLevel, maxLevel, playfields, classes, races, skipResults, nameSearch);
+
 					await SendCharacterSearchResult(client, packet);
 
 					break;
@@ -284,7 +324,19 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.SearchForTeam:
 				{
-					// LFG team search (0x200B -> 0x200F). Empty result.
+					// SearchForTeam(const InstanceVec_t& i_cPlayfieldVec, int i_nMinLevel, int i_nMaxLevel,
+					// int memberCountMin, int memberCountMax, uint32 i_nSkipResults) - LFG team search
+					// (0x200B -> 0x200F). Captured 24-byte body matches exactly. Empty result (#460).
+					var playfields = ReadListFrameOfUInt32(body, "SearchForTeam.playfields");
+					var minLevel = body.ReadUInt32();
+					var maxLevel = body.ReadUInt32();
+					var memberCountMin = body.ReadUInt32();
+					var memberCountMax = body.ReadUInt32();
+					var skipResults = body.ReadUInt32();
+
+					Logger.LogDebug("SearchForTeam level {MinLevel}..{MaxLevel}, members {MinMembers}..{MaxMembers}, {Playfields} playfields, skip {Skip} - empty result (#460).", minLevel, maxLevel, memberCountMin,
+						memberCountMax, playfields, skipResults);
+
 					await SendTeamSearchResult(client, packet);
 
 					break;
@@ -292,7 +344,12 @@ namespace Faolan.CSPlayerAgent
 
 				case CSPlayerAgentOpcodes.PvPMatchMakingRequestInfo:
 				{
-					// PvP matchmaking info (0x2054 -> 0x2092). Empty / not-queued result.
+					// PvPMatchMakingRequestInfo(int i_QueueType) - PvP matchmaking info (0x2054 -> 0x2092). Empty /
+					// not-queued result regardless of the queue asked about.
+					var queueType = body.ReadUInt32();
+
+					Logger.LogDebug("PvPMatchMakingRequestInfo queueType {QueueType} - answering not-queued.", queueType);
+
 					await SendPvpMatchMakingInfo(client, packet);
 
 					break;
@@ -350,6 +407,26 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 			}
+		}
+
+		// A count-framed vector of u32s (`InstanceVec_t` / `IntVec_t` in the client's search signatures): the ListFrame
+		// count word then that many words. Returns the count, having consumed the elements - the search handlers below
+		// answer with a canned result but must still leave the body empty. Every captured search vector is EMPTY, so
+		// the element WIDTH is inferred from the C++ type (both vectors are of 4-byte elements) rather than observed;
+		// a malformed word is rejected instead of looping on inbound arithmetic.
+		private int ReadListFrameOfUInt32(FaolanStream body, string what)
+		{
+			var word = body.ReadUInt32();
+			if (!ListFrame.TryCountOf(word, out var count))
+			{
+				Logger.LogWarning("{What}: 0x{Word:X} is not a count-framed list word; ignoring the entries.", what, word);
+				return 0;
+			}
+
+			for (var i = 0; i < count; i++)
+				body.ReadUInt32();
+
+			return count;
 		}
 	}
 }

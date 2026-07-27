@@ -90,7 +90,8 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 
-			var saleId = body.ReadUInt64(); // searchResultId follows but isn't needed to resolve the sale
+			var saleId = body.ReadUInt64();
+			body.ReadUInt64(); // searchResultId - the row in the client's own search result; the saleId resolves the sale
 
 			var listing = await Database.GetTradepostListingBySaleId(saleId, character.RealmId);
 			if (listing == null)

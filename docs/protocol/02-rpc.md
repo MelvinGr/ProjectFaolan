@@ -129,6 +129,20 @@ The same reading applies to `0x2000` IIR bodies once the carrier (§03) is strip
 (`0x97E02314`, the client's `DeleteQuest`) is byte-for-byte the record the server sends back down —
 `[u32 class][u32 handle][u32 0][u8 0x01][u32 state][u32 questId][u32 0]` [V3: QuestTests.BuildQuestIir_MatchesCapture].
 
+### Auditing it: bodies we do not read to the end
+
+An unread tail is an undecoded field, not a harmless remainder. `tools/capture/audit_unread_bodies.py`
+cross-references two things that never had to agree — the captured c2s body length per (receiver class,
+opcode), and how many bytes the matching `case` block consumes — and reports every handler that provably
+reads fewer bytes than the shortest captured body. It resolves the opcode the way `ProtocolCatalog` does
+(receiver-class hash → opcode enum → member) rather than by method name, because the `Method` in a tshark
+dump is whatever `Opcodes.cs` was called when the dump was written.
+
+It is a lead generator, not a verdict: it follows one level of delegation by name, and skips any handler that
+reaches a variable-length read rather than guessing. Confirm each hit by opening the handler, then look the
+method up in the signature catalog above rather than inventing a grammar. The first pass found nine real
+cases; a clean run reports zero. [V1: tools/capture/audit_unread_bodies.py]
+
 ## See also
 
 - [`03-iir-carrier.md`](03-iir-carrier.md) — opcode `0x2000` is itself a carrier for a second, 32-bit-hashed
