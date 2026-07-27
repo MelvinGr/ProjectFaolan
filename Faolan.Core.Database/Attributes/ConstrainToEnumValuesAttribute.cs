@@ -12,6 +12,13 @@ namespace Faolan.Core.Database.Attributes
 	// values>)" - so the allowed set stays in sync with the enum automatically (add/remove an enum member and the
 	// constraint follows on the next migration). Put it on CLOSED enums only: NOT open ones like CharacterStatId,
 	// which carries Unknown fillers for still-undecoded ids.
+	//
+	// ⚠️ It is also meaningless on a [Flags] enum, and dangerously so: "IN (<declared members>)" constrains the column
+	// to exactly ONE member, which is the opposite of what flags mean - a real combination like
+	// `GmPrivileges.GodMode | GmPrivileges.CanCloak` (0x00100200) is not a declared member and the CHECK rejects it.
+	// Nothing would catch that at build or migration time; it would surface as a constraint violation from the database
+	// on the first SaveChanges that stored a combination. So a [Flags] property is SKIPPED with a warning rather than
+	// constrained - see ApplyEnumCheckConstraints.
 	[AttributeUsage(AttributeTargets.Property)]
 	public sealed class ConstrainToEnumValuesAttribute : Attribute
 	{
@@ -36,6 +43,16 @@ namespace Faolan.Core.Database.Attributes
 					var enumType = Nullable.GetUnderlyingType(property.ClrType) ?? property.ClrType;
 					if (!enumType.IsEnum)
 						continue;
+
+					// A [Flags] enum cannot be expressed as "IN (<members>)" - see the type remarks. Skip it rather
+					// than emit a constraint that rejects legitimate combinations, and say so: silently doing nothing
+					// would leave the author believing the column is constrained when it is not.
+					if (enumType.IsDefined(typeof(FlagsAttribute), false))
+					{
+						Console.Error.WriteLine($"[ConstrainToEnumValues] SKIPPED {entityType.ClrType.Name}.{property.Name}: {enumType.Name} is a [Flags] enum, " +
+						                        "so an IN (<declared members>) constraint would reject valid combinations. The column is NOT constrained.");
+						continue;
+					}
 
 					var values = Enum.GetValues(enumType).Cast<object>().Select(Convert.ToInt64).Distinct().OrderBy(v => v).JoinAsString(", ");
 					var column = property.GetColumnName(store.Value);
