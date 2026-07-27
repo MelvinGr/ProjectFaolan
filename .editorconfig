@@ -166,7 +166,7 @@ csharp_style_var_elsewhere = true:error
 #dotnet_style_prefer_collection_expression = true:error
 
 # IDE0028
-dotnet_style_collection_initializer = true:error
+dotnet_style_collection_initializer = true:warning
 
 # Enforce block-scoped namespaces
 csharp_style_namespace_declarations = block_scoped:error
@@ -182,8 +182,9 @@ dotnet_diagnostic.IDE0007.severity = error
 dotnet_diagnostic.IDE0008.severity = none
 
 # dotnet_style_collection_initializer
-dotnet_diagnostic.IDE0028.severity = error
+dotnet_diagnostic.IDE0028.severity = warning
 
 # dotnet_style_prefer_collection_expression
 dotnet_diagnostic.IDE0301.severity = error
 
+dotnet_style_prefer_collection_expression = when_types_exactly_match
