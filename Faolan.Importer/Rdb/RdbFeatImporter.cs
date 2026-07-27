@@ -179,7 +179,12 @@ namespace Faolan.Importer.Rdb
 			// by element would only risk leaving a stale tail behind.
 			var effectRows = 0;
 			var wanted = featEffects.Where(kv => kv.Value.Count > 0).ToDictionary(kv => kv.Key, kv => kv.Value);
-			var stale = await db.FeatEffects.Where(fe => wanted.Keys.Contains(fe.FeatId)).ToListAsync();
+
+			// Scoped to every feat PARSED, not just those that still yield effects. Keying the delete off the results
+			// means a feat whose list becomes empty - because the parse got stricter - keeps its old rows for ever, so
+			// a change that REMOVES bad data would leave the bad data sitting there.
+			var touched = featEffects.Keys.ToHashSet();
+			var stale = await db.FeatEffects.Where(fe => touched.Contains(fe.FeatId)).ToListAsync();
 			db.FeatEffects.RemoveRange(stale);
 			foreach (var (featId, list) in wanted)
 			{

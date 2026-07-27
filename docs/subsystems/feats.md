@@ -24,6 +24,13 @@ and don't contain.
 - **The feat CATALOG now exists** (#251): `Feat` (**19,540** rows from the RDB 1000020 plaintext templates - id, name,
   description, tree, group, rank) + `FeatEffect` (**23,936** stat modifiers, 158 distinct stats). Built by
   `RdbFeatImporter` (the `rdb-feats` module), no TEA key and no capture needed.
+- ⚠️ **The EFFECT grammar is verified for the u32 record shape only.** 739 of 23,936 effect rows (3.1%) sit on stat
+  ids the client's own stat-name table does not contain, concentrated in the u16-shape records: the element is
+  40 bytes there too, but a `0xCF__` KIND tag leads it and the WIDTH varies with the kind (`0xCF46` carries two
+  extra trailing words where `0xCF35` does not), so a fixed stride walks off the list. Two alternatives were tried
+  and BOTH measured worse - starting the walk after name+description gave 11.4% bad, and delimiting on the kind tag
+  gave 24.2% (any `0xCF__` word in the tail reads as an element). The fixed-stride version is kept because it is the
+  best-measuring one, not because it is right.
 - **TWO record shapes carry the name**, and knowing only the first hid every feat the captured characters hold:
   `[u32 len][name]` and `[u16 nameLen][u16 descLen][name][description]`. The u16 shape also yields the TOOLTIP.
 - **The feat/item discriminator is the client's own feat TABLE, not the Flags word.** A template that RDB 1000042
