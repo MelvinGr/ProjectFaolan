@@ -222,6 +222,11 @@ namespace Faolan.Tests
 			var entity = Player();
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.Armor] = 100 };
 
+			// ⚠️ The debuff has to be ACTIVE. Without this line the catalog row never applies and the assertion below
+			// passed on an ArmorRating that had simply never been written - which is what it did until #473 made the
+			// recompute apply gear-only values too. 100 + (-500) = -400, clamped to 0.
+			entity.ActiveBuffs[999 << 8] = new ActiveBuff(999 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 60f);
+
 			BuffStatEffects.Recompute(entity, catalog);
 
 			Assert.Equal(0u, entity.ArmorRating);
@@ -281,6 +286,43 @@ namespace Faolan.Tests
 			BuffStatEffects.Recompute(entity, catalog);
 
 			Assert.Equal(8725u, entity.Vitals.MaxHealth); // 6341 + 584 gear + 1800 buff
+		}
+
+		// #473: a GEAR-ONLY change to a max pool must APPLY, with no buff involved. The recompute used to `continue`
+		// before calling SetMaxFromBonus whenever a stat was unseeded with no flat/percent delta - safe while
+		// GearBonuses was fixed at world entry, and wrong the moment equipping refreshes it mid-session. The entry was
+		// never seeded either, so the skip was permanent: a +25 HP item moved the server's max by nothing at all.
+		[Fact]
+		public void GearOnlyChangeToAMaxPool_IsApplied()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([]); // no buffs anywhere - gear is the only source
+			var entity = Player();
+			// FromCharacter, not FromMax: only it seeds BaseMaxHealth, which is what SetMaxFromBonus adds the bonus
+			// ONTO. (Production always comes through FromCharacter - GetOrAddPlayerVitals and RegisterPlayerInWorld.)
+			entity.Vitals = EntityVitals.FromCharacter(new Character
+			{
+				Class = ConanClass.Guardian,
+				Level = 1,
+				MaxStats = new CharacterMaxStats { Health = 1000 }
+			});
+			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 0 };
+
+			// First sync seeds off gear alone: it APPLIES but reports nothing (that is not news).
+			Assert.Empty(BuffStatEffects.Recompute(entity, catalog));
+			Assert.Equal(1000u, entity.Vitals.MaxHealth);
+
+			// Now equip a +25 HP piece. The max must move, and be reported so the caller can act on it.
+			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 25 };
+			var changed = BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(1025u, entity.Vitals.MaxHealth);
+			Assert.Contains(changed, c => c.Stat == CharacterStatId.HealthMax);
+
+			// And taking it off comes back down, clamping current with it.
+			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 0 };
+			BuffStatEffects.Recompute(entity, catalog);
+			Assert.Equal(1000u, entity.Vitals.MaxHealth);
+			Assert.Equal(1000u, entity.Vitals.Health); // current clamped down, not left above the bar
 		}
 
 		private static WorldEntity Player()

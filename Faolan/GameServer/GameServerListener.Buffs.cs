@@ -428,11 +428,11 @@ namespace Faolan.GameServer
 		///         <c>CombatService.ReseedFromMaxStats</c> - that one is for a level change, where full pools are correct.
 		///     </para>
 		///     <para>
-		///         ⚠️ <b>The PUSH here does not match retail and is being reworked (#473).</b> Decoding the
-		///         <c>0x96B8DC59</c> that follows a c2s equip across the corpus, retail sends the CURRENT pools only
-		///         (<c>0x001B</c>/<c>0x01F8</c>/<c>0x01FA</c>, plus BCC State) and never a max - the client derives the
-		///         max from the item it just equipped. Contrast a level-up, which does carry all six. Recomputing our
-		///         internal aggregate here is right and needed for combat/regen; emitting the max is not.
+		///         <b>The push is CURRENTS ONLY, from the captures.</b> The <c>0x96B8DC59</c> following a c2s equip
+		///         (<c>0x2a8a1b49</c>) carries <c>0x001B</c>/<c>0x01F8</c>/<c>0x01FA</c> and never a max - the client
+		///         derives the max from the item it just equipped, so sending one would fight its arithmetic. A
+		///         level-up is the contrary case (all six ids, 13-14 occurrences in the corpus), which is why
+		///         <c>CombatService.ReseedFromMaxStats</c> pushes the whole block and this does not.
 		///     </para>
 		///     <para>
 		///         ⚠️ Wired into equip and unequip. NOT yet wired into the WEAPON-SET swap (#400,
@@ -451,7 +451,23 @@ namespace Faolan.GameServer
 				MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet)),
 				MaxStatAggregator.AggregateFeatBonuses(await Database.GetCharacterFeatEffects(character.Id)));
 
-			await SyncBuffStats(client);
+			// Recompute the derived live fields off the new aggregate - max pools (which clamps current when a max
+			// shrinks), magic damage, the regen rates. The returned change list is DELIBERATELY DISCARDED: it is what
+			// a BUFF change would push, and retail's post-equip update carries none of it.
+			await _buffStats.Sync(entity);
+
+			if (entity.Vitals is not { } vitals)
+				return;
+
+			// Retail's shape, from the corpus: the 0x96B8DC59 after a c2s equip carries the three CURRENT pools and
+			// never a max, because the client derives the max from the item it just equipped. (A level-up is the
+			// contrary case - all six ids - which is why CombatService.ReseedFromMaxStats pushes the whole block and
+			// this does not.) Sending a max here would fight the client's own arithmetic.
+			await SendStatUpdate(client, new CharacterStatBlock()
+					.Set(CharacterStatId.HealthCurrent, vitals.Health)
+					.Set(CharacterStatId.StaminaCurrent, vitals.Stamina)
+					.Set(CharacterStatId.ManaCurrent, vitals.Mana),
+				character.Id);
 		}
 
 		private async Task SyncBuffStats(INetworkClient client)

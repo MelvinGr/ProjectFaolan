@@ -197,14 +197,26 @@ namespace Faolan.GameServer.Combat
 					? (uint)buffed
 					: 0u; // a debuff can only take a stat to 0, never negative
 
-				// First sync seeds the baseline: nothing has changed if the stat is still what gear alone gives.
-				if (entity.BuffedStats.TryGetValue(stat, out var previous)
-					    ? previous == value
-					    : flat.GetValueOrDefault(stat) == 0 && pct == 0)
+				// Genuinely unchanged since the last sync - nothing to apply and nothing to report.
+				var seeded = entity.BuffedStats.TryGetValue(stat, out var previous);
+				if (seeded && previous == value)
 					continue;
 
+				// ⚠️ APPLY first, and unconditionally. This used to `continue` before applying whenever the stat was
+				// gear-only (unseeded, no flat delta, no percent), which was safe while GearBonuses was fixed at world
+				// entry - it never changed, so "gear-only" did mean "unchanged". Equipping now refreshes the aggregate
+				// mid-session (#473), and under the old order a gear change to a pool was skipped BEFORE
+				// SetMaxFromBonus ran and the entry was never seeded, so it was skipped for ever: a +25 HP item moved
+				// the server's max by nothing at all.
 				entity.BuffedStats[stat] = value;
-				changed.Add((stat, apply?.Invoke(entity, value) ?? value));
+				var applied = apply?.Invoke(entity, value) ?? value;
+
+				// The FIRST seed off gear alone is not news - it is what the entity already had at world entry - so it
+				// applies but is not reported. Only a later change is.
+				if (!seeded && flat.GetValueOrDefault(stat) == 0 && pct == 0)
+					continue;
+
+				changed.Add((stat, applied));
 			}
 
 			return changed;
