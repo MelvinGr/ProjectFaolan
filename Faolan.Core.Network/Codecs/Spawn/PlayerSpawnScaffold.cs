@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Numerics;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Spawn
@@ -45,11 +46,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// because the scaffold round-trips verbatim; PlayerSpawnScaffoldRows.FreshPreFrame builds a fresh one.
 		public byte[] PreFrame { get; set; } = null!;
 
-		public byte[] Quat { get; set; } = null!; // #352: columnize (kept raw - typed would lose the exact captured field-set)
+		// Transform component (the 0x2C group): 0x0A vec3 (3 x fixed32), 0x12 quat (4 x fixed32), optional 0x25
+		// scale (4 bytes), 0x18 playfield varint. #352 kept these two as raw field payloads on the grounds that
+		// typing "would lose the exact captured field-set" - measured over 11,632 captured player spawns, the field
+		// set NEVER varies (vec3 is always {0D,15,1D}, quat always {0D,15,1D,25}), and PlayerSpawnBuilder already
+		// constructs both through ProtoVec3/ProtoQuat. So there is no captured field-set to lose, and the
+		// byte-exact regeneration gate over every captured spawn is what says so rather than this comment.
+		public Quaternion Rotation { get; set; }
+		public Vector3 Position { get; set; }
 
-		// Transform component payloads (the 0x2C group), kept as raw field payloads: 0x0A vec3 (3 x fixed32),
-		// 0x12 quat (4 x fixed32), optional 0x25 scale (4 bytes), 0x18 playfield varint.
-		public byte[] Vec3 { get; set; } = null!; // #352: columnize (kept raw - typed would lose the exact captured field-set)
+		// Field 4 as a fixed32, kept RAW - unlike the two above this one is genuinely unmodelled: it is absent from
+		// all 11,632 captured player spawns, so the corpus proves nothing about what it would contain, and
+		// ProtoGameCodeDynelIIR declares field 4 as `repeated RunningEffects` (length-delimited, not fixed32). If a
+		// 0x25 ever does turn up, one of the two models is wrong and it needs decoding, not typing.
 		public byte[]? Scale { get; set; } // null when absent
 		public uint Ack { get; set; } = EntityClass.Character;
 

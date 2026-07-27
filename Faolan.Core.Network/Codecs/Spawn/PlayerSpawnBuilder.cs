@@ -37,12 +37,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				Ack = EntityClass.Character,
 				Handle = handle,
 				FieldA = 0,
-				// The scaffold carries these as raw field payloads (it round-trips captured bodies), but BUILDING them
-				// from a Vector3/Quaternion is construction, so it goes through the generated classes: ProtoVec3 is
-				// {0D x, 15 y, 1D z} and ProtoQuat adds {25 w}, each a little-endian fixed32 - byte-identical to the
-				// hand-written encoders this replaces, and the same path WorldObjectBuilder already used.
-				Vec3 = ((ProtoVec3)position).ToProtobuf(),
-				Quat = ((ProtoQuat)rotation).ToProtobuf(),
+				Position = position,
+				Rotation = rotation,
 				Scale = null,
 				Playfield = playfield,
 				CharacterIir = characterIir

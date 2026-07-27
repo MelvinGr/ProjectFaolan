@@ -41,8 +41,8 @@ namespace Faolan.Tests
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var scaffold, out var error), error);
 
 			// Decompose the captured scaffold into the from-scratch builder's inputs.
-			var position = scaffold.Vec3.FromProtobuf<ProtoVec3>();
-			var rotation = scaffold.Quat.FromProtobuf<ProtoQuat>();
+			var position = scaffold.Position;
+			var rotation = scaffold.Rotation;
 
 			// The scaffold rows (entry table / id list) on a Character. Strie is an Assassin; the pre-IIR frame is now
 			// reconstructed from that class (not stored), so the from-scratch body equals the template's CONSTRUCTED
