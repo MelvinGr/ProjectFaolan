@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -15,8 +16,6 @@ namespace Faolan.Importer.Extractors
 	// name via the same spawn-name map the conversation/shop extractors use.
 	public static class NpcDispositionExtractor
 	{
-		private const uint C350 = 0x0000C350;
-
 		// The sender class 0x5B9756FC as it appears in the rebuilt RpcHeader: a `0x0d` proto tag then the class id
 		// LITTLE-ENDIAN (TsharkCaptureReader.TryEndpoint) - so the bytes 0d FC 56 97 5B.
 		private static readonly byte[] SenderClassTag = [0x0d, 0xFC, 0x56, 0x97, 0x5B];
@@ -45,7 +44,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 
 				var body = p.Bytes.AsSpan(bodyStart);
-				if (BinaryPrimitives.ReadUInt32BigEndian(body[..4]) != C350)
+				if (BinaryPrimitives.ReadUInt32BigEndian(body[..4]) != EntityClass.Character)
 					continue;
 
 				var target = BinaryPrimitives.ReadUInt32BigEndian(body.Slice(4, 4));

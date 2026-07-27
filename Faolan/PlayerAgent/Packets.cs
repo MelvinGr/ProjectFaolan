@@ -93,7 +93,7 @@ namespace Faolan.PlayerAgent
 			var realm = await ResolveActiveRealm(client);
 			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
 				(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xFA, 0xE5, 0x98, 0x9D, 0x02],
-				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.ChatServerPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(0x0000c350).WriteUInt32(client.Session.Character.Id)));
+				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.ChatServerPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id)));
 		}
 
 		private async Task SendCsPlayerAgent(INetworkClient client, ProtoEndpoint receiver)
@@ -101,7 +101,7 @@ namespace Faolan.PlayerAgent
 			var realm = await ResolveActiveRealm(client);
 			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
 				(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE0, 0xD4, 0xB4, 0xD7, 0x05],
-				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.CsPlayerAgentPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(0x0000c350).WriteUInt32(client.Session.Character.Id)));
+				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.CsPlayerAgentPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id)));
 		}
 
 		private async Task SendGameServer(INetworkClient client, ProtoEndpoint receiver)

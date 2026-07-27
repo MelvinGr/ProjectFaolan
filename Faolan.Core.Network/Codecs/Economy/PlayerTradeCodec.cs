@@ -1,4 +1,5 @@
 using Faolan.Core;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
@@ -29,14 +30,11 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// No `Opcode` constant: these are RPC methods, not 0x2000 IIR types.
 	public static class PlayerTradeCodec
 	{
-		// The entity-class word the ProtoID32 bodies carry.
-		private const uint CharacterClass = 0x0000C350;
-
 		// Every ProtoID32-bodied message in the flow: DispatchRequestTrade, DispatchStartTrade,
 		// DispatchPartnerAcceptedTrade. Which one it is comes from the OPCODE, so one builder serves all three.
 		public static byte[] BuildCharacterRef(uint characterId)
 		{
-			return new FaolanStream().WriteUInt32(CharacterClass).WriteUInt32(characterId).ToArray();
+			return new FaolanStream().WriteUInt32(EntityClass.Character).WriteUInt32(characterId).ToArray();
 		}
 
 		// s2c DispatchPartnerUpdatedCash (0x206E) - and the same body the client sends as SetTradeCash.

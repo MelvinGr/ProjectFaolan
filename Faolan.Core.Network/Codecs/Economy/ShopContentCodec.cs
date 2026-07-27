@@ -45,7 +45,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// type + a content length that lands exactly on the body end.
 		public static bool LooksLikeShopData(ReadOnlySpan<byte> body)
 		{
-			return body.Length > 20 && BinaryPrimitives.ReadUInt32BigEndian(body) == Shop.WireType && BinaryPrimitives.ReadUInt32BigEndian(body[8..]) == EntityClass.Character &&
+			return body.Length > 20 && BinaryPrimitives.ReadUInt32BigEndian(body) == EntityClass.Shop && BinaryPrimitives.ReadUInt32BigEndian(body[8..]) == EntityClass.Character &&
 			       BinaryPrimitives.ReadUInt32BigEndian(body[16..]) == body.Length - 20;
 		}
 
@@ -65,7 +65,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		{
 			public static ShopContent Read(FaolanStream s)
 			{
-				s.ReadUInt32(); // shop ID32 type (Shop.WireType)
+				s.ReadUInt32(); // shop ID32 type (EntityClass.Shop)
 				var shopInstance = s.ReadUInt32();
 				s.ReadUInt32(); // char ID32 type (CharacterWireType)
 				var npcHandle = s.ReadUInt32();
@@ -155,7 +155,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 				Serializer.Serialize(content, inv);
 				var proto = content.ToArray();
 
-				s.WriteUInt32(Shop.WireType);
+				s.WriteUInt32(EntityClass.Shop);
 				s.WriteUInt32(ShopInstance);
 				s.WriteUInt32(EntityClass.Character);
 				s.WriteUInt32(NpcHandle);

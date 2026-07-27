@@ -1,5 +1,6 @@
 using System.Numerics;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
@@ -21,7 +22,6 @@ namespace Faolan.Core.Network.Codecs.World
 		private const uint ProxyInstanceWord = 0x00009C50; // dest proxy u32[6] (constant in the captures)
 		private const uint ProxyReadyFlag = 0x00000001; // dest proxy u32[5] - instance valid/ready flag
 
-		private const uint ReceiverClass = 0x0000C350; // Character class tag
 
 		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.IntendedTeleportIIR, GameServer0X2000Opcodes.N3TeleportIIR];
@@ -31,7 +31,7 @@ namespace Faolan.Core.Network.Codecs.World
 		//   [u32 subop][u32 0xC350][u32 clientInstance][u8 env=01][PlayfieldProxy][u8 bool=0]
 		public static byte[] BuildBegin(uint clientInstance, uint destMapId)
 		{
-			var s = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.IntendedTeleportIIR).WriteUInt32(ReceiverClass).WriteUInt32(clientInstance).WriteByte(0x01); // env
+			var s = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.IntendedTeleportIIR).WriteUInt32(EntityClass.Character).WriteUInt32(clientInstance).WriteByte(0x01); // env
 			WritePlayfieldProxy(s, destMapId, 0, 0, 0);
 			return s.WriteByte(0x00).ToArray(); // IntendedTeleportIIR trailing bool (-> obj+0x40)
 		}
@@ -56,7 +56,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 			var s = new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.N3TeleportIIR)
-				.WriteUInt32(ReceiverClass)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(clientInstance)
 				.WriteByte(0x00) // env
 				.WriteArray(new byte[24]) // 6 leading words = 0
@@ -87,7 +87,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.N3TeleportIIR)
-				.WriteUInt32(ReceiverClass)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(clientInstance)
 				.WriteByte(0x00) // env
 				.WriteVector3(position)
@@ -130,7 +130,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			var s = new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.IntendedTeleportIIR)
-				.WriteUInt32(ReceiverClass)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(clientInstance)
 				.WriteByte(0x01) // env
 				.WriteByte(PlayfieldProxyVersion)

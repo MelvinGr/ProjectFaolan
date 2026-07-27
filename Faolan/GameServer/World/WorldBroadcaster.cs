@@ -311,10 +311,10 @@ namespace Faolan.GameServer.World
 			// Fully emptied -> the captured completion sequence: DispatchCloseLootBag -> looter resets -> fade ->
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchCloseLootBag,
-				b => b.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
+				b => b.WriteUInt32(EntityClass.LootBag).WriteUInt32(bag.Handle)));
 			await WorldIir.Send(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle));
 			await WorldIir.Send(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewAllowedLooterIIR, bag.Handle));
-			await WorldIir.Send(client, WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, bag.Handle, WorldLoot.DefaultFadeSeconds));
+			await WorldIir.Send(client, WorldLoot.BuildFadeBody(EntityClass.LootBag, bag.Handle, WorldLoot.DefaultFadeSeconds));
 			await WorldIir.Send(client, WorldLoot.BuildBagConsumedVisualBody(bag.Handle));
 
 			_sim.World.ZoneForEntity(bag).Remove(bag.Handle);
@@ -380,7 +380,7 @@ namespace Faolan.GameServer.World
 		// (consumed or expired). Loot bags carry the 0xC87A typetag.
 		public async Task BroadcastEntityFade(WorldEntity entity)
 		{
-			var body = WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, entity.Handle, WorldLoot.DefaultFadeSeconds);
+			var body = WorldLoot.BuildFadeBody(EntityClass.LootBag, entity.Handle, WorldLoot.DefaultFadeSeconds);
 			foreach (var viewer in _sim.World.ZoneForEntity(entity).PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client == null)
@@ -1068,7 +1068,7 @@ namespace Faolan.GameServer.World
 			// window). Decoded from the hoxxling gameplay capture (f1477): after this the client itself sends
 			// TryLootCash (0x2045) then TryLootAll (0x2043), which we already handle.
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchOpenLootBag,
-				b => b.WriteUInt32(WorldLoot.LootTypeTag).WriteUInt32(bag.Handle)));
+				b => b.WriteUInt32(EntityClass.LootBag).WriteUInt32(bag.Handle)));
 
 			_logger.LogInformation("Loot: {Name} opened the loot window on {Bag} 0x{Handle:X8}.", player.Name, bag.Name, bag.Handle);
 			return true;
@@ -1089,7 +1089,7 @@ namespace Faolan.GameServer.World
 			var obj = live.Row;
 
 			await WorldIir.Send(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x05));
-			await WorldIir.Send(client, WorldLoot.BuildOpenWindowBody(SimpleDynelMessageCodec.VisualChangeTypeTag, handle, "object_open"));
+			await WorldIir.Send(client, WorldLoot.BuildOpenWindowBody(EntityClass.SimpleDynel, handle, "object_open"));
 			_logger.LogInformation("Object: {Player} opened '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name ?? WorldObjectDisplay.Build(obj) ?? "object", handle);
 			return true;
 		}
@@ -1937,7 +1937,7 @@ namespace Faolan.GameServer.World
 			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
 			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the
 			// live playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
-			var body = WorldObjectBuilder.BuildBody(template, handle, position, Quaternion.Identity, LootContainerTemplate.TypeTag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken);
+			var body = WorldObjectBuilder.BuildBody(template, handle, position, Quaternion.Identity, EntityClass.LootBag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken);
 
 			body = WorldBroadcastBodies.WithLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l))]); // OUR items/cash, Pos 0..n-1
 

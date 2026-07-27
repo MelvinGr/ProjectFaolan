@@ -16,7 +16,14 @@ namespace Faolan.Core.Network.Constants
 		public const uint ClimbingDynel = 0x0000C87D; // 51325 - climbing dynels (1FD6412B)
 		public const uint Destructible = 0x0000C879; // 51321 - destructible objects (6BD56736)
 		public const uint LootBag = 0x0000C87A; // 51322 - loot bags / containers (F096251E)
+		public const uint Shop = 0x0000C75B; // 50011 - vendor shop containers (the ID32 type a shop's content is addressed by)
 		public const uint SimpleDynel = 0x0000C878; // 51320 - static decor / props (66AEDD50)
 		public const uint ZoneLabel = 0x0000C748; // 51016 - zone/city label objects (33A56FB0)
+
+		// NOT entity classes, despite sitting numerically nearby - listed so the next reader does not add them:
+		// 0xC79C/0xC79E/0xC7A0 are the resurrection-spot + playfield-proxy type words, which are per-PACKET rather
+		// than per-entity (the same spawn point appears under two of them in different frames - see
+		// ResurrectionSpotsBody), and 0x9C50 = 40016 is below the 50000 base entirely. All three stay local to their
+		// codec until they are decoded.
 	}
 }

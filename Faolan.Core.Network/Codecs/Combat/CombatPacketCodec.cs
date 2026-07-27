@@ -20,9 +20,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The NormalAttack behaviorId carried by an attack BehaviorControlCenterIIR.
 		private const uint NormalAttackBehaviorId = 0x0000000F;
 
-		// args.SpellTarget.field1 - the constant 0xC350 (50000) that precedes the target handle in the swing args.
-		private const uint SpellTargetTypeWord = 0x0000C350;
-
 		// NPC animation acks are server-initiated, so the echoed sequence is the constant 0x0004 (not a client seq).
 		private const ushort NpcAttackAckSeq = 0x0004;
 
@@ -77,7 +74,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				ExecutionStatus = 0,
 				Target = new ProtoID32
 				{
-					Type = SpellTargetTypeWord,
+					Type = EntityClass.Character,
 					Instance = playerHandle
 				},
 				RechargeTime = f11,
@@ -86,7 +83,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
-				.WriteUInt32(SpellTargetTypeWord)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(npcHandle)
 				.WriteUInt16(NpcAttackAckSeq)
 				.WriteUInt32(NormalAttackBehaviorId)
@@ -102,7 +99,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(0)
 				.WriteUInt32(0) // 6×u32 entry (zero in the single-hit case)
 				.WriteUInt32(1)
-				.WriteUInt32(SpellTargetTypeWord)
+				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(playerHandle)
 				.WriteUInt32(0)
 				.WriteByte(0x06)

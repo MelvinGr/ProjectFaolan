@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Xunit;
@@ -15,7 +16,7 @@ namespace Faolan.Tests
 		public void BuildFadeBody_MatchesCapture()
 		{
 			// hoxxling-login-gameplay: fade bag 0x000021FE over 3.0s (0x40400000 big-endian float).
-			var body = WorldLoot.BuildFadeBody(WorldLoot.LootTypeTag, 0x000021FE, 3.0f);
+			var body = WorldLoot.BuildFadeBody(EntityClass.LootBag, 0x000021FE, 3.0f);
 			Assert.Equal("66180b200000c87a000021fe0040400000", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
@@ -31,7 +32,7 @@ namespace Faolan.Tests
 		public void BuildOpenWindowBody_MatchesCapture()
 		{
 			// hoxxling-login-gameplay: SimpleDynelVisualChange "Open" on bag 0x000021FE opens the loot window.
-			var body = WorldLoot.BuildOpenWindowBody(WorldLoot.LootTypeTag, 0x000021FE);
+			var body = WorldLoot.BuildOpenWindowBody(EntityClass.LootBag, 0x000021FE);
 			Assert.Equal("e7f4f8f80000c87a000021fe000000000000044f70656e", Convert.ToHexString(body).ToLowerInvariant());
 		}
 

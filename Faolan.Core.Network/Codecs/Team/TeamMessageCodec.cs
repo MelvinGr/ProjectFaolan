@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
@@ -76,7 +77,7 @@ namespace Faolan.Core.Network.Codecs.Team
 		// leader's own record comes first in every capture.
 		public static byte[] BuildRoster(uint teamId, uint leaderId, IReadOnlyList<TeamMemberRecord> members)
 		{
-			var s = new FaolanStream().WriteUInt32(TeamClass).WriteUInt32(teamId).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(leaderId).WriteUInt32(ListFrame.ForCount(members.Count));
+			var s = new FaolanStream().WriteUInt32(TeamClass).WriteUInt32(teamId).WriteUInt32(EntityClass.Character).WriteUInt32(leaderId).WriteUInt32(ListFrame.ForCount(members.Count));
 			foreach (var member in members)
 				member.Write(s);
 

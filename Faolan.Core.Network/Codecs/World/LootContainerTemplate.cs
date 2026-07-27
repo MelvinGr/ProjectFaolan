@@ -21,7 +21,6 @@ namespace Faolan.Core.Network.Codecs.World
 	public static class LootContainerTemplate
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR; // LootBagFullUpdateIIR
-		public const uint TypeTag = 0x0000C87A; // the loot typetag (WorldLoot.LootTypeTag)
 		private const uint DefaultMaxSize = 10;
 
 		// The loot inventory's container KIND (ID32 type) on the wire; the instance is left 0 here and the live items +

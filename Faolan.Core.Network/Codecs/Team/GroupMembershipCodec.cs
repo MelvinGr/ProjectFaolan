@@ -1,5 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
@@ -28,14 +29,14 @@ namespace Faolan.Core.Network.Codecs.Team
 		// A member JOINED `teamId`, whose leader is `leaderId`.
 		public static byte[] BuildAdd(uint memberId, uint teamId, uint leaderId)
 		{
-			return new FaolanStream().WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.AddToGroupIIR).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(memberId)
-				.WriteByte(0).WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(leaderId)).ToArray();
+			return new FaolanStream().WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.AddToGroupIIR).WriteUInt32(EntityClass.Character).WriteUInt32(memberId)
+				.WriteByte(0).WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId).WriteUInt32(EntityClass.Character).WriteUInt32(leaderId)).ToArray();
 		}
 
 		// A member LEFT `teamId` (left, was kicked, or the team dissolved).
 		public static byte[] BuildRemove(uint memberId, uint teamId)
 		{
-			return new FaolanStream().WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.RemoveFromGroupIIR).WriteUInt32(TeamMemberRecord.CharacterClass).WriteUInt32(memberId)
+			return new FaolanStream().WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.RemoveFromGroupIIR).WriteUInt32(EntityClass.Character).WriteUInt32(memberId)
 				.WriteByte(0).WriteUInt32(TeamMessageCodec.TeamClass).WriteUInt32(teamId)).ToArray();
 		}
 	}

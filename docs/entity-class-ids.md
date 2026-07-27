@@ -22,6 +22,7 @@ The protocol has **two** unrelated id systems — don't confuse them:
 | id (`uint`) | dec | class | IIR record type |
 |---|---|---|---|
 | `0xC350` | 50000 | **Character** — players / NPCs / creatures (`n3Char`/creature) | (the per-character records) |
+| `0xC75B` | 50011 | Shop — a vendor's shop container | (the `ShopContent` ID32) |
 | `0xC748` | 51016 | ZoneLabel — zone/city labels | `0x33A56FB0` |
 | `0xC878` | 51320 | SimpleDynel — static decor / props | `0x66AEDD50` |
 | `0xC879` | 51321 | Destructible | `0x6BD56736` |
@@ -54,5 +55,20 @@ ids were `{type=0, instance=0}` (empty / no-owner) — a real looter would be `{
 ## In code
 `Faolan.Core.Network/Constants/EntityClass.cs` — the canonical `EntityClass.Character` (+ the world-object classes). It
 replaced ~a dozen ad-hoc local constants (`CharacterWireType`, `TypeTagAck`, `VitalsMarker`, `Ack`, `WireType`,
-`IirMarker`, `EntityTypeTag`, …) that all held `0x0000C350`. (Unrelated: `0x9C50` = 40016, which shows up inside
-the PlayfieldFIIR body, is a *different* value — not an entity class id; semantics TBD.)
+`IirMarker`, `EntityTypeTag`, …) that all held `0x0000C350`.
+
+That consolidation then **grew back nine more aliases**, because nothing enforced it: `SpellTargetTypeWord`,
+`CharacterClass` (twice), `ReceiverClass`, `Marker`, `TypeTag`, `LootTypeTag`, `VisualChangeTypeTag`, a bare
+`C350` in the importer, plus raw `0x0000c350` literals in the PlayerAgent handoff. `CodecConventionTests.`
+`EntityClassWordComesFromEntityClass_NotAHandRolledLiteral` now scans `Faolan.Core.Network/`, `Faolan/` and
+`Faolan.Importer/` and fails on any of these ids written as a literal, the same way the `ListFrame` rule guards
+the count-framing word.
+
+**Not entity class ids**, though they sit numerically nearby and have been mistaken for them:
+
+- `0xC79C` / `0xC79E` / `0xC7A0` — the resurrection-spot and playfield-proxy type words. These are per-**packet**
+  rather than per-entity: spawn point 790836 appears under both `0xC79C` and `0xC7A0` in different frames, so the
+  word cannot be a property of the thing it addresses (`ResurrectionSpotsBody`). Undecoded; kept local to their
+  codecs.
+- `0x9C50` = 40016 — shows up inside the PlayfieldFIIR body and the teleport destination proxy. Below the 50000
+  base entirely; semantics TBD.

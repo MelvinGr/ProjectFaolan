@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
@@ -24,7 +25,6 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		public const uint CloseChatWindow = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR; // 0xC4AF39EB
 		public const uint OpenChatWindow = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR; // 0x045B0B0F
 		public const uint SetDialogueCamera = (uint)GameCharInterfaceOpcodes.DispatchSetDialogueCamera; // GameCharAgent -> GameCharInterface (a 16-bit opcode, not an IIR sub)
-		private const uint Marker = 0x0000C350;
 
 		// The four Knubot screen IIR types this decoder recognizes (SetDialogueCamera is an RPC opcode, not an IIR).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes =
@@ -46,7 +46,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			var sub = U32(4);
 			if (sub is not (OpenChatWindow or AppendText or AnswerList or CloseChatWindow))
 				return DecodeCamera(data, headerLen, start);
-			if (start + 27 > data.Length || U32(8) != Marker)
+			if (start + 27 > data.Length || U32(8) != EntityClass.Character)
 				return null;
 
 			var env = data[start + 16];
@@ -123,7 +123,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				return null;
 
 			// Body must be [0xC350][npc][0xC350][player][>=0 params].
-			if (start + 16 > data.Length || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(start, 4)) != Marker || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(start + 8, 4)) != Marker)
+			if (start + 16 > data.Length || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(start, 4)) != EntityClass.Character || BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(start + 8, 4)) != EntityClass.Character)
 				return null;
 
 			var agentInstance = RpcCallerInstance(data);

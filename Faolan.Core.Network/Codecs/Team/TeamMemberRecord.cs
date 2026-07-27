@@ -1,5 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
@@ -23,9 +24,6 @@ namespace Faolan.Core.Network.Codecs.Team
 	// including whatever carries the LEVEL, which is not identifiable while both captured members share it.
 	public sealed class TeamMemberRecord : ICodec<TeamMemberRecord>
 	{
-		// The entity-class word every per-character record carries (EntityClass.Character).
-		public const uint CharacterClass = 0x0000C350;
-
 		public uint CharacterId { get; set; }
 		public string Name { get; set; } = "";
 
@@ -89,7 +87,7 @@ namespace Faolan.Core.Network.Codecs.Team
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteUInt32(CharacterClass).WriteUInt32(CharacterId).WriteString(Name).WriteUInt32((uint)Class).WriteUInt32(Field1).WriteUInt32(MapId).WriteUInt32(PerCharacterWord).WriteUInt32(Field4)
+			s.WriteUInt32(EntityClass.Character).WriteUInt32(CharacterId).WriteString(Name).WriteUInt32((uint)Class).WriteUInt32(Field1).WriteUInt32(MapId).WriteUInt32(PerCharacterWord).WriteUInt32(Field4)
 				.WriteUInt32(Field5).WriteUInt32(Field6).WriteUInt32(Field7).WriteUInt32(Field8);
 
 			// Field9 repeats the map id - the only trailing field that is not constant across the captures, and it

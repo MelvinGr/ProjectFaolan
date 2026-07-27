@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
 
@@ -28,8 +29,6 @@ namespace Faolan.Core.Network.Codecs.World
 		// as an invisible barrier). Decoded byte-exact from Hoxxling gameplay idx 2053 (21 B):
 		//   [subop 0xE7F4F8F8][typeTag 0xC878][u32 handle][u32 0][u8 state][u32 0]
 		public const uint VisualChangeOpcode = (uint)GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR; // 0xE7F4F8F8
-
-		public const uint VisualChangeTypeTag = 0x0000C878;
 
 		// The record header before the transform: [u32 type][u32 handle][u32 0].
 		private const int HeaderLength = 12;
@@ -77,7 +76,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 		public static byte[] BuildVisualChange(uint handle, byte state)
 		{
-			return new FaolanStream().WriteUInt32(VisualChangeOpcode).WriteUInt32(VisualChangeTypeTag).WriteUInt32(handle).WriteUInt32(0).WriteByte(state).WriteUInt32(0).ToArray();
+			return new FaolanStream().WriteUInt32(VisualChangeOpcode).WriteUInt32(EntityClass.SimpleDynel).WriteUInt32(handle).WriteUInt32(0).WriteByte(state).WriteUInt32(0).ToArray();
 		}
 
 		// Builds the typed identity message from a WorldObject row's columns (the DB-source path). Kdtree is always 0

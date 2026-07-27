@@ -47,7 +47,52 @@ namespace Faolan.Tests
 		// String literals are prose (exception messages naming the word) - stripped like comments before scanning.
 		private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\]|\\\\.)*\"");
 
+		// The entity object-class ids, in the 4- and 8-digit spellings both have been written in.
+		private static readonly Regex EntityClassLiteral = new(@"\b0x0*(C350|C748|C75B|C878|C879|C87A|C87D)\b", RegexOptions.IgnoreCase);
+
 		private static IEnumerable<Type> CodecTypes => typeof(ICodec<>).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith(CodecsNamespace, StringComparison.Ordinal));
+
+		// (5) The entity object-CLASS word comes from EntityClass, never a hand-rolled 0xC350. Same disease as the
+		// ListFrame rule below, and further along: docs/entity-class-ids.md already records that EntityClass "replaced
+		// ~a dozen ad-hoc local constants" - and then nine of them grew back, because nothing was watching. They were
+		// `SpellTargetTypeWord`, `CharacterClass` (twice), `ReceiverClass`, `Marker`, `TypeTag`, `LootTypeTag`,
+		// `VisualChangeTypeTag` and a bare `C350`, all holding a value the client itself checks by name
+		// (MoveTaskIIR_c::PollStatus: `id.type != 50000` -> "id is not of a character!").
+		//
+		// The cost is not tidiness. TeamMemberRecord carried 0xC79C as `Field8` and ShopContentCodec's shop tag lived
+		// on a DATABASE entity as `Shop.WireType`: with no single registry, nobody could see that these words are one
+		// id namespace, so each new codec re-derived "some constant word here" from its own capture. One name, one
+		// place, one test.
+		[Fact]
+		public void EntityClassWordComesFromEntityClass_NotAHandRolledLiteral()
+		{
+			string[] roots = [TestPaths.Repo("Faolan.Core.Network"), TestPaths.Repo("Faolan"), TestPaths.Repo("Faolan.Importer")];
+			var offenders = new List<string>();
+
+			foreach (var file in roots
+				         .Where(Directory.Exists)
+				         .SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
+				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")))
+			{
+				// EntityClass.cs IS the registry, and NpcSpawnScaffold's blobs are verbatim capture-derived bytes.
+				var name = Path.GetFileName(file);
+				if (name is "EntityClass.cs" or "NpcSpawnScaffold.cs")
+					continue;
+
+				var lines = File.ReadAllLines(file);
+				for (var i = 0; i < lines.Length; i++)
+				{
+					var code = StringLiteral.Replace(LineComment.Replace(BlockComment.Replace(lines[i], ""), ""), "");
+					if (code.Contains("EntityClass", StringComparison.Ordinal))
+						continue; // it comes from EntityClass on this line - that IS the convention
+
+					if (EntityClassLiteral.IsMatch(code))
+						offenders.Add($"{name}:{i + 1}  {code.Trim()}");
+				}
+			}
+
+			Assert.True(offenders.Count == 0, "entity object-class ids must come from EntityClass (Character = 0xC350, LootBag = 0xC87A, ...):\n  " + string.Join("\n  ", offenders));
+		}
 
 		// (4) The count-framed LIST word comes from ListFrame, never a hand-rolled 0x3F1. This word had ELEVEN local
 		// names and a pile of raw literals, and that scattering is exactly why it kept getting re-mistaken for a magic

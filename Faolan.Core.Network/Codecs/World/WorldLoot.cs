@@ -4,14 +4,13 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// Loot-bag interaction packets, decoded from captures (see protocol_loot_interaction). Loot bags use their own
-	// typetag 0xC87A (not the 0xC350 the entity family uses). These build the 0x2000 IIR record bodies (the bytes after
-	// the u32 length prefix).
+	// Loot-bag interaction packets, decoded from captures (see protocol_loot_interaction). A loot bag is its own
+	// entity class - EntityClass.LootBag (0xC87A), not the EntityClass.Character (0xC350) that players and NPCs
+	// carry - so every body here is addressed by that class word plus the bag's live handle. These build the 0x2000
+	// IIR record bodies (the bytes after the u32 length prefix).
 	public static class WorldLoot
 	{
 		public const float DefaultFadeSeconds = 3.0f;
-
-		public const uint LootTypeTag = 0x0000C87A; // the loot-bag class typetag
 
 		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes =
@@ -26,7 +25,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.UpdateSimpleDynelIIR)
-				.WriteUInt32(LootTypeTag)
+				.WriteUInt32(EntityClass.LootBag)
 				.WriteUInt32(bagHandle)
 				.WriteUInt32(0)
 				.WriteUInt32(0)
@@ -45,25 +44,42 @@ namespace Faolan.Core.Network.Codecs.World
 			return new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.N3ToClientFadeIIR).WriteUInt32(typeTag).WriteUInt32(handle).WriteByte(0x00).WriteFloat(fadeSeconds).ToArray();
 		}
 
-		// LootRemoveItemsIIR (0x70010162): the per-take ACK that tells the client which display slot to remove from the
-		// open bag window. The trailing u32 is the looted item's display Pos (the srcPos the client sent in TryLootItem
-		// 0x2046); the client removes that slot and compacts the window. 25 B:
-		// [subop][lootTypetag][bagHandle][00000000][000007e2 landmark][u32 removedPos].
-		// Decoded from loot-drag-1538 (a drag-only capture): drag srcPos=1 -> trailing=1, drag srcPos=0 -> trailing=0,
-		// single-item bags (srcPos 0) -> 0, loot-all -> 0. The OLD constant trailing=0 removed slot 0 on every take
+		// LootRemoveItemsIIR (0x70010162): the per-take ACK that tells the client which display slot(s) to remove from
+		// the open bag window; the client removes them and compacts the window. 25 B for the single-slot case:
+		//   [subop][lootTypetag][bagHandle][u32 0][u8 0][ListFrame count][u32 removedPos ...]
+		// The removed positions are a COUNT-FRAMED LIST, not a landmark plus a value. This used to be written as
+		// `[u32 0x00000007][u8 0xE2]`, straddling the word boundary, and described as "the 0x000007E2 landmark is a
+		// fixed constant here" - the exact mistake the project rule names: 0x7E2 is ListFrame.ForCount(1), every
+		// capture we have takes ONE slot at a time, and a single-element list is indistinguishable from a constant.
+		// Reading it aligned puts the u8 marker where its siblings carry one (BuildNewCurrentLooterBody /
+		// BuildLooterResetBody both have a u8 after the handle) and leaves the list word 4-byte aligned. The bytes are
+		// unchanged - WorldLootTakeTests pins both captured frames.
+		//
+		// Decoded from loot-drag-1538 (a drag-only capture): drag srcPos=1 -> element=1, drag srcPos=0 -> element=0,
+		// single-item bags (srcPos 0) -> 0, loot-all -> 0. The OLD constant element=0 removed slot 0 on every take
 		// (#226-2: "first slot disappears"); a remaining-COUNT value (e.g. 2) named no real slot, so the dragged item
-		// was left in the bag. The 0x000007E2 landmark is a fixed constant here.
-		public static byte[] BuildLootRemoveItemsBody(uint bagHandle, uint removedPos = 0)
+		// was left in the bag.
+		//
+		// Whether a multi-slot take sends count>1 rather than N single-slot acks is UNVERIFIED - no capture takes two
+		// slots in one message. Gitea #452. [V0]
+		public static byte[] BuildLootRemoveItemsBody(uint bagHandle, params uint[] removedPositions)
 		{
-			return new FaolanStream()
+			var positions = removedPositions.Length == 0
+				? [0u]
+				: removedPositions;
+
+			var s = new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.LootRemoveItemsIIR)
-				.WriteUInt32(LootTypeTag)
+				.WriteUInt32(EntityClass.LootBag)
 				.WriteUInt32(bagHandle)
 				.WriteUInt32(0)
-				.WriteUInt32(7)
-				.WriteByte(0xE2)
-				.WriteUInt32(removedPos)
-				.ToArray();
+				.WriteByte(0x00)
+				.WriteUInt32(ListFrame.ForCount(positions.Length));
+
+			foreach (var pos in positions)
+				s.WriteUInt32(pos);
+
+			return s.ToArray();
 		}
 
 		// NewCurrentLooter / NewAllowedLooter RESET (looter -> none) once the bag is emptied. 21 B:
@@ -71,7 +87,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// ASSIGNS a looter with [0x00][entityTypetag][playerHandle]); the reset clears it with two zero words.
 		public static byte[] BuildLooterResetBody(uint subOpcode, uint bagHandle)
 		{
-			return new FaolanStream().WriteUInt32(subOpcode).WriteUInt32(LootTypeTag).WriteUInt32(bagHandle).WriteUInt32(0).WriteUInt32(0).WriteByte(0x00).ToArray();
+			return new FaolanStream().WriteUInt32(subOpcode).WriteUInt32(EntityClass.LootBag).WriteUInt32(bagHandle).WriteUInt32(0).WriteUInt32(0).WriteByte(0x00).ToArray();
 		}
 
 		// "bag -> ALLOWED looter = this player" (NewAllowedLooterIIR), same shape as the current-looter body but the
@@ -83,7 +99,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.NewAllowedLooterIIR)
-				.WriteUInt32(LootTypeTag)
+				.WriteUInt32(EntityClass.LootBag)
 				.WriteUInt32(bagHandle)
 				.WriteByte(0x00)
 				.WriteUInt32(EntityClass.Character)
@@ -97,7 +113,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.NewCurrentLooterIIR)
-				.WriteUInt32(LootTypeTag)
+				.WriteUInt32(EntityClass.LootBag)
 				.WriteUInt32(bagHandle)
 				.WriteByte(0x00)
 				.WriteUInt32(EntityClass.Character)
