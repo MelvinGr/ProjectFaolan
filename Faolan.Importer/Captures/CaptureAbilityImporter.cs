@@ -8,7 +8,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -44,10 +43,10 @@ namespace Faolan.Importer.Captures
 		// fan-out / feat-tree taxonomy + validation: archetype-shared (Soldier_/Rogue_ -> 3 classes each), the Tortage
 		// starters (Slave_/Oar_), feat-tree trees (Reaver/Liberator/Halberdier/Lich/Warmonk/Masterthief/SneakAttack),
 		// NPC combos (combo_npc_*), racials (Cimmerian/Stygian/Khitan/Aquilonian), weapon-forms and one-off abilities.
-		private static readonly (string Prefix, Class Class)[] ClassComboPrefixes =
+		private static readonly (string Prefix, ConanClass Class)[] ClassComboPrefixes =
 		[
-			("Guardian_", Class.Guardian), ("Conqueror_", Class.Conqueror), ("DarkTemplar_", Class.DarkTemplar), ("Barbarian_", Class.Barbarian), ("Ranger_", Class.Ranger),
-			("Assassin_", Class.Assassin), ("BearShaman_", Class.BearShaman), ("Herald_", Class.HeraldOfXotli) // capture-validated: Hakotep HoX lvl-24 0x2076 combo book
+			("Guardian_", ConanClass.Guardian), ("Conqueror_", ConanClass.Conqueror), ("DarkTemplar_", ConanClass.DarkTemplar), ("Barbarian_", ConanClass.Barbarian), ("Ranger_", ConanClass.Ranger),
+			("Assassin_", ConanClass.Assassin), ("BearShaman_", ConanClass.BearShaman), ("Herald_", ConanClass.HeraldOfXotli) // capture-validated: Hakotep HoX lvl-24 0x2076 combo book
 		];
 
 		// The few human-readable names the old archive knows (the rest are client-side / unknown). Still the only
@@ -151,7 +150,7 @@ namespace Faolan.Importer.Captures
 			var dumps = 0;
 			foreach (var capture in createCaptures)
 			{
-				if (DetectClass(capture) is not { } cls || !Enum.IsDefined((Class)cls))
+				if (DetectClass(capture) is not { } cls || !Enum.IsDefined((ConanClass)cls))
 					continue; // can't confirm this is a class create
 
 				var grants = new Dictionary<uint, (uint, uint, uint, uint, uint, uint)>();
@@ -172,28 +171,28 @@ namespace Faolan.Importer.Captures
 			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
 			var inserted = 0;
 
-			foreach (var cls in Enum.GetValues<Class>())
-			foreach (var abilityId in kit)
-			{
-				if (!abilityIds.Contains(abilityId))
-					continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the kit is 8 distinct ids and all 8 are cataloged.
-
-				if (existing.ContainsKey((cls, abilityId)))
-					continue; // already known; DeriveClassAbilitiesAsync owns the level for those
-
-				db.ClassAbilities.Add(new ClassAbility
+			foreach (var cls in Enum.GetValues<ConanClass>())
+				foreach (var abilityId in kit)
 				{
-					Class = cls,
-					AbilityId = abilityId,
-					Level = 1 // the universal kit is level 1 by definition
-				});
-				existing[(cls, abilityId)] = null!;
-				inserted++;
-			}
+					if (!abilityIds.Contains(abilityId))
+						continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the kit is 8 distinct ids and all 8 are cataloged.
+
+					if (existing.ContainsKey((cls, abilityId)))
+						continue; // already known; DeriveClassAbilitiesAsync owns the level for those
+
+					db.ClassAbilities.Add(new ClassAbility
+					{
+						Class = cls,
+						AbilityId = abilityId,
+						Level = 1 // the universal kit is level 1 by definition
+					});
+					existing[(cls, abilityId)] = null!;
+					inserted++;
+				}
 
 			await db.SaveChangesAsync();
 			logger?.LogInformation("CaptureAbilityImporter: universal kit of {Kit} abilities (from {Dumps} create dumps) -> {Inserted} new class-ability rows across {Classes} classes.", kit.Count,
-				dumps, inserted, Enum.GetValues<Class>().Length);
+				dumps, inserted, Enum.GetValues<ConanClass>().Length);
 			return (inserted, kit.Count);
 		}
 
@@ -271,7 +270,7 @@ namespace Faolan.Importer.Captures
 			var dumps = 0;
 			foreach (var capture in createCaptures)
 			{
-				if (DetectClass(capture) is not { } cls || !Enum.IsDefined((Class)cls))
+				if (DetectClass(capture) is not { } cls || !Enum.IsDefined((ConanClass)cls))
 					continue; // can't confirm this is a class create
 
 				var byCharacter = new Dictionary<uint, HashSet<uint>>();
@@ -298,36 +297,36 @@ namespace Faolan.Importer.Captures
 
 			var levels = await db.Combos.Where(c => kit.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Level);
 			var existing = (await db.ClassCombos.Select(x => new
-				{
-					x.Class,
-					x.ComboId
-				})
+			{
+				x.Class,
+				x.ComboId
+			})
 				.ToListAsync()).Select(x => (x.Class, x.ComboId)).ToHashSet();
 			var inserted = 0;
 
-			foreach (var cls in Enum.GetValues<Class>())
-			foreach (var comboId in kit)
-			{
-				if (!levels.TryGetValue(comboId, out var level))
-					continue; // a grant for a combo we never cataloged would be a catalog gap, not a fake id
-
-				if (!existing.Add((cls, comboId)))
-					continue; // already known; DeriveClassCombosAsync owns the level for those
-
-				db.ClassCombos.Add(new ClassCombo
+			foreach (var cls in Enum.GetValues<ConanClass>())
+				foreach (var comboId in kit)
 				{
-					Class = cls,
-					ComboId = comboId,
-					Level = level
-				});
-				inserted++;
-			}
+					if (!levels.TryGetValue(comboId, out var level))
+						continue; // a grant for a combo we never cataloged would be a catalog gap, not a fake id
+
+					if (!existing.Add((cls, comboId)))
+						continue; // already known; DeriveClassCombosAsync owns the level for those
+
+					db.ClassCombos.Add(new ClassCombo
+					{
+						Class = cls,
+						ComboId = comboId,
+						Level = level
+					});
+					inserted++;
+				}
 
 			if (inserted > 0)
 				await db.SaveChangesAsync();
 
 			logger?.LogInformation("CaptureAbilityImporter: universal kit of {Kit} combos (intersection of {Dumps} create dumps) -> {Inserted} new ClassCombo rows across {Classes} classes.",
-				kit.Count, dumps, inserted, Enum.GetValues<Class>().Length);
+				kit.Count, dumps, inserted, Enum.GetValues<ConanClass>().Length);
 			return (inserted, kit.Count);
 		}
 

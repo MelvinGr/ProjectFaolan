@@ -20,7 +20,7 @@ namespace Faolan.Core.Database.Tables
 	public class ClassAttributeBase
 	{
 		[ConstrainToEnumValues]
-		public Class Class { get; set; }
+		public ConanClass Class { get; set; }
 
 		// 1..80.
 		public uint Level { get; set; }

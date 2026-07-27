@@ -10,7 +10,6 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
@@ -165,7 +164,7 @@ namespace Faolan.Importer.Captures
 
 				// Skip captures taken BEFORE class selection: their class byte is unset (0/1), not one of the 12
 				// real classes. Materializing them creates broken chars (and would violate the Class CHECK constraint).
-				if (!Enum.IsDefined((Class)classId))
+				if (!Enum.IsDefined((ConanClass)classId))
 				{
 					Console.WriteLine($"Characters: skipped '{name}' - invalid/unset class {classId} (captured pre-class-selection).");
 					skipped++;
@@ -212,7 +211,7 @@ namespace Faolan.Importer.Captures
 				CreationDate = DateTimeOffset.UtcNow,
 				Level = (ushort)Math.Max(1, stats.Level),
 				Race = (Race)stats.Race,
-				Class = (Class)classId,
+				Class = (ConanClass)classId,
 				// The Sex enum IS the wire sex-code (MALE=2 / FEMALE=3), so the captured value maps directly.
 				Sex = (Sex)stats.Sex,
 				// The map active when the spawn was sent (MapChange tracking; the transform's "playfield"

@@ -25,7 +25,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual Combo Combo { get; set; } = null!;
 
 		[ConstrainToEnumValues]
-		public Class Class { get; set; }
+		public ConanClass Class { get; set; }
 
 		// The character level this combo unlocks at FOR THIS CLASS.
 		public byte Level { get; set; }

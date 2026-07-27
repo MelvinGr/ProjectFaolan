@@ -24,7 +24,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual Spell Spell { get; set; } = null!;
 
 		[ConstrainToEnumValues]
-		public Class Class { get; set; }
+		public ConanClass Class { get; set; }
 
 		// True = a create capture SHOWS this class being granted this spell at creation (0x200A), so it is part of the
 		// starter kit regardless of the spell's level requirement. These are two INDEPENDENT facts and conflating them

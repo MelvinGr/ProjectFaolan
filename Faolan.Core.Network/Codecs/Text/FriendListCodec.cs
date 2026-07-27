@@ -1,4 +1,3 @@
-using Faolan.Core;
 using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.Text
@@ -48,7 +47,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		// shows. The level byte was read as a constant 0x05 until six friends of differing levels made it obvious, and
 		// that also settled the trailing byte: all six values are valid Class ids (HeraldOfXotli, BearShaman,
 		// Demonologist, TempestOfSet, Demonologist, Barbarian) while the level byte reads 7/10/5/8/10/5.
-		public static byte[] BuildState(uint characterId, bool online, byte level, Class classId, uint stamp)
+		public static byte[] BuildState(uint characterId, bool online, byte level, ConanClass classId, uint stamp)
 		{
 			return new FaolanStream().WriteUInt32(characterId).WriteByte(online).WriteByte(level).WriteUInt32(stamp).WriteByte(classId).ToArray();
 		}

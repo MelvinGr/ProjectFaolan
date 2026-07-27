@@ -345,7 +345,7 @@ namespace Faolan.Tests
 						Name = "Tester",
 						AccountId = accountId,
 						RealmId = 1,
-						Class = Class.Barbarian,
+						Class = ConanClass.Barbarian,
 						Race = Race.Cimmerian
 					});
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -410,7 +410,7 @@ namespace Faolan.Tests
 						IpAddress = "127.0.0.1",
 						Port = 1
 					}); // #324: RealmId FK
-					// ItemId is FK-restricted to Items.Id (#212), so seed the referenced catalog items first.
+						// ItemId is FK-restricted to Items.Id (#212), so seed the referenced catalog items first.
 					ctx.Items.Add(new Item
 					{
 						Id = 0x7530,
@@ -502,7 +502,7 @@ namespace Faolan.Tests
 						Name = "T",
 						AccountId = 1,
 						RealmId = 1,
-						Class = Class.Barbarian,
+						Class = ConanClass.Barbarian,
 						Race = Race.Cimmerian
 					});
 					ctx.Items.Add(new Item
@@ -583,7 +583,7 @@ namespace Faolan.Tests
 
 				// Simulate the editor: choose a mage class + level, regenerate, and commit (as CommitCharacterName does).
 				var character = await repo.GetCharacterForAccount(accountId, created.Id);
-				character!.Class = Class.Necromancer;
+				character!.Class = ConanClass.Necromancer;
 				character.Level = 20;
 				character.Name = "Mage";
 				character.RegenerateMaxStats();
@@ -591,7 +591,7 @@ namespace Faolan.Tests
 
 				// Reload: stats reflect the chosen class, and exactly one MaxStats row exists (updated in place).
 				var reloaded = await repo.GetCharacterForAccount(accountId, created.Id);
-				var expected = CharacterMaxStats.CreateDefaults(Class.Necromancer, 20);
+				var expected = CharacterMaxStats.CreateDefaults(ConanClass.Necromancer, 20);
 				Assert.Equal(expected.Mana, reloaded!.MaxStats!.Mana);
 				Assert.Equal(expected.Health, reloaded.MaxStats.Health);
 
@@ -642,7 +642,7 @@ namespace Faolan.Tests
 						Id = characterId,
 						AccountId = accountId,
 						RealmId = 1,
-						Class = Class.Barbarian,
+						Class = ConanClass.Barbarian,
 						Race = Race.Cimmerian
 					});
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -774,8 +774,8 @@ namespace Faolan.Tests
 						IpAddress = "127.0.0.1",
 						Port = 1
 					}); // #324: RealmId FK
-					// The listing's ItemId (search key) AND Template (instance, where the key lives) are both FK-restricted
-					// to Items.Id, so seed both referenced catalog items.
+						// The listing's ItemId (search key) AND Template (instance, where the key lives) are both FK-restricted
+						// to Items.Id, so seed both referenced catalog items.
 					ctx.Items.Add(new Item
 					{
 						Id = 0x7530,

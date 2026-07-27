@@ -97,7 +97,7 @@ namespace Faolan.Importer.Tsv
 
 					db.ClassSpells.Add(new ClassSpell
 					{
-						Class = (Class)cls,
+						Class = (ConanClass)cls,
 						SpellId = id
 					});
 					inserted++;

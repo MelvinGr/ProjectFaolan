@@ -56,7 +56,7 @@ namespace Faolan.Tests
 		{
 			return new Character
 			{
-				Class = Class.Guardian,
+				Class = ConanClass.Guardian,
 				Level = 1,
 				MaxStats = new CharacterMaxStats
 				{

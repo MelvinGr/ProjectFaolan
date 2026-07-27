@@ -183,7 +183,7 @@ namespace Faolan.GameServer.CreateFlow
 
 				case "ChangeClass":
 				{
-					character?.Class = (Class)value;
+					character?.Class = (ConanClass)value;
 					break;
 				}
 

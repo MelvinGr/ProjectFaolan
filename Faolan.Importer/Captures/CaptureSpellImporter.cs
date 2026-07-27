@@ -204,7 +204,7 @@ namespace Faolan.Importer.Captures
 
 				db.ClassSpells.Add(new ClassSpell
 				{
-					Class = (Class)cls,
+					Class = (ConanClass)cls,
 					SpellId = id
 				});
 				inserted++;
@@ -328,14 +328,14 @@ namespace Faolan.Importer.Captures
 
 			foreach (var ((cls, spellId), level) in proven)
 			{
-				if (!Enum.IsDefined((Class)cls) || !known.Contains(spellId))
+				if (!Enum.IsDefined((ConanClass)cls) || !known.Contains(spellId))
 					continue; // an uncataloged grant id is a catalog gap (learned_spells_not_subset_of_catalog), not a fake spell - skip rather than FK-fault
 
 				if (!existing.TryGetValue((cls, spellId), out var row))
 				{
 					row = new ClassSpell
 					{
-						Class = (Class)cls,
+						Class = (ConanClass)cls,
 						SpellId = spellId
 					};
 					db.ClassSpells.Add(row);
@@ -470,7 +470,7 @@ namespace Faolan.Importer.Captures
 				if (!levelByInstance.TryGetValue(instance, out var ding) || i - ding.At > GrantWindow)
 					continue; // no ding yet (a create kit or the login re-grant burst), or too far from one to blame on it
 
-				if (!classByHandle.TryGetValue(instance, out var cls) || !Enum.IsDefined((Class)cls))
+				if (!classByHandle.TryGetValue(instance, out var cls) || !Enum.IsDefined((ConanClass)cls))
 					continue; // never saw this character's own spawn, so its class is unknown
 
 				foreach (var spellId in ids)

@@ -1,4 +1,3 @@
-using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
@@ -30,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.Team
 
 		// Class.Necromancer / Class.Demonologist in the capture. The client needs a REAL class here - it builds the
 		// invite window's class icon from it - so a wrong value silently costs you the window.
-		public Class Class { get; set; }
+		public ConanClass Class { get; set; }
 
 		// The playfield the member is in - the client shows it in the team window and greys out members elsewhere.
 		public uint MapId { get; set; }
@@ -85,7 +84,7 @@ namespace Faolan.Core.Network.Codecs.Team
 			{
 				CharacterId = s.ReadUInt32(),
 				Name = s.ReadString(),
-				Class = (Class)s.ReadUInt32()
+				Class = (ConanClass)s.ReadUInt32()
 			};
 			s.ReadUInt32(); // Field1
 			m.MapId = s.ReadUInt32();

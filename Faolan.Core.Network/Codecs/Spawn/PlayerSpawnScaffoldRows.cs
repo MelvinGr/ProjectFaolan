@@ -31,20 +31,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		private const int PreFrameHead = FeatMarkerOffset + 4; // 126
 		private const int PreFrameTail = 113;
 
-		private static readonly Dictionary<Class, uint[]> FreshSkillIdsByClass = new Dictionary<Class, uint[]>
+		private static readonly Dictionary<ConanClass, uint[]> FreshSkillIdsByClass = new Dictionary<ConanClass, uint[]>
 		{
-			[Class.Barbarian] = [1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300],
-			[Class.Conqueror] = [2200, 6000, 6100, 6200, 6300, 6700, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 54900, 318400, 318800, 328700, 328900, 331300],
-			[Class.Guardian] = [2000, 6000, 6200, 6500, 6700, 6800, 6900, 7100, 7500, 8100, 8305, 8400, 13600, 14600, 24700, 328700, 328900, 331300],
-			[Class.DarkTemplar] = [3100, 6000, 6200, 6700, 6800, 6900, 7100, 7500, 7800, 8100, 8305, 8400, 13600, 14600, 74600, 328700, 328900, 331300],
-			[Class.BearShaman] = [2900, 6300, 6600, 6700, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 244300, 328700, 328900, 331300],
-			[Class.PriestOfMitra] = [2400, 6000, 6200, 6400, 6700, 6800, 6900, 7100, 7500, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 198000, 328900, 331300],
-			[Class.TempestOfSet] = [2800, 6000, 6200, 6400, 6500, 6600, 6700, 6800, 6900, 7100, 7500, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 234600, 328900, 331300],
-			[Class.Assassin] = [3400, 6400, 6700, 6900, 8100, 8305, 8400, 13600, 14600, 160000, 318000, 328700, 328900, 331300],
-			[Class.Ranger] = [3900, 6000, 6200, 6400, 6600, 6700, 6900, 7100, 7500, 8100, 8305, 8400, 13600, 14600, 175000, 318000, 328700, 328900, 331300],
-			[Class.Necromancer] = [4100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 85200, 328900, 331300],
-			[Class.Demonologist] = [4400, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 104500, 328900, 331300],
-			[Class.HeraldOfXotli] = [4300, 6100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 13600, 14600, 114800, 328700, 328900, 331300]
+			[ConanClass.Barbarian] = [1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300],
+			[ConanClass.Conqueror] = [2200, 6000, 6100, 6200, 6300, 6700, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 54900, 318400, 318800, 328700, 328900, 331300],
+			[ConanClass.Guardian] = [2000, 6000, 6200, 6500, 6700, 6800, 6900, 7100, 7500, 8100, 8305, 8400, 13600, 14600, 24700, 328700, 328900, 331300],
+			[ConanClass.DarkTemplar] = [3100, 6000, 6200, 6700, 6800, 6900, 7100, 7500, 7800, 8100, 8305, 8400, 13600, 14600, 74600, 328700, 328900, 331300],
+			[ConanClass.BearShaman] = [2900, 6300, 6600, 6700, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 244300, 328700, 328900, 331300],
+			[ConanClass.PriestOfMitra] = [2400, 6000, 6200, 6400, 6700, 6800, 6900, 7100, 7500, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 198000, 328900, 331300],
+			[ConanClass.TempestOfSet] = [2800, 6000, 6200, 6400, 6500, 6600, 6700, 6800, 6900, 7100, 7500, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 234600, 328900, 331300],
+			[ConanClass.Assassin] = [3400, 6400, 6700, 6900, 8100, 8305, 8400, 13600, 14600, 160000, 318000, 328700, 328900, 331300],
+			[ConanClass.Ranger] = [3900, 6000, 6200, 6400, 6600, 6700, 6900, 7100, 7500, 8100, 8305, 8400, 13600, 14600, 175000, 318000, 328700, 328900, 331300],
+			[ConanClass.Necromancer] = [4100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 85200, 328900, 331300],
+			[ConanClass.Demonologist] = [4400, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 8900, 13600, 14600, 104500, 328900, 331300],
+			[ConanClass.HeraldOfXotli] = [4300, 6100, 6400, 6700, 6800, 6900, 7800, 8100, 8305, 8400, 13600, 14600, 114800, 328700, 328900, 331300]
 		};
 
 		// The FULL ability/skill scaffold a high-level character of the class carries, harvested from the captured
@@ -56,25 +56,25 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// the two). Over-grants (no per-level breakdown), and only covers classes we have a high-level capture for.
 		// See [[feat_trees_decode_251]] (feats-vs-skills correction) and Gitea #298/#251/#74. Ascending ids (the
 		// wire/codec require it).
-		private static readonly Dictionary<Class, uint[]> FullSkillIdsByClass = new Dictionary<Class, uint[]>
+		private static readonly Dictionary<ConanClass, uint[]> FullSkillIdsByClass = new Dictionary<ConanClass, uint[]>
 		{
-			[Class.Necromancer] =
+			[ConanClass.Necromancer] =
 			[
 				4100, 7002, 8909, 13603, 18502, 85279, 86200, 86507, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313104,
 				321202, 321502, 323205, 323305, 323405, 323505, 326000, 326300, 326600, 327402, 327505, 328908, 329400, 330400, 330500, 331300, 1440500, 1445000
 			],
-			[Class.Demonologist] =
+			[ConanClass.Demonologist] =
 			[
 				4400, 7002, 8909, 13603, 18502, 104579, 104600, 299901, 301403, 302303, 302603, 303103, 304503, 304803, 304903, 305102, 305403, 305702, 306902, 307802, 308102, 308402, 313704,
 				321701, 322402, 323201, 323300, 323402, 323501, 326000, 326300, 326600, 327200, 327500, 328908, 329400, 330400, 330500, 331300, 1410900, 1411300, 1440000, 1440400, 1440500,
 				1440700, 1441902, 1445000
 			],
-			[Class.Assassin] =
+			[ConanClass.Assassin] =
 			[
 				3400, 13603, 14101, 14801, 15000, 16707, 160022, 160300, 165600, 301200, 302100, 302900, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 309100, 318100, 323301, 328703,
 				328902, 329302, 330400, 331300
 			],
-			[Class.HeraldOfXotli] =
+			[ConanClass.HeraldOfXotli] =
 			[
 				4300, 7700, 13603, 14101, 18502, 114823, 114900, 117801, 119000, 300300, 301200, 302100, 302400, 302900, 304300, 304600, 305101, 305200, 305500, 307600, 307900, 308200, 328703,
 				328902, 330400, 331300
@@ -227,7 +227,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToList();
 		}
 
-		public static byte[] FreshPreFrame(Class @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
+		public static byte[] FreshPreFrame(ConanClass @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
 		{
 			var featCount = feats?.Count ?? 0;
 			var f = new byte[PreFrameHead + 4 * featCount + PreFrameTail];
@@ -257,7 +257,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The fresh feat list for a class: the captured retail list when we have one, else the profession feat
 		// (class*100) prepended to the common base feats. Always ascending (the wire/codec require it).
-		public static uint[] FreshSkillIdsFor(Class @class)
+		public static uint[] FreshSkillIdsFor(ConanClass @class)
 		{
 			if (FreshSkillIdsByClass.TryGetValue(@class, out var ids))
 				return ids;
@@ -268,7 +268,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// The full high-level feat scaffold for a class (harvested from a captured retail char), or null when we have
 		// no high-level capture for that class. Used on level-up to make the class's learned spells castable (the
 		// feat-presence gate; see FullSkillIdsByClass). Ascending ids.
-		public static uint[]? FullSkillIdsFor(Class @class)
+		public static uint[]? FullSkillIdsFor(ConanClass @class)
 		{
 			return FullSkillIdsByClass.TryGetValue(@class, out var ids)
 				? ids
@@ -371,15 +371,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// exactly one value across all its sessions - the only genuine per-character field in the whole pre-IIR frame;
 		// everything else that varies is the RDB script-engine char buffer, transient/zero for a player). See
 		// docs/re/fa015807-spawn-reader.md (FUN_01121c00) + docs/re/player-spawn-generation.md.
-		private static byte FrameArchetype(Class @class)
+		private static byte FrameArchetype(ConanClass @class)
 		{
 			return @class switch
 			{
-				Class.Conqueror or Class.DarkTemplar or Class.Guardian         => 1, // Soldier
-				Class.PriestOfMitra or Class.TempestOfSet or Class.BearShaman  => 2, // Priest
-				Class.Barbarian or Class.Ranger or Class.Assassin              => 3, // Rogue
-				Class.HeraldOfXotli or Class.Demonologist or Class.Necromancer => 4, // Mage
-				_                                                              => 3
+				ConanClass.Conqueror or ConanClass.DarkTemplar or ConanClass.Guardian => 1, // Soldier
+				ConanClass.PriestOfMitra or ConanClass.TempestOfSet or ConanClass.BearShaman => 2, // Priest
+				ConanClass.Barbarian or ConanClass.Ranger or ConanClass.Assassin => 3, // Rogue
+				ConanClass.HeraldOfXotli or ConanClass.Demonologist or ConanClass.Necromancer => 4, // Mage
+				_ => 3
 			};
 		}
 
@@ -394,14 +394,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// for feat counts from 14 (Assassin -> 0x3F10) up to 47 (leveled chars). The old per-class hardcoded tags
 		// happened to match only because each class's feat-list length is fixed; computing it is correct for every
 		// feat list (incl. Assassin, whose interim 0x56B6 guess was wrong - 14 feats -> 0x3F10).
-		private static (ushort Tag, uint Value) FreshCloser(Class @class)
+		private static (ushort Tag, uint Value) FreshCloser(ConanClass @class)
 		{
 			var value = @class switch
 			{
-				Class.Guardian or Class.Conqueror or Class.DarkTemplar        => 100u, // Soldier
-				Class.PriestOfMitra or Class.TempestOfSet or Class.BearShaman => 200u, // Priest
-				Class.Barbarian or Class.Assassin or Class.Ranger             => 300u, // Rogue
-				_                                                             => 400u // Mage
+				ConanClass.Guardian or ConanClass.Conqueror or ConanClass.DarkTemplar => 100u, // Soldier
+				ConanClass.PriestOfMitra or ConanClass.TempestOfSet or ConanClass.BearShaman => 200u, // Priest
+				ConanClass.Barbarian or ConanClass.Assassin or ConanClass.Ranger => 300u, // Rogue
+				_ => 400u // Mage
 			};
 
 			var tag = (ushort)ListFrame.ForCount(FreshSkillIdsFor(@class).Length + 1); // as above: one more than the ids

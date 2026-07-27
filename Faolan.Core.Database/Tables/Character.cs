@@ -91,7 +91,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<CharacterTag> Tags { get; set; } = [];
 
 		[ConstrainToEnumValues]
-		public Class Class { get; set; }
+		public ConanClass Class { get; set; }
 
 		public DateTimeOffset CreationDate { get; set; }
 		public DateTimeOffset? LastConnection { get; set; }

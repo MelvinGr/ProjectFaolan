@@ -50,7 +50,7 @@ namespace Faolan.Tests
 			var scaffoldCharacter = new Character
 			{
 				Id = scaffold.Handle,
-				Class = Class.Assassin
+				Class = ConanClass.Assassin
 			};
 			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold);
 
@@ -58,7 +58,7 @@ namespace Faolan.Tests
 
 			Assert.NotNull(built);
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var expected, out _));
-			expected.PreFrame = PlayerSpawnScaffoldRows.FreshPreFrame(Class.Assassin);
+			expected.PreFrame = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Assassin);
 			expected.EntryTableX = 0xB7;
 			expected.BuffRecords.Clear();
 			Assert.Equal(Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(expected)), Convert.ToHexString(built));

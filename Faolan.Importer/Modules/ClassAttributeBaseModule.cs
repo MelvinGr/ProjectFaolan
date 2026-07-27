@@ -55,41 +55,41 @@ namespace Faolan.Importer.Modules
 		///         entirely (the Necromancer's landed on level 15). Do not re-derive an observation - re-observe it.
 		///     </para>
 		/// </summary>
-		public static readonly IReadOnlyList<(Class Class, uint Level, uint TemplateId)> ClientObservations =
+		public static readonly IReadOnlyList<(ConanClass Class, uint Level, uint TemplateId)> ClientObservations =
 		[
-			(Class.Barbarian, 1, 1083955),
-			(Class.Guardian, 1, 871090),
-			(Class.Conqueror, 1, 873357),
-			(Class.PriestOfMitra, 1, 3192040),
-			(Class.TempestOfSet, 1, 3067820),
-			(Class.BearShaman, 1, 1102716),
-			(Class.DarkTemplar, 1, 793759),
-			(Class.Assassin, 1, 3074028),
-			(Class.Assassin, 23, 3074050),
-			(Class.Ranger, 1, 3115334),
-			(Class.HeraldOfXotli, 24, 3130655),
-			(Class.Necromancer, 80, 1173863),
-			(Class.Demonologist, 80, 1126759)
+			(ConanClass.Barbarian, 1, 1083955),
+			(ConanClass.Guardian, 1, 871090),
+			(ConanClass.Conqueror, 1, 873357),
+			(ConanClass.PriestOfMitra, 1, 3192040),
+			(ConanClass.TempestOfSet, 1, 3067820),
+			(ConanClass.BearShaman, 1, 1102716),
+			(ConanClass.DarkTemplar, 1, 793759),
+			(ConanClass.Assassin, 1, 3074028),
+			(ConanClass.Assassin, 23, 3074050),
+			(ConanClass.Ranger, 1, 3115334),
+			(ConanClass.HeraldOfXotli, 24, 3130655),
+			(ConanClass.Necromancer, 80, 1173863),
+			(ConanClass.Demonologist, 80, 1126759)
 		];
 
 		/// <summary>
 		///     The class name each template writes into itself, which is not always the class's current name - the Tempest
 		///     of Set's templates are still filed under <b>Stormcaller</b>, the class's launch-era name.
 		/// </summary>
-		public static readonly IReadOnlyDictionary<string, Class> TemplateClassNames = new Dictionary<string, Class>(StringComparer.Ordinal)
+		public static readonly IReadOnlyDictionary<string, ConanClass> TemplateClassNames = new Dictionary<string, ConanClass>(StringComparer.Ordinal)
 		{
-			["Barbarian"] = Class.Barbarian,
-			["Guardian"] = Class.Guardian,
-			["Conqueror"] = Class.Conqueror,
-			["Priest of Mitra"] = Class.PriestOfMitra,
-			["Stormcaller"] = Class.TempestOfSet,
-			["Bear Shaman"] = Class.BearShaman,
-			["Dark Templar"] = Class.DarkTemplar,
-			["Assassin"] = Class.Assassin,
-			["Ranger"] = Class.Ranger,
-			["Necromancer"] = Class.Necromancer,
-			["Herald of Xotli"] = Class.HeraldOfXotli,
-			["Demonologist"] = Class.Demonologist
+			["Barbarian"] = ConanClass.Barbarian,
+			["Guardian"] = ConanClass.Guardian,
+			["Conqueror"] = ConanClass.Conqueror,
+			["Priest of Mitra"] = ConanClass.PriestOfMitra,
+			["Stormcaller"] = ConanClass.TempestOfSet,
+			["Bear Shaman"] = ConanClass.BearShaman,
+			["Dark Templar"] = ConanClass.DarkTemplar,
+			["Assassin"] = ConanClass.Assassin,
+			["Ranger"] = ConanClass.Ranger,
+			["Necromancer"] = ConanClass.Necromancer,
+			["Herald of Xotli"] = ConanClass.HeraldOfXotli,
+			["Demonologist"] = ConanClass.Demonologist
 		};
 
 		public const uint MaxLevel = 80;
@@ -140,9 +140,9 @@ namespace Faolan.Importer.Modules
 			foreach (var (cls, byLevel) in byClass)
 			{
 				foreach (var (level, t) in byLevel)
-				foreach (var mod in t.Mods)
-					if (Kept.Contains((CharacterStatId)mod.StatId))
-						rows.Add(new ClassAttributeBase { Class = cls, Level = level, StatId = (CharacterStatId)mod.StatId, Amount = (int)mod.WireAmount });
+					foreach (var mod in t.Mods)
+						if (Kept.Contains((CharacterStatId)mod.StatId))
+							rows.Add(new ClassAttributeBase { Class = cls, Level = level, StatId = (CharacterStatId)mod.StatId, Amount = (int)mod.WireAmount });
 
 				if (byLevel.Count != MaxLevel)
 					problems.Add($"{cls} {byLevel.Count}/{MaxLevel} levels");
@@ -172,18 +172,18 @@ namespace Faolan.Importer.Modules
 			}
 
 			return new ImportResult($"{rows.Count} base rows over {byClass.Count} classes" +
-			                        (problems.Count > 0
-				                        ? $"; ⚠ {string.Join("; ", problems)}"
-				                        : $"; all {MaxLevel} levels of each, and all {ClientObservations.Count} client observations reproduced"));
+									(problems.Count > 0
+										? $"; ⚠ {string.Join("; ", problems)}"
+										: $"; all {MaxLevel} levels of each, and all {ClientObservations.Count} client observations reproduced"));
 		}
 
 		/// <summary>
 		///     Every class-feat template in the RDB, grouped by class - the RAW candidate set, strays included. Use
 		///     <see cref="LevelsOf" /> to turn one class's candidates into its level map.
 		/// </summary>
-		public static Dictionary<Class, List<Template>> ScanRuns(RdbReader rdb)
+		public static Dictionary<ConanClass, List<Template>> ScanRuns(RdbReader rdb)
 		{
-			var byClass = new Dictionary<Class, List<Template>>();
+			var byClass = new Dictionary<ConanClass, List<Template>>();
 			foreach (var e in rdb.EntriesOfType(1000020).Where(rdb.CanRead))
 			{
 				if (!TryReadTemplate(rdb, e, out var t) || !TemplateClassNames.TryGetValue(t.ClassName, out var cls))
@@ -233,7 +233,7 @@ namespace Faolan.Importer.Modules
 			}
 
 			if (blob.Length < 24 || blob.ReadU32Le(0) != 1000020 ||
-			    blob.ReadU32Le(4) != entry.Id)
+				blob.ReadU32Le(4) != entry.Id)
 				return false;
 
 			var name = AsciiRuns(blob).Select(r => ClassFeatName().Match(r)).FirstOrDefault(m => m.Success);

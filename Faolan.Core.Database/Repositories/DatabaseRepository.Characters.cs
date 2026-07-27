@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Constants;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
-using Faolan.Core.Constants;
 
 namespace Faolan.Core.Database.Repositories
 {
@@ -47,7 +47,7 @@ namespace Faolan.Core.Database.Repositories
 		// The class/level BASE stats (#444): what a character of this class and level starts with before gear and buffs.
 		// Empty when that (class, level) has no decoded row - all 12 classes x 80 levels are shipped, so this means a
 		// level outside 1..80 or an unimported database - and the caller must treat empty as UNKNOWN, not as zero.
-		Task<IReadOnlyDictionary<CharacterStatId, int>> GetClassAttributeBase(Class characterClass, uint level);
+		Task<IReadOnlyDictionary<CharacterStatId, int>> GetClassAttributeBase(ConanClass characterClass, uint level);
 		Task<(int Min, int Max)?> GetEquippedWeaponDamage(uint characterId);
 		Task RemoveCharacterQuest(uint characterId, uint questId);
 		Task RemoveCharacterShortcut(uint characterId, uint slot);
@@ -207,7 +207,7 @@ namespace Faolan.Core.Database.Repositories
 					RealmId = realmId,
 					AuthChallenge = Guid.NewGuid().ToString("N"),
 					Level = 1,
-					Class = Class.Barbarian,
+					Class = ConanClass.Barbarian,
 					Race = Race.Cimmerian,
 					CreationDate = DateTimeOffset.UtcNow,
 					MapId = Map.NewPlayerSpawnSpawnPoint.MapId,
@@ -416,7 +416,7 @@ namespace Faolan.Core.Database.Repositories
 		// character has no equipment row or no stat-bearing gear.
 		// The class/level BASE stats (#444). Empty when that (class, level) has no decoded row - some classes' higher
 		// levels are not located yet - and the caller MUST treat empty as unknown rather than as zero.
-		public async Task<IReadOnlyDictionary<CharacterStatId, int>> GetClassAttributeBase(Class characterClass, uint level)
+		public async Task<IReadOnlyDictionary<CharacterStatId, int>> GetClassAttributeBase(ConanClass characterClass, uint level)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.ClassAttributeBases.AsNoTracking()

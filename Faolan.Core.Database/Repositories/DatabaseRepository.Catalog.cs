@@ -12,11 +12,11 @@ namespace Faolan.Core.Database.Repositories
 	{
 		Task<Ability[]> GetAbilities();
 		Task<Ability?> GetAbility(uint id);
-		Task<Ability[]> GetClassAbilities(uint level, Class @class);
-		Task<Ability[]> GetClassAbilitiesUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
-		Task<Combo[]> GetClassCombos(uint level, Class @class);
-		Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
-		Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive);
+		Task<Ability[]> GetClassAbilities(uint level, ConanClass @class);
+		Task<Ability[]> GetClassAbilitiesUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive);
+		Task<Combo[]> GetClassCombos(uint level, ConanClass @class);
+		Task<Combo[]> GetClassCombosUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive);
+		Task<uint[]> GetClassSpellsUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<Item?> GetItem(uint id);
 		Task<uint?> GetItemSearchCategory(uint template);
 		Task<Item[]> GetItems(params IReadOnlyList<uint> ids);
@@ -28,8 +28,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<SpellEffect[]> GetSpellEffects();
 		Task<Spell[]> GetSpells();
 		Task<SpellStatEffect[]> GetSpellStatEffects();
-		Task<uint[]> GetStartingBarSpells(uint level, Class @class);
-		Task<uint[]> GetStartingSpells(uint level, Class @class);
+		Task<uint[]> GetStartingBarSpells(uint level, ConanClass @class);
+		Task<uint[]> GetStartingSpells(uint level, ConanClass @class);
 		Task<Dictionary<string, StockPhrase>> GetStockPhrases();
 		Task<Item[]> SearchItems(string nameSubstring, int limit = 25);
 		Task<bool> SetItemRandomLootExcluded(uint itemId, bool excluded);
@@ -49,13 +49,13 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Abilities.FirstOrDefaultAsync(a => a.Id == id);
 		}
 
-		public async Task<Ability[]> GetClassAbilities(uint level, Class @class)
+		public async Task<Ability[]> GetClassAbilities(uint level, ConanClass @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.ClassAbilities.Where(ca => ca.Class == @class && ca.Level <= level).Include(ca => ca.Ability).Select(ca => ca.Ability).OrderBy(a => a.Slot).ToArrayAsync();
 		}
 
-		public async Task<Ability[]> GetClassAbilitiesUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
+		public async Task<Ability[]> GetClassAbilitiesUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
@@ -67,19 +67,19 @@ namespace Faolan.Core.Database.Repositories
 				.ToArrayAsync();
 		}
 
-		public async Task<Combo[]> GetClassCombos(uint level, Class @class)
+		public async Task<Combo[]> GetClassCombos(uint level, ConanClass @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.ClassCombos.Where(cc => cc.Class == @class && cc.Level <= level).Include(cc => cc.Combo).Select(cc => cc.Combo).ToArrayAsync();
 		}
 
-		public async Task<Combo[]> GetClassCombosUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
+		public async Task<Combo[]> GetClassCombosUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.ClassCombos.Where(cc => cc.Class == @class && cc.Level > fromLevelExclusive && cc.Level <= toLevelInclusive).Include(cc => cc.Combo).Select(cc => cc.Combo).ToArrayAsync();
 		}
 
-		public async Task<uint[]> GetClassSpellsUnlockedBetween(Class @class, uint fromLevelExclusive, uint toLevelInclusive)
+		public async Task<uint[]> GetClassSpellsUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
@@ -172,7 +172,7 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.SpellStatEffects.OrderBy(e => e.SpellId).ThenBy(e => e.StatId).ToArrayAsync();
 		}
 
-		public async Task<uint[]> GetStartingBarSpells(uint level, Class @class)
+		public async Task<uint[]> GetStartingBarSpells(uint level, ConanClass @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var candidates = await ctx
@@ -234,7 +234,7 @@ namespace Faolan.Core.Database.Repositories
 		// Essence R1 granted at 3 vs field 5; Contract of Protection R1 at 5 vs 10), so the field is a trainer /
 		// full-power level and the capture is the unlock. Only a handful of GrantLevels exist so far; every gameplay
 		// capture containing a ding adds more, and unlike a scrape they cannot be wrong about what retail granted.
-		public async Task<uint[]> GetStartingSpells(uint level, Class @class)
+		public async Task<uint[]> GetStartingSpells(uint level, ConanClass @class)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx

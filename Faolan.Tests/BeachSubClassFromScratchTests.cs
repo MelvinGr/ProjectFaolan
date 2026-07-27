@@ -43,8 +43,8 @@ namespace Faolan.Tests
 				// experience, and 100 is simply the level-1 to-next-level cost (#447). Authoring MaxExp from the curve
 				// reproduces the same byte with the character's real, zero, experience.
 				Experience = 0,
-				Class = Class.Assassin,
-				MaxStats = CharacterMaxStats.CreateDefaults(Class.Assassin, 1)
+				Class = ConanClass.Assassin,
+				MaxStats = CharacterMaxStats.CreateDefaults(ConanClass.Assassin, 1)
 			};
 			var built = FullCharSnapshotSubClass.BuildFromScratch(def, strie, TemplateInstance);
 

@@ -21,9 +21,9 @@ namespace Faolan.Core.Network.Constants
 			new SpellweaveProfile([0x37F29800, 0x37E5A800, 0x3969D000], [0x396AE9, 0x3969D8, 0x37E6D9, 0x396A22, 0x396A3D], [0x398, 0x39B, 0x39A, 0x39D],
 				0x37E5A8); // Spellweaving(1); refreshes 37e5a8 -> 37e5a9 -> 37e5aa each reappear
 
-		private static readonly Dictionary<Class, SpellweaveProfile> Profiles = new Dictionary<Class, SpellweaveProfile>
+		private static readonly Dictionary<ConanClass, SpellweaveProfile> Profiles = new Dictionary<ConanClass, SpellweaveProfile>
 		{
-			[Class.Necromancer] = Necromancer
+			[ConanClass.Necromancer] = Necromancer
 			// Demonologist / PriestOfMitra / TempestOfSet - need per-class spellweaving captures (#141).
 		};
 
@@ -33,16 +33,16 @@ namespace Faolan.Core.Network.Constants
 
 		// The universal ENERGY (yellow sprint-bar) max by class. Capture-derived: necro 8910, assassin 13984. Casters
 		// have the lower pool; everyone else the higher one (approximate until per-class energy captures land).
-		public static uint EnergyMaxForClass(Class characterClass)
+		public static uint EnergyMaxForClass(ConanClass characterClass)
 		{
 			return characterClass switch
 			{
-				Class.Necromancer or Class.Demonologist or Class.PriestOfMitra or Class.TempestOfSet => 8910,
-				_                                                                                    => 13984
+				ConanClass.Necromancer or ConanClass.Demonologist or ConanClass.PriestOfMitra or ConanClass.TempestOfSet => 8910,
+				_ => 13984
 			};
 		}
 
-		public static SpellweaveProfile? ForClass(Class characterClass)
+		public static SpellweaveProfile? ForClass(ConanClass characterClass)
 		{
 			return Profiles.GetValueOrDefault(characterClass);
 		}

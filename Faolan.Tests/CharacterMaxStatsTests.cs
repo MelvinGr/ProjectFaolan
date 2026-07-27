@@ -12,8 +12,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void Defaults_LevelZero_TreatedAsLevelOne()
 		{
-			var atZero = CharacterMaxStats.CreateDefaults(Class.Assassin, 0);
-			var atOne = CharacterMaxStats.CreateDefaults(Class.Assassin, 1);
+			var atZero = CharacterMaxStats.CreateDefaults(ConanClass.Assassin, 0);
+			var atOne = CharacterMaxStats.CreateDefaults(ConanClass.Assassin, 1);
 
 			Assert.Equal(atOne.Health, atZero.Health);
 			Assert.Equal(atOne.Mana, atZero.Mana);
@@ -22,8 +22,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void Defaults_MageHasMoreManaThanSoldier_AtSameLevel()
 		{
-			var mage = CharacterMaxStats.CreateDefaults(Class.Necromancer, 20);
-			var soldier = CharacterMaxStats.CreateDefaults(Class.Guardian, 20);
+			var mage = CharacterMaxStats.CreateDefaults(ConanClass.Necromancer, 20);
+			var soldier = CharacterMaxStats.CreateDefaults(ConanClass.Guardian, 20);
 
 			Assert.True(mage.Mana > soldier.Mana);
 			Assert.True(soldier.Health > mage.Health);
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Defaults_RogueAtLevel23_ApproximatesAssassinL23()
 		{
-			var stats = CharacterMaxStats.CreateDefaults(Class.Assassin, 23);
+			var stats = CharacterMaxStats.CreateDefaults(ConanClass.Assassin, 23);
 
 			// L1-anchored (Strie 98 HP / 236 Stam) + growth fitted to the L23 capture (AssassinL23 1270 HP / 736 Stam):
 			// 98 + 22*53 = 1264 (captured 1270), 236 + 22*23 = 742 (captured 736). Assassin is stamina-only so
@@ -47,7 +47,7 @@ namespace Faolan.Tests
 		{
 			var character = new Character
 			{
-				Class = Class.Guardian,
+				Class = ConanClass.Guardian,
 				Level = 5
 			};
 			Assert.Null(character.MaxStats);
@@ -55,7 +55,7 @@ namespace Faolan.Tests
 			character.RegenerateMaxStats();
 
 			Assert.NotNull(character.MaxStats);
-			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Guardian, 5).Health, character.MaxStats!.Health);
+			Assert.Equal(CharacterMaxStats.CreateDefaults(ConanClass.Guardian, 5).Health, character.MaxStats!.Health);
 		}
 
 		[Fact]
@@ -70,12 +70,12 @@ namespace Faolan.Tests
 			var seeded = character.MaxStats;
 
 			// The editor commits a mage class at a higher level -> stats regenerate into the SAME row.
-			character.Class = Class.Necromancer;
+			character.Class = ConanClass.Necromancer;
 			character.Level = 20;
 			character.RegenerateMaxStats();
 
 			Assert.Same(seeded, character.MaxStats); // same tracked row, not a replacement
-			Assert.Equal(CharacterMaxStats.CreateDefaults(Class.Necromancer, 20).Mana, character.MaxStats!.Mana);
+			Assert.Equal(CharacterMaxStats.CreateDefaults(ConanClass.Necromancer, 20).Mana, character.MaxStats!.Mana);
 		}
 	}
 }

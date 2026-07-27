@@ -72,7 +72,7 @@ namespace Faolan.Tests
 						Name = "DemoL80",
 						AccountId = 1,
 						RealmId = 1,
-						Class = Class.Barbarian,
+						Class = ConanClass.Barbarian,
 						Race = Race.Cimmerian
 					});
 					db.Characters.Add(new Character
@@ -81,7 +81,7 @@ namespace Faolan.Tests
 						Name = "Other",
 						AccountId = 1,
 						RealmId = 1,
-						Class = Class.Barbarian,
+						Class = ConanClass.Barbarian,
 						Race = Race.Cimmerian
 					});
 					await db.SaveChangesAsync(TestContext.Current.CancellationToken);

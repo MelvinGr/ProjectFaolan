@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Text;
-using Faolan.Core.Progression;
 
 namespace Faolan.GameServer.Combat
 {
@@ -15,7 +14,7 @@ namespace Faolan.GameServer.Combat
 		// The attribute increases for advancing `levelsGained` levels (as `class`). Returns one (attributeId, amount)
 		// per primary that rose; the caller emits one AttributeChanged message each. `class`/`newLevel` are accepted
 		// for the eventual per-class/per-level table - the provisional model ignores them beyond the level count.
-		public static IReadOnlyList<(uint AttributeId, uint Amount)> ForLevelGain(Class @class, uint newLevel, uint levelsGained = 1)
+		public static IReadOnlyList<(uint AttributeId, uint Amount)> ForLevelGain(ConanClass @class, uint newLevel, uint levelsGained = 1)
 		{
 			var amount = levelsGained == 0
 				? 1u

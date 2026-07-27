@@ -22,7 +22,7 @@ namespace Faolan.Core.Database.Tables
 		public virtual Ability Ability { get; set; } = null!;
 
 		[ConstrainToEnumValues]
-		public Class Class { get; set; }
+		public ConanClass Class { get; set; }
 
 		// The character level this ability unlocks at FOR THIS CLASS (min level of that class's captured holders).
 		public byte Level { get; set; }

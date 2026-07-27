@@ -21,10 +21,10 @@ namespace Faolan.Tests
 	{
 		// The member descriptor as retail sent it, from DispatchYouInvitedToTeam (f678) and DispatchTeamInvite (f680).
 		private const string DemonologistMemberHex = "0000c350013184ae000a53747269636b656e6e650000002c0000000500000fb400000003000000000000000600000000000001620000c79c00000fb4" +
-		                                           "0000000000000000000000000000000100009c5001eda8b2000000030159ea5c54000000000000000000";
+												   "0000000000000000000000000000000100009c5001eda8b2000000030159ea5c54000000000000000000";
 
 		private const string NecromancerMemberHex = "0000c35001317cf8000a4a6e6275657674666b6a000000290000000500000fb400000002000000000000000600000000000001620000c79c00000fb4" +
-		                                           "0000000000000000000000000000000100009c5001eda8b200000181813bc035ec000000000000000000";
+												   "0000000000000000000000000000000100009c5001eda8b200000181813bc035ec000000000000000000";
 
 		private static TeamMemberRecord Demonologist()
 		{
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 			{
 				CharacterId = 0x013184AE,
 				Name = "Strickenne",
-				Class = Class.Demonologist,
+				Class = ConanClass.Demonologist,
 				MapId = 4020,
 				PerCharacterWord = 3,
 				// Re-framed off the corrected PlayfieldProxy boundary (#454): what used to be read as
@@ -48,7 +48,7 @@ namespace Faolan.Tests
 			{
 				CharacterId = 0x01317CF8,
 				Name = "Jnbuevtfkj",
-				Class = Class.Necromancer,
+				Class = ConanClass.Necromancer,
 				MapId = 4020,
 				PerCharacterWord = 2,
 				OpaqueA = 0x00018181,
@@ -173,7 +173,7 @@ namespace Faolan.Tests
 		public void Trade_AddedItem_IsByteExact()
 		{
 			const string snapshot = "0888d7e395b3ec8aec2012040800100112060817108bf1301204081a10011a530a140d93991f2715011fcc4e1dd20089d625a4013d0d12140d93991f2715011fcc4e1dd20089d6" +
-			                        "25a4013d0d1a140d93991f2715011fcc4e1dd20089d625a4013d0d25e9550d002de9550d003801455a313848";
+									"25a4013d0d1a140d93991f2715011fcc4e1dd20089d625a4013d0d25e9550d002de9550d003801455a313848";
 
 			Assert.Equal("00000073" + snapshot + "00000001", Convert.ToHexString(PlayerTradeCodec.BuildAddedItem(Convert.FromHexString(snapshot), 1)).ToLowerInvariant());
 		}
@@ -185,13 +185,13 @@ namespace Faolan.Tests
 		// carries 0x01EDAF93 (1761 higher) and the offline one 0x6A64AD51 - so it is per-character, and the codec's
 		// default is just the value we have nothing better than.
 		[Theory]
-		[InlineData("01318405010701eda8b22b", 0x01318405u, true, 7, Class.HeraldOfXotli, 0x01EDA8B2u)]
-		[InlineData("01318477010a01edaf931d", 0x01318477u, true, 10, Class.BearShaman, 0x01EDAF93u)]
-		[InlineData("013184bb010801eda8b21c", 0x013184BBu, true, 8, Class.TempestOfSet, 0x01EDA8B2u)]
-		[InlineData("013184bd010a01eda8b22c", 0x013184BDu, true, 10, Class.Demonologist, 0x01EDA8B2u)]
-		[InlineData("013184c0010501eda8b212", 0x013184C0u, true, 5, Class.Barbarian, 0x01EDA8B2u)]
-		[InlineData("013184ae00056a64ad512c", 0x013184AEu, false, 5, Class.Demonologist, 0x6A64AD51u)] // the OFFLINE one
-		public void Friend_State_IsByteExact(string hex, uint id, bool online, byte level, Class classId, uint stamp)
+		[InlineData("01318405010701eda8b22b", 0x01318405u, true, 7, ConanClass.HeraldOfXotli, 0x01EDA8B2u)]
+		[InlineData("01318477010a01edaf931d", 0x01318477u, true, 10, ConanClass.BearShaman, 0x01EDAF93u)]
+		[InlineData("013184bb010801eda8b21c", 0x013184BBu, true, 8, ConanClass.TempestOfSet, 0x01EDA8B2u)]
+		[InlineData("013184bd010a01eda8b22c", 0x013184BDu, true, 10, ConanClass.Demonologist, 0x01EDA8B2u)]
+		[InlineData("013184c0010501eda8b212", 0x013184C0u, true, 5, ConanClass.Barbarian, 0x01EDA8B2u)]
+		[InlineData("013184ae00056a64ad512c", 0x013184AEu, false, 5, ConanClass.Demonologist, 0x6A64AD51u)] // the OFFLINE one
+		public void Friend_State_IsByteExact(string hex, uint id, bool online, byte level, ConanClass classId, uint stamp)
 		{
 			Assert.Equal(hex, Convert.ToHexString(FriendListCodec.BuildState(id, online, level, classId, stamp)).ToLowerInvariant());
 		}

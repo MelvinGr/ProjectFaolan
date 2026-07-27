@@ -28,7 +28,7 @@ namespace Faolan.Core.Database.Tables
 		// consistent - patching only the displayed slot and leaving the base at the Strie template's Rogue value was the
 		// suspected #4 (wrong mana) / "gear vanished" inconsistency.
 		// Returned in display units (the block scales ×100 at write time). #186/#4.
-		public (uint Hp, uint HpBase, uint Mana, uint ManaBase, uint Stamina, uint StaminaBase) SnapshotVitals(Class @class)
+		public (uint Hp, uint HpBase, uint Mana, uint ManaBase, uint Stamina, uint StaminaBase) SnapshotVitals(ConanClass @class)
 		{
 			var a = Archetype(@class);
 			var hpDelta = (uint)(a.HpL1 - a.HpBaseL1);
@@ -52,7 +52,7 @@ namespace Faolan.Core.Database.Tables
 		// Necromancer 89/246/0, Demonologist 89/246/0, Herald of Xotli 89/246/121 (HP/Mana/Stamina). Which pools a
 		// class HAS matches memory class_resource_mana_stamina (a 0 anchor zeroes the pool so the client hides that
 		// bar). PER-LEVEL growth is still rough (no multi-level captures yet); only L1 is authoritative.
-		public static CharacterMaxStats CreateDefaults(Class @class, ushort level)
+		public static CharacterMaxStats CreateDefaults(ConanClass @class, ushort level)
 		{
 			var lvl = level == 0
 				? (ushort)1
@@ -76,25 +76,25 @@ namespace Faolan.Core.Database.Tables
 		// manaL1 / staminaL1 means the class does not have that pool. The L1 values for Soldier/Rogue/Mage/Bear-Shaman
 		// (incl. hpBaseL1 = the snapshot's lower HP-base slot) are from retail captures; the rest are estimates (marked).
 		// Growth is a placeholder until levelling lands.
-		private static (int HpL1, int HpGrow, int ManaL1, int ManaGrow, int StaminaL1, int StaminaGrow, int HpBaseL1) Archetype(Class @class)
+		private static (int HpL1, int HpGrow, int ManaL1, int ManaGrow, int StaminaL1, int StaminaGrow, int HpBaseL1) Archetype(ConanClass @class)
 		{
 			switch (@class)
 			{
 				// Melee Soldiers - STAMINA ONLY. Retail L1 (login snapshots, #242): Guardian HP 130 (base 120) /
 				// Stam 179, Conqueror HP 168 (base 160) / Stam 178.
-				case Class.Guardian:
+				case ConanClass.Guardian:
 				{
 					return (130, 60, 0, 0, 179, 54, 120);
 				}
 
-				case Class.Conqueror:
+				case ConanClass.Conqueror:
 				{
 					return (168, 60, 0, 0, 178, 54, 160);
 				}
 
 				// Dark Templar - Soldier hybrid, BOTH. Retail L1 (login snapshot, #242): HP 128 (base 120),
 				// Mana 281, Stamina 178.
-				case Class.DarkTemplar:
+				case ConanClass.DarkTemplar:
 				{
 					return (128, 60, 281, 30, 178, 54, 120);
 				}
@@ -103,46 +103,46 @@ namespace Faolan.Core.Database.Tables
 				// Stam 236, Barbarian HP 118 (base 110) / Stam 178, Ranger HP 133 (base 120) / Stam 213. Growth is
 				// fitted to the Assassin's TWO captured points (L1 Strie 98/236, L23 AssassinL23 1270/736 -> ~53 HP /
 				// ~23 Stam per level) and reused for all three until per-class multi-level captures land.
-				case Class.Assassin:
+				case ConanClass.Assassin:
 				{
 					return (98, 53, 0, 0, 236, 23, 90);
 				}
 
-				case Class.Barbarian:
+				case ConanClass.Barbarian:
 				{
 					return (118, 53, 0, 0, 178, 23, 110);
 				}
 
-				case Class.Ranger:
+				case ConanClass.Ranger:
 				{
 					return (133, 53, 0, 0, 213, 23, 120);
 				}
 
 				// Ranged Priests - MANA ONLY. Retail L1 (login snapshots, #242): Priest of Mitra and Tempest of Set
 				// both HP 88 (base 80) / Mana 171 / no stamina pool.
-				case Class.PriestOfMitra:
-				case Class.TempestOfSet:
+				case ConanClass.PriestOfMitra:
+				case ConanClass.TempestOfSet:
 				{
 					return (88, 45, 171, 30, 0, 0, 80);
 				}
 
 				// Bear Shaman - Priest melee hybrid, BOTH. Retail L1: HP 108 (base 100), Mana 171, Stamina 178.
-				case Class.BearShaman:
+				case ConanClass.BearShaman:
 				{
 					return (108, 45, 171, 30, 178, 39, 100);
 				}
 
 				// Herald of Xotli - Mage melee hybrid, BOTH. Retail L1 (login snapshot, #242): HP 89 (base 80),
 				// Mana 246, Stamina 121.
-				case Class.HeraldOfXotli:
+				case ConanClass.HeraldOfXotli:
 				{
 					return (89, 38, 246, 40, 121, 32, 80);
 				}
 
 				// Pure Mages - MANA ONLY. Retail L1 (login snapshots, #242): Necromancer and Demonologist both HP 89
 				// (base 80) / Mana 246 / no stamina pool.
-				case Class.Demonologist:
-				case Class.Necromancer:
+				case ConanClass.Demonologist:
+				case ConanClass.Necromancer:
 				{
 					return (89, 38, 246, 40, 0, 0, 80);
 				}

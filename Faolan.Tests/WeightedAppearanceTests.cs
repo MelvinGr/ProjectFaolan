@@ -49,7 +49,7 @@ namespace Faolan.Tests
 			var character = new Character
 			{
 				Id = 0x02000007,
-				Class = Class.Necromancer
+				Class = ConanClass.Necromancer
 			}; // Faolanx is a mage-necromancer
 
 			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character, weighted));

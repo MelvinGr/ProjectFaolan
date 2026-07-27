@@ -1,12 +1,11 @@
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Server.GameServer;
-using Faolan.Tests.Support;
 using Faolan.CSPlayerAgent;
+using Faolan.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -51,7 +50,7 @@ namespace Faolan.Tests
 			{
 				var client = new RecordingNetworkClient(id);
 				client.Session.Character!.Name = $"C{id}";
-				client.Session.Character.Class = Class.Necromancer;
+				client.Session.Character.Class = ConanClass.Necromancer;
 				clients[id] = client;
 			}
 

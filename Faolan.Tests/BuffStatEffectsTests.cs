@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.GameServer.Combat;
@@ -236,7 +235,7 @@ namespace Faolan.Tests
 			// Sustaining Wrath (Rank 9): stat 1 = 180000 at the ×100 vitals scale -> +1800 health.
 			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
-			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = Class.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } });
+			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = ConanClass.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } });
 
 			entity.ActiveBuffs[4239610 << 8] = new ActiveBuff(4239610 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
 			var applied = BuffStatEffects.Recompute(entity, catalog);
@@ -252,7 +251,7 @@ namespace Faolan.Tests
 		{
 			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
-			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = Class.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } });
+			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = ConanClass.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } });
 
 			entity.ActiveBuffs[4239610 << 8] = new ActiveBuff(4239610 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
 			BuffStatEffects.Recompute(entity, catalog);
@@ -273,7 +272,7 @@ namespace Faolan.Tests
 			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 584 };
-			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = Class.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } },
+			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = ConanClass.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } },
 				entity.GearBonuses);
 
 			Assert.Equal(6925u, entity.Vitals.MaxHealth); // gear alone, before any buff

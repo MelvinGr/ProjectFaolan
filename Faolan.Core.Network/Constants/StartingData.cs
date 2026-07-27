@@ -21,15 +21,15 @@ namespace Faolan.Core.Network.Constants
 		// Universal: the Slave Manacles worn on the wrist (slot 0x12) by every fresh beach character.
 		public const uint StartingWristItem = 3361557; // Slave Manacles
 
-		public static readonly ImmutableArray<(Race race, ArchType archType, Class clas)> RaceArchClassCombinations =
+		public static readonly ImmutableArray<(Race race, ArchType archType, ConanClass clas)> RaceArchClassCombinations =
 		[
-			(Race.Aquilonian, ArchType.Priest, Class.PriestOfMitra), (Race.Aquilonian, ArchType.Soldier, Class.Conqueror), (Race.Aquilonian, ArchType.Soldier, Class.DarkTemplar),
-			(Race.Aquilonian, ArchType.Soldier, Class.Guardian), (Race.Aquilonian, ArchType.Rogue, Class.Barbarian), (Race.Aquilonian, ArchType.Rogue, Class.Ranger),
-			(Race.Aquilonian, ArchType.Rogue, Class.Assassin), (Race.Cimmerian, ArchType.Priest, Class.BearShaman), (Race.Cimmerian, ArchType.Soldier, Class.Conqueror),
-			(Race.Cimmerian, ArchType.Soldier, Class.DarkTemplar), (Race.Cimmerian, ArchType.Soldier, Class.Guardian), (Race.Cimmerian, ArchType.Rogue, Class.Barbarian),
-			(Race.Cimmerian, ArchType.Rogue, Class.Ranger), (Race.Stygian, ArchType.Priest, Class.TempestOfSet), (Race.Stygian, ArchType.Rogue, Class.Ranger),
-			(Race.Stygian, ArchType.Rogue, Class.Assassin), (Race.Stygian, ArchType.Mage, Class.HeraldOfXotli), (Race.Stygian, ArchType.Mage, Class.Demonologist),
-			(Race.Stygian, ArchType.Mage, Class.Necromancer)
+			(Race.Aquilonian, ArchType.Priest, ConanClass.PriestOfMitra), (Race.Aquilonian, ArchType.Soldier, ConanClass.Conqueror), (Race.Aquilonian, ArchType.Soldier, ConanClass.DarkTemplar),
+			(Race.Aquilonian, ArchType.Soldier, ConanClass.Guardian), (Race.Aquilonian, ArchType.Rogue, ConanClass.Barbarian), (Race.Aquilonian, ArchType.Rogue, ConanClass.Ranger),
+			(Race.Aquilonian, ArchType.Rogue, ConanClass.Assassin), (Race.Cimmerian, ArchType.Priest, ConanClass.BearShaman), (Race.Cimmerian, ArchType.Soldier, ConanClass.Conqueror),
+			(Race.Cimmerian, ArchType.Soldier, ConanClass.DarkTemplar), (Race.Cimmerian, ArchType.Soldier, ConanClass.Guardian), (Race.Cimmerian, ArchType.Rogue, ConanClass.Barbarian),
+			(Race.Cimmerian, ArchType.Rogue, ConanClass.Ranger), (Race.Stygian, ArchType.Priest, ConanClass.TempestOfSet), (Race.Stygian, ArchType.Rogue, ConanClass.Ranger),
+			(Race.Stygian, ArchType.Rogue, ConanClass.Assassin), (Race.Stygian, ArchType.Mage, ConanClass.HeraldOfXotli), (Race.Stygian, ArchType.Mage, ConanClass.Demonologist),
+			(Race.Stygian, ArchType.Mage, ConanClass.Necromancer)
 		];
 
 		// Female (Sex 1): a gown (chest) + matching bottom (legs). Retail randomises the garment COLOUR per
@@ -47,11 +47,11 @@ namespace Faolan.Core.Network.Constants
 		// Coverage is only the classes a create dump actually shows armed - the rest start unarmed until more create
 		// captures land. The create-verified armed entries are Assassin (Strie), Necromancer and Tempest of Set, each
 		// with the class's create-capture main-hand (see the per-entry notes below).
-		public static readonly ImmutableDictionary<Class, uint> StartingWeapon = new Dictionary<Class, uint>
+		public static readonly ImmutableDictionary<ConanClass, uint> StartingWeapon = new Dictionary<ConanClass, uint>
 		{
-			[Class.Assassin] = 3735601, // Marlin Spike
-			[Class.Necromancer] = 3395744, // Broken Bottle (0x33D0A0; necro create capture, BccIIR slot-6)
-			[Class.TempestOfSet] = 215711 // Broken Bottle (0x34A9F - the OTHER bottle; tempest create capture, BccIIR slot-6)
+			[ConanClass.Assassin] = 3735601, // Marlin Spike
+			[ConanClass.Necromancer] = 3395744, // Broken Bottle (0x33D0A0; necro create capture, BccIIR slot-6)
+			[ConanClass.TempestOfSet] = 215711 // Broken Bottle (0x34A9F - the OTHER bottle; tempest create capture, BccIIR slot-6)
 		}.ToImmutableDictionary();
 
 		public static readonly Vector3 EditorSpawnPosition = new Vector3(260.0f, 0.0f, 290.0f);

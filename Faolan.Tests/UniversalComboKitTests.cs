@@ -34,7 +34,7 @@ namespace Faolan.Tests
 			var dances = await db.Combos.Where(c => c.Name.Contains("_Dance_combo")).Select(c => c.Id).ToListAsync(TestContext.Current.CancellationToken);
 			Assert.Equal(12, dances.Count);
 
-			foreach (var cls in Enum.GetValues<Class>())
+			foreach (var cls in Enum.GetValues<ConanClass>())
 			{
 				// Level 0, so a freshly created character qualifies for all of them.
 				var granted = await db.ClassCombos.Where(cc => cc.Class == cls && cc.Level <= 1 && dances.Contains(cc.ComboId)).Select(cc => cc.ComboId).ToListAsync(TestContext.Current.CancellationToken);
@@ -47,7 +47,7 @@ namespace Faolan.Tests
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 
-			var classCount = Enum.GetValues<Class>().Length;
+			var classCount = Enum.GetValues<ConanClass>().Length;
 			var universal = await db
 				.ClassCombos.GroupBy(cc => cc.ComboId)
 				.Where(g => g.Count() == classCount)
