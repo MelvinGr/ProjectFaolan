@@ -31,25 +31,7 @@ namespace Faolan.Tests
 					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 					await CaptureItemImporter.ImportAsync(db, [await File.ReadAllBytesAsync(inventoryCapture, TestContext.Current.CancellationToken)]);
 
-					db.Accounts.Add(new Account
-					{
-						Id = 1,
-						UserName = "t",
-						Password = "t",
-						LastIpAddress = ""
-					});
-					db.Realms.Add(new Realm
-					{
-						Id = 1,
-						Name = "Test",
-						IpAddress = "127.0.0.1"
-					});
-					db.Maps.Add(new Map
-					{
-						Id = Map.TortageBeachId,
-						Name = "Tortage Beach"
-					});
-					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+					TestDb.SeedWorld(db);
 					db.Characters.Add(new Character
 					{
 						Id = characterId,

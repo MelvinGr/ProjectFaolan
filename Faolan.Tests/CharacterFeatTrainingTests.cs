@@ -3,8 +3,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
-using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -94,20 +92,7 @@ namespace Faolan.Tests
 
 		private static (DatabaseRepository Repo, DbContextOptions<DatabaseContext> Options, string Path) NewDb()
 		{
-			var path = Path.Combine(Path.GetTempPath(), $"faolan-feattrain-{Path.GetRandomFileName()}.db");
-			var options = TestDb.Options(path);
-			using (var ctx = new DatabaseContext(options))
-			{
-				ctx.Database.EnsureCreated();
-
-				// CharacterFeat has an FK to Character, which has FKs of its own - seed just enough for the insert.
-				ctx.Maps.Add(new Map { Id = 1, Name = "test" });
-				ctx.Realms.Add(new Realm { Id = 1, Name = "test", IpAddress = "127.0.0.1" });
-				ctx.Accounts.Add(new Account { Id = 1, UserName = "test", Password = "x" });
-				ctx.Characters.Add(new Character { Id = CharacterId, AccountId = 1, RealmId = 1, MapId = 1, Name = "Feattest", Class = ConanClass.Barbarian, Race = Race.Cimmerian, Sex = Sex.Male });
-				ctx.SaveChanges();
-			}
-
+			var (options, path) = TestDb.NewSeededDatabase(CharacterId);
 			return (new DatabaseRepository(new Factory(options)), options, path);
 		}
 

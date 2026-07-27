@@ -38,24 +38,8 @@ namespace Faolan.Tests
 				await using (var db = NewContext(dbPath))
 				{
 					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					db.Accounts.Add(new Account
-					{
-						Id = 1,
-						UserName = "t",
-						Password = "t",
-						LastIpAddress = ""
-					});
-					db.Realms.Add(new Realm
-					{
-						Id = 1,
-						Name = "Test",
-						IpAddress = "127.0.0.1"
-					});
-					db.Maps.Add(new Map
-					{
-						Id = Map.TortageBeachId,
-						Name = "Beach"
-					});
+					TestDb.SeedWorld(db);
+
 					// CharacterSpell.SpellId FKs Spells - the granted spell must be in the catalog (in production the
 					// scrape/cast modules populate it; uncataloged grants are skipped, not seeded).
 					db.Spells.Add(new Spell

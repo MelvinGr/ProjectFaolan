@@ -119,25 +119,7 @@ namespace Faolan.Tests
 				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
 					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					ctx.Accounts.Add(new Account
-					{
-						Id = accountId,
-						UserName = "t",
-						Password = "t",
-						LastIpAddress = ""
-					});
-					ctx.Realms.Add(new Realm
-					{
-						Id = realmId,
-						Name = "Test",
-						IpAddress = "127.0.0.1"
-					});
-					ctx.Maps.Add(new Map
-					{
-						Id = Map.TortageBeachId,
-						Name = "Tortage Beach"
-					});
-					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+					TestDb.SeedWorld(ctx, accountId, realmId);
 				}
 
 				var character = await repo.CreateCharacter(accountId, realmId);
@@ -260,25 +242,7 @@ namespace Faolan.Tests
 				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
 					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					ctx.Accounts.Add(new Account
-					{
-						Id = accountId,
-						UserName = "t",
-						Password = "t",
-						LastIpAddress = ""
-					});
-					ctx.Realms.Add(new Realm
-					{
-						Id = realmId,
-						Name = "Test",
-						IpAddress = "127.0.0.1"
-					});
-					ctx.Maps.Add(new Map
-					{
-						Id = Map.TortageBeachId,
-						Name = "Tortage Beach"
-					});
-					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+					TestDb.SeedWorld(ctx, accountId, realmId);
 				}
 
 				// CreateCharacter should cascade-insert a default MaxStats row (level-1 baseline).
@@ -551,25 +515,7 @@ namespace Faolan.Tests
 				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
 				{
 					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
-					ctx.Accounts.Add(new Account
-					{
-						Id = accountId,
-						UserName = "t",
-						Password = "t",
-						LastIpAddress = ""
-					});
-					ctx.Realms.Add(new Realm
-					{
-						Id = realmId,
-						Name = "Test",
-						IpAddress = "127.0.0.1"
-					});
-					ctx.Maps.Add(new Map
-					{
-						Id = Map.TortageBeachId,
-						Name = "Tortage Beach"
-					});
-					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+					TestDb.SeedWorld(ctx, accountId, realmId);
 				}
 
 				// Creation seeds the level-1 rogue baseline.

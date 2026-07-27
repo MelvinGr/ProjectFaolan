@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Tests.Support;
 using Microsoft.Data.Sqlite;
@@ -120,6 +121,75 @@ namespace Faolan.Tests
 		public static DbContextOptions<DatabaseContext> ReadOnly(string path)
 		{
 			return DatabaseExtensions.BuildOptions(FaolanDbProvider.Sqlite, $"Data Source={path};Mode=ReadOnly");
+		}
+
+		// Seeds the world rows a Character depends on - Account, Realm, Map - and SAVES. Character has non-null FKs to
+		// all three, plus NOT NULL columns on Realm, so nothing character-shaped inserts without them. Six tests had
+		// each hand-rolled this same trio.
+		//
+		// The map defaults to TortageBeachId because that is what every one of them used; pass another where the map
+		// itself is the subject.
+		public static void SeedWorld(DatabaseContext ctx, uint accountId = 1, uint realmId = 1, uint mapId = Map.TortageBeachId)
+		{
+			ctx.Accounts.Add(new Account
+			{
+				Id = accountId,
+				UserName = "t",
+				Password = "t",
+				LastIpAddress = ""
+			});
+			ctx.Realms.Add(new Realm
+			{
+				Id = realmId,
+				Name = "Test",
+				IpAddress = "127.0.0.1"
+			});
+			ctx.Maps.Add(new Map
+			{
+				Id = mapId,
+				Name = "Test Map"
+			});
+			ctx.SaveChanges();
+		}
+
+		// SeedWorld plus a character on it, saved. For tests that need to reach a character-OWNED table
+		// (CharacterFeat, CharacterSkill, CharacterQuest, ...) and do not care what the character is.
+		//
+		// Deliberately MINIMAL - it exists to get a test to the table it actually cares about. A test that asserts on
+		// the character itself should build its own, and one that needs several should call SeedWorld and add them.
+		public static Character SeedCharacter(DatabaseContext ctx, uint characterId = 0x01000001, ConanClass characterClass = ConanClass.Barbarian, string name = "Testchar")
+		{
+			SeedWorld(ctx);
+
+			var character = new Character
+			{
+				Id = characterId,
+				AccountId = 1,
+				RealmId = 1,
+				MapId = Map.TortageBeachId,
+				Name = name,
+				Class = characterClass,
+				Race = Race.Cimmerian,
+				Sex = Sex.Male
+			};
+			ctx.Characters.Add(character);
+			ctx.SaveChanges();
+			return character;
+		}
+
+		// A writable throwaway database with SeedCharacter already applied - the common case, and the one that saves a
+		// test from repeating the EnsureCreated + seed dance. The caller owns the file and should delete it.
+		public static (DbContextOptions<DatabaseContext> Options, string Path) NewSeededDatabase(uint characterId = 0x01000001, ConanClass characterClass = ConanClass.Barbarian)
+		{
+			var path = Path.Combine(Path.GetTempPath(), $"faolan-test-{Path.GetRandomFileName()}.db");
+			var options = Options(path);
+			using (var ctx = new DatabaseContext(options))
+			{
+				ctx.Database.EnsureCreated();
+				SeedCharacter(ctx, characterId, characterClass);
+			}
+
+			return (options, path);
 		}
 	}
 }
