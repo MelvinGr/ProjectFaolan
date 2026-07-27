@@ -30,9 +30,11 @@ namespace Faolan.Tests
 			Assert.True(FeatRules.WithinBudget(80, [800001u, 800101u]));
 		}
 
-		[Theory, InlineData(1u, 0), InlineData(9u, 0), InlineData(10u, 1), InlineData(24u, 15), InlineData(80u, 71)]
-		// AoC: 1 feat point per level from 10 -> 71 at 80
-		public void PointBudget_IsOnePerLevelFromTen(uint level, int expected)
+		// Superseded by FeatPointBudgetTests, which checks these against the CLIENT's FeatPointsTable (RDB 1000044)
+		// instead of against our own formula. This case asserted 15 at level 24 and 71 at 80 - the `level - 9` rule we
+		// had invented - so it could only ever confirm the code it was written from. The real values are 16 and 79.
+		[Theory, InlineData(1u, 0), InlineData(9u, 0), InlineData(10u, 1), InlineData(24u, 16), InlineData(80u, 79)]
+		public void PointBudget_MatchesTheClientsFeatPointsTable(uint level, int expected)
 		{
 			Assert.Equal(expected, FeatRules.PointBudget(level));
 		}

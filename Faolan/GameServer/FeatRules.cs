@@ -10,13 +10,27 @@ namespace Faolan.GameServer
 	// docs/subsystems/feats.md.
 	public static class FeatRules
 	{
-		// Feat points earned by level: 1 per level from level 10 (AoC's rule; level 80 = 71 points). Verified against
-		// the captured chars - each one's spent points fit within this budget with headroom.
+		// Levels that grant TWO feat points instead of one. Straight out of the client's own FeatPointsTable - RDB
+		// type 1000044 id 1, the resource FeatClassTable_c::LoadStaticData reads - which is 71 entries of
+		// [level 10..80][points][tsPoints].
+		private static readonly uint[] DoublePointLevels = [20, 30, 40, 50, 60, 70, 75, 80];
+
+		// Feat points earned by level. Was `level - 9` (1 per level from 10), giving 71 at level 80; the client's table
+		// gives **79** - eight levels grant two. The old value was "verified" against the captured characters, but
+		// every one of them fit with headroom, so the budget never actually bound and the error could not show up.
 		public static int PointBudget(uint level)
 		{
-			return level > 9
-				? (int)(level - 9)
-				: 0;
+			if (level < 10)
+				return 0;
+
+			var points = (int)(level - 9);
+			foreach (var doubled in DoublePointLevels)
+			{
+				if (level >= doubled)
+					points++;
+			}
+
+			return points;
 		}
 
 		// A feat's point cost = max(1, encoded rank). The composite feat id bakes the rank into its low two digits
