@@ -41,8 +41,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// fields), also repeated; `ownerStamp` (0xB290805C 0x29E627CA) is the fixed creator/timestamp pair that
 		// recurs across the whole WorldPrep burst (semantics unpinned). Decoded from WorldPrepBurst.bin by
 		// tools/capture/decode_create_iir_records.py and locked byte-exact by CreateEditorRecordTests.
-		private static readonly byte[] BehaviorOwnerStamp = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
-
 		// BehaviorControlCenterIIR (0x642CD3D6), registration form: registers one behavior on an entity.
 		//   [u32 type][u32 handle][u16 0x0004][u32 slot][u32 msgLen][protobuf][optional 20-byte bound tail]
 		// protobuf = base varint fields `08 <behaviorId> [10 <field2>] 18 <phase> 28 <field5> 30 <field6>
@@ -102,8 +100,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteArray(tagBytes)
 				.WriteArray(transform)
 				.WriteArray(transform)
-				.WriteArray(BehaviorOwnerStamp)
-				.WriteArray(BehaviorOwnerStamp)
+				.WriteArray(NullIdentity.Bytes)
+				.WriteArray(NullIdentity.Bytes)
 				.WriteUInt32(trailingA)
 				.WriteUInt32(trailingB)
 				.WriteUInt32(trailingC)

@@ -151,10 +151,12 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
    - `BehaviorControlCenterIIR` (0x642CD3D6) **short form** — behavior register (6 records).
    - `BehaviorControlCenterIIR` (0x642CD3D6) **116-byte long form** (×3, #223) — the 28-byte short-form head plus
      an 88-byte tail that binds the behavior to an **equipped item**: `[u32 index][u32 someId][u32 itemHandle×2]
-     [u32 0][u32 1][char[4] tag][byte[16] transform×2][8 ownerStamp×2][12 zero]`. The item handle, the 4-char
+     [u32 0][u32 1][char[4] tag][byte[16] transform×2][8 nullIdentity×2][12 zero]`. The item handle, the 4-char
      entity tag (`OPC1`/`M9W9`/`CUP5`) and the 16-byte transform (the item's pose as four big-endian u32) all
-     match the paired `DispatchAddItem` equipment piece earlier in the same burst; `ownerStamp`
-     (`B290805C 29E627CA`) is the fixed creator/timestamp pair that recurs burst-wide. Decoded by
+     match the paired `DispatchAddItem` equipment piece earlier in the same burst. The two 8-byte slots are the
+     `NullIdentity` sentinel (`B290805C 29E627CA`) — two *unset identity* slots, matching the doubling of every
+     field before them, rather than the "creator/timestamp pair" this was read as while the value had a different
+     name in each of the four codecs that write it. Decoded by
      the retired `decode_create_iir_records.py` (see above), built by `CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong`.
    - `RegenIIR` (0x28D0AC99, #223) — `[u32 type][u32 handle][u8 flag][u32 v1][u32 v2][u32 v3]` (21 bytes). The
      grammar was pinned by harvesting **590 records across all `*.tshark.json`** captures (it's ×1 in the create

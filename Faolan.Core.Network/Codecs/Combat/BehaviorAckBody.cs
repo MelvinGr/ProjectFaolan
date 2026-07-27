@@ -18,10 +18,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
 
-		// The 8-byte constant category/owner pair (== the 0x2052 grant's ConstantA/B halves) used as the equip-ack's
-		// null identity filler.
-		internal static readonly byte[] NullIdentityFiller = [0xB2, 0x90, 0x80, 0x5C, 0x29, 0xE6, 0x27, 0xCA];
-
 		// The behaviours whose ECHOED tail takes 12 zero bytes of padding. This is NOT universal, which is what the code
 		// used to assume: measured across every login capture, pairing each c2s request with its s2c ack and diffing the
 		// tail lengths, only the two attack behaviours pad an echoed tail -
@@ -156,12 +152,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 				for (var i = 0; i < 2; i++)
 					tail.WriteUInt32(item.Key.Key1).WriteUInt32(item.Key.Key2).WriteUInt32(item.Key.Key3).WriteUInt32(item.Key.Key4);
 
-				tail.WriteArray(NullIdentityFiller).WriteArray(NullIdentityFiller);
+				tail.WriteArray(NullIdentity.Bytes).WriteArray(NullIdentity.Bytes);
 			}
 			else
 			{
 				for (var i = 0; i < 6; i++)
-					tail.WriteArray(NullIdentityFiller);
+					tail.WriteArray(NullIdentity.Bytes);
 			}
 
 			return BuildBehaviorEchoAckBody(rawPayload, instance, phase, tail.ToArray());

@@ -40,7 +40,6 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		public const byte RoleIngredient = 0;
 		public const byte RoleResult = 1;
-		public const uint ListFrame = Codecs.ListFrame.Unit;
 
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.TradeskillReplyIIR;
 		public const uint Version = 1;
@@ -56,7 +55,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// the catalog this codec builds). Opcode below is the reply (what BuildReplyIir emits).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.TradeskillReplyIIR, GameServer0X2000Opcodes.TradeskillRequestIIR];
 
-		private static readonly uint[] ElementConst = [0xB290805Cu, 0x29E627CAu, 0xB290805Cu, 0x29E627CAu]; // element [13..16]
+		// Elements [13..16]: two unset identity slots (NullIdentity.Pair).
 
 		// Build the reply IIR body [env][version][type=3][count][records] from typed recipe records.
 		public static byte[] BuildReplyBody(IReadOnlyCollection<RecipeRecord> recipes)
@@ -66,7 +65,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 				.WriteByte(0x00) // env
 				.WriteUInt32(Version)
 				.WriteByte(ListType)
-				.WriteUInt32(((uint)recipes.Count + 1) * ListFrame);
+				.WriteUInt32(ListFrame.ForCount(recipes.Count));
 			foreach (var r in recipes)
 				WriteRecord(body, r);
 
@@ -157,7 +156,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 			for (var c = 0; c < 4; c++)
 			{
-				if (Read(data, ref p) != ElementConst[c])
+				if (Read(data, ref p) != NullIdentity.Pair[c])
 					throw new InvalidOperationException($"TradeskillReply: element const word differs for {itemId:x}"); // [13..16]
 			}
 
@@ -170,11 +169,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 
 		private static int ReadFramed(ReadOnlySpan<byte> body, ref int p)
 		{
-			var c = Read(body, ref p);
-			if (c == 0 || c % ListFrame != 0)
-				throw new InvalidOperationException($"TradeskillReply: list count 0x{c:X} is not a positive multiple of 0x{ListFrame:X}");
-
-			return (int)(c / ListFrame) - 1;
+			return ListFrame.CountOf(Read(body, ref p));
 		}
 
 		private static RecipeRecord ReadRecord(ReadOnlySpan<byte> body, ref int p)
@@ -234,17 +229,17 @@ namespace Faolan.Core.Network.Codecs.Economy
 				.WriteUInt32(e.Key2)
 				.WriteUInt32(e.Key3)
 				.WriteUInt32(e.Key4) // key (dup)
-				.WriteUInt32(ElementConst[0])
-				.WriteUInt32(ElementConst[1])
-				.WriteUInt32(ElementConst[2])
-				.WriteUInt32(ElementConst[3]);
+				.WriteUInt32(NullIdentity.Pair[0])
+				.WriteUInt32(NullIdentity.Pair[1])
+				.WriteUInt32(NullIdentity.Pair[2])
+				.WriteUInt32(NullIdentity.Pair[3]);
 			if (hasTrailing)
 				body.WriteUInt32(e.Trailing);
 		}
 
 		private static void WriteFramedCount(FaolanStream body, int n)
 		{
-			body.WriteUInt32(((uint)n + 1) * ListFrame);
+			body.WriteUInt32(ListFrame.ForCount(n));
 		}
 
 		private static void WriteRecord(FaolanStream body, RecipeRecord r)

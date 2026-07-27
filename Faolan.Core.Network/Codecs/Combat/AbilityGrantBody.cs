@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Combat
@@ -12,11 +13,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class AbilityGrantBody
 	{
 		public const int AddSpecialAbilityBodyLength = 81; // 20 u32 fields + the announce byte
-
-		// The 0x2052 ability-grant body carries this same 16-byte pair twice, identical for every ability and across
-		// every grant burst in the strickenbla combat capture - a fixed category/owner word, not ability-specific.
-		private const uint AddSpecialAbilityConstantA = 0xB290805C;
-		private const uint AddSpecialAbilityConstantB = 0x29E627CA;
 
 		// The 0x2052 body (everything after the opcode), byte-for-byte as retail. The final byte is the announce flag:
 		// 0x01 = "you learned a new ability" toast (first learn), 0x00 = silent re-grant (login) - the only byte that
@@ -38,10 +34,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(ability.Key.Key2)
 				.WriteUInt32(ability.Key.Key3)
 				.WriteUInt32(ability.Key.Key4)
-				.WriteUInt32(AddSpecialAbilityConstantA)
-				.WriteUInt32(AddSpecialAbilityConstantB)
-				.WriteUInt32(AddSpecialAbilityConstantA)
-				.WriteUInt32(AddSpecialAbilityConstantB)
+				// Two unset identity slots - see NullIdentity. They follow the repeated Key1..Key4 above, which is
+				// what shows they are a PAIR of identities rather than one 16-byte constant.
+				.WriteUInt32(NullIdentity.High)
+				.WriteUInt32(NullIdentity.Low)
+				.WriteUInt32(NullIdentity.High)
+				.WriteUInt32(NullIdentity.Low)
 				.WriteUInt32(0x00000001)
 				.WriteUInt32(0x00000000)
 				.WriteByte(Convert.ToByte(announce))
@@ -81,7 +79,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				return false;
 			if (f[10] != data1 || f[11] != data2 || f[12] != data3 || f[13] != data4)
 				return false;
-			if (f[14] != AddSpecialAbilityConstantA || f[15] != AddSpecialAbilityConstantB || f[16] != AddSpecialAbilityConstantA || f[17] != AddSpecialAbilityConstantB)
+			if (f[14] != NullIdentity.High || f[15] != NullIdentity.Low || f[16] != NullIdentity.High || f[17] != NullIdentity.Low)
 				return false;
 			// f[18]/f[19] are a VARIABLE per-grant trailer (kind + value), NOT constants: the server's own grants carry
 			// (1, 0) so Build writes that, but captured retail grants also carry (1, 0x0B) and (2, 0x37F412)/(2, 0x37F298)
