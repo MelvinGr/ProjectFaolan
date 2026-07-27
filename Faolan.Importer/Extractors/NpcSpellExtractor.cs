@@ -41,7 +41,7 @@ namespace Faolan.Importer.Extractors
 				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
-				var body = GetBody(p.Bytes);
+				var body = p.Body;
 				if (body.Length < PayloadOffset)
 					continue;
 				if (BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ApplySpellSubOpcode)
@@ -79,16 +79,5 @@ namespace Faolan.Importer.Extractors
 			return seen.Values.ToList();
 		}
 
-		private static byte[] GetBody(byte[] full)
-		{
-			if (full.Length < 12)
-				return [];
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length
-				? full[bodyStart..]
-				: [];
-		}
 	}
 }

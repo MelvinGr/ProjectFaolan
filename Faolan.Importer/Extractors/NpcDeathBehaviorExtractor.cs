@@ -42,7 +42,7 @@ namespace Faolan.Importer.Extractors
 				if (p.Opcode != RpcOpcode.IirCarrier || !p.IsDownload || p.SubOpcode != DeathBccSubOpcode)
 					continue;
 
-				var body = WorldObjectExtractor.GetBody(p.Bytes);
+				var body = p.Body;
 				if (!TryParseDeathBehavior(body, out var handle, out var behaviorId))
 					continue;
 

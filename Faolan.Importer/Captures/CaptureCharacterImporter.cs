@@ -73,7 +73,7 @@ namespace Faolan.Importer.Captures
 					if (p.Opcode != RpcOpcode.IirCarrier)
 						continue;
 
-					var body = GetBody(p.Bytes);
+					var body = GetScaffoldBody(p);
 					if (body.Length < 38)
 						continue;
 
@@ -436,18 +436,15 @@ namespace Faolan.Importer.Captures
 			return realm.Id;
 		}
 
-		// Returns the packet body INCLUDING its leading u32 length - the scaffold codec's input layout
-		// ([u32 bodyLen][u32 FA015807][...]).
-		private static byte[] GetBody(byte[] packet)
+		// CapturedPacket.Body, but only when it is long enough to BE a scaffold: the codec's input layout starts
+		// [u32 bodyLen][u32 FA015807], so a body under 8 bytes cannot be one. This extra guard is why the check does
+		// not live on CapturedPacket - every other caller wants the body whatever its length.
+		private static byte[] GetScaffoldBody(CapturedPacket packet)
 		{
-			if (packet.Length < 16)
-				return [];
-
-			var headerLen = BinaryPrimitives.ReadUInt32BigEndian(packet.AsSpan(8, 4));
-			var bodyStart = 12 + (int)headerLen;
-			return headerLen > packet.Length || bodyStart + 8 > packet.Length
-				? []
-				: packet[bodyStart..];
+			var body = packet.Body;
+			return body.Length >= 8
+				? body
+				: [];
 		}
 
 		// Parses a retail PlayerAgent character list (the SendCharacterList layout) into name -> entry;

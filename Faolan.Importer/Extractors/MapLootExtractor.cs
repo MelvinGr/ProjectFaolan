@@ -34,7 +34,7 @@ namespace Faolan.Importer.Extractors
 
 				if (p.SubOpcode == MapChangeSubOpcode)
 				{
-					var body = GetBody(p.Bytes);
+					var body = p.Body;
 					if (body.Length >= 38)
 						currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
 					continue;
@@ -43,7 +43,7 @@ namespace Faolan.Importer.Extractors
 				if (p.SubOpcode != LootBagSubOpcode || currentMap == 0)
 					continue;
 
-				foreach (var template in ReadLootTemplates(GetBody(p.Bytes)))
+				foreach (var template in ReadLootTemplates(p.Body))
 					entries.Add(new MapLootPoolEntry(currentMap, template));
 			}
 
@@ -56,17 +56,6 @@ namespace Faolan.Importer.Extractors
 			return all.GroupBy(e => (e.MapId, e.ItemTemplateId)).Select(g => g.First()).ToList();
 		}
 
-		private static byte[] GetBody(byte[] full)
-		{
-			if (full.Length < 12)
-				return [];
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length
-				? full[bodyStart..]
-				: [];
-		}
 
 		// The item template ids inside a loot-bag IIR record (mirrors ItemHashHarvester.ExtractFromLootBag, but yields
 		// only the template ids - the identity quad/hash is harvested separately by the items module). `body` is the

@@ -49,7 +49,7 @@ namespace Faolan.Importer.Extractors
 				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
-				var body = GetBody(p.Bytes);
+				var body = p.Body;
 				if (body.Length < 38)
 					continue;
 
@@ -115,17 +115,6 @@ namespace Faolan.Importer.Extractors
 
 		// Internal (shared with WorldTeleportExtractor, #zone-lines): strip the 12-byte lead + variable header, yielding
 		// the IIR body whose [0:4]=len, [4:8]=subop, [12:16]=handle.
-		internal static byte[] GetBody(byte[] full)
-		{
-			if (full.Length < 12)
-				return [];
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length
-				? full[bodyStart..]
-				: [];
-		}
 
 		// A LootBagFullUpdateIIR object is a TRANSIENT loot-container DROP (skip it) unless it was PLACED by the world
 		// builder, which every placed/scripted container in the corpus signals with a bracketed [script-tag] in its

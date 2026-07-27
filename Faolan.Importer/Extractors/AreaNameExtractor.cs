@@ -57,7 +57,7 @@ namespace Faolan.Importer.Extractors
 				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
-				var body = WorldObjectExtractor.GetBody(p.Bytes);
+				var body = p.Body;
 				if (body.Length < 30)
 					continue; // a CharDCMove body is shorter than the 38 a MapChange needs; each check re-validates its own length
 

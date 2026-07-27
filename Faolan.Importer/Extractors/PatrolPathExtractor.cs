@@ -42,7 +42,7 @@ namespace Faolan.Importer.Extractors
 				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
-				var body = GetBody(p.Bytes);
+				var body = p.Body;
 				if (body.Length < 8)
 					continue;
 
@@ -58,7 +58,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 
 				MoveTaskComposite task;
-				// Parse expects the record starting at the subop; GetBody includes the leading [u32 len], so skip it.
+				// Parse expects the record starting at the subop; the packet Body includes the leading [u32 len], so skip it.
 				try
 				{
 					task = MoveTaskComposite.Parse(body[4..]);
@@ -122,16 +122,5 @@ namespace Faolan.Importer.Extractors
 				CollectPathWaypoints(child, waypoints);
 		}
 
-		private static byte[] GetBody(byte[] full)
-		{
-			if (full.Length < 12)
-				return [];
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length
-				? full[bodyStart..]
-				: [];
-		}
 	}
 }

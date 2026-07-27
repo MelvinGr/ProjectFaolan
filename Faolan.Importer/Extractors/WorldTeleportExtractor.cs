@@ -71,7 +71,7 @@ namespace Faolan.Importer.Extractors
 				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
-				var body = WorldObjectExtractor.GetBody(p.Bytes);
+				var body = p.Body;
 				if (body.Length < 38)
 					continue;
 
@@ -123,7 +123,7 @@ namespace Faolan.Importer.Extractors
 					if (q.Opcode != RpcOpcode.IirCarrier || !q.IsDownload)
 						continue;
 
-					var qbody = WorldObjectExtractor.GetBody(q.Bytes);
+					var qbody = q.Body;
 					if (q.SubOpcode == IntendedTeleportSubOpcode)
 					{
 						if (TryParseProxyDestMap(qbody, out var dm))
@@ -191,7 +191,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// The used object's handle, parsed precisely from the UseObject (0x12) body. Layout after the fixed header
-		// (GetBody yields [0:4]=len, [4:8]=subop, [12:16]=carrier handle): [16:18]=unk1, [18:22]=actionType,
+		// (the packet Body yields [0:4]=len, [4:8]=subop, [12:16]=carrier handle): [16:18]=unk1, [18:22]=actionType,
 		// [22:26]=protobuf length, [26 : 26+pblen]=protobuf args, then the trailer [from u32][target u32][subaction u32]
 		// where `target` is the used object's handle (from = its typetag). A precise parse (vs scanning every 4-byte
 		// word) avoids a false hit against the broader SimpleDynel candidate set. Only a handle that is actually a

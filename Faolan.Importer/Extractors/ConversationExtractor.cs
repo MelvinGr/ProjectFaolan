@@ -12,10 +12,6 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
-	// A captured on-wire packet with the metadata the extractors need, uniform across the .json dumps and the
-	// .pcapng analyzer output.
-	public readonly record struct CapturedPacket(long Ticks, bool IsDownload, uint Opcode, uint SubOpcode, byte[] Bytes);
-
 	// One extracted conversation SCREEN, keyed by its answer-index PATH within the NPC's dialogue tree. The path is
 	// the sequence of option indices the player picked to reach this screen ("" = the greeting, "0" = after picking
 	// option 0, "0>1" = then option 1, ...). Packets are the ordered server responses to replay for that screen.
@@ -90,7 +86,7 @@ namespace Faolan.Importer.Extractors
 			{
 				if (p is { IsDownload: false, Opcode: RpcOpcode.IirCarrier, SubOpcode: InteractSubOpcode })
 				{
-					var body = GetBody(p.Bytes);
+					var body = p.Body;
 					if (body.Length < 26 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)) != TalkToNpcActionType)
 						continue;
 
@@ -117,7 +113,7 @@ namespace Faolan.Importer.Extractors
 				{
 					// The player picked option `idx`: the current screen is complete (emit it), and the responses that
 					// follow belong to the child screen reached by that option.
-					var body = GetBody(p.Bytes);
+					var body = p.Body;
 					if (body.Length < 4)
 						continue;
 
@@ -136,7 +132,7 @@ namespace Faolan.Importer.Extractors
 					// ""), and this is the quest's FIRST appearance in the capture (a restore re-sends a quest first seen
 					// at login). That pins the accept to the dialogue node the player walked. Always remember the quest so
 					// later re-sends aren't mistaken for grants.
-					var body = GetBody(p.Bytes);
+					var body = p.Body;
 					if (body.Length >= 25)
 					{
 						var questId = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(21, 4));
@@ -186,7 +182,7 @@ namespace Faolan.Importer.Extractors
 				if (p is not { IsDownload: false, Opcode: RpcOpcode.IirCarrier, SubOpcode: InteractSubOpcode })
 					continue;
 
-				var body = GetBody(p.Bytes);
+				var body = p.Body;
 				if (body.Length < 26 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(18, 4)) != TalkToNpcActionType)
 					continue;
 
@@ -261,7 +257,7 @@ namespace Faolan.Importer.Extractors
 				if (!p.IsDownload || p.Opcode != RpcOpcode.IirCarrier || p.SubOpcode != SpawnSubOpcode)
 					continue;
 
-				var body = GetBody(p.Bytes);
+				var body = p.Body;
 				if (body.Length < 16)
 					continue;
 
@@ -274,18 +270,6 @@ namespace Faolan.Importer.Extractors
 			return map;
 		}
 
-		// The 0x2000 body within the full on-wire packet: [len4][crc4][headerLen4][header][body].
-		private static byte[] GetBody(byte[] full)
-		{
-			if (full.Length < 12)
-				return [];
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length
-				? full[bodyStart..]
-				: [];
-		}
 
 		// The TalkToNpc action's args message. This is a CommandMessage (the client-recovered BCC payload), NOT the
 		// old hand-reconstructed "ProtoInteractIIR" - see Gitea #387. It used to be walked by a hand-written

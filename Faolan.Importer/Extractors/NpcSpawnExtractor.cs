@@ -66,7 +66,7 @@ namespace Faolan.Importer.Extractors
 				if (p.Opcode != RpcOpcode.IirCarrier)
 					continue;
 
-				var body = GetBody(p.Bytes);
+				var body = p.Body;
 				if (body.Length < 38)
 					continue;
 
@@ -100,7 +100,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				var body = GetBody(p.Bytes);
+				var body = p.Body;
 				var subop = body.Length >= 8
 					? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
 					: 0;
@@ -164,17 +164,6 @@ namespace Faolan.Importer.Extractors
 			return string.Empty;
 		}
 
-		private static byte[] GetBody(byte[] full)
-		{
-			if (full.Length < 12)
-				return [];
-
-			var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(full.AsSpan(8, 4));
-			var bodyStart = 12 + headerLen;
-			return bodyStart <= full.Length
-				? full[bodyStart..]
-				: [];
-		}
 
 		private static bool IsPrintableName(ReadOnlySpan<byte> s)
 		{
