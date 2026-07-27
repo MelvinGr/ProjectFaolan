@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Guild
 {
@@ -32,7 +33,6 @@ namespace Faolan.Core.Network.Codecs.Guild
 		public const int CategoryCount = 4; // Total(0), Valor(1), Glory(2), Artistry(3)
 		public const int MaxRanked = 20; // retail lists the top 20 guilds per tab
 
-		public const uint GuildClass = 0x0000DEB7; // the guild ID32 type word (Guild.WireType)
 		public const uint ListMultiplier = ListFrame.Unit; // count-framed-list word == (count + 1) * 0x3F1
 
 		// Sections[category] = the ranked entries for that tab (index 0..3 == Total/Valor/Glory/Artistry).
@@ -48,7 +48,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 			s.WriteUInt32(ListWord(Records.Count));
 			foreach (var r in Records)
 			{
-				s.WriteUInt32(GuildClass).WriteUInt32(r.Id).WriteString(r.Name);
+				s.WriteUInt32(EntityClass.Guild).WriteUInt32(r.Id).WriteString(r.Name);
 				s.WriteUInt64(r.Total).WriteUInt64(r.Valor).WriteUInt64(r.Glory).WriteUInt64(r.Artistry);
 				s.WriteUInt32(r.Members).WriteUInt32(r.Level);
 			}
@@ -58,7 +58,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 			{
 				s.WriteUInt32(category).WriteUInt32(ListWord(Sections[category].Count));
 				foreach (var e in Sections[category])
-					s.WriteUInt32(GuildClass).WriteUInt32(e.Id).WriteUInt64(e.Renown).WriteUInt32(e.PrevRank);
+					s.WriteUInt32(EntityClass.Guild).WriteUInt32(e.Id).WriteUInt64(e.Renown).WriteUInt32(e.PrevRank);
 			}
 
 			s.WriteUInt32(NextUpdateUnix);
@@ -172,8 +172,8 @@ namespace Faolan.Core.Network.Codecs.Guild
 
 		private static void RequireGuildClass(uint word)
 		{
-			if (word != GuildClass)
-				throw new InvalidOperationException($"expected guild class {GuildClass:X8}, got {word:X8}");
+			if (word != EntityClass.Guild)
+				throw new InvalidOperationException($"expected guild class {EntityClass.Guild:X8}, got {word:X8}");
 		}
 
 		// One guild's catalog row. Total is derived (valor + glory + artistry) - the wire carries it explicitly but it

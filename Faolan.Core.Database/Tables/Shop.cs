@@ -18,9 +18,6 @@ namespace Faolan.Core.Database.Tables
 		// The shop container type inside the content's ProtoInventoryGame.inventory_id (the bag is 104).
 		public const uint ContainerType = 111; // TODO: Should just use the enum
 
-		// The shop ID32 type word on the wire (0x0000C75B).
-		public const uint WireType = 0x0000C75B;
-
 		// The vendor NPC TYPE this shop belongs to (the stable per-type key).
 		public uint NpcTemplateId { get; set; }
 

@@ -13,9 +13,6 @@ namespace Faolan.Core.Database.Tables
 	[Index(nameof(RealmId), nameof(Name), IsUnique = true)]
 	public class Guild : BaseEntity
 	{
-		// The ID32 type word for guilds on the wire (characters use 0x0000C350).
-		public const uint WireType = 0x0000DEB7;
-
 		// The realm this guild belongs to (#324). Pinned at creation from the founder's realm - NOT derived from
 		// members (a just-created or emptied guild has no member to infer from). Every guild query is realm-scoped so
 		// two realm processes on the shared DB never cross-read. Backfilled to the existing single realm on migration.

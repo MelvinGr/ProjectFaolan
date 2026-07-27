@@ -15,6 +15,7 @@ namespace Faolan.Core.Network.Constants
 		public const uint Character = 0x0000C350; // 50000 - players / NPCs / creatures (the n3Char/creature class)
 		public const uint ClimbingDynel = 0x0000C87D; // 51325 - climbing dynels (1FD6412B)
 		public const uint Destructible = 0x0000C879; // 51321 - destructible objects (6BD56736)
+		public const uint Guild = 0x0000DEB7; // 57015 - player guilds (the ID32 a guild is addressed by)
 		public const uint LootBag = 0x0000C87A; // 51322 - loot bags / containers (F096251E)
 		public const uint Shop = 0x0000C75B; // 50011 - vendor shop containers (the ID32 type a shop's content is addressed by)
 		public const uint SimpleDynel = 0x0000C878; // 51320 - static decor / props (66AEDD50)

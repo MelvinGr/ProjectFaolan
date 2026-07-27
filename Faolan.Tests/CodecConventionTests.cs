@@ -48,7 +48,7 @@ namespace Faolan.Tests
 		private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\]|\\\\.)*\"");
 
 		// The entity object-class ids, in the 4- and 8-digit spellings both have been written in.
-		private static readonly Regex EntityClassLiteral = new(@"\b0x0*(C350|C748|C75B|C878|C879|C87A|C87D)\b", RegexOptions.IgnoreCase);
+		private static readonly Regex EntityClassLiteral = new(@"\b0x0*(C350|C748|C75B|C878|C879|C87A|C87D|DEB7)\b", RegexOptions.IgnoreCase);
 
 		private static IEnumerable<Type> CodecTypes => typeof(ICodec<>).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith(CodecsNamespace, StringComparison.Ordinal));
 
@@ -88,13 +88,20 @@ namespace Faolan.Tests
 		[Fact]
 		public void EntityClassWordComesFromEntityClass_NotAHandRolledLiteral()
 		{
-			string[] roots = [TestPaths.Repo("Faolan.Core.Network"), TestPaths.Repo("Faolan"), TestPaths.Repo("Faolan.Importer")];
+			// Faolan.Core.Database is in scope because that is where two of them were hiding: the guild and shop class
+			// words were `Guild.WireType` / `Shop.WireType` on the EF entities, a layer that has no business owning a
+			// wire constant and that the first version of this test did not look at.
+			string[] roots =
+			[
+				TestPaths.Repo("Faolan.Core.Network"), TestPaths.Repo("Faolan"), TestPaths.Repo("Faolan.Importer"), TestPaths.Repo("Faolan.Core.Database"), TestPaths.Repo("Faolan.Core")
+			];
 			var offenders = new List<string>();
 
 			foreach (var file in roots
 				         .Where(Directory.Exists)
 				         .SelectMany(r => Directory.EnumerateFiles(r, "*.cs", SearchOption.AllDirectories))
-				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")))
+				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") &&
+				                     !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}")))
 			{
 				// EntityClass.cs IS the registry, and NpcSpawnScaffold's blobs are verbatim capture-derived bytes.
 				var name = Path.GetFileName(file);

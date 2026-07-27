@@ -126,7 +126,7 @@ namespace Faolan.CSPlayerAgent
 				// [charId][guild ID32][03][02][charId][01] - the constants are not decoded (likely rank/flags);
 				// taken verbatim from the capture (Dahviie, same-guild reply).
 				await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateMember,
-					b => b.WriteUInt32(targetId).WriteUInt32(Guild.WireType).WriteUInt32(targetGuildId).WriteByte(0x03).WriteByte(0x02).WriteUInt32(targetId).WriteByte(0x01)));
+					b => b.WriteUInt32(targetId).WriteUInt32(EntityClass.Guild).WriteUInt32(targetGuildId).WriteByte(0x03).WriteByte(0x02).WriteUInt32(targetId).WriteByte(0x01)));
 				return;
 			}
 
@@ -140,7 +140,7 @@ namespace Faolan.CSPlayerAgent
 			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateOther,
 				b => b
 					.WriteUInt32(targetId)
-					.WriteUInt32(Guild.WireType)
+					.WriteUInt32(EntityClass.Guild)
 					.WriteUInt32(targetGuildId)
 					.WriteByte(0x03)
 					.WriteUInt32(targetGuildId)
@@ -432,7 +432,7 @@ namespace Faolan.CSPlayerAgent
 		// accept/decline dialog. Byte-exact against the captured Kyloth->Hoxxling invite (GuildPacketTests).
 		internal static void WriteGuildInviteBody(FaolanStream s, Guild guild, uint inviteeId, string inviterName) // TODO: Just inline, (remove the test?)
 		{
-			s.WriteUInt32(Guild.WireType).WriteUInt32(guild.Id).WriteString(guild.Name).WriteUInt32(EntityClass.Character).WriteUInt32(inviteeId).WriteString(inviterName);
+			s.WriteUInt32(EntityClass.Guild).WriteUInt32(guild.Id).WriteString(guild.Name).WriteUInt32(EntityClass.Character).WriteUInt32(inviteeId).WriteString(inviterName);
 		}
 
 		// One member record of the roster/joined/update packets (75 bytes + name):
