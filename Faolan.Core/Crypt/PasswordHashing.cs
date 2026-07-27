@@ -40,30 +40,15 @@ namespace Faolan.Core.Crypt
 			return $"{Prefix}{Iterations}${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
 		}
 
-		public static bool IsHashed(string? stored)
-		{
-			return stored != null && stored.StartsWith(Prefix, StringComparison.Ordinal);
-		}
-
-		// Does the supplied password match the stored value? Only a real PBKDF2 hash can match - an empty, "-",
-		// plaintext or otherwise malformed stored value matches NOTHING rather than everything.
-		public static bool Matches(string? stored, string supplied)
-		{
-			return Verify(supplied, stored);
-		}
-
 		// Verify a supplied password against a stored PBKDF2 hash. False for non-hash / malformed input.
 		public static bool Verify(string password, string? stored)
 		{
-			if (!IsHashed(stored))
-				return false;
-
-			var parts = stored![Prefix.Length..].Split('$');
-			if (parts.Length != 3 || !int.TryParse(parts[0], out var iterations))
-				return false;
-
 			try
 			{
+				var parts = stored?[Prefix.Length..]?.Split('$');
+				if (parts?.Length != 3 || !int.TryParse(parts[0], out var iterations))
+					return false;
+
 				var salt = Convert.FromBase64String(parts[1]);
 				var expected = Convert.FromBase64String(parts[2]);
 				var actual = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, expected.Length);

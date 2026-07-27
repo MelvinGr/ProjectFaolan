@@ -19,7 +19,7 @@ namespace Faolan.Web.Auth
 
 		public PasswordVerificationResult VerifyHashedPassword(Account user, string hashedPassword, string providedPassword)
 		{
-			return PasswordHashing.Matches(hashedPassword, providedPassword)
+			return PasswordHashing.Verify(providedPassword, hashedPassword)
 				? PasswordVerificationResult.Success
 				: PasswordVerificationResult.Failed;
 		}

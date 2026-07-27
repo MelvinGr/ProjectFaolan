@@ -52,7 +52,7 @@ namespace Faolan.UniverseAgent
 					bool authenticated;
 					if (LoginEncryption.Decrypt(loginKey) is { } credentials)
 					{
-						authenticated = credentials.Username == account.UserName && credentials.Challenge == account.AuthChallenge && PasswordHashing.Matches(account.Password, credentials.Password);
+						authenticated = credentials.Username == account.UserName && credentials.Challenge == account.AuthChallenge && PasswordHashing.Verify(credentials.Password, account.Password);
 
 						if (authenticated)
 							Logger.LogInformation("UniverseAgent login: password validated for {UserName} (patched client).", account.UserName);

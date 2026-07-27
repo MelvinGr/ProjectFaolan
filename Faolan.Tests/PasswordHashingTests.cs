@@ -28,18 +28,12 @@ namespace Faolan.Tests
 			Assert.True(PasswordHashing.Verify("hunter2", b));
 		}
 
-		[Theory, InlineData(null, false), InlineData("", false), InlineData("plaintext", false), InlineData("pbkdf2_sha256$1$x$y", true)]
-		public void IsHashed_DetectsThePrefix(string? stored, bool expected)
-		{
-			Assert.Equal(expected, PasswordHashing.IsHashed(stored));
-		}
-
 		[Fact]
 		public void Matches_HashedPassword()
 		{
 			var hash = PasswordHashing.Hash("s3cret");
-			Assert.True(PasswordHashing.Matches(hash, "s3cret"));
-			Assert.False(PasswordHashing.Matches(hash, "nope"));
+			Assert.True(PasswordHashing.Verify("s3cret", hash));
+			Assert.False(PasswordHashing.Verify("nope", hash));
 		}
 
 		// The plaintext path is GONE, and this is the test that would have passed before and must fail now: a stored
@@ -47,7 +41,7 @@ namespace Faolan.Tests
 		[Theory, InlineData("oldpw", "oldpw"), InlineData("oldpw", "other"), InlineData("letmein", "letmein")]
 		public void Matches_PlaintextStoredValue_NeverAuthenticates(string stored, string supplied)
 		{
-			Assert.False(PasswordHashing.Matches(stored, supplied));
+			Assert.False(PasswordHashing.Verify(supplied, stored));
 		}
 
 		// The "no password set" sentinels are GONE too: empty / null / "-" used to accept ANY password, which is how
@@ -56,8 +50,8 @@ namespace Faolan.Tests
 		[Theory, InlineData(null), InlineData(""), InlineData("-")]
 		public void Matches_NoPasswordSentinels_NoLongerAcceptAnything(string? stored)
 		{
-			Assert.False(PasswordHashing.Matches(stored, "anything"));
-			Assert.False(PasswordHashing.Matches(stored, ""));
+			Assert.False(PasswordHashing.Verify("anything", stored));
+			Assert.False(PasswordHashing.Verify("", stored));
 		}
 
 		// The default account a fresh database is seeded with must actually log in with the documented password -
@@ -67,9 +61,9 @@ namespace Faolan.Tests
 		{
 			var stored = PasswordHashing.Hash(PasswordHashing.DefaultSeedPassword);
 
-			Assert.True(PasswordHashing.Matches(stored, PasswordHashing.DefaultSeedPassword));
-			Assert.False(PasswordHashing.Matches(stored, ""));
-			Assert.False(PasswordHashing.Matches(stored, "Faolan")); // case-sensitive, unlike the username
+			Assert.True(PasswordHashing.Verify(PasswordHashing.DefaultSeedPassword, stored));
+			Assert.False(PasswordHashing.Verify("", stored));
+			Assert.False(PasswordHashing.Verify("Faolan", stored)); // case-sensitive, unlike the username
 		}
 
 		[Fact]
@@ -78,9 +72,9 @@ namespace Faolan.Tests
 			const string typed = "letmein";
 			var hash = PasswordHashing.Hash(typed);
 
-			Assert.True(PasswordHashing.Matches(hash, typed));
-			Assert.False(PasswordHashing.Matches(hash, "letmein!"));
-			Assert.False(PasswordHashing.Matches(hash, ""));
+			Assert.True(PasswordHashing.Verify(typed, hash));
+			Assert.False(PasswordHashing.Verify("letmein!", hash));
+			Assert.False(PasswordHashing.Verify("", hash));
 		}
 
 		[Fact]
