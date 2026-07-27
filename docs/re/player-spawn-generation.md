@@ -117,6 +117,35 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
 Three of those fields are decoded structurally but NOT semantically (the tail records, the entry kind flag, the
 third pair list's `(975, 0)` element) — carried verbatim; open work tracked in Gitea #466.
 
+### The client's readers (V1)
+
+The chain, recovered by decompiling the vtable slot-8 readers (`tools/ghidra/DecompAddrs.java`):
+
+| Function | Is |
+|---|---|
+| `FUN_01121c00` | `SimpleCharFullUpdateIIR_t::ReadSubClass` (`simplecharfullupdateiir.cpp`), version byte 5 |
+| `FUN_01122b10` | the buff/timer list — `0x3F1`-framed, per element `[u32]` + a ~56-byte struct |
+| `FUN_0145ac80` | `CoreCharacterFullUpdateIIR::ReadSubClass` (`CoreCharacter\IIR\CoreCharacterFullUpdateIIR.cpp`), version byte `'A'` |
+| `FUN_00cbfb80` | the length-prefixed embedded protobuf |
+| `FUN_010087b0` | a PLAIN-counted list, per element `[u32][u32][u32]` + a length-prefixed **string** |
+| `FUN_0079cfd0` | a `0x3F1`-framed list, per element `[u32][u8]` (5 bytes) |
+| `FUN_0145ba10` | a `0x3F1`-framed list (bound 30001), per element `FUN_014578e0` = `[u32][u32][u32][u8]` = **13 bytes** |
+| `FUN_004d5900` | a `0x3F1`-framed list of 8-byte pairs; the client **discards the first u32 and keeps the second** |
+
+This independently confirms three of the six corrections above: the head list really is a plain-counted
+`std::vector<u32>` (built at `+0x13c/+0x140/+0x144`), the 13-byte tail record is a real framed-list element down to
+its trailing byte, and the closing pair list really is count-framed where the two before it are plain-counted.
+
+⚠️ It also shows our field BOUNDARIES are not the client's. `FUN_0079cfd0` reads its 5-byte elements as
+`[u32 id][u8 rank]` behind a LEADING frame word, where `PlayerSpawnScaffoldCodec` carves `[u8 rank][u32 id]` groups
+and treats the frame word as a trailing terminator. Both reproduce the same bytes — the codec round-trips all 259
+captured bodies byte-exact — so this is a naming/semantics discrepancy, not a parsing bug, but the client is the
+authority and the two should be reconciled. Open on #466.
+
+**Semantic lead for the pair lists:** the reader asserts
+`g_Int32StatsOrder.size() == m_CoreCharacterMessage.generic_stats_size()`, so the pair lists are **stats** —
+positional against a global `g_Int32StatsOrder` table rather than self-describing.
+
 ⚠️ Five of the six corrections above are **the same mistake**: a count word whose list is empty in most captures
 reads as a closing constant. `ListFrame` documents the trap for `0x7E2`; `0x3F1` is the `ForCount(0)` face of it and
 is just as misleading. All 259 captured player-scaffold bodies now parse AND regenerate byte-exact
