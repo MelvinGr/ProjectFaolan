@@ -142,9 +142,15 @@ and treats the frame word as a trailing terminator. Both reproduce the same byte
 captured bodies byte-exact — so this is a naming/semantics discrepancy, not a parsing bug, but the client is the
 authority and the two should be reconciled. Open on #466.
 
-**Semantic lead for the pair lists:** the reader asserts
-`g_Int32StatsOrder.size() == m_CoreCharacterMessage.generic_stats_size()`, so the pair lists are **stats** —
-positional against a global `g_Int32StatsOrder` table rather than self-describing.
+**`generic_stats` is POSITIONAL against a client-side order table.** The reader asserts
+`g_Int32StatsOrder.size() == m_CoreCharacterMessage.generic_stats_size()`, and `FUN_01458d40` consumes the two
+together — `g_Int32StatsOrder[i]` is the STAT ID for the value at `generic_stats[i]`. So the protobuf carries
+values with no ids, and the ids live in a global the client builds at runtime (`DAT_02d25da4`, a `std::vector<u32>`;
+`FUN_01e14b00` is only its destructor, so the population is elsewhere and a static dump yields nothing).
+
+⚠️ This says nothing about the wire pair lists. The assert sits *between* the second pair loop and `FUN_004d5900`
+and refers to the embedded protobuf message, not to the pairs just read — those remain unnamed. (An earlier version
+of this section claimed the pair lists were the stats; that was a misreading of what the assert guards.)
 
 ⚠️ Five of the six corrections above are **the same mistake**: a count word whose list is empty in most captures
 reads as a closing constant. `ListFrame` documents the trap for `0x7E2`; `0x3F1` is the `ForCount(0)` face of it and
