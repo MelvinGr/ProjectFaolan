@@ -5,6 +5,24 @@ namespace Faolan.Core.Enums
 	///     Two on-wire encodings are confirmed:
 	///     - 64-bit big-endian: (statId &lt;&lt; 32) | rawValue
 	///     - compact 7-byte big-endian: 3-byte statId + 4-byte rawValue
+	///     <para>
+	///         Member names are held to the client's own LDB 615 names by
+	///         <c>Faolan.Importer --report ldb-stat-names</c>, which prints every divergence. The divergences it still
+	///         reports are DELIBERATE, so don't "fix" them:
+	///         <list type="bullet">
+	///             <item>
+	///                 <b>Health / Stamina / Mana.</b> LDB gives the current and max ids the SAME name ("Health" for
+	///                 both 0x0001 and 0x001B), which C# cannot express - hence the Current/Max suffixes.
+	///             </item>
+	///             <item>
+	///                 <b>Names carrying a decode the client's label does not.</b> 0x0014 is "BCC State" to the
+	///                 client and <see cref="CombatMode" /> here because that is what it was proven to DO;
+	///                 0x00BF "Last Concrete Playfield Instance" is <see cref="PlayfieldToken" />; 0x015E "Next XP"
+	///                 is <see cref="MaxExp" />; 0x0039 "Last XP" is <see cref="ExpCurrentLevelBase" />.
+	///             </item>
+	///             <item><b>Exp vs the client's XP</b> - a spelling choice the whole codebase shares.</item>
+	///         </list>
+	///     </para>
 	/// </summary>
 	public enum CharacterStatId : uint
 	{
@@ -45,12 +63,14 @@ namespace Faolan.Core.Enums
 		StaminaMax = 0x01F9,
 		ManaCurrent = 0x01FA,
 		ManaMax = 0x01FB,
-		KillingBlows = 0x0290,
-		Death = 0x0292,
-		AnnihilationWin = 0x029A,
-		AnnihilationLose = 0x029B,
-		CaptureSkullWin = 0x029C,
-		CaptureSkullLose = 0x029D,
+		// The PvP scoreboard counters, named as the client's own LDB 615 names them (2026-07-27) - they were singular
+		// and one was an interpretation ("killing blows" for what the client just calls kills).
+		Kills = 0x0290,
+		Deaths = 0x0292,
+		AnnihilationWins = 0x029A,
+		AnnihilationLosses = 0x029B,
+		CaptureSkullWins = 0x029C,
+		CaptureSkullLosses = 0x029D,
 		// The out-of-combat regen rows the character sheet shows (#442). The client SEEDS 278 -> 2000 and 279 -> 1000
 		// (display 20.00 / 10.00) and adds an attribute "trickledown" on top at display time; 280's base is CLASS data,
 		// carried by the class-feat template (0 for a class with no mana base, 2000/2200 for the casters).
@@ -136,7 +156,7 @@ namespace Faolan.Core.Enums
 		ProtectionFire = 0x039E, // LDB 926
 		ProtectionHoly = 0x03A0, // LDB 928
 		ProtectionUnholy = 0x03A1, // LDB 929
-		PerceptionSkill = 0x033E,
+		Perception = 0x033E, // LDB 830; the "Skill" suffix was ours, the client names it plain Perception
 		OutOfCombatMovementSpeed = 0x00F1,
 		BowRangeModifier = 0x0123,
 		XpModifier = 0x013F,

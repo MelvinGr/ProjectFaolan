@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.GameServer.Combat;
@@ -50,6 +51,27 @@ namespace Faolan.Tests
 			Assert.Equal(320u, vitals.MaxHealth);
 			Assert.Equal(320u, vitals.Health); // seeds full
 			Assert.Equal(179u, vitals.MaxStamina);
+		}
+
+		// #450: a vitals push has to carry the MAX ids, not just the current ones. The bug this pins was a
+		// currents-only sender used by every path that CHANGES a max: the client only ever learns a max when one is
+		// sent, so it kept the value it was seeded with at world entry and a `.level 80` rendered `4285 / 1270` -
+		// current at 3.4x the max. Asserting all SIX ids is what a currents-only block fails.
+		[Fact]
+		public void VitalsBlock_CarriesTheMaxIdsAndNotJustTheCurrentOnes()
+		{
+			var vitals = EntityVitals.FromCharacter(Guardian(320, 179));
+			vitals.Health = 100; // current below max, so the two ids cannot be confused for each other
+			vitals.Stamina = 50;
+
+			var ids = vitals.ToVitalsBlock().Records;
+
+			Assert.Equal(100u * 100, ids.Single(r => r.StatId == CharacterStatId.HealthCurrent).RawValue);
+			Assert.Equal(320u * 100, ids.Single(r => r.StatId == CharacterStatId.HealthMax).RawValue);
+			Assert.Equal(50u * 100, ids.Single(r => r.StatId == CharacterStatId.StaminaCurrent).RawValue);
+			Assert.Equal(179u * 100, ids.Single(r => r.StatId == CharacterStatId.StaminaMax).RawValue);
+			Assert.Contains(ids, r => r.StatId == CharacterStatId.ManaCurrent);
+			Assert.Contains(ids, r => r.StatId == CharacterStatId.ManaMax);
 		}
 
 		private static Character Guardian(uint hp, uint stamina)

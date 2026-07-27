@@ -125,6 +125,33 @@ namespace Faolan.GameServer.Combat
 			return entity.Vitals ??= EntityVitals.FromCharacter(client.Session.Character);
 		}
 
+		/// <summary>
+		///     Reseeds the LIVE entity's three pools (max and current) from the character's persisted
+		///     <see cref="CharacterMaxStats" />, and hands the vitals back so the caller can push them.
+		/// </summary>
+		/// <remarks>
+		///     Every path that CHANGES a max has to do this and then send <see cref="EntityVitals.ToVitalsBlock" />.
+		///     Both halves matter: the live entity owns its own maxima, so skipping the reseed leaves the world tick
+		///     pushing the STALE max straight back; and the max ids only ever reach the client when something sends
+		///     them, so skipping the push leaves the client's bar on whatever it was seeded with at world entry
+		///     (#450 - a `.level 80` left the client rendering `4285 / 1270`, current at 3.4x the max, because the
+		///     GM path pushed the new CURRENT alone).
+		/// </remarks>
+		public EntityVitals ReseedFromMaxStats(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			var vitals = GetOrAddPlayerVitals(client);
+
+			vitals.MaxHealth = max.Health;
+			vitals.MaxStamina = max.Stamina;
+			vitals.MaxMana = max.Mana;
+			vitals.Health = max.Health;
+			vitals.Stamina = max.Stamina;
+			vitals.Mana = max.Mana;
+			return vitals;
+		}
+
 		// Applies `damage` to an NPC and pushes its 0x96B8DC59 health update; on death, runs the kill lifecycle
 		// (despawn + scheduled respawn). Vitals resolve from the WORLD MODEL when the target is a model NPC (the
 		// authoritative owner), else fall back to the per-session store (e.g. the built-NPC test). Shared by the melee
@@ -522,14 +549,7 @@ namespace Faolan.GameServer.Combat
 			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, character.Level, levelsGained))
 				await SendWorldFeedback(killer, AttributeChangedFeedback.Build(instance, attributeId, amount));
 
-			var vitals = GetOrAddPlayerVitals(killer);
-			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
-			vitals.MaxHealth = max.Health;
-			vitals.MaxStamina = max.Stamina;
-			vitals.MaxMana = max.Mana;
-			vitals.Health = max.Health;
-			vitals.Stamina = max.Stamina;
-			vitals.Mana = max.Mana;
+			var vitals = ReseedFromMaxStats(killer);
 
 			var block = vitals
 				.ToVitalsBlock()

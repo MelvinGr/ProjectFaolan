@@ -525,25 +525,12 @@ namespace Faolan.GameServer
 				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots, b => ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(b, deathPosition, spots)));
 		}
 
-		// Pushes the character's own vitals from its persisted MaxStats (or class/level defaults if a legacy
-		// character has none). Current==max until per-vital current values are tracked.
-		private static Task SendVitals(INetworkClient client)
-		{
-			var character = client.Session.Character;
-			var stats = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
-
-			return SendVitals(client, stats.Health, stats.Stamina, stats.Mana);
-		}
-
-		// Convenience: push explicit vitals (Health/Stamina/Mana). Values are player-facing; the
-		// CharacterStatBlock applies the ×100 vitals scale.
-		private static Task SendVitals(INetworkClient client, uint health, uint stamina, uint mana)
-		{
-			// Emit the values under the CURRENT ids (0x001B/0x01F8/0x01FA) - matches the retail full-spawn announce, 			// which sends current (== max at full health) and lets the client show full bars; max rides the snapshot.
-			var stats = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, health).Set(CharacterStatId.StaminaCurrent, stamina).Set(CharacterStatId.ManaCurrent, mana);
-
-			return SendStatUpdate(client, stats, client.Session.Character.Id);
-		}
+		// A vitals push emits the whole EntityVitals.ToVitalsBlock (current AND max) - there is deliberately no
+		// currents-only sender here any more. There used to be a `SendVitals` pair that emitted the three CURRENT ids
+		// alone, justified as "matches the retail full-spawn announce; max rides the snapshot". That holds for the
+		// SPAWN ANNOUNCE and nowhere else: the max ids reach the client only when something sends them, so every
+		// later max change was invisible and the bar kept its world-entry seed (#450). Use
+		// CombatService.ReseedFromMaxStats(client).ToVitalsBlock() when a max changes.
 
 		// Pushes a ChatTextIIR (raw remoteformat XML) to the client's chat window. Addressed to the player's
 		// GameInterface instance, on the world conversation.
