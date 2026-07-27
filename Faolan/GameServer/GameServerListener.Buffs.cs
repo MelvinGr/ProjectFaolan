@@ -428,11 +428,11 @@ namespace Faolan.GameServer
 		///         <c>CombatService.ReseedFromMaxStats</c> - that one is for a level change, where full pools are correct.
 		///     </para>
 		///     <para>
-		///         <b>The push is CURRENTS ONLY, from the captures.</b> The <c>0x96B8DC59</c> following a c2s equip
-		///         (<c>0x2a8a1b49</c>) carries <c>0x001B</c>/<c>0x01F8</c>/<c>0x01FA</c> and never a max - the client
-		///         derives the max from the item it just equipped, so sending one would fight its arithmetic. A
-		///         level-up is the contrary case (all six ids, 13-14 occurrences in the corpus), which is why
-		///         <c>CombatService.ReseedFromMaxStats</c> pushes the whole block and this does not.
+		///         <b>It pushes NOTHING.</b> Retail's post-equip <c>0x96B8DC59</c> does carry the current pools
+		///         (<c>0x001B</c>/<c>0x01F8</c>/<c>0x01FA</c>, never a max - a level-up is the contrary case with all
+		///         six), but our pool VALUES are wrong at the source, so emitting them made the HUD render a mana bar
+		///         an Assassin should not have. Detail at the call site and in #473; the recompute is the whole job
+		///         here until the values are right.
 		///     </para>
 		///     <para>
 		///         ⚠️ Wired into equip and unequip. NOT yet wired into the WEAPON-SET swap (#400,
@@ -456,18 +456,19 @@ namespace Faolan.GameServer
 			// a BUFF change would push, and retail's post-equip update carries none of it.
 			await _buffStats.Sync(entity);
 
-			if (entity.Vitals is not { } vitals)
-				return;
-
-			// Retail's shape, from the corpus: the 0x96B8DC59 after a c2s equip carries the three CURRENT pools and
-			// never a max, because the client derives the max from the item it just equipped. (A level-up is the
-			// contrary case - all six ids - which is why CombatService.ReseedFromMaxStats pushes the whole block and
-			// this does not.) Sending a max here would fight the client's own arithmetic.
-			await SendStatUpdate(client, new CharacterStatBlock()
-					.Set(CharacterStatId.HealthCurrent, vitals.Health)
-					.Set(CharacterStatId.StaminaCurrent, vitals.Stamina)
-					.Set(CharacterStatId.ManaCurrent, vitals.Mana),
-				character.Id);
+			// ⚠️ NOTHING IS PUSHED TO THE CLIENT HERE, on purpose - the internal recompute above is the whole job.
+			//
+			// Retail DOES send the current pools after an equip (0x001B / 0x01F8 / 0x01FA, never a max - the client
+			// derives the max from the item itself). We do not, yet, because the values we would send are wrong at the
+			// source: our current mana for a geared Assassin is 0 where retail's is 74, because the snapshot takes it
+			// from the persisted CharacterMaxStats instead of the live geared vitals. Pushing `ManaCurrent = 0`
+			// against the client's own max of 74 made the HUD draw a mana bar the class does not show - retail has
+			// that same 74 mana and NO bar, because its pool is FULL rather than empty (retail sheet, AssassinL23:
+			// `Mana 74 / 74`, no HUD bar).
+			//
+			// So the push waits on the pool VALUES being right, which is #450's "is our base correct" question rather
+			// than anything about equipping. Combat, regen and the bar-fill clamp all read the recomputed values above
+			// and are unaffected. See #473.
 		}
 
 		private async Task SyncBuffStats(INetworkClient client)
