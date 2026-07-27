@@ -49,31 +49,10 @@ namespace Faolan.UniverseAgent
 					var loginKey = body.ReadString();
 					var account = client.Session.Account;
 
-					// Decrypt the DH+TEA login block. This only succeeds for a PATCHED client (one using our DH
-					// public key - see Faolan.ClientLauncher/ClientExePatcher.cs). When it decrypts and the challenge
-					// round-trips we enforce the real password; an unpatched client (block undecryptable to us, or a
-					// challenge mismatch) proved nothing but the account NAME, and what happens to it is the
-					// deployment's call - Login:AllowUnpatchedClients, default true (the legacy accept-any behaviour,
-					// so turning password validation on never breaks login).
-					var credentials = LoginEncryption.Decrypt(loginKey);
 					bool authenticated;
-					if (credentials != null && credentials.Challenge == account.AuthChallenge)
+					if (LoginEncryption.Decrypt(loginKey) is { } credentials)
 					{
-						// Patched client: enforce the password, unless none is configured (the "-" sentinel) - same as
-						// before. PasswordHashing.Matches verifies a stored PBKDF2 hash OR a legacy plaintext value.
-						if (string.IsNullOrEmpty(account.Password) || account.Password == "-")
-							authenticated = true;
-						else
-						{
-							authenticated = credentials.Username == account.UserName && PasswordHashing.Matches(account.Password, credentials.Password);
-
-							// Upgrade a legacy plaintext password to a hash on first successful login.
-							if (authenticated && PasswordHashing.NeedsRehash(account.Password))
-							{
-								account.Password = PasswordHashing.Hash(credentials.Password);
-								await Database.SetAccountPassword(account.Id, account.Password);
-							}
-						}
+						authenticated = credentials.Username == account.UserName && credentials.Challenge == account.AuthChallenge && PasswordHashing.Matches(account.Password, credentials.Password);
 
 						if (authenticated)
 							Logger.LogInformation("UniverseAgent login: password validated for {UserName} (patched client).", account.UserName);
@@ -82,16 +61,15 @@ namespace Faolan.UniverseAgent
 					}
 					else if (Configuration.LoginAllowUnpatchedClients)
 					{
-						Logger.LogDebug("UniverseAgent login: block not decryptable (unpatched client); accepting {UserName} without password check.", account.UserName);
 						authenticated = true;
+
+						Logger.LogDebug("UniverseAgent login: block not decryptable (unpatched client); accepting {UserName} without password check.", account.UserName);
 					}
 					else
 					{
-						// The account NAME is all this client proved, and this deployment does not accept that. Refused
-						// with the same reason a wrong password gets - the client has one invalid-login screen either
-						// way, and the log line below is where the real cause is written down.
-						Logger.LogWarning("UniverseAgent login: REFUSED {UserName} - unpatched client and Login:AllowUnpatchedClients is off (patch it with Faolan.ClientLauncher --patch-login).", account.UserName);
 						authenticated = false;
+
+						Logger.LogWarning("UniverseAgent login: REFUSED {UserName} - unpatched client and Login:AllowUnpatchedClients is off (patch it with Faolan.ClientLauncher --patch-login).", account.UserName);
 					}
 
 					if (!authenticated)
@@ -106,7 +84,6 @@ namespace Faolan.UniverseAgent
 						break;
 					}
 
-					Logger.LogInformation("UniverseAgent login accepted for user {UserName} ({AccountId})", account.UserName, account.Id.ToHex());
 					await Database.SetAccountLastInfo(account.Id, client.IpAddress!);
 
 					await SetRegionState(client, packet.Sender);

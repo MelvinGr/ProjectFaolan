@@ -47,6 +47,7 @@ namespace Faolan.Core.Crypt
 
 		// True when a stored value is a real legacy plaintext password that should be upgraded to a hash after a
 		// successful login (the empty / "-" "no password" sentinels are left alone).
+		[Obsolete]
 		public static bool NeedsRehash(string? stored)
 		{
 			return !string.IsNullOrEmpty(stored) && stored != "-" && !IsHashed(stored);
