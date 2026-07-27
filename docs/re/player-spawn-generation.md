@@ -89,22 +89,38 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
     @188-291 of `[00][type 01|06][u16 value]` entries (slot types constant across chars, values per-char).
 - `[u32 innerLen]` + the **ProtoCoreCharacterIIR**.
 - **post-IIR stream** (contiguous to EOF; nothing follows it):
-  - header `[u32 0][u32 4]`
+  - header: a **plain-counted list** `[u32 n][n x u32]` then the constant `[u32 4]`. Read as the constant pair
+    `[u32 0][u32 4]` until #251 — `n` is 0 on all but 2 captured spawns, which carry a single word (60).
   - `[u32 2][u32 0x3F1 * (nBuffs+1)]` — the second field encodes the count of **60-byte buff/timer records**
     that follow: `[t0][0x7E2][0][0x1207CF][a][b][0][seq from 4][0xC350][handle][5x u32 0]` (only on chars
     with active buffs; otherwise a bare 0x3F1).
   - `[u32 count][u32 X]` + (`[f32 1.0]` iff count>0) — the entry-table count and the per-char scalar X
     (Strie 0xB7, NecroL80 0x2B6, editor preview 0x3F1) = `PlayerSpawnScaffold.EntryTableX`.
-  - **count entries, UNIFORM 14 bytes**: `[u32 idx][u32 0][u16 tag][u32 value]` = `CharacterAttribute`.
+  - **count entries, UNIFORM 14 bytes**: `[u32 idx][u32 flag][u16 tag][u32 value]` = `CharacterAttribute`.
+    `flag` was read as a constant 0; 2 captured spawns carry a 1 on their LAST entry, and there `value` is a
+    plain integer (300, 400) rather than float bits — so it discriminates how `value` is read.
     Three payload flavors share the shape: weighted attributes (`tag` = value, `value` = 0x3F800000 weight),
     **morph entries** (`tag` = type<<8|sliderId, `value` = float bits — see the morph finding below) and the
     closing `[u16][u32]` record. Wire order is the stored `Sequence`, not ascending idx (DemoL80's closer is
     out of order).
-  - iff count>0: **ID list of 5-byte groups `[u8 rank][u32 id]`** = `CharacterSkill`; ids ascending,
-    terminated by the group with id 0x3F1 (ranks are small values, e.g. NecroL80 has 0x0A/0x41-0x4B on ability
-    ids). Iff count==0: a bare `[u32 0x3F1]` terminator instead.
-  - ending: TWO count-prefixed pair lists `[u32 N][N x (u32 id, s32 value)]` = `CharacterScaffoldPair` (ids
-    are decades 10,20,...,110; DemoL80 has both lists non-empty) + final `[u32 0x3F1]`.
+  - iff count>0: **ID list of 5-byte groups `[u8 rank][u32 id]`** = `CharacterSkill`; ids ascending (ranks are
+    small values, e.g. NecroL80 has 0x0A/0x41-0x4B on ability ids). The list is CLOSED by a group whose "id" is
+    a **`ListFrame` word**, followed by that many **13-byte records** `[u32 0xC350][u32 id][u32 0][u8 kind]`.
+    `0x3F1` is `ForCount(0)`, which is why the close was long written down as a terminator constant; 17 captured
+    spawns carry `ForCount(1)`/`ForCount(2)`. The closing group's rank byte is nonzero on 23 spawns and is
+    carried, not asserted. Iff count==0: a bare `[u32 0x3F1]` instead.
+  - ending: TWO **plain**-counted pair lists `[u32 N][N x (u32 id, s32 value)]` = `CharacterScaffoldPair` (ids
+    are decades 10,20,...,110; DemoL80 has both lists non-empty), then a THIRD pair list that is **count-framed**
+    (`[u32 ListFrame word][n x (u32 id, s32 value)]`). That word is what used to be called the final `0x3F1`
+    marker; 10 captured spawns carry `ForCount(1)`, every observed element being `(975, 0)`.
+
+Three of those fields are decoded structurally but NOT semantically (the tail records, the entry kind flag, the
+third pair list's `(975, 0)` element) — carried verbatim; open work tracked in Gitea #466.
+
+⚠️ Five of the six corrections above are **the same mistake**: a count word whose list is empty in most captures
+reads as a closing constant. `ListFrame` documents the trap for `0x7E2`; `0x3F1` is the `ForCount(0)` face of it and
+is just as misleading. All 259 captured player-scaffold bodies now parse AND regenerate byte-exact
+(`SpawnFeatListTests`); before these fixes 203 did.
 
 NPC FA015807 bodies use a different post-IIR header (`[0][5]`, `[0][0x129]`, ...) — out of scope (NPCs are
 replayed from the burst).

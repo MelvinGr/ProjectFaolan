@@ -239,7 +239,11 @@ Two things already run ahead of that move:
   `(count + 1) * 0x3F1` (guilds, AH, quests, spell book, shortcut bar, stat lists, spawn scaffold, resurrection
   spots). ⚠️ A ONE-element list frames as `0x7E2`, and single-element lists are the common case in captures — so
   `0x7E2` reads as magic and has been written down as a constant repeatedly (resurrection spots #372, the AH search
-  `head`, `SendMail` #378, GameActionList). **There is no such thing as a `0x3F1`/`0x7E2` constant**: of the 136
+  `head`, `SendMail` #378, GameActionList). ⚠️ **`0x3F1` itself is the same trap wearing the empty-list face** —
+  `ForCount(0)` — and it is the more dangerous one, because a list that is empty in *most* captures reads as a
+  closing/terminator constant. The player spawn's post-IIR carried FIVE of these at once (#251): the ID-list close,
+  a 13-byte-record list after it, the "final marker", and the header pair; all five looked constant across ~200
+  captured spawns and broke on the ~30 where the list was non-empty. **There is no such thing as a `0x3F1`/`0x7E2` constant**: of the 136
   functions in `AgeOfConan.exe` that touch the word, **77 divide by `0x3F1`** to read a count and **59 multiply** to
   write one — **zero** compare it to a constant (`tools/ghidra/DumpListFraming.java`). So when a "constant" equals
   `n * 0x3F1` it IS a list count; distrust any grammar pinned only by single-element captures. Enforced across

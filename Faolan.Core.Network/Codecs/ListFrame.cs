@@ -16,6 +16,15 @@ namespace Faolan.Core.Network.Codecs
 	// ⚠️ THE 0x7E2 TRAP. A ONE-element list frames as 2 * 0x3F1 = 0x7E2, and single-element lists are the common
 	// case in captures - so 0x7E2 reads as a fixed magic number and gets written down as one. It has happened three
 	// times:
+	//
+	// ...and its nastier sibling, THE 0x3F1 TRAP: an EMPTY list frames as 0x3F1 itself, so a list that happens to be
+	// empty in most captures reads as a closing constant - a "terminator", a "final marker", a "header pad". The
+	// player spawn's post-IIR stream carried FIVE at once (#251), all five of which parsed happily across ~200
+	// captured spawns and only broke on the ~30 where the list had elements: the ID-list close (whose "0x3F1
+	// terminator" is a count word with 13-byte records behind it), the third ending pair list (the "final marker"),
+	// and the leading plain-counted head list (the "[0][4] header"). If a constant sits where a list could, assume it
+	// is ForCount(0) until a capture with a non-empty one proves otherwise - and note that spawns_in_capture-style
+	// breadth over the WHOLE corpus is what surfaces those, not a fixture.
 	//   - the resurrection-spots body carried "const header 0x7E2" for months (every capture has 1 spot) - it was the
 	//     count, and sending 2 spots put a wrong word on the wire (#372);
 	//   - the AH search-results `head` was documented as "the query's category root, echoed, NOT a quantity" - it is

@@ -13,6 +13,10 @@ and don't contain.
   `0x3F1`-framed `u32` feat-id list. Decoded 2026-07-14 by `tools/capture/decode_unlocked_feats.py`. **This
   retires the former "#1 blocker".** Every high-level captured char yields a stable set (NecroL80 necro 25, DemoL80
   demo 25, Hakotep hox 6); every fresh/create char yields the empty `0x3F1` marker.
+  Read in C# by `PlayerSpawnScaffoldRows.ExtractPreFrameFeats` (at a fixed offset in the parsed frame) and written
+  back from `CharacterFeat` rows by `FreshPreFrame`. `SpawnFeatListTests` gates that over the WHOLE corpus: **109 of
+  the 259 captured player-scaffold spawns carry feats, 150 frame an empty list, 204 distinct feat ids**, with the
+  frame length (a fixed basis + 4 bytes per feat) corroborating every count independently.
 - **The spawn scaffold is NOT feats.** `CharacterSkill` / `PlayerSpawnScaffoldRows` / `decode_skill_scaffold.py` read the
   character's **ability/skill** presence list — the spawn's **post-IIR** id-list, a different region *and* a
   different id-space. It gates spell *usability* (see #298) but is unrelated to the feat tree. An earlier RE
