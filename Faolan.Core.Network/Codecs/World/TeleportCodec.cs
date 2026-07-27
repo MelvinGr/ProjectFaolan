@@ -16,11 +16,11 @@ namespace Faolan.Core.Network.Codecs.World
 	// the spawn position inside a length-prefixed blob (FUN_00cbf5d0). Every byte is reader-accounted (TeleportHandoffTests).
 	public static class TeleportCodec
 	{
-		private const byte PlayfieldProxyVersion = 0x62; // 'b' - the PlayfieldProxy stream version (FUN_00a6a600)
-		private const uint PlayfieldClassWord = 0x0000C79C; // PlayfieldProxy u32[0] (constant in the captures)
 		private const uint PositionBlobTag = 0x00018704; // first word of the length-prefixed spawn-position blob
-		private const uint ProxyInstanceWord = 0x00009C50; // dest proxy u32[6] (constant in the captures)
-		private const uint ProxyReadyFlag = 0x00000001; // dest proxy u32[5] - instance valid/ready flag
+
+		// The revive body's proxy uses this class word instead of PlayfieldProxy.PlayfieldClass; which of
+		// 0xC79C/0xC79E/0xC7A0 a packet carries is per-PACKET and undecoded (see ResurrectionSpotsBody).
+		private const uint RevivePlayfieldClass = 0x0000C7A0;
 
 
 		// The IIR types this codec constructs or parses (#317 convention; read by the coverage matrix).
@@ -32,7 +32,7 @@ namespace Faolan.Core.Network.Codecs.World
 		public static byte[] BuildBegin(uint clientInstance, uint destMapId)
 		{
 			var s = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.IntendedTeleportIIR).WriteUInt32(EntityClass.Character).WriteUInt32(clientInstance).WriteByte(0x01); // env
-			WritePlayfieldProxy(s, destMapId, 0, 0, 0);
+			PlayfieldProxy.ForMap(destMapId).Write(s);
 			return s.WriteByte(0x00).ToArray(); // IntendedTeleportIIR trailing bool (-> obj+0x40)
 		}
 
@@ -61,7 +61,7 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteByte(0x00) // env
 				.WriteArray(new byte[24]) // 6 leading words = 0
 				.WriteFloat(1.0f); // 7th leading word = 1.0
-			WritePlayfieldProxy(s, destMapId, ProxyReadyFlag, ProxyInstanceWord, destPlayfieldToken);
+			PlayfieldProxy.ForInstance(destMapId, destPlayfieldToken).Write(s);
 			return s
 				.WriteUInt32(0)
 				.WriteUInt32(0) // obj+0x6c / +0x70
@@ -85,7 +85,7 @@ namespace Faolan.Core.Network.Codecs.World
 		//   [u32 0][u32 0][u32 0][u8 0][u8 1]             # trailing
 		public static byte[] BuildReviveDestination(uint clientInstance, uint mapId, uint playerHandle, Vector3 position, float facingX, float facingZ)
 		{
-			return new FaolanStream()
+			var s = new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.N3TeleportIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(clientInstance)
@@ -94,16 +94,12 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteUInt32(0)
 				.WriteFloat(facingX)
 				.WriteUInt32(0)
-				.WriteFloat(facingZ)
-				.WriteByte(PlayfieldProxyVersion)
-				.WriteUInt32(0x0000C7A0) // proxy[0] (revive uses 0xC7A0, not 0xC79C)
-				.WriteUInt32(mapId) // proxy[1] = current map
-				.WriteUInt32(0) // proxy[2]
-				.WriteUInt32(playerHandle) // proxy[3]
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0) // proxy[4..7] (instance slots zero)
+				.WriteFloat(facingZ);
+
+			// Instance slots zero: a same-map move does not re-pin the playfield instance.
+			new PlayfieldProxy(mapId, RevivePlayfieldClass, playerHandle).Write(s);
+
+			return s
 				.WriteUInt32(0)
 				.WriteUInt32(0)
 				.WriteUInt32(0) // trailing words
@@ -132,35 +128,12 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteUInt32(GameServer0X2000Opcodes.IntendedTeleportIIR)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(clientInstance)
-				.WriteByte(0x01) // env
-				.WriteByte(PlayfieldProxyVersion)
-				.WriteUInt32(PlayfieldClassWord) // [0]
-				.WriteUInt32(mapId) // [1] = the CURRENT map (same-map revive)
-				.WriteUInt32(0) // [2]
-				.WriteUInt32(playerHandle) // [3] = the reviving player (beach capture)
-				.WriteUInt32(0) // [4]
-				.WriteUInt32(ProxyReadyFlag) // [5] = 1 (instance ready)
-				.WriteUInt32(ProxyInstanceWord) // [6] = 0x9C50
-				.WriteUInt32(playfieldToken) // [7] = the LIVE playfield-instance token
-				.WriteByte(0x00); // PlayfieldProxy trailing bool
-			return s.WriteByte(0x01).ToArray(); // IntendedTeleportIIR trailing bool = 1
-		}
+				.WriteByte(0x01); // env
 
-		// The PlayfieldProxy stream (FUN_00a6a600): version 'b' + 8 u32 + a trailing bool. u32[0]=class word,
-		// u32[1]=map; u32[5..7] pin the destination instance (zero in the "begin" body, set in the dest announce).
-		private static FaolanStream WritePlayfieldProxy(FaolanStream s, uint mapId, uint slot5, uint slot6, uint slot7)
-		{
-			return s
-				.WriteByte(PlayfieldProxyVersion)
-				.WriteUInt32(PlayfieldClassWord) // [0]
-				.WriteUInt32(mapId) // [1] destination map
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0) // [2..4]
-				.WriteUInt32(slot5) // [5]
-				.WriteUInt32(slot6) // [6]
-				.WriteUInt32(slot7) // [7]
-				.WriteByte(0x00); // trailing bool
+			// The CURRENT playfield, pinned, with the reviving player in slot 3.
+			(PlayfieldProxy.ForInstance(mapId, playfieldToken) with { CharacterHandle = playerHandle }).Write(s);
+
+			return s.WriteByte(0x01).ToArray(); // IntendedTeleportIIR trailing bool = 1
 		}
 	}
 }

@@ -1,5 +1,6 @@
 using Faolan.Core;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Team
@@ -39,29 +40,43 @@ namespace Faolan.Core.Network.Codecs.Team
 		// sex, race and level are all still candidates. [V0]
 		public uint PerCharacterWord { get; set; }
 
-		// A 9-byte per-character opaque, read as [u32][u32][u8] because only that last BYTE differs between the two
-		// members (0x54 / 0xEC) and the three after it are zero in both. It appears NOWHERE else in the capture -
-		// not in login, not in the snapshot - so it is CS-tier state we cannot derive from anything we send, and
-		// there is no basis for computing it. Carried so a captured member round-trips byte-exact; our own members
-		// send zero until an in-client check says otherwise. [V0]
+		// The playfield the member's client is looking at, as a PlayfieldProxy - the SAME stream the teleport records
+		// carry (client FUN_00a6a600), embedded here rather than being a run of constants (Gitea #454). It reads
+		// misaligned if you take the record as all-u32, which is how it was modelled: `Field7 = 0x00000162` had
+		// swallowed the proxy's version byte ('b' = 0x62). Read aligned, both captured members decode into all ten
+		// proxy fields exactly - class word 0xC79C, this MapId, the ready flag, 0x9C50, and a token.
+		//
+		// ⚠️ The token is carried VERBATIM (CapturedPlayfieldToken) rather than sourced from the member's live
+		// playfield, so our rosters ship the captured session's value. That is deliberate for now: the reading is
+		// structural (two codecs agreeing, plus the same value showing up as FriendListCodec's "online stamp") and has
+		// not been checked in-client. Gitea #454 / #426. [V0]
+		public PlayfieldProxy Playfield { get; set; } = null!;
+
+		// An 8-byte per-character opaque followed by nine zero bytes. It appears NOWHERE else in the capture - not in
+		// login, not in the snapshot - so it is CS-tier state we cannot derive from anything we send, and there is no
+		// basis for computing it. Carried so a captured member round-trips byte-exact; our own members send zero until
+		// an in-client check says otherwise.
+		//
+		// The boundary moved by one byte when the PlayfieldProxy above was framed correctly: what used to be
+		// OpaqueA's leading byte is the proxy's trailing bool. So this is now [u32][u32] where it was [u32][u32][u8],
+		// and the two captured values are (0x00000301, 0x59EA5C54) and (0x00018181, 0x3BC035EC). Still opaque, but
+		// off the right offset. [V0]
 		public uint OpaqueA { get; set; }
 		public uint OpaqueB { get; set; }
-		public byte OpaqueC { get; set; }
 
 		// The constants, in wire order. Named by position deliberately: every captured record agrees on them, so a
-		// name would be a guess. Field1 is the same 5 the friend reply carries.
+		// name would be a guess. Field1 is the same 5 the friend reply carries. Field7Head is the first THREE bytes of
+		// what used to be `Field7 = 0x00000162` - its fourth byte was the PlayfieldProxy version.
 		private const uint Field1 = 0x00000005;
 		private const uint Field4 = 0x00000000;
 		private const uint Field5 = 0x00000006;
 		private const uint Field6 = 0x00000000;
-		private const uint Field7 = 0x00000162;
-		private const uint Field8 = 0x0000C79C;
-		private const uint Field10 = 0x00000000;
-		private const uint Field11 = 0x00000000;
-		private const uint Field12 = 0x00000000;
-		private const uint Field13 = 0x00000001;
-		private const uint Field14 = 0x00009C50;
-		private const uint Field15 = 0x01EDA8B2;
+		private static readonly byte[] Field7Head = [0x00, 0x00, 0x01];
+
+		// The playfield-instance token both captured members carry. They are two DIFFERENT characters in the same map
+		// (4020) carrying the same value, which is what identifies it as an instance token rather than anything
+		// per-character. Retained as the default so a from-columns member still builds the captured bytes.
+		public const uint CapturedPlayfieldToken = 0x01EDA8B2;
 
 		public static TeamMemberRecord Read(FaolanStream s)
 		{
@@ -75,12 +90,13 @@ namespace Faolan.Core.Network.Codecs.Team
 			s.ReadUInt32(); // Field1
 			m.MapId = s.ReadUInt32();
 			m.PerCharacterWord = s.ReadUInt32();
-			for (var i = 0; i < 12; i++)
-				s.ReadUInt32(); // Field4..Field15
-
+			s.ReadUInt32(); // Field4
+			s.ReadUInt32(); // Field5
+			s.ReadUInt32(); // Field6
+			s.ReadArray((uint)Field7Head.Length);
+			m.Playfield = PlayfieldProxy.Read(s);
 			m.OpaqueA = s.ReadUInt32();
 			m.OpaqueB = s.ReadUInt32();
-			m.OpaqueC = s.ReadByte();
 			s.ReadArray(9); // nine zero bytes
 			return m;
 		}
@@ -88,12 +104,11 @@ namespace Faolan.Core.Network.Codecs.Team
 		public void Write(FaolanStream s)
 		{
 			s.WriteUInt32(EntityClass.Character).WriteUInt32(CharacterId).WriteString(Name).WriteUInt32((uint)Class).WriteUInt32(Field1).WriteUInt32(MapId).WriteUInt32(PerCharacterWord).WriteUInt32(Field4)
-				.WriteUInt32(Field5).WriteUInt32(Field6).WriteUInt32(Field7).WriteUInt32(Field8);
+				.WriteUInt32(Field5).WriteUInt32(Field6).WriteArray(Field7Head);
 
-			// Field9 repeats the map id - the only trailing field that is not constant across the captures, and it
-			// tracks MapId in both members of every roster.
-			s.WriteUInt32(MapId).WriteUInt32(Field10).WriteUInt32(Field11).WriteUInt32(Field12).WriteUInt32(Field13).WriteUInt32(Field14).WriteUInt32(Field15).WriteUInt32(OpaqueA)
-				.WriteUInt32(OpaqueB).WriteByte(OpaqueC).WriteArray(new byte[9]);
+			(Playfield ?? PlayfieldProxy.ForInstance(MapId, CapturedPlayfieldToken)).Write(s);
+
+			s.WriteUInt32(OpaqueA).WriteUInt32(OpaqueB).WriteArray(new byte[9]);
 		}
 	}
 }

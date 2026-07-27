@@ -35,9 +35,10 @@ namespace Faolan.Tests
 				Class = Class.Demonologist,
 				MapId = 4020,
 				PerCharacterWord = 3,
-				OpaqueA = 3,
-				OpaqueB = 0x0159EA5C,
-				OpaqueC = 0x54
+				// Re-framed off the corrected PlayfieldProxy boundary (#454): what used to be read as
+				// (3, 0x0159EA5C, 0x54) is one byte late - the leading 0x00 is the proxy's trailing bool.
+				OpaqueA = 0x00000301,
+				OpaqueB = 0x59EA5C54
 			};
 		}
 
@@ -50,9 +51,8 @@ namespace Faolan.Tests
 				Class = Class.Necromancer,
 				MapId = 4020,
 				PerCharacterWord = 2,
-				OpaqueA = 0x181,
-				OpaqueB = 0x813BC035,
-				OpaqueC = 0xEC
+				OpaqueA = 0x00018181,
+				OpaqueB = 0x3BC035EC
 			};
 		}
 

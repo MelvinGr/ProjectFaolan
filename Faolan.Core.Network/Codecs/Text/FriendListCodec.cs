@@ -30,10 +30,14 @@ namespace Faolan.Core.Network.Codecs.Text
 		// The state's stamp is a UNION on the online flag:
 		//   OFFLINE -> a unix LAST-SEEN. The captured offline friend's 0x6A64AD51 is 2026-07-25 12:34:25 UTC, 2h06 before
 		//              that capture was taken, which is what identified it. We send Character.LastConnection.
-		//   ONLINE  -> this constant, whose meaning is NOT a time (0x01EDA8B2 reads as 1971). Five of the six captured
-		//              friends carry it and one carries 0x01EDAF93, 1761 higher - so it is not a plain constant either.
-		//              Its magnitude and high word sit right beside the character ids (0x0131xxxx vs 0x01EDxxxx), so an
-		//              id/handle is the better guess than a time. Open: Gitea #426. [V0]
+		//   ONLINE  -> a PLAYFIELD-INSTANCE TOKEN, i.e. which playfield instance the friend is in. Definitely not a
+		//              time (0x01EDA8B2 reads as 1971). The identification comes from TeamMemberRecord, which embeds a
+		//              PlayfieldProxy carrying this exact value in its instance-token slot (Gitea #454), and the
+		//              distribution here agrees: five of the six captured friends share 0x01EDA8B2 and one carries
+		//              0x01EDAF93, 1761 higher - five players in one instance and one in another, which is what a
+		//              token does and what neither a constant nor a per-friend id would. PresenceStamp below sits in
+		//              the same 0x01Exxxxx range and is very likely the same kind of value. Gitea #426. [V0 -
+		//              structural, not yet checked in-client.]
 		//
 		// GuildService's member record already carries the same online/last-seen union off the same column.
 		public const uint OnlineStamp = 0x01EDA8B2;

@@ -61,7 +61,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// was left in the bag.
 		//
 		// Whether a multi-slot take sends count>1 rather than N single-slot acks is UNVERIFIED - no capture takes two
-		// slots in one message. Gitea #452. [V0]
+		// slots in one message. Gitea #453. [V0]
 		public static byte[] BuildLootRemoveItemsBody(uint bagHandle, params uint[] removedPositions)
 		{
 			var positions = removedPositions.Length == 0
