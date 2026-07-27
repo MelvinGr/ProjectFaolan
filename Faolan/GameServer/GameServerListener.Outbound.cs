@@ -35,9 +35,9 @@ namespace Faolan.GameServer
 		// sizing the snapshot uses (FullPlayerCharacterBuilder), so a grown bag can actually be filled. #12.
 		private const uint BaseBackpackSlots = 24;
 
-		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, bool allowHashless)
+		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, bool allowHashless, int? preferredSlot)
 		{
-			return GrantItemToBackpack(client, itemTemplateId, count, allowHashless: allowHashless);
+			return GrantItemToBackpack(client, itemTemplateId, count, allowHashless: allowHashless, preferredSlot: preferredSlot);
 		}
 
 		Task IEconomyOutbound.SendAddItem(INetworkClient client, ContainerKind containerType, uint itemPos, ProtoInventoryGameEntry entry, uint feedback)
@@ -192,10 +192,16 @@ namespace Faolan.GameServer
 		}
 
 		// The first free cell (0..capacity-1) in `container`, skipping persisted rows.
-		private async Task<int?> FindFreeContainerSlot(uint characterId, ContainerKind container, int capacity)
+		// `preferred` is the slot the player DROPPED the item on (the loot window's drag target, #462); it wins when it
+		// is in range and empty, and is otherwise ignored in favour of the first free slot - a drag onto an occupied
+		// slot must still put the item somewhere rather than failing or overwriting.
+		private async Task<int?> FindFreeContainerSlot(uint characterId, ContainerKind container, int capacity, int? preferred = null)
 		{
 			var rows = await Database.GetCharacterInventory(characterId);
 			var taken = rows.Where(r => r.Container == container).Select(r => r.Slot).ToHashSet();
+			if (preferred is >= 0 && preferred < capacity && !taken.Contains(preferred.Value))
+				return preferred;
+
 			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
 		}
 
@@ -212,7 +218,9 @@ namespace Faolan.GameServer
 		// DispatchAddItem. Our own client agrees - persist-only left the items un-takeable (see LootService). The flag
 		// went dead when loot moved onto the IEconomyOutbound port, which has no such parameter; removing it here makes
 		// the one live behaviour explicit instead of leaving a false claim next to an unused knob.
-		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, bool allowHashless = false)
+		// `preferredSlot` is honoured only for the backpack: a quest item routes to its own container, where a bag
+		// slot index means nothing.
+		private async Task<int?> GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count = 1, bool allowHashless = false, int? preferredSlot = null)
 		{
 			var item = await Database.GetItem(itemTemplateId);
 			if (item == null)
@@ -235,7 +243,9 @@ namespace Faolan.GameServer
 			var capacity = isQuestItem
 				? 48 // quest tab holds 48 (NewContainer(QuestKind, 48))
 				: await BackpackCapacity(characterId); // backpack = 24 base + the equipped bag's extra slots
-			var slot = await FindFreeContainerSlot(characterId, kind, capacity);
+			var slot = await FindFreeContainerSlot(characterId, kind, capacity, isQuestItem
+				? null
+				: preferredSlot);
 			if (slot == null)
 				return null;
 

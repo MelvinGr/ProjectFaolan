@@ -57,17 +57,16 @@ tools/capture/tshark_dump.sh Captures/<capture>.pcapng   # the canonical *.tshar
 # so it has not been migratable for a long time. The Postgres PROVIDER code stays (Faolan.Core.Database is
 # provider-agnostic and faolan.sql loads into both), but its migration chain is dead: bringing Postgres back means
 # deleting its Migrations/ and scaffolding ONE fresh initial migration from the current model, not replaying 16.
-# GOTCHA: the EF tools run design time with CWD = the PROJECT dir, so the design-time factory can't see the
-# repo-root faolan.json - point FAOLAN_CONFIG at it (every exe reads Global.ConfigPath: "faolan.json" beside
-# the exe / in the CWD, or whatever FAOLAN_CONFIG names):
-FAOLAN_CONFIG=$PWD/faolan.json dotnet ef migrations add <Name> \
+# The EF tools run design time with CWD = the PROJECT dir. That used to need FAOLAN_CONFIG + an absolute
+# --connection override (#456): Global.ConfigPath now searches UP from the CWD (then up from the exe dir) for
+# faolan.json, and a relative SQLite `Data Source` resolves against the DIRECTORY that file was found in - so
+# both commands work from anywhere in the tree with no overrides. FAOLAN_CONFIG still wins if you set it.
+dotnet ef migrations add <Name> \
   --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite
-# Same CWD gotcha for `database update`: a relative `Data Source=faolan.db` would create a stray DB beside the
-# project. Use the absolute connection override (or just start the server - it migrates, loads faolan.sql
-# into a database with no content, and seeds the default realm/account at startup):
-FAOLAN_CONFIG=$PWD/faolan.json dotnet ef database update \
-  --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite \
-  --connection "Data Source=$PWD/faolan.db"
+# `database update` likewise (or just start the server - it migrates, loads faolan.sql into a database with no
+# content, and seeds the default realm/account at startup):
+dotnet ef database update \
+  --project Faolan.Core.Database.Migrations.Sqlite --startup-project Faolan.Core.Database.Migrations.Sqlite
 # For pure DATA changes (no schema change) just UPDATE faolan.db directly and commit it - no migration.
 ```
 

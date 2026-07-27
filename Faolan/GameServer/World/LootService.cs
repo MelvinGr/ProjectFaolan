@@ -45,9 +45,9 @@ namespace Faolan.GameServer.World
 		// Grants one looted item, and puts it BACK on the bag if the grant fails (full backpack / an item the snapshot
 		// cannot build). The bag hands each item over exactly once, so discarding the result - which is what this code
 		// did - destroyed the loot and then logged the take as a success. Returns whether the player actually got it.
-		private async Task<bool> GrantLootedItem(INetworkClient client, uint bagHandle, uint itemTemplateId, int? position = null)
+		private async Task<bool> GrantLootedItem(INetworkClient client, uint bagHandle, uint itemTemplateId, int? position = null, int? preferredSlot = null)
 		{
-			if (await _outbound.GrantItemToBackpack(client, itemTemplateId) != null)
+			if (await _outbound.GrantItemToBackpack(client, itemTemplateId, preferredSlot: preferredSlot) != null)
 				return true;
 
 			_broadcaster.ReturnBagItem(client, bagHandle, itemTemplateId, position);
@@ -132,10 +132,11 @@ namespace Faolan.GameServer.World
 			// TryLootItem(const ID32& i_cLootBagID, int i_nItemPos, const ID32& i_cCharID, int i_nDesiredPosition) -
 			// the client's own signature (docs/re/aoc-client-rpc-methods.json). The handler used to stop after
 			// i_nItemPos and leave 12 bytes on the body, which hid i_nDesiredPosition entirely: the player DRAGS the
-			// item onto a specific backpack slot and that word is the slot they dropped it on. We still grant into the
-			// first free slot (GrantItemToBackpack), so a deliberate drop position is ignored - Gitea #462. The two
-			// captured multi-loot sequences make the meaning unambiguous: i_nItemPos runs over the bag's display
-			// indices while i_nDesiredPosition tracks the player's own filling backpack (0,1,2,...,5,6).
+			// item onto a specific backpack slot and that word is the slot they dropped it on. The two captured
+			// multi-loot sequences make the meaning unambiguous: i_nItemPos runs over the bag's display indices while
+			// i_nDesiredPosition tracks the player's own filling backpack (0,1,2,...,5,6). It is now honoured (#462) -
+			// as a REQUEST: an occupied or out-of-range slot still falls back to the first free one, because a drag
+			// onto a full slot must put the item somewhere rather than failing or overwriting what is there.
 			body.ReadUInt32(); // loot typetag (0xC87A)
 			var bagHandle = body.ReadUInt32();
 			var itemIndex = body.ReadUInt32(); // i_nItemPos - which item (display index) the player dragged
@@ -143,11 +144,11 @@ namespace Faolan.GameServer.World
 			var looterHandle = body.ReadUInt32(); // i_cCharID - the looter; we key off the session instead
 			var desiredPosition = body.ReadUInt32();
 
-			_logger.LogDebug("TryLootItem: bag {Bag:X8} index {Index} -> looter {Looter:X8} slot {Slot} (desired slot not honoured, #462).", bagHandle, itemIndex, looterHandle, desiredPosition);
+			_logger.LogDebug("TryLootItem: bag {Bag:X8} index {Index} -> looter {Looter:X8} desired slot {Slot}.", bagHandle, itemIndex, looterHandle, desiredPosition);
 
 			var sourceNpc = _broadcaster.BagSourceName(client, bagHandle);
 			var item = _broadcaster.TakeBagItem(client, bagHandle, (int)itemIndex);
-			if (item != null && await GrantLootedItem(client, bagHandle, item.Value, (int)itemIndex))
+			if (item != null && await GrantLootedItem(client, bagHandle, item.Value, (int)itemIndex, (int)desiredPosition))
 				await _questProgression.AdvanceLootGoals(client, sourceNpc!, item.Value); // #261: the goal wants THIS item
 
 			// Confirm the take: tell the client to remove the dragged slot (itemIndex) from the open window. AfterLootTake
