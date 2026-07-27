@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**80** IIR carrier types · **76 V3** (76 with an auto-cited golden). The
+**80** IIR carrier types · **77 V3** (77 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -66,6 +66,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `NewCurrentLooterIIR` | `0xD06568C8` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V3 | `NewLevelIIR` | `0x6D314743` | `NewLevelIirCodec` | [V3: NewLevelIirCodecTests.Build_Convenience_CarriesLevelWithZeroDeltas] |
 | V3 | `PetIIR` | `0x1F4CB0F7` | `PetIirCodec` | [V3: PetIirCodecTests.BuildAssign_Combat_MatchesCapture] |
+| V3 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` | [V3: MapChangeCodecTests.BuildIir_ReproducesTheCapturedRecord] |
 | V3 | `QuestFullUpdateIIR` | `0x63268258` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `QuestGoalIIR` | `0x0774C8C1` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `QuestIIR` | `0x97E02314` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
@@ -97,7 +98,6 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `InventoryDeleteCodec` |  |
 | V2 | `FanaticCommandIir` | `0xEE4AA85C` | `FanaticCommandCodec` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `InventoryMoveCodec` |  |
-| V2 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see
 [`gaps.md`](../gaps.md)). A V3 row with an empty golden column is byte-exact via a codec whose test the
