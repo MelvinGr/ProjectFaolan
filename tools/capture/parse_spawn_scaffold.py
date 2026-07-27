@@ -32,6 +32,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent  # repo root (this file is at tools/capture/)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from captures import capture_files  # noqa: E402  (needs the sys.path line above)
+
 spec = importlib.util.spec_from_file_location('c', ROOT / 'tools/capture/compare_log_to_dump.py')
 cdt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cdt)
@@ -364,7 +367,7 @@ def cmd_template():
 
 
 def cmd_all(player_only=False):
-    caps = sorted((ROOT / 'Captures').glob('*.tshark.json'))
+    caps = [Path(f) for f in capture_files()]
     total = ok = 0
     fails = {}
     for cap in caps:
@@ -404,7 +407,7 @@ def cmd_pre():
     rows = []
     _tb = template_bytes()
     caps = [(Path('TEMPLATE'), [_tb])] if _tb is not None else []
-    caps += [(cap, spawns_in_capture(cap, player_only=True)) for cap in sorted((ROOT / 'Captures').glob('*.tshark.json'))]
+    caps += [(cap, spawns_in_capture(cap, player_only=True)) for cap in [Path(f) for f in capture_files()]]
     for cap, bodies in caps:
         for idx, body in enumerate(bodies):
             try:
@@ -443,7 +446,7 @@ def cmd_prediff():
     groups = {}
     _tb = template_bytes()
     caps = [(Path('TEMPLATE'), [_tb])] if _tb is not None else []
-    caps += [(cap, spawns_in_capture(cap, player_only=True)) for cap in sorted((ROOT / 'Captures').glob('*.tshark.json'))]
+    caps += [(cap, spawns_in_capture(cap, player_only=True)) for cap in [Path(f) for f in capture_files()]]
     for cap, bodies in caps:
         for idx, body in enumerate(bodies):
             try:

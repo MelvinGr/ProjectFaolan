@@ -33,6 +33,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent  # repo root (this file is at tools/capture/)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from captures import capture_files  # noqa: E402  (needs the sys.path line above)
 _spec = importlib.util.spec_from_file_location('pss', ROOT / 'tools/capture/parse_spawn_scaffold.py')
 pss = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(pss)
@@ -71,7 +74,7 @@ def spawns(cap):
 
 def cmd_list(include_empty=False):
     print(f'{"capture":58} {"idx":>3} {"cnt":>3}  feats')
-    for cap in sorted((ROOT / 'Captures').glob('*.tshark.json')):
+    for cap in [Path(f) for f in capture_files()]:
         for idx, body in spawns(cap):
             r = decode_feat_list(body)
             if r is None:
@@ -85,7 +88,7 @@ def cmd_list(include_empty=False):
 def cmd_perchar():
     """The largest feat set observed per character (character = first token of the capture name)."""
     best = {}
-    for cap in sorted((ROOT / 'Captures').glob('*.tshark.json')):
+    for cap in [Path(f) for f in capture_files()]:
         who = cap.name.split('_')[0].split('-')[0]
         for idx, body in spawns(cap):
             r = decode_feat_list(body)

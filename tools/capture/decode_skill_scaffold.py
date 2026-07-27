@@ -43,6 +43,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent  # repo root (this file is at tools/capture/)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from captures import capture_files  # noqa: E402  (needs the sys.path line above)
+
 # Reuse the proven scaffold parser (spawns_in_capture + parse_player_spawn) rather than re-deriving the grammar.
 _spec = importlib.util.spec_from_file_location('pss', ROOT / 'tools/capture/parse_spawn_scaffold.py')
 pss = importlib.util.module_from_spec(_spec)
@@ -82,7 +85,7 @@ def player_spawns(cap):
 
 def cmd_discover():
     rows = []
-    for cap in sorted((ROOT / 'Captures').glob('*.tshark.json')):
+    for cap in [Path(f) for f in capture_files()]:
         for idx, body in player_spawns(cap):
             cls, feats = feats_of_spawn(body)
             if feats:
@@ -107,7 +110,7 @@ def cmd_dump(cap, idx=0):
 def cmd_perclass():
     # Pick, per class, the player spawn with the MOST feats (the most-progressed capture for that class).
     best = {}
-    for cap in sorted((ROOT / 'Captures').glob('*.tshark.json')):
+    for cap in [Path(f) for f in capture_files()]:
         for idx, body in player_spawns(cap):
             cls, feats = feats_of_spawn(body)
             if cls and (cls not in best or len(feats) > len(best[cls][2])):
@@ -122,7 +125,7 @@ def cmd_perclass():
 def cmd_json(outfile=None):
     # Per class, the most-progressed player spawn's feat list, as structured records (the seed for a DB feat model).
     best = {}
-    for cap in sorted((ROOT / 'Captures').glob('*.tshark.json')):
+    for cap in [Path(f) for f in capture_files()]:
         for idx, body in player_spawns(cap):
             cls, feats = feats_of_spawn(body)
             if cls and (cls not in best or len(feats) > len(best[cls]['feats'])):

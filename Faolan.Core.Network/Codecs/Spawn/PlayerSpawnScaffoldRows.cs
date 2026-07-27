@@ -31,6 +31,28 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		private const int PreFrameHead = FeatMarkerOffset + 4; // 126
 		private const int PreFrameTail = 113;
 
+		// Offsets of the two per-character bytes in the u16 value island at frame @70 (abs @135). Archetype is the
+		// high byte, the class enum the low one - see FrameArchetype.
+		private const int ArchetypeOffset = 70;
+		private const int ClassOffset = ArchetypeOffset + 1;
+
+		// The rest of the 239-byte frame is zero except for these islands, which carry the SAME value in every
+		// captured frame and whose meaning is NOT known - only their position and value are. Held as data rather
+		// than as literal index pokes so the frame's shape reads in one place. Offsets are frame-relative; add 65
+		// for the absolute offsets docs/re/player-spawn-generation.md quotes.
+		private static readonly (int Offset, byte[] Bytes)[] PreFrameSkeleton =
+		[
+			(0, [0x05]), // abs @65  - the frame's lead byte / kind
+			(76, [0x6F]), // abs @141
+			(81, [0x41, 0x70]), // abs @146
+			(93, [0x00, 0x08]), // abs @158 - the u16 island; the one byte that differed between fresh captures
+			(113, [0x07, 0xE2]) // abs @178 - 0x7E2 (2018), the landmark preceding the feat marker
+		];
+
+		// The frame's last 5 bytes, constant across every captured spawn (one capture ends 0a instead of 08 - the
+		// generated frame always writes 08, which the client accepts).
+		private static readonly byte[] PreFrameCloser = [0x41, 0x00, 0x00, 0x82, 0x08];
+
 		private static readonly Dictionary<ConanClass, uint[]> FreshSkillIdsByClass = new Dictionary<ConanClass, uint[]>
 		{
 			[ConanClass.Barbarian] = [1800, 6000, 6100, 6200, 6300, 6600, 6800, 6900, 7100, 8100, 8305, 8400, 13600, 14600, 124400, 318400, 318800, 328700, 328900, 331300],
@@ -231,16 +253,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		{
 			var featCount = feats?.Count ?? 0;
 			var f = new byte[PreFrameHead + 4 * featCount + PreFrameTail];
-			f[0] = 0x05;
+			foreach (var (offset, bytes) in PreFrameSkeleton)
+				bytes.CopyTo(f, offset);
+
 			f.WriteU32Be(VanityShownMaskOffset, vanityShownMask); // vanity shown mask (#336)
-			f[70] = FrameArchetype(@class); // @135 hi byte = archetype (Soldier1/Priest2/Rogue3/Mage4)
-			f[71] = (byte)@class; // @136 = the class byte (0x12 Barbarian .. 0x2c Demonologist)
-			f[76] = 0x6F; // constant marker
-			f[81] = 0x41; // constant marker 0x4170
-			f[82] = 0x70;
-			f[94] = 0x08; // u16 island @93 = 0x0008 (the one byte that differed between fresh captures)
-			f[113] = 0x07; // constant 0x7E2 (2018) landmark preceding the feat marker
-			f[114] = 0xE2;
+			f[ArchetypeOffset] = FrameArchetype(@class); // @135 hi byte = archetype (Soldier1/Priest2/Rogue3/Mage4)
+			f[ClassOffset] = (byte)@class; // @136 = the class byte (0x12 Barbarian .. 0x2c Demonologist)
 
 			// Feat list: [u32 (count+1)*0x3F1] then count x u32 feat id (train order). Empty (count 0) writes the bare
 			// 0x3F1 marker and no ids - byte-identical to the old constant-239 fresh frame.
@@ -248,10 +266,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			for (var k = 0; k < featCount; k++)
 				f.WriteU32Be(PreFrameHead + 4 * k, feats![k]);
 
-			var tail = PreFrameHead + 4 * featCount;
-			f[tail + 108] = 0x41; // closer 41 00 00 82 08
-			f[tail + 111] = 0x82;
-			f[tail + 112] = 0x08;
+			PreFrameCloser.CopyTo(f, f.Length - PreFrameCloser.Length);
 			return f;
 		}
 
