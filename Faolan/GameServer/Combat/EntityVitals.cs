@@ -189,9 +189,9 @@ namespace Faolan.GameServer.Combat
 			// The fourth term - buffs that raise a max pool (Focused Mind's +mana, Sustaining Wrath's +health) - is not
 			// here because it is not fixed at world entry: BuffStatEffects re-applies it through SetMaxFromBonus on every
 			// change to the entity's live buffs, on top of the base these two terms establish.
-			var vitals = FromMax(AddBonus(max.Health, classBase, CharacterStatId.HealthMax),
-				AddBonus(max.Mana, classBase, CharacterStatId.ManaMax),
-				AddBonus(max.Stamina, classBase, CharacterStatId.StaminaMax));
+			var vitals = FromMax(AddClassBase(max.Health, classBase, CharacterStatId.HealthMax),
+				AddClassBase(max.Mana, classBase, CharacterStatId.ManaMax),
+				AddClassBase(max.Stamina, classBase, CharacterStatId.StaminaMax));
 			vitals.BaseMaxHealth = vitals.MaxHealth;
 			vitals.BaseMaxMana = vitals.MaxMana;
 			vitals.BaseMaxStamina = vitals.MaxStamina;
@@ -234,12 +234,27 @@ namespace Faolan.GameServer.Combat
 		}
 
 		// Adds the gear bonus for one vital stat onto its base max, clamped at 0 (a bonus never drops a pool below zero).
-		private static uint AddBonus(uint baseMax, IReadOnlyDictionary<CharacterStatId, int>? statBonuses, CharacterStatId stat)
+		/// <summary>
+		///     Adds a CLASS-BASE pool term onto a display-unit max, converting it out of wire scale on the way.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ <see cref="ClassAttributeBase.Amount" /> is the RAW WIRE value, and these pools are the x100 stats -
+		///     so the term has to be divided by <see cref="CharacterStatIdExtensions.GetScale" /> before it meets a
+		///     display max. Adding it raw made a level-1 Necromancer's max health 89 + 100 = <b>189</b> where its class
+		///     base is one point of health (100 wire / 100), and would have added <b>38,600</b> rather than 386 at level
+		///     80. Proven in-client 2026-07-27 on a freshly created (non-imported) Necromancer: the sheet reads
+		///     `Health 89 / 89` and every attribute reads `1` off a 10-wire base, i.e. display == wire / scale.
+		///     <para>
+		///         The gear/feat path does NOT come through here - <see cref="MaxStatAggregator.AggregateGearBonuses" />
+		///         already returns display units, which is why only the class base was wrong.
+		///     </para>
+		/// </remarks>
+		private static uint AddClassBase(uint baseMax, IReadOnlyDictionary<CharacterStatId, int>? classBase, CharacterStatId stat)
 		{
-			if (statBonuses == null || !statBonuses.TryGetValue(stat, out var bonus))
+			if (classBase == null || !classBase.TryGetValue(stat, out var wireAmount))
 				return baseMax;
 
-			var total = baseMax + bonus;
+			var total = baseMax + wireAmount / (int)stat.GetScale();
 			return total < 0
 				? 0
 				: (uint)total;

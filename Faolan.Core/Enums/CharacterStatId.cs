@@ -84,6 +84,12 @@ namespace Faolan.Core.Enums
 		Wisdom = 0x032A,
 		Dexterity = 0x032E,
 
+		// The SIXTH attribute the character sheet lists under the five above (LDB 615 names it "Ferocity"). Nothing on
+		// our side grants it: zero rows in ClassAttributeBases / ItemStatModifiers / FeatEffects, 3 in SpellStatEffects,
+		// and the client's own live stat table carries no entry for it either - so the sheet renders 0 for every
+		// character, which is what it should read until something sets it. Named here so the id is not re-derived.
+		Ferocity = 0x057B,
+
 		// Combat ratings carried by the item-template stat-modifier region (docs/rdb/item-template-stats.md, #3).
 		// Decoded 3/3 against the in-client Royal Signet tooltip (+52 Magic Damage / +15 Hit Rating): Magic Damage is
 		// wire-scaled ×100 (5200 -> 52), Hit Rating ×1 (15 -> 15).
