@@ -16,42 +16,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// genuinely fresh scaffold). See docs/re/player-spawn-generation.md "VALIDATED GRAMMAR".
 	public static class PlayerSpawnScaffoldRows
 	{
-		// Offset of the u32 feat-list count marker within the PreFrame. The pre-IIR frame carries the character's
-		// UNLOCKED FEAT list here: [u32 (featCount+1)*0x3F1][featCount x u32 featId BE]. Everything up to & including
-		// the marker is the 126-byte HEAD; the feats splice in after it; a constant 113-byte TAIL (zero padding + the
-		// 41 00 00 82 08 closer) follows. So PreFrame length = 126 + 4*featCount + 113. See docs/subsystems/feats.md
-		// + tools/capture/decode_unlocked_feats.py.
-		public const int FeatMarkerOffset = 122;
-
-		// Offset of the vanity SHOWN-slots bitmask within the 239-byte PreFrame (4 bytes, big-endian; bit = base equip
-		// slot id, SET = that slot's vanity piece is shown). 0 = no vanity shown, which is the fresh default. The
-		// FA015807 self-spawn carries it so the setting survives relog - the client renders the show/hide off it
-		// (#336). See CharacterEquipment.VanityShownMask for the polarity, which was modelled backwards.
-		public const int VanityShownMaskOffset = 18;
-		private const int PreFrameHead = FeatMarkerOffset + 4; // 126
-		private const int PreFrameTail = 113;
-
-		// Offsets of the two per-character bytes in the u16 value island at frame @70 (abs @135). Archetype is the
-		// high byte, the class enum the low one - see FrameArchetype.
-		private const int ArchetypeOffset = 70;
-		private const int ClassOffset = ArchetypeOffset + 1;
-
-		// The rest of the 239-byte frame is zero except for these islands, which carry the SAME value in every
-		// captured frame and whose meaning is NOT known - only their position and value are. Held as data rather
-		// than as literal index pokes so the frame's shape reads in one place. Offsets are frame-relative; add 65
-		// for the absolute offsets docs/re/player-spawn-generation.md quotes.
-		private static readonly (int Offset, byte[] Bytes)[] PreFrameSkeleton =
-		[
-			(0, [0x05]), // abs @65  - the frame's lead byte / kind
-			(76, [0x6F]), // abs @141
-			(81, [0x41, 0x70]), // abs @146
-			(93, [0x00, 0x08]), // abs @158 - the u16 island; the one byte that differed between fresh captures
-			(113, [0x07, 0xE2]) // abs @178 - 0x7E2 (2018), the landmark preceding the feat marker
-		];
-
-		// The frame's last 5 bytes, constant across every captured spawn (one capture ends 0a instead of 08 - the
-		// generated frame always writes 08, which the client accepts).
-		private static readonly byte[] PreFrameCloser = [0x41, 0x00, 0x00, 0x82, 0x08];
+		// The pre-IIR frame's grammar lives in PlayerSpawnPreFrame / PlayerSpawnPreFrameCodec - it is the client's
+		// SimpleCharFullUpdateIIR scaffold, not a blob with islands, and the character's UNLOCKED FEAT list is the
+		// nested count-framed list inside its sublist (see docs/subsystems/feats.md +
+		// tools/capture/decode_unlocked_feats.py). Nothing here addresses the frame by offset any more.
 
 		private static readonly Dictionary<ConanClass, uint[]> FreshSkillIdsByClass = new Dictionary<ConanClass, uint[]>
 		{
@@ -193,22 +161,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// such as the 228-byte create-editor variant). Order is preserved (the wire order is train order, NOT sorted).
 		public static List<uint> ExtractPreFrameFeats(byte[] preFrame)
 		{
-			var feats = new List<uint>();
-			if (preFrame == null || preFrame.Length < PreFrameHead)
-				return feats;
-
-			var marker = preFrame.ReadU32Be(FeatMarkerOffset);
-			if (!ListFrame.TryCountOf(marker, out var signedCount))
-				return feats;
-
-			var count = (uint)signedCount;
-			if (PreFrameHead + 4 * (long)count > preFrame.Length)
-				return feats;
-
-			for (var k = 0; k < count; k++)
-				feats.Add(preFrame.ReadU32Be(PreFrameHead + 4 * k));
-
-			return feats;
+			return PlayerSpawnPreFrameCodec.TryParse(preFrame, out var frame)
+				? frame.Sublist.SelectMany(e => e.FeatIds).ToList()
+				: [];
 		}
 
 		// Replaces the character's scaffold rows with the scaffold's content (extraction: captured spawn -> rows).
@@ -239,6 +194,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// The unlocked FEAT list lives in the pre-IIR frame (not the post-IIR IdList, which is skills). It IS
 			// character data, so extract it to CharacterFeat rows (in wire/train order); the rest of the frame +
 			// EntryTableX are constants reconstructed from Character.Class by TryApplyFrom (see FreshPreFrame).
+			// A character with SEVERAL saved feat specs flattens to one row set here - CharacterFeat has no spec
+			// column, and the generated frame emits a single unnamed spec. That is the shape of every shipped
+			// character; multi-spec persistence is open work (Gitea).
 			character.Feats = ExtractPreFrameFeats(scaffold.PreFrame)
 				.Select((id, sequence) => new CharacterFeat
 				{
@@ -251,23 +209,23 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		public static byte[] FreshPreFrame(ConanClass @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
 		{
-			var featCount = feats?.Count ?? 0;
-			var f = new byte[PreFrameHead + 4 * featCount + PreFrameTail];
-			foreach (var (offset, bytes) in PreFrameSkeleton)
-				bytes.CopyTo(f, offset);
+			var frame = new PlayerSpawnPreFrame();
+			frame.Flags[PlayerSpawnPreFrame.ArchetypeFlagIndex] = FrameArchetype(@class);
+			frame.Flags[PlayerSpawnPreFrame.ClassFlagIndex] = (byte)@class;
+			frame.Words[PlayerSpawnPreFrame.VanityShownMaskWordIndex] = vanityShownMask; // #336
+			frame.Words[PlayerSpawnPreFrame.CategoryWordIndex] = NpcSpawnPreIir.DefaultCategory;
+			frame.Words[PlayerSpawnPreFrame.ConstantWordIndex] = PlayerSpawnPreFrame.ConstantWordValue;
+			frame.Words[PlayerSpawnPreFrame.SessionWordIndex] = PlayerSpawnPreFrame.FreshSessionWordValue;
 
-			f.WriteU32Be(VanityShownMaskOffset, vanityShownMask); // vanity shown mask (#336)
-			f[ArchetypeOffset] = FrameArchetype(@class); // @135 hi byte = archetype (Soldier1/Priest2/Rogue3/Mage4)
-			f[ClassOffset] = (byte)@class; // @136 = the class byte (0x12 Barbarian .. 0x2c Demonologist)
+			// The sublist carries exactly one entry on every captured login, and that entry's nested count-framed
+			// list is the character's unlocked FEAT list in train order. A fresh character's is empty, which frames
+			// as the bare 0x3F1 word - byte-identical to the old constant-239 fresh frame.
+			var entry = new PlayerSpawnPreFrameSublistEntry();
+			if (feats != null)
+				entry.FeatIds.AddRange(feats);
 
-			// Feat list: [u32 (count+1)*0x3F1] then count x u32 feat id (train order). Empty (count 0) writes the bare
-			// 0x3F1 marker and no ids - byte-identical to the old constant-239 fresh frame.
-			f.WriteU32Be(FeatMarkerOffset, ListFrame.ForCount(featCount));
-			for (var k = 0; k < featCount; k++)
-				f.WriteU32Be(PreFrameHead + 4 * k, feats![k]);
-
-			PreFrameCloser.CopyTo(f, f.Length - PreFrameCloser.Length);
-			return f;
+			frame.Sublist.Add(entry);
+			return PlayerSpawnPreFrameCodec.Build(frame);
 		}
 
 		// The fresh feat list for a class: the captured retail list when we have one, else the profession feat
@@ -294,9 +252,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// read side, so the importer recovers a captured character's setting instead of defaulting it to 0.
 		public static uint ReadVanityShownMask(PlayerSpawnScaffold scaffold)
 		{
-			var preFrame = scaffold?.PreFrame;
-			return preFrame is { Length: >= VanityShownMaskOffset + 4 } f
-				? f.ReadU32Be(VanityShownMaskOffset)
+			return PlayerSpawnPreFrameCodec.TryParse(scaffold?.PreFrame!, out var frame)
+				? frame.Words[PlayerSpawnPreFrame.VanityShownMaskWordIndex]
 				: 0u;
 		}
 
@@ -378,10 +335,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return true;
 		}
 
-		// The normal-login pre-IIR frame (239 bytes) with the fresh-character island values: the near-constant
-		// skeleton (0x05 lead, the 0x7E2/0x3F1 constants, the 41 00 00 82 08 closer) + Dikketest's per-char
-		// values at the two known islands.
-		// The frame's archetype code at @70 (abs-135 high byte): Soldier=1, Priest=2, Rogue=3, Mage=4. This is a
+		// The frame's archetype code (scaffold flag 1, abs @135): Soldier=1, Priest=2, Rogue=3, Mage=4. This is a
 		// DIFFERENT numbering than the ArchType enum, recovered from the captured player spawns (each class maps to
 		// exactly one value across all its sessions - the only genuine per-character field in the whole pre-IIR frame;
 		// everything else that varies is the RDB script-engine char buffer, transient/zero for a player). See

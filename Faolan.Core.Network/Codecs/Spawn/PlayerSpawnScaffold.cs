@@ -38,9 +38,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// byte-identical; see PlayerSpawnGenerationTests).
 		public byte[] CharacterIir { get; set; } = null!;
 
-		// The pre-IIR frame between the transform and the CharacterIIR length prefix: a near-constant skeleton
-		// with per-character value islands (228 bytes editor-constant / 239 normal / 339 geared+table). Kept raw;
-		// PlayerSpawnScaffoldRows.FreshPreFrame builds the fresh-character variant.
+		// The pre-IIR frame between the transform and the CharacterIIR length prefix. DECODED - it is the client's
+		// SimpleCharFullUpdateIIR scaffold (the same one NpcSpawnPreIir models) plus the embedded CoreCharacter's
+		// version byte + IirHeader, and its sublist is the character's saved FEAT SPECS: see PlayerSpawnPreFrame /
+		// PlayerSpawnPreFrameCodec, which parse and rebuild every captured frame byte-exact. Held as bytes here
+		// because the scaffold round-trips verbatim; PlayerSpawnScaffoldRows.FreshPreFrame builds a fresh one.
 		public byte[] PreFrame { get; set; } = null!;
 
 		public byte[] Quat { get; set; } = null!; // #352: columnize (kept raw - typed would lose the exact captured field-set)

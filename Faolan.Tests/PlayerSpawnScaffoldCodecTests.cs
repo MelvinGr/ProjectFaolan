@@ -13,7 +13,7 @@ namespace Faolan.Tests
 	// player-own spawns, including captures added after the codec was written; these pin the C# port):
 	//   SpawnEditorPreview      - in-editor preview, 228-byte constant pre frame, empty scaffold
 	//   SpawnDikketestLogin     - fresh char at world entry (the fresh-character generation reference)
-	//   SpawnNecroKingsCastle  - geared char, 339-byte pre frame with the 26-slot table, end pairs
+	//   SpawnNecroKingsCastle  - geared char, 339-byte pre frame (one feat spec carrying 25 feats), end pairs
 	//   SpawnDemoRandomActions- both ending pair lists non-empty
 	//   SpawnHoxxlingBuffed     - active buffs (two 60-byte buff records)
 	public class PlayerSpawnScaffoldCodecTests
@@ -72,7 +72,7 @@ namespace Faolan.Tests
 		{
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroKingsCastle"), out var s, out _));
 
-			Assert.Equal(339, s.PreFrame.Length); // the geared variant with the 26-slot table
+			Assert.Equal(339, s.PreFrame.Length); // the standard frame with one feat spec carrying 25 feats
 			Assert.Equal(14, s.Entries.Count);
 			Assert.Equal(0x2B6u, s.EntryTableX);
 			Assert.Equal(8, s.EndPairs.Count);

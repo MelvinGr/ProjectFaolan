@@ -134,8 +134,11 @@ namespace Faolan.Tests
 		public void FreshPreFrame_WritesVanityMaskBigEndian(uint mask, string expectedHex)
 		{
 			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Assassin, mask);
-			var off = PlayerSpawnScaffoldRows.VanityShownMaskOffset;
-			Assert.Equal(expectedHex, Convert.ToHexString(frame.AsSpan(off, 4).ToArray()).ToLowerInvariant());
+
+			// Byte offset 18, spelled out rather than taken from the codec: this is the assertion that pins scaffold
+			// word 4 to the place #336 found the mask by a different route, so reading the index back off
+			// PlayerSpawnPreFrame would make it self-referential.
+			Assert.Equal(expectedHex, Convert.ToHexString(frame.AsSpan(18, 4).ToArray()).ToLowerInvariant());
 		}
 
 		// #239: the AoC client derives the displayed profession from the character's feat tree, whose first

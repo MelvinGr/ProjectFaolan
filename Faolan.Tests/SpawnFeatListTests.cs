@@ -90,18 +90,25 @@ namespace Faolan.Tests
 			// the list, lands here rather than passing with fewer spawns.
 			// INDEPENDENT corroboration, and why this gate is not self-referential: the pre-IIR frame's LENGTH is not
 			// something ExtractPreFrameFeats looks at, yet frame length minus 4 per feat collapses onto a handful of
-			// fixed bases - 239 for the standard frame (all 232 of them), 228 for the create-editor variant, and six
-			// outliers in four larger shapes that carry something else variable-width and are pinned rather than waved
-			// through. A feat count read one too high or low would break this arithmetic immediately.
-			Assert.Equal(new Dictionary<int, int> { [228] = 21, [239] = 232, [350] = 2, [370] = 1, [464] = 2, [772] = 1 }, bases);
+			// fixed bases - 239 for the standard frame (all 232 of them), 228 for the create-editor variant, and three
+			// larger bases for the six MULTI-SPEC frames, whose extra width is their specs' NAMES (see
+			// PlayerSpawnPreFrameTests): 250 = 228 + 2 unnamed specs, 264 = 250 + len("PvE - Lance") + len("PvP"),
+			// 336 = 228 + 4 named specs. A feat count read one too high or low would break this arithmetic immediately.
+			// (These bases were 350/370/464/772 while the extractor read a fixed offset: on a multi-spec frame that
+			// offset lands inside a spec NAME, so it found no valid count word and reported ZERO feats - base ==
+			// length. The frames were pinned, but pinned to a mis-read.)
+			Assert.Equal(new Dictionary<int, int> { [228] = 21, [239] = 232, [250] = 3, [264] = 2, [336] = 1 }, bases);
 
 			Assert.Equal(11632, withFeats + empty + notPlayerScaffold);
-			Assert.Equal(109, withFeats);
-			Assert.Equal(150, empty);
+			// 112 / 147, from 109 / 150: the three multi-spec frames whose fixed-offset read landed inside a spec name
+			// reported an EMPTY feat list and were counted as unfeated characters. They are level-80 characters.
+			Assert.Equal(112, withFeats);
+			Assert.Equal(147, empty);
 
-			// 204 distinct feat ids, up from 86 when six fields of this grammar were still being read as constants.
-			// EVERY captured player spawn now parses, so this is the whole corpus rather than the part that fit.
-			Assert.Equal(204, distinct.Count);
+			// 296 distinct feat ids: 86 while six fields of this grammar were read as constants, 204 once the spawn
+			// parsed, and 296 once the pre-IIR frame's SUBLIST was read as a list of named specs instead of a single
+			// feat list at a fixed offset - the six multi-spec frames alone carry 92 ids nothing had ever read.
+			Assert.Equal(296, distinct.Count);
 		}
 
 		// The create-editor pre-IIR variant: a different shape with no feat region.

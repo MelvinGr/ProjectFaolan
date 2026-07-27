@@ -72,21 +72,49 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
 
 - `[u32 bodyLen=len-4][u32 FA015807][u32 ack=C350][u32 handle][u32 fieldA]`
 - transform group `0x2C`: `0A <len> vec3, 12 <len> quat, (25 <fixed32 scale>,) 18 <varint playfield>`
-- **pre-IIR frame** (between the transform and the CharacterIIR length prefix), 3 variants:
-  - **228 bytes (in-editor preview spawns): fully constant**, zero per-char data.
-  - **239 bytes (normal logins)**: constant skeleton + per-char value islands at fixed absolute offsets:
-    u16 @135 (Strie 0x322, Dikketest 0x312, Hoxxling 0x42B, ...), u16 @158 (Dikketest 0x08 vs Strickenen
-    0x21; also session-variant, e.g. Hoxxling 0x3ED vs 0x36B0), bytes @145/@163/@167/@246, 3 bytes @81
-    (usually 0), final marker byte @303 (08, once 0a). Constants include 0x7E2 (=2018) @178, 0x3F1 @186 and
-    the `41 00 00 82 08|0a` closer.
-    **NOTE: the u32 @133 is NOT a length** (an early misread): Hoxxling's stays 1067 while his post-IIR
-    varies by ±280 bytes, AssassinL23's is 2018 (the 0x7E2 constant), and several chars have no length-consistent
-    u32 at all. It is the u16 value island @135. The legacy splice path
-    (the obsolete `SpawnPacketBuilder.SetCharacterMessage`, using `NameOuterLengthOffset` = 133) still
-    adjusts it on resize — the client demonstrably tolerates that — but the generation path builds the
-    whole frame from `Character.Class` (`PlayerSpawnScaffoldRows.FreshPreFrame` → `PlayerSpawnScaffold.PreFrame`).
-  - **339 bytes (geared necrol80/demol80)**: adds XP-ish u32s @77-91, a few bytes @102-111, and a 26-slot table
-    @188-291 of `[00][type 01|06][u16 value]` entries (slot types constant across chars, values per-char).
+- **pre-IIR frame** (between the transform and the CharacterIIR length prefix) — **decoded**
+  (`PlayerSpawnPreFrame` / `PlayerSpawnPreFrameCodec`). It is not a constant skeleton with value islands: it is
+  the SAME `SimpleCharFullUpdateIIR_t::ReadSubClass` scaffold the NPC spawn uses (`NpcSpawnPreIir`, grammar in
+  `docs/re/fa015807-spawn-reader.md`), plus the head of the embedded CoreCharacter:
+
+  ```
+  [u8 version 0x05] [6 x u8 + 53 x u32, in the reader's fixed order, around one count-framed SUBLIST]
+  [u8 CoreChar version 0x41] [u32 CoreChar IirHeader]
+  ```
+
+  The last two fields are why the frame appeared to end in a magic `41 00 00 82 08|0a` "closer": the player
+  parse cuts at the CharacterIIR's u32 length prefix, which sits 5 bytes into the CoreCharacter's 9-byte header
+  `[u8 0x41][u32 iirHeader][u32 msgLen]`. The `iirHeader` is the same word `NpcSpawnBuilder` writes from
+  `NpcStatCore.IirHeader` (0x8208 or 0x820A; not per-character).
+
+  **The SUBLIST is the character's saved FEAT SPECS**, one entry each:
+  `[u32 index][u8 index][u16 len + Latin1 name][count-framed list of u32 feat ids]`. Every normal login carries
+  exactly ONE entry with an empty name — which is why the frame's bytes 119..121 read as three reserved zeros
+  and the whole entry read as a lead-in to a bare feat list — and the create-editor preview carries none, which
+  is why its frame is exactly `NpcSpawnPreIir.FixedLength` + 5 = 228 bytes. Six captured frames carry two or
+  four NAMED specs (`PvE - Lance` 23 feats, `PvP` 27, `PvP - Decap/Protection` 28, `PvP - Decap/Armor` 28,
+  `Hybrid` 27, `Berserker: No Decap` 26).
+
+  So the 25 captured frame LENGTHS are ONE shape parameterised by the sublist, and the two "landmark constants"
+  the generator used to hardcode are list counts: `0x07E2` = `ForCount(1)` (one spec), `0x03F1` = `ForCount(0)`
+  (that spec has no feats). The earlier reading of the 339-byte frame as a "geared variant adding XP-ish u32s
+  and a 26-slot table of `[00][type 01|06][u16 value]` entries" was the count word plus 25 feat ids: a feat id
+  such as `0x0001adb4` reads as `[00][01][adb4]` if you look for a table.
+
+  Named fields inside the 53 words: **4** = the vanity shown-slots mask (#336 found it independently at frame
+  offset 18, which is exactly word 4 — corroboration that this grid is the client's), **17** = the same
+  category enum `NpcSpawnPreIir` calls the category, carrying its modal `0x6f` on all 259 captured frames,
+  **19** = a constant `0x41700000` (float 15.0) on all 259, **21** = a per-session value (6..44, plus round
+  outliers 1005/1586/9000/11185/14000) that nothing predicts. The 6 u8 fields carry the archetype
+  (Soldier 1 / Priest 2 / Rogue 3 / Mage 4) and the class byte at flags 1 and 2 — the frame's only genuinely
+  per-character content besides the mask and the feat specs.
+
+  **NOTE: the u32 @133 is NOT a length** (an early misread): Hoxxling's stays 1067 while his post-IIR
+  varies by ±280 bytes, AssassinL23's is 2018 (the sublist's `ForCount(1)` word), and several chars have no
+  length-consistent u32 at all. The legacy splice path
+  (the obsolete `SpawnPacketBuilder.SetCharacterMessage`, using `NameOuterLengthOffset` = 133) still
+  adjusts it on resize — the client demonstrably tolerates that — but the generation path builds the
+  whole frame from `Character.Class` (`PlayerSpawnScaffoldRows.FreshPreFrame` → `PlayerSpawnScaffold.PreFrame`).
 - `[u32 innerLen]` + the **ProtoCoreCharacterIIR**.
 - **post-IIR stream** (contiguous to EOF; nothing follows it):
   - header: a **plain-counted list** `[u32 n][n x u32]` then the constant `[u32 4]`. Read as the constant pair
