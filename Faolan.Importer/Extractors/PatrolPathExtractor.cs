@@ -39,7 +39,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				if (p.Opcode != RpcOpcode.IirCarrier)
+				if (!p.IsIirCarrier)
 					continue;
 
 				var body = p.Body;

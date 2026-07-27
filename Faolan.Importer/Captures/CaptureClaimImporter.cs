@@ -7,6 +7,7 @@ using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Protocol;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Faolan.Core.Enums;
 
 namespace Faolan.Importer.Captures
 {
@@ -28,7 +29,7 @@ namespace Faolan.Importer.Captures
 				try
 				{
 					var packet = Rpc.Parse(bytes);
-					if (packet.Opcode != 0x2000)
+					if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 						continue;
 
 					payload = packet.BodyReader().ReadArrayUInt32Length();

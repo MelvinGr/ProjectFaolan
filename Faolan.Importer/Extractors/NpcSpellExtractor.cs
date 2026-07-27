@@ -38,7 +38,7 @@ namespace Faolan.Importer.Extractors
 			var entries = new List<NpcSpellEntry>();
 			foreach (var p in packets)
 			{
-				if (p.Opcode != RpcOpcode.IirCarrier)
+				if (!p.IsIirCarrier)
 					continue;
 
 				var body = p.Body;

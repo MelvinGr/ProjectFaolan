@@ -598,7 +598,7 @@ namespace Faolan.Importer.Captures
 				uint id;
 				if (isCombo)
 				{
-					if (packet.Opcode != RpcOpcode.IirCarrier || body.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ComboBookSubOpcode)
+					if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob || body.Length < 22 || BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4)) != ComboBookSubOpcode)
 						return;
 
 					id = ComboBookIirCodec.Message.Read(new FaolanStream(body)).ComboId;

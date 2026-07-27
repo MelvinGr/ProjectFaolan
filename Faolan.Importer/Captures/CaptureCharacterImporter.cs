@@ -70,7 +70,7 @@ namespace Faolan.Importer.Captures
 						continue;
 					}
 
-					if (p.Opcode != RpcOpcode.IirCarrier)
+					if (!p.IsIirCarrier)
 						continue;
 
 					var body = GetScaffoldBody(p);

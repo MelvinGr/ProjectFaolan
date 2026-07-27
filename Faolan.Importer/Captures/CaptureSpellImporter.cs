@@ -432,7 +432,7 @@ namespace Faolan.Importer.Captures
 			var classByHandle = new Dictionary<uint, byte>();
 			foreach (var p in packets)
 			{
-				if (p.Opcode != RpcOpcode.IirCarrier)
+				if (!p.IsIirCarrier)
 					continue;
 
 				// Only PLAYER spawns parse with the scaffold codec - an NPC's FA015807 body has a different shape - so
@@ -606,7 +606,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != RpcOpcode.IirCarrier)
+				if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 					return false;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
@@ -638,7 +638,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != RpcOpcode.IirCarrier)
+				if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 					return false;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
@@ -664,7 +664,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != 0x2000)
+				if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 					return;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();

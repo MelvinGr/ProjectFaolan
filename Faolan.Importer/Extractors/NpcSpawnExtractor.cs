@@ -63,7 +63,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				if (p.Opcode != RpcOpcode.IirCarrier)
+				if (!p.IsIirCarrier)
 					continue;
 
 				var body = p.Body;
@@ -105,7 +105,7 @@ namespace Faolan.Importer.Extractors
 					? BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(4, 4))
 					: 0;
 
-				if (p is { Opcode: RpcOpcode.IirCarrier, IsDownload: true } && subop == MapChangeSubOpcode && body.Length >= 38)
+				if (p is { IsIirCarrier: true, IsDownload: true } && subop == MapChangeSubOpcode && body.Length >= 38)
 				{
 					currentMap = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(34, 4));
 					sawPoll = false;
@@ -121,7 +121,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
-				if (sawPoll || p.Opcode != RpcOpcode.IirCarrier || !p.IsDownload || subop != SpawnSubOpcode)
+				if (sawPoll || !p.IsIirCarrier || !p.IsDownload || subop != SpawnSubOpcode)
 					continue;
 				if (allowedMaps != null && !allowedMaps.Contains(currentMap))
 					continue;

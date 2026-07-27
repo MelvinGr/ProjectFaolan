@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Enums;
 
 namespace Faolan.Importer.Extractors
 {
@@ -29,7 +30,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				if (!p.IsDownload || p.Opcode != 0x2000 || p.Bytes.Length < 12)
+				if (!p.IsDownload || p.Opcode != (uint)GameCharInterfaceProjectOpcodes.DispatchUpdateAggroStatus || p.Bytes.Length < 12)
 					continue;
 
 				var headerLen = (int)BinaryPrimitives.ReadUInt32BigEndian(p.Bytes.AsSpan(8, 4));

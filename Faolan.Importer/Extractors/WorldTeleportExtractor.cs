@@ -68,7 +68,7 @@ namespace Faolan.Importer.Extractors
 			for (var i = 0; i < packets.Count; i++)
 			{
 				var p = packets[i];
-				if (p.Opcode != RpcOpcode.IirCarrier)
+				if (!p.IsIirCarrier)
 					continue;
 
 				var body = p.Body;
@@ -120,7 +120,7 @@ namespace Faolan.Importer.Extractors
 				for (var j = i + 1; j < packets.Count && j <= i + LookaheadPackets; j++)
 				{
 					var q = packets[j];
-					if (q.Opcode != RpcOpcode.IirCarrier || !q.IsDownload)
+					if (!q.IsIirCarrier || !q.IsDownload)
 						continue;
 
 					var qbody = q.Body;

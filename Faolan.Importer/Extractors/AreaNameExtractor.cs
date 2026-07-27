@@ -54,7 +54,7 @@ namespace Faolan.Importer.Extractors
 			{
 				// NB both directions: the banner is s2c but the POSITION comes from the client's own c2s move, so
 				// this can't filter to downloads the way it did when it only read banners.
-				if (p.Opcode != RpcOpcode.IirCarrier)
+				if (!p.IsIirCarrier)
 					continue;
 
 				var body = p.Body;

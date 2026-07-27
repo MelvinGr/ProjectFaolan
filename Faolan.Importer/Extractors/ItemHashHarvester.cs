@@ -196,7 +196,7 @@ namespace Faolan.Importer.Extractors
 		private static void ExtractFromBankIir(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != 0x2000)
+			if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 				return;
 
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
@@ -229,7 +229,7 @@ namespace Faolan.Importer.Extractors
 		private static void ExtractFromClaimList(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != 0x2000)
+			if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 				return;
 
 			var payload = packet.BodyReader().ReadArrayUInt32Length();
@@ -260,7 +260,7 @@ namespace Faolan.Importer.Extractors
 		private static void ExtractFromLootBag(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != 0x2000)
+			if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 				return;
 
 			var payload = packet.BodyReader().ReadArrayUInt32Length();
@@ -392,7 +392,7 @@ namespace Faolan.Importer.Extractors
 			root = null!;
 
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != 0x2000)
+			if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 				return false;
 
 			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());

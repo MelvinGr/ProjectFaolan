@@ -84,7 +84,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != RpcOpcode.IirCarrier)
+				if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 					return;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();

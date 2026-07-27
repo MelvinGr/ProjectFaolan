@@ -39,7 +39,7 @@ namespace Faolan.Importer.Extractors
 			var results = new List<NpcDeathBehavior>();
 			foreach (var p in packets)
 			{
-				if (p.Opcode != RpcOpcode.IirCarrier || !p.IsDownload || p.SubOpcode != DeathBccSubOpcode)
+				if (!p.IsIirCarrier || !p.IsDownload || p.SubOpcode != DeathBccSubOpcode)
 					continue;
 
 				var body = p.Body;
