@@ -135,7 +135,7 @@ namespace Faolan.GameServer.World
 		// transform + vitals from the persisted Character. After this the WorldEntity is the source of truth for live
 		// position/vitals; the Character is only re-read on a fresh entry/teleport. Idempotent (GetOrAdd keeps the
 		// existing entity, so vitals aren't reset across re-entry/teleport/respawn).
-		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses = null,
+		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
 			IReadOnlyDictionary<CharacterStatId, int>? classBase = null)
 		{
 			var character = client.Session.Character;
@@ -148,26 +148,26 @@ namespace Faolan.GameServer.World
 			// fresh-entry seed uses it; a re-entry keeps its existing (already gear-aware) vitals via GetOrAdd.
 			var entity = Players.GetOrAdd(client, _ => new WorldEntity(handle, character.MapId, true, character.Name ?? $"Character{handle}", client)
 			{
-				Vitals = EntityVitals.FromCharacter(character, gearBonuses, classBase),
+				Vitals = EntityVitals.FromCharacter(character, statBonuses, classBase),
 				// #401: cache the worn-gear physical armor + magical Protection for incoming-damage mitigation.
-				ArmorRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.Armor) ?? 0),
-				Protection = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.Protection) ?? 0),
+				ArmorRating = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.Armor) ?? 0),
+				Protection = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.Protection) ?? 0),
 				// #399: cache the worn-gear Hit Rating (hit chance, not yet consumed) + the crit stats.
-				HitRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.HitRating) ?? 0),
-				CriticalRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.CriticalRating) ?? 0),
-				CriticalDamageRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.CriticalDamageRating) ?? 0),
-				CombatRating = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.CombatRating) ?? 0),
+				HitRating = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.HitRating) ?? 0),
+				CriticalRating = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.CriticalRating) ?? 0),
+				CriticalDamageRating = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.CriticalDamageRating) ?? 0),
+				CombatRating = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.CombatRating) ?? 0),
 				// #399: cache the worn-gear Magic Damage added flat to the player's spell hits.
-				MagicDamage = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.MagicDamage) ?? 0),
+				MagicDamage = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.MagicDamage) ?? 0),
 				// Cache the worn-gear natural mana/stamina regen added onto the base regen tick.
-				NaturalManaRegen = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.NaturalManaRegen) ?? 0),
-				NaturalStaminaRegen = (uint)Math.Max(0, gearBonuses?.GetValueOrDefault(CharacterStatId.NaturalStaminaRegen) ?? 0),
+				NaturalManaRegen = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.NaturalManaRegen) ?? 0),
+				NaturalStaminaRegen = (uint)Math.Max(0, statBonuses?.GetValueOrDefault(CharacterStatId.NaturalStaminaRegen) ?? 0),
 				// #400: seed the live drawn weapon set from the persisted value so a mid-session swap starts from the set
-				// the character last had out (and the gearBonuses above were aggregated for that same set).
+				// the character last had out (and the statBonuses above were aggregated for that same set).
 				ActiveWeaponSet = character.ActiveWeaponSet,
 				// #367: keep the gear bonuses themselves, not just their sum into the fields above - they are the
 				// baseline a buff's stat delta is added to (and removed from) by BuffStatEffects.
-				GearBonuses = gearBonuses ?? new Dictionary<CharacterStatId, int>(),
+				GearBonuses = statBonuses ?? new Dictionary<CharacterStatId, int>(),
 				ClassBase = classBase ?? new Dictionary<CharacterStatId, int>()
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map

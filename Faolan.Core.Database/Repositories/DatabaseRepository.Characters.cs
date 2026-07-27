@@ -33,6 +33,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<CharacterEquipment?> GetCharacterEquipment(uint characterId);
 		Task<uint[]> GetCharacterFeats(uint characterId);
 		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
+		Task<FeatEffect[]> GetCharacterFeatEffects(uint characterId);
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId);
@@ -365,6 +366,21 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArrayAsync();
+		}
+
+		// The stat modifiers a character's trained feats grant. Two hops, because the wire and the catalog use
+		// different id spaces (#467): CharacterFeat.FeatId is a WIRE id, FeatIdMap resolves it to the RDB TEMPLATE id,
+		// and FeatEffect hangs off the template.
+		//
+		// A feat whose template is one of the TEA-encrypted ones contributes nothing - we cannot read its effects -
+		// so this returns fewer rows than the character has feats, which is expected rather than a fault.
+		public async Task<FeatEffect[]> GetCharacterFeatEffects(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await (from feat in ctx.CharacterFeats.Where(f => f.CharacterId == characterId)
+				join map in ctx.FeatIdMaps on feat.FeatId equals map.WireFeatId
+				join effect in ctx.FeatEffects on map.TemplateId equals effect.FeatId
+				select effect).ToArrayAsync();
 		}
 
 		// The prerequisite edges for `featIds` (FeatPrereq, imported from the client's own feat table), as

@@ -171,10 +171,10 @@ namespace Faolan.GameServer.Combat
 		///     Full-health vitals seeded from a character's persisted max stats (class/level defaults if it has none),
 		///     PLUS the equipped-gear vital bonuses (#3) so worn +HP/+Stamina/+Mana raises the max and the regen bar can
 		///     fill past the class base. The world model's single seed point for a player's live vitals - used both by
-		///     combat and by the world simulation when a player is registered. <paramref name="gearBonuses" /> is the
+		///     combat and by the world simulation when a player is registered. <paramref name="statBonuses" /> is the
 		///     MaxStatAggregator output (display-unit totals by stat); null/absent = no gear bonus.
 		/// </summary>
-		public static EntityVitals FromCharacter(Character character, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses = null,
+		public static EntityVitals FromCharacter(Character character, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
 			IReadOnlyDictionary<CharacterStatId, int>? classBase = null)
 		{
 			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
@@ -189,14 +189,14 @@ namespace Faolan.GameServer.Combat
 			// The fourth term - buffs that raise a max pool (Focused Mind's +mana, Sustaining Wrath's +health) - is not
 			// here because it is not fixed at world entry: BuffStatEffects re-applies it through SetMaxFromBonus on every
 			// change to the entity's live buffs, on top of the base these two terms establish.
-			var vitals = FromMax(AddGear(max.Health, classBase, CharacterStatId.HealthMax),
-				AddGear(max.Mana, classBase, CharacterStatId.ManaMax),
-				AddGear(max.Stamina, classBase, CharacterStatId.StaminaMax));
+			var vitals = FromMax(AddBonus(max.Health, classBase, CharacterStatId.HealthMax),
+				AddBonus(max.Mana, classBase, CharacterStatId.ManaMax),
+				AddBonus(max.Stamina, classBase, CharacterStatId.StaminaMax));
 			vitals.BaseMaxHealth = vitals.MaxHealth;
 			vitals.BaseMaxMana = vitals.MaxMana;
 			vitals.BaseMaxStamina = vitals.MaxStamina;
 			foreach (var stat in MaxPools)
-				vitals.SetMaxFromBonus(stat, gearBonuses?.GetValueOrDefault(stat) ?? 0);
+				vitals.SetMaxFromBonus(stat, statBonuses?.GetValueOrDefault(stat) ?? 0);
 
 			vitals.ReviveToFull();
 			// #214: a character that logged out dead is still dead - seed current health at 0 (max stays full) so the
@@ -234,9 +234,9 @@ namespace Faolan.GameServer.Combat
 		}
 
 		// Adds the gear bonus for one vital stat onto its base max, clamped at 0 (a bonus never drops a pool below zero).
-		private static uint AddGear(uint baseMax, IReadOnlyDictionary<CharacterStatId, int>? gearBonuses, CharacterStatId stat)
+		private static uint AddBonus(uint baseMax, IReadOnlyDictionary<CharacterStatId, int>? statBonuses, CharacterStatId stat)
 		{
-			if (gearBonuses == null || !gearBonuses.TryGetValue(stat, out var bonus))
+			if (statBonuses == null || !statBonuses.TryGetValue(stat, out var bonus))
 				return baseMax;
 
 			var total = baseMax + bonus;

@@ -33,6 +33,14 @@ and don't contain.
   no captured character carries two ranks of one base. So `AddCharacterFeats` REPLACES on rank-up (keeping the
   feat's original `Sequence`, since the wire order is train order) and ignores a request at or below the rank held.
   It used to dedup on the exact id, which would have put an entry on the spawn's list that retail never sends.
+- **Feats GRANT their stats.** `MaxStatAggregator.AggregateFeatBonuses` sums `FeatEffect` into the same additive
+  bonus table gear feeds, applied at world entry (`GameServerListener.WorldEntry`).
+  ⚠️ **No `GetScale()` division**, unlike the gear path: `FeatEffect.Value` is a DISPLAY value where
+  `ItemStatModifier.Amount` is raw wire. Strength (scale 10) carries 1..9 in the feat table and HealthMax
+  (scale 100) carries 100..700 - dividing those would under-grant every feat by 10x or 100x.
+  ⚠️ **Only 2,056 of the 6,593 mapped feats have readable effects**, and NONE of the three captured characters'
+  feats do - theirs all resolve to TEA-encrypted templates. So the path is live and exercisable (`.feat train 15200`
+  grants +720 to two attack ratings) but contributes nothing to an imported character until the keys are cracked.
 - **Training ENFORCES the tree.** `FeatService` rejects a train whose resulting set leaves a prerequisite unmet
   (`FeatRules.MissingPrerequisites`), alongside the existing point-budget check.
   ⚠️ A prerequisite is satisfied by the **same base at an equal-or-higher rank**, not by the exact id. The graph

@@ -28,5 +28,33 @@ namespace Faolan.GameServer.Combat
 
 			return totals;
 		}
+
+		// Total stat bonus per stat across a character's trained FEATS (#251).
+		//
+		// ⚠️ NO GetScale() division here, unlike the gear path above. FeatEffect.Value is already a DISPLAY value:
+		// Strength (scale 10) carries 1..9 in the feat table, which as a raw wire value would be +0.1 Strength, and
+		// HealthMax (scale 100) carries 100..700, which would be +1 HP. Dividing these would under-grant every feat
+		// by 10x or 100x. The two sources genuinely use different conventions - the item template stores raw wire,
+		// the feat table stores display.
+		public static IReadOnlyDictionary<CharacterStatId, int> AggregateFeatBonuses(IEnumerable<FeatEffect> effects)
+		{
+			var totals = new Dictionary<CharacterStatId, int>();
+			foreach (var effect in effects)
+				totals[effect.StatId] = totals.GetValueOrDefault(effect.StatId) + (int)effect.Value;
+
+			return totals;
+		}
+
+		// Sums several bonus sources into one table. The simulation takes a single additive bonus set, and gear and
+		// feats are just two contributors to it.
+		public static IReadOnlyDictionary<CharacterStatId, int> Combine(params IReadOnlyDictionary<CharacterStatId, int>[] sources)
+		{
+			var totals = new Dictionary<CharacterStatId, int>();
+			foreach (var source in sources)
+			foreach (var (stat, amount) in source)
+				totals[stat] = totals.GetValueOrDefault(stat) + amount;
+
+			return totals;
+		}
 	}
 }

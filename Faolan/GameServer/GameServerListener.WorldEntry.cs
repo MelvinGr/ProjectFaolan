@@ -511,8 +511,13 @@ namespace Faolan.GameServer
 			// Resolve which COPY (instance) of this map the player joins from its instancing mode (#268): register the
 			// player first (which picks/keeps their instance), then populate THAT instance's NPCs.
 			var map = await Database.GetMap(mapId) ?? throw new  InvalidOperationException();
-			// #3: aggregate the equipped-gear stat bonuses so the player's live vitals seed with gear-boosted maxes.
-			var gearBonuses = MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet));
+			// #3/#251: the additive stat bonuses the player carries into the world - equipped GEAR plus trained FEATS -
+			// so their live vitals seed with both. Feats contribute only where the feat's RDB template is one of the
+			// plaintext ones; the TEA-encrypted majority yields no effect rows, so a character can hold feats that add
+			// nothing yet (see GetCharacterFeatEffects).
+			var statBonuses = MaxStatAggregator.Combine(
+				MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet)),
+				MaxStatAggregator.AggregateFeatBonuses(await Database.GetCharacterFeatEffects(character.Id)));
 			// #444: the class/level BASE the character's attributes start from. The client computes this locally (retail
 			// sends a flat 10 for every attribute), so it is decoded data, not wire data - see ClassAttributeBaseModule.
 			var classBase = await Database.GetClassAttributeBase(character.Class, character.Level);
@@ -522,7 +527,7 @@ namespace Faolan.GameServer
 					character.Class, character.Level, character.Name);
 			}
 
-			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, gearBonuses, classBase);
+			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId);
 			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them
