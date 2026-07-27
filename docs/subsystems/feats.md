@@ -64,6 +64,9 @@ and don't contain.
   and **0-BASED** (the first rank is 0: "Corrupted Soul" is 84100..84104 = ranks 0..4). ⚠️ NOT `Feat.Rank`, which is
   parsed from the NAME: the name's trailing number is a rank sometimes ("Thrown Weapons 5") and an INDEX other times
   ("Guardian Class Feat 011" parses as 11), so the two disagree on 2394 of the 2491 feats where both have a value.
+  ⚠️ `FeatIdMap.Rank` is only a RANK below **10**, and that bound is the client's: `FUN_007850c0` computes
+  `(id / 100) * 100 + 10` and requires `id <` it. 5,742 of 6,593 entries fit; the other 851 are "<Class> Class Feat
+  071"-style rows whose low digits index a family (24779 reads as 79). `HasRank` gates it.
 - **The id encodes the class.** Each entry's 11th word is `wireId / 100`, and for the ROOT feats that value is the
   `ConanClass` enum value: wire 1800 = Barbarian (0x12), 2000 = Guardian (0x14), 2200 = Conqueror (0x16),
   2900 = BearShaman (0x1D), 3100 = DarkTemplar (0x1F). Below them sit the four ARCHETYPE roots -

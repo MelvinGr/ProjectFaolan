@@ -54,7 +54,22 @@ namespace Faolan.Core.Database.Tables
 		// 011" parses as 11), so the two disagree on 2394 of the 2491 feats where both have a value, and the deltas
 		// scatter (+1 x1462, -1 x99, -5 x98, 0 x97, ...) rather than being a clean off-by-one. This one is the
 		// client's own encoding - its own loader computes featId/100 for the base - so prefer it.
+		//
+		// ⚠️ Only a RANK while it is < 10, and that bound is the client's, not a guess: FUN_007850c0 computes
+		// `(id / 100) * 100 + 10` and requires `id <` it, so the split it recognises is base*100 + rank with rank in
+		// 0..9. 5742 of the 6593 entries fit. The other 851 are all "<Class> Class Feat 071"-style rows whose low
+		// digits are an INDEX in a differently-numbered family (24779 reads as 79), the same trap the NAME's trailing
+		// number sets. Carried raw with HasRank to gate it, rather than zeroed - the value is real, its meaning just
+		// changes above the bound.
 		public uint Rank { get; set; }
+
+		// The client's own bound on a feat rank (FUN_007850c0's `base*100 + 10` ceiling).
+		public const uint MaxRank = 10;
+
+		// True when Rank really is a rank - i.e. inside the client's own 0..9 window. False on the "Class Feat NNN"
+		// rows, where the low digits index a family instead. A convenience over the raw value, not a column.
+		[NotMapped]
+		public bool HasRank => Rank < MaxRank;
 
 		// True for an archetype/class/tree root - see RootFlag. A convenience over the raw word, not a column.
 		[NotMapped]
