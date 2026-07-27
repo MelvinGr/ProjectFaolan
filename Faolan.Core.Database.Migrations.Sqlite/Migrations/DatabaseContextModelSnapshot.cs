@@ -2988,6 +2988,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float>("Range")
                         .HasColumnType("REAL");
 
+                    b.Property<byte>("Rank")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.ToTable("Spells");

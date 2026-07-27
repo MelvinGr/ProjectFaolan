@@ -6,6 +6,19 @@ namespace Faolan.Core.Database.Tables
 	public class Spell : BaseEntity
 	{
 		public byte Level { get; set; }
+
+		// RDB field 123 (0x7B) of the spell's type-1040005 record, carried RAW.
+		//
+		// ⚠️ It is the rank for MOST spells but NOT all, so do not read it as one without checking. Measured against
+		// the "(Rank N)" suffix in the name over the 883 spells that have both: 669 agree, and the other 214 are a
+		// clean rank x10 - "Healing Benediction (Rank 1/2/3)" carries 10/20/30 where "Wave of Life (Rank 2)" carries
+		// 2. The scale differs by spell FAMILY and nothing found so far discriminates the two: field 128 is constant
+		// (2) across that family's ranks, so it is not the selector either.
+		//
+		// Kept raw rather than normalised because the two cases are genuinely ambiguous at 10 - a true rank 10 and a
+		// x10-encoded rank 1 are the same value - and guessing would silently corrupt one of them. The #367 field dump
+		// labelled 123 "rank"; this is that label qualified, not overturned.
+		public byte Rank { get; set; }
 		public float DamageRating { get; set; } // spell damage rating percent (RDB field 0x15C / 100)
 		public float Range { get; set; } // target range in metres (RDB field 0x11F / 100)
 

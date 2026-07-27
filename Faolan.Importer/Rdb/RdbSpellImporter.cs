@@ -78,6 +78,10 @@ namespace Faolan.Importer.Rdb
 		// on 7, so the pin was overwriting a CORRECT level with a sentinel. The starter kit is now a capture-proven
 		// list on ClassSpell.IsStarter, independent of level, and Spells.Level means only "the level requirement".
 		private const uint LevelField = 0x07D;
+
+		// 123 - the spell's RANK. Named in the #367 field dump but never lifted until now; the rank used to come from
+		// the "(Rank N)" suffix in the name, and with the ellatha scrape gone the RDB is the only source.
+		private const uint RankField = 0x07B;
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 		private const uint SpellDataType = 1040005;
 
@@ -173,6 +177,9 @@ namespace Faolan.Importer.Rdb
 				var level = fields.TryGetValue(LevelField, out var lv) && lv <= byte.MaxValue
 					? (byte)lv
 					: (byte)0;
+				var rank = fields.TryGetValue(RankField, out var rk) && rk <= byte.MaxValue
+					? (byte)rk
+					: (byte)0;
 
 				// #367: buff/debuff stat deltas live in the same [2][9] region as item templates. The record's KIND is
 				// carried through, not dropped: a spell mixes flat and PERCENT records in one region, and reading a
@@ -196,7 +203,8 @@ namespace Faolan.Importer.Rdb
 						Range = range,
 						DamageRating = damageRating,
 						DurationMs = durationMs,
-						Level = level
+						Level = level,
+						Rank = rank
 					};
 					byId[entry.Id] = spell;
 					toAdd.Add(spell);
@@ -234,6 +242,10 @@ namespace Faolan.Importer.Rdb
 					spell.Level = level;
 					levelsSet++;
 				}
+
+				// Rank is set unconditionally, unlike level: the RDB is its ONLY source, so there is no other value
+				// to defer to and a 0 here means the record genuinely carries no rank.
+				spell.Rank = rank;
 			}
 
 			if (toAdd.Count > 0)
