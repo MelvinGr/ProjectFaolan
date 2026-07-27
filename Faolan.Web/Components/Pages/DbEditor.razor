@@ -1,10 +1,8 @@
 @page "/admin/db"
 @rendermode InteractiveServer
-@inject IDbContextFactory<DatabaseContext> DbFactory
-@inject NavigationManager Nav
 @using Faolan.Core.Database
 @using Microsoft.EntityFrameworkCore
-@implements IDisposable
+@inherits AdminDbPage
 
 <PageTitle>Database — Admin</PageTitle>
 
@@ -14,18 +12,18 @@
 		<span class="warn">⚠ edits the live game DB — the server may need a restart to pick up changes</span>
 	</div>
 
-	@if (!_authorized)
+	@if (!Authorized)
 	{
 		<p class="muted">Checking access…</p>
 	}
 	else
 	{
-		@if (_status != null)
+		@if (Status != null)
 		{
-			<p class="dbe-status @(_error
+			<p class="dbe-status @(Error
 				                     ? "err"
 				                     : "")">
-				@_status
+				@Status
 			</p>
 		}
 
@@ -42,7 +40,7 @@
 			</aside>
 
 			<section class="dbe-rows">
-				<input class="filter" placeholder="Filter rows…" @bind="_filter" @bind:event="oninput"/>
+				<input class="filter" placeholder="Filter rows…" @bind="Filter" @bind:event="oninput"/>
 				<div class="rowlist">
 					@foreach (var r in Filtered())
 					{

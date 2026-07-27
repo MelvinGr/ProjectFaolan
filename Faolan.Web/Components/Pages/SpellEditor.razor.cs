@@ -25,7 +25,7 @@ namespace Faolan.Web.Components.Pages
 	// buff actually modifies.
 	//
 	// Admin-gated, edits the live DB (restart to apply) - same contract as the other two editors.
-	public partial class SpellEditor : IDisposable
+	public partial class SpellEditor
 	{
 		private static readonly SpellEffectTrigger[] Triggers = Enum.GetValues<SpellEffectTrigger>();
 		private static readonly SpellEffectKind[] Kinds = Enum.GetValues<SpellEffectKind>();
@@ -33,7 +33,6 @@ namespace Faolan.Web.Components.Pages
 		// The catalog is ~20k rows, so the list is filtered down before rendering rather than paged: rendering every
 		// row as a button is what would make this page unusable, not loading them.
 		private const int ShowCap = 300;
-		private DatabaseContext? _ctx;
 		private List<Spell> _spells = [];
 
 		// Effects by spell id, loaded once for the whole catalog: they are a few dozen / ~1700 rows, cheap to hold, and
@@ -41,37 +40,14 @@ namespace Faolan.Web.Components.Pages
 		private Dictionary<uint, List<SpellEffect>> _effects = [];
 		private Dictionary<uint, List<SpellStatEffect>> _statEffects = [];
 		private Spell? _spell;
-		private bool _authorized;
-		private bool _error;
 		private bool _onlyWithEffects;
-		private string _filter = "";
-		private string? _status;
 		private int _shown;
 
-		[CascadingParameter]
-		private Task<AuthenticationState>? AuthState { get; set; }
-
-		public void Dispose()
+		protected override async Task LoadAsync(DatabaseContext ctx)
 		{
-			_ctx?.Dispose();
-		}
-
-		protected override async Task OnInitializedAsync()
-		{
-			var user = AuthState == null
-				? null
-				: (await AuthState).User;
-			if (user == null || !user.IsInRole("Admin"))
-			{
-				Nav.NavigateTo("/", true);
-				return;
-			}
-
-			_authorized = true;
-			_ctx = await DbFactory.CreateDbContextAsync();
-			_spells = await _ctx.Spells.OrderBy(s => s.Id).ToListAsync();
-			_effects = (await _ctx.SpellEffects.ToListAsync()).GroupBy(e => e.SpellId).ToDictionary(g => g.Key, g => g.ToList());
-			_statEffects = (await _ctx.SpellStatEffects.ToListAsync()).GroupBy(e => e.SpellId).ToDictionary(g => g.Key, g => g.ToList());
+			_spells = await ctx.Spells.OrderBy(s => s.Id).ToListAsync();
+			_effects = (await ctx.SpellEffects.ToListAsync()).GroupBy(e => e.SpellId).ToDictionary(g => g.Key, g => g.ToList());
+			_statEffects = (await ctx.SpellStatEffects.ToListAsync()).GroupBy(e => e.SpellId).ToDictionary(g => g.Key, g => g.ToList());
 
 			// Open on something worth looking at rather than spell #1: the spells that HAVE server-acted effects are the
 			// reason this page exists.
@@ -82,7 +58,7 @@ namespace Faolan.Web.Components.Pages
 
 		private void AddEffect()
 		{
-			if (_spell == null || _ctx == null)
+			if (_spell == null || Ctx == null)
 				return;
 
 			var list = _effects.TryGetValue(_spell.Id, out var existing)
@@ -101,7 +77,7 @@ namespace Faolan.Web.Components.Pages
 				Kind = SpellEffectKind.SummonPet
 			};
 			list.Add(fx);
-			_ctx.SpellEffects.Add(fx);
+			Ctx.SpellEffects.Add(fx);
 			Set("Added effect (unsaved — press Save)");
 		}
 
@@ -125,9 +101,9 @@ namespace Faolan.Web.Components.Pages
 			if (_onlyWithEffects)
 				q = q.Where(s => _effects.ContainsKey(s.Id) || _statEffects.ContainsKey(s.Id));
 
-			if (!string.IsNullOrWhiteSpace(_filter))
+			if (!string.IsNullOrWhiteSpace(Filter))
 			{
-				var f = _filter.Trim();
+				var f = Filter.Trim();
 				q = q.Where(s => s.Id.ToString().Contains(f, StringComparison.OrdinalIgnoreCase) || (s.Name ?? "").Contains(f, StringComparison.OrdinalIgnoreCase));
 			}
 
@@ -138,45 +114,21 @@ namespace Faolan.Web.Components.Pages
 
 		private void RemoveEffect(SpellEffect fx)
 		{
-			if (_ctx == null || _spell == null)
+			if (Ctx == null || _spell == null)
 				return;
 
 			if (_effects.TryGetValue(_spell.Id, out var list))
 				list.Remove(fx);
 			// A never-saved row is only tracked as Added, so dropping it is enough; a persisted one must be explicitly
 			// removed for SaveChanges to delete it.
-			if (_ctx.Entry(fx).State != EntityState.Added)
-				_ctx.Remove(fx);
+			if (Ctx.Entry(fx).State != EntityState.Added)
+				Ctx.Remove(fx);
 			Set("Removed effect (unsaved — press Save)");
-		}
-
-		private async Task Save()
-		{
-			if (_ctx == null)
-				return;
-
-			try
-			{
-				var n = await _ctx.SaveChangesAsync();
-				Set($"Saved — {n} change(s) written. Restart the server to apply.");
-			}
-			catch (Exception ex)
-			{
-				// The CHECK constraints (ConstrainToEnumValues on Trigger/Kind) and the composite key surface here, so
-				// show the inner message: "UNIQUE constraint failed" is the useful half, not the EF wrapper.
-				Set(ex.InnerException?.Message ?? ex.Message, true);
-			}
 		}
 
 		private void Select(Spell s)
 		{
 			_spell = s;
-		}
-
-		private void Set(string msg, bool err = false)
-		{
-			_status = msg;
-			_error = err;
 		}
 
 		private IEnumerable<SpellStatEffect> StatEffects()

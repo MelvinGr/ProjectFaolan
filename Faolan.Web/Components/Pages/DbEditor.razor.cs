@@ -20,52 +20,27 @@ namespace Faolan.Web.Components.Pages
 		private static readonly MethodInfo SetMethod = typeof(DbContext).GetMethod(nameof(DbContext.Set), 1, Type.EmptyTypes)!;
 		private readonly Dictionary<string, FkOptions> _fks = [];
 		private readonly List<object> _rows = [];
-		private DatabaseContext? _ctx;
 		private IReadOnlyList<DbEditorField> _fields = [];
 		private List<Type> _tables = [];
 		private Type? _table;
-		private bool _authorized;
-		private bool _error;
 		private object? _row;
-		private string _filter = "";
-		private string? _status;
 
-		[CascadingParameter]
-		private Task<AuthenticationState>? AuthState { get; set; }
-
-		public void Dispose()
+		protected override async Task LoadAsync(DatabaseContext ctx)
 		{
-			_ctx?.Dispose();
-		}
-
-		protected override async Task OnInitializedAsync()
-		{
-			var user = AuthState == null
-				? null
-				: (await AuthState).User;
-			if (user == null || !user.IsInRole("Admin"))
-			{
-				Nav.NavigateTo("/", true);
-				return;
-			}
-
-			_authorized = true;
-
-			_ctx = await DbFactory.CreateDbContextAsync();
-			_tables = _ctx.Model.GetEntityTypes().Where(t => t.ClrType != null && !t.IsOwned()).Select(t => t.ClrType).Distinct().OrderBy(t => t.Name).ToList();
+			_tables = ctx.Model.GetEntityTypes().Where(t => t.ClrType != null && !t.IsOwned()).Select(t => t.ClrType).Distinct().OrderBy(t => t.Name).ToList();
 			if (_tables.Count > 0)
 				SelectTable(_tables[0]);
 		}
 
 		private void AddRow()
 		{
-			if (_ctx == null || _table == null)
+			if (Ctx == null || _table == null)
 				return;
 
 			try
 			{
 				var entity = Activator.CreateInstance(_table)!;
-				_ctx.Add(entity);
+				Ctx.Add(entity);
 				_rows.Insert(0, entity);
 				SelectRow(entity);
 				Set($"Added a new {_table.Name} (unsaved — press Save)");
@@ -78,7 +53,7 @@ namespace Faolan.Web.Components.Pages
 
 		private void ComputeForeignKeys(Type t)
 		{
-			var et = _ctx!.Model.FindEntityType(t);
+			var et = Ctx!.Model.FindEntityType(t);
 			if (et == null)
 				return;
 
@@ -95,7 +70,7 @@ namespace Faolan.Web.Components.Pages
 
 				var items = new List<FkOption>();
 				var overCap = false;
-				foreach (var row in (IEnumerable)SetMethod.MakeGenericMethod(principal).Invoke(_ctx, null)!)
+				foreach (var row in (IEnumerable)SetMethod.MakeGenericMethod(principal).Invoke(Ctx, null)!)
 				{
 					if (items.Count >= FkOptionCap)
 					{
@@ -113,10 +88,10 @@ namespace Faolan.Web.Components.Pages
 
 		private void DeleteRow()
 		{
-			if (_ctx == null || _row == null)
+			if (Ctx == null || _row == null)
 				return;
 
-			_ctx.Remove(_row);
+			Ctx.Remove(_row);
 			_rows.Remove(_row);
 			_row = null;
 			_fields = [];
@@ -125,25 +100,9 @@ namespace Faolan.Web.Components.Pages
 
 		private IEnumerable<object> Filtered()
 		{
-			return string.IsNullOrWhiteSpace(_filter)
+			return string.IsNullOrWhiteSpace(Filter)
 				? _rows
-				: _rows.Where(r => (r.ToString() ?? "").Contains(_filter.Trim(), StringComparison.OrdinalIgnoreCase));
-		}
-
-		private async Task Save()
-		{
-			if (_ctx == null)
-				return;
-
-			try
-			{
-				var n = await _ctx.SaveChangesAsync();
-				Set($"Saved — {n} change(s) written");
-			}
-			catch (Exception ex)
-			{
-				Set(ex.InnerException?.Message ?? ex.Message, true);
-			}
+				: _rows.Where(r => (r.ToString() ?? "").Contains(Filter.Trim(), StringComparison.OrdinalIgnoreCase));
 		}
 
 		private void SelectRow(object r)
@@ -157,15 +116,15 @@ namespace Faolan.Web.Components.Pages
 			_table = t;
 			_row = null;
 			_fields = [];
-			_filter = "";
+			Filter = "";
 			_rows.Clear();
 			_fks.Clear();
-			if (_ctx == null)
+			if (Ctx == null)
 				return;
 
 			try
 			{
-				var set = (IEnumerable)SetMethod.MakeGenericMethod(t).Invoke(_ctx, null)!;
+				var set = (IEnumerable)SetMethod.MakeGenericMethod(t).Invoke(Ctx, null)!;
 				foreach (var e in set)
 				{
 					_rows.Add(e);
@@ -180,12 +139,6 @@ namespace Faolan.Web.Components.Pages
 			{
 				Set(ex.Message, true);
 			}
-		}
-
-		private void Set(string msg, bool error = false)
-		{
-			_status = msg;
-			_error = error;
 		}
 
 		private void SetText(DbEditorField f, string? value)

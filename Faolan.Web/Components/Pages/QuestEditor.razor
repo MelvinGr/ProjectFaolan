@@ -1,10 +1,8 @@
 @page "/admin/quests"
 @rendermode InteractiveServer
-@inject IDbContextFactory<DatabaseContext> DbFactory
-@inject NavigationManager Nav
 @using Faolan.Core.Database
 @using Microsoft.EntityFrameworkCore
-@implements IDisposable
+@inherits AdminDbPage
 
 <PageTitle>Quests — Admin</PageTitle>
 
@@ -14,24 +12,24 @@
 		<span class="warn">⚠ edits the live game DB — restart the server to pick up changes</span>
 	</div>
 
-	@if (!_authorized)
+	@if (!Authorized)
 	{
 		<p class="muted">Checking access…</p>
 	}
 	else
 	{
-		@if (_status != null)
+		@if (Status != null)
 		{
-			<p class="qe-status @(_error
+			<p class="qe-status @(Error
 				                    ? "err"
 				                    : "")">
-				@_status
+				@Status
 			</p>
 		}
 
 		<div class="qe-grid">
 			<aside class="qe-list">
-				<input class="filter" placeholder="Filter by id / next / target…" @bind="_filter" @bind:event="oninput"/>
+				<input class="filter" placeholder="Filter by id / next / target…" @bind="Filter" @bind:event="oninput"/>
 				<div class="rowlist">
 					@foreach (var q in Filtered())
 					{

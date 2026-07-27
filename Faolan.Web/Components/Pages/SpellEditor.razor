@@ -1,11 +1,9 @@
 @page "/admin/spells"
 @rendermode InteractiveServer
-@inject IDbContextFactory<DatabaseContext> DbFactory
-@inject NavigationManager Nav
 @using Faolan.Core.Database
 @using Faolan.Core.Enums
 @using Microsoft.EntityFrameworkCore
-@implements IDisposable
+@inherits AdminDbPage
 
 <PageTitle>Spells — Admin</PageTitle>
 
@@ -15,24 +13,24 @@
 		<span class="warn">⚠ edits the live game DB — restart the server to pick up changes</span>
 	</div>
 
-	@if (!_authorized)
+	@if (!Authorized)
 	{
 		<p class="muted">Checking access…</p>
 	}
 	else
 	{
-		@if (_status != null)
+		@if (Status != null)
 		{
-			<p class="se-status @(_error
+			<p class="se-status @(Error
 				                    ? "err"
 				                    : "")">
-				@_status
+				@Status
 			</p>
 		}
 
 		<div class="se-grid">
 			<aside class="se-list">
-				<input class="filter" placeholder="Filter by id / name…" @bind="_filter" @bind:event="oninput"/>
+				<input class="filter" placeholder="Filter by id / name…" @bind="Filter" @bind:event="oninput"/>
 				<label class="onlyfx">
 					<input type="checkbox" @bind="_onlyWithEffects"/> only spells with effects
 				</label>

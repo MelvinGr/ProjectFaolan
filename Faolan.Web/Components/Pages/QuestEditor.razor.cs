@@ -16,39 +16,15 @@ namespace Faolan.Web.Components.Pages
 	// with GoalType as a dropdown, so wiring a stage doesn't need raw SQL. Admin-gated. Edits the live DB (restart to
 	// apply). The wire/@609 display fields (markers/keys) are shown but editing them can break byte-exact quests, so
 	// they carry a warning.
-	public partial class QuestEditor : IDisposable
+	public partial class QuestEditor
 	{
 		private static readonly QuestGoalType[] GoalTypes = Enum.GetValues<QuestGoalType>();
-		private DatabaseContext? _ctx;
 		private List<QuestDefinition> _quests = [];
 		private QuestDefinition? _quest;
-		private bool _authorized;
-		private bool _error;
-		private string _filter = "";
-		private string? _status;
 
-		[CascadingParameter]
-		private Task<AuthenticationState>? AuthState { get; set; }
-
-		public void Dispose()
+		protected override async Task LoadAsync(DatabaseContext ctx)
 		{
-			_ctx?.Dispose();
-		}
-
-		protected override async Task OnInitializedAsync()
-		{
-			var user = AuthState == null
-				? null
-				: (await AuthState).User;
-			if (user == null || !user.IsInRole("Admin"))
-			{
-				Nav.NavigateTo("/", true);
-				return;
-			}
-
-			_authorized = true;
-			_ctx = await DbFactory.CreateDbContextAsync();
-			_quests = await _ctx.QuestDefinitions.Include(q => q.Goals).OrderBy(q => q.QuestId).ToListAsync();
+			_quests = await ctx.QuestDefinitions.Include(q => q.Goals).OrderBy(q => q.QuestId).ToListAsync();
 			if (_quests.Count > 0)
 				Select(_quests[0]);
 		}
@@ -77,10 +53,10 @@ namespace Faolan.Web.Components.Pages
 
 		private IEnumerable<QuestDefinition> Filtered()
 		{
-			if (string.IsNullOrWhiteSpace(_filter))
+			if (string.IsNullOrWhiteSpace(Filter))
 				return _quests;
 
-			var f = _filter.Trim();
+			var f = Filter.Trim();
 			return _quests.Where(q =>
 				q.QuestId.ToString().Contains(f, StringComparison.OrdinalIgnoreCase) || (q.NextQuestId?.ToString() ?? "").Contains(f, StringComparison.OrdinalIgnoreCase) ||
 				q.Goals.Any(g => (g.TargetName ?? "").Contains(f, StringComparison.OrdinalIgnoreCase)));
@@ -107,25 +83,9 @@ namespace Faolan.Web.Components.Pages
 			_quest.Goals.Remove(g);
 			// A never-saved goal is only tracked as Added - dropping it from the nav is enough; a persisted goal must be
 			// explicitly deleted so SaveChanges removes the row.
-			if (_ctx != null && _ctx.Entry(g).State != EntityState.Added)
-				_ctx.Remove(g);
+			if (Ctx != null && Ctx.Entry(g).State != EntityState.Added)
+				Ctx.Remove(g);
 			Set("Removed goal (unsaved — press Save)");
-		}
-
-		private async Task Save()
-		{
-			if (_ctx == null)
-				return;
-
-			try
-			{
-				var n = await _ctx.SaveChangesAsync();
-				Set($"Saved — {n} change(s) written. Restart the server to apply.");
-			}
-			catch (Exception ex)
-			{
-				Set(ex.InnerException?.Message ?? ex.Message, true);
-			}
 		}
 
 		private void Select(QuestDefinition q)
@@ -133,10 +93,5 @@ namespace Faolan.Web.Components.Pages
 			_quest = q;
 		}
 
-		private void Set(string msg, bool err = false)
-		{
-			_status = msg;
-			_error = err;
-		}
 	}
 }
