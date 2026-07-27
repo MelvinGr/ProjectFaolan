@@ -12,6 +12,7 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -854,6 +855,79 @@ namespace Faolan.Tests
 			{
 				if (File.Exists(dbPath))
 					File.Delete(dbPath);
+			}
+		}
+
+		// The web and game logins used to disagree about case: Identity's FindByNameAsync normalises to upper-case, so
+		// the web let you in as "Faolan" for a row that said "faolan", while Database.GetAccount(name) - the game's
+		// UniverseAgent lookup and the `.account` GM command - matched exactly and did not. Same account, same
+		// password, different answer depending on which door you used.
+		[Theory]
+		[InlineData("faolan")]
+		[InlineData("Faolan")]
+		[InlineData("FAOLAN")]
+		[InlineData("fAoLaN")]
+		public async Task GetAccountByName_IsCaseInsensitive(string typed)
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-acct-{Guid.NewGuid():N}.db");
+			try
+			{
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
+				{
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					ctx.Accounts.Add(new Account
+					{
+						Id = 1,
+						UserName = "faolan",
+						Password = "-",
+						AuthChallenge = "",
+						LastIpAddress = ""
+					});
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+				}
+
+				var account = await repo.GetAccount(typed);
+
+				Assert.NotNull(account);
+				Assert.Equal("faolan", account.UserName);
+			}
+			finally
+			{
+				SqliteConnection.ClearAllPools();
+				File.Delete(dbPath);
+			}
+		}
+
+		// A name that differs by more than case is still a different account - the fold must not swallow real misses.
+		[Fact]
+		public async Task GetAccountByName_StillRejectsADifferentName()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-acct-{Guid.NewGuid():N}.db");
+			try
+			{
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
+				{
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					ctx.Accounts.Add(new Account
+					{
+						Id = 1,
+						UserName = "faolan",
+						Password = "-",
+						AuthChallenge = "",
+						LastIpAddress = ""
+					});
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+				}
+
+				Assert.Null(await repo.GetAccount("faolan2"));
+				Assert.Null(await repo.GetAccount("faola"));
+			}
+			finally
+			{
+				SqliteConnection.ClearAllPools();
+				File.Delete(dbPath);
 			}
 		}
 

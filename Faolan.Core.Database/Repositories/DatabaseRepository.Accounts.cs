@@ -44,10 +44,18 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Accounts.FirstOrDefaultAsync(a => a.Id == id);
 		}
 
+		// Case-INSENSITIVE, matching how the web login has always looked accounts up (Identity's FindByNameAsync
+		// normalises to upper-case). This was an exact match, so the two logins disagreed: the web let you in as
+		// "Faolan" when the row said "faolan" and the game did not, for the same account and the same password.
+		// Usernames are alphanumeric ASCII, so UPPER() folding is exact here.
+		//
+		// ⚠️ The unique index on UserName is still BINARY collation, so the DATABASE would accept "Faolan" and
+		// "faolan" as two rows even though nothing can now tell them apart. Nothing creates such a pair today -
+		// registration has always checked case-insensitively - but making the index NOCASE is the real fix.
 		public async Task<Account?> GetAccount(string userName)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Accounts.FirstOrDefaultAsync(a => a.UserName == userName);
+			return await ctx.Accounts.FirstOrDefaultAsync(a => a.UserName.ToUpper() == userName.ToUpper());
 		}
 
 		public async Task<AccountClaim?> GetAccountClaim(uint claimId)
