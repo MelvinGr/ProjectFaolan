@@ -5,41 +5,36 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Faolan.Core.Database.Migrations.Postgres.Migrations
+namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260724202100_DerivedIdRoots")]
-    partial class DerivedIdRoots
+    [Migration("20260727100756_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
-                .HasAnnotation("Relational:MaxIdentifierLength", 63);
-
-            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Ability", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Data0")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Data0")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("Slot")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Slot")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -48,56 +43,53 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Account", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<Guid>("AuthChallenge")
+                        .HasColumnType("TEXT");
 
-                    b.Property<string>("AuthChallenge")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<long>("AuthStatus")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("AuthStatus")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("ClaimsAvailable")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ClientInstance")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ClientInstance")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset>("CreationDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("GmGodMode")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("GmInvisible")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset?>("LastConnection")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LastIpAddress")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Password")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<byte>("State")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Type")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -106,43 +98,40 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.ToTable("Accounts", t =>
                         {
-                            t.HasCheckConstraint("CK_Account_State", "\"State\" IN (0, 1, 2)");
+                            t.HasCheckConstraint("CK_Account_State", "State IN (0, 1, 2)");
 
-                            t.HasCheckConstraint("CK_Account_Type", "\"Type\" IN (0, 1, 2, 3)");
+                            t.HasCheckConstraint("CK_Account_Type", "Type IN (0, 1, 2, 3)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.AccountClaim", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<uint>("AccountId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("AccountId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("ClaimType")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ClaimType")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(4)
-                        .HasColumnType("character varying(4)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("ItemTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ItemTemplateId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("Level")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<ulong>("Level")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MaxCharges")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MaxCharges")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Quantity")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Quantity")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -155,148 +144,139 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.AppearanceChoice", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                    b.Property<byte>("Race")
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<byte>("Sex")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Category")
-                        .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Color")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Max")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Min")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<byte>("Race")
-                        .HasColumnType("smallint");
-
-                    b.Property<int>("Sequence")
-                        .HasColumnType("integer");
-
-                    b.Property<byte>("Sex")
-                        .HasColumnType("smallint");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.HasKey("Id");
+                    b.HasKey("Race", "Sex", "Category", "Sequence");
 
                     b.ToTable("AppearanceChoices", t =>
                         {
-                            t.HasCheckConstraint("CK_AppearanceChoice_Race", "\"Race\" IN (1, 2, 3)");
+                            t.HasCheckConstraint("CK_AppearanceChoice_Race", "Race IN (1, 2, 3)");
 
-                            t.HasCheckConstraint("CK_AppearanceChoice_Sex", "\"Sex\" IN (0, 2, 3)");
+                            t.HasCheckConstraint("CK_AppearanceChoice_Sex", "Sex IN (0, 2, 3)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Character", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("AccountId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("AccountId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ActiveWeaponSet")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<string>("AuthChallenge")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                    b.Property<Guid>("AuthChallenge")
+                        .HasColumnType("TEXT");
 
-                    b.Property<long?>("BindRespawnPointId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("BindRespawnPointId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Class")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset>("CreationDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("Experience")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Experience")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("GuildId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("GuildId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("GuildRank")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDead")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Language")
                         .HasMaxLength(4)
-                        .HasColumnType("character varying(4)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset?>("LastConnection")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LastIpAddress")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<int>("Level")
-                        .HasColumnType("integer");
+                    b.Property<ushort>("Level")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("Money")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<ulong>("Money")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MountId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MountId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<float>("PositionX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<byte>("Race")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("RealmId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RealmId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("RotationW")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<byte>("Sex")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -313,23 +293,23 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.ToTable("Characters", t =>
                         {
-                            t.HasCheckConstraint("CK_Character_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                            t.HasCheckConstraint("CK_Character_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
 
-                            t.HasCheckConstraint("CK_Character_GuildRank", "\"GuildRank\" IN (0, 4)");
+                            t.HasCheckConstraint("CK_Character_GuildRank", "GuildRank IN (0, 4)");
 
-                            t.HasCheckConstraint("CK_Character_Race", "\"Race\" IN (1, 2, 3)");
+                            t.HasCheckConstraint("CK_Character_Race", "Race IN (1, 2, 3)");
 
-                            t.HasCheckConstraint("CK_Character_Sex", "\"Sex\" IN (0, 2, 3)");
+                            t.HasCheckConstraint("CK_Character_Sex", "Sex IN (0, 2, 3)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterAbility", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("AbilityId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("AbilityId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "AbilityId");
 
@@ -338,26 +318,24 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterAttribute", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("EntryIndex")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("EntryIndex")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Sequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<int>("Tag")
-                        .HasColumnType("integer");
+                    b.Property<ushort>("Tag")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Value")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Value")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -368,104 +346,104 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterBody", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("Arm")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("Arse")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("Bosom")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("CheekDepth")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("CheekHeight")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("CheekWidth")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("Chest")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("ChinLength")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("ChinWidth")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("CrookedNose")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("EarAngle")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("Ears")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("EyebrowScale")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("EyesAngle")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("EyesDepth")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("EyesHorizontalPos")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("EyesVerticalPos")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("FaceLength")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.Property<long>("HeadMesh")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("HeadMesh")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("JawWidth")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("Leg")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("MouthVerticalPos")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("MouthWidth")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("NoseAngle")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("NoseCurve")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("NoseLength")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("NoseWidth")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<byte>("Size")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("SkinColor")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("Stomach")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("Thigh")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<byte>("Voice")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId");
 
@@ -474,22 +452,20 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterBodyResource", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Ref")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Sequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -500,17 +476,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterBuff", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("BuffId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("BuffId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset?>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("Nonce")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Nonce")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "BuffId");
 
@@ -519,11 +495,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterCombo", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ComboId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ComboId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "ComboId");
 
@@ -532,89 +508,89 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterEquipment", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("BagId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("BagId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("BeltId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("BeltId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("BootsId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("BootsId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ChestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ChestId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("CloakId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("CloakId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("FirstPosBagId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("FirstPosBagId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("HandsId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("HandsId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("HeadId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("HeadId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("LegsId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("LegsId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MainHandLeftId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MainHandLeftId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MainHandRightId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MainHandRightId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("NeckId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("NeckId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("OffHandLeftId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("OffHandLeftId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("OffHandRightId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("OffHandRightId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ResourceBagId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ResourceBagId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("RingLeftId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("RingLeftId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("RingRightId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("RingRightId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ShoulderId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ShoulderId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("VanityBeltId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("VanityBeltId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("VanityBootsId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("VanityBootsId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("VanityCapeId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("VanityCapeId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("VanityChestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("VanityChestId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("VanityHeadId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("VanityHeadId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("VanityLegsId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("VanityLegsId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("VanityShownMask")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("VanityShownMask")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("VanityWristId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("VanityWristId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("WristId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("WristId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId");
 
@@ -675,36 +651,51 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFeat", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("FeatId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("FeatId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Sequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "FeatId");
 
                     b.ToTable("CharacterFeats");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFriend", b =>
+                {
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("FriendCharacterId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("CharacterId", "FriendCharacterId");
+
+                    b.HasIndex("FriendCharacterId");
+
+                    b.ToTable("CharacterFriends");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterInventory", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Container")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Container")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Slot")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Count")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Count")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ItemId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ItemId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "Container", "Slot");
 
@@ -712,23 +703,23 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.ToTable("CharacterInventory", t =>
                         {
-                            t.HasCheckConstraint("CK_CharacterInventory_Container", "\"Container\" IN (101, 104, 105, 112, 113, 115)");
+                            t.HasCheckConstraint("CK_CharacterInventory_Container", "Container IN (101, 104, 105, 111, 112, 113, 115)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterMaxStats", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Health")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Health")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Mana")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Mana")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Stamina")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Stamina")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId");
 
@@ -737,30 +728,28 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterQuest", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GoalProgress")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("GoalProgress")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("GoalRequired")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GoalRequired")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("GoalTargetName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("QuestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("QuestId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("State")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -768,23 +757,23 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.ToTable("CharacterQuests", t =>
                         {
-                            t.HasCheckConstraint("CK_CharacterQuest_State", "\"State\" IN (0, 1)");
+                            t.HasCheckConstraint("CK_CharacterQuest_State", "State IN (0, 1)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterQuestGoal", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("QuestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("QuestId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("GoalId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GoalId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Progress")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Progress")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "QuestId", "GoalId");
 
@@ -797,17 +786,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterRespawnPoint", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("RespawnPointId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RespawnPointId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -820,23 +807,21 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterScaffoldPair", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("ListIndex")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("PairId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("PairId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Value")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -847,17 +832,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterShortcut", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Slot")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Slot")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ShortcutType")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ShortcutType")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("TargetId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TargetId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "Slot");
 
@@ -866,14 +851,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterSkill", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SkillId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SkillId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Rank")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "SkillId");
 
@@ -882,11 +867,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterSpell", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SpellId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SpellId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "SpellId");
 
@@ -897,17 +882,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterStat", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Ordinal")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("StatId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("StatId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Value")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Value")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "Ordinal");
 
@@ -916,11 +901,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterTag", b =>
                 {
-                    b.Property<long>("CharacterId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("TagId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TagId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("CharacterId", "TagId");
 
@@ -929,39 +914,37 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ChatMessage", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("ChannelId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ChannelId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("ChannelType")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsWhisper")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SenderId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SenderId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SenderName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset>("SentAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long?>("TargetId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("TargetId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -975,13 +958,13 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.ClassAbility", b =>
                 {
                     b.Property<byte>("Class")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("AbilityId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("AbilityId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Level")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Class", "AbilityId");
 
@@ -989,20 +972,44 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.ToTable("ClassAbilities", t =>
                         {
-                            t.HasCheckConstraint("CK_ClassAbility_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                            t.HasCheckConstraint("CK_ClassAbility_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                        });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ClassAttributeBase", b =>
+                {
+                    b.Property<byte>("Class")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Level")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("StatId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Amount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Class", "Level", "StatId");
+
+                    b.ToTable("ClassAttributeBases", t =>
+                        {
+                            t.HasCheckConstraint("CK_ClassAttributeBase_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+
+                            t.HasCheckConstraint("CK_ClassAttributeBase_StatId", "StatId IN (0, 1, 11, 12, 20, 27, 33, 34, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 91, 106, 127, 140, 157, 165, 169, 173, 174, 186, 187, 191, 215, 224, 225, 226, 241, 243, 275, 278, 279, 280, 291, 310, 311, 312, 319, 331, 334, 350, 353, 355, 363, 389, 448, 450, 451, 454, 456, 458, 475, 488, 490, 491, 498, 504, 505, 506, 507, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 711, 713, 804, 806, 808, 810, 814, 818, 824, 828, 830, 861, 871, 872, 875, 878, 901, 920, 922, 923, 925, 926, 927, 928, 929, 965, 1007, 1035, 1085, 1093, 1097, 1098, 1099, 1332, 1376, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ClassCombo", b =>
                 {
                     b.Property<byte>("Class")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ComboId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ComboId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Level")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Class", "ComboId");
 
@@ -1010,23 +1017,23 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.ToTable("ClassCombos", t =>
                         {
-                            t.HasCheckConstraint("CK_ClassCombo_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                            t.HasCheckConstraint("CK_ClassCombo_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ClassSpell", b =>
                 {
                     b.Property<byte>("Class")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SpellId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SpellId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("GrantLevel")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsStarter")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Class", "SpellId");
 
@@ -1034,53 +1041,53 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.ToTable("ClassSpells", t =>
                         {
-                            t.HasCheckConstraint("CK_ClassSpell_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                            t.HasCheckConstraint("CK_ClassSpell_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Combo", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Actions")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Animation")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Cooldown")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Criteria")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("FeatId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("FeatId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("GameActionId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GameActionId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Level")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("ParentId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ParentId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Quality")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Stamina")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1089,33 +1096,33 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AnswerPath")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long?>("ConditionQuestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ConditionQuestId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("ConditionQuestState")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("GrantQuestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("GrantQuestId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("NpcName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long?>("NpcTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("TypeId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TypeId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1130,47 +1137,47 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationPacket", b =>
                 {
-                    b.Property<long>("ConversationNodeId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ConversationNodeId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Sequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool?>("Autoface")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("Env")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Field")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Field")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("Flag")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<float?>("HeadPaddingY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.Property<long?>("SenderInstance")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("SenderInstance")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("ShotEmphasis")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("ShotFov")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("ShotSize")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("ShotTilt")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("ShotType")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("SubOpcode")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("SubOpcode")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("ConversationNodeId", "Sequence");
 
@@ -1179,31 +1186,31 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationScreen", b =>
                 {
-                    b.Property<long>("ConversationNodeId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ConversationNodeId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("PacketSequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Sequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Antitag")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Antitag")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Category")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Category")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Key")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("Knubot")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Knubot")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ScreenId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ScreenId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("ConversationNodeId", "PacketSequence", "Sequence");
 
@@ -1212,86 +1219,104 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationScreenParameter", b =>
                 {
-                    b.Property<long>("ConversationNodeId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ConversationNodeId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("PacketSequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ScreenSequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Sequence")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<string>("InnerRaw")
+                    b.Property<uint?>("Category")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContentKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Flags")
                         .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("LocalizedId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LocalizedToken")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Text")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
 
                     b.HasKey("ConversationNodeId", "PacketSequence", "ScreenSequence", "Sequence");
 
-                    b.ToTable("ConversationScreenParameters");
+                    b.ToTable("ConversationScreenParameters", t =>
+                        {
+                            t.HasCheckConstraint("CK_ConversationScreenParameter_Kind", "Kind IN (0, 1, 2)");
+                        });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Guild", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<decimal>("Cash")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<ulong>("Cash")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset>("CreationDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasColumnType("TEXT");
 
                     b.Property<byte>("GovernmentForm")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Level")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Level")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("MessageOfTheDay")
                         .IsRequired()
                         .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("RealmId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RealmId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Renown")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Renown")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("RenownArtistry")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<ulong>("RenownArtistry")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("RenownGlory")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<ulong>("RenownGlory")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("RenownValor")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<ulong>("RenownValor")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1303,51 +1328,55 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Item", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("BagExtraSlots")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("BagExtraSlots")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("ExcludeFromRandomLoot")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Hash")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Hash")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Level")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("MaxDamage")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("MinDamage")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long?>("OnUseSpell")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("OnUseSpell")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("Quality")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ResourceBagExtraSlots")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ResourceBagExtraSlots")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SearchCategory")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SearchCategory")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Type")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("INTEGER")
                         .HasDefaultValue(104);
 
-                    b.Property<long>("Value")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Value")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1355,79 +1384,77 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.ToTable("Items", t =>
                         {
-                            t.HasCheckConstraint("CK_Item_Quality", "\"Quality\" IN (0, 1, 2, 3, 4, 5)");
+                            t.HasCheckConstraint("CK_Item_Quality", "Quality IN (0, 1, 2, 3, 4, 5)");
 
-                            t.HasCheckConstraint("CK_Item_Type", "\"Type\" IN (104, 112, 113)");
+                            t.HasCheckConstraint("CK_Item_Type", "Type IN (104, 112, 113)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ItemStatModifier", b =>
                 {
-                    b.Property<long>("ItemId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ItemId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("StatId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("StatId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Amount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("ItemId", "StatId");
 
                     b.ToTable("ItemStatModifiers", t =>
                         {
-                            t.HasCheckConstraint("CK_ItemStatModifier_StatId", "\"StatId\" IN (0, 1, 11, 12, 20, 27, 33, 34, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 91, 106, 127, 140, 165, 169, 173, 174, 186, 187, 191, 215, 224, 225, 226, 241, 243, 275, 291, 310, 311, 312, 319, 331, 350, 353, 355, 363, 389, 448, 451, 454, 456, 458, 475, 488, 490, 491, 498, 504, 505, 506, 507, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 711, 713, 804, 806, 808, 810, 814, 818, 824, 828, 830, 861, 871, 872, 875, 878, 901, 920, 922, 923, 925, 927, 1007, 1035, 1085, 1093, 1097, 1098, 1099, 1332, 1376, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397)");
+                            t.HasCheckConstraint("CK_ItemStatModifier_StatId", "StatId IN (0, 1, 11, 12, 20, 27, 33, 34, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 91, 106, 127, 140, 157, 165, 169, 173, 174, 186, 187, 191, 215, 224, 225, 226, 241, 243, 275, 278, 279, 280, 291, 310, 311, 312, 319, 331, 334, 350, 353, 355, 363, 389, 448, 450, 451, 454, 456, 458, 475, 488, 490, 491, 498, 504, 505, 506, 507, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 711, 713, 804, 806, 808, 810, 814, 818, 824, 828, 830, 861, 871, 872, 875, 878, 901, 920, 922, 923, 925, 926, 927, 928, 929, 965, 1007, 1035, 1085, 1093, 1097, 1098, 1099, 1332, 1376, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Mail", b =>
                 {
-                    b.Property<decimal>("MailId")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<ulong>("MailId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("BodyXml")
                         .IsRequired()
                         .HasMaxLength(4096)
-                        .HasColumnType("character varying(4096)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("FooterWord")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("FooterWord")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsRead")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("Money")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<ulong>("Money")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("RealmId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RealmId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("RecipientClass")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RecipientClass")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("RecipientName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("SenderBankSlot")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SenderBankSlot")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SenderClass")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SenderClass")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SenderName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("Timestamp1")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Timestamp1")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Timestamp2")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Timestamp2")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("MailId");
 
@@ -1440,40 +1467,36 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MailAttachment", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<uint>("ItemHash")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ItemHash")
-                        .HasColumnType("bigint");
+                    b.Property<ulong>("ItemInstanceId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("ItemInstanceId")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<uint>("ItemLevel")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ItemLevel")
-                        .HasColumnType("bigint");
+                    b.Property<ulong>("MailId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("MailId")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<uint>("Quantity")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Quantity")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Template")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Template")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TrailerClass")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("TrailerClass")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TrailerTail")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("TrailerTail")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("TrailerWord")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TrailerWord")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1486,34 +1509,40 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Map", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("InstanceMode")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("PlayfieldCount")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("PlayfieldCount")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("PlayfieldFieldB")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("PlayfieldFieldA")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("PlayfieldFlags")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("PlayfieldFieldB")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("PlayfieldFieldC")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("PlayfieldFlags")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("PlayfieldInstanced")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("PlayfieldToken")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("PlayfieldToken")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("PopulationCap")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1522,32 +1551,32 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapArea", b =>
                 {
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("AreaNameId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("AreaNameId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("MaxX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("MaxY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("MaxZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("MinX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("MinY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("MinZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.Property<long>("SampleCount")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SampleCount")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("MapId", "AreaNameId");
 
@@ -1556,11 +1585,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapLootEntry", b =>
                 {
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ItemTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ItemTemplateId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("MapId", "ItemTemplateId");
 
@@ -1569,19 +1598,19 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MorphTarget", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Category")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<float>("Weight")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.HasKey("Id");
 
@@ -1590,50 +1619,59 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<string>("Channel")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("NpcTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SayInChat")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<string>("RemoteFormat")
+                    b.Property<uint>("Category")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("ChannelCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FormatKey")
                         .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
-                    b.HasKey("Id");
+                    b.Property<string>("Group")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
-                    b.HasIndex("NpcTemplateId");
+                    b.Property<uint>("Knubot")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ParameterName")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("NpcTemplateId", "Channel", "SayInChat");
 
                     b.ToTable("NpcChatter");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcEquipment", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<uint>("Pos")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Level")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Level")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("NpcTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Template")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Pos")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("Template")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcTemplateId");
+                    b.HasKey("NpcTemplateId", "Pos");
 
                     b.HasIndex("Template");
 
@@ -1642,127 +1680,116 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcMorph", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("MorphId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("NpcTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Ordinal")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("MorphId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<float>("Value")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcTemplateId");
+                    b.HasKey("NpcTemplateId", "Ordinal");
 
                     b.ToTable("NpcMorphs");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawn", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ApprenticeLevel")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ApprenticeLevel")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("CapturedHandle")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("GuildId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("GuildId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("HasEquipment")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("HeadMesh")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("HeadMesh")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Health")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Health")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("HearingSkill")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("HearingSkill")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Level")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Level")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Life")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Life")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Mana")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Mana")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MaxMana")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MaxMana")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MaxStamina")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MaxStamina")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MonsterData")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MonsterData")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MonsterScale")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MonsterScale")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("NpcSpawnAreaId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("NpcSpawnAreaId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("NpcTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("PositionX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationW")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.Property<long?>("SightSkill")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("SightSkill")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("SmellingSkill")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("SmellingSkill")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Stamina")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Stamina")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("VoiceSet")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("VoiceSet")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("WireHealth")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("WireHealth")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1778,59 +1805,59 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnArea", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("BoundsMaxX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("BoundsMaxY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("BoundsMaxZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("BoundsMinX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("BoundsMinY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("BoundsMinZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<string>("Category")
                         .IsRequired()
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long?>("CommunityId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("CommunityId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("GroupKey")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GroupName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("GroupOrdinal")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("MaxCount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("NpcTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("ResolvedBy")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -1844,20 +1871,20 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnAreaPoint", b =>
                 {
-                    b.Property<long>("NpcSpawnAreaId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcSpawnAreaId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("PointIndex")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("PositionX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.HasKey("NpcSpawnAreaId", "PointIndex");
 
@@ -1866,17 +1893,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnEquipment", b =>
                 {
-                    b.Property<long>("NpcSpawnId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcSpawnId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Pos")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Pos")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Level")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Level")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Template")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Template")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("NpcSpawnId", "Pos");
 
@@ -1887,22 +1914,22 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnMorph", b =>
                 {
-                    b.Property<long>("NpcSpawnId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcSpawnId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Ordinal")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MorphId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MorphId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<float>("Value")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.HasKey("NpcSpawnId", "Ordinal");
 
@@ -1911,29 +1938,29 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpell", b =>
                 {
-                    b.Property<long>("NpcTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SpellId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SpellId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<int>("Duration")
-                        .HasColumnType("integer");
+                    b.Property<ushort>("Duration")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("FlagA")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("FlagB")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("FlagC")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Magnitude")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Rank")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("NpcTemplateId", "SpellId");
 
@@ -1942,452 +1969,438 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcStatCore", b =>
                 {
-                    b.Property<long>("NpcTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool?>("AnimActionBlend")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("AnimActionId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("AnimActionId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float?>("AnimActionTimer")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.Property<long?>("AnimFlags")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("AnimFlags")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool?>("AnimForcedBlend")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("AnimForcedId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("AnimForcedId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float?>("AnimForcedTimer")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<bool?>("AnimIdleBlend")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("AnimIdleId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("AnimIdleId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float?>("AnimIdleTimer")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.Property<long?>("ApprenticeLevel")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ApprenticeLevel")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Bcc")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Bcc")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("BccState")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("BccState")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("BloodType")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("BloodType")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool?>("CanFall")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("CarsGroup")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("CarsGroup")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ChatId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ChatId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ClientScryScript")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ClientScryScript")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Community")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Community")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Disposition")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Disposition")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("FactionId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("FactionId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Flags")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Flags")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("GuildId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("GuildId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("HeadMesh")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("HeadMesh")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Health")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Health")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("HearingSkill")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("HearingSkill")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("IirHeader")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("IirHeader")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Level")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Level")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Life")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Life")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("LooksPackage")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("LooksPackage")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("LosHeight")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("LosHeight")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Mana")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Mana")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MaxMana")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MaxMana")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MaxRunSpeed")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MaxRunSpeed")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MaxSkulk")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MaxSkulk")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MaxStamina")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MaxStamina")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MinimalPostIirRecordCount")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MinimalPostIirRecordCount")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MonsterData")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MonsterData")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MonsterScale")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MonsterScale")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MountFlags")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MountFlags")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MountMesh")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MountMesh")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MountScale")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MountScale")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MovementMode")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MovementMode")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MovementMultiplier")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MovementMultiplier")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Normalset")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Normalset")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("NpcFlags")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("NpcFlags")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("NpcType")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("NpcType")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("OocMovementMultiplier")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("OocMovementMultiplier")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("OrientationMode")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("OrientationMode")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ProfessionName")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ProfessionName")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ProfessionType")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ProfessionType")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Race")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Race")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("Radius")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("RunSpeed")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("RunSpeed")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("Sex")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Side")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Side")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("SightSkill")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("SightSkill")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Skulk")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Skulk")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("SmellingSkill")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("SmellingSkill")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("SoundScryScript")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("SoundScryScript")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("SpawnAnimation")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("SpawnAnimation")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("Stamina")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("Stamina")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("SuperFamily")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("SuperFamily")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("TemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("TemplateId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("TradeskillFlags")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("TradeskillFlags")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("VoiceSet")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("VoiceSet")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("NpcTemplateId");
 
                     b.ToTable("NpcStatCores", t =>
                         {
-                            t.HasCheckConstraint("CK_NpcStatCore_Sex", "\"Sex\" IN (0, 2, 3)");
+                            t.HasCheckConstraint("CK_NpcStatCore_Sex", "Sex IN (0, 2, 3)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcTemplate", b =>
                 {
-                    b.Property<long>("TemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TemplateId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("DeathBehaviorId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("DeathBehaviorId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("LootContainerTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("LootContainerTemplateId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("TemplateId");
 
                     b.ToTable("NpcTemplates", t =>
                         {
-                            t.HasCheckConstraint("CK_NpcTemplate_LootContainerTemplateId", "\"LootContainerTemplateId\" IN (13781, 13782)");
+                            t.HasCheckConstraint("CK_NpcTemplate_LootContainerTemplateId", "LootContainerTemplateId IN (13781, 13782)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNode", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcSpawnId")
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<string>("OrdinalPath")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<float?>("AnchorX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("AnchorY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("AnchorZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<byte?>("ApproachFlag")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ApproachTarget")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ApproachTarget")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ApproachType")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("ApproachType")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float?>("Duration")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<byte?>("Flag")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("HeaderFlags")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("ListMin")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Mode")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Ordinal")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("ParentId")
-                        .HasColumnType("bigint");
+                    b.Property<string>("ParentPath")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<float?>("PathDirection1")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("PathDirection2")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<byte?>("PathFlags")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("PathFloat10")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("PathFloat10")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("PathFloat20")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("PathFloat20")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("PathPacked1")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("PathPacked2")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("PathTrailerWord")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("PatrolPathId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("PathTrailerWord")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float?>("Remaining")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<int?>("RotateTail")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<float?>("Speed")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("TargetRotationW")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("TargetRotationX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("TargetRotationY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("TargetRotationZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("TargetX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("TargetY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("TargetZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<byte?>("TrailerByte")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.HasKey("Id");
+                    b.HasKey("NpcSpawnId", "OrdinalPath");
 
-                    b.HasIndex("ParentId");
-
-                    b.HasIndex("PatrolPathId");
+                    b.HasIndex("NpcSpawnId", "ParentPath");
 
                     b.ToTable("PatrolNodes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNodeWaypoint", b =>
                 {
-                    b.Property<long>("PatrolNodeId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcSpawnId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("OrdinalPath")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Ordinal")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("PositionX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.HasKey("PatrolNodeId", "Ordinal");
+                    b.HasKey("NpcSpawnId", "OrdinalPath", "Ordinal");
 
                     b.ToTable("PatrolNodeWaypoints");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNodeWord", b =>
                 {
-                    b.Property<long>("PatrolNodeId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcSpawnId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("OrdinalPath")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Ordinal")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Value")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Value")
+                        .HasColumnType("INTEGER");
 
-                    b.HasKey("PatrolNodeId", "Ordinal");
+                    b.HasKey("NpcSpawnId", "OrdinalPath", "Ordinal");
 
                     b.ToTable("PatrolNodeWords");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolPath", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("NpcSpawnId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcSpawnId")
-                        .IsUnique();
-
-                    b.ToTable("PatrolPaths");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestArea", b =>
                 {
-                    b.Property<long>("AreaId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("AreaId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("AreaTitleCategory")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("AreaTitleCategory")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("AreaTitleKey")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("AreaTitleRefId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("AreaTitleRefId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Magic")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Magic")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MapCategory")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MapCategory")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("MapKey")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("MapRefId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MapRefId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("RegionCategory")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RegionCategory")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("RegionKey")
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("RegionRefId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RegionRefId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("TableField1")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TableField1")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("AreaId");
 
@@ -2396,79 +2409,78 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestDefinition", b =>
                 {
-                    b.Property<long>("QuestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("QuestId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("AreaId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("AreaId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("GoalId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GoalId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("HasSnapshotRecord")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("IndexGoalSteps")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("IndexMagic")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("IndexMagic")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("IndexMarker")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("IndexMarker")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("IndexTableField1")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("IndexTableField1")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("IndexTableField2")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("IndexTableField2")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("IndexTableField3")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("IndexTableField3")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("IndexTrailerWord")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("IndexTrailerWord")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("JournalSequence")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("JournalSequence")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Level")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Level")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MarkerX")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MarkerX")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MarkerY")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MarkerY")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("NextQuestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("NextQuestId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("ObjectiveRegionVerified")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SnapshotUnknown118")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SnapshotUnknown118")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SnapshotUnknown14")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SnapshotUnknown14")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SnapshotUnknown28")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SnapshotUnknown28")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SnapshotUnknownEc")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SnapshotUnknownEc")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SnapshotUnknownF0")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SnapshotUnknownF0")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("SnapshotUnknownF8")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<ulong>("SnapshotUnknownF8")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("QuestId");
 
@@ -2481,110 +2493,110 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestGoalDefinition", b =>
                 {
-                    b.Property<long>("GoalId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GoalId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Extra0")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Extra0")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Extra1")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Extra1")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Extra2")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Extra2")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Extra3")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Extra3")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Extra4")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Extra4")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Extra5")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Extra5")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Extra6")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Extra6")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("GoalIdEcho")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GoalIdEcho")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("GoalType")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MapId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MapId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MarkerX")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MarkerX")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("MarkerY")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("MarkerY")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ObjectiveCategory")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ObjectiveCategory")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ObjectiveKey")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("ObjectiveRefId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ObjectiveRefId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ObjectiveToken")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("QuestDefinitionId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("QuestDefinitionId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("QuestItemId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("QuestItemId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("RegionOrder")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RegionOrder")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("RequiredCount")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RequiredCount")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Separator")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Separator")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Sequence")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Sequence")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("SubId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SubId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TargetName")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("TrailingCategory")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TrailingCategory")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TrailingFlags")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("TrailingKey")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("TrailingLocalized")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("TrailingRefId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TrailingRefId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("TrailingToken")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("Unknown1")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Unknown1")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Unknown2")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Unknown2")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("GoalId");
 
@@ -2599,29 +2611,29 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestTextRef", b =>
                 {
-                    b.Property<long>("QuestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("QuestId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Slot")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Category")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Category")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Flags")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsLocalized")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("KeyText")
                         .IsRequired()
                         .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("RefId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RefId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("QuestId", "Slot");
 
@@ -2630,42 +2642,40 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Realm", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<int>("ChatServerPort")
-                        .HasColumnType("integer");
+                    b.Property<ushort>("ChatServerPort")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Country")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<int>("CsPlayerAgentPort")
-                        .HasColumnType("integer");
+                    b.Property<ushort>("CsPlayerAgentPort")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("IpAddress")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
                     b.Property<byte>("LoadStatus")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<byte>("OnlineStatus")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<int>("Port")
-                        .HasColumnType("integer");
+                    b.Property<ushort>("Port")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
+                    b.Property<ushort>("Type")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -2674,41 +2684,41 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.ToTable("Realms", t =>
                         {
-                            t.HasCheckConstraint("CK_Realm_Country", "\"Country\" IN (0, 1, 2, 3)");
+                            t.HasCheckConstraint("CK_Realm_Country", "Country IN (0, 1, 2, 3)");
 
-                            t.HasCheckConstraint("CK_Realm_LoadStatus", "\"LoadStatus\" IN (0, 1, 2, 3, 4)");
+                            t.HasCheckConstraint("CK_Realm_LoadStatus", "LoadStatus IN (0, 1, 2, 3, 4)");
 
-                            t.HasCheckConstraint("CK_Realm_OnlineStatus", "\"OnlineStatus\" IN (0, 2)");
+                            t.HasCheckConstraint("CK_Realm_OnlineStatus", "OnlineStatus IN (0, 2)");
 
-                            t.HasCheckConstraint("CK_Realm_Type", "\"Type\" IN (0, 1, 256, 257, 1081)");
+                            t.HasCheckConstraint("CK_Realm_Type", "Type IN (0, 1, 256, 257, 1081)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Recipe", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Header1")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Header1")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MidFlag")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MidFlag")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("RdbType")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RdbType")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("RefId0")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RefId0")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("RefId1")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("RefId1")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Tail")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Tail")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("TrailingFlag")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -2717,23 +2727,23 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.RecipeItem", b =>
                 {
-                    b.Property<long>("RecipeId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RecipeId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Role")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Position")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Flag")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Flag")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ItemId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ItemId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Trailing")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Trailing")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("RecipeId", "Role", "Position");
 
@@ -2741,49 +2751,49 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.ToTable("RecipeItems", t =>
                         {
-                            t.HasCheckConstraint("CK_RecipeItem_Role", "\"Role\" IN (0, 1)");
+                            t.HasCheckConstraint("CK_RecipeItem_Role", "Role IN (0, 1)");
                         });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.RespawnPoint", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("AlwaysKnown")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<float>("PositionX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RestorationLevel")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationW")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.HasKey("Id");
 
@@ -2794,50 +2804,41 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Shop", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("MaxSize")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("NpcTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MaxSize")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("VendorName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("NpcTemplateId")
-                        .IsUnique();
+                    b.HasKey("NpcTemplateId");
 
                     b.ToTable("Shops");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ShopItem", b =>
                 {
-                    b.Property<long>("ShopId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ShopId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Pos")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Pos")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Count")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Count")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ItemTemplateId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ItemTemplateId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Stat356")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Stat356")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("TailLevel")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("TailLevel")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("ShopId", "Pos");
 
@@ -2848,59 +2849,106 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Spell", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<int>("CastTime")
-                        .HasColumnType("integer");
+                    b.Property<ushort>("CastTime")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<int>("Cooldown")
-                        .HasColumnType("integer");
+                    b.Property<ushort>("Cooldown")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("DamageRating")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("DotDelta")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("DotType")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("DotType")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("DurationMs")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("DurationMs")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("EffectSpell")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("EffectSpell")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Level")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<int>("ManaCost")
-                        .HasColumnType("integer");
+                    b.Property<ushort>("ManaCost")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<float>("Range")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.HasKey("Id");
 
                     b.ToTable("Spells");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>
+                {
+                    b.Property<uint>("SpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("Trigger")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Combat")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("DurationMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("MaxDurationMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("TargetSpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Template")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("SpellId", "Trigger", "Sequence");
+
+                    b.ToTable("SpellEffects", t =>
+                        {
+                            t.HasCheckConstraint("CK_SpellEffect_Kind", "Kind IN (0, 1)");
+
+                            t.HasCheckConstraint("CK_SpellEffect_Trigger", "Trigger IN (0, 1)");
+                        });
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellStatEffect", b =>
                 {
-                    b.Property<long>("SpellId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SpellId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("StatId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("StatId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Amount")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("EffectKind")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("SpellId", "StatId");
 
@@ -2911,21 +2959,21 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 {
                     b.Property<string>("Key")
                         .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("Category")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Category")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("FormatKey")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("Knubot")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Knubot")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("RemoteFormatId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RemoteFormatId")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Key");
 
@@ -2934,61 +2982,56 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.TradepostListing", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<uint>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    b.Property<uint>("BankSlot")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("BankSlot")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("EntryFlags")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("EntryFlags")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Handle")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Handle")
-                        .HasColumnType("bigint");
+                    b.Property<ulong>("InstanceField")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("InstanceField")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<uint>("ItemHandle")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ItemHandle")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ItemHash")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ItemHash")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ItemId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ItemId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ItemLevel")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("ItemLevel")
-                        .HasColumnType("bigint");
+                    b.Property<ulong>("Price")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("Price")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<uint>("Quantity")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Quantity")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("RealmId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("RealmId")
-                        .HasColumnType("bigint");
-
-                    b.Property<decimal>("SaleId")
-                        .HasPrecision(20)
-                        .HasColumnType("numeric(20,0)");
+                    b.Property<ulong>("SaleId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SellerName")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("Template")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Template")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Timestamp")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Timestamp")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -3004,150 +3047,172 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.WorldObject", b =>
                 {
-                    b.Property<long>("Id")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("BoundsMaxX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("BoundsMaxY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("BoundsMaxZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("BoundsMinX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("BoundsMinY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("BoundsMinZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.Property<long>("CapturedHandle")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("CarsGroup")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("CarsGroup")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("DestinationMapId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("DestinationMapId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float?>("DestinationX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("DestinationY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float?>("DestinationZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.Property<string>("DisplayName")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                    b.Property<uint?>("DisplayCategory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisplayFlags")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint?>("DisplayId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisplayKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte?>("DisplayKind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("DisplayKnubot")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DisplayToken")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
 
                     b.Property<byte>("EffectDynelState")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("EffectQuestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("EffectQuestId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("GateQuestId")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("GateQuestId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("GeometryAssetId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GeometryAssetId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("GeometryAssetType")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GeometryAssetType")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("GeometryFlag")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("GeometryName")
                         .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("GeometryWord0")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GeometryWord0")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("GeometryWord1")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("GeometryWord1")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("InteractAction")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("InteractAction")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsClosed")
-                        .HasColumnType("boolean");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Kdtree")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Kdtree")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("MapId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
+                        .HasColumnType("TEXT");
 
-                    b.Property<long>("ObjectId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("ObjectId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("PositionX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("PositionZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.Property<long?>("QuestItemEffect")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("QuestItemEffect")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("RotationW")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationX")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationY")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
                     b.Property<float>("RotationZ")
-                        .HasColumnType("real");
+                        .HasColumnType("REAL");
 
-                    b.Property<long>("SubOpcode")
-                        .HasColumnType("bigint");
+                    b.Property<bool?>("ShowPopupOnUse")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("TemplateItemId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("SubOpcode")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long?>("WaypointType")
-                        .HasColumnType("bigint");
+                    b.Property<uint?>("TemplateItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("WaypointType")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("MapId", "PositionX", "PositionY", "PositionZ", "DisplayName")
-                        .IsUnique();
+                    b.HasIndex("MapId");
 
-                    b.ToTable("WorldObjects");
+                    b.ToTable("WorldObjects", t =>
+                        {
+                            t.HasCheckConstraint("CK_WorldObject_DisplayKind", "DisplayKind IN (0, 1, 2)");
+                        });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.WorldObjectWord", b =>
                 {
-                    b.Property<long>("WorldObjectId")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("WorldObjectId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte>("Kind")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Ordinal")
-                        .HasColumnType("integer");
+                        .HasColumnType("INTEGER");
 
-                    b.Property<long>("Value")
-                        .HasColumnType("bigint");
+                    b.Property<uint>("Value")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("WorldObjectId", "Kind", "Ordinal");
 
@@ -3158,23 +3223,23 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 {
                     b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "Key", b1 =>
                         {
-                            b1.Property<long>("AbilityId")
-                                .HasColumnType("bigint");
+                            b1.Property<uint>("AbilityId")
+                                .HasColumnType("INTEGER");
 
-                            b1.Property<long>("Key1")
-                                .HasColumnType("bigint")
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
                                 .HasColumnName("Key1");
 
-                            b1.Property<long>("Key2")
-                                .HasColumnType("bigint")
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
                                 .HasColumnName("Key2");
 
-                            b1.Property<long>("Key3")
-                                .HasColumnType("bigint")
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
                                 .HasColumnName("Key3");
 
-                            b1.Property<long>("Key4")
-                                .HasColumnType("bigint")
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
                                 .HasColumnName("Key4");
 
                             b1.HasKey("AbilityId");
@@ -3492,6 +3557,25 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("Character");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFriend", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
+                        .WithMany()
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "Friend")
+                        .WithMany()
+                        .HasForeignKey("FriendCharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Character");
+
+                    b.Navigation("Friend");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterInventory", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
@@ -3752,23 +3836,23 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "Key", b1 =>
                         {
-                            b1.Property<long>("ItemId")
-                                .HasColumnType("bigint");
+                            b1.Property<uint>("ItemId")
+                                .HasColumnType("INTEGER");
 
-                            b1.Property<long>("Key1")
-                                .HasColumnType("bigint")
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
                                 .HasColumnName("Key1");
 
-                            b1.Property<long>("Key2")
-                                .HasColumnType("bigint")
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
                                 .HasColumnName("Key2");
 
-                            b1.Property<long>("Key3")
-                                .HasColumnType("bigint")
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
                                 .HasColumnName("Key3");
 
-                            b1.Property<long>("Key4")
-                                .HasColumnType("bigint")
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
                                 .HasColumnName("Key4");
 
                             b1.HasKey("ItemId");
@@ -3998,27 +4082,27 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNode", b =>
                 {
-                    b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "Parent")
-                        .WithMany("Children")
-                        .HasForeignKey("ParentId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
-                    b.HasOne("Faolan.Core.Database.Tables.PatrolPath", "PatrolPath")
-                        .WithMany("Nodes")
-                        .HasForeignKey("PatrolPathId")
+                    b.HasOne("Faolan.Core.Database.Tables.NpcSpawn", "NpcSpawn")
+                        .WithMany("PatrolNodes")
+                        .HasForeignKey("NpcSpawnId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Parent");
+                    b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("NpcSpawnId", "ParentPath")
+                        .OnDelete(DeleteBehavior.NoAction);
 
-                    b.Navigation("PatrolPath");
+                    b.Navigation("NpcSpawn");
+
+                    b.Navigation("Parent");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolNodeWaypoint", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "PatrolNode")
                         .WithMany("Waypoints")
-                        .HasForeignKey("PatrolNodeId")
+                        .HasForeignKey("NpcSpawnId", "OrdinalPath")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -4029,22 +4113,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.PatrolNode", "PatrolNode")
                         .WithMany("Words")
-                        .HasForeignKey("PatrolNodeId")
+                        .HasForeignKey("NpcSpawnId", "OrdinalPath")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("PatrolNode");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolPath", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.NpcSpawn", "NpcSpawn")
-                        .WithOne("PatrolPath")
-                        .HasForeignKey("Faolan.Core.Database.Tables.PatrolPath", "NpcSpawnId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("NpcSpawn");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestDefinition", b =>
@@ -4158,6 +4231,17 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("Item");
 
                     b.Navigation("Shop");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.SpellEffect", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Spell", "Spell")
+                        .WithMany()
+                        .HasForeignKey("SpellId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Spell");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.SpellStatEffect", b =>
@@ -4307,7 +4391,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
                     b.Navigation("Morphs");
 
-                    b.Navigation("PatrolPath");
+                    b.Navigation("PatrolNodes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawnArea", b =>
@@ -4339,11 +4423,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     b.Navigation("Waypoints");
 
                     b.Navigation("Words");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.PatrolPath", b =>
-                {
-                    b.Navigation("Nodes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestArea", b =>

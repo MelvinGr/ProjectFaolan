@@ -18,6 +18,7 @@ namespace Faolan.Core.Database.Repositories
 		Task SaveAccount(Account account);
 		Task SetAccountClaimQuantity(uint claimId, uint? quantity);
 		Task SetAccountClaimsAvailable(uint accountId, bool available);
+		Task<bool> SetAccountAuthChallenge(uint accountId, Guid challenge);
 		Task<bool> SetAccountLastInfo(uint accountId, string ipAddress);
 		Task<bool> SetAccountState(uint accountId, AccountState state);
 	}
@@ -92,6 +93,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.ClaimsAvailable, available));
+		}
+
+		// Rotates the login nonce. Called on every Authenticate BEFORE the challenge goes out, so a login block
+		// captured off the wire can never be replayed against the next attempt.
+		public async Task<bool> SetAccountAuthChallenge(uint accountId, Guid challenge)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.AuthChallenge, challenge)) == 1;
 		}
 
 		public async Task<bool> SetAccountLastInfo(uint accountId, string ipAddress)

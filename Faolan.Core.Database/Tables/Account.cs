@@ -41,8 +41,11 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string UserName { get; set; } = null!;
 
-		[MaxLength(32)]
-		public string? AuthChallenge { get; set; }
+		// The login nonce (see docs/protocol/01-crypto.md): sent to the client at Authenticate, echoed back inside
+		// the TEA block at AnswerChallenge, and compared there. ROTATED on every Authenticate (UniverseAgentListener)
+		// - it was previously a constant empty string for every account, which meant a captured login block replayed
+		// forever. Rendered on the wire as 32 lowercase hex chars ("N"), the shape retail used.
+		public Guid AuthChallenge { get; set; }
 
 		[MaxLength(64)] // INET6_ADDRSTRLEN 46
 		public string? LastIpAddress { get; set; }

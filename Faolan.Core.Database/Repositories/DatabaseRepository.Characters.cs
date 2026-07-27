@@ -205,7 +205,7 @@ namespace Faolan.Core.Database.Repositories
 					Id = nextId,
 					AccountId = accountId,
 					RealmId = realmId,
-					AuthChallenge = Guid.NewGuid().ToString("N"),
+					AuthChallenge = Guid.NewGuid(),
 					Level = 1,
 					Class = ConanClass.Barbarian,
 					Race = Race.Cimmerian,

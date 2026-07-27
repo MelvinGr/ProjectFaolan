@@ -48,7 +48,6 @@ namespace Faolan.Tests
 						Id = accountId,
 						UserName = "t",
 						Password = "t",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					ctx.Realms.Add(new Realm
@@ -125,7 +124,6 @@ namespace Faolan.Tests
 						Id = accountId,
 						UserName = "t",
 						Password = "t",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					ctx.Realms.Add(new Realm
@@ -267,7 +265,6 @@ namespace Faolan.Tests
 						Id = accountId,
 						UserName = "t",
 						Password = "t",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					ctx.Realms.Add(new Realm
@@ -325,7 +322,6 @@ namespace Faolan.Tests
 						Id = accountId,
 						UserName = "t",
 						Password = "t",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					ctx.Realms.Add(new Realm
@@ -482,7 +478,6 @@ namespace Faolan.Tests
 						Id = 1,
 						UserName = "t",
 						Password = "t",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					ctx.Realms.Add(new Realm
@@ -561,7 +556,6 @@ namespace Faolan.Tests
 						Id = accountId,
 						UserName = "t",
 						Password = "t",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					ctx.Realms.Add(new Realm
@@ -623,7 +617,6 @@ namespace Faolan.Tests
 						Id = accountId,
 						UserName = "t",
 						Password = "t",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					ctx.Realms.Add(new Realm
@@ -693,7 +686,6 @@ namespace Faolan.Tests
 						Id = accountId,
 						UserName = "t",
 						Password = "t",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					ctx.Realms.Add(new Realm
@@ -881,7 +873,6 @@ namespace Faolan.Tests
 						Id = 1,
 						UserName = "faolan",
 						Password = "-",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -915,7 +906,6 @@ namespace Faolan.Tests
 						Id = 1,
 						UserName = "faolan",
 						Password = "-",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);

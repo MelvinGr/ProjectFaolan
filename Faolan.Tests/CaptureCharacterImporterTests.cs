@@ -35,7 +35,6 @@ namespace Faolan.Tests
 					Id = 7,
 					UserName = "t",
 					Password = "t",
-					AuthChallenge = "",
 					LastIpAddress = ""
 				});
 				db.Maps.Add(new Map

@@ -45,7 +45,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     GmInvisible = table.Column<bool>(type: "boolean", nullable: false),
                     Password = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     UserName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    AuthChallenge = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
+                    AuthChallenge = table.Column<Guid>(type: "uuid", nullable: false),
                     LastIpAddress = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     AuthStatus = table.Column<long>(type: "bigint", nullable: false),
                     ClientInstance = table.Column<long>(type: "bigint", nullable: false)
@@ -61,21 +61,19 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "AppearanceChoices",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     Race = table.Column<byte>(type: "smallint", nullable: false),
                     Sex = table.Column<byte>(type: "smallint", nullable: false),
-                    Max = table.Column<int>(type: "integer", nullable: false),
-                    Min = table.Column<int>(type: "integer", nullable: false),
                     Sequence = table.Column<int>(type: "integer", nullable: false),
                     Category = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    Max = table.Column<int>(type: "integer", nullable: false),
+                    Min = table.Column<int>(type: "integer", nullable: false),
                     Value = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     Color = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AppearanceChoices", x => x.Id);
+                    table.PrimaryKey("PK_AppearanceChoices", x => new { x.Race, x.Sex, x.Category, x.Sequence });
                     table.CheckConstraint("CK_AppearanceChoice_Race", "\"Race\" IN (1, 2, 3)");
                     table.CheckConstraint("CK_AppearanceChoice_Sex", "\"Sex\" IN (0, 2, 3)");
                 });
@@ -98,6 +96,22 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ChatMessages", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ClassAttributeBases",
+                columns: table => new
+                {
+                    Class = table.Column<byte>(type: "smallint", nullable: false),
+                    Level = table.Column<long>(type: "bigint", nullable: false),
+                    StatId = table.Column<long>(type: "bigint", nullable: false),
+                    Amount = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClassAttributeBases", x => new { x.Class, x.Level, x.StatId });
+                    table.CheckConstraint("CK_ClassAttributeBase_Class", "\"Class\" IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
+                    table.CheckConstraint("CK_ClassAttributeBase_StatId", "\"StatId\" IN (0, 1, 11, 12, 20, 27, 33, 34, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 91, 106, 127, 140, 157, 165, 169, 173, 174, 186, 187, 191, 215, 224, 225, 226, 241, 243, 275, 278, 279, 280, 291, 310, 311, 312, 319, 331, 334, 350, 353, 355, 363, 389, 448, 450, 451, 454, 456, 458, 475, 488, 490, 491, 498, 504, 505, 506, 507, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 711, 713, 804, 806, 808, 810, 814, 818, 824, 828, 830, 861, 871, 872, 875, 878, 901, 920, 922, 923, 925, 926, 927, 928, 929, 965, 1007, 1035, 1085, 1093, 1097, 1098, 1099, 1332, 1376, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397)");
                 });
 
             migrationBuilder.CreateTable(
@@ -131,8 +145,10 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     PlayfieldInstanced = table.Column<bool>(type: "boolean", nullable: false),
                     PopulationCap = table.Column<int>(type: "integer", nullable: false),
                     Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    PlayfieldFieldA = table.Column<long>(type: "bigint", nullable: false),
                     PlayfieldCount = table.Column<long>(type: "bigint", nullable: false),
                     PlayfieldFieldB = table.Column<long>(type: "bigint", nullable: false),
+                    PlayfieldFieldC = table.Column<long>(type: "bigint", nullable: false),
                     PlayfieldFlags = table.Column<long>(type: "bigint", nullable: false),
                     PlayfieldToken = table.Column<long>(type: "bigint", nullable: false)
                 },
@@ -245,6 +261,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     Range = table.Column<float>(type: "real", nullable: false),
                     DotDelta = table.Column<int>(type: "integer", nullable: false),
                     Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Description = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     DotType = table.Column<long>(type: "bigint", nullable: false),
                     DurationMs = table.Column<long>(type: "bigint", nullable: false),
                     EffectSpell = table.Column<long>(type: "bigint", nullable: false),
@@ -341,14 +358,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "MapLootEntries",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     ItemTemplateId = table.Column<long>(type: "bigint", nullable: false),
                     MapId = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_MapLootEntries", x => x.Id);
+                    table.PrimaryKey("PK_MapLootEntries", x => new { x.MapId, x.ItemTemplateId });
                     table.ForeignKey(
                         name: "FK_MapLootEntries_Maps_MapId",
                         column: x => x.MapId,
@@ -389,8 +404,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "WorldObjects",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Id = table.Column<long>(type: "bigint", nullable: false),
                     DestinationMapId = table.Column<long>(type: "bigint", nullable: true),
                     EffectQuestId = table.Column<long>(type: "bigint", nullable: true),
                     GateQuestId = table.Column<long>(type: "bigint", nullable: true),
@@ -399,6 +413,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     TemplateItemId = table.Column<long>(type: "bigint", nullable: true),
                     InteractAction = table.Column<long>(type: "bigint", nullable: false),
                     IsClosed = table.Column<bool>(type: "boolean", nullable: false),
+                    ShowPopupOnUse = table.Column<bool>(type: "boolean", nullable: true),
                     EffectDynelState = table.Column<byte>(type: "smallint", nullable: false),
                     GeometryAssetId = table.Column<long>(type: "bigint", nullable: false),
                     GeometryAssetType = table.Column<long>(type: "bigint", nullable: false),
@@ -415,9 +430,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     DestinationX = table.Column<float>(type: "real", nullable: true),
                     DestinationY = table.Column<float>(type: "real", nullable: true),
                     DestinationZ = table.Column<float>(type: "real", nullable: true),
-                    DisplayName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    DisplayKind = table.Column<byte>(type: "smallint", nullable: true),
+                    DisplayId = table.Column<long>(type: "bigint", nullable: true),
+                    DisplayToken = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    DisplayCategory = table.Column<long>(type: "bigint", nullable: true),
+                    DisplayFlags = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
+                    DisplayKey = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    DisplayKnubot = table.Column<long>(type: "bigint", nullable: true),
                     Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    CapturedHandle = table.Column<long>(type: "bigint", nullable: false),
                     CarsGroup = table.Column<long>(type: "bigint", nullable: false),
                     Kdtree = table.Column<long>(type: "bigint", nullable: false),
                     SubOpcode = table.Column<long>(type: "bigint", nullable: false),
@@ -434,6 +454,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_WorldObjects", x => x.Id);
+                    table.CheckConstraint("CK_WorldObject_DisplayKind", "\"DisplayKind\" IN (0, 1, 2)");
                     table.ForeignKey(
                         name: "FK_WorldObjects_Maps_MapId",
                         column: x => x.MapId,
@@ -446,14 +467,19 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcChatter",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    RemoteFormat = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false)
+                    Channel = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    SayInChat = table.Column<long>(type: "bigint", nullable: false),
+                    ChannelCount = table.Column<long>(type: "bigint", nullable: false),
+                    Group = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    Category = table.Column<long>(type: "bigint", nullable: false),
+                    Knubot = table.Column<long>(type: "bigint", nullable: false),
+                    FormatKey = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    ParameterName = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_NpcChatter", x => x.Id);
+                    table.PrimaryKey("PK_NpcChatter", x => new { x.NpcTemplateId, x.Channel, x.SayInChat });
                     table.ForeignKey(
                         name: "FK_NpcChatter_NpcTemplates_NpcTemplateId",
                         column: x => x.NpcTemplateId,
@@ -466,17 +492,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcMorphs",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    MorphId = table.Column<long>(type: "bigint", nullable: false),
                     NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    Value = table.Column<float>(type: "real", nullable: false),
                     Ordinal = table.Column<int>(type: "integer", nullable: false),
+                    MorphId = table.Column<long>(type: "bigint", nullable: false),
+                    Value = table.Column<float>(type: "real", nullable: false),
                     Text = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_NpcMorphs", x => x.Id);
+                    table.PrimaryKey("PK_NpcMorphs", x => new { x.NpcTemplateId, x.Ordinal });
                     table.ForeignKey(
                         name: "FK_NpcMorphs_NpcTemplates_NpcTemplateId",
                         column: x => x.NpcTemplateId,
@@ -489,8 +513,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpawnAreas",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Id = table.Column<long>(type: "bigint", nullable: false),
                     CommunityId = table.Column<long>(type: "bigint", nullable: true),
                     MapId = table.Column<long>(type: "bigint", nullable: false),
                     NpcTemplateId = table.Column<long>(type: "bigint", nullable: true),
@@ -528,8 +551,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpells",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
                     SpellId = table.Column<long>(type: "bigint", nullable: false),
                     FlagA = table.Column<byte>(type: "smallint", nullable: false),
@@ -541,7 +562,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_NpcSpells", x => x.Id);
+                    table.PrimaryKey("PK_NpcSpells", x => new { x.NpcTemplateId, x.SpellId });
                     table.ForeignKey(
                         name: "FK_NpcSpells_NpcTemplates_NpcTemplateId",
                         column: x => x.NpcTemplateId,
@@ -638,15 +659,13 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "Shops",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
                     VendorName = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     MaxSize = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Shops", x => x.Id);
+                    table.PrimaryKey("PK_Shops", x => x.NpcTemplateId);
                     table.ForeignKey(
                         name: "FK_Shops_NpcTemplates_NpcTemplateId",
                         column: x => x.NpcTemplateId,
@@ -797,6 +816,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     MaxDamage = table.Column<int>(type: "integer", nullable: true),
                     MinDamage = table.Column<int>(type: "integer", nullable: true),
                     Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Description = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
                     Hash = table.Column<long>(type: "bigint", nullable: false),
                     SearchCategory = table.Column<long>(type: "bigint", nullable: false),
                     Value = table.Column<long>(type: "bigint", nullable: false),
@@ -817,11 +837,39 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "SpellEffects",
+                columns: table => new
+                {
+                    SpellId = table.Column<long>(type: "bigint", nullable: false),
+                    Trigger = table.Column<byte>(type: "smallint", nullable: false),
+                    Sequence = table.Column<byte>(type: "smallint", nullable: false),
+                    Kind = table.Column<byte>(type: "smallint", nullable: false),
+                    TargetSpellId = table.Column<long>(type: "bigint", nullable: true),
+                    Template = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    Combat = table.Column<bool>(type: "boolean", nullable: false),
+                    DurationMs = table.Column<long>(type: "bigint", nullable: true),
+                    MaxDurationMs = table.Column<long>(type: "bigint", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SpellEffects", x => new { x.SpellId, x.Trigger, x.Sequence });
+                    table.CheckConstraint("CK_SpellEffect_Kind", "\"Kind\" IN (0, 1)");
+                    table.CheckConstraint("CK_SpellEffect_Trigger", "\"Trigger\" IN (0, 1)");
+                    table.ForeignKey(
+                        name: "FK_SpellEffects_Spells_SpellId",
+                        column: x => x.SpellId,
+                        principalTable: "Spells",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "SpellStatEffects",
                 columns: table => new
                 {
                     SpellId = table.Column<long>(type: "bigint", nullable: false),
                     StatId = table.Column<long>(type: "bigint", nullable: false),
+                    EffectKind = table.Column<long>(type: "bigint", nullable: false),
                     Amount = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
@@ -880,15 +928,13 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpawns",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Id = table.Column<long>(type: "bigint", nullable: false),
                     GuildId = table.Column<long>(type: "bigint", nullable: true),
                     MapId = table.Column<long>(type: "bigint", nullable: false),
                     NpcSpawnAreaId = table.Column<long>(type: "bigint", nullable: true),
                     NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
                     HasEquipment = table.Column<bool>(type: "boolean", nullable: false),
                     ApprenticeLevel = table.Column<long>(type: "bigint", nullable: false),
-                    CapturedHandle = table.Column<long>(type: "bigint", nullable: false),
                     HeadMesh = table.Column<long>(type: "bigint", nullable: false),
                     Health = table.Column<long>(type: "bigint", nullable: false),
                     Level = table.Column<long>(type: "bigint", nullable: false),
@@ -939,17 +985,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ConversationNodes",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Id = table.Column<long>(type: "bigint", nullable: false),
                     ConditionQuestId = table.Column<long>(type: "bigint", nullable: true),
                     GrantQuestId = table.Column<long>(type: "bigint", nullable: true),
                     NpcTemplateId = table.Column<long>(type: "bigint", nullable: true),
                     TypeId = table.Column<long>(type: "bigint", nullable: false),
                     ConditionQuestState = table.Column<int>(type: "integer", nullable: true),
                     AnswerPath = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    NpcName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    CapturedInstance = table.Column<long>(type: "bigint", nullable: false),
-                    CapturedNpcHandle = table.Column<long>(type: "bigint", nullable: false)
+                    NpcName = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -1009,7 +1052,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                     Sex = table.Column<byte>(type: "smallint", nullable: false),
                     ActiveWeaponSet = table.Column<int>(type: "integer", nullable: false),
                     IsDead = table.Column<bool>(type: "boolean", nullable: false),
-                    AuthChallenge = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: true),
+                    AuthChallenge = table.Column<Guid>(type: "uuid", nullable: false),
                     Language = table.Column<string>(type: "character varying(4)", maxLength: 4, nullable: true),
                     LastIpAddress = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
                     Name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
@@ -1104,7 +1147,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ItemStatModifiers", x => new { x.ItemId, x.StatId });
-                    table.CheckConstraint("CK_ItemStatModifier_StatId", "\"StatId\" IN (0, 1, 11, 12, 20, 27, 33, 34, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 91, 106, 127, 140, 165, 169, 173, 174, 186, 187, 191, 215, 224, 225, 226, 241, 243, 275, 291, 310, 311, 312, 319, 331, 350, 353, 355, 363, 389, 448, 451, 454, 456, 458, 475, 488, 490, 491, 498, 504, 505, 506, 507, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 711, 713, 804, 806, 808, 810, 814, 818, 824, 828, 830, 861, 871, 872, 875, 878, 901, 920, 922, 923, 925, 927, 1007, 1035, 1085, 1093, 1097, 1098, 1099, 1332, 1376, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397)");
+                    table.CheckConstraint("CK_ItemStatModifier_StatId", "\"StatId\" IN (0, 1, 11, 12, 20, 27, 33, 34, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 91, 106, 127, 140, 157, 165, 169, 173, 174, 186, 187, 191, 215, 224, 225, 226, 241, 243, 275, 278, 279, 280, 291, 310, 311, 312, 319, 331, 334, 350, 353, 355, 363, 389, 448, 450, 451, 454, 456, 458, 475, 488, 490, 491, 498, 504, 505, 506, 507, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 711, 713, 804, 806, 808, 810, 814, 818, 824, 828, 830, 861, 871, 872, 875, 878, 901, 920, 922, 923, 925, 926, 927, 928, 929, 965, 1007, 1035, 1085, 1093, 1097, 1098, 1099, 1332, 1376, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397)");
                     table.ForeignKey(
                         name: "FK_ItemStatModifiers_Items_ItemId",
                         column: x => x.ItemId,
@@ -1150,16 +1193,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcEquipment",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     NpcTemplateId = table.Column<long>(type: "bigint", nullable: false),
-                    Level = table.Column<long>(type: "bigint", nullable: false),
                     Pos = table.Column<long>(type: "bigint", nullable: false),
+                    Level = table.Column<long>(type: "bigint", nullable: false),
                     Template = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_NpcEquipment", x => x.Id);
+                    table.PrimaryKey("PK_NpcEquipment", x => new { x.NpcTemplateId, x.Pos });
                     table.ForeignKey(
                         name: "FK_NpcEquipment_Items_Template",
                         column: x => x.Template,
@@ -1237,18 +1278,16 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "RecipeItems",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ItemId = table.Column<long>(type: "bigint", nullable: false),
                     RecipeId = table.Column<long>(type: "bigint", nullable: false),
                     Role = table.Column<byte>(type: "smallint", nullable: false),
                     Position = table.Column<int>(type: "integer", nullable: false),
+                    ItemId = table.Column<long>(type: "bigint", nullable: false),
                     Flag = table.Column<long>(type: "bigint", nullable: false),
                     Trailing = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_RecipeItems", x => x.Id);
+                    table.PrimaryKey("PK_RecipeItems", x => new { x.RecipeId, x.Role, x.Position });
                     table.CheckConstraint("CK_RecipeItem_Role", "\"Role\" IN (0, 1)");
                     table.ForeignKey(
                         name: "FK_RecipeItems_Items_ItemId",
@@ -1268,18 +1307,16 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ShopItems",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ItemTemplateId = table.Column<long>(type: "bigint", nullable: false),
                     ShopId = table.Column<long>(type: "bigint", nullable: false),
-                    Count = table.Column<long>(type: "bigint", nullable: false),
                     Pos = table.Column<long>(type: "bigint", nullable: false),
+                    ItemTemplateId = table.Column<long>(type: "bigint", nullable: false),
+                    Count = table.Column<long>(type: "bigint", nullable: false),
                     Stat356 = table.Column<long>(type: "bigint", nullable: false),
                     TailLevel = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ShopItems", x => x.Id);
+                    table.PrimaryKey("PK_ShopItems", x => new { x.ShopId, x.Pos });
                     table.ForeignKey(
                         name: "FK_ShopItems_Items_ItemTemplateId",
                         column: x => x.ItemTemplateId,
@@ -1290,7 +1327,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                         name: "FK_ShopItems_Shops_ShopId",
                         column: x => x.ShopId,
                         principalTable: "Shops",
-                        principalColumn: "Id",
+                        principalColumn: "NpcTemplateId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -1343,16 +1380,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpawnEquipment",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     NpcSpawnId = table.Column<long>(type: "bigint", nullable: false),
-                    Level = table.Column<long>(type: "bigint", nullable: false),
                     Pos = table.Column<long>(type: "bigint", nullable: false),
+                    Level = table.Column<long>(type: "bigint", nullable: false),
                     Template = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_NpcSpawnEquipment", x => x.Id);
+                    table.PrimaryKey("PK_NpcSpawnEquipment", x => new { x.NpcSpawnId, x.Pos });
                     table.ForeignKey(
                         name: "FK_NpcSpawnEquipment_Items_Template",
                         column: x => x.Template,
@@ -1371,17 +1406,15 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "NpcSpawnMorphs",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    MorphId = table.Column<long>(type: "bigint", nullable: false),
                     NpcSpawnId = table.Column<long>(type: "bigint", nullable: false),
-                    Value = table.Column<float>(type: "real", nullable: false),
                     Ordinal = table.Column<int>(type: "integer", nullable: false),
+                    MorphId = table.Column<long>(type: "bigint", nullable: false),
+                    Value = table.Column<float>(type: "real", nullable: false),
                     Text = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_NpcSpawnMorphs", x => x.Id);
+                    table.PrimaryKey("PK_NpcSpawnMorphs", x => new { x.NpcSpawnId, x.Ordinal });
                     table.ForeignKey(
                         name: "FK_NpcSpawnMorphs_NpcSpawns_NpcSpawnId",
                         column: x => x.NpcSpawnId,
@@ -1391,35 +1424,69 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "PatrolPaths",
+                name: "PatrolNodes",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    NpcSpawnId = table.Column<long>(type: "bigint", nullable: false)
+                    OrdinalPath = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    NpcSpawnId = table.Column<long>(type: "bigint", nullable: false),
+                    ParentPath = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    Mode = table.Column<byte>(type: "smallint", nullable: false),
+                    Flag = table.Column<byte>(type: "smallint", nullable: true),
+                    HeaderFlags = table.Column<byte>(type: "smallint", nullable: true),
+                    ListMin = table.Column<byte>(type: "smallint", nullable: true),
+                    PathFlags = table.Column<byte>(type: "smallint", nullable: true),
+                    TrailerByte = table.Column<byte>(type: "smallint", nullable: true),
+                    ApproachFlag = table.Column<byte>(type: "smallint", nullable: true),
+                    AnchorX = table.Column<float>(type: "real", nullable: true),
+                    AnchorY = table.Column<float>(type: "real", nullable: true),
+                    AnchorZ = table.Column<float>(type: "real", nullable: true),
+                    Duration = table.Column<float>(type: "real", nullable: true),
+                    Remaining = table.Column<float>(type: "real", nullable: true),
+                    Speed = table.Column<float>(type: "real", nullable: true),
+                    PathDirection1 = table.Column<float>(type: "real", nullable: true),
+                    PathDirection2 = table.Column<float>(type: "real", nullable: true),
+                    PathTrailerWord = table.Column<long>(type: "bigint", nullable: true),
+                    TargetX = table.Column<float>(type: "real", nullable: true),
+                    TargetY = table.Column<float>(type: "real", nullable: true),
+                    TargetZ = table.Column<float>(type: "real", nullable: true),
+                    TargetRotationX = table.Column<float>(type: "real", nullable: true),
+                    TargetRotationY = table.Column<float>(type: "real", nullable: true),
+                    TargetRotationZ = table.Column<float>(type: "real", nullable: true),
+                    TargetRotationW = table.Column<float>(type: "real", nullable: true),
+                    Ordinal = table.Column<int>(type: "integer", nullable: false),
+                    PathPacked1 = table.Column<int>(type: "integer", nullable: true),
+                    PathPacked2 = table.Column<int>(type: "integer", nullable: true),
+                    RotateTail = table.Column<int>(type: "integer", nullable: true),
+                    ApproachTarget = table.Column<long>(type: "bigint", nullable: true),
+                    ApproachType = table.Column<long>(type: "bigint", nullable: true),
+                    PathFloat10 = table.Column<long>(type: "bigint", nullable: true),
+                    PathFloat20 = table.Column<long>(type: "bigint", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_PatrolPaths", x => x.Id);
+                    table.PrimaryKey("PK_PatrolNodes", x => new { x.NpcSpawnId, x.OrdinalPath });
                     table.ForeignKey(
-                        name: "FK_PatrolPaths_NpcSpawns_NpcSpawnId",
+                        name: "FK_PatrolNodes_NpcSpawns_NpcSpawnId",
                         column: x => x.NpcSpawnId,
                         principalTable: "NpcSpawns",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PatrolNodes_PatrolNodes_NpcSpawnId_ParentPath",
+                        columns: x => new { x.NpcSpawnId, x.ParentPath },
+                        principalTable: "PatrolNodes",
+                        principalColumns: new[] { "NpcSpawnId", "OrdinalPath" });
                 });
 
             migrationBuilder.CreateTable(
                 name: "ConversationPackets",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     ConversationNodeId = table.Column<long>(type: "bigint", nullable: false),
+                    Sequence = table.Column<int>(type: "integer", nullable: false),
                     SubOpcode = table.Column<long>(type: "bigint", nullable: true),
                     Env = table.Column<byte>(type: "smallint", nullable: true),
                     Flag = table.Column<byte>(type: "smallint", nullable: true),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
                     ShotSize = table.Column<byte>(type: "smallint", nullable: true),
                     ShotType = table.Column<byte>(type: "smallint", nullable: true),
                     ShotEmphasis = table.Column<byte>(type: "smallint", nullable: true),
@@ -1432,7 +1499,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ConversationPackets", x => x.Id);
+                    table.PrimaryKey("PK_ConversationPackets", x => new { x.ConversationNodeId, x.Sequence });
                     table.ForeignKey(
                         name: "FK_ConversationPackets_ConversationNodes_ConversationNodeId",
                         column: x => x.ConversationNodeId,
@@ -1784,6 +1851,30 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CharacterFriends",
+                columns: table => new
+                {
+                    CharacterId = table.Column<long>(type: "bigint", nullable: false),
+                    FriendCharacterId = table.Column<long>(type: "bigint", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CharacterFriends", x => new { x.CharacterId, x.FriendCharacterId });
+                    table.ForeignKey(
+                        name: "FK_CharacterFriends_Characters_CharacterId",
+                        column: x => x.CharacterId,
+                        principalTable: "Characters",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CharacterFriends_Characters_FriendCharacterId",
+                        column: x => x.FriendCharacterId,
+                        principalTable: "Characters",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "CharacterInventory",
                 columns: table => new
                 {
@@ -1796,7 +1887,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_CharacterInventory", x => new { x.CharacterId, x.Container, x.Slot });
-                    table.CheckConstraint("CK_CharacterInventory_Container", "\"Container\" IN (101, 104, 105, 112, 113, 115)");
+                    table.CheckConstraint("CK_CharacterInventory_Container", "\"Container\" IN (101, 104, 105, 111, 112, 113, 115)");
                     table.ForeignKey(
                         name: "FK_CharacterInventory_Characters_CharacterId",
                         column: x => x.CharacterId,
@@ -2037,81 +2128,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "PatrolNodes",
-                columns: table => new
-                {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ParentId = table.Column<long>(type: "bigint", nullable: true),
-                    PatrolPathId = table.Column<long>(type: "bigint", nullable: false),
-                    Mode = table.Column<byte>(type: "smallint", nullable: false),
-                    Flag = table.Column<byte>(type: "smallint", nullable: true),
-                    HeaderFlags = table.Column<byte>(type: "smallint", nullable: true),
-                    ListMin = table.Column<byte>(type: "smallint", nullable: true),
-                    PathFlags = table.Column<byte>(type: "smallint", nullable: true),
-                    TrailerByte = table.Column<byte>(type: "smallint", nullable: true),
-                    ApproachFlag = table.Column<byte>(type: "smallint", nullable: true),
-                    AnchorX = table.Column<float>(type: "real", nullable: true),
-                    AnchorY = table.Column<float>(type: "real", nullable: true),
-                    AnchorZ = table.Column<float>(type: "real", nullable: true),
-                    Duration = table.Column<float>(type: "real", nullable: true),
-                    Remaining = table.Column<float>(type: "real", nullable: true),
-                    Speed = table.Column<float>(type: "real", nullable: true),
-                    Ordinal = table.Column<int>(type: "integer", nullable: false),
-                    PathPacked1 = table.Column<int>(type: "integer", nullable: true),
-                    PathPacked2 = table.Column<int>(type: "integer", nullable: true),
-                    RotateTail = table.Column<int>(type: "integer", nullable: true),
-                    ApproachTarget = table.Column<long>(type: "bigint", nullable: true),
-                    ApproachType = table.Column<long>(type: "bigint", nullable: true),
-                    PathFloat10 = table.Column<long>(type: "bigint", nullable: true),
-                    PathFloat20 = table.Column<long>(type: "bigint", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PatrolNodes", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_PatrolNodes_PatrolNodes_ParentId",
-                        column: x => x.ParentId,
-                        principalTable: "PatrolNodes",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_PatrolNodes_PatrolPaths_PatrolPathId",
-                        column: x => x.PatrolPathId,
-                        principalTable: "PatrolPaths",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ConversationScreens",
-                columns: table => new
-                {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ConversationPacketId = table.Column<long>(type: "bigint", nullable: false),
-                    ScreenId = table.Column<long>(type: "bigint", nullable: false),
-                    Sequence = table.Column<int>(type: "integer", nullable: false),
-                    Key = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Category = table.Column<long>(type: "bigint", nullable: false),
-                    Knubot = table.Column<long>(type: "bigint", nullable: false),
-                    Antitag = table.Column<long>(type: "bigint", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ConversationScreens", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ConversationScreens_ConversationPackets_ConversationPacketId",
-                        column: x => x.ConversationPacketId,
-                        principalTable: "ConversationPackets",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "PatrolNodeWaypoints",
                 columns: table => new
                 {
-                    PatrolNodeId = table.Column<long>(type: "bigint", nullable: false),
+                    NpcSpawnId = table.Column<long>(type: "bigint", nullable: false),
+                    OrdinalPath = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     Ordinal = table.Column<int>(type: "integer", nullable: false),
                     PositionX = table.Column<float>(type: "real", nullable: false),
                     PositionY = table.Column<float>(type: "real", nullable: false),
@@ -2119,12 +2140,12 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_PatrolNodeWaypoints", x => new { x.PatrolNodeId, x.Ordinal });
+                    table.PrimaryKey("PK_PatrolNodeWaypoints", x => new { x.NpcSpawnId, x.OrdinalPath, x.Ordinal });
                     table.ForeignKey(
-                        name: "FK_PatrolNodeWaypoints_PatrolNodes_PatrolNodeId",
-                        column: x => x.PatrolNodeId,
+                        name: "FK_PatrolNodeWaypoints_PatrolNodes_NpcSpawnId_OrdinalPath",
+                        columns: x => new { x.NpcSpawnId, x.OrdinalPath },
                         principalTable: "PatrolNodes",
-                        principalColumn: "Id",
+                        principalColumns: new[] { "NpcSpawnId", "OrdinalPath" },
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -2132,18 +2153,43 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "PatrolNodeWords",
                 columns: table => new
                 {
-                    PatrolNodeId = table.Column<long>(type: "bigint", nullable: false),
+                    NpcSpawnId = table.Column<long>(type: "bigint", nullable: false),
+                    OrdinalPath = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     Ordinal = table.Column<int>(type: "integer", nullable: false),
                     Value = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_PatrolNodeWords", x => new { x.PatrolNodeId, x.Ordinal });
+                    table.PrimaryKey("PK_PatrolNodeWords", x => new { x.NpcSpawnId, x.OrdinalPath, x.Ordinal });
                     table.ForeignKey(
-                        name: "FK_PatrolNodeWords_PatrolNodes_PatrolNodeId",
-                        column: x => x.PatrolNodeId,
+                        name: "FK_PatrolNodeWords_PatrolNodes_NpcSpawnId_OrdinalPath",
+                        columns: x => new { x.NpcSpawnId, x.OrdinalPath },
                         principalTable: "PatrolNodes",
-                        principalColumn: "Id",
+                        principalColumns: new[] { "NpcSpawnId", "OrdinalPath" },
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ConversationScreens",
+                columns: table => new
+                {
+                    ConversationNodeId = table.Column<long>(type: "bigint", nullable: false),
+                    PacketSequence = table.Column<int>(type: "integer", nullable: false),
+                    Sequence = table.Column<int>(type: "integer", nullable: false),
+                    ScreenId = table.Column<long>(type: "bigint", nullable: false),
+                    Key = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Category = table.Column<long>(type: "bigint", nullable: false),
+                    Knubot = table.Column<long>(type: "bigint", nullable: false),
+                    Antitag = table.Column<long>(type: "bigint", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ConversationScreens", x => new { x.ConversationNodeId, x.PacketSequence, x.Sequence });
+                    table.ForeignKey(
+                        name: "FK_ConversationScreens_ConversationPackets_ConversationNodeId_~",
+                        columns: x => new { x.ConversationNodeId, x.PacketSequence },
+                        principalTable: "ConversationPackets",
+                        principalColumns: new[] { "ConversationNodeId", "Sequence" },
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -2151,21 +2197,28 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ConversationScreenParameters",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ConversationScreenId = table.Column<long>(type: "bigint", nullable: false),
+                    ConversationNodeId = table.Column<long>(type: "bigint", nullable: false),
+                    PacketSequence = table.Column<int>(type: "integer", nullable: false),
+                    ScreenSequence = table.Column<int>(type: "integer", nullable: false),
                     Sequence = table.Column<int>(type: "integer", nullable: false),
-                    InnerRaw = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
+                    Kind = table.Column<byte>(type: "smallint", nullable: false),
+                    LocalizedId = table.Column<long>(type: "bigint", nullable: true),
+                    LocalizedToken = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    Category = table.Column<long>(type: "bigint", nullable: true),
+                    Flags = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
+                    ContentKey = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    Text = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     Name = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_ConversationScreenParameters", x => x.Id);
+                    table.PrimaryKey("PK_ConversationScreenParameters", x => new { x.ConversationNodeId, x.PacketSequence, x.ScreenSequence, x.Sequence });
+                    table.CheckConstraint("CK_ConversationScreenParameter_Kind", "\"Kind\" IN (0, 1, 2)");
                     table.ForeignKey(
                         name: "FK_ConversationScreenParameters_ConversationScreens_Conversati~",
-                        column: x => x.ConversationScreenId,
+                        columns: x => new { x.ConversationNodeId, x.PacketSequence, x.ScreenSequence },
                         principalTable: "ConversationScreens",
-                        principalColumn: "Id",
+                        principalColumns: new[] { "ConversationNodeId", "PacketSequence", "Sequence" },
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -2326,6 +2379,11 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 column: "WristId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_CharacterFriends_FriendCharacterId",
+                table: "CharacterFriends",
+                column: "FriendCharacterId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_CharacterInventory_ItemId",
                 table: "CharacterInventory",
                 column: "ItemId");
@@ -2422,30 +2480,14 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 column: "GrantQuestId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_ConversationNodes_NpcName_TypeId_AnswerPath_ConditionQuestI~",
+                name: "IX_ConversationNodes_NpcName_TypeId_AnswerPath",
                 table: "ConversationNodes",
-                columns: new[] { "NpcName", "TypeId", "AnswerPath", "ConditionQuestId", "ConditionQuestState" },
-                unique: true);
+                columns: new[] { "NpcName", "TypeId", "AnswerPath" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_ConversationNodes_NpcTemplateId",
                 table: "ConversationNodes",
                 column: "NpcTemplateId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ConversationPackets_ConversationNodeId",
-                table: "ConversationPackets",
-                column: "ConversationNodeId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ConversationScreenParameters_ConversationScreenId",
-                table: "ConversationScreenParameters",
-                column: "ConversationScreenId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ConversationScreens_ConversationPacketId",
-                table: "ConversationScreens",
-                column: "ConversationPacketId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Guilds_RealmId_Name",
@@ -2479,29 +2521,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 column: "RecipientName");
 
             migrationBuilder.CreateIndex(
-                name: "IX_MapLootEntries_MapId",
-                table: "MapLootEntries",
-                column: "MapId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NpcChatter_NpcTemplateId",
-                table: "NpcChatter",
-                column: "NpcTemplateId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NpcEquipment_NpcTemplateId",
-                table: "NpcEquipment",
-                column: "NpcTemplateId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_NpcEquipment_Template",
                 table: "NpcEquipment",
                 column: "Template");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NpcMorphs_NpcTemplateId",
-                table: "NpcMorphs",
-                column: "NpcTemplateId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_NpcSpawnAreas_MapId_GroupOrdinal",
@@ -2515,19 +2537,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 column: "NpcTemplateId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_NpcSpawnEquipment_NpcSpawnId",
-                table: "NpcSpawnEquipment",
-                column: "NpcSpawnId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_NpcSpawnEquipment_Template",
                 table: "NpcSpawnEquipment",
                 column: "Template");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_NpcSpawnMorphs_NpcSpawnId",
-                table: "NpcSpawnMorphs",
-                column: "NpcSpawnId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_NpcSpawns_MapId_PositionX_PositionY_PositionZ",
@@ -2546,25 +2558,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 column: "NpcTemplateId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_NpcSpells_NpcTemplateId",
-                table: "NpcSpells",
-                column: "NpcTemplateId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PatrolNodes_ParentId",
+                name: "IX_PatrolNodes_NpcSpawnId_ParentPath",
                 table: "PatrolNodes",
-                column: "ParentId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PatrolNodes_PatrolPathId",
-                table: "PatrolNodes",
-                column: "PatrolPathId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PatrolPaths_NpcSpawnId",
-                table: "PatrolPaths",
-                column: "NpcSpawnId",
-                unique: true);
+                columns: new[] { "NpcSpawnId", "ParentPath" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_QuestDefinitions_AreaId",
@@ -2603,11 +2599,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 column: "ItemId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_RecipeItems_RecipeId",
-                table: "RecipeItems",
-                column: "RecipeId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_RespawnPoints_MapId",
                 table: "RespawnPoints",
                 column: "MapId");
@@ -2616,18 +2607,6 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "IX_ShopItems_ItemTemplateId",
                 table: "ShopItems",
                 column: "ItemTemplateId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ShopItems_ShopId_Pos",
-                table: "ShopItems",
-                columns: new[] { "ShopId", "Pos" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Shops_NpcTemplateId",
-                table: "Shops",
-                column: "NpcTemplateId",
-                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_TradepostListings_ItemId",
@@ -2646,10 +2625,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 column: "Template");
 
             migrationBuilder.CreateIndex(
-                name: "IX_WorldObjects_MapId_PositionX_PositionY_PositionZ_DisplayName",
+                name: "IX_WorldObjects_MapId",
                 table: "WorldObjects",
-                columns: new[] { "MapId", "PositionX", "PositionY", "PositionZ", "DisplayName" },
-                unique: true);
+                column: "MapId");
         }
 
         /// <inheritdoc />
@@ -2684,6 +2662,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             migrationBuilder.DropTable(
                 name: "CharacterFeats");
+
+            migrationBuilder.DropTable(
+                name: "CharacterFriends");
 
             migrationBuilder.DropTable(
                 name: "CharacterInventory");
@@ -2723,6 +2704,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
 
             migrationBuilder.DropTable(
                 name: "ClassAbilities");
+
+            migrationBuilder.DropTable(
+                name: "ClassAttributeBases");
 
             migrationBuilder.DropTable(
                 name: "ClassCombos");
@@ -2788,6 +2772,9 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ShopItems");
 
             migrationBuilder.DropTable(
+                name: "SpellEffects");
+
+            migrationBuilder.DropTable(
                 name: "SpellStatEffects");
 
             migrationBuilder.DropTable(
@@ -2845,7 +2832,7 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ConversationPackets");
 
             migrationBuilder.DropTable(
-                name: "PatrolPaths");
+                name: "NpcSpawns");
 
             migrationBuilder.DropTable(
                 name: "Spells");
@@ -2857,22 +2844,19 @@ namespace Faolan.Core.Database.Migrations.Postgres.Migrations
                 name: "ConversationNodes");
 
             migrationBuilder.DropTable(
-                name: "NpcSpawns");
+                name: "NpcSpawnAreas");
 
             migrationBuilder.DropTable(
                 name: "QuestDefinitions");
 
             migrationBuilder.DropTable(
-                name: "NpcSpawnAreas");
-
-            migrationBuilder.DropTable(
-                name: "QuestAreas");
+                name: "NpcTemplates");
 
             migrationBuilder.DropTable(
                 name: "Maps");
 
             migrationBuilder.DropTable(
-                name: "NpcTemplates");
+                name: "QuestAreas");
         }
     }
 }

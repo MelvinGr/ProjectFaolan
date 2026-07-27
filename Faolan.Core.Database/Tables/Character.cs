@@ -124,8 +124,10 @@ namespace Faolan.Core.Database.Tables
 		// (WorldSimulation.TickPlayerDeaths), cleared on respawn (RespawnPlayer).
 		public bool IsDead { get; set; }
 
-		[MaxLength(32)]
-		public string? AuthChallenge { get; set; }
+		// Per-character token handed to the client in the small/full char lists, as 32 lowercase hex chars ("N").
+		// Generated once at character creation. NOTE: nothing on the server validates it back yet - see the Gitea
+		// follow-up; the account-level challenge is the one that actually gates login.
+		public Guid AuthChallenge { get; set; }
 
 		[MaxLength(4)]
 		public string? Language { get; set; }

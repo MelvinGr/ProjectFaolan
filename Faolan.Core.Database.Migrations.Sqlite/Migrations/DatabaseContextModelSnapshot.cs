@@ -44,8 +44,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("AuthChallenge")
-                        .HasMaxLength(32)
+                    b.Property<Guid>("AuthChallenge")
                         .HasColumnType("TEXT");
 
                     b.Property<uint>("AuthStatus")
@@ -195,8 +194,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<int>("ActiveWeaponSet")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("AuthChallenge")
-                        .HasMaxLength(32)
+                    b.Property<Guid>("AuthChallenge")
                         .HasColumnType("TEXT");
 
                     b.Property<uint?>("BindRespawnPointId")

@@ -207,7 +207,7 @@ namespace Faolan.Importer.Captures
 				Id = originalId,
 				AccountId = accountId,
 				Name = name,
-				AuthChallenge = Guid.NewGuid().ToString("N"),
+				AuthChallenge = Guid.NewGuid(),
 				CreationDate = DateTimeOffset.UtcNow,
 				Level = (ushort)Math.Max(1, stats.Level),
 				Race = (Race)stats.Race,
@@ -405,7 +405,6 @@ namespace Faolan.Importer.Captures
 			{
 				UserName = ImportAccountName,
 				Password = ImportAccountName,
-				AuthChallenge = "",
 				LastIpAddress = ""
 			};
 			db.Accounts.Add(account);

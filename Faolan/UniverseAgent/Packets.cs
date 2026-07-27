@@ -27,7 +27,7 @@ namespace Faolan.UniverseAgent
 
 		private static Task InitAuth(INetworkClient client)
 		{
-			return client.SendAsync(new Rpc(Sender, AuthChallengeReceiver, UniverseInterfaceOpcodes.DispatchChallenge, b => b.WriteString(client.Session.Account.AuthChallenge!)));
+			return client.SendAsync(new Rpc(Sender, AuthChallengeReceiver, UniverseInterfaceOpcodes.DispatchChallenge, b => b.WriteString(client.Session.Account.AuthChallenge.ToString("N"))));
 		}
 
 		private static Task SendInvalidLogin(INetworkClient client, ProtoEndpoint receiver, InvalidLoginReasons reason)

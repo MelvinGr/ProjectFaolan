@@ -57,7 +57,7 @@ namespace Faolan.PlayerAgent
 				body.WriteString(character.Language!); // enEN
 				body.WriteUInt32(0x00000000);
 				body.WriteUInt32(0x00000000);
-				body.WriteString(character.AuthChallenge!);
+				body.WriteString(character.AuthChallenge.ToString("N"));
 				body.WriteUInt32(0x00000000);
 				body.WriteUInt32(0x00000001);
 			}
@@ -160,7 +160,7 @@ namespace Faolan.PlayerAgent
 				foreach (var character in characters)
 				{
 					b.WriteUInt32(character.Id);
-					b.WriteString(character.AuthChallenge!);
+					b.WriteString(character.AuthChallenge.ToString("N"));
 				}
 			}));
 		}

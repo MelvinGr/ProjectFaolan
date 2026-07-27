@@ -43,7 +43,6 @@ namespace Faolan.Tests
 						Id = 1,
 						UserName = "t",
 						Password = "t",
-						AuthChallenge = "",
 						LastIpAddress = ""
 					});
 					db.Realms.Add(new Realm

@@ -31,7 +31,6 @@ namespace Faolan.Core.Database
 				Password = PasswordHashing.Hash(PasswordHashing.DefaultSeedPassword),
 				Type = AccountType.Administrator,
 				State = AccountState.Active,
-				AuthChallenge = "",
 				LastIpAddress = ""
 			});
 

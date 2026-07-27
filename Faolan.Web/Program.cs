@@ -132,7 +132,6 @@ namespace Faolan.Web
 						Type = AccountType.Normal,
 						State = AccountState.Active,
 						CreationDate = DateTimeOffset.UtcNow,
-						AuthChallenge = "",
 						LastIpAddress = ""
 					};
 					var result = await users.CreateAsync(account, password);

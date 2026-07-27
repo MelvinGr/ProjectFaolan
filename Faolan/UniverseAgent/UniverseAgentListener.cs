@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database.Repositories;
@@ -39,7 +40,16 @@ namespace Faolan.UniverseAgent
 						await SendInvalidLogin(client, packet.Sender, InvalidLoginReasons.InvalidLogin);
 					}
 					else
+					{
+						// Rotate the nonce BEFORE it goes out. It used to be a constant (every account shipped with an
+						// empty AuthChallenge and nothing ever wrote one), so the challenge proved nothing: the same
+						// encrypted login block replayed off a capture authenticated forever. A fresh Guid per attempt
+						// makes the block single-use. Persisted because AnswerChallenge re-reads the account.
+						client.Session.Account.AuthChallenge = Guid.NewGuid();
+						await Database.SetAccountAuthChallenge(client.Session.Account.Id, client.Session.Account.AuthChallenge);
+
 						await InitAuth(client);
+					}
 
 					break;
 				}
@@ -52,7 +62,8 @@ namespace Faolan.UniverseAgent
 					bool authenticated;
 					if (LoginEncryption.Decrypt(loginKey) is { } credentials)
 					{
-						authenticated = credentials.Username == account.UserName && credentials.Challenge == account.AuthChallenge && PasswordHashing.Verify(credentials.Password, account.Password);
+						authenticated = credentials.Username == account.UserName && credentials.Challenge == account.AuthChallenge.ToString("N") &&
+						                PasswordHashing.Verify(credentials.Password, account.Password);
 
 						if (authenticated)
 							Logger.LogInformation("UniverseAgent login: password validated for {UserName} (patched client).", account.UserName);
