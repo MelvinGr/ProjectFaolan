@@ -84,6 +84,14 @@ namespace Faolan.Core.Enums
 		Wisdom = 0x032A,
 		Dexterity = 0x032E,
 
+		// Sheet stats measured with `.setstat` (2026-07-27), named from LDB 615. Their SCALES are in GetScale, and the
+		// two fatality stats are the warning against inferring one from a neighbour: despite the names, 0x0177 renders
+		// its raw value verbatim (×1) while 0x017C is a ×100 percent.
+		HateModifier = 0x00AA, // LDB 170 - the sheet's "Hate Modification"
+		Immunity = 0x0146, // LDB 326 - the sheet's "Immunity Chance"
+		FatalityChance = 0x0177, // LDB 375
+		SpellFatalityChance = 0x017C, // LDB 380
+
 		// The SIXTH attribute the character sheet lists under the five above (LDB 615 names it "Ferocity"). Nothing on
 		// our side grants it: zero rows in ClassAttributeBases / ItemStatModifiers / FeatEffects, 3 in SpellStatEffects,
 		// and the client's own live stat table carries no entry for it either - so the sheet renders 0 for every
@@ -441,7 +449,10 @@ namespace Faolan.Core.Enums
 				// column of 10000 (x1, stat 310) beside an Effect of 2000.0%, which is a derived combat formula, not a
 				// unit conversion. Rating stats and chance stats are different ids with different scales; read the
 				// Rating/Score/Value column for a scale and never the Effect column.
-				CharacterStatId.EvadeChance or CharacterStatId.ChanceOfOffhandAttack => 100,
+				CharacterStatId.EvadeChance or CharacterStatId.ChanceOfOffhandAttack
+					// 326 Immunity: the sheet's Immunity Chance moved 105.0% -> 205.0%, i.e. +100 points from 10000
+					// wire. 380 Spell Fatality Chance: 0.0% -> 100%.
+					or CharacterStatId.Immunity or CharacterStatId.SpellFatalityChance => 100,
 
 				// Attributes: proven on a freshly created Necromancer's sheet (2026-07-27) - a 10-wire class base
 				// renders as 1. Ferocity is the sixth attribute and shares their scale: `.setstat 1403 10000` draws as
@@ -453,7 +464,9 @@ namespace Faolan.Core.Enums
 				// = 10000 + its base of 2; 310 Hit Bonus Chance and 711 Critical Bonus Damage drew 10000 in the Rating
 				// column (their "Effect" percent is a derived game formula, not a scale); 451 Protection drew 10000 and
 				// feeds all five schools off the one stat; 875 Combat Rating drew 10003 as the sheet's "Combat Damage
-				// Increase". They land on the default below - listed here so they read as measured rather than assumed.
+				// Increase"; 375 Fatality Chance drew "10000.0 %" and 170 Hate Modifier "10000.0 %" - the raw value
+				// verbatim with a % suffix, which is a FORMAT and not a scale. They land on the default below - listed
+				// here so they read as measured rather than assumed.
 				//
 				// ⚠️ Still UNMEASURED, because the sheet does not render them for a level-1 Conqueror: 920 Attack
 				// Rating, 922 Defense Rating, 923 Magic Rating, 925 Magical Resist, 974 Damage Deflection, 1037
