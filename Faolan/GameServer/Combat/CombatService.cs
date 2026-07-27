@@ -126,8 +126,8 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
-		///     Reseeds the LIVE entity's three pools (max and current) from the character's persisted
-		///     <see cref="CharacterMaxStats" />, and hands the vitals back so the caller can push them.
+		///     Reseeds the LIVE entity's three pools (max and current) for a character whose max has just changed, and
+		///     hands the vitals back so the caller can push them.
 		/// </summary>
 		/// <remarks>
 		///     Every path that CHANGES a max has to do this and then send <see cref="EntityVitals.ToVitalsBlock" />.
@@ -136,19 +136,30 @@ namespace Faolan.GameServer.Combat
 		///     them, so skipping the push leaves the client's bar on whatever it was seeded with at world entry
 		///     (#450 - a `.level 80` left the client rendering `4285 / 1270`, current at 3.4x the max, because the
 		///     GM path pushed the new CURRENT alone).
+		///     <para>
+		///         ⚠️ It rebuilds through <see cref="EntityVitals.FromCharacter" /> with the SAME gear + feat + class
+		///         base that world entry folds in, not from the persisted <see cref="CharacterMaxStats" /> alone.
+		///         Reseeding from the bare persisted row silently drops every bonus the character was carrying, so a
+		///         `.level` would hand back a max BELOW the one world entry had computed - a level-up that lowers your
+		///         health bar.
+		///     </para>
 		/// </remarks>
-		public EntityVitals ReseedFromMaxStats(INetworkClient client)
+		public async Task<EntityVitals> ReseedFromMaxStats(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			var statBonuses = MaxStatAggregator.Combine(
+				MaxStatAggregator.AggregateGearBonuses(await _database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet)),
+				MaxStatAggregator.AggregateFeatBonuses(await _database.GetCharacterFeatEffects(character.Id)));
+			var classBase = await _database.GetClassAttributeBase(character.Class, character.Level);
+			var seeded = EntityVitals.FromCharacter(character, statBonuses, classBase);
 			var vitals = GetOrAddPlayerVitals(client);
 
-			vitals.MaxHealth = max.Health;
-			vitals.MaxStamina = max.Stamina;
-			vitals.MaxMana = max.Mana;
-			vitals.Health = max.Health;
-			vitals.Stamina = max.Stamina;
-			vitals.Mana = max.Mana;
+			vitals.MaxHealth = seeded.MaxHealth;
+			vitals.MaxStamina = seeded.MaxStamina;
+			vitals.MaxMana = seeded.MaxMana;
+			vitals.Health = seeded.MaxHealth;
+			vitals.Stamina = seeded.MaxStamina;
+			vitals.Mana = seeded.MaxMana;
 			return vitals;
 		}
 
@@ -549,7 +560,7 @@ namespace Faolan.GameServer.Combat
 			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, character.Level, levelsGained))
 				await SendWorldFeedback(killer, AttributeChangedFeedback.Build(instance, attributeId, amount));
 
-			var vitals = ReseedFromMaxStats(killer);
+			var vitals = await ReseedFromMaxStats(killer);
 
 			var block = vitals
 				.ToVitalsBlock()

@@ -600,7 +600,7 @@ namespace Faolan.GameServer
 			// every later change. Measured in-client (#450): `.level 80` left the client rendering `4285 / 1270` -
 			// the new current against the max it had been seeded with 57 levels earlier.
 			await SendStatUpdate(client,
-				_combat.ReseedFromMaxStats(client)
+				(await _combat.ReseedFromMaxStats(client))
 					.ToVitalsBlock()
 					.Set(CharacterStatId.Level, level)
 					.Set(CharacterStatId.Exp, character.Experience)
