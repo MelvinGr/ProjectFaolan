@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
@@ -50,6 +51,43 @@ namespace Faolan.Tests
 
 			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.True(template.SequenceEqual(built), "authoring the per-class block for an Assassin L1 must still equal the captured Strie template byte-for-byte");
+		}
+
+		// #473: the sheet's vitals come from the CHARACTER, whatever the sheet's provenance. A captured stat sheet is
+		// a BASELINE, not an override - exactly like the Level/Exp/GmLevel overrides, whose own comment notes a
+		// captured level is "stale the moment it dings". This used to be guarded by `!imported`, so a character with
+		// rows in CharacterStats rendered its capture-time health for ever: the same 1270 at level 10 and at level 40
+		// in-client, while armour mitigation moved with the level and proved the client knew.
+		//
+		// Nothing is lost by overriding, because CaptureCharacterImporter seeds MaxStats FROM the captured stats - so
+		// an imported character emits its captured numbers on the first login and simply tracks itself after.
+		[Fact]
+		public async Task BuildFromScratch_ImportedSheet_StillTakesItsVitalsFromTheCharacter()
+		{
+			var def = await LoadDefinition(BeachStarterQuestId);
+			Assert.NotNull(def);
+
+			var character = new Character
+			{
+				Level = 7,
+				Experience = 98760,
+				Class = ConanClass.Assassin,
+				MaxStats = new CharacterMaxStats { Health = 4321, Mana = 765, Stamina = 543 }
+			};
+
+			// A captured sheet carrying a DIFFERENT health from the character's - the shape that used to win.
+			var captured = SubClassStatBlock.FreshSheet()
+				.Select(p => ((CharacterStatId)p.Id, p.Value))
+				.ToList();
+
+			var fromCapture = FullCharSnapshotSubClass.Deserialize(
+				FullCharSnapshotSubClass.BuildFromScratch(def, character, 0x0802ABCD, statSheet: captured));
+			var fromScratch = FullCharSnapshotSubClass.Deserialize(
+				FullCharSnapshotSubClass.BuildFromScratch(def, character, 0x0802ABCD));
+
+			Assert.Equal(4321u, fromCapture.PostAccessBlock!.CurrentHp);
+			Assert.Equal(fromScratch.PostAccessBlock!.CurrentHp, fromCapture.PostAccessBlock.CurrentHp);
+			Assert.Equal(fromScratch.PostAccessBlock.Values[21], fromCapture.PostAccessBlock.Values[21]);
 		}
 
 		// #214 step 2: a DEAD character's from-scratch tails carry current-health = 0 (the release-window gate)

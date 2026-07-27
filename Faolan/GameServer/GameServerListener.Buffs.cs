@@ -412,6 +412,41 @@ namespace Faolan.GameServer
 		//
 		// Cheap and quiet by design: most buffs carry no honored stat delta, so Sync returns nothing and no packet is
 		// sent. Only a real change reaches the wire.
+		/// <summary>
+		///     Re-reads the character's equipped gear into the live entity's <see cref="WorldEntity.GearBonuses" /> and
+		///     re-syncs the stats that derive from it. Call after any change to what is WORN.
+		/// </summary>
+		/// <remarks>
+		///     <c>GearBonuses</c> is a CACHE, written once by <c>RegisterPlayerInWorld</c> at world entry, and the buff
+		///     recompute reads `gear + buffs` off it - so without this an equip changed nothing until relog, and a buff
+		///     applied afterwards would re-assert the stale gear half on top. Same family as #450's stale max: a value
+		///     computed once at entry and never refreshed.
+		///     <para>
+		///         The refresh goes through <c>SetMaxFromBonus</c> (via the buff sync), not a reseed, so the semantics
+		///         are right for gear: a bigger max leaves current where it is and fills by regen, a smaller one clamps
+		///         current down. Equipping a +HP ring must not heal you, which is why this does NOT use
+		///         <c>CombatService.ReseedFromMaxStats</c> - that one is for a level change, where full pools are correct.
+		///     </para>
+		///     <para>
+		///         ⚠️ Wired into equip and unequip. NOT yet wired into the WEAPON-SET swap (#400,
+		///         <c>WorldBroadcaster</c>), which changes <c>ActiveWeaponSet</c> - and
+		///         <c>GetEquippedStatItems(characterId, set)</c> is set-dependent, so swapping sets changes the gear
+		///         aggregate just as equipping does. It needs a seam from the broadcaster back to here; see Gitea #3.
+		///     </para>
+		/// </remarks>
+		private async Task RefreshGearBonuses(INetworkClient client)
+		{
+			if (_simulation.PlayerWorldEntity(client) is not { } entity)
+				return; // not in the world yet - world entry will build the aggregate itself
+
+			var character = client.Session.Character;
+			entity.GearBonuses = MaxStatAggregator.Combine(
+				MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet)),
+				MaxStatAggregator.AggregateFeatBonuses(await Database.GetCharacterFeatEffects(character.Id)));
+
+			await SyncBuffStats(client);
+		}
+
 		private async Task SyncBuffStats(INetworkClient client)
 		{
 			var entity = _simulation.PlayerWorldEntity(client);

@@ -187,8 +187,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				                                    "one cannot be written - fix the character's CharacterStats rows rather than padding here.");
 			}
 
-			var imported = statSheet is { Count: > 0 };
-
 			// The stat sheet has ONE author (#447): SnapshotStatSheet picks the baseline from provenance and then
 			// applies the SAME override table either way, so a modelled stat reaches the wire for an imported character
 			// and a freshly-created one alike. The overrides land on the SHEET rather than on the built block, because
@@ -202,16 +200,26 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// Positional post-ops (SetValue-based, confined to the stat region - they do NOT scan the inline known-list).
 			if (character != null)
 			{
-				// A fresh character's per-class vitals (displayed + base/secondary slots) so the sheet is internally
-				// consistent (#4/#186); an imported character already carries its real vitals in the sheet.
-				if (!imported && character.MaxStats != null)
+				// The character's per-class vitals (displayed + base/secondary slots) so the sheet is internally
+				// consistent (#4/#186) - for EVERY character, whatever its provenance, exactly like the stat-id
+				// overrides above.
+				//
+				// This used to be `if (!imported && ...)`, on the reasoning that "an imported character already
+				// carries its real vitals in the sheet". It does - but frozen at capture time, so a captured character
+				// rendered the same health, stamina, mana and attributes at level 10 and at level 40 (#473), which is
+				// the very staleness the Level override exists to prevent ("stale the moment it dings"). And the guard
+				// protected nothing: CaptureCharacterImporter seeds MaxStats FROM the captured stats, so the values
+				// that reach the wire here are the captured ones anyway on the first login - they simply track the
+				// character from then on.
+				if (character.MaxStats != null)
 				{
 					var v = character.MaxStats.SnapshotVitals(character.Class);
 					block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
 				}
 
 				// #214: a dead character logs in dead - zero current-health so the client shows the release window.
-				if (character.IsDead && (imported || character.MaxStats != null))
+				// Unconditional: whichever baseline the sheet came from, it now carries a full-health pool.
+				if (character.IsDead)
 					block.CurrentHp = 0;
 			}
 
@@ -406,12 +414,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return HeaderSlots.All(slots.Contains);
 		}
 
-		// For callers with no area to hand: never eligible, since the index cannot be built without one.
-		public static bool IsSnapshotEligible(QuestDefinition? def)
-		{
-			return IsSnapshotEligible(def, null);
-		}
-
 		// Serializes a sequence of access-window entries to their wire bytes (the inverse of the parse loop in
 		// Deserialize). Used by the from-scratch tails builder to emit the game-static PFAccessWindow_ catalog
 		// (AccessWindowCatalog) instead of a captured byte blob; byte-identical to the captured region (#258).
@@ -421,16 +423,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			foreach (var entry in entries)
 				WriteAccessWindowEntry(writer, entry);
 			return writer.ToArray();
-		}
-
-		private static List<uint> CopyRange(List<uint> values, int startIndex, int length)
-		{
-			var result = new List<uint>(length);
-
-			for (var i = 0; i < length; i++)
-				result.Add(values[startIndex + i]);
-
-			return result;
 		}
 
 		private static void ExpectByte(FaolanStream reader, byte expected)

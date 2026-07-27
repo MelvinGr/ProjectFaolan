@@ -2060,7 +2060,11 @@ namespace Faolan.GameServer
 									? await Database.GetItem(equipHandle)
 									: null;
 								if (equipHandle != 0)
+								{
 									await _equipment.PersistEquip(client, targetSlot, equipHandle, (int)from);
+									// What is WORN changed, so the live gear aggregate is stale - see RefreshGearBonuses.
+									await RefreshGearBonuses(client);
+								}
 
 								// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
 								// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
@@ -2082,6 +2086,7 @@ namespace Faolan.GameServer
 								// Unequip is identified by the source equip slot (the trailing handle is 0);
 								// `target` is the bag cell the item lands in.
 								await _equipment.PersistUnequip(client, fromSlot, (int)target);
+								await RefreshGearBonuses(client);
 
 								// Retail's reply: the behavior ack with null identity + a 0x201C entry
 								// (prefix 0x68, state 0). Capture frames 320-321.
