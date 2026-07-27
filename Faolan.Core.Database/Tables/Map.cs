@@ -77,7 +77,22 @@ namespace Faolan.Core.Database.Tables
 		// four trailing words PlayfieldFIIR's own reader takes (FUN_008f36e0 -> obj+0x88), the one before the flags.
 		public uint PlayfieldFieldA { get; set; } // PlayfieldProxy u32[2] (0 on most maps, 2 on 2040/4022/5007)
 		public uint PlayfieldCount { get; set; } = 2; // the PlayfieldProxy "count" word (beach 2, Old Tarantia 1)
-		public uint PlayfieldFieldB { get; set; } = 3; // trailer word before the FFFF pair (beach 0x3, Old Tarantia 0x0)
+		// ⚠️ SUSPECT - unlike its neighbours this is almost certainly NOT a map property, so do not source new values
+		// for it and do not trust the ones here (#451). The corpus says a per-map value cannot be right: across the 151
+		// captured MapChange records fieldB takes 0/1/2/3, and **10 of the 12 captured maps carry more than one of
+		// them** - map 4010 alone shows all four (0 x27, 3 x8, 2 x8, 1 x4). The two that look constant (4000, 4022)
+		// just have the fewest samples. That is the exact opposite of the test that identified FieldA/FieldC as
+		// playfield properties, where every record for a given map agreed.
+		//
+		// It is not an obvious sequence either: of the 39 captures carrying more than one MapChange, ordering them by
+		// frame gives 0,1,2,… in exactly ONE - captures begin at 2 or 3, repeat a value, and go 3 -> 0 - so a
+		// per-session counter is ruled out too. Every one of the 151 is s2c, so direction does not explain it.
+		// Undecoded; it is per-ENTRY state of some kind, and this column is the wrong shape for it.
+		//
+		// Left in place because it is what we send and changing it is a live wire change on the map-change path; 529
+		// of the 530 rows carry the default 3 (Old Tarantia is 0), so today it is effectively still the constant it
+		// was before it became a column.
+		public uint PlayfieldFieldB { get; set; } = 3; // trailer word before the FFFF pair - see the warning above
 		public uint PlayfieldFieldC { get; set; } = 7; // the word before the flags (7 on most maps, 0 on 1010/2010/2040/5007, 6 on 11040)
 		public uint PlayfieldFlags { get; set; } // the final PlayfieldFIIR flag word (beach 0, Old Tarantia 1 - the mount-rule bit)
 
