@@ -2,6 +2,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
 	public sealed class PfAccessWindowChildDetail
 	{
+		// 0 in all 43 catalog details - see the note on PfAccessWindowEntry (Gitea #464).
 		public byte DetailUnknown { get; init; }
 		public byte DetailsMode { get; init; }
 

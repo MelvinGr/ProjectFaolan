@@ -24,7 +24,7 @@ Wireshark without the JSON dump + Python dissector pipeline.
   `op=0x0a0a` bug, #108).
 - **Method names**: the (receiver class, opcode) pair resolves to its recovered method name
   (`faolan.pkt.method`, e.g. `GameCharAgent TryLootItem`) via tables **generated at build
-  time from the server's curated C# catalogs** (`Faolan.Core.Network/Constants/Opcodes.cs`,
+  time from the server's curated C# catalogs** (`Faolan.Core/Enums/Opcodes.cs`,
   `scripts/gen_opcode_names.py`) - the plugin never drifts from what the server calls a
   method. PlayerAgent/PlayerInterface (32-bit hash dispatch, not `0x2000 + index`) only
   resolve their behavior-verified subset; everything else falls back to raw hex.

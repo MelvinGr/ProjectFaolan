@@ -17,7 +17,7 @@ pkg_check_modules(WIRESHARK REQUIRED IMPORTED_TARGET wireshark)
 
 # Per-RPC-class method-name tables, generated from the server's curated C# opcode enums
 # (single source of truth - regenerated whenever Opcodes.cs changes).
-set(FAOLAN_OPCODES_CS "${CMAKE_CURRENT_SOURCE_DIR}/../Faolan.Core.Network/Constants/Opcodes.cs")
+set(FAOLAN_OPCODES_CS "${CMAKE_CURRENT_SOURCE_DIR}/../Faolan.Core/Enums/Opcodes.cs")
 set(FAOLAN_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 set(FAOLAN_OPCODE_NAMES_H "${FAOLAN_GENERATED_DIR}/faolan_opcode_names.h")
 

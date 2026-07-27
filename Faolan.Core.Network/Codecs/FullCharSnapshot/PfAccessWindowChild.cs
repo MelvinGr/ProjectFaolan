@@ -12,6 +12,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public uint? Id { get; init; }
 
+		// 0 in all 13 catalog children that carry it - see the note on PfAccessWindowEntry (Gitea #464).
 		public uint? Unknown { get; init; }
 
 		public override string ToString()
