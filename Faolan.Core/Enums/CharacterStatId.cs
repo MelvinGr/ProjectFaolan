@@ -433,6 +433,16 @@ namespace Faolan.Core.Enums
 				// its ranged twin: same LDB 615 family, adjacent id, and the same feat trees carry both.
 				CharacterStatId.WeaponDamageMelee or CharacterStatId.WeaponDamageRanged => 100,
 
+				// The CHANCE percents, measured the same way (2026-07-27): `.setstat 254 10000` moved the sheet's Evade
+				// Chance from 100.0% to 200.0%, and `.setstat 1071 10000` moved Offhand Attack Chance from 0.0% to
+				// 100.0% - 10000 wire == 100.00 percentage points in both.
+				//
+				// ⚠️ A chance is NOT the rating that sits in the same sheet row. `Hit Bonus Chance` renders a Rating
+				// column of 10000 (x1, stat 310) beside an Effect of 2000.0%, which is a derived combat formula, not a
+				// unit conversion. Rating stats and chance stats are different ids with different scales; read the
+				// Rating/Score/Value column for a scale and never the Effect column.
+				CharacterStatId.EvadeChance or CharacterStatId.ChanceOfOffhandAttack => 100,
+
 				// Attributes: proven on a freshly created Necromancer's sheet (2026-07-27) - a 10-wire class base
 				// renders as 1. Ferocity is the sixth attribute and shares their scale: `.setstat 1403 10000` draws as
 				// 1000 on the General tab.
@@ -442,8 +452,14 @@ namespace Faolan.Core.Enums
 				// MEASURED x1 (`.setstat <id> 10000`, 2026-07-27, read off the character sheet): 448 Armor drew 10002
 				// = 10000 + its base of 2; 310 Hit Bonus Chance and 711 Critical Bonus Damage drew 10000 in the Rating
 				// column (their "Effect" percent is a derived game formula, not a scale); 451 Protection drew 10000 and
-				// feeds all five schools off the one stat. They land on the default below - listed here so they read as
-				// measured rather than assumed.
+				// feeds all five schools off the one stat; 875 Combat Rating drew 10003 as the sheet's "Combat Damage
+				// Increase". They land on the default below - listed here so they read as measured rather than assumed.
+				//
+				// ⚠️ Still UNMEASURED, because the sheet does not render them for a level-1 Conqueror: 920 Attack
+				// Rating, 922 Defense Rating, 923 Magic Rating, 925 Magical Resist, 974 Damage Deflection, 1037
+				// Knockback Resistance, 156 Chance of Being Staggered, 252 Miss Chance, 535 Healing Efficiency, 861
+				// Magic Damage. Probing them needs a surface that shows them - an item/feat tooltip carrying the stat,
+				// or a character that has one.
 				_ => 1
 			};
 		}

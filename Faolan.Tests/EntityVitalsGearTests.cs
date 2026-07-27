@@ -88,6 +88,8 @@ namespace Faolan.Tests
 		[InlineData(CharacterStatId.Strength, 10u)]
 		[InlineData(CharacterStatId.Dexterity, 10u)]
 		[InlineData(CharacterStatId.Ferocity, 10u)]
+		[InlineData(CharacterStatId.EvadeChance, 100u)]
+		[InlineData(CharacterStatId.ChanceOfOffhandAttack, 100u)]
 		public void GetScale_KeepsTheInClientProvenScales(CharacterStatId stat, uint expected)
 		{
 			Assert.Equal(expected, stat.GetScale());
