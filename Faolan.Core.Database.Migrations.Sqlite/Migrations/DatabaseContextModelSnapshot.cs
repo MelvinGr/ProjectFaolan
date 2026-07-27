@@ -1267,6 +1267,43 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Feat", b =>
+                {
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BaseName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint>("Flags")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Group")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Rank")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("TemplateCategory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Tree")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Feats");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.Guild", b =>
                 {
                     b.Property<uint>("Id")

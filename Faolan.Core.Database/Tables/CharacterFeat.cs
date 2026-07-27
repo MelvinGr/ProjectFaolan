@@ -21,6 +21,13 @@ namespace Faolan.Core.Database.Tables
 		public virtual Character Character { get; set; } = null!;
 
 		// The composite feat id.
+		//
+		// ⚠️ NO foreign key to Feat, deliberately: this id space and the RDB catalog's are DISJOINT. Measured against
+		// the imported catalog (#251) - 0 of the 56 captured CharacterFeat ids exist in Feats, and neither FeatId/100
+		// (the base*100+rank hypothesis) nor FeatId/10 bridges them. A FK here would reject every captured character.
+		// The catalog id space IS the one the rest of the client data uses - 45 of the 482 Combo.FeatId values resolve
+		// into Feats - so the missing piece is the mapping from the wire's unlocked-feat ids to catalog ids, not the
+		// catalog. Add the FK when that mapping exists, not before.
 		public uint FeatId { get; set; }
 
 		// Wire position within the pre-IIR feat list. Unlike the ascending skill scaffold, the feat list is in

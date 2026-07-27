@@ -28,7 +28,7 @@ namespace Faolan.Importer.Cli
 			new EllathaLevelsModule(), new EllathaCombosModule(), new WikiClassSpellsModule(), new WikiSpellLevelsModule(),
 			new StarterSpellLevelsModule(), // capture-sourced but runs late: overrides the ellatha/wiki levels
 			// --- rdb modules (opt-in, require --rdb) ---
-			new RdbInventoryModule(), new RdbMorphsModule(), new RdbAppearanceModule(), new RdbSpellsModule(), new RdbLdbNamesModule(), new RdbLdbAbilitiesModule(), new RdbAbilitiesModule(), new RdbCombosModule(),
+			new RdbInventoryModule(), new RdbMorphsModule(), new RdbAppearanceModule(), new RdbSpellsModule(), new RdbLdbNamesModule(), new RdbLdbAbilitiesModule(), new RdbAbilitiesModule(), new RdbCombosModule(), new RdbFeatsModule(),
 			new RdbMapsModule(), new RdbRespawnsModule(), new RdbItemsModule(), new RdbNpcSpawnsModule(), new ClassAttributeBaseModule()
 		];
 

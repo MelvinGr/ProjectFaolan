@@ -15,6 +15,7 @@ namespace Faolan.Core.Database
 		DatabaseFacade Database { get; } // from DbContext
 
 		DbSet<Ability> Abilities { get; }
+		DbSet<Feat> Feats { get; }
 		DbSet<Account> Accounts { get; }
 		DbSet<AccountClaim> AccountClaims { get; }
 		DbSet<AppearanceChoice> AppearanceChoices { get; }
@@ -96,6 +97,7 @@ namespace Faolan.Core.Database
 	public class DatabaseContext : DbContext, IDatabaseContext
 	{
 		public DbSet<Ability> Abilities { get; set; }
+		public DbSet<Feat> Feats { get; set; }
 		public DbSet<Account> Accounts { get; set; }
 		public DbSet<AccountClaim> AccountClaims { get; set; }
 		public DbSet<AppearanceChoice> AppearanceChoices { get; set; }
@@ -237,6 +239,7 @@ namespace Faolan.Core.Database
 			// Natural-key catalogs whose Id is an external id set by the importer (RDB/wire id), never DB-generated - so
 			// EF must not treat the integer PK as auto-increment (like Character/RespawnPoint/MorphTarget below).
 			modelBuilder.Entity<Ability>().Property(a => a.Id).ValueGeneratedNever();
+			modelBuilder.Entity<Feat>().Property(f => f.Id).ValueGeneratedNever(); // the RDB template id, the same id space the wire uses
 			modelBuilder.Entity<Spell>().Property(s => s.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Combo>().Property(c => c.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Item>().Property(i => i.Id).ValueGeneratedNever();
