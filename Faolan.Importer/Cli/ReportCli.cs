@@ -1430,36 +1430,6 @@ namespace Faolan.Importer.Cli
 		}
 
 
-		// The record's NAME: a u32-length-prefixed ASCII run. The fixed header is [magic][id][1000000][...u32 fields]
-		// and the name closes it - for the 96-byte form the length sits at offset 88 and the string ends the record
-		// exactly. Scanned u32-aligned rather than pinned to 88, because the header is longer on the other record
-		// shape (the field at offset 16 is 2 for the short form and 3 for the long one). Returns "" when nothing
-		// there parses as a name, so a wrong guess shows up as an empty column rather than as mojibake.
-		private static string FeatName(byte[] body)
-		{
-			for (var i = 8; i + 4 < body.Length; i += 4)
-			{
-				var len = BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(i));
-				if (len is < 2 or > 96 || i + 4 + len > body.Length)
-					continue;
-
-				var span = body.AsSpan(i + 4, (int)len);
-				var printable = true;
-				foreach (var b in span)
-				{
-					if (b is < 0x20 or > 0x7E)
-					{
-						printable = false;
-						break;
-					}
-				}
-
-				if (printable)
-					return Encoding.ASCII.GetString(span);
-			}
-
-			return "";
-		}
 
 		private static void RdbId(string rdbDir, string arg)
 		{
