@@ -124,6 +124,7 @@ namespace Faolan.Importer.Rdb
 						WireFeatId = wire,
 						TemplateId = template,
 						BaseIndex = baseIndex,
+						Rank = wire % 100, // 0-based; the other half of the split BaseIndex tops
 						RootFlag = rootFlag
 					});
 					mapRows++;

@@ -45,6 +45,17 @@ namespace Faolan.Core.Database.Tables
 		// not ours - if it ever diverges from the division, the division was the wrong model.
 		public uint BaseIndex { get; set; }
 
+		// The feat's RANK, from the wire id's low two digits (`WireFeatId % 100`) - the other half of the split
+		// BaseIndex is the top of. **0-BASED**: the first rank is 0, so "Corrupted Soul" ranks read 84100..84104 as
+		// ranks 0..4.
+		//
+		// ⚠️ This is NOT Feat.Rank, which is parsed from the NAME and is not trustworthy as a rank. The name's
+		// trailing number is a rank sometimes ("Thrown Weapons 5") and an INDEX other times ("Guardian Class Feat
+		// 011" parses as 11), so the two disagree on 2394 of the 2491 feats where both have a value, and the deltas
+		// scatter (+1 x1462, -1 x99, -5 x98, 0 x97, ...) rather than being a clean off-by-one. This one is the
+		// client's own encoding - its own loader computes featId/100 for the base - so prefer it.
+		public uint Rank { get; set; }
+
 		// True for an archetype/class/tree root - see RootFlag. A convenience over the raw word, not a column.
 		[NotMapped]
 		public bool IsRoot => RootFlag == RootFlagValue;

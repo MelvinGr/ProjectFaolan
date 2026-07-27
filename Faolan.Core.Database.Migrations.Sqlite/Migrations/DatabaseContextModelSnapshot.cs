@@ -1337,6 +1337,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("BaseIndex")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("Rank")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("RootFlag")
                         .HasColumnType("INTEGER");
 

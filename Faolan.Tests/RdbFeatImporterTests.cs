@@ -116,6 +116,11 @@ namespace Faolan.Tests
 			// is 1; 1800 "Barbarian" here is left 0 to prove the flag is read per-entry and not assumed.
 			Assert.Equal((100u, 7336u, 1u, 1u), map[0]);
 			Assert.Equal((1800u, 7353u, 18u, 0u), map[1]);
+
+			// The wire id splits into (BaseIndex, Rank) as base*100 + rank - the same split the client's own loader
+			// computes as its fallback. Both of these are rank 0, which is the FIRST rank, not "unranked".
+			Assert.Equal(0u, map[0].Wire % 100);
+			Assert.Equal(0u, map[1].Wire % 100);
 		}
 
 		// A blank slot must not become a 0 -> 0 row: the table is a lookup, and a zero key would collide.
