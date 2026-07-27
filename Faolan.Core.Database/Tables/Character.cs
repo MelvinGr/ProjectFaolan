@@ -149,9 +149,6 @@ namespace Faolan.Core.Database.Tables
 			return $"{base.ToString()}: {Name}";
 		}
 
-		//[NotMapped]
-		//public string LastConnectionRealmString => DateTimeOffset.FromUnixTimeSeconds(LastConnection).ToString("MM/dd/yyyy HH:mm:ss");
-
 		// Recomputes MaxStats from the current Class/Level. Updates the existing row in place when present (so EF
 		// keeps tracking the same row instead of orphaning/duplicating it) and creates it otherwise. Call when the
 		// class or level changes - e.g. once the create-editor commits the chosen class.

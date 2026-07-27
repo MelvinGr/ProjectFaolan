@@ -95,10 +95,9 @@ namespace Faolan.GameServer
 		// NOT clear it, so the warning is benign (our despawn body is byte-identical to retail's). Reverted to 0x58.
 		public static readonly ProtoEndpoint WorldSenderEndpoint = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
 
-		// Tortage Beach (0xFAA/4010) - the universal fallback world. Its burst is always seeded (the proven blob), so
-		// any character whose own map has no usable burst still enters a real, rendered world instead of a hand-built
-		// one. (There is no hand-built login/teleport path anymore.)
-		//private const uint DefaultWorldMapId = Map.TortageBeachId;
+		// (Tortage Beach, Map.TortageBeachId, is the universal fallback world - its burst is always seeded, so a
+		// character whose own map has no usable burst still enters a real rendered world. The world-entry path reads
+		// it directly; there is no hand-built login/teleport path anymore, so no constant here selects it.)
 
 		// Starter beach gear (StartingData.StartingMaleLegsItem / StartingWristItem / …) lives in
 		// Faolan.Core.Network/Constants/StartingData.cs.

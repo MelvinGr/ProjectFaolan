@@ -80,16 +80,6 @@ namespace Faolan.Core
 			return (T)Enum.ToObject(typeof(T), ReadByte());
 		}
 
-		/*public T ReadByte<T>() where T : IConvertible
-		{
-			if(typeof(T).IsEnum)
-				return (T)Enum.ToObject(typeof(T), ReadByte());
-			if(typeof(T) == typeof(bool))
-				return (T)(object)Convert.ToBoolean(ReadByte());
-
-			return (T)(object)ReadByte();
-		}*/
-
 		public float ReadFloat()
 		{
 			Span<byte> buffer = stackalloc byte[sizeof(float)];

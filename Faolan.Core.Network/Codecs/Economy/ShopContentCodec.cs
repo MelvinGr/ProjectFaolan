@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 using ProtoBuf;
@@ -97,7 +98,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 				{
 					InventoryId = new ProtoID32
 					{
-						Type = Shop.ContainerType,
+						Type = (uint)ContainerKind.Shop,
 						Instance = 0
 					},
 					MaxSize = MaxSize,

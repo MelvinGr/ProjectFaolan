@@ -15,9 +15,6 @@ namespace Faolan.Core.Database.Tables
 	[PrimaryKey(nameof(NpcTemplateId))]
 	public class Shop
 	{
-		// The shop container type inside the content's ProtoInventoryGame.inventory_id (the bag is 104).
-		public const uint ContainerType = 111; // TODO: Should just use the enum
-
 		// The vendor NPC TYPE this shop belongs to (the stable per-type key).
 		public uint NpcTemplateId { get; set; }
 

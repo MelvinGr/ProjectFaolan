@@ -702,7 +702,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.ToTable("CharacterInventory", t =>
                         {
-                            t.HasCheckConstraint("CK_CharacterInventory_Container", "Container IN (101, 104, 105, 112, 113, 115)");
+                            t.HasCheckConstraint("CK_CharacterInventory_Container", "Container IN (101, 104, 105, 111, 112, 113, 115)");
                         });
                 });
 
