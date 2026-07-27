@@ -19,14 +19,9 @@ namespace Faolan.Web.Content
 		public static Dictionary<string, string?>? Overrides(string[] args, out int exitCode)
 		{
 			var command = new RootCommand("Faolan CDN mirror - a store-and-forward mirror of Age of Conan's UPM content CDN.") { Store, Ip, Port };
-			var result = command.Parse(args);
-			if (result.Errors.Count > 0 || args.Length > 0 && (args[0] == "--help" || args[0] == "-h" || args[0] == "-?"))
-			{
-				exitCode = result.Invoke();
+			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
 				return null;
-			}
 
-			exitCode = 0;
 			return FaolanCommandLine.Overrides(result, Store, Ip, Port);
 		}
 	}

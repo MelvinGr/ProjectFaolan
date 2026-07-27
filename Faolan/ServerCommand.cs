@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.CommandLine;
-using System.Linq;
 using Faolan.Core.Cli;
 
 namespace Faolan
@@ -48,14 +47,9 @@ namespace Faolan
 			foreach (var option in ConfigOptions)
 				command.Options.Add(option);
 
-			var result = command.Parse(args);
-			if (result.Errors.Count > 0 || args.Contains("--help") || args.Contains("-h") || args.Contains("-?"))
-			{
-				exitCode = result.Invoke();
+			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
 				return null;
-			}
 
-			exitCode = 0;
 			return new ServerOptions(result.GetValue(Role) ?? [], FaolanCommandLine.Overrides(result, ConfigOptions));
 		}
 	}

@@ -459,7 +459,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return false;
 		}
 
-		private static int IndexOfAscii(byte[] data, string text, int startOffset = 0) // TODO: Convert to extension on byte[]
+		// Stays a private helper rather than a byte[] extension: it has exactly one caller (the PFAccessWindow_ anchor
+		// below) and no duplicate anywhere in the tree, so promoting it would widen the surface for no reader.
+		private static int IndexOfAscii(byte[] data, string text, int startOffset = 0)
 		{
 			var pattern = Encoding.Latin1.GetBytes(text);
 

@@ -32,14 +32,9 @@ namespace Faolan.Web
 			foreach (var hostOption in new[] { "urls", "environment", "contentRoot", "applicationName" })
 				command.Options.Add(new Option<string>($"--{hostOption}") { Description = $"ASP.NET host setting ({hostOption})." });
 
-			var result = command.Parse(args);
-			if (result.Errors.Count > 0 || args.Length > 0 && args[0] is "--help" or "-h" or "-?")
-			{
-				exitCode = result.Invoke();
+			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
 				return null;
-			}
 
-			exitCode = 0;
 			return FaolanCommandLine.Overrides(result, Options);
 		}
 	}

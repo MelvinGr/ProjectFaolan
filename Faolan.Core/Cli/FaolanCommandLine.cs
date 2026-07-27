@@ -25,6 +25,23 @@ namespace Faolan.Core.Cli
 			return new Option<string>($"--{key}") { Description = description };
 		}
 
+		// Parses argv against `command`, in the one way every executable here does it: a parse error or `--help` is
+		// handled BY THE PARSER (it prints, and `exitCode` is what the process should return) and this returns null;
+		// otherwise the caller reads its values off the result. Nothing is invoked on the success path - these commands
+		// carry no actions, the Main that owns them is the action.
+		public static ParseResult? Parse(Command command, string[] args, out int exitCode)
+		{
+			var result = command.Parse(args);
+			if (result.Errors.Count > 0 || args.Any(a => a is "--help" or "-h" or "-?"))
+			{
+				exitCode = result.Invoke();
+				return null;
+			}
+
+			exitCode = 0;
+			return result;
+		}
+
 		// The values of those options, as a configuration override layer. An option the user did not pass is absent
 		// rather than null, so it cannot shadow faolan.json with nothing.
 		public static Dictionary<string, string?> Overrides(ParseResult result, params Option<string>[] options)

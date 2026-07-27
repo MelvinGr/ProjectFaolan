@@ -19,19 +19,11 @@ namespace Faolan.Core.Network.Codecs.World
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.CoreClaimIIR;
 
-		// TODO: Convert these to enum
-		// Sub-opcodes carried in the u16 after the endpoint (method indices within the InventoryClaims IIR).
-		public const ushort SubList = 0x0001; // s2c: the claim list (this codec)
-		public const ushort SubNewClaims = 0x0009; // s2c: "you have new claims" glow (CoreClaimCodec.Build)
-		public const ushort SubRedeem = 0x0003; // c2s: redeem the 1-based claim index
-		public const ushort SubRedeemAck = 0x0005; // s2c: multi-charge redeem ack (one entry, decremented amount)
-		public const ushort SubRequest = 0x0007; // c2s: "send me my claims"
-
 		private const int EntrySize = 106;
 
 		public static byte[] Build(uint handle, IReadOnlyList<ClaimEntry> claims)
 		{
-			var stream = new FaolanStream().WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteUInt16(SubList).WriteUInt32(claims.Count);
+			var stream = new FaolanStream().WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteUInt16(CoreClaimSubOpcode.List).WriteUInt32(claims.Count);
 
 			foreach (var claim in claims)
 				WriteEntry(stream, claim);
@@ -43,18 +35,18 @@ namespace Faolan.Core.Network.Codecs.World
 		// button. Body = [opcode][Character][handle][u16 sub], no payload. Retail sends it at world entry ONLY when
 		// the account has unseen claims: present in the Faolanx login capture (new claims), absent in the NecroL80
 		// login_redeem-claim capture (already seen), so it is gated on an IsNew flag rather than pushed
-		// unconditionally. (Was a separate one-method CoreClaimCodec that already borrowed SubNewClaims from here -
+		// unconditionally. (Was a separate one-method CoreClaimCodec that already borrowed CoreClaimSubOpcode.NewClaims from here -
 		// one opcode, one codec.) See docs/subsystems/item-claims.md.
 		public static byte[] BuildNewClaimsGlow(uint handle)
 		{
-			return new FaolanStream().WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteUInt16(SubNewClaims).ToArray();
+			return new FaolanStream().WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteUInt16(CoreClaimSubOpcode.NewClaims).ToArray();
 		}
 
 		// The sub-0x05 redeem ack for a multi-charge claim: a single entry echoing the row with its decremented
 		// remaining amount (the client refreshes that row in place). Byte-exact against frames 396/540.
 		public static byte[] BuildRedeemAck(uint handle, ClaimEntry claim)
 		{
-			var stream = new FaolanStream().WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteUInt16(SubRedeemAck);
+			var stream = new FaolanStream().WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteUInt16(CoreClaimSubOpcode.RedeemAck);
 
 			WriteEntry(stream, claim);
 			return stream.ToArray();
@@ -76,7 +68,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 			stream.ReadUInt32(); // EntityClass.Character
 			handle = stream.ReadUInt32();
-			if (stream.ReadUInt16() != SubList)
+			if (stream.ReadUInt16() != (ushort)CoreClaimSubOpcode.List)
 				return false;
 
 			var count = stream.ReadUInt32();

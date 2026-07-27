@@ -108,21 +108,21 @@ namespace Faolan.GameServer.Economy
 		{
 			_ = body.ReadUInt32(); // receiver class (0xC350 Character)
 			_ = body.ReadUInt32(); // receiver instance (the player's handle)
-			var sub = body.ReadUInt16();
+			var sub = (CoreClaimSubOpcode)body.ReadUInt16();
 
 			switch (sub)
 			{
-				case CoreClaimListCodec.SubRequest: // 0x0007 - "send me my claims"
+				case CoreClaimSubOpcode.Request:
 					await SendClaimList(client);
 					break;
 
-				case CoreClaimListCodec.SubRedeem: // 0x0003 - redeem the 1-based claim index
+				case CoreClaimSubOpcode.Redeem:
 					var index = body.ReadUInt32();
 					await RedeemClaim(client, index);
 					break;
 
 				default:
-					_logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", sub, body.Length);
+					_logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", (ushort)sub, body.Length);
 					break;
 			}
 		}

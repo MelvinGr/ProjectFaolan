@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.CommandLine;
-using System.Linq;
 using Faolan.Core.Cli;
 
 namespace Faolan.Importer.Cli
@@ -56,14 +55,9 @@ namespace Faolan.Importer.Cli
 				Report, ReportArg, Out, Skeleton, TerrainOut, DumpMesh, DumpTemplates, RdbProxy
 			};
 
-			var result = command.Parse(args);
-			if (result.Errors.Count > 0 || args.Contains("--help") || args.Contains("-h") || args.Contains("-?"))
-			{
-				exitCode = result.Invoke();
+			if (FaolanCommandLine.Parse(command, args, out exitCode) is not { } result)
 				return null;
-			}
 
-			exitCode = 0;
 			return new ImporterOptions(
 				result.GetValue(Captures), result.GetValue(Only), result.GetValue(Skip), result.GetValue(Mode),
 				result.GetValue(DryRun), result.GetValue(Force), result.GetValue(List),
