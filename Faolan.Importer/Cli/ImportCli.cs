@@ -111,7 +111,7 @@ namespace Faolan.Importer.Cli
 
 			Console.WriteLine($"Faolan.Importer: {provider} [{connection}]  captures={capturesPath ?? "(none - no module needs them)"}  rdb={rdbDir ?? "(none)"}");
 			var captures = capturesPath != null
-				? LoadCaptures(capturesPath)
+				? NamedCapture.LoadAll(capturesPath)
 				: [];
 
 			// Raw packet bytes across every capture PLUS the loose *.bin files (the `itemPackets` source).
@@ -157,20 +157,6 @@ namespace Faolan.Importer.Cli
 			};
 
 			return await ImportRunner.RunAsync(ctx, plan);
-		}
-
-		private static List<NamedCapture> LoadCaptures(string capturesDir)
-		{
-			var captures = new List<NamedCapture>();
-			foreach (var ts in Directory.EnumerateFiles(capturesDir, "*.tshark.json"))
-			{
-				var name = Path.GetFileName(ts);
-				if (name.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase))
-					name = name[..^".tshark.json".Length];
-				captures.Add(new NamedCapture(name, TsharkCaptureReader.Read(ts)));
-			}
-
-			return captures;
 		}
 
 		// --mode upsert | insert | overwrite, with optional per-module overrides:

@@ -80,55 +80,55 @@ namespace Faolan.Importer.Cli
 
 				case "conversation-states":
 				{
-					ConversationStates(LoadCaptures(capturesDir));
+					ConversationStates(NamedCapture.LoadAll(capturesDir));
 					return 0;
 				}
 
 				case "coverage":
 				{
-					await Coverage(LoadCaptures(capturesDir), arg, RdbDir());
+					await Coverage(NamedCapture.LoadAll(capturesDir), arg, RdbDir());
 					return 0;
 				}
 
 				case "anim":
 				{
-					Anim(LoadCaptures(capturesDir), arg ?? "Casilda");
+					Anim(NamedCapture.LoadAll(capturesDir), arg ?? "Casilda");
 					return 0;
 				}
 
 				case "equip":
 				{
-					Equip(LoadCaptures(capturesDir), arg ?? "Casilda");
+					Equip(NamedCapture.LoadAll(capturesDir), arg ?? "Casilda");
 					return 0;
 				}
 
 				case "snapshot":
 				{
-					SnapshotScan(LoadCaptures(capturesDir));
+					SnapshotScan(NamedCapture.LoadAll(capturesDir));
 					return 0;
 				}
 
 				case "mapchange":
 				{
-					MapChangeScan(LoadCaptures(capturesDir));
+					MapChangeScan(NamedCapture.LoadAll(capturesDir));
 					return 0;
 				}
 
 				case "opcodes":
 				{
-					OpcodeScan(LoadCaptures(capturesDir));
+					OpcodeScan(NamedCapture.LoadAll(capturesDir));
 					return 0;
 				}
 
 				case "opcodes-csv":
 				{
-					OpcodeCsv(LoadCaptures(capturesDir));
+					OpcodeCsv(NamedCapture.LoadAll(capturesDir));
 					return 0;
 				}
 
 				case "subopcodes-csv":
 				{
-					SubOpcodeCsv(LoadCaptures(capturesDir), arg);
+					SubOpcodeCsv(NamedCapture.LoadAll(capturesDir), arg);
 					return 0;
 				}
 
@@ -948,20 +948,6 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"wrote {path}");
 		}
 
-		private static List<NamedCapture> LoadCaptures(string capturesDir)
-		{
-			var captures = new List<NamedCapture>();
-			foreach (var ts in Directory.EnumerateFiles(capturesDir, "*.tshark.json"))
-			{
-				var name = Path.GetFileName(ts);
-				if (name.EndsWith(".tshark.json", StringComparison.OrdinalIgnoreCase))
-					name = name[..^".tshark.json".Length];
-				captures.Add(new NamedCapture(name, TsharkCaptureReader.Read(ts)));
-			}
-
-			return captures;
-		}
-
 		// One 0x5D85BFC7 MapChange body per distinct map across the captures, so the map-build constants can be diffed
 		// against BuildMapChange's hardcoded (beach) values - to see whether they're per-map or universal.
 		private static void MapChangeScan(IReadOnlyList<NamedCapture> captures)
@@ -1504,31 +1490,6 @@ namespace Faolan.Importer.Cli
 			return string.Join(" ", mods.Select(x => $"{(CharacterStatId)x.StatId}={x.WireAmount}"));
 		}
 
-		// Printable ASCII runs of 4+ chars in a blob - the item name is one of them.
-		private static IEnumerable<string> AsciiRuns(byte[] blob)
-		{
-			var sb = new StringBuilder();
-			foreach (var b in blob)
-			{
-				if (b is >= 32 and < 127)
-				{
-					sb.Append((char)b);
-					continue;
-				}
-
-				if (sb.Length >= 4)
-					yield return sb.ToString();
-
-				sb.Clear();
-			}
-
-			if (sb.Length >= 4)
-				yield return sb.ToString();
-		}
-
-		[GeneratedRegex(@"^(.+?) Class Feat \d+$")]
-		private static partial Regex ClassFeatName();
-
 		private static void RdbClassVitals(string rdbDir, string? filter)
 		{
 			const uint tableType = 1000511;
@@ -1644,7 +1605,7 @@ namespace Faolan.Importer.Cli
 				};
 				foreach (var f in fields)
 				{
-					cells.Add(TryReadTemplateField(body, f, out var v)
+					cells.Add(RdbItemImporter.TryReadPropertyField(body, f, out var v)
 						? v.ToString()
 						: "");
 				}
@@ -1664,54 +1625,6 @@ namespace Faolan.Importer.Cli
 			File.WriteAllLines(path, rows);
 			Console.WriteLine($"item-stat-scaling: {scanned} templates decrypted ({withRegion} with explicit records, {scanned - withRegion} template-scaled), {noEntry} without a readable/decryptable entry, {failed} too short.");
 			Console.WriteLine($"wrote {path} ({rows.Count - 1} rows)");
-		}
-
-		// The strictly-decreasing [fieldId][value] property table, same parse as RdbItemImporter.TryReadPropertyField
-		// (kept local so the report stays read-only and independent of the importer's internals).
-		private static bool TryReadTemplateField(ReadOnlySpan<byte> body, uint fieldId, out uint value)
-		{
-			value = 0;
-			var words = body.Length / 4;
-			var bestLen = 0;
-			var bestValue = 0u;
-			var bestFound = false;
-			for (var start = 0; start + 1 < words; start++)
-			{
-				uint last = 0;
-				var haveLast = false;
-				var len = 0;
-				var found = false;
-				var fv = 0u;
-				for (var j = start; j + 1 < words; j++)
-				{
-					var fid = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice(j * 4, 4));
-					if (fid == 0 || fid > 2000 || (haveLast && fid >= last))
-						break;
-
-					var val = BinaryPrimitives.ReadUInt32LittleEndian(body.Slice((j + 1) * 4, 4));
-					if (fid == fieldId)
-					{
-						found = true;
-						fv = val;
-					}
-
-					last = fid;
-					haveLast = true;
-					len++;
-					j++; // consumed the value word too
-				}
-
-				if (len > bestLen)
-				{
-					bestLen = len;
-					bestFound = found;
-					bestValue = fv;
-				}
-			}
-
-			if (bestFound)
-				value = bestValue;
-			return bestFound;
 		}
 
 		// type -> (entry count, local count) histogram of the whole RDB index, to spot candidate record families.

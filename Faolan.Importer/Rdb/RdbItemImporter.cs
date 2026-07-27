@@ -391,7 +391,13 @@ namespace Faolan.Importer.Rdb
 		// 12-byte RDB-Id header). The property table is the longest run of [fieldId u32][value u32] LE pairs with
 		// strictly-decreasing fieldId in (0, 2000] - the same grammar tools/capture/decode_item_template.py validated.
 		// Returns false when no such run contains the field (some template kinds don't carry it).
-		private static bool TryReadPropertyField(ReadOnlySpan<byte> body, uint fieldId, out uint value)
+		//
+		// `internal` because the item-stat-scaling report needs the SAME parse. ReportCli used to carry a
+		// byte-identical private copy called TryReadTemplateField, justified as "kept local so the report stays
+		// read-only and independent of the importer's internals" - but this is a pure parse over a span, so sharing
+		// it neither writes anything nor exposes importer state. Two copies of a grammar this fiddly (a
+		// strictly-decreasing run, not a fixed offset) is how a report quietly stops agreeing with the importer.
+		internal static bool TryReadPropertyField(ReadOnlySpan<byte> body, uint fieldId, out uint value)
 		{
 			value = 0;
 			var words = body.Length / 4;

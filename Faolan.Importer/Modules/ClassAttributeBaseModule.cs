@@ -254,6 +254,9 @@ namespace Faolan.Importer.Modules
 		[GeneratedRegex(@"^(.+?) Class Feat (\d+)")]
 		private static partial Regex ClassFeatName();
 
+		// Printable ASCII runs of 4+ chars in a blob - the class-feat name is one of them. Stays private: ReportCli
+		// had a byte-identical copy, but it was DEAD (left behind when this scan moved out of the CLI into this
+		// module), so deleting it leaves one caller - and a single-use helper belongs next to its caller.
 		private static IEnumerable<string> AsciiRuns(byte[] blob)
 		{
 			var sb = new StringBuilder();
