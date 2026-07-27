@@ -44,6 +44,60 @@ namespace Faolan.Core.Database.Tables
 			return (Health, hpBase, Mana, manaBase, Stamina, staminaBase);
 		}
 
+		// Retail's CLASS BASE for the three pools at `level`, in WIRE hundredths - the exact value retail puts in
+		// stat 0x0001 / 0x01F9 / 0x01FB. Sourced from the client's own `HitsManaAndStamina_c` table (RDB 1000511,
+		// `--report rdb-class-vitals`), whose 95 records are 5 races x 19 class slots carrying 14 x i32; the six
+		// words below are `[2..4]` (base, hundredths) and `[5..7]` (growth, thousandths) of a class's record. The
+		// growth divides by 10 because it is stored one decimal finer than the base.
+		//
+		//   base(level) = baseWord + growthWord * (level - 1) / 10
+		//
+		// VERIFIED, not fitted: it reproduces the max in all 16 captured retail level-up pushes (the 0x96B8DC59 that
+		// follows a NewLevelIIR) exactly, across 6 classes and levels 2-5, including Guardian's non-integral stamina
+		// (172.5 + 25.3 = 197.8 -> the captured 19780). See docs/rdb/client-data-tables.md.
+		//
+		// ⚠️ THIS IS NOT THE DISPLAYED MAX, and wiring it as one would LOWER every character's ceiling. Retail
+		// routinely sends a base below the current in the same packet (#450); the client tops it up from gear, feats
+		// and attributes, and an L23 Assassin whose sheet reads 1270 has a class base of 772. The remaining term is
+		// tracked in #450/#3 - this is the first of its three sources, not the whole sum.
+		public static (uint Health, uint Mana, uint Stamina) ClassBaseHundredths(ConanClass @class, ushort level)
+		{
+			var (hp, hpGrow, mana, manaGrow, stamina, staminaGrow) = ClassBaseCurve(@class);
+			var steps = (level == 0
+				? 1
+				: level) - 1;
+			return (At(hp, hpGrow), At(mana, manaGrow), At(stamina, staminaGrow));
+
+			uint At(int b, int grow)
+			{
+				return b == 0
+					? 0u
+					: (uint)(b + grow * steps / 10);
+			}
+		}
+
+		// RDB 1000511's six vitals words per class: (health, healthGrowth, mana, manaGrowth, stamina, staminaGrowth).
+		// A 0 base means the class does not have that pool (the client hides the bar). These are the table's own
+		// integers - the base in hundredths, the growth in thousandths - copied rather than computed so the numbers
+		// can be diffed against a fresh `--report rdb-class-vitals` run.
+		private static (int Health, int HealthGrowth, int Mana, int ManaGrowth, int Stamina, int StaminaGrowth) ClassBaseCurve(ConanClass @class)
+		{
+			return @class switch
+			{
+				ConanClass.Guardian => (12000, 40000, 0, 0, 17250, 25300),
+				ConanClass.Conqueror => (16000, 36000, 0, 0, 17200, 25000),
+				ConanClass.DarkTemplar => (12000, 37000, 27500, 15000, 17200, 25000),
+				ConanClass.Assassin => (9000, 31000, 0, 0, 23000, 23000),
+				ConanClass.Barbarian => (11000, 37000, 0, 0, 17200, 28000),
+				ConanClass.Ranger => (12000, 26000, 0, 0, 20700, 28000),
+				ConanClass.PriestOfMitra or ConanClass.TempestOfSet => (8000, 10000, 16500, 28000, 0, 0),
+				ConanClass.BearShaman => (10000, 20000, 16500, 26000, 17200, 17000),
+				ConanClass.HeraldOfXotli => (8000, 33000, 24000, 30000, 11500, 13000),
+				ConanClass.Necromancer or ConanClass.Demonologist => (8000, 29000, 24000, 30000, 0, 0),
+				_ => (9000, 31000, 0, 0, 17200, 25000)
+			};
+		}
+
 		// Class/level vitals. The LEVEL-1 values are anchored to the retail character sheet (read off the live
 		// client 2026-06-17, cross-checked against the world-entry FullChar snapshot stat block - see
 		// #242): all 12 classes are now retail-anchored at L1 -

@@ -113,8 +113,58 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 String-bearing tables are **variable-width** - 1000517 (7 entries, 137 B), 1000518 (38 entries, 1145 B) and
 1000626 (9921 B) do not divide evenly, so they cannot be walked by stride.
 
-Only 1000513 of the above is decoded past its shape; the rest are counts and strides only. Open work is tracked
-in Gitea #469.
+Only 1000511 and 1000513 of the above are decoded past their shape; the rest are counts and strides only. Open
+work is tracked in Gitea #469.
+
+## 1000511 `HitsManaAndStamina_c` — the class BASE vitals curve
+
+95 records of 14 × i32 (5 races × 19 class slots), 20-byte header with the count in the FIFTH word. Words `[0]`
+and `[1]` are the race and the class; `[2..4]` are the health/mana/stamina **base** in hundredths and `[5..7]`
+their **growth** in thousandths. The remaining six (`8000,3000,3000,2000,2000,2000` and its zeroed variants) are
+constant per pool-set and undecoded. Dump it with `--report rdb-class-vitals`.
+
+```
+base(level) = baseWord + growthWord * (level - 1) / 10
+```
+
+The `/10` is because growth is stored one decimal finer than the base. The result is already in the wire's ×100
+units, so it is the value that goes on the wire unscaled.
+
+**This is retail's own number, verified rather than fitted.** It reproduces the max in **all 16** captured retail
+level-up pushes — the `0x96B8DC59` stat block that follows a `NewLevelIIR` — exactly, across six classes and
+levels 2–5, including the Guardian's non-integral stamina (`172.5 + 25.3 = 197.8` → the captured `19780`).
+[V3: ClassBaseVitalsCurveTests.ClassBase_ReproducesTheCapturedRetailLevelUpPush]
+
+| class | health | /level | mana | /level | stamina | /level |
+|---|---|---|---|---|---|---|
+| Guardian | 120 | 40 | — | — | 172.5 | 25.3 |
+| Conqueror | 160 | 36 | — | — | 172 | 25 |
+| Dark Templar | 120 | 37 | 275 | 15 | 172 | 25 |
+| Assassin | 90 | 31 | — | — | 230 | 23 |
+| Barbarian | 110 | 37 | — | — | 172 | 28 |
+| Ranger | 120 | 26 | — | — | 207 | 28 |
+| Priest of Mitra | 80 | 10 | 165 | 28 | — | — |
+| Tempest of Set | 80 | 10 | 165 | 28 | — | — |
+| Bear Shaman | 100 | 20 | 165 | 26 | 172 | 17 |
+| Herald of Xotli | 80 | 33 | 240 | 30 | 115 | 13 |
+| Necromancer | 80 | 29 | 240 | 30 | — | — |
+| Demonologist | 80 | 29 | 240 | 30 | — | — |
+
+An em dash is a pool the class does not have — the base is a literal 0 and the client hides that bar.
+
+The table is keyed by (race, class) and is race-INVARIANT with one exception: race 4's Guardian carries a health
+growth of **59** where every other race carries 40. Nothing else differs across the five races.
+
+⚠️ **The base is NOT the displayed maximum.** Retail routinely sends a base *below* the current in the same
+packet, and the client tops it up from gear, feats and attributes: an L23 Assassin whose character sheet reads
+1270 health has a class base of 772. So this curve is one of three terms, not the whole sum, and swapping it in
+as the max would LOWER every character's ceiling. `CharacterMaxStats.ClassBaseHundredths` exposes it and says so;
+open work on the remaining terms is tracked in Gitea #450 / #3.
+
+Independent corroboration that this word IS the same quantity our snapshot has always carried as the "HP base"
+slot: all twelve of `CharacterMaxStats`'s hand-anchored `hpBaseL1` values, read off retail login snapshots long
+before this table was decoded, equal this table's health base exactly. The mana and stamina bases sit 6 below the
+sheet's displayed value for every class.
 
 ## 1000513 `RDBComboLookup_c` — the combo damage/stamina curve
 
