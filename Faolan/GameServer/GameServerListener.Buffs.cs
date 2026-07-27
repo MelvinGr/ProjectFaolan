@@ -544,12 +544,6 @@ namespace Faolan.GameServer
 			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, message);
 		}
 
-		// WorldIir.Send frames the body; the codecs return the bare record (PetIirCodec convention).
-		Task ISpellweaveOutbound.SendIir(INetworkClient client, byte[] record)
-		{
-			return WorldIir.Send(client, record);
-		}
-
 		Task ISpellweaveOutbound.SendSprintBar(INetworkClient client, uint energy)
 		{
 			return SendSprintBar(client, energy);

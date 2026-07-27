@@ -32,9 +32,6 @@ namespace Faolan.GameServer.Combat
 		// An on-screen system message to the caster.
 		Task SendFeedback(INetworkClient client, string message);
 
-		// Send a bare IIR record on the world-framed carrier (the framing is added for you).
-		Task SendIir(INetworkClient client, byte[] record);
-
 		// DispatchUpdateSprintbar (0x200E) - the yellow energy bar that drains during the trance.
 		Task SendSprintBar(INetworkClient client, uint energy);
 	}
