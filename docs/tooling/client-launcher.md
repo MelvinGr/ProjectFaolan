@@ -125,6 +125,10 @@ By default any password is accepted. To enforce the real password, the client mu
   `CURLE_UNSUPPORTED_PROTOCOL`; front https content with a plain-http proxy such as `Faolan.Web.Content`).
 - Server side: `Faolan.Core.Network/LoginEncryption.cs` decrypts the block and, for a patched client, enforces
   `password == Account.Password` (else falls back to accept-any). Set a real `Account.Password` to test rejection.
+- **`Login:AllowUnpatchedClients`** (server config, default `true`) decides whether that fallback exists at all.
+  Set it `false` and an unpatched client — one whose block the server cannot decrypt, so it proved only the
+  account name — is refused instead of accepted. That makes `--patch-login` mandatory for every client that
+  connects, so flip it only once your clients are patched.
 - **The launcher reads the same `faolan.json` (and the same environment) the server does**, so a deployment that
   overrides `Login:PrivateKey` gets the matching public key patched in by derivation — there is no second setting
   to keep in step. `Login:PublicKey` / `Login:RetailPublicKey` cover the two cases where the launcher's key is not

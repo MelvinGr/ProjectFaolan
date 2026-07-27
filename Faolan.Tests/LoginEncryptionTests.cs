@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
 using Faolan.ClientLauncher;
 using Faolan.Core.Crypt;
 using System.Text;
 using System.Globalization;
 using System.Numerics;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace Faolan.Tests
@@ -183,6 +186,30 @@ namespace Faolan.Tests
 			{
 				DhKeys.ConfigurePublic(null);
 			}
+		}
+
+		// Whether an UNPATCHED client (one whose block we cannot decrypt, so it proved only the account name) may log
+		// in is Login:AllowUnpatchedClients, read by UniverseAgentListener's AnswerChallenge handler.
+		//
+		// The polarity is the point, and it fails in opposite directions: unset must mean ALLOW, or a server that
+		// never configured this locks out every client the moment it upgrades; and only an explicit "false" may deny,
+		// or a typo'd value quietly turns the password check on and looks like a mass wrong-password outage.
+		[Theory]
+		[InlineData(null, true)] // unset: the historical accept-any behaviour
+		[InlineData("true", true)]
+		[InlineData("True", true)]
+		[InlineData("false", false)]
+		[InlineData("False", false)]
+		[InlineData("no", true)] // not a bool: allow, never a silent deny
+		[InlineData("0", true)]
+		[InlineData("", true)]
+		public void LoginAllowUnpatchedClients_DefaultsToAllowAndOnlyAnExplicitFalseDenies(string? configured, bool expected)
+		{
+			var config = new ConfigurationBuilder()
+				.AddInMemoryCollection([new KeyValuePair<string, string?>("Login:AllowUnpatchedClients", configured)])
+				.Build();
+
+			Assert.Equal(expected, config.LoginAllowUnpatchedClients);
 		}
 	}
 }

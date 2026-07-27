@@ -29,6 +29,14 @@ namespace Faolan.Core.Extensions
 			public uint AccountPremiumCharSlots => uint.TryParse(config["Account:PremiumCharSlots"], out var slots) ? slots : 10;
 			public uint AccountFreeCharSlots => uint.TryParse(config["Account:FreeCharSlots"], out var slots) ? slots : 4;
 
+			// Whether a client whose login block the server CANNOT decrypt may still log in. That block only decrypts
+			// for a client patched with our DH public key (Faolan.ClientLauncher --patch-login), so an unpatched retail
+			// client is authenticated on the account NAME alone - it never proves the password. Defaults to ON, the
+			// historical behaviour: turning password validation on must not lock out the clients that predate it.
+			// Turn it OFF (Login:AllowUnpatchedClients = false) for a deployment that hands out patched clients and
+			// wants the password to actually be required.
+			public bool LoginAllowUnpatchedClients => !bool.TryParse(config["Login:AllowUnpatchedClients"], out var allow) || allow;
+
 			public double ChannelBacklogGraceMs => double.TryParse(config["ChatBridge:BacklogGraceMs"], out var ms)
 				? ms
 				: 120_000;

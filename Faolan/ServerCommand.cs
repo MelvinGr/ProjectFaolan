@@ -29,6 +29,10 @@ namespace Faolan
 			FaolanCommandLine.ConfigOption("PlayerAgentPort", "Login-tier player-agent port."),
 			FaolanCommandLine.ConfigOption("WelcomeString", "Login MOTD."),
 			FaolanCommandLine.ConfigOption("TerrainDir", "Baked terrain directory; without it ground-snap and line-of-sight are disabled."),
+			// The server reads Login:PrivateKey (Program.cs) but never declared it, so it was settable everywhere EXCEPT
+			// here. Login:PublicKey / Login:RetailPublicKey are launcher-side only and stay off the server's line.
+			FaolanCommandLine.ConfigOption("Login:PrivateKey", "The login DH private key (default: the built-in CellAO key). Patch clients with the matching public key - Faolan.ClientLauncher --patch-login."),
+			FaolanCommandLine.ConfigOption("Login:AllowUnpatchedClients", "Let a client whose login block we cannot decrypt in on its account NAME alone (default true). False requires a patched client, so the password is actually checked."),
 			FaolanCommandLine.ConfigOption("Mcp:Enabled", "Host the in-process MCP endpoint (default off when unset)."),
 			FaolanCommandLine.ConfigOption("Mcp:Port", "MCP endpoint port."),
 			FaolanCommandLine.ConfigOption("Mcp:Url", "MCP endpoint URL the chat bridge connects to."),

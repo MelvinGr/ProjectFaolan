@@ -23,8 +23,11 @@
 	// PublicKey overrides what the launcher patches IN, for the one case where it is not ours: patching a client to
 	// talk to somebody else's server, whose private key you must not need. RetailPublicKey is what it searches FOR in
 	// an unpatched exe, for a client build shipping a key other than retail's.
-	// Env overrides: Login__PrivateKey / Login__PublicKey / Login__RetailPublicKey.
-	// "Login": { "PrivateKey": "7ad852c6...", "PublicKey": "", "RetailPublicKey": "" },
+	// AllowUnpatchedClients (default true) is what happens to a client whose login block the server cannot decrypt -
+	// an UNPATCHED one, which proves only that it knows the account name. True keeps the historical accept-any
+	// behaviour; false refuses it, so the password is genuinely required and every client must be patched.
+	// Env overrides: Login__PrivateKey / Login__PublicKey / Login__RetailPublicKey / Login__AllowUnpatchedClients.
+	// "Login": { "PrivateKey": "7ad852c6...", "PublicKey": "", "RetailPublicKey": "", "AllowUnpatchedClients": true },
 
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 

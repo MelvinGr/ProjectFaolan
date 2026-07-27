@@ -50,9 +50,11 @@ namespace Faolan.UniverseAgent
 					var account = client.Session.Account;
 
 					// Decrypt the DH+TEA login block. This only succeeds for a PATCHED client (one using our DH
-					// public key - see Faolan.ClientLauncher/LoginKeyPatcher.cs). When it decrypts and the challenge round-trips
-					// we enforce the real password; an unpatched client (block undecryptable to us, or a challenge
-					// mismatch) keeps the legacy accept-any behaviour, so turning this on never breaks login.
+					// public key - see Faolan.ClientLauncher/ClientExePatcher.cs). When it decrypts and the challenge
+					// round-trips we enforce the real password; an unpatched client (block undecryptable to us, or a
+					// challenge mismatch) proved nothing but the account NAME, and what happens to it is the
+					// deployment's call - Login:AllowUnpatchedClients, default true (the legacy accept-any behaviour,
+					// so turning password validation on never breaks login).
 					var credentials = LoginEncryption.Decrypt(loginKey);
 					bool authenticated;
 					if (credentials != null && credentials.Challenge == account.AuthChallenge)
@@ -78,10 +80,18 @@ namespace Faolan.UniverseAgent
 						else
 							Logger.LogWarning("UniverseAgent login: WRONG PASSWORD for {UserName} (patched client).", account.UserName);
 					}
-					else
+					else if (Configuration.LoginAllowUnpatchedClients)
 					{
 						Logger.LogDebug("UniverseAgent login: block not decryptable (unpatched client); accepting {UserName} without password check.", account.UserName);
 						authenticated = true;
+					}
+					else
+					{
+						// The account NAME is all this client proved, and this deployment does not accept that. Refused
+						// with the same reason a wrong password gets - the client has one invalid-login screen either
+						// way, and the log line below is where the real cause is written down.
+						Logger.LogWarning("UniverseAgent login: REFUSED {UserName} - unpatched client and Login:AllowUnpatchedClients is off (patch it with Faolan.ClientLauncher --patch-login).", account.UserName);
+						authenticated = false;
 					}
 
 					if (!authenticated)

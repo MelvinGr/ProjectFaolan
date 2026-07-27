@@ -25,8 +25,16 @@ ours.
 - A **patched** client → the challenge decrypts correctly and real credential checking is possible.
   [V3: LoginEncryptionTests.RoundTrip_RecoversCredentials]
 - An **unpatched** retail client uses Funcom's public key, so the block decrypts to garbage that fails the
-  challenge check, and the caller falls back to accept-any.
+  challenge check, and it has proved nothing but the account NAME.
   [V3: LoginEncryptionTests.Decrypt_TamperedBlock_DoesNotRecoverChallenge]
+
+What happens to that unpatched client is `Login:AllowUnpatchedClients` (`UniverseAgentListener`'s
+`AnswerChallenge` handler). **True by default** — the accept-any fallback, so enabling password validation never
+locks out a client that predates it. Set it false for a deployment that hands out patched clients and wants the
+password to actually be required; the refusal is the same `InvalidLogin` reason a wrong password gets, and the
+server log names the real cause. Only an explicit `false` denies: an unset or unparseable value allows, because
+a typo must not read as "deny every login".
+[V3: LoginEncryptionTests.LoginAllowUnpatchedClients_DefaultsToAllowAndOnlyAnExplicitFalseDenies]
 
 The server's public key is exactly `g^ServerPrivate mod N` for the baked-in keypair — this is the value the
 launcher patches into the client. [V3: LoginEncryptionTests.ServerPublic_IsCellaoPublicKey]
@@ -41,6 +49,7 @@ line < environment), one setting per role:
 | `Login:PrivateKey` | the **server** — the only half it needs | the historical CellAO key |
 | `Login:PublicKey` | the **launcher**, as what to patch IN | `g^PrivateKey mod N`, i.e. derived |
 | `Login:RetailPublicKey` | the **launcher**, as what to search FOR | the key retail's exe ships |
+| `Login:AllowUnpatchedClients` | the **server** — may a client it cannot decrypt log in? | `true` (accept-any) |
 
 The launcher reads the same `faolan.json` the server does, so overriding `Login:PrivateKey` is enough — it
 patches the matching public key by derivation and the pair cannot drift.

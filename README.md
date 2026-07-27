@@ -295,6 +295,7 @@ Related keys are grouped into sections; the remaining shared keys stay flat:
 | `ServerIpAddress` | the address the login tier advertises to clients (must be reachable from the client) |
 | `UniverseAgentPort` / `PlayerAgentPort` | login-tier listen ports (7010 is the fixed client entry point) |
 | `WelcomeString` / `TerrainDir` | login MOTD; baked-terrain dir for line-of-sight (optional) |
+| `Login` `{ PrivateKey, PublicKey, RetailPublicKey, AllowUnpatchedClients }` | the login DH keypair, and whether a client the server cannot decrypt — an unpatched one, which proves only the account name — may log in (default: yes) |
 | `Mcp` `{ Enabled, Port, Url }` | the in-process MCP endpoint, and the chat-bridge's target URL |
 | `CdnMirror` `{ Store, Ip, Port }` | the `Faolan.Web.Content` mirror's store dir + bind address |
 | `ChatBridge` `{ PollMs, BacklogGraceMs }` | the Claude chat-bridge poll-loop tuning |
