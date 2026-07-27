@@ -58,7 +58,7 @@ namespace Faolan.Importer.Rdb
 			var mappedTemplates = map.Select(m => m.Template).ToHashSet();
 
 			var found = new List<Feat>();
-			var featEffects = new Dictionary<uint, List<(uint StatId, uint Value)>>();
+			var featEffects = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.Modifier>>();
 			var skippedUnnamed = 0;
 
 			foreach (var e in rdb.EntriesOfType(TemplateType))
@@ -195,7 +195,8 @@ namespace Faolan.Importer.Rdb
 						FeatId = featId,
 						Sequence = i,
 						StatId = (CharacterStatId)list[i].StatId,
-						Value = list[i].Value
+						EffectKind = list[i].Kind,
+						Value = list[i].WireAmount
 					});
 					effectRows++;
 				}
@@ -404,29 +405,21 @@ namespace Faolan.Importer.Rdb
 		// The record's TAIL, after the name: [u32 2][u32 14][u32 ListFrame(n)] then n x 40-byte effect elements whose
 		// last two words are (StatId, Value). The eight leading words of an element are a fixed descriptor.
 		// Returns an empty list when the tail is not this shape - some records carry no effect block at all.
-		public static List<(uint StatId, uint Value)> ParseEffects(byte[] body)
+		// The feat's stat modifiers, via the SHARED template-region parser.
+		//
+		// Feats, spells and items are the SAME record layout - `[u32 type][u32 id][u32 1000000][...]` - so they share
+		// this region and its parser (#367 already uses it for spells). Hand-rolling a second reader here is what
+		// produced five successive regressions: a fixed stride, then a kind-range delimiter, then a measured
+		// per-kind width table all mis-walked the list, because the records are NOT uniformly strided. Parse anchors
+		// on the 6-word signature `4,0,1,0,2,9` inside the 10-word record instead, which is stride-independent.
+		//
+		// It also carries the KIND, which the hand-rolled version dropped: a 53067 record is a PERCENT modifier, so
+		// reading it as flat turns "+2% Critical Rating" into "+200".
+		public static IReadOnlyList<ItemTemplateStatModifiers.Modifier> ParseEffects(byte[] body)
 		{
-			var effects = new List<(uint StatId, uint Value)>();
-			var tail = TailStart(body);
-			if (tail + 12 > body.Length)
-				return effects;
-
-			var frame = Word(body, tail + 8);
-			if (frame == 0 || frame % ListUnit != 0)
-				return effects;
-
-			var count = (int)(frame / ListUnit) - 1;
-			var first = tail + 12;
-			if (count <= 0 || first + (count * EffectElementLength) > body.Length)
-				return effects;
-
-			for (var i = 0; i < count; i++)
-			{
-				var at = first + (i * EffectElementLength);
-				effects.Add((Word(body, at + 32), Word(body, at + 36)));
-			}
-
-			return effects;
+			return body.Length <= 12
+				? []
+				: ItemTemplateStatModifiers.Parse(body.AsSpan(12));
 		}
 
 		// The effect block's start (past the [2][14][frame] header) and its element COUNT, or (0, 0) when the record

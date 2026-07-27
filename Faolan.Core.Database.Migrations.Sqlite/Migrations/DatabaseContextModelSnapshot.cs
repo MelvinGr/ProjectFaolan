@@ -1317,6 +1317,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<int>("Sequence")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("EffectKind")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("StatId")
                         .HasColumnType("INTEGER");
 

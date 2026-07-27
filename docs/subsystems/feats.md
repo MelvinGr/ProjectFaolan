@@ -24,13 +24,13 @@ and don't contain.
 - **The feat CATALOG now exists** (#251): `Feat` (**19,540** rows from the RDB 1000020 plaintext templates - id, name,
   description, tree, group, rank) + `FeatEffect` (**23,936** stat modifiers, 158 distinct stats). Built by
   `RdbFeatImporter` (the `rdb-feats` module), no TEA key and no capture needed.
-- ⚠️ **The EFFECT grammar is verified for the u32 record shape only.** 739 of 23,936 effect rows (3.1%) sit on stat
-  ids the client's own stat-name table does not contain, concentrated in the u16-shape records: the element is
-  40 bytes there too, but a `0xCF__` KIND tag leads it and the WIDTH varies with the kind (`0xCF46` carries two
-  extra trailing words where `0xCF35` does not), so a fixed stride walks off the list. Two alternatives were tried
-  and BOTH measured worse - starting the walk after name+description gave 11.4% bad, and delimiting on the kind tag
-  gave 24.2% (any `0xCF__` word in the tail reads as an element). The fixed-stride version is kept because it is the
-  best-measuring one, not because it is right.
+- **Feats, spells and items are the SAME RDB record layout** - `[u32 type][u32 id][u32 1000000][...]` - so they
+  share the stat-modifier region AND its parser, `ItemTemplateStatModifiers.Parse(body[12..])`. (The "TB magic" that
+  identifies a plaintext feat record is simply the TYPE word 1000020: `0x000F4254` renders as `TB\x0f\x00`.)
+  That parser anchors on the 6-word signature `4,0,1,0,2,9` inside the 10-word record rather than on a stride, which
+  is what makes it right where five hand-rolled attempts were wrong (fixed stride 3.1% bad, kind-range delimiter
+  24.2%, measured per-kind width table 7.2%). It scores **2.2% on MORE rows**, and it carries the effect KIND that
+  the hand-rolled version dropped - 53045 flat vs 53067 percent-stored-x100.
 - **TWO record shapes carry the name**, and knowing only the first hid every feat the captured characters hold:
   `[u32 len][name]` and `[u16 nameLen][u16 descLen][name][description]`. The u16 shape also yields the TOOLTIP.
 - **The feat/item discriminator is the client's own feat TABLE, not the Flags word.** A template that RDB 1000042

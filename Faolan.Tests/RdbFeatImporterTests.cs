@@ -68,16 +68,18 @@ namespace Faolan.Tests
 			"2031020000000E000000D30B000035CF000000000000040000000000000001000000000000000200000009000000AA030000D0020000" +
 			"35CF000000000000040000000000000001000000000000000200000009000000AC030000D0020000";
 
+		// Feats share the template stat-modifier region with items and spells, so they share its parser. The two
+		// modifiers of "Soldier: 1HB and 1HE 1" come back with their KIND as well - 53045 is a FLAT modifier, and a
+		// consumer must branch on that (53067 would be a percent stored x100).
 		[Fact]
-		public void ParseEffects_ReadsTheCountFramedEffectList()
+		public void ParseEffects_ReadsBothModifiersWithTheirKind()
 		{
 			var effects = RdbFeatImporter.ParseEffects(Convert.FromHexString(TwoEffectRecordHex));
 
-			// ListFrame(2) = 3027 in the tail, so exactly two elements - NOT one fixed slot, which is what the
-			// single-effect records alone would have suggested.
 			Assert.Equal(2, effects.Count);
-			Assert.Equal((938u, 720u), effects[0]);
-			Assert.Equal((940u, 720u), effects[1]);
+			Assert.Equal((938u, 720u), (effects[0].StatId, effects[0].WireAmount));
+			Assert.Equal((940u, 720u), (effects[1].StatId, effects[1].WireAmount));
+			Assert.All(effects, m => Assert.Equal(53045u, m.Kind));
 		}
 
 		// A record whose tail is not the effect shape must yield an EMPTY list rather than a garbage pair - the

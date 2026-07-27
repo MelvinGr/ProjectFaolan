@@ -38,6 +38,12 @@ namespace Faolan.Core.Database.Tables
 		// incomplete, and a caller still wants GetScale() and a CharacterStatId-keyed dictionary without casting.
 		public CharacterStatId StatId { get; set; }
 
+		// The effect-KIND tag that opens the record, and what says how to read Value. Feats share the template
+		// stat-modifier region with items and spells (same parser), where 53045/53189/53220/53221 are FLAT and 53067
+		// is a PERCENT modifier stored x100 - reading a percent one as flat turns "+2% Critical Rating" into "+200".
+		// Carried rather than collapsed, for the same reason SpellStatEffect carries it.
+		public uint EffectKind { get; set; }
+
 		// The modifier magnitude, in DISPLAY units.
 		//
 		// ⚠️ NOT the same convention as ItemStatModifier.Amount, which is the RAW WIRE value and must be divided by
