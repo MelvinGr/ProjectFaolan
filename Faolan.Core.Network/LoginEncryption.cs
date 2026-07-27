@@ -22,11 +22,8 @@ namespace Faolan.Core.Network
 		// does not reference this assembly, and it used to carry a hand-copied duplicate of the public key. These
 		// forwards keep the existing call sites (and LoginEncryptionTests) unchanged.
 		public static BigInteger ServerPublic => DhKeys.ServerPublic;
-
 		private static BigInteger N => DhKeys.N;
-
 		private static BigInteger ServerPrivate => DhKeys.ServerPrivate;
-
 		private static BigInteger G => DhKeys.G;
 
 		/// <summary>

@@ -1,33 +1,27 @@
 {
 	"Database": {
 		"Provider": "Sqlite", // Postgres
-		"ConnectionString":
-			"Data Source=faolan.db" // "Host=localhost;Port=5432;Database=faolan;Username=faolan;Password=faolan"
+		"ConnectionString": "Data Source=faolan.db" // "Host=localhost;Port=5432;Database=faolan;Username=faolan;Password=faolan"
 	},
 
 	"ServerIpAddress": "127.0.0.1",
 	"UniverseAgentPort": 7010,
 	"PlayerAgentPort": 7011,
+
 	"WelcomeString": "Welcome to Project Faolan!",
 
-	// Subscription state advertised in the PlayerAgent character list (0x20EF), per deployment.
 	"Account": {
 		"Premium": true,
 		"PremiumCharSlots": 10,
 		"FreeCharSlots": 4
 	},
 
-	// Login DH keys (docs/protocol/01-crypto.md). Unset = the built-in CellAO key, which is public and is what
-	// Faolan.ClientLauncher patches into a client by default. Set your own PRIVATE key here and the launcher - which
-	// reads THIS file too - derives and patches the matching PUBLIC one, so the pair cannot drift.
-	// PublicKey overrides what the launcher patches IN, for the one case where it is not ours: patching a client to
-	// talk to somebody else's server, whose private key you must not need. RetailPublicKey is what it searches FOR in
-	// an unpatched exe, for a client build shipping a key other than retail's.
-	// AllowUnpatchedClients (default true) is what happens to a client whose login block the server cannot decrypt -
-	// an UNPATCHED one, which proves only that it knows the account name. True keeps the historical accept-any
-	// behaviour; false refuses it, so the password is genuinely required and every client must be patched.
-	// Env overrides: Login__PrivateKey / Login__PublicKey / Login__RetailPublicKey / Login__AllowUnpatchedClients.
-	// "Login": { "PrivateKey": "7ad852c6...", "PublicKey": "", "RetailPublicKey": "", "AllowUnpatchedClients": true },
+	"Login": {
+		//"PrivateKey": "",
+		//"PublicKey": "",
+		//"RetailPublicKey": "",
+		"AllowUnpatchedClients": true
+	},
 
 	"TerrainDir": "../../ProjectFaolan-Data/Terrain",
 
@@ -48,12 +42,10 @@
 	"ChatBridge": {
 		// "PollMs": 1500,
 		// "BacklogGraceMs": 120000
-	
 	},
 
 	"Log": {
-		"File":
-			"faolan.log", // log file location (default faolan.log in the CWD); point at a mounted volume in a container
+		"File": "faolan.log", // log file location (default faolan.log in the CWD); point at a mounted volume in a container
 		"PacketBytes": true // false = drop the raw header/body hex dump, keep just the opcode + lengths
 	}
 }
