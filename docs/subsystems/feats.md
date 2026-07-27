@@ -21,9 +21,14 @@ and don't contain.
   character's **ability/skill** presence list — the spawn's **post-IIR** id-list, a different region *and* a
   different id-space. It gates spell *usability* (see #298) but is unrelated to the feat tree. An earlier RE
   conflated the two; that has been corrected across code + memories.
-- **The feat CATALOG now exists** (#251): `Feat` (15,834 rows from the RDB 1000020 plaintext templates - id, name, tree,
-  group, rank) + `FeatEffect` (22,486 stat modifiers across 12,316 feats, 158 distinct stats). Built by
+- **The feat CATALOG now exists** (#251): `Feat` (**19,540** rows from the RDB 1000020 plaintext templates - id, name,
+  description, tree, group, rank) + `FeatEffect` (**23,936** stat modifiers, 158 distinct stats). Built by
   `RdbFeatImporter` (the `rdb-feats` module), no TEA key and no capture needed.
+- **TWO record shapes carry the name**, and knowing only the first hid every feat the captured characters hold:
+  `[u32 len][name]` and `[u16 nameLen][u16 descLen][name][description]`. The u16 shape also yields the TOOLTIP.
+- **The feat/item discriminator is the client's own feat TABLE, not the Flags word.** A template that RDB 1000042
+  points at is a feat by definition; Hellfire (3187268) carries Flags `0x5` rather than `0x10000005` and was
+  silently excluded while the heuristic was the only gate.
 - **The PREREQUISITE GRAPH is in the RDB** - in the 1000042 feat TABLE, not the 1000020 template. Columns 2/3/4 of
   each entry are up to three prerequisite wire feat ids: `FeatPrereq`, **5,501 edges over 5,489 feats**, and the
   chains resolve end to end (`Equip: One Handed Edged Weapons 2` requires `... 1`). Together with `FeatIdMap` this is

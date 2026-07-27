@@ -24,6 +24,12 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;
 
+		// The feat's tooltip text, where the record carries one ("Reduces the casting time of Hellfire Breath, but
+		// increases the re-use time."). Only the u16-length record shape has it; the u32 shape carries a name alone,
+		// so an empty string means the record had none rather than that it was skipped.
+		[MaxLength(1024)]
+		public string Description { get; set; } = "";
+
 		// The record's word at offset 44: 0x10000005 on the feat records, 0x200 on the item templates. This is the
 		// discriminator the importer selects on.
 		public uint Flags { get; set; }

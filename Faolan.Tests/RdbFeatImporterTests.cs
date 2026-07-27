@@ -182,5 +182,35 @@ namespace Faolan.Tests
 
 			Assert.Empty(RdbFeatImporter.ParsePrereqs(body));
 		}
+
+		// The u16 record shape, against the real bytes of template 3187268 - the Hellfire feat Hakotep unlocks on tape.
+		// This shape carries a name AND a description behind a [u16 nameLen][u16 descLen] pair; knowing only the u32
+		// shape left 3,633 plaintext records looking nameless, and every feat the three captured characters hold was
+		// among them. Getting this wrong does not fail loudly - it silently drops feats from the catalog.
+		private const string HellfireRecordHex =
+			"54420F0044A2300040420F003DC70000030000000F00000017000000881F00004C000000000000001E000000050000000000000001000000" +
+			"2A01000000000000580000000000000036000000010000004F000000A03D3100150000002100000008004B0048656C6C66697265" +
+			"52656475636573207468652063617374696E672074696D65206F662048656C6C66697265204272656174682C2062757420696E6372656173" +
+			"6573207468652072652D7573652074696D652E020000000E000000D30B000046CF000000000000040000000000000001000000000000000200000009000000FDA7000026010000";
+
+		[Fact]
+		public void ReadNameAndDescription_ReadsTheU16ShapeWithItsTooltip()
+		{
+			var (name, description) = RdbFeatImporter.ReadNameAndDescription(Convert.FromHexString(HellfireRecordHex));
+
+			Assert.Equal("Hellfire", name);
+			Assert.Equal("Reduces the casting time of Hellfire Breath, but increases the re-use time.", description);
+		}
+
+		// The u32 shape still reads, and yields NO description - an empty string there means the record carried none,
+		// not that the parse failed.
+		[Fact]
+		public void ReadNameAndDescription_StillReadsTheU32Shape()
+		{
+			var (name, description) = RdbFeatImporter.ReadNameAndDescription(Convert.FromHexString(TwoEffectRecordHex));
+
+			Assert.Equal("Soldier: 1HB and 1HE 1", name);
+			Assert.Equal("", description);
+		}
 	}
 }

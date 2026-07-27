@@ -50,6 +50,13 @@ namespace Faolan.Importer.Rdb
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? proxyBase = null, ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, proxyBase);
+
+			// Read the client's feat TABLE first: it gates the sweep below. A template the table POINTS AT is a feat by
+			// definition, which is a far better test than the Flags heuristic - Hakotep's Hellfire (3187268) carries
+			// Flags 0x5, not 0x10000005, and was silently excluded until the id map was used as the authority.
+			var (map, prereqs) = ReadIdMapAndPrereqs(rdb);
+			var mappedTemplates = map.Select(m => m.Template).ToHashSet();
+
 			var found = new List<Feat>();
 			var featEffects = new Dictionary<uint, List<(uint StatId, uint Value)>>();
 			var skippedUnnamed = 0;
@@ -69,10 +76,13 @@ namespace Faolan.Importer.Rdb
 					continue; // a record we cannot read is not a feat we can silently drop a column of - it is skipped whole
 				}
 
-				if (body.Length < 48 || Word(body, 0) != PlaintextMagic || Word(body, 44) != FeatFlags)
+				// Either the client's feat table points at it, or it carries the feat Flags value. The union matters:
+				// the table covers 6,593 templates (every feat the WIRE can name) while Flags reaches a wider catalog
+				// the table does not enumerate.
+				if (body.Length < 48 || Word(body, 0) != PlaintextMagic || (Word(body, 44) != FeatFlags && !mappedTemplates.Contains(e.Id)))
 					continue;
 
-				var name = ReadName(body);
+				var (name, description) = ReadNameAndDescription(body);
 				if (name.Length == 0)
 				{
 					skippedUnnamed++;
@@ -91,14 +101,14 @@ namespace Faolan.Importer.Rdb
 					Tree = parsed.Tree,
 					Group = parsed.Group,
 					BaseName = parsed.BaseName,
-					Rank = parsed.Rank
+					Rank = parsed.Rank,
+					Description = description
 				});
 			}
 
 			// The wire-id -> template-id map (#467). Delete+reinsert: it is wholly derived from one RDB resource.
 			var mapRows = 0;
 			var prereqRows = 0;
-			var (map, prereqs) = ReadIdMapAndPrereqs(rdb);
 			if (map.Count > 0)
 			{
 				// TWO saves, deliberately. FeatPrereq cascades off FeatIdMap, so deleting the old map rows and adding
@@ -149,11 +159,12 @@ namespace Faolan.Importer.Rdb
 					continue;
 				}
 
-				if (row.Name == feat.Name && row.Tree == feat.Tree && row.Group == feat.Group && row.BaseName == feat.BaseName
+				if (row.Name == feat.Name && row.Description == feat.Description && row.Tree == feat.Tree && row.Group == feat.Group && row.BaseName == feat.BaseName
 					&& row.Rank == feat.Rank && row.Flags == feat.Flags && row.TemplateCategory == feat.TemplateCategory)
 					continue;
 
 				row.Name = feat.Name;
+				row.Description = feat.Description;
 				row.Tree = feat.Tree;
 				row.Group = feat.Group;
 				row.BaseName = feat.BaseName;
@@ -226,32 +237,54 @@ namespace Faolan.Importer.Rdb
 
 		private static readonly Regex RankSuffix = new(@"\s+(\((?<n>\d{1,3})\)|(?<n>\d{1,3}))$", RegexOptions.Compiled);
 
-		// The u32-length-prefixed ASCII name. Scanned u32-aligned because the header length varies with the record's
-		// block count; returns "" when nothing parses as one, so an unnamed record is skipped rather than guessed at.
-		private static string ReadName(byte[] body)
+		// The record's NAME and DESCRIPTION. TWO shapes exist, and knowing only the first is what left 3,633 plaintext
+		// records looking nameless - including every feat the three captured characters hold:
+		//
+		//   u32 form:  [u32 len][name]                                - a name alone
+		//   u16 form:  [u16 nameLen][u16 descLen][name][description]
+		//
+		// Template 3187268 (the Hellfire hakotep unlocks on tape) is the u16 form: `08 00 4B 00 "Hellfire" "Reduces
+		// the casting time of Hellfire Breath, but increases the re-use time."`. Both are scanned and whichever
+		// VALIDATES wins; the u16 form is tried first because a length PAIR landing two printable runs back to back is
+		// a far stronger signature than one u32 that merely looks plausible.
+		//
+		// Returns ("", "") when neither fits, so an unreadable record is skipped rather than guessed at.
+		public static (string Name, string Description) ReadNameAndDescription(byte[] body)
 		{
+			for (var i = 8; i + 4 < body.Length; i++)
+			{
+				var nameLen = BinaryPrimitives.ReadUInt16LittleEndian(body.AsSpan(i));
+				var descLen = BinaryPrimitives.ReadUInt16LittleEndian(body.AsSpan(i + 2));
+				if (nameLen is < 2 or > 96 || descLen is < 1 or > 1024 || i + 4 + nameLen + descLen > body.Length)
+					continue;
+
+				if (!IsPrintable(body, i + 4, nameLen) || !IsPrintable(body, i + 4 + nameLen, descLen))
+					continue;
+
+				return (Encoding.ASCII.GetString(body, i + 4, nameLen), Encoding.ASCII.GetString(body, i + 4 + nameLen, descLen));
+			}
+
 			for (var i = 8; i + 4 < body.Length; i += 4)
 			{
 				var len = Word(body, i);
-				if (len is < 2 or > 96 || i + 4 + len > body.Length)
+				if (len is < 2 or > 96 || i + 4 + len > body.Length || !IsPrintable(body, i + 4, (int)len))
 					continue;
 
-				var span = body.AsSpan(i + 4, (int)len);
-				var printable = true;
-				foreach (var b in span)
-				{
-					if (b is < 0x20 or > 0x7E)
-					{
-						printable = false;
-						break;
-					}
-				}
-
-				if (printable)
-					return Encoding.ASCII.GetString(span);
+				return (Encoding.ASCII.GetString(body, i + 4, (int)len), "");
 			}
 
-			return "";
+			return ("", "");
+		}
+
+		private static bool IsPrintable(byte[] body, int start, int length)
+		{
+			for (var i = start; i < start + length; i++)
+			{
+				if (body[i] is < 0x20 or > 0x7E)
+					return false;
+			}
+
+			return true;
 		}
 
 		// Reads the wire-id -> template-id map out of RDB 1000042 id 1 - the resource FeatTable_t::LoadStaticData
