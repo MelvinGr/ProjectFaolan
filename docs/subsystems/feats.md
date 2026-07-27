@@ -31,6 +31,12 @@ and don't contain.
   is what makes it right where five hand-rolled attempts were wrong (fixed stride 3.1% bad, kind-range delimiter
   24.2%, measured per-kind width table 7.2%). It scores **2.2% on MORE rows**, and it carries the effect KIND that
   the hand-rolled version dropped - 53045 flat vs 53067 percent-stored-x100.
+- **Why items score 0% and feats 2.2%**: `RdbItemImporter` WHITELISTS (`ApplicableStatIds.Contains`), accepting only
+  the 17 stats it can name; feats touch 344, so that curated list does not transfer. The feat residue is also not
+  spread out - **kind 53182 carries 480 of the 561 bad rows (86%)** while 53045 is 61 of 22,539 (0.3%) and
+  53220/53139/53176/53189/53067 are clean. 53182 is not in the documented kind set, so its payload is probably not a
+  (stat, amount) pair at all: decoding that beats whitelisting, which would also silence the real-but-unnamed stats
+  (the 1084..1094 family, values 100..900, looks deliberate).
 - **TWO record shapes carry the name**, and knowing only the first hid every feat the captured characters hold:
   `[u32 len][name]` and `[u16 nameLen][u16 descLen][name][description]`. The u16 shape also yields the TOOLTIP.
 - **The feat/item discriminator is the client's own feat TABLE, not the Flags word.** A template that RDB 1000042
