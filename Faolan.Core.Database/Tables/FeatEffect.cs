@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -27,13 +28,22 @@ namespace Faolan.Core.Database.Tables
 		// Wire position within the feat's effect list, so the list regenerates in the order the client stores it.
 		public int Sequence { get; set; }
 
-		// The stat this modifies. Ids are in the client's stat space (938/940 on "1HB and 1HE", 946 on "Thrown
-		// Weapons"), NOT resolved to names here - LDB category 615 carries the stat names.
-		public uint StatId { get; set; }
+		// The stat this modifies - the same id space as ItemStatModifier.StatId (0x324 Strength, 0x001 HealthMax and
+		// the rest all appear on both).
+		//
+		// ⚠️ NO [ConstrainToEnumValues], unlike ItemStatModifier. That attribute emits a CHECK against the enum's
+		// DECLARED members, and CharacterStatId is a catalog of the stats we have NAMED, not of the stat space: items
+		// touch 17 ids and every one is declared, while feats touch 158 and 127 are not. The CHECK would reject four
+		// fifths of these rows on insert. Typed as the enum anyway, because the value IS one - the names are just
+		// incomplete, and a caller still wants GetScale() and a CharacterStatId-keyed dictionary without casting.
+		public CharacterStatId StatId { get; set; }
 
-		// The modifier magnitude, as stored. Scaling is not applied: the rank series for "Thrown Weapons" reads
-		// 720 / 960 / 1200 / 1410 / 1500, which is a designed progression rather than a linear one, so a divisor
-		// would be a guess. Stored raw and left to the consumer.
+		// The modifier magnitude, in DISPLAY units.
+		//
+		// ⚠️ NOT the same convention as ItemStatModifier.Amount, which is the RAW WIRE value and must be divided by
+		// CharacterStatId.GetScale(). These are already divided: Strength (scale 10) carries 1..9 here, which as raw
+		// wire would be +0.1 Strength, and HealthMax (scale 100) carries 100..700, which as raw wire would be +1 HP.
+		// Applying the gear convention to these would silently under-grant every feat by 10x or 100x.
 		public uint Value { get; set; }
 	}
 }

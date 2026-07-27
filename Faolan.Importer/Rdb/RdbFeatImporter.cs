@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -175,7 +176,7 @@ namespace Faolan.Importer.Rdb
 					{
 						FeatId = featId,
 						Sequence = i,
-						StatId = list[i].StatId,
+						StatId = (CharacterStatId)list[i].StatId,
 						Value = list[i].Value
 					});
 					effectRows++;
