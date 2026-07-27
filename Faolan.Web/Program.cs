@@ -73,8 +73,13 @@ namespace Faolan.Web
 			// CheckPasswordAsync auto-rehashes a legacy plaintext password. Cookie sign-in (below) is still ours.
 			builder.Services.AddIdentityCore<Account>(o =>
 			{
-				// Game usernames/passwords aren't ASCII/complexity-restricted — relax Identity's defaults.
-				o.User.AllowedUserNameCharacters = "";
+				// The retail client's login box only accepts ALPHANUMERIC usernames - no symbols, not even Identity's
+				// default `-._@+`. So the web registration has to be at least as strict, or you can register an account
+				// here that cannot be typed into the game at all. This was `""`, which disables the check entirely.
+				o.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+				// Passwords are NOT restricted the same way - the client sends whatever you type, so Identity's
+				// complexity defaults would reject passwords that work fine in-game.
 				o.Password.RequiredLength = 1;
 				o.Password.RequiredUniqueChars = 1;
 				o.Password.RequireDigit = false;

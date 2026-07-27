@@ -9,7 +9,6 @@ namespace Faolan.Core.Database.Repositories
 {
 	public interface IAccountRepository
 	{
-		Task<bool> CheckLogin(string username, string password);
 		Task CreateAccountClaim(AccountClaim claim);
 		Task DeleteAccountClaim(uint claimId);
 		Task<Account?> GetAccount(uint id);
@@ -20,18 +19,11 @@ namespace Faolan.Core.Database.Repositories
 		Task SetAccountClaimQuantity(uint claimId, uint? quantity);
 		Task SetAccountClaimsAvailable(uint accountId, bool available);
 		Task<bool> SetAccountLastInfo(uint accountId, string ipAddress);
-		Task<bool> SetAccountPassword(uint accountId, string password);
 		Task<bool> SetAccountState(uint accountId, AccountState state);
 	}
 
 	public partial class DatabaseRepository
 	{
-		public async Task<bool> CheckLogin(string username, string password)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Accounts.AnyAsync(a => a.UserName == username && a.Password == password);
-		}
-
 		public async Task CreateAccountClaim(AccountClaim claim)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -99,12 +91,6 @@ namespace Faolan.Core.Database.Repositories
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.LastConnection, DateTimeOffset.UtcNow).SetProperty(a => a.LastIpAddress, ipAddress)) ==
 			       1;
-		}
-
-		public async Task<bool> SetAccountPassword(uint accountId, string password)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.Password, password)) == 1;
 		}
 
 		public async Task<bool> SetAccountState(uint accountId, AccountState state)

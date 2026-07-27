@@ -41,50 +41,32 @@ namespace Faolan.Tests
 			Assert.False(PasswordHashing.Matches(hash, "nope"));
 		}
 
-		[Fact]
-		public void Matches_LegacyPlaintext()
+		// The plaintext path is GONE, and this is the test that would have passed before and must fail now: a stored
+		// value equal to the supplied password used to authenticate on a string compare.
+		[Theory, InlineData("oldpw", "oldpw"), InlineData("oldpw", "other"), InlineData("letmein", "letmein")]
+		public void Matches_PlaintextStoredValue_NeverAuthenticates(string stored, string supplied)
 		{
-			Assert.True(PasswordHashing.Matches("oldpw", "oldpw"));
-			Assert.False(PasswordHashing.Matches("oldpw", "OLDPW"));
-			Assert.False(PasswordHashing.Matches("oldpw", "other"));
+			Assert.False(PasswordHashing.Matches(stored, supplied));
 		}
 
-		[Theory, InlineData(null), InlineData(""), InlineData("-")]
+		// NOT a fallback and deliberately kept: an account with no password set accepts anything. The shipped seed
+		// account stores exactly this, so it is what a fresh clone logs in with.
+		[Theory, InlineData(null), InlineData(""), InlineData(PasswordHashing.NoPassword)]
 		public void Matches_NoPasswordSet_AcceptsAnything(string? stored)
 		{
-			// Preserves the historical "any password works" behaviour for accounts without a configured password.
 			Assert.True(PasswordHashing.Matches(stored, "anything"));
 			Assert.True(PasswordHashing.Matches(stored, ""));
 		}
 
 		[Fact]
-		public void MigrationScenario_PlaintextThenRehash()
+		public void AHashedAccount_MatchesOnlyItsOwnPassword()
 		{
-			// 1) Account stored as legacy plaintext: matches, and is flagged for rehash.
 			const string typed = "letmein";
-			const string legacy = "letmein";
-			Assert.True(PasswordHashing.Matches(legacy, typed));
-			Assert.True(PasswordHashing.NeedsRehash(legacy));
+			var hash = PasswordHashing.Hash(typed);
 
-			// 2) Caller rehashes on successful login.
-			var migrated = PasswordHashing.Hash(typed);
-
-			// 3) Now it's a hash: still matches the same password, and no longer needs rehashing.
-			Assert.True(PasswordHashing.Matches(migrated, typed));
-			Assert.False(PasswordHashing.Matches(migrated, "letmein!"));
-			Assert.False(PasswordHashing.NeedsRehash(migrated));
-		}
-
-		[Fact]
-		public void NeedsRehash_FalseForAHash()
-		{
-			Assert.False(PasswordHashing.NeedsRehash(PasswordHashing.Hash("x")));
-		}
-
-		[Theory, InlineData(null, false), InlineData("", false), InlineData("-", false), InlineData("legacyplaintext", true)]
-		public void NeedsRehash_OnlyForRealPlaintext(string? stored, bool expected)
-		{
-			Assert.Equal(expected, PasswordHashing.NeedsRehash(stored));
+			Assert.True(PasswordHashing.Matches(hash, typed));
+			Assert.False(PasswordHashing.Matches(hash, "letmein!"));
+			Assert.False(PasswordHashing.Matches(hash, ""));
 		}
 
 		[Fact]

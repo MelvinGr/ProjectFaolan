@@ -9,10 +9,15 @@ namespace Faolan.Core.Crypt
 	///     <c>pbkdf2_sha256$&lt;iterations&gt;$&lt;base64 salt&gt;$&lt;base64 hash&gt;</c> (~90 chars, fits the 128-char
 	///     column).
 	///     <para>
-	///         <see cref="Matches" /> also accepts a stored LEGACY plaintext value (so existing seed/captured accounts
-	///         keep working), and an empty / "-" stored value means "no password set" (accept anything) — this is what
-	///         keeps the historical "any password works" behaviour for accounts without a password. Callers should
-	///         re-hash on a successful legacy match (see <see cref="NeedsRehash" />) so plaintext is migrated away.
+	///         An empty / <c>"-"</c> stored value means <b>no password set</b> and accepts anything — that is a
+	///         deliberate dev convenience, not a fallback, and it is what the shipped seed account uses.
+	///     </para>
+	///     <para>
+	///         There is no plaintext path. <see cref="Matches" /> used to compare a non-hash stored value to the
+	///         supplied password verbatim, so a row that had never been migrated authenticated on a string compare —
+	///         and only the WEB login ever re-hashed after such a match, so a plaintext account logging in through the
+	///         game server stayed plaintext forever. Anything that is neither a hash nor the "no password" sentinel is
+	///         now simply rejected.
 	///     </para>
 	/// </summary>
 	public static class PasswordHashing
@@ -21,6 +26,9 @@ namespace Faolan.Core.Crypt
 		private const int Iterations = 210_000;
 		private const int SaltSize = 16;
 		private const string Prefix = "pbkdf2_sha256$";
+
+		// The "this account has no password" sentinel, as stored in Account.Password.
+		public const string NoPassword = "-";
 
 		public static string Hash(string password)
 		{
@@ -34,23 +42,14 @@ namespace Faolan.Core.Crypt
 			return stored != null && stored.StartsWith(Prefix, StringComparison.Ordinal);
 		}
 
-		// Does the supplied password match the stored value? Handles hashed, legacy plaintext, and "no password set".
+		// Does the supplied password match the stored value? Either the account has no password set, or the stored
+		// value is a PBKDF2 hash - a stored value that is neither is malformed and matches nothing.
 		public static bool Matches(string? stored, string supplied)
 		{
-			if (string.IsNullOrEmpty(stored) || stored == "-")
-				return true; // no password configured -> accept anything (historical behaviour)
+			if (string.IsNullOrEmpty(stored) || stored == NoPassword)
+				return true; // no password configured -> accept anything (deliberate dev convenience)
 
-			return IsHashed(stored)
-				? Verify(supplied, stored)
-				: string.Equals(stored, supplied, StringComparison.Ordinal); // legacy plaintext
-		}
-
-		// True when a stored value is a real legacy plaintext password that should be upgraded to a hash after a
-		// successful login (the empty / "-" "no password" sentinels are left alone).
-		[Obsolete]
-		public static bool NeedsRehash(string? stored)
-		{
-			return !string.IsNullOrEmpty(stored) && stored != "-" && !IsHashed(stored);
+			return Verify(supplied, stored);
 		}
 
 		// Verify a supplied password against a stored PBKDF2 hash. False for non-hash / malformed input.

@@ -4,9 +4,12 @@ using Microsoft.AspNetCore.Identity;
 
 namespace Faolan.Web.Auth
 {
-	// Bridges Identity's UserManager to the SHARED PasswordHashing format (so the game server's login stays
-	// compatible). Verifying a legacy plaintext value returns SuccessRehashNeeded, which makes UserManager
-	// transparently re-store it as a hash after a successful login.
+	// Bridges Identity's UserManager to the SHARED PasswordHashing format, so the game server's login stays
+	// compatible with the web one - one Account.Password column serves both.
+	//
+	// SuccessRehashNeeded is never returned: it existed to migrate legacy PLAINTEXT values, and there is no plaintext
+	// path any more. If the PBKDF2 iteration count is ever raised, this is where the re-hash prompt goes back in -
+	// keyed off the iteration count parsed from the stored hash, not off "the stored value isn't a hash".
 	public sealed class AccountPasswordHasher : IPasswordHasher<Account>
 	{
 		public string HashPassword(Account user, string password)
@@ -16,12 +19,9 @@ namespace Faolan.Web.Auth
 
 		public PasswordVerificationResult VerifyHashedPassword(Account user, string hashedPassword, string providedPassword)
 		{
-			if (!PasswordHashing.Matches(hashedPassword, providedPassword))
-				return PasswordVerificationResult.Failed;
-
-			return PasswordHashing.NeedsRehash(hashedPassword)
-				? PasswordVerificationResult.SuccessRehashNeeded
-				: PasswordVerificationResult.Success;
+			return PasswordHashing.Matches(hashedPassword, providedPassword)
+				? PasswordVerificationResult.Success
+				: PasswordVerificationResult.Failed;
 		}
 	}
 }
