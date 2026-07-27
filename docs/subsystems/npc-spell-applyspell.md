@@ -19,9 +19,10 @@ HP change rides a separate vitals `StatUpdate` (`0x96B8DC59`), as combat already
 
 ## Field map (54-byte payload)
 Initially recovered by the reader grammar + an empirical diff of same-spell instances (per-cast fields) vs
-different spells (spell params) in `tools/capture/decode_applyspell.py`; then fully decoded and modelled as
-columns in #304 (`Faolan.Core.Network/Codecs/Combat/NpcSpellEffect.cs`, byte-exact over all 21 distinct captured
-payloads — `Faolan.Tests/NpcSpellEffectCodecTests.cs`). The payload is a sparse fixed-offset layout, big-endian,
+different spells (spell params); then fully decoded and modelled as columns in #304
+(`Faolan.Core.Network/Codecs/Combat/NpcSpellEffect.cs`, byte-exact over all 21 distinct captured payloads —
+`Faolan.Tests/NpcSpellEffectCodecTests.cs`, which is where the proof lives now that the Python dissector that
+did the original diff has been retired). The payload is a sparse fixed-offset layout, big-endian,
 with every other byte a constant 0:
 
 | Offset | Field | Notes |
