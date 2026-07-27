@@ -261,7 +261,7 @@ namespace Faolan.Importer.Rdb
 				if (!IsPrintable(body, i + 4, nameLen) || !IsPrintable(body, i + 4 + nameLen, descLen))
 					continue;
 
-				return (Encoding.ASCII.GetString(body, i + 4, nameLen), Encoding.ASCII.GetString(body, i + 4 + nameLen, descLen));
+				return (DecodeText(body, i + 4, nameLen), DecodeText(body, i + 4 + nameLen, descLen));
 			}
 
 			for (var i = 8; i + 4 < body.Length; i += 4)
@@ -270,17 +270,44 @@ namespace Faolan.Importer.Rdb
 				if (len is < 2 or > 96 || i + 4 + len > body.Length || !IsPrintable(body, i + 4, (int)len))
 					continue;
 
-				return (Encoding.ASCII.GetString(body, i + 4, (int)len), "");
+				return (DecodeText(body, i + 4, (int)len), "");
 			}
 
 			return ("", "");
+		}
+
+		// LATIN-1 printable, not ASCII. The descriptions carry CP1252 typography - template 3186541 ("Demonic Leech")
+		// has a 0x92 curly apostrophe in "The herald's Body and Spirit Wrack combo ..." - and capping at 0x7E rejected
+		// the whole record, which is how six of the captured characters' feats stayed missing after the u16 shape was
+		// understood. Wire strings in this client are Latin-1 everywhere else too.
+		// The strings are CP1252, not Latin-1: the descriptions use typographic punctuation, and 0x91-0x94 / 0x96-0x97 /
+		// 0x85 land in Latin-1's C1 CONTROL block rather than on the quotes and dashes they mean. Decoding as Latin-1
+		// silently drops them - "the necromancer's Pestilential Blast" comes out as "the necromancers Pestilential
+		// Blast". Only that 0x80-0x9F window differs between the two encodings, so it is mapped explicitly rather than
+		// by pulling in the CodePages provider for one range.
+		private static string DecodeText(byte[] body, int start, int length)
+		{
+			var chars = new char[length];
+			for (var i = 0; i < length; i++)
+			{
+				var b = body[start + i];
+				chars[i] = b switch
+				{
+					0x82 => '\u201A', 0x84 => '\u201E', 0x85 => '\u2026', 0x8B => '\u2039',
+					0x91 => '\u2018', 0x92 => '\u2019', 0x93 => '\u201C', 0x94 => '\u201D',
+					0x95 => '\u2022', 0x96 => '\u2013', 0x97 => '\u2014', 0x9B => '\u203A',
+					_ => (char)b
+				};
+			}
+
+			return new string(chars);
 		}
 
 		private static bool IsPrintable(byte[] body, int start, int length)
 		{
 			for (var i = start; i < start + length; i++)
 			{
-				if (body[i] is < 0x20 or > 0x7E)
+				if (body[i] is < 0x20 or 0x7F)
 					return false;
 			}
 

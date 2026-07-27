@@ -1305,7 +1305,7 @@ namespace Faolan.Importer.Cli
 					continue;
 				}
 
-				plain.Add((e.Id, FeatName(body), body));
+				plain.Add((e.Id, RdbFeatImporter.ReadNameAndDescription(body).Name, body));
 			}
 
 			var total = plain.Count + encrypted + other + unreadable;
@@ -1428,6 +1428,7 @@ namespace Faolan.Importer.Cli
 		{
 			return offset + 4 <= body.Length ? BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(offset)) : 0;
 		}
+
 
 		// The record's NAME: a u32-length-prefixed ASCII run. The fixed header is [magic][id][1000000][...u32 fields]
 		// and the name closes it - for the 96-byte form the length sits at offset 88 and the string ends the record
