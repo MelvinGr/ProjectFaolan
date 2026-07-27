@@ -49,9 +49,16 @@ resolves the blend + a backlash roll on deactivate.
   `GrantCharacterCombos` + the level-up dings emit them all. Showing only the highest rank of a line is a
   **client-side display filter**, not something the server does — an earlier "rank-supersede per family" collapse
   here was wrong about that and has been removed.
-- **`ComboActionParser`** (`Faolan/GameServer/Combat/ComboActionParser.cs`) — normalises all 33 `Actions` tokens into the
-  `ComboInput` enum (4 quadrants + Up/Head/Thrust); returns false for the non-directional markers (spellweaving /
-  reactive). Validated against all 130 distinct `Actions` (109 directional, 21 non-directional, 0 unknown).
+- **`ComboActionParser`** (`Faolan/GameServer/Combat/ComboActionParser.cs`) — normalises the catalog's `Actions`
+  token spellings into the `ComboInput` enum (4 quadrants + Up/Head/Thrust); returns false for the non-directional
+  markers (spellweaving / reactive). The normalisation is the point: the same key appears as `UR`,
+  `CombatUpperRight`, `Up Right`, `UpRight` and `1_Combatupperright`. Gated over the whole shipped catalog by
+  `ComboActionParserTests` — every distinct `Actions` value must parse, carry a known marker, or be blank, with
+  **zero** unknown spellings, so a new catalog spelling fails loudly instead of being dropped from a sequence.
+  ⚠️ Nothing calls the parser yet: its only consumer was the combo service dropped as dead in #353.
+  ⚠️ The non-directional markers are a **prefix**, not the whole value — every one reads `<marker>,<direction…>`
+  (`MagicCombo,Combatlowerleft`). The direction after the marker is real and currently discarded; open in
+  Gitea #455, along with the 160 of 744 catalog rows whose `Actions` is blank.
 
 ## Wire decode
 

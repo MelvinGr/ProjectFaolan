@@ -49,16 +49,20 @@ namespace Faolan.GameServer.Combat
 			"Combo_Reactive"
 		};
 
-		// Parses the comma-separated Actions into the ComboInput sequence. Returns false (and an empty list) when the
-		// combo is non-directional (reactive/magic/placeholder) or when a token is unrecognised - callers only match
-		// directional combos.
+		// Parses the comma-separated Actions into the ComboInput sequence. Returns false AND an empty sequence when
+		// the combo is non-directional (reactive/magic/placeholder) or when a token is unrecognised - callers only
+		// match directional combos.
+		//
+		// The empty-on-failure half was only in this comment: the old code returned the partially-filled list, so a
+		// combo whose second key was unrecognised handed back a valid-looking ONE-key sequence. A caller that
+		// matched on the sequence without checking the bool would have matched the wrong combo.
 		public static bool TryParse(string actions, out IReadOnlyList<ComboInput> sequence)
 		{
-			var list = new List<ComboInput>();
-			sequence = list;
+			sequence = [];
 			if (string.IsNullOrWhiteSpace(actions))
 				return false;
 
+			var list = new List<ComboInput>();
 			foreach (var raw in actions.Split(','))
 			{
 				var token = StripStepPrefix(raw.Trim());
@@ -74,7 +78,35 @@ namespace Faolan.GameServer.Combat
 				list.Add(input);
 			}
 
-			return list.Count > 0;
+			if (list.Count == 0)
+				return false;
+
+			sequence = list;
+			return true;
+		}
+
+		// True when the value carries a non-directional marker - i.e. TryParse returned false because the combo is
+		// deliberately not key-sequenced, rather than because it carried a spelling we failed to recognise. TryParse
+		// returns false for both, so this is what separates "accounted for" from "unknown" (ComboActionParserTests).
+		//
+		// The marker is a PREFIX, not the whole value: every one of the 21 non-directional rows in the catalog reads
+		// `<marker>,<direction...>` - "MagicCombo,Combatlowerleft", "Magic_Reactive,CombatHead",
+		// "Combo_Reactive,Combatupperright". So the marker tags HOW the combo triggers and a real directional
+		// sequence still follows it, which this parser currently discards. Whether the client uses that direction for
+		// a spellweave/reactive proc is undecoded - Gitea #455. [V0]
+		public static bool IsNonDirectional(string actions)
+		{
+			if (string.IsNullOrWhiteSpace(actions))
+				return false;
+
+			foreach (var raw in actions.Split(','))
+			{
+				var token = StripStepPrefix(raw.Trim());
+				if (token.Length > 0 && NonDirectional.Contains(token))
+					return true;
+			}
+
+			return false;
 		}
 
 		// A few catalog rows number the step, e.g. "1_Combatupperleft" / "2_Combatlowerleft" - drop the "N_" prefix.
