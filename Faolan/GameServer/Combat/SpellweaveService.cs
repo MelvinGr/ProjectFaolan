@@ -19,8 +19,7 @@ namespace Faolan.GameServer.Combat
 	// On ACTIVATE the server must answer with the trance-open burst or the client never enters the interactive
 	// trance (it stalls at "started" and never sends the adds): 3 trance buffs (ApplySpell) + the reactive element
 	// LIST (which declares the addable weave elements the componentIndex indexes into). This service emits that burst
-	// via two narrow seams the listener passes in - `_applySpell` (the listener's ApplySpell self-buff helper) and
-	// `_sendIir` (wrap a record in the world-framed IIR carrier). The per-add element re-send (with the used element
+	// via ISpellweaveOutbound, the port the listener implements. The per-add element re-send (with the used element
 	// zeroed) + the meter drain-stream + the componentIndex -> stat/effect contribution table are not built yet (see
 	// docs/subsystems/combos.md + Gitea #141). The trance immobilisation IS wired (the CharDCMove handler
 	// pins the caster's position while IsSpellweaving).
@@ -33,7 +32,7 @@ namespace Faolan.GameServer.Combat
 		private const int ElementCooldownMs = 8000;
 
 		// Trance drain: the yellow ENERGY bar drains while weaving. The bar is moved by DispatchUpdateSprintbar (0x200E,
-		// _sendSprintBar) - full = 8910 for the necro - alongside the 0x37E68C "Spellweaving Cost" gauge (both retail
+		// ISpellweaveOutbound.SendSprintBar) - full = 8910 for the necro - alongside the 0x37E68C "Spellweaving Cost" gauge (both retail
 		// sends, same token). The drain accelerates as the weave goes on (the capture's -90 -> -270). When energy hits
 		// 0 the health DoT (0x37E690) kicks in, draining ~31705 health/tick - the damage for over-weaving. Streamed on
 		// a self-rescheduling timer; the DoT is visual (drains the health bar) - authoritative vitals/death is a follow-up.
@@ -47,27 +46,13 @@ namespace Faolan.GameServer.Combat
 		// The "Exhausted" debuff (spell 0xB90, 100s) applied when stamina hits 0 - the standard stamina-depletion
 		// debuff. Not in the capture (the client applies it locally), so the id is our choice; applied server-side.
 		private const uint ExhaustedBuff = 0xB90 << 8;
-		private readonly Action<INetworkClient>? _ensureEnergyLoop; // starts the persistent energy tracking/regen loop
-		private readonly Func<INetworkClient, byte[], Task>? _sendIir; // send a record on the world-framed IIR carrier
-		private readonly Func<INetworkClient, string, Task> _feedback;
-		private readonly Func<INetworkClient, uint, Task>? _sendSprintBar; // DispatchUpdateSprintbar (0x200E) - the energy bar
-		private readonly Func<INetworkClient, uint, uint, uint, Task>? _applySpell; // ApplySpell(client, applyTo, applyFrom, spellId)
-		private readonly Func<INetworkClient, uint, uint, uint, Task>? _removeBuff; // SendBuffRemoval end-twin
-		private readonly Func<INetworkClient, bool>? _isMounted; // is the caster on a mount right now (WorldEntity state)
 		private readonly ILogger _logger;
+		private readonly ISpellweaveOutbound _out;
 
-		public SpellweaveService(ILogger logger, Func<INetworkClient, string, Task> feedback, Func<INetworkClient, uint, uint, uint, Task>? applySpell = null,
-			Func<INetworkClient, byte[], Task>? sendIir = null, Func<INetworkClient, uint, uint, uint, Task>? removeBuff = null, Func<INetworkClient, uint, Task>? sendSprintBar = null,
-			Action<INetworkClient>? ensureEnergyLoop = null, Func<INetworkClient, bool>? isMounted = null)
+		public SpellweaveService(ILogger logger, ISpellweaveOutbound outbound)
 		{
 			_logger = logger;
-			_feedback = feedback;
-			_applySpell = applySpell;
-			_sendIir = sendIir;
-			_removeBuff = removeBuff;
-			_sendSprintBar = sendSprintBar;
-			_ensureEnergyLoop = ensureEnergyLoop;
-			_isMounted = isMounted;
+			_out = outbound;
 		}
 
 		// A component add (CombatReactiveIIR) - only meaningful inside an open trance. componentIndex indexes into the
@@ -96,21 +81,21 @@ namespace Faolan.GameServer.Combat
 			var hasElement = profile != null && componentIndex < profile.WeaveElements.Length;
 
 			// The component-add gesture animation (BCC begin + complete), carrying the added element.
-			if (hasElement && _sendIir != null)
+			if (hasElement)
 			{
-				await _sendIir(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile!.WeaveElements[componentIndex], false));
-				await _sendIir(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile.WeaveElements[componentIndex], true));
+				await _out.SendIir(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile!.WeaveElements[componentIndex], false));
+				await _out.SendIir(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile.WeaveElements[componentIndex], true));
 			}
 
 			// Immediate component effect: apply the element's own spell as a self-buff (the full id is the base << 8).
-			if (hasElement && _applySpell != null)
-				await _applySpell(client, caster, caster, profile!.WeaveElements[componentIndex] << 8);
+			if (hasElement)
+				await _out.ApplyBuff(client, caster, caster, profile!.WeaveElements[componentIndex] << 8);
 
 			// Do NOT re-send the reactive list now: the client HIDES the component picker itself once a component is
 			// picked (the capture sends no list after an add - the next one is frame 1705, ~8s later). Re-sending it
 			// immediately is what kept the picker up and let the player spam. Instead bring the picker back after the
 			// cooldown by re-sending the full list, so the flow is: pick -> picker disappears -> ~cooldown -> reappears.
-			if (profile != null && _sendIir != null)
+			if (profile != null)
 			{
 				Task.RunAfter(ElementCooldownMs, async () =>
 				{
@@ -120,13 +105,12 @@ namespace Faolan.GameServer.Combat
 
 					// Refresh the Spellweaving buff at the NEXT stack level (a new buff id that overlaps the previous
 					// one still ticking down -> the brief x2 the user sees), then bring the picker back.
-					if (_applySpell != null)
-					{
+							{
 						session.SpellweaveBuffStack++;
-						await _applySpell(client, caster, caster, (profile.StackingBuffBase + (uint)session.SpellweaveBuffStack) << 8);
+						await _out.ApplyBuff(client, caster, caster, (profile.StackingBuffBase + (uint)session.SpellweaveBuffStack) << 8);
 					}
 
-					await _sendIir(client, SpellweaveCodec.BuildReactiveList(caster, profile.WeaveElements));
+					await _out.SendIir(client, SpellweaveCodec.BuildReactiveList(caster, profile.WeaveElements));
 				}, _logger);
 			}
 
@@ -152,9 +136,7 @@ namespace Faolan.GameServer.Combat
 
 		private Task Feedback(INetworkClient client, string message)
 		{
-			return _feedback != null
-				? _feedback(client, message)
-				: Task.CompletedTask;
+			return _out.SendFeedback(client, message);
 		}
 
 		// Deactivate: fire the accumulated weave and close the trance. Emits the s2c fire burst (0xF98E10B3); the
@@ -170,24 +152,23 @@ namespace Faolan.GameServer.Combat
 			// Clear IsSpellweaving FIRST so the meter/add loops stop before we tear the trance down.
 			session.IsSpellweaving = false;
 
-			if (profile != null && _sendIir != null)
+			if (profile != null)
 			{
 				foreach (var stage in profile.FireStages)
-					await _sendIir(client, SpellweaveCodec.BuildFireStage(caster, stage));
+					await _out.SendIir(client, SpellweaveCodec.BuildFireStage(caster, stage));
 			}
 
 			// The trance-EXIT animation: take the character out of the weave pose (without it it stays stuck kneeling).
-			if (_sendIir != null)
-				await _sendIir(client, BehaviorAnimationCodec.SpellweaveTranceExit(caster));
+			await _out.SendIir(client, BehaviorAnimationCodec.SpellweaveTranceExit(caster));
 
 			// Close the trance: remove the trance buffs (their rank-1 end-twins) so the client clears the icons + exits
 			// the trance pose (capture: the cancel press removes 37F298 + the current 37E5A8 stack). Without this the
 			// client stays in the trance visually even though the server considers the weave done (#the cancel bug).
-			if (profile != null && _removeBuff != null)
+			if (profile != null)
 			{
-				await _removeBuff(client, caster, caster, 0x37F29800); // Spellweaving (main)
-				await _removeBuff(client, caster, caster, 0x3969D000); // Arcane Drought
-				await _removeBuff(client, caster, caster, (profile.StackingBuffBase + (uint)session.SpellweaveBuffStack) << 8); // current Spellweaving(1) stack
+				await _out.RemoveBuff(client, caster, caster, 0x37F29800); // Spellweaving (main)
+				await _out.RemoveBuff(client, caster, caster, 0x3969D000); // Arcane Drought
+				await _out.RemoveBuff(client, caster, caster, (profile.StackingBuffBase + (uint)session.SpellweaveBuffStack) << 8); // current Spellweaving(1) stack
 			}
 
 			await Feedback(client, $"Spellweave fired with {session.WeaveComponents.Count} components.");
@@ -215,7 +196,7 @@ namespace Faolan.GameServer.Combat
 				while (await timer.WaitForNextTickAsync())
 				{
 					var session = client.Session;
-					if (session.Account == null || !session.IsSpellweaving || _sendIir == null)
+					if (session.Account == null || !session.IsSpellweaving)
 						return; // trance closed
 
 					if (session.Energy > 0)
@@ -226,9 +207,8 @@ namespace Faolan.GameServer.Combat
 						var drain = (uint)Math.Min(EnergyBaseDrain + tick * EnergyDrainAccelPerTick, EnergyDrainMax);
 						drain = Math.Min(drain, session.Energy);
 						session.Energy -= drain;
-						if (_sendSprintBar != null)
-							await _sendSprintBar(client, session.Energy);
-						await _sendIir(client, SpellweaveCodec.BuildStatGauge(caster, session.Energy, -(int)drain, SpellweaveCodec.StaminaGauge, SpellweaveCodec.StaminaScale));
+						await _out.SendSprintBar(client, session.Energy);
+						await _out.SendIir(client, SpellweaveCodec.BuildStatGauge(caster, session.Energy, -(int)drain, SpellweaveCodec.StaminaGauge, SpellweaveCodec.StaminaScale));
 					}
 					else
 					{
@@ -236,14 +216,13 @@ namespace Faolan.GameServer.Combat
 						if (!exhausted)
 						{
 							exhausted = true;
-							if (_applySpell != null)
-								await _applySpell(client, caster, caster, ExhaustedBuff);
+									await _out.ApplyBuff(client, caster, caster, ExhaustedBuff);
 						}
 
 						// Phase 2: energy empty -> the health DoT (the damage the player takes for over-weaving).
 						var dmg = (uint)Math.Min(DotDrainPerTick, (int)health);
 						health -= dmg;
-						await _sendIir(client, SpellweaveCodec.BuildStatGauge(caster, health, -(int)dmg, SpellweaveCodec.DotGauge, SpellweaveCodec.DotScale));
+						await _out.SendIir(client, SpellweaveCodec.BuildStatGauge(caster, health, -(int)dmg, SpellweaveCodec.DotGauge, SpellweaveCodec.DotScale));
 					}
 
 					tick++;
@@ -264,7 +243,7 @@ namespace Faolan.GameServer.Combat
 			// Not from the saddle. The trance ROOTS the caster (the move handler pins their position while
 			// IsSpellweaving) and plays a kneeling pose, neither of which a mounted character can do - the rider would
 			// be pinned mid-gallop with the horse animating underneath. Refuse the open rather than produce that.
-			if (_isMounted?.Invoke(client) == true)
+			if (_out.IsMounted(client))
 			{
 				_logger.LogInformation("Spellweave START refused for '{Name}': mounted.", session.Character.Name);
 				await Feedback(client, "You cannot weave spells while mounted.");
@@ -288,26 +267,23 @@ namespace Faolan.GameServer.Combat
 
 			// Ensure the persistent energy loop is running (inits the pool + regens it between weaves) so the weave
 			// drains from the CURRENT tracked value, not a stale 0 left by a previous weave.
-			_ensureEnergyLoop?.Invoke(client);
+			_out.EnsureEnergyLoop(client);
 			_logger.LogInformation("Spellweave START for '{Name}' (class={Class}, param=0x{Param:X}).", session.Character.Name, session.Character.Class, param);
 
 			// The three trance buffs (ApplySpell): open the trance state client-side. Their real durations are stamped
 			// from Spells.DurationMs by the ApplySpell helper (matches the capture byte-for-byte).
-			if (_applySpell != null)
 			{
 				foreach (var buff in profile.TranceBuffs)
-					await _applySpell(client, caster, caster, buff);
+					await _out.ApplyBuff(client, caster, caster, buff);
 			}
 
 			// The trance-pose animation (BCC): make the character play the spellweaving stance (without it the buffs
 			// render but the body stays idle).
-			if (_sendIir != null)
-				await _sendIir(client, BehaviorAnimationCodec.SpellweaveTrance(caster));
+			await _out.SendIir(client, BehaviorAnimationCodec.SpellweaveTrance(caster));
 
 			// The reactive element list: tells the client which weave elements it can add (the componentIndex on each
 			// add indexes into this list). This is what unblocks the adds.
-			if (_sendIir != null)
-				await _sendIir(client, SpellweaveCodec.BuildReactiveList(caster, profile.WeaveElements));
+			await _out.SendIir(client, SpellweaveCodec.BuildReactiveList(caster, profile.WeaveElements));
 
 			// The trance METER: stream the draining energy bar (then the health DoT) while the trance is open.
 			_ = RunTranceMeter(client, caster); // fire-and-forget; it logs its own exceptions and stops itself

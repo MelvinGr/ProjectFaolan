@@ -33,7 +33,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : RpcServer<ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, ISpellEffectOutbound, ITradeOutbound, IGameServerProvider
+	public partial class GameServerListener : RpcServer<ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -257,15 +257,9 @@ namespace Faolan.GameServer
 			_buffStats = new BuffStatEffects(database, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a),
 				SendLearnSpell, _fatality); // announced level-up ability + spell unlocks (#209/#73/#74), fatality burst (#140)
-			_spellweave = new SpellweaveService(logger, (c, msg) => agentServerDispatcher.SendSystemMessage(c.Session.Character.Id, msg),
-				ApplySpellweaveBuff, // trance + component buffs (correct 54-byte blob)
-				// reactive element list + fire burst (docs/subsystems/combos.md); WorldIir.Send frames the body for you,
-				// the codec returns the bare record (PetIirCodec convention), so prefix it here.
-				WorldIir.Send,
-				SendBuffRemoval, // trance-buff end-twins on cancel/fire
-				SendSprintBar, // DispatchUpdateSprintbar (0x200E) - the yellow energy bar
-				EnsureEnergyLoop, // start the persistent energy tracking/regen loop
-				c => _simulation.PlayerWorldEntity(c)?.IsMounted == true); // the trance roots + kneels, so not from the saddle
+			// Seven Func<> seams collapsed into ISpellweaveOutbound, which this listener implements
+			// (GameServerListener.Buffs.cs) - see the port for why.
+			_spellweave = new SpellweaveService(logger, this);
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression);
 			_stockConversation = new StockConversationService(logger, database);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, agentServerDispatcher, logger);

@@ -517,5 +517,42 @@ namespace Faolan.GameServer
 			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, newLevel, levelsGained))
 				await SendFeedback(client, AttributeChangedFeedback.BuildXml(attributeId, amount), AttributeChangedFeedback.TypeFlags, AttributeChangedFeedback.Footer);
 		}
+		// --- ISpellweaveOutbound: the spellweaving FSM's wire + world-state surface. Explicit forwards to the
+		// methods that already existed, which is all the seven Func<> seams ever were - see ISpellweaveOutbound.
+		bool ISpellweaveOutbound.IsMounted(INetworkClient client)
+		{
+			return _simulation.PlayerWorldEntity(client)?.IsMounted == true;
+		}
+
+		void ISpellweaveOutbound.EnsureEnergyLoop(INetworkClient client)
+		{
+			EnsureEnergyLoop(client);
+		}
+
+		Task ISpellweaveOutbound.ApplyBuff(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId)
+		{
+			return ApplySpellweaveBuff(client, applyTo, applyFrom, wireSpellId);
+		}
+
+		Task ISpellweaveOutbound.RemoveBuff(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId)
+		{
+			return SendBuffRemoval(client, applyTo, applyFrom, wireSpellId);
+		}
+
+		Task ISpellweaveOutbound.SendFeedback(INetworkClient client, string message)
+		{
+			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, message);
+		}
+
+		// WorldIir.Send frames the body; the codecs return the bare record (PetIirCodec convention).
+		Task ISpellweaveOutbound.SendIir(INetworkClient client, byte[] record)
+		{
+			return WorldIir.Send(client, record);
+		}
+
+		Task ISpellweaveOutbound.SendSprintBar(INetworkClient client, uint energy)
+		{
+			return SendSprintBar(client, energy);
+		}
 	}
 }
