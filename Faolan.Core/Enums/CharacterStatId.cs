@@ -396,18 +396,45 @@ namespace Faolan.Core.Enums
 		WeaponDamageRanged = 0x448,
 	}
 
-	// The x100 / x10 wire scale a stat's player-facing value is multiplied by (vitals x100, attributes x10, the rest
-	// x1). CharacterStatBlock.Set applies it so callers pass display values.
+	/// <summary>
+	///     The wire scale a stat's player-facing value is multiplied by - vitals ×100, attributes ×10, the rest ×1.
+	///     <see cref="CharacterStatBlock" />.Set applies it, so callers pass DISPLAY values.
+	/// </summary>
+	/// <remarks>
+	///     ⚠️ <b>This table is INCOMPLETE, and its default is a silent wrong answer.</b> An id it does not name falls to
+	///     ×1, which reads exactly like "this stat is unscaled" - and that is how a ×100 stat went unnoticed:
+	///     <see cref="CharacterStatId.WeaponDamageMelee" /> was in the enum but not here, so a feat granting 3800 would
+	///     have been applied as +3800% where the client renders +38%. Assume an id absent from this switch is
+	///     UNMEASURED rather than known to be ×1.
+	///     <para>
+	///         <b>How an entry gets added: only from a RENDERED value.</b> The client keeps its whole stat table in WIRE
+	///         units and divides only when it draws, so the `ClientInterface` log cannot tell you a scale - mining 64
+	///         client-applied deltas across 11 stats against our stored amounts returns a ratio of 1 for every one of
+	///         them (which does independently confirm our <c>ItemStatModifier.Amount</c> values are right, just not
+	///         their scale). A scale needs a number a human can read: a tooltip or the character sheet, against the
+	///         wire value we hold. That is how the three groups below were each established.
+	///     </para>
+	/// </remarks>
 	public static class CharacterStatIdExtensions
 	{
 		public static uint GetScale(this CharacterStatId statId)
 		{
 			return statId switch
 			{
+				// Vitals: proven on screen twice (2026-07-27) - wire 428500 renders as 4285 health, 205300 as 2053
+				// stamina. MagicDamage's ×100 came from the in-client Royal Signet tooltip (#3).
 				CharacterStatId.HealthCurrent or CharacterStatId.HealthMax or CharacterStatId.StaminaMax or CharacterStatId.StaminaCurrent or CharacterStatId.ManaMax or CharacterStatId.ManaCurrent
 					or CharacterStatId.MagicDamage or CharacterStatId.NaturalManaRegen or CharacterStatId.NaturalStaminaRegen or CharacterStatId.PvpMagicDamage or CharacterStatId.MagicDamageHoly
 					or CharacterStatId.BowRangeModifier => 100,
 
+				// The weapon-damage PERCENTS. Proven in-client 2026-07-27: the feat `Lotus Blades` holds 3800/7600/
+				// 11400/15200/19000 across its five ranks on 1095 and the client's own tooltip renders rank 1 as
+				// "+38% Weapon Damage (Melee)" - exactly ×100, and the whole curve reads 38/76/114/152/190. 1096 is
+				// its ranged twin: same LDB 615 family, adjacent id, and the same feat trees carry both.
+				CharacterStatId.WeaponDamageMelee or CharacterStatId.WeaponDamageRanged => 100,
+
+				// Attributes: proven on a freshly created Necromancer's sheet (2026-07-27) - a 10-wire class base
+				// renders as 1.
 				CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity => 10,
 
 				_ => 1

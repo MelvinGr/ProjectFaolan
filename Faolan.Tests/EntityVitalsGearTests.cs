@@ -74,6 +74,24 @@ namespace Faolan.Tests
 			Assert.Contains(ids, r => r.StatId == CharacterStatId.ManaMax);
 		}
 
+		// The GetScale entries that were established from a RENDERED client value, pinned so a future edit cannot
+		// quietly drop one. Each number here was read off the client, not inferred: wire 428500 drew as 4285 health,
+		// a 10-wire class base drew as 1 Strength, and the feat `Lotus Blades` holds 3800 on WeaponDamageMelee where
+		// the tooltip reads "+38%". The ×1 default is deliberately NOT asserted - an id missing from the table is
+		// unmeasured, not known-unscaled (see the remarks on CharacterStatIdExtensions).
+		[Theory]
+		[InlineData(CharacterStatId.HealthMax, 100u)]
+		[InlineData(CharacterStatId.StaminaMax, 100u)]
+		[InlineData(CharacterStatId.ManaMax, 100u)]
+		[InlineData(CharacterStatId.WeaponDamageMelee, 100u)]
+		[InlineData(CharacterStatId.WeaponDamageRanged, 100u)]
+		[InlineData(CharacterStatId.Strength, 10u)]
+		[InlineData(CharacterStatId.Dexterity, 10u)]
+		public void GetScale_KeepsTheInClientProvenScales(CharacterStatId stat, uint expected)
+		{
+			Assert.Equal(expected, stat.GetScale());
+		}
+
 		private static Character Guardian(uint hp, uint stamina)
 		{
 			return new Character
