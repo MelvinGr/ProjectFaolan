@@ -140,5 +140,44 @@ namespace Faolan.Tests
 			BitConverter.GetBytes(99u).CopyTo(overrun, 12);
 			Assert.Empty(RdbFeatImporter.ParseIdMap(overrun));
 		}
+
+		// The PREREQUISITE edges (#251): columns 2/3/4 of the same 48-byte entry, zero where unused. Two feats, one
+		// with a single prerequisite and one with three, so both the "skip the zeros" and the ordering are covered.
+		[Fact]
+		public void ParsePrereqs_ReadsUpToThreeEdgesPerFeat_InColumnOrder()
+		{
+			var body = new byte[20 + (2 * 48)];
+			BitConverter.GetBytes(1000042u).CopyTo(body, 0);
+			BitConverter.GetBytes(2u).CopyTo(body, 12);
+
+			BitConverter.GetBytes(6001u).CopyTo(body, 20);      // feat
+			BitConverter.GetBytes(6000u).CopyTo(body, 20 + 8);  // col2 - its only prerequisite
+
+			BitConverter.GetBytes(300000u).CopyTo(body, 68);    // feat
+			BitConverter.GetBytes(6001u).CopyTo(body, 68 + 8);  // col2
+			BitConverter.GetBytes(70u).CopyTo(body, 68 + 12);   // col3
+			BitConverter.GetBytes(80u).CopyTo(body, 68 + 16);   // col4
+
+			var edges = RdbFeatImporter.ParsePrereqs(body);
+
+			Assert.Equal(4, edges.Count);
+			Assert.Equal((6001u, 0, 6000u), edges[0]);
+			Assert.Equal((300000u, 0, 6001u), edges[1]);
+			Assert.Equal((300000u, 1, 70u), edges[2]);
+			Assert.Equal((300000u, 2, 80u), edges[3]);
+		}
+
+		// A feat with no prerequisites must produce NO rows - a 0 edge would claim "requires feat 0", which is a
+		// dependency on a feat that does not exist.
+		[Fact]
+		public void ParsePrereqs_EmitsNothing_ForAFeatWithNoPrerequisites()
+		{
+			var body = new byte[20 + 48];
+			BitConverter.GetBytes(1000042u).CopyTo(body, 0);
+			BitConverter.GetBytes(1u).CopyTo(body, 12);
+			BitConverter.GetBytes(6000u).CopyTo(body, 20);
+
+			Assert.Empty(RdbFeatImporter.ParsePrereqs(body));
+		}
 	}
 }

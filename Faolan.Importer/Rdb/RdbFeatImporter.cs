@@ -41,6 +41,9 @@ namespace Faolan.Importer.Rdb
 		private const uint FeatTableId = 1;
 		private const uint FeatTableType = 1000042;
 		private const int MapEntryLength = 48;
+
+		// Columns 2/3/4 of an entry: up to three prerequisite wire feat ids.
+		private const int PrereqSlots = 3;
 		private const int MapHeaderLength = 20;
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir, string? proxyBase = null, ILogger? logger = null)
@@ -93,10 +96,16 @@ namespace Faolan.Importer.Rdb
 
 			// The wire-id -> template-id map (#467). Delete+reinsert: it is wholly derived from one RDB resource.
 			var mapRows = 0;
-			var map = ReadIdMap(rdb);
+			var prereqRows = 0;
+			var (map, prereqs) = ReadIdMapAndPrereqs(rdb);
 			if (map.Count > 0)
 			{
+				// TWO saves, deliberately. FeatPrereq cascades off FeatIdMap, so deleting the old map rows and adding
+				// the new ones in ONE change-tracker run makes EF cascade the delete onto the prereq rows we just
+				// added - they vanish on save, silently, and the table ends up empty.
+				db.FeatPrereqs.RemoveRange(await db.FeatPrereqs.ToListAsync());
 				db.FeatIdMaps.RemoveRange(await db.FeatIdMaps.ToListAsync());
+				await db.SaveChangesAsync();
 				foreach (var (wire, template, baseIndex) in map)
 				{
 					db.FeatIdMaps.Add(new FeatIdMap
@@ -106,6 +115,23 @@ namespace Faolan.Importer.Rdb
 						BaseIndex = baseIndex
 					});
 					mapRows++;
+				}
+
+				// Only edges whose OWNER is a mapped feat: the FK points at FeatIdMap, and an orphan edge would fail
+				// the insert rather than being quietly useful.
+				var mapped = map.Select(m => m.Wire).ToHashSet();
+				foreach (var (wire, sequence, requires) in prereqs)
+				{
+					if (!mapped.Contains(wire))
+						continue;
+
+					db.FeatPrereqs.Add(new FeatPrereq
+					{
+						WireFeatId = wire,
+						Sequence = sequence,
+						RequiresWireFeatId = requires
+					});
+					prereqRows++;
 				}
 			}
 
@@ -156,13 +182,13 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0)
+			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0)
 				await db.SaveChangesAsync();
 
-			logger?.LogInformation("RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows.",
-				found.Count, skippedUnnamed, added, updated, effectRows, mapRows);
+			logger?.LogInformation("RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges.",
+				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows);
 
-			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows);
+			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows);
 		}
 
 		// Splits a catalog name into its tree / group / base / rank. The client encodes all four in the string:
@@ -229,12 +255,14 @@ namespace Faolan.Importer.Rdb
 		// Reads the wire-id -> template-id map out of RDB 1000042 id 1 - the resource FeatTable_t::LoadStaticData
 		// loads. Header [u32 type][u32 id][u32 1][u32 count][u32 version], then `count` 48-byte entries whose first
 		// two words are (wireId, templateId) and whose 11th is the base index.
-		public static List<(uint Wire, uint Template, uint BaseIndex)> ReadIdMap(RdbReader rdb)
+		public static (List<(uint Wire, uint Template, uint BaseIndex)> Map, List<(uint Wire, int Sequence, uint Requires)> Prereqs)
+			ReadIdMapAndPrereqs(RdbReader rdb)
 		{
 			var map = new List<(uint, uint, uint)>();
+			var prereqs = new List<(uint, int, uint)>();
 			var matches = rdb.EntriesOfType(FeatTableType).Where(e => e.Id == FeatTableId).ToList();
 			if (matches.Count == 0)
-				return map;
+				return (map, prereqs);
 
 			var entry = matches[0];
 			byte[] body;
@@ -244,10 +272,10 @@ namespace Faolan.Importer.Rdb
 			}
 			catch
 			{
-				return map;
+				return (map, prereqs);
 			}
 
-			return ParseIdMap(body);
+			return (ParseIdMap(body), ParsePrereqs(body));
 		}
 
 		// Split out from the RDB read so it can be tested against bytes without the client install.
@@ -273,6 +301,36 @@ namespace Faolan.Importer.Rdb
 			}
 
 			return map;
+		}
+
+		// The PREREQUISITE edges of the same entries: columns 2/3/4 (offsets +8/+12/+16) are wire feat ids a feat
+		// depends on, zero where unused. Returned in column order so the rows keep the client's ordering.
+		public static List<(uint Wire, int Sequence, uint Requires)> ParsePrereqs(byte[] body)
+		{
+			var edges = new List<(uint, int, uint)>();
+			if (body.Length < MapHeaderLength || Word(body, 0) != FeatTableType)
+				return edges;
+
+			var count = (int)Word(body, 12);
+			if (count <= 0 || MapHeaderLength + ((long)count * MapEntryLength) > body.Length)
+				return edges;
+
+			for (var i = 0; i < count; i++)
+			{
+				var at = MapHeaderLength + (i * MapEntryLength);
+				var wire = Word(body, at);
+				if (wire == 0)
+					continue;
+
+				for (var slot = 0; slot < PrereqSlots; slot++)
+				{
+					var requires = Word(body, at + 8 + (slot * 4));
+					if (requires != 0)
+						edges.Add((wire, slot, requires));
+				}
+			}
+
+			return edges;
 		}
 
 		// The record's TAIL, after the name: [u32 2][u32 14][u32 ListFrame(n)] then n x 40-byte effect elements whose
@@ -336,6 +394,6 @@ namespace Faolan.Importer.Rdb
 
 		public readonly record struct Parsed(string? Tree, string? Group, string BaseName, int Rank);
 
-		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows);
+		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows, int PrereqEdges);
 	}
 }

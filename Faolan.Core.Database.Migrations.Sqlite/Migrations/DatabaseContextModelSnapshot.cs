@@ -1340,6 +1340,22 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("FeatIdMaps");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatPrereq", b =>
+                {
+                    b.Property<uint>("WireFeatId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("RequiresWireFeatId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("WireFeatId", "Sequence");
+
+                    b.ToTable("FeatPrereqs");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.Guild", b =>
                 {
                     b.Property<uint>("Id")
@@ -3892,6 +3908,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
                         .WithMany()
                         .HasForeignKey("FeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatPrereq", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.FeatIdMap", "Feat")
+                        .WithMany()
+                        .HasForeignKey("WireFeatId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

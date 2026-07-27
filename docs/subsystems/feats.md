@@ -24,10 +24,14 @@ and don't contain.
 - **The feat CATALOG now exists** (#251): `Feat` (15,834 rows from the RDB 1000020 plaintext templates - id, name, tree,
   group, rank) + `FeatEffect` (22,486 stat modifiers across 12,316 feats, 158 distinct stats). Built by
   `RdbFeatImporter` (the `rdb-feats` module), no TEA key and no capture needed.
-- **Tier, prerequisites and cost are NOT in the RDB.** Diffing records across four different trees moves only the id,
-  the block count and the name - no header word tracks tree depth. The client's own
-  `"**Error: GDB and RDB data for feat "` says why: it JOINS server-side GDB data with the RDB record, and the tree's
-  SHAPE lives on the GDB side. So the RDB gives what a feat DOES, not where it sits.
+- **The PREREQUISITE GRAPH is in the RDB** - in the 1000042 feat TABLE, not the 1000020 template. Columns 2/3/4 of
+  each entry are up to three prerequisite wire feat ids: `FeatPrereq`, **5,501 edges over 5,489 feats**, and the
+  chains resolve end to end (`Equip: One Handed Edged Weapons 2` requires `... 1`). Together with `FeatIdMap` this is
+  the tree's shape. (An earlier pass concluded prereqs were not in the RDB at all - that was true of the 1000020
+  TEMPLATE, which is what it diffed, and wrong about the client's data as a whole.)
+- **Feat POINTS per level: RDB type 1000044 id 1**, 71 entries of `[level 10..80][points][tsPoints]`. Levels
+  20/30/40/50/60/70/75/80 grant **two** points, so the level-80 budget is **79**, not the 71 that `1 per level from
+  10` implies. `FeatRules.PointBudget` was wrong until it was checked against this table.
 - **The wire<->catalog id map is SOLVED** (#467): the client does not derive it, it LOADS it.
   `FeatTable_t::LoadStaticData()` (`FUN_00788e20`) reads **RDB type 1000042, id 1** - a 20-byte header
   `[type][id][1][count][version]` then `count` 48-byte entries whose first two words are `(wireId, templateId)`.

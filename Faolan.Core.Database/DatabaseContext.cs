@@ -18,6 +18,7 @@ namespace Faolan.Core.Database
 		DbSet<Feat> Feats { get; }
 		DbSet<FeatEffect> FeatEffects { get; }
 		DbSet<FeatIdMap> FeatIdMaps { get; }
+		DbSet<FeatPrereq> FeatPrereqs { get; }
 		DbSet<Account> Accounts { get; }
 		DbSet<AccountClaim> AccountClaims { get; }
 		DbSet<AppearanceChoice> AppearanceChoices { get; }
@@ -102,6 +103,7 @@ namespace Faolan.Core.Database
 		public DbSet<Feat> Feats { get; set; }
 		public DbSet<FeatEffect> FeatEffects { get; set; }
 		public DbSet<FeatIdMap> FeatIdMaps { get; set; }
+		public DbSet<FeatPrereq> FeatPrereqs { get; set; }
 		public DbSet<Account> Accounts { get; set; }
 		public DbSet<AccountClaim> AccountClaims { get; set; }
 		public DbSet<AppearanceChoice> AppearanceChoices { get; set; }
