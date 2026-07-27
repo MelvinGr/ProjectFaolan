@@ -80,26 +80,45 @@ namespace Faolan.Core.Database.Repositories
 		private const uint FirstCharacterId = EntityHandles.CharacterInstanceBase;
 		private const uint MaxCharacterId = EntityHandles.MaxCharacterId;
 
+		// Trains feats onto a character. A feat id is composite (base*100 + rank) and retail keeps exactly ONE id per
+		// BASE - the highest rank held. No captured character carries two ranks of one base, so ranking a feat up
+		// REPLACES its row; keeping both would put an entry on the wire retail never sends and would lengthen the
+		// spawn's pre-IIR frame. A request at or below the rank already held is ignored - feats do not downgrade here
+		// (the untrain path is a full reset, ClearCharacterFeats).
+		//
+		// The replacement keeps the original Sequence: the wire order is TRAIN order, and ranking a feat up is not a
+		// new train, so it holds its place in the list.
 		public async Task<int> AddCharacterFeats(uint characterId, IEnumerable<uint> featIds)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var existing = await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).ToListAsync();
-			var have = existing.Select(f => f.FeatId).ToHashSet();
+			var byBase = existing.ToDictionary(f => f.FeatId / 100);
 			var nextSeq = existing.Count == 0
 				? 0
 				: existing.Max(f => f.Sequence) + 1;
 			var added = 0;
 			foreach (var id in featIds)
 			{
-				if (!have.Add(id))
-					continue;
+				var sequence = nextSeq;
+				if (byBase.TryGetValue(id / 100, out var held))
+				{
+					if (held.FeatId % 100 >= id % 100)
+						continue; // already at that rank or higher
 
-				ctx.CharacterFeats.Add(new CharacterFeat
+					sequence = held.Sequence;
+					ctx.CharacterFeats.Remove(held); // FeatId is part of the key, so a rank-up is a delete + insert
+				}
+				else
+					nextSeq++;
+
+				var row = new CharacterFeat
 				{
 					CharacterId = characterId,
 					FeatId = id,
-					Sequence = nextSeq++
-				});
+					Sequence = sequence
+				};
+				ctx.CharacterFeats.Add(row);
+				byBase[id / 100] = row;
 				added++;
 			}
 

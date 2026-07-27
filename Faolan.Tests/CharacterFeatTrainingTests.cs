@@ -1,0 +1,122 @@
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
+using Microsoft.EntityFrameworkCore;
+using Xunit;
+
+namespace Faolan.Tests
+{
+	// AddCharacterFeats keeps ONE row per feat BASE - the highest rank held (Gitea #251).
+	//
+	// A feat id is composite (base*100 + rank) and retail stores only the current rank: no captured character carries
+	// two ranks of one base. The repository used to dedup on the exact id, so ranking a feat up left BOTH rows, which
+	// would put an entry on the spawn's feat list that retail never sends and lengthen the pre-IIR frame with it.
+	//
+	// Runs against a real throwaway SQLite DB rather than a fake, because the rank-up is a DELETE + INSERT (FeatId is
+	// part of the primary key) and that is exactly the part worth exercising for real.
+	public class CharacterFeatTrainingTests
+	{
+		[Fact]
+		public async Task RankingAFeatUp_ReplacesTheRow_AndKeepsItsPlaceInTheList()
+		{
+			var (repo, options, path) = NewDb();
+			try
+			{
+				// Two feats trained in order, then the FIRST is ranked up. It must not become a third entry, and it
+				// must not jump to the end of the list - the wire order is train order.
+				await repo.AddCharacterFeats(CharacterId, [80001u, 90000u]);
+				await repo.AddCharacterFeats(CharacterId, [80004u]);
+
+				await using var ctx = new DatabaseContext(options);
+				var rows = await ctx.CharacterFeats.Where(f => f.CharacterId == CharacterId).OrderBy(f => f.Sequence).ToListAsync(TestContext.Current.CancellationToken);
+
+				Assert.Equal([80004u, 90000u], rows.Select(f => f.FeatId));
+				Assert.Equal([0, 1], rows.Select(f => f.Sequence));
+			}
+			finally
+			{
+				Cleanup(path);
+			}
+		}
+
+		[Fact]
+		public async Task TrainingALowerRank_IsIgnored()
+		{
+			var (repo, options, path) = NewDb();
+			try
+			{
+				await repo.AddCharacterFeats(CharacterId, [80004u]);
+				var added = await repo.AddCharacterFeats(CharacterId, [80002u, 80004u]);
+
+				await using var ctx = new DatabaseContext(options);
+				var rows = await ctx.CharacterFeats.Where(f => f.CharacterId == CharacterId).ToListAsync(TestContext.Current.CancellationToken);
+
+				Assert.Equal(0, added);
+				Assert.Equal([80004u], rows.Select(f => f.FeatId));
+			}
+			finally
+			{
+				Cleanup(path);
+			}
+		}
+
+		// Distinct bases are unrelated - the replacement must key on the base, not on proximity of the ids.
+		[Fact]
+		public async Task DistinctBases_EachKeepTheirOwnRow()
+		{
+			var (repo, options, path) = NewDb();
+			try
+			{
+				await repo.AddCharacterFeats(CharacterId, [80004u, 80104u, 80200u]);
+
+				await using var ctx = new DatabaseContext(options);
+				var rows = await ctx.CharacterFeats.Where(f => f.CharacterId == CharacterId).OrderBy(f => f.Sequence).ToListAsync(TestContext.Current.CancellationToken);
+
+				Assert.Equal([80004u, 80104u, 80200u], rows.Select(f => f.FeatId));
+			}
+			finally
+			{
+				Cleanup(path);
+			}
+		}
+
+		private const uint CharacterId = 0x01000001;
+
+		private static void Cleanup(string path)
+		{
+			if (File.Exists(path))
+				File.Delete(path);
+		}
+
+		private static (DatabaseRepository Repo, DbContextOptions<DatabaseContext> Options, string Path) NewDb()
+		{
+			var path = Path.Combine(Path.GetTempPath(), $"faolan-feattrain-{Path.GetRandomFileName()}.db");
+			var options = TestDb.Options(path);
+			using (var ctx = new DatabaseContext(options))
+			{
+				ctx.Database.EnsureCreated();
+
+				// CharacterFeat has an FK to Character, which has FKs of its own - seed just enough for the insert.
+				ctx.Maps.Add(new Map { Id = 1, Name = "test" });
+				ctx.Realms.Add(new Realm { Id = 1, Name = "test", IpAddress = "127.0.0.1" });
+				ctx.Accounts.Add(new Account { Id = 1, UserName = "test", Password = "x" });
+				ctx.Characters.Add(new Character { Id = CharacterId, AccountId = 1, RealmId = 1, MapId = 1, Name = "Feattest", Class = ConanClass.Barbarian, Race = Race.Cimmerian, Sex = Sex.Male });
+				ctx.SaveChanges();
+			}
+
+			return (new DatabaseRepository(new Factory(options)), options, path);
+		}
+
+		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
+		{
+			public DatabaseContext CreateDbContext()
+			{
+				return new DatabaseContext(options);
+			}
+		}
+	}
+}

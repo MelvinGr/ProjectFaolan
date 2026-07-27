@@ -29,6 +29,10 @@ and don't contain.
   chains resolve end to end (`Equip: One Handed Edged Weapons 2` requires `... 1`). Together with `FeatIdMap` this is
   the tree's shape. (An earlier pass concluded prereqs were not in the RDB at all - that was true of the 1000020
   TEMPLATE, which is what it diffed, and wrong about the client's data as a whole.)
+- **One row per feat BASE.** A feat id is composite (`base*100 + rank`) and retail stores only the current rank -
+  no captured character carries two ranks of one base. So `AddCharacterFeats` REPLACES on rank-up (keeping the
+  feat's original `Sequence`, since the wire order is train order) and ignores a request at or below the rank held.
+  It used to dedup on the exact id, which would have put an entry on the spawn's list that retail never sends.
 - **Training ENFORCES the tree.** `FeatService` rejects a train whose resulting set leaves a prerequisite unmet
   (`FeatRules.MissingPrerequisites`), alongside the existing point-budget check.
   ⚠️ A prerequisite is satisfied by the **same base at an equal-or-higher rank**, not by the exact id. The graph
