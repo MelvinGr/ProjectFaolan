@@ -428,6 +428,13 @@ namespace Faolan.GameServer
 		///         <c>CombatService.ReseedFromMaxStats</c> - that one is for a level change, where full pools are correct.
 		///     </para>
 		///     <para>
+		///         ⚠️ <b>The PUSH here does not match retail and is being reworked (#473).</b> Decoding the
+		///         <c>0x96B8DC59</c> that follows a c2s equip across the corpus, retail sends the CURRENT pools only
+		///         (<c>0x001B</c>/<c>0x01F8</c>/<c>0x01FA</c>, plus BCC State) and never a max - the client derives the
+		///         max from the item it just equipped. Contrast a level-up, which does carry all six. Recomputing our
+		///         internal aggregate here is right and needed for combat/regen; emitting the max is not.
+		///     </para>
+		///     <para>
 		///         ⚠️ Wired into equip and unequip. NOT yet wired into the WEAPON-SET swap (#400,
 		///         <c>WorldBroadcaster</c>), which changes <c>ActiveWeaponSet</c> - and
 		///         <c>GetEquippedStatItems(characterId, set)</c> is set-dependent, so swapping sets changes the gear
