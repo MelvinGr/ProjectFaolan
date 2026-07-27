@@ -7,6 +7,12 @@ namespace Faolan.Core.Rdb.Assets
 	// FCTX/DXT1, and hand back the raw IOz1+zlib blob ready for RdbWriter.InlineEntries. A drop-in higher-res
 	// replacement for a (type,id). Bilinear upscale here is a placeholder for an ML upscaler (Real-ESRGAN etc.) — the
 	// container/encode/inline path is the point; swap the resampler for quality. DXT1 only for now (opaque diffuse).
+	//
+	// ⚠️ NOTHING CALLS THIS. Its only consumer was the Faolan.TextureUpscaler project (GPU ESRGAN upscale + inline),
+	// which has since been removed from the solution, so this is the orphaned driver of a pipeline whose parts are
+	// still live: FctxConverter and FctxEncoder are used and gated by FctxEncoderTests, RdbWriter is used widely.
+	// Kept because #295 is OPEN and this is its in-progress top half, not because anything depends on it - so it is
+	// unexercised code and should be re-verified against a real texture before being trusted.
 	public static class RdbTextureReplacer
 	{
 		// Bilinear resample RGBA32 (row-major, top-down) from (sw,sh) to (dw,dh).
