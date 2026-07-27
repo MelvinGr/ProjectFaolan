@@ -1136,17 +1136,17 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					// `/gm` in the client sends FanaticCommandIIR ("Fanatic" is its own name for the GM command channel).
+					// A GM command in the client sends FanaticCommandIIR ("Fanatic" is its own name for the GM subsystem).
 					// We can read what it asked for, but what to send BACK is not decoded - no corpus capture contains
 					// one - so report the parsed command rather than inventing a reply (#448/#449).
 					if ((uint)pbOpcode == FanaticCommandCodec.Opcode)
 					{
 						var fanatic = FanaticCommandCodec.TryParse(rawPayload);
-						Logger.LogInformation("GameServer /gm FanaticCommandIIR: command={Command} targets=({TargetA},{TargetB}) arg='{Argument}' ({RawLength} bytes)",
-							fanatic?.Command, fanatic?.TargetA, fanatic?.TargetB, fanatic?.Argument, rawPayload.Length);
+						Logger.LogInformation("GameServer FanaticCommandIIR: text='{Text}' word0={Word0} targets=({TargetA},{TargetB}) ({RawLength} bytes)",
+							fanatic?.Text, fanatic?.Word0, fanatic?.TargetA, fanatic?.TargetB, rawPayload.Length);
 						await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, fanatic is { } f
-							? $"/gm received: command {f.Command}, targets ({f.TargetA}, {f.TargetB}){(f.Argument.Length > 0 ? $", arg '{f.Argument}'" : "")}. The server's reply is not decoded yet (#448)."
-							: $"/gm received but the FanaticCommandIIR body did not parse ({rawPayload.Length} bytes).");
+							? $"GM command received: '{f.Text}' (word0 {f.Word0}, targets {f.TargetA}/{f.TargetB}). The server's reply is not decoded yet (#448)."
+							: $"GM command received but the FanaticCommandIIR body did not parse ({rawPayload.Length} bytes).");
 						break;
 					}
 
