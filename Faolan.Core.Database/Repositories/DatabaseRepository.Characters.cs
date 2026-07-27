@@ -7,6 +7,7 @@ using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
+using Faolan.Core.Constants;
 
 namespace Faolan.Core.Database.Repositories
 {
@@ -73,11 +74,10 @@ namespace Faolan.Core.Database.Repositories
 
 	public partial class DatabaseRepository
 	{
-		// Character ids ARE the on-wire client instance and the burst replay substitutes them into captured 4-byte
-		// protobuf-varint slots, so they must encode to <= 4 varint bytes (id <= 0x0FFFFFFF). Allocate from this base
-		// continuing the existing 0x013xxxxx rows; a 5-byte id (> 0x0FFFFFFF) crashes the client (see DatabaseContext).
-		private const uint FirstCharacterId = 0x02000000;
-		private const uint MaxCharacterId = 0x0FFFFFFF;
+		// Character ids ARE the on-wire client instance (see EntityHandles for the whole number line and why the
+		// ceiling exists). Allocated from the base upward, continuing the existing 0x013xxxxx rows.
+		private const uint FirstCharacterId = EntityHandles.CharacterInstanceBase;
+		private const uint MaxCharacterId = EntityHandles.MaxCharacterId;
 
 		public async Task<int> AddCharacterFeats(uint characterId, IEnumerable<uint> featIds)
 		{

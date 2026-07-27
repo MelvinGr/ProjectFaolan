@@ -1,3 +1,4 @@
+using Faolan.Core.Constants;
 using Faolan.Core.Network.Codecs.Spawn;
 using Xunit;
 
@@ -36,8 +37,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void HandleBase_IsClearOfCharacterInstanceRange()
 		{
-			// Character instances are >= 0x02000000; allocated handles must not collide with them.
-			Assert.True(SpawnHandleTable.HandleBase < 0x02000000u);
+			// Character instances start at EntityHandles.CharacterInstanceBase; allocated handles must stay below it.
+			Assert.True(SpawnHandleTable.HandleBase < EntityHandles.CharacterInstanceBase);
 		}
 	}
 }

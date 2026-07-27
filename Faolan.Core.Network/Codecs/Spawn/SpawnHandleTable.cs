@@ -15,7 +15,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	public sealed class SpawnHandleTable
 	{
 		// Base chosen to sit in the same low range retail uses while staying clear of character instances
-		// (which are >= 0x02000000). Allocation is sequential from here.
+		// (EntityHandles.CharacterInstanceBase). Allocation is sequential from here, and staying below that base is
+		// the invariant that keeps a spawned entity from colliding with a character - asserted in SpawnHandleTableTests.
 		public const uint HandleBase = 0x00090000;
 		private readonly Dictionary<string, uint> _byKey = [];
 

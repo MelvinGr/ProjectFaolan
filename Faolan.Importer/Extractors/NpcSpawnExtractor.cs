@@ -8,6 +8,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -48,7 +49,6 @@ namespace Faolan.Importer.Extractors
 	// (>= 0x02000000), whereas NPC handles are small. Dedup key is (map, position); the handle/name vary.
 	public static class NpcSpawnExtractor
 	{
-		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles live in the instance range
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the pre-poll login burst window
 		private const uint SpawnSubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
@@ -256,7 +256,7 @@ namespace Faolan.Importer.Extractors
 				return false; // too short to hold the transform (position + rotation)
 
 			var handle = BinaryPrimitives.ReadUInt32BigEndian(body.AsSpan(12, 4));
-			if (handle >= InstanceRangeStart)
+			if (handle >= EntityHandles.CharacterInstanceBase)
 				return false; // the player's own spawn
 
 			// Another visible PLAYER's spawn (not the own player - a different account in view): it carries

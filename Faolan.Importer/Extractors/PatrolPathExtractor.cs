@@ -8,6 +8,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
 
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -24,7 +25,6 @@ namespace Faolan.Importer.Extractors
 	// same-session mob identity); dedup by (map, position) joins a route to its NPC. Sibling of NpcSpawnExtractor.
 	public static class PatrolPathExtractor
 	{
-		private const uint InstanceRangeStart = 0x02000000; // player/own-entity handles (a player isn't a patrol)
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint MoveTaskSubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
 
@@ -68,7 +68,7 @@ namespace Faolan.Importer.Extractors
 					continue;
 				} // a form the grammar can't parse (should not happen - 6225/6225) - skip defensively
 
-				if (task.Handle == 0 || task.Handle >= InstanceRangeStart)
+				if (task.Handle == 0 || task.Handle >= EntityHandles.CharacterInstanceBase)
 					continue; // a player's MoveTask, not an NPC patrol
 
 				var waypoints = new List<Vector3>();
