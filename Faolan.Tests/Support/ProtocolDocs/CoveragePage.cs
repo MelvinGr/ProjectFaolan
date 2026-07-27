@@ -71,6 +71,11 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("  byte-exact golden guards it yet.");
 			sb.AppendLine("- **V1** — nothing builds or parses it. Genuinely undecoded.");
 			sb.AppendLine();
+			sb.AppendLine("⚠️ **A V2 is not automatically a to-do.** V3 is defined as *a BUILDER reproducing captured bytes*, so a");
+			sb.AppendLine("message we only ever RECEIVE can never reach it — there is nothing to build. The parse-only c2s types");
+			sb.AppendLine("sit at V2 permanently and correctly; read the remaining V2 count as \"types with no golden\", not as work");
+			sb.AppendLine("outstanding, and check the direction before treating one as a gap.");
+			sb.AppendLine();
 			sb.AppendLine("V1 now means what it says. A codec cannot emit an IIR without declaring it: `CodecConventionTests`");
 			sb.AppendLine("forbids a bare opcode hex literal anywhere in `Codecs/`, so every emitter names its");
 			sb.AppendLine("`GameServer0X2000Opcodes.<Type>` member and is attributed here. (Before #317 the scan fell back on a");

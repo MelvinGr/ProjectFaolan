@@ -20,6 +20,11 @@ Every opcode is named (V1). That is NOT the same as its message body being decod
   byte-exact golden guards it yet.
 - **V1** — nothing builds or parses it. Genuinely undecoded.
 
+⚠️ **A V2 is not automatically a to-do.** V3 is defined as *a BUILDER reproducing captured bytes*, so a
+message we only ever RECEIVE can never reach it — there is nothing to build. The parse-only c2s types
+sit at V2 permanently and correctly; read the remaining V2 count as "types with no golden", not as work
+outstanding, and check the direction before treating one as a gap.
+
 V1 now means what it says. A codec cannot emit an IIR without declaring it: `CodecConventionTests`
 forbids a bare opcode hex literal anywhere in `Codecs/`, so every emitter names its
 `GameServer0X2000Opcodes.<Type>` member and is attributed here. (Before #317 the scan fell back on a
