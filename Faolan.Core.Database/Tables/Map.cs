@@ -67,8 +67,18 @@ namespace Faolan.Core.Database.Tables
 		// NOT universal - they differ beach vs mainland; sourced per-map from the capture. Defaults (set by the
 		// migration) are the beach/Tortage values so un-sourced maps behave as before; Old Tarantia (mainland) carries
 		// the "shared world" set. See WorldEntryGeneratedRecords.BuildMapChange / CreateEditorRecordBuilder.BuildPlayfieldFiir.
+		// ⚠️ FieldA and FieldC are PER-MAP with no exceptions - across all 151 captured MapChange records every one for
+		// a given map carries the same pair, which is what identifies them as playfield properties rather than
+		// per-entry state (#451). Both were hardcoded before that (0 and 7), so six of the twelve captured maps -
+		// 1010, 2010, 2040, 4022, 5007 and 11040 - were being sent a wrong value.
+		//
+		// In the decoded structures (docs/subsystems/teleport-changemap.md): FieldA is the PlayfieldProxy's u32[2] -
+		// the slot between the map id (u32[1]) and the character instance (u32[3]) - and FieldC is the THIRD of the
+		// four trailing words PlayfieldFIIR's own reader takes (FUN_008f36e0 -> obj+0x88), the one before the flags.
+		public uint PlayfieldFieldA { get; set; } // PlayfieldProxy u32[2] (0 on most maps, 2 on 2040/4022/5007)
 		public uint PlayfieldCount { get; set; } = 2; // the PlayfieldProxy "count" word (beach 2, Old Tarantia 1)
 		public uint PlayfieldFieldB { get; set; } = 3; // trailer word before the FFFF pair (beach 0x3, Old Tarantia 0x0)
+		public uint PlayfieldFieldC { get; set; } = 7; // the word before the flags (7 on most maps, 0 on 1010/2010/2040/5007, 6 on 11040)
 		public uint PlayfieldFlags { get; set; } // the final PlayfieldFIIR flag word (beach 0, Old Tarantia 1 - the mount-rule bit)
 
 		// The map's real playfield-instance token (#305) - the value the client scopes the character to when it loads

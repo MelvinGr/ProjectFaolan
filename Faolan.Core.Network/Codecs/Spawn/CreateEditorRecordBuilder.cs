@@ -194,7 +194,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// pinned, so they're passed through. Constructing this drives the map change from the Map row + the session
 		// token instead of replaying the captured MapChange.
 		public static byte[] BuildPlayfieldFiir(float posX, float posY, float posZ, uint mapId, uint charInstance, uint count, uint playfieldToken, float nearClip, float farClip, uint flags,
-			uint field58 = 0u, uint fieldB = 0u)
+			uint field58 = 0u, uint fieldB = 0u, uint fieldA = 0u, uint fieldC = 7u)
 		{
 			return new FaolanStream()
 				.WriteUInt32(0u)
@@ -206,7 +206,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteByte(0x62)
 				.WriteUInt32(0x0000C79Cu)
 				.WriteUInt32(mapId)
-				.WriteUInt32(0u)
+				.WriteUInt32(fieldA) // [previously hardcoded 0]: per-MAP, 2 on maps 2040/4022/5007 (#451)
 				.WriteUInt32(charInstance)
 				.WriteUInt32(0u)
 				.WriteUInt32(count)
@@ -223,7 +223,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteUInt32(fieldB) // [previously hardcoded 0]: beach capture carries 0x3, retail Old Tarantia 0x0
 				.WriteUInt32(0xFFFFFFFFu)
 				.WriteUInt32(0xFFFFFFFFu)
-				.WriteUInt32(0x00000007u)
+				.WriteUInt32(fieldC) // [previously hardcoded 7]: per-MAP, 0 on 1010/2010/2040/5007 and 6 on 11040 (#451)
 				.WriteUInt32(flags)
 				.ToArray();
 		}

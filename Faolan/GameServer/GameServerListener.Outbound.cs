@@ -371,10 +371,14 @@ namespace Faolan.GameServer
 			var count = map?.PlayfieldCount ?? 2u;
 			var fieldB = map?.PlayfieldFieldB ?? 3u;
 			var flags = map?.PlayfieldFlags ?? 0u;
+			// #451: the two per-map words that used to be builder constants. The `??` defaults are those constants, so
+			// a map with no imported MapChange behaves exactly as before rather than silently getting a zero.
+			var fieldA = map?.PlayfieldFieldA ?? 0u;
+			var fieldC = map?.PlayfieldFieldC ?? 7u;
 
 			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(MapChangeCodec.BuildIir(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, character.PositionY, character.PositionZ, character.MapId,
-					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB))));
+					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB, fieldA, fieldC))));
 		}
 
 		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared

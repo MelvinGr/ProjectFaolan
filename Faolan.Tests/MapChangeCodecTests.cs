@@ -11,11 +11,14 @@ namespace Faolan.Tests
 	// [u32 subop][body] wrapper MapChangeCodec puts around it, and the offsets its parser reads back out. Both halves
 	// together are what actually goes on the wire, so this compares them against a whole captured record.
 	//
-	// ⚠️ A pass here does NOT mean the record is fully modelled. Across the 151 captured PlayfieldFIIRs, FOUR body
-	// bytes vary that BuildPlayfieldFiir writes as constants - @33, @58, @86 and @98. Two of them (@33 and @98) are
-	// per-MAP: every record for a given playfield carries the same value, and ours are wrong for six of the twelve
-	// captured maps. This golden uses a capture whose four bytes happen to equal our constants, which is exactly why
-	// it can pass while the gap is open. Gitea #451.
+	// ⚠️ A pass here does NOT mean the record is fully modelled. Across the 151 captured PlayfieldFIIRs, four body
+	// words vary that BuildPlayfieldFiir wrote as constants. The two PER-MAP ones are now imported and sent from the
+	// Maps table (PlayfieldFieldA @30 and PlayfieldFieldC @95, which were wrong for six of the twelve captured maps).
+	// The other two - field58 @58 and fieldB @83 - vary WITHIN a map, so they are per-entry state, still supplied by
+	// the caller as constants and still undecoded. Gitea #451.
+	//
+	// This golden uses a capture whose four words equal the values the create path supplies, which is exactly why it
+	// can pass while that half of the gap is open.
 	public class MapChangeCodecTests
 	{
 		// Blablabla_soldier-guardian_create frame 1926 (s2c): the whole IIR content past the carrier's [u32 length],
