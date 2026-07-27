@@ -1273,8 +1273,7 @@ namespace Faolan.Importer.Cli
 
 		// List every (type, id) entry in the RDB index that has the given id, with availability. Used to discover what
 		// id-space a cross-reference lives in (e.g. a character's HeadMesh / *hairmesh resource id) (#275).
-		// The feat/ability catalog's RDB type, and the magic a PLAINTEXT record opens with (`TB\x0f\x00`).
-		private const uint FeatPlaintextMagic = 0x000F4254;
+		// The feat/ability catalog's RDB type.
 		private const uint FeatTemplateType = 1000020;
 
 		// Harvests the feat EFFECT element's kind -> width table empirically (#251).
@@ -1306,7 +1305,7 @@ namespace Faolan.Importer.Cli
 					continue;
 				}
 
-				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != FeatPlaintextMagic)
+				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != FeatTemplateType)
 					continue;
 
 				var (start, count) = RdbFeatImporter.EffectTail(body);
@@ -1333,8 +1332,8 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Classify the RDB feat/ability catalog (type 1000020) into PLAINTEXT vs TEA-ENCRYPTED records, and dump the
-		// plaintext ones (Gitea #251). A plaintext record opens with the `TB\x0f\x00` magic (u32 LE 0x000f4254) - the
-		// same decisive marker the key-crack used as its validation - while an encrypted one opens with `RDBH`.
+		// plaintext ones (Gitea #251). A plaintext record opens with its own TYPE word (1000020 = 0x000F4254, which
+		// renders as `TB\x0f\x00` in a dump and is NOT a magic) while an encrypted one opens with `RDBH`.
 		// The plaintext share needs NO key, so it is a feat catalog we can build today.
 		// --report-arg <substring>  filters the dumped names   --out <dir>  writes feat-catalog.tsv
 		private static void FeatCatalog(string rdbDir, string? filter, string? outDir)
@@ -1367,7 +1366,7 @@ namespace Faolan.Importer.Cli
 					continue;
 				}
 
-				if (BinaryPrimitives.ReadUInt32LittleEndian(body) != FeatPlaintextMagic)
+				if (BinaryPrimitives.ReadUInt32LittleEndian(body) != FeatTemplateType)
 				{
 					// `RDBH` is the TEA-encrypted template header; anything else is a shape we have not seen.
 					if (body[0] == (byte)'R' && body[1] == (byte)'D' && body[2] == (byte)'B' && body[3] == (byte)'H')

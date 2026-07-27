@@ -23,12 +23,13 @@ namespace Faolan.Importer.Captures
 	//
 	// Method: treat every 16-byte window in every captured packet body as a candidate key and TEA-decrypt the target
 	// record's FIRST BLOCK ONLY. That block is decisive and cheap: a plaintext feat record opens
-	// [u32 magic 0x000F4254 "TB"][u32 id], so a correct key yields exactly those 8 bytes and a wrong one effectively
+	// [u32 type 1000020][u32 id], so a correct key yields exactly those 8 bytes and a wrong one effectively
 	// never will. One 8-byte decrypt per candidate rather than a whole record.
 	public static class FeatKeyScanner
 	{
-		// The magic a decrypted feat/item template opens with ("TB").
-		private const uint PlaintextMagic = 0x000F4254;
+		// A decrypted template opens with its own RDB TYPE word - 1000020, which renders as "TB\x0f\x00" in a dump
+		// but is not a magic. That plus the id is the decisive two-word oracle for a correct key.
+		private const uint TemplateTypeWord = 1000020;
 
 		// One target: the encrypted record we are trying to open, and the id its first block must reveal.
 		public readonly record struct Target(uint TemplateId, byte[] FirstBlock);
@@ -70,7 +71,7 @@ namespace Faolan.Importer.Captures
 							var v0 = BinaryPrimitives.ReadUInt32LittleEndian(target.FirstBlock);
 							var v1 = BinaryPrimitives.ReadUInt32LittleEndian(target.FirstBlock.AsSpan(4));
 							Tea.DecryptBlock(ref v0, ref v1, key);
-							if (v0 != PlaintextMagic || v1 != target.TemplateId)
+							if (v0 != TemplateTypeWord || v1 != target.TemplateId)
 								continue;
 
 							hits.Add(new Hit(target.TemplateId, [key[0], key[1], key[2], key[3]], Path.GetFileName(path), i));

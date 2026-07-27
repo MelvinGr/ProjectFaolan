@@ -21,8 +21,8 @@ and don't contain.
   character's **ability/skill** presence list — the spawn's **post-IIR** id-list, a different region *and* a
   different id-space. It gates spell *usability* (see #298) but is unrelated to the feat tree. An earlier RE
   conflated the two; that has been corrected across code + memories.
-- **The feat CATALOG now exists** (#251): `Feat` (**19,540** rows from the RDB 1000020 plaintext templates - id, name,
-  description, tree, group, rank) + `FeatEffect` (**23,936** stat modifiers, 158 distinct stats). Built by
+- **The feat CATALOG now exists** (#251): `Feat` (**19,777** rows from the RDB 1000020 plaintext templates - id, name,
+  description, tree, group, rank) + `FeatEffect` (**23,321** stat modifiers, 173 distinct stats). Built by
   `RdbFeatImporter` (the `rdb-feats` module), no TEA key and no capture needed.
 - **Feats, spells and items are the SAME RDB record layout** - `[u32 type][u32 id][u32 1000000][...]` - so they
   share the stat-modifier region AND its parser, `ItemTemplateStatModifiers.Parse(body[12..])`. (The "TB magic" that
@@ -31,12 +31,15 @@ and don't contain.
   is what makes it right where five hand-rolled attempts were wrong (fixed stride 3.1% bad, kind-range delimiter
   24.2%, measured per-kind width table 7.2%). It scores **2.2% on MORE rows**, and it carries the effect KIND that
   the hand-rolled version dropped - 53045 flat vs 53067 percent-stored-x100.
-- **Why items score 0% and feats 2.2%**: `RdbItemImporter` WHITELISTS (`ApplicableStatIds.Contains`), accepting only
-  the 17 stats it can name; feats touch 344, so that curated list does not transfer. The feat residue is also not
-  spread out - **kind 53182 carries 480 of the 561 bad rows (86%)** while 53045 is 61 of 22,539 (0.3%) and
-  53220/53139/53176/53189/53067 are clean. 53182 is not in the documented kind set, so its payload is probably not a
-  (stat, amount) pair at all: decoding that beats whitelisting, which would also silence the real-but-unnamed stats
-  (the 1084..1094 family, values 100..900, looks deliberate).
+- **Why items score 0.00% and feats 0.35%**: `RdbItemImporter` WHITELISTS (`ApplicableStatIds.Contains`), accepting
+  only the 17 stats it can name; feats touch 173, so that curated list does not transfer.
+  **Kind 53182 is excluded** - decoded, and it is NOT a stat modifier: its element is `(index, FOURCC)`, the "amount"
+  being four ASCII characters identical across a feat family (`0x4450434E` "DPCN" on every Perception feat,
+  `0x5633534D` "V3SM" on Hide In Shadows, `0x454F4854` "EOHT" on the crafting ranks). It carried 480 of the 561 bad
+  rows; dropping the whole KIND rather than the rows that failed a stat lookup took the residue to **81 of 23,321**.
+  The 1,145 of its rows that landed on named stats were just as bogus - a small index is often a valid stat id.
+  ⚠️ 17 stat ids remain unnamed by LDB 615, including the `1084..1094` family (values 100..900) which looks
+  deliberate - identify those before anyone adds a whitelist, which would silence exactly them.
 - **TWO record shapes carry the name**, and knowing only the first hid every feat the captured characters hold:
   `[u32 len][name]` and `[u16 nameLen][u16 descLen][name][description]`. The u16 shape also yields the TOOLTIP.
 - **The feat/item discriminator is the client's own feat TABLE, not the Flags word.** A template that RDB 1000042
@@ -56,9 +59,9 @@ and don't contain.
   ⚠️ **No `GetScale()` division**, unlike the gear path: `FeatEffect.Value` is a DISPLAY value where
   `ItemStatModifier.Amount` is raw wire. Strength (scale 10) carries 1..9 in the feat table and HealthMax
   (scale 100) carries 100..700 - dividing those would under-grant every feat by 10x or 100x.
-  ⚠️ **Only 2,056 of the 6,593 mapped feats have readable effects**, and NONE of the three captured characters'
-  feats do - theirs all resolve to TEA-encrypted templates. So the path is live and exercisable (`.feat train 15200`
-  grants +720 to two attack ratings) but contributes nothing to an imported character until the keys are cracked.
+  **2,939 of the 6,593 mapped feats have readable effects.** The captured characters DO now resolve - all 56 of
+  their feats name a real feat - but only 9 of those 56 carry stat effects; the rest are feats whose record has no
+  modifier region (Hellfire's tooltip is "reduces the casting time of Hellfire Breath", which is not a stat).
 - **Training ENFORCES the tree.** `FeatService` rejects a train whose resulting set leaves a prerequisite unmet
   (`FeatRules.MissingPrerequisites`), alongside the existing point-budget check.
   ⚠️ A prerequisite is satisfied by the **same base at an equal-or-higher rank**, not by the exact id. The graph

@@ -16,14 +16,15 @@ namespace Faolan.Importer.Rdb
 {
 	// Builds the FEAT catalog (Gitea #251) from the client's RDB, with no key crack and no capture.
 	//
-	// RDB type 1000020 holds items AND feats. An item template is TEA-encrypted (`RDBH`); a feat is PLAINTEXT and
-	// opens with the "TB" magic, so ~20.8% of the 98,048 records read without a key - and that share is essentially
+	// RDB type 1000020 holds items AND feats. An item template is TEA-encrypted and opens with `RDBH`; a PLAINTEXT
+	// record opens with its own TYPE word, so ~20.8% of the 98,048 read without a key - and that share is essentially
 	// the feats, because the items are the encrypted part. `--report feat-catalog` prints the split.
 	//
-	// Record layout:
-	//   [u32 magic 0x000F4254][u32 id][u32 1000000][...u32 fields...][u32 nameLen][name ASCII]
-	// The name length is a u32, NOT a byte - and word [16] is a block count (2 for the 96-byte form, 3/4 for the
-	// longer ones), so the name is found by an aligned scan rather than at a fixed offset.
+	// ⚠️ There is no "TB magic", despite how this reads in a hex dump: 0x000F4254 IS 1000020, which happens to render
+	// as `TB\x0f\x00`. Feats, spells (1040005) and items share ONE layout -
+	//   [u32 type][u32 id][u32 1000000][...u32 fields...][text][stat-modifier region]
+	// - which is why the modifier region has one shared parser (ItemTemplateStatModifiers) rather than a reader per
+	// subsystem. See docs/subsystems/feats.md.
 	public static class RdbFeatImporter
 	{
 		// Word [44] on a feat record. The item templates that survive in plaintext carry 0x200; every other value in
@@ -34,7 +35,6 @@ namespace Faolan.Importer.Rdb
 		private const int EffectElementLength = 40;
 		private const uint ListUnit = 0x3F1;
 
-		private const uint PlaintextMagic = 0x000F4254;
 		private const uint TemplateType = 1000020;
 
 		// The client's own feat TABLE: FeatTable_t::LoadStaticData reads this resource and its entries carry the
@@ -79,7 +79,7 @@ namespace Faolan.Importer.Rdb
 				// Either the client's feat table points at it, or it carries the feat Flags value. The union matters:
 				// the table covers 6,593 templates (every feat the WIRE can name) while Flags reaches a wider catalog
 				// the table does not enumerate.
-				if (body.Length < 48 || Word(body, 0) != PlaintextMagic || (Word(body, 44) != FeatFlags && !mappedTemplates.Contains(e.Id)))
+				if (body.Length < 48 || Word(body, 0) != TemplateType || (Word(body, 44) != FeatFlags && !mappedTemplates.Contains(e.Id)))
 					continue;
 
 				var (name, description) = ReadNameAndDescription(body);
