@@ -14,7 +14,7 @@ namespace Faolan.Tests
 		public void AreaFormula_RoundTripsCapturedBody()
 		{
 			var body = Convert.FromHexString("00000031ce30be4e0000c35001316e7100000007e20000c35000017f80003006fe000007e243a5347d431173f7442aea0e00000000");
-			var a = AreaFormulaCodec.Parse(body);
+			var a = AreaFormula.Parse(body);
 			Assert.Equal(0x01316e71u, a.Handle);
 			Assert.Single(a.Refs);
 			Assert.Equal((0x0000c350u, 0x00017f80u), a.Refs[0]);
@@ -27,7 +27,7 @@ namespace Faolan.Tests
 		public void ChainKill_RoundTripsCapturedBody()
 		{
 			var body = Convert.FromHexString("000000110eed70680000c35001316e710100000002");
-			var c = ChainKillCodec.Parse(body);
+			var c = ChainKill.Parse(body);
 			Assert.Equal(0x01316e71u, c.Handle);
 			Assert.Equal((byte)0x01, c.Env);
 			Assert.Equal(2u, c.Count);
@@ -45,7 +45,7 @@ namespace Faolan.Tests
 		public void SetShadowCoverage_RoundTripsCapturedBody(string hex, uint handle, byte env)
 		{
 			var body = Convert.FromHexString(hex);
-			var c = SetShadowCoverageCodec.Parse(body);
+			var c = SetShadowCoverage.Parse(body);
 
 			Assert.Equal(handle, c.Handle);
 			Assert.Equal(env, c.Env);
@@ -58,16 +58,16 @@ namespace Faolan.Tests
 		[Fact]
 		public void SetShadowCoverage_BuildDefaultsToTheServerEnv()
 		{
-			Assert.Equal(Convert.FromHexString("00000011d6c1f0cc0000c3500802e5d40000000064"), SetShadowCoverageCodec.Build(0x0802e5d4, 100));
+			Assert.Equal(Convert.FromHexString("00000011d6c1f0cc0000c3500802e5d40000000064"), SetShadowCoverage.Build(0x0802e5d4, 100));
 			Assert.Equal(Convert.FromHexString("00000011d6c1f0cc0000c3500802e5d40100000064"),
-				SetShadowCoverageCodec.Build(0x0802e5d4, 100, SetShadowCoverageCodec.ClientEnv));
+				SetShadowCoverage.Build(0x0802e5d4, 100, SetShadowCoverage.ClientEnv));
 		}
 
 		[Fact]
 		public void Crime_RoundTripsCapturedBody()
 		{
 			var body = Convert.FromHexString("00000012c79545040000c35008006f31000100000001");
-			var c = CrimeCodec.Parse(body);
+			var c = Crime.Parse(body);
 			Assert.Equal(0x08006f31u, c.Handle);
 			Assert.Equal((byte)0x01, c.Flag);
 			Assert.Equal(1u, c.Value);
@@ -78,7 +78,7 @@ namespace Faolan.Tests
 		public void Feedback_RoundTripsCapturedBody()
 		{
 			var body = Convert.FromHexString("0000001aba1fd2220000c35001316e71010000000000000064096a3a8401");
-			var f = FeedbackIirCodec.Parse(body);
+			var f = FeedbackIir.Parse(body);
 			Assert.Equal(0x01316e71u, f.Handle);
 			Assert.Equal((byte)0x01, f.Env);
 			Assert.Equal(100u, f.Value);
@@ -91,7 +91,7 @@ namespace Faolan.Tests
 		public void KnubotFinishTrade_RoundTripsCapturedBody()
 		{
 			var body = Convert.FromHexString("000000237446f3fa0000c35001316e710000010000c35000004fec000000000000000000000000");
-			var k = KnubotFinishTradeCodec.Parse(body);
+			var k = KnubotFinishTrade.Parse(body);
 			Assert.Equal(0x01316e71u, k.Handle);
 			Assert.Equal((ushort)1, k.Version);
 			Assert.Equal(0x0000c350u, k.TargetClass);
@@ -104,7 +104,7 @@ namespace Faolan.Tests
 		{
 			// [len=0x1f][subop 4b2a47bf][c350][handle][env][18-byte payload] - the Knubot XML shop payload rides verbatim.
 			var body = Convert.FromHexString("0000001f4b2a47bf0000c35001316e710000010000c35000004fec00000000deadbeef");
-			var k = KnubotStartTradeCodec.Parse(body);
+			var k = KnubotStartTrade.Parse(body);
 			Assert.Equal(0x01316e71u, k.Handle);
 			Assert.Equal(Convert.FromHexString("00010000c35000004fec00000000deadbeef"), k.Payload);
 			Assert.Equal(body, k.ToArray());
@@ -114,7 +114,7 @@ namespace Faolan.Tests
 		public void LockedToChanged_RoundTripsCapturedBody()
 		{
 			var body = Convert.FromHexString("000000156b0aec580000c3500004deea000000c35002165eff");
-			var l = LockedToChangedCodec.Parse(body);
+			var l = LockedToChanged.Parse(body);
 			Assert.Equal(0x0004deeau, l.Handle);
 			Assert.Equal(0x0000c350u, l.TargetClass); // Character
 			Assert.Equal(0x02165effu, l.TargetInstance);
@@ -125,7 +125,7 @@ namespace Faolan.Tests
 		public void Regen_RoundTripsCapturedBody()
 		{
 			var body = Convert.FromHexString("0000001928d0ac990000c35002165eff00000000000000000000000415");
-			var r = RegenCodec.Parse(body);
+			var r = Regen.Parse(body);
 			Assert.Equal(0x02165effu, r.Handle);
 			Assert.Equal(0, r.HealthDelta);
 			Assert.Equal(0, r.ManaDelta);
@@ -137,7 +137,7 @@ namespace Faolan.Tests
 		public void SpellBook_RoundTripsCapturedBody()
 		{
 			var body = Convert.FromHexString("000000116ba109360000c35001316e7100000003f1");
-			var sb = SpellBookCodec.Parse(body);
+			var sb = SpellBook.Parse(body);
 			Assert.Equal(0x01316e71u, sb.Handle);
 			Assert.Equal(0x3F1u, sb.ListMarker);
 			Assert.Equal(body, sb.ToArray());
@@ -148,9 +148,9 @@ namespace Faolan.Tests
 		{
 			var body = Convert.FromHexString(
 				"000000696c3009370000c35001316df100004a1f2c004a1f2c00000000000000145455363145e485bb5235153d50b6c704d40ad68845e485bb5235153d50b6c704d40ad688b290805c29e627cab290805c29e627ca000000010000000300000000000000000000000000000000");
-			var t = TemplateActionCodec.Parse(body);
+			var t = TemplateAction.Parse(body);
 			Assert.Equal(0x01316df1u, t.Handle);
-			Assert.Equal(TemplateActionCodec.TemplateBytes, t.Template.Length);
+			Assert.Equal(TemplateAction.TemplateBytes, t.Template.Length);
 			Assert.Equal(1u, t.F1);
 			Assert.Equal(3u, t.F2);
 			Assert.Equal(body, t.ToArray());
@@ -160,7 +160,7 @@ namespace Faolan.Tests
 		public void UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf()
 		{
 			var body = Convert.FromHexString("00000019a74d28140000c35000017e3600000000080a06086510b6fc05");
-			var u = UpdateInventoryCodec.Parse(body);
+			var u = UpdateInventory.Parse(body);
 			Assert.Equal(0x00017e36u, u.Handle);
 			// the length-prefixed protobuf (a ProtoInventoryGame) is carried intact.
 			Assert.Equal(Convert.FromHexString("0a06086510b6fc05"), u.InventoryProtobuf);

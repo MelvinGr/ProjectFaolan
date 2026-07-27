@@ -201,7 +201,7 @@ the target out in the field also sends it home. WORKS in-client (it moves + leas
 
 On arrival home the NPC now also emits a **StopIIR** (`StopCodec` → `BroadcastNpcStop`, the `NpcStopped`
 tick effect) to formally close the move stream (#190), and on engage the broadcaster pushes the NPC's
-**aggro** — a `HateListUpdate` + `ThreatLevel` (`HateListCodec`/`ThreatLevelCodec` → `BroadcastNpcAggro`,
+**aggro** — a `HateListUpdate` + `ThreatLevel` (`HateListCodec`/`ThreatLevel` → `BroadcastNpcAggro`,
 #216) — alongside the combat-mode weapon-draw. Both are gated by `NpcAutoAttackEnabled`.
 
 **Walk gait + slight snap.** The 61-byte form has no speed field, so the client uses a default

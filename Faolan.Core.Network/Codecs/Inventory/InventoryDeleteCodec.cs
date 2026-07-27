@@ -35,7 +35,7 @@ namespace Faolan.Core.Network.Codecs.Inventory
 		// drop descriptor. `body` must be positioned at the IIR body start (just past the [len][subop] prefix).
 		public static (uint CharInstance, ProtoDeleteItemIIR Delete) Parse(FaolanStream body)
 		{
-			body.ReadUInt32(); // 0xC350 entity-class tag
+			body.ReadUInt32(); // EntityClass.Character entity-class tag
 			var charInstance = body.ReadUInt32();
 			body.ReadUInt32(); // reserved
 			var delete = body.ReadProtobufByteLength<ProtoDeleteItemIIR>();

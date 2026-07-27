@@ -400,7 +400,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			var hate = HateListCodec.Build(npc.Handle, target.Handle);
-			var threat = ThreatLevelCodec.Build(npc.Handle, 1, 1);
+			var threat = ThreatLevel.Build(npc.Handle, 1, 1);
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{

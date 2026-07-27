@@ -52,7 +52,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			{
 				s.ReadUInt32(); // len
 				s.ReadUInt32(); // subop (0x6D314743)
-				s.ReadUInt32(); // 0xC350 marker
+				s.ReadUInt32(); // EntityClass.Character
 				var instance = s.ReadUInt32();
 				s.ReadArray(1); // lead flag 0x00
 				var newLevel = s.ReadUInt32();

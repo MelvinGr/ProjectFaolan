@@ -23,21 +23,21 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// Both captures carry 100, from two different characters on two different maps, so the scale is a percentage and
 	// 100 is "fully in shadow" (or the value a character out in the open reports - the corpus has no second value to
 	// tell those apart). It is an INTEGER: 0x00000064 read as a float is a denormal.
-	public record SetShadowCoverageCodec(uint Handle, byte Env, uint Percent) : ICodec<SetShadowCoverageCodec>
+	public record SetShadowCoverage(uint Handle, byte Env, uint Percent) : ICodec<SetShadowCoverage>
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.SetShadowCoverageIIR;
 
 		/// <summary>The env byte the CLIENT sends with; the server's echo carries 0.</summary>
 		public const byte ClientEnv = 0x01;
 
-		public static SetShadowCoverageCodec Read(FaolanStream s)
+		public static SetShadowCoverage Read(FaolanStream s)
 		{
 			s.ReadUInt32(); // length
 			s.ReadUInt32(); // subop
-			s.ReadUInt32(); // 0xC350
+			s.ReadUInt32(); // EntityClass.Character
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
-			return new SetShadowCoverageCodec(handle, env, s.ReadUInt32());
+			return new SetShadowCoverage(handle, env, s.ReadUInt32());
 		}
 
 		public void Write(FaolanStream s)
@@ -47,10 +47,10 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		public static byte[] Build(uint handle, uint percent, byte env = 0x00)
 		{
-			return new SetShadowCoverageCodec(handle, env, percent).ToArray();
+			return new SetShadowCoverage(handle, env, percent).ToArray();
 		}
 
-		public static SetShadowCoverageCodec Parse(byte[] body)
+		public static SetShadowCoverage Parse(byte[] body)
 		{
 			return Read(new FaolanStream(body));
 		}

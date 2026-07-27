@@ -7,22 +7,22 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// base prefix (FUN_009a7e00, a u16 streaming version) then a target entity ref + trailer. Body observed as
 	// [u16 version][u32 targetClass = 0xC350][u32 targetInstance][u64][u32]. Grammar from the client reader
 	// (docs/re/v1-iir-readers.md), byte-exact.
-	public record KnubotFinishTradeCodec(uint Handle, byte Env, ushort Version, uint TargetClass, uint TargetInstance, ulong Trailer64, uint Trailer32) : ICodec<KnubotFinishTradeCodec>
+	public record KnubotFinishTrade(uint Handle, byte Env, ushort Version, uint TargetClass, uint TargetInstance, ulong Trailer64, uint Trailer32) : ICodec<KnubotFinishTrade>
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.KnubotFinishTradeIIR;
 
-		public static KnubotFinishTradeCodec Read(FaolanStream s)
+		public static KnubotFinishTrade Read(FaolanStream s)
 		{
 			s.ReadUInt32(); // length
 			s.ReadUInt32(); // subop
-			s.ReadUInt32(); // 0xC350
+			s.ReadUInt32(); // EntityClass.Character
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
 			var version = s.ReadUInt16();
 			var targetClass = s.ReadUInt32();
 			var targetInstance = s.ReadUInt32();
 			var trailer64 = s.ReadUInt64();
-			return new KnubotFinishTradeCodec(handle, env, version, targetClass, targetInstance, trailer64, s.ReadUInt32());
+			return new KnubotFinishTrade(handle, env, version, targetClass, targetInstance, trailer64, s.ReadUInt32());
 		}
 
 		public void Write(FaolanStream s)
@@ -39,7 +39,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(Trailer32));
 		}
 
-		public static KnubotFinishTradeCodec Parse(byte[] body)
+		public static KnubotFinishTrade Parse(byte[] body)
 		{
 			return Read(new FaolanStream(body));
 		}

@@ -55,7 +55,7 @@ namespace Faolan.Core.Network.Codecs.Feats
 			if (r.ReadUInt32() != Opcode)
 				return false;
 
-			r.ReadUInt32(); // 0xC350 type word
+			r.ReadUInt32(); // EntityClass.Character
 			var handle = r.ReadUInt32();
 			r.ReadByte(); // constant 0x00
 			var parsedState = r.ReadByte();

@@ -65,7 +65,7 @@ namespace Faolan.Core.Network.Codecs.Team
 
 		public static TeamMemberRecord Read(FaolanStream s)
 		{
-			s.ReadUInt32(); // 0xC350
+			s.ReadUInt32(); // EntityClass.Character
 			var m = new TeamMemberRecord
 			{
 				CharacterId = s.ReadUInt32(),

@@ -4,7 +4,7 @@ using Faolan.Core.Network.Constants;
 namespace Faolan.Core.Network.Codecs.Economy
 {
 	// PLAYER-TO-PLAYER trade (Gitea #101) - distinct from the vendor/auction paths in this folder, and from
-	// KnubotStartTradeCodec (which opens an NPC vendor). Decoded from login_2-clients_group-trade-friend, where both
+	// KnubotStartTrade (which opens an NPC vendor). Decoded from login_2-clients_group-trade-friend, where both
 	// clients are on tape, so every message is seen from BOTH sides; tools/capture/decode_team_trade_friend.py reads
 	// them all to their exact end.
 	//

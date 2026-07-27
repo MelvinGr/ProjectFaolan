@@ -110,7 +110,7 @@ namespace Faolan.Core.Network.Codecs.Text
 			{
 				s.ReadUInt32(); // len
 				s.ReadUInt32(); // subop (0x8D5A8B6B)
-				s.ReadUInt32(); // 0xC350 marker
+				s.ReadUInt32(); // EntityClass.Character
 				var instance = s.ReadUInt32();
 				s.ReadArray(1); // lead flag 0x01
 				s.ReadUInt64(); // reserved 0

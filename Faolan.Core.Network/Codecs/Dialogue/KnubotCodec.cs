@@ -120,11 +120,11 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		// Reads the carrier marker + player instance, then the KnubotBase header (env, version, marker, npc handle).
 		private static uint ReadHeader(FaolanStream s, out byte env, out uint npcHandle)
 		{
-			s.ReadUInt32(); // 0xC350 marker
+			s.ReadUInt32(); // EntityClass.Character
 			var player = s.ReadUInt32(); // player instance (carrier handle)
 			env = s.ReadByte();
 			s.ReadUInt16(); // version (1)
-			s.ReadUInt32(); // 0xC350 marker
+			s.ReadUInt32(); // EntityClass.Character
 			npcHandle = s.ReadUInt32();
 			return player;
 		}

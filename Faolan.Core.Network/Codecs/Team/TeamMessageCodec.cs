@@ -87,7 +87,7 @@ namespace Faolan.Core.Network.Codecs.Team
 		// c2s TeamInvite (0x2003): who to invite, then three bytes (0, 0, 1 in every capture).
 		public static uint ParseInviteTarget(FaolanStream s)
 		{
-			s.ReadUInt32(); // 0xC350
+			s.ReadUInt32(); // EntityClass.Character
 			return s.ReadUInt32();
 		}
 
@@ -95,7 +95,7 @@ namespace Faolan.Core.Network.Codecs.Team
 		// a bare [u32 class][u32 id].
 		public static uint ParseCharacterId(FaolanStream s)
 		{
-			s.ReadUInt32(); // 0xC350
+			s.ReadUInt32(); // EntityClass.Character
 			return s.ReadUInt32();
 		}
 	}

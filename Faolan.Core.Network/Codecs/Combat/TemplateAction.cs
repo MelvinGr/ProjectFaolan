@@ -7,20 +7,20 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// 68 bytes on the wire) then six u32. The struct is item-identity data - a name/length region + item keys (the
 	// B2 90 80 5C 29 E6 27 CA equip-identity pattern + TEA-key-like blocks), so it is carried verbatim; the six
 	// trailing u32 are constructed. Grammar from the client reader (docs/re/v1-iir-readers.md), byte-exact.
-	public record TemplateActionCodec(uint Handle, byte Env, byte[] Template, uint F1, uint F2, uint F3, uint F4, uint F5, uint F6) : ICodec<TemplateActionCodec>
+	public record TemplateAction(uint Handle, byte Env, byte[] Template, uint F1, uint F2, uint F3, uint F4, uint F5, uint F6) : ICodec<TemplateAction>
 	{
 		public const int TemplateBytes = 68;
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.TemplateActionIIR;
 
-		public static TemplateActionCodec Read(FaolanStream s)
+		public static TemplateAction Read(FaolanStream s)
 		{
 			s.ReadUInt32(); // length
 			s.ReadUInt32(); // subop
-			s.ReadUInt32(); // 0xC350
+			s.ReadUInt32(); // EntityClass.Character
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
 			var template = s.ReadArray(TemplateBytes);
-			return new TemplateActionCodec(handle, env, template, s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32());
+			return new TemplateAction(handle, env, template, s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32(), s.ReadUInt32());
 		}
 
 		public void Write(FaolanStream s)
@@ -39,7 +39,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(F6));
 		}
 
-		public static TemplateActionCodec Parse(byte[] body)
+		public static TemplateAction Parse(byte[] body)
 		{
 			return Read(new FaolanStream(body));
 		}

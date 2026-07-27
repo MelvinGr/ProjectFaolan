@@ -51,10 +51,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void ThreatLevel_BuildsByteExact()
 		{
-			var p = ThreatLevelCodec.Parse(Convert.FromHexString(ThreatLevelBody));
+			var p = ThreatLevel.Parse(Convert.FromHexString(ThreatLevelBody));
 			Assert.Equal(0x01316E71u, p.Handle);
 			Assert.Equal(1, p.Flag);
-			Assert.Equal(ThreatLevelBody, Convert.ToHexStringLower(ThreatLevelCodec.Build(p.Handle, p.Threat, p.Flag, p.Env)));
+			Assert.Equal(ThreatLevelBody, Convert.ToHexStringLower(ThreatLevel.Build(p.Handle, p.Threat, p.Flag, p.Env)));
 		}
 	}
 }

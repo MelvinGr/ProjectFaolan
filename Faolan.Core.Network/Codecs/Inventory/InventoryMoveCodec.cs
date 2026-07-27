@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.Inventory
 		// descriptor. `body` must be positioned at the IIR body start (just past the [len][subop] carrier prefix).
 		public static (uint CharInstance, ProtoMoveInventoryItemIIR Move) Parse(FaolanStream body)
 		{
-			body.ReadUInt32(); // 0xC350 entity-class tag
+			body.ReadUInt32(); // EntityClass.Character entity-class tag
 			var charInstance = body.ReadUInt32();
 			body.ReadUInt32(); // reserved
 			var move = body.ReadProtobufByteLength<ProtoMoveInventoryItemIIR>();

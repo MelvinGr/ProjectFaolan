@@ -52,6 +52,28 @@ namespace Faolan.Tests
 
 		private static IEnumerable<Type> CodecTypes => typeof(ICodec<>).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith(CodecsNamespace, StringComparison.Ordinal));
 
+		// (6) The two codec SHAPES keep distinct names. A `*Codec`/`*Builder` is a static MODULE of stateless ops; a
+		// wire VALUE is a record/class named after the value it holds, implementing ICodec<T> (see ICodec.cs). So a
+		// type that implements ICodec<T> is a value and must not wear the module suffix.
+		//
+		// Thirteen did - AreaFormulaCodec, ChainKillCodec, CrimeCodec, RegenCodec, ... - one batch of V1 IIR decoders
+		// that all copied the same wrong shape, which is how `ChainKillCodec.Parse(body)` came to return a
+		// `ChainKillCodec`: a "codec" that is a value. The sibling types got it right by nesting the value inside the
+		// module (CombatShieldCodec.Message, StatDamageCodec.Message, HateListCodec.Message), so both spellings of one
+		// idea were in the same folder.
+		[Fact]
+		public void TypesImplementingICodec_AreNotNamedCodec()
+		{
+			var bad = CodecTypes
+				.Where(t => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICodec<>)))
+				.Where(t => t.Name.EndsWith("Codec", StringComparison.Ordinal) || t.Name.EndsWith("Builder", StringComparison.Ordinal))
+				.Select(t => t.FullName!)
+				.ToList();
+
+			Assert.True(bad.Count == 0,
+				"a type implementing ICodec<T> is a wire VALUE - name it after the value, not `*Codec`/`*Builder` (those suffixes mean a static codec module):\n  " + string.Join("\n  ", bad));
+		}
+
 		// (5) The entity object-CLASS word comes from EntityClass, never a hand-rolled 0xC350. Same disease as the
 		// ListFrame rule below, and further along: docs/entity-class-ids.md already records that EntityClass "replaced
 		// ~a dozen ad-hoc local constants" - and then nine of them grew back, because nothing was watching. They were

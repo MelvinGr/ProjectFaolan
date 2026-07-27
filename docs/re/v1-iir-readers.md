@@ -27,7 +27,7 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
   (2026-07-22, `FUN_0079dd10`): the three fields are per-tick `[+health][+mana][+stamina]` deltas (×100 wire
   scale, signed - can drain) that the client ADDS to the current vitals (stats 0x1B/0x1FA/0x1F8). So retail
   regenerates the bars smoothly with a compact 12-byte delta instead of pushing a full 0x96B8DC59 stat block;
-  `RegenCodec` models this and the `WorldSimulation` regen tick emits it (delta = the per-tick rise).
+  `Regen` models this and the `WorldSimulation` regen tick emits it (delta = the per-tick rise).
   The delta lands through the **same setter as a full stat block** — `StatUpdateIIR_c`'s apply (`FUN_007a00e0`)
   calls `entity+0x10c` vtable `+0xc` with `(statId, value)`, and `FUN_0079dd10` calls `+8` (get) then that same
   `+0xc` with `(statId, current + delta)` — so a client that renders one renders the other; both resolve the
@@ -50,14 +50,14 @@ read `std::string`. Body = the carrier `[len][subop][0xC350][handle][env]` then 
 ## Status
 
 Grammar decoded + a byte-exact codec with a captured round-trip for **all twelve** (`V1IirCodecTests`) — the IIR
-coverage matrix is now **0 V1**. Codecs: `RegenCodec`, `LockedToChangedCodec`, `ChainKillCodec`,
-`SetShadowCoverageCodec`,
-`SpellBookCodec`, `FeedbackIirCodec`, `CrimeCodec`, `UpdateInventoryCodec` (frames `[handle][env][u32 pbLen]
-[ProtoInventoryGame protobuf]`), `TemplateActionCodec` (`[68-B item struct][u32×6]`), `KnubotFinishTradeCodec`,
-`AreaFormulaCodec` (the two `0x3F1` ref+position lists, fully modelled), and `KnubotStartTradeCodec`.
+coverage matrix is now **0 V1**. Codecs: `Regen`, `LockedToChanged`, `ChainKill`,
+`SetShadowCoverage`,
+`SpellBook`, `FeedbackIir`, `Crime`, `UpdateInventory` (frames `[handle][env][u32 pbLen]
+[ProtoInventoryGame protobuf]`), `TemplateAction` (`[68-B item struct][u32×6]`), `KnubotFinishTrade`,
+`AreaFormula` (the two `0x3F1` ref+position lists, fully modelled), and `KnubotStartTrade`.
 
-Two carry an inner structure verbatim rather than re-modelling an existing subsystem: `UpdateInventoryCodec`
-carries the item **protobuf** (deserialize with `ProtoInventoryGame`/`ProtoAcgItem`), and `KnubotStartTradeCodec`
+Two carry an inner structure verbatim rather than re-modelling an existing subsystem: `UpdateInventory`
+carries the item **protobuf** (deserialize with `ProtoInventoryGame`/`ProtoAcgItem`), and `KnubotStartTrade`
 carries the Knubot **XML `<remoteformat>` shop dialogue** payload (the conversation-packet grammar) — both
-byte-exact, both with the frame constructed. `TemplateActionCodec` carries its 68-B item-identity struct verbatim
+byte-exact, both with the frame constructed. `TemplateAction` carries its 68-B item-identity struct verbatim
 (name + item keys) with the six trailing u32 typed. The rest are fully field-typed.

@@ -80,7 +80,7 @@ namespace Faolan.Core.Network.Codecs.World
 			if (subop != (uint)GameServer0X2000Opcodes.GameActionListIIR)
 				throw new InvalidOperationException($"GameActionList: subop 0x{subop:X} != 0x{(uint)GameServer0X2000Opcodes.GameActionListIIR:X}");
 
-			r.ReadUInt32(); // 0xC350 type word
+			r.ReadUInt32(); // EntityClass.Character
 			var frameHandle = r.ReadUInt32();
 
 			var flag = r.ReadByte();

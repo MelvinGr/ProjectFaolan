@@ -8,16 +8,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// invariant as GameActionListIIR: wire count = (N+1) * 0x3F1) with a u32 between and after: the first list is
 	// entity refs [class][instance], the second is world positions [x][y][z] floats - an area/AoE formula (a set of
 	// targets + a centre). Grammar from the client reader (docs/re/v1-iir-readers.md), byte-exact.
-	public record AreaFormulaCodec(uint Handle, byte Env, (uint Class, uint Instance)[] Refs, uint FieldA, Vector3[] Positions, uint FieldB) : ICodec<AreaFormulaCodec>
+	public record AreaFormula(uint Handle, byte Env, (uint Class, uint Instance)[] Refs, uint FieldA, Vector3[] Positions, uint FieldB) : ICodec<AreaFormula>
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.AreaFormulaIIR;
 		private const uint ListStride = ListFrame.Unit;
 
-		public static AreaFormulaCodec Read(FaolanStream s)
+		public static AreaFormula Read(FaolanStream s)
 		{
 			s.ReadUInt32(); // length
 			s.ReadUInt32(); // subop
-			s.ReadUInt32(); // 0xC350
+			s.ReadUInt32(); // EntityClass.Character
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
 
@@ -31,7 +31,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			for (var i = 0; i < positions.Length; i++)
 				positions[i] = s.ReadVector3();
 
-			return new AreaFormulaCodec(handle, env, refs, fieldA, positions, s.ReadUInt32());
+			return new AreaFormula(handle, env, refs, fieldA, positions, s.ReadUInt32());
 		}
 
 		public void Write(FaolanStream s)
@@ -54,7 +54,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			});
 		}
 
-		public static AreaFormulaCodec Parse(byte[] body)
+		public static AreaFormula Parse(byte[] body)
 		{
 			return Read(new FaolanStream(body));
 		}

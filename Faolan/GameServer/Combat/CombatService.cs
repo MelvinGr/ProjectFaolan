@@ -685,12 +685,12 @@ namespace Faolan.GameServer.Combat
 
 		// Retail's per-tick vitals regen (RegenIIR 0x28D0AC99, decoded): a compact [+hp][+mana][+stamina] delta the
 		// client ADDS to the current bars, ×100 wire scale. Lets the bars regen smoothly without pushing a full
-		// 0x96B8DC59 block every tick. RegenCodec.Build already frames it as the [u32 len][iir] carrier body, so it
+		// 0x96B8DC59 block every tick. Regen.Build already frames it as the [u32 len][iir] carrier body, so it
 		// rides the DispatchPassBlob directly (WriteArray, not WriteArrayUInt32Length).
 		public static Task SendRegen(INetworkClient client, uint handle, int healthDelta, int manaDelta, int staminaDelta)
 		{
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				RegenCodec.Build(handle, healthDelta, manaDelta, staminaDelta)));
+				Regen.Build(handle, healthDelta, manaDelta, staminaDelta)));
 		}
 
 		// A DoT tick's StatDamageIIR (the health effect of an active bleed/HoT). idx 1 is the typical effect slot in

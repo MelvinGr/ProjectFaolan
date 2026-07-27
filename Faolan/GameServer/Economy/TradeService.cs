@@ -12,7 +12,7 @@ namespace Faolan.GameServer.Economy
 {
 	// PLAYER-TO-PLAYER trade (#101), decoded in docs/subsystems/teams-trade-friends.md from
 	// login_2-clients_group-trade-friend, where both clients are on tape so every message is seen from both sides.
-	// Distinct from the vendor/bank/auction paths beside it, and from KnubotStartTradeCodec (which opens an NPC vendor).
+	// Distinct from the vendor/bank/auction paths beside it, and from KnubotStartTrade (which opens an NPC vendor).
 	//
 	// A trade is LIVE state, like a team and unlike a friend list: it cannot outlive either connection, so nothing here
 	// is persisted. What IS persisted is the outcome, and only at the commit.

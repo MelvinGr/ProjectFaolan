@@ -67,7 +67,7 @@ namespace Faolan.Core.Network.Codecs.World
 			if (s.ReadUInt32() != Opcode)
 				throw new InvalidOperationException("not a CharDCMoveIIR record");
 
-			s.ReadUInt32(); // 0xC350 marker
+			s.ReadUInt32(); // EntityClass.Character
 			var r = new CharDCMove
 			{
 				Handle = s.ReadUInt32(),

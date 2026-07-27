@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			{
 				s.ReadUInt32(); // len
 				s.ReadUInt32(); // subop (0xA8BBEB7F)
-				s.ReadUInt32(); // 0xC350 marker
+				s.ReadUInt32(); // EntityClass.Character
 				var instance = s.ReadUInt32();
 				s.ReadUInt16(); // add flag 0x0001
 				var comboId = s.ReadUInt32();

@@ -41,10 +41,10 @@ the margins, but never invents a golden that isn't there.
 | Level | IIR type | Built by |
 |-------|----------|----------|
 | V3 | `AddToGroupIIR` | `GroupMembershipCodec` |
-| V3 | `AreaFormulaIIR` | `AreaFormulaCodec` |
+| V3 | `AreaFormulaIIR` | `AreaFormula` |
 | V3 | `BankIIR` | `BankIirCodec` |
 | V3 | `BehaviorControlCenterIIR` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `BehaviorHeartbeatCodec`, `CombatPacketCodec`, `WorldDeath` |
-| V3 | `ChainKillIIR` | `ChainKillCodec` |
+| V3 | `ChainKillIIR` | `ChainKill` |
 | V3 | `CharDCMoveIIR` | `CharDCMoveCodec` |
 | V3 | `CharInPlayIIR` | `CreateEditorRecordBuilder` |
 | V3 | `CharacterActionIIR` | `CreateEditorRecordBuilder` |
@@ -54,13 +54,13 @@ the margins, but never invents a golden that isn't there.
 | V3 | `CombatShieldIIR` | `CombatShieldCodec` |
 | V3 | `ComboBookIIR` | `ComboBookIirCodec` |
 | V3 | `CoreClaimIIR` | `CoreClaimListCodec` |
-| V3 | `CrimeIIR` | `CrimeCodec` |
+| V3 | `CrimeIIR` | `Crime` |
 | V3 | `DamageResultIIR` | `CombatEffectBuilder`, `CombatPacketCodec` |
 | V3 | `DestructibleFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `DoorFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `EnergyIIR` | `CombatPacketCodec` |
 | V3 | `FeatIIR` | `FeatIirCodec` |
-| V3 | `FeedbackIIR` | `FeedbackIirCodec` |
+| V3 | `FeedbackIIR` | `FeedbackIir` |
 | V3 | `FormatFeedbackIIR` | `FormatFeedbackCodec` |
 | V3 | `FullPlayerCharacterIIR` | `FullPlayerCharacterBuilder` |
 | V3 | `GameActionListIIR` | `GameActionListCodec` |
@@ -72,10 +72,10 @@ the margins, but never invents a golden that isn't there.
 | V3 | `KnubotAnswerListIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
 | V3 | `KnubotAppendTextIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
 | V3 | `KnubotCloseChatWindowIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
-| V3 | `KnubotFinishTradeIIR` | `KnubotFinishTradeCodec` |
+| V3 | `KnubotFinishTradeIIR` | `KnubotFinishTrade` |
 | V3 | `KnubotOpenChatWindowIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
-| V3 | `KnubotStartTradeIIR` | `KnubotStartTradeCodec` |
-| V3 | `LockedToChangedIIR` | `LockedToChangedCodec` |
+| V3 | `KnubotStartTradeIIR` | `KnubotStartTrade` |
+| V3 | `LockedToChangedIIR` | `LockedToChanged` |
 | V3 | `LookAtIIR` | `ShopOpenBuilder`, `WorldDeath` |
 | V3 | `LootBagFullUpdateIIR` | `LootBagMessageCodec`, `LootContainerTemplate` |
 | V3 | `LootRemoveItemsIIR` | `WorldLoot` |
@@ -94,28 +94,28 @@ the margins, but never invents a golden that isn't there.
 | V3 | `QuestIIR` | `WorldQuest` |
 | V3 | `QuestJournalIIR` | `WorldQuest` |
 | V3 | `QuestLogListIIR` | `WorldQuest` |
-| V3 | `RegenIIR` | `RegenCodec` |
+| V3 | `RegenIIR` | `Regen` |
 | V3 | `RemoveFromGroupIIR` | `GroupMembershipCodec` |
 | V3 | `ScryScriptIIR` | `ScryScript` |
 | V3 | `SetMorphValueIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetNameIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetPosIIR` | `SetPosCodec` |
-| V3 | `SetShadowCoverageIIR` | `SetShadowCoverageCodec` |
+| V3 | `SetShadowCoverageIIR` | `SetShadowCoverage` |
 | V3 | `SimpleCharFullUpdateIIR` | `PlayerSpawnScaffoldCodec` |
 | V3 | `SimpleCharKilledByUpdateIIR` | `WorldDeath` |
 | V3 | `SimpleDynelFullUpdateIIR` | `SimpleDynelMessageCodec` |
 | V3 | `SimpleDynelVisualChangeIIR` | `SimpleDynelMessageCodec`, `WorldLoot` |
-| V3 | `SpellBookIIR` | `SpellBookCodec` |
+| V3 | `SpellBookIIR` | `SpellBook` |
 | V3 | `StatDamageIIR` | `CombatEffectBuilder`, `SpellweaveCodec`, `StatDamageCodec` |
 | V3 | `StatIIR` | `SpellweaveCodec` |
 | V3 | `StatUpdateIIR` | `StatUpdateCodec` |
 | V3 | `StopIIR` | `StopCodec` |
-| V3 | `TemplateActionIIR` | `TemplateActionCodec` |
-| V3 | `ThreatLevelIIR` | `ThreatLevelCodec` |
+| V3 | `TemplateActionIIR` | `TemplateAction` |
+| V3 | `ThreatLevelIIR` | `ThreatLevel` |
 | V3 | `TombStoneFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `TradeskillReplyIIR` | `TradeskillRecipeCodec` |
 | V3 | `TradeskillRequestIIR` | `TradeskillRecipeCodec` |
-| V3 | `UpdateInventoryIIR` | `UpdateInventoryCodec` |
+| V3 | `UpdateInventoryIIR` | `UpdateInventory` |
 | V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
 | V2 | `DeleteItemIIR` | `InventoryDeleteCodec` |
 | V2 | `FanaticCommandIir` | `FanaticCommandCodec` |

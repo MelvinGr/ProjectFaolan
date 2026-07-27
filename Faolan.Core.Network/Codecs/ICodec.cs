@@ -8,6 +8,12 @@ namespace Faolan.Core.Network.Codecs
 	// xml), Parse(record), ...) rather than instances that serialize themselves. Their uniform contract is the
 	// `Opcode` / `HandledTypes` constant instead, enforced by CodecConventionTests. Trying to make one interface
 	// span both shapes is what motivated #317 - see docs/protocol/methodology.md.
+	//
+	// NAMING follows that split, and CodecConventionTests.TypesImplementingICodec_AreNotNamedCodec enforces it: the
+	// `*Codec`/`*Builder` suffix belongs to the static MODULE, so a type implementing this interface is named after
+	// the VALUE it holds (ChainKill, Regen, GuildTagBody, NpcSpellEffect). A value may also live nested inside its
+	// module when the module has other ops to offer - CombatShieldCodec.Message, StatDamageCodec.Message. What it
+	// must not be is `ChainKillCodec.Parse(body)` returning a `ChainKillCodec`: a codec that is a value.
 	public interface ICodec<out T>
 	{
 		void Write(FaolanStream s);

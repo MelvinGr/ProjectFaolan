@@ -19,10 +19,10 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | Level | IIR type | Opcode | Codec | Golden (proof of layout) |
 |-------|----------|--------|-------|--------------------------|
 | V3 | `AddToGroupIIR` | `0x0DF44B73` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
-| V3 | `AreaFormulaIIR` | `0xCE30BE4E` | `AreaFormulaCodec` | [V3: V1IirCodecTests.AreaFormula_RoundTripsCapturedBody] |
+| V3 | `AreaFormulaIIR` | `0xCE30BE4E` | `AreaFormula` | [V3: V1IirCodecTests.AreaFormula_RoundTripsCapturedBody] |
 | V3 | `BankIIR` | `0x0BA1C1CB` | `BankIirCodec` | [V3: BankStorageTests.BuildBankIirRecord_Matches_CapturedBank] |
 | V3 | `BehaviorControlCenterIIR` | `0x642CD3D6` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `BehaviorHeartbeatCodec`, `CombatPacketCodec`, `WorldDeath` | [V3: BehaviorAckTests.UnequipOutOfSlot_AckMatchesCapture] |
-| V3 | `ChainKillIIR` | `0x0EED7068` | `ChainKillCodec` | [V3: V1IirCodecTests.ChainKill_RoundTripsCapturedBody] |
+| V3 | `ChainKillIIR` | `0x0EED7068` | `ChainKill` | [V3: V1IirCodecTests.ChainKill_RoundTripsCapturedBody] |
 | V3 | `CharDCMoveIIR` | `0x4517AA81` | `CharDCMoveCodec` | [V3: CrossPlayerMoveRelayTests.BroadcastPlayerMove_ForwardsTheJumpVerbatim_ToAViewerWhoKnowsTheMover] |
 | V3 | `CharInPlayIIR` | `0x864CFEF8` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `CharacterActionIIR` | `0x6B6FD368` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
@@ -32,13 +32,13 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `CombatShieldIIR` | `0xCFFD0519` | `CombatShieldCodec` | [V3: CombatShieldCodecTests.RoundTrips_ACapturedRecord_ByteExact] |
 | V3 | `ComboBookIIR` | `0xA8BBEB7F` | `ComboBookIirCodec` | [V3: ComboBookIirCodecTests.Build_MatchesCapturedLevelUpCombo] |
 | V3 | `CoreClaimIIR` | `0x06EC1255` | `CoreClaimListCodec` | [V3: CoreClaimListCodecTests.Build_MatchesCapturedClaim] |
-| V3 | `CrimeIIR` | `0xC7954504` | `CrimeCodec` | [V3: V1IirCodecTests.Crime_RoundTripsCapturedBody] |
+| V3 | `CrimeIIR` | `0xC7954504` | `Crime` | [V3: V1IirCodecTests.Crime_RoundTripsCapturedBody] |
 | V3 | `DamageResultIIR` | `0xFEC4158A` | `CombatEffectBuilder`, `CombatPacketCodec` | [V3: CombatEffectBuilderTests.DamageResult_IsByteIdentical] |
 | V3 | `DestructibleFullUpdateIIR` | `0x6BD56736` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `DoorFullUpdateIIR` | `0x33A56FB0` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `EnergyIIR` | `0x40749B8A` | `CombatPacketCodec` | [V3: CombatPacketCodecTests.DamageResultBody_MatchesExpectedLayout] |
 | V3 | `FeatIIR` | `0x28DA68A0` | `FeatIirCodec` | [V3: FeatIirCodecTests.Build_MatchesTheCapturedAck] |
-| V3 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackIirCodec` | [V3: V1IirCodecTests.Feedback_RoundTripsCapturedBody] |
+| V3 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackIir` | [V3: V1IirCodecTests.Feedback_RoundTripsCapturedBody] |
 | V3 | `FormatFeedbackIIR` | `0x8D5A8B6B` | `FormatFeedbackCodec` | [V3: FormatFeedbackCodecTests.BuildAreaNameXml_MatchesCapturedBanner] |
 | V3 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `FullPlayerCharacterBuilder` | [V3: FullCharIirRoundTripTests.BuildRoot_FromCapturedFields_ReEncodesByteIdentically] |
 | V3 | `GameActionListIIR` | `0xF508F4C1` | `GameActionListCodec` | [V3: GameActionListCodecTests.Parse_ThenBuild_RoundTripsByteExact] |
@@ -50,10 +50,10 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `KnubotAnswerListIIR` | `0xF164A4A5` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
 | V3 | `KnubotAppendTextIIR` | `0x4A3D899A` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
 | V3 | `KnubotCloseChatWindowIIR` | `0xC4AF39EB` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
-| V3 | `KnubotFinishTradeIIR` | `0x7446F3FA` | `KnubotFinishTradeCodec` | [V3: V1IirCodecTests.KnubotFinishTrade_RoundTripsCapturedBody] |
+| V3 | `KnubotFinishTradeIIR` | `0x7446F3FA` | `KnubotFinishTrade` | [V3: V1IirCodecTests.KnubotFinishTrade_RoundTripsCapturedBody] |
 | V3 | `KnubotOpenChatWindowIIR` | `0x045B0B0F` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
-| V3 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTradeCodec` | [V3: V1IirCodecTests.KnubotStartTrade_FramesAndCarriesTheDialoguePayloadVerbatim] |
-| V3 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChangedCodec` | [V3: V1IirCodecTests.LockedToChanged_RoundTripsCapturedBody] |
+| V3 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTrade` | [V3: V1IirCodecTests.KnubotStartTrade_FramesAndCarriesTheDialoguePayloadVerbatim] |
+| V3 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChanged` | [V3: V1IirCodecTests.LockedToChanged_RoundTripsCapturedBody] |
 | V3 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder`, `WorldDeath` | [V3: ShopOpenBuilderTests.BuildTradeSelectEcho_IsByteIdenticalToFrame1189] |
 | V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootContainerTemplate` | [V3: LootBagMessageTests.BuildContents_RoundTripsByteExact] |
 | V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
@@ -72,28 +72,28 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `QuestIIR` | `0x97E02314` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `QuestJournalIIR` | `0x79F8C7A1` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `QuestLogListIIR` | `0x504B7924` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
-| V3 | `RegenIIR` | `0x28D0AC99` | `RegenCodec` | [V3: V1IirCodecTests.Regen_RoundTripsCapturedBody] |
+| V3 | `RegenIIR` | `0x28D0AC99` | `Regen` | [V3: V1IirCodecTests.Regen_RoundTripsCapturedBody] |
 | V3 | `RemoveFromGroupIIR` | `0xE4FF0C85` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
 | V3 | `ScryScriptIIR` | `0xA36D3B74` | `ScryScript` | [V3: ScryScriptCodecTests.BuildStartScriptGroup_MatchesTheHandWrittenBytes] |
 | V3 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `SetNameIIR` | `0xADCE0CDA` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `SetPosIIR` | `0x04B80B24` | `SetPosCodec` | [V3: DeadReckoningCodecTests.SetPos_RoundTripsByteExact] |
-| V3 | `SetShadowCoverageIIR` | `0xD6C1F0CC` | `SetShadowCoverageCodec` | [V3: V1IirCodecTests.ChainKill_RoundTripsCapturedBody] |
+| V3 | `SetShadowCoverageIIR` | `0xD6C1F0CC` | `SetShadowCoverage` | [V3: V1IirCodecTests.ChainKill_RoundTripsCapturedBody] |
 | V3 | `SimpleCharFullUpdateIIR` | `0xFA015807` | `PlayerSpawnScaffoldCodec` | [V3: PlayerSpawnScaffoldCodecTests.Generate_AfterCharacterIirSwap_StaysParseable] |
 | V3 | `SimpleCharKilledByUpdateIIR` | `0xB066AFC2` | `WorldDeath` | [V3: WorldDeathTests.BuildDeathBcc_ReproducesCapturedNpcDeath_ByteExact] |
 | V3 | `SimpleDynelFullUpdateIIR` | `0x66AEDD50` | `SimpleDynelMessageCodec` | [V3: SimpleDynelMessageTests.BuildMessage_RoundTripsByteExact] |
 | V3 | `SimpleDynelVisualChangeIIR` | `0xE7F4F8F8` | `SimpleDynelMessageCodec`, `WorldLoot` | [V3: SimpleDynelMessageTests.BuildMessage_RoundTripsByteExact] |
-| V3 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` | [V3: V1IirCodecTests.SpellBook_RoundTripsCapturedBody] |
+| V3 | `SpellBookIIR` | `0x6BA10936` | `SpellBook` | [V3: V1IirCodecTests.SpellBook_RoundTripsCapturedBody] |
 | V3 | `StatDamageIIR` | `0xE9F24184` | `CombatEffectBuilder`, `SpellweaveCodec`, `StatDamageCodec` | [V3: CombatEffectBuilderTests.DamageResult_IsByteIdentical] |
 | V3 | `StatIIR` | `0xF98E10B3` | `SpellweaveCodec` | [V3: SpellweaveCodecTests.BuildReactiveList_ConsumedElementZeroed_MatchesCapture] |
 | V3 | `StatUpdateIIR` | `0x96B8DC59` | `StatUpdateCodec` | [V3: CharacterStatBlockTests.BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame] |
 | V3 | `StopIIR` | `0xD751EBB4` | `StopCodec` | [V3: DeadReckoningCodecTests.Stop_RoundTripsByteExact] |
-| V3 | `TemplateActionIIR` | `0x6C300937` | `TemplateActionCodec` | [V3: V1IirCodecTests.TemplateAction_RoundTripsCapturedBody] |
-| V3 | `ThreatLevelIIR` | `0x1745EF6C` | `ThreatLevelCodec` | [V3: CombatRecordCodecTests.ThreatLevel_BuildsByteExact] |
+| V3 | `TemplateActionIIR` | `0x6C300937` | `TemplateAction` | [V3: V1IirCodecTests.TemplateAction_RoundTripsCapturedBody] |
+| V3 | `ThreatLevelIIR` | `0x1745EF6C` | `ThreatLevel` | [V3: CombatRecordCodecTests.ThreatLevel_BuildsByteExact] |
 | V3 | `TombStoneFullUpdateIIR` | `0x0D80E7C9` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `TradeskillReplyIIR` | `0x9062D559` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `TradeskillRequestIIR` | `0x06B9CD94` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
-| V3 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventoryCodec` | [V3: V1IirCodecTests.UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf] |
+| V3 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventory` | [V3: V1IirCodecTests.UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf] |
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `InventoryDeleteCodec` |  |
 | V2 | `FanaticCommandIir` | `0xEE4AA85C` | `FanaticCommandCodec` |  |

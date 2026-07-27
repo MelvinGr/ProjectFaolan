@@ -9,19 +9,19 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The protobuf is the same item schema as the snapshot - repeated ProtoAcgItem entries, each carrying 3x
 	// ProtoDecryptionKey (the item's 4x fixed32 TEA keys). This codec constructs the frame and carries the item
 	// protobuf verbatim (deserialize with ProtoInventoryGame); byte-exact against the captured bodies.
-	public record UpdateInventoryCodec(uint Handle, byte Env, byte[] InventoryProtobuf) : ICodec<UpdateInventoryCodec>
+	public record UpdateInventory(uint Handle, byte Env, byte[] InventoryProtobuf) : ICodec<UpdateInventory>
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.UpdateInventoryIIR;
 
-		public static UpdateInventoryCodec Read(FaolanStream s)
+		public static UpdateInventory Read(FaolanStream s)
 		{
 			s.ReadUInt32(); // length
 			s.ReadUInt32(); // subop
-			s.ReadUInt32(); // 0xC350
+			s.ReadUInt32(); // EntityClass.Character
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
 			var pbLength = s.ReadUInt32();
-			return new UpdateInventoryCodec(handle, env, s.ReadArray(pbLength));
+			return new UpdateInventory(handle, env, s.ReadArray(pbLength));
 		}
 
 		public void Write(FaolanStream s)
@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			s.WriteArrayUInt32Length(b => b.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteArrayUInt32Length(InventoryProtobuf));
 		}
 
-		public static UpdateInventoryCodec Parse(byte[] body)
+		public static UpdateInventory Parse(byte[] body)
 		{
 			return Read(new FaolanStream(body));
 		}

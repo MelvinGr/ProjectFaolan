@@ -7,21 +7,21 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// ReadSubClass (FUN_0079f8e0) reads three u32 then keys off the env byte. Body observed as
 	// [u32 a=0][u32 value][u32 source-handle][u8 flag]. Grammar from the client reader (docs/re/v1-iir-readers.md),
 	// byte-exact.
-	public record FeedbackIirCodec(uint Handle, byte Env, uint FieldA, uint Value, uint Source, byte Flag) : ICodec<FeedbackIirCodec>
+	public record FeedbackIir(uint Handle, byte Env, uint FieldA, uint Value, uint Source, byte Flag) : ICodec<FeedbackIir>
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.FeedbackIIR;
 
-		public static FeedbackIirCodec Read(FaolanStream s)
+		public static FeedbackIir Read(FaolanStream s)
 		{
 			s.ReadUInt32(); // length
 			s.ReadUInt32(); // subop
-			s.ReadUInt32(); // 0xC350
+			s.ReadUInt32(); // EntityClass.Character
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
 			var a = s.ReadUInt32();
 			var value = s.ReadUInt32();
 			var source = s.ReadUInt32();
-			return new FeedbackIirCodec(handle, env, a, value, source, s.ReadByte());
+			return new FeedbackIir(handle, env, a, value, source, s.ReadByte());
 		}
 
 		public void Write(FaolanStream s)
@@ -37,7 +37,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteByte(Flag));
 		}
 
-		public static FeedbackIirCodec Parse(byte[] body)
+		public static FeedbackIir Parse(byte[] body)
 		{
 			return Read(new FaolanStream(body));
 		}

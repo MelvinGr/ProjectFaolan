@@ -8,18 +8,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// Knubot dialogue text as the conversation packets). The trade/dialogue PAYLOAD is that conversation-system
 	// structure, so this codec constructs the frame ([handle][env]) and carries the payload verbatim - byte-exact -
 	// rather than re-modelling the whole Knubot XML shop grammar here (docs/re/v1-iir-readers.md).
-	public record KnubotStartTradeCodec(uint Handle, byte Env, byte[] Payload) : ICodec<KnubotStartTradeCodec>
+	public record KnubotStartTrade(uint Handle, byte Env, byte[] Payload) : ICodec<KnubotStartTrade>
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.KnubotStartTradeIIR;
 
-		public static KnubotStartTradeCodec Read(FaolanStream s)
+		public static KnubotStartTrade Read(FaolanStream s)
 		{
 			s.ReadUInt32(); // length
 			s.ReadUInt32(); // subop
-			s.ReadUInt32(); // 0xC350
+			s.ReadUInt32(); // EntityClass.Character
 			var handle = s.ReadUInt32();
 			var env = s.ReadByte();
-			return new KnubotStartTradeCodec(handle, env, s.ReadRemainingArray());
+			return new KnubotStartTrade(handle, env, s.ReadRemainingArray());
 		}
 
 		public void Write(FaolanStream s)
@@ -27,7 +27,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			s.WriteArrayUInt32Length(b => b.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(Handle).WriteByte(Env).WriteArray(Payload));
 		}
 
-		public static KnubotStartTradeCodec Parse(byte[] body)
+		public static KnubotStartTrade Parse(byte[] body)
 		{
 			return Read(new FaolanStream(body));
 		}

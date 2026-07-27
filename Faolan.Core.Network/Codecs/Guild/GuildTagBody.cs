@@ -18,7 +18,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 		public static GuildTagBody Read(FaolanStream s)
 		{
 			s.ReadUInt32(); // subop
-			s.ReadUInt32(); // 0xC350 marker
+			s.ReadUInt32(); // EntityClass.Character
 			var characterId = s.ReadUInt32();
 			s.ReadUInt16(); // constant 0
 			return new GuildTagBody(characterId, s.ReadString());

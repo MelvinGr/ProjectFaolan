@@ -1106,7 +1106,7 @@ namespace Faolan.GameServer
 					// Hoxxling_mage-heraldofxotli_login_gameplay2 frame 5118) - zero of the 34 requests draw a reply.
 					// Visible gear already arrives with the spawn snapshot, so drop it quietly like the teleport acks
 					// below; answering would diverge from capture. The s2c push itself is unimplemented (see
-					// UpdateInventoryCodec, currently emitted nowhere).
+					// UpdateInventory, currently emitted nowhere).
 
 					Logger.LogDebug("GameServer 0x2000 inventory probe"); //" {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), probe.Length);
 
@@ -1130,9 +1130,9 @@ namespace Faolan.GameServer
 				// Nothing consumes the value yet; stealth detection is where it will.
 				case GameServer0X2000Opcodes.SetShadowCoverageIIR:
 				{
-					var shadow = SetShadowCoverageCodec.Parse(rawPayload);
+					var shadow = SetShadowCoverage.Parse(rawPayload);
 					Logger.LogDebug("GameServer shadow coverage {Percent}% for handle {Handle}.", shadow.Percent, shadow.Handle);
-					await WorldIir.SendFramed(client, SetShadowCoverageCodec.Build(shadow.Handle, shadow.Percent));
+					await WorldIir.SendFramed(client, SetShadowCoverage.Build(shadow.Handle, shadow.Percent));
 					break;
 				}
 

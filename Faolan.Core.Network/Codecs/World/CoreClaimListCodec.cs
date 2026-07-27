@@ -74,7 +74,7 @@ namespace Faolan.Core.Network.Codecs.World
 			if (stream.ReadUInt32() != Opcode)
 				return false;
 
-			stream.ReadUInt32(); // 0xC350 Character
+			stream.ReadUInt32(); // EntityClass.Character
 			handle = stream.ReadUInt32();
 			if (stream.ReadUInt16() != SubList)
 				return false;
