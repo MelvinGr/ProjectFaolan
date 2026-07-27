@@ -78,8 +78,12 @@ namespace Faolan.GameServer.World
 
 		// Dev visualization (#363): when true, an NPC that resolves to an RDB spawn AREA has that area's label pushed as
 		// its overhead nameplate (via SetNameIIR after spawn) so a manual creature-labeling pass sees which area it's in.
-		// Off by default; toggled live per-session by the `.togglenpcgroup` GM command (ToggleAreaLabels) - no config.
-		public static bool DebugAreaLabels;
+		// Off by default; toggled live by the `.togglenpcgroup` GM command (ToggleAreaLabels) - no config.
+		//
+		// INSTANCE state, not static. It is a per-world-host toggle and this class is per-host, so a static made it
+		// process-global - which under `--role login --role realm=<id>` (or the all-in-one dev run) would mean one
+		// GM's debug nameplates following the other realm's players around. Nothing outside this class touches it.
+		private bool _debugAreaLabels;
 
 		// #363 ambient spawn-group pools per loaded zone (built in LoadAmbientSpawns on the entry thread, iterated by
 		// MaintainAmbientPools on the tick thread - concurrent so the tick doesn't throw mid-load).
@@ -1170,7 +1174,7 @@ namespace Faolan.GameServer.World
 					await _questHandler.SendCasildaPose(client, npc.Handle, true);
 
 				// #363 dev nameplate override (dev-only, gated on .togglenpcgroup).
-				if (DebugAreaLabels && npc.OverheadNameOverride is { } overrideName)
+				if (_debugAreaLabels && npc.OverheadNameOverride is { } overrideName)
 					await SendSetName(client, npc.Handle, overrideName);
 			}
 		}
@@ -1445,7 +1449,7 @@ namespace Faolan.GameServer.World
 		// visible without a re-stream. NPCs that stream in later pick it up in SendWorldSpawn. Returns (nowOn, affected).
 		public async Task<(bool On, int Affected)> ToggleAreaLabels(INetworkClient client)
 		{
-			DebugAreaLabels = !DebugAreaLabels;
+			_debugAreaLabels = !_debugAreaLabels;
 			var player = _sim.PlayerWorldEntity(client);
 			var affected = 0;
 			if (player != null)
@@ -1455,14 +1459,14 @@ namespace Faolan.GameServer.World
 					if (npc.OverheadNameOverride is not { } label || !player.Known.Contains(npc.Handle))
 						continue;
 
-					await SendSetName(client, npc.Handle, DebugAreaLabels
+					await SendSetName(client, npc.Handle, _debugAreaLabels
 						? label
 						: npc.Name ?? "");
 					affected++;
 				}
 			}
 
-			return (DebugAreaLabels, affected);
+			return (_debugAreaLabels, affected);
 		}
 
 		// #400 weapon-set switch: flip the player's active weapon LOADOUT (Primary<->Secondary), persist it so the drawn
@@ -1857,7 +1861,7 @@ namespace Faolan.GameServer.World
 			// spawn-body `Name`, so overriding the visible name needs a SetNameIIR (0xADCE0CDA). Sent right AFTER the
 			// spawn (in TCP order) so the entity + its OverheadText exist before the name lands. Dev-only, gated on the
 			// live `.togglenpcgroup` toggle, so it never touches retail parity.
-			if (DebugAreaLabels && subject.OverheadNameOverride is { } overrideName)
+			if (_debugAreaLabels && subject.OverheadNameOverride is { } overrideName)
 				await SendSetName(recipient, subject.Handle, overrideName);
 		}
 
@@ -2225,7 +2229,7 @@ namespace Faolan.GameServer.World
 		}
 
 		// The runtime state of one resolved NpcSpawnArea: the creature TYPE + spawn points + the population it maintains.
-		// Label is the dev nameplate tag (FormatAreaLabel), applied to members when DebugAreaLabels is on.
+		// Label is the dev nameplate tag (FormatAreaLabel), applied to members when _debugAreaLabels is on.
 		private sealed record AmbientPool(uint AreaId, int MaxCount, Vector3[] Points, NpcTemplate Type, uint Level, uint MaxHealth, uint Disposition, string Label);
 
 		// The resolved destination of a zone-line teleporter: the map to hand the player off to, and where to place

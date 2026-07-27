@@ -289,670 +289,7 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.BehaviorControlCenterIIR:
 				{
-					// Important capture observation:
-					// world-object interactions appear to be the likely trigger path for the container-style
-					// response family 0xF096251E, which carries names like "Chest [N7FU]" and "object_closed".
-					// Representative samples split into a small object/position block, a 125-byte metadata block, 					// and a variable nested entry block that currently decodes as 2, 3, or 4 repeated entries.
-					// New random-actions evidence suggests the player bag is more likely part of the giant 0x737A6DF9
-					// initial-state dump, while 0xF096251E still looks like remote chest/container data.
-					var unk0 = body.ReadUInt32();
-					var clientInst = body.ReadUInt32();
-					var unk1 = body.ReadUInt16();
-					// Some Interact variants are short and carry NO actionType/args (observed: a 10-byte trailer ending
-					// `00 08` the client sends around loot/kill). Reading actionType unconditionally threw EndOfStreamException, 					// which ReceivedPacket turns into a hard client.Stop() (disconnect). Bail gracefully on a short body.
-					if (body.Length - body.Position < sizeof(uint))
-					{
-						Logger.LogDebug("Interact: short body (unk1=0x{Unk1:X4}), no actionType - ignoring.", unk1);
-						break;
-					}
-
-					var actionType = body.ReadUInt32<ActionType>();
-					var args = body.ReadProtobufUInt32Length<CommandMessage>();
-
-					if (actionType == ActionType.SwitchWeaponsButton)
-					{
-						// #400: SwitchWeaponsButton is the weapon-SET switch (toggles the two swappable loadouts), NOT a draw/sheathe -
-						// capture-confirmed: a character wearing both sets pressed it 3x and the newly-active weapon main slot alternated
-						// 6->20->6 (Stihetfv armed-and-unarmed). Echo-ack to self, toggle+persist the active set, then RELAY the swap
-						// behavior to nearby viewers so they re-render the drawn weapons (the cross-player render channel is the BCC
-						// command replication - Ghidra FUN_005e1c70 - the same path the combat swing/cast relay below uses; the
-						// SetItemStat retail also sends is owner-only inventory bookkeeping, so it is not broadcast). NEEDS in-client verification.
-						await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
-						var activeSet = await _broadcaster.TogglePlayerWeaponSet(client);
-
-						var swapRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account!.ClientInstance, rawPayload, args.CommandqueueClientId);
-						if (swapRelay != null)
-							await _broadcaster.BroadcastBehaviorToViewers(client, swapRelay);
-
-						Logger.LogInformation("SwitchWeaponsButton -> weapon set {Set}. {Args}", activeSet, args);
-					}
-					else
-					{
-						// Not every action carries from/target after the args (e.g. TalkToNpc only has a short
-						// trailer - the NPC handle lives in args.Target.Instance). Read defensively to avoid overrunning.
-						var from = body.Length - body.Position >= sizeof(uint)
-							? body.ReadUInt32()
-							: 0; // fromid or slotid depending on actionType, see below
-						var target = body.Length - body.Position >= sizeof(uint)
-							? body.ReadUInt32()
-							: 0;
-						var unk2 = body.ReadRemainingArray();
-
-						switch (actionType)
-						{
-							case ActionType.SummonMount:
-							{
-								// SummonMount TOGGLES (pressing the same button while mounted dismounts) and the two directions time
-								// DIFFERENTLY:
-								//  - MOUNT is a SERVER-timed channel: the client shows the cast bar + horse-runs-up, and retail sends
-								//    the ride buff 545ms later (SummonChannelMs; capture frame 498->520). So we begin-echo-ack, then
-								//    after the channel complete-echo-ack + ride buff 0x31EB1500 + StatUpd(Mount=id, MountSpeed=100).
-								//  - DISMOUNT is CLIENT-driven: the client runs its OWN (longer) dismount channel + horse-runs-away, so
-								//    the server responds IMMEDIATELY with the end-twin 0x31EB1501 (empty payload) + StatUpd(Mount=0)
-								//    (capture frame 1449) rather than holding the mount state on a timer.
-								// Retail sends NO summon ApplySpell / no horse entity - the client animates it all. IsMounted lives on
-								// the player WorldEntity (without the toggle the press re-mounts and the char sticks).
-								// KNOWN COSMETIC (accepted): during the dismount the char briefly dips into the floor and re-grounds at
-								// animation end. Confirmed NOT server-side - retail sends nothing extra during the dismount window (only
-								// this end-twin + StatUpd), and both immediate and timer-deferred dismount show it. It is a client-side
-								// ground/height recalculation on the mount->ground transition; a fix would need live client RE. #27.
-								var mount = MountCatalog.ForId(from) ?? throw new InvalidOperationException($"SummonMount: unknown mount id 0x{from:X8} (not in MountCatalog)");
-								var playerEntity = PlayerWorldEntity(client);
-								var dismounting = playerEntity?.IsMounted ?? false;
-								Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.CreatureName, dismounting
-									? "dismount"
-									: "mount", args);
-
-								var self = client.Session.Character.Id;
-								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId); // cast begin: bar + animation
-
-								if (dismounting)
-								{
-									// Immediate: don't hold the mount state during the client's dismount channel.
-									var dismountAck = (byte[])rawPayload.Clone();
-									if (dismountAck.Length > 17)
-									{
-										dismountAck[16] = 0x00;
-										dismountAck[17] = 0x09;
-									}
-
-									await CombatService.SendBehaviorEchoAck(client, dismountAck, 3);
-									await ApplySpell(client, self, self, MountCatalog.DismountSpell); // end-twin removes the ride buff
-									var dismountStats = new CharacterStatBlock
-									{
-										[CharacterStatId.Mount] = 0 // clear the mount stat (frame 1449)
-									};
-									await SendStatUpdate(client, dismountStats, self);
-									await _broadcaster.BroadcastStatsToViewers(client, dismountStats); // #428: the horse renders from THIS, so viewers need it too
-									playerEntity?.IsMounted = false;
-									playerEntity?.MountRideStat = 0;
-
-									// Voluntary dismount -> forget the mount so it isn't restored on the next world entry.
-									client.Session.Character.MountId = null;
-									await Database.SaveCharacterMount(client.Session.Character.Id, null);
-									break;
-								}
-
-								var mountCastPayload = (byte[])rawPayload.Clone();
-								Task.RunAfter(MountCatalog.SummonChannelMs, async () => // horse runs up during the channel, then mount
-								{
-									if (client.Session.Account == null)
-										return;
-
-									if (mountCastPayload.Length > 17)
-									{
-										mountCastPayload[16] = 0x00;
-										mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
-									}
-
-									await CombatService.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
-									await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(CasterLevel(client))); // seat (#26)
-									var mountStats = new CharacterStatBlock
-									{
-										[CharacterStatId.Mount] = mount.RideStat,
-										[CharacterStatId.MountSpeed] = 100
-									}; // the mount StatUpd (frame 520)
-									await SendStatUpdate(client, mountStats, self);
-									await _broadcaster.BroadcastStatsToViewers(client, mountStats); // #428: the horse renders from THIS, so viewers need it too
-									playerEntity?.IsMounted = true;
-									playerEntity?.MountRideStat = mount.RideStat; // so a viewer arriving LATER can be told (#428)
-
-									// Persist the mount so it survives a relog / a trip through a no-mount area (restored on
-									// world entry to a mount-allowed map). Cleared only on a voluntary dismount above.
-									client.Session.Character.MountId = mount.Id;
-									await Database.SaveCharacterMount(client.Session.Character.Id, mount.Id);
-								}, Logger);
-
-								break;
-							}
-
-							case ActionType.RightClickItem:
-							{
-								Logger.LogInformation("RightClickItem: container={Container} slot={Slot} {Args}", (ContainerKind)from, target, args);
-
-								// Every behavior gets an echo-ack (docs/subsystems/combat.md rule 1); the item-use domain logic
-								// lives in UseInventoryItem (GameServerListener.ItemUse.cs). The used item is identified by its inventory location - from =
-								// container (0x68 = backpack), target = slot - decoded from the use_totem_of_origin
-								// capture (using a Totem of Origin recalls to the bind point, #206; the recall's handoff
-								// is the capture's "long loading screen").
-								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
-								await UseInventoryItem(client, (ContainerKind)from, (int)target);
-
-								break;
-							}
-
-							case ActionType.CastSpell:
-							{
-								// The BCC "state" word (unk1) tells begin from cancel: 3 = begin, 2 = CANCEL. The client sends
-								// the cancel when the cast is interrupted (moving mid-cast - "move cancels the cast", #346/#347),
-								// so honor it by invalidating any in-flight resolve (bump the token so the deferred Resolve below
-								// aborts) and acking the cancel. State values are capture-derived (actions-described-in-chat:
-								// begin=3 x2, cancel=2 x1; every cast in the ice-strike/casilda/casting captures is begin=3).
-								const ushort castStateCancel = 2;
-								if (unk1 == castStateCancel)
-								{
-									client.Session.ActiveCastToken++; // a pending Resolve() now sees a mismatched token and aborts
-									var beginArgs = client.Session.PendingCastArgs;
-									client.Session.PendingCastArgs = null!;
-
-									// Retail answers the cancel with a state=0x0007 abort BCC (NOT an echo of the cancel) - that
-									// is what drops the cast bar, cancels the animation and pops the client's "Interrupted" text
-									// (#347, cast-interupt idx1013). The old echo of the cancel payload left the bar running. Needs
-									// the stored BEGIN args; fall back to the plain echo if it's missing.
-									if (beginArgs != null)
-										await CombatService.SendCastInterruptAbort(client, beginArgs, rawPayload, client.Session.PendingCastMode);
-									else
-										await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
-									Logger.LogInformation("CastSpell CANCEL (interrupted/moved) - abort ack sent, cast bar cleared.");
-									break;
-								}
-
-								// The real spell id rides the action TRAILER (`target`, the uint32 read after the protobuf
-								// args), NOT the args message. The old model called field 10 a "SpellTarget" whose field 1 was
-								// a spell_id, so casts logged as "spell 50000" and ApplySpell carried a non-existent id (no
-								// effect shown) - 50000 is 0xC350, an ENTITY CLASS. Field 10 is a ProtoID32 {type, instance}
-								// (CommandMessage.target); the fallback below reads .Type only to preserve the old behaviour.
-								// Decoded from the ice-strike capture (c2s 0x642CD3D6 cast): trailer = [u32 from=1][u32 spellId];
-								// 0x125D9B / 0x42CA77 are real learned-spell ids. args.Target.Instance is the target. (#236)
-								var spellId = target != 0
-									? target
-									: args.Target?.Type ?? args.BccActionId;
-								var casterHandle = client.Session.Character.Id;
-								var targetHandle = args.Target?.Instance ?? 0;
-
-								// A GROUND-TARGETED AoE (e.g. Deathly Blizzard) is aimed at a reticle POSITION carried in the
-								// trailer instead of a locked entity: it has NO SpellTarget and the trailer's kind byte is 0.
-								// CastGroundTarget reads the reticle; SpellTarget == null confirms there's no locked entity. (#236)
-								var isGroundCast = CastGroundTarget.TryParse(unk2, out var groundTarget) && args.Target == null;
-
-								// This cast's invalidation token: a later cancel (or a new cast) bumps ActiveCastToken so the
-								// deferred Resolve below aborts if the cast was interrupted before its cast time elapsed.
-								var castToken = ++client.Session.ActiveCastToken;
-
-								Logger.LogInformation($"CastSpell spell=0x{spellId:X} target=0x{targetHandle:X}{(isGroundCast ? $" ground={groundTarget}" : "")} {args}");
-
-								// Cast-begin ack (#236): retail answers the cast behavior with a BCC echo right away, which
-								// is what makes the client enter the channel state + render the cast bar (without it the
-								// client never channels - it sent only Mode 1, no progress ticks - and the cast looks
-								// instant). Ack every cast packet (begin + channel ticks); the effect itself is resolved
-								// once, below, after the cast time.
-								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
-
-								// Shield of the Risen breaks the moment an AGGRESSIVE cast is COMMITTED (cast begin), not when
-								// the cast time elapses (#361) - a ground AoE (Deathly Blizzard) or an offensive cast at another
-								// entity. A self-buff / self-target cast never breaks it (BreakShieldOnAggression is a no-op with
-								// no shield tracked anyway). Done here at begin so the protection drops as the player starts to
-								// attack, matching retail; the effect itself still resolves after castMs below.
-								if (isGroundCast || (targetHandle != 0 && targetHandle != casterHandle))
-									await BreakShieldOnAggression(client);
-
-								// Honor the spell's cast time (#236): retail resolves the effect only AFTER the cast time
-								// elapses (ice-strike capture: cast at frame 377, ApplySpell impact ~frame 441). Resolving on
-								// receipt skipped the client's cast bar. CastTime 0 (instant spell, or an un-populated row)
-								// resolves immediately. Movement mid-cast interrupts it (the cancel branch above / the move
-								// handler's token bump); the abort BCC drops the client bar (#347).
-								var spell = await Database.GetSpell(spellId);
-								var castMs = spell?.CastTime ?? 0;
-								if (castMs == 0)
-									await Resolve();
-								else
-								{
-									// Hold the begin's args (only) so the cast-cancel handler can build the state=0x0007 abort that
-									// stops the client's cast bar (#347). The rest of the abort comes from the cancel packet.
-									// Cleared on resolve/cancel.
-									var castArgsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4)); // TODO: just read the packet with FaolanStream instead of rawPayload
-									client.Session.PendingCastArgs = rawPayload[26..(26 + castArgsLen)];
-									client.Session.PendingCastMode = args.CommandqueueClientId;
-
-									// A channeled ground AoE (Deathly Blizzard) ticks damage DURING the channel, not one hit at
-									// the end (#349) - kick the tick loop now; it stops itself if the cast is interrupted (the
-									// castToken it captured gets bumped). The complete-ack + mana still fire from Resolve at the
-									// channel's end.
-									if (isGroundCast)
-										_ = _combat.ChannelGroundAoe(client, casterHandle, groundTarget, spellId, castMs, castToken);
-
-									Task.RunAfter(castMs, async () => // resolve the effect after the cast time (#236)
-									{
-										if (client.Session.Account != null)
-											await Resolve();
-									}, Logger);
-								}
-
-								break;
-
-								// Resolves the cast: play the ApplySpell (caster -> target, or self when no target), drain
-								// mana, and on an offensive cast apply damage + push the target's vitals (#69).
-								async Task Resolve()
-								{
-									// Interrupted mid-cast (the player moved / sent the cancel BCC): ActiveCastToken was bumped
-									// after we captured castToken, so skip the effect entirely - no complete-ack, no damage. This
-									// is what makes the move-interrupt stick (the "then moving to interrupt" cast in the capture).
-									if (client.Session.ActiveCastToken != castToken)
-										return;
-
-									client.Session.PendingCastArgs = null!; // cast completed; no abort needed
-
-									// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC, 									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
-									// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
-									// (cast-state complete). Without this the bar fills then hangs.
-									var completePayload = (byte[])rawPayload.Clone();
-									if (completePayload.Length > 17)
-									{
-										completePayload[16] = 0x00;
-										completePayload[17] = 0x09;
-									}
-
-									await CombatService.SendBehaviorEchoAck(client, completePayload, 3);
-
-									// #439/#307: a cast whose effect is something the SERVER does - today a PET SUMMON (creature +
-									// PetIIR owner-assign + follow) - resolves as that instead of applying a target effect. This
-									// is what hooks pet summoning to real spell casts, not just the .pet GM command. Decoded
-									// from the necro-pet capture (docs/subsystems/summon-pet-decode.md): cast (CastSpell) ->
-									// after the channel -> FA015807 pet spawn + PetIIR. The spell -> effect mapping is a
-									// SpellEffect row, so a new summon is an imported row rather than a branch here.
-									var castEffects = await _spellEffects.ForCast(spellId);
-									if (await _spellEffects.RunAll(client, castEffects))
-									{
-										Logger.LogInformation("CastSpell 0x{Spell:X} resolved {Count} server-side effect(s): {Kinds}.", spellId, castEffects.Count,
-											string.Join(", ", castEffects.Select(e => e.Kind)));
-										return;
-									}
-
-									// GROUND-TARGETED AoE: damage attackable NPCs around the reticle instead of applying a single
-									// target debuff or a self-buff. The blizzard/AoE VFX is rendered client-side from the cast
-									// behavior itself (retail sent no ApplySpell on the empty-ground casts - only the complete-ack,
-									// the DispatchLockTemplate unlocks, and the mana push), so there is no ApplySpell carrier here.
-									if (isGroundCast)
-									{
-										await _combat.SpendCasterMana(client, spellId);
-										// A channeled AoE (castMs > 0) already ticked its damage during the channel
-										// (ChannelGroundAoe, kicked at begin); only an INSTANT ground cast resolves its
-										// single blast here (#349).
-										if (castMs == 0)
-											await _combat.ResolveGroundAoe(client, casterHandle, groundTarget, spellId);
-										return;
-									}
-
-									// applyTo = the spell's SUBJECT (the target, or the caster for a targetless self-cast),
-									// applyFrom = the CASTER. Passing these the other way round applied every hostile cast
-									// to the CASTER "from" the NPC: the debuff landed on the player's own buff bar, and
-									// because applyTo != applyFrom SendMagicBuffIir never registered it, so it never
-									// expired - a permanent 0s icon per cast. Invisible on a self-cast, where both
-									// arguments are casterHandle. (#370)
-									//
-									// ApplySpell takes the WIRE buff id ((base<<8)|rank), but the cast trailer carries the
-									// bare BASE id (the Spells key) - shift it to rank 0. Unshifted, the client resolved
-									// base=spellId>>8 / rank=spellId's low byte, neither of which is a real spell, and
-									// silently rendered no icon while the server-side lifecycle looked correct (#274).
-									await ApplySpell(client, targetHandle == 0
-										? casterHandle
-										: targetHandle, casterHandle, spellId << 8);
-									await _combat.SpendCasterMana(client, spellId);
-									if (targetHandle != 0 && targetHandle != casterHandle)
-										await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
-								}
-							}
-
-							case ActionType.NormalAttack:
-							{
-								// The melee swing / auto-attack: ack the behavior + resolve the hit (see
-								// SendNormalAttackResponse). The target is in the request args (SpellTarget.TargetHandle).
-								await BreakShieldOnAggression(client); // swinging a weapon is aggressive - drops the shield (#361)
-								await _combat.SendNormalAttackResponse(client, rawPayload, args.Target?.Instance ?? 0, args.CommandqueueClientId);
-
-								break;
-							}
-
-							case ActionType.UnarmedAttack:
-							{
-								// Unarmed swing (empty main hand; behavior TypeIds 1089xx, ability id in the tail).
-								// Retail's reply is the plain behavior echo-ack - no result block (combat capture
-								// 2026-06-12); targeted damage reuses the armed path (the capture's unarmed swings
-								// hit air, so the damage part is an extension pending in-client validation).
-								await BreakShieldOnAggression(client); // an unarmed swing is aggressive - drops the shield (#361)
-								await _combat.SendUnarmedAttackResponse(client, rawPayload, args.CommandqueueClientId, args.Target?.Instance ?? 0);
-
-								break;
-							}
-
-							case ActionType.Emote:
-							{
-								Logger.LogInformation($"Emote: {args}");
-
-								break;
-							}
-
-							case ActionType.UseObject:
-							{
-								// Using a world object - `target` is the object handle (its typetag, 0xC87A for loot bags,
-								// rides in `from`). Dispatch on what the object DOES (its InteractAction, data-driven from
-								// the DB): a zone-line teleports to another playfield; everything else (a SimpleDynel door
-								// that opens, a loot bag) is handled by the open/loot path.
-								var interaction = await _broadcaster.ResolveUseObject(client, target);
-								switch (interaction.Action)
-								{
-									case InteractAction.Teleport:
-									case InteractAction.ProxyTeleport:
-									{
-										// The client sends a door-use as TWO BCC phases (begin 0x0003 then release 0x0002); retail teleports
-										// only on the begin phase (Hoxxling inn: the IntendedTeleport follows the 0x0003 record). Acting on
-										// both double-fires the teleport - a redundant relocation / extra loading flash. Ignore the release.
-										if (unk1 != 0x0003)
-											break;
-
-										// Hand the player off to the destination playfield - or, if this teleporter's
-										// destination hasn't been captured yet, surface a message (like the missing-vendor
-										// case) rather than a silent no-op.
-										var dest = interaction.Teleport;
-										var currentMap = PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
-										if (dest.DestMapId == 0)
-										{
-											await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
-												ChatMarkup.Color("red", $"Zone-line '{dest.DestinationName}' has no known destination yet."));
-										}
-										else if (dest.DestMapId == currentMap && dest.ArrivalPosition is { } samePos)
-											// Same-playfield door (e.g. the Thirsty Dog Inn): relocate in place, no loading screen.
-											await _simulation.RelocateSameMap(client, samePos);
-										else
-											await DoTeleport(client.Session.Character.Id, dest.DestMapId, dest.ArrivalPosition); // TODO: Move DoTeleport into _simulation like RelocateSameMap
-
-										break;
-									}
-
-									case InteractAction.None:
-									default:
-									{
-										// #262: a quest-item PICKUP (QuestItemEffect dynel, e.g. a quarry Stone Brick) - grant the
-										// collect goal's item + advance it + vanish the node, but ONLY while a matching collect quest
-										// is active (TryAdvanceCollectPickup returns null otherwise, so the brick is inert for a player
-										// without Shipwrecked V). Handled here before the generic open path.
-										if (await _broadcaster.IsQuestPickup(client, target))
-										{
-											if (await _questProgression.TryAdvanceCollectPickup(client) is { } pickedItem)
-											{
-												await GrantItemToBackpack(client, pickedItem);
-												await WorldBroadcaster.HidePickupObject(client, target);
-											}
-
-											break; // inert (no active collect quest) still swallows the use - don't open a window on a brick
-										}
-
-										// Not a column-driven teleporter: a BENCH seats the player (the sit animation), else the
-										// animated-door open path (DB world object by CapturedHandle), else the loot-bag window.
-										if (await _broadcaster.TrySitOnObject(client, target))
-											break;
-										if (await _broadcaster.OpenWorldObject(client, target))
-											break;
-										if (await _broadcaster.OpenLootBag(client, target))
-											break;
-
-										// Unknown object: no bench/door/loot behavior. Surface the gap the same way as an
-										// un-imported vendor/dialogue NPC (notify the player, never a silent no-op).
-										// Float the bubble over the clicked object so the client shows it in place.
-										var usedEntity = PlayerWorldEntity(client);
-										var usedName = usedEntity != null && _simulation.World.ZoneForEntity(usedEntity).TryGetWorldObject(target, out var usedObj)
-											? usedObj.Row.Name
-											: null;
-
-										await _agentServerDispatcher.CharacterSay(target, $"({usedName ?? "object"}: not imported yet)",
-											[client.Session.Character.Id]); // TODO: Why this this also print when looting the item? check InteractAction value
-
-										break;
-									}
-								}
-
-								break;
-							}
-
-							case ActionType.InteractWithCharacter:
-							{
-								// The clicked NPC's entity handle rides in the interact args (field 10 / field 2);
-								// (TypeId, Mode, Field3) select the conversation node the client is requesting.
-								var npcHandle = args.Target?.Instance ?? 0;
-								Logger.LogInformation("TalkToNpc: from=0x{From:X}, target=0x{Target:X}, npcHandle=0x{NpcHandle:X}, args={Args}", from, target, npcHandle, args);
-
-								// 0x16 is the generic "interact with a character", so the TARGET decides what it means: an NPC
-								// opens its conversation (below), a PLAYER is a TRADE REQUEST (#101, capture f1251 -> f1260).
-								// A player's handle IS its character id, which is what makes the distinction this cheap.
-								if (npcHandle != client.Session.Character.Id && await Database.GetCharacter(npcHandle) is { })
-								{
-									await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
-									await _trade.Request(client.Session.Character.Id, npcHandle);
-									break;
-								}
-
-								// Vendor trade-open (#134): when the clicked NPC is a shop vendor (matched by NAME - the
-								// stable key), retail answers the interact itself with the trade-select echo + bare BCC
-								// echo + DispatchShopData riding this conversation (sell_items_to_trader frames
-								// 1188-1193) - no knubot screens in between. Checked on the greeting click only
-								// (Field3 == 0, like the captured open).
-								// Only a shop VENDOR takes this path: gate on an actual shop row existing for the clicked NPC's
-								// TEMPLATE (#244). Keying by template, not name, is what stops the "Halen van Dummy" collision -
-								// the vendor templates (19265, ...) get their shop, while the same-named conversation NPC Atraxus
-								// (template 12236) does NOT, so his click falls through to dialogue below. A non-vendor (Casilda,
-								// a quest NPC, an un-imported vendor) yields a null shop and falls through - do NOT break here, or
-								// the greeting is swallowed and dialogue never opens.
-								if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var vendorTemplate) &&
-								    await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
-								{
-									await _shop.HandleVendorTradeOpen(client, rawPayload, args.CommandqueueClientId, vendorShop, npcHandle);
-									break;
-								}
-
-								// Auction-house open (the real trigger for the Tradepost - the `.ah` GM command is only a PoC
-								// bootstrap). Retail opens the AH window when the player interacts with the "Trader" auctioneer
-								// NPC (capture `sell_items_to_trader-intract-with-auctionhouse`: FA015807 "Trader"). The NPC NAME
-								// is the stable key (like shop vendors above); the player is standing next to the auctioneer to
-								// click it, so their own position trivially satisfies the 15-unit client proximity check.
-								if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
-								    talkedNpcName == AuctioneerNpcName && PlayerWorldEntity(client) is { } auctioneerPlayer)
-								{
-									await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
-									break;
-								}
-
-								// Real branching dialogue: replay the captured conversation node for whichever NPC/node
-								// the client asked for, re-addressed to the clicked NPC.
-								if (await _conversation.TryReplayConversation(client, args.BccActionId, args.CommandqueueServerId, npcHandle))
-									break;
-
-								// Only a GREETING click (Field3 == 0) may OPEN a dialogue. The client fires a second
-								// TalkToNpc with Field3 != 0 the same instant it opens one (retail answers it with a bare
-								// ack); if that duplicate isn't absorbed above (no active conversation - e.g. right after a
-								// close) it must NOT re-open the intro/greeting, or the dialogue "triggers a second time"
-								// (#217). A non-greeting click with nothing to absorb is a no-op.
-								if (args.CommandqueueServerId != 0)
-									break;
-
-								// Beach login with no captured node for this (Mode, Field3): close the chat window so the
-								// client doesn't hang waiting for a reply (the "advance a step -> chat locks, can't ESC"
-								// bug). Conversation replay is coverage-bound, so an un-captured branch is expected.
-								if (client.Session.WorldEntered || client.Session.EntryMode == WorldEntryMode.CreateWorld)
-								{
-									var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn)
-										? rn
-										: "<unmapped handle>";
-									Logger.LogInformation(
-										"TalkToNpc: no conversation node for npcHandle=0x{NpcTemplate:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.", npcHandle,
-										routedName, args.BccActionId, args.CommandqueueClientId, args.CommandqueueServerId);
-
-									// Surface the gap instead of silently closing (have them say so). A greeting click
-									// that reaches here has NEITHER an imported shop (the vendor branch above didn't match)
-									// NOR an imported conversation node - and we can't tell a vendor-without-shop from a plain
-									// talk NPC (no merchant flag on the NPC), so one honest bubble covers both. Sender = the NPC
-									// handle so the client floats it over the NPC; recipient = the clicking player (SayRecipients
-									// excludes the actor, which would drop the clicker here). No-fallbacks rule: say what's missing.
-									if (npcHandle != 0)
-										await _agentServerDispatcher.CharacterSay(npcHandle, $"({routedName}: no dialogue or shop imported yet)", [client.Session.Character.Id]);
-
-									await ConversationService.SendConversationClose(client, npcHandle); // #217: close the CLICKED NPC's window (re-address the camera release)
-								}
-
-								break;
-							}
-
-							case ActionType.MoveEquippedToFromInventory:
-							{
-								// bag slot starts top left, continue counting on next page
-
-								var direction = (MoveItemInInventoryDirection)args.BccActionId;
-								switch (direction)
-								{
-									// Into-slot moves: tail = [srcBagCell][destEquipSlot][item][item][0][flags].
-									// 42011 and 41843 are the same grammar via different windows (capture + live).
-									case MoveItemInInventoryDirection.InventoryToEquipped:
-									case MoveItemInInventoryDirection.BagToEquipped:
-									{
-										var targetSlot = (CharacterEquipmentSlot)target;
-
-										Logger.LogInformation($"{direction}: ({from} -> {targetSlot}) {args}");
-
-										// The trailing struct (after from/target) carries the item's template handle as a
-										// big-endian uint32; persist the equip into CharacterEquipment.
-										var equipHandle = unk2.Length >= 4
-											? BinaryPrimitives.ReadUInt32BigEndian(unk2.AsSpan(0, 4))
-											: 0;
-										var movedItem = equipHandle != 0
-											? await Database.GetItem(equipHandle)
-											: null;
-										if (equipHandle != 0)
-											await _equipment.PersistEquip(client, targetSlot, equipHandle, (int)from);
-
-										// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
-										// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
-										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem!);
-										await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000065, target,
-											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
-
-										break;
-									}
-
-									// Out-of-slot moves: tail = [srcEquipSlot][destBagCell][0...].
-									case MoveItemInInventoryDirection.EquippedToInventory:
-									case MoveItemInInventoryDirection.EquippedToBag:
-									{
-										var fromSlot = (CharacterEquipmentSlot)from;
-
-										Logger.LogInformation($"{direction}: ({fromSlot} -> {target}) {args}");
-
-										// Unequip is identified by the source equip slot (the trailing handle is 0);
-										// `target` is the bag cell the item lands in.
-										await _equipment.PersistUnequip(client, fromSlot, (int)target);
-
-										// Retail's reply: the behavior ack with null identity + a 0x201C entry
-										// (prefix 0x68, state 0). Capture frames 320-321.
-										await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, null!);
-										await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000068, 0,
-											0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
-
-										break;
-									}
-
-									default:
-									{
-										Logger.LogInformation($"MoveEquippedToFromInventory: unknown direction={direction} {args}");
-
-										break;
-									}
-								}
-
-								break;
-							}
-
-							default:
-							{
-								Logger.LogInformation($"UNKNOWN-{actionType.ToHex()}: {args}");
-
-								// Behaviour 1 while SEATED is the client ASKING to stand up (#355) - getting up is
-								// client-initiated, not movement-inferred as we had it. Retail's sit capture, matched pairs:
-								//   6829 c2s bId=1 seq=0x0003  ->  6837 s2c bId=1 seq=0x0004
-								//   6830 c2s bId=1 seq=0x0002  ->  6838 s2c bId=1 seq=0x000F  ->  6844 s2c STANDUP (bId=0x2A)
-								// i.e. the SAME two-phase confirm the sit runs on behaviour 0x12, then the standup animation.
-								// Because we inferred standup from movement instead, these requests fell into this
-								// un-decoded fallback and got a bare echo - so the client asked to get up, was never
-								// answered, and stayed stuck in the pose until it timed out and stood up on its own.
-								// The seq mapping (3->4, 2->0x0F) lives in BehaviorAckBody.AckSeq.
-								if ((uint)actionType == 1 && client.Session.SeatedOnHandle is not null)
-								{
-									var requestSeq = rawPayload.Length >= 18
-										? (ushort)((rawPayload[16] << 8) | rawPayload[17])
-										: 0;
-									await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
-
-									// The phase-2 confirm is what commits it; the standup animation follows the ack.
-									if (requestSeq == 0x0002)
-									{
-										Logger.LogInformation("Sit: client asked to stand up (behaviour 1 phase 2) - answering and standing.");
-										await _broadcaster.StandUp(client);
-									}
-
-									break;
-								}
-
-								// ...EXCEPT a server-driven object-action ANIMATION while seated (#355). The client re-sends the
-								// sit behaviour (actionType 0x2A, carrying "chair_sit_calm") after we seat it; echoing that back
-								// makes the client play the SIT again, and its 2.6s blend IS the progress bar seen while trying
-								// to stand - which is also what delayed the standup. Retail emits chair_sit_calm exactly ONCE per
-								// sit, s2c only, and never echoes one back. The guard is scoped to being seated because retail's
-								// client does send 0x2A otherwise (17 across the captures) and those ARE answered, so a blanket
-								// skip would soft-lock other object actions - the very thing the ack below exists to prevent.
-								if ((uint)actionType == BehaviorAnimationCodec.ObjectActionBehaviorId && client.Session.SeatedOnHandle is not null)
-								{
-									Logger.LogInformation("Sit: absorbed the client's re-sent sit behavior (not echoed - it would replay the sit).");
-
-									break;
-								}
-
-								// Robustness (#236 channeled cast 0x15, #238 dodge hop): an un-decoded behavior must
-								// STILL get the generic behavior echo-ack (docs/subsystems/combat.md rule 1), or the client stays
-								// stuck in the action's start state forever (cast bar never finishes / dodge never lands
-								// back to idle) and the player soft-locks until relog. Acking with the request's Mode
-								// returns control even when we don't yet model the action's effect.
-								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
-
-								break;
-							}
-						}
-
-						// #48: the combat responses above are framed to the ACTOR only - so the swing/cast was invisible
-						// to other players. Relay the actor's behavior (the BCC animation) to nearby viewers so the attack
-						// renders on their clients too (retail relays this exact echo body, only the frame receiver
-						// differs - other-players-visible capture). The cross-player render channel is the BCC command replication
-						// (Ghidra FUN_005e1c70), so it also carries the APPEARANCE-changing behaviors: equipping/unequipping an item
-						// (#400 sibling - a new chestpiece/weapon on another player) rides the same relay; the weapon-SET switch is
-						// relayed in its own branch above. NEEDS in-client verification for the equip case (no multiplayer capture
-						// contains a remote player equipping - single-player traces only).
-						// PlayAnimation (#428): the mounted jump. A standing jump moves the character nowhere, so there is
-						// no CharDCMove for the relay to carry - the client asks for the animation over this channel
-						// instead, and without it in this list the actor animated on their own screen only.
-						if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell or ActionType.MoveEquippedToFromInventory or ActionType.PlayAnimation)
-						{
-							var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Character.Id, rawPayload, args.CommandqueueClientId);
-							if (behaviorRelay != null)
-								await _broadcaster.BroadcastBehaviorToViewers(client, behaviorRelay);
-						}
-					}
-
+					await HandleBehaviorControlCenter(client, packet, body, rawPayload);
 					break;
 				}
 
@@ -2046,6 +1383,680 @@ namespace Faolan.GameServer
 			Logger.LogDebug("ToggleVanityArmorFilter(slot={Slot}, toggleState={toggleState}) {Applied}.", slot, toggleState, applied
 				? "persisted"
 				: "(unmodelled appearance slot, ignored)");
+		}
+
+		// The BehaviorControlCenter (0x642CD3D6) inbound: by a wide margin the biggest thing the client sends on the
+		// world carrier - every action that goes through the command queue (attack swings, interacts, sit, mount,
+		// loot, emotes) arrives as one of its actionTypes. It was 669 lines INSIDE the Handle0X2000 switch, 60% of
+		// that method's 1140; splitting it out leaves the switch readable as the routing table it is.
+		//
+		// Pure move, no behaviour change: the four early `return`s inside were already equivalent to the case's
+		// `break` because nothing follows the switch in Handle0X2000.
+		private async Task HandleBehaviorControlCenter(INetworkClient client, Rpc packet, FaolanStream body, byte[] rawPayload)
+		{
+			// Important capture observation:
+			// world-object interactions appear to be the likely trigger path for the container-style
+			// response family 0xF096251E, which carries names like "Chest [N7FU]" and "object_closed".
+			// Representative samples split into a small object/position block, a 125-byte metadata block, 					// and a variable nested entry block that currently decodes as 2, 3, or 4 repeated entries.
+			// New random-actions evidence suggests the player bag is more likely part of the giant 0x737A6DF9
+			// initial-state dump, while 0xF096251E still looks like remote chest/container data.
+			var unk0 = body.ReadUInt32();
+			var clientInst = body.ReadUInt32();
+			var unk1 = body.ReadUInt16();
+			// Some Interact variants are short and carry NO actionType/args (observed: a 10-byte trailer ending
+			// `00 08` the client sends around loot/kill). Reading actionType unconditionally threw EndOfStreamException, 					// which ReceivedPacket turns into a hard client.Stop() (disconnect). Bail gracefully on a short body.
+			if (body.Length - body.Position < sizeof(uint))
+			{
+				Logger.LogDebug("Interact: short body (unk1=0x{Unk1:X4}), no actionType - ignoring.", unk1);
+				return; // was a `break` out of the Handle0X2000 switch - same exit, now from this method
+			}
+
+			var actionType = body.ReadUInt32<ActionType>();
+			var args = body.ReadProtobufUInt32Length<CommandMessage>();
+
+			if (actionType == ActionType.SwitchWeaponsButton)
+			{
+				// #400: SwitchWeaponsButton is the weapon-SET switch (toggles the two swappable loadouts), NOT a draw/sheathe -
+				// capture-confirmed: a character wearing both sets pressed it 3x and the newly-active weapon main slot alternated
+				// 6->20->6 (Stihetfv armed-and-unarmed). Echo-ack to self, toggle+persist the active set, then RELAY the swap
+				// behavior to nearby viewers so they re-render the drawn weapons (the cross-player render channel is the BCC
+				// command replication - Ghidra FUN_005e1c70 - the same path the combat swing/cast relay below uses; the
+				// SetItemStat retail also sends is owner-only inventory bookkeeping, so it is not broadcast). NEEDS in-client verification.
+				await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
+				var activeSet = await _broadcaster.TogglePlayerWeaponSet(client);
+
+				var swapRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account!.ClientInstance, rawPayload, args.CommandqueueClientId);
+				if (swapRelay != null)
+					await _broadcaster.BroadcastBehaviorToViewers(client, swapRelay);
+
+				Logger.LogInformation("SwitchWeaponsButton -> weapon set {Set}. {Args}", activeSet, args);
+			}
+			else
+			{
+				// Not every action carries from/target after the args (e.g. TalkToNpc only has a short
+				// trailer - the NPC handle lives in args.Target.Instance). Read defensively to avoid overrunning.
+				var from = body.Length - body.Position >= sizeof(uint)
+					? body.ReadUInt32()
+					: 0; // fromid or slotid depending on actionType, see below
+				var target = body.Length - body.Position >= sizeof(uint)
+					? body.ReadUInt32()
+					: 0;
+				var unk2 = body.ReadRemainingArray();
+
+				switch (actionType)
+				{
+					case ActionType.SummonMount:
+					{
+						// SummonMount TOGGLES (pressing the same button while mounted dismounts) and the two directions time
+						// DIFFERENTLY:
+						//  - MOUNT is a SERVER-timed channel: the client shows the cast bar + horse-runs-up, and retail sends
+						//    the ride buff 545ms later (SummonChannelMs; capture frame 498->520). So we begin-echo-ack, then
+						//    after the channel complete-echo-ack + ride buff 0x31EB1500 + StatUpd(Mount=id, MountSpeed=100).
+						//  - DISMOUNT is CLIENT-driven: the client runs its OWN (longer) dismount channel + horse-runs-away, so
+						//    the server responds IMMEDIATELY with the end-twin 0x31EB1501 (empty payload) + StatUpd(Mount=0)
+						//    (capture frame 1449) rather than holding the mount state on a timer.
+						// Retail sends NO summon ApplySpell / no horse entity - the client animates it all. IsMounted lives on
+						// the player WorldEntity (without the toggle the press re-mounts and the char sticks).
+						// KNOWN COSMETIC (accepted): during the dismount the char briefly dips into the floor and re-grounds at
+						// animation end. Confirmed NOT server-side - retail sends nothing extra during the dismount window (only
+						// this end-twin + StatUpd), and both immediate and timer-deferred dismount show it. It is a client-side
+						// ground/height recalculation on the mount->ground transition; a fix would need live client RE. #27.
+						var mount = MountCatalog.ForId(from) ?? throw new InvalidOperationException($"SummonMount: unknown mount id 0x{from:X8} (not in MountCatalog)");
+						var playerEntity = PlayerWorldEntity(client);
+						var dismounting = playerEntity?.IsMounted ?? false;
+						Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.CreatureName, dismounting
+							? "dismount"
+							: "mount", args);
+
+						var self = client.Session.Character.Id;
+						await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId); // cast begin: bar + animation
+
+						if (dismounting)
+						{
+							// Immediate: don't hold the mount state during the client's dismount channel.
+							var dismountAck = (byte[])rawPayload.Clone();
+							if (dismountAck.Length > 17)
+							{
+								dismountAck[16] = 0x00;
+								dismountAck[17] = 0x09;
+							}
+
+							await CombatService.SendBehaviorEchoAck(client, dismountAck, 3);
+							await ApplySpell(client, self, self, MountCatalog.DismountSpell); // end-twin removes the ride buff
+							var dismountStats = new CharacterStatBlock
+							{
+								[CharacterStatId.Mount] = 0 // clear the mount stat (frame 1449)
+							};
+							await SendStatUpdate(client, dismountStats, self);
+							await _broadcaster.BroadcastStatsToViewers(client, dismountStats); // #428: the horse renders from THIS, so viewers need it too
+							playerEntity?.IsMounted = false;
+							playerEntity?.MountRideStat = 0;
+
+							// Voluntary dismount -> forget the mount so it isn't restored on the next world entry.
+							client.Session.Character.MountId = null;
+							await Database.SaveCharacterMount(client.Session.Character.Id, null);
+							break;
+						}
+
+						var mountCastPayload = (byte[])rawPayload.Clone();
+						Task.RunAfter(MountCatalog.SummonChannelMs, async () => // horse runs up during the channel, then mount
+						{
+							if (client.Session.Account == null)
+								return;
+
+							if (mountCastPayload.Length > 17)
+							{
+								mountCastPayload[16] = 0x00;
+								mountCastPayload[17] = 0x09; // form-0x0a cast-complete (closes the bar)
+							}
+
+							await CombatService.SendBehaviorEchoAck(client, mountCastPayload, 3); // cast complete: mounts
+							await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(CasterLevel(client))); // seat (#26)
+							var mountStats = new CharacterStatBlock
+							{
+								[CharacterStatId.Mount] = mount.RideStat,
+								[CharacterStatId.MountSpeed] = 100
+							}; // the mount StatUpd (frame 520)
+							await SendStatUpdate(client, mountStats, self);
+							await _broadcaster.BroadcastStatsToViewers(client, mountStats); // #428: the horse renders from THIS, so viewers need it too
+							playerEntity?.IsMounted = true;
+							playerEntity?.MountRideStat = mount.RideStat; // so a viewer arriving LATER can be told (#428)
+
+							// Persist the mount so it survives a relog / a trip through a no-mount area (restored on
+							// world entry to a mount-allowed map). Cleared only on a voluntary dismount above.
+							client.Session.Character.MountId = mount.Id;
+							await Database.SaveCharacterMount(client.Session.Character.Id, mount.Id);
+						}, Logger);
+
+						break;
+					}
+
+					case ActionType.RightClickItem:
+					{
+						Logger.LogInformation("RightClickItem: container={Container} slot={Slot} {Args}", (ContainerKind)from, target, args);
+
+						// Every behavior gets an echo-ack (docs/subsystems/combat.md rule 1); the item-use domain logic
+						// lives in UseInventoryItem (GameServerListener.ItemUse.cs). The used item is identified by its inventory location - from =
+						// container (0x68 = backpack), target = slot - decoded from the use_totem_of_origin
+						// capture (using a Totem of Origin recalls to the bind point, #206; the recall's handoff
+						// is the capture's "long loading screen").
+						await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
+						await UseInventoryItem(client, (ContainerKind)from, (int)target);
+
+						break;
+					}
+
+					case ActionType.CastSpell:
+					{
+						// The BCC "state" word (unk1) tells begin from cancel: 3 = begin, 2 = CANCEL. The client sends
+						// the cancel when the cast is interrupted (moving mid-cast - "move cancels the cast", #346/#347),
+						// so honor it by invalidating any in-flight resolve (bump the token so the deferred Resolve below
+						// aborts) and acking the cancel. State values are capture-derived (actions-described-in-chat:
+						// begin=3 x2, cancel=2 x1; every cast in the ice-strike/casilda/casting captures is begin=3).
+						const ushort castStateCancel = 2;
+						if (unk1 == castStateCancel)
+						{
+							client.Session.ActiveCastToken++; // a pending Resolve() now sees a mismatched token and aborts
+							var beginArgs = client.Session.PendingCastArgs;
+							client.Session.PendingCastArgs = null!;
+
+							// Retail answers the cancel with a state=0x0007 abort BCC (NOT an echo of the cancel) - that
+							// is what drops the cast bar, cancels the animation and pops the client's "Interrupted" text
+							// (#347, cast-interupt idx1013). The old echo of the cancel payload left the bar running. Needs
+							// the stored BEGIN args; fall back to the plain echo if it's missing.
+							if (beginArgs != null)
+								await CombatService.SendCastInterruptAbort(client, beginArgs, rawPayload, client.Session.PendingCastMode);
+							else
+								await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
+							Logger.LogInformation("CastSpell CANCEL (interrupted/moved) - abort ack sent, cast bar cleared.");
+							break;
+						}
+
+						// The real spell id rides the action TRAILER (`target`, the uint32 read after the protobuf
+						// args), NOT the args message. The old model called field 10 a "SpellTarget" whose field 1 was
+						// a spell_id, so casts logged as "spell 50000" and ApplySpell carried a non-existent id (no
+						// effect shown) - 50000 is 0xC350, an ENTITY CLASS. Field 10 is a ProtoID32 {type, instance}
+						// (CommandMessage.target); the fallback below reads .Type only to preserve the old behaviour.
+						// Decoded from the ice-strike capture (c2s 0x642CD3D6 cast): trailer = [u32 from=1][u32 spellId];
+						// 0x125D9B / 0x42CA77 are real learned-spell ids. args.Target.Instance is the target. (#236)
+						var spellId = target != 0
+							? target
+							: args.Target?.Type ?? args.BccActionId;
+						var casterHandle = client.Session.Character.Id;
+						var targetHandle = args.Target?.Instance ?? 0;
+
+						// A GROUND-TARGETED AoE (e.g. Deathly Blizzard) is aimed at a reticle POSITION carried in the
+						// trailer instead of a locked entity: it has NO SpellTarget and the trailer's kind byte is 0.
+						// CastGroundTarget reads the reticle; SpellTarget == null confirms there's no locked entity. (#236)
+						var isGroundCast = CastGroundTarget.TryParse(unk2, out var groundTarget) && args.Target == null;
+
+						// This cast's invalidation token: a later cancel (or a new cast) bumps ActiveCastToken so the
+						// deferred Resolve below aborts if the cast was interrupted before its cast time elapsed.
+						var castToken = ++client.Session.ActiveCastToken;
+
+						Logger.LogInformation($"CastSpell spell=0x{spellId:X} target=0x{targetHandle:X}{(isGroundCast ? $" ground={groundTarget}" : "")} {args}");
+
+						// Cast-begin ack (#236): retail answers the cast behavior with a BCC echo right away, which
+						// is what makes the client enter the channel state + render the cast bar (without it the
+						// client never channels - it sent only Mode 1, no progress ticks - and the cast looks
+						// instant). Ack every cast packet (begin + channel ticks); the effect itself is resolved
+						// once, below, after the cast time.
+						await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
+
+						// Shield of the Risen breaks the moment an AGGRESSIVE cast is COMMITTED (cast begin), not when
+						// the cast time elapses (#361) - a ground AoE (Deathly Blizzard) or an offensive cast at another
+						// entity. A self-buff / self-target cast never breaks it (BreakShieldOnAggression is a no-op with
+						// no shield tracked anyway). Done here at begin so the protection drops as the player starts to
+						// attack, matching retail; the effect itself still resolves after castMs below.
+						if (isGroundCast || (targetHandle != 0 && targetHandle != casterHandle))
+							await BreakShieldOnAggression(client);
+
+						// Honor the spell's cast time (#236): retail resolves the effect only AFTER the cast time
+						// elapses (ice-strike capture: cast at frame 377, ApplySpell impact ~frame 441). Resolving on
+						// receipt skipped the client's cast bar. CastTime 0 (instant spell, or an un-populated row)
+						// resolves immediately. Movement mid-cast interrupts it (the cancel branch above / the move
+						// handler's token bump); the abort BCC drops the client bar (#347).
+						var spell = await Database.GetSpell(spellId);
+						var castMs = spell?.CastTime ?? 0;
+						if (castMs == 0)
+							await Resolve();
+						else
+						{
+							// Hold the begin's args (only) so the cast-cancel handler can build the state=0x0007 abort that
+							// stops the client's cast bar (#347). The rest of the abort comes from the cancel packet.
+							// Cleared on resolve/cancel.
+							var castArgsLen = (int)BinaryPrimitives.ReadUInt32BigEndian(rawPayload.AsSpan(22, 4)); // TODO: just read the packet with FaolanStream instead of rawPayload
+							client.Session.PendingCastArgs = rawPayload[26..(26 + castArgsLen)];
+							client.Session.PendingCastMode = args.CommandqueueClientId;
+
+							// A channeled ground AoE (Deathly Blizzard) ticks damage DURING the channel, not one hit at
+							// the end (#349) - kick the tick loop now; it stops itself if the cast is interrupted (the
+							// castToken it captured gets bumped). The complete-ack + mana still fire from Resolve at the
+							// channel's end.
+							if (isGroundCast)
+								_ = _combat.ChannelGroundAoe(client, casterHandle, groundTarget, spellId, castMs, castToken);
+
+							Task.RunAfter(castMs, async () => // resolve the effect after the cast time (#236)
+							{
+								if (client.Session.Account != null)
+									await Resolve();
+							}, Logger);
+						}
+
+						break;
+
+						// Resolves the cast: play the ApplySpell (caster -> target, or self when no target), drain
+						// mana, and on an offensive cast apply damage + push the target's vitals (#69).
+						async Task Resolve()
+						{
+							// Interrupted mid-cast (the player moved / sent the cancel BCC): ActiveCastToken was bumped
+							// after we captured castToken, so skip the effect entirely - no complete-ack, no damage. This
+							// is what makes the move-interrupt stick (the "then moving to interrupt" cast in the capture).
+							if (client.Session.ActiveCastToken != castToken)
+								return;
+
+							client.Session.PendingCastArgs = null!; // cast completed; no abort needed
+
+							// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC, 									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
+							// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3
+							// (cast-state complete). Without this the bar fills then hangs.
+							var completePayload = (byte[])rawPayload.Clone();
+							if (completePayload.Length > 17)
+							{
+								completePayload[16] = 0x00;
+								completePayload[17] = 0x09;
+							}
+
+							await CombatService.SendBehaviorEchoAck(client, completePayload, 3);
+
+							// #439/#307: a cast whose effect is something the SERVER does - today a PET SUMMON (creature +
+							// PetIIR owner-assign + follow) - resolves as that instead of applying a target effect. This
+							// is what hooks pet summoning to real spell casts, not just the .pet GM command. Decoded
+							// from the necro-pet capture (docs/subsystems/summon-pet-decode.md): cast (CastSpell) ->
+							// after the channel -> FA015807 pet spawn + PetIIR. The spell -> effect mapping is a
+							// SpellEffect row, so a new summon is an imported row rather than a branch here.
+							var castEffects = await _spellEffects.ForCast(spellId);
+							if (await _spellEffects.RunAll(client, castEffects))
+							{
+								Logger.LogInformation("CastSpell 0x{Spell:X} resolved {Count} server-side effect(s): {Kinds}.", spellId, castEffects.Count,
+									string.Join(", ", castEffects.Select(e => e.Kind)));
+								return;
+							}
+
+							// GROUND-TARGETED AoE: damage attackable NPCs around the reticle instead of applying a single
+							// target debuff or a self-buff. The blizzard/AoE VFX is rendered client-side from the cast
+							// behavior itself (retail sent no ApplySpell on the empty-ground casts - only the complete-ack,
+							// the DispatchLockTemplate unlocks, and the mana push), so there is no ApplySpell carrier here.
+							if (isGroundCast)
+							{
+								await _combat.SpendCasterMana(client, spellId);
+								// A channeled AoE (castMs > 0) already ticked its damage during the channel
+								// (ChannelGroundAoe, kicked at begin); only an INSTANT ground cast resolves its
+								// single blast here (#349).
+								if (castMs == 0)
+									await _combat.ResolveGroundAoe(client, casterHandle, groundTarget, spellId);
+								return;
+							}
+
+							// applyTo = the spell's SUBJECT (the target, or the caster for a targetless self-cast),
+							// applyFrom = the CASTER. Passing these the other way round applied every hostile cast
+							// to the CASTER "from" the NPC: the debuff landed on the player's own buff bar, and
+							// because applyTo != applyFrom SendMagicBuffIir never registered it, so it never
+							// expired - a permanent 0s icon per cast. Invisible on a self-cast, where both
+							// arguments are casterHandle. (#370)
+							//
+							// ApplySpell takes the WIRE buff id ((base<<8)|rank), but the cast trailer carries the
+							// bare BASE id (the Spells key) - shift it to rank 0. Unshifted, the client resolved
+							// base=spellId>>8 / rank=spellId's low byte, neither of which is a real spell, and
+							// silently rendered no icon while the server-side lifecycle looked correct (#274).
+							await ApplySpell(client, targetHandle == 0
+								? casterHandle
+								: targetHandle, casterHandle, spellId << 8);
+							await _combat.SpendCasterMana(client, spellId);
+							if (targetHandle != 0 && targetHandle != casterHandle)
+								await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
+						}
+					}
+
+					case ActionType.NormalAttack:
+					{
+						// The melee swing / auto-attack: ack the behavior + resolve the hit (see
+						// SendNormalAttackResponse). The target is in the request args (SpellTarget.TargetHandle).
+						await BreakShieldOnAggression(client); // swinging a weapon is aggressive - drops the shield (#361)
+						await _combat.SendNormalAttackResponse(client, rawPayload, args.Target?.Instance ?? 0, args.CommandqueueClientId);
+
+						break;
+					}
+
+					case ActionType.UnarmedAttack:
+					{
+						// Unarmed swing (empty main hand; behavior TypeIds 1089xx, ability id in the tail).
+						// Retail's reply is the plain behavior echo-ack - no result block (combat capture
+						// 2026-06-12); targeted damage reuses the armed path (the capture's unarmed swings
+						// hit air, so the damage part is an extension pending in-client validation).
+						await BreakShieldOnAggression(client); // an unarmed swing is aggressive - drops the shield (#361)
+						await _combat.SendUnarmedAttackResponse(client, rawPayload, args.CommandqueueClientId, args.Target?.Instance ?? 0);
+
+						break;
+					}
+
+					case ActionType.Emote:
+					{
+						Logger.LogInformation($"Emote: {args}");
+
+						break;
+					}
+
+					case ActionType.UseObject:
+					{
+						// Using a world object - `target` is the object handle (its typetag, 0xC87A for loot bags,
+						// rides in `from`). Dispatch on what the object DOES (its InteractAction, data-driven from
+						// the DB): a zone-line teleports to another playfield; everything else (a SimpleDynel door
+						// that opens, a loot bag) is handled by the open/loot path.
+						var interaction = await _broadcaster.ResolveUseObject(client, target);
+						switch (interaction.Action)
+						{
+							case InteractAction.Teleport:
+							case InteractAction.ProxyTeleport:
+							{
+								// The client sends a door-use as TWO BCC phases (begin 0x0003 then release 0x0002); retail teleports
+								// only on the begin phase (Hoxxling inn: the IntendedTeleport follows the 0x0003 record). Acting on
+								// both double-fires the teleport - a redundant relocation / extra loading flash. Ignore the release.
+								if (unk1 != 0x0003)
+									break;
+
+								// Hand the player off to the destination playfield - or, if this teleporter's
+								// destination hasn't been captured yet, surface a message (like the missing-vendor
+								// case) rather than a silent no-op.
+								var dest = interaction.Teleport;
+								var currentMap = PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
+								if (dest.DestMapId == 0)
+								{
+									await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+										ChatMarkup.Color("red", $"Zone-line '{dest.DestinationName}' has no known destination yet."));
+								}
+								else if (dest.DestMapId == currentMap && dest.ArrivalPosition is { } samePos)
+									// Same-playfield door (e.g. the Thirsty Dog Inn): relocate in place, no loading screen.
+									await _simulation.RelocateSameMap(client, samePos);
+								else
+									await DoTeleport(client.Session.Character.Id, dest.DestMapId, dest.ArrivalPosition); // TODO: Move DoTeleport into _simulation like RelocateSameMap
+
+								break;
+							}
+
+							case InteractAction.None:
+							default:
+							{
+								// #262: a quest-item PICKUP (QuestItemEffect dynel, e.g. a quarry Stone Brick) - grant the
+								// collect goal's item + advance it + vanish the node, but ONLY while a matching collect quest
+								// is active (TryAdvanceCollectPickup returns null otherwise, so the brick is inert for a player
+								// without Shipwrecked V). Handled here before the generic open path.
+								if (await _broadcaster.IsQuestPickup(client, target))
+								{
+									if (await _questProgression.TryAdvanceCollectPickup(client) is { } pickedItem)
+									{
+										await GrantItemToBackpack(client, pickedItem);
+										await WorldBroadcaster.HidePickupObject(client, target);
+									}
+
+									break; // inert (no active collect quest) still swallows the use - don't open a window on a brick
+								}
+
+								// Not a column-driven teleporter: a BENCH seats the player (the sit animation), else the
+								// animated-door open path (DB world object by CapturedHandle), else the loot-bag window.
+								if (await _broadcaster.TrySitOnObject(client, target))
+									break;
+								if (await _broadcaster.OpenWorldObject(client, target))
+									break;
+								if (await _broadcaster.OpenLootBag(client, target))
+									break;
+
+								// Unknown object: no bench/door/loot behavior. Surface the gap the same way as an
+								// un-imported vendor/dialogue NPC (notify the player, never a silent no-op).
+								// Float the bubble over the clicked object so the client shows it in place.
+								var usedEntity = PlayerWorldEntity(client);
+								var usedName = usedEntity != null && _simulation.World.ZoneForEntity(usedEntity).TryGetWorldObject(target, out var usedObj)
+									? usedObj.Row.Name
+									: null;
+
+								await _agentServerDispatcher.CharacterSay(target, $"({usedName ?? "object"}: not imported yet)",
+									[client.Session.Character.Id]); // TODO: Why this this also print when looting the item? check InteractAction value
+
+								break;
+							}
+						}
+
+						break;
+					}
+
+					case ActionType.InteractWithCharacter:
+					{
+						// The clicked NPC's entity handle rides in the interact args (field 10 / field 2);
+						// (TypeId, Mode, Field3) select the conversation node the client is requesting.
+						var npcHandle = args.Target?.Instance ?? 0;
+						Logger.LogInformation("TalkToNpc: from=0x{From:X}, target=0x{Target:X}, npcHandle=0x{NpcHandle:X}, args={Args}", from, target, npcHandle, args);
+
+						// 0x16 is the generic "interact with a character", so the TARGET decides what it means: an NPC
+						// opens its conversation (below), a PLAYER is a TRADE REQUEST (#101, capture f1251 -> f1260).
+						// A player's handle IS its character id, which is what makes the distinction this cheap.
+						if (npcHandle != client.Session.Character.Id && await Database.GetCharacter(npcHandle) is { })
+						{
+							await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
+							await _trade.Request(client.Session.Character.Id, npcHandle);
+							break;
+						}
+
+						// Vendor trade-open (#134): when the clicked NPC is a shop vendor (matched by NAME - the
+						// stable key), retail answers the interact itself with the trade-select echo + bare BCC
+						// echo + DispatchShopData riding this conversation (sell_items_to_trader frames
+						// 1188-1193) - no knubot screens in between. Checked on the greeting click only
+						// (Field3 == 0, like the captured open).
+						// Only a shop VENDOR takes this path: gate on an actual shop row existing for the clicked NPC's
+						// TEMPLATE (#244). Keying by template, not name, is what stops the "Halen van Dummy" collision -
+						// the vendor templates (19265, ...) get their shop, while the same-named conversation NPC Atraxus
+						// (template 12236) does NOT, so his click falls through to dialogue below. A non-vendor (Casilda,
+						// a quest NPC, an un-imported vendor) yields a null shop and falls through - do NOT break here, or
+						// the greeting is swallowed and dialogue never opens.
+						if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(npcHandle, out var vendorTemplate) &&
+						    await Database.GetShopByTemplate(vendorTemplate) is { } vendorShop)
+						{
+							await _shop.HandleVendorTradeOpen(client, rawPayload, args.CommandqueueClientId, vendorShop, npcHandle);
+							break;
+						}
+
+						// Auction-house open (the real trigger for the Tradepost - the `.ah` GM command is only a PoC
+						// bootstrap). Retail opens the AH window when the player interacts with the "Trader" auctioneer
+						// NPC (capture `sell_items_to_trader-intract-with-auctionhouse`: FA015807 "Trader"). The NPC NAME
+						// is the stable key (like shop vendors above); the player is standing next to the auctioneer to
+						// click it, so their own position trivially satisfies the 15-unit client proximity check.
+						if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
+						    talkedNpcName == AuctioneerNpcName && PlayerWorldEntity(client) is { } auctioneerPlayer)
+						{
+							await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
+							break;
+						}
+
+						// Real branching dialogue: replay the captured conversation node for whichever NPC/node
+						// the client asked for, re-addressed to the clicked NPC.
+						if (await _conversation.TryReplayConversation(client, args.BccActionId, args.CommandqueueServerId, npcHandle))
+							break;
+
+						// Only a GREETING click (Field3 == 0) may OPEN a dialogue. The client fires a second
+						// TalkToNpc with Field3 != 0 the same instant it opens one (retail answers it with a bare
+						// ack); if that duplicate isn't absorbed above (no active conversation - e.g. right after a
+						// close) it must NOT re-open the intro/greeting, or the dialogue "triggers a second time"
+						// (#217). A non-greeting click with nothing to absorb is a no-op.
+						if (args.CommandqueueServerId != 0)
+							break;
+
+						// Beach login with no captured node for this (Mode, Field3): close the chat window so the
+						// client doesn't hang waiting for a reply (the "advance a step -> chat locks, can't ESC"
+						// bug). Conversation replay is coverage-bound, so an un-captured branch is expected.
+						if (client.Session.WorldEntered || client.Session.EntryMode == WorldEntryMode.CreateWorld)
+						{
+							var routedName = client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var rn)
+								? rn
+								: "<unmapped handle>";
+							Logger.LogInformation(
+								"TalkToNpc: no conversation node for npcHandle=0x{NpcTemplate:X} (name={Name}, typeId={TypeId}, mode={Mode}, field3={Field3}); closing the window.", npcHandle,
+								routedName, args.BccActionId, args.CommandqueueClientId, args.CommandqueueServerId);
+
+							// Surface the gap instead of silently closing (have them say so). A greeting click
+							// that reaches here has NEITHER an imported shop (the vendor branch above didn't match)
+							// NOR an imported conversation node - and we can't tell a vendor-without-shop from a plain
+							// talk NPC (no merchant flag on the NPC), so one honest bubble covers both. Sender = the NPC
+							// handle so the client floats it over the NPC; recipient = the clicking player (SayRecipients
+							// excludes the actor, which would drop the clicker here). No-fallbacks rule: say what's missing.
+							if (npcHandle != 0)
+								await _agentServerDispatcher.CharacterSay(npcHandle, $"({routedName}: no dialogue or shop imported yet)", [client.Session.Character.Id]);
+
+							await ConversationService.SendConversationClose(client, npcHandle); // #217: close the CLICKED NPC's window (re-address the camera release)
+						}
+
+						break;
+					}
+
+					case ActionType.MoveEquippedToFromInventory:
+					{
+						// bag slot starts top left, continue counting on next page
+
+						var direction = (MoveItemInInventoryDirection)args.BccActionId;
+						switch (direction)
+						{
+							// Into-slot moves: tail = [srcBagCell][destEquipSlot][item][item][0][flags].
+							// 42011 and 41843 are the same grammar via different windows (capture + live).
+							case MoveItemInInventoryDirection.InventoryToEquipped:
+							case MoveItemInInventoryDirection.BagToEquipped:
+							{
+								var targetSlot = (CharacterEquipmentSlot)target;
+
+								Logger.LogInformation($"{direction}: ({from} -> {targetSlot}) {args}");
+
+								// The trailing struct (after from/target) carries the item's template handle as a
+								// big-endian uint32; persist the equip into CharacterEquipment.
+								var equipHandle = unk2.Length >= 4
+									? BinaryPrimitives.ReadUInt32BigEndian(unk2.AsSpan(0, 4))
+									: 0;
+								var movedItem = equipHandle != 0
+									? await Database.GetItem(equipHandle)
+									: null;
+								if (equipHandle != 0)
+									await _equipment.PersistEquip(client, targetSlot, equipHandle, (int)from);
+
+								// Retail's reply: the behavior ack carrying the item's identity quad + a 0x201C
+								// entry (prefix 0x65, state = the destination slot). Capture frames 289-290.
+								await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, movedItem!);
+								await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000065, target,
+									0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
+
+								break;
+							}
+
+							// Out-of-slot moves: tail = [srcEquipSlot][destBagCell][0...].
+							case MoveItemInInventoryDirection.EquippedToInventory:
+							case MoveItemInInventoryDirection.EquippedToBag:
+							{
+								var fromSlot = (CharacterEquipmentSlot)from;
+
+								Logger.LogInformation($"{direction}: ({fromSlot} -> {target}) {args}");
+
+								// Unequip is identified by the source equip slot (the trailing handle is 0);
+								// `target` is the bag cell the item lands in.
+								await _equipment.PersistUnequip(client, fromSlot, (int)target);
+
+								// Retail's reply: the behavior ack with null identity + a 0x201C entry
+								// (prefix 0x68, state 0). Capture frames 320-321.
+								await CombatService.SendEquipMoveAck(client, rawPayload, args.CommandqueueClientId, null!);
+								await Send0X201CEntry(client, LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), 0x00000068, 0,
+									0x00160000u + ((uint)Environment.TickCount & 0xFFFF));
+
+								break;
+							}
+
+							default:
+							{
+								Logger.LogInformation($"MoveEquippedToFromInventory: unknown direction={direction} {args}");
+
+								break;
+							}
+						}
+
+						break;
+					}
+
+					default:
+					{
+						Logger.LogInformation($"UNKNOWN-{actionType.ToHex()}: {args}");
+
+						// Behaviour 1 while SEATED is the client ASKING to stand up (#355) - getting up is
+						// client-initiated, not movement-inferred as we had it. Retail's sit capture, matched pairs:
+						//   6829 c2s bId=1 seq=0x0003  ->  6837 s2c bId=1 seq=0x0004
+						//   6830 c2s bId=1 seq=0x0002  ->  6838 s2c bId=1 seq=0x000F  ->  6844 s2c STANDUP (bId=0x2A)
+						// i.e. the SAME two-phase confirm the sit runs on behaviour 0x12, then the standup animation.
+						// Because we inferred standup from movement instead, these requests fell into this
+						// un-decoded fallback and got a bare echo - so the client asked to get up, was never
+						// answered, and stayed stuck in the pose until it timed out and stood up on its own.
+						// The seq mapping (3->4, 2->0x0F) lives in BehaviorAckBody.AckSeq.
+						if ((uint)actionType == 1 && client.Session.SeatedOnHandle is not null)
+						{
+							var requestSeq = rawPayload.Length >= 18
+								? (ushort)((rawPayload[16] << 8) | rawPayload[17])
+								: 0;
+							await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
+
+							// The phase-2 confirm is what commits it; the standup animation follows the ack.
+							if (requestSeq == 0x0002)
+							{
+								Logger.LogInformation("Sit: client asked to stand up (behaviour 1 phase 2) - answering and standing.");
+								await _broadcaster.StandUp(client);
+							}
+
+							break;
+						}
+
+						// ...EXCEPT a server-driven object-action ANIMATION while seated (#355). The client re-sends the
+						// sit behaviour (actionType 0x2A, carrying "chair_sit_calm") after we seat it; echoing that back
+						// makes the client play the SIT again, and its 2.6s blend IS the progress bar seen while trying
+						// to stand - which is also what delayed the standup. Retail emits chair_sit_calm exactly ONCE per
+						// sit, s2c only, and never echoes one back. The guard is scoped to being seated because retail's
+						// client does send 0x2A otherwise (17 across the captures) and those ARE answered, so a blanket
+						// skip would soft-lock other object actions - the very thing the ack below exists to prevent.
+						if ((uint)actionType == BehaviorAnimationCodec.ObjectActionBehaviorId && client.Session.SeatedOnHandle is not null)
+						{
+							Logger.LogInformation("Sit: absorbed the client's re-sent sit behavior (not echoed - it would replay the sit).");
+
+							break;
+						}
+
+						// Robustness (#236 channeled cast 0x15, #238 dodge hop): an un-decoded behavior must
+						// STILL get the generic behavior echo-ack (docs/subsystems/combat.md rule 1), or the client stays
+						// stuck in the action's start state forever (cast bar never finishes / dodge never lands
+						// back to idle) and the player soft-locks until relog. Acking with the request's Mode
+						// returns control even when we don't yet model the action's effect.
+						await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
+
+						break;
+					}
+				}
+
+				// #48: the combat responses above are framed to the ACTOR only - so the swing/cast was invisible
+				// to other players. Relay the actor's behavior (the BCC animation) to nearby viewers so the attack
+				// renders on their clients too (retail relays this exact echo body, only the frame receiver
+				// differs - other-players-visible capture). The cross-player render channel is the BCC command replication
+				// (Ghidra FUN_005e1c70), so it also carries the APPEARANCE-changing behaviors: equipping/unequipping an item
+				// (#400 sibling - a new chestpiece/weapon on another player) rides the same relay; the weapon-SET switch is
+				// relayed in its own branch above. NEEDS in-client verification for the equip case (no multiplayer capture
+				// contains a remote player equipping - single-player traces only).
+				// PlayAnimation (#428): the mounted jump. A standing jump moves the character nowhere, so there is
+				// no CharDCMove for the relay to carry - the client asks for the animation over this channel
+				// instead, and without it in this list the actor animated on their own screen only.
+				if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell or ActionType.MoveEquippedToFromInventory or ActionType.PlayAnimation)
+				{
+					var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Character.Id, rawPayload, args.CommandqueueClientId);
+					if (behaviorRelay != null)
+						await _broadcaster.BroadcastBehaviorToViewers(client, behaviorRelay);
+				}
+			}
 		}
 	}
 }

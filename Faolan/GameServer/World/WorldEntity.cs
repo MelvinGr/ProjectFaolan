@@ -360,7 +360,7 @@ namespace Faolan.GameServer.World
 		public string Name { get; }
 
 		// #363 dev nameplate override: the FULL labelled overhead name ("Crocodile [Ape2 | id-prop x8]") to push via a
-		// SetNameIIR right after this NPC's spawn, when DebugAreaLabels is on. The client resolves an NPC's floating
+		// SetNameIIR right after this NPC's spawn, when the broadcaster's area-label debug toggle is on. The client resolves an NPC's floating
 		// nameplate from its template_id LDB name and IGNORES the free spawn-body `Name` string, so the label can only
 		// be shown by a SetNameIIR (0xADCE0CDA) - the same per-entity name-commit the create flow uses. Null = no label.
 		public string OverheadNameOverride { get; set; } = null!;
