@@ -366,7 +366,8 @@ namespace Faolan.GameServer
 				["togglenpcgroup"] = (client, _) => ToggleNpcGroupCommand(client),
 				["graduatenpcgroup"] = GraduateNpcGroupCommand,
 				["weaponset"] = WeaponSetCommand,
-				["time"] = TimeCommand
+				["time"] = TimeCommand,
+				["setstat"] = SetStatCommand
 			};
 		}
 
@@ -375,6 +376,53 @@ namespace Faolan.GameServer
 		// is 4.8 real hours; this shifts its PHASE rather than stopping it. Verified in-client 2026-07-25: the sky follows
 		// the time sent, so game-midnight is 0 and the client's own 06:00-18:00 day window (GameTime_t holds 21600.0 /
 		// 64800.0) lines up with it. No argument reports the current time.
+		// .setstat <statId> <rawValue> [<statId> <rawValue> ...]  - push arbitrary stats at their RAW WIRE value, with
+		// no scaling applied by us. The measuring instrument for CharacterStatIdExtensions.GetScale: the client keeps
+		// its stat table in wire units and divides only when it DRAWS, so a scale cannot be read off the wire or the
+		// debug log - it needs a rendered number. Send a known raw value, read what the character sheet shows, and
+		// `raw / displayed` IS the scale. Ids are decimal or 0x-hex, and several pairs ride one block so a whole sheet
+		// tab can be probed in one shot.
+		//
+		// ⚠️ Deliberately NOT persisted and NOT reflected into the world model - this writes to the client's view
+		// only, so a relog or the next vitals push undoes it. That keeps a probe from corrupting a character.
+		private async Task SetStatCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var parts = (arguments ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			if (parts.Length == 0 || parts.Length % 2 != 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .setstat <statId> <rawValue> [<statId> <rawValue> ...]   (ids decimal or 0x-hex; value is the RAW wire value)");
+				return;
+			}
+
+			var block = new CharacterStatBlock();
+			var applied = new List<string>();
+			for (var i = 0; i < parts.Length; i += 2)
+			{
+				if (!TryParseStatId(parts[i], out var statId) || !uint.TryParse(parts[i + 1], out var raw))
+				{
+					await _agentServerDispatcher.SendSystemMessage(characterId, $"Not a stat id / raw value: '{parts[i]}' '{parts[i + 1]}'.");
+					return;
+				}
+
+				block.SetRaw(statId, raw);
+				applied.Add($"{(uint)statId} (0x{(uint)statId:X}) = {raw} raw");
+			}
+
+			await SendStatUpdate(client, block, characterId);
+			await _agentServerDispatcher.SendSystemMessage(characterId, $"Pushed {applied.Count} stat(s): {string.Join(", ", applied)}. Read the sheet - raw/displayed is the scale.");
+		}
+
+		private static bool TryParseStatId(string text, out CharacterStatId statId)
+		{
+			var ok = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+				? uint.TryParse(text[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var raw)
+				: uint.TryParse(text, out raw);
+
+			statId = (CharacterStatId)raw;
+			return ok;
+		}
+
 		private async Task TimeCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;

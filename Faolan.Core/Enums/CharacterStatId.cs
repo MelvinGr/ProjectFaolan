@@ -434,9 +434,16 @@ namespace Faolan.Core.Enums
 				CharacterStatId.WeaponDamageMelee or CharacterStatId.WeaponDamageRanged => 100,
 
 				// Attributes: proven on a freshly created Necromancer's sheet (2026-07-27) - a 10-wire class base
-				// renders as 1.
-				CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity => 10,
+				// renders as 1. Ferocity is the sixth attribute and shares their scale: `.setstat 1403 10000` draws as
+				// 1000 on the General tab.
+				CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity
+					or CharacterStatId.Ferocity => 10,
 
+				// MEASURED x1 (`.setstat <id> 10000`, 2026-07-27, read off the character sheet): 448 Armor drew 10002
+				// = 10000 + its base of 2; 310 Hit Bonus Chance and 711 Critical Bonus Damage drew 10000 in the Rating
+				// column (their "Effect" percent is a derived game formula, not a scale); 451 Protection drew 10000 and
+				// feeds all five schools off the one stat. They land on the default below - listed here so they read as
+				// measured rather than assumed.
 				_ => 1
 			};
 		}
