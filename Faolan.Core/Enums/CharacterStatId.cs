@@ -161,6 +161,40 @@ namespace Faolan.Core.Enums
 		// `(bonus * 0.01 + 1.0) * <armour|protection>`, so a value of 25 means +25%. BonusArmor feeds the physical
 		// branch and BonusProtection the magical one - which is what identifies them, since the LDB names alone do not
 		// say they are percentages.
+		// The rest of the ids the item [2][9] region actually carries, named from LDB 615 in one pass (#464). They
+		// were the tail of `--report region-stat-census`: every id ANY item grants, whether or not we import it.
+		// Nothing reads them yet and none are whitelisted for import - naming is not importing - but an id with a
+		// name is one nobody has to re-derive, and several answer questions that were open in prose:
+		//
+		//   - the per-SCHOOL Combat Ratings complete the family we already had (Cold/Electrical/Holy/Unholy),
+		//   - the TAP ratings are the leech family (health/mana/stamina/magic-life),
+		//   - Evade Rating is the counterpart of the EvadeChance percent GetScale already knows about,
+		//   - and three are not combat stats at all (Hair Render Type, Scale, Sprinting Stamina Drain) - a reminder
+		//     that the region is an item's whole property list, not a damage sheet.
+		CombatRatingCold = 0x00A2, // LDB 162
+		AttackRange = 0x011F, // LDB 287
+		CrossbowRangeModifier = 0x0124, // LDB 292
+		EvadeRating = 0x0134, // LDB 308 - the RATING beside EvadeChance (0xFE), which is the percent
+		Scale = 0x0168, // LDB 360 - render scale, not a combat stat
+		MagicLifeTapRating = 0x01DC, // LDB 476
+		HealthTapRating = 0x01DD, // LDB 477
+		MagicManaTapRating = 0x01E0, // LDB 480
+		StaminaTapRating = 0x01ED, // LDB 493
+		MagicDamageModifier = 0x0218, // LDB 536
+		PvpXpModifier = 0x02B2, // LDB 690
+		CastingConcentration = 0x0330, // LDB 816
+		DamageMultiplier = 0x0348, // LDB 840
+		DefenseRatingHeroic = 0x03B4, // LDB 948
+		CombatRatingElectrical = 0x03F0, // LDB 1008
+		CombatRatingHoly = 0x03F1, // LDB 1009
+		CombatRatingUnholy = 0x03F2, // LDB 1010
+		XpFromPvpKills = 0x0562, // LDB 1378
+		HairRenderType = 0x002F, // LDB 47 - appearance, not combat
+		SprintingStaminaDrain = 0x0025, // LDB 37
+
+		// ⚠️ TWO region ids have NO LDB 615 entry and stay unnamed: 10 (on 89 items, values 0..6 - the most common
+		// unnamed id by a wide margin) and 1669. LDB 615 is the client's own stat-name catalog, so an id missing
+		// from it will not be named by reading harder - it needs a consumer in the client to identify it.
 		// The FOURTH most common stat on an item's [2][9] region - 249 of 3,317 templates carry it, more than
 		// HealthMax - and it sat unnamed while rarer neighbours had names. Found by censusing the region rather than
 		// the whitelist (`--report region-stat-census`), then read straight out of LDB 615.
