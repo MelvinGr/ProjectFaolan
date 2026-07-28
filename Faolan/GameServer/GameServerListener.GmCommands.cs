@@ -911,6 +911,10 @@ namespace Faolan.GameServer
 		// derivation. The client's ALT+F7 hotkey (`DebugToggleFlyingMode`, the gmlevel="-1" group in
 		// Data/Gui/Default/Hotkeys.xml) reaches the same client state but is not wired to anything we send.
 		//
+		// ⚠️ If you just want to FLY, type `/luke` instead - the client's own SkywalkingCommand is client-local (it
+		// sends no packet) and toggles the same state, so it works regardless of what the server does. This command is
+		// the server-driven alternative, for granting flight rather than the player toggling it.
+		//
 		// ⚠️ UNVERIFIED on the wire: the GameAction's parameter list lives in a runtime-filled descriptor table, so an
 		// empty one is an assumption (FlymodeActionBuilder). There is also no "stop" counterpart in the client's type
 		// list, so this is one-way until that is decoded - relog to land.

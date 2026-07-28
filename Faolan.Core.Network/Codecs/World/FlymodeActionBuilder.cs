@@ -17,6 +17,12 @@ namespace Faolan.Core.Network.Codecs.World
 	// It is absent from that file only because the dump behind it scanned 0xCF09..0xD026 and this sits past the end -
 	// the same reason ProxyTeleport (0xD04D) is missing.
 	//
+	// ⚠️ NOTE: the client can already do this WITHOUT us. `SkywalkingCommand` is a plain client-local chat command -
+	// verb `/luke` (Luke Skywalker; the verb is an LDB string, which is why nothing in the exe greps as "fly") - and
+	// its execute FUN_013f6130 sends no packet: it toggles the same object+0x1BC flag and alignment mode. So `/luke`
+	// is the decoded, working route, and this GameAction is the SERVER-driven alternative, kept because a server that
+	// wants to grant/revoke flight (rather than the player toggling it) needs a lever of its own.
+	//
 	// ⚠️ The PARAMETER list is unverified. Key lists live in the runtime-filled descriptor table (BSS), so they come
 	// from a live Frida dump, and StartFlymode is not in ours. An empty key list - nothing after the four fixed ints -
 	// is the shape of a parameterless toggle and is what this sends; it is an assumption awaiting an in-client check,

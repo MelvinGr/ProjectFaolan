@@ -142,3 +142,36 @@ the spell + item crib scores.
 - **Appearance (hair) names** (#291's original target) — the hair LDB page holds only ~15 internal art codenames,
   and a hair meshid maps to a style-group not present in the registry/XML, so the localized hair names this issue
   hoped for don't exist in a usable form. Face/head/tattoo/beard/piercing already resolve from their own `name=`.
+
+## String ids are ELF hashes of the token name (2026-07-29)
+
+A string id in the LDB is not opaque: it is the **28-bit ELF hash of the token name** the client looks the
+string up by. The exe is full of `FUN_0061f640(<category>, "<Token>")` calls whose second argument is a literal
+token name, so **any of them can be resolved to its actual string with no live client** - hash the token, look
+the id up in the category.
+
+```python
+def elf(s):                      # the classic UNIX ELF/PJW hash, masked to 28 bits
+    h = 0
+    for c in s:
+        h = (h << 4) + ord(c)
+        h = (h ^ ((h & 0xF0000000) >> 24)) & 0x0FFFFFFF
+    return h
+```
+
+Verified on 21 independent token/value pairs: `SkywalkingCommand_Description` → 97813470
+(`"This command enables skywalking."`), `SkywalkingEnabled` → 80504532, `SkywalkingDisabled` → 137024644, and
+18 `<Class>Command_Name` tokens each landing on exactly the expected verb in category **10002** -
+`LogCombatCommand_Name` → `"logcombat"`, `SitCommand_Name` → `"sit"`, `ReloadHotkeysCommand_Name` →
+`"reloadhotkeys"`, `ASEvalCommand_Name` → `"aseval"`, and so on.
+
+**Category 10002 is the chat-command page**: it holds every command's verb, its description, and its parameter
+names (514 entries). That makes it the catalog of what the client will accept as a `/command` - including
+commands with no default hotkey and no GM gate.
+
+The whole page is committed as [`../re/ldb-chat-command-page.tsv`](../re/ldb-chat-command-page.tsv) (514 rows,
+`id` + `value`), so a token can be resolved by hashing it and grepping that file.
+
+This is what identified the fly command: `SkywalkingCommand_Name` hashes to 47110773, whose value is **`luke`**
+(as in Luke *Skywalker*) - a verb no amount of grepping for "fly" or "skywalk" would have found. See
+[`gm-commands.md`](../subsystems/gm-commands.md).

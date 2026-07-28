@@ -1,0 +1,515 @@
+id	value
+531790	This command will let you give, remove, clear or show PvP points of your target.
+586917	renown
+1369886	This parameter is the string value of the repeating string - float and string - bool value parameter pairs of the subcommand4 and subcommand6 subcommands of the test command.
+2303861	playername
+4185694	This command will open the claim window.
+4368741	help
+4390261	camp
+4795381	String
+5328990	This is the amount of money to be withdrawn from the guild bank.
+5370293	value
+5437358	The name of the alias.
+5881909	Integer
+5883333	Positive Integer
+9303006	This is the area ID of the battlekeep.
+9379438	This parameter will give the player feedback about his afk status.
+9499637	group
+9667790	This is the message you will send to the group.
+9709468	greater or equal to %s
+9883197	stringParam
+9963885	stringParam
+10954949	noerror
+11029630	This is a uint parameter of the test command.
+11125381	amount
+11260766	Unloads a Flash file.
+11510622	Vuelve a cargar un archivo Flash.
+11643934	This command will show you the amount of time your character has been played.
+13306725	description
+14144350	Loads a new Flash file.
+16308286	Runs an arbitrary GameAction directly.
+16576357	command
+17755173	clearall
+20232341	g
+20245070	This command will move the character out of his miserable position
+20435774	This command will let your character stand up.
+20546798	Name of the emote to play.
+22068373	create
+22297390	This will let you remove guild renown points from a player.
+22377717	subcommand1
+23214142	Cambia el servidor de juego por la identidad especificada; si no se ha especificado ninguna, se decidirá entre todos.
+23418830	Run the GameAction on the server.
+23426293	subcommand2
+24340878	The ID of the GameAction to run. Either the TypeID or the name of the GameAction.
+24399955	tell
+25430629	emotename
+25832549	gmrename
+26556718	This command plays a user-specified emote.
+26572021	subcommand5
+26977518	This command will let a GM rename the guild of his target.
+27049685	sendmoney
+27567205	clear
+27620597	subcommand6
+27809845	aseval
+28625109	guildid
+28669173	subcommand3
+28893925	stacksize
+29717749	subcommand4
+30285710	If provided with this the points will not be given to the player but to the guild only.
+31118414	This is the name of the character you want to invite to your guild.
+31438798	You can use this command to create 'aliases' to existing commands, and even fix some of the parameters.<br>If you don't enter any parameter, all of your aliases will be listed. If you enter one parameter, the provided<br>alias will be deleted. Otherwise, a new alias to the provided command and its parameters will be registered.
+31602014	This parameter is the character name you want to send the private message to.
+31643502	This command will let you write to a channel you specifiy.
+32007886	This is the name the guild will be called.
+32330046	This command will give you access to some of the guild functions.
+32647102	Enables verbose output to log when executing ActionScript.
+32863477	subcommand7
+32914430	This command will let you send a message to your current group.
+33912053	subcommand8
+34273365	greater or equal to #1%s and less than #2%s
+36229445	history
+36529989	parameters
+38403150	Vuelve a cargar los datos itemshop del usuario actual.
+38677486	This is a subcommand which requires all it's parameters to be present, but in any order.
+39899429	g
+41451957	GM Flag
+41556750	This command will remove you from your guild.
+41593445	message
+42174910	Will reload the contents of the PREORDER_ITEMS table for your target or yourself if target is invalid.
+42257678	The petition message should contain what the petition is about.
+43222606	Este comando abre una ventana para solicitar que se transfiera el liderazgo del gremio.
+43843973	sfinfo
+44020229	s
+44758261	greater than #1%s and less or equal to #2%s
+45271534	This command will let you send money to the guild bank.
+45394339	yes
+45400998	off
+45506661	message
+46023182	This command sends your message to the %s channel.
+46381602	user
+46393798	self
+46399950	Level of the item to reimburse.
+46528101	playername
+46735070	Sends Scaleform and ActionScript information to the client log.\r\nHelpful for debugging and for identifying available gamecode interface and enum names.
+46816341	bugreport
+47110773	luke
+47461790	This command will let a GM promote his target in its guild hierarchy.
+48367326	This will let you shout a message to players in your vicinity.
+49592469	c
+50342270	Queries or sets a game option.
+50615614	Queries or sets a game option, but does not print the changed value.
+50994638	Character instance of the target (when you cannot directly target the character).\r\n
+51567774	Value must be %s.
+51717246	This is the amount of money to send to the guild bank.
+52653838	For changing the amount of log output from Scaleform.
+52738197	t
+52746654	Give 'disconnect' as a parameter to disconnect from the visual remote debugger.
+53683438	Clear gameplay preview data and reload gameplay data from RDB Server.
+53810190	This command will promote your target in your guild hierarchy.
+54245941	guildname
+54919461	cc
+55413125	amount
+55454702	This is a subcommand with two periodically repeating parameters, followed by another two periodically repeating parameters.
+56681614	Will disconnect the network connection between the specified servers
+56932501	x
+57371390	Suppress printing of ActionScript errors in log.
+57511358	This command will withdraw money from the guild bank.
+58026574	The name of the player to be ignored.
+58484718	Evaluates the provided ActionScript expression.
+59051774	Reimburse this much money to the player.
+59229493	server
+59665205	alias
+59709445	guildname
+60674645	level
+60795342	This command will let a GM demote his target in its guild hierarchy.
+60895637	targetid
+61309774	This message parameter will provide the afk message a player has set with the '/afk' command.
+61426734	Will disconnect the connection between the CommunityServer and ExternalBilling server. The connection will be re-establish in 5 seconds.
+61500629	gmdemote
+62338053	invitetoraid
+62621763	reply
+63519294	The path to the Flash GUI file.
+64326101	debugclient
+64498501	command
+64656174	This parameter will let you remove your guild from a massive PvP keep fight.
+64712452	target
+65347973	gu
+66369685	s
+67692773	targetid
+69154965	newname
+70507294	The chat server command.
+70609390	ID del gremio para el que se va a eliminar el tiempo de recuperación.
+71559525	tell
+71761061	physics
+72133486	This parameter will let you clear the PvP points of your target.
+72153877	tax
+72231918	This is a subcommand with optional and recurring parameters.
+72835694	The ActionScript expression to evaluate.
+72868702	This command will create a petition for the user.
+73196766	This is the message you want to shout.
+73462670	This is the message you will send to your raid.
+74065614	This command will invite your target or the character you specify by name to your raid.
+74375365	greater than #1%s and less than #2%s
+74891061	aliasname
+74910958	The item stack size.
+75493022	Reset hotkeys to the default values.
+76592181	verbose
+77179605	reload
+78072469	withdrawmoney
+78395006	This is the message you want to send to your guild.
+79307045	false
+81054085	reloadhotkeys
+81065677	floatParam
+81278181	unlockguildrenown
+82058910	Use this to fake a connection to the billing servers.
+82234158	Elimina el tiempo de recuperación de las invitaciones del gremio de un personaje concreto.
+82520917	playfield type
+82883573	amount
+83395317	type
+83952533	remove
+84437045	Nombre del canal
+84446533	rename
+85165125	h
+85166149	d
+86049333	demote
+86514741	create
+87069877	DimensionID
+87234885	reloadui
+87511125	count
+88196414	Apply for a massive PvP keep fight.
+88472446	This is a literal parameter of the test command or its subcommand8 subcommand.
+88475189	set
+88480149	add
+88491230	The name of the character you want to add to your friends list.
+88930837	guildsay
+89009134	This is a subcommand with two periodically repeating parameters.
+90196062	This parameter is the float value of the repeating string - float value parameter pairs of the subcommand4 and subcommand6 subcommands of the test command.
+90534222	This is the message you will say as if your character would say it.
+91159685	add
+91516341	claim
+91653973	amount
+91958629	unloadclip
+91974757	reloadclip
+92204389	loadclip
+92915901	literalParam
+92933461	Real Number
+93171374	The new value of the game option.
+94151134	This command will open the bug report window so a user can report a bug.
+95007998	Descripción de lo que está haciendo tu personaje.
+95315646	This is an alias to <font color=active>%s</font>.
+96686926	How many times should the GameAction be executed. Only works for buffs.
+97078405	value
+97419918	The game option to query or change.
+97813470	This command enables skywalking.
+98700446	This will let you say a message to players in your vicinity.
+98997141	enable
+99225013	selectself
+100621987	group
+100905493	dimension
+101545013	invite
+101763317	cashamount
+103500847	no
+103500862	on
+104177342	Reloads your hotkey settings.
+104413877	replymessage
+104430942	Cantidad de oro que hay que reembolsar.
+104962510	Use this sub-command to connect the client's physics simulator to a visual remote debugger.
+105051077	born
+105917086	This is a float parameter of the test command.
+108670142	This command will unlock guild renown.
+108769998	The command you need information about.
+108815694	Follow the targeted character.
+109030414	This parameter should contain the name of the player who you want to get information about.
+111072021	gmpromote
+111402453	disconnect
+111873061	Emote
+112750725	reset
+113039716	disabled
+113147171	guildsay
+113234309	fakebillingconnection
+114095198	Use this sub-command to toggle the debug rendering of the client's physics simulator.
+114275045	v
+114314574	This is a bool parameter of the test command.
+114332542	Add the given character to your friends list.
+115338789	reimburse
+115518173	enumParam
+115756085	Renowntype
+115853470	Reimburses a claimed item for your target or you if target is invalid.
+116793164	less or equal to %s
+118664205	hashParam
+119635237	inverted
+120038725	interval
+122043045	who
+122515893	guildonly
+122699182	Specify whether to enable or disable the physics' debug renderer.
+123048542	This is the switch to turn logging on or off.
+123746661	setasnew
+123851326	Enable or disable the fake billing connection.
+124241077	ID32
+124996958	This is an enum parameter of the subcommand3 subcommand of the test command. It accepts GM flags.
+125257358	Este comando desbloquea un personaje del campo de juego al que está ligado. El comando puede desbloquear el objetivo seleccionado en el campo de juego en el que se encuentre o puede ser usado sin objetivo con parámetros adicionales.
+125562510	This command will enable/disable combat logging.
+126396629	gameactionid
+126454517	Message
+127524782	This command will select yourself as target.
+127687198	Este parámetro debería contener el nombre del jugador que quieras desbloquear de un campo de juego.
+128426085	disconnect
+128692670	Este parámetro debería contener el tipo de campo de juego que desees restablecer (normalmente 51100). Este parámetro es opcional.
+129474421	message
+130906693	optionname
+131173230	Target the provided player.
+131209917	floatParam
+131344718	This command plays the %s emote.
+132657285	logcombat
+132703749	unlockplayfield
+133315518	This is the amount of renown points.
+134472789	Command
+136928046	This command will let you calculate the renown rankings.
+137522638	Bandera de reembolso de plata.
+137522654	Limited claim count flag.
+137546405	Literal
+138655189	invite
+138805701	ch
+139340782	This is a subcommand which takes an arbitrary length string - a message - as parameter.
+141626302	Tipo de fama del gremio.
+142155342	This command will let you talk to your raid.
+142172549	status
+142269973	GameAction
+144557189	Hash
+144807125	setoption
+144884837	amount
+145495774	greater than %s
+145928189	id32Param
+146273534	The command you want to create an alias for.
+146494213	message
+147384200	Syntax:
+147775685	greater or equal to #1%s and less or equal to #2%s
+148806005	friend
+149201230	Este parámetro debería contener la ID del campo de juego que quieras restablecer.
+150603630	This command will put your target or the character you specify by name on the ignore list.
+151138997	dumpnpc
+151600558	This command will remove your target from the guild.
+152702830	This command will dump information about a npc.
+153094357	playername
+153224606	Command to switch to another dimension
+154885637	chsay "%s"
+155598133	say
+156117982	This is a subcommand which takes takes one of two optional parameters.
+156314693	description
+156498357	clearinvitecooldown
+157107301	reply
+157634062	This is the message sent to the players in your vicinity.
+158385957	remove
+158454446	This command will rename the guild.
+158740734	This command will give you access to the renown points.
+158821566	ID del personaje para el que se va a eliminar el tiempo de recuperación (si no hay ID se asigna a tu objetivo).
+158956878	Cantidad de plata que hay que reembolsar.
+159157477	played
+160415029	chsay
+160845566	This is an ID32 parameter of the subcommand3 subcommand of the test command.
+161715278	Use this sub-command to connect the server's physics simulation to a remote visual debugger.
+162319886	This is the message you want to send to the channel.
+162880757	clear
+162960718	This command will let you test the itemshop functionality.
+162981957	expression
+164505502	This command will invite your target or the specified character to your guild.
+164618030	Shows the IP address of the client.
+165128430	This parameter will let you clear all massive PvP sign-ups.
+166284451	shout
+166628085	target
+167785013	ignore
+168648510	Additional parameters for the chat server command.
+169943726	Header flag.
+169960110	Data flag.
+170074405	whisper
+173115893	loadgui
+173127157	unloadgui
+174307461	massivepvp
+174869822	This is a hash parameter of the subcommand2 subcommand of the test command.
+175182229	pvppoints
+175708718	This command will send a private message to another character.
+175819293	intParam
+176801221	Stat Name
+177189653	charactername
+177536190	less than %s
+177865413	emote %s
+179761269	petition
+180571054	This parameter is the bool value of the repeating string - bool value parameter pairs of the subcommand6 subcommand of the test command.
+181667733	amount
+182280037	debugrender
+182896965	booleanparameter
+183135678	This is the new name of the guild.
+184117614	The player you want to target.
+185075605	cantidad
+185141166	This command will demote your target in the guild hierarchy.
+185313637	debugserver
+185387054	Run the GameAction on the client.
+185399573	itemshop
+185522318	Invert the GameAction.
+187190517	gameplaypreview
+187288197	both
+187397118	The name of the player to invite.
+187854286	Target instance flag.
+189187317	afk
+189387829	data
+189456277	true
+189457989	Boolean
+189979501	uintParam
+191058574	How much time between each tick of the GameAction. Measured in hundredth of a second,<br>but used only with second precision. Only works for buffs.
+192156382	This command will set your guild's history.
+192456622	This command will create a guild with a given name.
+192785230	Commands to control and check the status of the gameplay preview feature.
+193257669	stuck
+193302094	Run the GameAction on both client and server.
+193871205	name
+194318309	reloaddata
+194685445	transferirlíder
+195610821	playername
+195816053	afkmessage
+196791134	This is a test int parameter.
+197642069	message
+198026613	ticks
+198144734	Additional parameters for the command.
+198727701	follow
+199382117	enable
+200259870	The host name of the computer where the visual remote debugger is running. The default host name is "localhost".
+200290222	The numeric ID of the dimension to switch to.
+200317982	Opens the claim window for your target or yourself if target is invalid.
+200438405	raidinvite
+200859710	This is the channel you want to talk to.
+201317461	playfield ID
+202458549	parameters
+203985582	Reloads the User Interface resources.
+204479909	canal
+204631534	Money reimbursement flag.
+205751461	raid
+205752757	quit
+205777317	text
+205777365	testcommand
+205930421	sit
+206006997	message
+206351669	buytimes
+206465440	<font color=active>%s:</font> %s
+206521333	<font color=active>Tipo:</font> %s.
+206554677	applyon
+207590389	shout
+208527790	The claim count limit.
+208538949	info
+210038133	stand
+210219813	Cambiar servidor de juego
+210407326	This parameter is the message the character wants to send as a reply.
+210715989	guild
+211932437	option
+211978190	This is the new name of the guild.
+212665285	flashfilepath
+212910654	This will let you reply to your last received private message.
+212952110	Este es el nombre del canal al que cambiar.
+214240286	Used when a GM wants to reimburse gold/cash instead of an item
+214240542	Hash of the item you want to reimburse.
+214273557	apply
+215133133	boolParam
+215289061	gpview
+216191365	t
+216256901	w
+216501573	enable
+216613603	say
+217039134	The tcp/ip port number to connect to. The default is port 5425.
+218983861	ip
+219387134	This command will either give you information on one specific command or list all available commands if called without a parameter.
+219392302	This command will put the character into hide state.
+219417374	This is a string parameter of the subcommand2, subcommand3, subcommand5 and subcommand8 subcommands of the test command.
+219560606	This command will retrieve the character's birth date.
+219599870	This command will take you back to the character selection screen.
+220278846	This command lets you talk to your raid.
+220290597	client
+220307262	This command will bring you back to the login screen.
+220354942	This command will invite your target or the character you specify by name to your group.
+220697790	This command will send a private message to a character.
+220698942	This is a test command.
+220700734	This command will print your message in chat.
+222070885	canal
+222473429	hide
+222618179	gameplaypreview
+222691669	r
+222691941	me
+223685454	This command allows you to go into 'afk' mode with an afk message the player can provide. If another player is telling something he will get an automatic reply with the players afk message.
+223785150	Use this command to debug CorePhysics.
+223911342	This lets you add points to guild renown.
+223937582	With this command you can say something as if your character is saying it.
+223942862	Sends a command to the chat server. Try &quot;/cc help&quot; for a list of available server commands.
+223943294	Esto configurará el canal de salida en el canal seleccionado.
+223954862	This lets you set a specific amount of guild renown points.
+224039054	This command will give you information about a character.
+224057198	This command will let you say a message to the players in your vicinity.
+224067390	Your character will sit down.
+225168789	disable
+225185589	instance
+225413438	This is the message sent to your guild.
+225670777	Artistry
+226054005	areaid
+226764622	Additional parameters specific to the GameAction.
+226939893	remove
+227197909	emote
+229012510	This parameter is the message you want to send in private to another character.
+229265234	Valor
+229312229	externalbilling
+229521781	remove
+229889854	Number of times you want to buy all the items in the shop.
+230065582	This command will tell your message to your guild.
+230077886	This command lets you set a tax for guild membership.
+230686453	clearinvitecooldown
+230792910	This is the amount of PvP points to change.
+231979653	ra
+232327198	Reset gameplay preview data. Used for restarting scryscript, patrols, etc.
+232553129	Glory
+232965389	boolParam
+233129790	Whom to apply the GameAction on.
+234008046	Populates the target's or your database with items matching the relevant expansion flags.
+234030581	calculaterankings
+234986334	Creates a new Flash context and loads a Flash file into the new context.
+235035486	Unloads a Flash file and deletes its context as well.
+235282430	This value will define the guild tax for membership.
+235643502	This is the history of the guild.
+237323780	enabled
+237412206	Elimina el tiempo de recuperación de las invitaciones del gremio de un personaje concreto.
+237754197	ApplyOn
+237988821	host
+238066149	open
+238406989	messageParam
+238928533	hash
+238928613	reimbursecash
+239038037	port
+239859557	message
+239993381	reset
+240004078	This is a simple subcommand with no parameters.
+241127876	Cambiar servidor de juego
+241563493	textmessage
+246722037	servercommand
+246743237	Limited %s
+248325230	This command will reply your message to the last whipser/tell the player got.
+249576254	This command will let you shout your message to other players.
+250238405	playername
+250878174	This command will let you talk to your group.
+251303054	Flags all claimable items as new for the target or you if the target is invalid.
+251542318	This is the message parameter of the subcommand7 subcommand of the test command.
+252167813	message
+252403333	message
+253051955	invitetoraid
+253914718	This command will let you set up a massive PvP keep fight, delete one or clear all.
+254963150	Stack size flag.
+255886350	Use this command to buy all items x amount of times. This is for stresstest purposes.
+256275486	This is the message printed in chat from the '/text' command.
+256781294	This is a subcommand with two mutually exclusive parameters.
+258316901	buyall
+259281971	raid
+260054309	gameaction
+261632501	leave
+261742229	petitionmessage
+262383797	sfcontrol
+262455653	promote
+263664990	This command will tell your message to the guild.
+263845678	If provided with this the character whose instance is provided will be given the points.
+265727662	This lets you add PvP points to your target.
+265841893	playername
+265933374	Print information on last received update from Genesis and the size of the assets received.
+267745390	This parameter will let you remove PvP points from your target.

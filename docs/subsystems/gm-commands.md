@@ -129,8 +129,70 @@ the same mask:
 ```
 
 `gmlevel="-1"` is `0xFFFFFFFF` — under the `&`-test that reads as "any GM bit at all", so a non-zero `gm_level`
-enables the group. It is the only group in the file that carries the attribute. Also in it: `Debug_ToggleCameramode`
-(CTRL+ALT+V, "Toggle Godcam"), `Debug_MouseWorldPos` (CTRL+ALT+X) and `Debug_LoadTweak` (CTRL+ALT+F2).
+enables the group. It is the only group in the file that carries the attribute.
+
+### The chat command that actually flies: `/luke`
+
+ALT+F7 is not the only way in, and it is not the reliable one — the whole GM/Debug group is a *debug* input path.
+The client also ships a plain chat command for it, `SkywalkingCommand`, and it is **entirely client-local**: its
+execute (`FUN_013f6130`) sends no packet at all, so **it works against our server today with no server support**.
+
+The verb is **`/luke`** — Luke *Skywalker*. It is an LDB string, which is why grepping the exe for "fly" or
+"skywalk" never finds it: `SkywalkingCommand_Name` ELF-hashes to id 47110773 in category 10002, whose value is
+`luke` (see [`../rdb/ldb-string-index.md`](../rdb/ldb-string-index.md) for the hash rule). Its description, id
+97813470, reads *"This command enables skywalking."*, and it reports `Skywalking enabled` / `Skywalking disabled`.
+
+It is a **toggle**, and what it toggles is client-side movement state, not anything on the wire:
+
+```c
+obj = <local player>;
+toggle = (obj->[0x1BC] == 0);      // the flying flag
+obj->[0x1BC] = toggle;
+if (toggle) { SetAlignmentMode(obj->[0x100]); feedback("SkywalkingEnabled"); }
+else        { if (mode == 5) SetAlignmentMode(obj->[0x100]); feedback("SkywalkingDisabled"); }
+```
+
+Flying is **alignment mode 5** in the client's movement state machine (`vehiclealignment.cpp`; the factory
+`FUN_00a3cbc0` maps 0=Normal 1=Climbing 2=Dead 3=Diving 4=Falling **5=Flying** 6=Knockback 7=Swimming). Nothing
+about it rides `CharDCMove`, whose MovingType is a layout bitfield with no movement-mode enum
+([`../re/chardcmove-grammar.md`](../re/chardcmove-grammar.md)) — so there is no server-side "make them fly" field,
+only the client's own state.
+
+The one server-side lever the client exposes is the GameAction `e_Type_GC_GameAction_StartFlymode`
+(`0xD12D`), which the `.fly` GM command sends; that path is **unverified** (its parameter list lives in a
+runtime-filled descriptor table). `/luke` is the route that is decoded end to end.
+
+### The rest of the GM/Debug group
+
+All 18 entries, every one enabled by a non-zero `gm_level`:
+
+| key | action | what it is |
+|---|---|---|
+| `CTRL + ALT + V` | `Debug_ToggleCameramode` | **Godcam** — detached free camera |
+| `ALT + F7` | `DebugToggleFlyingMode` | the flying toggle (see `/luke` above) |
+| `CTRL + ALT + X` | `Debug_MouseWorldPos` | world position under the cursor |
+| `SHIFT + O` | `Debug_CopyMeshID` | copies the mesh id of what you're looking at |
+| `SHIFT + CTRL + F7` | `Open_TweakGUIWindow` | the **tweak-table GUI** (RDB 1000516) |
+| `CTRL + ALT + F2` | `Debug_LoadTweak` | reload the tweak file |
+| `SHIFT + CTRL + F8` | `Open_ServerStatWindow` | server stat window |
+| `CTRL + ALT + D` | `Toggle_DamageMeterWindow` | damage meter |
+| `ALT + SHIFT + R` | `ToggleResManWindow` | resource-manager window |
+| `ALT + SHIFT + S` | `ToggleSoundWindow` | sound window |
+| `CTRL + ALT + P` | `Toggle_PerformanceLogger` | performance logger |
+| `F10` | `Toggle_Options` | options |
+| `ALT + ENTER` | `ToggleFullscreen` | fullscreen |
+| `ALT+SHIFT+CTRL+1..5` | `Debug_CrashConan1..5` | ⚠️ deliberate crashes — do not press |
+
+### Registered input actions with no default binding
+
+The client registers **190** input actions but `Hotkeys.xml` binds only 163. The 28 unbound ones are reachable by
+adding a `<HotKey>` entry for them, and several are real features rather than debug leftovers:
+`Open_TradeSkillWindow`, `Toggle_PvPStatWindow`, `Toggle_QuestSharingWindow`, `Toggle_SP_Inventory`,
+`ShowMagicCone`, `Use_Perception`, `LookAtTarget`, `CycleVicinityTagModes`, `SwitchLayout`, `TakePrintScreenShot`,
+`Movement_ToggleSitStand`, `NextFriendlyTarget` / `PrevFriendlyTarget` / `NextHostileTarget` / `PrevHostileTarget`,
+`Combat_TabWeapons` / `Combat_TabSpellFriendly` / `Combat_TabSpellHostile`, `SelectTeammember7..10`,
+`Action_Reload`, `Debug_ToggleCPUAffinity`, `Use_Perception`, and the mouse-button pseudo-actions.
+(`ToggleControlCenter__UNUSED` names itself.)
 
 ## Reproducing
 
