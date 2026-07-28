@@ -64,6 +64,62 @@ from what the table appears to hold.
 | 1000627 | `FUN_013b21c0` | `GroupFinderActivitiesTable` |
 | 1065103 | `FUN_008379e0` | `PvPConRating_c` |
 
+## Decoded: the two GUILD tables (1000517 / 1000518)
+
+Both parse callbacks assert `version == 1` and complain through the client's own `Community/Guild` channel on a
+mismatch (`GuildGoverningFormDataTable::ReadRDBData: Unexpected version number %i.`), which is what confirms the
+class each loader belongs to independently of the RTTI sweep.
+
+Recovered with `tools/ghidra/DecompileWithCallees.java` (`FNS=0057e330,0057edb0 DEPTH=2`); both files carry the
+usual 12-byte RDB-Id header, then `[u32 count][u32 version=1]`, then `count` records.
+
+### 1000517 `GuildGoverningFormDataTable` — 7 records, `[u32 id][string]`
+
+The seven guild governing forms, and the id is the one `CreateGuild(name, i_nGoverningForm, tax, lookingForMember)`
+carries on the wire:
+
+| id | 0 | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|---|
+| | Cimmerian | Acheron | Stygian | Aquilonian | Nemedian | Hyborian Milita | Harem |
+
+(`Hyborian Milita` is the client's own spelling.)
+
+### 1000518 `GuildRankDataTable` — 38 records, `[u32 rank][u32 form][u32 limit][u32 permissions][string]`
+
+The rank LADDER per governing form — the names the guild window shows. The object stores the four words
+permuted (`[0]=form, [4]=rank, [8..35]=name, [36]=permissions, [40]=limit`, stride `0x2C`); the wire order is the
+one above.
+
+- **`form`** indexes 1000517 exactly: values 0–6, seven groups, no gaps.
+- **`rank`** is a dense 0-based index within its form (Cimmerian 0–4, Acheron 0–5, …).
+- **`permissions`** is a BITMASK, and the observed values are strictly NESTED —
+  `0 ⊂ 30 ⊂ 286 ⊂ 6430 ⊂ 7518 ⊂ 0x7FFFFFFF` (each is a superset of the one before), which is what a rank ladder
+  looks like. The top rank of **every** form carries `0x7FFFFFFF`, i.e. everything. Which bit is which right is
+  not decoded.
+- **`limit`** takes 0, 1, 5, 10, 20 and 1000 and reads as a per-rank member CAP with 0 meaning uncapped — six of
+  the seven leader ranks carry 1. It is not clean, though: `Strategos` (Nemedian leader) carries 10 and `Madam`
+  (Harem leader) carries 0, so either the reading is wrong or those two forms genuinely allow several leaders.
+  [V0]
+
+Cimmerian, in full, as the shape of every form:
+
+| rank | limit | permissions | name |
+|---|---|---|---|
+| 0 | 0 | 0 | Comrade |
+| 1 | 0 | 0 | Kinsman |
+| 2 | 0 | 0 | Elder |
+| 3 | 0 | 7518 | War Chief |
+| 4 | 1 | `0x7FFFFFFF` | Chieftain |
+
+The other six: **Acheron** Blood Initiate / Sacrificer Apprentice / Ritualist Acolyte / Infernal Adept /
+Deathbringer Envoy / Chaos-lord · **Stygian** Initiate / Serpent Devotee / Disciple of Set / Emissary of Set ·
+**Aquilonian** Citizen / Partisan / Stateman / Patrician / Ambassador / Potentate · **Nemedian** Aspirant /
+Vassal / Squire / Knight / Commandant / Lord · **Hyborian Milita** Conscript / Chiliostys / Phalanx / Hyparchos /
+Taxiarchos / Strategos · **Harem** Trollop / Harlot / Concubine / Courtesan / Madam.
+
+Nothing reads this yet — our guilds carry a numeric `GuildRank` with no names and no per-form ladder. Importing
+it is guild-subsystem work (#104).
+
 Two corrections the sweep made to the names this table used to carry, both from guessing at a loader by what it
 sat next to: 1000042 is `Feat_t`, not `FeatTable_t`, and 1000044 is `FeatPointsTable_c` — the `FeatClassTable_c`
 name belongs to the 1000043 loader, not to it, so there was never anything ironic about a "class table" holding
