@@ -193,6 +193,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "region-stat-census":
+				{
+					RegionStatCensus(RdbDir());
+					return 0;
+				}
+
 				case "class-attribute-runs":
 				{
 					ClassAttributeRuns(RdbDir(), _options.Out);
@@ -1794,6 +1800,61 @@ namespace Faolan.Importer.Cli
 		//
 		// Writing BOTH sides in one row is the point: an item with an explicit Armor/HealthMax record is ground truth for
 		// what the same inputs must produce, and there is no need to ask the client for a tooltip to fit against.
+		// Every stat id the item [2][9] stat-modifier region carries, with how many templates carry it and its value
+		// range - the whole region, NOT just RdbItemImporter's whitelist. The question it answers is the one that
+		// keeps coming up when a consumer lands: "is this rating actually ON any item, or would importing it be dead
+		// weight?" (#401 asked it of BonusArmor/BonusProtection.)
+		private static void RegionStatCensus(string rdbDir)
+		{
+			using var db = OpenDb();
+			var items = db.Items.Where(i => i.Key.Key1 != 0 || i.Key.Key2 != 0 || i.Key.Key3 != 0 || i.Key.Key4 != 0).OrderBy(i => i.Id).ToList();
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+
+			var counts = new Dictionary<uint, (int Items, long Min, long Max)>();
+			var scanned = 0;
+			foreach (var item in items)
+			{
+				var key = new[] { item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4 };
+				byte[]? template = null;
+				foreach (var type in new uint[] { 1000020, 1000620 })
+				{
+					if (!rdb.TryGet(type, item.Id, out var e) || e.Size == 0 || !rdb.CanRead(e))
+						continue;
+					try
+					{
+						template = rdb.ReadDecrypted(e, key);
+						break;
+					}
+					catch
+					{
+						// a wrong/stale key - skipped, like the sibling reports
+					}
+				}
+
+				if (template is not { Length: >= 16 })
+					continue;
+
+				scanned++;
+				foreach (var m in ItemTemplateStatModifiers.Parse(template.AsSpan(12)))
+				{
+					var amount = (long)m.WireAmount;
+					counts[m.StatId] = counts.TryGetValue(m.StatId, out var prev)
+						? (prev.Items + 1, Math.Min(prev.Min, amount), Math.Max(prev.Max, amount))
+						: (1, amount, amount);
+				}
+			}
+
+			Console.WriteLine($"region-stat-census: {scanned} templates read, {counts.Count} distinct stat ids");
+			Console.WriteLine($"{"statId",-8} {"name",-32} {"items",7} {"min",12} {"max",12}");
+			foreach (var (statId, row) in counts.OrderByDescending(k => k.Value.Items))
+			{
+				var name = Enum.IsDefined(typeof(CharacterStatId), statId)
+					? ((CharacterStatId)statId).ToString()
+					: "";
+				Console.WriteLine($"{statId,-8} {name,-32} {row.Items,7} {row.Min,12} {row.Max,12}");
+			}
+		}
+
 		private static void ItemStatScaling(string rdbDir, string? outPath)
 		{
 			using var db = OpenDb();

@@ -161,6 +161,11 @@ namespace Faolan.Core.Enums
 		// `(bonus * 0.01 + 1.0) * <armour|protection>`, so a value of 25 means +25%. BonusArmor feeds the physical
 		// branch and BonusProtection the magical one - which is what identifies them, since the LDB names alone do not
 		// say they are percentages.
+		// The FOURTH most common stat on an item's [2][9] region - 249 of 3,317 templates carry it, more than
+		// HealthMax - and it sat unnamed while rarer neighbours had names. Found by censusing the region rather than
+		// the whitelist (`--report region-stat-census`), then read straight out of LDB 615.
+		KnockbackResistance = 0x040D, // LDB 1037
+
 		BonusArmor = 0x01C2, // LDB 450 "Bonus Armor" - percent, physical branch
 		BonusProtection = 0x014E, // LDB 334 "Bonus Protection" - percent, magical branch
 

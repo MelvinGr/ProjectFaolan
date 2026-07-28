@@ -57,9 +57,12 @@ namespace Faolan.GameServer.Combat
 		//     0x02d24724  magical ability weight  TWK_ProtectionAbilityModifier     0.5
 		//     0x02d24734  physical ability weight TWK_ArmorAbilityModifier          2.0
 		// MitigationFraction below already uses exactly these, which is why its trace points reproduce retail's
-		// numbers - so the formula is retail's, not a fit. What is NOT resolved is the percent term's SOURCE on the
-		// PHYSICAL branch: the client reads a stat into `(x * 0.01 + 1.0) * rating` there (0x14e BonusProtection is
-		// the magical one) and we pass 0. See #401.
+		// numbers - so the formula is retail's, not a fit.
+		//
+		// The percent term `(x * 0.01 + 1.0) * rating` is BonusArmor (0x1c2) on the physical branch and
+		// BonusProtection (0x14e) on the magical one - and passing 0 for it is CORRECT rather than a gap: a census
+		// of the [2][9] region across all 3,317 item templates (`--report region-stat-census`) finds NEITHER id on
+		// a single item. Nothing in the game's item set grants an armour percentage, so the term is always 1.0.
 		// This half-point stands in for that
 		// level-normalized, Strength-scaled curve: single armor pieces reach ~1500 and a worn set sums into the thousands,
 		// tuned so a geared set mitigates ~half and a starter's few hundred armor little. Tune in-client (gaps.md / #401).
