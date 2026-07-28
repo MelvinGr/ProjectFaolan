@@ -45,6 +45,9 @@ namespace Faolan.Tests
 				// reproduces the same byte with the character's real, zero, experience.
 				Experience = 0,
 				Class = ConanClass.Assassin,
+				// Strie is FEMALE, and the sheet's Sex slot is authored from the character now rather than carried at
+				// the captured 3 - so the golden states who the template's character is instead of inheriting it.
+				Sex = Sex.Female,
 				MaxStats = CharacterMaxStats.CreateDefaults(ConanClass.Assassin, 1)
 			};
 			var built = FullCharSnapshotSubClass.BuildFromScratch(def, strie, TemplateInstance);

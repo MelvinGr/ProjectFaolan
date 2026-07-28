@@ -24,6 +24,19 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	public static class SnapshotStatSheet
 	{
 		/// <summary>
+		///     The stats this file authors from the character or the session, as opposed to carrying from whichever
+		///     baseline the character landed on. Declared because one of them - <see cref="CharacterStatId.ExpCurrentLevelBase" />
+		///     - is authored to the SAME value (0) for every character, so no behavioural diff can discover it; the
+		///     gate in SnapshotStatSheetAuthoringTests checks both directions, so this cannot drift from
+		///     <see cref="Overrides" /> without failing.
+		/// </summary>
+		public static IReadOnlyList<CharacterStatId> Authored { get; } =
+		[
+			CharacterStatId.PlayfieldToken, CharacterStatId.GmLevel, CharacterStatId.Sex,
+			CharacterStatId.Level, CharacterStatId.Exp, CharacterStatId.MaxExp, CharacterStatId.ExpCurrentLevelBase
+		];
+
+		/// <summary>
 		///     The full sheet - <see cref="SubClassStatBlock.SheetSize" /> <c>(statId, value)</c> pairs, StatList#1's
 		///     displayed stats followed by StatList#2's single copy - ready for
 		///     <see cref="SubClassStatBlock.CreateBlock" />.
@@ -59,6 +72,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			if (character == null)
 				yield break;
+
+			// The character's SEX. The fresh skeleton hardcodes 3 (the captured character's), and the corpus shows the
+			// slot taking 0, 2 and 3 - so it is per-character, and the enum's values ARE the wire codes.
+			yield return (CharacterStatId.Sex, (uint)character.Sex);
 
 			// The level, from the CHARACTER rather than from whichever baseline it landed on. The fresh skeleton
 			// hardcodes 1 (so without this the client blocks every level-gated spell and item), and a captured sheet
