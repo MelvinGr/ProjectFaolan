@@ -64,6 +64,74 @@ from what the table appears to hold.
 | 1000627 | `FUN_013b21c0` | `GroupFinderActivitiesTable` |
 | 1065103 | `FUN_008379e0` | `PvPConRating_c` |
 
+## Decoded: 1000505 `RDBPlayerClassData_c` — the class registry
+
+Its parse callback names itself in an error string (`RDBPlayerClassData_c::PlayerClassMapDataReady(): To many
+entries: `), which is also where the record shape comes from — `FUN_00708770`, reached from loader
+`FUN_00708690`. After the 12-byte RDB-Id header: `[u32 count]` (asserted `< 1001`), then `count` records of
+`[u32 classId][string name][u32 tier]`. Keys `0x1A` and `0x2A` are special-cased — the string is read into a
+scratch and the value discarded.
+
+17 records, and the ids are exactly our `ConanClass` values:
+
+| tier | ids | |
+|---|---|---|
+| **1** — archetypes | `0x00`–`0x04` | Commoner, Soldier, Priest, Rogue, Mage |
+| **3** — playable classes | `0x12` `0x14` `0x16` `0x18` `0x1C` `0x1D` `0x1F` `0x22` `0x27` `0x29` `0x2B` `0x2C` | Barbarian, Guardian, Conqueror, Priest of Mitra, Tempest of Set, Bear Shaman, Dark Templar, Assassin, Ranger, Necromancer, Herald of Xotli, Demonologist |
+
+So this is the authoritative source for the class id space, and it confirms `ConanClass` independently: Barbarian
+`0x12`, Assassin `0x22`, Necromancer `0x29`, Herald of Xotli `0x2B`, Demonologist `0x2C` all match.
+
+⚠️ **The registry row above over-claims its range.** `1000505–1000508` is written as a span, but only **1000505**
+carries this string-keyed shape. `1000506` is listed *again* on the `FeatClassTable_c` row and does not parse as
+class data; `1000507` is a different shape entirely — plain `[u32][u32]` pairs whose second word is a class id and
+whose first runs 1, 2, 3, 10, i.e. a race × class combination table (a lead, not a decode). Treat the loader→type
+mapping as per-type, not as a range.
+
+## Decoded: 1000507 — the RACE x CLASS combination table
+
+Plain `[u32 raceId][u32 classId]` pairs after `[12-byte RDB-Id header][u32 count]`, and the arithmetic pins it:
+`12 + 4 + 48*8 = 400` and `12 + 4 + 56*8 = 464`, the exact sizes of its two records. No strings, so it is NOT
+the `RDBPlayerClassData_c` shape the registry's range implies.
+
+Record 0 (48 pairs, four races) reads as the playable set:
+
+| race | classes |
+|---|---|
+| **1** | Commoner, Soldier, Priest, Rogue, Barbarian, Guardian, Conqueror, Bear Shaman, Dark Templar, Assassin, Ranger |
+| **2** | Commoner, Soldier, Priest, Rogue, Mage, Barbarian, Guardian, Conqueror, Priest of Mitra, Dark Templar, Assassin, Ranger, Necromancer |
+| **3** | Commoner, Priest, Rogue, Mage, Tempest of Set, Dark Templar, Assassin, Ranger, Necromancer, Herald of Xotli, Demonologist |
+| **10** | Commoner, Soldier, Priest, Rogue, Mage, Guardian, Bear Shaman, Dark Templar, Assassin, Ranger, Necromancer, Herald of Xotli, Demonologist |
+
+Record 1 is a wider set including ids the class registry (1000505) does not name — `0x13`, `0x15`, `0x17`,
+`0x19`, `0x1A`, `0x1B`, `0x1E`, `0x21`, `0x23`, `0x24`, `0x2A` — so it is probably the DESIGN-time table and
+record 0 the shipped one. Undecided which the client actually uses. [V0]
+
+### ⚠️ It disagrees with our `Race` enum, and we cannot settle it from our own data
+
+`Faolan.Core/Enums/Race.cs` is `Aquilonian = 1, Cimmerian = 2, Stygian = 3`.
+
+- **Race 3 is confirmed Stygian**, both ways: the table gives it Tempest of Set / Necromancer / Herald of Xotli /
+  Demonologist, and all four shipped characters are race 3 carrying `0x22`/`0x29`/`0x2B`/`0x2C`, every one of
+  which the table allows for race 3.
+- **Races 1 and 2 are SWAPPED**, and our own hand-written table corroborates it. `StartingData
+  .RaceArchClassCombinations` lists the class set per race, and matching those sets to 1000507's ignores the
+  names entirely:
+
+  | our label | our classes | 1000507 |
+  |---|---|---|
+  | Aquilonian | Priest of Mitra, Conqueror, Dark Templar, Guardian, Barbarian, Ranger, Assassin | **race 2** (+ Necromancer) |
+  | Cimmerian | Bear Shaman, Conqueror, Dark Templar, Guardian, Barbarian, Ranger | **race 1** (+ Assassin) |
+  | Stygian | Tempest of Set, Ranger, Assassin, Herald of Xotli, Demonologist, Necromancer | **race 3** (+ Dark Templar) |
+
+  The sets we hand-authored are right; the ids the enum attaches to them are not. `Race.Aquilonian` should be 2
+  and `Race.Cimmerian` 1.
+- We hold no race-1 or race-2 CHARACTER, so no capture observes it directly — every shipped character is race 3.
+  The evidence is two independent class-set matches, which is strong but is still not a sighting. Flipping the
+  enum changes a value that goes on the wire and drives the client's body model, so it wants a deliberate call
+  (and, ideally, one created character of each).
+- **Race `10` is a fourth race we do not model at all** — Khitan, by its class set (Rise of the Godslayer).
+
 ## Decoded: the two GUILD tables (1000517 / 1000518)
 
 Both parse callbacks assert `version == 1` and complain through the client's own `Community/Guild` channel on a

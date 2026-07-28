@@ -177,7 +177,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.ToTable("AppearanceChoices", t =>
                         {
-                            t.HasCheckConstraint("CK_AppearanceChoice_Race", "Race IN (1, 2, 3)");
+                            t.HasCheckConstraint("CK_AppearanceChoice_Race", "Race IN (1, 2, 3, 10)");
 
                             t.HasCheckConstraint("CK_AppearanceChoice_Sex", "Sex IN (0, 2, 3)");
                         });
@@ -303,7 +303,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("CK_Character_GuildRank", "GuildRank IN (0, 4)");
 
-                            t.HasCheckConstraint("CK_Character_Race", "Race IN (1, 2, 3)");
+                            t.HasCheckConstraint("CK_Character_Race", "Race IN (1, 2, 3, 10)");
 
                             t.HasCheckConstraint("CK_Character_Sex", "Sex IN (0, 2, 3)");
                         });
