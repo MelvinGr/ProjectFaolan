@@ -708,7 +708,8 @@ namespace Faolan.Importer.Modules
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
 			WriteMode.Insert,
-			WriteMode.Upsert
+			WriteMode.Upsert,
+			WriteMode.Overwrite
 		};
 
 		public ImportSource Source => ImportSource.Captures;
@@ -719,7 +720,13 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var objects = WorldObjectExtractor.Merge(ctx.Captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets)));
-			await ImportOps.ImportWorldObjects(ctx.Db, objects);
+
+			// Overwrite deletes every stored row the harvest did not yield, so the table is by construction what the
+			// captures say. Upsert cannot: it re-writes the live rows and leaves the dead ones, reporting a row-count
+			// delta of zero either way, which is how the divergence went unseen (#481). ⚠️ Only a cleanup when the
+			// corpus you are importing is a SUPERSET of the one that built the table - read the warning on
+			// ImportOps.ImportWorldObjects before pointing it at the shipped faolan.db.
+			await ImportOps.ImportWorldObjects(ctx.Db, objects, ctx.ModeFor(Name) == WriteMode.Overwrite);
 			return new ImportResult($"{objects.Count} world objects.");
 		}
 	}

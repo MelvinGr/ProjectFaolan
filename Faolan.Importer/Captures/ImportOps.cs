@@ -862,7 +862,24 @@ namespace Faolan.Importer.Captures
 		}
 
 		// Static world objects (decor/containers/zones), deduped by (map, position). Transient loot bags skipped.
-		public static async Task ImportWorldObjects(DatabaseContext db, List<WorldObjectEntry> objects)
+		//
+		// `overwrite` makes the table exactly what the captures produce: any row the harvest did NOT yield is deleted.
+		// Upsert alone cannot do that, and a row-count delta of zero is what it reports either way - it re-writes the
+		// live rows and silently leaves the dead ones - which is why the divergence went unseen (#481).
+		//
+		// ⚠️ IT IS NOT SAFE TO RUN ON THE SHIPPED faolan.db, and the reason is not about this code. Overwrite is only
+		// a cleanup if the CURRENT corpus is a SUPERSET of the one that built the table. Ours is not: the corpus has
+		// been curated down (111 captures today; the tickets and the extract manifest were written against 213/227),
+		// so a row can be absent from the harvest simply because the capture that showed it is gone. Measured on the
+		// shipped table, the 62 "orphans" are mostly real props - zone labels, climbing points, tagged static chests -
+		// including `decor_chain_hangingwoman`, which carries EffectQuestId 12407 and is looked up BY NAME below to
+		// seed the Casilda after-quest effect, and the Thirsty Dog Inn, the canonical same-playfield zone-line door.
+		// Deleting those loses content nothing can rebuild. See #481 and the ORPHAN listing the mode prints.
+		//
+		// So: use it on a table built from the SAME corpus you are importing (a fresh DB, or after a full re-harvest),
+		// and read the listing first anywhere else. The transient-loot-bag purge below stays, because it keys on what
+		// a row IS rather than on whether a capture still exists.
+		public static async Task ImportWorldObjects(DatabaseContext db, List<WorldObjectEntry> objects, bool overwrite = false)
 		{
 			// Purge any transient loot-bag rows that leaked in from old runtime persistence: a dropped loot bag is a
 			// live-only world entity (built from scratch by LootBagTemplate, never DB-persisted), so it must not sit in
@@ -935,6 +952,36 @@ namespace Faolan.Importer.Captures
 			}
 
 			Console.WriteLine("World objects: identity columns + geometry tail lifted from the dump at import (#187).");
+
+			if (overwrite)
+			{
+				// Delete by DERIVED id, not by a positional match: the id IS the identity (map + position + display
+				// reference), so "the harvest did not yield this row" is exactly "no built row computed this id".
+				// WorldObjectWords cascades, and the enrichment columns other modules own (DestinationMapId,
+				// InteractAction, the quest gates) live on rows the harvest DOES yield, so they are untouched.
+				var live = pending.Keys.ToHashSet();
+				var orphans = await db.WorldObjects.Where(o => !live.Contains(o.Id)).ToListAsync();
+				if (orphans.Count > 0)
+				{
+					// Print every row, with the columns that say whether it is residue or content. ⚠️ Read this list
+					// before trusting the mode: an "orphan" is only junk if the CURRENT corpus is a superset of the one
+					// that built the table. Ours is not - see the warning on the method - so most of these are real
+					// props from captures that no longer exist, not stale rows.
+					foreach (var o in orphans.OrderBy(o => o.MapId).ThenBy(o => o.Name))
+						Console.WriteLine($"  ORPHAN map {o.MapId} subop 0x{o.SubOpcode:X8} act={o.InteractAction} dest={o.DestinationMapId?.ToString() ?? "-"} eq={o.EffectQuestId?.ToString() ?? "-"} gq={o.GateQuestId?.ToString() ?? "-"} tmpl={o.TemplateItemId?.ToString() ?? "-"} :: {o.Name ?? o.GeometryName ?? "?"}");
+
+					var enriched = orphans.Count(o => o.InteractAction != InteractAction.None || o.DestinationMapId != null || o.EffectQuestId != null || o.GateQuestId != null);
+					if (enriched > 0)
+						Console.WriteLine($"World objects: ⚠️  {enriched} of these carry ENRICHMENT another module wrote (quest gate / teleport destination). Deleting them drops data no capture can rebuild.");
+
+					db.WorldObjects.RemoveRange(orphans);
+					Console.WriteLine($"World objects: removed {orphans.Count} orphaned row(s) (overwrite).");
+				}
+				else
+				{
+					Console.WriteLine("World objects: no orphaned rows - the table already matches the harvest.");
+				}
+			}
 
 			await db.SaveChangesAsync();
 		}
