@@ -47,28 +47,21 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// two values exist was wrong, and it is the kind of claim a later "simplification" would have leaned on.
 		public const uint MinimalWord2 = 1;
 
-		// firstRecordLen = len(post) - 36 (the header's self-length of the first record group).
-		private const int RecordLenBias = 36;
-
-		// word0 is constant 0 across the corpus (the player spawn has 2 in this slot).
+		// word0 is constant 0 across the corpus. It is the head-word LIST'S COUNT, not a word of its own (#475).
 		private const uint HeaderWord0 = 0;
 
-		// The minimal record body + the shared 0x3F1 terminators (everything after the 12-byte header). Constant
-		// across all 23 NPCs that carry the minimal form (verified single distinct value, dissect_npc_spawn.py).
-		private static readonly byte[] MinimalBody =
-		[
-			0x00, 0x00, 0x00, 0x03, 0xF1, // [u8 0][u32 0x3F1] - empty ID-list terminator
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1, // empty pair list, 0x3F1 terminator
-			0x00, 0x00, 0x03, 0xF1, // 0x3F1 marker
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1 // end pairs, final 0x3F1 marker
-		];
-
-		// Builds the minimal post-IIR scaffold for a freshly-spawned NPC: [u32 0][u32 len-36][u32 word2] + the
-		// constant terminator body. word2 defaults to 1 (the animal form, byte-identical to the 23 minimal-form
-		// NPCs in the beach burst); pass MinimalHumanoidWord2 (2) for a no-morph humanoid (#243 tail).
+		// Builds the minimal post-IIR scaffold for a freshly-spawned NPC. word2 defaults to 1 (the animal form,
+		// byte-identical to the 23 minimal-form NPCs in the beach burst); pass MinimalHumanoidWord2 (2) for a
+		// no-morph humanoid (#243 tail).
+		//
+		// The 29 bytes after the header used to be a baked `MinimalBody` array described as "the constant
+		// terminators". They are not constants: they are an EMPTY buff list, an EMPTY morph table and three EMPTY
+		// closing pair lists, four of whose framing words are ForCount(0) - which is 0x3F1, the exact face the
+		// 0x3F1 trap wears (see ListFrame). Built from the typed stream now, so an NPC that needs a non-empty one of
+		// those can have it; the byte-exact gates against the captured minimal NPCs are unchanged.
 		public static byte[] BuildMinimalPostIir(uint word2 = MinimalWord2)
 		{
-			return new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(MinimalPostIirLength - RecordLenBias).WriteUInt32(word2).WriteArray(MinimalBody).ToArray();
+			return new NpcSpawnPostIir { Word2 = word2 }.Encode();
 		}
 
 		// The fresh post-IIR word2 for a NO-MORPH spawn (#243): the type-stable third header word (1, 2 or 3).

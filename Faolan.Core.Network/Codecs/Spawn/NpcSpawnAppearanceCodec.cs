@@ -5,135 +5,133 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
-	// Decodes / re-encodes the humanoid NPC post-IIR appearance table byte-exact. The post-IIR (the stream after
-	// the embedded CoreCharacterIIR) of a humanoid is its morph table, NOT runtime state - dropping it renders the
-	// NPC bald (#243). Animals carry no table (they ship the 41-byte minimal form, NpcSpawnScaffold.BuildMinimalPostIir);
-	// TryDecodeAppearance returns false for them and for the larger runtime-state forms, so only the clean
-	// appearance shape is lifted. Wire grammar (all u32 big-endian, value a big-endian raw-body float):
-	//   [u32 word0=0][u32 firstRecordLen=5][u32 recordCount=2]
-	//   record1: 00 00 00 03 F1
-	//   [u32 entryCount]
-	//   entryCount x [u32 morphId][f32 value][u32 0][u8 0][u8 strLen][strLen bytes]   (strLen 0 on plain entries)
-	//   terminator (constant 20 bytes)
+	// The MORPH TABLE that fills a humanoid NPC's entry slot in the FA015807 post-IIR, and the classification of
+	// which captured bodies carry one. Dropping the table renders the NPC bald (#243); animals carry none (their
+	// slot is empty - the 41-byte minimal form, NpcSpawnScaffold.BuildMinimalPostIir).
+	//
+	// One entry: [u32 morphId][f32 value][u32 word2][u8 flag][u8 strLen][strLen bytes] - the value a big-endian
+	// raw-body float, the string the "*ii=-1;*bl=-1" texscript colour ref carried on the id 0x10D entry. word2 and
+	// flag are 0 on a clean appearance and carry runtime state mid-session.
+	//
+	// The stream AROUND the table is not this codec's - it is the same one the player's spawn uses
+	// (SpawnPostIirCommon / NpcSpawnPostIir), which is what the two decoders below now read rather than computing
+	// the table's offset from the header.
 	public static class NpcSpawnAppearanceCodec
 	{
 		// One fixed-shape entry minus its string: [u32 id][f32 value][u32 0][u8 0] = 13 bytes, then [u8 strLen][str].
 		private const int EntryFixedLength = 13;
-		private const uint FirstRecordLen = 5;
-		private const uint HeaderWord0 = 0;
 		private const uint Word2 = 2; // the post-IIR header's third word - not a record count (#475)
 
-		// record1 = the empty leading list ([u8 0][u32 0x3F1]).
-		private static readonly byte[] Record1 = [0x00, 0x00, 0x00, 0x03, 0xF1];
-
-		// The constant tail after the entry list: empty pair list + 0x3F1 markers (same terminators the minimal
-		// form ends on). 00 00 03 F1 | 00 00 03 F1 | 00 00 00 00 00 00 00 00 | 00 00 03 F1.
-		private static readonly byte[] Terminator = [0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1];
-
-		// Builds the post-IIR bytes for a humanoid from its morph rows (the inverse of TryDecodeAppearance).
+		// Builds the post-IIR bytes for a humanoid from its morph rows (the inverse of TryDecodeAppearance). The
+		// stream around the table is the shared one, so this is the fresh NPC scaffold with the table dropped in -
+		// the same construction NpcSpawnScaffold.BuildMinimalPostIir makes with no morphs at all.
 		public static byte[] BuildPostIir(IReadOnlyList<NpcAppearanceMorph> morphs)
 		{
-			var stream = new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(FirstRecordLen).WriteUInt32(Word2).WriteArray(Record1).WriteUInt32(morphs.Count);
-
-			foreach (var morph in morphs)
-				stream.WriteUInt32(morph.MorphId).WriteFloat(morph.Value).WriteUInt32(0).WriteByte(0).WriteArrayByteLength(Encoding.Latin1.GetBytes(morph.Text ?? ""));
-
-			return stream.WriteArray(Terminator).ToArray();
+			var post = new NpcSpawnPostIir
+			{
+				Word2 = Word2
+			};
+			post.Morphs.AddRange(morphs);
+			return post.Encode();
 		}
 
-		// Decodes the appearance/morph table out of an FA015807 body's post-IIR. Returns false (morphs = empty) if
-		// the body has no CharacterIIR, or its post-IIR is not the clean humanoid appearance shape (animal minimal
-		// form, or a larger runtime-state form) - those are left to the minimal-scaffold path. The clean shape has the
-		// empty 5-byte record1 (Record1) followed immediately by the morph table; use TryDecodeAppearanceLenient to
-		// also lift the table when it sits behind a larger RUNTIME record1 (a mid-session humanoid capture).
+		// Writes the entry slot's NPC element: [u32 count][count x entry]. The two words that follow it belong to
+		// the stream, not the table - see NpcSpawnPostIir.
+		public static void WriteMorphTable(FaolanStream stream, IReadOnlyList<NpcAppearanceMorph> morphs)
+		{
+			stream.WriteUInt32(morphs.Count);
+			foreach (var morph in morphs)
+				stream.WriteUInt32(morph.MorphId).WriteFloat(morph.Value).WriteUInt32(morph.Word2).WriteByte(morph.Flag)
+					.WriteArrayByteLength(Encoding.Latin1.GetBytes(morph.Text ?? ""));
+		}
+
+		// Reads that same slot at `i`, advancing it. Unlike the appearance decoders below this one CARRIES an entry's
+		// Word2/Flag instead of requiring them to be zero: a mid-session capture puts runtime state there, and a
+		// reader that rejected it would lose the rest of the stream with it. Returns false only when the table does
+		// not fit - it is the walk's landing on the stream's last byte that says whether this was a morph table at
+		// all, not a per-field guess.
+		public static bool TryReadMorphTable(byte[] post, ref int i, List<NpcAppearanceMorph> morphs)
+		{
+			if (i + 4 > post.Length)
+				return false;
+
+			var count = post.ReadU32Be(i);
+			i += 4;
+			if (count > 0x100)
+				return false;
+
+			for (var n = 0; n < count; n++)
+			{
+				if (i + EntryFixedLength + 1 > post.Length)
+					return false;
+
+				var strLen = post[i + EntryFixedLength];
+				if (i + EntryFixedLength + 1 + strLen > post.Length)
+					return false;
+
+				morphs.Add(new NpcAppearanceMorph
+				{
+					MorphId = post.ReadU32Be(i),
+					Value = post.ReadF32Be(i + 4),
+					Word2 = post.ReadU32Be(i + 8),
+					Flag = post[i + 12],
+					Text = strLen == 0 ? "" : Encoding.Latin1.GetString(post, i + EntryFixedLength + 1, strLen)
+				});
+				i += EntryFixedLength + 1 + strLen;
+			}
+
+			return true;
+		}
+
+		// Decodes the appearance/morph table out of an FA015807 body's post-IIR. Returns false (morphs = empty) when
+		// the body has no CharacterIIR, or its post-IIR is not an appearance stream at all: an animal's minimal
+		// no-morph form, a player's, or a mid-session capture whose entries carry runtime state. Those are left to
+		// the minimal-scaffold path. STRICT additionally requires the stream to be FRESH - a first record with
+		// nothing in front of the buff list's framing word, and no buffs in that list.
 		public static bool TryDecodeAppearance(byte[] body, out List<NpcAppearanceMorph> morphs)
 		{
 			morphs = [];
-			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+			if (!TryDecodeAppearanceLenient(body, out var table))
+				return false;
+			if (!NpcSpawnPostIir.TryDecode(body, out var post))
+				return false;
+			if (post.Common.BuffRecords.Count > 0 || !post.Common.FirstRecordPrefix.AsSpan().SequenceEqual(NpcSpawnPostIir.FreshFirstRecordPrefix))
 				return false;
 
-			var post = body.AsSpan(read.Offset + read.Length);
-			if (post.Length < 21 || post.ReadU32Be(0) != HeaderWord0)
-				return false;
-			if (!post.Slice(12, Record1.Length).SequenceEqual(Record1))
-				return false;
-
-			return TryDecodeMorphTable(post, 12 + Record1.Length, out morphs);
+			morphs = table;
+			return true;
 		}
 
-		// Lenient variant (#243): decodes the SAME morph table even when it is preceded by a large RUNTIME record1
-		// (movement/bounds state accrued mid-session), not the empty 5-byte record1 the clean shape has. RE of the
-		// humanoid tail: the table always sits at 12 + firstRecordLen (skip the header + the first record group) and
-		// ends at the shared terminator, regardless of recordCount. A FRESH spawn drops the runtime record1, so
-		// lifting just this table gives the canonical appearance (the clean-appearance captures of the same type carry
-		// an identical table). Returns false for the minimal/no-morph forms and any body whose trailing bytes are not
-		// a clean morph table ending exactly at the terminator. A clean-shape body decodes identically here
-		// (firstRecordLen == 5, record1 == Record1), so this is a strict superset of TryDecodeAppearance.
+		// Lenient variant (#243): lifts the SAME morph table from a mid-session capture, where the stream also carries
+		// runtime state - a large first record (movement/bounds state accrued in play) and the character's active
+		// buffs. A FRESH spawn drops both, so the table alone is the canonical appearance, and the clean-appearance
+		// captures of the same type carry an identical one.
+		//
+		// ⚠️ It used to find the table by ARITHMETIC - at 12 + firstRecordLen, i.e. straight after the first record -
+		// which is where the table sits only when the character has NO active buffs, because each buff pushes it 60
+		// bytes further. A buffed humanoid was therefore classified no-morph and would spawn BALD (#243's own failure
+		// mode). Reading the stream instead of computing an offset lifts 269 more captured bodies and loses none;
+		// nothing else about the classification changed, which is what the corpus census asserts.
 		public static bool TryDecodeAppearanceLenient(byte[] body, out List<NpcAppearanceMorph> morphs)
 		{
 			morphs = [];
-			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+			if (!NpcSpawnPostIir.TryDecode(body, out var post))
 				return false;
 
-			var post = body.AsSpan(read.Offset + read.Length);
-			if (post.Length < 12 || post.ReadU32Be(0) != HeaderWord0)
+			// An empty table is the minimal (no-morph) form, not an appearance; an entry carrying runtime state, or a
+			// non-empty closing list, means this stream is more than the appearance and is not what the from-DB build
+			// reproduces. Both keep this decoder NARROWER than the reader it now runs on.
+			if (post.Morphs.Count == 0 || post.Morphs.Exists(m => m.Word2 != 0 || m.Flag != 0))
+				return false;
+			if (post.EntryTableX != ListFrame.Empty || post.EntryTableMarker != ListFrame.Empty)
+				return false;
+			if (post.Common.EndPairs.Count > 0 || post.Common.EndPairs2.Count > 0 || post.Common.EndPairs3.Count > 0)
 				return false;
 
-			var firstRecordLen = post.ReadU32Be(4);
-			var tableStart = 12L + firstRecordLen;
-			if (tableStart + 4 > post.Length)
-				return false;
-
-			return TryDecodeMorphTable(post, (int)tableStart, out morphs);
-		}
-
-		// Parses the morph table [u32 count][count x entry][terminator] starting at `o`, requiring it to end EXACTLY
-		// at the shared Terminator (post end) with every entry in the clean shape (field2/field3 == 0). This is the
-		// grammar shared by the strict and lenient decoders; the only difference is where the table starts (right
-		// after the empty record1 vs. after a runtime record1).
-		private static bool TryDecodeMorphTable(ReadOnlySpan<byte> post, int o, out List<NpcAppearanceMorph> morphs)
-		{
-			morphs = [];
-			var count = post.ReadU32Be(o);
-			o += 4;
-			if (count is 0 or > 0x100)
-				return false;
-
-			var result = new List<NpcAppearanceMorph>((int)count);
-			for (var n = 0; n < count; n++)
-			{
-				if (o + EntryFixedLength + 1 > post.Length)
-					return false;
-
-				var morphId = post.ReadU32Be(o);
-				var value = post.ReadF32Be(o + 4);
-				if (post.ReadU32Be(o + 8) != 0 || post[o + 12] != 0)
-					return false; // not the clean appearance shape (field2/field3 carry runtime state)
-
-				var strLen = post[o + 13];
-				o += EntryFixedLength + 1;
-				if (o + strLen > post.Length)
-					return false;
-
-				var text = strLen == 0
-					? ""
-					: Encoding.Latin1.GetString(post.Slice(o, strLen));
-				o += strLen;
-				result.Add(new NpcAppearanceMorph
-				{
-					MorphId = morphId,
-					Value = value,
-					Text = text
-				});
-			}
-
-			// What remains must be exactly the constant terminator - else this is a runtime-bearing form, skip it.
-			if (!post[o..].SequenceEqual(Terminator))
-				return false;
-
-			morphs = result;
+			morphs = post.Morphs;
 			return true;
 		}
+
 	}
 
 	// One entry in a HUMANOID NPC's FA015807 post-IIR APPEARANCE / morph table: a morph id, its float value, and
@@ -145,6 +143,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	{
 		public uint MorphId { get; set; }
 		public float Value { get; set; }
+
+		// Zero on every CLEAN appearance entry, which is what the two decoders below require to classify a body as
+		// an appearance-bearing type. A mid-session capture carries runtime state here, so the general reader
+		// (NpcSpawnPostIir) carries these instead of asserting them and those streams round-trip byte-exact.
+		public uint Word2 { get; set; }
+		public byte Flag { get; set; }
 		public string Text { get; set; } = "";
 	}
 }

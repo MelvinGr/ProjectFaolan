@@ -121,9 +121,13 @@ minimal form "drops hair". **The cross-capture sweep (`NpcSpawnAppearanceTests`,
 - **19 humanoid NPC types** (Kalanthes, Guard, Nobleman, Black Dragon Guard, Poacher, Bat Pict Mauler, …) emit
   the **41-byte minimal post-IIR themselves** in some captures. A type that renders correctly with the minimal
   post-IIR proves the larger form is not required for its looks.
-- The minimal form has just **3 variants differing only in `recordCount` ∈ {1,2,3}** over a constant `0x3F1`
-  body; `word0 == 0` on 5148/5151. The larger forms concatenate per-instance **runtime records** (movement
-  waypoints / buff-timer pairs), session state the simulation re-derives — not template/appearance data.
+- The minimal form has just **3 variants differing only in `word2` ∈ {1,2,3}** over an otherwise identical
+  body; `word0 == 0` on 5148/5151.
+- ⚠️ **"The larger forms are per-instance runtime records the simulation re-derives" was only a third right**
+  (corrected 2026-07-28, #475). The buffs are runtime state; the rest of the larger form is the player's own
+  grammar, and on a humanoid it carries the **morph table** — which the minimal form drops. So the minimal
+  scaffold is correct for a type that has no morph rows and WRONG for one that does; see the bald-guard
+  correction below.
 
 So the "missing hair" regression was the **#23 playfield token** (a stale token made the client drop the spawn),
 now fixed by `SpawnPlayfieldRewriter` — not the post-IIR content. The minimal post-IIR is correct for animals
@@ -161,15 +165,14 @@ after them as an opaque `byte[]`. One shared reader walks both:
 ```
 [u32 headCount][headCount x u32]        the plain-counted head word list
 [u32 firstRecordLen][u32 word2]         <- the player's "4" and "2"
-[firstRecordLen bytes]                  the first record
-[u32 entryCount][u32 entryTableX]       the entry table (empty on every NPC form)
-  ... entries / ID list / ID-list tail, iff entryCount > 0
+[firstRecordLen bytes]                  the first record, ENDING in the buff list's framing word
+[the entry slot]                        NPC: the morph table · PLAYER: entry table + ID list
 [u32 count] pairs, [u32 count] pairs    two PLAIN-counted pair lists
 [u32 ListFrame] pairs                   the count-framed third
 ```
 
-**3,882 captured streams walk to their exact last byte** — every NPC minimal form and every create-editor
-preview. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameGrammar]
+The MINIMAL forms — entry slot and all three pair lists empty — pin the header the two codecs used to disagree
+about. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameGrammar]
 
 - The create-editor preview's **40-byte** stream is the fully-empty PLAYER scaffold: `firstRecordLen` 4 (the
   buff list's count word) and every list empty, so `40 = 12 + 4 + 24`.
@@ -178,51 +181,56 @@ preview. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameG
 - `firstRecordLen` is the length of the FIRST record only. On a player it stays 4 whether the character has 0
   or 3 buffs, because the buff records are that list's *elements*, not further records.
 - ⚠️ **`word2` does not count records.** Streams of identical length carry 1, 2 and 3 in it, so it cannot be
-  counting anything that occupies bytes. `NpcSpawnPostIir.RecordCount` and the persisted column
-  `NpcStatCore.MinimalPostIirRecordCount` are both misnamed; it is a type-stable enum of unknown meaning.
+  counting anything that occupies bytes. It is a type-stable enum of unknown meaning, named for its position -
+  `NpcSpawnPostIir.Word2` and the persisted column `NpcStatCore.MinimalPostIirWord2`, both of which used to say
+  "record count".
 - `12 + firstRecordLen + 24` is the length only when all three pair lists are empty, i.e. the minimal forms. It
   is not a general identity — streams with populated pair lists are longer and still walk exactly.
 
 ### The record body, decoded (2026-07-28)
 
 The body between that header and the terminator was written up as *"session runtime state the simulation
-re-derives"*. **One walk consumes 11,626 of the 11,632 captured streams to their exact last byte:**
+re-derives"*. It is the player's own stream, and **every one of the 11,632 captured streams is now read to its
+exact last byte** by one of the two codecs:
 
 ```
-[shared header]                     SpawnPostIirHeader
-[first record - firstRecordLen bytes]
-[k x 60-byte ScaffoldBuff]          the PLAYER scaffold's buff record, on NPCs too
-[u32 count][count x morph entry]    the entry-table slot
-[u32][u32]                          the pair the player codec reads as its ID-list close
-[u32 c1][c1 x 8] [u32 c2][c2 x 8]   two PLAIN-counted pair lists
-[u32 ListFrame][n x 8]              the count-framed third
+[SpawnPostIirCommon prologue]       header + first record + the ACTIVE BUFFS
+  [u32 headCount][headCount x u32]
+  [u32 firstRecordLen][u32 word2]
+  [firstRecordLen-4 prefix][u32 buff list frame]      <- the record ENDS in the buff count
+  [k x 60-byte ScaffoldBuff]
+[the ENTRY SLOT]                    NPC: [u32 count][morph entries][u32][u32]
+                                    PLAYER: [u32 count][u32 entryTableX][f32 1.0][14-byte entries][ID list]
+[SpawnPostIirCommon tail]           [u32 c1][c1 x 8] [u32 c2][c2 x 8] [u32 ListFrame][n x 8]
 ```
 
-Everything from the entry table down is the **player's own tail**. The one genuine difference is the ENTRY
-shape: a player's entries are 14 bytes, an NPC's are the variable-width morph records
-`NpcSpawnAppearanceCodec` already parses — same slot, different element. That is why the two read as unrelated
-formats, and why the "single record" NPC forms turn out to be this shape with `count == 0` rather than a form
-of their own.
+Everything but the entry slot is shared — `SpawnPostIirCommon`, held by both `PlayerSpawnScaffold` and
+`NpcSpawnPostIir`, which stay separate codecs because each asserts what its own family guarantees.
 
 | | streams |
 |---|---|
-| walks to the exact last byte | **11,626** |
-| unresolved | **6** |
+| read by the NPC codec | **11,373** |
+| read by the player codec | **232** |
+| read identically by both | **27** |
+| unread | **0** |
 
-**99.95%.** The entry slot takes one of TWO element shapes and the walk tries both: the NPC's variable-width
-morph records, or the PLAYER's `[u32 entryTableX][f32 1.0]` + 14-byte entries + ID list + tail refs. Whichever
-lands exactly on the stream's end is the answer — they cannot both, because each self-checks against the same
-fixed endpoint. That is what took this from 98% to 99.95%: the 232 that were "unresolved" were player spawns
-all along, and their `firstRecordLen`/`word2` of 4/2 said so.
+[V3: NpcPostIirBodyTests.EveryCapturedPostIirStream_IsReadByOneOfTheTwoCodecs]
 
-Of the six holdouts, **one is a corrupt capture record** rather than a wire shape — its ASCII is scrambled in
-4-byte groups (`uoY era ehtsohCuG`, `dilanregof t`) while other strings in the same body read cleanly, which is
-a mis-reassembled TCP segment. The other five are the price of requiring a buff record to be *recognisable*
-(`Kind` + `EntityClass.Character`) rather than inferred from arithmetic: without that guard the search finds
-runs of zero bytes that make the arithmetic work out and invents buff records with a zero target class. Five
-streams that do not walk beat five that walk for the wrong reason.
+The 27 that both read are player streams whose entry slot is EMPTY, where the player's
+`[count][entryTableX][marker]` and the NPC's `[count][two words]` are the same twelve bytes — the two codecs
+read the same stream and put the same bytes back, so it is not an ambiguity. Every NPC-shaped stream also
+**re-encodes byte-exact**, which is the acceptance bar for a decoded region.
+[V3: NpcPostIirBodyTests.EveryNpcShapedStream_ReEncodesByteExact]
 
-[V3: NpcPostIirBodyTests.EveryNpcPostIirBody_WalksAsBuffsThenAnEntryTableThenThePlayersTail]
+⚠️ **THE BUFF COUNT IS READ, NOT SEARCHED.** The last four bytes of the first record are the buff list's
+framing word on all 11,632 streams, without exception. This is invisible from the player side, where the first
+record IS that word (length 4, no prefix) so it reads as "the record" rather than as a count of what follows;
+an NPC carries a prefix in front of it — one `0x00` byte fresh, 20..1,273 bytes of accrued runtime state
+mid-session. Searching for the record count instead capped the walk at **99.95%** (11,626 of 11,632) and needed
+a "does this look like a buff?" guard to stop the search inventing records out of runs of zero bytes. Reading
+it resolves all six holdouts, including the one whose ASCII is scrambled in 4-byte groups (`uoY era
+ehtsohCuG`) — a mis-reassembled TCP segment, which reads fine because the corruption is inside a string rather
+than in the framing.
 
 **The 60-byte records are the player scaffold's buff records**, not an NPC-only shape. All 941 carry the same
 `Kind` and `EntityClass.Character` as their target class, their timer pair orders correctly in every one, and
@@ -239,6 +247,18 @@ observed range rather than asserting 1..80.
 the stream end, not 24 (the word at −24 belongs to the table's own region), and the terminator's three pair
 lists are **counted, not constant** — requiring the last 24 bytes to be a fixed pattern rejected every stream
 whose lists are populated.
+
+### A buffed humanoid used to spawn BALD (2026-07-28, #475)
+
+The appearance classifier found the morph table by arithmetic — at `12 + firstRecordLen`, i.e. straight after
+the first record. That is where the table sits only when the character carries **no active buffs**, because
+each buff pushes it 60 bytes further. A humanoid captured mid-buff was therefore classified no-morph, stored
+without morph rows, and would spawn with the minimal post-IIR — which drops the appearance table and renders
+the NPC bald, the exact failure #243 exists to prevent.
+
+Reading the stream instead of computing an offset lifts **269 more captured bodies and loses none**. In the DB
+that is **+258 morph rows across 7 spawns** — all Red Hand City Guards in Tortage (map 4020), which had been
+storing no appearance at all. [V3: NpcSpawnAppearanceTests.DecodeAppearanceLenient_WithAnActiveBuff_StillRecoversTheTable]
 
 ## Typed scaffold codec — landed (2026-06-16, byte-exact)
 `NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan.Core.Network/Codecs/Spawn/NpcSpawnPreIir.cs`) decode the 223-byte

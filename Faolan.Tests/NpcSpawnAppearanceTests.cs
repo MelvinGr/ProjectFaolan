@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
@@ -33,9 +34,9 @@ namespace Faolan.Tests
 		}
 
 		// #243 lenient decode: a mid-session humanoid capture carries the SAME morph table behind a large RUNTIME
-		// record1 instead of the empty 5-byte record1. Strict TryDecodeAppearance declines it; TryDecodeAppearanceLenient
-		// skips the runtime record (using firstRecordLen) and recovers the identical table. Synthesize the runtime shape
-		// from Casilda's clean capture (swap her empty record1 for a runtime block, bump firstRecordLen, recordCount=1).
+		// first record instead of the fresh 5-byte one. Strict TryDecodeAppearance declines it; the lenient decode
+		// recovers the identical table. Synthesized from Casilda's clean capture by swapping her fresh first record
+		// for a runtime block - which, like every captured first record, ENDS in the buff list's framing word (#475).
 		[Fact]
 		public void DecodeAppearanceLenient_RuntimeBearing_RecoversSameMorphs()
 		{
@@ -48,21 +49,62 @@ namespace Faolan.Tests
 			// 12-byte header + 5-byte record1 (the morph table + terminator) unchanged.
 			var tableAndTerminator = body[(postStart + 12 + 5)..];
 
-			var runtime = new byte[40];
-			new Random(1).NextBytes(runtime);
-			runtime[0] = 0xFF; // ensure bytes[12..17] can't be mistaken for the empty record1 (strict must decline)
-			var runtimePost = new FaolanStream().WriteUInt32(0u).WriteUInt32(runtime.Length).WriteUInt32(1u).WriteArray(runtime).WriteArray(tableAndTerminator).ToArray();
+			var runtimeBody0 = BuildRuntimeBearing(body, postStart, tableAndTerminator, buffs: 0);
 
-			var runtimeBody = new byte[postStart + runtimePost.Length];
-			Array.Copy(body, runtimeBody, postStart);
-			runtimePost.CopyTo(runtimeBody, postStart);
-			runtimeBody.WriteU32Be(0, (uint)(runtimeBody.Length - 4));
-
-			Assert.False(NpcSpawnAppearanceCodec.TryDecodeAppearance(runtimeBody, out _));
-			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(runtimeBody, out var lenientMorphs));
+			Assert.False(NpcSpawnAppearanceCodec.TryDecodeAppearance(runtimeBody0, out _));
+			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(runtimeBody0, out var lenientMorphs));
 			Assert.Equal(cleanMorphs.Count, lenientMorphs.Count);
 			// Both lift the identical appearance table (BuildPostIir is the canonical fresh form for both).
 			Assert.Equal(NpcSpawnAppearanceCodec.BuildPostIir(cleanMorphs), NpcSpawnAppearanceCodec.BuildPostIir(lenientMorphs));
+		}
+
+		// The same body with an ACTIVE BUFF on it, which is the case the lenient decode used to lose (#475). It found
+		// the table by arithmetic - at 12 + firstRecordLen - and a buff record sits between that offset and the table,
+		// so a buffed humanoid was classified no-morph and would spawn BALD. Reading the stream finds the table
+		// wherever the buffs leave it. Over the corpus this is 269 more captured bodies, and no lost ones.
+		[Fact]
+		public void DecodeAppearanceLenient_WithAnActiveBuff_StillRecoversTheTable()
+		{
+			var body = Golden.Bytes("SpawnNpcCasilda");
+			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
+			var postStart = read.Offset + read.Length;
+
+			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var cleanMorphs));
+			var tableAndTerminator = body[(postStart + 12 + 5)..];
+
+			var buffed = BuildRuntimeBearing(body, postStart, tableAndTerminator, buffs: 1);
+			Assert.True(NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(buffed, out var morphs));
+			Assert.Equal(NpcSpawnAppearanceCodec.BuildPostIir(cleanMorphs), NpcSpawnAppearanceCodec.BuildPostIir(morphs));
+
+			// And the whole stream still walks: the buff is READ, not skipped past.
+			Assert.True(NpcSpawnPostIir.TryDecode(buffed, out var post));
+			Assert.Single(post.Common.BuffRecords);
+		}
+
+		// A mid-session body: Casilda's morph table behind a 40-byte runtime first record (which ends in the buff
+		// list's framing word, as every captured one does) and `buffs` active buff records.
+		private static byte[] BuildRuntimeBearing(byte[] body, int postStart, byte[] tableAndTerminator, int buffs)
+		{
+			var runtime = new byte[36];
+			new Random(1).NextBytes(runtime);
+			runtime[0] = 0xFF; // so the record cannot be mistaken for the fresh one (strict must decline)
+
+			var post = new FaolanStream()
+				.WriteUInt32(0u) // no head words
+				.WriteUInt32((uint)runtime.Length + 4) // the first record: the runtime block + the buff list's frame
+				.WriteUInt32(1u)
+				.WriteArray(runtime)
+				.WriteUInt32(ListFrame.ForCount(buffs));
+
+			for (var n = 0; n < buffs; n++)
+				new ScaffoldBuff { SpellId = 1148789, TargetHandle = 0x1310001 }.Write(post);
+
+			var bytes = post.WriteArray(tableAndTerminator).ToArray();
+			var runtimeBody = new byte[postStart + bytes.Length];
+			Array.Copy(body, runtimeBody, postStart);
+			bytes.CopyTo(runtimeBody, postStart);
+			runtimeBody.WriteU32Be(0, (uint)(runtimeBody.Length - 4));
+			return runtimeBody;
 		}
 
 		// Animals carry no appearance table (the 41-byte minimal post-IIR), so the decoder declines them - they
