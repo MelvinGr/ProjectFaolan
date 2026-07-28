@@ -39,7 +39,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (s.Scale != null)
 				payload.WriteByte(0x25).WriteArray(s.Scale);
 
-			payload.WriteByte(0x18).WriteVarint(s.Playfield).WriteArray(s.PreFrame).WriteArrayUInt32Length(s.CharacterIir).WriteArray(post);
+			payload.WriteByte(0x18).WriteVarint(s.Playfield).WriteArray(PlayerSpawnPreFrameCodec.Build(s.Frame)).WriteArrayUInt32Length(s.Character.ToProtobuf()).WriteArray(post);
 
 			return new FaolanStream().WriteArrayUInt32Length(payload.ToArray()).ToArray();
 		}
@@ -141,8 +141,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (body.ReadU32Be(iir.Offset - 4) != (uint)iir.Length)
 				throw new FormatException("CharacterIIR length prefix mismatch");
 
-			s.PreFrame = body.AsSpan(i, iir.Offset - 4 - i).ToArray();
-			s.CharacterIir = body.AsSpan(iir.Offset, iir.Length).ToArray();
+			if (!PlayerSpawnPreFrameCodec.TryParse(body.AsSpan(i, iir.Offset - 4 - i).ToArray(), out var frame))
+				throw new FormatException($"the {iir.Offset - 4 - i}-byte pre-IIR frame does not walk as a spawn scaffold");
+
+			s.Frame = frame;
+			s.Character = iir.Message; // PlayerSpawnReader decoded it to locate it - there is nothing left to parse
 
 			ParsePostIir(body, iir.Offset + iir.Length, s);
 			return s;

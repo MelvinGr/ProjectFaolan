@@ -2097,7 +2097,7 @@ namespace Faolan.GameServer.World
 			// (WithSessionNavigations). It did not, once: the session copy came back with Body + MaxStats only, so the
 			// build failed - and that failure landed on the ENTERING player, hanging them on the loading screen over a
 			// row missing from somebody ELSE's session object.
-			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIir.Build(character, equipment).ToProtobuf(), character);
+			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIir.Build(character, equipment), character);
 		}
 
 		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)

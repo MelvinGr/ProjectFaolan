@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -81,6 +82,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public uint[] Words { get; } = new uint[NpcSpawnPreIir.WordCount];
 
 		public byte Version { get; set; } = NpcSpawnPreIir.ExpectedVersion;
+
+		// The frame's width on the wire: the fixed scaffold (version byte + 6 u8 + 53 u32 + the sublist's own count
+		// word = NpcSpawnPreIir.FixedLength), the 5 embedded CoreCharacter bytes, and each sublist entry's
+		// [u32 key][u8 flag][u16 len + name][count word][4 x feat id]. Derived rather than measured, so the six
+		// captured length variants (228/239/251/259/263/339) are a consequence of the grammar rather than a list to
+		// be matched against.
+		public int ByteCount => NpcSpawnPreIir.FixedLength + 5 + Sublist.Sum(e => 4 + 1 + 2 + e.Name.Length + 4 + 4 * e.FeatIds.Count);
 
 		// The embedded CoreCharacterFullUpdateIIR's version byte, 'A'. The client rejects any other value.
 		public const byte CoreCharacterVersion = 0x41;

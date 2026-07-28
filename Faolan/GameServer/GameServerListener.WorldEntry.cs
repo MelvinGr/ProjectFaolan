@@ -823,7 +823,7 @@ namespace Faolan.GameServer
 				? character.Rotation
 				: Quaternion.Identity;
 
-			return BuildWorldEntrySpawn(client, PlayerSpawnBuilder.BuildFromScratch(character.Id, playfield, character.Position, rotation, message.ToProtobuf(), character));
+			return BuildWorldEntrySpawn(client, PlayerSpawnBuilder.BuildFromScratch(character.Id, playfield, character.Position, rotation, message, character));
 		}
 
 		// The burst-less world-object packets: each WorldObjects row built via WorldObjectBuilder and framed. Built on

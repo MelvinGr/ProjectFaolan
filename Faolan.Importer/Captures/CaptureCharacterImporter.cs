@@ -97,12 +97,13 @@ namespace Faolan.Importer.Captures
 						continue;
 
 					// Only PLAYER spawns parse with the scaffold codec (NPC FA015807 bodies have a different
-					// post-IIR layout). Editor-preview spawns (the fully-constant 228-byte pre-frame) carry a
+					// post-IIR layout). Editor-preview spawns (the only frame with an EMPTY sublist - what used
+					// to be spelled as "the fully-constant 228-byte pre-frame") carry a
 					// synthesized "Character<instance>" placeholder name - those are the creator's temp
 					// instances, never importable. Real spawns also include OTHER PLAYERS visible in gameplay
 					// captures; those are filtered out after pooling (only the capturing account's own played
 					// character is imported - see the own-character prune below).
-					if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || scaffold.PreFrame is { Length: 228 })
+					if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || scaffold.Frame.Sublist.Count == 0)
 						continue;
 					if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read) || string.IsNullOrEmpty(read.Message.Name) || IsCreatorTempName(read.Message.Name))
 						continue;

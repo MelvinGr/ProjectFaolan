@@ -27,7 +27,7 @@ namespace Faolan.Tests
 			// fall back to: the rows are seeded at character creation, so their absence is corruption and it throws.
 			// Returning null instead used to mean a player nobody could see, reported only as a log warning.
 			var ex = Assert.Throws<InvalidOperationException>(() => PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, Vector3.Zero, Quaternion.Identity,
-				scaffold.CharacterIir, new Character
+				scaffold.Character, new Character
 				{
 					Id = 1
 				}));
@@ -54,11 +54,11 @@ namespace Faolan.Tests
 			};
 			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold);
 
-			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, position, rotation, scaffold.CharacterIir, scaffoldCharacter);
+			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, position, rotation, scaffold.Character, scaffoldCharacter);
 
 			Assert.NotNull(built);
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var expected, out _));
-			expected.PreFrame = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Assassin);
+			expected.Frame = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Assassin);
 			expected.EntryTableX = 0xB7;
 			expected.BuffRecords.Clear();
 			Assert.Equal(Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(expected)), Convert.ToHexString(built));
@@ -94,12 +94,11 @@ namespace Faolan.Tests
 			};
 			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold);
 
-			var body = PlayerSpawnBuilder.BuildFromScratch(0x0A1B2C3D, scaffold.Playfield, new Vector3(1, 2, 3), Quaternion.Identity, message.ToProtobuf(), scaffoldCharacter);
+			var body = PlayerSpawnBuilder.BuildFromScratch(0x0A1B2C3D, scaffold.Playfield, new Vector3(1, 2, 3), Quaternion.Identity, message, scaffoldCharacter);
 
 			Assert.NotNull(body);
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out var err), err);
-			var back = rebuilt.CharacterIir.FromProtobuf<ProtoCoreCharacterIIR>();
-			Assert.Equal("Newcomer", back.Name);
+			Assert.Equal("Newcomer", rebuilt.Character.Name);
 			Assert.Equal(0x0A1B2C3Du, rebuilt.Handle);
 		}
 	}

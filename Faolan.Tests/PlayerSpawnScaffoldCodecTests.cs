@@ -28,7 +28,7 @@ namespace Faolan.Tests
 			var donor = Support.Golden.Bytes("SpawnStrieTemplate");
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(donor, out var strie));
 
-			s.CharacterIir = donor.AsSpan(strie.Offset, strie.Length).ToArray(); // different length than Dikketest's
+			s.Character = strie.Message; // a different character, and a different serialised length than Dikketest's
 			var rebuilt = PlayerSpawnScaffoldCodec.Generate(s);
 
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(rebuilt, out var back, out var error), $"reparse failed: {error}");
@@ -87,7 +87,7 @@ namespace Faolan.Tests
 		{
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroKingsCastle"), out var s, out _));
 
-			Assert.Equal(339, s.PreFrame.Length); // the standard frame with one feat spec carrying 25 feats
+			Assert.Equal(339, s.Frame.ByteCount); // the standard frame with one feat spec carrying 25 feats
 			Assert.Equal(14, s.Entries.Count);
 			Assert.Equal(0x2B6u, s.EntryTableX);
 			Assert.Equal(8, s.EndPairs.Count);
@@ -108,7 +108,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(0x02165EFFu, s.Handle);
 			Assert.Equal(5235752UL, s.Playfield);
-			Assert.Equal(239, s.PreFrame.Length);
+			Assert.Equal(239, s.Frame.ByteCount);
 			Assert.Empty(s.BuffRecords);
 
 			// Strie: 7 entries (the weighted attributes idx 1..6 with weight 1.0 + the [u16][u32] closer at 7).

@@ -59,7 +59,7 @@ namespace Faolan.Tests
 					continue;
 				}
 
-				var feats = PlayerSpawnScaffoldRows.ExtractPreFrameFeats(scaffold.PreFrame);
+				var feats = PlayerSpawnScaffoldRows.ExtractPreFrameFeats(scaffold.Frame);
 				if (feats.Count == 0)
 					empty++;
 				else
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 				// something ExtractPreFrameFeats looks at, yet it agrees with the count the extractor read, every time.
 				// The feat list is the frame's only variable-width part, so a standard frame is 239 bytes + 4 per feat.
 				// (228 is the create-editor variant, which has no feat region at all - excluded, not silently passed.)
-				var basis = scaffold.PreFrame.Length - (4 * feats.Count);
+				var basis = scaffold.Frame.ByteCount - (4 * feats.Count);
 				bases[basis] = bases.GetValueOrDefault(basis) + 1;
 
 				foreach (var id in feats)

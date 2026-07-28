@@ -169,28 +169,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return true;
 		}
 
-		// Reads the unlocked-feat id list out of a captured (or generated) PreFrame - the inverse of FreshPreFrame's
-		// feat splice. Returns an empty list when the frame carries no feat list (fresh char / a non-standard frame
-		// such as the 228-byte create-editor variant). Order is preserved (the wire order is train order, NOT sorted).
-		public static List<uint> ExtractPreFrameFeats(byte[] preFrame)
+		// The unlocked-feat id list the frame carries, flattened across its specs - the inverse of FreshPreFrame's
+		// feat splice. Empty when the frame has no sublist (the create-editor variant). Order is preserved: the wire
+		// order is TRAIN order, not sorted.
+		//
+		// The frame arrives typed now, so there is nothing to parse here and nothing to fail. It used to take the
+		// frame's BYTES and re-walk them - the same walk PlayerSpawnScaffoldCodec had already done to produce them.
+		public static List<uint> ExtractPreFrameFeats(PlayerSpawnPreFrame frame)
 		{
-			return ExtractPreFrameSpecs(preFrame).SelectMany(spec => spec.FeatIds).ToList();
-		}
-
-		// THROWS on a frame that does not walk. It used to answer "no feats", which is a fabricated value: every one
-		// of the 259 captured frames parses, so a failure here means a genuinely new wire shape - and answering with
-		// an empty list would write a character's feats away silently. That is not hypothetical, it is the bug this
-		// decode found: the old fixed-offset reader returned zero feats for three level-80 characters.
-
-		// The character's saved feat SPECS as the frame carries them - name and trained-feat list per spec, in wire
-		// order (#474). Returns empty for the create-editor frame, which has no sublist at all. ExtractPreFrameFeats
-		// is the flattened view for callers that only want "every feat this character has trained".
-		public static IReadOnlyList<PlayerSpawnPreFrameSublistEntry> ExtractPreFrameSpecs(byte[] preFrame)
-		{
-			if (!PlayerSpawnPreFrameCodec.TryParse(preFrame, out var frame))
-				throw new FormatException($"the {preFrame?.Length ?? 0}-byte pre-IIR frame does not walk as a spawn scaffold - its feat specs cannot be read.");
-
-			return frame.Sublist;
+			return frame.Sublist.SelectMany(spec => spec.FeatIds).ToList();
 		}
 
 		// Replaces the character's scaffold rows with the scaffold's content (extraction: captured spawn -> rows).
@@ -223,8 +210,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// EntryTableX are constants reconstructed from Character.Class by TryApplyFrom (see FreshPreFrame).
 			// Specs are preserved rather than flattened (#474): a character with four saved specs round-trips as
 			// four CharacterFeatSpec rows, and the same feat id may legitimately appear in several of them.
-			var specs = ExtractPreFrameSpecs(scaffold.PreFrame);
-			character.FeatSpecs = specs
+			character.FeatSpecs = scaffold.Frame.Sublist
 				.Select((spec, index) => new CharacterFeatSpec
 				{
 					CharacterId = character.Id,
@@ -232,7 +218,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					Name = spec.Name
 				})
 				.ToList();
-			character.Feats = specs
+			character.Feats = scaffold.Frame.Sublist
 				.SelectMany((spec, index) => spec.FeatIds.Select((id, sequence) => new CharacterFeat
 				{
 					CharacterId = character.Id,
@@ -275,7 +261,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		// The single-spec overload - the shape every fresh character and every shipped character has.
-		public static byte[] FreshPreFrame(ConanClass @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
+		public static PlayerSpawnPreFrame FreshPreFrame(ConanClass @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
 		{
 			var entry = new PlayerSpawnPreFrameSublistEntry();
 			if (feats != null)
@@ -284,7 +270,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return FreshPreFrame(@class, vanityShownMask, [entry]);
 		}
 
-		public static byte[] FreshPreFrame(ConanClass @class, uint vanityShownMask, IReadOnlyList<PlayerSpawnPreFrameSublistEntry> specs)
+		public static PlayerSpawnPreFrame FreshPreFrame(ConanClass @class, uint vanityShownMask, IReadOnlyList<PlayerSpawnPreFrameSublistEntry> specs)
 		{
 			var frame = new PlayerSpawnPreFrame();
 			frame.Flags[PlayerSpawnPreFrame.ArchetypeFlagIndex] = FrameArchetype(@class);
@@ -298,7 +284,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// order. A fresh character has one unnamed spec with no feats, which frames as the bare 0x3F1 word -
 			// byte-identical to the old constant-239 fresh frame.
 			frame.Sublist.AddRange(specs);
-			return PlayerSpawnPreFrameCodec.Build(frame);
+			return frame;
 		}
 
 		// The fresh feat list for a class: the captured retail list when we have one, else the profession feat
@@ -321,16 +307,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				: null;
 		}
 
-		// The vanity shown-mask carried by a captured spawn's PreFrame. The write side is FreshPreFrame; this is the
+		// The vanity shown-mask carried by a captured spawn's frame. The write side is FreshPreFrame; this is the
 		// read side, so the importer recovers a captured character's setting instead of defaulting it to 0.
-		// THROWS on a frame that does not walk, rather than answering 0: "no vanity shown" is a real, plausible-looking
-		// setting, so a fabricated one here would import as a deliberate choice and be indistinguishable from it.
 		public static uint ReadVanityShownMask(PlayerSpawnScaffold scaffold)
 		{
-			if (!PlayerSpawnPreFrameCodec.TryParse(scaffold?.PreFrame!, out var frame))
-				throw new FormatException($"the {scaffold?.PreFrame?.Length ?? 0}-byte pre-IIR frame does not walk as a spawn scaffold - its vanity mask cannot be read.");
-
-			return frame.Words[PlayerSpawnPreFrame.VanityShownMaskWordIndex];
+			return scaffold.Frame.Words[PlayerSpawnPreFrame.VanityShownMaskWordIndex];
 		}
 
 		// Rebuilds ONLY the appearance portion of an EXISTING scaffold (the weighted appearance entries + the editor
@@ -375,7 +356,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// hidden-slots mask (#336) from the character's equipment (the FA015807 self-spawn carries it so a hidden
 			// piece survives relog), and the unlocked FEAT list spliced in from CharacterFeat rows (train order).
 			// EntryTableX is the constant 0xB7. Transient session islands are correctly absent.
-			scaffold.PreFrame = FreshPreFrame(character.Class, character.Equipment?.VanityShownMask ?? 0, SpecsOf(character));
+			scaffold.Frame = FreshPreFrame(character.Class, character.Equipment?.VanityShownMask ?? 0, SpecsOf(character));
 			scaffold.EntryTableX = 0xB7;
 			scaffold.BuffRecords.Clear();
 

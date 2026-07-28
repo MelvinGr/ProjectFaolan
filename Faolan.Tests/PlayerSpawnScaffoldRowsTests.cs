@@ -74,7 +74,7 @@ namespace Faolan.Tests
 			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 			Assert.Empty(character.Feats);
 
-			Assert.Equal(239, PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Necromancer).Length);
+			Assert.Equal(239, PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Necromancer).ByteCount);
 			Assert.Empty(PlayerSpawnScaffoldRows.ExtractPreFrameFeats(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Necromancer)));
 		}
 
@@ -121,7 +121,7 @@ namespace Faolan.Tests
 			uint[] feats = [110004, 110100, 111304, 111402, 110300, 112700]; // hakotep (hox) unlocked set
 			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.HeraldOfXotli, 0, feats);
 
-			Assert.Equal(126 + 4 * feats.Length + 113, frame.Length);
+			Assert.Equal(126 + 4 * feats.Length + 113, frame.ByteCount);
 			Assert.Equal(feats, PlayerSpawnScaffoldRows.ExtractPreFrameFeats(frame).ToArray());
 		}
 
@@ -138,7 +138,7 @@ namespace Faolan.Tests
 			// Byte offset 18, spelled out rather than taken from the codec: this is the assertion that pins scaffold
 			// word 4 to the place #336 found the mask by a different route, so reading the index back off
 			// PlayerSpawnPreFrame would make it self-referential.
-			Assert.Equal(expectedHex, Convert.ToHexString(frame.AsSpan(18, 4).ToArray()).ToLowerInvariant());
+			Assert.Equal(expectedHex, Convert.ToHexString(PlayerSpawnPreFrameCodec.Build(frame).AsSpan(18, 4).ToArray()).ToLowerInvariant());
 		}
 
 		// #239: the AoC client derives the displayed profession from the character's feat tree, whose first
@@ -241,8 +241,8 @@ namespace Faolan.Tests
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var s, out _));
 			// The frame is reconstructed, but the unlocked FEAT list it carries IS character data and survives the row
 			// round-trip - so the constructed form keeps the captured feats (spliced into the canonical frame).
-			var feats = PlayerSpawnScaffoldRows.ExtractPreFrameFeats(s.PreFrame);
-			s.PreFrame = PlayerSpawnScaffoldRows.FreshPreFrame(@class, 0, feats);
+			var feats = PlayerSpawnScaffoldRows.ExtractPreFrameFeats(s.Frame);
+			s.Frame = PlayerSpawnScaffoldRows.FreshPreFrame(@class, 0, feats);
 			s.EntryTableX = 0xB7;
 			s.BuffRecords.Clear();
 			return PlayerSpawnScaffoldCodec.Generate(s);

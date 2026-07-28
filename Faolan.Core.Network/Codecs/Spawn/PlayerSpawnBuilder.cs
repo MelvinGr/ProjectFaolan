@@ -23,12 +23,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// A fresh player spawn carries no per-instance scale; the transform's optional 0x25 scale field is absent.
 
 		// Produces the FA015807 player body (the packet[bodyStart..] form: [u32 bodyLen][subop][ack][handle][fieldA]
-		// [transform][preFrame][CharacterIIR][post-IIR]). `characterIir` is the ProtoCoreCharacterIIR blob.
+		// [transform][preFrame][CharacterIIR][post-IIR]). The caller hands over the typed character message; the
+		// codec serialises it, so nobody on this path deals in its bytes.
 		//
 		// A character with no scaffold rows THROWS. It used to return null so the caller could fall back to splicing a
 		// captured spawn, but that path is gone (construct-don't-replay) and the rows are seeded at character creation,
 		// so a character without them is corruption - and the "fallback" it enabled was a player nobody could see.
-		public static byte[] BuildFromScratch(uint handle, ulong playfield, Vector3 position, Quaternion rotation, byte[] characterIir, Character scaffoldCharacter)
+		public static byte[] BuildFromScratch(uint handle, ulong playfield, Vector3 position, Quaternion rotation, ProtoCoreCharacterIIR characterIir, Character scaffoldCharacter)
 		{
 			ArgumentNullException.ThrowIfNull(characterIir);
 
@@ -41,7 +42,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				Rotation = rotation,
 				Scale = null,
 				Playfield = playfield,
-				CharacterIir = characterIir
+				Character = characterIir
 			};
 
 			// Fill the scaffold frame (pre-IIR + entry table + id list + pair lists) from the character's DB rows.

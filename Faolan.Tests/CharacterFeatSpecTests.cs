@@ -27,8 +27,10 @@ namespace Faolan.Tests
 
 			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
 			{
-				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || !PlayerSpawnPreFrameCodec.TryParse(scaffold.PreFrame, out var frame))
+				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) )
 					continue;
+
+				var frame = scaffold.Frame;
 
 				// Extraction: the captured spawn -> CharacterFeatSpec + CharacterFeat rows.
 				var character = new Character
@@ -144,8 +146,10 @@ namespace Faolan.Tests
 			Assert.Single(specs);
 			Assert.Equal("", specs[0].Name);
 			Assert.Equal([200000u, 200100u], specs[0].FeatIds);
-			Assert.Equal(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Guardian, 0, [200000u, 200100u]),
-				PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Guardian, 0, specs));
+			// Compared as WIRE BYTES: the frame is a typed object now, so equality here has to be the thing that
+			// matters - that both construction paths put the same bytes on the wire.
+			Assert.Equal(PlayerSpawnPreFrameCodec.Build(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Guardian, 0, [200000u, 200100u])),
+				PlayerSpawnPreFrameCodec.Build(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Guardian, 0, specs)));
 		}
 
 		// A multi-spec frame built from rows is a valid scaffold, and it is 11 bytes + the name per extra spec longer
@@ -158,8 +162,8 @@ namespace Faolan.Tests
 
 			// A sublist entry is 11 bytes of frame (key 4 + flag 1 + name length 2 + the feat list's count word 4)
 			// plus its name plus 4 per feat.
-			Assert.Equal(single.Length + 11 + "PvP".Length + 4 * 2, two.Length);
-			Assert.True(PlayerSpawnPreFrameCodec.TryParse(two, out var parsed));
+			Assert.Equal(single.ByteCount + 11 + "PvP".Length + 4 * 2, two.ByteCount);
+			Assert.True(PlayerSpawnPreFrameCodec.TryParse(PlayerSpawnPreFrameCodec.Build(two), out var parsed));
 			Assert.Equal(["", "PvP"], parsed.Sublist.Select(s => s.Name).ToArray());
 		}
 
@@ -184,7 +188,7 @@ namespace Faolan.Tests
 		{
 			return new PlayerSpawnScaffold
 			{
-				PreFrame = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Barbarian, 0, SpecEntries(specs))
+				Frame = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Barbarian, 0, SpecEntries(specs))
 			};
 		}
 	}

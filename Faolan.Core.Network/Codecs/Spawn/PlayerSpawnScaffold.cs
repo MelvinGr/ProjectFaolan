@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -43,16 +44,21 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public List<uint> HeadWords => Common.Header.HeadWords;
 		public List<ScaffoldBuff> BuffRecords => Common.BuffRecords;
 
-		// The embedded ProtoCoreCharacterIIR bytes (typed round-trip via FromProtobuf/ToProtobufBytes is
-		// byte-identical; see PlayerSpawnGenerationTests).
-		public byte[] CharacterIir { get; set; } = null!;
+		// The embedded character message - identity, appearance, equipment. TYPED, not bytes: PlayerSpawnReader
+		// already decodes it to find the message at all, so holding the bytes beside it meant carrying the same
+		// thing twice and re-parsing at every use. Its re-encode is byte-identical on every captured spawn
+		// (ProtobufCorpusRoundTripTests), and the whole-body regeneration gate covers it end to end.
+		public ProtoCoreCharacterIIR Character { get; set; } = new();
 
-		// The pre-IIR frame between the transform and the CharacterIIR length prefix. DECODED - it is the client's
+		// The pre-IIR frame between the transform and the CharacterIIR length prefix: the client's own
 		// SimpleCharFullUpdateIIR scaffold (the same one NpcSpawnPreIir models) plus the embedded CoreCharacter's
-		// version byte + IirHeader, and its sublist is the character's saved FEAT SPECS: see PlayerSpawnPreFrame /
-		// PlayerSpawnPreFrameCodec, which parse and rebuild every captured frame byte-exact. Held as bytes here
-		// because the scaffold round-trips verbatim; PlayerSpawnScaffoldRows.FreshPreFrame builds a fresh one.
-		public byte[] PreFrame { get; set; } = null!;
+		// version byte + IirHeader, its sublist being the character's saved FEAT SPECS (#466 / #474).
+		//
+		// TYPED, not bytes. It was held as a byte[] long after PlayerSpawnPreFrameCodec could parse and rebuild
+		// every captured frame byte-exact, which meant PlayerSpawnScaffoldRows serialised a frame it had just built
+		// and five call sites parsed it straight back - a round trip through the wire format, in memory, to reach
+		// fields that were already there.
+		public PlayerSpawnPreFrame Frame { get; set; } = new();
 
 		// Transform component (the 0x2C group): 0x0A vec3 (3 x fixed32), 0x12 quat (4 x fixed32), optional 0x25
 		// scale (4 bytes), 0x18 playfield varint. #352 kept these two as raw field payloads on the grounds that

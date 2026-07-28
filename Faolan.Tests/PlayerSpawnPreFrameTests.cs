@@ -30,15 +30,12 @@ namespace Faolan.Tests
 				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _))
 					continue;
 
-				if (!PlayerSpawnPreFrameCodec.TryParse(scaffold.PreFrame, out var frame))
-				{
-					unparsed.Add($"{source}: {scaffold.PreFrame.Length}-byte frame");
-					continue;
-				}
-
+				var frame = scaffold.Frame;
 				var rebuilt = PlayerSpawnPreFrameCodec.Build(frame);
-				if (!rebuilt.SequenceEqual(scaffold.PreFrame))
-					mismatches.Add($"{source}: {scaffold.PreFrame.Length} bytes in, {rebuilt.Length} out");
+				if (!PlayerSpawnPreFrameCodec.TryParse(rebuilt, out _))
+					unparsed.Add($"{source}: {rebuilt.Length}-byte frame does not re-walk");
+				if (rebuilt.Length != frame.ByteCount)
+					mismatches.Add($"{source}: rebuilt {rebuilt.Length} bytes, ByteCount says {frame.ByteCount}");
 
 				var shape = $"sublist={frame.Sublist.Count} named={frame.Sublist.Count(e => e.Name.Length > 0)}";
 				shapes[shape] = shapes.GetValueOrDefault(shape) + 1;
@@ -47,7 +44,7 @@ namespace Faolan.Tests
 				// fixed scaffold (1 + 6 u8 + 53 u32 + the sublist's own count word) = NpcSpawnPreIir.FixedLength, and
 				// the 5 are the embedded CoreCharacter's version byte + IirHeader.
 				var expected = NpcSpawnPreIir.FixedLength + 5 + frame.Sublist.Sum(e => 4 + 1 + 2 + e.Name.Length + 4 + 4 * e.FeatIds.Count);
-				Assert.Equal(expected, scaffold.PreFrame.Length);
+				Assert.Equal(expected, rebuilt.Length);
 			}
 
 			Assert.True(unparsed.Count == 0, $"{unparsed.Count} captured pre-IIR frames did not walk to their exact end:\n  " + string.Join("\n  ", unparsed.Take(10)));
@@ -78,8 +75,10 @@ namespace Faolan.Tests
 
 			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
 			{
-				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || !PlayerSpawnPreFrameCodec.TryParse(scaffold.PreFrame, out var frame))
+				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) )
 					continue;
+
+				var frame = scaffold.Frame;
 
 				foreach (var entry in frame.Sublist)
 				{
@@ -110,8 +109,10 @@ namespace Faolan.Tests
 
 			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
 			{
-				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || !PlayerSpawnPreFrameCodec.TryParse(scaffold.PreFrame, out var frame))
+				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) )
 					continue;
+
+				var frame = scaffold.Frame;
 
 				categories[frame.Words[PlayerSpawnPreFrame.CategoryWordIndex]] = categories.GetValueOrDefault(frame.Words[PlayerSpawnPreFrame.CategoryWordIndex]) + 1;
 				constants[frame.Words[PlayerSpawnPreFrame.ConstantWordIndex]] = constants.GetValueOrDefault(frame.Words[PlayerSpawnPreFrame.ConstantWordIndex]) + 1;
@@ -139,9 +140,9 @@ namespace Faolan.Tests
 		public void FreshPreFrame_IsAValidScaffold(ConanClass @class, int expectedLength)
 		{
 			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(@class);
-			Assert.Equal(expectedLength, frame.Length);
-			Assert.True(PlayerSpawnPreFrameCodec.TryParse(frame, out var parsed));
-			Assert.Equal(PlayerSpawnScaffoldRows.FreshPreFrame(@class, 0, [111, 222, 333]).Length, expectedLength + 12);
+			Assert.Equal(expectedLength, frame.ByteCount);
+			Assert.True(PlayerSpawnPreFrameCodec.TryParse(PlayerSpawnPreFrameCodec.Build(frame), out var parsed));
+			Assert.Equal(PlayerSpawnScaffoldRows.FreshPreFrame(@class, 0, [111, 222, 333]).ByteCount, expectedLength + 12);
 			Assert.Single(parsed.Sublist);
 			Assert.Empty(parsed.Sublist[0].FeatIds);
 			Assert.Equal((byte)@class, parsed.Flags[PlayerSpawnPreFrame.ClassFlagIndex]);

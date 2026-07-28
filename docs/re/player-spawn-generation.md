@@ -114,14 +114,16 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
   length-consistent u32 at all. The legacy splice path
   (the obsolete `SpawnPacketBuilder.SetCharacterMessage`, using `NameOuterLengthOffset` = 133) still
   adjusts it on resize — the client demonstrably tolerates that — but the generation path builds the
-  whole frame from `Character.Class` (`PlayerSpawnScaffoldRows.FreshPreFrame` → `PlayerSpawnScaffold.PreFrame`).
+  whole frame from `Character.Class` (`PlayerSpawnScaffoldRows.FreshPreFrame` → `PlayerSpawnScaffold.Frame`,
+  which is a typed `PlayerSpawnPreFrame` — the scaffold holds no frame bytes).
 - `[u32 innerLen]` + the **ProtoCoreCharacterIIR**.
 - **post-IIR stream** (contiguous to EOF; nothing follows it):
   - header: a **plain-counted list** `[u32 n][n x u32]` then the constant `[u32 4]`. Read as the constant pair
     `[u32 0][u32 4]` until #251 — `n` is 0 on all but 2 captured spawns, which carry a single word (60).
-  - `[u32 2][u32 0x3F1 * (nBuffs+1)]` — the second field encodes the count of **60-byte buff/timer records**
-    that follow: `[t0][0x7E2][0][0x1207CF][a][b][0][seq from 4][0xC350][handle][5x u32 0]` (only on chars
-    with active buffs; otherwise a bare 0x3F1).
+  - `[u32 2][u32 0x3F1 * (nBuffs+1)]` — the second field is the framing word of the **60-byte buff record**
+    list, i.e. the count of `ScaffoldBuff`s that follow (spell id, timer pair, caster level, the
+    `[EntityClass.Character][handle]` reference to whoever the buff is on — decoded in #475). An empty list
+    frames as a bare `0x3F1`, which is `ForCount(0)`, not a constant.
   - `[u32 count][u32 X]` + (`[f32 1.0]` iff count>0) — the entry-table count and the per-char scalar X
     (Strie 0xB7, NecroL80 0x2B6, editor preview 0x3F1) = `PlayerSpawnScaffold.EntryTableX`.
   - **count entries, UNIFORM 14 bytes**: `[u32 idx][u32 flag][u16 tag][u32 value]` = `CharacterAttribute`.
