@@ -30,7 +30,10 @@ namespace Faolan.Tests
 			var captured = body[(read.Offset + read.Length)..];
 
 			Assert.True(NpcSpawnPostIir.TryDecode(body, out var post));
-			Assert.Equal(0u, post.Word0); // word0 == 0 across the NPC corpus (the player spawn has 2)
+			// No head words. That leading u32 is the head-word LIST'S COUNT, not a constant - it is 0 on 11,627
+			// captured streams and 1 on the 5 that carry a word, and it was written up as "constant 0 (the player
+			// spawn has 2)", which is wrong on both halves (#475).
+			Assert.Empty(post.Header.HeadWords);
 			Assert.Equal(captured, post.Encode());
 		}
 

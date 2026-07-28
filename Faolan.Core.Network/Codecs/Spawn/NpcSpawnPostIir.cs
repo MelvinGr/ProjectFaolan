@@ -27,18 +27,31 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// byte-exact, so the from-DB path owns the header grammar in code (Gitea #185).
 	public sealed class NpcSpawnPostIir
 	{
-		// The 12-byte header ([u32 word0][u32 firstRecordLen][u32 recordCount]).
-		private const int HeaderLength = 12;
 		public byte[] Records { get; set; } = [];
-		public uint FirstRecordLen { get; set; }
-		public uint Word2 { get; set; } = 1;
 
-		public uint Word0 { get; set; }
+		// The stream's opening header, shared with the player scaffold (SpawnPostIirHeader).
+		public SpawnPostIirHeader Header { get; set; } = new()
+		{
+			FirstRecordLen = 5,
+			Word2 = 1
+		};
+
+		public uint FirstRecordLen
+		{
+			get => Header.FirstRecordLen;
+			set => Header.FirstRecordLen = value;
+		}
+
+		public uint Word2
+		{
+			get => Header.Word2;
+			set => Header.Word2 = value;
+		}
 
 		// Serializes the scaffold to its wire bytes (the 12-byte header + the raw record body).
 		public byte[] Encode()
 		{
-			return new FaolanStream().WriteUInt32(Word0).WriteUInt32(FirstRecordLen).WriteUInt32(Word2).WriteArray(Records).ToArray();
+			return new FaolanStream().WriteArray(Header.ToArray()).WriteArray(Records).ToArray();
 		}
 
 		// Decodes the post-IIR scaffold from an FA015807 body (the bytes after the embedded CoreCharacterIIR,
@@ -51,15 +64,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				return false;
 
 			var start = read.Offset + read.Length;
-			if (start + HeaderLength > body.Length)
+			if (SpawnPostIirHeader.Read(body, start) is not { } header)
 				return false;
 
 			scaffold = new NpcSpawnPostIir
 			{
-				Word0 = body.ReadU32Be(start),
-				FirstRecordLen = body.ReadU32Be(start + 4),
-				Word2 = body.ReadU32Be(start + 8),
-				Records = body[(start + HeaderLength)..]
+				Header = header,
+				Records = body[(start + header.ByteCount)..]
 			};
 			return true;
 		}

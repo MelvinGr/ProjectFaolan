@@ -12,6 +12,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	{
 		public const uint Marker = ListFrame.Unit;
 
+		// The player's own values for the shared post-IIR header's last two words (see SpawnPostIirHeader). Constant
+		// across every captured player spawn, which is why they used to be bare literals - but constant for the
+		// PLAYER, not for the protocol: an NPC carries 5 and 1/2/3 in the same two slots.
+		private const uint PlayerFirstRecordLen = 4;
+		private const uint PlayerWord2 = 2;
+
 		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 
@@ -66,16 +72,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		{
 			var count = s.Entries.Count;
 			var b = new FaolanStream();
-			b.WriteUInt32((uint)s.HeadWords.Count);
-			foreach (var word in s.HeadWords)
-				b.WriteUInt32(word);
-
-			// [u32 firstRecordLen][u32 word2]. NOT protocol constants, despite being written as literals here: they
-			// are the same two words NpcSpawnPostIir reads, and an NPC carries 5 and 1/2/3 where a player carries 4
-			// and 2 (#475, SpawnPostIirGrammarTests). 4 is the length of the player's first record - the buff list's
-			// count word alone, which stays 4 whether the player has 0 or 3 buffs, since the records are that list's
-			// ELEMENTS. They are hardcoded because every captured player spawn carries exactly these two values.
-			b.WriteUInt32(4).WriteUInt32(2).WriteUInt32(Marker * ((uint)s.BuffRecords.Count + 1));
+			// The shared post-IIR header - the same three-word opening the NPC stream carries (SpawnPostIirHeader).
+			// The `4` is the length of the FIRST RECORD alone: the buff list's count word, which stays 4 whether the
+			// character has 0 or 3 buffs, because the buff records are that list's elements rather than more records.
+			var header = new SpawnPostIirHeader
+			{
+				FirstRecordLen = PlayerFirstRecordLen,
+				Word2 = PlayerWord2
+			};
+			header.HeadWords.AddRange(s.HeadWords);
+			b.WriteArray(header.ToArray()).WriteUInt32(Marker * ((uint)s.BuffRecords.Count + 1));
 			foreach (var buff in s.BuffRecords)
 			{
 				b.WriteUInt32(buff.SpellId).WriteUInt32(buff.Kind).WriteUInt32(buff.SourceHandle).WriteUInt32(buff.Stamp).WriteUInt32(buff.TimerTotal).WriteUInt32(buff.TimerRemaining)
@@ -173,20 +179,23 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		private static void ParsePostIir(byte[] b, int i, PlayerSpawnScaffold s)
 		{
-			// The post-IIR opens with a plain-counted list, then a constant 4. It was read as the constant pair [0][4]
-			// because the list is empty on all but 2 captured spawns - those carry [1][60][4]. Same mistake as the two
-			// count-FRAMED lists below, in the one spelling ListFrame does not cover: a bare count, not an n*0x3F1 word.
-			var headCount = U32(b, ref i);
-			if (headCount > 0x100)
-				throw new FormatException($"implausible post-IIR head count {headCount}");
+			// The shared header (SpawnPostIirHeader): a plain-counted head-word list, then firstRecordLen and word2.
+			// The head list read as the constant pair [0][4] for a long time because it is empty on all but a few
+			// captured spawns - those carry [1][60][4]. Same mistake as the two count-FRAMED lists below, in the one
+			// spelling ListFrame does not cover: a bare count, not an n*0x3F1 word.
+			//
+			// The two values are ASSERTED rather than carried because this codec only ever parses PLAYER spawns, and
+			// every captured one has 4 and 2. An NPC's 5 and 1/2/3 landing here means the body is not a player
+			// scaffold, which is exactly what the caller wants to be told.
+			if (SpawnPostIirHeader.Read(b, i) is not { } header)
+				throw new FormatException("post-IIR is too short to hold its header");
 
-			for (var n = 0; n < headCount; n++)
-				s.HeadWords.Add(U32(b, ref i));
-
-			if (U32(b, ref i) != 4)
-				throw new FormatException("post-IIR header mismatch");
-			if (U32(b, ref i) != 2)
-				throw new FormatException("post-IIR entry intro mismatch");
+			s.HeadWords.AddRange(header.HeadWords);
+			i += header.ByteCount;
+			if (header.FirstRecordLen != PlayerFirstRecordLen)
+				throw new FormatException($"post-IIR firstRecordLen {header.FirstRecordLen} is not the player's {PlayerFirstRecordLen}");
+			if (header.Word2 != PlayerWord2)
+				throw new FormatException($"post-IIR word2 {header.Word2} is not the player's {PlayerWord2}");
 
 			// The next field is 0x3F1 * (buffRecordCount + 1); each active buff/timer adds a 60-byte record.
 			var key = U32(b, ref i);
