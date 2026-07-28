@@ -70,6 +70,40 @@ def capture(name: str) -> str:
     return str(path)
 
 
+def iter_packets(pattern: str = "*.tshark.json", name_only: bool = False):
+    """Yield ``(capture_name, packet)`` across the corpus, ONE capture at a time.
+
+    The idiom every dissector here grew up with is::
+
+        for f in capture_files():
+            for p in json.load(open(f))["Packets"]:
+
+    which holds a whole capture's parsed JSON - the largest is 19 MB on disk and roughly 15x that as Python
+    objects - and, worse, invites accumulating parsed packets ACROSS captures. This drops each capture's tree
+    before opening the next, so peak memory is one capture regardless of how many you scan.
+
+    Set ``name_only`` to skip captures whose name you do not want without parsing them at all.
+
+    Yields the raw packet dict. Pull the few fields you need out of it and keep those - retaining the dict (or
+    its ``BodyHex``, a hex STRING at 2 chars per byte) across the whole corpus is what makes a scan expensive.
+    """
+    import json
+
+    for path in capture_files(pattern):
+        name = os.path.basename(path)
+        if name_only:
+            yield name, None
+            continue
+        try:
+            with open(path) as fh:
+                packets = json.load(fh)["Packets"]
+        except (OSError, ValueError, KeyError):
+            continue
+        for packet in packets:
+            yield name, packet
+        del packets  # drop this capture before the next one is opened
+
+
 def add_to_path() -> None:
     """Let sibling scripts `import captures` regardless of the caller's CWD."""
     here = str(Path(__file__).resolve().parent)

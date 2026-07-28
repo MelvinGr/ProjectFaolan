@@ -53,10 +53,24 @@ def load_index(rdb_dir):
 
 
 class Rdb:
+    """Random access into the RDB data files.
+
+    ⚠️ Reads the (offset, size) range and NOTHING else. This used to cache each touched `.rdbdata` file WHOLE -
+    `self._files[f] = open(...).read()` - which is a 1 GB allocation per file, never evicted, to serve lookups
+    that want a few hundred bytes. There are 28 of them, 28 GB in total, so a scan spanning the catalog OOMs a
+    32 GB box and no amount of RAM fixes it. Keep the file HANDLE, not the contents.
+    """
+
     def __init__(self, rdb_dir):
         self.dir = rdb_dir
         self.ent = load_index(rdb_dir)
-        self._files = {}
+        self._handles = {}
+
+    def _handle(self, f):
+        h = self._handles.get(f)
+        if h is None:
+            h = self._handles[f] = open(os.path.join(self.dir, f"{f:02d}.rdbdata"), "rb")
+        return h
 
     def body(self, rid):
         if rid not in self.ent:
@@ -64,9 +78,14 @@ class Rdb:
         f, off, size = self.ent[rid]
         if f == 0xFF:  # CDN-hosted, not local
             return None
-        if f not in self._files:
-            self._files[f] = open(os.path.join(self.dir, f"{f:02d}.rdbdata"), "rb").read()
-        return self._files[f][off:off + size]
+        h = self._handle(f)
+        h.seek(off)
+        return h.read(size)
+
+    def close(self):
+        for h in self._handles.values():
+            h.close()
+        self._handles.clear()
 
     def fields(self, rid):
         """The longest strictly-increasing [fieldId][value] run (fieldId in (0,2000]) - mirrors RdbSpellImporter."""
