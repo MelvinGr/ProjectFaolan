@@ -27,13 +27,18 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	//    NpcSpawnAppearanceCodec already parses. Same slot, different element; and the "single record" forms are
 	//    this shape with count == 0 rather than a form of their own.
 	//
-	//    | walks, 0 buffs | 10,773 |   | walks, 1 buff | 584 |
-	//    | walks, 2 buffs |     43 |   | unresolved    | 232 |
+	//    11,626 of 11,632 walk - 99.95%. The entry slot takes one of TWO element shapes and the walk tries both:
+	//    the NPC's variable-width morph records, or the PLAYER's [u32 entryTableX][f32 1.0] + 14-byte entries + ID
+	//    list. Whichever lands exactly on the stream's end is the answer; they cannot both.
 	//
-	//    The 60-byte records are the PLAYER scaffold's buff records: all 670 carry the same Kind and
-	//    EntityClass.Character, and their nine spell ids all resolve in our catalog (Stagger, Hearty Meal, Shrink,
-	//    Frozen Hatred, two necromancer pet summons, ...). So "runtime state" was right about the buffs and wrong
-	//    about the rest. Gate: NpcPostIirBodyTests. The unresolved 232 are what is genuinely left.
+	//    The 60-byte records are the PLAYER scaffold's buff records: all 941 carry the same Kind and
+	//    EntityClass.Character, and the nine that appear on NPCs all resolve in our catalog (Stagger, Hearty Meal,
+	//    Shrink, Frozen Hatred, two necromancer pet summons, ...). So "runtime state" was right about the buffs and
+	//    wrong about the rest. Gate: NpcPostIirBodyTests.
+	//
+	//    Of the six holdouts, ONE is a corrupt capture record (its ASCII is scrambled in 4-byte groups - a
+	//    mis-reassembled TCP segment). The other five are the cost of requiring a buff record to be RECOGNISABLE
+	//    rather than inferred from arithmetic, which is a cost worth paying.
 	//
 	// 2. The third header word DOES NOT COUNT RECORDS, which is what it used to be called. Streams of identical
 	//    length carry 1, 2 and 3 in it, so it cannot be counting anything that occupies bytes; it is a type-stable

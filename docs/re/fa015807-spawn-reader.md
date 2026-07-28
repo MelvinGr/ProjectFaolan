@@ -186,7 +186,7 @@ preview. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameG
 ### The record body, decoded (2026-07-28)
 
 The body between that header and the terminator was written up as *"session runtime state the simulation
-re-derives"*. **One walk consumes 11,399 of the 11,632 captured streams to their exact last byte:**
+re-derives"*. **One walk consumes 11,626 of the 11,632 captured streams to their exact last byte:**
 
 ```
 [shared header]                     SpawnPostIirHeader
@@ -206,21 +206,32 @@ of their own.
 
 | | streams |
 |---|---|
-| walks, no buff records | 10,773 |
-| walks, one buff record | 584 |
-| walks, two buff records | 43 |
-| **unresolved** | **232** |
+| walks to the exact last byte | **11,626** |
+| unresolved | **6** |
+
+**99.95%.** The entry slot takes one of TWO element shapes and the walk tries both: the NPC's variable-width
+morph records, or the PLAYER's `[u32 entryTableX][f32 1.0]` + 14-byte entries + ID list + tail refs. Whichever
+lands exactly on the stream's end is the answer — they cannot both, because each self-checks against the same
+fixed endpoint. That is what took this from 98% to 99.95%: the 232 that were "unresolved" were player spawns
+all along, and their `firstRecordLen`/`word2` of 4/2 said so.
+
+Of the six holdouts, **one is a corrupt capture record** rather than a wire shape — its ASCII is scrambled in
+4-byte groups (`uoY era ehtsohCuG`, `dilanregof t`) while other strings in the same body read cleanly, which is
+a mis-reassembled TCP segment. The other five are the price of requiring a buff record to be *recognisable*
+(`Kind` + `EntityClass.Character`) rather than inferred from arithmetic: without that guard the search finds
+runs of zero bytes that make the arithmetic work out and invents buff records with a zero target class. Five
+streams that do not walk beat five that walk for the wrong reason.
 
 [V3: NpcPostIirBodyTests.EveryNpcPostIirBody_WalksAsBuffsThenAnEntryTableThenThePlayersTail]
 
-**The 60-byte records are the player scaffold's buff records**, not an NPC-only shape. All 670 carry the same
+**The 60-byte records are the player scaffold's buff records**, not an NPC-only shape. All 941 carry the same
 `Kind` and `EntityClass.Character` as their target class, their timer pair orders correctly in every one, and
-their nine spell ids all resolve in our own catalog: *Stagger*, *Hearty Meal*, *Shrink*, *Ether Channel*,
+the nine that appear on NPCs all resolve in our own catalog: *Stagger*, *Hearty Meal*, *Shrink*, *Ether Channel*,
 *Runed Flesh (Rank 1/5)*, *Undead Minion: Mutilator*, *Deathless Acolyte: Arcanist*, *Frozen Hatred*. Two of
 those are necromancer PET summons and one is the Frozen Hatred proc — corroboration from a direction the walk
 knows nothing about (#307/#140).
 
-⚠️ Their `CasterLevel` runs **5..82**, and 82 is above the level cap. #438 identified this field as the
+⚠️ Their `CasterLevel` runs **0..82** (5..82 on the NPC records alone), and 82 is above the level cap. #438 identified this field as the
 caster's level by a separate route, but this corpus does not prove it IS the level — the gate pins the
 observed range rather than asserting 1..80.
 
