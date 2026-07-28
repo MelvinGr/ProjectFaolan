@@ -183,6 +183,32 @@ preview. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameG
 - `12 + firstRecordLen + 24` is the length only when all three pair lists are empty, i.e. the minimal forms. It
   is not a general identity — streams with populated pair lists are longer and still walk exactly.
 
+### The record body, censused (2026-07-28)
+
+The body between that header and the terminator was written up as *"session runtime state the simulation
+re-derives"*. Over all 11,632 captured streams, **95% of it is grammar this codebase already had**:
+
+```
+[header] [first record] [k x 60-byte ScaffoldBuff] [morph table] [20-byte terminator]
+```
+
+| shape | streams |
+|---|---|
+| single record, nothing after it | 3,875 |
+| a morph table — `NpcSpawnAppearanceCodec`'s grammar | 6,889 |
+| one `ScaffoldBuff`, then a morph table | 268 |
+| body still unresolved | 321 |
+| does not end in the standard terminator | 279 |
+
+The 60-byte records are **the PLAYER scaffold's buff records**, not an NPC-only shape: all 268 carry the same
+`Kind`, `EntityClass.Character` as their target class, and one spell id that resolves in our own catalog to
+**"Stagger"**. So the old note was right about the buffs and wrong about everything else.
+[V3: NpcPostIirBodyTests.EveryNpcPostIirBody_IsBuffRecordsThenAMorphTable]
+
+The 321 + 279 are what is genuinely left. Their signature: the unresolved ones read a plausible word where the
+morph count should be but never land on the terminator, and the 279 end in something other than the standard
+empty terminator (they concentrate in the two-client and Hoxxling gameplay captures).
+
 ## Typed scaffold codec — landed (2026-06-16, byte-exact)
 `NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan.Core.Network/Codecs/Spawn/NpcSpawnPreIir.cs`) decode the 223-byte
 count==0 scaffold into a typed, mutable struct (`Version`, 6 `Flags`, 53 `Words`, the raw `Sublist`) and
