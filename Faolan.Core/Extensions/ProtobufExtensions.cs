@@ -6,6 +6,11 @@ namespace Faolan.Core.Extensions
 {
 	public static class ProtobufExtensions
 	{
+		public static T FromProtobuf<T>(this Span<byte> data) where T : IExtensible
+		{
+			return Serializer.Deserialize<T>(data);
+		}
+
 		public static T FromProtobuf<T>(this ReadOnlySpan<byte> data) where T : IExtensible
 		{
 			return Serializer.Deserialize<T>(data);

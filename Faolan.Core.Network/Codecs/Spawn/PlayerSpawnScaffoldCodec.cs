@@ -146,12 +146,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (body[i] != 0x0A)
 				throw new FormatException("no vec3");
 
-			s.Position = body.AsSpan(i + 2, body[i + 1]).ToArray().FromProtobuf<ProtoVec3>();
+			s.Position = body.AsSpan(i + 2, body[i + 1]).FromProtobuf<ProtoVec3>();
 			i += 2 + body[i + 1];
 			if (body[i] != 0x12)
 				throw new FormatException("no quat");
 
-			s.Rotation = body.AsSpan(i + 2, body[i + 1]).ToArray().FromProtobuf<ProtoQuat>();
+			s.Rotation = body.AsSpan(i + 2, body[i + 1]).FromProtobuf<ProtoQuat>();
 			i += 2 + body[i + 1];
 			if (body[i] == 0x25)
 			{
