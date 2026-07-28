@@ -5,7 +5,7 @@ namespace Faolan.Core.Database.Tables
 {
 	// One saved FEAT SPEC (the retail multi-spec feature - the client ships Data/Gui/Default/Flash/MultiSpecsFeats.swf).
 	// A character's trained feats are not one flat list: the player spawn's pre-IIR scaffold carries a count-framed
-	// sublist of specs, each with its OWN name and its own trained-feat list (PlayerSpawnPreFrameSublistEntry).
+	// sublist of specs, each with its OWN name and its own trained-feat list (SpawnPreFrameSublistEntry).
 	// Six captured frames carry two or four named specs - "PvE - Lance" (23 feats), "PvP" (27), "PvP - Decap/Protection"
 	// (28), "PvP - Decap/Armor" (28), "Hybrid" (27), "Berserker: No Decap" (26); every other captured character carries
 	// exactly ONE spec with an EMPTY name, which is why the sublist read as a lead-in to a bare feat list for so long.

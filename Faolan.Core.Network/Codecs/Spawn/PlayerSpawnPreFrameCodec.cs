@@ -18,15 +18,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			foreach (var (isByte, isSublist) in NpcSpawnPreIir.Layout)
 			{
 				if (isSublist)
-				{
-					stream.WriteUInt32(ListFrame.ForCount(frame.Sublist.Count));
-					foreach (var entry in frame.Sublist)
-					{
-						stream.WriteUInt32(entry.Key).WriteByte(entry.Flag).WriteString(entry.Name).WriteUInt32(ListFrame.ForCount(entry.FeatIds.Count));
-						foreach (var id in entry.FeatIds)
-							stream.WriteUInt32(id);
-					}
-				}
+					SpawnPreFrameSublist.Write(stream, frame.Sublist);
 				else if (isByte)
 					stream.WriteByte(frame.Flags[bi++]);
 				else
@@ -56,7 +48,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			{
 				if (isSublist)
 				{
-					if (!TryReadSublist(frame, ref o, result))
+					if (!SpawnPreFrameSublist.TryRead(frame, ref o, result.Sublist))
 						return false;
 				}
 				else if (isByte)
@@ -82,45 +74,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			result.CoreCharVersion = frame[o];
 			result.CoreCharIirHeader = frame.ReadU32Be(o + 1);
 			parsed = result;
-			return true;
-		}
-
-		private static bool TryReadSublist(byte[] frame, ref int o, PlayerSpawnPreFrame result)
-		{
-			if (o + 4 > frame.Length || !ListFrame.TryCountOf(frame.ReadU32Be(o), out var count))
-				return false;
-
-			o += 4;
-			for (var e = 0; e < count; e++)
-			{
-				if (o + 4 + 1 + 2 > frame.Length)
-					return false;
-
-				var entry = new PlayerSpawnPreFrameSublistEntry
-				{
-					Key = frame.ReadU32Be(o),
-					Flag = frame[o + 4]
-				};
-				var nameLength = frame.ReadU16Be(o + 5);
-				o += 4 + 1 + 2;
-				if (o + nameLength + 4 > frame.Length)
-					return false;
-
-				entry.Name = Encoding.Latin1.GetString(frame, o, nameLength);
-				o += nameLength;
-				if (!ListFrame.TryCountOf(frame.ReadU32Be(o), out var ids))
-					return false;
-
-				o += 4;
-				if (o + 4 * (long)ids > frame.Length)
-					return false;
-
-				for (var k = 0; k < ids; k++, o += 4)
-					entry.FeatIds.Add(frame.ReadU32Be(o));
-
-				result.Sublist.Add(entry);
-			}
-
 			return true;
 		}
 	}

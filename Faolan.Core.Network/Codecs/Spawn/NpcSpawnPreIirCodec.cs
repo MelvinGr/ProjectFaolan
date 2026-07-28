@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Spawn
@@ -24,7 +25,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			foreach (var (isByte, isSublist) in NpcSpawnPreIir.Layout)
 			{
 				if (isSublist)
-					stream.WriteArray(scaffold.Sublist);
+					SpawnPreFrameSublist.Write(stream, scaffold.Sublist);
 				else if (isByte)
 					stream.WriteByte(scaffold.Flags[bi++]);
 				else
@@ -35,18 +36,25 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		// Decodes the pre-IIR scaffold from an FA015807 body. `offset` returns the scaffold's start (the version
-		// byte). Returns false if the body has no CharacterIIR, or the scaffold isn't the fixed count==0 form
-		// (wrong version byte / the walk doesn't land exactly on the embedded CoreCharacter).
+		// byte). Returns false if the body has no CharacterIIR, or the walk doesn't land exactly on the embedded
+		// CoreCharacter.
+		//
+		// ⚠️ The start is WALKED to, not computed. It used to be `coreCharOffset - FixedLength`, which assumes the
+		// scaffold's one variable-width field - the sublist - is empty. On the six captured spawns whose list has an
+		// entry that subtraction lands in the middle of a preceding field, so they were rejected outright. Walking
+		// the body's own header is the route PlayerSpawnScaffoldCodec already takes, and it does not care how wide
+		// the scaffold turns out to be.
 		public static bool TryDecode(byte[] body, [NotNullWhen(true)] out NpcSpawnPreIir? scaffold, out int offset)
 		{
 			scaffold = null;
 			offset = 0;
 			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 				return false;
+			if (!TryWalkToScaffold(body, out var start))
+				return false;
 
 			var coreCharOffset = read.Offset - CoreCharHeaderLength;
-			var start = coreCharOffset - NpcSpawnPreIir.FixedLength;
-			if (start < 0 || coreCharOffset > body.Length || body[start] != NpcSpawnPreIir.ExpectedVersion)
+			if (start >= coreCharOffset || coreCharOffset > body.Length || body[start] != NpcSpawnPreIir.ExpectedVersion)
 				return false;
 
 			var result = new NpcSpawnPreIir
@@ -60,11 +68,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			{
 				if (isSublist)
 				{
-					if (o + 4 > coreCharOffset || body.ReadU32Be(o) != ListFrame.Unit)
-						return false; // count>0 sublist - variable-width, out of scope
-
-					result.Sublist = body[o..(o + 4)];
-					o += 4;
+					if (!SpawnPreFrameSublist.TryRead(body, ref o, result.Sublist))
+						return false;
 				}
 				else if (isByte)
 					result.Flags[bi++] = body[o++];
@@ -76,11 +81,43 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			}
 
 			if (o != coreCharOffset)
-				return false; // didn't frame exactly up to the CoreCharacter - not the count==0 form
+				return false; // didn't frame exactly up to the CoreCharacter - so this walk was not the scaffold
 
 			scaffold = result;
 			offset = start;
 			return true;
+		}
+
+		// [u32 len][u32 subop][u32 ack][u32 handle][u32 fieldA][0x2C transform group][0x18 playfield varint], and
+		// then the scaffold. The same header PlayerSpawnScaffoldCodec walks; only the offset is wanted here.
+		private static bool TryWalkToScaffold(byte[] body, out int start)
+		{
+			start = 0;
+			if (body.Length < 24 || body.ReadU32Be(4) != (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR)
+				return false;
+
+			var i = 20;
+			if (body[i++] != 0x2C || body[i] != 0x0A)
+				return false;
+
+			i += 2 + body[i + 1];
+			if (i + 1 >= body.Length || body[i] != 0x12)
+				return false;
+
+			i += 2 + body[i + 1];
+			if (i >= body.Length)
+				return false;
+			if (body[i] == 0x25)
+				i += 5;
+			if (i >= body.Length || body[i++] != 0x18)
+				return false;
+
+			while (i < body.Length && (body[i++] & 0x80) != 0)
+			{
+			}
+
+			start = i;
+			return i < body.Length;
 		}
 	}
 }

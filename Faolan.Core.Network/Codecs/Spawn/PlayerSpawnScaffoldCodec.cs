@@ -38,7 +38,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 					payload.WriteByte(0x18).WriteVarint(s.Playfield)
 						.WriteArray(PlayerSpawnPreFrameCodec.Build(s.Frame))
-						.WriteProtobufByteLength(s.Character)
+						// A U32 length, not a byte one: the CharacterIIR is [u32 msgLen][protobuf], and every real
+						// character's message is longer than 255 bytes (Dikketest's is 382), so the byte-length
+						// helper throws on everything except a fixture small enough to hide it.
+						.WriteProtobufUInt32Length(s.Character)
 						.WriteArray(GeneratePostIir(s));
 				})
 				.ToArray();

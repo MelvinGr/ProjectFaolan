@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.Importer.Extractors
@@ -65,7 +64,7 @@ namespace Faolan.Importer.Extractors
 						if (byGoal.ContainsKey(g.GoalId))
 							continue;
 
-						var objective = CompletedQuestExtractor.ParseRecord(Encoding.Latin1.GetString(g.Objective));
+						var objective = CompletedQuestExtractor.ParseRecord(g.Objective);
 						if (objective == null)
 							continue;
 
@@ -83,7 +82,7 @@ namespace Faolan.Importer.Extractors
 							? g.Reserved[5]
 							: 0, g.Reserved.Length > 6
 							? g.Reserved[6]
-							: 0, g.RequiredCount, objective, CompletedQuestExtractor.ParseRecord(Encoding.Latin1.GetString(g.TextRecord)));
+							: 0, g.RequiredCount, objective, CompletedQuestExtractor.ParseRecord(g.TextRecord));
 					}
 				}
 			}

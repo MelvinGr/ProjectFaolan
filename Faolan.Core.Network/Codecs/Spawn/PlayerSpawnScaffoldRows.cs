@@ -236,7 +236,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// so an empty set is a broken character, not a shape to paper over. Synthesizing one here would let a
 		// character whose spec rows failed to load spawn with an EMPTY feat list, which renders as "you have trained
 		// nothing" and is indistinguishable from the real thing.
-		public static IReadOnlyList<PlayerSpawnPreFrameSublistEntry> SpecsOf(Character character)
+		public static IReadOnlyList<SpawnPreFrameSublistEntry> SpecsOf(Character character)
 		{
 			if (character?.FeatSpecs is not { Count: > 0 })
 				throw new InvalidOperationException($"character {character?.Id} has no CharacterFeatSpec rows - every character carries at least the one unnamed spec, so this row set is incomplete (was it loaded without Include(c => c.FeatSpecs)?).");
@@ -248,7 +248,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return specs
 				.Select(spec =>
 				{
-					var entry = new PlayerSpawnPreFrameSublistEntry
+					var entry = new SpawnPreFrameSublistEntry
 					{
 						Key = (uint)spec.Index,
 						Flag = (byte)spec.Index,
@@ -263,14 +263,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// The single-spec overload - the shape every fresh character and every shipped character has.
 		public static PlayerSpawnPreFrame FreshPreFrame(ConanClass @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
 		{
-			var entry = new PlayerSpawnPreFrameSublistEntry();
+			var entry = new SpawnPreFrameSublistEntry();
 			if (feats != null)
 				entry.FeatIds.AddRange(feats);
 
 			return FreshPreFrame(@class, vanityShownMask, [entry]);
 		}
 
-		public static PlayerSpawnPreFrame FreshPreFrame(ConanClass @class, uint vanityShownMask, IReadOnlyList<PlayerSpawnPreFrameSublistEntry> specs)
+		public static PlayerSpawnPreFrame FreshPreFrame(ConanClass @class, uint vanityShownMask, IReadOnlyList<SpawnPreFrameSublistEntry> specs)
 		{
 			var frame = new PlayerSpawnPreFrame();
 			frame.Flags[PlayerSpawnPreFrame.ArchetypeFlagIndex] = FrameArchetype(@class);

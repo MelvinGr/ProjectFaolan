@@ -11,8 +11,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public uint MapId { get; init; }
 		public uint QuestId { get; init; }
 		public uint SubId { get; init; } // a secondary text id (= the trailing record's id)
-		public byte[] Objective { get; init; } = []; // <remoteformat category=50304> ascii (u32-length-prefixed)
-		public byte[] TextRecord { get; init; } = []; // <remoteformat 51200>/<localized 51000> ascii (00 + u8 length)
+		// The two text records, u32- and u16-length-prefixed Latin1 (the wire's string encoding). They were held as
+		// byte[] while every producer built a string and called Latin1.GetBytes to hand them over.
+		public string Objective { get; init; } = ""; // <remoteformat category=50304>
+		public string TextRecord { get; init; } = ""; // <remoteformat 51200>/<localized 51000>
 		public uint GoalIdRepeat { get; init; }
 		public uint Instance { get; init; } // the live player's client instance (re-addressed)
 		public uint K { get; init; } // goal separator second word (9 / 12 in the template)
@@ -58,14 +60,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var zero1 = r.ReadUInt32();
 			var zero2 = r.ReadUInt32();
 
-			var objective = r.ReadArrayUInt32Length();
+			var objective = r.ReadStringUInt32Length();
 
 			// The trailing text record is a u16-length-prefixed string, NOT [0x00][u8 len]. Those are the same bytes
 			// below 256 - the "lead 0x00" is the length's high byte - and the longest captured record is 119 B, so the
 			// corpus could never tell them apart (#388). The CLIENT settles it: BinaryStream::ReadString
 			// (FUN_00cbf840 <- FUN_0048f840) reads a u16 in its default mode, and this record is read through that
 			// same primitive (FUN_00922c90 = u32 + 3x ReadString). The sibling QuestcRecord already read it as u16.
-			var text = r.ReadArrayUInt16Length();
+			var text = r.ReadString(); // u16 + Latin1
 
 			return new QuestObjectiveGoal
 			{
@@ -107,8 +109,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(MarkerY);
 			w.WriteUInt32(Unknown1);
 			w.WriteUInt32(Unknown2);
-			w.WriteArrayUInt32Length(Objective);
-			w.WriteArrayUInt16Length(TextRecord); // u16-framed - see Read (#388)
+			w.WriteStringUInt32Length(Objective);
+			w.WriteString(TextRecord); // u16-framed - see Read (#388)
 		}
 
 		// Builds one goal record from its MEANINGFUL fields, synthesizing the constants (Lead/One = 1, GoalIdRepeat =
@@ -122,7 +124,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// which is what the earlier note here claimed: quest 14615 carries [0,70099,810042964,0,0,70099,1415075403].
 		// Carried per goal like QuestcRecord's undecoded scalars; the tags being random is why they must be stored
 		// rather than derived (see the WTHD note in questc-region-decode).
-		public static QuestObjectiveGoal BuildSingle(uint instance, uint questId, uint goalId, uint n, uint k, uint subId, uint mapId, uint markerX, uint markerY, byte[] objective, byte[] textRecord,
+		public static QuestObjectiveGoal BuildSingle(uint instance, uint questId, uint goalId, uint n, uint k, uint subId, uint mapId, uint markerX, uint markerY, string objective, string textRecord,
 			uint extra5 = 0, uint extra6 = 0, uint requiredCount = 1, uint extra1 = 0, uint extra2 = 0, uint unknown1 = 0, uint extra0 = 0, uint extra3 = 0, uint extra4 = 0, uint goalIdEcho = 0,
 			uint unknown2 = 0)
 		{

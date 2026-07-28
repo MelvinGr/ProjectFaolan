@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
 using Xunit;
@@ -72,7 +71,7 @@ namespace Faolan.Tests
 			Assert.Equal(10238u, g1.QuestId);
 			Assert.Equal(1448u, g1.GoalId);
 			Assert.Equal((416u, 701u), (g1.MarkerX, g1.MarkerY)); // matches QuestDefinition's marker
-			Assert.Contains("category=\"50304\"", Encoding.Latin1.GetString(g1.Objective));
+			Assert.Contains("category=\"50304\"", g1.Objective);
 			Assert.All(g1.Reserved, w => Assert.Equal(0u, w));
 
 			Assert.Equal(1u, g1.RequiredCount); // beach objectives are "do 1" (the on-wire count, #47)
@@ -82,7 +81,7 @@ namespace Faolan.Tests
 			Assert.Equal(3490u, g2.GoalId);
 			Assert.Equal((521u, 757u), (g2.MarkerX, g2.MarkerY));
 			Assert.Equal(1u, g2.RequiredCount);
-			Assert.Contains("<localized", Encoding.Latin1.GetString(g2.TextRecord));
+			Assert.Contains("<localized", g2.TextRecord);
 		}
 
 		[Fact]
@@ -102,8 +101,8 @@ namespace Faolan.Tests
 			// The goal record's count field (the word after goalIdRepeat) is NOT a constant 1: values 1/3/4/8/12/64 are
 			// seen across captures (e.g. Hoxxling quest 14012 = 3, quest 13778 goal 6658 = 64), so it is the objective's
 			// required amount (#47). Prove a count > 1 survives BuildSingle -> Write -> Read.
-			var obj = Encoding.ASCII.GetBytes("<remoteformat id=\"6491\" category=\"50304\" key=\"x\" >");
-			var txt = Encoding.ASCII.GetBytes("<remoteformat id=\"1\" category=\"51200\" key=\"y\" >");
+			var obj = "<remoteformat id=\"6491\" category=\"50304\" key=\"x\" >";
+			var txt = "<remoteformat id=\"1\" category=\"51200\" key=\"y\" >";
 			var goal = QuestObjectiveGoal.BuildSingle(0x1234, 14012, 6491, 1, 12, 0, 4010, 0, 0, obj, txt, requiredCount: 3);
 			Assert.Equal(3u, goal.RequiredCount);
 

@@ -151,9 +151,10 @@ Implemented:
 world-entry and interest-streamed NPCs render the same ("ncs seem the same"), chat connects (the real load
 confirmation), zero stream errors. So the minimal scaffold was made the **default** (commit `48be35a`) and the
 `FAOLAN_MINIMAL_SCAFFOLD` / `FAOLAN_NPC_VERBATIM` env toggles + the dead `FAOLAN_BUILT_NPC_TEST` injector were
-removed — construct-don't-replay is now the only NPC spawn path. The per-spawn sub-list (`@1122b10`) entry
-sub-object grammar stays unobserved (`count==0` everywhere)
-but is irrelevant to the minimal build. The same reader primitives + `0x3F1` framing drove the dynel/loot readers
+removed — construct-don't-replay is now the only NPC spawn path. The per-spawn sub-list (`@1122b10`) is
+`count==0` on 11,394 of the 11,400 captured NPC spawns — but **not everywhere**, as this said: six carry one
+entry (all of one NPC, Viriden), and it is the same entry shape a player's frame carries, so its grammar is not
+unobserved at all — the player side decoded it in #466. Shared as `SpawnPreFrameSublist` since #475. The same reader primitives + `0x3F1` framing drove the dynel/loot readers
 (#187, done) — see `tools/ghidra/DumpIirReaders.java`.
 
 ## The NPC post-IIR and the PLAYER post-IIR are the SAME grammar (2026-07-28, #475)
@@ -261,12 +262,13 @@ that is **+258 morph rows across 7 spawns** — all Red Hand City Guards in Tort
 storing no appearance at all. [V3: NpcSpawnAppearanceTests.DecodeAppearanceLenient_WithAnActiveBuff_StillRecoversTheTable]
 
 ## Typed scaffold codec — landed (2026-06-16, byte-exact)
-`NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan.Core.Network/Codecs/Spawn/NpcSpawnPreIir.cs`) decode the 223-byte
-count==0 scaffold into a typed, mutable struct (`Version`, 6 `Flags`, 53 `Words`, the raw `Sublist`) and
-re-encode it **byte-exact**, anchored by `PlayerSpawnReader` (the embedded CoreCharacter `0x41` is a fixed
-9-byte header before the protobuf name; the scaffold is the fixed 223 bytes before it). The post-IIR header
-is likewise typed (`NpcSpawnPostIir`, in `NpcSpawnPostIir.cs`): `[u32 word0][u32 firstRecordLen][u32
-recordCount]` + raw records (the records are tick-derived session runtime state, kept raw). Round-trip gates:
+`NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan.Core.Network/Codecs/Spawn/NpcSpawnPreIir.cs`) decode the
+scaffold into a typed, mutable struct (`Version`, 6 `Flags`, 53 `Words`, the typed `Sublist`) and re-encode it
+**byte-exact**. The scaffold's start is WALKED to through the body's own header; it used to be computed as
+"the fixed 223 bytes before the embedded CoreCharacter", which assumes the sublist — the one variable-width
+field — is empty, and so rejected outright the six captured spawns where it is not
+(`SpawnPreIirSublistTests`). The post-IIR is likewise typed end to end (`NpcSpawnPostIir` +
+`SpawnPostIirCommon`), not a header over raw records. Round-trip gates:
 `NpcSpawnPreIirTests` (8 tests, both goldens). This makes the from-DB path own the grammar in code instead of
 slicing the captured `Data` blob — the foundation for sourcing the scaffold from DB / zeroing the buffer.
 

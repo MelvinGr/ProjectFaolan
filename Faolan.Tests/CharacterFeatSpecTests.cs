@@ -167,12 +167,12 @@ namespace Faolan.Tests
 			Assert.Equal(["", "PvP"], parsed.Sublist.Select(s => s.Name).ToArray());
 		}
 
-		private static IReadOnlyList<PlayerSpawnPreFrameSublistEntry> SpecEntries((string Name, uint[] Ids)[] specs)
+		private static IReadOnlyList<SpawnPreFrameSublistEntry> SpecEntries((string Name, uint[] Ids)[] specs)
 		{
 			return specs
 				.Select((s, index) =>
 				{
-					var entry = new PlayerSpawnPreFrameSublistEntry
+					var entry = new SpawnPreFrameSublistEntry
 					{
 						Key = (uint)index,
 						Flag = (byte)index,

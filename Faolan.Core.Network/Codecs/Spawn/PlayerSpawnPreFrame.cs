@@ -72,11 +72,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public uint CoreCharIirHeader { get; set; } = DefaultCoreCharIirHeader;
 
 		// The 6 single-byte scaffold fields, in wire order (read positions 0, 18, 19, 20, 25, 26).
-		public byte[] Flags { get; } = new byte[NpcSpawnPreIir.ByteCount];
+		public byte[] Flags { get; } = new byte[NpcSpawnPreIir.FlagCount];
 
-		// The count-framed sublist between the 32nd and 33rd scaffold field. Empty on the create-editor frame;
-		// exactly one entry on every normal login.
-		public List<PlayerSpawnPreFrameSublistEntry> Sublist { get; } = [];
+		// The count-framed sublist between the 32nd and 33rd scaffold field - the character's saved FEAT SPECS
+		// (SpawnPreFrameSublist, shared with the NPC scaffold, which runs the same client reader). Empty on the
+		// create-editor frame; exactly one entry on every normal login.
+		public List<SpawnPreFrameSublistEntry> Sublist { get; } = [];
 
 		// The 53 u32 scaffold fields, in wire order, big-endian as read off the wire.
 		public uint[] Words { get; } = new uint[NpcSpawnPreIir.WordCount];
@@ -88,27 +89,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// [u32 key][u8 flag][u16 len + name][count word][4 x feat id]. Derived rather than measured, so the six
 		// captured length variants (228/239/251/259/263/339) are a consequence of the grammar rather than a list to
 		// be matched against.
-		public int ByteCount => NpcSpawnPreIir.FixedLength + 5 + Sublist.Sum(e => 4 + 1 + 2 + e.Name.Length + 4 + 4 * e.FeatIds.Count);
+		public int ByteCount => NpcSpawnPreIir.FixedLength - 4 + SpawnPreFrameSublist.ByteCount(Sublist) + 5;
 
 		// The embedded CoreCharacterFullUpdateIIR's version byte, 'A'. The client rejects any other value.
 		public const byte CoreCharacterVersion = 0x41;
 	}
 
-	// One entry of the scaffold's count-framed sublist - a NAMED FEAT SPEC:
-	//
-	//   [u32 key][u8 flag][u16 len + Latin1 name][count-framed list of u32 feat ids]
-	//
-	// Every normal login carries exactly one entry with key 0, flag 0 and an EMPTY name - which is why the frame's
-	// bytes 119..121 read as "3 reserved zero bytes" and the whole entry read as a lead-in to a bare feat list.
-	// Three captured frames (NecroL80, a level-80 necromancer) carry two and four entries, and those are NAMED:
-	// "PvE - Lance" (23 feats), "PvP" (27), "PvP - Decap/Protection", "PvP - Decap/Armor", "Hybrid" - the
-	// character's saved feat specs, each with its own trained-feat list. Key and flag ascend with the entry index
-	// on those frames (0/0, 1/1, ...). The ids are in TRAIN order, not sorted.
-	public sealed class PlayerSpawnPreFrameSublistEntry
-	{
-		public List<uint> FeatIds { get; } = [];
-		public byte Flag { get; set; }
-		public uint Key { get; set; }
-		public string Name { get; set; } = "";
-	}
 }

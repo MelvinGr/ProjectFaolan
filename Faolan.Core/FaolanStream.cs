@@ -127,6 +127,11 @@ namespace Faolan.Core
 			return Encoding.Latin1.GetString(ReadArrayUInt16Length());
 		}
 
+		public string ReadStringUInt32Length()
+		{
+			return Encoding.Latin1.GetString(ReadArrayUInt32Length());
+		}
+
 		public string ReadStringByteLength()
 		{
 			return Encoding.Latin1.GetString(ReadArrayByteLength());
@@ -329,6 +334,11 @@ namespace Faolan.Core
 		public FaolanStream WriteString(string value)
 		{
 			return WriteArrayUInt16Length(Encoding.Latin1.GetBytes(value ?? ""));
+		}
+
+		public FaolanStream WriteStringUInt32Length(string value)
+		{
+			return WriteArrayUInt32Length(Encoding.Latin1.GetBytes(value ?? ""));
 		}
 
 		public FaolanStream WriteStringByteLength(string value)

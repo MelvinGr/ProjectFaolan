@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -129,10 +128,10 @@ namespace Faolan.Tests
 						            $"marker cap=({cg.MarkerX},{cg.MarkerY}) got=({bg.MarkerX},{bg.MarkerY})");
 						o.WriteLine($"      rest cap: lead={cg.Lead} rep={cg.GoalIdRepeat} inst={cg.Instance} z1={cg.Unknown1} z2={cg.Unknown2} res=[{string.Join(",", cg.Reserved)}]");
 						o.WriteLine($"      rest got: lead={bg.Lead} rep={bg.GoalIdRepeat} inst={bg.Instance} z1={bg.Unknown1} z2={bg.Unknown2} res=[{string.Join(",", bg.Reserved)}]");
-						if (!cg.Objective.SequenceEqual(bg.Objective))
-							o.WriteLine($"      OBJ cap={Encoding.Latin1.GetString(cg.Objective)}\n      OBJ got={Encoding.Latin1.GetString(bg.Objective)}");
-						if (!cg.TextRecord.SequenceEqual(bg.TextRecord))
-							o.WriteLine($"      TXT cap={Encoding.Latin1.GetString(cg.TextRecord)}\n      TXT got={Encoding.Latin1.GetString(bg.TextRecord)}");
+						if (cg.Objective != bg.Objective)
+							o.WriteLine($"      OBJ cap={cg.Objective}\n      OBJ got={bg.Objective}");
+						if (cg.TextRecord != bg.TextRecord)
+							o.WriteLine($"      TXT cap={cg.TextRecord}\n      TXT got={bg.TextRecord}");
 					}
 				}
 			}
@@ -147,7 +146,7 @@ namespace Faolan.Tests
 
 				foreach (var g2 in o2.Goals)
 				{
-					var txt = Encoding.Latin1.GetString(g2.TextRecord);
+					var txt = g2.TextRecord;
 					var cur = spell.GetValueOrDefault(g2.GoalId);
 					spell[g2.GoalId] = txt.Contains("<localized")
 						? (cur.Localized + 1, cur.Remote)
@@ -171,7 +170,7 @@ namespace Faolan.Tests
 
 				foreach (var g3 in o3.Goals)
 				{
-					var sig = $"{g3.Unknown1}|{g3.Unknown2}|{string.Join(",", g3.Reserved)}|{Encoding.Latin1.GetString(g3.TextRecord)}";
+					var sig = $"{g3.Unknown1}|{g3.Unknown2}|{string.Join(",", g3.Reserved)}|{g3.TextRecord}";
 					(tagVals.TryGetValue(g3.GoalId, out var set)
 						? set
 						: tagVals[g3.GoalId] = []).Add(sig);

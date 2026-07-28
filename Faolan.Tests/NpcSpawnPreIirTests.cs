@@ -72,8 +72,11 @@ namespace Faolan.Tests
 			Assert.True(NpcSpawnPreIirCodec.TryDecode(body, out var scaffold, out _));
 
 			Assert.Equal(NpcSpawnPreIir.WordCount, scaffold.Words.Length);
-			Assert.Equal(NpcSpawnPreIir.ByteCount, scaffold.Flags.Length);
-			Assert.Equal(new byte[] { 0x00, 0x00, 0x03, 0xF1 }, scaffold.Sublist); // count==0 framing word
+			Assert.Equal(NpcSpawnPreIir.FlagCount, scaffold.Flags.Length);
+			// The sublist is EMPTY on these two - which is what the four bytes 00 00 03 F1 used to be asserted as, a
+			// "count==0 framing word" written down as a constant. It is ForCount(0), and six captured spawns carry an
+			// entry in it (SpawnPreIirSublistTests).
+			Assert.Empty(scaffold.Sublist);
 		}
 
 		// The pre-IIR scaffold CAN carry the NPC's RDB script-binding diagnostic string (the script-bound PvP

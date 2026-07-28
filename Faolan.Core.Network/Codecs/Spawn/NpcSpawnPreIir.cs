@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 
 namespace Faolan.Core.Network.Codecs.Spawn
@@ -14,12 +15,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// instance handles - the only stale reference in an NPC spawn is the playfield token in the transform
 	// (SpawnPlayfieldRewriter), which is why a carried-over scaffold re-addresses cleanly once the token is fixed.
 	//
-	// This is the count==0 form (the per-spawn sublist is empty on every observed beach/login NPC); a count>0
-	// sublist is variable-width and out of scope here (NpcSpawnPreIirCodec.TryDecode returns false on it).
+	// The per-spawn sublist is EMPTY on 11,394 of the 11,400 captured NPC spawns, which is why it was held here as
+	// the raw 4-byte `0x3F1` framing word and why the codec used to REJECT any spawn whose list was not empty. Six
+	// captured spawns (all of one NPC, Viriden) carry a one-entry list - the same key-0/flag-0/unnamed entry a fresh
+	// player carries - and those six could not be decoded at all. It is the same list the player frame models, so it
+	// is typed and shared now: SpawnPreFrameSublist.
 	public sealed class NpcSpawnPreIir
 	{
 		public const byte ExpectedVersion = 0x05;
-		public const int ByteCount = 6;
+		// How many of the scaffold's fields are single BYTES (the other 53 are u32). Named for what it counts:
+		// it used to be `ByteCount`, which reads as a width and collided with the scaffold's actual width.
+		public const int FlagCount = 6;
 
 		// The wire index of the one word that is reliably non-zero on a freshly-spawned NPC. The cross-capture
 		// sweep (tools/capture/classify_fa015807_fields.py over 5026 scaffolds) showed every other word is per-instance
@@ -27,9 +33,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// the most-minimal captured scaffolds carry exactly ONE non-zero word here. Its struct offset is 0x1fc.
 		public const int CategoryWordIndex = 17;
 
-		// Total scaffold size on the wire for the count==0 form: u8 version + 6 u8 + 53 u32 + the 4-byte sublist
-		// framing word (0x3F1). 1 + 6 + 53*4 + 4 = 223.
-		public const int FixedLength = 1 + ByteCount + WordCount * 4 + 4;
+		// Scaffold size on the wire for the EMPTY-sublist form: u8 version + 6 u8 + 53 u32 + the sublist's own
+		// framing word. 1 + 6 + 53*4 + 4 = 223. A scaffold whose sublist has entries is wider - use ByteCount.
+		public const int FixedLength = 1 + FlagCount + WordCount * 4 + 4;
 		public const int WordCount = 53;
 
 		// The modal value of the category word across the corpus (111 = 0x6f, ~49% of all NPCs; it is a 5-state
@@ -66,18 +72,21 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// The C++ struct offset each of the 53 u32 is stored to, in WIRE order. Only used to reassemble the
 		// script-binding char buffer (DecodeScriptText); irrelevant to byte-exact wire round-trip.
 
-		// The wire read order (after the version byte): true == u8 field, false == u32 field. The single sublist
-		// is held out of this table (it sits between the 32nd and 33rd entry) and serialized as raw bytes.
+		// The wire read order (after the version byte): true == u8 field, false == u32 field. The single sublist is
+		// held out of this table - it sits between the 32nd and 33rd entry and is variable-width.
 
 		// version byte (0x05; client rejects any other value).
 		public byte Version { get; set; } = ExpectedVersion;
 
 		// The 6 single-byte fields, in wire order (read positions 0, 18, 19, 20, 25, 26).
-		public byte[] Flags { get; set; } = new byte[ByteCount];
+		public byte[] Flags { get; set; } = new byte[FlagCount];
 
-		// The per-spawn sublist, raw. count==0 (the only observed form) is the bare 0x3F1 framing word.
-		// ListFrame.Empty (the (0+1)*0x3F1 word) as bytes - an empty count-framed list, not a magic constant.
-		public byte[] Sublist { get; set; } = [0x00, 0x00, 0x03, 0xF1];
+		// The per-spawn sublist, shared with the player frame (SpawnPreFrameSublist). Empty on all but six captured
+		// spawns, which is exactly why it used to be four bytes of "the 0x3F1 constant".
+		public List<SpawnPreFrameSublistEntry> Sublist { get; } = [];
+
+		// The scaffold's width on the wire: the fixed grid plus whatever the sublist costs.
+		public int ByteCount => FixedLength - 4 + SpawnPreFrameSublist.ByteCount(Sublist);
 
 		// The 53 u32 fields, in wire order, each held as the big-endian value read off the wire (the value the
 		// client byteswaps into its struct). Re-emitted big-endian, so the round-trip is byte-exact regardless of
@@ -155,7 +164,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		private static (bool, bool)[] BuildLayout()
 		{
-			var layout = new (bool, bool)[ByteCount + WordCount + 1]; // 6 u8 + 53 u32 + 1 sublist = 60 entries
+			var layout = new (bool, bool)[FlagCount + WordCount + 1]; // 6 u8 + 53 u32 + 1 sublist = 60 entries
 			var k = 0;
 			foreach (var isByte in IsByteField)
 				layout[k++] = (isByte, false);
