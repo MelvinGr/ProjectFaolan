@@ -78,7 +78,12 @@ namespace Faolan.Tests
 				Assert.Equal(0x01316D2Bu, character.Id); // the ORIGINAL retail id (the spawn handle)
 				Assert.Equal(7u, character.AccountId);
 				Assert.Equal(Sex.Female, character.Sex); // dikketest: editor ChangeSex 6 -> wire 3 = female
-				Assert.Equal(Race.Aquilonian, character.Race);
+				// Race 1. This assertion used to read Aquilonian and was written from the enum, which had 1 and 2 the
+				// wrong way round (#469). It is now the PROOF that they were: Dikketest's captured head mesh 1142847
+				// occurs in exactly one appearance list - the female heads under CHARACTERCREATOR's <cimmerian>
+				// element - and her captured race byte is 1. That ties wire race 1 to Cimmerian without going through
+				// the enum at all.
+				Assert.Equal(Race.Cimmerian, character.Race);
 				Assert.Equal(18u, (uint)character.Class); // the pre-frame island's low byte @135/136
 				Assert.Equal(4000u, character.MapId);
 				// RealmId is required; the importer find-or-creates the server's realm (none seeded here).

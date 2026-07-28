@@ -126,10 +126,12 @@ record 0 the shipped one. Undecided which the client actually uses. [V0]
 
   The sets we hand-authored are right; the ids the enum attaches to them are not. `Race.Aquilonian` should be 2
   and `Race.Cimmerian` 1.
-- We hold no race-1 or race-2 CHARACTER, so no capture observes it directly — every shipped character is race 3.
-  The evidence is two independent class-set matches, which is strong but is still not a sighting. Flipping the
-  enum changes a value that goes on the wire and drives the client's body model, so it wants a deliberate call
-  (and, ideally, one created character of each).
+- **A captured character confirms it, so this is settled and the enum has been flipped.** `Dikketest`
+  (`Dikketest_rogue-barbarian_create`) is female, carries head mesh **1142847** and race byte **1** — and that
+  head occurs in exactly one appearance list, the female heads under CHARACTERCREATOR's `<cimmerian>` element.
+  That ties wire race 1 to Cimmerian without going through our enum at all. `CaptureCharacterImporterTests`
+  asserted `Aquilonian` here purely because the expectation had been written from the enum; it is now the gate on
+  the corrected value.
 - **Race `10` is a fourth race we do not model at all** — Khitan, by its class set (Rise of the Godslayer).
 
 ## Decoded: the two GUILD tables (1000517 / 1000518)

@@ -8,15 +8,19 @@ namespace Faolan.Core.Enums
 	// four races, ids 1, 2, 3 and 10, with 10's class set - Herald of Xotli, Demonologist, Necromancer, Bear Shaman,
 	// Guardian, Ranger, Assassin, Dark Templar - being the Khitan one from Rise of the Godslayer.
 	//
-	// ⚠️ 1 and 2 may be SWAPPED here. In 1000507 race 1 has Barbarian and Bear Shaman and no Mage archetype at all
-	// (the Cimmerian profile) while race 2 has Mage and Priest of Mitra (the Aquilonian one) - the opposite of the
-	// names below. Race 3 = Stygian IS confirmed both ways (the table's class set, and all four shipped characters
-	// are race 3 carrying classes it allows). We hold no race-1 or race-2 character, so nothing in our own data
-	// settles it; left as-is deliberately rather than flipped on a reading of class sets alone.
+	// ⚠️ Aquilonian and Cimmerian were the other way round until 2026-07-28. A CAPTURED character settles it:
+	// Dikketest (Dikketest_rogue-barbarian_create) is female, carries head mesh 1142847 and race byte 1, and that
+	// head occurs in exactly ONE appearance list - the female heads under CHARACTERCREATOR's <cimmerian> element.
+	// Wire race 1 is Cimmerian, established without reference to this enum.
+	//
+	// Two readings of RDB 1000507 agree and are what prompted the check. In that table race 1 carries Barbarian and Bear Shaman and NO Mage archetype at all -
+	// the Cimmerian profile - while race 2 carries Mage and Priest of Mitra, the Aquilonian one. And matching the
+	// class SETS in StartingData.RaceArchClassCombinations against it, ignoring the names entirely, puts what we had
+	// labelled Aquilonian at race 2 and Cimmerian at race 1. Race 3 = Stygian was right and is confirmed both ways.
 	public enum Race : byte
 	{
-		Aquilonian = 1,
-		Cimmerian = 2,
+		Cimmerian = 1,
+		Aquilonian = 2,
 		Stygian = 3,
 
 		// Rise of the Godslayer. No shipped character uses it yet; the enum carries it so the CHECK admits one.

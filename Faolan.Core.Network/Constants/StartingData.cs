@@ -21,15 +21,35 @@ namespace Faolan.Core.Network.Constants
 		// Universal: the Slave Manacles worn on the wrist (slot 0x12) by every fresh beach character.
 		public const uint StartingWristItem = 3361557; // Slave Manacles
 
+		// Which classes each race may create, straight from the client's own RDB 1000507 race x class table (record 0,
+		// the shipped set - see docs/rdb/client-data-tables.md). It replaces a hand-authored list that was close but
+		// not complete: it was missing Assassin for Cimmerians, Necromancer for Aquilonians, Dark Templar for
+		// Stygians, and the whole Khitan race.
+		//
+		// The ARCHETYPE is not in 1000507 - that table is (race, class) pairs and lists the five archetypes as
+		// entries of their own rather than as parents - so the class -> archetype mapping below is ours, unchanged
+		// from the previous list.
 		public static readonly ImmutableArray<(Race race, ArchType archType, ConanClass clas)> RaceArchClassCombinations =
 		[
-			(Race.Aquilonian, ArchType.Priest, ConanClass.PriestOfMitra), (Race.Aquilonian, ArchType.Soldier, ConanClass.Conqueror), (Race.Aquilonian, ArchType.Soldier, ConanClass.DarkTemplar),
-			(Race.Aquilonian, ArchType.Soldier, ConanClass.Guardian), (Race.Aquilonian, ArchType.Rogue, ConanClass.Barbarian), (Race.Aquilonian, ArchType.Rogue, ConanClass.Ranger),
-			(Race.Aquilonian, ArchType.Rogue, ConanClass.Assassin), (Race.Cimmerian, ArchType.Priest, ConanClass.BearShaman), (Race.Cimmerian, ArchType.Soldier, ConanClass.Conqueror),
-			(Race.Cimmerian, ArchType.Soldier, ConanClass.DarkTemplar), (Race.Cimmerian, ArchType.Soldier, ConanClass.Guardian), (Race.Cimmerian, ArchType.Rogue, ConanClass.Barbarian),
-			(Race.Cimmerian, ArchType.Rogue, ConanClass.Ranger), (Race.Stygian, ArchType.Priest, ConanClass.TempestOfSet), (Race.Stygian, ArchType.Rogue, ConanClass.Ranger),
+			// Cimmerian - no Mage archetype at all, which is what identified this race as 1 rather than 2.
+			(Race.Cimmerian, ArchType.Soldier, ConanClass.Guardian), (Race.Cimmerian, ArchType.Soldier, ConanClass.Conqueror), (Race.Cimmerian, ArchType.Soldier, ConanClass.DarkTemplar),
+			(Race.Cimmerian, ArchType.Priest, ConanClass.BearShaman), (Race.Cimmerian, ArchType.Rogue, ConanClass.Barbarian), (Race.Cimmerian, ArchType.Rogue, ConanClass.Ranger),
+			(Race.Cimmerian, ArchType.Rogue, ConanClass.Assassin),
+
+			// Aquilonian
+			(Race.Aquilonian, ArchType.Soldier, ConanClass.Guardian), (Race.Aquilonian, ArchType.Soldier, ConanClass.Conqueror), (Race.Aquilonian, ArchType.Soldier, ConanClass.DarkTemplar),
+			(Race.Aquilonian, ArchType.Priest, ConanClass.PriestOfMitra), (Race.Aquilonian, ArchType.Rogue, ConanClass.Barbarian), (Race.Aquilonian, ArchType.Rogue, ConanClass.Ranger),
+			(Race.Aquilonian, ArchType.Rogue, ConanClass.Assassin), (Race.Aquilonian, ArchType.Mage, ConanClass.Necromancer),
+
+			// Stygian - the only race with no Soldier archetype entry in 1000507, yet it does get Dark Templar.
+			(Race.Stygian, ArchType.Soldier, ConanClass.DarkTemplar), (Race.Stygian, ArchType.Priest, ConanClass.TempestOfSet), (Race.Stygian, ArchType.Rogue, ConanClass.Ranger),
 			(Race.Stygian, ArchType.Rogue, ConanClass.Assassin), (Race.Stygian, ArchType.Mage, ConanClass.HeraldOfXotli), (Race.Stygian, ArchType.Mage, ConanClass.Demonologist),
-			(Race.Stygian, ArchType.Mage, ConanClass.Necromancer)
+			(Race.Stygian, ArchType.Mage, ConanClass.Necromancer),
+
+			// Khitan (Rise of the Godslayer) - no Barbarian, no Conqueror, no Priest of Mitra, no Tempest of Set.
+			(Race.Khitan, ArchType.Soldier, ConanClass.Guardian), (Race.Khitan, ArchType.Soldier, ConanClass.DarkTemplar), (Race.Khitan, ArchType.Priest, ConanClass.BearShaman),
+			(Race.Khitan, ArchType.Rogue, ConanClass.Ranger), (Race.Khitan, ArchType.Rogue, ConanClass.Assassin), (Race.Khitan, ArchType.Mage, ConanClass.HeraldOfXotli),
+			(Race.Khitan, ArchType.Mage, ConanClass.Demonologist), (Race.Khitan, ArchType.Mage, ConanClass.Necromancer)
 		];
 
 		// Female (Sex 1): a gown (chest) + matching bottom (legs). Retail randomises the garment COLOUR per
