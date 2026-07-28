@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Constants;
 using Xunit;
 
 namespace Faolan.Tests
@@ -63,7 +64,21 @@ namespace Faolan.Tests
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnHoxxlingBuffed"), out var s, out _));
 
 			Assert.Equal(2, s.BuffRecords.Count);
-			Assert.All(s.BuffRecords, r => Assert.Equal(60, r.Length));
+
+			// The record is decoded now, not a 60-byte blob (#475): each carries a real spell id, the standard
+			// [EntityClass.Character][handle] reference to the character it is running on, and a timer pair whose
+			// remaining half never exceeds its total.
+			Assert.All(s.BuffRecords, r =>
+			{
+				Assert.NotEqual(0u, r.SpellId);
+				Assert.Equal(ScaffoldBuff.DefaultKind, r.Kind);
+				Assert.Equal(EntityClass.Character, r.TargetClass);
+				Assert.Equal(s.Handle, r.TargetHandle);
+				Assert.InRange(r.CasterLevel, 1u, 80u);
+				Assert.True(r.TimerRemaining <= r.TimerTotal, "the remaining timer must not exceed the total");
+				Assert.All(r.Trailer, word => Assert.Equal(0u, word));
+			});
+
 			Assert.Equal(35, s.Entries.Count);
 		}
 

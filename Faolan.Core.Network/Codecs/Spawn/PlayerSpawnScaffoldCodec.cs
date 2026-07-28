@@ -14,7 +14,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
-		private const int BuffRecordSize = 60;
 
 		public static byte[] Generate(PlayerSpawnScaffold s)
 		{
@@ -72,8 +71,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				b.WriteUInt32(word);
 
 			b.WriteUInt32(4).WriteUInt32(2).WriteUInt32(Marker * ((uint)s.BuffRecords.Count + 1));
-			foreach (var rec in s.BuffRecords)
-				b.WriteArray(rec);
+			foreach (var buff in s.BuffRecords)
+			{
+				b.WriteUInt32(buff.SpellId).WriteUInt32(buff.Kind).WriteUInt32(buff.SourceHandle).WriteUInt32(buff.Stamp).WriteUInt32(buff.TimerTotal).WriteUInt32(buff.TimerRemaining)
+					.WriteUInt32(buff.Word6).WriteUInt32(buff.CasterLevel).WriteUInt32(buff.TargetClass).WriteUInt32(buff.TargetHandle);
+				foreach (var word in buff.Trailer)
+					b.WriteUInt32(word);
+			}
 
 			b.WriteUInt32(count).WriteUInt32(s.EntryTableX);
 			if (count > 0)
@@ -190,11 +194,26 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// that was doing the real work all along.
 			for (var n = key / Marker - 1; n > 0; n--)
 			{
-				if (i + BuffRecordSize > b.Length)
+				if (i + ScaffoldBuff.ByteCount > b.Length)
 					throw new FormatException($"buff record {n} runs past the body");
 
-				s.BuffRecords.Add(b.AsSpan(i, BuffRecordSize).ToArray());
-				i += BuffRecordSize;
+				var buff = new ScaffoldBuff
+				{
+					SpellId = U32(b, ref i),
+					Kind = U32(b, ref i),
+					SourceHandle = U32(b, ref i),
+					Stamp = U32(b, ref i),
+					TimerTotal = U32(b, ref i),
+					TimerRemaining = U32(b, ref i),
+					Word6 = U32(b, ref i),
+					CasterLevel = U32(b, ref i),
+					TargetClass = U32(b, ref i),
+					TargetHandle = U32(b, ref i)
+				};
+				for (var w = 0; w < ScaffoldBuff.TrailerWords; w++)
+					buff.Trailer[w] = U32(b, ref i);
+
+				s.BuffRecords.Add(buff);
 			}
 
 			var count = U32(b, ref i);

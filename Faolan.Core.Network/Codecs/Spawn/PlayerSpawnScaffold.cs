@@ -31,9 +31,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// spawns (which carry a single word, 60), which is why the pair read as the constant [0][4] for so long.
 		public List<uint> HeadWords { get; } = [];
 
-		// Post-IIR stream. Buff/timer records are 60-byte transient state (only on captured chars with active
-		// buffs); the entry table / ID list / end pairs are the per-character skill+feat scaffold.
-		public List<byte[]> BuffRecords { get; } = [];
+		// The character's ACTIVE BUFFS - transient session state, present only on a captured character that had one
+		// running. Decoded (#475); see ScaffoldBuff.
+		public List<ScaffoldBuff> BuffRecords { get; } = [];
 
 		// The embedded ProtoCoreCharacterIIR bytes (typed round-trip via FromProtobuf/ToProtobufBytes is
 		// byte-identical; see PlayerSpawnGenerationTests).
@@ -100,4 +100,50 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 	// One 8-byte ending pair [u32 id][s32 value] (ids are decades 10..110).
 	public readonly record struct ScaffoldPair(uint Id, int Value);
+
+	// One 60-byte ACTIVE BUFF record in the post-IIR stream, count-framed. Fifteen u32, decoded over all 95 captured
+	// records (Gitea #475) - it was carried as an opaque byte[] described only as "buff/timer state".
+	//
+	// What the corpus establishes, and what it does not:
+	//   SpellId       w0  - THE find: 35 of its 36 distinct values are rows in our own Spells catalog, and they read
+	//                       as a buff bar - "Hearty Meal", "Focused Mind", "Refresh Strength", "Death Penalty 1",
+	//                       "Spirit of the Bear (Rank 1)". That is what identifies the record.
+	//   Kind          w1  - ListFrame.ForCount(1) on all 95. ⚠️ Whether that is a CONSTANT or a real one-element
+	//                       list count cannot be decided from this corpus: the value never varies, so the record's
+	//                       fixed 60-byte width is equally consistent with "a constant" and with "a one-element list
+	//                       whose element is the remaining 52 bytes". That is the 0x7E2 trap's exact signature, so it
+	//                       is written as ForCount(1) rather than as a magic number, and CARRIED per record - a
+	//                       capture with a count of 2 then round-trips and shows up, instead of being rejected.
+	//   SourceHandle  w2  - 0 on 94; the one exception carries a value in the same 0x131xxxx range as TargetHandle,
+	//                       so it reads as an entity reference that is simply absent for a self-applied buff.
+	//   Stamp         w3  - 37 distinct large values (874724..98289218), unrelated to the timer pair. Unknown.
+	//   TimerTotal    w4  } TimerRemaining <= TimerTotal on ALL 95 records, which is what makes them a PAIR rather
+	//   TimerRemaining w5 } than two independent numbers. Their unit is not pinned; only the ordering is evidence.
+	//   CasterLevel   w7  - 1..80 exactly, the game's level range. #438 independently found the caster's LEVEL in the
+	//                       MagicBuff payload, which is the same quantity arriving by another route.
+	//   TargetClass   w8  - EntityClass.Character (0xC350) on all 95, and
+	//   TargetHandle  w9  - the spawning character's own handle on 94 of 95: the standard [class][handle] entity
+	//                       reference, i.e. who the buff is ON.
+	//   Word6, Trailer    - zero on every record. Carried rather than asserted, so a non-zero one round-trips
+	//                       instead of being silently dropped.
+	public sealed class ScaffoldBuff
+	{
+		public const int ByteCount = 60;
+		public const int TrailerWords = 5;
+
+		// See the Kind note above: ForCount(1) on every captured record, and not provably a constant.
+		public static readonly uint DefaultKind = ListFrame.ForCount(1);
+
+		public uint SpellId { get; set; }
+		public uint Kind { get; set; } = DefaultKind;
+		public uint SourceHandle { get; set; }
+		public uint Stamp { get; set; }
+		public uint TimerTotal { get; set; }
+		public uint TimerRemaining { get; set; }
+		public uint Word6 { get; set; }
+		public uint CasterLevel { get; set; }
+		public uint TargetClass { get; set; } = EntityClass.Character;
+		public uint TargetHandle { get; set; }
+		public uint[] Trailer { get; set; } = new uint[TrailerWords];
+	}
 }
