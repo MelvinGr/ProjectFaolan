@@ -18,22 +18,22 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	//    they were modelled as different formats.
 	//
 	// 3. THE BODY IS NOT RUNTIME NOISE. It was documented as "session runtime state the simulation re-derives".
-	//    Walked over all 11,632 captured streams, 95% of it is made of two things this codebase ALREADY decodes:
+	//    ONE walk consumes 11,399 of the 11,632 captured streams to their exact last byte:
 	//
-	//        [header] [first record] [k x 60-byte ScaffoldBuff] [morph table] [20-byte terminator]
+	//        [header][first record][k x 60-byte ScaffoldBuff][u32 count][count x morph entry][player tail]
 	//
-	//    | shape | streams |
-	//    |---|---|
-	//    | single record, nothing after it | 3,875 |
-	//    | a morph table (NpcSpawnAppearanceCodec's grammar) | 6,889 |
-	//    | one ScaffoldBuff then a morph table | 268 |
-	//    | body still unresolved | 321 |
-	//    | does not end in the standard terminator | 279 |
+	//    Everything from the entry table down is the PLAYER's own tail. The single genuine difference is the ENTRY
+	//    shape - a player's entries are 14 bytes, an NPC's are the variable-width morph records
+	//    NpcSpawnAppearanceCodec already parses. Same slot, different element; and the "single record" forms are
+	//    this shape with count == 0 rather than a form of their own.
 	//
-	//    The 60-byte records are the PLAYER scaffold's buff records, not an NPC-only shape: all 268 carry the same
-	//    Kind, EntityClass.Character as their target class, and a single spell id that resolves in our own catalog
-	//    to "Stagger". So "runtime state" was right about the buffs and wrong about the rest.
-	//    Gate: NpcPostIirBodyTests. The 321 + 279 are what is genuinely left.
+	//    | walks, 0 buffs | 10,773 |   | walks, 1 buff | 584 |
+	//    | walks, 2 buffs |     43 |   | unresolved    | 232 |
+	//
+	//    The 60-byte records are the PLAYER scaffold's buff records: all 670 carry the same Kind and
+	//    EntityClass.Character, and their nine spell ids all resolve in our catalog (Stagger, Hearty Meal, Shrink,
+	//    Frozen Hatred, two necromancer pet summons, ...). So "runtime state" was right about the buffs and wrong
+	//    about the rest. Gate: NpcPostIirBodyTests. The unresolved 232 are what is genuinely left.
 	//
 	// 2. The third header word DOES NOT COUNT RECORDS, which is what it used to be called. Streams of identical
 	//    length carry 1, 2 and 3 in it, so it cannot be counting anything that occupies bytes; it is a type-stable

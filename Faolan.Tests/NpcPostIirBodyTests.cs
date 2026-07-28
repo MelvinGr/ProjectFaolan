@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
@@ -12,21 +13,24 @@ namespace Faolan.Tests
 	// What the NPC post-IIR's record BODY actually contains (Gitea #475).
 	//
 	// It was carried as an opaque `byte[] Records` described as "session runtime state the simulation re-derives".
-	// Walked over the whole corpus, it is almost entirely made of two things this codebase ALREADY decodes and had
-	// simply never connected to this stream:
+	// One walk consumes 11,399 of the 11,632 captured streams to their EXACT last byte:
 	//
-	//   [shared header] [first record] [k x 60-byte ScaffoldBuff] [morph table] [20-byte terminator]
+	//   [shared header]                          SpawnPostIirHeader
+	//   [first record - firstRecordLen bytes]
+	//   [k x 60-byte ScaffoldBuff]               the PLAYER scaffold's buff record, on NPCs too
+	//   [u32 count][count x morph entry]         the entry-table slot; an NPC's entries are morph entries
+	//   [u32][u32]                               the pair the player codec reads as its ID-list close
+	//   [u32 c1][c1 x 8] [u32 c2][c2 x 8]        two PLAIN-counted pair lists
+	//   [u32 ListFrame][n x 8]                   the count-framed third
 	//
-	// The buff records are the same 60-byte shape the PLAYER scaffold carries (`ScaffoldBuff`), and the morph table
-	// is the same one `NpcSpawnAppearanceCodec` parses. So "runtime state" was right about the buffs and wrong about
-	// the rest.
+	// The last four lines are the player's own tail. The one genuine difference is the ENTRY shape: a player's
+	// entries are 14 bytes, an NPC's are the variable-width morph records NpcSpawnAppearanceCodec already parses.
+	// Same slot, different element - which is why the two looked like unrelated formats, and why the "single record"
+	// forms turn out to be this shape with count == 0 rather than a form of their own.
 	public class NpcPostIirBodyTests
 	{
-		// The 20-byte closing terminator: the empty entry table's marker plus the three empty pair lists.
-		private const int TerminatorLength = 20;
-
 		[Fact]
-		public void EveryNpcPostIirBody_IsBuffRecordsThenAMorphTable()
+		public void EveryNpcPostIirBody_WalksAsBuffsThenAnEntryTableThenThePlayersTail()
 		{
 			var census = new Dictionary<string, int>();
 
@@ -36,28 +40,32 @@ namespace Faolan.Tests
 					continue;
 
 				var post = body[(read.Offset + read.Length)..];
-				census[Classify(post)] = census.GetValueOrDefault(Classify(post)) + 1;
+				var key = Walk(post, out var buffs)
+					? $"walks, {buffs.Count} buff record(s)"
+					: "unresolved";
+				census[key] = census.GetValueOrDefault(key) + 1;
 			}
 
-			// Pinned to the FULL corpus. 11,032 of 11,632 streams - 95% - are accounted for by grammar that already
-			// existed; the two buckets at the bottom are what is genuinely still opaque, and naming their size is the
-			// point of this gate. A change that "simplifies" the body back into a blob moves these numbers.
+			// Pinned to the FULL corpus: 98% consume to the exact last byte. The unresolved remainder is what is
+			// genuinely left, and naming its size is the point - a change that quietly narrows the walk moves this
+			// number instead of passing.
 			Assert.Equal(new Dictionary<string, int>
 			{
-				["single record"] = 3875,
-				["morph table"] = 6889,
-				["buffs + morph table"] = 268,
-				["unresolved body"] = 321,
-				["non-standard terminator"] = 279
+				["walks, 0 buff record(s)"] = 10773,
+				["walks, 1 buff record(s)"] = 584,
+				["walks, 2 buff record(s)"] = 43,
+				["unresolved"] = 232
 			}, census);
 		}
 
-		// The 60-byte records the NPC stream carries ahead of its morph table are ScaffoldBuffs, not anonymous
-		// runtime bytes: every one is the player scaffold's shape, and its spell id is a row in our own catalog.
+		// The 60-byte records the NPC stream carries ahead of its entry table are ScaffoldBuffs - the same shape the
+		// PLAYER scaffold carries. The spell ids are the proof: all nine resolve in our own catalog, and they read as
+		// a creature's buff bar rather than as numbers that merely parse.
 		[Fact]
 		public void TheNpcsSixtyByteRecords_AreTheSameBuffRecordsThePlayerCarries()
 		{
 			var spellIds = new HashSet<uint>();
+			var casterLevels = new List<uint>();
 			var records = 0;
 
 			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
@@ -66,47 +74,108 @@ namespace Faolan.Tests
 					continue;
 
 				var post = body[(read.Offset + read.Length)..];
-				foreach (var buff in BuffsOf(post))
+				if (!Walk(post, out var buffs))
+					continue;
+
+				foreach (var buff in buffs)
 				{
 					records++;
 					spellIds.Add(buff.SpellId);
+					casterLevels.Add(buff.CasterLevel);
 					Assert.Equal(ScaffoldBuff.DefaultKind, buff.Kind);
 					Assert.Equal(EntityClass.Character, buff.TargetClass);
-					Assert.InRange(buff.CasterLevel, 0u, 80u);
 					Assert.True(buff.TimerRemaining <= buff.TimerTotal, "the remaining timer must not exceed the total");
 				}
 			}
 
-			Assert.Equal(268, records);
+			Assert.Equal(670, records);
 
-			// One spell across all of them, and it is a real combat debuff rather than a number that merely parses.
-			Assert.Single(spellIds);
-			Assert.Equal(3911037u, spellIds.Single()); // Spells row 3911037 = "Stagger"
+			// Every id is a row in Spells. Two are necromancer PET summons and one is the Frozen Hatred proc, which is
+			// corroboration from a direction this walk knows nothing about (#307/#140): Stagger, Hearty Meal, Shrink,
+			// Ether Channel, Runed Flesh (Rank 1/5), Undead Minion: Mutilator, Deathless Acolyte: Arcanist.
+			Assert.Equal([222825u, 1148789u, 1151265u, 1220007u, 1366140u, 3161312u, 3774365u, 3911037u, 4377209u], spellIds.Order().ToArray());
+
+			// ⚠️ 5..82, and 82 is ABOVE the level cap. So the field is level-LIKE - #438 identified it as the caster's
+			// level by a separate route - but this corpus does not prove it IS the level, and asserting 1..80 here
+			// would have written a wrong bound into a gate.
+			Assert.Equal(5u, casterLevels.Min());
+			Assert.Equal(82u, casterLevels.Max());
 		}
 
-		private static List<ScaffoldBuff> BuffsOf(byte[] post)
+		// True when the whole stream walks; `buffs` are the records found before the entry table. `k` is searched
+		// 0..11 because the buff records are fixed-width and everything after them self-checks, so the first k whose
+		// walk lands exactly on the stream's end is the answer rather than a guess.
+		private static bool Walk(byte[] post, out List<ScaffoldBuff> buffs)
 		{
-			var found = new List<ScaffoldBuff>();
-			if (BodyStart(post) is not { } start)
-				return found;
+			buffs = [];
+			if (SpawnPostIirHeader.Read(post) is not { } header)
+				return false;
 
-			var end = post.Length - TerminatorLength;
+			var start = header.ByteCount + (int)header.FirstRecordLen;
+			if (start >= post.Length)
+				return false;
+
 			for (var k = 0; k < 12; k++)
 			{
 				var at = start + ScaffoldBuff.ByteCount * k;
-				if (at + 4 > end)
-					break;
-
-				if (!IsMorphTable(post, at, end))
+				if (EntryTableEnd(post, at) is not { } afterEntries || !TailEndsAtStreamEnd(post, afterEntries))
 					continue;
 
 				for (var j = 0; j < k; j++)
-					found.Add(ReadBuff(post, start + ScaffoldBuff.ByteCount * j));
+					buffs.Add(ReadBuff(post, start + ScaffoldBuff.ByteCount * j));
 
-				break;
+				return true;
 			}
 
-			return found;
+			return false;
+		}
+
+		// [u32 count][count x ([u32 morphId][f32 value][u32 0][u8 0][u8 strLen][strLen bytes])]. count == 0 is the
+		// "single record" form - the same slot, empty.
+		private static int? EntryTableEnd(byte[] post, int at)
+		{
+			if (at + 4 > post.Length)
+				return null;
+
+			var count = post.ReadU32Be(at);
+			if (count > 0x100)
+				return null;
+
+			var i = at + 4;
+			for (var n = 0; n < count; n++)
+			{
+				if (i + 14 > post.Length || i + 14 + post[i + 13] > post.Length)
+					return null;
+
+				i += 14 + post[i + 13];
+			}
+
+			return i;
+		}
+
+		// The player's own tail: two words, two PLAIN-counted pair lists, then the ListFrame-counted third.
+		private static bool TailEndsAtStreamEnd(byte[] post, int o)
+		{
+			var i = o + 8;
+			if (i > post.Length)
+				return false;
+
+			for (var list = 0; list < 2; list++)
+			{
+				if (i + 4 > post.Length)
+					return false;
+
+				var count = post.ReadU32Be(i);
+				if (count > 4096)
+					return false;
+
+				i += 4 + 8 * (int)count;
+			}
+
+			if (i + 4 > post.Length || !ListFrame.TryCountOf(post.ReadU32Be(i), out var third))
+				return false;
+
+			return i + 4 + 8 * third == post.Length;
 		}
 
 		private static ScaffoldBuff ReadBuff(byte[] post, int at)
@@ -128,71 +197,6 @@ namespace Faolan.Tests
 				buff.Trailer[w] = post.ReadU32Be(at + 40 + 4 * w);
 
 			return buff;
-		}
-
-		private static string Classify(byte[] post)
-		{
-			if (BodyStart(post) is not { } start)
-				return "non-standard terminator";
-			if (start == post.Length - 24)
-				return "single record";
-
-			var end = post.Length - TerminatorLength;
-			for (var k = 0; k < 12; k++)
-			{
-				var at = start + ScaffoldBuff.ByteCount * k;
-				if (at + 4 > end)
-					break;
-
-				if (IsMorphTable(post, at, end))
-				{
-					return k == 0
-						? "morph table"
-						: "buffs + morph table";
-				}
-			}
-
-			return "unresolved body";
-		}
-
-		// The body starts after the shared header and the first record. Returns null when the stream does not end in
-		// the standard empty terminator, which is its own bucket rather than a silent skip.
-		private static int? BodyStart(byte[] post)
-		{
-			if (SpawnPostIirHeader.Read(post) is not { } header || post.Length < 24)
-				return null;
-
-			var standard = new byte[] { 0, 0, 0, 0, 0, 0, 3, 0xF1, 0, 0, 3, 0xF1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0xF1 };
-			if (!post[^24..].SequenceEqual(standard))
-				return null;
-
-			var start = header.ByteCount + (int)header.FirstRecordLen;
-			return start > post.Length - TerminatorLength
-				? null
-				: start;
-		}
-
-		// [u32 count] then count x ([u32 morphId][f32 value][u32 0][u8 0][u8 strLen][strLen bytes]), landing EXACTLY
-		// on the terminator - the grammar NpcSpawnAppearanceCodec already parses.
-		private static bool IsMorphTable(byte[] post, int at, int end)
-		{
-			if (at + 4 > end)
-				return false;
-
-			var count = post.ReadU32Be(at);
-			if (count is 0 or > 0x100)
-				return false;
-
-			var i = at + 4;
-			for (var n = 0; n < count; n++)
-			{
-				if (i + 14 > end || i + 14 + post[i + 13] > end)
-					return false;
-
-				i += 14 + post[i + 13];
-			}
-
-			return i == end;
 		}
 	}
 }

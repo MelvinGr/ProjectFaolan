@@ -183,31 +183,51 @@ preview. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameG
 - `12 + firstRecordLen + 24` is the length only when all three pair lists are empty, i.e. the minimal forms. It
   is not a general identity — streams with populated pair lists are longer and still walk exactly.
 
-### The record body, censused (2026-07-28)
+### The record body, decoded (2026-07-28)
 
 The body between that header and the terminator was written up as *"session runtime state the simulation
-re-derives"*. Over all 11,632 captured streams, **95% of it is grammar this codebase already had**:
+re-derives"*. **One walk consumes 11,399 of the 11,632 captured streams to their exact last byte:**
 
 ```
-[header] [first record] [k x 60-byte ScaffoldBuff] [morph table] [20-byte terminator]
+[shared header]                     SpawnPostIirHeader
+[first record - firstRecordLen bytes]
+[k x 60-byte ScaffoldBuff]          the PLAYER scaffold's buff record, on NPCs too
+[u32 count][count x morph entry]    the entry-table slot
+[u32][u32]                          the pair the player codec reads as its ID-list close
+[u32 c1][c1 x 8] [u32 c2][c2 x 8]   two PLAIN-counted pair lists
+[u32 ListFrame][n x 8]              the count-framed third
 ```
 
-| shape | streams |
+Everything from the entry table down is the **player's own tail**. The one genuine difference is the ENTRY
+shape: a player's entries are 14 bytes, an NPC's are the variable-width morph records
+`NpcSpawnAppearanceCodec` already parses — same slot, different element. That is why the two read as unrelated
+formats, and why the "single record" NPC forms turn out to be this shape with `count == 0` rather than a form
+of their own.
+
+| | streams |
 |---|---|
-| single record, nothing after it | 3,875 |
-| a morph table — `NpcSpawnAppearanceCodec`'s grammar | 6,889 |
-| one `ScaffoldBuff`, then a morph table | 268 |
-| body still unresolved | 321 |
-| does not end in the standard terminator | 279 |
+| walks, no buff records | 10,773 |
+| walks, one buff record | 584 |
+| walks, two buff records | 43 |
+| **unresolved** | **232** |
 
-The 60-byte records are **the PLAYER scaffold's buff records**, not an NPC-only shape: all 268 carry the same
-`Kind`, `EntityClass.Character` as their target class, and one spell id that resolves in our own catalog to
-**"Stagger"**. So the old note was right about the buffs and wrong about everything else.
-[V3: NpcPostIirBodyTests.EveryNpcPostIirBody_IsBuffRecordsThenAMorphTable]
+[V3: NpcPostIirBodyTests.EveryNpcPostIirBody_WalksAsBuffsThenAnEntryTableThenThePlayersTail]
 
-The 321 + 279 are what is genuinely left. Their signature: the unresolved ones read a plausible word where the
-morph count should be but never land on the terminator, and the 279 end in something other than the standard
-empty terminator (they concentrate in the two-client and Hoxxling gameplay captures).
+**The 60-byte records are the player scaffold's buff records**, not an NPC-only shape. All 670 carry the same
+`Kind` and `EntityClass.Character` as their target class, their timer pair orders correctly in every one, and
+their nine spell ids all resolve in our own catalog: *Stagger*, *Hearty Meal*, *Shrink*, *Ether Channel*,
+*Runed Flesh (Rank 1/5)*, *Undead Minion: Mutilator*, *Deathless Acolyte: Arcanist*, *Frozen Hatred*. Two of
+those are necromancer PET summons and one is the Frozen Hatred proc — corroboration from a direction the walk
+knows nothing about (#307/#140).
+
+⚠️ Their `CasterLevel` runs **5..82**, and 82 is above the level cap. #438 identified this field as the
+caster's level by a separate route, but this corpus does not prove it IS the level — the gate pins the
+observed range rather than asserting 1..80.
+
+⚠️ Two boundary traps, both of which made a correct model look wrong: the entry table ends **20** bytes from
+the stream end, not 24 (the word at −24 belongs to the table's own region), and the terminator's three pair
+lists are **counted, not constant** — requiring the last 24 bytes to be a fixed pattern rejected every stream
+whose lists are populated.
 
 ## Typed scaffold codec — landed (2026-06-16, byte-exact)
 `NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan.Core.Network/Codecs/Spawn/NpcSpawnPreIir.cs`) decode the 223-byte
