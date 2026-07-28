@@ -9,6 +9,11 @@ modelled curve (like CombatResolver.DefaultNpcMaxHealth), which is a design deci
 Censuses the stat ids carried by the stat-update IIR (0x96B8DC59) across the whole corpus, and reports whether
 Armor (448) / Protection (451) / PvpArmor (454) ever appear.
 
+The spawn's own `generic_stats` array is the other place an NPC stat could hide; census that with
+`dotnet run --project Faolan.Importer -- --report npc-generic-stats`, which decodes the protobuf properly.
+Do NOT hand-scan the wire for the field tag - `\xb2\x01` occurs inside strings and reports ASCII as stat values,
+which is how a first version of this script "found" runs of 105/108/111.
+
 Run:  python3 tools/capture/scan_npc_armor_stat.py
 """
 import json
@@ -80,6 +85,8 @@ def main():
     print(f"\nARMOUR-family stats on the wire: {len(armour_hits)}")
     for name, stat, value in armour_hits[:20]:
         print(f"  {stat} = {value}   ({name})")
+
+
 
 
 if __name__ == '__main__':

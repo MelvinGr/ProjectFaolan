@@ -87,6 +87,12 @@ namespace Faolan.GameServer.Combat
 		// IIR in the corpus - 6,024 packets, 29 distinct stat ids - carries ZERO armour-family stats (448/451/454
 		// and the two Bonus percents). tools/capture/scan_npc_armor_stat.py.
 		//
+		// Three independent checks, so this is not "we did not find it": (1) the stat-update IIR carries no
+		// armour-family stat in 6,024 packets; (2) the spawn's own CharacterStats message has NO armour field at
+		// all; (3) its `generic_stats` array - the only other place a per-NPC stat could ride - is EMPTY on all
+		// 11,373 captured NPC spawns (`--report npc-generic-stats`). The client RDB has no NPC stat tables either
+		// (#76). Retail simply never tells the client an NPC's armour, because only its server needs it.
+		//
 		// So NPC armour has to be MODELLED, like DefaultNpcMaxHealth below, and that is a balance decision rather
 		// than a decode. The principled default if it lands: retail's own tweak table defines the armour a level is
 		// "targeted" at (TWK_TargetPerLevelArmor x level), and MitigationFraction gives exactly 50% at that value -

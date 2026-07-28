@@ -103,6 +103,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "npc-generic-stats":
+				{
+					NpcGenericStats(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "snapshot":
 				{
 					SnapshotScan(NamedCapture.LoadAll(capturesDir));
@@ -711,6 +717,44 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Per capture, the named NPC's worn equipment (InventoryEntries: slot + template) from its FA015807 (#267).
+		// Does an NPC spawn carry any per-NPC STAT array? (#401's player->NPC half needs an armour source, and the
+		// stat-update IIR carries none - tools/capture/scan_npc_armor_stat.py.) The spawn's character message has a
+		// `generic_stats` repeated-uint32 field; this censuses it over every captured NPC spawn using the real
+		// protobuf decoder, because hand-scanning the wire for the field tag matches inside strings.
+		private static void NpcGenericStats(IReadOnlyList<NamedCapture> captures)
+		{
+			var lengths = new Dictionary<int, int>();
+			var samples = new List<string>();
+			int spawns = 0, withStats = 0;
+
+			foreach (var c in captures)
+			foreach (var e in NpcSpawnExtractor.Extract(c.Packets))
+			{
+				var body = e.Data is { Length: >= 12 }
+					? e.Data[(12 + (int)e.Data.ReadU32Be(8))..]
+					: null;
+				if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+					continue;
+
+				spawns++;
+				var stats = read.Message.GenericStats;
+				if (stats is not { Length: > 0 })
+					continue;
+
+				withStats++;
+				lengths[stats.Length] = lengths.GetValueOrDefault(stats.Length) + 1;
+				if (samples.Count < 8)
+					samples.Add($"{e.Name} (level {read.Message.Stats?.Level}): [{string.Join(", ", stats.Take(16))}]");
+			}
+
+			Console.WriteLine($"npc-generic-stats: {spawns} NPC spawns read, {withStats} carry generic_stats");
+			foreach (var (length, n) in lengths.OrderByDescending(k => k.Value))
+				Console.WriteLine($"  length {length}: {n}");
+
+			foreach (var sample in samples)
+				Console.WriteLine($"  {sample}");
+		}
+
 		private static void Equip(IReadOnlyList<NamedCapture> captures, string target)
 		{
 			foreach (var c in captures)
