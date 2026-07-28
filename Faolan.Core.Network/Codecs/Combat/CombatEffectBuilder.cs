@@ -19,9 +19,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new DamageResult(target, attacker, damage, school).ToArray();
 		}
 
-		public static byte[] BuildStatDamage(uint target, uint statValue, int delta, uint statId, uint caster, uint idx, uint spellBaseId)
+		public static byte[] BuildStatDamage(uint target, uint statValue, int delta, uint school, uint caster, uint idx, uint spellBaseId)
 		{
-			return new StatDamage(target, statValue, delta, statId, caster, idx, spellBaseId).ToArray();
+			return new StatDamage(target, statValue, delta, (DamageSchool)school, caster, idx, spellBaseId).ToArray();
 		}
 	}
 
@@ -65,14 +65,21 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 	}
 
-	// StatDamageIIR (0xE9F24184): a buff/debuff's effect on one of the target's stats (e.g. Rend -> stat 1 by -8).
+	// StatDamageIIR (0xE9F24184): a damage/DoT tick on the target - the packet that renders SPELL and
+	// damage-over-time numbers, where DamageResult renders the melee hit (#349).
 	// Decoded fields (env-aligned):
-	//   [subop][class][target][env=0][u32 statValue][0][0][0][u32 0x1b][u32 count=2][i32 delta][u32 statId]
+	//   [subop][class][target][env=0][u32 statValue][0][0][0][u32 0x1b][u32 count=2][i32 delta][u32 school]
 	//   [class][u32 caster][u32 idx][0][u32 spellBaseId][u32 1][0][0][0]
-	// statValue is the target stat's resulting value; delta is the signed change (negative = a debuff); spellId is
-	// the BASE spell id (wire id >> 8, e.g. Rend 0x316449). idx is the effect's slot (1, 2...). The 0x1b marker
-	// and count=2 are constant across the capture. Golden: fr 6689 = Rend's stat-1 -8 from the trapper.
-	public sealed record StatDamage(uint Target, uint StatValue, int Delta, uint StatId, uint Caster, uint Idx, uint SpellBaseId) : ICodec<StatDamage>
+	// statValue is the target's resulting health; delta is the signed change (negative = damage); spellId is the
+	// BASE spell id (wire id >> 8, e.g. Rend 0x316449). idx is the effect's slot (1, 2...). The 0x1b marker and
+	// count=2 are constant across the capture. Golden: fr 6689 = Rend ticking the trapper's victim for 8 Slashing.
+	//
+	// ⚠️ The word after `delta` is the damage SCHOOL, not a stat id - it used to be called StatId, which made the
+	// golden read as "Rend reduces stat 1 by 8" instead of "Rend deals 8 Slashing". Every value the corpus carries
+	// is 0..10, exactly the DamageSchool range (`--report npc-damage`), and our own send path already passed a
+	// `DotType` into it. That mislabel is also why a census of magical NPC damage came up empty: it looked for
+	// health-stat records and there are none - the caster NPCs are Fire/Cold/Electrical/Siege records here.
+	public sealed record StatDamage(uint Target, uint StatValue, int Delta, DamageSchool School, uint Caster, uint Idx, uint SpellBaseId) : ICodec<StatDamage>
 	{
 		public static StatDamage Read(FaolanStream s)
 		{
@@ -87,7 +94,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			s.ReadUInt32(); // 0x1b marker
 			s.ReadUInt32(); // count 2
 			var delta = (int)s.ReadUInt32();
-			var statId = s.ReadUInt32();
+			var school = (DamageSchool)s.ReadUInt32();
 			s.ReadUInt32(); // class
 			var caster = s.ReadUInt32();
 			var idx = s.ReadUInt32();
@@ -97,7 +104,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 			s.ReadUInt32(); // 0
 			s.ReadUInt32(); // 0
 			s.ReadUInt32(); // 0
-			return new StatDamage(target, statValue, delta, statId, caster, idx, spellBaseId);
+			return new StatDamage(target, statValue, delta, school, caster, idx, spellBaseId);
 		}
 
 		public void Write(FaolanStream s)
@@ -114,7 +121,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(0x1b)
 				.WriteUInt32(2)
 				.WriteUInt32(Delta)
-				.WriteUInt32(StatId)
+				.WriteUInt32(School)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(Caster)
 				.WriteUInt32(Idx)

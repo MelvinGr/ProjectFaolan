@@ -737,6 +737,8 @@ namespace Faolan.Importer.Cli
 			var scaleRatios = new Dictionary<double, int>();
 			var killRatios = new Dictionary<double, int>();
 			var fromNpc = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
+			var fromNpcSpell = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
+			var toNpcSpell = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
 			var toNpc = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
 
 			foreach (var c in captures)
@@ -786,6 +788,43 @@ namespace Faolan.Importer.Cli
 							}
 
 							health[handle] = now;
+						}
+
+						continue;
+					}
+
+					// ⚠️ SPELL damage is NOT a DamageResult - it rides StatDamageIIR (see CombatEffectBuilder / #349),
+					// so a census of DamageResult alone reports "no magical schools" and means only "I looked in the
+					// melee packet". A caster NPC's hit is a negative HealthCurrent delta with the caster's handle.
+					if (p.Body.ReadU32Be(4) == (uint)GameServer0X2000Opcodes.StatDamageIIR)
+					{
+						StatDamage cast;
+						try
+						{
+							cast = StatDamage.Read(new FaolanStream(p.Body[4..]));
+						}
+						catch
+						{
+							continue;
+						}
+
+						// ⚠️ The record's "StatId" slot is the damage SCHOOL for a damage record - every observed value
+						// is 0..10, i.e. exactly the DamageSchool range, and treating it as a stat id makes Rend
+						// reduce stat 1 rather than deal Slashing. So the magical branch IS represented here.
+						if (cast.Delta >= 0)
+							continue;
+
+						var magnitude = (uint)(-cast.Delta);
+						if (levels.TryGetValue(cast.Caster, out var casterLevel))
+						{
+							fromNpcSpell.TryAdd((casterLevel, cast.School), []);
+							fromNpcSpell[(casterLevel, cast.School)].Add(magnitude);
+						}
+
+						if (levels.TryGetValue(cast.Target, out var spellTargetLevel))
+						{
+							toNpcSpell.TryAdd((spellTargetLevel, cast.School), []);
+							toNpcSpell[(spellTargetLevel, cast.School)].Add(magnitude);
 						}
 
 						continue;
@@ -848,6 +887,8 @@ namespace Faolan.Importer.Cli
 
 			Report("NPC -> PLAYER (what ResolveNpcAttackDamage should reproduce)", fromNpc, level => 5 + level * 3);
 			Report("PLAYER -> NPC (the shape an NPC-armour model has to reproduce)", toNpc, null);
+			Report("NPC -> PLAYER, SPELL/DoT damage (StatDamageIIR)", fromNpcSpell, null);
+			Report("PLAYER -> NPC, SPELL/DoT damage (StatDamageIIR)", toNpcSpell, null);
 
 			// The school decides which mitigation BRANCH the client runs (FUN_0113ba00 switches on it): 1/2/3/8 take
 			// the physical branch - armour, Strength-scaled - and everything else the magical one, protection scaled

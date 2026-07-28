@@ -85,7 +85,7 @@ namespace Faolan.Importer.Captures
 				deltas.TryAdd(dmg.SpellBaseId, []);
 				deltas[dmg.SpellBaseId][dmg.Delta] = deltas[dmg.SpellBaseId].GetValueOrDefault(dmg.Delta) + 1;
 				types.TryAdd(dmg.SpellBaseId, []);
-				types[dmg.SpellBaseId][dmg.StatId] = types[dmg.SpellBaseId].GetValueOrDefault(dmg.StatId) + 1;
+				types[dmg.SpellBaseId][(uint)dmg.School] = types[dmg.SpellBaseId].GetValueOrDefault((uint)dmg.School) + 1;
 			}
 			catch
 			{
