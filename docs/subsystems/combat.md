@@ -765,3 +765,27 @@ capturing it pins the display-vs-wire scale by direct correspondence instead of 
 **Best value:** run `/logcombat on` for the SAME fight that is being packet-captured
 ([#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479)). One pcap plus one log gives both sides of
 every number.
+
+### Measure damage as a FRACTION of the target, not as a number
+
+`--report npc-damage` prints a PLAYER -> NPC section as a percentage of each target's own health, and that is the
+row to tune against:
+
+| level | hits | median % of target | hits to kill |
+|---|---|---|---|
+| 1 | 176 | 10.4 | 9.6 |
+| 2 | 60 | 10.7 | 9.3 |
+| 3 | 217 | 3.8 | 26.1 |
+| 4 | 24 | 2.5 | 39.7 |
+| 5 | 201 | 7.3 | 13.7 |
+
+So retail kills an ordinary mob in roughly **10 hits** early on, tailing to 14-26 by level 5.
+
+⚠️ The absolute medians in the section above it (465..691 at level 1) are NOT that number. A level bucket mixes a
+63-health critter, a ~5,000-health elite and a 300,000-health city guard - `NpcSpawn.Health` legitimately spans
+9 to 1,108,500, because retail's world has both populations (see `NpcHpAnchors`). Averaging damage across them
+produces a figure that matches no actual fight, and reading it as if it did is what briefly made our weapon
+damage look 50x too low. Per-target fractions are stable across the same data.
+
+The rows above level 5 in that table (0.0%, "700,000 hits to kill") are exactly the unkillable population showing
+itself - which is a useful check that the split is real and not an artefact.

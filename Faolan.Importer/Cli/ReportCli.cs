@@ -739,6 +739,7 @@ namespace Faolan.Importer.Cli
 		{
 			var scaleRatios = new Dictionary<double, int>();
 			var killRatios = new Dictionary<double, int>();
+			var hitsToKill = new Dictionary<uint, List<double>>();
 			var fromNpc = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
 			var fromNpcSpell = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
 			var toNpcSpell = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
@@ -862,6 +863,17 @@ namespace Faolan.Importer.Cli
 						toNpc.TryAdd((targetLevel, hit.School), []);
 						toNpc[(targetLevel, hit.School)].Add(hit.Damage);
 						dealtTo[hit.Target] = dealtTo.GetValueOrDefault(hit.Target) + hit.Damage;
+
+						// ...and as a FRACTION of what that NPC actually had. A level bucket mixes a 63-health
+						// chicken with a 63,000-health elite, so a median damage figure across it means nothing;
+						// "what fraction of the target did this hit take" is comparable across both, and its
+						// reciprocal is the number a designer actually cares about - hits to kill.
+						if (spawnHealth.TryGetValue(hit.Target, out var targetHp) && targetHp > 0)
+						{
+							var pct = 100.0 * hit.Damage / targetHp;
+							hitsToKill.TryAdd(targetLevel, []);
+							hitsToKill[targetLevel].Add(pct);
+						}
 					}
 				}
 
@@ -890,6 +902,15 @@ namespace Faolan.Importer.Cli
 
 			Report("NPC -> PLAYER (what ResolveNpcAttackDamage should reproduce)", fromNpc, level => 5 + level * 3);
 			Report("PLAYER -> NPC (the shape an NPC-armour model has to reproduce)", toNpc, null);
+			Console.WriteLine($"\n=== PLAYER -> NPC as a FRACTION of the target's own health ===");
+			Console.WriteLine($"{"level",5} {"hits",6} {"median %",9} {"hits-to-kill",13}");
+			foreach (var (level, pcts) in hitsToKill.OrderBy(k => k.Key))
+			{
+				var sorted = pcts.Order().ToList();
+				var median = sorted[sorted.Count / 2];
+				Console.WriteLine($"{level,5} {sorted.Count,6} {median,9:F1} {(median > 0 ? 100.0 / median : 0),13:F1}");
+			}
+
 			Report("NPC -> PLAYER, SPELL/DoT damage (StatDamageIIR)", fromNpcSpell, null);
 			Report("PLAYER -> NPC, SPELL/DoT damage (StatDamageIIR)", toNpcSpell, null);
 

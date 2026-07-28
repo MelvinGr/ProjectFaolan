@@ -81,9 +81,14 @@ namespace Faolan.GameServer.Combat
 		// per-hit damage figure. PROVISIONAL: the field IDs are decoded authoritatively (GUIGetMin/MaxDamage), but the
 		// exact display/combat scale isn't - ÷100 (the vitals convention) gives sane numbers (a starter dagger ~10, a
 		// high-end greatsword ~80). Tune in-client alongside the real damage formula (still server-GDB, undecoded).
-		// PROVISIONAL in its VALUE, but note the corpus does constrain it: a player's melee hits an NPC for 465..691
-		// (median) at level 1 rising to ~1100..1400 by level 5 (`--report npc-damage`, PLAYER -> NPC section), so a
-		// change here can be sanity-checked against a real number instead of taste alone.
+		// PROVISIONAL in its VALUE, but the corpus constrains it - and the useful form of that constraint is a
+		// FRACTION, not a damage figure. Retail's player melee takes ~10% of a normal mob's health per hit at
+		// levels 1-2 (~10 hits to kill) and 4..7% at 3-5 (`--report npc-damage`, the FRACTION section).
+		//
+		// ⚠️ Do NOT tune this against the absolute medians in the section above it. A level bucket mixes a
+		// 63-health critter with a 5,000-health elite and a 300,000-health city guard, so "the median hit at level
+		// 1 is 465..691" is an average over incomparable fights; measured as a fraction of each target's own
+		// health it is a stable 10%. Reading the absolute number is what briefly made this look 50x wrong.
 		public const int WeaponDamageScale = 100;
 
 		// The half-mitigation point for the provisional armor curve: the total armor rating at which incoming physical
@@ -164,6 +169,10 @@ namespace Faolan.GameServer.Combat
 		// Captured CIVILIAN-baseline HP per level (NpcSpawns.Health; HP is level-derived - the same value recurs across
 		// unrelated creatures, e.g. L20->933 for 43 NPCs, L40->2217 for 109). High-confidence anchors; HP is
 		// piecewise-linear between them. Validates to <1% at unsampled levels (L35->1953, L45->2482, L11->386 vs 382).
+		// Capture-anchored NPC health by level - and the reason NpcSpawn.Health spans 9 to 1,108,500 without being
+		// broken: retail's world genuinely holds two populations. Ordinary mobs follow this curve (a level-1 is 63,
+		// a level-10 is 318), while guards, bosses and target dummies carry thousands to millions and are not meant
+		// to die. Any per-level average over NpcSpawn.Health mixes the two and means nothing.
 		private static readonly (uint Level, uint Hp)[] NpcHpAnchors = [(1, 63), (5, 150), (10, 318), (15, 658), (20, 933), (30, 1688), (40, 2217), (50, 2746), (60, 3276)];
 
 		// The critical-hit damage: the normal hit scaled by (base 1.5x + the attacker's Critical Damage Rating, each
