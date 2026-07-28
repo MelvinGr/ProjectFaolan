@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -26,6 +27,7 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.Economy;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
+using ProtoBuf;
 
 namespace Faolan.GameServer
 {
@@ -271,6 +273,55 @@ namespace Faolan.GameServer
 			return slot;
 		}
 
+		// Pushes the s2c UpdateInventoryIIR (0xA74D2814) for the player's OWN Equipped(101) and Bag(104) containers,
+		// in full - retail's "here is your inventory again" after the SERVER changes it behind the player's back (#380).
+		//
+		// Decoded from Hoxxling_mage-heraldofxotli_login_gameplay2, where the Slave Manacles come off:
+		//   f5109 c2s ScryScriptIIR "ShacklesOff"
+		//   f5115 s2c DispatchRemoveItem   [container 101][char][pos 0x12][amount 0]
+		//   f5118 s2c UpdateInventoryIIR   kind=101 Equipped cap=1028   (522 B)
+		//   f5118 s2c UpdateInventoryIIR   kind=104 Bag      cap=24     (1141 B)
+		// i.e. a server-initiated removal followed by BOTH containers whole, in the same frame. Note it is NOT the
+		// answer to the c2s probe of the same opcode - retail answers those never (34 requests, 0 replies).
+		//
+		// The payload is plain ProtoInventoryGame, the same schema the login snapshot carries, so it is built by the
+		// SAME BuildContainers call rather than a second inventory serialiser - capacities included (Equipped 1028,
+		// Bag 24 + the equipped bag's extra slots), which is what the capture shows.
+		private async Task SendUpdateInventory(INetworkClient client)
+		{
+			var characterId = client.Session.Character.Id;
+			var equipment = await Database.GetCharacterEquipment(characterId);
+			if (equipment == null)
+				return;
+
+			var equipped = new Dictionary<ulong, (Item Item, uint Hash)>();
+			foreach (var slot in InventoryEquippedSlots)
+			{
+				if (equipment[slot] is { Hash: not 0 } item)
+					equipped[(ulong)slot] = (item, item.Hash);
+			}
+
+			(Item, uint)? bagFirst = equipment.FirstPosBag is { Hash: not 0 }
+				? (equipment.FirstPosBag, equipment.FirstPosBag.Hash)
+				: null;
+
+			var containers = FullPlayerCharacterBuilder.BuildContainers(characterId, equipped, bagFirst, await Database.GetCharacterInventory(characterId));
+
+			// containers[0] = Equipped(101), [1] = Bag(104) - the two retail pushes. The Resource and Quest containers
+			// it also builds are NOT pushed: the capture carries exactly these two.
+			foreach (var container in containers.Take(2))
+			{
+				using var ms = new MemoryStream();
+				Serializer.Serialize(ms, container);
+				var payload = ms.ToArray();
+
+				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+					s => new UpdateInventory(characterId, 0x00, payload).Write(s)));
+			}
+
+			Logger.LogDebug("Pushed UpdateInventoryIIR for {Character}: Equipped + Bag (#380).", client.Session.Character.Name);
+		}
+
 		// Removes an item from the player's backpack: clears the persisted CharacterInventory bag cell (so it stays
 		// gone across relog) AND pushes the live DispatchRemoveItem so it disappears immediately. The mirror of
 		// GrantItemToBackpack. Returns true if a row was cleared.
@@ -290,6 +341,11 @@ namespace Faolan.GameServer
 
 			await Database.SetCharacterInventorySlot(characterId, FullPlayerCharacterBuilder.BagKind, slot, null);
 			await SendRemoveItem(client, ContainerKind.Bag, (uint)slot, amountToRemove);
+
+			// Retail follows a SERVER-initiated removal with both containers in full (#380). This path is exactly that
+			// case - the server took something out of the bag, the player did not move it - which is the shape the
+			// ShacklesOff capture shows. A player-initiated move is NOT followed by one: the client already knows.
+			await SendUpdateInventory(client);
 			return true;
 		}
 
