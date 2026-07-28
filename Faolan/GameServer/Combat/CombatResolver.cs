@@ -53,6 +53,9 @@ namespace Faolan.GameServer.Combat
 	{
 		// PROVISIONAL. Nothing in the corpus separates a crit from a big hit - DamageResult carries no crit flag
 		// (the two trailing words are always 0), so a crit is just a larger number and cannot be counted.
+		// ⚠️ But it IS measurable in-client: the retail client's own combat log (`/logcombat on`) labels them -
+		// "%s hit %s for %d points of damage. Critical Hit!" - so these two constants are waiting on a log, not on
+		// a decode. See docs/subsystems/combat.md.
 		public const int BaseCritChancePercent = 5; // everyone crits sometimes, even with no Critical Rating gear
 
 		// Critical-hit tuning (#399), driven by the decoded crit stats: Critical Rating (0x138) = chance, Critical

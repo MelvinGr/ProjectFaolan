@@ -725,3 +725,43 @@ subtracted from.
 ⚠️ **Only levels 1-6 are well sampled** (hundreds of hits each). Above that the corpus gives single digits, so
 the measured curves are extrapolated - [#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479)
 tracks the captures that would settle the high end.
+
+## The client's own COMBAT LOG - an instrument the packets cannot replace (2026-07-28)
+
+The retail client writes a plain-text combat log on demand. It exists in our build: the exe carries
+`logCombatCommand`, `CombatLog-%s.txt`, `CombatLoggingStarted`/`CombatLoggingAlreadyStarted`, and the command's
+own name comes from the LDB, where all six language pages give the same word.
+
+```
+/logcombat on      # start
+/logcombat off     # stop - do this BEFORE quitting, or the file can be left truncated
+```
+
+The file lands in the client's install directory as `CombatLog-<date>_<time>.txt`, one time-indexed line per
+event, written as English sentences. The templates are LDB page **211711**, which is how we know exactly what it
+records without having to run it first:
+
+| template | what it gives us |
+|---|---|
+| `You hit %s for %u points of %s damage.` | damage + SCHOOL, player -> target |
+| `You were attacked by %s for %u points of %s damage.` | damage + school, incoming |
+| `You hit %s with a spell for %u points of %s damage.` | spell hits are DISTINGUISHED from melee |
+| `%s hit %s for %d points of damage. Critical Hit!` | **crits are labelled** |
+| `You absorbed %d points of damage from %s attack` | **mitigation/absorb is visible** |
+| `%s absorbed %d points of damage.` | the same, third-person |
+
+⚠️ **Two of those cannot be measured from a packet capture at all**, which is what makes this worth running:
+
+- **Crits.** `DamageResultIIR` carries no crit flag - its two trailing words are always 0 - so on the wire a crit
+  is just a larger number and is uncountable. The log labels it. `BaseCritChancePercent` /
+  `BaseCritDamagePercent` are marked PROVISIONAL in `CombatResolver` precisely because the corpus cannot see
+  them; the log can.
+- **Absorb / mitigation.** The wire carries the post-mitigation number only. The log names the absorbed amount
+  separately, so the armour formula becomes checkable end to end rather than only at its output.
+
+It also settles a question the corpus left open: the log prints what the player SEES, so logging a fight while
+capturing it pins the display-vs-wire scale by direct correspondence instead of by the kill-ratio argument.
+
+**Best value:** run `/logcombat on` for the SAME fight that is being packet-captured
+([#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479)). One pcap plus one log gives both sides of
+every number.
