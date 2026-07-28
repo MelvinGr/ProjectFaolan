@@ -70,8 +70,9 @@ namespace Faolan.Tests
 			Assert.True(withEntries > 0, "no stream carried an entry table - the corpus slice is wrong");
 		}
 
-		// word2 is NOT a record count, which is what `NpcSpawnPostIir.RecordCount` calls it: it takes three different
-		// values across streams of IDENTICAL length, so it cannot be counting anything that occupies bytes.
+		// word2 is NOT a record count, which is what it was called until this landed: it takes three different values
+		// across streams of IDENTICAL length, so it cannot be counting anything that occupies bytes. This is the gate
+		// behind the NpcSpawnPostIir.Word2 / NpcStatCore.MinimalPostIirWord2 rename.
 		[Fact]
 		public void Word2_DoesNotAffectTheStreamsLength_SoItIsNotARecordCount()
 		{

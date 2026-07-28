@@ -18,11 +18,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	//    41-byte one differ by exactly ONE leading byte inside the first record, and that byte is the whole reason
 	//    they were modelled as different formats.
 	//
-	// 2. `RecordCount` DOES NOT COUNT RECORDS. Streams of identical length carry 1, 2 and 3 in it, so it cannot be
-	//    counting anything that occupies bytes; it is a type-stable enum whose meaning is still unknown. The name is
-	//    kept for now only because the persisted column NpcStatCore.MinimalPostIirRecordCount shares it and renaming
-	//    that needs a migration - it is wrong, and this note is here so it does not get believed.
-	// minimal freshly-spawned form (word0=0, recordCount=1, the constant 0x3F1-terminated body) is what a
+	// 2. The third header word DOES NOT COUNT RECORDS, which is what it used to be called. Streams of identical
+	//    length carry 1, 2 and 3 in it, so it cannot be counting anything that occupies bytes; it is a type-stable
+	//    enum whose meaning is still unknown, and it is now named `Word2` for its POSITION - the house style for a
+	//    word whose place is known and whose meaning is not (cf. Word0 beside it, EntryTableX, FieldA).
+	// minimal freshly-spawned form (word0=0, word2=1, the constant 0x3F1-terminated body) is what a
 	// from-scratch construction emits; this typed view round-trips both that and the larger runtime-state forms
 	// byte-exact, so the from-DB path owns the header grammar in code (Gitea #185).
 	public sealed class NpcSpawnPostIir
@@ -31,14 +31,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		private const int HeaderLength = 12;
 		public byte[] Records { get; set; } = [];
 		public uint FirstRecordLen { get; set; }
-		public uint RecordCount { get; set; } = 1;
+		public uint Word2 { get; set; } = 1;
 
 		public uint Word0 { get; set; }
 
 		// Serializes the scaffold to its wire bytes (the 12-byte header + the raw record body).
 		public byte[] Encode()
 		{
-			return new FaolanStream().WriteUInt32(Word0).WriteUInt32(FirstRecordLen).WriteUInt32(RecordCount).WriteArray(Records).ToArray();
+			return new FaolanStream().WriteUInt32(Word0).WriteUInt32(FirstRecordLen).WriteUInt32(Word2).WriteArray(Records).ToArray();
 		}
 
 		// Decodes the post-IIR scaffold from an FA015807 body (the bytes after the embedded CoreCharacterIIR,
@@ -58,7 +58,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			{
 				Word0 = body.ReadU32Be(start),
 				FirstRecordLen = body.ReadU32Be(start + 4),
-				RecordCount = body.ReadU32Be(start + 8),
+				Word2 = body.ReadU32Be(start + 8),
 				Records = body[(start + HeaderLength)..]
 			};
 			return true;

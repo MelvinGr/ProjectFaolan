@@ -18,7 +18,7 @@ namespace Faolan.Tests
 		public void BuildFromScratch_Animal_ParsesAndCarriesMinimalPostIir()
 		{
 			var golden = Golden.Bytes("SpawnNpcCrocodile");
-			var body = BuildFromGolden(golden, out var handle, out var morphs, NpcSpawnScaffold.MinimalRecordCount);
+			var body = BuildFromGolden(golden, out var handle, out var morphs, NpcSpawnScaffold.MinimalWord2);
 
 			Assert.Empty(morphs); // an animal carries no appearance table
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 		public void BuildFromScratch_Humanoid_ParsesAndCarriesAppearanceTable()
 		{
 			var golden = Golden.Bytes("SpawnNpcCasilda");
-			var body = BuildFromGolden(golden, out _, out var morphs, NpcSpawnScaffold.MinimalRecordCount);
+			var body = BuildFromGolden(golden, out _, out var morphs, NpcSpawnScaffold.MinimalWord2);
 
 			Assert.NotEmpty(morphs); // Casilda's appearance/morph table
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
@@ -43,7 +43,7 @@ namespace Faolan.Tests
 
 		// Decompose a golden capture into the inputs BuildBody takes (IIR header, transform, token, message,
 		// morphs) and reassemble from scratch - the same decomposition TryBuildLive performs off the DB columns.
-		private static byte[] BuildFromGolden(byte[] golden, out uint handle, out List<NpcAppearanceMorph> morphs, uint minimalRc)
+		private static byte[] BuildFromGolden(byte[] golden, out uint handle, out List<NpcAppearanceMorph> morphs, uint minimalWord2Value)
 		{
 			handle = golden.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(golden, out var read));
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 			var rot = new Quaternion(golden.ReadF32Le(SpawnPacketBuilder.RotXOffset), golden.ReadF32Le(SpawnPacketBuilder.RotYOffset), golden.ReadF32Le(SpawnPacketBuilder.RotZOffset),
 				golden.ReadF32Le(SpawnPacketBuilder.RotWOffset));
 			NpcSpawnAppearanceCodec.TryDecodeAppearance(golden, out morphs);
-			return NpcSpawnBuilder.BuildBody(handle, x, pos, rot, ReadPlayfieldToken(golden), read.Message, morphs, minimalRc);
+			return NpcSpawnBuilder.BuildBody(handle, x, pos, rot, ReadPlayfieldToken(golden), read.Message, morphs, minimalWord2Value);
 		}
 
 

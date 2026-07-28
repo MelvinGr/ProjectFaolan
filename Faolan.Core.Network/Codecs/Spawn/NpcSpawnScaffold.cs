@@ -32,16 +32,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// byte before the first list word (and so has firstRecordLen 4 rather than 5). Censused over all 11,632
 		// captured post-IIR streams (#475).
 		public const int MinimalPostIirLength = 41;
-		public const uint MinimalHumanoidRecordCount = 2;
+		public const uint MinimalHumanoidWord2 = 2;
+
+		// The third observed value (23 captured streams). Named for its value like its two siblings, because what it
+		// SELECTS is unknown - see NpcSpawnPostIir for why this word is not a record count.
+		public const uint MinimalThirdWord2 = 3;
 
 		// The record-group count in the minimal (no-morph) form. A TYPE-STABLE constant whose meaning isn't decoded -
 		// NOT an animal-vs-humanoid split (both values carry people AND creatures; the names here are historical, from
 		// the beach-burst sample where the animals happened to be 1 and the no-morph humanoids 2).
 		// ⚠️ It is 1, 2 or **3**, not "1 or 2" as this said: a corpus-wide census of the 3,272 captured 41-byte forms
 		// gives 1 x757, 2 x2492 and 3 x23 (#475). Nothing here rejects a 3 - BuildMinimalPostIir(rc) takes the count
-		// and the type's own value is stored in NpcStatCore.MinimalPostIirRecordCount (#243) - but the claim that only
+		// and the type's own value is stored in NpcStatCore.MinimalPostIirWord2 (#243) - but the claim that only
 		// two values exist was wrong, and it is the kind of claim a later "simplification" would have leaned on.
-		public const uint MinimalRecordCount = 1;
+		public const uint MinimalWord2 = 1;
 
 		// firstRecordLen = len(post) - 36 (the header's self-length of the first record group).
 		private const int RecordLenBias = 36;
@@ -59,25 +63,25 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1 // end pairs, final 0x3F1 marker
 		];
 
-		// Builds the minimal post-IIR scaffold for a freshly-spawned NPC: [u32 0][u32 len-36][u32 recordCount] + the
-		// constant terminator body. recordCount defaults to 1 (the animal form, byte-identical to the 23 minimal-form
-		// NPCs in the beach burst); pass MinimalHumanoidRecordCount (2) for a no-morph humanoid (#243 tail).
-		public static byte[] BuildMinimalPostIir(uint recordCount = MinimalRecordCount)
+		// Builds the minimal post-IIR scaffold for a freshly-spawned NPC: [u32 0][u32 len-36][u32 word2] + the
+		// constant terminator body. word2 defaults to 1 (the animal form, byte-identical to the 23 minimal-form
+		// NPCs in the beach burst); pass MinimalHumanoidWord2 (2) for a no-morph humanoid (#243 tail).
+		public static byte[] BuildMinimalPostIir(uint word2 = MinimalWord2)
 		{
-			return new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(MinimalPostIirLength - RecordLenBias).WriteUInt32(recordCount).WriteArray(MinimalBody).ToArray();
+			return new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(MinimalPostIirLength - RecordLenBias).WriteUInt32(word2).WriteArray(MinimalBody).ToArray();
 		}
 
-		// The fresh post-IIR recordCount for a NO-MORPH spawn (#243): the type-stable header recordCount word (1 or 2).
+		// The fresh post-IIR word2 for a NO-MORPH spawn (#243): the type-stable third header word (1, 2 or 3).
 		// Reads it off the exact 41-byte minimal form AND a larger RUNTIME-BEARING no-morph capture - the recordCount
 		// word is stable per type across minimal and runtime captures
 		// (validated: 0/107 no-morph types carry >1 distinct value), and the runtime records are dropped on a fresh
-		// spawn, so BuildMinimalPostIir(recordCount) is the canonical fresh form. Returns false when the body carries a
+		// spawn, so BuildMinimalPostIir(word2) is the canonical fresh form. Returns false when the body carries a
 		// liftable morph table (an APPEARANCE type - it builds from morph rows, not the minimal form), when word0 isn't
 		// the constant 0, or when no CharacterIIR is present. This is what lets the ~24 runtime-bearing no-morph types
-		// (whose type has no minimal-form capture) derive their recordCount without a guess.
-		public static bool TryReadNoMorphRecordCount(byte[] body, out uint recordCount)
+		// (whose type has no minimal-form capture) derive their word2 without a guess.
+		public static bool TryReadNoMorphWord2(byte[] body, out uint word2)
 		{
-			recordCount = 0;
+			word2 = 0;
 			if (NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out _) || NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out _))
 				return false; // an appearance type - builds from morph rows, not the minimal form
 			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
@@ -87,8 +91,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (post.Length < 12 || post.ReadU32Be(0) != HeaderWord0)
 				return false;
 
-			recordCount = post.ReadU32Be(8);
-			return recordCount is MinimalRecordCount or MinimalHumanoidRecordCount;
+			word2 = post.ReadU32Be(8);
+			// 1, 2 or 3. The old check accepted only 1 or 2, which is the stale "observed as 1 or 2" claim acting as a
+			// FILTER: a type whose word2 is 3 was declined here, left with a null column, and so kept splicing its
+			// captured Data blob instead of building from scratch. 23 captured streams carry a 3.
+			return word2 is MinimalWord2 or MinimalHumanoidWord2 or MinimalThirdWord2;
 		}
 	}
 }

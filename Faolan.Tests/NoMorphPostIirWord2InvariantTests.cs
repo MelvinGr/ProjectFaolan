@@ -8,11 +8,11 @@ namespace Faolan.Tests
 {
 	// #243/#244: every shipped NPC spawn builds its FA015807 body wholly from typed columns - the captured
 	// NpcSpawn.Data blob has been retired, so this is the gate that nothing regressed back into needing it.
-	public class NoMorphRecordCountInvariantTests
+	public class NoMorphPostIirWord2InvariantTests
 	{
 		private readonly ITestOutputHelper _out;
 
-		public NoMorphRecordCountInvariantTests(ITestOutputHelper o)
+		public NoMorphPostIirWord2InvariantTests(ITestOutputHelper o)
 		{
 			_out = o;
 		}
@@ -35,7 +35,7 @@ namespace Faolan.Tests
 				.ToList();
 
 			var fallback = rows
-				.Where(s => !(s.NpcTemplate.StatCore!.IirHeader is not null && (!s.HasEquipment || s.Morphs.Count > 0 || s.NpcTemplate.StatCore.MinimalPostIirRecordCount is not null)))
+				.Where(s => !(s.NpcTemplate.StatCore!.IirHeader is not null && (!s.HasEquipment || s.Morphs.Count > 0 || s.NpcTemplate.StatCore.MinimalPostIirWord2 is not null)))
 				.ToList();
 
 			_out.WriteLine($"shipped={rows.Count} not-buildable-from-columns={fallback.Count}");

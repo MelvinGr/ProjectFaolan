@@ -35,22 +35,22 @@ namespace Faolan.Tests
 			Assert.Equal(capturedPostIir, NpcSpawnScaffold.BuildMinimalPostIir());
 		}
 
-		// #243: TryReadNoMorphRecordCount reads the fresh recordCount off a no-morph body (minimal OR runtime-bearing)
+		// #243: TryReadNoMorphWord2 reads the fresh recordCount off a no-morph body (minimal OR runtime-bearing)
 		// and declines an appearance-bearing body (which builds from morph rows). The animal minimal golden is rc==1;
 		// Casilda (a morph table) is declined.
 		[Fact]
-		public void TryReadNoMorphRecordCount_ReadsMinimal_DeclinesAppearance()
+		public void TryReadNoMorphWord2_ReadsMinimal_DeclinesAppearance()
 		{
-			Assert.True(NpcSpawnScaffold.TryReadNoMorphRecordCount(Golden.Bytes("SpawnNpcCrocodile"), out var rc));
-			Assert.Equal(NpcSpawnScaffold.MinimalRecordCount, rc);
+			Assert.True(NpcSpawnScaffold.TryReadNoMorphWord2(Golden.Bytes("SpawnNpcCrocodile"), out var rc));
+			Assert.Equal(NpcSpawnScaffold.MinimalWord2, rc);
 
-			Assert.False(NpcSpawnScaffold.TryReadNoMorphRecordCount(Golden.Bytes("SpawnNpcCasilda"), out _));
+			Assert.False(NpcSpawnScaffold.TryReadNoMorphWord2(Golden.Bytes("SpawnNpcCasilda"), out _));
 		}
 
 		// A RUNTIME-BEARING no-morph body (a large runtime record1, no morph table) still yields its header
 		// recordCount - the key to building the runtime tail from columns.
 		[Fact]
-		public void TryReadNoMorphRecordCount_ReadsRuntimeBearingForm()
+		public void TryReadNoMorphWord2_ReadsRuntimeBearingForm()
 		{
 			var animal = Golden.Bytes("SpawnNpcCrocodile");
 			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(animal, out var read));
@@ -66,7 +66,7 @@ namespace Faolan.Tests
 			post.CopyTo(body, postStart);
 			body.WriteU32Be(0, (uint)(body.Length - 4));
 
-			Assert.True(NpcSpawnScaffold.TryReadNoMorphRecordCount(body, out var rc));
+			Assert.True(NpcSpawnScaffold.TryReadNoMorphWord2(body, out var rc));
 			Assert.Equal(2u, rc);
 		}
 	}

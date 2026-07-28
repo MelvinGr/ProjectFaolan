@@ -9,7 +9,7 @@ namespace Faolan.Core.Database.Tables
 	//
 	// The whole spawn body is now CONSTRUCTED from typed columns (#243/#244): the transform from the columns below,
 	// the pre-IIR/post-IIR scaffolds from scratch, the stat core from NpcTemplate.StatCore, equipment from NpcSpawnEquipment,
-	// morphs from NpcSpawnMorph, and a no-morph spawn's post-IIR recordCount from NpcTemplate.StatCore.MinimalPostIirRecordCount.
+	// morphs from NpcSpawnMorph, and a no-morph spawn's post-IIR recordCount from NpcTemplate.StatCore.MinimalPostIirWord2.
 	// The captured FA015807 `Data` blob has been RETIRED - every shipped spawn builds from columns (988/988), so the
 	// column was dropped; the importer lifts these rows from the dump body at import time (never persisting it).
 	// The structured columns below are LIFTED from the ProtoCoreCharacterIIR: NPC identity/appearance

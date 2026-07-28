@@ -1497,7 +1497,7 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				var b = WorldObjectBuilder.ExtractBody(e.Data);
-				if (b != null && NpcSpawnScaffold.TryReadNoMorphRecordCount(b, out var rc))
+				if (b != null && NpcSpawnScaffold.TryReadNoMorphWord2(b, out var rc))
 					minimalRcByTemplate[e.TemplateId] = rc;
 			}
 
@@ -1537,7 +1537,7 @@ namespace Faolan.Importer.Captures
 
 				// #243: stamp the type's fresh minimal post-IIR recordCount from the dump-derived scan above.
 				if (npc.StatCore != null && minimalRcByTemplate.TryGetValue(e.TemplateId, out var minRc))
-					npc.StatCore.MinimalPostIirRecordCount = minRc;
+					npc.StatCore.MinimalPostIirWord2 = minRc;
 			}
 
 			await db.SaveChangesAsync();

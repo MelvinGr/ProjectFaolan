@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		private const int EntryFixedLength = 13;
 		private const uint FirstRecordLen = 5;
 		private const uint HeaderWord0 = 0;
-		private const uint RecordCount = 2;
+		private const uint Word2 = 2; // the post-IIR header's third word - not a record count (#475)
 
 		// record1 = the empty leading list ([u8 0][u32 0x3F1]).
 		private static readonly byte[] Record1 = [0x00, 0x00, 0x00, 0x03, 0xF1];
@@ -33,7 +33,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Builds the post-IIR bytes for a humanoid from its morph rows (the inverse of TryDecodeAppearance).
 		public static byte[] BuildPostIir(IReadOnlyList<NpcAppearanceMorph> morphs)
 		{
-			var stream = new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(FirstRecordLen).WriteUInt32(RecordCount).WriteArray(Record1).WriteUInt32(morphs.Count);
+			var stream = new FaolanStream().WriteUInt32(HeaderWord0).WriteUInt32(FirstRecordLen).WriteUInt32(Word2).WriteArray(Record1).WriteUInt32(morphs.Count);
 
 			foreach (var morph in morphs)
 				stream.WriteUInt32(morph.MorphId).WriteFloat(morph.Value).WriteUInt32(0).WriteByte(0).WriteArrayByteLength(Encoding.Latin1.GetBytes(morph.Text ?? ""));

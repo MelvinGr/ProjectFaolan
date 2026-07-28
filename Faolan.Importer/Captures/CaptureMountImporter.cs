@@ -72,8 +72,8 @@ namespace Faolan.Importer.Captures
 				{
 					type.StatCore ??= NpcStatCoreCodec.Lift(read.Message);
 					type.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
-					if (type.StatCore.MinimalPostIirRecordCount == null && NpcSpawnScaffold.TryReadNoMorphRecordCount(body, out var rc))
-						type.StatCore.MinimalPostIirRecordCount = rc;
+					if (type.StatCore.MinimalPostIirWord2 == null && NpcSpawnScaffold.TryReadNoMorphWord2(body, out var rc))
+						type.StatCore.MinimalPostIirWord2 = rc;
 
 					type.Equipment.Clear();
 					foreach (var entry in read.Message.InventoryEntries)
