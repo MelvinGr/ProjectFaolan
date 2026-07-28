@@ -1489,7 +1489,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Description")
-                        .HasMaxLength(512)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("ExcludeFromRandomLoot")
@@ -3016,7 +3016,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("REAL");
 
                     b.Property<string>("Description")
-                        .HasMaxLength(512)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("DotDelta")

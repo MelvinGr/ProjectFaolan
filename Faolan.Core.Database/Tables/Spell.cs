@@ -41,7 +41,7 @@ namespace Faolan.Core.Database.Tables
 		// itself carries magnitudes but not their meaning, so the description is how an effect gets identified (it is
 		// what pinned Frozen Hatred's fatality proc, #434) and how a decoded magnitude gets sanity-checked. Some carry
 		// the client's inline gender markup (#name{m:…|f:…}) verbatim - stored as-is, it is the client's own text.
-		[MaxLength(512)]
+		[MaxLength(2048)]
 		public string? Description { get; set; }
 
 		public uint DotType { get; set; }

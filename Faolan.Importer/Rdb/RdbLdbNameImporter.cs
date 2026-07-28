@@ -111,11 +111,11 @@ namespace Faolan.Importer.Rdb
 			// Descriptions (#414 items, #367 spells) cannot use the name crib - we hold no descriptions to crib against -
 			// which is exactly why they need the language index: they are taken from the English pages, full stop.
 			var descriptionEnglish = Merge(descriptionPages);
-			var descriptionsFilled = await BackfillDescriptionsAsync(await db.Items.ToListAsync(), i => i.Id, i => i.Description, (i, d) => i.Description = d, descriptionEnglish);
+			var descriptionsFilled = await BackfillDescriptionsAsync(await db.Items.ToListAsync(), i => i.Id, i => i.Description, (i, d) => i.Description = d, descriptionEnglish, logger);
 
 			var spellDescriptionEnglish = Merge(spellDescriptionPages);
 			var spellDescriptionsFilled =
-				await BackfillDescriptionsAsync(await db.Spells.ToListAsync(), s => s.Id, s => s.Description, (s, d) => s.Description = d, spellDescriptionEnglish);
+				await BackfillDescriptionsAsync(await db.Spells.ToListAsync(), s => s.Id, s => s.Description, (s, d) => s.Description = d, spellDescriptionEnglish, logger);
 
 			await db.SaveChangesAsync();
 			logger?.LogInformation(
@@ -186,9 +186,17 @@ namespace Faolan.Importer.Rdb
 
 		// Fills Description on the rows we hold, from the English page set. Only ever ADDS - never overwrites a
 		// description already stored, so a re-run is idempotent and a hand-edit survives. Shared by items and spells:
-		// both carry a 512-char Description keyed by their own id, from their own LDB category.
+		// both carry a Description keyed by their own id, from their own LDB category.
+		//
+		// The cap was 512 and it CLIPPED: 99 spells and one item landed on exactly that length, cut mid-word - "Tome
+		// of Epithur" ended at "significantly increases the recast", "Seal of Yog" at "the number of Seals consum".
+		// They are all long ability/perk tooltips, i.e. the descriptions carrying the most information. 2048 covers
+		// every one of them with room, and anything still over it is now WARNED about rather than silently shortened -
+		// a truncation nobody is told about is the same failure as an importer `continue`.
+		private const int MaxDescription = 2048;
+
 		private static Task<int> BackfillDescriptionsAsync<T>(List<T> rows, Func<T, uint> idOf, Func<T, string?> descriptionOf, Action<T, string> setDescription,
-			Dictionary<uint, string> english)
+			Dictionary<uint, string> english, ILogger? logger = null)
 		{
 			if (english.Count == 0)
 				return Task.FromResult(0);
@@ -199,9 +207,13 @@ namespace Faolan.Importer.Rdb
 				if (!string.IsNullOrEmpty(descriptionOf(row)) || !english.TryGetValue(idOf(row), out var text) || string.IsNullOrWhiteSpace(text))
 					continue;
 
-				setDescription(row, text.Length > 512
-					? text[..512]
-					: text);
+				if (text.Length > MaxDescription)
+				{
+					logger?.LogWarning("LDB description for id {Id} is {Length} chars, over the {Max}-char column - CLIPPED. Widen Description if this recurs.", idOf(row), text.Length, MaxDescription);
+					text = text[..MaxDescription];
+				}
+
+				setDescription(row, text);
 				filled++;
 			}
 
