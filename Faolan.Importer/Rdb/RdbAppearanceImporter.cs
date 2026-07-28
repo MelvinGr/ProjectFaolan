@@ -91,6 +91,14 @@ namespace Faolan.Importer.Rdb
 					AddList(rows, sex, race, "bodymarkings", raceEl.Elements("bodymarkings"), "texscript", "*texscript_", null, id => CleanTexName(ResourceName(TexScriptType, id)));
 					AddList(rows, sex, race, "facemarkings", raceEl.Elements("facemarkings"), "texscript", "*texscript_", null, id => CleanTexName(ResourceName(TexScriptType, id)));
 
+					// beard and piercings are MESH lists exactly like hair (`meshid`, "0" = the creator's none
+					// placeholder), and were simply never read - 294 beard options and 14 piercing ones dropped on
+					// every import. `body` is one monsterdataid per race/sex: the value Faolan.Web's CharacterModelService
+					// currently carries as a hardcoded BodyMonster table, so that table can now be sourced instead.
+					AddList(rows, sex, race, "beard", raceEl.Elements("beard"), "meshid", "*hairmesh_", null, null);
+					AddList(rows, sex, race, "piercings", raceEl.Elements("piercings"), "meshid", "*hairmesh_", null, null);
+					AddList(rows, sex, race, "body", raceEl.Elements("body"), "monsterdataid", "", null, null);
+
 					var hseq = 0;
 					foreach (var he in raceEl.Elements("head"))
 					{
