@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Faolan.Core.Enums;
 using System.Linq;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Xunit;
@@ -49,6 +51,53 @@ namespace Faolan.Tests
 			// after that is the second stat list and the spell list, which is the per-character part.
 			Assert.All(shapes.Keys, shape => Assert.StartsWith("f8x0,f8x0,f8x17,f8x148", shape));
 			Assert.Equal(10, shapes.Count);
+		}
+
+		// ⚠️ THE STAT TABLE LABELS ITSELF. #393 asks for the PostAccessBlock's slots to be labelled; the slots carry
+		// their own ids on the wire, so there is nothing to label by position. Every one of the 22,348 stat ids in
+		// the corpus is a defined CharacterStatId - and the table is literally TWO IDENTICAL COPIES of the same run,
+		// which is what SubClassPostAccessBlock.HasRepeatedStatTable detects and why a vitals patch writes both.
+		[Fact]
+		public void TheStatTable_IsSelfLabellingAndDoubled()
+		{
+			var ids = 0;
+			var unknown = new HashSet<uint>();
+			var names = new HashSet<string>();
+			var tables = 0;
+
+			foreach (var (_, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
+			{
+				if (!SnapshotTailRegion.TryParse(sub.UnknownAfterAccessWindowTable ?? [], out var parsed))
+					continue;
+
+				var table = parsed.StatTable;
+				Assert.NotNull(table);
+				tables++;
+
+				// 148 pairs = 74 pairs, twice. The halves match in ids AND values on every capture.
+				Assert.Equal(296, table.Words.Count);
+				var half = table.Words.Count / 2;
+				for (var i = 0; i < half; i++)
+					Assert.Equal(table.Words[i], table.Words[half + i]);
+
+				foreach (var pair in table.Pairs)
+				{
+					ids++;
+					if (Enum.IsDefined(typeof(CharacterStatId), pair.Id))
+						names.Add(((CharacterStatId)pair.Id).ToString());
+					else
+						unknown.Add(pair.Id);
+				}
+			}
+
+			Assert.Equal(151, tables);
+			Assert.Equal(151 * 148, ids);
+
+			// NOT ONE unknown id across the corpus - the catalog already covers everything this table names.
+			Assert.Empty(unknown);
+			Assert.Contains("HealthMax", names);
+			Assert.Contains("HealthCurrent", names);
+			Assert.Contains("StaminaMax", names);
 		}
 
 		// The 12-byte lists are the known-spell/feat records of #74: the middle word is the "no bound bar slot"

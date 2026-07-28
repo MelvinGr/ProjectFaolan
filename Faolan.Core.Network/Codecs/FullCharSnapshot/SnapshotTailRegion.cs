@@ -44,6 +44,40 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// id-map), so it reads as a per-character counter table.
 		public List<SnapshotTailPair> PairTail { get; } = [];
 
+		// The character's STAT TABLE, and the reason #393's "label the slots" question dissolves: the table is
+		// SELF-LABELLING. Every element is [u32 statId][u32 value] and every one of the 22,348 ids across the corpus
+		// is a defined CharacterStatId - HealthCurrent, HealthMax, Intelligence, StaminaMax, PvpMaxExp - so a value
+		// is found BY ID rather than by counting slots. (SubClassPostAccessBlock still indexes this table
+		// POSITIONALLY through CharacterValueIndex, whose names are early-dev guesses; the ids are on the wire.)
+		//
+		// It is identified by CONTENT, not by position: it is the stride-8 list that is TWO IDENTICAL COPIES of the
+		// same run - same ids AND same values in both halves, on all 151 captures. That doubling is what
+		// SubClassPostAccessBlock.HasRepeatedStatTable detects, and why patching a vital has to write both halves.
+		public SnapshotTailList? StatTable
+		{
+			get
+			{
+				foreach (var list in Lists)
+					if (list.Stride == 8 && list.Words.Count >= 4 && IsDoubled(list))
+						return list;
+
+				return null;
+			}
+		}
+
+		private static bool IsDoubled(SnapshotTailList list)
+		{
+			if (list.Words.Count % 4 != 0)
+				return false;
+
+			var half = list.Words.Count / 2;
+			for (var i = 0; i < half; i++)
+				if (list.Words[i] != list.Words[half + i])
+					return false;
+
+			return true;
+		}
+
 		public static bool TryParse(byte[] region, [NotNullWhen(true)] out SnapshotTailRegion? parsed)
 		{
 			parsed = null;
@@ -152,6 +186,19 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	{
 		public int Stride { get; init; } = 8;
 		public List<uint> Words { get; } = [];
+
+		// The stride-8 shape read as what it is: [u32 id][u32 value].
+		public IEnumerable<SnapshotTailPair> Pairs
+		{
+			get
+			{
+				if (Stride != 8)
+					yield break;
+
+				for (var i = 0; i + 1 < Words.Count; i += 2)
+					yield return new SnapshotTailPair(Words[i], Words[i + 1]);
+			}
+		}
 	}
 
 	// One element of the base reader's trailing list: a byte and two 8-byte reads (FUN_0048f720 reads 8).

@@ -308,6 +308,21 @@ Lists D and E carry VARIABLE-width records (both call ReadString) and are empty 
 empty frame is which is not observable on the wire; `SnapshotTailRegion` holds the lists generically rather than
 labelling them beyond what the captures can prove.
 
+### The stat table LABELS ITSELF (2026-07-28, #393)
+
+`StatList_t` #1 is not a positional array that needs slot names — every element is `[u32 statId][u32 value]`, and
+**all 22,348 stat ids across the 151 captures are defined `CharacterStatId` values**, not one unknown. The names
+read exactly as a character sheet: `HealthCurrent=8000`, `HealthMax=8000`, `Intelligence=10`, `StaminaMax=5000`,
+`PvpMaxExp=3500`. A value is found BY ID; nothing needs counting.
+
+The table is also **two identical copies** of the same 74-pair run — same ids *and* same values in both halves, on
+every capture. That doubling is what `SubClassPostAccessBlock.HasRepeatedStatTable` detects, and why patching a
+vital has to write both halves.
+[V3: SnapshotTailRegionTests.TheStatTable_IsSelfLabellingAndDoubled]
+
+⚠️ `SubClassPostAccessBlock` still indexes this table POSITIONALLY through `CharacterValueIndex`, whose names are
+early-dev guesses (word 80 is MaxExp, not XP). The ids are on the wire; that indirection is now avoidable.
+
 ## The per-character KNOWN-SPELL/FEAT list (decoded 2026-06-20, #74) — relog persistence + bar placement
 
 NOT the stride-0x14 `SpellBook_t` above (region 11). The list that actually carries a character's **learned
