@@ -12,28 +12,36 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// captured template/burst bytes.
 	public sealed class PlayerSpawnScaffold
 	{
+		// The player's own values for the shared header's last two words. Constant across every captured player spawn,
+		// which is why they used to be bare literals in the codec - but constant for the PLAYER, not for the protocol:
+		// an NPC carries 5 and 1/2/3 in the same two slots (SpawnPostIirHeader).
+		public const uint PostIirFirstRecordLen = 4;
+		public const uint PostIirWord2 = 2;
+
+		// The post-IIR stream MINUS its entry slot: the header, the first record, the active buffs and the three
+		// closing pair lists. Shared with the NPC family verbatim (SpawnPostIirCommon) - the entry table and ID list
+		// below are the only part of that stream this codec reads for itself.
+		public SpawnPostIirCommon Common { get; set; } = new()
+		{
+			Header = new SpawnPostIirHeader
+			{
+				FirstRecordLen = PostIirFirstRecordLen,
+				Word2 = PostIirWord2
+			}
+		};
+
 		public List<ScaffoldEntry> Entries { get; } = [];
 
 		public List<ScaffoldIdEntry> IdList { get; } = [];
 
-		// EndPairs (the first ending list) IS the FACTION-REPUTATION block: Id = faction id, Value = signed standing
-		// (+/-50000) shown in the client's Factions window. See CharacterScaffoldPair / Gitea #315.
-		public List<ScaffoldPair> EndPairs { get; } = [];
-		public List<ScaffoldPair> EndPairs2 { get; } = [];
-
-		// A THIRD pair list, and the body's last field. What used to be called "the final 0x3F1 marker" is its count
-		// word: 0x3F1 is ForCount(0), and it is empty on all but 10 captured spawns, so it read as a closing constant.
-		// Note the asymmetry, which is what the bytes say rather than what is tidy: EndPairs/EndPairs2 are framed by a
-		// PLAIN count, this one by a ListFrame word. Every observed element is (975, 0).
-		public List<ScaffoldPair> EndPairs3 { get; } = [];
-
-		// The plain-counted list that OPENS the post-IIR stream, before the constant 4. Empty on all but 2 captured
-		// spawns (which carry a single word, 60), which is why the pair read as the constant [0][4] for so long.
-		public List<uint> HeadWords { get; } = [];
-
-		// The character's ACTIVE BUFFS - transient session state, present only on a captured character that had one
-		// running. Decoded (#475); see ScaffoldBuff.
-		public List<ScaffoldBuff> BuffRecords { get; } = [];
+		// The three closing pair lists, the character's active buffs and the header's head-word list all live on
+		// Common - they are not player fields, and the NPC stream carries every one of them. Kept reachable here
+		// because that is how the rest of the codebase (the faction rows, the row builders, the tests) names them.
+		public List<ScaffoldPair> EndPairs => Common.EndPairs;
+		public List<ScaffoldPair> EndPairs2 => Common.EndPairs2;
+		public List<ScaffoldPair> EndPairs3 => Common.EndPairs3;
+		public List<uint> HeadWords => Common.Header.HeadWords;
+		public List<ScaffoldBuff> BuffRecords => Common.BuffRecords;
 
 		// The embedded ProtoCoreCharacterIIR bytes (typed round-trip via FromProtobuf/ToProtobufBytes is
 		// byte-identical; see PlayerSpawnGenerationTests).
@@ -97,53 +105,4 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// One 13-byte record closing the ID list: [u32 0xC350][u32 Id][u32 0][u8 Kind]. Kind is 0x01 or 0x04 in the
 	// captures. The leading 0xC350 and the zero word are fixed and asserted on parse rather than carried.
 	public readonly record struct ScaffoldTailRef(uint Id, byte Kind);
-
-	// One 8-byte ending pair [u32 id][s32 value] (ids are decades 10..110).
-	public readonly record struct ScaffoldPair(uint Id, int Value);
-
-	// One 60-byte ACTIVE BUFF record in the post-IIR stream, count-framed. Fifteen u32, decoded over all 95 captured
-	// records (Gitea #475) - it was carried as an opaque byte[] described only as "buff/timer state".
-	//
-	// What the corpus establishes, and what it does not:
-	//   SpellId       w0  - THE find: 35 of its 36 distinct values are rows in our own Spells catalog, and they read
-	//                       as a buff bar - "Hearty Meal", "Focused Mind", "Refresh Strength", "Death Penalty 1",
-	//                       "Spirit of the Bear (Rank 1)". That is what identifies the record.
-	//   Kind          w1  - ListFrame.ForCount(1) on all 95. ⚠️ Whether that is a CONSTANT or a real one-element
-	//                       list count cannot be decided from this corpus: the value never varies, so the record's
-	//                       fixed 60-byte width is equally consistent with "a constant" and with "a one-element list
-	//                       whose element is the remaining 52 bytes". That is the 0x7E2 trap's exact signature, so it
-	//                       is written as ForCount(1) rather than as a magic number, and CARRIED per record - a
-	//                       capture with a count of 2 then round-trips and shows up, instead of being rejected.
-	//   SourceHandle  w2  - 0 on 94; the one exception carries a value in the same 0x131xxxx range as TargetHandle,
-	//                       so it reads as an entity reference that is simply absent for a self-applied buff.
-	//   Stamp         w3  - 37 distinct large values (874724..98289218), unrelated to the timer pair. Unknown.
-	//   TimerTotal    w4  } TimerRemaining <= TimerTotal on ALL 95 records, which is what makes them a PAIR rather
-	//   TimerRemaining w5 } than two independent numbers. Their unit is not pinned; only the ordering is evidence.
-	//   CasterLevel   w7  - 1..80 exactly, the game's level range. #438 independently found the caster's LEVEL in the
-	//                       MagicBuff payload, which is the same quantity arriving by another route.
-	//   TargetClass   w8  - EntityClass.Character (0xC350) on all 95, and
-	//   TargetHandle  w9  - the spawning character's own handle on 94 of 95: the standard [class][handle] entity
-	//                       reference, i.e. who the buff is ON.
-	//   Word6, Trailer    - zero on every record. Carried rather than asserted, so a non-zero one round-trips
-	//                       instead of being silently dropped.
-	public sealed class ScaffoldBuff
-	{
-		public const int ByteCount = 60;
-		public const int TrailerWords = 5;
-
-		// See the Kind note above: ForCount(1) on every captured record, and not provably a constant.
-		public static readonly uint DefaultKind = ListFrame.ForCount(1);
-
-		public uint SpellId { get; set; }
-		public uint Kind { get; set; } = DefaultKind;
-		public uint SourceHandle { get; set; }
-		public uint Stamp { get; set; }
-		public uint TimerTotal { get; set; }
-		public uint TimerRemaining { get; set; }
-		public uint Word6 { get; set; }
-		public uint CasterLevel { get; set; }
-		public uint TargetClass { get; set; } = EntityClass.Character;
-		public uint TargetHandle { get; set; }
-		public uint[] Trailer { get; set; } = new uint[TrailerWords];
-	}
 }

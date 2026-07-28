@@ -12,12 +12,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	{
 		public const uint Marker = ListFrame.Unit;
 
-		// The player's own values for the shared post-IIR header's last two words (see SpawnPostIirHeader). Constant
-		// across every captured player spawn, which is why they used to be bare literals - but constant for the
-		// PLAYER, not for the protocol: an NPC carries 5 and 1/2/3 in the same two slots.
-		private const uint PlayerFirstRecordLen = 4;
-		private const uint PlayerWord2 = 2;
-
 		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 
@@ -72,25 +66,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		{
 			var count = s.Entries.Count;
 			var b = new FaolanStream();
-			// The shared post-IIR header - the same three-word opening the NPC stream carries (SpawnPostIirHeader).
-			// The `4` is the length of the FIRST RECORD alone: the buff list's count word, which stays 4 whether the
-			// character has 0 or 3 buffs, because the buff records are that list's elements rather than more records.
-			var header = new SpawnPostIirHeader
-			{
-				FirstRecordLen = PlayerFirstRecordLen,
-				Word2 = PlayerWord2
-			};
-			header.HeadWords.AddRange(s.HeadWords);
-			b.WriteArray(header.ToArray()).WriteUInt32(Marker * ((uint)s.BuffRecords.Count + 1));
-			foreach (var buff in s.BuffRecords)
-			{
-				b.WriteUInt32(buff.SpellId).WriteUInt32(buff.Kind).WriteUInt32(buff.SourceHandle).WriteUInt32(buff.Stamp).WriteUInt32(buff.TimerTotal).WriteUInt32(buff.TimerRemaining)
-					.WriteUInt32(buff.Word6).WriteUInt32(buff.CasterLevel).WriteUInt32(buff.TargetClass).WriteUInt32(buff.TargetHandle);
-				foreach (var word in buff.Trailer)
-					b.WriteUInt32(word);
-			}
 
-			b.WriteUInt32(count).WriteUInt32(s.EntryTableX);
+			// The header, the first record and the buff list - the part of this stream that is not the player's
+			// (SpawnPostIirCommon). The player's first record IS the buff list's framing word, which is why its
+			// length stays 4 whether the character has 0 or 3 buffs: the records are that list's ELEMENTS.
+			s.Common.WritePrologue(b);
+
+			b.WriteUInt32((uint)count).WriteUInt32(s.EntryTableX);
 			if (count > 0)
 				b.WriteUInt32(0x3F800000);
 			foreach (var entry in s.Entries)
@@ -109,18 +91,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			else
 				b.WriteUInt32(Marker);
 
-			foreach (var pairs in new[] { s.EndPairs, s.EndPairs2 })
-			{
-				b.WriteUInt32(pairs.Count);
-				foreach (var pair in pairs)
-					b.WriteUInt32(pair.Id).WriteUInt32(pair.Value);
-			}
-
-			// ForCount(0) IS 0x3F1, so an empty third list regenerates the exact closing word it always did.
-			b.WriteUInt32(ListFrame.ForCount(s.EndPairs3.Count));
-			foreach (var pair in s.EndPairs3)
-				b.WriteUInt32(pair.Id).WriteUInt32((uint)pair.Value);
-
+			// The three closing pair lists, shared with the NPC stream byte for byte.
+			s.Common.WriteTail(b);
 			return b.ToArray();
 		}
 
@@ -179,56 +151,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		private static void ParsePostIir(byte[] b, int i, PlayerSpawnScaffold s)
 		{
-			// The shared header (SpawnPostIirHeader): a plain-counted head-word list, then firstRecordLen and word2.
-			// The head list read as the constant pair [0][4] for a long time because it is empty on all but a few
-			// captured spawns - those carry [1][60][4]. Same mistake as the two count-FRAMED lists below, in the one
-			// spelling ListFrame does not cover: a bare count, not an n*0x3F1 word.
-			//
-			// The two values are ASSERTED rather than carried because this codec only ever parses PLAYER spawns, and
-			// every captured one has 4 and 2. An NPC's 5 and 1/2/3 landing here means the body is not a player
+			// The header, the first record and the buff list come from the shared reader (SpawnPostIirCommon), which
+			// hands back where the ENTRY SLOT starts - the only part of this stream that is the player's own.
+			s.Common = SpawnPostIirCommon.ReadPrologue(b, i, out i);
+
+			// The header's two family words are ASSERTED rather than carried, because this codec only ever parses PLAYER
+			// spawns and every captured one has 4 and 2. An NPC's 5 and 1/2/3 landing here means the body is not a player
 			// scaffold, which is exactly what the caller wants to be told.
-			if (SpawnPostIirHeader.Read(b, i) is not { } header)
-				throw new FormatException("post-IIR is too short to hold its header");
-
-			s.HeadWords.AddRange(header.HeadWords);
-			i += header.ByteCount;
-			if (header.FirstRecordLen != PlayerFirstRecordLen)
-				throw new FormatException($"post-IIR firstRecordLen {header.FirstRecordLen} is not the player's {PlayerFirstRecordLen}");
-			if (header.Word2 != PlayerWord2)
-				throw new FormatException($"post-IIR word2 {header.Word2} is not the player's {PlayerWord2}");
-
-			// The next field is 0x3F1 * (buffRecordCount + 1); each active buff/timer adds a 60-byte record.
-			var key = U32(b, ref i);
-			if (key == 0 || key % Marker != 0)
-				throw new FormatException($"post-IIR key 0x{key:X} is not a multiple of 0x3F1");
-
-			// The record's word at +32 is 0xC350 on all but ONE captured record, which carries 0 - so it is a field of
-			// the record, not a shape signature, and asserting it rejected a spawn whose walk was otherwise exact. The
-			// count comes from the framing word above and the walk is proven by landing on b.Length, which is the check
-			// that was doing the real work all along.
-			for (var n = key / Marker - 1; n > 0; n--)
-			{
-				if (i + ScaffoldBuff.ByteCount > b.Length)
-					throw new FormatException($"buff record {n} runs past the body");
-
-				var buff = new ScaffoldBuff
-				{
-					SpellId = U32(b, ref i),
-					Kind = U32(b, ref i),
-					SourceHandle = U32(b, ref i),
-					Stamp = U32(b, ref i),
-					TimerTotal = U32(b, ref i),
-					TimerRemaining = U32(b, ref i),
-					Word6 = U32(b, ref i),
-					CasterLevel = U32(b, ref i),
-					TargetClass = U32(b, ref i),
-					TargetHandle = U32(b, ref i)
-				};
-				for (var w = 0; w < ScaffoldBuff.TrailerWords; w++)
-					buff.Trailer[w] = U32(b, ref i);
-
-				s.BuffRecords.Add(buff);
-			}
+			if (s.Common.Header.FirstRecordLen != PlayerSpawnScaffold.PostIirFirstRecordLen)
+				throw new FormatException($"post-IIR firstRecordLen {s.Common.Header.FirstRecordLen} is not the player's {PlayerSpawnScaffold.PostIirFirstRecordLen}");
+			if (s.Common.Header.Word2 != PlayerSpawnScaffold.PostIirWord2)
+				throw new FormatException($"post-IIR word2 {s.Common.Header.Word2} is not the player's {PlayerSpawnScaffold.PostIirWord2}");
 
 			var count = U32(b, ref i);
 			if (count > 0x1000)
@@ -291,36 +224,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			else if (U32(b, ref i) != Marker)
 				throw new FormatException("bare ID-list terminator missing");
 
-			ReadPairs(b, ref i, s.EndPairs);
-			ReadPairs(b, ref i, s.EndPairs2);
-
-			// The body's last field is a THIRD pair list, count-FRAMED rather than plain-counted. It was read as a
-			// closing 0x3F1 constant because ForCount(0) is 0x3F1 and it is empty on all but 10 captured spawns - the
-			// same trap as the ID-list close above.
-			var endFrame = U32(b, ref i);
-			if (!ListFrame.TryCountOf(endFrame, out var endCount))
-				throw new FormatException($"final list word 0x{endFrame:X} is not count-framed");
-
-			for (var n = 0; n < endCount; n++)
-			{
-				var id = U32(b, ref i);
-				s.EndPairs3.Add(new ScaffoldPair(id, (int)U32(b, ref i)));
-			}
-			if (i != b.Length)
-				throw new FormatException($"{b.Length - i} trailing bytes after the final marker");
-		}
-
-		private static void ReadPairs(byte[] b, ref int i, List<ScaffoldPair> pairs)
-		{
-			var n = U32(b, ref i);
-			if (n > 0x100)
-				throw new FormatException($"implausible pair count {n}");
-
-			for (; n > 0; n--)
-			{
-				var id = U32(b, ref i);
-				pairs.Add(new ScaffoldPair(id, (int)U32(b, ref i)));
-			}
+			// The three closing pair lists, and the requirement that they land on the body's LAST byte, are shared with
+			// the NPC stream (SpawnPostIirCommon) - the end-exactness is what proves the entry table above was read right.
+			s.Common.ReadTail(b, i);
 		}
 
 		// Cursor reads over the FA015807 body. The parse path is offset-addressed (it anchors the CharacterIIR by
