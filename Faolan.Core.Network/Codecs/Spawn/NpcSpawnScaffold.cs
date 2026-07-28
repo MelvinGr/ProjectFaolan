@@ -27,15 +27,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// replayed. The codecs below are the validated from-scratch foundation, byte-exact here.
 	public static class NpcSpawnScaffold
 	{
-		// The minimal post-IIR length, in bytes (the constant freshly-spawned form).
+		// The minimal post-IIR length, in bytes, for a freshly-spawned WORLD npc. Not the shortest form on the wire:
+		// the 21 create-editor preview spawns carry a 40-byte one, identical except that it lacks the leading rank
+		// byte before the first list word (and so has firstRecordLen 4 rather than 5). Censused over all 11,632
+		// captured post-IIR streams (#475).
 		public const int MinimalPostIirLength = 41;
 		public const uint MinimalHumanoidRecordCount = 2;
 
-		// The record-group count in the minimal (no-morph) form: observed as 1 or 2. A TYPE-STABLE constant (no type
-		// ships both) whose meaning isn't decoded - NOT an animal-vs-humanoid split (both values carry people AND
-		// creatures; the names below are historical, from the beach-burst sample where the animals happened to be 1 and
-		// the no-morph humanoids 2). BuildMinimalPostIir(rc) reproduces either; the type's value is stored in
-		// NpcStatCore.MinimalPostIirRecordCount (#243).
+		// The record-group count in the minimal (no-morph) form. A TYPE-STABLE constant whose meaning isn't decoded -
+		// NOT an animal-vs-humanoid split (both values carry people AND creatures; the names here are historical, from
+		// the beach-burst sample where the animals happened to be 1 and the no-morph humanoids 2).
+		// ⚠️ It is 1, 2 or **3**, not "1 or 2" as this said: a corpus-wide census of the 3,272 captured 41-byte forms
+		// gives 1 x757, 2 x2492 and 3 x23 (#475). Nothing here rejects a 3 - BuildMinimalPostIir(rc) takes the count
+		// and the type's own value is stored in NpcStatCore.MinimalPostIirRecordCount (#243) - but the claim that only
+		// two values exist was wrong, and it is the kind of claim a later "simplification" would have leaned on.
 		public const uint MinimalRecordCount = 1;
 
 		// firstRecordLen = len(post) - 36 (the header's self-length of the first record group).
