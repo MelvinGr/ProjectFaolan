@@ -6,6 +6,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Extensions;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
@@ -74,6 +75,7 @@ namespace Faolan.Tests
 					.Include(c => c.Body)
 					.Include(c => c.Attributes)
 					.Include(c => c.Skills)
+					.Include(c => c.BodyResources)
 					.SingleAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken);
 				Assert.Equal(0x01316D2Bu, character.Id); // the ORIGINAL retail id (the spawn handle)
 				Assert.Equal(7u, character.AccountId);
@@ -98,6 +100,36 @@ namespace Faolan.Tests
 				Assert.NotEqual(1f, character.RotationW); // a real captured W, not the identity fallback
 				Assert.NotNull(character.MaxStats);
 				Assert.Equal(14, character.Attributes.Count); // 6 weighted + 7 morphs + closer
+
+				// Those 7 morph entries must also reach CharacterBody, which is the model Faolan.Web renders from and
+				// the one RefreshAppearance regenerates the scaffold FROM. They used to stay at zero, so an imported
+				// character looked right in game (the spawn replays the scaffold) and unmorphed everywhere else - and
+				// the first appearance edit would have rebuilt the scaffold from those zeros and lost them.
+				// BuildEntries skips a zero slider, so 7 entries means all 7 body sliders are non-zero.
+				float[] bodyMorphs = [character.Body!.Arm, character.Body.Chest, character.Body.Bosom, character.Body.Stomach, character.Body.Arse, character.Body.Thigh, character.Body.Leg];
+				Assert.All(bodyMorphs, m => Assert.NotEqual(0f, m));
+
+				// And they round-trip: regenerating the scaffold from the body reproduces each captured morph entry
+				// exactly, tag and value. Matched by TAG rather than by filtering on the type byte - type 0x01 is not
+				// morph-only, the weighted appearance rows use it too (slider ids 68 and 10 here, which are not
+				// sliders at all), so a type filter sweeps those in and the comparison fails on THEM, not on a morph.
+				var regenerated = CharacterMorphs.BuildEntries(character.Body, 7);
+				Assert.Equal(7, regenerated.Count);
+				foreach (var entry in regenerated)
+					Assert.Contains(character.Attributes, a => a.Tag == entry.Tag && a.Value == entry.Value);
+
+				// The weighted entries are recovered as resource refs (the inverse of BuildWeightedEntries, which maps
+				// a ref to its MorphTarget's Id = the entry tag). This test seeds no MorphTargets, so NOTHING should
+				// resolve - that is the property worth pinning here: recovery is driven entirely by the catalog and
+				// never invents a ref. The real inversion is exercised against the shipped catalog, where every
+				// captured tag resolves (e.g. Hakotep's 686 -> "*beardmesh_3181881", 296 -> "*hairmesh_566202").
+				Assert.Empty(character.BodyResources);
+
+				// And a morph slider must never be mistaken for a resource - the two share a tag space (MorphTargets
+				// carries entries literally named "arm"/"chest"/"bosom" at ids 256..258, which are also the type-1
+				// slider tags), so the discriminator is the whole (type, id) pair, not the type byte.
+				Assert.All(character.Attributes.Where(a => CharacterMorphs.IsMorphTag(a.Tag)),
+					a => Assert.DoesNotContain(character.BodyResources, r => r.Sequence == a.Sequence));
 				Assert.Equal(20, character.Skills.Count);
 
 				// Re-run: nothing added, nothing changed.

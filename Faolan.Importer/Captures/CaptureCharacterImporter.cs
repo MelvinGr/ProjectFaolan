@@ -261,6 +261,39 @@ namespace Faolan.Importer.Captures
 			// pre-IIR UNLOCKED FEAT list (a different region + id-space; see [[feat_trees_decode_251]] / feats.md).
 			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
 
+			// Project the scaffold's morph entries back into CharacterBody, which is the model everything else reads.
+			// Without this an imported character carried its morphs ONLY as scaffold rows: the client saw them (the
+			// spawn is replayed from those rows) but Faolan.Web rendered an unmorphed body, and the first appearance
+			// edit would have regenerated the scaffold from a zeroed CharacterBody and destroyed them.
+			var morphsApplied = CharacterMorphs.ApplyEntries(character.Body, character.Attributes.Select(a => (a.Tag, a.Value)));
+
+			// And recover the WEIGHTED entries as CharacterBodyResources. BuildWeightedEntries maps a resource ref to
+			// its MorphTarget's Id (the entry tag) and Weight, so the inverse is a lookup by id - tag 133 comes back
+			// as "*beardmesh_210844", 226 as "*texscript_202392", and so on. Without this an imported character had no
+			// resource rows at all, so Faolan.Web rendered it hairless and ResolveWeightedAppearance fell through to
+			// DIKKETEST's face on any appearance edit.
+			//
+			// This is also what makes CharacterAttributes fully DERIVED rather than a second source of truth: weighted
+			// rows from BodyResources, morph rows from Body, the closer from the class.
+			var byId = await db.MorphTargets.ToDictionaryAsync(m => (ushort)m.Id, m => m.Name);
+			var resourcesRecovered = 0;
+			foreach (var attribute in character.Attributes.OrderBy(a => a.Sequence))
+			{
+				// A morph slider is not a resource - it is regenerated from CharacterBody, not from a ref.
+				if (CharacterMorphs.IsMorphTag(attribute.Tag) || !byId.TryGetValue(attribute.Tag, out var resourceRef))
+					continue;
+
+				character.BodyResources.Add(new CharacterBodyResource
+				{
+					CharacterId = character.Id,
+					Sequence = resourcesRecovered++,
+					Ref = resourceRef
+				});
+			}
+
+			if (morphsApplied > 0 || resourcesRecovered > 0)
+				Console.WriteLine($"  {character.Name}: lifted {morphsApplied} morph slider(s) into CharacterBody and recovered {resourcesRecovered} appearance resource(s).");
+
 			// Worn equipment: every IIR InventoryEntry whose template is a DB item.
 			var equipment = new CharacterEquipment
 			{

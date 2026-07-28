@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
 
@@ -58,6 +59,50 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			}
 
 			return entries;
+		}
+
+		// Whether a scaffold entry tag is one of the morph sliders (rather than a weighted appearance entry). The type
+		// byte alone will NOT do: type 0x01 is shared - the weighted rows use it too, with slider ids outside the
+		// slider table - so the whole (type, id) pair has to match.
+		public static bool IsMorphTag(ushort tag)
+		{
+			var type = (byte)(tag >> 8);
+			var sliderId = (byte)(tag & 0xFF);
+			return Sliders.Any(s => s.Type == type && s.SliderId == sliderId);
+		}
+
+		// The INVERSE of BuildEntries: reads captured scaffold entries back into the body's columns.
+		//
+		// Needed because a captured character came in with its morphs stored ONLY as scaffold rows, and CharacterBody -
+		// which is the single model everything else reads - left at zero. That was not merely cosmetic. The spawn the
+		// client gets is replayed from the scaffold, so the character looked right in game; but Faolan.Web renders from
+		// CharacterBody, so the viewer showed an unmorphed character, and worse, RefreshAppearance REGENERATES the
+		// scaffold's morph entries from CharacterBody - so the first appearance edit of an imported character would
+		// have silently wiped the captured morphs it never knew about.
+		//
+		// Entries that are not morph sliders (the weighted appearance rows, the closer) simply do not match a slider
+		// and are skipped. Returns how many landed.
+		public static int ApplyEntries(CharacterBody body, IEnumerable<(ushort Tag, uint Value)> entries)
+		{
+			var applied = 0;
+			foreach (var (tag, bits) in entries)
+			{
+				var type = (byte)(tag >> 8);
+				var sliderId = (byte)(tag & 0xFF);
+
+				foreach (var slider in Sliders)
+				{
+					if (slider.Type != type || slider.SliderId != sliderId)
+						continue;
+
+					// BuildEntries stores value / 1000 as float bits; undo exactly that.
+					slider.Set(body, BitConverter.UInt32BitsToSingle(bits) * 1000f);
+					applied++;
+					break;
+				}
+			}
+
+			return applied;
 		}
 
 		// Stores one editor SetMorphValue into the body: strips the face slot prefix ("33_NoseCrookedRight") and
