@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.World;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -29,11 +30,21 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// The stream's opening header (shared already, since #475's first pass).
 		public SpawnPostIirHeader Header { get; set; } = new();
 
-		// The first record's bytes BEFORE the buff list's framing word - the one region of the post-IIR still carried
-		// opaque. Bounded and well-censused: EMPTY on every player stream, a single 0x00 byte on the 9,694 captured
-		// fresh NPC streams, and 20..1,273 bytes of accrued runtime state on the ~1,600 mid-session ones. A
-		// from-scratch build emits the fresh form, so nothing we construct depends on the unknown shape.
-		public byte[] FirstRecordPrefix { get; set; } = [];
+		// The first record's MOVE TASK slot, ahead of the buff list's framing word (Gitea #477). An NPC's record
+		// opens with a presence byte - 0 on a fresh spawn, 1 followed by the entity's current MoveTaskNode - and a
+		// player's record has no slot at all (its first record IS the buff frame, length 4).
+		//
+		// This was the last opaque region of the spawn stream, carried as bytes and written up as "runtime state the
+		// simulation re-derives, 20..1,273 bytes". It is a MoveTask, and we have parsed that grammar since #53: all
+		// 1,679 captured prefixes are consumed to their exact last byte by MoveTaskNode.Read, in the same five modes
+		// the MoveTaskIIR packet uses (path x1,636, approach-facing x22, approach-target x18, ...). Same lesson as
+		// the pre-IIR frame and the morph table before it - the sibling codec already modelled it.
+		public MoveTaskNode? MoveTask { get; set; }
+
+		// Whether the first record carries the move-task slot at all: true on every NPC stream, false on every
+		// player one. Kept distinct from `MoveTask == null`, because a fresh NPC has the SLOT with no task in it and
+		// that is one byte of wire difference.
+		public bool HasMoveTaskSlot { get; set; }
 
 		public List<ScaffoldBuff> BuffRecords { get; } = [];
 
@@ -62,7 +73,24 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (frame + 4 > post.Length)
 				throw new FormatException("the first record runs past the stream");
 
-			common.FirstRecordPrefix = post[i..frame];
+			// The move-task slot, if the record has one. It must consume EXACTLY the bytes ahead of the buff frame -
+			// that is what says the slot was read as the right thing rather than skipped over.
+			if (frame > i)
+			{
+				common.HasMoveTaskSlot = true;
+				var flag = post[i];
+				if (flag == 1)
+				{
+					var reader = new FaolanStream(post[(i + 1)..frame]);
+					common.MoveTask = MoveTaskNode.Read(reader);
+					if (reader.Position != frame - i - 1)
+						throw new FormatException($"the move task left {frame - i - 1 - reader.Position} bytes before the buff list");
+				}
+				else if (flag != 0)
+					throw new FormatException($"move-task presence byte {flag} is neither 0 nor 1");
+				else if (frame - i != 1)
+					throw new FormatException($"an absent move task should leave no bytes, but {frame - i - 1} follow its 0");
+			}
 
 			var word = post.ReadU32Be(frame);
 			if (!ListFrame.TryCountOf(word, out var count))
@@ -113,11 +141,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		public void WritePrologue(FaolanStream stream)
 		{
-			if (Header.FirstRecordLen != FirstRecordPrefix.Length + 4)
-				throw new InvalidOperationException(
-					$"the header's first-record length {Header.FirstRecordLen} disagrees with the {FirstRecordPrefix.Length}-byte prefix + the buff list's 4-byte framing word");
+			var record = new FaolanStream();
+			if (HasMoveTaskSlot)
+			{
+				record.WriteByte(MoveTask != null ? (byte)1 : (byte)0);
+				MoveTask?.Write(record);
+			}
 
-			stream.WriteArray(Header.ToArray()).WriteArray(FirstRecordPrefix).WriteUInt32(ListFrame.ForCount(BuffRecords.Count));
+			var slot = record.ToArray();
+
+			// The header's own first-record length is DERIVED from what the record turned out to be, rather than
+			// carried beside it - two sources of truth for one width is how the fixed-width readers went wrong.
+			Header.FirstRecordLen = (uint)slot.Length + 4;
+			stream.WriteArray(Header.ToArray()).WriteArray(slot).WriteUInt32(ListFrame.ForCount(BuffRecords.Count));
 			foreach (var buff in BuffRecords)
 				buff.Write(stream);
 		}

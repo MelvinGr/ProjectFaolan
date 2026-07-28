@@ -21,9 +21,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	//    documented as "session runtime state the simulation re-derives". The buffs are runtime state; the rest is
 	//    the player's own grammar, and the create-editor preview's 40-byte stream differs from the NPC's 41-byte one
 	//    by exactly ONE leading byte inside the first record - which is the whole reason they were modelled as two
-	//    formats. The one genuinely undecoded region left is that first record's PREFIX
-	//    (SpawnPostIirCommon.FirstRecordPrefix): empty on a player, one 0x00 byte on a fresh NPC, and 20..1,273
-	//    bytes of accrued state on a mid-session capture. A from-scratch build emits the fresh form.
+	//    formats. The first record's own slot - the last part of it that was carried as bytes - is the entity's
+	//    current MOVE TASK (#477): absent on a player, an empty slot on a fresh NPC, and a MoveTaskNode on a
+	//    mid-session capture. Nothing in this stream is opaque any more.
 	//
 	// 2. The third header word DOES NOT COUNT RECORDS, which is what it used to be called. Streams of identical
 	//    length carry 1, 2 and 3 in it, so it cannot be counting anything that occupies bytes; it is a type-stable
@@ -34,19 +34,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// NpcSpawnFromScratchTests hold the decode/encode and the from-scratch builds byte-exact against captures.
 	public sealed class NpcSpawnPostIir
 	{
-		// The fresh (no runtime state) first record: one 0x00 byte in front of the buff list's framing word. The
-		// player's record is the framing word alone, which is why its length is 4 where this one's is 5.
-		public static readonly byte[] FreshFirstRecordPrefix = [0x00];
-
-		// The stream minus its entry slot - shared with the player verbatim.
+		// The stream minus its entry slot - shared with the player verbatim. A fresh NPC has the move-task SLOT with
+		// no task in it (the one 0x00 byte that makes its first record 5 bytes where a player's is 4).
 		public SpawnPostIirCommon Common { get; set; } = new()
 		{
 			Header = new SpawnPostIirHeader
 			{
-				FirstRecordLen = (uint)FreshFirstRecordPrefix.Length + 4,
+				FirstRecordLen = 5,
 				Word2 = NpcSpawnScaffold.MinimalWord2
 			},
-			FirstRecordPrefix = FreshFirstRecordPrefix
+			HasMoveTaskSlot = true
 		};
 
 		// The entry slot: a humanoid's morph table, empty on an animal and on the minimal fresh form. Dropping it

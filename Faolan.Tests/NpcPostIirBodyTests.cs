@@ -81,6 +81,62 @@ namespace Faolan.Tests
 			Assert.Equal(11373 + 27, streams);
 		}
 
+		// The first record's move-task slot (#477) - the last region of the spawn stream that was carried as bytes.
+		// It was written up as "runtime state the simulation re-derives, 20..1,273 bytes"; it is the entity's current
+		// MoveTask, in the same modes the MoveTaskIIR packet uses, and we have parsed that grammar since #53.
+		[Fact]
+		public void EveryFirstRecordSlot_IsAMoveTask()
+		{
+			var modes = new Dictionary<byte, int>();
+			var withTask = 0;
+			var emptySlot = 0;
+			var noSlot = 0;
+
+			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
+			{
+				if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+					continue;
+
+				var post = body[(read.Offset + read.Length)..];
+				var common = NpcSpawnPostIir.TryDecodePost(post, out var npc)
+					? npc.Common
+					: PlayerSpawnScaffoldCodec.TryParse(body, out var player, out _)
+						? player.Common
+						: null;
+				if (common == null)
+					continue;
+
+				if (!common.HasMoveTaskSlot)
+					noSlot++;
+				else if (common.MoveTask is not { } task)
+					emptySlot++;
+				else
+				{
+					withTask++;
+					modes[task.Mode] = modes.GetValueOrDefault(task.Mode) + 1;
+				}
+			}
+
+			// Pinned to the FULL corpus. Every NPC stream has the slot; every player stream lacks it (a player's
+			// first record IS the buff list's framing word, which is why its length is 4 where an NPC's is 5+).
+			// 259 = the 232 read by the player codec plus the 27 player streams the NPC codec also accepts, which
+			// it can because their entry slot is empty - it reads them with no slot, which is what they have.
+			Assert.Equal(259, noSlot);
+			Assert.Equal(9694, emptySlot);
+			Assert.Equal(1679, withTask);
+
+			// The five modes are MoveTaskCodec's own: 4 = ListMoveTask (a waypoint path), 7 and 8 = the approach
+			// forms, 1 = PathMoveTask, 2 = the stationary from/to/facing record.
+			Assert.Equal(new Dictionary<byte, int>
+			{
+				[0x04] = 1636,
+				[0x07] = 22,
+				[0x08] = 18,
+				[0x01] = 2,
+				[0x02] = 1
+			}, modes);
+		}
+
 		// Every 60-byte record the readers find, on NPCs and players alike, is a ScaffoldBuff. The spell ids are the
 		// proof that this is a buff list and not an arithmetic coincidence: they resolve in our own catalog and read
 		// as a buff bar - and nine of them turn up on NPCs, two of those being necromancer PET summons.

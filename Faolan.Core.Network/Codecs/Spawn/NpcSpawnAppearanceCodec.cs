@@ -95,7 +95,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				return false;
 			if (!NpcSpawnPostIir.TryDecode(body, out var post))
 				return false;
-			if (post.Common.BuffRecords.Count > 0 || !post.Common.FirstRecordPrefix.AsSpan().SequenceEqual(NpcSpawnPostIir.FreshFirstRecordPrefix))
+			if (post.Common.BuffRecords.Count > 0 || post.Common.MoveTask != null || !post.Common.HasMoveTaskSlot)
 				return false;
 
 			morphs = table;

@@ -4,6 +4,7 @@ using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -85,15 +86,21 @@ namespace Faolan.Tests
 		// list's framing word, as every captured one does) and `buffs` active buff records.
 		private static byte[] BuildRuntimeBearing(byte[] body, int postStart, byte[] tableAndTerminator, int buffs)
 		{
-			var runtime = new byte[36];
-			new Random(1).NextBytes(runtime);
-			runtime[0] = 0xFF; // so the record cannot be mistaken for the fresh one (strict must decline)
+			// The runtime state is a MOVE TASK - decoded in #477, and the reader now requires the slot to BE one
+			// rather than accepting any bytes of the right length. A mode-3 Jump node is the shortest real task.
+			var task = new FaolanStream().WriteByte(1); // the move-task presence byte
+			new MoveTaskNode
+			{
+				Mode = 3,
+				Flag = 1
+			}.Write(task);
 
+			var slot = task.ToArray();
 			var post = new FaolanStream()
 				.WriteUInt32(0u) // no head words
-				.WriteUInt32((uint)runtime.Length + 4) // the first record: the runtime block + the buff list's frame
+				.WriteUInt32((uint)slot.Length + 4) // the first record: the move task + the buff list's frame
 				.WriteUInt32(1u)
-				.WriteArray(runtime)
+				.WriteArray(slot)
 				.WriteUInt32(ListFrame.ForCount(buffs));
 
 			for (var n = 0; n < buffs; n++)

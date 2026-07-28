@@ -226,8 +226,7 @@ read the same stream and put the same bytes back, so it is not an ambiguity. Eve
 ⚠️ **THE BUFF COUNT IS READ, NOT SEARCHED.** The last four bytes of the first record are the buff list's
 framing word on all 11,632 streams, without exception. This is invisible from the player side, where the first
 record IS that word (length 4, no prefix) so it reads as "the record" rather than as a count of what follows;
-an NPC carries a prefix in front of it — one `0x00` byte fresh, 20..1,273 bytes of accrued runtime state
-mid-session. Searching for the record count instead capped the walk at **99.95%** (11,626 of 11,632) and needed
+an NPC carries a move-task slot in front of it — one `0x00` byte fresh, a whole `MoveTaskNode` mid-session. Searching for the record count instead capped the walk at **99.95%** (11,626 of 11,632) and needed
 a "does this look like a buff?" guard to stop the search inventing records out of runs of zero bytes. Reading
 it resolves all six holdouts, including the one whose ASCII is scrambled in 4-byte groups (`uoY era
 ehtsohCuG`) — a mis-reassembled TCP segment, which reads fine because the corruption is inside a string rather
@@ -248,6 +247,36 @@ observed range rather than asserting 1..80.
 the stream end, not 24 (the word at −24 belongs to the table's own region), and the terminator's three pair
 lists are **counted, not constant** — requiring the last 24 bytes to be a fixed pattern rejected every stream
 whose lists are populated.
+
+### The first record's slot is a MOVE TASK (2026-07-28, #477)
+
+The last region of the spawn stream carried as `byte[]`, and the last thing described as *"per-instance runtime
+records (movement waypoints / buff-timer pairs), session state the simulation re-derives"*. The guess was right
+about what it holds and wrong that it was ours to re-derive: it is the entity's current **MoveTask**, in the
+grammar `MoveTaskNode` has parsed since #53.
+
+```
+[u8 present]                  0 on a fresh NPC, 1 when a task follows; absent entirely on a player
+[MoveTaskNode]                the same recursive node the MoveTaskIIR packet carries
+```
+
+All **1,679** captured slots are consumed to their exact last byte by `MoveTaskNode.Read`, and re-encode
+byte-exact. The modes are `MoveTaskCodec`'s own:
+
+| mode | | streams |
+|---|---|---|
+| `0x04` | ListMoveTask — a waypoint path | 1,636 |
+| `0x07` | approach/facing | 22 |
+| `0x08` | approach target | 18 |
+| `0x01` | PathMoveTask | 2 |
+| `0x02` | stationary from/to/facing | 1 |
+
+[V3: NpcPostIirBodyTests.EveryFirstRecordSlot_IsAMoveTask]
+
+That the payloads are vec3 positions and unit quaternions is what identified it — and then the sibling codec
+parsed all 1,679 without a line of new grammar. Third time in this packet: the pre-IIR frame was the NPC
+scaffold, the entry slot was the morph table, this is the MoveTask. **Before decoding an FA015807 region, look
+for the codec that already reads it.**
 
 ### A buffed humanoid used to spawn BALD (2026-07-28, #475)
 
