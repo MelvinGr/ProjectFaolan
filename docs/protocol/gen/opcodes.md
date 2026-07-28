@@ -48,7 +48,7 @@ RPC class **CSPlayerAgent** (id `0x6DD55614`) · C2S (client→server call)
 | `0x2016` | `SetCommunityServerOptions` |  |
 | `0x2017` | `StartVoteKick` |  |
 | `0x2018` | `VoteKickAnswer` |  |
-| `0x2019` | `StartVoteRetreat` | NAME AND BODY DISAGREE: index 0x19 is StartVoteRetreat() (no params) but the observed body is [u32 0xC350][u32 clientInstance]; 0 packets in the corpus - Gitea #458 |
+| `0x2019` | `StartVoteRetreat` | StartVoteRetreat(), NO params. The "observed [u32 0xC350][u32 clientInstance] at login" was 0x201E ClientRequestGuildInfo mis-attributed (#458) |
 | `0x201A` | `VoteRetreatAccept` |  |
 | `0x201B` | `VoteRetreatReject` |  |
 | `0x201C` | `AcceptGuildInvitation` |  |

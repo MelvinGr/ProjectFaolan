@@ -156,16 +156,15 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
+				// 0x2019 StartVoteRetreat(): NO parameters. The empty body is correct and the name is confirmed
+				// (#458). This used to read an ID32 here, on the strength of an "observed at login" body of
+				// [u32 0xC350][u32 clientInstance] - that observation was MIS-ATTRIBUTED. Scanning every c2s packet
+				// addressed to the CSPlayerAgent across Captures/*.tshark.json: 0x2019 occurs ZERO times, while
+				// 0x201E ClientRequestGuildInfo(const ID32&) occurs 141 times, always 8 bytes, always exactly that
+				// shape, and does fire at login. Reading two words that are not there would have desynced the body
+				// stream the moment a retreat vote was actually cast.
 				case CSPlayerAgentOpcodes.StartVoteRetreat:
 				{
-					// ⚠️ The name and the body DISAGREE, and neither is settled. Index 0x19 on CSPlayerAgent is
-					// StartVoteRetreat() - which takes NO parameters (docs/re/aoc-client-rpc-methods.json) - yet the
-					// body noted here is an ID32 {EntityClass.Character, handle}. 0x2019 c2s appears ZERO times in the
-					// 213-capture corpus, so the observation cannot be re-checked and the name cannot be confirmed
-					// against traffic. Left reading the two words that were observed; see Gitea #458.
-					body.ReadUInt32(); // EntityClass.Character (0xC350)
-					var nClientInst = body.ReadUInt32();
-
 					break;
 				}
 
