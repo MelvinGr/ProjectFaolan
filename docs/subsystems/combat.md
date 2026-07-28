@@ -693,3 +693,35 @@ content scan of the live client's 1.8 GB of writable memory for the 28-byte patt
 reason is that the 28-byte struct above is the IN-MEMORY form; the parser may expand or reorder the file records, so
 matching the file by this stride was never guaranteed. Next: decode `ArmorMitigation_c`'s own read method, or read
 the vector by following the table singleton (`FUN_0113d9a0`) rather than by scanning for a pattern. Gitea #401.
+
+## Where the combat numbers come from (2026-07-28)
+
+The damage constants in `CombatResolver` are labelled **MEASURED** or **PROVISIONAL**, and the class header
+explains the method. In short:
+
+```zsh
+dotnet run --project Faolan.Importer -- --report npc-damage --captures <data-repo>/Captures
+```
+
+joins every captured damage record to the attacker's/target's **spawn level** and prints
+hits/min/median/mean/max per level per damage school, in both directions. The sample size sits beside each
+number, which is the point - a row built on four hits is visibly not a curve.
+
+**Two packets, two meanings.** `DamageResultIIR` (0xFEC4158A) is the melee HIT - one per swing, 91..133 at
+level 1. `StatDamageIIR` (0xE9F24184) is spell hits and DoT TICKS - small and repeating for a bleed, large for
+a real cast. ⚠️ The word after `delta` in StatDamage is the damage **school**, not a stat id; censusing it as a
+stat finds nothing and reads as "retail has no caster NPCs", which is how the magical branch went missing on a
+first pass. Filtering by school instead shows Fire / Cold / Electrical / Siege casters at levels 1-6.
+
+**The scale is settled**, which is what allows a damage number to be compared with a health pool. Pairing a hit
+with the target's next health update does not work (4 usable pairs in the whole corpus - retail does not push
+one per hit). The kill does: total damage dealt to an NPC that **died** equals the health its own spawn
+declared, ratio 0.73..1.10. So damage, spawn health and player health share one unit.
+
+That is what exposed the long-standing `5 + 3 * level` NPC swing: 8 damage at level 1 against health pools in
+the thousands, ~15x too weak, invisible because nothing in the code compared damage with the health it is
+subtracted from.
+
+⚠️ **Only levels 1-6 are well sampled** (hundreds of hits each). Above that the corpus gives single digits, so
+the measured curves are extrapolated - [#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479)
+tracks the captures that would settle the high end.

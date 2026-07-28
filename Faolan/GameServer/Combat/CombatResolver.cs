@@ -13,14 +13,53 @@ namespace Faolan.GameServer.Combat
 	///     not a clean decode. The level-scaled placeholders below are the honest interim, like the (now capture-anchored)
 	///     HP and XP curves.
 	/// </summary>
+	// ---------------------------------------------------------------------------------------------------------
+	// WHERE THESE NUMBERS COME FROM (read this before changing one)
+	//
+	// Combat constants here are one of two things, and the comment on each says which:
+	//   MEASURED  - derived from the capture corpus, with the sample size recorded. Change one only with new
+	//               evidence, and say what capture it came from.
+	//   PROVISIONAL - invented to be plausible because nothing decodes it yet (the real formula is server-side
+	//               GDB, which we do not have). Tune freely in-client; that is what it is for.
+	//
+	// HOW TO RE-DERIVE THE MEASURED ONES
+	//
+	//     dotnet run --project Faolan.Importer -- --report npc-damage --captures <data-repo>/Captures
+	//
+	// It joins every captured damage record to the attacker's/target's SPAWN LEVEL and prints
+	// hits/min/median/mean/max per level per damage school - the sample size sits next to each number, so a row
+	// built on four hits is visibly not a curve.
+	//
+	// THE TWO DAMAGE PACKETS ARE DIFFERENT THINGS (#349, and the reason a first census reported "no magical NPCs"):
+	//   DamageResultIIR 0xFEC4158A - the MELEE HIT. One per swing, big: 91..133 at level 1.
+	//   StatDamageIIR   0xE9F24184 - SPELL hits and DoT TICKS. Small and repeating (8, 8, 8...) for a bleed;
+	//                                large for a real cast. Its post-`delta` word is the damage SCHOOL, not a
+	//                                stat id - censusing it as a stat finds nothing and reads as "no casters".
+	// Both are sent in BOTH directions, so the same report measures NPC->player and player->NPC.
+	//
+	// THE SCALE IS SETTLED, which is what lets a damage number be compared with a health pool at all. Pairing each
+	// hit with the target's next health update does NOT work - retail pushes only 4 such pairs in the whole corpus.
+	// What works is the kill: the total damage dealt to an NPC that DIED equals the health its own spawn declared
+	// (ratio 0.73..1.10). So damage, spawn health and player health share one unit, and a damage constant can be
+	// read against NpcSpawn.Health directly. Getting this wrong is how `5 + 3 * level` survived: 8 damage against a
+	// pool of thousands, with nothing in the code comparing the two.
+	//
+	// ⚠️ THE CORPUS ONLY REACHES LEVEL 6. Levels 1-6 have hundreds of hits each; above that it is single digits
+	// (level 41: 20 hits spanning 182..28,368; levels 42/44/80: 1-4 hits). The measured curves are extrapolated
+	// past level 6 and nobody should treat the high end as verified - Gitea #479 tracks the capture that would fix
+	// it, and lists which fights are worth recording.
+	// ---------------------------------------------------------------------------------------------------------
 	public static class CombatResolver
 	{
+		// PROVISIONAL. Nothing in the corpus separates a crit from a big hit - DamageResult carries no crit flag
+		// (the two trailing words are always 0), so a crit is just a larger number and cannot be counted.
 		public const int BaseCritChancePercent = 5; // everyone crits sometimes, even with no Critical Rating gear
 
 		// Critical-hit tuning (#399), driven by the decoded crit stats: Critical Rating (0x138) = chance, Critical
 		// Damage Rating (0x2C7) = magnitude. A crit multiplies the hit and rides the wire as DamageResult type 3
 		// (2 = normal, 3 = crit/big hit - capture-derived, CombatEffectBuilder). The CHANCE/MAGNITUDE CURVES are still
 		// provisional (the real crit formula is server-GDB) but now use the right stats; tune in-client.
+		// PROVISIONAL, same reason: unmeasurable from the wire, because a crit is not labelled as one.
 		public const int BaseCritDamagePercent = 150; // a crit with no Critical Damage Rating hits for 1.5x
 
 		// Melee swing damage: driven by the EQUIPPED WEAPON's damage (#395) instead of the flat level placeholder, so a
@@ -31,6 +70,7 @@ namespace Faolan.GameServer.Combat
 		// The divisor turning a raw Combat Rating (0x36B) into a flat melee damage bonus. PROVISIONAL (#399): Combat
 		// Rating's real role is hit-rate (offense vs the target's defense), which needs a hit/miss model we don't have;
 		// until then a geared attacker's Combat Rating (~14-262) adds a modest offensive bump. Tune in-client.
+		// PROVISIONAL.
 		public const int CombatRatingDamageDivisor = 10;
 		public const int MaxCritChancePercent = 75;
 
@@ -38,6 +78,9 @@ namespace Faolan.GameServer.Combat
 		// per-hit damage figure. PROVISIONAL: the field IDs are decoded authoritatively (GUIGetMin/MaxDamage), but the
 		// exact display/combat scale isn't - ÷100 (the vitals convention) gives sane numbers (a starter dagger ~10, a
 		// high-end greatsword ~80). Tune in-client alongside the real damage formula (still server-GDB, undecoded).
+		// PROVISIONAL in its VALUE, but note the corpus does constrain it: a player's melee hits an NPC for 465..691
+		// (median) at level 1 rising to ~1100..1400 by level 5 (`--report npc-damage`, PLAYER -> NPC section), so a
+		// change here can be sanity-checked against a real number instead of taste alone.
 		public const int WeaponDamageScale = 100;
 
 		// The half-mitigation point for the provisional armor curve: the total armor rating at which incoming physical
@@ -66,6 +109,8 @@ namespace Faolan.GameServer.Combat
 		// This half-point stands in for that
 		// level-normalized, Strength-scaled curve: single armor pieces reach ~1500 and a worn set sums into the thousands,
 		// tuned so a geared set mitigates ~half and a starter's few hundred armor little. Tune in-client (gaps.md / #401).
+		// PROVISIONAL, and only reached when the level is unknown - MitigationFraction (the retail formula, with
+		// retail's own tweak-table coefficients) is the real path.
 		public const uint ArmorHalfMitigation = 2000;
 
 		// TWK_ArmorAbilityModifier / TWK_TargetPerLevelArmor from the client's own tweak table (RDB 1000516,
@@ -286,6 +331,10 @@ namespace Faolan.GameServer.Combat
 		//
 		// i.e. very close to 100 per level, which is also ~1.5% of a same-level player's health pool - and the same
 		// fraction the level-80 rows show, so the line holds across the range rather than fitting the beach.
+		//
+		// MEASURED (the class header explains the method and how to re-run it). Sample sizes are in the table above:
+		// levels 1-6 are hundreds of hits each and trustworthy; there is effectively no data between 7 and 80, so
+		// this line is an EXTRAPOLATION past level 6 - see #479 for the capture that would settle it.
 		//
 		// ⚠️ The previous curve was `5 + 3 * level`, i.e. 8 at level 1 against a captured NPC/player health pool in
 		// the THOUSANDS - about 15x too weak, and the mismatch was invisible because nothing compared the two. The

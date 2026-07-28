@@ -724,6 +724,9 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Per capture, the named NPC's worn equipment (InventoryEntries: slot + template) from its FA015807 (#267).
+		// THE COMBAT-BALANCE MEASUREMENT TOOL. CombatResolver's MEASURED constants come from this report, and its
+		// class header explains how to read the output; docs/subsystems/combat.md carries the same summary.
+		//
 		// What retail's combat actually DEALT, by NPC level (#401/#20). The captures carry every floating number as a
 		// DamageResultIIR [target][attacker][damage][school], and the spawn extractor gives each NPC handle its level
 		// - so joining them measures both directions instead of guessing:

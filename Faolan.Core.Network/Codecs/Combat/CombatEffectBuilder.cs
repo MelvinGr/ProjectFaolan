@@ -26,6 +26,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 	}
 
 	// DamageResultIIR (0xFEC4158A): the floating combat-damage number shown over the target. Decoded fields:
+	//
+	// This packet is also the MEASUREMENT INSTRUMENT for combat balance: every hit retail ever dealt is one of
+	// these, so joining them to the attacker's spawn level gives the damage curve directly. That is what
+	// `dotnet run --project Faolan.Importer -- --report npc-damage` does, and where CombatResolver's measured
+	// constants come from - see the provenance block at the top of CombatResolver. If you change this record's
+	// layout, that report is the thing that silently stops measuring.
 	//   [subop][class][target][env=0][class][attacker][u32 damage][u32 type][0][0]
 	// `Type` is the ATTACKER's damage school (DamageSchool), NOT a hit result - RE of all 1485 captured DamageResults
 	// (2026-07-22) showed it is CONSTANT per attacker (the player's physical melee is Crushing/3; different NPCs use
