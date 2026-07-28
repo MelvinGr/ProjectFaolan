@@ -81,6 +81,18 @@ namespace Faolan.GameServer.Combat
 		// asymptotic), so this only guards a pathological input.
 		public const double MaxMitigationFraction = 0.95;
 
+		// ⚠️ THE PLAYER->NPC HALF OF #401 CANNOT BE SOURCED FROM CAPTURES. Player-side mitigation is wired (the
+		// client's own armour/protection reduce incoming damage, WorldSimulation), but an NPC's armour reducing a
+		// PLAYER's hit is decided server-side, and retail never puts it on the wire: a census of every stat-update
+		// IIR in the corpus - 6,024 packets, 29 distinct stat ids - carries ZERO armour-family stats (448/451/454
+		// and the two Bonus percents). tools/capture/scan_npc_armor_stat.py.
+		//
+		// So NPC armour has to be MODELLED, like DefaultNpcMaxHealth below, and that is a balance decision rather
+		// than a decode. The principled default if it lands: retail's own tweak table defines the armour a level is
+		// "targeted" at (TWK_TargetPerLevelArmor x level), and MitigationFraction gives exactly 50% at that value -
+		// so `npcArmor = level * TargetArmorPerLevel * k` ties the curve to retail's scale with one tunable k,
+		// rather than to a free number.
+
 		// Fallback NPC max health for a creature with NO captured spawn HP. The real per-creature HP is the captured
 		// NpcSpawn.Health (the wire value retail sent); this is only used when that's absent (a GM-spawned template,
 		// future content). It is NOT in the client RDB - the NpcSpawnDataExport stat tables aren't shipped (#76, see
