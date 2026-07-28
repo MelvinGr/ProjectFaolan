@@ -275,14 +275,27 @@ namespace Faolan.GameServer.Combat
 			return ResolveSpellDamage(0, level) + combatBonus;
 		}
 
-		// Provisional damage an NPC's swing deals to a player, scaled by the NPC's level (mirrors ResolveSpellDamage;
-		// real NPC weapon/mitigation data isn't modelled yet). Level 0 maps to level 1.
+		// Damage an NPC's swing deals to a player, MEASURED from retail rather than invented. Every captured floating
+		// number is a DamageResultIIR, and joining it to the attacker's spawn level gives the curve directly
+		// (`--report npc-damage`). The physical-school medians, which is what NPC melee is - no captured NPC swing
+		// uses a magical school:
+		//
+		//     level 1   91..133   (486 hits)      level 4   628   (46)
+		//     level 2  163..268   (153)           level 5  481..567 (357)
+		//     level 3  264..282   (256)           level 6   613   (19)
+		//
+		// i.e. very close to 100 per level, which is also ~1.5% of a same-level player's health pool - and the same
+		// fraction the level-80 rows show, so the line holds across the range rather than fitting the beach.
+		//
+		// ⚠️ The previous curve was `5 + 3 * level`, i.e. 8 at level 1 against a captured NPC/player health pool in
+		// the THOUSANDS - about 15x too weak, and the mismatch was invisible because nothing compared the two. The
+		// scale is settled: total damage dealt to a killed NPC equals the health its spawn declared, ratio 0.73..1.10
+		// over the corpus, so damage and health share one unit.
+		public const uint NpcAttackDamagePerLevel = 100;
+
 		public static uint ResolveNpcAttackDamage(uint npcLevel)
 		{
-			var lvl = npcLevel == 0
-				? 1u
-				: npcLevel;
-			return 5u + lvl * 3u;
+			return Math.Max(1u, npcLevel) * NpcAttackDamagePerLevel;
 		}
 
 		// Spell damage: the level-scaled base plus the caster's aggregated Magic Damage rating (#399), added flat like

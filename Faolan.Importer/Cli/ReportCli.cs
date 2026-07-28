@@ -14,6 +14,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Rdb;
@@ -100,6 +101,12 @@ namespace Faolan.Importer.Cli
 				case "equip":
 				{
 					Equip(NamedCapture.LoadAll(capturesDir), arg ?? "Casilda");
+					return 0;
+				}
+
+				case "npc-damage":
+				{
+					NpcDamageCensus(NamedCapture.LoadAll(capturesDir));
 					return 0;
 				}
 
@@ -717,6 +724,150 @@ namespace Faolan.Importer.Cli
 		}
 
 		// Per capture, the named NPC's worn equipment (InventoryEntries: slot + template) from its FA015807 (#267).
+		// What retail's combat actually DEALT, by NPC level (#401/#20). The captures carry every floating number as a
+		// DamageResultIIR [target][attacker][damage][school], and the spawn extractor gives each NPC handle its level
+		// - so joining them measures both directions instead of guessing:
+		//   NPC -> player  : the curve ResolveNpcAttackDamage approximates (today: 5 + 3*level, invented)
+		//   player -> NPC  : what a player's hit lands for on a level-N NPC, i.e. the shape any NPC-armour model has
+		//                    to reproduce
+		// ⚠️ Both sides are POST-mitigation - they are what the client was told to draw - so they are the target
+		// numbers, not raw weapon rolls.
+		private static void NpcDamageCensus(IReadOnlyList<NamedCapture> captures)
+		{
+			var scaleRatios = new Dictionary<double, int>();
+			var killRatios = new Dictionary<double, int>();
+			var fromNpc = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
+			var toNpc = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
+
+			foreach (var c in captures)
+			{
+				// handle -> level, for every NPC this capture spawned.
+				var levels = new Dictionary<uint, uint>();
+				var spawnHealth = new Dictionary<uint, uint>();
+				foreach (var e in NpcSpawnExtractor.Extract(c.Packets))
+				{
+					var spawnBody = e.Data is { Length: >= 12 }
+						? e.Data[(12 + (int)e.Data.ReadU32Be(8))..]
+						: null;
+					if (spawnBody != null && PlayerSpawnReader.TryReadCharacterMessage(spawnBody, out var read) && read.Message.Stats is { } st)
+					{
+						levels[e.Handle] = st.Level;
+						if (st.Health > 0)
+							spawnHealth[e.Handle] = st.Health;
+					}
+				}
+
+				// Track each entity's last-seen HealthCurrent from the stat updates, so a hit can be compared with the
+				// health drop that follows it - the only way to settle whether the damage number shares the vitals'
+				// x100 wire scale or is the raw displayed figure.
+				var health = new Dictionary<uint, uint>();
+				var pendingHits = new Dictionary<uint, DamageResult>(); // per TARGET: other packets interleave
+				var dealtTo = new Dictionary<uint, uint>();             // total damage each NPC took, for the scale check
+
+				foreach (var p in c.Packets)
+				{
+					if (!p.IsIirCarrier || p.Body is not { Length: >= 8 })
+						continue;
+
+					if (p.Body.ReadU32Be(4) == (uint)GameServer0X2000Opcodes.StatUpdateIIR && p.Body.Length >= 29)
+					{
+						var handle = p.Body.ReadU32Be(12);
+						var count = p.Body[20];
+						for (var k = 0; k < count && 21 + k * 8 + 8 <= p.Body.Length; k++)
+						{
+							if (p.Body.ReadU32Be(21 + k * 8) != (uint)CharacterStatId.HealthCurrent)
+								continue;
+
+							var now = p.Body.ReadU32Be(21 + k * 8 + 4);
+							if (pendingHits.Remove(handle, out var prior) && health.TryGetValue(handle, out var before) && before > now)
+							{
+								var ratio = (double)(before - now) / prior.Damage;
+								scaleRatios[Math.Round(ratio, 2)] = scaleRatios.GetValueOrDefault(Math.Round(ratio, 2)) + 1;
+							}
+
+							health[handle] = now;
+						}
+
+						continue;
+					}
+
+					if (p.Body.ReadU32Be(4) != (uint)GameServer0X2000Opcodes.DamageResultIIR)
+						continue;
+
+					DamageResult hit;
+					try
+					{
+						hit = DamageResult.Read(new FaolanStream(p.Body[4..]));
+					}
+					catch
+					{
+						continue; // a truncated/odd record - counted by its absence, not by a wrong number
+					}
+
+					if (hit.Damage == 0)
+						continue;
+
+					pendingHits[hit.Target] = hit;
+
+					if (levels.TryGetValue(hit.Attacker, out var attackerLevel))
+					{
+						fromNpc.TryAdd((attackerLevel, hit.School), []);
+						fromNpc[(attackerLevel, hit.School)].Add(hit.Damage);
+					}
+
+					if (levels.TryGetValue(hit.Target, out var targetLevel))
+					{
+						toNpc.TryAdd((targetLevel, hit.School), []);
+						toNpc[(targetLevel, hit.School)].Add(hit.Damage);
+						dealtTo[hit.Target] = dealtTo.GetValueOrDefault(hit.Target) + hit.Damage;
+					}
+				}
+
+				// An NPC that died took at least its own health in damage; the RATIO of the two says whether the
+				// damage number shares the health scale. Only NPCs whose total >= a third of their health are
+				// counted, so a mob the player walked away from does not read as "the scale is 3x".
+				foreach (var (handle, dealt) in dealtTo)
+				{
+					if (!spawnHealth.TryGetValue(handle, out var hp) || hp == 0 || dealt * 3 < hp)
+						continue;
+
+					var bucket = Math.Round((double)dealt / hp, 2);
+					killRatios[bucket] = killRatios.GetValueOrDefault(bucket) + 1;
+				}
+			}
+
+			Console.WriteLine($"\n=== SCALE: total damage an NPC took vs the health its SPAWN declared ===");
+			Console.WriteLine($"{"ratio",8} {"npcs",6}   (~1 = same scale as health; ~0.01 = damage is x100 of health)");
+			foreach (var (bucket, n) in killRatios.OrderByDescending(k => k.Value).Take(8))
+				Console.WriteLine($"{bucket,8:F2} {n,6}");
+
+			Console.WriteLine($"\n=== SCALE: does a hit move the target's health by the SAME number? ===");
+			Console.WriteLine($"{"ratio",8} {"pairs",6}   (1.00 = damage and health share a scale; 0.01 = damage is x100 of health)");
+			foreach (var (ratio, n) in scaleRatios.OrderByDescending(k => k.Value).Take(6))
+				Console.WriteLine($"{ratio,8:F2} {n,6}");
+
+			Report("NPC -> PLAYER (what ResolveNpcAttackDamage should reproduce)", fromNpc, level => 5 + level * 3);
+			Report("PLAYER -> NPC (the shape an NPC-armour model has to reproduce)", toNpc, null);
+
+			// The school decides which mitigation BRANCH the client runs (FUN_0113ba00 switches on it): 1/2/3/8 take
+			// the physical branch - armour, Strength-scaled - and everything else the magical one, protection scaled
+			// by Int/Wis. Mixing them into one average would compare a sword swing with a fire spell.
+			static void Report(string title, Dictionary<(uint Level, DamageSchool School), List<uint>> byLevel, Func<uint, uint>? model)
+			{
+				Console.WriteLine($"\n=== {title} ===");
+				Console.WriteLine($"{"level",5} {"school",-12} {"branch",-9} {"hits",6} {"min",6} {"median",7} {"mean",7} {"max",6}" + (model == null ? "" : $" {"ours",6}"));
+				foreach (var ((level, school), hits) in byLevel.OrderBy(k => k.Key.Level).ThenBy(k => k.Key.School))
+				{
+					var sorted = hits.Order().ToList();
+					var branch = school is DamageSchool.Slashing or DamageSchool.Piercing or DamageSchool.Crushing or DamageSchool.Unholy
+						? "physical"
+						: "magical";
+					var line = $"{level,5} {school,-12} {branch,-9} {sorted.Count,6} {sorted[0],6} {sorted[sorted.Count / 2],7} {sorted.Select(v => (double)v).Average(),7:F1} {sorted[^1],6}";
+					Console.WriteLine(model == null ? line : line + $" {model(level),6}");
+				}
+			}
+		}
+
 		// Does an NPC spawn carry any per-NPC STAT array? (#401's player->NPC half needs an armour source, and the
 		// stat-update IIR carries none - tools/capture/scan_npc_armor_stat.py.) The spawn's character message has a
 		// `generic_stats` repeated-uint32 field; this censuses it over every captured NPC spawn using the real
