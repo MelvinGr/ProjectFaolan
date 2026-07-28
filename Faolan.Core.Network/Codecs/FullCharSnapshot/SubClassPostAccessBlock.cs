@@ -48,23 +48,25 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public uint BlockType { get; init; }
 
-		// The vitals, x100 on the wire.
+		// The vitals, in PLAYER-FACING units. The wire scale (x100 for every vital) comes from
+		// CharacterStatId.GetScale, the same table CharacterStatBlock uses for the live stat packet - it was written
+		// out as a literal `* 100` in six places here, which is the same knowledge kept in two spellings.
 		public uint CurrentHp
 		{
-			get => GetStat(CharacterStatId.HealthCurrent) / 100;
-			set => SetStat(CharacterStatId.HealthCurrent, value * 100);
+			get => GetScaled(CharacterStatId.HealthCurrent);
+			set => SetScaled(CharacterStatId.HealthCurrent, value);
 		}
 
 		public uint CurrentMana
 		{
-			get => GetStat(CharacterStatId.ManaCurrent) / 100;
-			set => SetStat(CharacterStatId.ManaCurrent, value * 100);
+			get => GetScaled(CharacterStatId.ManaCurrent);
+			set => SetScaled(CharacterStatId.ManaCurrent, value);
 		}
 
 		public uint CurrentStamina
 		{
-			get => GetStat(CharacterStatId.StaminaCurrent) / 100;
-			set => SetStat(CharacterStatId.StaminaCurrent, value * 100);
+			get => GetScaled(CharacterStatId.StaminaCurrent);
+			set => SetScaled(CharacterStatId.StaminaCurrent, value);
 		}
 
 		/// <summary>
@@ -90,12 +92,23 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// MAX. Pass CharacterMaxStats.SnapshotVitals().
 		public void ApplyClassVitals(uint hp, uint hpMax, uint mana, uint manaMax, uint stamina, uint staminaMax)
 		{
-			SetStat(CharacterStatId.HealthCurrent, hp * 100);
-			SetStat(CharacterStatId.HealthMax, hpMax * 100);
-			SetStat(CharacterStatId.ManaCurrent, mana * 100);
-			SetStat(CharacterStatId.ManaMax, manaMax * 100);
-			SetStat(CharacterStatId.StaminaCurrent, stamina * 100);
-			SetStat(CharacterStatId.StaminaMax, staminaMax * 100);
+			SetScaled(CharacterStatId.HealthCurrent, hp);
+			SetScaled(CharacterStatId.HealthMax, hpMax);
+			SetScaled(CharacterStatId.ManaCurrent, mana);
+			SetScaled(CharacterStatId.ManaMax, manaMax);
+			SetScaled(CharacterStatId.StaminaCurrent, stamina);
+			SetScaled(CharacterStatId.StaminaMax, staminaMax);
+		}
+
+		// Player-facing value in, wire value out (and back), through the shared scale table.
+		public uint GetScaled(CharacterStatId stat)
+		{
+			return GetStat(stat) / stat.GetScale();
+		}
+
+		public void SetScaled(CharacterStatId stat, uint value)
+		{
+			SetStat(stat, value * stat.GetScale());
 		}
 
 		// A stat's value is the slot immediately after its id. The first occurrence answers; SetStat writes them all.

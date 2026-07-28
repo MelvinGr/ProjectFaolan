@@ -126,6 +126,33 @@ namespace Faolan.Tests
 			Assert.Equal(37u, Value(sheet, CharacterStatId.Deaths));
 		}
 
+		// The LOGIN snapshot and the LIVE stat packet must put the same wire number on the same stat. They are built
+		// by different classes (SubClassPostAccessBlock vs CharacterStatBlock) and the snapshot side used to spell
+		// the vital scale as a literal `* 100` in six places; if the two ever disagreed the client would show one
+		// value at world entry and jump to another on the first stat update.
+		[Fact]
+		public void TheSnapshotAndTheLiveStatPacket_AgreeOnTheVitalScale()
+		{
+			var block = SubClassStatBlock.CreateFreshBlock();
+			block.ApplyClassVitals(196, 200, 24, 30, 217, 220);
+
+			var live = new CharacterStatBlock()
+				.Set(CharacterStatId.HealthCurrent, 196)
+				.Set(CharacterStatId.HealthMax, 200)
+				.Set(CharacterStatId.ManaCurrent, 24)
+				.Set(CharacterStatId.ManaMax, 30)
+				.Set(CharacterStatId.StaminaCurrent, 217)
+				.Set(CharacterStatId.StaminaMax, 220);
+
+			foreach (var (statId, raw) in live.Records)
+				Assert.Equal(raw, block.GetStat(statId));
+
+			// ...and the player-facing round trip agrees with what went in.
+			Assert.Equal(196u, block.CurrentHp);
+			Assert.Equal(24u, block.CurrentMana);
+			Assert.Equal(217u, block.CurrentStamina);
+		}
+
 		// A derived stat is written at EVERY occurrence: a stat can appear in both lists and twice within StatList#2,
 		// and a half-written sheet is what makes the client's view internally inconsistent.
 		[Fact]
