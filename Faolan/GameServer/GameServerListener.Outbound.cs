@@ -381,6 +381,11 @@ namespace Faolan.GameServer
 		// NOT universal (beach vs mainland differ), so they come from the DB (Map.PlayfieldCount/FieldB/Flags/Instanced), 		// defaulting to the beach values for un-sourced maps. Position is the character's entry transform (per-session);
 		// nearClip 15.0 + the farClip float are camera params (left constant). `map` may be null (fresh/unmapped -> beach
 		// defaults).
+		// The word at body [55:59] (client obj+0x54). We send 1 for every map, which is what 97 of the 151 captured
+		// records carry; the other 54 carry 0, and the split is not per-map (4000 and 4010 carry both). Was written
+		// as 0x01000000 while the builder's framing was a byte out - see BuildPlayfieldFiir (#451). [V0]
+		private const uint SceneWord = 1u;
+
 		internal static Rpc BuildMapChange(INetworkClient client, Map map, uint playfieldToken)
 		{
 			var character = client.Session.Character;
@@ -397,7 +402,7 @@ namespace Faolan.GameServer
 
 			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(MapChangeCodec.BuildIir(CreateEditorRecordBuilder.BuildPlayfieldFiir(character.PositionX, character.PositionY, character.PositionZ, character.MapId,
-					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, 0x01000000u, fieldB, fieldA, fieldC))));
+					charInstance, count, playfieldToken, 15.0f, BitConverter.UInt32BitsToSingle(0x40E3944Fu), flags, SceneWord, fieldB, fieldA, fieldC))));
 		}
 
 		// 0x96B8DC59 - entity vitals / stat-update packet. The wire builder now lives on World.VitalsPacket (shared

@@ -744,7 +744,7 @@ namespace Faolan.GameServer.CreateFlow
 			// trailing flags are this map's constants (not yet semantically pinned - carried as builder args).
 			await Iir(GameServer0X2000Opcodes.PlayfieldFIIR,
 				CreateEditorRecordBuilder.BuildPlayfieldFiir(StartingData.EditorSpawnPosition.X, StartingData.EditorSpawnPosition.Y, StartingData.EditorSpawnPosition.Z, StartingData.EditorMapId, 0, 1,
-					CreateEditorCharBuilder.EditorPlayfieldInstance, 15.0f, BitConverter.UInt32BitsToSingle(0x415DA9E7u), 0x00000080, 0x01000000u));
+					CreateEditorCharBuilder.EditorPlayfieldInstance, 15.0f, BitConverter.UInt32BitsToSingle(0x415DA9E7u), 0x00000080, 1u));
 
 			// The 18 galley scene props: SPAWNED FROM their map-4000 WorldObjects rows (built byte-exact by
 			// WorldObjectBuilder, re-addressed to the captured handle + editor playfield), in retail send order.

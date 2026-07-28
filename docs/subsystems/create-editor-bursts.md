@@ -83,12 +83,34 @@ create-specific to decode, only builder wiring to do:
 
 ### Fully decoded + constructive builders (added 2026-06-15)
 `CreateEditorRecordBuilder.BuildPlayfieldFiir` / `BuildGameTimeIir`, locked by `CreateEditorRecordTests`.
-- **PlayfieldFIIR** (`0x5D85BFC7`, "MapChange"), 103 bytes:
-  `[9-byte prefix][Vec3 reference pos (BE floats)][0x62][0x0000C79C][u32 mapId][0][u32 charInstance][0]
-   [u32 count][0x00009C50][u32 playfieldToken][8 zeros][0x18][0x00000001][u32 playfieldToken][0x0000CB20]
-   [f32 nearClip=15.0][f32 farClip][0][0xFFFFFFFFFFFFFFFF][0x00000007][u32 flags]`.
-  The position is the map's reference point; the playfield token (live, per-session) is carried twice. `count`,
-  `farClip` and `flags` are passed through (not yet semantically pinned). Byte-exact for maps 4000 + 4010.
+- **PlayfieldFIIR** (`0x5D85BFC7`, "MapChange"), 103 bytes. Framed the way the CLIENT reads it (#451) — its
+  reader is `PlayfieldFIIR_c`'s `ReadSubClass` = `FUN_008f36e0`, which calls the base `FUN_013d0a20` and then
+  reads the four trailing words:
+
+  | body offset | field | client |
+  |---|---|---|
+  | `@0..8` | `[u32 0xC350][u32 handle][u8 env]` | the IIR base carrier |
+  | `@9..20` | `[f32 X][f32 Y][f32 Z]` the map's reference point | `obj+0x24 / +0x28 / +0x2C` |
+  | `@21..54` | an embedded **`PlayfieldProxy`** (`FUN_00a6a600`) | slot `[1]` = map, `[2]` = `Map.PlayfieldFieldA`, `[3]` = char instance, `[5]` = count, `[7]` = playfield token |
+  | `@55..58` | `[u32 sceneWord]` | `obj+0x54` |
+  | `@59..86` | `[u32 len = 24][24-byte blob]`, a `FUN_00cbf5d0` length-prefixed sub-stream | blob = `[u32 1][u32 playfieldToken][u32 0x0000CB20][f32 nearClip=15.0][f32 farClip][u32 blobLastWord]` |
+  | `@87..102` | `[u32 -1][u32 -1][u32 fieldC][u32 flags]` | `obj+0x80 / +0x84 / +0x88 / +0x8C` |
+
+  Validated over **all 151 captured PlayfieldFIIR bodies**: every one is 103 bytes, carries the proxy's `'b'`
+  version byte at `@21`, and its blob-length word reads exactly 24, so `59 + 4 + 24 + 16 == 103`. Zero failures.
+  [V1: tools/ghidra/DecompileWithCallees.java — `FNS=008f36e0` then `FNS=013d0a20 DEPTH=2`]
+
+  Two things this framing corrected. The builder used to write the proxy's trailing bool as the first byte of a
+  leading zero word, which pushed everything after it one byte out: `sceneWord` was therefore modelled as a
+  `field58 = 0x01000000`, a u32 whose only meaningful byte was its **top** one, and `blobLastWord` (`fieldB`) was
+  modelled as a top-level word when it is really the last word **inside** the blob. Read aligned, `sceneWord` is a
+  plain 0 or 1 (54 / 97 across the captures). The bytes were always right — which is exactly why the goldens
+  never caught it.
+
+  Neither `sceneWord` nor `blobLastWord` is semantically pinned [V0]: `sceneWord` is 0 on maps 4020/4022 and 1 on
+  1000/1010/2000/2010/2040/3000/5007/11040, while 4000 and 4010 carry both; `blobLastWord` takes 0/1/2/3 *within*
+  a single map. `count`, `farClip` and `flags` are likewise passed through. The two genuinely per-map words —
+  the proxy's slot `[2]` and `fieldC` — come from `Map.PlayfieldFieldA` / `Map.PlayfieldFieldC`.
 - **GameTimeIIR** (`0x4F57DC08`), 29 bytes:
   `[u32 0][u32 0][u8 isToBePassed][f32 dayTime][u32 word][u32 gameDay][u32 unixSeconds][f32 rate=1.0]`. Byte-exact.
   `dayTime` is a **float** count of game seconds (86400 to a game day, advancing 5 per real second) and the anchor is
@@ -136,8 +158,9 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
 - **`PlayfieldFIIR`/`GameTimeIIR`** — both are constructed in the burst
    via `CreateEditorRecordBuilder.BuildPlayfieldFiir`/`BuildGameTimeIir`. MapChange is built from the editor
    map id + the session playfield token (carried twice); GameTime from the captured day-time/timestamp/rate.
-   Wiring `InitialBurst.bin` surfaced an un-pinned u32 at PlayfieldFIIR `[58:62]` (0 in the test capture,
-   `0x01000000` here) — added as the `field58` pass-through param. Locked by `BurstGoldenTests`.
+   Wiring `InitialBurst.bin` surfaced an un-pinned u32 near PlayfieldFIIR `[58:62]` (0 in the test capture,
+   `0x01000000` here) — added as a pass-through param. It is now framed as the client reads it, a plain `0`/`1`
+   word at `[55:59]` (`sceneWord`, see the table above). Locked by `BurstGoldenTests`.
 - **Record coverage** — the only record left verbatim is the live `Character…` preview (`IirId`, intentionally
    verbatim — see above). Across `WorldPrepBurst` +
    `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built

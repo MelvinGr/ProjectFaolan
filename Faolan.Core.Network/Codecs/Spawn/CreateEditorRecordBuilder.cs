@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 
@@ -186,42 +187,64 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference
 		// position (a Vec3, raw-body big-endian floats), the map id, the entering character instance, and the live
-		// per-session playfield token (carried TWICE). 103 bytes; framing decoded from the create captures
-		// (docs/subsystems/create-editor-bursts.md). `count` (3/6), `nearClip`=15.0 + `farClip` (~12-14), the trailing `flags`
-		// and `field58` (a u32 at [58:62] - 0 in some captures, 0x01000000 in others) are not yet semantically
-		// pinned, so they're passed through. Constructing this drives the map change from the Map row + the session
-		// token instead of replaying the captured MapChange.
+		// per-session playfield token (carried TWICE). 103 bytes.
+		//
+		// Framed the way the CLIENT reads it (#451). Its reader is a two-part chain: PlayfieldFIIR_c's own
+		// ReadSubClass is FUN_008f36e0, which calls the base FUN_013d0a20 and then reads the four trailing words:
+		//
+		//   [u32 c350][u32 handle][u8 env]     the IIR base carrier                            @0..8
+		//   [f32 X][f32 Y][f32 Z]              -> obj+0x24 / +0x28 / +0x2C                     @9..20
+		//   [PlayfieldProxy]                   the FUN_00a6a600 stream, EMBEDDED here          @21..54
+		//   [u32 sceneWord]                    -> obj+0x54                                     @55..58
+		//   [u32 len = 24][24-byte blob]       the FUN_00cbf5d0 length-prefixed sub-stream      @59..86
+		//   [u32][u32][u32 fieldC][u32 flags]  -> obj+0x80 / +0x84 / +0x88 / +0x8C             @87..102
+		//
+		// Validated over all 151 captured PlayfieldFIIR bodies: every one is 103 bytes, carries the proxy's 'b'
+		// version byte at @21, and its blob length word reads exactly 24 so that 59 + 4 + 24 + 16 == 103. Zero
+		// failures.
+		//
+		// That framing is one byte off from how this builder used to write the middle, which is why `sceneWord` used
+		// to be a `field58 = 0x01000000` - a u32 whose only meaningful byte was its TOP one, because the proxy's
+		// trailing bool had been absorbed into a leading zero word. Read aligned it is a plain 0 or 1 (54 / 97), and
+		// `fieldB` turns out to be the LAST WORD OF THE BLOB rather than a top-level field. Neither is semantically
+		// pinned - `sceneWord` is 0 on maps 4020/4022 and 1 on 1000/1010/2000/2010/2040/3000/5007/11040 while 4000
+		// and 4010 carry both, and `blobLastWord` takes 0/1/2/3 within a single map - so both are still passed
+		// through. [V0 on their meaning; V1 on the framing.]
+		//
+		// `nearClip` = 15.0 and `farClip` (~12-14) are likewise carried. Constructing this drives the map change from
+		// the Map row + the session token instead of replaying the captured MapChange.
 		public static byte[] BuildPlayfieldFiir(float posX, float posY, float posZ, uint mapId, uint charInstance, uint count, uint playfieldToken, float nearClip, float farClip, uint flags,
-			uint field58 = 0u, uint fieldB = 0u, uint fieldA = 0u, uint fieldC = 7u)
+			uint sceneWord = 0u, uint blobLastWord = 0u, uint fieldA = 0u, uint fieldC = 7u)
 		{
-			return new FaolanStream()
-				.WriteUInt32(0u)
-				.WriteUInt32(0u)
-				.WriteByte(0x00) // [0:9] prefix
-				.WriteFloat(posX)
-				.WriteFloat(posY)
-				.WriteFloat(posZ) // [9:21] reference position
-				.WriteByte(0x62)
-				.WriteUInt32(0x0000C79Cu)
-				.WriteUInt32(mapId)
-				.WriteUInt32(fieldA) // [previously hardcoded 0]: per-MAP, 2 on maps 2040/4022/5007 (#451)
-				.WriteUInt32(charInstance)
-				.WriteUInt32(0u)
-				.WriteUInt32(count)
-				.WriteUInt32(0x00009C50u) // 0x9C50 = 40016 (distinct from EntityClass.Character 0xC350; semantics TBD)
-				.WriteUInt32(playfieldToken)
-				.WriteUInt32(0u)
-				.WriteUInt32(field58) // [54:62]: a zero u32 then the un-pinned field58
-				.WriteByte(0x18)
+			// The length-prefixed sub-blob at @59: the client reads it through FUN_00cbf5d0, so its contents are a
+			// nested stream and not four more top-level words. 24 bytes in all 151 captured records.
+			var sceneBlob = new FaolanStream()
 				.WriteUInt32(0x00000001u)
-				.WriteUInt32(playfieldToken) // token again
+				.WriteUInt32(playfieldToken) // the token again, inside the blob
 				.WriteUInt32(0x0000CB20u)
 				.WriteFloat(nearClip)
 				.WriteFloat(farClip)
-				.WriteUInt32(fieldB) // [previously hardcoded 0]: beach capture carries 0x3, retail Old Tarantia 0x0
+				.WriteUInt32(blobLastWord) // beach capture carries 0x3, retail Old Tarantia 0x0
+				.ToArray();
+
+			var s = new FaolanStream()
+				.WriteUInt32(0u)
+				.WriteUInt32(0u)
+				.WriteByte(0x00) // [0:9] the IIR base carrier: [u32 c350][u32 handle][u8 env]
+				.WriteFloat(posX)
+				.WriteFloat(posY)
+				.WriteFloat(posZ); // [9:21] reference position
+
+			// [21:55] the embedded PlayfieldProxy. Slot [2] is the per-map fieldA and slot [5] the small count -
+			// two slots the teleport and team-member embeddings both read as constants; see PlayfieldProxy.
+			new PlayfieldProxy(mapId, PlayfieldProxy.PlayfieldClass, charInstance, count, PlayfieldProxy.PinnedInstanceWord, playfieldToken, Slot2: fieldA).Write(s);
+
+			return s
+				.WriteUInt32(sceneWord) // [55:59] -> obj+0x54
+				.WriteArrayUInt32Length(sceneBlob) // [59:87]
 				.WriteUInt32(0xFFFFFFFFu)
 				.WriteUInt32(0xFFFFFFFFu)
-				.WriteUInt32(fieldC) // [previously hardcoded 7]: per-MAP, 0 on 1010/2010/2040/5007 and 6 on 11040 (#451)
+				.WriteUInt32(fieldC) // per-MAP, 0 on 1010/2010/2040/5007 and 6 on 11040 (#451)
 				.WriteUInt32(flags)
 				.ToArray();
 		}
