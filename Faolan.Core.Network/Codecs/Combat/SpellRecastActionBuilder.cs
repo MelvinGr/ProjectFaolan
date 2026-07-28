@@ -34,14 +34,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public const uint ChangeRecastTimeType = 0xCF81; // keyList: [0x4c3 spell, 0x2f9 recast]
 
 		// GameActionData version word (obj+0x14 area; validated == 4 by the deserializer, else "Invalid GameAction data version").
-		public const uint Version = 4;
-
-		// Byte length of an element prefix through the first fixed int (0x2d5): [typeId][field][version][subCount][0x2d5].
-		private const int PrefixThrough0x2d5 = 5 * sizeof(uint);
-
-		// The four ALWAYS-present positional int values, in wire order = the ctor default seeds (the recast handler
-		// ignores them). Keys shown for documentation; only the values reach the wire.
-		private static readonly uint[] FixedInts = [ /*0x2d5*/ 1, /*0x2d6*/ 0, /*0x2f2*/ 1, /*0x2f5*/ 0];
+		public const uint Version = GameActionElement.Version;
 
 		// Wraps a ChangeRecastTime element as a full GameActionListIIR body (a 1-element 0x3F1 list) delivered to
 		// `frameHandle`. Reuses GameActionListCodec's list framing: it writes [subop][c350][frame][0][0x7E2][typeId]
@@ -50,8 +43,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// (asserted by the round-trip test).
 		public static byte[] BuildChangeRecastTimeBody(uint frameHandle, uint spellId, uint recastCentiseconds)
 		{
-			var element = BuildChangeRecastTimeElement(spellId, recastCentiseconds);
-			return GameActionListCodec.BuildBody(frameHandle, ChangeRecastTimeType, 0, element[PrefixThrough0x2d5..]);
+			return GameActionElement.BuildBody(frameHandle, ChangeRecastTimeType, 0, 0, [spellId, recastCentiseconds]);
 		}
 
 		// Builds a single ChangeRecastTime GameActionData ELEMENT (the positional body FUN_00899a60 consumes): set
@@ -66,13 +58,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// keys 0x4d9/0x4da are not modelled here - the recast/stat-modifier setters are all-u32.)
 		public static byte[] BuildElement(uint typeId, uint field, uint subCount, IReadOnlyList<uint> keyValues)
 		{
-			ArgumentNullException.ThrowIfNull(keyValues);
-			var s = new FaolanStream().WriteUInt32(typeId).WriteUInt32(field).WriteUInt32(Version).WriteUInt32(subCount);
-			foreach (var value in FixedInts)
-				s.WriteUInt32(value);
-			foreach (var value in keyValues)
-				s.WriteUInt32(value);
-			return s.ToArray();
+			return GameActionElement.Build(typeId, field, subCount, keyValues);
 		}
 	}
 }

@@ -165,3 +165,33 @@ cast — base cooldowns are client-side (the client reads recast from its own RD
 `#271` scope is (a) an in-client confirmation that a granted spell goes on cooldown with no server emit, and
 (b) an *optional*, low-priority server override emit (cooldown resets / AA reductions) — now constructible via
 `ChangeRecastTime` the moment it's wanted.
+
+## The full type-id catalog — 260 types, recovered from the descriptor initialiser
+
+[`gameaction-type-ids.tsv`](gameaction-type-ids.tsv) lists every GameAction type the client registers, with both
+ids. It supersedes the 68-entry `gameaction_types.json` for *identity* (the JSON keeps its per-type **keyList**,
+which this cannot reach — see the caveat below).
+
+`FUN_008bdf40` initialises the descriptor table at **`0x025077C8`, stride `0x41`**, and each registration writes
+the name pointer at `descriptor+0` and the enum id at `descriptor+8`. So the descriptor **index** yields the wire
+type id:
+
+```
+typeId = 0xCF09 + (descriptorAddress - 0x025077C8) / 0x41
+```
+
+Two registration forms exist: 171 inline (`MOV [descriptor],<imm>`, giving the type id *directly* from the
+address) and 89 via `CALL FUN_008bde20` (the descriptor address is not visible, so those carry the enum id only).
+The two ids are related by `typeId = 53005 + 4*(enumId - 53002)`, which holds for **all 171 independently measured
+pairs with zero violations** and agrees with **all 49** overlapping `gameaction_types.json` entries — so the 89
+call-form type ids are derived from it (`source` column: `descriptor-index` vs `derived`).
+
+⚠️ **192 of the 260 sit past `0xD026`**, the end of the window `tools/ghidra/DumpGameActionTypes.java` scans, so
+they were invisible to the JSON — that is why `ProxyTeleport` (`0xD04D`) and `StartFlymode` (`0xD12D`) are absent
+from it rather than genuinely missing. Notable ones the window hid: `Fatality` `0xD331`, `SummonMount` `0xD2D5` /
+`BanishMount` `0xD2D9`, `ResurrectTarget` `0xD291`, `StartSpellWeavingMode` `0xD1FD`, `CinematicCamera` `0xD2B1`,
+`SetTradingPostAccess` `0xD075`, `OpenDialog` `0xD0D1`, `Knockback` `0xD269` / `AreaKnockback` `0xD2E1`.
+
+⚠️ **KeyLists are NOT recoverable statically.** The descriptor table is BSS — filled at runtime — so a static read
+of `descriptor+0xc` returns zeros; the JSON's key lists come from a live Frida dump. A type in this TSV but not in
+the JSON has an **unknown parameter list**, and assuming an empty one is a guess to be proven in-client.
