@@ -49,7 +49,8 @@ Implemented in `BehaviorAckBody.AckSeq`.
 
 - **The client re-sends its own sit behaviour** (`0x2A` carrying `chair_sit_calm`) after being seated. It must NOT be
   echoed back - echoing replays the sit, and the animation's 2.6 s blend renders as a progress bar. Retail emits
-  `chair_sit_calm` exactly once per sit, s2c only: across all 213 captures the string appears twice, both s2c.
+  `chair_sit_calm` exactly once per sit, s2c only: across all 111 captures the string appears twice, both s2c
+  (re-measured 2026-07-28 - the corpus has since been curated down from 213, and the claim still holds).
 - **`movement_drunk_sit_chair_idle`** appears in unrelated gameplay captures as an 89-byte non-BCC record. That is a
   tavern NPC's seated idle, not part of the player sit flow.
 - The `key=""` in our feedback `remoteformat` differs from retail's (which carries the object's localized action

@@ -11,7 +11,8 @@ namespace Faolan.Tests
 	// A second test used to guard a 50-byte "SHORT form" against a blob captioned "captured", but that blob was our own
 	// ApplySpell path's hand-built default, so the test asserted the codec against its own output and could never fail.
 	// The client rejects that shape outright (MagicBuffIIR_c::ReadSubClass, "datasize left in stream=4, raw=76") and it
-	// occurs ZERO times across all 103 Captures/*.tshark.json, so form + test were removed (#274, 2026-07-16).
+	// occurs ZERO times across Captures/*.tshark.json, so form + test were removed (#274, 2026-07-16). Re-measured
+	// over the current 111 captures (#438): the only s2c MagicBuffIIR tails are 54 bytes (x1938) and 0 (x982).
 	public class SelfBuffCodecTests
 	{
 		[Theory, InlineData(0x37F298u, 640000u, 0x195DA1FEu, "00000000000000000009c40000010000000100000000 0037f298 00000050 00000000 00000000 00000000 00000050 00000000 195da1fe"),
