@@ -6,14 +6,13 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Logging;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.UniverseAgent
 {
-	public partial class UniverseAgentListener : RpcServer<ConanMessageFramer>
+	public partial class UniverseAgentListener : RpcServer
 	{
 		public UniverseAgentListener(ILogger<UniverseAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.UniverseAgentPort, logger, configuration,
 			database, new ConanPacketTracer(logger, "UniverseAgent", typeof(UniverseInterfaceOpcodes)))

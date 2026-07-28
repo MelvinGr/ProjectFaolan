@@ -9,7 +9,6 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Logging;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
@@ -18,7 +17,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
-	public partial class CsPlayerAgentListener : RpcServer<ConanMessageFramer>, ICsPlayerAgentProvider
+	public partial class CsPlayerAgentListener : RpcServer, ICsPlayerAgentProvider
 	{
 		// Composed collaborator: owns the guild RPC handlers, wire builders, and pending-invite / reply-endpoint
 		// state. The cross-connection lookup (ClientForCharacter, on the Server base) is injected as a delegate seam.

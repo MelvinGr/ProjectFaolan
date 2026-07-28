@@ -13,7 +13,6 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.CsPlayerAgent;
@@ -33,7 +32,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : RpcServer<ConanMessageFramer>, IWorldOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, IGameServerProvider
+	public partial class GameServerListener : RpcServer, IWorldOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk

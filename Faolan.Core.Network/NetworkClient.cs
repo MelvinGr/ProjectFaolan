@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Interfaces;
 using Faolan.Core.Network.Packets.ChatServer;
+using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
@@ -259,14 +260,15 @@ namespace Faolan.Core.Network
 	}
 
 	// The Rpc-dispatching client (Gitea #406/#407): parses each frame straight into the structured Rpc via
-	// Rpc.Parse - no per-frame packet object - and hands it to the listener. Used by every Conan protocol listener.
-	public sealed class RpcNetworkClient<TMessageFramer> : NetworkClient where TMessageFramer : IMessageFramer, new()
+	// Rpc.Parse - no per-frame packet object - and hands it to the listener. Used by every Conan protocol listener, so
+	// the framer is fixed at ConanMessageFramer (every tier speaks the same wire framing).
+	public sealed class RpcNetworkClient : NetworkClient
 	{
 		public Func<INetworkClient, Rpc, Task>? ReceivedRpc { get; init; }
 
 		protected override string ProtocolName => "Rpc";
 
-		public RpcNetworkClient(Socket socket, ILogger logger, IPacketTracer tracer) : base(socket, logger, new TMessageFramer(), tracer)
+		public RpcNetworkClient(Socket socket, ILogger logger, IPacketTracer tracer) : base(socket, logger, new ConanMessageFramer(), tracer)
 		{
 		}
 

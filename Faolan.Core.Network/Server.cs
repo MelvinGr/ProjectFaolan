@@ -18,7 +18,7 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Core.Network
 {
 	// The shared listener machinery - TCP accept loop, client registry, connect/disconnect lifecycle - independent of
-	// how a frame is parsed. ChatServerBase (the chat protocol, a typed Packet) and RpcServer<TFramer> (every Conan
+	// how a frame is parsed. ChatServerBase (the chat protocol, a typed Packet) and RpcServer (every Conan
 	// protocol listener, the structured Rpc) supply CreateClient + their ReceivedPacket, and each holds the concrete
 	// tracer its protocol traces BOTH directions through (the RX half is protocol-typed, so it lives there, not here).
 	public abstract class ServerBase : BackgroundService
@@ -218,7 +218,7 @@ namespace Faolan.Core.Network
 
 	// The structured-Rpc listener (every Conan protocol tier): each frame is parsed straight to an Rpc (Rpc.Parse)
 	// and dispatched - no per-frame Packet object, no ConanPacket (Gitea #406/#407).
-	public abstract class RpcServer<TMessageFramer> : ServerBase where TMessageFramer : IMessageFramer, new()
+	public abstract class RpcServer : ServerBase
 	{
 		// This channel's packet trace - both directions through one object (see ChatServerBase._tracer).
 		private readonly ConanPacketTracer _tracer;
@@ -230,7 +230,7 @@ namespace Faolan.Core.Network
 
 		protected override NetworkClient CreateClient(Socket socket)
 		{
-			return new RpcNetworkClient<TMessageFramer>(socket, Logger, _tracer)
+			return new RpcNetworkClient(socket, Logger, _tracer)
 			{
 				Disconnected = OnClientDisconnected,
 				ReceivedBatchComplete = OnBatchComplete,

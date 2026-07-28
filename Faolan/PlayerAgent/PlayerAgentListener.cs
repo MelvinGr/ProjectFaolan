@@ -7,14 +7,13 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Logging;
-using Faolan.Core.Network.Packets.Conan;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.PlayerAgent
 {
-	public partial class PlayerAgentListener : RpcServer<ConanMessageFramer>
+	public partial class PlayerAgentListener : RpcServer
 	{
 		public PlayerAgentListener(ILogger<PlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.PlayerAgentPort, logger, configuration,
 			database, new ConanPacketTracer(logger, "PlayerAgent", typeof(PlayerInterfaceOpcodes)))
