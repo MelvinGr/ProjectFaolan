@@ -1067,7 +1067,9 @@ namespace Faolan.GameServer.World
 					// Persist the dead state (#214) so a logout-while-dead returns dead - the login snapshot then
 					// carries current-health = 0 and the client shows the release window at world entry.
 					character.IsDead = true;
+					character.Deaths++; // the sheet's death counter (#447)
 					await _database.SaveCharacterDeadState(character.Id, true);
+					await _database.SetCharacterKillCounts(character.Id, character.Kills, character.Deaths);
 					await SendDeathScreen(client, character, pair.Value, pair.Value.Position);
 				}
 			}

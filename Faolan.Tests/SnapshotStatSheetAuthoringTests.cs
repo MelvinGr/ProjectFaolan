@@ -30,9 +30,7 @@ namespace Faolan.Tests
 			// Fatalities are 0 on every captured character, so carrying them as 0 is a fact, not a shortcut - and
 			// the anti-rot half of the gate below rejects them if listed.
 			[CharacterStatId.Played] = "play time not tracked",
-			[CharacterStatId.Deaths] = "kill/death counters not tracked",
-			[CharacterStatId.Kills] = "kill/death counters not tracked",
-			[CharacterStatId.LastKillNumber] = "kill/death counters not tracked",
+			[CharacterStatId.LastKillNumber] = "a per-kill sequence number, semantics unknown",
 			[CharacterStatId.PreviousHealth] = "derived from combat history we do not keep",
 			[CharacterStatId.DeathEffectXp] = "death-penalty XP not tracked",
 			[CharacterStatId.PvpExp] = "PvP progression not tracked",
@@ -111,6 +109,21 @@ namespace Faolan.Tests
 
 			rich.Money = (ulong)uint.MaxValue + 5000;
 			Assert.Equal(uint.MaxValue, Value(SnapshotStatSheet.For(rich, null, null), CharacterStatId.Money));
+		}
+
+		// The kill/death counters reach the sheet. They were listed as "not tracked", which was true of the COLUMNS,
+		// not of the events - the server already knew at the XP award and at the death persist.
+		[Fact]
+		public void TheKillAndDeathCounters_ReachTheSheet()
+		{
+			var veteran = Character(level: 40, exp: 0, Sex.Male);
+			veteran.Kills = 239;
+			veteran.Deaths = 37;
+
+			var sheet = SnapshotStatSheet.For(veteran, null, null);
+
+			Assert.Equal(239u, Value(sheet, CharacterStatId.Kills));
+			Assert.Equal(37u, Value(sheet, CharacterStatId.Deaths));
 		}
 
 		// A derived stat is written at EVERY occurrence: a stat can appear in both lists and twice within StatList#2,

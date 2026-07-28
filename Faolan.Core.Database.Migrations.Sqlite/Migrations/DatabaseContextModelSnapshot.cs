@@ -206,6 +206,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<DateTimeOffset>("CreationDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<uint>("Deaths")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("Experience")
                         .HasColumnType("INTEGER");
 
@@ -216,6 +219,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDead")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Kills")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Language")

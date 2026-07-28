@@ -150,6 +150,13 @@ namespace Faolan.Core.Database.Tables
 		public ulong Money { get; set; }
 		public ushort Level { get; set; }
 
+		// Kill/death counters, shown on the character sheet (snapshot stats Kills 0x2A2 / Deaths 0x292). They vary per
+		// character across the captured corpus, so carrying them at the captured character's value shipped someone
+		// else's record to everyone (#447). Incremented where the server already knows: CombatService on a kill,
+		// WorldSimulation when the player dies.
+		public uint Kills { get; set; }
+		public uint Deaths { get; set; }
+
 		public override string ToString()
 		{
 			return $"{base.ToString()}: {Name}";

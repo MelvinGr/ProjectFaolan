@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		[
 			CharacterStatId.PlayfieldToken, CharacterStatId.GmLevel, CharacterStatId.Sex,
 			CharacterStatId.Level, CharacterStatId.Exp, CharacterStatId.MaxExp, CharacterStatId.ExpCurrentLevelBase,
-			CharacterStatId.Money
+			CharacterStatId.Money, CharacterStatId.Kills, CharacterStatId.Deaths
 		];
 
 		/// <summary>
@@ -80,6 +80,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// past uint.MaxValue saturates: the wire cannot express it, and clamping is visible where silently
 			// truncating the low word would look like a robbery.
 			yield return (CharacterStatId.Money, character.Money > uint.MaxValue ? uint.MaxValue : (uint)character.Money);
+
+			// The kill/death counters the sheet shows. They were on the not-modelled list as "not tracked", which was
+			// true of the COLUMNS rather than of the events: the server already knew, at the XP award and at the
+			// death persist, and was throwing the count away.
+			yield return (CharacterStatId.Kills, character.Kills);
+			yield return (CharacterStatId.Deaths, character.Deaths);
 
 			// The character's SEX. The fresh skeleton hardcodes 3 (the captured character's), and the corpus shows the
 			// slot taking 0, 2 and 3 - so it is per-character, and the enum's values ARE the wire codes.

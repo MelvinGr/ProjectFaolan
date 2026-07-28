@@ -444,6 +444,11 @@ namespace Faolan.GameServer.Combat
 			var xp = CombatResolver.ResolveKillXp(npcLevel);
 			character.Experience += xp;
 
+			// The sheet's kill counter (#447). Persisted here rather than at autosave for the same reason the XP is:
+			// a kill is earned once, and a crash between the kill and the save loses it.
+			character.Kills++;
+			await _database.SetCharacterKillCounts(character.Id, character.Kills, character.Deaths);
+
 			var (levelsGained, remaining) = LevelingResolver.Apply(character.Level, character.Experience);
 			character.Experience = remaining;
 

@@ -65,6 +65,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<bool> SetCharacterGuild(uint characterId, uint? guildId, GuildRank rank);
 		Task SetCharacterInventorySlot(uint characterId, ContainerKind container, int slot, uint? itemId, uint count = 1);
 		Task SetCharacterMoney(uint characterId, ulong money);
+		Task SetCharacterKillCounts(uint characterId, uint kills, uint deaths);
+
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null);
 		Task SetCharacterQuestGoal(uint characterId, uint questId, uint goalId, uint progress);
@@ -754,6 +756,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.Money, money));
+		}
+
+		// The kill/death counters, persisted immediately like SetCharacterProgress: they are earned one event at a
+		// time, and a crash between the event and the autosave would silently lose the count.
+		public async Task SetCharacterKillCounts(uint characterId, uint kills, uint deaths)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.Kills, kills).SetProperty(c => c.Deaths, deaths));
 		}
 
 		public async Task SetCharacterProgress(uint characterId, uint experience, ushort level)
