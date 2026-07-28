@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -304,18 +305,15 @@ namespace Faolan.CSPlayerAgent
 				{
 					// SearchForGuilds(uint16 i_nMinMembers, uint16 i_nMaxMembers, uint8 i_nMinLevel, uint8 i_nMaxLevel,
 					// const String& i_cNameSearch) - the guild-finder browse window (0x2043 -> 0x205C). The 8-byte
-					// captured body is exactly that, with an empty name. We return the realm's guilds UNFILTERED
-					// (Gitea #460); read the criteria so the body is fully consumed and the gap is visible in the log.
+					// captured body is exactly that, with an empty name. The criteria are APPLIED (#460) - every captured
+					// search sends the wide-open defaults, so filtering is invisible in the corpus but not in the client.
 					var minMembers = body.ReadUInt16();
 					var maxMembers = body.ReadUInt16();
 					var minLevel = body.ReadByte();
 					var maxLevel = body.ReadByte();
 					var nameSearch = body.ReadString();
 
-					Logger.LogDebug("SearchForGuilds members {MinMembers}..{MaxMembers}, level {MinLevel}..{MaxLevel}, name '{Name}' - criteria NOT applied (#460).", minMembers, maxMembers, minLevel, maxLevel,
-						nameSearch);
-
-					await SendGuildSearchResult(client, packet);
+					await SendGuildSearchResult(client, packet, minMembers, maxMembers, minLevel, maxLevel, nameSearch);
 
 					break;
 				}
@@ -325,8 +323,8 @@ namespace Faolan.CSPlayerAgent
 					// CharacterSearch(int i_eSearchmode, const InstanceVec_t& i_cPlayfieldVec, int i_nMinLevel,
 					// int i_nMaxLevel, const IntVec_t& i_nClassVec, const IntVec_t& i_nRaceVec, uint32 i_nSkipResults,
 					// const String& i_cNameSearch) - the "who" window (0x200A -> 0x2010). The captured 30-byte body is
-					// that exactly: mode 1, three EMPTY ListFrame vectors, levels 5..10, skip 0, empty name. We still
-					// answer with an empty result (no search index yet, Gitea #460) - read it so nothing is left over.
+					// that exactly: mode 1, three EMPTY ListFrame vectors, levels 5..10, skip 0, empty name. Answered from
+					// the ONLINE players, filtered by every criterion (#460) - this is a /who, not a database browse.
 					var searchMode = body.ReadUInt32();
 					var playfields = ReadListFrameOfUInt32(body, "CharacterSearch.playfields");
 					var minLevel = body.ReadUInt32();
@@ -336,10 +334,10 @@ namespace Faolan.CSPlayerAgent
 					var skipResults = body.ReadUInt32();
 					var nameSearch = body.ReadString();
 
-					Logger.LogDebug("CharacterSearch mode {Mode}, level {MinLevel}..{MaxLevel}, {Playfields} playfields / {Classes} classes / {Races} races, skip {Skip}, name '{Name}' - empty result (#460).", searchMode,
-						minLevel, maxLevel, playfields, classes, races, skipResults, nameSearch);
+					Logger.LogDebug("CharacterSearch mode {Mode}, level {MinLevel}..{MaxLevel}, {Playfields} playfields / {Classes} classes / {Races} races, skip {Skip}, name '{Name}'.", searchMode, minLevel, maxLevel,
+						playfields.Count, classes.Count, races.Count, skipResults, nameSearch);
 
-					await SendCharacterSearchResult(client, packet);
+					await SendCharacterSearchResult(client, packet, minLevel, maxLevel, playfields, classes, races, skipResults, nameSearch);
 
 					break;
 				}
@@ -356,8 +354,10 @@ namespace Faolan.CSPlayerAgent
 					var memberCountMax = body.ReadUInt32();
 					var skipResults = body.ReadUInt32();
 
-					Logger.LogDebug("SearchForTeam level {MinLevel}..{MaxLevel}, members {MinMembers}..{MaxMembers}, {Playfields} playfields, skip {Skip} - empty result (#460).", minLevel, maxLevel, memberCountMin,
-						memberCountMax, playfields, skipResults);
+					// Still an EMPTY result, and filters are not the reason: we run no LFG registry, so there is nothing to
+					// filter. That is a missing subsystem, not a missing WHERE clause (#460).
+					Logger.LogDebug("SearchForTeam level {MinLevel}..{MaxLevel}, members {MinMembers}..{MaxMembers}, {Playfields} playfields, skip {Skip} - no LFG registry, empty result.", minLevel, maxLevel,
+						memberCountMin, memberCountMax, playfields.Count, skipResults);
 
 					await SendTeamSearchResult(client, packet);
 
@@ -432,23 +432,25 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// A count-framed vector of u32s (`InstanceVec_t` / `IntVec_t` in the client's search signatures): the ListFrame
-		// count word then that many words. Returns the count, having consumed the elements - the search handlers below
-		// answer with a canned result but must still leave the body empty. Every captured search vector is EMPTY, so
-		// the element WIDTH is inferred from the C++ type (both vectors are of 4-byte elements) rather than observed;
-		// a malformed word is rejected instead of looping on inbound arithmetic.
-		private int ReadListFrameOfUInt32(FaolanStream body, string what)
+		// count word then that many words. Returns the ELEMENTS - it used to return only the count, having consumed and
+		// thrown away the values, which was fine while the search handlers answered with a canned result and is not now
+		// that they filter on them (#460). Every captured search vector is EMPTY, so the element WIDTH is inferred from
+		// the C++ type (both vectors are of 4-byte elements) rather than observed; a malformed word is rejected instead
+		// of looping on inbound arithmetic.
+		private List<uint> ReadListFrameOfUInt32(FaolanStream body, string what)
 		{
 			var word = body.ReadUInt32();
 			if (!ListFrame.TryCountOf(word, out var count))
 			{
 				Logger.LogWarning("{What}: 0x{Word:X} is not a count-framed list word; ignoring the entries.", what, word);
-				return 0;
+				return [];
 			}
 
+			var values = new List<uint>(count);
 			for (var i = 0; i < count; i++)
-				body.ReadUInt32();
+				values.Add(body.ReadUInt32());
 
-			return count;
+			return values;
 		}
 	}
 }

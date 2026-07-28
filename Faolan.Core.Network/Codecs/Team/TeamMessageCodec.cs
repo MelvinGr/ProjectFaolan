@@ -35,6 +35,7 @@ namespace Faolan.Core.Network.Codecs.Team
 				CharacterId = character.Id,
 				Name = character.Name ?? "", // a nameless character cannot happen post-create, but the wire needs a string
 				Class = character.Class,
+				Level = character.Level,
 				MapId = mapId
 			};
 		}

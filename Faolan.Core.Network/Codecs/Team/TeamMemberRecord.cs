@@ -19,9 +19,15 @@ namespace Faolan.Core.Network.Codecs.Team
 	// it, and the client agrees: fed a level here, it took the invite, answered it, and refused to raise the invite
 	// window, because it cannot build one for a class that does not exist.)
 	//
-	// Then the map id, and the two per-character values below. The rest are identical across both captured characters
-	// and every message, and are carried as captured; naming them from one two-character capture would be invention -
-	// including whatever carries the LEVEL, which is not identifiable while both captured members share it.
+	// Then the LEVEL, the map id, and the per-character value below. The rest are identical across both captured
+	// characters and every message, and are carried as captured; naming them from one two-character capture would be
+	// invention.
+	//
+	// The level was the one field this record could NOT identify on its own: it sat here as a constant `Field1 = 5`
+	// because both captured team members happened to be level 5. DispatchCharacterSearchResult (0x2010) carries the
+	// SAME record for several characters at once, and across the five captured bodies that word reads 5, 7, 8 and 10 -
+	// every value inside the 5..10 range the client's CharacterSearch asked for, and `Nefalis` appears at 7 in one
+	// capture and 8 in a later one. That is a level (#460).
 	public sealed class TeamMemberRecord : ICodec<TeamMemberRecord>
 	{
 		public uint CharacterId { get; set; }
@@ -34,9 +40,13 @@ namespace Faolan.Core.Network.Codecs.Team
 		// The playfield the member is in - the client shows it in the team window and greys out members elsewhere.
 		public uint MapId { get; set; }
 
+		// The character's LEVEL - see the class comment. Sent as a constant 5 until the character-search bodies
+		// identified it, which meant every team roster, invite and search result described everyone as level 5.
+		public uint Level { get; set; }
+
 		// Differs per character (2 and 3 for the two captured members) while everything around it is constant, so it is
-		// per-character. Not the class (that is Class above), and not identifiable from one capture of two characters:
-		// sex, race and level are all still candidates. [V0]
+		// per-character. Not the class (that is Class above), not the level (that is Level above), and not identifiable
+		// from the captures: sex and race are still candidates. [V0]
 		public uint PerCharacterWord { get; set; }
 
 		// The playfield the member's client is looking at, as a PlayfieldProxy - the SAME stream the teleport records
@@ -64,9 +74,8 @@ namespace Faolan.Core.Network.Codecs.Team
 		public uint OpaqueB { get; set; }
 
 		// The constants, in wire order. Named by position deliberately: every captured record agrees on them, so a
-		// name would be a guess. Field1 is the same 5 the friend reply carries. Field7Head is the first THREE bytes of
-		// what used to be `Field7 = 0x00000162` - its fourth byte was the PlayfieldProxy version.
-		private const uint Field1 = 0x00000005;
+		// name would be a guess. Field7Head is the first THREE bytes of what used to be `Field7 = 0x00000162` - its
+		// fourth byte was the PlayfieldProxy version.
 		private const uint Field4 = 0x00000000;
 		private const uint Field5 = 0x00000006;
 		private const uint Field6 = 0x00000000;
@@ -86,7 +95,7 @@ namespace Faolan.Core.Network.Codecs.Team
 				Name = s.ReadString(),
 				Class = (ConanClass)s.ReadUInt32()
 			};
-			s.ReadUInt32(); // Field1
+			m.Level = s.ReadUInt32();
 			m.MapId = s.ReadUInt32();
 			m.PerCharacterWord = s.ReadUInt32();
 			s.ReadUInt32(); // Field4
@@ -102,7 +111,7 @@ namespace Faolan.Core.Network.Codecs.Team
 
 		public void Write(FaolanStream s)
 		{
-			s.WriteUInt32(EntityClass.Character).WriteUInt32(CharacterId).WriteString(Name).WriteUInt32((uint)Class).WriteUInt32(Field1).WriteUInt32(MapId).WriteUInt32(PerCharacterWord).WriteUInt32(Field4)
+			s.WriteUInt32(EntityClass.Character).WriteUInt32(CharacterId).WriteString(Name).WriteUInt32((uint)Class).WriteUInt32(Level).WriteUInt32(MapId).WriteUInt32(PerCharacterWord).WriteUInt32(Field4)
 				.WriteUInt32(Field5).WriteUInt32(Field6).WriteArray(Field7Head);
 
 			(Playfield ?? PlayfieldProxy.ForInstance(MapId, CapturedPlayfieldToken)).Write(s);

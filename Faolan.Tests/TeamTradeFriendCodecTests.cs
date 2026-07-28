@@ -34,6 +34,9 @@ namespace Faolan.Tests
 				CharacterId = 0x013184AE,
 				Name = "Strickenne",
 				Class = ConanClass.Demonologist,
+				// Both captured members are level 5 - which is exactly why this word read as a constant until the
+				// character-search bodies showed it taking 5/7/8/10 across several characters (#460).
+				Level = 5,
 				MapId = 4020,
 				PerCharacterWord = 3,
 				// Re-framed off the corrected PlayfieldProxy boundary (#454): what used to be read as
@@ -50,6 +53,7 @@ namespace Faolan.Tests
 				CharacterId = 0x01317CF8,
 				Name = "Jnbuevtfkj",
 				Class = ConanClass.Necromancer,
+				Level = 5,
 				MapId = 4020,
 				PerCharacterWord = 2,
 				OpaqueA = 0x00018181,

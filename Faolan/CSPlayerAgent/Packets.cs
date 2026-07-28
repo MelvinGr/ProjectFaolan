@@ -1,9 +1,13 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Guild;
+using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Protocol;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent
 {
@@ -26,16 +30,32 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x205C DispatchGuildSearchResult: the guild-finder browse list (client requests it with 0x2043
 		// SearchForGuilds). Built from the realm's guilds via GuildSearchResult (byte-exact codec,
-		// GuildSearchResultTests). We ignore the 0x2043 level/name filter and return every guild in the realm; the
-		// leader is the highest-ranked member.
-		private async Task SendGuildSearchResult(INetworkClient client, Rpc packet)
+		// GuildSearchResultTests); the leader is the highest-ranked member.
+		//
+		// The 0x2043 criteria are APPLIED (#460). Every captured search sends the wide-open defaults - the browse
+		// window opens with the sliders at their limits and an empty name - so no capture distinguishes a filtered
+		// result from an unfiltered one, and the corpus cannot be the oracle here. The filter is therefore written to
+		// the client's own signature (`uint16 i_nMinMembers, uint16 i_nMaxMembers, uint8 i_nMinLevel,
+		// uint8 i_nMaxLevel, String i_cNameSearch`) and to what the widget plainly means, with the one rule that a
+		// ZERO bound is "no bound" rather than a real limit - otherwise the defaults would filter everything out.
+		private async Task SendGuildSearchResult(INetworkClient client, Rpc packet, ushort minMembers = 0, ushort maxMembers = 0, byte minLevel = 0, byte maxLevel = 0, string nameSearch = "")
 		{
 			var realmId = client.Session.Character?.RealmId ?? 0;
 			var guilds = await Database.GetGuilds(realmId);
 
+			var matches = guilds
+				.Where(g => Within(g.Members?.Count ?? 0, minMembers, maxMembers))
+				.Where(g => Within((int)g.Level, minLevel, maxLevel))
+				.Where(g => nameSearch.Length == 0 || (g.Name ?? "").Contains(nameSearch, StringComparison.OrdinalIgnoreCase))
+				.ToList();
+
+			if (matches.Count != guilds.Length)
+				Logger.LogDebug("SearchForGuilds members {MinMembers}..{MaxMembers}, level {MinLevel}..{MaxLevel}, name '{Name}': {Matched} of {Total} guilds.", minMembers, maxMembers, minLevel, maxLevel,
+					nameSearch, matches.Count, guilds.Length);
+
 			var result = new GuildSearchResult
 			{
-				Guilds = guilds
+				Guilds = matches
 					.Select(g => new GuildSearchResult.Entry(g.Id, g.Name ?? "", g.Members?.OrderByDescending(m => m.GuildRank).FirstOrDefault()?.Name ?? "", (ushort)(g.Members?.Count ?? 0),
 						(uint)g.RenownTotal, 0))
 					.ToList()
@@ -44,18 +64,56 @@ namespace Faolan.CSPlayerAgent
 			await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GuildSearchResult.Opcode, result.Encode()));
 		}
 
-		// 0x2010 DispatchCharacterSearchResult: the character/"who" search result (answer to 0x200A CharacterSearch).
-		// Grammar decoded byte-exact from the hoxxling login capture (3 records, rebuilt 1:1):
-		//   [u32 (count+1)*0x3F1] { count × record } [u8 0x00]
-		// The trailing [u8 0x00] closes the list (same end-marker shape as DispatchTeamSearchResult's 000003f100). We
-		// keep no character-search index, so we return the empty list - but MUST still emit that trailer, or the client
-		// reads the empty frame then runs off the end (the #408 dropped-trailer failure mode). Empty body = [(0+1)*0x3F1][0].
-		private static Task SendCharacterSearchResult(INetworkClient client, Rpc packet)
+		// An inclusive range where 0 means "unbounded" at either end. The search widgets send 0/0 when the player has
+		// not touched the sliders, which is every captured search, so treating 0 as a hard bound would answer the
+		// default browse with nothing at all.
+		private static bool Within(int value, uint min, uint max)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchCharacterSearchResult, b => b
-				.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
-				.WriteByte(0x00))); // list end-marker
+			return (min == 0 || value >= min) && (max == 0 || value <= max);
 		}
+
+		// 0x2010 DispatchCharacterSearchResult: the character/"who" search result (answer to 0x200A CharacterSearch),
+		// built by CharacterSearchResult (byte-exact against the captured 3-character body, CharacterSearchResultTests).
+		//
+		// Answered from the ONLINE players, because this is a /who and not a database browse: an offline character has
+		// no playfield to report and the client greys members by playfield. GetWorldSessions() is the whole population,
+		// so "everyone online in this realm" is the candidate set and every criterion narrows it (#460).
+		//
+		// The empty result still carries the frame AND the trailing 0x00, or the client reads the empty frame then runs
+		// off the end - the #408 dropped-trailer failure that took the whole CSPlayerAgent route down.
+		private Task SendCharacterSearchResult(INetworkClient client, Rpc packet, uint minLevel, uint maxLevel, List<uint> playfields, List<uint> classes, List<uint> races, uint skipResults,
+			string nameSearch)
+		{
+			var realmId = client.Session.Character?.RealmId ?? 0;
+
+			var matches = _gameServerDispatcher.GetWorldSessions()
+				.Select(s => s.Character)
+				.Where(c => c != null && c.RealmId == realmId)
+				.Where(c => Within((int)c.Level, minLevel, maxLevel))
+				.Where(c => classes.Count == 0 || classes.Contains((uint)c.Class))
+				.Where(c => races.Count == 0 || races.Contains((uint)c.Race))
+				.Where(c => nameSearch.Length == 0 || (c.Name ?? "").Contains(nameSearch, StringComparison.OrdinalIgnoreCase))
+				.Select(c => (Character: c, MapId: _gameServerDispatcher.GetCharacterLiveState(c.Id)?.MapId ?? c.MapId))
+				.Where(m => playfields.Count == 0 || playfields.Contains(m.MapId))
+				.OrderBy(m => m.Character.Name, StringComparer.OrdinalIgnoreCase)
+				.Skip((int)Math.Min(skipResults, int.MaxValue))
+				.Take(MaxCharacterSearchResults)
+				.Select(m => TeamMessageCodec.MemberOf(m.Character, m.MapId))
+				.ToList();
+
+			Logger.LogDebug("CharacterSearch: {Count} online character(s) matched.", matches.Count);
+
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CharacterSearchResult.Opcode, new CharacterSearchResult
+			{
+				Characters = matches
+			}.Encode()));
+		}
+
+		// One page of "who" results. The client's own request carries i_nSkipResults, so it pages, and the reply method
+		// is DispatchCharacterSearchResult(i_cResult, i_bMoreHits) - retail caps the page and says whether more exist.
+		// The captured bodies carry 3 and 4 records, which sets no ceiling; 50 is ours until a capture shows retail's.
+		// [V0]
+		private const int MaxCharacterSearchResults = 50;
 
 		// 0x2039 DispatchGuildRenownHistoryUpdate: the renown-over-time graph in the guild window (answer to 0x2040
 		// RequestRenownHistory). The captured body is a fixed 112-byte block of renown/pvp time buckets; we track no
