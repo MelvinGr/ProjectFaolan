@@ -152,6 +152,37 @@ sub-object grammar stays unobserved (`count==0` everywhere)
 but is irrelevant to the minimal build. The same reader primitives + `0x3F1` framing drove the dynel/loot readers
 (#187, done) — see `tools/ghidra/DumpIirReaders.java`.
 
+## The NPC post-IIR and the PLAYER post-IIR are the SAME grammar (2026-07-28, #475)
+
+They were modelled as two unrelated formats. `PlayerSpawnScaffoldCodec` writes `[u32 4][u32 2]` as bare
+constants; `NpcSpawnPostIir` reads the same two words as `[firstRecordLen][recordCount]` and keeps everything
+after them as an opaque `byte[]`. One shared reader walks both:
+
+```
+[u32 headCount][headCount x u32]        the plain-counted head word list
+[u32 firstRecordLen][u32 word2]         <- the player's "4" and "2"
+[firstRecordLen bytes]                  the first record
+[u32 entryCount][u32 entryTableX]       the entry table (empty on every NPC form)
+  ... entries / ID list / ID-list tail, iff entryCount > 0
+[u32 count] pairs, [u32 count] pairs    two PLAIN-counted pair lists
+[u32 ListFrame] pairs                   the count-framed third
+```
+
+**3,882 captured streams walk to their exact last byte** — every NPC minimal form and every create-editor
+preview. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameGrammar]
+
+- The create-editor preview's **40-byte** stream is the fully-empty PLAYER scaffold: `firstRecordLen` 4 (the
+  buff list's count word) and every list empty, so `40 = 12 + 4 + 24`.
+- The NPC minimal **41-byte** form is the same thing with `firstRecordLen` 5 — one extra leading byte inside
+  that first record. **That single byte is the whole reason the two looked like different formats.**
+- `firstRecordLen` is the length of the FIRST record only. On a player it stays 4 whether the character has 0
+  or 3 buffs, because the buff records are that list's *elements*, not further records.
+- ⚠️ **`word2` does not count records.** Streams of identical length carry 1, 2 and 3 in it, so it cannot be
+  counting anything that occupies bytes. `NpcSpawnPostIir.RecordCount` and the persisted column
+  `NpcStatCore.MinimalPostIirRecordCount` are both misnamed; it is a type-stable enum of unknown meaning.
+- `12 + firstRecordLen + 24` is the length only when all three pair lists are empty, i.e. the minimal forms. It
+  is not a general identity — streams with populated pair lists are longer and still walk exactly.
+
 ## Typed scaffold codec — landed (2026-06-16, byte-exact)
 `NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan.Core.Network/Codecs/Spawn/NpcSpawnPreIir.cs`) decode the 223-byte
 count==0 scaffold into a typed, mutable struct (`Version`, 6 `Flags`, 53 `Words`, the raw `Sublist`) and

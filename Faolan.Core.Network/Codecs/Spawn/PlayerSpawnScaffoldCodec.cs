@@ -70,6 +70,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			foreach (var word in s.HeadWords)
 				b.WriteUInt32(word);
 
+			// [u32 firstRecordLen][u32 word2]. NOT protocol constants, despite being written as literals here: they
+			// are the same two words NpcSpawnPostIir reads, and an NPC carries 5 and 1/2/3 where a player carries 4
+			// and 2 (#475, SpawnPostIirGrammarTests). 4 is the length of the player's first record - the buff list's
+			// count word alone, which stays 4 whether the player has 0 or 3 buffs, since the records are that list's
+			// ELEMENTS. They are hardcoded because every captured player spawn carries exactly these two values.
 			b.WriteUInt32(4).WriteUInt32(2).WriteUInt32(Marker * ((uint)s.BuffRecords.Count + 1));
 			foreach (var buff in s.BuffRecords)
 			{
