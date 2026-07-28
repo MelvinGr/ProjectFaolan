@@ -393,8 +393,24 @@ namespace Faolan.GameServer
 					var questId = body.ReadUInt32();
 					body.ReadUInt32(); // trailing 0
 
-					Logger.LogInformation("QuestIIR (DeleteQuest) from character {CharacterId}: questId={QuestId}, state={State} - not acted on yet (Gitea #457).", clientInst.ToHex(), questId, state);
+					// Retail's answer is the SAME record echoed back, byte for byte, one frame later - both captured
+					// deletes show c2s -> s2c with an identical body (frames 3937/3938 and 3975/3976). So the drop is
+					// confirmed by the echo, not by a bespoke reply. Send it BEFORE the delete so the client is answered
+					// even if persistence throws.
+					await _broadcaster.SendQuestIir(client, questId, state);
+					await Database.RemoveCharacterQuest(client.Session.Character.Id, questId);
 
+					Logger.LogInformation("QuestIIR (DeleteQuest) from character {CharacterId}: dropped quest {QuestId} (state {State}).", clientInst.ToHex(), questId, state);
+
+					// ⚠️ Retail sends a THIRD packet in the same frame: a QuestLogListIIR (0x504B7924) refreshing the
+					// J-panel. We do NOT, because its body is a SHORTER variant than BuildQuestLogList writes and the
+					// two captured instances are not enough to pin it. Both are 41 bytes:
+					//   [u32 c350][u32 handle][01][u32 2][u32 areaId][24 zero bytes]
+					// where the full list carries [01][u32 1][u32 areaId][u32 trackedQuestId][u32 count][entries]
+					// [areaTitle][u32 1][10 zeros]. The word after the marker is 1 on every captured full list and 2 on
+					// both of these, so it reads as a KIND rather than a constant - but the tail does not line up with
+					// the builder's, and a malformed list is the #408 failure mode. Tracked as Gitea #482. The journal
+					// is correct on the next login either way; what is missing is the live J-panel refresh.
 					break;
 				}
 
