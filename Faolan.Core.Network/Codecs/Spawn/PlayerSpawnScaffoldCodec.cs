@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -31,9 +30,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				// theory that a captured field-set would be lost; over 11,632 spawns the field set never varies.
 				.WriteByte(0x2C)
 				.WriteByte(0x0A)
-				.WriteArrayByteLength(((ProtoVec3)s.Position).ToProtobuf())
+				.WriteProtobufByteLength((ProtoVec3)s.Position)
 				.WriteByte(0x12)
-				.WriteArrayByteLength(((ProtoQuat)s.Rotation).ToProtobuf());
+				.WriteProtobufByteLength((ProtoQuat)s.Rotation);
 			// Field 4 as a fixed32. Never observed: all 15787 captured FA015807/66AEDD50 transform groups are exactly
 			// {0x0A vec3, 0x12 quat, 0x18 playfield}, and nothing in the codebase ever SETS Scale - it is only ever
 			// parsed out of a body and written back. Kept as defensive pass-through, not as a modelled field.
