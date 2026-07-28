@@ -47,9 +47,20 @@ namespace Faolan.GameServer.Combat
 		//   TotalArmorValue         = clamp0( (C3*0.01 + 1.0)*armor(0x1c0) + (Strength(0x324)-10)*0.1*C4 )  (+ invuln 0x1c6 when flagged)
 		//   ApprenticeAdjustedArmor = (2.0 - level(0x36)/stat(0x3c5)) * TotalArmorValue
 		//   MitigationModification  = (ApprenticeAdjustedArmor / (level * C1)) * 100      // a percent
-		// but the coefficients C1/C3/C4 (globals 0x02d24704/24/34) read 0.0 statically - they load from runtime BALANCE
-		// CONFIG (server-GDB, like the #395 weapon scale), so the exact numbers need a live Frida dump or in-client tuning;
-		// only the static consts (0.01/1.0/0.1/2.0/100) are offline-recoverable. This half-point stands in for that
+		// ⚠️ THE COEFFICIENTS ARE KNOWN (2026-07-28) - this used to say they "need a live Frida dump or in-client
+		// tuning" because the four globals read 0.0 in the image. They read 0.0 because they are filled at runtime
+		// from the client's own TWEAK TABLE (RDB 1000516), and XrefsTo finds only READS of them, no writer - the tell
+		// that a computed pointer fills them. Their roles identify them one-to-one, and the pairing is forced by
+		// WHICH BRANCH uses which:
+		//     0x02d24704  physical divisor        TWK_TargetPerLevelArmor         137.225
+		//     0x02d24714  magical divisor         TWK_TargetPerLevelProtection     46.0625
+		//     0x02d24724  magical ability weight  TWK_ProtectionAbilityModifier     0.5
+		//     0x02d24734  physical ability weight TWK_ArmorAbilityModifier          2.0
+		// MitigationFraction below already uses exactly these, which is why its trace points reproduce retail's
+		// numbers - so the formula is retail's, not a fit. What is NOT resolved is the percent term's SOURCE on the
+		// PHYSICAL branch: the client reads a stat into `(x * 0.01 + 1.0) * rating` there (0x14e BonusProtection is
+		// the magical one) and we pass 0. See #401.
+		// This half-point stands in for that
 		// level-normalized, Strength-scaled curve: single armor pieces reach ~1500 and a worn set sums into the thousands,
 		// tuned so a geared set mitigates ~half and a starter's few hundred armor little. Tune in-client (gaps.md / #401).
 		public const uint ArmorHalfMitigation = 2000;

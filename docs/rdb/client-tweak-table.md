@@ -181,3 +181,22 @@ different classes, so the remaining factor is per-character — gear, which is G
 into `CharacterMaxStats` would LOWER a geared character's maximum, so the mapping needs #441 first. Open work: #3.
 
 Dump it with `--report rdb-dump --report-arg 1000511`.
+
+## Where the armour constants land in the client (2026-07-28, #401)
+
+The mitigation routine `FUN_0113ba00` (log tag `GameCode/ArmorMitigation`) reads four globals that are **0.0 in
+the image**, and `XrefsTo` finds only READS of them — no writer, which is the tell that a computed pointer fills
+them at load. They are four of this table's constants, and their roles identify them one-to-one; the pairing is
+forced by which branch of the routine uses which:
+
+| global | role in `FUN_0113ba00` | tweak | value |
+|---|---|---|---|
+| `0x02d24704` | physical divisor — `mitigation% = adjusted / (level × C) × 100` | `TWK_TargetPerLevelArmor` | 137.225 |
+| `0x02d24714` | magical divisor, same shape | `TWK_TargetPerLevelProtection` | 46.0625 |
+| `0x02d24724` | magical ability weight — `(Int/Wis − 10) × 0.1 × C` | `TWK_ProtectionAbilityModifier` | 0.5 |
+| `0x02d24734` | physical ability weight — `(Strength − 10) × 0.1 × C` | `TWK_ArmorAbilityModifier` | 2.0 |
+
+`CombatResolver.MitigationFraction` already computes with exactly these, which is why its trace points reproduce
+retail's numbers — the formula is retail's, not a fit. Tools: `tools/ghidra/DumpFloatsAt.java` reads a global's
+value (a 0.0 says "runtime-filled"), `tools/ghidra/XrefsTo.java` shows whether anything writes it.
+
