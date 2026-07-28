@@ -79,6 +79,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// character: one covers five different characters, the two TWO-CLIENT captures carry exactly two ids,
 			// and one character name appears under two ids in different sessions. The static list carried one of
 			// those three, so every character we created logged in wearing a stranger's id.
+			// ...and it is the account id RAW, with no base added: UniverseAgent's AckAuthenticate sends the account
+			// both as a 0x2712-prefixed u64 and as a raw u32, and it is the RAW one this slot repeats - equal in all
+			// 105 captures that carry both. The login tier and this sheet must therefore send the same number.
 			yield return (CharacterStatId.PlayerId, character.AccountId);
 
 			// The WALLET. GameServerListener.WorldEntry pushes an interim 0x2005 at login with the note that "retail

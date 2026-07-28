@@ -17,6 +17,11 @@ namespace Faolan.UniverseAgent
 		// which is client-specific and can't be generated (see ce487719).
 		private Task SendPlayerAgentRealm(INetworkClient client, ProtoEndpoint receiver)
 		{
+			// The account rides this reply TWICE: a 64-bit universe-scoped form (0x2712 in the high word) and the
+			// RAW id. That raw u32 is the same number the FullChar snapshot later carries as its PlayerId stat -
+			// verified equal in the 105 captures that contain both (tools/capture/scan_account_id_vs_playerid.py),
+			// with NO base added. So the two must stay in step: if this ever sends something other than Account.Id,
+			// SnapshotStatSheet's PlayerId has to follow (#478).
 			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceOpcodes.DispatchAckAuthenticate, b => b
 				.WriteUInt32(client.Session.Account.AuthStatus) // authstatus 0x01
 				.WriteUInt64(0x0000271200000000u + client.Session.Account.Id)
