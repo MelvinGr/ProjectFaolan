@@ -3022,6 +3022,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<int>("DotDelta")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("DotIntervalMs")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("DotType")
                         .HasColumnType("INTEGER");
 

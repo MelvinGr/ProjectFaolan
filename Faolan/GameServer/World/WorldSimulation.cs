@@ -56,7 +56,9 @@ namespace Faolan.GameServer.World
 		// Applies damage/heal-over-time from active DoT debuffs (#274). Each tracked buff with a DotDelta bleeds (or
 		// heals) the target's HealthCurrent on a fixed cadence, mirroring the captured StatDamageIIR cycle: the tick
 		// moves the player's vitals by the delta and sends the byte-exact StatDamageIIR (+ a PushVitals for the bar).
-		// Retail's bleeds tick roughly every couple of seconds; DotTickSeconds matches that.
+		// The fallback DoT cadence, for a spell whose interval was never observed. Retail's bleeds tick roughly every
+		// couple of seconds, which is what this was for EVERY DoT until the interval was measured per spell (#437) -
+		// see Spell.DotIntervalMs.
 		private const double DotTickSeconds = 2.0;
 
 		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).
@@ -88,7 +90,7 @@ namespace Faolan.GameServer.World
 
 		// Cached DoT effect per base spell id (Spell.DotDelta/DotType): looked up once per spell, then reused so the
 		// per-cast NPC path doesn't hit the DB. (delta 0 = not a DoT.)
-		private readonly ConcurrentDictionary<uint, (int Delta, uint Type)> _dotEffects = new ConcurrentDictionary<uint, (int Delta, uint Type)>();
+		private readonly ConcurrentDictionary<uint, (int Delta, uint Type, uint IntervalMs)> _dotEffects = new ConcurrentDictionary<uint, (int Delta, uint Type, uint IntervalMs)>();
 		private readonly ConcurrentDictionary<uint, HashSet<uint>> _discoveredRespawnByCharacter = new ConcurrentDictionary<uint, HashSet<uint>>();
 
 		// Players currently dead, with the seconds remaining until respawn (counted down every tick).
@@ -396,11 +398,12 @@ namespace Faolan.GameServer.World
 			{
 				// Attach the DoT effect (Spell.DotDelta, captured StatDamageIIR) so the tick bleeds the player's health
 				// while the debuff is active - Rend -8/tick etc. Looked up by base spell id (wire id >> 8). #274
-				var (dotDelta, dotType) = await DotEffect(spell.SpellId >> 8);
+				var (dotDelta, dotType, dotIntervalMs) = await DotEffect(spell.SpellId >> 8);
 				target.ActiveBuffs[spell.SpellId] = new ActiveBuff(spell.SpellId, npc.Handle, DateTimeOffset.UtcNow, debuffMs / 1000f)
 				{
 					DotDelta = dotDelta,
 					DotType = dotType,
+					DotIntervalMs = dotIntervalMs,
 					LastDotTick = DateTimeOffset.UtcNow
 				};
 			}
@@ -474,13 +477,13 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		private async Task<(int Delta, uint Type)> DotEffect(uint baseSpellId)
+		private async Task<(int Delta, uint Type, uint IntervalMs)> DotEffect(uint baseSpellId)
 		{
 			if (_dotEffects.TryGetValue(baseSpellId, out var cached))
 				return cached;
 
 			var spell = await _database.GetSpell(baseSpellId);
-			var effect = (spell?.DotDelta ?? 0, spell?.DotType ?? 0);
+			var effect = (spell?.DotDelta ?? 0, spell?.DotType ?? 0, spell?.DotIntervalMs ?? 0);
 			_dotEffects[baseSpellId] = effect;
 			return effect;
 		}
@@ -998,6 +1001,14 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// This DoT's own tick interval, or the 2 s fallback where the captures never showed one.
+		private static double IntervalOf(ActiveBuff buff)
+		{
+			return buff.DotIntervalMs > 0
+				? buff.DotIntervalMs
+				: DotTickSeconds * 1000;
+		}
+
 		private async Task TickDots()
 		{
 			var now = DateTimeOffset.UtcNow;
@@ -1013,7 +1024,7 @@ namespace Faolan.GameServer.World
 
 				foreach (var buff in entity.ActiveBuffs.Values)
 				{
-					if (buff.DotDelta == 0 || (now - buff.LastDotTick).TotalSeconds < DotTickSeconds)
+					if (buff.DotDelta == 0 || (now - buff.LastDotTick).TotalMilliseconds < IntervalOf(buff))
 						continue;
 
 					buff.LastDotTick = now;

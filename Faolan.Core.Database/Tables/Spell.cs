@@ -46,6 +46,17 @@ namespace Faolan.Core.Database.Tables
 
 		public uint DotType { get; set; }
 
+		// How often the DoT ticks, in milliseconds. MEASURED from the captures rather than lifted from the RDB (#437):
+		// a StatDamageIIR carries its spell's base id at word 12, so the gap between consecutive ticks of one spell on
+		// one target IS the interval. Over 38 spells the quartiles are tight (Ripper Volley 0.92/0.98/1.12, Ether Drain
+		// 4.92/4.95/5.11), and the values are round - 500 ms to 11 s.
+		//
+		// Which is why this column exists at all: the tick used ONE constant, 2 s, for every DoT. That is right for the
+		// Incinerate family and wrong everywhere else - Ripper Volley and Archfiend tick twice as fast as we ran them,
+		// Ether Drain two and a half times slower, Hellfire Breath five times slower. 0 = unmeasured, and the tick
+		// falls back to the old 2 s.
+		public uint DotIntervalMs { get; set; }
+
 		// Buff/effect duration in milliseconds. Imported from RDB field 0x008, which is in CENTISECONDS (×10ms - the
 		// same unit as the cast-time field; calibrated in-client: Rend 700->7s, Butcher 400->4s, Exhausted 10000->100s),
 		// so it is stored here ×10 as real ms. 0 = no self-duration on this record (an instant spell, or an ability

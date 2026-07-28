@@ -24,6 +24,9 @@ namespace Faolan.GameServer.World
 		public int DotDelta { get; init; }
 		public uint DotType { get; init; }
 
+		// This DoT's measured tick interval in ms (Spell.DotIntervalMs); 0 = unmeasured, and the tick uses its default.
+		public uint DotIntervalMs { get; init; }
+
 		// The bit needed to reconstruct this buff's ApplySpell payload on relog (#274): the per-application effect
 		// Nonce (last u32 of the payload). Set at apply from the constructed payload; persisted to CharacterBuff for a
 		// self-buff. Default 0 for the NPC-cast debuffs (which are never persisted).
