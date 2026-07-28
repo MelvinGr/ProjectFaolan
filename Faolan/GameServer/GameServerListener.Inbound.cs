@@ -899,14 +899,39 @@ namespace Faolan.GameServer
 					return;
 				}
 
-				// 0x2003 SetTutorialStats(int nValue): the Tortage tutorial reporting which step the player reached.
-				// 22 distinct values across 147 captures (0x1D, 0x1E, 0x1F, 0x2D, ...), i.e. a STEP ORDINAL, not a
-				// flag. Nothing persists it, so the tutorial restarts from the client's own state on relog (#461).
+				// 0x2003 SetTutorialStats(int nValue): the client naming a Tortage tutorial hint it has just shown.
+				//
+				// It is a hint ID, not a progress ordinal (#461). Filtered to the GameCharAgent receiver class - 0x2003
+				// collides with a GameAgent method that carries a character id, which is what made the values look
+				// bimodal - the captures give 22 distinct values, all in 0..47, and they are NOT monotone: each session
+				// reports only the hints newly seen in it. Faolanx sends {45,15,16,46}, then {29,30,31,13}, then
+				// {10,28} across three logins. So the client keeps its own cumulative set and tells us the deltas.
+				//
+				// We accumulate them into Character.TutorialStepsSeen, a bitmask. NO reply: the client's own method
+				// catalog has no s2c counterpart, so this is a one-way notification and there is nothing to answer
+				// with - which is also why storing it cannot fix "lost on a fresh client" on its own. See the column's
+				// comment.
 				case GameCharAgentOpcodes.SetTutorialStats:
 				{
 					var tutorialStep = body.ReadUInt32();
+					var character = client.Session.Character;
 
-					Logger.LogDebug("GameCharAgent.SetTutorialStats step {Step}; not persisted (#461), no reply.", tutorialStep);
+					if (tutorialStep >= 64)
+					{
+						// Every observed id is in 0..47. A wider one would silently shift out of the mask, so say so
+						// rather than drop it: it means the id space is bigger than the captures showed.
+						Logger.LogWarning("SetTutorialStats id {Step} is outside the 0..63 the bitmask holds; not recorded (#461).", tutorialStep);
+						return;
+					}
+
+					var updated = character.TutorialStepsSeen | (1UL << (int)tutorialStep);
+					if (updated != character.TutorialStepsSeen)
+					{
+						character.TutorialStepsSeen = updated;
+						await Database.SetCharacterTutorialSteps(character.Id, updated);
+					}
+
+					Logger.LogDebug("SetTutorialStats hint {Step} seen by {Character} (mask now 0x{Mask:X16}).", tutorialStep, character.Name, updated);
 					return;
 				}
 

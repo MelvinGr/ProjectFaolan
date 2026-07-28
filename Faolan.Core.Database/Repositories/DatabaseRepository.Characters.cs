@@ -69,6 +69,9 @@ namespace Faolan.Core.Database.Repositories
 
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null);
+
+		/// <summary>Records the Tortage tutorial hints a character has been shown, as a bitmask (#461).</summary>
+		Task SetCharacterTutorialSteps(uint characterId, ulong stepsSeen);
 		Task SetCharacterQuestGoal(uint characterId, uint questId, uint goalId, uint progress);
 		Task SetCharacterShortcut(uint characterId, uint slot, uint shortcutType, uint targetId);
 		Task<bool> SetCreationSpawn(uint characterId);
@@ -535,6 +538,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.CharacterQuests.Where(q => q.CharacterId == characterId && q.QuestId == questId).ExecuteDeleteAsync();
+		}
+
+		// A targeted single-column update rather than SaveCharacter: the client fires one of these per tutorial hint,
+		// several per session, and there is no periodic character save that would pick up an in-memory change.
+		public async Task SetCharacterTutorialSteps(uint characterId, ulong stepsSeen)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(c => c.SetProperty(x => x.TutorialStepsSeen, stepsSeen));
 		}
 
 		public async Task RemoveCharacterShortcut(uint characterId, uint slot)

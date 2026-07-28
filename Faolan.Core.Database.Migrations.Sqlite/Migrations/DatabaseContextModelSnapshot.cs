@@ -281,6 +281,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<byte>("Sex")
                         .HasColumnType("INTEGER");
 
+                    b.Property<ulong>("TutorialStepsSeen")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId");

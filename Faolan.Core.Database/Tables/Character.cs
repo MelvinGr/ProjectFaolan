@@ -157,6 +157,19 @@ namespace Faolan.Core.Database.Tables
 		public uint Kills { get; set; }
 		public uint Deaths { get; set; }
 
+		// Which Tortage tutorial hints this character has already been shown, as a BITMASK of the step ids the client
+		// reports through GameCharAgent.SetTutorialStats (#461). A set and not a "current step": across the captures
+		// the values are not monotone and each session reports only the hints newly seen that session - Faolanx sends
+		// {45,15,16,46}, then {29,30,31,13}, then {10,28} over three logins - so the client is naming individual hints
+		// as they fire, not reporting how far it has got. All 22 observed ids are in 0..47, which is why one u64 holds
+		// the whole set.
+		//
+		// ⚠️ Write-only for now, and deliberately so. The client's method catalog has NO s2c counterpart to
+		// SetTutorialStats, so there is no way to hand this back - the client keeps its own copy and a fresh install
+		// starts the tutorial over regardless of what we stored. We persist it because it is real per-character state
+		// the client volunteers and it is cheap to keep; restoring it needs a feed-back path nobody has found yet.
+		public ulong TutorialStepsSeen { get; set; }
+
 		public override string ToString()
 		{
 			return $"{base.ToString()}: {Name}";
