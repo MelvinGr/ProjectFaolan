@@ -16,32 +16,32 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		public static byte[] Generate(PlayerSpawnScaffold s)
 		{
-			var post = GeneratePostIir(s);
+			return new FaolanStream()
+				.WriteArrayUInt32Length(payload =>
+				{
+					payload
+						.WriteUInt32(GameServer0X2000Opcodes.SimpleCharFullUpdateIIR)
+						.WriteUInt32(s.Ack)
+						.WriteUInt32(s.Handle)
+						.WriteUInt32(s.FieldA)
+						.WriteByte(0x2C)
+						.WriteByte(0x0A)
+						.WriteProtobufByteLength((ProtoVec3)s.Position)
+						.WriteByte(0x12)
+						.WriteProtobufByteLength((ProtoQuat)s.Rotation);
 
-			// Everything from SubOpcode onward; the leading u32 length prefix (= payload length) is added last.
-			var payload = new FaolanStream()
-				.WriteUInt32(GameServer0X2000Opcodes.SimpleCharFullUpdateIIR)
-				.WriteUInt32(s.Ack)
-				.WriteUInt32(s.Handle)
-				.WriteUInt32(s.FieldA)
-				// Position/Rotation go back out through the generated ProtoVec3/ProtoQuat - the same path
-				// PlayerSpawnBuilder constructs with, and byte-identical to the payloads this codec parsed (proven by
-				// the byte-exact regeneration of every captured spawn, not asserted here). #352 kept them raw on the
-				// theory that a captured field-set would be lost; over 11,632 spawns the field set never varies.
-				.WriteByte(0x2C)
-				.WriteByte(0x0A)
-				.WriteProtobufByteLength((ProtoVec3)s.Position)
-				.WriteByte(0x12)
-				.WriteProtobufByteLength((ProtoQuat)s.Rotation);
-			// Field 4 as a fixed32. Never observed: all 15787 captured FA015807/66AEDD50 transform groups are exactly
-			// {0x0A vec3, 0x12 quat, 0x18 playfield}, and nothing in the codebase ever SETS Scale - it is only ever
-			// parsed out of a body and written back. Kept as defensive pass-through, not as a modelled field.
-			if (s.Scale != null)
-				payload.WriteByte(0x25).WriteArray(s.Scale);
+					// Field 4 as a fixed32. Never observed: all 15787 captured FA015807/66AEDD50 transform groups are exactly
+					// {0x0A vec3, 0x12 quat, 0x18 playfield}, and nothing in the codebase ever SETS Scale - it is only ever
+					// parsed out of a body and written back. Kept as defensive pass-through, not as a modelled field.
+					if (s.Scale != null)
+						payload.WriteByte(0x25).WriteArray(s.Scale);
 
-			payload.WriteByte(0x18).WriteVarint(s.Playfield).WriteArray(PlayerSpawnPreFrameCodec.Build(s.Frame)).WriteArrayUInt32Length(s.Character.ToProtobuf()).WriteArray(post);
-
-			return new FaolanStream().WriteArrayUInt32Length(payload.ToArray()).ToArray();
+					payload.WriteByte(0x18).WriteVarint(s.Playfield)
+						.WriteArray(PlayerSpawnPreFrameCodec.Build(s.Frame))
+						.WriteProtobufByteLength(s.Character)
+						.WriteArray(GeneratePostIir(s));
+				})
+				.ToArray();
 		}
 
 		public static bool TryParse(byte[] body, [NotNullWhen(true)] out PlayerSpawnScaffold? scaffold, [NotNullWhen(false)] out string? error)
@@ -64,7 +64,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		private static byte[] GeneratePostIir(PlayerSpawnScaffold s)
 		{
 			var count = s.Entries.Count;
-			var b = new FaolanStream();
+			using var b = new FaolanStream();
 
 			// The header, the first record and the buff list - the part of this stream that is not the player's
 			// (SpawnPostIirCommon). The player's first record IS the buff list's framing word, which is why its
