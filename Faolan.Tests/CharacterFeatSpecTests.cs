@@ -100,16 +100,38 @@ namespace Faolan.Tests
 			Assert.Equal(["PvE", "PvP"], character.FeatSpecs.OrderBy(s => s.Index).Select(s => s.Name).ToArray());
 		}
 
-		// A character persisted before specs existed has feat rows and no spec rows. It must still generate the frame
-		// it always did rather than losing its feats - the fallback is what makes the migration safe for a DB whose
-		// rows were written by the old code.
+		// A character with NO spec rows THROWS rather than being handed a synthesized one. Every character carries at
+		// least the one unnamed spec - TrySeedFreshRows writes it and the #474 migration backfilled every existing
+		// character - so an empty set means the rows are incomplete, most likely loaded without
+		// Include(c => c.FeatSpecs). Synthesizing one would spawn the character with an EMPTY feat list, which renders
+		// as "you have trained nothing" and is indistinguishable from the truth.
 		[Fact]
-		public void ACharacterWithNoSpecRows_StillGeneratesItsOneUnnamedSpec()
+		public void ACharacterWithNoSpecRows_Throws()
 		{
 			var character = new Character
 			{
 				Id = 7,
 				Class = ConanClass.Guardian,
+				Feats =
+				[
+					new CharacterFeat { CharacterId = 7, FeatId = 200000, Sequence = 0 },
+					new CharacterFeat { CharacterId = 7, FeatId = 200100, Sequence = 1 }
+				]
+			};
+
+			var error = Assert.Throws<InvalidOperationException>(() => PlayerSpawnScaffoldRows.SpecsOf(character));
+			Assert.Contains("no CharacterFeatSpec rows", error.Message);
+		}
+
+		// With its one spec row present it generates exactly the frame the single-spec overload does.
+		[Fact]
+		public void ACharacterWithItsOneSpec_GeneratesTheSingleSpecFrame()
+		{
+			var character = new Character
+			{
+				Id = 7,
+				Class = ConanClass.Guardian,
+				FeatSpecs = [new CharacterFeatSpec { CharacterId = 7, Index = 0, Name = "" }],
 				Feats =
 				[
 					new CharacterFeat { CharacterId = 7, FeatId = 200000, Sequence = 0 },

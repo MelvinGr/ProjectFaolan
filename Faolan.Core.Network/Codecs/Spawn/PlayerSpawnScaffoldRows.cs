@@ -177,14 +177,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return ExtractPreFrameSpecs(preFrame).SelectMany(spec => spec.FeatIds).ToList();
 		}
 
+		// THROWS on a frame that does not walk. It used to answer "no feats", which is a fabricated value: every one
+		// of the 259 captured frames parses, so a failure here means a genuinely new wire shape - and answering with
+		// an empty list would write a character's feats away silently. That is not hypothetical, it is the bug this
+		// decode found: the old fixed-offset reader returned zero feats for three level-80 characters.
+
 		// The character's saved feat SPECS as the frame carries them - name and trained-feat list per spec, in wire
 		// order (#474). Returns empty for the create-editor frame, which has no sublist at all. ExtractPreFrameFeats
 		// is the flattened view for callers that only want "every feat this character has trained".
 		public static IReadOnlyList<PlayerSpawnPreFrameSublistEntry> ExtractPreFrameSpecs(byte[] preFrame)
 		{
-			return PlayerSpawnPreFrameCodec.TryParse(preFrame, out var frame)
-				? frame.Sublist
-				: [];
+			if (!PlayerSpawnPreFrameCodec.TryParse(preFrame, out var frame))
+				throw new FormatException($"the {preFrame?.Length ?? 0}-byte pre-IIR frame does not walk as a spawn scaffold - its feat specs cannot be read.");
+
+			return frame.Sublist;
 		}
 
 		// Replaces the character's scaffold rows with the scaffold's content (extraction: captured spawn -> rows).
@@ -238,13 +244,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		// The character's specs as the wire wants them: each spec's feats in Sequence order, specs in Index order.
-		// A character with feats but no spec rows (persisted before #474) yields the one unnamed spec it always had.
+		//
+		// THROWS when the character has none. Every character has at least the one unnamed spec - the wire's sublist
+		// always carries it, TrySeedFreshRows writes it, and the #474 migration backfilled it for every existing row -
+		// so an empty set is a broken character, not a shape to paper over. Synthesizing one here would let a
+		// character whose spec rows failed to load spawn with an EMPTY feat list, which renders as "you have trained
+		// nothing" and is indistinguishable from the real thing.
 		public static IReadOnlyList<PlayerSpawnPreFrameSublistEntry> SpecsOf(Character character)
 		{
-			var feats = character.Feats ?? [];
-			var specs = character.FeatSpecs is { Count: > 0 }
-				? character.FeatSpecs.OrderBy(s => s.Index).Select(s => (s.Index, s.Name)).ToList()
-				: [(0, "")];
+			if (character?.FeatSpecs is not { Count: > 0 })
+				throw new InvalidOperationException($"character {character?.Id} has no CharacterFeatSpec rows - every character carries at least the one unnamed spec, so this row set is incomplete (was it loaded without Include(c => c.FeatSpecs)?).");
+
+			// Not `Feats ?? []`: the collection is initialised on the entity, so a null one means the graph is broken,
+			// and coalescing it would spawn the character carrying no feats at all.
+			var specs = character.FeatSpecs.OrderBy(s => s.Index).Select(s => (s.Index, s.Name)).ToList();
 
 			return specs
 				.Select(spec =>
@@ -255,7 +268,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 						Flag = (byte)spec.Index,
 						Name = spec.Name
 					};
-					entry.FeatIds.AddRange(feats.Where(f => f.SpecIndex == spec.Index).OrderBy(f => f.Sequence).Select(f => f.FeatId));
+					entry.FeatIds.AddRange(character.Feats.Where(f => f.SpecIndex == spec.Index).OrderBy(f => f.Sequence).Select(f => f.FeatId));
 					return entry;
 				})
 				.ToList();
@@ -310,11 +323,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The vanity shown-mask carried by a captured spawn's PreFrame. The write side is FreshPreFrame; this is the
 		// read side, so the importer recovers a captured character's setting instead of defaulting it to 0.
+		// THROWS on a frame that does not walk, rather than answering 0: "no vanity shown" is a real, plausible-looking
+		// setting, so a fabricated one here would import as a deliberate choice and be indistinguishable from it.
 		public static uint ReadVanityShownMask(PlayerSpawnScaffold scaffold)
 		{
-			return PlayerSpawnPreFrameCodec.TryParse(scaffold?.PreFrame!, out var frame)
-				? frame.Words[PlayerSpawnPreFrame.VanityShownMaskWordIndex]
-				: 0u;
+			if (!PlayerSpawnPreFrameCodec.TryParse(scaffold?.PreFrame!, out var frame))
+				throw new FormatException($"the {scaffold?.PreFrame?.Length ?? 0}-byte pre-IIR frame does not walk as a spawn scaffold - its vanity mask cannot be read.");
+
+			return frame.Words[PlayerSpawnPreFrame.VanityShownMaskWordIndex];
 		}
 
 		// Rebuilds ONLY the appearance portion of an EXISTING scaffold (the weighted appearance entries + the editor

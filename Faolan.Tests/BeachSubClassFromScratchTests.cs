@@ -101,6 +101,8 @@ namespace Faolan.Tests
 
 			var alive = new Character
 			{
+				// A real class: the vitals anchors are per-class and there is no fallback row for an unset one.
+				Class = ConanClass.Barbarian,
 				Level = 7,
 				Experience = 98760,
 				MaxStats = Stats(),
@@ -108,6 +110,7 @@ namespace Faolan.Tests
 			};
 			var dead = new Character
 			{
+				Class = ConanClass.Barbarian,
 				Level = 7,
 				Experience = 98760,
 				MaxStats = Stats(),
@@ -180,6 +183,7 @@ namespace Faolan.Tests
 
 			var character = new Character
 			{
+				Class = ConanClass.Barbarian,
 				Level = 7,
 				Experience = 98760,
 				MaxStats = new CharacterMaxStats

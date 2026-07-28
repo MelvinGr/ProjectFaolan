@@ -192,15 +192,24 @@ namespace Faolan.GameServer
 		}
 
 		// The first free cell (0..capacity-1) in `container`, skipping persisted rows.
-		// `preferred` is the slot the player DROPPED the item on (the loot window's drag target, #462); it wins when it
-		// is in range and empty, and is otherwise ignored in favour of the first free slot - a drag onto an occupied
-		// slot must still put the item somewhere rather than failing or overwriting.
+		// `preferred` is the slot the player DROPPED the item on (the loot window's drag target, #462).
+		//
+		// An OCCUPIED preferred slot falls through to the first free one, and that is a game rule rather than a
+		// fallback: the player really did drop it there, the bag has already handed the item over, and neither losing
+		// the item nor overwriting what is in the slot is a defensible answer.
+		//
+		// An OUT-OF-RANGE one is a different thing entirely - the client cannot drop an item outside the backpack, so
+		// it means we misread the wire - and it THROWS. Quietly treating it as "first free" would make a
+		// mis-parsed body look like a working loot.
 		private async Task<int?> FindFreeContainerSlot(uint characterId, ContainerKind container, int capacity, int? preferred = null)
 		{
+			if (preferred is { } slot && (slot < 0 || slot >= capacity))
+				throw new ArgumentOutOfRangeException(nameof(preferred), slot, $"a requested {container} slot outside 0..{capacity - 1} cannot come from the client - the body was misread.");
+
 			var rows = await Database.GetCharacterInventory(characterId);
 			var taken = rows.Where(r => r.Container == container).Select(r => r.Slot).ToHashSet();
-			if (preferred is >= 0 && preferred < capacity && !taken.Contains(preferred.Value))
-				return preferred;
+			if (preferred is { } wanted && !taken.Contains(wanted))
+				return wanted;
 
 			return Enumerable.Range(0, capacity).Where(s => !taken.Contains(s)).Cast<int?>().FirstOrDefault();
 		}

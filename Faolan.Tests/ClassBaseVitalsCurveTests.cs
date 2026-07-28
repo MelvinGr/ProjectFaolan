@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Xunit;
@@ -53,12 +54,21 @@ namespace Faolan.Tests
 			Assert.Equal(0u, CharacterMaxStats.ClassBaseHundredths(@class, level).Stamina);
 		}
 
+		// Level 0 THROWS rather than being read as level 1. Every character row is allocated at level 1, so a 0 is a
+		// corrupt row, and serving it a level-1 curve would make it indistinguishable from a new character.
 		[Theory]
-		[InlineData(ConanClass.Guardian, 0)]
-		[InlineData(ConanClass.Assassin, 0)]
-		public void ClassBase_LevelZeroIsLevelOne(ConanClass @class, ushort level)
+		[InlineData(ConanClass.Guardian)]
+		[InlineData(ConanClass.Assassin)]
+		public void ClassBase_LevelZeroThrows(ConanClass @class)
 		{
-			Assert.Equal(CharacterMaxStats.ClassBaseHundredths(@class, 1), CharacterMaxStats.ClassBaseHundredths(@class, level));
+			Assert.Throws<ArgumentOutOfRangeException>(() => CharacterMaxStats.ClassBaseHundredths(@class, 0));
+		}
+
+		// And a class outside the twelve throws instead of borrowing another class's curve.
+		[Fact]
+		public void ClassBase_AnUnknownClassThrows()
+		{
+			Assert.Throws<ArgumentOutOfRangeException>(() => CharacterMaxStats.ClassBaseHundredths((ConanClass)0, 10));
 		}
 
 		// The base is NOT the displayed max, which is the whole reason this curve is not simply wired into

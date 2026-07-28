@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Xunit;
@@ -9,14 +10,14 @@ namespace Faolan.Tests
 	// docs/subsystems/player-stats.md.
 	public class CharacterMaxStatsTests
 	{
+		// Level 0 THROWS; it used to be read as level 1. Every character row is allocated at level 1
+		// (DatabaseRepository.CreateCharacter) and no shipped character is below it, so a 0 is a corrupt row - and
+		// quietly serving it level-1 vitals made a broken character indistinguishable from a new one. Nothing in the
+		// server depended on the old behaviour: this test was its only consumer.
 		[Fact]
-		public void Defaults_LevelZero_TreatedAsLevelOne()
+		public void Defaults_LevelZero_Throws()
 		{
-			var atZero = CharacterMaxStats.CreateDefaults(ConanClass.Assassin, 0);
-			var atOne = CharacterMaxStats.CreateDefaults(ConanClass.Assassin, 1);
-
-			Assert.Equal(atOne.Health, atZero.Health);
-			Assert.Equal(atOne.Mana, atZero.Mana);
+			Assert.Throws<ArgumentOutOfRangeException>(() => CharacterMaxStats.CreateDefaults(ConanClass.Assassin, 0));
 		}
 
 		[Fact]
@@ -61,9 +62,12 @@ namespace Faolan.Tests
 		[Fact]
 		public void RegenerateMaxStats_UpdatesExistingRowInPlace()
 		{
-			// Seeded baseline (level-1 rogue default before the class is chosen).
+			// The placeholder class every character row is allocated with (DatabaseRepository.CreateCharacter hands
+			// out a Cimmerian barbarian), NOT an unset one - ConanClass has no zero member and there is deliberately
+			// no fallback row, so a character with no class cannot produce vitals at all.
 			var character = new Character
 			{
+				Class = ConanClass.Barbarian,
 				Level = 1
 			};
 			character.RegenerateMaxStats();

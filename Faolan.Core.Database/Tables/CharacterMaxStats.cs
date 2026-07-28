@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -62,10 +63,9 @@ namespace Faolan.Core.Database.Tables
 		// tracked in #450/#3 - this is the first of its three sources, not the whole sum.
 		public static (uint Health, uint Mana, uint Stamina) ClassBaseHundredths(ConanClass @class, ushort level)
 		{
+			ArgumentOutOfRangeException.ThrowIfZero(level); // level 0 is not a character state - creation allocates at 1
 			var (hp, hpGrow, mana, manaGrow, stamina, staminaGrow) = ClassBaseCurve(@class);
-			var steps = (level == 0
-				? 1
-				: level) - 1;
+			var steps = level - 1;
 			return (At(hp, hpGrow), At(mana, manaGrow), At(stamina, staminaGrow));
 
 			uint At(int b, int grow)
@@ -94,7 +94,11 @@ namespace Faolan.Core.Database.Tables
 				ConanClass.BearShaman => (10000, 20000, 16500, 26000, 17200, 17000),
 				ConanClass.HeraldOfXotli => (8000, 33000, 24000, 30000, 11500, 13000),
 				ConanClass.Necromancer or ConanClass.Demonologist => (8000, 29000, 24000, 30000, 0, 0),
-				_ => (9000, 31000, 0, 0, 17200, 25000)
+
+				// No default arm on purpose. The twelve above are the whole class list and each row is the client's
+				// own, so an unknown class here is a corrupt Character.Class - not a case to answer with somebody
+				// else's curve. A fabricated one would put a plausible max on the wire and be invisible.
+				_ => throw new ArgumentOutOfRangeException(nameof(@class), @class, "no class base vitals curve - RDB 1000511 covers exactly the twelve playable classes.")
 			};
 		}
 
@@ -108,10 +112,11 @@ namespace Faolan.Core.Database.Tables
 		// bar). PER-LEVEL growth is still rough (no multi-level captures yet); only L1 is authoritative.
 		public static CharacterMaxStats CreateDefaults(ConanClass @class, ushort level)
 		{
-			var lvl = level == 0
-				? (ushort)1
-				: level;
-			var extra = lvl - 1;
+			// No level-0 normalisation: DatabaseRepository.CreateCharacter allocates every row at level 1 and no
+			// shipped character is below it, so a 0 here is a corrupt row and quietly serving it level-1 vitals would
+			// make a broken character look like a new one.
+			ArgumentOutOfRangeException.ThrowIfZero(level);
+			var extra = level - 1;
 			var (hpL1, hpGrow, manaL1, manaGrow, staminaL1, staminaGrow, _) = Archetype(@class);
 
 			return new CharacterMaxStats
@@ -201,9 +206,12 @@ namespace Faolan.Core.Database.Tables
 					return (89, 38, 246, 40, 0, 0, 80);
 				}
 
+				// Same as ClassBaseCurve: no default arm. The twelve cases above are every playable class, so reaching
+				// here means Character.Class is corrupt, and answering with an invented Rogue-ish row would hand the
+				// client a plausible sheet built from nothing.
 				default:
 				{
-					return (98, 47, 150, 30, 150, 41, 90);
+					throw new ArgumentOutOfRangeException(nameof(@class), @class, "no class vitals anchors - the twelve playable classes are all listed above.");
 				}
 			}
 		}

@@ -45,14 +45,18 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
-            // Every character that already has feats needs the spec they implicitly belonged to, or the FK below
-            // rejects them. SpecIndex defaulted to 0 above, so one unnamed spec 0 per such character is exactly the
-            // pre-#474 shape - and it must be inserted BEFORE the constraint exists (EF 10 checks FKs on the table
-            // rebuild, so a data step after the AddForeignKey is too late).
+            // EVERY character gets the one unnamed spec it implicitly always had - not just the ones that currently
+            // have feats. Two reasons it is all of them:
+            //   1. the FK below rejects any existing feat row whose spec is missing, and
+            //   2. the spec is not optional. The wire's sublist always carries one, so PlayerSpawnScaffoldRows.SpecsOf
+            //      THROWS on a character with none rather than synthesizing one - which means a character that has
+            //      simply not trained anything yet must still have its spec row, or it could not spawn.
+            // It must be inserted BEFORE the constraint exists: EF 10 checks FKs during the SQLite table rebuild, so
+            // a data step after the AddForeignKey is too late.
             migrationBuilder.Sql(
                 """
                 INSERT INTO "CharacterFeatSpecs" ("CharacterId", "Index", "Name")
-                SELECT DISTINCT "CharacterId", 0, '' FROM "CharacterFeats";
+                SELECT "Id", 0, '' FROM "Characters";
                 """);
 
             migrationBuilder.AddForeignKey(
