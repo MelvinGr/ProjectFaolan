@@ -89,9 +89,26 @@ namespace Faolan.Core.Database.Repositories
 		//
 		// The replacement keeps the original Sequence: the wire order is TRAIN order, and ranking a feat up is not a
 		// new train, so it holds its place in the list.
+		// Trains into the character's FIRST spec (index 0). Retail's train packet carries no spec id, and every
+		// captured train is on a single-spec character, so which spec a trained feat lands in is not something the
+		// corpus answers - spec 0 is the only defensible reading until a multi-spec train is captured (#474).
 		public async Task<int> AddCharacterFeats(uint characterId, IEnumerable<uint> featIds)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
+
+			// The feat rows are keyed by their spec, so the spec has to exist first. A character that has never had a
+			// feat has no spec row either, and creating it here is what makes the first train work.
+			if (!await ctx.CharacterFeatSpecs.AnyAsync(s => s.CharacterId == characterId && s.Index == 0))
+			{
+				ctx.CharacterFeatSpecs.Add(new CharacterFeatSpec
+				{
+					CharacterId = characterId,
+					Index = 0,
+					Name = ""
+				});
+				await ctx.SaveChangesAsync();
+			}
+
 			var existing = await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).ToListAsync();
 			var byBase = existing.ToDictionary(f => f.FeatId / 100);
 			var nextSeq = existing.Count == 0
@@ -868,6 +885,7 @@ namespace Faolan.Core.Database.Repositories
 				.Include(c => c.Attributes)
 				.Include(c => c.Skills)
 				.Include(c => c.Feats)
+				.Include(c => c.FeatSpecs)
 				.Include(c => c.ScaffoldPairs);
 		}
 	}

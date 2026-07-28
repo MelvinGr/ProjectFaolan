@@ -152,7 +152,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				})
 				.ToList();
 			character.ScaffoldPairs = [];
-			character.Feats = []; // a fresh character has trained no feats
+
+			// A fresh character has trained no feats - but it DOES have the one unnamed spec every character carries,
+			// which is what the frame's sublist entry is. No spec rows at all would still generate correctly
+			// (SpecsOf falls back to it), but persisting it keeps the row set the same shape as an imported char's.
+			character.Feats = [];
+			character.FeatSpecs =
+			[
+				new CharacterFeatSpec
+				{
+					CharacterId = character.Id,
+					Index = 0,
+					Name = ""
+				}
+			];
 			return true;
 		}
 
@@ -161,8 +174,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// such as the 228-byte create-editor variant). Order is preserved (the wire order is train order, NOT sorted).
 		public static List<uint> ExtractPreFrameFeats(byte[] preFrame)
 		{
+			return ExtractPreFrameSpecs(preFrame).SelectMany(spec => spec.FeatIds).ToList();
+		}
+
+		// The character's saved feat SPECS as the frame carries them - name and trained-feat list per spec, in wire
+		// order (#474). Returns empty for the create-editor frame, which has no sublist at all. ExtractPreFrameFeats
+		// is the flattened view for callers that only want "every feat this character has trained".
+		public static IReadOnlyList<PlayerSpawnPreFrameSublistEntry> ExtractPreFrameSpecs(byte[] preFrame)
+		{
 			return PlayerSpawnPreFrameCodec.TryParse(preFrame, out var frame)
-				? frame.Sublist.SelectMany(e => e.FeatIds).ToList()
+				? frame.Sublist
 				: [];
 		}
 
@@ -194,20 +215,63 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// The unlocked FEAT list lives in the pre-IIR frame (not the post-IIR IdList, which is skills). It IS
 			// character data, so extract it to CharacterFeat rows (in wire/train order); the rest of the frame +
 			// EntryTableX are constants reconstructed from Character.Class by TryApplyFrom (see FreshPreFrame).
-			// A character with SEVERAL saved feat specs flattens to one row set here - CharacterFeat has no spec
-			// column, and the generated frame emits a single unnamed spec. That is the shape of every shipped
-			// character; multi-spec persistence is open work (Gitea).
-			character.Feats = ExtractPreFrameFeats(scaffold.PreFrame)
-				.Select((id, sequence) => new CharacterFeat
+			// Specs are preserved rather than flattened (#474): a character with four saved specs round-trips as
+			// four CharacterFeatSpec rows, and the same feat id may legitimately appear in several of them.
+			var specs = ExtractPreFrameSpecs(scaffold.PreFrame);
+			character.FeatSpecs = specs
+				.Select((spec, index) => new CharacterFeatSpec
 				{
 					CharacterId = character.Id,
+					Index = index,
+					Name = spec.Name
+				})
+				.ToList();
+			character.Feats = specs
+				.SelectMany((spec, index) => spec.FeatIds.Select((id, sequence) => new CharacterFeat
+				{
+					CharacterId = character.Id,
+					SpecIndex = index,
 					FeatId = id,
 					Sequence = sequence
+				}))
+				.ToList();
+		}
+
+		// The character's specs as the wire wants them: each spec's feats in Sequence order, specs in Index order.
+		// A character with feats but no spec rows (persisted before #474) yields the one unnamed spec it always had.
+		public static IReadOnlyList<PlayerSpawnPreFrameSublistEntry> SpecsOf(Character character)
+		{
+			var feats = character.Feats ?? [];
+			var specs = character.FeatSpecs is { Count: > 0 }
+				? character.FeatSpecs.OrderBy(s => s.Index).Select(s => (s.Index, s.Name)).ToList()
+				: [(0, "")];
+
+			return specs
+				.Select(spec =>
+				{
+					var entry = new PlayerSpawnPreFrameSublistEntry
+					{
+						Key = (uint)spec.Index,
+						Flag = (byte)spec.Index,
+						Name = spec.Name
+					};
+					entry.FeatIds.AddRange(feats.Where(f => f.SpecIndex == spec.Index).OrderBy(f => f.Sequence).Select(f => f.FeatId));
+					return entry;
 				})
 				.ToList();
 		}
 
+		// The single-spec overload - the shape every fresh character and every shipped character has.
 		public static byte[] FreshPreFrame(ConanClass @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
+		{
+			var entry = new PlayerSpawnPreFrameSublistEntry();
+			if (feats != null)
+				entry.FeatIds.AddRange(feats);
+
+			return FreshPreFrame(@class, vanityShownMask, [entry]);
+		}
+
+		public static byte[] FreshPreFrame(ConanClass @class, uint vanityShownMask, IReadOnlyList<PlayerSpawnPreFrameSublistEntry> specs)
 		{
 			var frame = new PlayerSpawnPreFrame();
 			frame.Flags[PlayerSpawnPreFrame.ArchetypeFlagIndex] = FrameArchetype(@class);
@@ -217,14 +281,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			frame.Words[PlayerSpawnPreFrame.ConstantWordIndex] = PlayerSpawnPreFrame.ConstantWordValue;
 			frame.Words[PlayerSpawnPreFrame.SessionWordIndex] = PlayerSpawnPreFrame.FreshSessionWordValue;
 
-			// The sublist carries exactly one entry on every captured login, and that entry's nested count-framed
-			// list is the character's unlocked FEAT list in train order. A fresh character's is empty, which frames
-			// as the bare 0x3F1 word - byte-identical to the old constant-239 fresh frame.
-			var entry = new PlayerSpawnPreFrameSublistEntry();
-			if (feats != null)
-				entry.FeatIds.AddRange(feats);
-
-			frame.Sublist.Add(entry);
+			// One sublist entry per saved feat spec, each carrying its name and its own trained-feat list in train
+			// order. A fresh character has one unnamed spec with no feats, which frames as the bare 0x3F1 word -
+			// byte-identical to the old constant-239 fresh frame.
+			frame.Sublist.AddRange(specs);
 			return PlayerSpawnPreFrameCodec.Build(frame);
 		}
 
@@ -299,8 +359,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// hidden-slots mask (#336) from the character's equipment (the FA015807 self-spawn carries it so a hidden
 			// piece survives relog), and the unlocked FEAT list spliced in from CharacterFeat rows (train order).
 			// EntryTableX is the constant 0xB7. Transient session islands are correctly absent.
-			var feats = character.Feats?.OrderBy(f => f.Sequence).Select(f => f.FeatId).ToList();
-			scaffold.PreFrame = FreshPreFrame(character.Class, character.Equipment?.VanityShownMask ?? 0, feats);
+			scaffold.PreFrame = FreshPreFrame(character.Class, character.Equipment?.VanityShownMask ?? 0, SpecsOf(character));
 			scaffold.EntryTableX = 0xB7;
 			scaffold.BuffRecords.Clear();
 

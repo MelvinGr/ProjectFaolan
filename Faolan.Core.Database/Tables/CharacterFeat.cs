@@ -12,13 +12,23 @@ namespace Faolan.Core.Database.Tables
 	// FeatId = featBase*100 + rank, e.g. Hellfire base 1127 -> 112700 at rank 0, and hakotep's base 1100 at rank 4
 	// = 110004). Stored composite so the wire value is reproduced exactly; the same id-space is used by FeatIIR
 	// (0x28DA68A0), the train/unlock record.
-	[PrimaryKey(nameof(CharacterId), nameof(FeatId))]
+	// Keyed by the SPEC as well as the feat: a character may hold several specs (CharacterFeatSpec) and the same feat
+	// id legitimately appears in more than one of them - four of the captured multi-spec characters share most of
+	// their list across specs. A (CharacterId, FeatId) key would silently collapse those into one.
+	[PrimaryKey(nameof(CharacterId), nameof(SpecIndex), nameof(FeatId))]
 	public class CharacterFeat
 	{
 		public uint CharacterId { get; set; }
 
 		[ForeignKey(nameof(CharacterId))]
 		public virtual Character Character { get; set; } = null!;
+
+		// Which of the character's specs this feat is trained in. 0 for a single-spec character, which is every
+		// character we ship - so this defaults to the historical behaviour rather than needing a backfill.
+		public int SpecIndex { get; set; }
+
+		[ForeignKey($"{nameof(CharacterId)},{nameof(SpecIndex)}")]
+		public virtual CharacterFeatSpec Spec { get; set; } = null!;
 
 		// The composite feat id.
 		//
@@ -30,7 +40,7 @@ namespace Faolan.Core.Database.Tables
 		// catalog. Add the FK when that mapping exists, not before.
 		public uint FeatId { get; set; }
 
-		// Wire position within the pre-IIR feat list. Unlike the ascending skill scaffold, the feat list is in
+		// Wire position within its SPEC's feat list. Unlike the ascending skill scaffold, the feat list is in
 		// TRAIN order (e.g. NecroL80: 80004, 82704, 410604, 80200, ...), so the order must be preserved to regenerate
 		// the spawn byte-exact - hence a Sequence column rather than sorting by id.
 		public int Sequence { get; set; }

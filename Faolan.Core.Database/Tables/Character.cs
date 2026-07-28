@@ -75,6 +75,10 @@ namespace Faolan.Core.Database.Tables
 		// ability scaffold). See CharacterFeat + docs/subsystems/feats.md.
 		public virtual ICollection<CharacterFeat> Feats { get; set; } = [];
 
+		// The character's saved feat SPECS (#474). One unnamed spec is the normal case; a feat belongs to exactly one
+		// of these via CharacterFeat.SpecIndex.
+		public virtual ICollection<CharacterFeatSpec> FeatSpecs { get; set; } = [];
+
 		// Non-worn carried items (bag/backpack/quest/resources); worn items are in Equipment. Drives the FullChar
 		// inventory snapshot. See [[CharacterInventory]] / docs/re/player-spawn-generation.md.
 		public virtual ICollection<CharacterInventory> Inventory { get; set; } = [];

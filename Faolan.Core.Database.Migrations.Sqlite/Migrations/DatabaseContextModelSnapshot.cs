@@ -651,15 +651,35 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("CharacterId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("SpecIndex")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("FeatId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Sequence")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("CharacterId", "FeatId");
+                    b.HasKey("CharacterId", "SpecIndex", "FeatId");
 
                     b.ToTable("CharacterFeats");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFeatSpec", b =>
+                {
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Index")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("CharacterId", "Index");
+
+                    b.ToTable("CharacterFeatSpecs");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFriend", b =>
@@ -3682,6 +3702,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Faolan.Core.Database.Tables.CharacterFeatSpec", "Spec")
+                        .WithMany()
+                        .HasForeignKey("CharacterId", "SpecIndex")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Character");
+
+                    b.Navigation("Spec");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterFeatSpec", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
+                        .WithMany("FeatSpecs")
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Character");
                 });
 
@@ -4472,6 +4511,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Buffs");
 
                     b.Navigation("Equipment");
+
+                    b.Navigation("FeatSpecs");
 
                     b.Navigation("Feats");
 
