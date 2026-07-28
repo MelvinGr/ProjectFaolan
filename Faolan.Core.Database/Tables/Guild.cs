@@ -4,6 +4,9 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
+using Faolan.Core.Database.Attributes;
+using Faolan.Core.Enums;
+
 namespace Faolan.Core.Database.Tables
 {
 	// A player guild. Wire identity is ID32 [type 0x0000DEB7][instance = Id]; members are Characters with
@@ -30,7 +33,12 @@ namespace Faolan.Core.Database.Tables
 		// at 1 on the wire today, because GuildRenownBlock only encodes that form's body layout (the captured
 		// "Sepulchra Invictus" guild was form 1). This column is retained for a future real government-form feature
 		// and is not yet emitted. The client UI maps the value to a government label (#219, docs/subsystems/guilds.md).
-		public byte GovernmentForm { get; set; } = 1; // TODO: To enum
+		// The governing form the founder picked, from CreateGuild's `i_nGoverningForm` byte. It decides the guild's
+		// whole rank ladder - see GuildRankLadder - so it has to be STORED, which it was not: HandleCreateGuild read
+		// the byte and only logged it. Default Cimmerian (0) rather than the old 1, which was Acheron by accident.
+		// CLOSED enum - the client's table has exactly these seven and no Unknown fillers - so it takes the CHECK.
+		[ConstrainToEnumValues]
+		public GuildGoverningForm GovernmentForm { get; set; } = GuildGoverningForm.Cimmerian;
 
 		[MaxLength(512)]
 		public string Description { get; set; } = "";

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
@@ -195,9 +196,9 @@ namespace Faolan.CSPlayerAgent
 			var character = client.Session.Character;
 
 			var name = body.ReadString();
-			var form = body.Length - body.Position >= 1
+			var form = (GuildGoverningForm)(body.Length - body.Position >= 1
 				? body.ReadByte()
-				: (byte)0; // guild-form (docs/subsystems/create-guild-decode.md)
+				: (byte)GuildGoverningForm.Cimmerian); // i_nGoverningForm (docs/subsystems/create-guild-decode.md)
 			if (string.IsNullOrWhiteSpace(name) || character.GuildId != null)
 			{
 				_logger.LogWarning("CreateGuild rejected for {CharacterId:X8}: name \"{Name}\", already in guild: {InGuild}.", character.Id, name, character.GuildId != null);
@@ -214,13 +215,19 @@ namespace Faolan.CSPlayerAgent
 			}
 
 			character.GuildId = guild.Id;
-			character.GuildRank = GuildRank.Leader;
 
-			_logger.LogInformation("Guild \"{Name}\" ({GuildId:X}) created by {Character} (form 0x{Form:X2}).", guild.Name, guild.Id, character.Name, form);
+			// STORE the form - it was read and dropped, so every guild kept the column's default and its rank ladder
+			// was whatever that happened to be. And the leader's rung is per-form: Stygian tops out at 3, Cimmerian
+			// and Harem at 4, the other four at 5, so a flat GuildRank.Leader was right for two forms of seven (#469).
+			guild.GovernmentForm = form;
+			character.GuildRank = (GuildRank)GuildRankLadder.LeaderRank(form);
+
+			_logger.LogInformation("Guild \"{Name}\" ({GuildId:X}) created by {Character} as {Form}; leader rank {Rank} (\"{RankName}\").", guild.Name, guild.Id, character.Name, form,
+				(byte)character.GuildRank, GuildRankLadder.NameOf(form, (byte)character.GuildRank!) ?? "?");
 			// Retail's immediate create response is 0x2044 DispatchGuildCreated (opens the window with NO relog), not
 			// the 0x203F full-update. If the client doesn't accept it the guild still shows on the next login (the
 			// re-auth 0x203F push), so this only ADDS the no-relog path.
-			await SendGuildCreated(client, ReplySender(packet.Receiver), packet.Sender, guild, character, form);
+			await SendGuildCreated(client, ReplySender(packet.Receiver), packet.Sender, guild, character, (byte)form);
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
 		}
 

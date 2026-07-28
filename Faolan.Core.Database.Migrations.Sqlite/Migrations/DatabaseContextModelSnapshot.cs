@@ -1477,7 +1477,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasIndex("RealmId", "Name")
                         .IsUnique();
 
-                    b.ToTable("Guilds");
+                    b.ToTable("Guilds", t =>
+                        {
+                            t.HasCheckConstraint("CK_Guild_GovernmentForm", "GovernmentForm IN (0, 1, 2, 3, 4, 5, 6)");
+                        });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Item", b =>
