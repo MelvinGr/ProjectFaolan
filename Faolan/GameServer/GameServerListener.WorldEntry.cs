@@ -239,10 +239,13 @@ namespace Faolan.GameServer
 			// second 0x737A6DF9 for an already-constructed identity. Inventory rides the WORLD-ENTRY snapshot,
 			// see BuildBurstlessSnapshotRoot.)
 
-			// Wallet sync: retail does NOT push a 0x2005 at login (the initial balance presumably rides the
-			// FullChar snapshot, location undecoded) - this is our interim so a moneyed character doesn't
-			// show 0 until the first change. Reason 0 = a plain sync, not a gain celebration.
-			if (client.Session.Character.Money > 0) // TODO: Confirm previous comment, remove this call if not retail
+			// Wallet sync. Retail does NOT push a 0x2005 at login - the balance rides the FullChar snapshot, and
+			// the slot this comment used to call "undecoded" is CharacterStatId.Money in the stat sheet, authored
+			// from the character since #447. So this push is now REDUNDANT rather than a stand-in for something
+			// missing; it stays until an in-client login confirms the sheet alone shows the right balance, because
+			// removing it on reasoning alone would show a moneyed character 0 if the sheet slot turned out to be
+			// read some other way. Reason 0 = a plain sync, not a gain celebration.
+			if (client.Session.Character.Money > 0)
 				await SendUpdateCash(client, client.Session.Character.Money, UpdateCashReason.Spend);
 
 			// Guilded character: set the in-world guild tag (0x2550C99A). Retail sends this once on guild

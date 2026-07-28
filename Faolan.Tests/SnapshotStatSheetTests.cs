@@ -69,7 +69,7 @@ namespace Faolan.Tests
 			var sheet = SnapshotStatSheet.For(Char80(), null, Captured());
 
 			Assert.Equal(0xDEADu, Value(sheet, CharacterStatId.AttackRating));
-			Assert.Equal(0xDEADu, Value(sheet, CharacterStatId.Money));
+			Assert.Equal(0xDEADu, Value(sheet, CharacterStatId.Perception));
 		}
 
 		// The sheet is always the full size the two StatList_t need - a builder that dropped or appended a pair would

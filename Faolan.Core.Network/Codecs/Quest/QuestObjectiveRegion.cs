@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// validated 2026-06-16 (tools/capture/decode_snapshot_609.py, docs/re/fullplayer-snapshot-reader.md): a per-GOAL
 	// objective-detail list, NOT a BuildQuestFullUpdate block (that earlier claim was disproven - 559 B vs 869 B).
 	//
-	// Wire: u32 chapterTag(0x0BD3) ; then per goal:
+	// Wire: u32 goal-list frame ((goals+1) * 0x3F1) ; then per goal:
 	//   u32 1 ; u32 k ; u32 instance ; u32 questId ; u32 goalId ; u32 n ; u32 goalIdRep ; u32 requiredCount ;
 	//   u32 x7 reserved ; u32 subId ; u32 mapId ; u32 markerX ; u32 markerY ; u32 0 ; u32 0 ;
 	//   [u32 len][objective <remoteformat 50304> ascii] ; [00][u8 len][text record <remoteformat 51200>/<localized 51000> ascii]

@@ -33,7 +33,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public static IReadOnlyList<CharacterStatId> Authored { get; } =
 		[
 			CharacterStatId.PlayfieldToken, CharacterStatId.GmLevel, CharacterStatId.Sex,
-			CharacterStatId.Level, CharacterStatId.Exp, CharacterStatId.MaxExp, CharacterStatId.ExpCurrentLevelBase
+			CharacterStatId.Level, CharacterStatId.Exp, CharacterStatId.MaxExp, CharacterStatId.ExpCurrentLevelBase,
+			CharacterStatId.Money
 		];
 
 		/// <summary>
@@ -72,6 +73,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			if (character == null)
 				yield break;
+
+			// The WALLET. GameServerListener.WorldEntry pushes an interim 0x2005 at login with the note that "retail
+			// does NOT push a 0x2005 at login (the initial balance presumably rides the FullChar snapshot, location
+			// undecoded)" - this is that location. The slot is a u32 and Character.Money is a ulong, so a balance
+			// past uint.MaxValue saturates: the wire cannot express it, and clamping is visible where silently
+			// truncating the low word would look like a robbery.
+			yield return (CharacterStatId.Money, character.Money > uint.MaxValue ? uint.MaxValue : (uint)character.Money);
 
 			// The character's SEX. The fresh skeleton hardcodes 3 (the captured character's), and the corpus shows the
 			// slot taking 0, 2 and 3 - so it is per-character, and the enum's values ARE the wire codes.

@@ -30,7 +30,6 @@ namespace Faolan.Tests
 			// Fatalities are 0 on every captured character, so carrying them as 0 is a fact, not a shortcut - and
 			// the anti-rot half of the gate below rejects them if listed.
 			[CharacterStatId.Played] = "play time not tracked",
-			[CharacterStatId.Money] = "the wallet lives in Character.Money; snapshot slot not wired",
 			[CharacterStatId.Deaths] = "kill/death counters not tracked",
 			[CharacterStatId.Kills] = "kill/death counters not tracked",
 			[CharacterStatId.LastKillNumber] = "kill/death counters not tracked",
@@ -97,6 +96,21 @@ namespace Faolan.Tests
 				Assert.Equal(0x1111u, Value(a, CharacterStatId.PlayfieldToken));
 				Assert.Equal(0x2222u, Value(b, CharacterStatId.PlayfieldToken));
 			}
+		}
+
+		// The wallet rides the snapshot - the slot the login path called "undecoded" when it added its interim
+		// 0x2005 push. A ulong balance past what the u32 slot can hold saturates rather than truncating: a wrapped
+		// low word would read in-client as a character being robbed, which is worse than a visibly capped number.
+		[Fact]
+		public void TheWallet_RidesTheSheet_AndSaturatesRatherThanWrapping()
+		{
+			var rich = Character(level: 1, exp: 0, Sex.Male);
+			rich.Money = 1_041_495; // a captured balance
+
+			Assert.Equal(1_041_495u, Value(SnapshotStatSheet.For(rich, null, null), CharacterStatId.Money));
+
+			rich.Money = (ulong)uint.MaxValue + 5000;
+			Assert.Equal(uint.MaxValue, Value(SnapshotStatSheet.For(rich, null, null), CharacterStatId.Money));
 		}
 
 		// A derived stat is written at EVERY occurrence: a stat can appear in both lists and twice within StatList#2,
