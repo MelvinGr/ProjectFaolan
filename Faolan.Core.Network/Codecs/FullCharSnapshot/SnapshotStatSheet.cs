@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		[
 			CharacterStatId.PlayfieldToken, CharacterStatId.GmLevel, CharacterStatId.Sex,
 			CharacterStatId.Level, CharacterStatId.Exp, CharacterStatId.MaxExp, CharacterStatId.ExpCurrentLevelBase,
-			CharacterStatId.Money, CharacterStatId.Kills, CharacterStatId.Deaths
+			CharacterStatId.Money, CharacterStatId.Kills, CharacterStatId.Deaths, CharacterStatId.PlayerId
 		];
 
 		/// <summary>
@@ -73,6 +73,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			if (character == null)
 				yield break;
+
+			// PlayerId is the ACCOUNT's, not the character's (#478). Scanned over the whole capture corpus - 111
+			// captures, 146 snapshots - the slot takes three values, and they group by account rather than by
+			// character: one covers five different characters, the two TWO-CLIENT captures carry exactly two ids,
+			// and one character name appears under two ids in different sessions. The static list carried one of
+			// those three, so every character we created logged in wearing a stranger's id.
+			yield return (CharacterStatId.PlayerId, character.AccountId);
 
 			// The WALLET. GameServerListener.WorldEntry pushes an interim 0x2005 at login with the note that "retail
 			// does NOT push a 0x2005 at login (the initial balance presumably rides the FullChar snapshot, location

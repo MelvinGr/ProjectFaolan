@@ -19,11 +19,6 @@ namespace Faolan.Tests
 		// that varies in retail and is constant in our emit is a character wearing someone else's number.
 		private static readonly Dictionary<CharacterStatId, string> NotModelledYet = new()
 		{
-			// The three captured PlayerIds belong to three captured characters, so the slot IS per-character - but
-			// what it maps to (account? character? a retail-side id?) is not established, and our own character ids
-			// are not it. Carried at the captured value rather than guessed at. Gitea #478.
-			[CharacterStatId.PlayerId] = "per-character, mapping unknown (#478)",
-
 			// Progression/statistics we do not track yet: play time, money, the PvP and kill/death counters, the
 			// skill ratings. All read as character state we simply have no source for, not as protocol unknowns.
 			// NB the list holds only what actually VARIES: MurderPoints, MinigamesAbandoned, SiegeWins/Losses and
@@ -151,6 +146,23 @@ namespace Faolan.Tests
 			Assert.Equal(196u, block.CurrentHp);
 			Assert.Equal(24u, block.CurrentMana);
 			Assert.Equal(217u, block.CurrentStamina);
+		}
+
+		// PlayerId is the ACCOUNT's (#478): scanned over the whole capture corpus the three observed ids group by
+		// account, not by character - so two characters on one account share it, which is the assertion that would
+		// have caught the old "derive it from the character id" guess.
+		[Fact]
+		public void PlayerId_IsTheAccountsAndIsSharedByItsCharacters()
+		{
+			var first = Character(level: 1, exp: 0, Sex.Male);
+			var second = Character(level: 40, exp: 5, Sex.Female);
+			first.Id = 0x0200000B;
+			second.Id = 0x0200000C; // a DIFFERENT character...
+			first.AccountId = 77;
+			second.AccountId = 77; // ...on the same account
+
+			Assert.Equal(77u, Value(SnapshotStatSheet.For(first, null, null), CharacterStatId.PlayerId));
+			Assert.Equal(77u, Value(SnapshotStatSheet.For(second, null, null), CharacterStatId.PlayerId));
 		}
 
 		// A derived stat is written at EVERY occurrence: a stat can appear in both lists and twice within StatList#2,
