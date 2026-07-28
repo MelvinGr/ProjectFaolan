@@ -70,7 +70,12 @@ namespace Faolan.Importer.Rdb
 				foreach (var raceEl in sexEl.Elements())
 				{
 					if (!TryRace(raceEl.Name.LocalName, out var race))
+					{
+						// Say so. A race element we cannot name is appearance data being dropped, and the silent
+						// `continue` here is what hid Khitan (#469).
+						Console.WriteLine($"RDB appearance: unknown race element <{raceEl.Name.LocalName}> - its choices are SKIPPED.");
 						continue;
+					}
 
 					foreach (var m in morphs)
 						rows.Add(Row(sex, race, "morph", m.Seq, m.Name!, null, null, m.Min, m.Max)); // Name != null by the Where above
@@ -226,6 +231,15 @@ namespace Faolan.Importer.Rdb
 				case "stygian":
 				{
 					race = Race.Stygian;
+					return true;
+				}
+
+				// Rise of the Godslayer. The CHARACTERCREATOR XML has carried a <khitan> section all along and this
+				// switch did not know the name, so every Khitan choice fell through to `default` and was dropped by
+				// the caller's `continue` - silently, which is how it went unnoticed (#469).
+				case "khitan":
+				{
+					race = Race.Khitan;
 					return true;
 				}
 
