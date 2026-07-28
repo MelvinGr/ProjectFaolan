@@ -53,6 +53,7 @@ namespace Faolan.Importer.Rdb
 			var nameCache = new Dictionary<(uint, uint), string?>();
 
 			var rows = new List<AppearanceChoice>();
+			var seenElements = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var sexEl in root.Elements())
 			{
 				var sex = sexEl.Name.LocalName.Equals("female", StringComparison.OrdinalIgnoreCase)
@@ -67,8 +68,30 @@ namespace Faolan.Importer.Rdb
 					.Where(m => m.Name != null)
 					.ToList();
 
+				// FACE morphs, the sibling of BodyNodes above and unimported until the coverage check below pointed at
+				// it: 21 more MorphNode ranges per sex (EyebrowScale, BrowLow/BrowHigh, ...). Same shape, own category.
+				var faceMorphs = sexEl
+					.Elements("FaceNodes")
+					.Elements("MorphNode")
+					.Select((mn, i) => (Name: (string?)mn.Attribute("MorphName"), Min: Scale(mn.Attribute("min_value")), Max: Scale(mn.Attribute("max_value")), Seq: i))
+					.Where(m => m.Name != null)
+					.ToList();
+
+				// The five create-editor voice samples per sex: [enum][wav path].
+				var voices = sexEl
+					.Elements("voice")
+					.Select((v, i) => (Value: (string?)v.Attribute("enum"), File: (string?)v.Attribute("file"), Seq: i))
+					.Where(v => v.Value != null)
+					.ToList();
+
 				foreach (var raceEl in sexEl.Elements())
 				{
+					// The sex element's non-race children (BodyNodes / FaceNodes / voice) are read ABOVE, per sex
+					// rather than per race - skip them here without complaining, or the guard cries wolf on data it
+					// already has.
+					if (SexLevelElements.Contains(raceEl.Name.LocalName))
+						continue;
+
 					if (!TryRace(raceEl.Name.LocalName, out var race))
 					{
 						// Say so. A race element we cannot name is appearance data being dropped, and the silent
@@ -79,6 +102,12 @@ namespace Faolan.Importer.Rdb
 
 					foreach (var m in morphs)
 						rows.Add(Row(sex, race, "morph", m.Seq, m.Name!, null, null, m.Min, m.Max)); // Name != null by the Where above
+
+					foreach (var m in faceMorphs)
+						rows.Add(Row(sex, race, "facemorph", m.Seq, m.Name!, null, null, m.Min, m.Max));
+
+					foreach (var v in voices)
+						rows.Add(Row(sex, race, "voice", v.Seq, v.Value!, null, v.File, 0, 0));
 
 					var h = raceEl.Element("height");
 					if (h != null)
@@ -99,6 +128,12 @@ namespace Faolan.Importer.Rdb
 					AddList(rows, sex, race, "piercings", raceEl.Elements("piercings"), "meshid", "*hairmesh_", null, null);
 					AddList(rows, sex, race, "body", raceEl.Elements("body"), "monsterdataid", "", null, null);
 
+					// Anything in the XML this method does not read is appearance data silently dropped - which is
+					// exactly how beard (294 options), piercings and body sat unimported for as long as they did.
+					// Record what the file actually contains so the check after the loop can compare.
+					foreach (var child in raceEl.Elements())
+						seenElements.Add(child.Name.LocalName);
+
 					var hseq = 0;
 					foreach (var he in raceEl.Elements("head"))
 					{
@@ -110,6 +145,14 @@ namespace Faolan.Importer.Rdb
 					}
 				}
 			}
+
+			// ⚠️ COVERAGE CHECK. The suite cannot do this - it runs from a plain clone with no RDB - so the guard
+			// lives here, where the file is open. A client patch that adds a category would otherwise be imported as
+			// "nothing", and the row count would still look plausible: that is precisely how beard, piercings and
+			// body were missed. Loud rather than fatal, because a new element is content to add, not corruption.
+			var unhandled = seenElements.Except(HandledElements, StringComparer.OrdinalIgnoreCase).OrderBy(e => e, StringComparer.Ordinal).ToList();
+			if (unhandled.Count > 0)
+				Console.WriteLine($"RDB appearance: ⚠️  {unhandled.Count} XML element(s) NOT imported - {string.Join(", ", unhandled.Select(e => $"<{e}>"))}. Add them to AddList and to HandledElements.");
 
 			await db.AppearanceChoices.ExecuteDeleteAsync();
 			db.AppearanceChoices.AddRange(rows);
@@ -219,6 +262,17 @@ namespace Faolan.Importer.Rdb
 				? (int)Math.Round(v * 1000)
 				: 0;
 		}
+
+		// Every per-race child element this importer reads. Kept beside the reads deliberately: adding an AddList call
+		// without adding its name here makes the coverage check complain about an element that IS handled, which is a
+		// far better failure than the reverse.
+		// Children of the SEX element that are not races - read per sex, above the race loop.
+		private static readonly HashSet<string> SexLevelElements = new(StringComparer.OrdinalIgnoreCase) { "BodyNodes", "FaceNodes", "voice" };
+
+		private static readonly string[] HandledElements =
+		[
+			"height", "hair", "haircolor", "eyecolor", "skincolor", "bodymarkings", "facemarkings", "head", "beard", "piercings", "body"
+		];
 
 		private static bool TryRace(string name, out Race race)
 		{

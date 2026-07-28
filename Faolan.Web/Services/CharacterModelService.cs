@@ -54,16 +54,30 @@ namespace Faolan.Web.Services
 		// RdbAssetExtractor.ResolveBodyRenderMesh (a <mesh> is either a 1010030 mesh-index - the male bodies - or a 1010001
 		// RenderMesh directly - the female bodies). This replaces the old hardcoded MESHINDEXFILE table, which pointed the
 		// FEMALE bodies at a censored/wrong atlas (no nipples + a torso/limb tone seam) and at CDN-only meshes; the
-		// monsterdata bodies are the correct, locally-present ones for all three races (#275).
-		private static readonly Dictionary<(Race, Sex), uint> BodyMonster = new()
+		// monsterdata bodies are the correct, locally-present ones (#275).
+		//
+		// SOURCED from AppearanceChoices now, not hardcoded. The `body` element was one of three the appearance importer
+		// never read, so the six values had to be transcribed by hand; they are imported as of #469 and the table below
+		// is built from them. The transcription was right - all six match - but it could not carry KHITAN, whose bodies
+		// (male 4189400 / female 4189398) only appeared once the element was actually imported. Cached for the process:
+		// it is eight rows of static client content.
+		private Dictionary<(Race, Sex), uint>? _bodyMonster;
+
+		private Dictionary<(Race, Sex), uint> BodyMonster
 		{
-			[(Race.Aquilonian, Sex.Male)] = 1091335,
-			[(Race.Cimmerian, Sex.Male)] = 1091337,
-			[(Race.Stygian, Sex.Male)] = 1091339,
-			[(Race.Aquilonian, Sex.Female)] = 1091334,
-			[(Race.Cimmerian, Sex.Female)] = 1091336,
-			[(Race.Stygian, Sex.Female)] = 1091338
-		};
+			get
+			{
+				if (_bodyMonster != null)
+					return _bodyMonster;
+
+				using var db = _dbFactory.CreateDbContext();
+				return _bodyMonster = db.AppearanceChoices
+					.Where(a => a.Category == "body")
+					.AsEnumerable()
+					.Where(a => uint.TryParse(a.Value, out _))
+					.ToDictionary(a => (a.Race, a.Sex), a => uint.Parse(a.Value));
+			}
+		}
 
 		// Deterministic renders are cached for a while after last use; the empty array is the "no model" sentinel so a
 		// 404 result is cached too (a slot with no display mesh isn't rebuilt on every draw).
@@ -791,7 +805,7 @@ namespace Faolan.Web.Services
 		// ResolveBodyRenderMesh). Falls back to the same-sex Aquilonian body if a race body can't be resolved (all three
 		// race bodies are locally present today, so the fallback is belt-and-braces, and it keeps the correct sex). Returns
 		// 0 only when even the fallback is unavailable. Lenient by design - the STRICT editor path resolves without this.
-		private static uint BodyRenderMesh(RdbReader rdb, Race race, Sex sex)
+		private uint BodyRenderMesh(RdbReader rdb, Race race, Sex sex)
 		{
 			if (BodyMonster.TryGetValue((race, sex), out var monster) && RdbAssetExtractor.ResolveBodyRenderMesh(rdb, monster) is { } rm)
 				return rm;
