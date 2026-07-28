@@ -128,15 +128,18 @@ namespace Faolan.CSPlayerAgent
 					var checkCriminalStatus = body.ReadByte() != 0;
 
 					if (await Database.GetCharacter(targetId) is { } target)
-						// The invite MESSAGE is decoded but not yet delivered - TeamService.Invite has no message
-						// parameter, so a typed invite note is silently dropped (Gitea #459). Same for the
-						// criminal-status check, which is a PvP rule we do not model.
-						await _teams.Invite(client, client.Session.Character, target);
+						// The MESSAGE now rides the s2c push: DispatchTeamInvite's trailing "zero u16" is that string's
+						// empty encoding (#459, see TeamMessageCodec.BuildInvite).
+						await _teams.Invite(client, client.Session.Character, target, inviteMessage);
 					else
 						Logger.LogWarning("TeamInvite for unknown character {TargetId:X8}.", targetId);
 
-					if (inviteMessage.Length > 0 || checkCriminalStatus)
-						Logger.LogInformation("TeamInvite extras not acted on: message='{Message}', checkCriminalStatus={Check} (#459).", inviteMessage, checkCriminalStatus);
+					// i_bCheckCriminalStatus asks us to refuse the invite if the target is flagged CRIMINAL - a PvP
+					// rule we model nothing of, so there is no status to check and refusing would be inventing one.
+					// Set in every captured invite, so this is not a rare path; it is simply a no-op until PvP
+					// flagging exists (#459).
+					if (checkCriminalStatus)
+						Logger.LogDebug("TeamInvite asked for a criminal-status check; no PvP flagging is modelled, so the invite proceeds.");
 
 					break;
 				}

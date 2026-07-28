@@ -48,12 +48,21 @@ namespace Faolan.Core.Network.Codecs.Team
 			return s.ToArray();
 		}
 
-		// s2c DispatchTeamInvite (0x2001) and c2s RequestTeamInvite (0x2091) - the member plus a zero u16.
-		public static byte[] BuildInvite(TeamMemberRecord member)
+		// s2c DispatchTeamInvite (0x2001) and c2s RequestTeamInvite (0x2091) - the member plus the invite MESSAGE, the
+		// note the inviter types into the invite dialog.
+		//
+		// That trailing field was modelled as "a zero u16" because every captured invite carries an empty message, and
+		// an empty wire string IS `[u16 0]` (wire strings are [u16 len][latin1]). What identifies it is the c2s side:
+		// `TeamInvite(const ID32& i_cTargetID, const std::string& i_cMessage, bool i_bCheckCriminalStatus)` carries a
+		// message the client asks the player for, the s2c push is what the target is shown, and this is a string slot
+		// sitting in exactly the right place with exactly the right empty encoding (#459). Passing "" reproduces the
+		// captured bytes exactly, so the goldens are unaffected. [V0 on the field's identity - structural, since no
+		// capture carries a non-empty note.]
+		public static byte[] BuildInvite(TeamMemberRecord member, string message = "")
 		{
 			var s = new FaolanStream();
 			member.Write(s);
-			return s.WriteUInt16(0).ToArray();
+			return s.WriteString(message).ToArray();
 		}
 
 		// s2c DispatchReplyTeamInvite (0x209F) - as BuildInvite with one more zero byte.

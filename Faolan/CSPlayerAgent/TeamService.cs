@@ -95,7 +95,7 @@ namespace Faolan.CSPlayerAgent
 		// stating, because the names read backwards: retail sends DispatchYouInvitedToTeam to the INVITER carrying the
 		// TARGET's record ("you invited X" - f674 -> f678, both on the inviter's connection), and DispatchTeamInvite to
 		// the TARGET carrying the INVITER's ("X invites you" - f680, on the target's). Each side is shown the other.
-		public async Task Invite(INetworkClient inviterClient, Character inviter, Character target)
+		public async Task Invite(INetworkClient inviterClient, Character inviter, Character target, string message = "")
 		{
 			if (_teamByCharacter.ContainsKey(target.Id))
 			{
@@ -107,7 +107,7 @@ namespace Faolan.CSPlayerAgent
 
 			await Send(inviterClient, CSPlayerInterfaceOpcodes.DispatchYouInvitedToTeam, TeamMessageCodec.BuildMemberOnly(MemberOf(target)));
 
-			await Push(target.Id, CSPlayerInterfaceOpcodes.DispatchTeamInvite, TeamMessageCodec.BuildInvite(MemberOf(inviter)));
+			await Push(target.Id, CSPlayerInterfaceOpcodes.DispatchTeamInvite, TeamMessageCodec.BuildInvite(MemberOf(inviter), message));
 			_logger.LogInformation("Team: {Inviter} invited {Target}.", inviter.Name, target.Name);
 		}
 
