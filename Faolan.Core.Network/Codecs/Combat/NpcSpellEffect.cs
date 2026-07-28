@@ -11,6 +11,17 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//   @29 = Magnitude, @45 = Rank (equal on most casts; differ on a few - the two effect-strength bytes)
 	//   @50 u32 = a per-cast Counter/timestamp the client does NOT validate (0 when we synthesise a cast)
 	// Codec is byte-exact: ToBytes(Parse(captured)) == captured for all 21 goldens (NpcSpellEffectCodecTests).
+	//
+	// ⚠️ THE PROPERTY NAMES ABOVE ARE MISNOMERS. They date from that empirical diff; the client's own reader and its
+	// Activate log format (#438) name these fields differently, and the offsets here are the LOW BYTES of wider
+	// fields. Byte-exactness is unaffected - every offset written is still the offset retail writes - but do not
+	// reason about the VALUES from these names:
+	//   Magnitude (@29) is not a magnitude - it is the low byte of the u32 at @26, slot[3] of a descriptor struct
+	//   Rank      (@45) is not a rank      - it is the low byte of the u32 CastingLevel at @42 (the caster's level)
+	//   Counter   (@50) is not a counter   - it is the LOW HALF of a u64 absolute expiry stamp starting at @46
+	//   FlagB     (@17) / FlagC (@33) are low bytes of descriptor words, not payload-level flags
+	// Renaming these reaches the NpcSpell columns and so needs a migration - tracked as Gitea #480.
+	// Full table and the old-to-new mapping: docs/subsystems/npc-spell-applyspell.md.
 	public readonly record struct NpcSpellEffect(uint SpellId, ushort Duration, byte Magnitude, byte Rank, byte FlagA, byte FlagB, byte FlagC, uint Counter = 0) : ICodec<NpcSpellEffect>
 	{
 		public const int Length = 54;

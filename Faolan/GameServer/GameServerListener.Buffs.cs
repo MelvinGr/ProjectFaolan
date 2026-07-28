@@ -147,12 +147,12 @@ namespace Faolan.GameServer
 		}
 
 		// Applies a self-buff (or an offensive MagicBuff cast) by CONSTRUCTING its 54-byte MagicBuffIIR payload from
-		// scratch (SelfBuffCodec): the spell's real BASE id (id >> 8, the (base<<8)|rank convention) + its RDB DURATION
+		// scratch (SelfBuffCodec): the spell's real BASE id (id >> 8; the low byte is the client's FORM selector, #438) + its RDB DURATION
 		// (Spell.DurationMs -> centiseconds at payload+8), so the client counts down the correct time AND the server
 		// expires it at the same instant (#274).
 		//
-		// The LONG (54-byte) form is the ONLY shape retail ever sends: across all 103 Captures/*.tshark.json the only
-		// s2c MagicBuffIIR tails are 54 bytes (x1412) and 0 (x578, the rank-1 end twin) - a 50-byte tail NEVER occurs.
+		// The LONG (54-byte) form is the ONLY shape retail ever sends: across all 111 Captures/*.tshark.json the only
+		// s2c MagicBuffIIR tails are 54 bytes (x1938) and 0 (x982, the END twin) - a 50-byte tail NEVER occurs.
 		// The old 50-byte "short form" was our own invention; the client's MagicBuffIIR_c::ReadSubClass runs 4 bytes off
 		// the end of it and rejects the record ("datasize left in stream=4, raw=76"), so nothing rendered (#274).
 		private async Task ApplySpell(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
@@ -302,9 +302,11 @@ namespace Faolan.GameServer
 		// only on relog. applyTo/applyFrom MIRROR the apply: equal for a self-buff, applyTo=player + applyFrom=NPC for
 		// an NPC-cast debuff. Byte-exact carrier content (after the IIR [u32 len=0x1A]):
 		//   [ApplySpell][c350][applyTo][u16 0][(base<<8)|1][c350][applyFrom]   (no payload)
+		// The trailing 1 is the client's FORM byte (0 = apply, 1 = end, 2 = update), not a rank - see #438 and
+		// docs/subsystems/npc-spell-applyspell.md.
 		private async Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
 		{
-			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // the rank-1 "end" twin of the applied buff id
+			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // form 1 = the "end" twin of the applied buff id
 			var body = NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, []);
 
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, b => b.WriteArrayUInt32Length(body)));
@@ -513,7 +515,7 @@ namespace Faolan.GameServer
 		// apply). Applying BOTH at once (the first cut) made the client render a second, description-less duplicate.
 		// Our maps are all InstanceMode.Shared for now, so this resolves to the 10h everywhere; it future-proofs the
 		// moment the beach/Tortage maps are modelled Solo. On a playfield change we remove the prior shield's icon
-		// (retail's rank-1 end twin) before applying the new one so only one is ever shown.
+		// (retail's form-1 end twin) before applying the new one so only one is ever shown.
 		private async Task SendShieldOfTheRisen(INetworkClient client)
 		{
 			var self = client.Session.Character.Id;

@@ -14,36 +14,96 @@ the target. The **54-byte PAYLOAD** is the `MagicBuffIIR` effect descriptor.
 Ghidra `MagicBuffIIR_c::ReadSubClass` (`FUN_007a12a0`, `tools/ghidra/DumpMagicBuffReader.java`) reads a type
 byte (`+0x7c`, 0 or 2) then a sequence of `ReadU32`s + a 7-word sub-block (`FUN_00897b60`) + a `ReadU64`. The
 class's `Activate` logs `"MagicBuffIIR_c::Activate, UpdateBuff with parameters: BuffTemplate ..."` — so the
-payload is a **buff/effect record** (template + magnitude + duration + flags), NOT a damage number. The actual
+payload is a **buff/effect record** (template + duration + flags), NOT a damage number. The actual
 HP change rides a separate vitals `StatUpdate` (`0x96B8DC59`), as combat already does.
 
-## Field map (54-byte payload)
-Initially recovered by the reader grammar + an empirical diff of same-spell instances (per-cast fields) vs
-different spells (spell params); then fully decoded and modelled as columns in #304
+## The CLIENT's own field names (#438)
+`MagicBuffIIR_c::Activate` (`FUN_007a1580`, vtable slot 2 — `tools/ghidra/DumpMagicBuffConsumers.java`) builds a
+`GameCode/Magic` log line whose format string names six fields, and every one of them is an offset the reader
+above filled:
+
+```
+MagicBuffIIR_c::Activate, UpdateBuff with parameters:
+  BuffTemplate <+0x2C>  CasterID <+0x3C>  CastingLevel <+0x38>
+  Counter <+0x30>  CounterType <+0x34>  CounterTimeLeft <+0x78 / 100>
+```
+
+`CasterID` is `+0x3C`, not `+0x38`: the buff-add call takes `in_ECX + 0x3c` **by pointer**, i.e. the two-word
+`ID32` the wire carries as `[u32 0xC350][u32 applyFrom]`. That leaves `+0x38` — the payload's `@42` word — as
+`CastingLevel`, which is what `SelfBuffCodec` already sends the caster's level in.
+
+## Reading order, and where the record really starts
+The client's IIR base read consumes `[u32 0xC350][u32 handle][u8 env]` — **nine** bytes, the same carrier
+`TeleportCodec` writes — so `ReadSubClass` starts one byte into what this doc has always drawn as `[u16 0]`:
+
+| content offset | client field | our builder writes |
+|---|---|---|
+| `0..8` | IIR base carrier (`0xC350`, `applyTo`, `env`) | `[u32 c350][u32 applyTo]` + the first byte of `[u16 0]` |
+| `9..12` | **`BuffTemplate`** `+0x2C` | the second `[u16 0]` byte + the top 3 bytes of `spellId` = `spellId >> 8` |
+| `13` | **form byte** `+0x7C` | the LOW byte of `spellId` |
+| `14..21` | **`CasterID`** (`ID32` at `+0x3C`/`+0x40`) | `[u32 c350][u32 applyFrom]` |
+| `22..` | the payload below | |
+
+**The low byte of the wire spell id is the FORM, not a rank.** The reader switches three ways on it and reads a
+different number of bytes in each: `0` = APPLY (58 more), `1` = END (nothing more), `2` = UPDATE (20 more).
+Checked across all 111 `Captures/*.tshark.json`: `form=0` → 54-byte tail ×1938 and `form=1` → empty tail ×982,
+with **zero exceptions** — an exact functional dependency, and the same base ids appear under both, which is an
+apply/end pair and not two ranks of one spell. Form 2 is never sent by retail.
+[V1: tools/ghidra/DumpMagicBuffReader.java — the three-way switch on `+0x7C`]
+
+## Field map (54-byte payload, form 0)
+Framed the way the CLIENT reads it. The byte-level offsets the earlier empirical diff recorded (`@10`, `@23`,
+`@29`, `@45`) are the low bytes of these u32s, so both readings agree — but only this one says where a field
+ENDS, which is what a builder needs.
+
+| Offset | Client field | Notes |
+|---|---|---|
+| `@0` | u32 **`Counter`** `+0x30` | we send 0; meaning undecoded, but `Activate` skips the whole update when it is 0 |
+| `@4` | u32 **`CounterType`** `+0x34` | we send 0 |
+| `@8` | u32 **`Duration`** `+0x44` | centiseconds — `Activate` does `* 10` to get ms. The early "`@10` u16" is this word's low half. |
+| `@12` | bool flag `+0x48` | passed to the buff-add |
+| `@13` | bool flag `+0x49` | passed to the buff-add (the "flag A" of the empirical map) |
+| `@14–41` | **7-word sub-struct** `+0x4C` | read by `FUN_00897b60`, passed to the buff-add BY POINTER. Wire words land in slots `[0],[2],[1],[3],[8],[4],[5]` — so `@22` → slot `[1]` = the spell base id again, and `@26` → slot `[3]`. |
+| `@42` | u32 **`CastingLevel`** `+0x38` | the caster's level |
+| `@46–53` | u64 **expiry stamp** `+0x70` | NOT a nonce — see below |
+
+**`@46–53` is an absolute expiry, not a counter.** `Activate` computes `(stamp64 - <global clock>) / 10` and, if
+that is positive and *shorter* than `Duration`, overwrites `Duration` with it. That is how retail resumes a buff
+that is already partly elapsed (relog, or an entity streaming in mid-buff). It is also why the earlier note said
+"the client does NOT validate it": our synthetic value simply fails the `0 < x <= Duration` test and is ignored.
+
+**`@26` stays open [V0].** It sits in the descriptor beside the spell id and tracks `CastingLevel` closely but not
+exactly across the captures (1563 equal, 283 below, 92 above), so a second input exists. What the read DOES settle
+is that neither `@26` nor `@42` is a rendered magnitude or a stack count — the question #438 was opened to answer.
+
+## The EMPIRICAL map, and how it lines up
+Before the client's reader was walked, the payload was recovered by diffing same-spell instances (per-cast
+fields) against different spells (spell params), and modelled as `NpcSpell` columns in #304
 (`Faolan.Core.Network/Codecs/Combat/NpcSpellEffect.cs`, byte-exact over all 21 distinct captured payloads —
 `Faolan.Tests/NpcSpellEffectCodecTests.cs`, which is where the proof lives now that the Python dissector that
-did the original diff has been retired). The payload is a sparse fixed-offset layout, big-endian,
-with every other byte a constant 0:
+did the original diff has been retired). Every one of its offsets is the **low byte** of a u32 in the table
+above, so the two readings agree everywhere; the column names are what changes:
 
-| Offset | Field | Notes |
+| empirical | client | reading |
 |---|---|---|
-| `@0–9`   | const 0 | |
-| **`@10–11`** | **u16 Duration** | centiseconds; per-SPELL constant (Rend 700 = 7s, Poacher 400 = 4s, "Ripper Volley" 600 = 6s) |
-| `@13` | flag A | 0/1 (meaning undecoded) |
-| `@17` | flag B | 1/2 (meaning undecoded) |
-| **`@23–26`** | **u32 spell id** | the cast's wire id `(base<<8)|rank` (`31 64 49 …`) |
-| `@29` | byte Magnitude | effect strength |
-| `@33` | flag C | 0/1 (meaning undecoded) |
-| `@45` | byte Rank | equals Magnitude on most casts, differs on a few |
-| `@50–53` | u32 counter/timestamp | the only steadily-incrementing field; the client does NOT validate it (0 when we synthesise a cast) |
+| `@10–11` u16 `Duration` | `@8` u32 `Duration` | same field, low half — the wide read is the client's |
+| `@13` flag A | `@13` bool `+0x49` | confirmed a bool, not a small int |
+| `@17` flag B (1/2) | sub-struct slot `[0]`, low byte | a descriptor word, not a payload flag |
+| `@23–26` u32 spell id | `@22` u32 = sub-struct slot `[1]` | reads as the full wire id only because `@26`'s top byte is 0 |
+| `@29` byte `Magnitude` | `@26` u32 = sub-struct slot `[3]`, low byte | **not a magnitude** — see the `[V0]` note above |
+| `@33` flag C | sub-struct slot `[8]`, low byte | a descriptor word |
+| `@45` byte `Rank` | `@42` u32 `CastingLevel`, low byte | **not a rank** — the caster's level |
+| `@50–53` u32 counter | the LOW half of the `@46` u64 expiry stamp | not a counter, and not standalone |
 
-Validated: `NpcSpellEffect.Parse`→`ToArray` reproduces every captured payload byte-for-byte, and `Duration` (`@10`)
-and the echoed spell id (`@23`) are constant per spell.
+The `NpcSpell` columns still round-trip byte-exact, so nothing is broken by this — but `Magnitude` and `Rank`
+are misnomers, and a builder that treats `@50` as an independent u32 is writing half of a 64-bit field.
 
-## The rank pair
-Every NPC cast arrives as a `(base<<8)|rank` pair: **rank 0** carries the full 54-byte payload (the apply),
-**rank 1** carries an **empty** payload — the buff-end / effect-landed marker (same apply-then-end shape as the
-mount buff `…01 empty=dismount`). So a caster's real cast = the rank-0 apply; the rank-1 is its terminator.
+## The apply / end pair
+Every cast arrives as a pair of ids differing only in their low byte: **form 0** carries the full 54-byte
+payload (the apply), **form 1** carries an **empty** payload — the buff-end marker (the same apply-then-end
+shape as the mount buff `…01 empty = dismount`). So a caster's real cast is the form-0 apply and the form-1 is
+its terminator. This was read as a `(base<<8)|rank` convention with "rank 0" and "rank 1"; it is the client's
+form byte (see above), and the ids pair up as one spell's start and stop rather than two ranks of it.
 
 ## What this gives #232
 - The cast packet is fully understood and `NpcSpellCastBuilder` reproduces it byte-exact.
@@ -51,8 +111,8 @@ mount buff `…01 empty=dismount`). So a caster's real cast = the rank-0 apply; 
   sim **builds** the wire payload from them via `NpcSpellEffect` (#304) — there is no stored blob any more. The
   value at `@10` that the early decode read as a u32 "magnitude" is actually the **Duration** (centiseconds; the
   `@10` u16 read big-endian off a zeroed high half, e.g. Poacher 400 = 4s), which is why the raw 400–4000 range
-  is durations, not HP. The per-cast counter (`@50`) is session state and is not stored.
-- Importing only the rank-0 (non-empty) row per spell is the clean form (the rank-1 is a terminator, not a
+  is durations, not HP. The value at `@50` is not stored — it is the low half of the client's expiry stamp.
+- Importing only the form-0 (non-empty) row per spell is the clean form (the form-1 is a terminator, not a
   standalone cast).
 
 ## In-client VERIFIED (2026-06-17, #232 done)

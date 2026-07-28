@@ -8,12 +8,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// only with applyFrom = the casting NPC's handle and applyTo = the target player. Decoded from the captures:
 	// retail NPC casts are exactly these (28 caster NPCs on the beach, applyFrom = the NPC's spawn handle).
 	//
-	// The 54-byte effect `payload` is DB-sourced (NpcSpell.Payload) and now DECODED (diffed across all 21 distinct
-	// captured payloads, zero unexplained bytes - tools/capture one-off): byte-packed, big-endian:
-	//   @10 u16 = DURATION (wire unit; 100..4000)   @13/@17/@33 = effect flags (0/1, 1/2, 0/1)
-	//   @23 u32 = the effect SPELL ID (== the cast spell id, bar one capture-data mismatch)
-	//   @29 + @45 bytes = the two magnitude/rank values (equal on most casts = the rank; differ on a few = a
-	//                     separate magnitude), @50 u32 = a per-cast counter/timestamp the client does NOT validate.
+	// The 54-byte effect `payload` is DB-sourced (NpcSpell.Payload) and DECODED. Its field NAMES now come from the
+	// client's own MagicBuffIIR_c::Activate log format rather than from diffing captures (#438), which reframed
+	// several of them - full table and the old-to-new mapping in docs/subsystems/npc-spell-applyspell.md:
+	//   @0  Counter   @4 CounterType   @8 u32 DURATION (centiseconds; the empirical "@10 u16" is its low half)
+	//   @12/@13 two bools, @14..41 a 7-word descriptor (slot[1] = @22 = the spell BASE id, slot[3] = @26)
+	//   @42 u32 CastingLevel (the caster's level - the empirical "@45 byte Rank" is its low byte)
+	//   @46 u64 an absolute EXPIRY stamp (the empirical "@50 u32 counter" is its LOW HALF, not a field)
 	// Still carried as the stored blob here (the client renders it as-is); modelling it as NpcSpell columns +
 	// building from them is the remaining #304 step, but the grammar is no longer opaque.
 	//
