@@ -72,6 +72,11 @@ namespace Faolan.Importer.Captures
 		// The clean burst-truth NPC spawn set (#266): per capture one entry per distinct mob (dedup by handle),
 		// each type taken from its single authoritative session. `petNames` are the summonable pet creature types
 		// (the SpellEffect summons) - they are excluded from the placements, see below.
+		// How near a spawn must stand to a candidate patrol route's nearest waypoint to be counted as walking it (#425).
+		// Measured, not chosen: over the 139 spawns that carry their own route by handle, spawn-to-nearest-waypoint is
+		// 0.0 at the median, 4.4 at p90 and 7.8 at p95.
+		private const float RouteMatchRadius = 10f;
+
 		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures, IReadOnlySet<string> petNames)
 		{
 			var perCap = captures
@@ -104,6 +109,51 @@ namespace Faolan.Importer.Captures
 				if (e.Equipment.Count > 0 && (!equipByTemplate.TryGetValue(e.TemplateId, out var cur) || e.Equipment.Count > cur.Count))
 					equipByTemplate[e.TemplateId] = e.Equipment;
 			}
+
+			// Richest PATROL ROUTE per (map, template) - the third backfill of the same shape as the two above, and the
+			// one that was missing (#425).
+			//
+			// A route rides the burst-truth capture's own observation (`best.Routes`, keyed by that session's handle),
+			// so a capture that wins on spawn COUNT while happening to observe fewer NPCs mid-patrol takes the map's
+			// patrols down with it: importing the two beach->city captures moved PatrolNodes 632 -> 596 for zero new
+			// information, six spawns on map 4020 losing their route entirely. But a route is per-NPC CONTENT - the
+			// path is a stable asset of that spawn - so it can be backfilled from ANY capture that saw the NPC, exactly
+			// as morphs and equipment already are.
+			//
+			// Keyed by (map, template) for the reason spelled out above: NAME is not a key, because ~16 unrelated
+			// templates share the internal name "Halen van Dummy" and keying by it would hand one NPC another's path.
+			//
+			// ⚠️ Template alone is NOT enough to pick the route, and measuring said so. Handing every same-template
+			// spawn the one route observed for that template recovered 207 PatrolNodes where the regression lost 36 -
+			// the extra 171 being ten guards of one template, one of them ever seen walking, all ten then walking the
+			// same path and converging on one spot. That is a worse artefact than the missing route, and in the row
+			// counts it would have looked like a big win.
+			//
+			// So the route is tied to the spawn POSITIONALLY: a spawn inherits a candidate route only if it is standing
+			// ON it. The threshold is measured, not invented - across the 139 spawns that DO carry their own route by
+			// handle, the distance from the spawn to the nearest waypoint of its own path is 0.0 at the median, 4.4 at
+			// p90 and 7.8 at p95. RouteMatchRadius is 10, which accepts ~95% of genuine matches while being far tighter
+			// than the spacing between distinct patrol routes on a map. An AMBIGUOUS spawn - two candidate routes in
+			// range - is left alone rather than guessed at.
+			var routeCandidates = new Dictionary<(uint Map, uint Template), List<PatrolPathEntry>>();
+			foreach (var cap in perCap)
+			{
+				var byHandle = cap.All.ToDictionary(e => e.Handle, e => e);
+				foreach (var (handle, route) in cap.Routes)
+				{
+					if (route.Waypoints.Count == 0 || !byHandle.TryGetValue(handle, out var spawn))
+						continue;
+
+					if (!routeCandidates.TryGetValue((spawn.MapId, spawn.TemplateId), out var list))
+						routeCandidates[(spawn.MapId, spawn.TemplateId)] = list = [];
+					list.Add(route);
+				}
+			}
+
+			var routesForTemplate = routeCandidates.ToDictionary(kv => kv.Key, kv => kv.Value
+				.GroupBy(WaypointKey)
+				.Select(g => g.First())
+				.ToList());
 
 			var spawns = new List<NpcSpawnEntry>();
 			var patrols = new List<PatrolPathEntry>();
@@ -139,6 +189,26 @@ namespace Faolan.Importer.Captures
 			var placements = spawns.Where(e => !petNames.Contains((e.Name ?? string.Empty).ToLowerInvariant())).ToList();
 
 			return (NpcSpawnExtractor.Merge(placements), patrols);
+
+			// The one unambiguous candidate route this spawn is standing on, or null.
+			PatrolPathEntry? BackfilledRoute(NpcSpawnEntry e)
+			{
+				if (!routesForTemplate.TryGetValue((e.MapId, e.TemplateId), out var candidates))
+					return null;
+
+				var here = new Vector3(e.X, e.Y, e.Z);
+				var inRange = candidates.Where(c => c.Waypoints.Min(w => Vector3.Distance(w, here)) <= RouteMatchRadius).ToList();
+				return inRange.Count == 1
+					? inRange[0]
+					: null;
+			}
+
+			// A route's identity for the agreement test: its waypoint polyline, rounded so float noise across captures
+			// does not read as a different path.
+			static string WaypointKey(PatrolPathEntry r)
+			{
+				return string.Join("|", r.Waypoints.Select(w => $"{w.X:F1},{w.Y:F1},{w.Z:F1}"));
+			}
 
 			void Take(List<NpcSpawnEntry> chosen, Dictionary<uint, PatrolPathEntry> routes)
 			{
@@ -181,8 +251,17 @@ namespace Faolan.Importer.Captures
 					}
 
 					spawns.Add(e);
+
+					// This capture's own observation first; otherwise the unambiguous cross-capture route for the
+					// template, so a session that simply did not catch this NPC walking no longer costs it its path.
 					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
+					{
 						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Waypoints, 0, r.Task));
+					}
+					else if (BackfilledRoute(e) is { } backfilled)
+					{
+						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), backfilled.Waypoints, 0, backfilled.Task));
+					}
 				}
 			}
 		}
