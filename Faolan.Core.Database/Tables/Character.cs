@@ -60,14 +60,11 @@ namespace Faolan.Core.Database.Tables
 		// defaults on character creation; the ×100 vitals wire scale is applied when sending (CharacterStatBlock).
 		public virtual CharacterMaxStats? MaxStats { get; set; }
 
-		// The spawn's IIR scaffold, structured so it can be generated instead of template-copied: the uniform
-		// entry table (Attributes), the feat/ability ID list (Skills), the two ending pair lists (ScaffoldPairs)
-		// (the pre-IIR frame + EntryTableX are reconstructed from Class at spawn time, not stored - they carry no
-		// character data). See docs/re/player-spawn-generation.md + docs/re/fa015807-spawn-reader.md.
-		public virtual ICollection<CharacterAttribute> Attributes { get; set; } = [];
-
 		// The appearance resources chosen in the create editor (hair/beard mesh, hair/eye/skin color, tattoos,
-		// scars), in editor send order. Resolved via MorphTarget into the spawn scaffold's weighted entries.
+		// scars), in editor send order. Resolved via MorphTarget into the spawn scaffold's weighted entries - which,
+		// with Body's morph sliders, is the WHOLE of the spawn's appearance entry table. That table used to be stored
+		// alongside these rows as CharacterAttributes and refreshed from them on every edit path; it is derived at
+		// send time now (#483, PlayerSpawnScaffoldRows.BuildAppearanceEntries).
 		public virtual ICollection<CharacterBodyResource> BodyResources { get; set; } = [];
 		public virtual ICollection<CharacterBuff> Buffs { get; set; } = [];
 

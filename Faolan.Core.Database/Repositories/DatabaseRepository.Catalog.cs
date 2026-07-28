@@ -20,7 +20,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Item?> GetItem(uint id);
 		Task<uint?> GetItemSearchCategory(uint template);
 		Task<Item[]> GetItems(params IReadOnlyList<uint> ids);
-		Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names);
+		Task<IReadOnlyDictionary<string, MorphTarget>> GetMorphTargetRegistry();
 		Task<Item[]> GetRandomBuildableItems(int count);
 		Task<Item[]> GetRandomLootExcludedItems();
 		Task<Recipe[]> GetRecipes();
@@ -37,6 +37,8 @@ namespace Faolan.Core.Database.Repositories
 
 	public partial class DatabaseRepository
 	{
+		private Task<IReadOnlyDictionary<string, MorphTarget>>? _morphTargetRegistry;
+
 		public async Task<Ability[]> GetAbilities()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -120,10 +122,20 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Items.Where(i => ids.Contains(i.Id)).ToArrayAsync();
 		}
 
-		public async Task<Dictionary<string, MorphTarget>> GetMorphTargets(IReadOnlyCollection<string> names)
+		// The client's character-customization registry, by resource ref. Every player spawn resolves the character's
+		// editor choices through it (PlayerSpawnScaffoldRows.BuildWeightedEntries), so it sits on the world-entry and
+		// broadcast paths - but it is 1072 rows of STATIC seed content that only the importer ever rewrites, so it is
+		// read once and held for the process rather than queried per spawn. Two callers racing the first read is
+		// harmless: they build the same dictionary and one of them wins.
+		public Task<IReadOnlyDictionary<string, MorphTarget>> GetMorphTargetRegistry()
+		{
+			return _morphTargetRegistry ??= LoadMorphTargetRegistry();
+		}
+
+		private async Task<IReadOnlyDictionary<string, MorphTarget>> LoadMorphTargetRegistry()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.MorphTargets.Where(t => names.Contains(t.Name)).ToDictionaryAsync(t => t.Name);
+			return await ctx.MorphTargets.AsNoTracking().ToDictionaryAsync(t => t.Name);
 		}
 
 		public async Task<Item[]> GetRandomBuildableItems(int count)

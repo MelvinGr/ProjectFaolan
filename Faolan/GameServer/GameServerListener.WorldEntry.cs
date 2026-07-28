@@ -616,7 +616,7 @@ namespace Faolan.GameServer
 			var (worldObjectRecords, worldObjectTotal) = _broadcaster.BuildEntryWorldObjects(client, _simulation.PlayerWorldEntity(client)!, activeQuestIds);
 			toSend.AddRange(worldObjectRecords);
 
-			toSend.Add(BuildBurstlessPlayerSpawn(client, equipment, playfieldToken));
+			toSend.Add(BuildBurstlessPlayerSpawn(client, equipment, playfieldToken, await Database.GetMorphTargetRegistry()));
 
 			toSend.Add(snapshot);
 
@@ -813,7 +813,7 @@ namespace Faolan.GameServer
 		// are first known, and a character without them throws in the builder. One character object throughout - the
 		// session copy carries the scaffold rows (WithSessionNavigations) - so identity, transform and scaffold cannot
 		// disagree.
-		private static Rpc BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, uint playfield)
+		private static Rpc BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, uint playfield, IReadOnlyDictionary<string, MorphTarget> morphRegistry)
 		{
 			var character = client.Session.Character;
 			// The CharacterIIR is built from code (PlayerCharacterIir, formerly PlayerCharacterIirTemplate.bin, #258):
@@ -826,7 +826,7 @@ namespace Faolan.GameServer
 				? character.Rotation
 				: Quaternion.Identity;
 
-			return BuildWorldEntrySpawn(client, PlayerSpawnBuilder.BuildFromScratch(character.Id, playfield, character.Position, rotation, message, character));
+			return BuildWorldEntrySpawn(client, PlayerSpawnBuilder.BuildFromScratch(character.Id, playfield, character.Position, rotation, message, character, morphRegistry));
 		}
 
 		// The burst-less world-object packets: each WorldObjects row built via WorldObjectBuilder and framed. Built on

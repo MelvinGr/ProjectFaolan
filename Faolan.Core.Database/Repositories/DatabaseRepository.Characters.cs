@@ -690,11 +690,9 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 
-			ctx.CharacterAttributes.RemoveRange(ctx.CharacterAttributes.Where(a => a.CharacterId == character.Id));
 			ctx.CharacterSkills.RemoveRange(ctx.CharacterSkills.Where(s => s.CharacterId == character.Id));
 			ctx.CharacterScaffoldPairs.RemoveRange(ctx.CharacterScaffoldPairs.Where(p => p.CharacterId == character.Id));
 
-			ctx.CharacterAttributes.AddRange(character.Attributes);
 			ctx.CharacterSkills.AddRange(character.Skills);
 			ctx.CharacterScaffoldPairs.AddRange(character.ScaffoldPairs);
 
@@ -903,7 +901,6 @@ namespace Faolan.Core.Database.Repositories
 				.Include(c => c.BodyResources)
 				.Include(c => c.MaxStats)
 				.Include(c => c.Equipment)
-				.Include(c => c.Attributes)
 				.Include(c => c.Skills)
 				.Include(c => c.Feats)
 				.Include(c => c.FeatSpecs)

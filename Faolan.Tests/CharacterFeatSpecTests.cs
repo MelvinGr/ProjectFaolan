@@ -38,7 +38,7 @@ namespace Faolan.Tests
 					Id = scaffold.Handle,
 					Class = ConanClass.Necromancer
 				};
-				PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
+				PlayerSpawnScaffoldRows.ExtractTo(character, scaffold, MorphRegistry.RefsByTag);
 				checkedSpawns++;
 
 				// Extraction is EXACT, the create-editor frame included: it has no sublist at all, so it yields no
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 			};
 			var scaffold = SpawnWithSpecs([("PvE", [110004u, 112700u]), ("PvP", [110004u, 118800u])]);
 
-			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
+			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold, MorphRegistry.RefsByTag);
 
 			Assert.Equal(4, character.Feats.Count);
 			Assert.Equal(2, character.Feats.Count(f => f.FeatId == 110004u));

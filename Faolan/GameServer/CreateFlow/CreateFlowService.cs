@@ -454,6 +454,10 @@ namespace Faolan.GameServer.CreateFlow
 		// later TCP segment - would only touch the in-memory body and be LOST on the spawn (which reloads from the DB),
 		// showing wrong hair/mustache/size intermittently. Re-persist here so a late edit survives. No-op until named
 		// (the pre-name edits are flushed by the name-commit save), so the common path takes no extra write.
+		//
+		// Saving the body IS the edit landing (#483): the spawn's appearance entries are DERIVED from Body /
+		// BodyResources when the spawn is built, so there is no second copy to push the edit into. This used to be
+		// followed by a RefreshAppearance + SaveCharacterScaffold pair, and missing that pair anywhere froze the face.
 		private async Task PersistLateBodyEdit(INetworkClient client)
 		{
 			var character = client.Session.Character;
@@ -461,12 +465,6 @@ namespace Faolan.GameServer.CreateFlow
 				return;
 
 			await _database.SaveCharacter(character);
-
-			// The scaffold was seeded at name-commit and carries the body's morph entries, so a LATE edit has to reach
-			// it too or the avatar renders the pre-edit face for good. RefreshAppearance rewrites exactly those entries
-			// and leaves progression alone - the same call Faolan.Web makes when an appearance edit is saved there.
-			if (PlayerSpawnScaffoldRows.RefreshAppearance(character, await ResolveWeightedAppearance(character)))
-				await _database.SaveCharacterScaffold(character);
 		}
 
 		// Seeds the fresh-character spawn-scaffold rows onto `character` and persists them. No-op for a character that
@@ -477,7 +475,12 @@ namespace Faolan.GameServer.CreateFlow
 		// spawn broadcast, forever - a create that half-succeeded is worse than one that visibly failed.
 		private async Task SeedSpawnScaffold(Character character)
 		{
-			if (!PlayerSpawnScaffoldRows.TrySeedFreshRows(character, await ResolveWeightedAppearance(character)))
+			// Creation is the one place the character's editor choices are worth checking against the catalog: from
+			// here on they are resolved silently on every spawn, so an unimportable ref would show up as a wrong face
+			// and nothing else.
+			await ReportUnresolvableAppearance(character);
+
+			if (!PlayerSpawnScaffoldRows.TrySeedFreshRows(character))
 				return;
 
 			await _database.SaveCharacterScaffold(character);
@@ -545,17 +548,17 @@ namespace Faolan.GameServer.CreateFlow
 			_logger.LogInformation("Bind: {Name} bound to respawn point {Point} on map {Map} at creation.", character.Name, spawn.Id, character.MapId);
 		}
 
-		// The character's own editor appearance choices as weighted scaffold entries, or null when nothing is stored or
-		// nothing resolves - the callers then fall back to the proven default set.
-		private async Task<List<ScaffoldEntry>?> ResolveWeightedAppearance(Character character)
+		// Says out loud when the character's own editor appearance choices will NOT reach its spawn. The spawn resolves
+		// them itself, on every send (PlayerSpawnScaffoldRows.BuildWeightedEntries); this runs once, at creation,
+		// because that is where a gap is still actionable and where saying it once is not log spam.
+		private async Task ReportUnresolvableAppearance(Character character)
 		{
 			if (character.BodyResources is not { Count: > 0 })
-				return null;
+				return;
 
-			var registry = await _database.GetMorphTargets(character.BodyResources.Select(r => r.Ref).ToArray());
-			var weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(character.BodyResources, registry);
-			if (weighted != null)
-				return weighted;
+			var registry = await _database.GetMorphTargetRegistry();
+			if (PlayerSpawnScaffoldRows.BuildWeightedEntries(character.BodyResources, registry) != null)
+				return;
 
 			// Falling back to the defaults means wearing DIKKETEST's face, so be precise about why, instead of the old
 			// one-size warning: BuildWeightedEntries returns null for two unrelated reasons and only one of them is a
@@ -577,8 +580,6 @@ namespace Faolan.GameServer.CreateFlow
 				_logger.LogInformation("Character {CharacterId:X8}: all {Count} appearance resource(s) are cosmetic-only (category 2), which spawns never carry - using the default entries.",
 					character.Id, character.BodyResources.Count);
 			}
-
-			return null;
 		}
 
 		private void SchedulePostMorphBurst(INetworkClient client)

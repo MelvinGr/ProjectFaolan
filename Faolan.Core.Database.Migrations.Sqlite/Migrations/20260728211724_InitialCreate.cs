@@ -73,8 +73,26 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AppearanceChoices", x => new { x.Race, x.Sex, x.Category, x.Sequence });
-                    table.CheckConstraint("CK_AppearanceChoice_Race", "Race IN (1, 2, 3)");
+                    table.CheckConstraint("CK_AppearanceChoice_Race", "Race IN (1, 2, 3, 10)");
                     table.CheckConstraint("CK_AppearanceChoice_Sex", "Sex IN (0, 2, 3)");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "AppearanceSexOptions",
+                columns: table => new
+                {
+                    Sex = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    Category = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    Max = table.Column<int>(type: "INTEGER", nullable: false),
+                    Min = table.Column<int>(type: "INTEGER", nullable: false),
+                    Value = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AppearanceSexOptions", x => new { x.Sex, x.Category, x.Sequence });
+                    table.CheckConstraint("CK_AppearanceSexOption_Sex", "Sex IN (0, 2, 3)");
                 });
 
             migrationBuilder.CreateTable(
@@ -110,7 +128,23 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     table.PrimaryKey("PK_ClassAttributeBases", x => new { x.Class, x.Level, x.StatId });
                     table.CheckConstraint("CK_ClassAttributeBase_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
-                    table.CheckConstraint("CK_ClassAttributeBase_StatId", "StatId IN (0, 1, 11, 12, 20, 27, 33, 34, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 91, 106, 127, 140, 157, 165, 169, 173, 174, 186, 187, 191, 215, 224, 225, 226, 241, 243, 275, 278, 279, 280, 291, 310, 311, 312, 319, 331, 334, 350, 353, 355, 363, 389, 448, 450, 451, 454, 456, 458, 475, 488, 490, 491, 498, 504, 505, 506, 507, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 711, 713, 804, 806, 808, 810, 814, 818, 824, 828, 830, 861, 871, 872, 875, 878, 901, 920, 922, 923, 925, 926, 927, 928, 929, 965, 1007, 1035, 1085, 1093, 1097, 1098, 1099, 1332, 1376, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397)");
+                    table.CheckConstraint("CK_ClassAttributeBase_StatId", "StatId IN (0, 1, 2, 11, 12, 13, 20, 21, 23, 25, 27, 33, 34, 37, 39, 47, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 90, 91, 100, 102, 104, 106, 110, 127, 131, 135, 139, 140, 141, 143, 149, 157, 158, 162, 165, 167, 169, 170, 173, 174, 186, 187, 191, 215, 216, 217, 218, 219, 220, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 238, 240, 241, 243, 254, 255, 260, 269, 271, 275, 278, 279, 280, 281, 282, 287, 291, 292, 296, 300, 301, 308, 310, 311, 312, 319, 320, 326, 330, 331, 334, 346, 350, 353, 355, 360, 363, 375, 380, 389, 448, 450, 451, 454, 456, 458, 465, 475, 476, 477, 480, 488, 490, 491, 493, 498, 504, 505, 506, 507, 536, 560, 561, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 690, 711, 713, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 821, 823, 824, 825, 827, 828, 829, 830, 831, 833, 835, 837, 840, 861, 864, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 899, 901, 902, 903, 904, 905, 906, 907, 908, 909, 920, 922, 923, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 948, 965, 1007, 1008, 1009, 1010, 1035, 1037, 1040, 1071, 1085, 1093, 1095, 1096, 1097, 1098, 1099, 1332, 1376, 1378, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397, 1403)");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ClassComboScalings",
+                columns: table => new
+                {
+                    Class = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Level = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DpsModifier = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SecondaryModifier = table.Column<uint>(type: "INTEGER", nullable: false),
+                    StaminaDivisor = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClassComboScalings", x => new { x.Class, x.Level });
+                    table.CheckConstraint("CK_ClassComboScaling_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
                 });
 
             migrationBuilder.CreateTable(
@@ -133,6 +167,41 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Combos", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "FeatIdMaps",
+                columns: table => new
+                {
+                    WireFeatId = table.Column<uint>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    TemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    RootFlag = table.Column<uint>(type: "INTEGER", nullable: false),
+                    BaseIndex = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Rank = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FeatIdMaps", x => x.WireFeatId);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Feats",
+                columns: table => new
+                {
+                    Id = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 1024, nullable: false),
+                    Flags = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TemplateCategory = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Group = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    Rank = table.Column<int>(type: "INTEGER", nullable: false),
+                    Tree = table.Column<string>(type: "TEXT", maxLength: 64, nullable: true),
+                    BaseName = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Feats", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -256,12 +325,14 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     Id = table.Column<uint>(type: "INTEGER", nullable: false),
                     Level = table.Column<byte>(type: "INTEGER", nullable: false),
+                    Rank = table.Column<byte>(type: "INTEGER", nullable: false),
                     DamageRating = table.Column<float>(type: "REAL", nullable: false),
                     Range = table.Column<float>(type: "REAL", nullable: false),
                     DotDelta = table.Column<int>(type: "INTEGER", nullable: false),
                     Name = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
-                    Description = table.Column<string>(type: "TEXT", maxLength: 512, nullable: true),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 2048, nullable: true),
                     DotType = table.Column<uint>(type: "INTEGER", nullable: false),
+                    DotIntervalMs = table.Column<uint>(type: "INTEGER", nullable: false),
                     DurationMs = table.Column<uint>(type: "INTEGER", nullable: false),
                     EffectSpell = table.Column<uint>(type: "INTEGER", nullable: false),
                     CastTime = table.Column<ushort>(type: "INTEGER", nullable: false),
@@ -324,6 +395,46 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         name: "FK_ClassCombos_Combos_ComboId",
                         column: x => x.ComboId,
                         principalTable: "Combos",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "FeatPrereqs",
+                columns: table => new
+                {
+                    WireFeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    RequiresWireFeatId = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FeatPrereqs", x => new { x.WireFeatId, x.Sequence });
+                    table.ForeignKey(
+                        name: "FK_FeatPrereqs_FeatIdMaps_WireFeatId",
+                        column: x => x.WireFeatId,
+                        principalTable: "FeatIdMaps",
+                        principalColumn: "WireFeatId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "FeatEffects",
+                columns: table => new
+                {
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
+                    StatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    EffectKind = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Value = table.Column<uint>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FeatEffects", x => new { x.FeatId, x.Sequence });
+                    table.ForeignKey(
+                        name: "FK_FeatEffects_Feats_FeatId",
+                        column: x => x.FeatId,
+                        principalTable: "Feats",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -576,7 +687,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     NpcTemplateId = table.Column<uint>(type: "INTEGER", nullable: false),
                     IirHeader = table.Column<uint>(type: "INTEGER", nullable: true),
-                    MinimalPostIirRecordCount = table.Column<uint>(type: "INTEGER", nullable: true),
+                    MinimalPostIirWord2 = table.Column<uint>(type: "INTEGER", nullable: true),
                     Race = table.Column<uint>(type: "INTEGER", nullable: true),
                     Sex = table.Column<byte>(type: "INTEGER", nullable: true),
                     Side = table.Column<uint>(type: "INTEGER", nullable: true),
@@ -741,6 +852,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Guilds", x => x.Id);
+                    table.CheckConstraint("CK_Guild_GovernmentForm", "GovernmentForm IN (0, 1, 2, 3, 4, 5, 6)");
                     table.ForeignKey(
                         name: "FK_Guilds_Realms_RealmId",
                         column: x => x.RealmId,
@@ -815,7 +927,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     MaxDamage = table.Column<int>(type: "INTEGER", nullable: true),
                     MinDamage = table.Column<int>(type: "INTEGER", nullable: true),
                     Name = table.Column<string>(type: "TEXT", maxLength: 256, nullable: false),
-                    Description = table.Column<string>(type: "TEXT", maxLength: 512, nullable: true),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 2048, nullable: true),
                     Hash = table.Column<uint>(type: "INTEGER", nullable: false),
                     SearchCategory = table.Column<uint>(type: "INTEGER", nullable: false),
                     Value = table.Column<uint>(type: "INTEGER", nullable: false),
@@ -1058,6 +1170,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     Experience = table.Column<uint>(type: "INTEGER", nullable: false),
                     Money = table.Column<ulong>(type: "INTEGER", nullable: false),
                     Level = table.Column<ushort>(type: "INTEGER", nullable: false),
+                    Kills = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Deaths = table.Column<uint>(type: "INTEGER", nullable: false),
+                    TutorialStepsSeen = table.Column<ulong>(type: "INTEGER", nullable: false),
                     PositionX = table.Column<float>(type: "REAL", nullable: false),
                     PositionY = table.Column<float>(type: "REAL", nullable: false),
                     PositionZ = table.Column<float>(type: "REAL", nullable: false),
@@ -1071,7 +1186,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     table.PrimaryKey("PK_Characters", x => x.Id);
                     table.CheckConstraint("CK_Character_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
                     table.CheckConstraint("CK_Character_GuildRank", "GuildRank IN (0, 4)");
-                    table.CheckConstraint("CK_Character_Race", "Race IN (1, 2, 3)");
+                    table.CheckConstraint("CK_Character_Race", "Race IN (1, 2, 3, 10)");
                     table.CheckConstraint("CK_Character_Sex", "Sex IN (0, 2, 3)");
                     table.ForeignKey(
                         name: "FK_Characters_Accounts_AccountId",
@@ -1146,7 +1261,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ItemStatModifiers", x => new { x.ItemId, x.StatId });
-                    table.CheckConstraint("CK_ItemStatModifier_StatId", "StatId IN (0, 1, 11, 12, 20, 27, 33, 34, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 91, 106, 127, 140, 157, 165, 169, 173, 174, 186, 187, 191, 215, 224, 225, 226, 241, 243, 275, 278, 279, 280, 291, 310, 311, 312, 319, 331, 334, 350, 353, 355, 363, 389, 448, 450, 451, 454, 456, 458, 475, 488, 490, 491, 498, 504, 505, 506, 507, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 711, 713, 804, 806, 808, 810, 814, 818, 824, 828, 830, 861, 871, 872, 875, 878, 901, 920, 922, 923, 925, 926, 927, 928, 929, 965, 1007, 1035, 1085, 1093, 1097, 1098, 1099, 1332, 1376, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397)");
+                    table.CheckConstraint("CK_ItemStatModifier_StatId", "StatId IN (0, 1, 2, 11, 12, 13, 20, 21, 23, 25, 27, 33, 34, 37, 39, 47, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 90, 91, 100, 102, 104, 106, 110, 127, 131, 135, 139, 140, 141, 143, 149, 157, 158, 162, 165, 167, 169, 170, 173, 174, 186, 187, 191, 215, 216, 217, 218, 219, 220, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 238, 240, 241, 243, 254, 255, 260, 269, 271, 275, 278, 279, 280, 281, 282, 287, 291, 292, 296, 300, 301, 308, 310, 311, 312, 319, 320, 326, 330, 331, 334, 346, 350, 353, 355, 360, 363, 375, 380, 389, 448, 450, 451, 454, 456, 458, 465, 475, 476, 477, 480, 488, 490, 491, 493, 498, 504, 505, 506, 507, 536, 560, 561, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 690, 711, 713, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 821, 823, 824, 825, 827, 828, 829, 830, 831, 833, 835, 837, 840, 861, 864, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 899, 901, 902, 903, 904, 905, 906, 907, 908, 909, 920, 922, 923, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 948, 965, 1007, 1008, 1009, 1010, 1035, 1037, 1040, 1071, 1085, 1093, 1095, 1096, 1097, 1098, 1099, 1332, 1376, 1378, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397, 1403)");
                     table.ForeignKey(
                         name: "FK_ItemStatModifiers_Items_ItemId",
                         column: x => x.ItemId,
@@ -1526,29 +1641,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "CharacterAttributes",
-                columns: table => new
-                {
-                    Id = table.Column<uint>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Sequence = table.Column<int>(type: "INTEGER", nullable: false),
-                    EntryIndex = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Value = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Tag = table.Column<ushort>(type: "INTEGER", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CharacterAttributes", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_CharacterAttributes_Characters_CharacterId",
-                        column: x => x.CharacterId,
-                        principalTable: "Characters",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "CharacterBodies",
                 columns: table => new
                 {
@@ -1831,18 +1923,18 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "CharacterFeats",
+                name: "CharacterFeatSpecs",
                 columns: table => new
                 {
                     CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
-                    Sequence = table.Column<int>(type: "INTEGER", nullable: false)
+                    Index = table.Column<int>(type: "INTEGER", nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_CharacterFeats", x => new { x.CharacterId, x.FeatId });
+                    table.PrimaryKey("PK_CharacterFeatSpecs", x => new { x.CharacterId, x.Index });
                     table.ForeignKey(
-                        name: "FK_CharacterFeats_Characters_CharacterId",
+                        name: "FK_CharacterFeatSpecs_Characters_CharacterId",
                         column: x => x.CharacterId,
                         principalTable: "Characters",
                         principalColumn: "Id",
@@ -2193,6 +2285,32 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CharacterFeats",
+                columns: table => new
+                {
+                    CharacterId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    SpecIndex = table.Column<int>(type: "INTEGER", nullable: false),
+                    FeatId = table.Column<uint>(type: "INTEGER", nullable: false),
+                    Sequence = table.Column<int>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CharacterFeats", x => new { x.CharacterId, x.SpecIndex, x.FeatId });
+                    table.ForeignKey(
+                        name: "FK_CharacterFeats_CharacterFeatSpecs_CharacterId_SpecIndex",
+                        columns: x => new { x.CharacterId, x.SpecIndex },
+                        principalTable: "CharacterFeatSpecs",
+                        principalColumns: new[] { "CharacterId", "Index" },
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_CharacterFeats_Characters_CharacterId",
+                        column: x => x.CharacterId,
+                        principalTable: "Characters",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ConversationScreenParameters",
                 columns: table => new
                 {
@@ -2236,11 +2354,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 table: "Accounts",
                 column: "UserName",
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CharacterAttributes_CharacterId",
-                table: "CharacterAttributes",
-                column: "CharacterId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_CharacterBodyResources_CharacterId",
@@ -2639,10 +2752,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "AppearanceChoices");
 
             migrationBuilder.DropTable(
-                name: "CharacterAbilities");
+                name: "AppearanceSexOptions");
 
             migrationBuilder.DropTable(
-                name: "CharacterAttributes");
+                name: "CharacterAbilities");
 
             migrationBuilder.DropTable(
                 name: "CharacterBodies");
@@ -2711,10 +2824,19 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "ClassCombos");
 
             migrationBuilder.DropTable(
+                name: "ClassComboScalings");
+
+            migrationBuilder.DropTable(
                 name: "ClassSpells");
 
             migrationBuilder.DropTable(
                 name: "ConversationScreenParameters");
+
+            migrationBuilder.DropTable(
+                name: "FeatEffects");
+
+            migrationBuilder.DropTable(
+                name: "FeatPrereqs");
 
             migrationBuilder.DropTable(
                 name: "ItemStatModifiers");
@@ -2786,10 +2908,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "WorldObjectWords");
 
             migrationBuilder.DropTable(
-                name: "QuestGoalDefinitions");
+                name: "CharacterFeatSpecs");
 
             migrationBuilder.DropTable(
-                name: "Characters");
+                name: "QuestGoalDefinitions");
 
             migrationBuilder.DropTable(
                 name: "Abilities");
@@ -2799,6 +2921,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             migrationBuilder.DropTable(
                 name: "ConversationScreens");
+
+            migrationBuilder.DropTable(
+                name: "Feats");
+
+            migrationBuilder.DropTable(
+                name: "FeatIdMaps");
 
             migrationBuilder.DropTable(
                 name: "Mails");
@@ -2816,7 +2944,16 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "WorldObjects");
 
             migrationBuilder.DropTable(
+                name: "Characters");
+
+            migrationBuilder.DropTable(
                 name: "Items");
+
+            migrationBuilder.DropTable(
+                name: "ConversationPackets");
+
+            migrationBuilder.DropTable(
+                name: "NpcSpawns");
 
             migrationBuilder.DropTable(
                 name: "Accounts");
@@ -2828,22 +2965,16 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 name: "RespawnPoints");
 
             migrationBuilder.DropTable(
-                name: "ConversationPackets");
-
-            migrationBuilder.DropTable(
-                name: "NpcSpawns");
-
-            migrationBuilder.DropTable(
                 name: "Spells");
-
-            migrationBuilder.DropTable(
-                name: "Realms");
 
             migrationBuilder.DropTable(
                 name: "ConversationNodes");
 
             migrationBuilder.DropTable(
                 name: "NpcSpawnAreas");
+
+            migrationBuilder.DropTable(
+                name: "Realms");
 
             migrationBuilder.DropTable(
                 name: "QuestDefinitions");

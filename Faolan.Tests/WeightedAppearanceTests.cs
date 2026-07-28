@@ -43,23 +43,22 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void TrySeedFreshRows_UsesTheResolvedWeightedEntries()
+		public void BuildAppearanceEntries_UsesTheResolvedWeightedEntries()
 		{
-			var weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(FaolanxRefs), RegistryDict());
 			var character = new Character
 			{
 				Id = 0x02000007,
-				Class = ConanClass.Necromancer
+				Class = ConanClass.Necromancer,
+				BodyResources = Resources(FaolanxRefs)
 			}; // Faolanx is a mage-necromancer
 
-			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character, weighted));
+			var entries = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, PlayerSpawnScaffoldRows.BuildWeightedEntries(character.BodyResources, RegistryDict()));
 
 			// 7 weighted + no morphs + the closer at idx 8.
-			Assert.Equal(8, character.Attributes.Count);
-			var rows = character.Attributes.OrderBy(a => a.Sequence).ToList();
-			Assert.Equal(FaolanxWire, rows.Take(7).Select(a => a.Tag));
-			Assert.Equal(8u, rows[7].EntryIndex);
-			Assert.Equal(0x4301, rows[7].Tag); // Necromancer's per-class closer (#250); was the old hardcoded 0x56B6
+			Assert.Equal(8, entries.Count);
+			Assert.Equal(FaolanxWire, entries.Take(7).Select(e => e.Tag));
+			Assert.Equal(8u, entries[7].Index);
+			Assert.Equal(0x4301, entries[7].Tag); // Necromancer's per-class closer (#250); was the old hardcoded 0x56B6
 		}
 
 		[Fact]

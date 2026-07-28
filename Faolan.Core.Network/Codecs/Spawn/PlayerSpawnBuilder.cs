@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
@@ -26,10 +27,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// [transform][preFrame][CharacterIIR][post-IIR]). The caller hands over the typed character message; the
 		// codec serialises it, so nobody on this path deals in its bytes.
 		//
+		// `morphRegistry` is the MorphTarget catalog by ref name (IDatabaseRepository.GetMorphTargetRegistry - 1072
+		// rows of static seed content, cached for the process). It is what turns the character's stored editor
+		// choices into the spawn's weighted appearance entries; without it the character wears the default face.
+		//
 		// A character with no scaffold rows THROWS. It used to return null so the caller could fall back to splicing a
 		// captured spawn, but that path is gone (construct-don't-replay) and the rows are seeded at character creation,
 		// so a character without them is corruption - and the "fallback" it enabled was a player nobody could see.
-		public static byte[] BuildFromScratch(uint handle, ulong playfield, Vector3 position, Quaternion rotation, ProtoCoreCharacterIIR characterIir, Character scaffoldCharacter)
+		public static byte[] BuildFromScratch(uint handle, ulong playfield, Vector3 position, Quaternion rotation, ProtoCoreCharacterIIR characterIir, Character scaffoldCharacter,
+			IReadOnlyDictionary<string, MorphTarget>? morphRegistry)
 		{
 			ArgumentNullException.ThrowIfNull(characterIir);
 
@@ -46,7 +52,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			};
 
 			// Fill the scaffold frame (pre-IIR + entry table + id list + pair lists) from the character's DB rows.
-			if (!PlayerSpawnScaffoldRows.TryApplyFrom(scaffoldCharacter, scaffold))
+			if (!PlayerSpawnScaffoldRows.TryApplyFrom(scaffoldCharacter, scaffold, morphRegistry))
 			{
 				throw new InvalidOperationException(
 					$"Character {scaffoldCharacter.Id:X8} has no spawn-scaffold rows, so its FA015807 cannot be built. They are seeded at character creation (CreateFlowService.CommitCharacterName).");

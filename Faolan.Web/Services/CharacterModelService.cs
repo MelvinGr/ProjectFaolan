@@ -666,6 +666,11 @@ namespace Faolan.Web.Services
 		// Persist an edited appearance to the character's CharacterBody (morphs + head) and CharacterBodyResources
 		// (the chosen hair/colour/tattoo refs, re-sequenced). This is what the editor's Save writes; the web viewer
 		// reads these back so the change sticks. Returns false when the character does not exist.
+		//
+		// These two rows ARE the appearance (#483). The edit used to need a second write - PropagateToScaffold,
+		// rebuilding the spawn's CharacterAttribute entry table from them - or the change showed in the viewer and
+		// never in game. The game now derives that table from these rows when it builds the spawn, so saving here is
+		// the whole edit.
 		public bool SaveAppearance(uint characterId, AppearanceSpec spec)
 		{
 			using var db = _dbFactory.CreateDbContext();
@@ -705,8 +710,6 @@ namespace Faolan.Web.Services
 			}
 
 			db.SaveChanges();
-
-			PropagateToScaffold(characterId);
 			return true;
 		}
 
@@ -782,30 +785,6 @@ namespace Faolan.Web.Services
 			return bytes.Length == 0
 				? null
 				: bytes;
-		}
-
-		// Rebuild the character's spawn-scaffold appearance entries from the just-saved resources so the edit shows
-		// in-game on the next login - now possible because PlayerSpawnScaffoldRows lives in Faolan.Core.Spawn (#290),
-		// which the web can reference. No-op when the character has no scaffold yet (first login seeds it from the new
-		// resources via TrySeedFreshRows). The game server's login-time RefreshAppearance stays as a safety net.
-		private void PropagateToScaffold(uint characterId)
-		{
-			using var db = _dbFactory.CreateDbContext();
-			var character = db.Characters.AsNoTracking().Include(c => c.Attributes).Include(c => c.Body).Include(c => c.BodyResources).FirstOrDefault(c => c.Id == characterId);
-			if (character?.Attributes is not { Count: > 0 })
-				return;
-
-			var refs = character.BodyResources.Select(r => r.Ref).ToList();
-			var registry = db.MorphTargets.AsNoTracking().Where(m => refs.Contains(m.Name)).ToDictionary(m => m.Name);
-			var weighted = PlayerSpawnScaffoldRows.BuildWeightedEntries(character.BodyResources, registry);
-
-			if (!PlayerSpawnScaffoldRows.RefreshAppearance(character, weighted))
-				return;
-
-			// Persist only the entry table (fresh, navigation-free rows - so EF doesn't cascade-insert the parent).
-			db.CharacterAttributes.RemoveRange(db.CharacterAttributes.Where(a => a.CharacterId == characterId));
-			db.CharacterAttributes.AddRange(character.Attributes);
-			db.SaveChanges();
 		}
 
 		private RdbReader Reader()

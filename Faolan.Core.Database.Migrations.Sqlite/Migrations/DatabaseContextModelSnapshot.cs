@@ -357,34 +357,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("CharacterAbilities");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterAttribute", b =>
-                {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("CharacterId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("EntryIndex")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Sequence")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<ushort>("Tag")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Value")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CharacterId");
-
-                    b.ToTable("CharacterAttributes");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterBody", b =>
                 {
                     b.Property<uint>("CharacterId")
@@ -3522,17 +3494,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Character");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterAttribute", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
-                        .WithMany("Attributes")
-                        .HasForeignKey("CharacterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Character");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterBody", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
@@ -4552,8 +4513,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Character", b =>
                 {
-                    b.Navigation("Attributes");
-
                     b.Navigation("Body");
 
                     b.Navigation("BodyResources");

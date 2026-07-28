@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    [Migration("20260728060031_RenameMinimalPostIirWord2")]
-    partial class RenameMinimalPostIirWord2
+    [Migration("20260728211724_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -180,9 +180,44 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.ToTable("AppearanceChoices", t =>
                         {
-                            t.HasCheckConstraint("CK_AppearanceChoice_Race", "Race IN (1, 2, 3)");
+                            t.HasCheckConstraint("CK_AppearanceChoice_Race", "Race IN (1, 2, 3, 10)");
 
                             t.HasCheckConstraint("CK_AppearanceChoice_Sex", "Sex IN (0, 2, 3)");
+                        });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.AppearanceSexOption", b =>
+                {
+                    b.Property<byte>("Sex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Max")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Min")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Sex", "Category", "Sequence");
+
+                    b.ToTable("AppearanceSexOptions", t =>
+                        {
+                            t.HasCheckConstraint("CK_AppearanceSexOption_Sex", "Sex IN (0, 2, 3)");
                         });
                 });
 
@@ -209,6 +244,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<DateTimeOffset>("CreationDate")
                         .HasColumnType("TEXT");
 
+                    b.Property<uint>("Deaths")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("Experience")
                         .HasColumnType("INTEGER");
 
@@ -219,6 +257,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDead")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Kills")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Language")
@@ -278,6 +319,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<byte>("Sex")
                         .HasColumnType("INTEGER");
 
+                    b.Property<ulong>("TutorialStepsSeen")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId");
@@ -297,7 +341,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                             t.HasCheckConstraint("CK_Character_GuildRank", "GuildRank IN (0, 4)");
 
-                            t.HasCheckConstraint("CK_Character_Race", "Race IN (1, 2, 3)");
+                            t.HasCheckConstraint("CK_Character_Race", "Race IN (1, 2, 3, 10)");
 
                             t.HasCheckConstraint("CK_Character_Sex", "Sex IN (0, 2, 3)");
                         });
@@ -314,34 +358,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasKey("CharacterId", "AbilityId");
 
                     b.ToTable("CharacterAbilities");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterAttribute", b =>
-                {
-                    b.Property<uint>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("CharacterId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("EntryIndex")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("Sequence")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<ushort>("Tag")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Value")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CharacterId");
-
-                    b.ToTable("CharacterAttributes");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterBody", b =>
@@ -1016,7 +1032,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         {
                             t.HasCheckConstraint("CK_ClassAttributeBase_Class", "Class IN (18, 20, 22, 24, 28, 29, 31, 34, 39, 41, 43, 44)");
 
-                            t.HasCheckConstraint("CK_ClassAttributeBase_StatId", "StatId IN (0, 1, 2, 11, 12, 13, 20, 21, 23, 25, 27, 33, 34, 39, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 90, 91, 100, 102, 104, 106, 110, 127, 131, 135, 139, 140, 141, 143, 149, 157, 158, 165, 167, 169, 170, 173, 174, 186, 187, 191, 215, 216, 217, 218, 219, 220, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 238, 240, 241, 243, 254, 255, 260, 269, 271, 275, 278, 279, 280, 281, 282, 291, 296, 300, 301, 310, 311, 312, 319, 320, 326, 330, 331, 334, 346, 350, 353, 355, 363, 375, 380, 389, 448, 450, 451, 454, 456, 458, 465, 475, 488, 490, 491, 498, 504, 505, 506, 507, 560, 561, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 711, 713, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 817, 818, 819, 821, 823, 824, 825, 827, 828, 829, 830, 831, 833, 835, 837, 861, 864, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 899, 901, 902, 903, 904, 905, 906, 907, 908, 909, 920, 922, 923, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 965, 1007, 1035, 1040, 1071, 1085, 1093, 1095, 1096, 1097, 1098, 1099, 1332, 1376, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397, 1403)");
+                            t.HasCheckConstraint("CK_ClassAttributeBase_StatId", "StatId IN (0, 1, 2, 11, 12, 13, 20, 21, 23, 25, 27, 33, 34, 37, 39, 47, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 90, 91, 100, 102, 104, 106, 110, 127, 131, 135, 139, 140, 141, 143, 149, 157, 158, 162, 165, 167, 169, 170, 173, 174, 186, 187, 191, 215, 216, 217, 218, 219, 220, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 238, 240, 241, 243, 254, 255, 260, 269, 271, 275, 278, 279, 280, 281, 282, 287, 291, 292, 296, 300, 301, 308, 310, 311, 312, 319, 320, 326, 330, 331, 334, 346, 350, 353, 355, 360, 363, 375, 380, 389, 448, 450, 451, 454, 456, 458, 465, 475, 476, 477, 480, 488, 490, 491, 493, 498, 504, 505, 506, 507, 536, 560, 561, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 690, 711, 713, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 821, 823, 824, 825, 827, 828, 829, 830, 831, 833, 835, 837, 840, 861, 864, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 899, 901, 902, 903, 904, 905, 906, 907, 908, 909, 920, 922, 923, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 948, 965, 1007, 1008, 1009, 1010, 1035, 1037, 1040, 1071, 1085, 1093, 1095, 1096, 1097, 1098, 1099, 1332, 1376, 1378, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397, 1403)");
                         });
                 });
 
@@ -1471,7 +1487,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasIndex("RealmId", "Name")
                         .IsUnique();
 
-                    b.ToTable("Guilds");
+                    b.ToTable("Guilds", t =>
+                        {
+                            t.HasCheckConstraint("CK_Guild_GovernmentForm", "GovernmentForm IN (0, 1, 2, 3, 4, 5, 6)");
+                        });
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Item", b =>
@@ -1483,7 +1502,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Description")
-                        .HasMaxLength(512)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("ExcludeFromRandomLoot")
@@ -1553,7 +1572,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.ToTable("ItemStatModifiers", t =>
                         {
-                            t.HasCheckConstraint("CK_ItemStatModifier_StatId", "StatId IN (0, 1, 2, 11, 12, 13, 20, 21, 23, 25, 27, 33, 34, 39, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 90, 91, 100, 102, 104, 106, 110, 127, 131, 135, 139, 140, 141, 143, 149, 157, 158, 165, 167, 169, 170, 173, 174, 186, 187, 191, 215, 216, 217, 218, 219, 220, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 238, 240, 241, 243, 254, 255, 260, 269, 271, 275, 278, 279, 280, 281, 282, 291, 296, 300, 301, 310, 311, 312, 319, 320, 326, 330, 331, 334, 346, 350, 353, 355, 363, 375, 380, 389, 448, 450, 451, 454, 456, 458, 465, 475, 488, 490, 491, 498, 504, 505, 506, 507, 560, 561, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 711, 713, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 817, 818, 819, 821, 823, 824, 825, 827, 828, 829, 830, 831, 833, 835, 837, 861, 864, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 899, 901, 902, 903, 904, 905, 906, 907, 908, 909, 920, 922, 923, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 965, 1007, 1035, 1040, 1071, 1085, 1093, 1095, 1096, 1097, 1098, 1099, 1332, 1376, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397, 1403)");
+                            t.HasCheckConstraint("CK_ItemStatModifier_StatId", "StatId IN (0, 1, 2, 11, 12, 13, 20, 21, 23, 25, 27, 33, 34, 37, 39, 47, 51, 52, 54, 57, 58, 59, 60, 61, 70, 75, 79, 90, 91, 100, 102, 104, 106, 110, 127, 131, 135, 139, 140, 141, 143, 149, 157, 158, 162, 165, 167, 169, 170, 173, 174, 186, 187, 191, 215, 216, 217, 218, 219, 220, 222, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 238, 240, 241, 243, 254, 255, 260, 269, 271, 275, 278, 279, 280, 281, 282, 287, 291, 292, 296, 300, 301, 308, 310, 311, 312, 319, 320, 326, 330, 331, 334, 346, 350, 353, 355, 360, 363, 375, 380, 389, 448, 450, 451, 454, 456, 458, 465, 475, 476, 477, 480, 488, 490, 491, 493, 498, 504, 505, 506, 507, 536, 560, 561, 577, 594, 595, 596, 597, 607, 656, 658, 666, 667, 668, 669, 670, 671, 690, 711, 713, 804, 805, 806, 807, 808, 809, 810, 811, 812, 813, 814, 815, 816, 817, 818, 819, 821, 823, 824, 825, 827, 828, 829, 830, 831, 833, 835, 837, 840, 861, 864, 866, 867, 868, 869, 870, 871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 899, 901, 902, 903, 904, 905, 906, 907, 908, 909, 920, 922, 923, 925, 926, 927, 928, 929, 931, 932, 933, 934, 935, 936, 937, 938, 939, 940, 941, 942, 943, 944, 945, 946, 948, 965, 1007, 1008, 1009, 1010, 1035, 1037, 1040, 1071, 1085, 1093, 1095, 1096, 1097, 1098, 1099, 1332, 1376, 1378, 1380, 1382, 1383, 1385, 1386, 1387, 1390, 1392, 1393, 1395, 1397, 1403)");
                         });
                 });
 
@@ -3010,10 +3029,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("REAL");
 
                     b.Property<string>("Description")
-                        .HasMaxLength(512)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("DotDelta")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("DotIntervalMs")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("DotType")
@@ -3468,17 +3490,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
                         .WithMany()
-                        .HasForeignKey("CharacterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Character");
-                });
-
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterAttribute", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
-                        .WithMany("Attributes")
                         .HasForeignKey("CharacterId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -4505,8 +4516,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Character", b =>
                 {
-                    b.Navigation("Attributes");
-
                     b.Navigation("Body");
 
                     b.Navigation("BodyResources");

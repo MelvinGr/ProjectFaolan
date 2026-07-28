@@ -30,19 +30,33 @@ just logs a warning and skips the spawn):
    equipment from `CharacterEquipment` via `PlayerSpawnEquipment` (`InventoryEntry { pos, ProtoAcgItem }`,
    items built like `SnapshotItemBuilder`); `SpawnPacketBuilder.SetCharacterMessage` splices it back.
 3. **Scaffold frame** — `PlayerSpawnScaffoldCodec` (byte-exact parse/generate of the full body) +
-   `PlayerSpawnScaffoldRows` regenerate everything around the CharacterIIR from the character's rows:
-   - `CharacterAttribute` — the uniform entry table (`Sequence`-ordered; wire order ≠ index order, see DemoL80)
+   `PlayerSpawnScaffoldRows` regenerate everything around the CharacterIIR from the character:
+   - the uniform entry table is **DERIVED, not stored** (`PlayerSpawnScaffoldRows.BuildAppearanceEntries`):
+     weighted entries from `CharacterBodyResource` through the `MorphTarget` registry, morph entries from
+     `CharacterBody`, the closer from `Character.Class`. Indices are `1..n` in that order.
    - `CharacterSkill` — the feat/ability ID list (`SkillId` ascending + a `Rank` byte)
    - `CharacterScaffoldPair` — the two ending `[id][s32]` pair lists (`ListIndex` 0/1)
    - the pre-IIR frame + `EntryTableX` scalar are CONSTRUCTED from `Character.Class`
      (`PlayerSpawnScaffoldRows.FreshPreFrame`; `EntryTableX` is const `0xB7`), NOT stored as rows — they
      carry no per-character data (there is no `CharacterSpawnFrame` table)
 
-Characters without scaffold rows are lazily seeded ONCE at world entry (`EnsureSpawnScaffoldRows` →
-`IDatabaseRepository.SaveCharacterScaffold`) with the **fresh-character defaults** in
-`PlayerSpawnScaffoldRows`: Dikketest's extracted scaffold (a just-created character at world entry — 6
-weighted attributes, 7 morph entries, the closer, 20 feat ids, fresh pre-frame). Locked by the test
-`FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture`.
+The entry table used to be persisted as `CharacterAttributes` rows and re-synced from the appearance model on
+every edit path; the table is gone. The registry it resolves through reaches the builder as a parameter
+(`IDatabaseRepository.GetMorphTargetRegistry`, read once per process — 1,072 rows of static seed content).
+
+Characters without scaffold rows are seeded ONCE at creation
+(`CreateFlowService.SeedSpawnScaffold` → `IDatabaseRepository.SaveCharacterScaffold`) with the
+**fresh-character defaults** in `PlayerSpawnScaffoldRows`: Dikketest's extracted scaffold (a just-created
+character at world entry — 6 weighted attributes, 7 morph entries, the closer, 20 feat ids, fresh pre-frame).
+Locked by the test `FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture`.
+
+**Retail's entry indices are per-character SLOT ids, not positions** — they survive appearance edits, so a
+re-barbered character carries gaps and appends its re-chosen resources after its morphs (`NecroL80` runs
+2..15, `DemoL80` runs 4..13 then 24,23). Nothing derives them and nothing needs to: every character we build
+spawns with `1..n` and renders. So those two captures round-trip to the same `(tag, value)` multiset with a
+canonical index run rather than byte-identically — pinned by
+`EditedAppearance_RoundTripsExceptItsRetailSlots`, while `SpawnStrieTemplate` / `SpawnDikketestLogin` /
+`SpawnHoxxlingBuffed` stay byte-exact through the derivation.
 
 Buff/timer records (see grammar) are transient session state and are deliberately NOT stored: a buffed
 captured spawn extracts to the same rows as its unbuffed form (locked by
@@ -126,13 +140,14 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
     frames as a bare `0x3F1`, which is `ForCount(0)`, not a constant.
   - `[u32 count][u32 X]` + (`[f32 1.0]` iff count>0) — the entry-table count and the per-char scalar X
     (Strie 0xB7, NecroL80 0x2B6, editor preview 0x3F1) = `PlayerSpawnScaffold.EntryTableX`.
-  - **count entries, UNIFORM 14 bytes**: `[u32 idx][u32 flag][u16 tag][u32 value]` = `CharacterAttribute`.
+  - **count entries, UNIFORM 14 bytes**: `[u32 idx][u32 flag][u16 tag][u32 value]` = the appearance entry table.
     `flag` was read as a constant 0; 2 captured spawns carry a 1 on their LAST entry, and there `value` is a
     plain integer (300, 400) rather than float bits — so it discriminates how `value` is read.
     Three payload flavors share the shape: weighted attributes (`tag` = value, `value` = 0x3F800000 weight),
     **morph entries** (`tag` = type<<8|sliderId, `value` = float bits — see the morph finding below) and the
-    closing `[u16][u32]` record. Wire order is the stored `Sequence`, not ascending idx (DemoL80's closer is
-    out of order).
+    closing `[u16][u32]` record. Wire order is the LIST order, not ascending idx: `idx` is a per-character
+    slot id retail keeps across appearance edits, so DemoL80's re-chosen hair/beard sit at 24/23 after its
+    morphs and its closer is out of order.
   - iff count>0: **ID list of 5-byte groups `[u8 rank][u32 id]`** = `CharacterSkill`; ids ascending (ranks are
     small values, e.g. NecroL80 has 0x0A/0x41-0x4B on ability ids). The list is CLOSED by a group whose "id" is
     a **`ListFrame` word**, followed by that many **13-byte records** `[u32 0xC350][u32 id][u32 0][u8 kind]`.
@@ -233,10 +248,12 @@ The weighted (1.0) entries at the top of the entry table are the character's **c
   37 spawns) disagrees with this client's registry (arse=0x106/thigh=0x107/leg=0x37). Generation follows
   the **client's own registry** (it's the table this client ships) with the retail-proven morph table kept
   for the sliders.
-- Implementation: `Faolan.Importer --rdb` imports the registry → `MorphTarget` (Id = wire tag);
-  the create-flow `RecordBodyResource` records the editor's refs → `CharacterBodyResource` (send order); world-entry seeding
-  resolves refs → `PlayerSpawnScaffoldRows.BuildWeightedEntries` (falls back to Dikketest's set when
-  nothing resolves). Locked by `WeightedAppearanceTests` (faolanx 7/7).
+- Implementation: `Faolan.Importer --only rdb-morphs` imports the registry → `MorphTarget` (Id = wire tag);
+  the create-flow `RecordBodyResource` records the editor's refs → `CharacterBodyResource` (send order); the
+  SPAWN resolves refs → `PlayerSpawnScaffoldRows.BuildWeightedEntries` on every send (falls back to
+  Dikketest's set when nothing resolves, which `CreateFlowService.ReportUnresolvableAppearance` says out loud
+  once, at creation). Locked by `WeightedAppearanceTests` (faolanx 7/7) and, against the shipped catalog in
+  both directions, by `PlayerSpawnScaffoldRowsTests`.
 - **The closing record is session state, not character data**: its tag is always a multiple of **0x3F1**
   (the grammar's magic: Dikketest 22×0x3F1, Hoxxling 18/19/22/32×0x3F1 across his logins — same char,
   different sessions) and its value one of 100/300/400. Like the buff records it varies per login, so the

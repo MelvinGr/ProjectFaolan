@@ -8,12 +8,19 @@ using Faolan.Core.Extensions;
 namespace Faolan.Core.Network.Codecs.Spawn
 {
 	// Maps the spawn scaffold between its wire form (PlayerSpawnScaffold) and the character's DB rows
-	// (CharacterAttribute / CharacterSkill / CharacterScaffoldPair), so a player spawn can
-	// be GENERATED from the database instead of spliced into captured template bytes. Buff/timer records are
-	// transient session state and are deliberately not stored - a buffed captured spawn extracts to the same rows
-	// as its unbuffed form. Fresh characters get the fresh-character defaults below (extracted from the Dikketest
-	// create capture - a just-created character at world entry; the same role Strie's template played, but with a
-	// genuinely fresh scaffold). See docs/re/player-spawn-generation.md "VALIDATED GRAMMAR".
+	// (CharacterSkill / CharacterScaffoldPair / CharacterFeat, plus the appearance model CharacterBody +
+	// CharacterBodyResources), so a player spawn can be GENERATED from the database instead of spliced into
+	// captured template bytes. Buff/timer records are transient session state and are deliberately not stored - a
+	// buffed captured spawn extracts to the same rows as its unbuffed form. Fresh characters get the
+	// fresh-character defaults below (extracted from the Dikketest create capture - a just-created character at
+	// world entry; the same role Strie's template played, but with a genuinely fresh scaffold).
+	// See docs/re/player-spawn-generation.md "VALIDATED GRAMMAR".
+	//
+	// The ENTRY TABLE is DERIVED, never stored (#483). It used to be persisted as CharacterAttribute rows and kept
+	// in step with the appearance model by explicit refresh calls on every edit path - two copies of one fact, and
+	// forgetting one froze the avatar's face permanently. BuildAppearanceEntries is the single generator now:
+	// weighted entries from CharacterBodyResources through the MorphTarget registry, morph entries from
+	// CharacterBody, the closer from the class.
 	public static class PlayerSpawnScaffoldRows
 	{
 		// The pre-IIR frame's grammar lives in PlayerSpawnPreFrame / PlayerSpawnPreFrameCodec - it is the client's
@@ -96,7 +103,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// send order (Sequence). Category 2 (face paint, e.g. the always-sent *texscript_183875) is never
 		// emitted in captured spawns and is skipped; unresolvable refs are skipped too. Returns null when
 		// nothing resolves - the caller then falls back to the Dikketest defaults.
-		public static List<ScaffoldEntry>? BuildWeightedEntries(IEnumerable<CharacterBodyResource> resources, IReadOnlyDictionary<string, MorphTarget> registry)
+		public static List<ScaffoldEntry>? BuildWeightedEntries(IEnumerable<CharacterBodyResource>? resources, IReadOnlyDictionary<string, MorphTarget>? registry)
 		{
 			if (resources == null || registry == null)
 				return null;
@@ -115,35 +122,38 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				: null;
 		}
 
+		// The scaffold's ENTRY TABLE, built WHOLE from the character's appearance model - the one generator, used by
+		// every spawn. In wire order: the weighted appearance entries (the character's chosen editor resources,
+		// resolved through the registry by BuildWeightedEntries, or Dikketest's proven set when none resolve), then
+		// the character's OWN editor morphs (CharacterMorphs - absent sliders yield no entry, the captured shape of an
+		// unmorphed character), then the closing record. Indices are 1..n in that order.
+		//
+		// NB retail's captured indices are NOT always 1..n: they are per-character SLOT ids that survive appearance
+		// edits, so a re-barbered character carries gaps and appends its new hair/beard after its morphs
+		// (SpawnNecroKingsCastle starts at 2, SpawnDemoRandomActions runs 4..13,24,23). Nothing derives them, and
+		// nothing needs to - every character we create spawns with 1..n and renders correctly in-client.
+		public static List<ScaffoldEntry> BuildAppearanceEntries(Character character, IReadOnlyList<ScaffoldEntry>? weightedAppearance)
+		{
+			var entries = new List<ScaffoldEntry>(weightedAppearance ?? FreshWeightedAttributes);
+			entries.AddRange(CharacterMorphs.BuildEntries(character.Body, (uint)entries.Count + 1));
+
+			var closer = FreshCloser(character.Class);
+			entries.Add(new ScaffoldEntry((uint)entries.Count + 1, closer.Tag, closer.Value));
+			return entries;
+		}
+
 		// Seeds the fresh-character scaffold defaults onto a character that has none, IN PLACE, and says whether it did
 		// - false means it already had rows and nothing was touched, so the caller can skip the save. Try-named because
 		// that "no" is an ordinary outcome (every login after the first), not a failure.
-		// weightedAppearance (from BuildWeightedEntries) replaces the Dikketest weighted-attribute defaults when the
-		// character's own editor choices are resolvable.
-		public static bool TrySeedFreshRows(Character character, IReadOnlyList<ScaffoldEntry>? weightedAppearance = null)
+		//
+		// The APPEARANCE is not seeded: it is derived from CharacterBody / CharacterBodyResources at spawn time
+		// (BuildAppearanceEntries). What is left is the progression the character starts with, and the "already
+		// seeded" marker is therefore the SKILL rows - seeded here and nowhere else.
+		public static bool TrySeedFreshRows(Character character)
 		{
-			if (character.Attributes is { Count: > 0 })
+			if (character.Skills is { Count: > 0 })
 				return false;
 
-			// Entry table: the weighted appearance entries (the character's chosen resources, or Dikketest's
-			// proven set when none resolve), then the character's OWN editor morphs (CharacterMorphs - absent
-			// sliders yield no entry, the captured shape of an unmorphed character), then the closing record.
-			// Indices and Sequence both follow that wire order.
-			var entries = new List<ScaffoldEntry>(weightedAppearance ?? FreshWeightedAttributes);
-			entries.AddRange(CharacterMorphs.BuildEntries(character.Body, (uint)entries.Count + 1));
-			var closer = FreshCloser(character.Class);
-			entries.Add(new ScaffoldEntry((uint)entries.Count + 1, closer.Tag, closer.Value));
-
-			character.Attributes = entries
-				.Select((e, sequence) => new CharacterAttribute
-				{
-					CharacterId = character.Id,
-					Sequence = sequence,
-					EntryIndex = e.Index,
-					Tag = e.Tag,
-					Value = e.Value
-				})
-				.ToList();
 			character.Skills = FreshSkillIdsFor(character.Class)
 				.Select(id => new CharacterSkill
 				{
@@ -180,19 +190,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return frame.Sublist.SelectMany(spec => spec.FeatIds).ToList();
 		}
 
-		// Replaces the character's scaffold rows with the scaffold's content (extraction: captured spawn -> rows).
-		public static void ExtractTo(Character character, PlayerSpawnScaffold scaffold)
+		// Replaces the character's scaffold rows with the scaffold's content (extraction: captured spawn -> rows), and
+		// says how much of the entry table landed in the appearance model.
+		//
+		// `refsByTag` is the MorphTarget registry keyed by WIRE TAG (= MorphTarget.Id), i.e. the inverse of the map
+		// BuildWeightedEntries generates through: tag 133 comes back as "*beardmesh_210844", 226 as
+		// "*texscript_202392". It is REQUIRED rather than optional because the entry table is the only place a
+		// captured character's looks exist - extracting without it would silently import a faceless character.
+		public static (int Morphs, int Resources) ExtractTo(Character character, PlayerSpawnScaffold scaffold, IReadOnlyDictionary<ushort, string> refsByTag)
 		{
-			character.Attributes = scaffold
-				.Entries.Select((e, sequence) => new CharacterAttribute
-				{
-					CharacterId = character.Id,
-					Sequence = sequence,
-					EntryIndex = e.Index,
-					Tag = e.Tag,
-					Value = e.Value
-				})
-				.ToList();
+			ArgumentNullException.ThrowIfNull(refsByTag);
 
 			character.Skills = scaffold
 				.IdList.Select(s => new CharacterSkill
@@ -227,6 +234,45 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					Sequence = sequence
 				}))
 				.ToList();
+
+			return ExtractAppearance(character, scaffold, refsByTag);
+		}
+
+		// The entry table read back into the APPEARANCE MODEL - the inverse of BuildAppearanceEntries, and the reason
+		// a captured character's looks survive without a stored copy of the table.
+		//
+		//   - morph entries  -> CharacterBody columns (CharacterMorphs.ApplyEntries, pure arithmetic),
+		//   - weighted rows  -> CharacterBodyResources, by looking the wire tag back up as a resource ref,
+		//   - the closer     -> dropped; it is derived from the class (FreshCloser).
+		//
+		// A morph slider is never mistaken for a resource: the two share a tag SPACE (the registry carries entries
+		// literally named "arm"/"chest"/"bosom" at ids 256..258, which are also the type-1 slider tags), so the
+		// discriminator is CharacterMorphs.IsMorphTag - the whole (type, id) pair - and it is checked FIRST.
+		private static (int Morphs, int Resources) ExtractAppearance(Character character, PlayerSpawnScaffold scaffold, IReadOnlyDictionary<ushort, string> refsByTag)
+		{
+			character.Body ??= new CharacterBody
+			{
+				CharacterId = character.Id
+			};
+
+			var morphs = CharacterMorphs.ApplyEntries(character.Body, scaffold.Entries.Select(e => (e.Tag, e.Value)));
+
+			// Everything but the closer, which is the LAST record and carries a count marker, not appearance.
+			character.BodyResources.Clear();
+			foreach (var entry in scaffold.Entries.Take(Math.Max(0, scaffold.Entries.Count - 1)))
+			{
+				if (CharacterMorphs.IsMorphTag(entry.Tag) || !refsByTag.TryGetValue(entry.Tag, out var resourceRef))
+					continue;
+
+				character.BodyResources.Add(new CharacterBodyResource
+				{
+					CharacterId = character.Id,
+					Sequence = character.BodyResources.Count,
+					Ref = resourceRef
+				});
+			}
+
+			return (morphs, character.BodyResources.Count);
 		}
 
 		// The character's specs as the wire wants them: each spec's feats in Sequence order, specs in Index order.
@@ -314,41 +360,20 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return scaffold.Frame.Words[PlayerSpawnPreFrame.VanityShownMaskWordIndex];
 		}
 
-		// Rebuilds ONLY the appearance portion of an EXISTING scaffold (the weighted appearance entries + the editor
-		// morphs + the closer) from the character's current CharacterBody / CharacterBodyResources, leaving skills,
-		// spawn-frame and scaffold-pairs intact. This propagates a later appearance edit (e.g. the Faolan.Web editor,
-		// which rewrites Body/BodyResources) into the spawn the game sends on the next login, WITHOUT resetting the
-		// character's progression the way a full TrySeedFreshRows would. Returns false when there's no scaffold to
-		// refresh (the caller then seeds a fresh one). For an unedited character it reproduces the same entries it was
-		// seeded with, so it is a no-op in effect.
-		public static bool RefreshAppearance(Character character, IReadOnlyList<ScaffoldEntry>? weightedAppearance = null)
+		// Fills the scaffold's per-character parts from the character (generation: model -> wire). Returns false when
+		// the character was never seeded, i.e. has no scaffold rows to describe it with.
+		//
+		// That "never seeded" test is now the SKILL rows. It used to be the entry table, which no longer exists as
+		// state; skills are the honest replacement because TrySeedFreshRows writes them and nothing else does, and
+		// every captured character extracts a full id list. The APPEARANCE deliberately does not gate anything - a
+		// character with no editor choices legitimately wears the default face.
+		//
+		// `registry` is the MorphTarget catalog by ref name; it resolves the character's editor choices into the
+		// weighted entries. Refs that do not resolve fall back to the proven Dikketest set - the default face rather
+		// than none - which is what the create flow reports on (CreateFlowService.ReportUnresolvableAppearance).
+		public static bool TryApplyFrom(Character character, PlayerSpawnScaffold scaffold, IReadOnlyDictionary<string, MorphTarget>? registry)
 		{
-			if (character?.Attributes is not { Count: > 0 })
-				return false;
-
-			var entries = new List<ScaffoldEntry>(weightedAppearance ?? FreshWeightedAttributes);
-			entries.AddRange(CharacterMorphs.BuildEntries(character.Body, (uint)entries.Count + 1));
-			var closer = FreshCloser(character.Class);
-			entries.Add(new ScaffoldEntry((uint)entries.Count + 1, closer.Tag, closer.Value));
-
-			character.Attributes = entries
-				.Select((e, sequence) => new CharacterAttribute
-				{
-					CharacterId = character.Id,
-					Sequence = sequence,
-					EntryIndex = e.Index,
-					Tag = e.Tag,
-					Value = e.Value
-				})
-				.ToList();
-			return true;
-		}
-
-		// Fills the scaffold's per-character parts from the rows (generation: rows -> wire). Returns false when
-		// the character has no scaffold rows yet (caller falls back to the captured-spawn splice path).
-		public static bool TryApplyFrom(Character character, PlayerSpawnScaffold scaffold)
-		{
-			if (character?.Attributes == null || character.Attributes.Count == 0)
+			if (character?.Skills is not { Count: > 0 })
 				return false;
 
 			// The frame + EntryTableX are CONSTRUCTED, not stored: FreshPreFrame(class, vanityMask, feats) is the
@@ -361,7 +386,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			scaffold.BuffRecords.Clear();
 
 			scaffold.Entries.Clear();
-			scaffold.Entries.AddRange(character.Attributes.OrderBy(a => a.Sequence).Select(a => new ScaffoldEntry(a.EntryIndex, a.Tag, a.Value)));
+			scaffold.Entries.AddRange(BuildAppearanceEntries(character, BuildWeightedEntries(character.BodyResources, registry)));
 
 			scaffold.IdList.Clear();
 			if (character.Skills != null)

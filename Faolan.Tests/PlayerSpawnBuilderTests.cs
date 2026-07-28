@@ -30,7 +30,7 @@ namespace Faolan.Tests
 				scaffold.Character, new Character
 				{
 					Id = 1
-				}));
+				}, MorphRegistry.ByName));
 			Assert.Contains("no spawn-scaffold rows", ex.Message);
 		}
 
@@ -44,17 +44,22 @@ namespace Faolan.Tests
 			var position = scaffold.Position;
 			var rotation = scaffold.Rotation;
 
-			// The scaffold rows (entry table / id list) on a Character. Strie is an Assassin; the pre-IIR frame is now
-			// reconstructed from that class (not stored), so the from-scratch body equals the template's CONSTRUCTED
-			// form - same transform/rows/IIR, canonical FreshPreFrame(Assassin), EntryTableX 0xB7, no buff records.
+			// The scaffold rows (id list / feats) plus the APPEARANCE MODEL (Body morphs + BodyResources refs) on a
+			// Character. Strie is an Assassin; the pre-IIR frame is now reconstructed from that class (not stored), so
+			// the from-scratch body equals the template's CONSTRUCTED form - same transform/rows/IIR, canonical
+			// FreshPreFrame(Assassin), EntryTableX 0xB7, no buff records.
+			//
+			// The entry table is not carried across as rows any more: extraction turns Strie's six weighted entries
+			// into resource refs through the catalog, and generation resolves those refs back to the same six tags. So
+			// this now proves the DERIVATION is lossless, not merely that a row copy round-trips.
 			var scaffoldCharacter = new Character
 			{
 				Id = scaffold.Handle,
 				Class = ConanClass.Assassin
 			};
-			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold);
+			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold, MorphRegistry.RefsByTag);
 
-			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, position, rotation, scaffold.Character, scaffoldCharacter);
+			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, position, rotation, scaffold.Character, scaffoldCharacter, MorphRegistry.ByName);
 
 			Assert.NotNull(built);
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var expected, out _));
@@ -92,9 +97,9 @@ namespace Faolan.Tests
 			{
 				Id = 0x0A1B2C3D
 			};
-			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold);
+			PlayerSpawnScaffoldRows.ExtractTo(scaffoldCharacter, scaffold, MorphRegistry.RefsByTag);
 
-			var body = PlayerSpawnBuilder.BuildFromScratch(0x0A1B2C3D, scaffold.Playfield, new Vector3(1, 2, 3), Quaternion.Identity, message, scaffoldCharacter);
+			var body = PlayerSpawnBuilder.BuildFromScratch(0x0A1B2C3D, scaffold.Playfield, new Vector3(1, 2, 3), Quaternion.Identity, message, scaffoldCharacter, MorphRegistry.ByName);
 
 			Assert.NotNull(body);
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out var err), err);

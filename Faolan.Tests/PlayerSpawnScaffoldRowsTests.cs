@@ -5,14 +5,20 @@ using System.Runtime.CompilerServices;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
 {
-	// Locks the scaffold <-> DB-rows mapping: extracting a captured spawn into CharacterAttribute / CharacterSkill /
-	// CharacterScaffoldPair rows and regenerating from those rows reproduces the row-carried content byte-for-byte.
-	// The pre-IIR frame + EntryTableX are NOT stored - they're reconstructed from Character.Class (FreshPreFrame) - so
-	// a capture round-trips to its CONSTRUCTED form: the buff records + transient frame islands drop out.
+	// Locks the scaffold <-> character mapping: extracting a captured spawn into the character's rows - CharacterSkill
+	// / CharacterScaffoldPair / CharacterFeat, plus the APPEARANCE MODEL (CharacterBody sliders + CharacterBodyResource
+	// refs) - and regenerating from those reproduces the captured content byte-for-byte. The pre-IIR frame +
+	// EntryTableX are NOT stored - they're reconstructed from Character.Class (FreshPreFrame) - so a capture
+	// round-trips to its CONSTRUCTED form: the buff records + transient frame islands drop out.
+	//
+	// The entry table is not stored either (#483). It is DERIVED from the appearance model on every send, so these
+	// round-trips now gate the derivation: a captured tag has to survive being turned into a resource ref and resolved
+	// back. Two of the five captures cannot make it all the way - see EditedAppearance_RoundTripsExceptItsRetailSlots.
 	public class PlayerSpawnScaffoldRowsTests
 	{
 		// Buff records are session state, not character data: rows from a buffed capture regenerate the same
@@ -21,20 +27,51 @@ namespace Faolan.Tests
 		public void BuffedSpawn_RoundTripsToItsUnbuffedConstructedForm()
 		{
 			// Hoxxling is a Herald of Xotli; his buffed capture regenerates WITHOUT the buff records (transient) and
-			// with the frame reconstructed from his class - i.e. its constructed form.
+			// with the frame reconstructed from his class - i.e. its constructed form. He is also the widest appearance
+			// case in the corpus: 6 weighted refs + 27 morph sliders, all of which have to survive the derivation.
 			var body = Golden("SpawnHoxxlingBuffed");
 			Assert.Equal(Convert.ToHexString(ConstructedForm(body, ConanClass.HeraldOfXotli)), Convert.ToHexString(RoundTripThroughRows(body, ConanClass.HeraldOfXotli)));
 		}
 
-		// The row-carried content (entry table / feat id-list / pair lists) + IIR still regenerate byte-exact; only the
-		// pre-IIR frame is now the constructed canonical form (FreshPreFrame(class)). Dikketest's captured frame already
+		// The character-carried content (appearance / feat id-list / pair lists) + IIR still regenerate byte-exact; only
+		// the pre-IIR frame is the constructed canonical form (FreshPreFrame(class)). Dikketest's captured frame already
 		// equals FreshPreFrame(Barbarian), so his case is still byte-identical to the raw capture.
-		[Theory, InlineData("SpawnDikketestLogin", ConanClass.Barbarian), InlineData("SpawnNecroKingsCastle", ConanClass.Necromancer), InlineData("SpawnDemoRandomActions", ConanClass.Demonologist)]
+		[Theory, InlineData("SpawnDikketestLogin", ConanClass.Barbarian), InlineData("SpawnStrieTemplate", ConanClass.Assassin)]
 		public void ExtractThenApply_RegeneratesTheConstructedForm(string name, ConanClass @class)
 		{
 			var body = Golden(name);
 
 			Assert.Equal(Convert.ToHexString(ConstructedForm(body, @class)), Convert.ToHexString(RoundTripThroughRows(body, @class)));
+		}
+
+		// The two captures that DON'T come back byte-identical, and exactly how far they get.
+		//
+		// Retail's entry-table index is a per-character SLOT id that survives appearance edits, not a position: the
+		// Necro capture runs 2..15 (slot 1 vacated) and the Demo one runs 4..13 then 24,23 - a hair and a beard
+		// re-chosen later, allocated fresh slots and appended AFTER the morphs. Nothing in the character's data
+		// derives those numbers, and nothing should: every character we create spawns with 1..n and renders.
+		//
+		// So the claim these two can support is the strong half of it - every captured (tag, value) survives the trip
+		// through CharacterBody + CharacterBodyResources bit-exact, and everything outside the entry table is
+		// byte-identical - with the slot numbering explicitly asserted to be the ONLY thing lost.
+		[Theory, InlineData("SpawnNecroKingsCastle", ConanClass.Necromancer), InlineData("SpawnDemoRandomActions", ConanClass.Demonologist)]
+		public void EditedAppearance_RoundTripsExceptItsRetailSlots(string name, ConanClass @class)
+		{
+			var body = Golden(name);
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(ConstructedForm(body, @class), out var captured, out _));
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(RoundTripThroughRows(body, @class), out var rebuilt, out _));
+
+			// Every entry's payload survives - same records, same float bits, closer included.
+			Assert.Equal(captured.Entries.OrderBy(e => e.Tag).Select(e => (e.Tag, e.Value)), rebuilt.Entries.OrderBy(e => e.Tag).Select(e => (e.Tag, e.Value)));
+
+			// ...and the slot numbering is what does not, which is the whole of the divergence.
+			Assert.NotEqual(captured.Entries.Select(e => e.Index), rebuilt.Entries.Select(e => e.Index));
+			Assert.Equal(Enumerable.Range(1, rebuilt.Entries.Count).Select(i => (uint)i), rebuilt.Entries.Select(e => e.Index));
+
+			// Everything else in the record is byte-identical: swap the entry tables and the bytes match exactly.
+			captured.Entries.Clear();
+			captured.Entries.AddRange(rebuilt.Entries);
+			Assert.Equal(Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(captured)), Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(rebuilt)));
 		}
 
 		// The unlocked FEAT list (spawn pre-IIR) extracts to CharacterFeat rows in wire/train order - a DIFFERENT
@@ -55,7 +92,7 @@ namespace Faolan.Tests
 				Id = 0x0200000A,
 				Class = ConanClass.Necromancer
 			};
-			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
+			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold, MorphRegistry.RefsByTag);
 
 			Assert.Equal(expected, character.Feats.OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArray());
 			Assert.Empty(character.Feats.Select(f => f.FeatId).Intersect(character.Skills.Select(s => s.SkillId))); // feats != skills
@@ -86,9 +123,8 @@ namespace Faolan.Tests
 				Id = 0x02000009,
 				Class = ConanClass.Assassin
 			};
-			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 
-			var closer = character.Attributes.OrderBy(a => a.Sequence).Last();
+			var closer = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, null).Last();
 			Assert.Equal(0x3F10, closer.Tag); // 14 feats -> (14+2)*0x3F1
 			Assert.Equal(300u, closer.Value);
 		}
@@ -108,7 +144,7 @@ namespace Faolan.Tests
 			};
 			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 
-			var closer = character.Attributes.OrderBy(a => a.Sequence).Last();
+			var closer = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, null).Last();
 			var expectedTag = (ushort)((character.Skills.Count + 2) * 0x3F1);
 			Assert.Equal(expectedTag, closer.Tag);
 		}
@@ -162,10 +198,11 @@ namespace Faolan.Tests
 			Assert.Equal((uint)@class * 100, feats.First());
 		}
 
-		// The fresh-character defaults are Dikketest's extracted scaffold, with the morph entries now GENERATED
-		// from the character's editor sliders: seeding a character that carries Dikketest's CharacterBody (the
-		// raw editor stream from his create capture, zigzag-decoded by CharacterMorphs.TryApply) and generating
-		// over his transform/CharacterIIR must reproduce his captured spawn byte-for-byte.
+		// The fresh-character defaults are Dikketest's extracted scaffold, with the morph entries GENERATED from the
+		// character's editor sliders: a character that carries Dikketest's CharacterBody (the raw editor stream from
+		// his create capture, zigzag-decoded by CharacterMorphs.TryApply) and NO resource refs - so the weighted half
+		// falls back to the proven defaults - must reproduce his captured spawn byte-for-byte. This is the
+		// brand-new-character path, the one every created character takes.
 		[Fact]
 		public void FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture()
 		{
@@ -187,7 +224,7 @@ namespace Faolan.Tests
 
 			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 			Assert.False(PlayerSpawnScaffoldRows.TrySeedFreshRows(character)); // idempotent
-			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, scaffold));
+			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, scaffold, MorphRegistry.ByName));
 
 			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(scaffold)));
 		}
@@ -195,7 +232,7 @@ namespace Faolan.Tests
 		// A character that never touched a slider (no CharacterBody) gets no morph entries at all: 6 weighted
 		// attributes + the closer at idx 7 - the exact entry-table shape of strickenbla's captured spawn.
 		[Fact]
-		public void FreshRows_WithoutBody_HaveNoMorphEntries()
+		public void FreshAppearance_WithoutBody_HasNoMorphEntries()
 		{
 			// The closer (#250/#269) is derived: value = archetype*100, tag = (feat count + 2)*0x3F1. A Barbarian has
 			// 20 fresh feats -> tag (20+2)*0x3F1 = 0x56B6, value 300 (rogue = archetype 3).
@@ -204,23 +241,19 @@ namespace Faolan.Tests
 				Id = 0x02000006,
 				Class = ConanClass.Barbarian
 			};
-			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 
-			Assert.Equal(7, character.Attributes.Count);
-			var closer = character.Attributes.Single(a => a.Sequence == 6);
-			Assert.Equal(7u, closer.EntryIndex);
+			var entries = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, null);
+			Assert.Equal(7, entries.Count);
+
+			var closer = entries[^1];
+			Assert.Equal(7u, closer.Index);
 			Assert.Equal(0x56B6, closer.Tag);
 			Assert.Equal(300u, closer.Value);
 		}
 
-		[Fact]
-		public void Template_ExtractThenApply_RegeneratesTheConstructedForm()
-		{
-			var body = Support.Golden.Bytes("SpawnStrieTemplate"); // Strie is an Assassin
-
-			Assert.Equal(Convert.ToHexString(ConstructedForm(body, ConanClass.Assassin)), Convert.ToHexString(RoundTripThroughRows(body, ConanClass.Assassin)));
-		}
-
+		// A never-seeded character has nothing to describe a spawn with, and the marker for that is its SKILL rows -
+		// the entry table used to be that marker, and cannot be any more now that it is derived (an appearance-less
+		// character legitimately generates the default one).
 		[Fact]
 		public void TryApplyFrom_WithoutRows_ReturnsFalse()
 		{
@@ -229,13 +262,13 @@ namespace Faolan.Tests
 			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(new Character
 			{
 				Id = 1
-			}, scaffold));
-			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(null!, scaffold));
+			}, scaffold, MorphRegistry.ByName));
+			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(null!, scaffold, MorphRegistry.ByName));
 		}
 
 		// The frame + EntryTableX are no longer stored - TryApplyFrom reconstructs them from the character's class. So
-		// a captured spawn round-trips to its CONSTRUCTED form: identical rows (entry table / feats / pairs) + IIR, with
-		// the frame regenerated as FreshPreFrame(class), EntryTableX 0xB7, and transient buff/session records dropped.
+		// a captured spawn round-trips to its CONSTRUCTED form: identical appearance/feats/pairs + IIR, with the frame
+		// regenerated as FreshPreFrame(class), EntryTableX 0xB7, and transient buff/session records dropped.
 		private static byte[] ConstructedForm(byte[] body, ConanClass @class)
 		{
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var s, out _));
@@ -258,6 +291,9 @@ namespace Faolan.Tests
 			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
 		}
 
+		// Capture -> character -> capture, through the SHIPPED MorphTarget catalog in both directions: extraction turns
+		// the entry table's weighted rows into resource refs and its morph rows into CharacterBody sliders, generation
+		// resolves them back. Nothing about the entry table is carried across as data.
 		private static byte[] RoundTripThroughRows(byte[] body, ConanClass @class)
 		{
 			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
@@ -267,10 +303,10 @@ namespace Faolan.Tests
 				Id = 0x02000005,
 				Class = @class
 			};
-			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold);
+			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold, MorphRegistry.RefsByTag);
 
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out _)); // fresh instance, then rows overwrite
-			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, rebuilt));
+			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out _)); // fresh instance, then the character overwrites
+			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, rebuilt, MorphRegistry.ByName));
 			return PlayerSpawnScaffoldCodec.Generate(rebuilt);
 		}
 	}

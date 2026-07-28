@@ -36,7 +36,7 @@
 > **2026-06-10: the PLAYER-SPAWN half of this plan is COMPLETE and documented in
 > `docs/re/player-spawn-generation.md`** — the player's FA015807 is fully generated from DB rows
 > (identity/stats/equipment via `ProtoCoreCharacterIIR`, the scaffold frame via `PlayerSpawnScaffoldCodec` +
-> the CharacterAttribute/CharacterSkill/CharacterScaffoldPair/CharacterSpawnFrame rows);
+> the appearance model + CharacterSkill/CharacterScaffoldPair rows);
 > `spawn-player-template.bin` and the `PlayerSpawnTemplate` constant are both gone. The morph-encoding
 > blocker recorded below is SUPERSEDED: the editor sliders are the float-valued scaffold entries. The
 > sections below cover the NPC-spawn, static-world and conversation families and dissection history.
@@ -165,7 +165,7 @@ slider→float mapping is the last open piece before appearance renders from `Ch
 
 SPAWN MORPH ENCODING — ~~BLOCKED~~ **SOLVED for the location (2026-06-10): the morphs are NOT in `field4`.**
 The earlier search failed because it looked in the wrong place: the editor sliders are the **float-valued
-entries of the post-CharacterIIR scaffold entry table** (now `CharacterAttribute` rows, payload
+entries of the post-CharacterIIR scaffold entry table** (generated from `CharacterBody`, payload
 `[u8 type][u8 sliderId][f32 bits]`). Dikketest's 7 type-0x01 entries (slider ids 0x00-0x06) match his editor
 slider multiset {59×4, 14×2, 30×1} exactly; Hoxxling, who modified ALL sliders, has ~26 type-0x00 entries
 (face slider ids 0x02-0x24). Only the exact slider→float mapping remains (59 → −0.03, 14 → +0.007,

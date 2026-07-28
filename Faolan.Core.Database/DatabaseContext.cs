@@ -26,7 +26,6 @@ namespace Faolan.Core.Database
 		DbSet<AppearanceSexOption> AppearanceSexOptions { get; }
 		DbSet<Character> Characters { get; }
 		DbSet<CharacterAbility> CharacterAbilities { get; }
-		DbSet<CharacterAttribute> CharacterAttributes { get; }
 		DbSet<CharacterBody> CharacterBodies { get; }
 		DbSet<CharacterBodyResource> CharacterBodyResources { get; }
 		DbSet<CharacterBuff> CharacterBuffs { get; }
@@ -115,7 +114,6 @@ namespace Faolan.Core.Database
 		public DbSet<AppearanceSexOption> AppearanceSexOptions { get; set; }
 		public DbSet<Character> Characters { get; set; }
 		public DbSet<CharacterAbility> CharacterAbilities { get; set; }
-		public DbSet<CharacterAttribute> CharacterAttributes { get; set; }
 		public DbSet<CharacterBody> CharacterBodies { get; set; }
 		public DbSet<CharacterBodyResource> CharacterBodyResources { get; set; }
 		public DbSet<CharacterBuff> CharacterBuffs { get; set; }
@@ -339,7 +337,6 @@ namespace Faolan.Core.Database
 			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
 			modelBuilder.Entity<Character>().HasOne(c => c.MaxStats).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.Inventory).WithOne(i => i.Character).OnDelete(DeleteBehavior.Cascade);
-			modelBuilder.Entity<Character>().HasMany(c => c.Attributes).WithOne(a => a.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.Skills).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.ScaffoldPairs).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.BodyResources).WithOne(r => r.Character).OnDelete(DeleteBehavior.Cascade);

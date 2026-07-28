@@ -2092,12 +2092,13 @@ namespace Faolan.GameServer.World
 				? character.Rotation
 				: Quaternion.Identity;
 
-			// The scaffold half of the record is built from the character's own rows (attributes, feats, appearance),
+			// The scaffold half of the record is built from the character's own rows (skills, feats, appearance model),
 			// which the session character carries because every loader that produces one applies the same include set
 			// (WithSessionNavigations). It did not, once: the session copy came back with Body + MaxStats only, so the
 			// build failed - and that failure landed on the ENTERING player, hanging them on the loading screen over a
 			// row missing from somebody ELSE's session object.
-			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIir.Build(character, equipment), character);
+			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIir.Build(character, equipment), character,
+				await _database.GetMorphTargetRegistry());
 		}
 
 		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)
