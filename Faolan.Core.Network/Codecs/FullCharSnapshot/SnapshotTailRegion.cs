@@ -47,8 +47,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// The character's STAT TABLE, and the reason #393's "label the slots" question dissolves: the table is
 		// SELF-LABELLING. Every element is [u32 statId][u32 value] and every one of the 22,348 ids across the corpus
 		// is a defined CharacterStatId - HealthCurrent, HealthMax, Intelligence, StaminaMax, PvpMaxExp - so a value
-		// is found BY ID rather than by counting slots. (SubClassPostAccessBlock still indexes this table
-		// POSITIONALLY through CharacterValueIndex, whose names are early-dev guesses; the ids are on the wire.)
+		// is found BY ID rather than by counting slots. `SubClassPostAccessBlock` reads it that way now; it used to
+		// carry a 150-member enum of `UnknownNN` slot names, three of which named the wrong stat.
 		//
 		// It is identified by CONTENT, not by position: it is the stride-8 list that is TWO IDENTICAL COPIES of the
 		// same run - same ids AND same values in both halves, on all 151 captures. That doubling is what
@@ -131,7 +131,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 				var list = new SnapshotTailList
 				{
-					Stride = stride
+					Stride = stride,
+					Offset = i + 4
 				};
 				for (var w = 0; w < count * stride / 4; w++)
 					list.Words.Add(region.ReadU32Be(i + 4 + 4 * w));
@@ -185,6 +186,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	public sealed class SnapshotTailList
 	{
 		public int Stride { get; init; } = 8;
+
+		// Byte offset of this list's FIRST RECORD within the region (i.e. just past its own framing word). Lets a
+		// caller line the list up with a flat view of the same bytes - which is what SubClassPostAccessBlock needs
+		// to address stats by id without re-deriving where the tables are.
+		public int Offset { get; init; }
 		public List<uint> Words { get; } = [];
 
 		// The stride-8 shape read as what it is: [u32 id][u32 value].

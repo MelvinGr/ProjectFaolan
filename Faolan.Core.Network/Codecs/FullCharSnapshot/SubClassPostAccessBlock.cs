@@ -5,302 +5,136 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
+	// The snapshot's post-access-window block: a flat u32 view over the tail region, skipping its first three
+	// framing words. `Values` therefore spans List F, the doubled StatList_t and everything after it - see
+	// SnapshotTailRegion for the region's actual grammar.
+	//
+	// ⚠️ ADDRESSED BY STAT ID, not by slot (#393). Every stat in this block is a [u32 statId][u32 value] pair and
+	// all 22,348 ids across the corpus are defined CharacterStatId values, so a value is FOUND rather than counted
+	// to. This class used to carry a 150-member `CharacterValueIndex` enum of `UnknownNN` slots plus hardcoded
+	// indexes (21, 56, 60, 62, 66, ...) and a `+148` copy rule; the enum's names were early-dev guesses and three
+	// of them were wrong in a way that only the ids could show:
+	//
+	//   slot [21]/[56] "HP base"          is HealthMax    (id 1)
+	//   slot [23]/[54] "HP displayed"     is HealthCurrent(id 27)
+	//   slot [60]/[64] "displayed MAX mana" is ManaCurrent (id 506)   <- named the exact opposite
+	//   slot [62]      "~6-lower secondary" is ManaMax     (id 507)   <- likewise
+	//   slot [66]      "stamina secondary" is StaminaMax   (id 505)
+	//   slot [68]      "stamina displayed" is StaminaCurrent (id 504)
+	//   slot [178]     "PvpDeathsOverall" is Deaths        (id 658)
+	//
+	// The `+148` rule was the doubled stat table (SnapshotTailRegion: two identical copies of the same 74-pair run),
+	// and writing by id covers it without knowing that - SetStat writes EVERY occurrence, which is 2-4 slots
+	// depending on the stat, and is what keeps the sheet internally consistent (#4's suspected cause was a setter
+	// that touched one slot and left its siblings on the captured template's values).
 	public sealed class SubClassPostAccessBlock
 	{
-		private const int RepeatedBlockEndIndex = 182;
-		private const int RepeatedBlockOffset = 148;
-		private const int RepeatedBlockStartIndex = 35;
-
 		public List<uint> Values { get; init; } = [];
 
-		// Whether the post-access stat table carries its ADJACENT REPEATED RUN - the region whose second copy sits
-		// +148 words after the first, so a vitals patch has to write both (SubClassPostAccessBlock.SetValue). Only the
-		// yes/no was ever consumed: this used to be a SubClassRepeatedUInt32Run object carrying StartIndex/Length/
-		// RepeatCount, whose only reader was a layout-analysis class that nothing read in turn.
+		// Where the [statId][value] tables sit inside `Values`, as (start, wordCount) pairs - the stride-8 lists of
+		// the region walk (SnapshotTailRegion). A stat is looked up PAIR-ALIGNED inside these and nowhere else.
+		//
+		// ⚠️ Scanning the flat array instead is not a smaller version of this, it is wrong: HealthMax's id is 1, and
+		// the word 1 appears all over the array as ordinary data, so "the slot after any word equal to the id" wrote
+		// 9000 into five unrelated places on the beach template. The tables are where ids are ids.
+		public List<(int Start, int Words)> StatTables { get; init; } = [];
+
+		// Whether the block carries the doubled stat table. Kept because callers assert on it; the doubling itself
+		// no longer needs to be KNOWN to write a stat - the two copies are both inside the same table and both
+		// pair-aligned, so a pair-aligned scan writes them without a +148 rule.
 		public bool HasRepeatedStatTable { get; init; }
 
 		public byte[] Trailer { get; init; } = [];
 
 		public uint BlockType { get; init; }
 
+		// The vitals, x100 on the wire.
 		public uint CurrentHp
 		{
-			get => GetValue(CharacterValueIndex.CurrentHp) / 100;
-			set
-			{
-				var scaledValue = value * 100;
-
-				Values[(int)CharacterValueIndex.CurrentHpExtra] = scaledValue;
-				SetValue(CharacterValueIndex.CurrentHp, scaledValue);
-			}
+			get => GetStat(CharacterStatId.HealthCurrent) / 100;
+			set => SetStat(CharacterStatId.HealthCurrent, value * 100);
 		}
 
 		public uint CurrentMana
 		{
-			get => GetValue(CharacterValueIndex.CurrentMana) / 100;
-			set => SetValue(CharacterValueIndex.CurrentMana, value * 100);
+			get => GetStat(CharacterStatId.ManaCurrent) / 100;
+			set => SetStat(CharacterStatId.ManaCurrent, value * 100);
 		}
 
 		public uint CurrentStamina
 		{
-			get => GetValue(CharacterValueIndex.CurrentStamina) / 100;
-			set => SetValue(CharacterValueIndex.CurrentStamina, value * 100);
+			get => GetStat(CharacterStatId.StaminaCurrent) / 100;
+			set => SetStat(CharacterStatId.StaminaCurrent, value * 100);
 		}
 
 		/// <summary>
-		///     Word 80 - which is <b>MaxExp</b>'s value slot, not experience (#447). The pair at that position is
-		///     StatList#2's <c>(0x15E MaxExp, value)</c>, and the value is the raw to-next-level cost, unscaled.
+		///     The raw to-next-level cost, unscaled (#447). It used to be a <c>CurrentXp</c> accessor with a "factor
+		///     10", which produced the right bytes for exactly one case by coincidence: the beach template is a level-1
+		///     character whose MaxExp is 100 and the golden carried <c>Experience = 10</c>. Experience itself is
+		///     <see cref="CharacterStatId.Exp" />, authored by id in <see cref="SnapshotStatSheet" />.
 		/// </summary>
-		/// <remarks>
-		///     It used to be a <c>CurrentXp</c> accessor with a "factor 10", written from the character's experience.
-		///     That produced the right bytes for exactly one case and by coincidence: the beach template is a level-1
-		///     character whose MaxExp is 100, and the golden test carried <c>Experience = 10</c> so <c>10 * 10</c> hit it.
-		///     Experience itself is stat 0x34, in both lists, and is authored by id in <see cref="SnapshotStatSheet" />
-		///     along with MaxExp and the level base - so nothing writes this positionally any more. Kept as a READER
-		///     because the round-trip tests assert on it.
-		/// </remarks>
-		public uint MaxExp => GetValue(CharacterValueIndex.MaxExp);
+		public uint MaxExp => GetStat(CharacterStatId.MaxExp);
+
+		public uint Deaths
+		{
+			get => GetStat(CharacterStatId.Deaths);
+			set => SetStat(CharacterStatId.Deaths, value);
+		}
 
 		public uint Marker0 { get; init; }
 
 		public uint Marker1 { get; init; }
 
-		// PvpXpTillNextLevel and PvpKillsOverall had accessors here, commented out. Nothing needs them: the block is
-		// addressed positionally through GetValue/SetValue, so a named accessor is a convenience for a value some
-		// caller actually reads, and no caller ever read those two. Their CharacterValueIndex slots are still in the
-		// enum below, which is where the positional knowledge belongs - add the accessor back when something reads it.
-		public uint PvpDeathsOverall
+		// Authors the whole per-class vitals block (#4/#186): current AND max for each vital, x100. The parameters
+		// used to be named hp/hpBase..., which read as "displayed and its base"; the ids say they are current and
+		// MAX. Pass CharacterMaxStats.SnapshotVitals().
+		public void ApplyClassVitals(uint hp, uint hpMax, uint mana, uint manaMax, uint stamina, uint staminaMax)
 		{
-			get => GetValue(CharacterValueIndex.PvpDeathsOverall);
-			set => SetValue(CharacterValueIndex.PvpDeathsOverall, value);
+			SetStat(CharacterStatId.HealthCurrent, hp * 100);
+			SetStat(CharacterStatId.HealthMax, hpMax * 100);
+			SetStat(CharacterStatId.ManaCurrent, mana * 100);
+			SetStat(CharacterStatId.ManaMax, manaMax * 100);
+			SetStat(CharacterStatId.StaminaCurrent, stamina * 100);
+			SetStat(CharacterStatId.StaminaMax, staminaMax * 100);
 		}
 
-		public enum CharacterValueIndex : uint
+		// A stat's value is the slot immediately after its id. The first occurrence answers; SetStat writes them all.
+		public uint GetStat(CharacterStatId stat)
 		{
-			// HP is special:
-			// - Extra pre-block slot: 23
-			// - Main repeated-block slot: 54
-			// - Copy slot: 202
-			CurrentHpExtra = 23,
-
-			Unknown35 = 35,
-			Unknown36 = 36,
-			Unknown37 = 37,
-			Unknown38 = 38,
-			Unknown39 = 39,
-			Unknown40 = 40,
-			Unknown41 = 41,
-			Unknown42 = 42,
-			Unknown43 = 43,
-			Unknown44 = 44, // PvpXpTillNextLevel?
-			Unknown45 = 45,
-			PvpXp = 46,
-			Unknown47 = 47,
-			Unknown48 = 48,
-			Unknown49 = 49,
-			Unknown50 = 50,
-			Unknown51 = 51,
-			Unknown52 = 52,
-			Unknown53 = 53,
-			CurrentHp = 54,
-			Unknown55 = 55,
-			Unknown56 = 56,
-			Unknown57 = 57,
-			Unknown58 = 58,
-			Unknown59 = 59,
-			Unknown60 = 60,
-			Unknown61 = 61,
-
-			// Index 62 is a SECONDARY mana value (~6 lower than displayed): retail Necro [62]=24000 vs displayed
-			// 24600, Bear Shaman [62]=16500 vs displayed 17100. NOT the displayed max — see CurrentMana below.
-			ManaSecondary = 62,
-			Unknown63 = 63,
-
-			// The displayed MAX mana (×100). Verified against retail LOGIN snapshots: Necro [64]=24600 (=246 mana,
-			// matches the client sheet), Bear Shaman [64]=17100 (=171). Index 60 carries the same value; [62] is a
-			// ~6-lower secondary. (The earlier "[64]=2276 / use 62" note came from an UNSETTLED create snapshot.)
-			CurrentMana = 64,
-			Unknown65 = 65,
-			Unknown66 = 66,
-			Unknown67 = 67,
-			CurrentStamina = 68,
-			Unknown69 = 69,
-			Unknown70 = 70,
-			Unknown71 = 71,
-			Unknown72 = 72,
-			Unknown73 = 73,
-			Unknown74 = 74,
-			Unknown75 = 75,
-			Unknown76 = 76,
-			Unknown77 = 77,
-			Unknown78 = 78,
-			Unknown79 = 79,
-			MaxExp = 80, // StatList#2 pair 22: (0x15E MaxExp, value) - the value slot, unscaled
-			Unknown81 = 81,
-			Unknown82 = 82,
-			Unknown83 = 83,
-			Unknown84 = 84,
-			Unknown85 = 85,
-			PvpLevel = 86,
-			Unknown87 = 87,
-			Unknown88 = 88,
-			Unknown89 = 89,
-			Unknown90 = 90,
-			Unknown91 = 91,
-			Unknown92 = 92,
-			Unknown93 = 93,
-			Unknown94 = 94,
-			Unknown95 = 95,
-			Unknown96 = 96,
-			Unknown97 = 97,
-			Unknown98 = 98,
-			Unknown99 = 99,
-			Unknown100 = 100,
-			Unknown101 = 101,
-			Unknown102 = 102,
-			Unknown103 = 103,
-			Unknown104 = 104,
-			Unknown105 = 105,
-			Unknown106 = 106,
-			Unknown107 = 107,
-			Unknown108 = 108,
-			Unknown109 = 109,
-			Unknown110 = 110,
-			Unknown111 = 111,
-			Unknown112 = 112,
-			Unknown113 = 113,
-			Unknown114 = 114,
-			Unknown115 = 115,
-			Unknown116 = 116,
-			Unknown117 = 117,
-			Unknown118 = 118,
-			Unknown119 = 119,
-			Unknown120 = 120,
-			Unknown121 = 121,
-			Unknown122 = 122,
-			Unknown123 = 123,
-			Unknown124 = 124,
-			Unknown125 = 125,
-			Unknown126 = 126,
-			Unknown127 = 127,
-			Unknown128 = 128,
-			Unknown129 = 129,
-			Unknown130 = 130,
-			Unknown131 = 131,
-			Unknown132 = 132,
-			Unknown133 = 133,
-			Unknown134 = 134,
-			Unknown135 = 135,
-			Unknown136 = 136,
-			Unknown137 = 137,
-			Unknown138 = 138,
-			Unknown139 = 139,
-			Unknown140 = 140,
-			Unknown141 = 141,
-			Unknown142 = 142,
-			Unknown143 = 143,
-			PvpMinigamesAbandonedSeason = 144,
-			Unknown145 = 145,
-			PvpMinigamesAbandonedOverall = 146,
-			Unknown147 = 147,
-			PvpSiegeLosesSeason = 148,
-			Unknown149 = 149,
-			PvpSiegeLosesOverall = 150,
-			Unknown151 = 151,
-			PvpSiegeWinsSeason = 152,
-			Unknown153 = 153,
-			PvpSiegeWinsOverall = 154,
-			Unknown155 = 155,
-			PvpCaptureTheSkullLossesSeason = 156,
-			Unknown157 = 157,
-			PvpCaptureTheSkullLossesOverall = 158,
-			Unknown159 = 159,
-			PvpCaptureTheSkullWinsSeason = 160,
-			Unknown161 = 161,
-			PvpCaptureTheSkullWinsOverall = 162,
-			Unknown163 = 163,
-			PvpAnnihilationLossesSeason = 164,
-			Unknown165 = 165,
-			PvpAnnihilationLossesOverall = 166,
-			Unknown167 = 167,
-			PvpAnnihilationWinsSeason = 168,
-			Unknown169 = 169,
-			PvpAnnihilationWinsOverall = 170,
-			Unknown171 = 171,
-			PvpFatalitiesSeason = 172,
-			Unknown173 = 173,
-			PvpFatalitiesOverall = 174,
-			Unknown175 = 175,
-			PvpDeathSeason = 176,
-			Unknown177 = 177,
-			PvpDeathsOverall = 178,
-			Unknown179 = 179,
-			PvpKillsSeason = 180, // factor 10
-			Unknown181 = 181,
-			Unknown182 = 182 // PvpKillsOverall ?
+			return GetStat((uint)stat);
 		}
 
-		// Authors the WHOLE per-class vitals block (#4/#186): for HP/Mana/Stamina it sets the DISPLAYED max AND the
-		// lower base/secondary the client reads into a parallel slot, each ×100, keeping the +148 repeated copies in
-		// sync. The old per-stat setters (CurrentHp/Mana/Stamina) touched only the displayed slot, leaving the base
-		// slots - and the second mana copy [60] - at the captured Strie (Rogue) template's values; that internal
-		// inconsistency is the suspected cause of #4 (a Necromancer showed ~0 mana because [60] stayed 0 while [64]
-		// held 24600) and the in-client "gear vanished" snapshot reject. Verified slot map across four archetypes'
-		// retail LOGIN snapshots (decode_statblock.py): HP displayed [23]/[54], base [21]/[56]; mana displayed
-		// [60]=[64], secondary [62]; stamina displayed [68], secondary [66]. Pass CharacterMaxStats.SnapshotVitals().
-		public void ApplyClassVitals(uint hp, uint hpBase, uint mana, uint manaBase, uint stamina, uint staminaBase)
+		public uint GetStat(uint statId)
 		{
-			// HP: [21]/[23] are pre-repeated-block standalone slots (like CurrentHpExtra, no +148 copy); [54]/[56] live
-			// inside the repeated block, so SetValue also writes their [202]/[204] copies.
-			Values[21] = hpBase * 100;
-			Values[(int)CharacterValueIndex.CurrentHpExtra] = hp * 100; // [23]
-			SetValue(CharacterValueIndex.CurrentHp, hp * 100); // [54] (+[202])
-			SetValue((CharacterValueIndex)56, hpBase * 100); // [56] (+[204])
+			foreach (var (start, words) in StatTables)
+			{
+				for (var i = start; i + 1 < start + words && i + 1 < Values.Count; i += 2)
+					if (Values[i] == statId)
+						return Values[i + 1];
+			}
 
-			// Mana: the displayed max lives in BOTH [60] and [64]; [62] is the ~6-lower secondary.
-			SetValue((CharacterValueIndex)60, mana * 100); // [60] (+[208])
-			SetValue(CharacterValueIndex.ManaSecondary, manaBase * 100); // [62] (+[210])
-			SetValue(CharacterValueIndex.CurrentMana, mana * 100); // [64] (+[212])
-
-			// Stamina: displayed [68], secondary [66].
-			SetValue((CharacterValueIndex)66, staminaBase * 100); // [66] (+[214])
-			SetValue(CharacterValueIndex.CurrentStamina, stamina * 100); // [68] (+[216])
+			return 0;
 		}
 
-		public uint GetValue(CharacterValueIndex index)
+		public void SetStat(CharacterStatId stat, uint value)
 		{
-			return Values[(int)index];
+			SetStat((uint)stat, value);
 		}
 
-		// The block is a [statId, value] stat sheet: a stat's value is the slot immediately after each occurrence of
-		// its id (a stat appears in the leading displayed section, the repeated run, AND the run's +148 copy). Sets the
-		// value at EVERY occurrence so the sheet is internally consistent. Used to DERIVE character stats (Level 0x36,
-		// XP 0x34, MaxXP 0x15E, ...) from the character instead of carrying the skeleton's fixed value - the fix for
-		// hardcoded Level: the 313-value "fixed skeleton" was diffed only across level-1 characters, so the level slot
-		// never varied and was misclassified as fixed (it is really character-derived).
+		// Sets the value at every occurrence of the id ACROSS THE TABLES, which is what keeps the sheet consistent:
+		// a stat appears in the small leading table, in the stat table, and again in that table's identical second
+		// copy. Used to derive character stats (Level 0x36, Exp 0x34, MaxExp 0x15E) from the character rather than
+		// carrying the captured template's values.
 		public void SetStat(uint statId, uint value)
 		{
-			for (var i = 0; i + 1 < Values.Count; i++)
+			foreach (var (start, words) in StatTables)
 			{
-				if (Values[i] == statId)
-					Values[i + 1] = value;
+				for (var i = start; i + 1 < start + words && i + 1 < Values.Count; i += 2)
+				{
+					if (Values[i] == statId)
+						Values[i + 1] = value;
+				}
 			}
-		}
-
-		public void SetValue(CharacterValueIndex index, uint value)
-		{
-			Values[(int)index] = value;
-			Values[GetRepeatedCopyIndex(index)] = value;
-		}
-
-		private static int GetRepeatedCopyIndex(CharacterValueIndex index)
-		{
-			var indexx = (int)index;
-
-			if (indexx is < RepeatedBlockStartIndex or > RepeatedBlockEndIndex)
-				throw new ArgumentOutOfRangeException(nameof(indexx), indexx, $"Index must be inside repeated block {RepeatedBlockStartIndex}..{RepeatedBlockEndIndex}.");
-
-			return indexx + RepeatedBlockOffset;
 		}
 	}
 }

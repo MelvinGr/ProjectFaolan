@@ -808,12 +808,30 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			var trailer = data[offset..];
 
+			// Where the [statId][value] tables sit inside the flat `values` view: the region walk's stride-8 lists,
+			// mapped from their byte offsets (values[0] is the region's byte 12, just past the three framing words).
+			// Without these a lookup by id has to scan the whole array, which is wrong - see SubClassPostAccessBlock.
+			var statTables = new List<(int Start, int Words)>();
+			if (SnapshotTailRegion.TryParse(data, out var region))
+			{
+				foreach (var list in region.Lists)
+				{
+					if (list.Stride != 8 || list.Words.Count == 0)
+						continue;
+
+					var start = (list.Offset - 12) / 4;
+					if (start >= 0 && start + list.Words.Count <= values.Count)
+						statTables.Add((start, list.Words.Count));
+				}
+			}
+
 			return new SubClassPostAccessBlock
 			{
 				Marker0 = marker0,
 				Marker1 = marker1,
 				BlockType = blockType,
 				Values = values,
+				StatTables = statTables,
 				HasRepeatedStatTable = HasAdjacentRepeatedRun(values),
 				Trailer = trailer
 			};

@@ -12,12 +12,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// HP/Mana/Stamina + hash, XP, the playfield token + position, one session slot) - the other 313 are this
 	// FIXED baseline, identical for every fresh character. CreateFreshBlock() returns a PostAccessBlock seeded with
 	// the skeleton; SnapshotStatSheet authors the character-derived slots by stat id before the block is built, and
-	// the per-class vitals ride the positional setters after it - so generating == relocating
+	// the per-class vitals ride the id-addressed setters after it - so generating == relocating
 	// this baseline (the genuinely-fixed fresh-char stats) + the already-computed patches.
 	public static class SubClassStatBlock
 	{
-		public const int RepeatedRunLength = 148;
-		public const int RepeatedRunStart = 35; // the 35..182 sub-block is copied to 183..330 (Length 148)
 		public const uint Marker = ListFrame.Unit; // an EMPTY count-framed list, twice
 
 		// StatList#1's count word - and the field the parser scans for. It is NOT a type tag: it is
@@ -122,6 +120,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				Marker1 = Marker,
 				BlockType = ListFrame.ForCount(displayedCount), // StatList#1 count word = 0x46F2 for its 17 pairs
 				Values = values,
+				// Where the [statId][value] tables sit, stated by the code that just laid them out: the displayed
+				// list at the front, then StatList#2's doubled run behind its count word. A lookup by id scans these
+				// PAIR-ALIGNED and nothing else - scanning the flat array matches ordinary data (HealthMax's id is 1).
+				StatTables =
+				[
+					(0, displayedCount * 2),
+					(displayedCount * 2 + 1, sheetCount * 4)
+				],
 				Trailer = [0x00],
 				// True so HasKnownRepeatedStatTable is, and the caller's vitals patches (which write the +148 copy too)
 				// fire. A FRESH sheet is built with the doubled region by construction, so this is a statement of fact
