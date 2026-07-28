@@ -47,7 +47,7 @@ namespace Faolan.Web.Services
 		private const uint FemaleHead = 4502887;
 		private const uint MaleHead = 4821637;
 
-		private static readonly AppearanceOptions EmptyOptions = new([], [], [], [], [], [], [], 0, 0, new Dictionary<string, int[]>());
+		private static readonly AppearanceOptions EmptyOptions = new([], [], [], [], [], [], [], [], [], [], 0, 0, new Dictionary<string, int[]>(), new Dictionary<string, int[]>());
 
 		// (race, sex) -> the body's CHARACTERCREATOR monsterdata id (RDB type 1010700 <body monsterdataid>, the
 		// authoritative per-race/sex body). The MonsterData in turn names the body's skinned RenderMesh, resolved via
@@ -426,11 +426,13 @@ namespace Faolan.Web.Services
 			if (rows.Count == 0)
 				return EmptyOptions;
 
-			var morphLimits = rows.Where(r => r.Category == "morph").GroupBy(r => r.Value).ToDictionary(g => g.Key, g => new[] { g.First().Min, g.First().Max });
+			// The morph ranges and the voices are per SEX, not per race - one set each, in their own table rather than
+			// duplicated into every race (AppearanceSexOption).
+			var sexRows = db.AppearanceSexOptions.AsNoTracking().Where(o => o.Sex == sex).OrderBy(o => o.Sequence).ToList();
 			var height = rows.FirstOrDefault(r => r.Category == "height");
 
-			return new AppearanceOptions(Cat("hair"), Cat("haircolor"), Cat("eyecolor"), Cat("skincolor"), Cat("bodymarkings"), Cat("facemarkings"), Cat("head"), height?.Min ?? 0, height?.Max ?? 0,
-				morphLimits);
+			return new AppearanceOptions(Cat("hair"), Cat("haircolor"), Cat("eyecolor"), Cat("skincolor"), Cat("bodymarkings"), Cat("facemarkings"), Cat("head"), Cat("beard"), Cat("piercings"),
+				SexCat("voice"), height?.Min ?? 0, height?.Max ?? 0, Limits("morph"), Limits("facemorph"));
 
 			List<AppearanceOption> Cat(string category)
 			{
@@ -440,6 +442,22 @@ namespace Faolan.Web.Services
 						? $"#{r.Sequence + 1}"
 						: r.Name, r.Color))
 					.ToList();
+			}
+
+			// A per-sex list. Voices carry their wav path in Name; the label falls back to an ordinal like the rest.
+			List<AppearanceOption> SexCat(string category)
+			{
+				return sexRows
+					.Where(o => o.Category == category)
+					.Select(o => new AppearanceOption(o.Value, string.IsNullOrEmpty(o.Name)
+						? $"#{o.Sequence + 1}"
+						: o.Name, null))
+					.ToList();
+			}
+
+			Dictionary<string, int[]> Limits(string category)
+			{
+				return sexRows.Where(o => o.Category == category).GroupBy(o => o.Value).ToDictionary(g => g.Key, g => new[] { g.First().Min, g.First().Max });
 			}
 		}
 
@@ -919,6 +937,9 @@ namespace Faolan.Web.Services
 		// monsterdataid); Color = the swatch hex for colour lists (null otherwise).
 		public sealed record AppearanceOption(string Value, string Label, string? Color);
 
+		// Beard/Piercings/Voices/FaceMorphLimits are as real as the rest and were simply never surfaced - the importer
+		// did not read their XML elements until #469, so there was nothing to offer. Note Piercings is Stygian-male
+		// only and Beard male only, so both are legitimately EMPTY for most (sex, race) pairs; that is data, not a gap.
 		public sealed record AppearanceOptions(
 			IReadOnlyList<AppearanceOption> HairStyle,
 			IReadOnlyList<AppearanceOption> HairColor,
@@ -927,9 +948,13 @@ namespace Faolan.Web.Services
 			IReadOnlyList<AppearanceOption> BodyTattoo,
 			IReadOnlyList<AppearanceOption> FaceTattoo,
 			IReadOnlyList<AppearanceOption> Heads,
+			IReadOnlyList<AppearanceOption> Beard,
+			IReadOnlyList<AppearanceOption> Piercings,
+			IReadOnlyList<AppearanceOption> Voices,
 			int HeightMin,
 			int HeightMax,
-			IReadOnlyDictionary<string, int[]> MorphLimits);
+			IReadOnlyDictionary<string, int[]> MorphLimits,
+			IReadOnlyDictionary<string, int[]> FaceMorphLimits);
 
 		public sealed record AppearanceSpec(float Arm, float Chest, float Bosom, float Stomach, float Arse, float Thigh, float Leg, uint HeadMesh, IReadOnlyList<string> Refs);
 	}

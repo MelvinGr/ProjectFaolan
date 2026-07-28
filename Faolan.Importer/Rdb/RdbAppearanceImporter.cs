@@ -53,6 +53,7 @@ namespace Faolan.Importer.Rdb
 			var nameCache = new Dictionary<(uint, uint), string?>();
 
 			var rows = new List<AppearanceChoice>();
+			var sexRows = new List<AppearanceSexOption>();
 			var seenElements = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 			foreach (var sexEl in root.Elements())
 			{
@@ -84,6 +85,18 @@ namespace Faolan.Importer.Rdb
 					.Where(v => v.Value != null)
 					.ToList();
 
+				// PER-SEX, written ONCE - these hang off the sex element, not a race one. They used to be duplicated
+				// into every race so a single (sex, race) query returned them, which stored 66 definitions as 264 rows
+				// and implied morphs vary by race. They do not.
+				foreach (var m in morphs)
+					sexRows.Add(SexRow(sex, "morph", m.Seq, m.Name!, null, m.Min, m.Max)); // Name != null by the Where above
+
+				foreach (var m in faceMorphs)
+					sexRows.Add(SexRow(sex, "facemorph", m.Seq, m.Name!, null, m.Min, m.Max));
+
+				foreach (var v in voices)
+					sexRows.Add(SexRow(sex, "voice", v.Seq, v.Value!, v.File, 0, 0));
+
 				foreach (var raceEl in sexEl.Elements())
 				{
 					// The sex element's non-race children (BodyNodes / FaceNodes / voice) are read ABOVE, per sex
@@ -99,15 +112,6 @@ namespace Faolan.Importer.Rdb
 						Console.WriteLine($"RDB appearance: unknown race element <{raceEl.Name.LocalName}> - its choices are SKIPPED.");
 						continue;
 					}
-
-					foreach (var m in morphs)
-						rows.Add(Row(sex, race, "morph", m.Seq, m.Name!, null, null, m.Min, m.Max)); // Name != null by the Where above
-
-					foreach (var m in faceMorphs)
-						rows.Add(Row(sex, race, "facemorph", m.Seq, m.Name!, null, null, m.Min, m.Max));
-
-					foreach (var v in voices)
-						rows.Add(Row(sex, race, "voice", v.Seq, v.Value!, null, v.File, 0, 0));
 
 					var h = raceEl.Element("height");
 					if (h != null)
@@ -155,9 +159,11 @@ namespace Faolan.Importer.Rdb
 				Console.WriteLine($"RDB appearance: ⚠️  {unhandled.Count} XML element(s) NOT imported - {string.Join(", ", unhandled.Select(e => $"<{e}>"))}. Add them to AddList and to HandledElements.");
 
 			await db.AppearanceChoices.ExecuteDeleteAsync();
+			await db.AppearanceSexOptions.ExecuteDeleteAsync();
 			db.AppearanceChoices.AddRange(rows);
+			db.AppearanceSexOptions.AddRange(sexRows);
 			var n = await db.SaveChangesAsync();
-			Console.WriteLine($"RDB appearance: imported {rows.Count} choices across {rows.Select(r => (r.Sex, r.Race)).Distinct().Count()} sex/race combos.");
+			Console.WriteLine($"RDB appearance: imported {rows.Count} per-race choices across {rows.Select(r => (r.Sex, r.Race)).Distinct().Count()} sex/race combos, plus {sexRows.Count} per-sex options.");
 			return n;
 
 			string? ResourceName(uint type, uint id)
@@ -238,6 +244,20 @@ namespace Faolan.Importer.Rdb
 			return s.Length > 0
 				? s
 				: null;
+		}
+
+		private static AppearanceSexOption SexRow(Sex sex, string category, int seq, string value, string? name, int min, int max)
+		{
+			return new AppearanceSexOption
+			{
+				Sex = sex,
+				Category = category,
+				Sequence = seq,
+				Value = value,
+				Name = name,
+				Min = min,
+				Max = max
+			};
 		}
 
 		private static AppearanceChoice Row(Sex sex, Race race, string category, int seq, string value, string? colour, string? name, int min, int max)

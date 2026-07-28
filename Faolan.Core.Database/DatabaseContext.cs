@@ -22,6 +22,8 @@ namespace Faolan.Core.Database
 		DbSet<Account> Accounts { get; }
 		DbSet<AccountClaim> AccountClaims { get; }
 		DbSet<AppearanceChoice> AppearanceChoices { get; }
+
+		DbSet<AppearanceSexOption> AppearanceSexOptions { get; }
 		DbSet<Character> Characters { get; }
 		DbSet<CharacterAbility> CharacterAbilities { get; }
 		DbSet<CharacterAttribute> CharacterAttributes { get; }
@@ -109,6 +111,8 @@ namespace Faolan.Core.Database
 		public DbSet<Account> Accounts { get; set; }
 		public DbSet<AccountClaim> AccountClaims { get; set; }
 		public DbSet<AppearanceChoice> AppearanceChoices { get; set; }
+
+		public DbSet<AppearanceSexOption> AppearanceSexOptions { get; set; }
 		public DbSet<Character> Characters { get; set; }
 		public DbSet<CharacterAbility> CharacterAbilities { get; set; }
 		public DbSet<CharacterAttribute> CharacterAttributes { get; set; }

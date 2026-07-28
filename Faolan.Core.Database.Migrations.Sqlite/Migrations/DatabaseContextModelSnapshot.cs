@@ -183,6 +183,41 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.AppearanceSexOption", b =>
+                {
+                    b.Property<byte>("Sex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Max")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Min")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Sex", "Category", "Sequence");
+
+                    b.ToTable("AppearanceSexOptions", t =>
+                        {
+                            t.HasCheckConstraint("CK_AppearanceSexOption_Sex", "Sex IN (0, 2, 3)");
+                        });
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.Character", b =>
                 {
                     b.Property<uint>("Id")
