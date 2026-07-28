@@ -255,9 +255,12 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
    `[u32 @0x14][u32 @0x18][u32 @0x30][u32 @0x34][u32 @0x44][u32 objCount][ (u32,u32) × objCount ][u32 @0x48]
    [u32 @0x4c][u32 @0x50]` — **all numeric, no strings** (the numeric state/goal tracking; the readable text
    for these quests is in the `Quest_c` journal list, region 2).
-6. **List D** — `FUN_0077d220`: `0x3F1`-framed (records via `FUN_0077db70`; error path "does not return",
-   typically empty for a fresh char).
-7. **List E** — `FUN_0077d5b0` (374 B; not yet decoded).
+6. **List D** — `FUN_0077d220`: `0x3F1`-framed. Record (`FUN_0077db70`, decompiled 2026-07-28):
+   `[u8 flag][u32][u32][string][u32 innerCount][ innerCount x ([u8][u32][string][string]) ]` — VARIABLE-WIDTH
+   (the inner count is a PLAIN count, not `0x3F1`-framed). **Empty on all 151 captured subclasses.**
+7. **List E** — `FUN_0077d5b0`: `0x3F1`-framed. Record = `[u32 key]` (read by the outer loop) +
+   `FUN_0077df00`: `[string][u32][u32][u32][u8][string]` — also VARIABLE-WIDTH.
+   **Empty on all 151 captured subclasses.**
 8. **List F** — `FUN_004d5900`: `0x3F1`-framed; `N-1` records, each reads 2 `u32`, stores the 2nd.
 9. **`StatList_t` #1** — `FUN_0139d450` @ `+0x74`: `0x3F1`-framed; `N-1` × `StatPair_t` (`FUN_0139d210` =
    `[u32 statId][u32 value]`, asserts `"StatPair_t:reading %d %d"`). **This is our `PostAccessBlock` stat
@@ -268,7 +271,42 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
 
 Then back in `FullPlayerCharacterIIR::ReadSubClass` (`FUN_0148c210`):
 
-12. **Trailing pair-list** — **plain** `u32 count`, then `count` × `[u32,u32]` (wide reads via `FUN_0048f720`).
+12. **Trailing list** — **plain** `u32 count`, then `count` × **17 bytes**: `[u8][u64][u64]`. ⚠️ This was
+    written up as `count × [u32,u32]`; `FUN_0048f720` reads **8** bytes (`FUN_00cba1b0(&buf, 8)`), and the
+    loop reads one raw byte before the two wide reads. A closing `u32` follows the list.
+
+### How much of the tail this actually walks (2026-07-28, #393)
+
+Walking `UnknownAfterAccessWindowTable` with the grammar above — Lists D/E (variable-width, both empty), List F,
+`StatList_t` #1, then either `StatList_t` #2 or the 12-byte known-spell list, then the trailing 17-byte-element
+list and its closing word — consumes **65 of 151** captured subclasses to their exact last byte:
+
+| walk | subclasses |
+|---|---|
+| `D0, E0, F×17, stat×148, stat×0, trail×1` | 24 |
+| `D0, E0, F×17, stat×148, trail×0` | 21 |
+| `D0, E0, F×17, stat×148, spells×1, trail×1` | 11 |
+| `D0, E0, F×17, stat×148, spells×2, trail×1` | 9 |
+
+**CLOSED — 151/151 (2026-07-28).** The two things blocking it were both errors in this document, and both fell
+out of decompiling rather than measuring:
+
+- **`SpellBook_t`'s wire record is 12 bytes, not 20.** `FUN_0077af90` makes THREE 4-byte reads per record and
+  advances its in-memory array by `0x14` — the documented "records of 20 bytes (stride 0x14)" was the in-memory
+  stride. At 12 bytes it is the same `[u32 id][u32 0xFFFFFFFF][u32 type]` list `KnownSpellList` already models
+  (#74), so region 11 and the "separate per-character known-spell list" are one list, not two.
+- **There are TWO trailing lists, not one.** The base reader ends with `[u32 n][ n × ([u8][u64][u64]) ]` (17-byte
+  element), and `FullPlayerCharacterIIR::ReadSubClass` then reads its own `[u32 m][ m × ([u32][u32]) ]`. The
+  second one's ids are RDB template ids (`0xF426A` = 1000042, the feat id-map), so it reads as a counter table.
+
+With those corrected, every one of the 151 captured subclasses walks to its exact last byte and re-encodes
+byte-exact through `SnapshotTailRegion`. Every capture opens identically — `D×0, E×0, F×17, StatList×148` — and
+what varies is the second stat list and the spell list, i.e. the per-character part.
+[V3: SnapshotTailRegionTests.EveryCapturedTailRegion_WalksAndReEncodesByteExact]
+
+Lists D and E carry VARIABLE-width records (both call ReadString) and are empty in all 151, so which leading
+empty frame is which is not observable on the wire; `SnapshotTailRegion` holds the lists generically rather than
+labelling them beyond what the captures can prove.
 
 ## The per-character KNOWN-SPELL/FEAT list (decoded 2026-06-20, #74) — relog persistence + bar placement
 
