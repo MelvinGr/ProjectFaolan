@@ -538,9 +538,10 @@ namespace Faolan.GameServer.CreateFlow
 			_logger.LogInformation("Dressed new character {CharacterId:X8} ({Class}, {Sex}) in its starting gear.", character.Id, character.Class, character.Sex);
 		}
 
-		// Binds the new character to its starting map's default respawn point, so recalls (Totem of Origin, Path of
-		// Asura, .recall) and death-resurrect have somewhere to send it from the very first login. The bind moves after
-		// this only when the player uses a bindstone/Wayfarer.
+		// Binds the new character to its starting map's default respawn point, so bind recalls (the Path of Asura spell,
+		// .recall) and death-resurrect have somewhere to send it from the very first login. The bind moves after this
+		// only when the player uses a bindstone/Wayfarer. The Totem of Origins does NOT read the bind - it goes to the
+		// racial home city (StartingData.RacialHomeMap).
 		//
 		// No bind packet is sent here: the "You are now bound here" banner (#346) belongs to a bindstone USE, and this
 		// connection is still the character editor. The client learns the bind with the rest of its state at world

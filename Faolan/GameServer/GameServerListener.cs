@@ -68,9 +68,10 @@ namespace Faolan.GameServer
 		private const uint DefaultSelfBuffEffectNonce = 0x14C5C912;
 
 		// The 0x205A (PerformSpecialAction) selector for the "Path of Asura" teleport spell (NecroL80 path-of-azura
-		// capture: PerformSpecialAction 0x4E1 -> retail DispatchRedirectToServer, a long-load teleport). Works like the
-		// Totem of Origin - a recall to the bind point (our single-server DoTeleport is the equivalent of retail's
-		// cross-server redirect).
+		// capture: PerformSpecialAction 0x4E1 -> retail DispatchRedirectToServer, a long-load teleport). It recalls to
+		// the BOUND location (our single-server DoTeleport is the equivalent of retail's cross-server redirect).
+		// ⚠️ Do NOT conflate it with the Totem of Origins: the Totem returns to the RACIAL home city instead
+		// (StartingData.RacialHomeMap). Two different destinations, two different handlers.
 		private const uint PathOfAsuraSpecialAction = 0x4E1;
 
 		// Shield of the Risen (#221) base spell ids - the two persistent protection buffs applied on every world entry.

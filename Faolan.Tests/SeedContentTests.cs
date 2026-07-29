@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -59,6 +60,37 @@ namespace Faolan.Tests
 
 			var empty = counts.Where(c => c.Actual < c.Floor).Select(c => $"{c.Table}={c.Actual} (floor {c.Floor})").ToList();
 			Assert.True(empty.Count == 0, $"The shipped seed is missing content: {string.Join(", ", empty)}");
+		}
+
+		// Every race's Totem of Origins destination actually resolves. RecallToRacialHomeCommand maps the character's
+		// Race to a home city map and then takes that map's default respawn point, so a map id that is absent from the
+		// seed - or present with no respawn point - means the Totem silently does nothing for everyone of that race.
+		// Both failures are content gaps a row count cannot see, and the map ids are hand-authored constants rather
+		// than imported rows, which is exactly the kind of thing that rots when the seed is re-harvested.
+		[Fact]
+		public async Task EveryRacialHomeMap_HasADefaultSpawn()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+			var broken = new List<string>();
+
+			foreach (var (race, mapId) in StartingData.RacialHomeMap)
+			{
+				if (!await db.Maps.AnyAsync(m => m.Id == mapId, ct))
+				{
+					broken.Add($"{race} -> map {mapId} is not in the seed");
+					continue;
+				}
+
+				// Mirrors GetDefaultSpawn: the AlwaysKnown starter, else any point on the map.
+				var points = db.RespawnPoints.Where(r => r.MapId == mapId);
+				if (!await points.AnyAsync(ct))
+					broken.Add($"{race} -> map {mapId} has no respawn point at all");
+				else if (!await points.AnyAsync(r => r.AlwaysKnown, ct))
+					broken.Add($"{race} -> map {mapId} has no AlwaysKnown point, so arrival depends on row order");
+			}
+
+			Assert.True(broken.Count == 0, $"Totem of Origins destinations that do not resolve: {string.Join("; ", broken)}");
 		}
 
 		// A shop with no wares is a shop the player cannot buy from - the exact shape of the loss above, and the one

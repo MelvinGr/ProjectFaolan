@@ -357,6 +357,7 @@ namespace Faolan.GameServer
 				["tp"] = TeleportCommand,
 				["position"] = (client, _) => PositionCommand(client),
 				["recall"] = (client, _) => RecallToBindCommand(client),
+				["recallhome"] = (client, _) => RecallToRacialHomeCommand(client),
 				["level"] = SetLevelCommand,
 				["feat"] = _feats.FeatCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
@@ -558,11 +559,11 @@ namespace Faolan.GameServer
 				$"Map {mapId} - position {pos.X.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Y.ToString("0.###", CultureInfo.InvariantCulture)} {pos.Z.ToString("0.###", CultureInfo.InvariantCulture)}");
 		}
 
-		// .recall  - use the Totem of Origin: recall to the bound location (the persisted bind point). The real
-		// trigger is using the totem ITEM (use_totem_of_origin capture); this GM command is the test bootstrap.
-		// Recall the player to their bind point (the Totem of Origin, the Path of Asura teleport spell, and .recall all
-		// funnel here). `flavor` is the on-screen line shown before the handoff, so each caller keeps its own voice.
-		private async Task RecallToBindCommand(INetworkClient client, string flavor = "The Totem of Origin pulls you home...")
+		// .recall  - recall to the BOUND location (the persisted bind point). The retail triggers that land here are the
+		// Path of Asura spell and a bindstone recall; this GM command is the test bootstrap.
+		// ⚠️ NOT the Totem of Origins - that returns to the RACIAL home city and goes through RecallToRacialHomeCommand.
+		// No on-screen line before the handoff: retail sends none, and the ones this used to send were invented.
+		private async Task RecallToBindCommand(INetworkClient client)
 		{
 			var character = client.Session.Character;
 			if (character.BindRespawnPointId is not { } pointId)
@@ -578,7 +579,33 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			await _agentServerDispatcher.SendSystemMessage(character.Id, flavor);
+			await DoTeleport(character.Id, point.MapId, point.Position);
+		}
+
+		// .recallhome  - use the Totem of Origins: return to the character's RACIAL home city, which is NOT the bind
+		// point (see StartingData.RacialHomeMap for the mapping and the capture that pins the Stygian row). Bound
+		// location vs racial origin are two separate destinations; the Totem ignores the bind entirely, so this shares
+		// no state with RecallToBindCommand beyond the DoTeleport handoff.
+		// No on-screen line before the handoff, same as the bind recall - retail sends none.
+		private async Task RecallToRacialHomeCommand(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (!StartingData.RacialHomeMap.TryGetValue(character.Race, out var homeMapId))
+			{
+				// Not silent: an unmapped race is a content gap in RacialHomeMap, not a corrupt character.
+				Logger.LogWarning("Totem of Origins: race {Race} has no home city mapped, so {CharacterId:X8} cannot recall home.", character.Race, character.Id);
+				await _agentServerDispatcher.SendSystemMessage(character.Id, ChatMarkup.Color("red", $"No home city is mapped for race {character.Race}."));
+				return;
+			}
+
+			var point = await Database.GetDefaultSpawn(homeMapId);
+			if (point == null)
+			{
+				Logger.LogWarning("Totem of Origins: home map {Map} ({Race}) has no respawn point.", homeMapId, character.Race);
+				await _agentServerDispatcher.SendSystemMessage(character.Id, ChatMarkup.Color("red", $"Home map {homeMapId} has no respawn point."));
+				return;
+			}
+
 			await DoTeleport(character.Id, point.MapId, point.Position);
 		}
 

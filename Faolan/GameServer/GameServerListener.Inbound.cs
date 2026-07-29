@@ -1323,12 +1323,13 @@ namespace Faolan.GameServer
 							break;
 						}
 
-						// Path of Asura: a recall teleport, same as the Totem of Origin (#206). The client double-sends the
-						// action (capture F303+F307), so gate on IsTeleportingOut - the first recall arms the handoff, the
-						// duplicate is absorbed.
+						// Path of Asura: a recall to the BOUND location (#206). NOT the same destination as the Totem of
+						// Origins, which returns to the racial home city. The client double-sends the action (capture
+						// F303+F307), so gate on IsTeleportingOut - the first recall arms the handoff, the duplicate is
+						// absorbed.
 						case PathOfAsuraSpecialAction when !client.Session.IsTeleportingOut:
 						{
-							await RecallToBindCommand(client, "The Path of Asura carries you home...");
+							await RecallToBindCommand(client);
 							break;
 						}
 					}
@@ -1715,8 +1716,8 @@ namespace Faolan.GameServer
 						// Every behavior gets an echo-ack (docs/subsystems/combat.md rule 1); the item-use domain logic
 						// lives in UseInventoryItem (GameServerListener.ItemUse.cs). The used item is identified by its inventory location - from =
 						// container (0x68 = backpack), target = slot - decoded from the use_totem_of_origin
-						// capture (using a Totem of Origin recalls to the bind point, #206; the recall's handoff
-						// is the capture's "long loading screen").
+						// capture (using a Totem of Origins recalls to the RACIAL home city, #206; the recall's handoff
+						// is the capture's "long loading screen" - that capture is what pins Stygian -> Khemi).
 						await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
 						await UseInventoryItem(client, (ContainerKind)from, (int)target);
 

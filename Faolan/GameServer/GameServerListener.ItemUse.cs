@@ -10,8 +10,9 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		// Totem of Origins template (faolan.db): a non-spell on-use item that recalls to the bind point (#206). The
-		// only special-cased use left - buff consumables are all data-driven via Items.OnUseSpell.
+		// Totem of Origins template (faolan.db): a non-spell on-use item that returns the player to their RACIAL home
+		// city (#206) - NOT to the bind point, which is what the Path of Asura spell does. The only special-cased use
+		// left - buff consumables are all data-driven via Items.OnUseSpell.
 		private const uint TotemOfOriginsId = 3514741; // TODO: Move to consts
 
 		// Apply a consumable's on-use self-buff (Spell `spellBase`, wire id base<<8) and consume one from the slot. The
@@ -61,7 +62,7 @@ namespace Faolan.GameServer
 
 			if (item.Id == TotemOfOriginsId)
 			{
-				await RecallToBindCommand(client); // Totem of Origin -> recall to the bound resurrection point (#206)
+				await RecallToRacialHomeCommand(client); // Totem of Origins -> the RACIAL home city, not the bind point (#206)
 				return;
 			}
 

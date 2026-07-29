@@ -21,6 +21,25 @@ namespace Faolan.Core.Network.Constants
 		// Universal: the Slave Manacles worn on the wrist (slot 0x12) by every fresh beach character.
 		public const uint StartingWristItem = 3361557; // Slave Manacles
 
+		// Each race's HOME city - where the Totem of Origins sends you. This is a DIFFERENT destination from the bind
+		// point: the Path of Asura spell recalls to the bound location (the bindstone/Wayfarer point the player last
+		// set), while the Totem returns you to your race's origin regardless of where you are bound. Both used to
+		// funnel into the same bind recall, which was wrong for the Totem.
+		//
+		// Confirmed for Stygian from the use_totem_of_origin capture (AssassinL23, rogue-assassin): the player uses the
+		// Totem while standing in Old Tarantia at (1001.8, 115.3, 618.8) - ~57 u from Old Tarantia's own respawn point,
+		// so a bind recall would have been a no-op - and lands on map 3000 (Khemi) at (759.0, 165.4, 1093.0), 22 u from
+		// Khemi's AlwaysKnown "Akhet Docks" point. Khemi is the Stygian city, and the character was neither bound nor
+		// standing there. The other three rows are the same rule applied to each race's origin city; only the Stygian
+		// one is capture-verified, hence the ticket stays needs-testing.
+		public static readonly ImmutableDictionary<Race, uint> RacialHomeMap = new Dictionary<Race, uint>
+		{
+			[Race.Cimmerian] = 1000, // Conarch Village
+			[Race.Aquilonian] = 2000, // Old Tarantia
+			[Race.Stygian] = 3000, // Khemi          (capture-verified)
+			[Race.Khitan] = 6400 // Paikang        (Rise of the Godslayer)
+		}.ToImmutableDictionary();
+
 		// Which classes each race may create, straight from the client's own RDB 1000507 race x class table (record 0,
 		// the shipped set - see docs/rdb/client-data-tables.md). It replaces a hand-authored list that was close but
 		// not complete: it was missing Assassin for Cimmerians, Necromancer for Aquilonians, Dark Templar for
