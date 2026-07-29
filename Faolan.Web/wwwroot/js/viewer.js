@@ -404,7 +404,7 @@ export function setPose(canvasId, id, deg)
 	const state = states.get(canvasId);
 	if (!state)
 		return false;
-	(state.pose ??  = {})[id] = deg || 0;
+	(state.pose ??= {})[id] = deg || 0;
 	if (!state.skinned)
 		return false;
 	applyPose(state);
@@ -533,43 +533,44 @@ async function renderItemThumb(url)
 		_thumbRenderer.setSize(96, 96);
 	}
 
+	let gltf;
 	try
 	{
-		let gltf;
 		gltf = await new GLTFLoader().loadAsync(url);
 	}
-	catch {
-		return null;
-}
-
-const scene = new THREE.Scene();
-scene.add(new THREE.HemisphereLight(0xffffff, 0x40404a, 1.4));
-const dl = new THREE.DirectionalLight(0xffffff, 1.3);
-dl.position.set(1.2, 2, 2.2);
-scene.add(dl);
-
-const model = gltf.scene;
-model.updateWorldMatrix(true, true);
-const box = new THREE.Box3();
-model.traverse(o =>
-{
-	if (o.isMesh && o.geometry)
+	catch
 	{
-		o.geometry.computeBoundingBox();
-		box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
-		o.material.flatShading = false;
+		return null;
 	}
-});
-const sphere = box.getBoundingSphere(new THREE.Sphere());
-model.position.sub(sphere.center);
-scene.add(model);
 
-const cam = new THREE.PerspectiveCamera(32, 1, 0.001, 100);
-const r = sphere.radius || 1;
-cam.position.set(r * 1.3, r * 0.8, r * 2.1);
-cam.lookAt(0, 0, 0);
-_thumbRenderer.render(scene, cam);
-return _thumbRenderer.domElement.toDataURL("image/png");
+	const scene = new THREE.Scene();
+	scene.add(new THREE.HemisphereLight(0xffffff, 0x40404a, 1.4));
+	const dl = new THREE.DirectionalLight(0xffffff, 1.3);
+	dl.position.set(1.2, 2, 2.2);
+	scene.add(dl);
+
+	const model = gltf.scene;
+	model.updateWorldMatrix(true, true);
+	const box = new THREE.Box3();
+	model.traverse(o =>
+	{
+		if (o.isMesh && o.geometry)
+		{
+			o.geometry.computeBoundingBox();
+			box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld));
+			o.material.flatShading = false;
+		}
+	});
+	const sphere = box.getBoundingSphere(new THREE.Sphere());
+	model.position.sub(sphere.center);
+	scene.add(model);
+
+	const cam = new THREE.PerspectiveCamera(32, 1, 0.001, 100);
+	const r = sphere.radius || 1;
+	cam.position.set(r * 1.3, r * 0.8, r * 2.1);
+	cam.lookAt(0, 0, 0);
+	_thumbRenderer.render(scene, cam);
+	return _thumbRenderer.domElement.toDataURL("image/png");
 }
 
 // Fill each filled slot (.slot[data-item], equipment + inventory) with a rendered thumbnail of its item's 3D model.
