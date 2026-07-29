@@ -159,8 +159,12 @@ about it rides `CharDCMove`, whose MovingType is a layout bitfield with no movem
 only the client's own state.
 
 The one server-side lever the client exposes is the GameAction `e_Type_GC_GameAction_StartFlymode`
-(`0xD12D`), which the `.fly` GM command sends; that path is **unverified** (its parameter list lives in a
-runtime-filled descriptor table). `/luke` is the route that is decoded end to end.
+(`0xCF92`), which the `.fly` GM command sends; that path is **unverified** (its parameter list lives in a
+runtime-filled descriptor table). `/luke` is the route that is decoded end to end and confirmed working.
+
+⚠️ `.fly` first shipped with the id `0xD12D`, which is outside the range the client asserts
+(`0xCF09..0xD026`, `SpellData.cpp:1577`) and **crashed the client**. See
+[`../re/gameactionlist-grammar.md`](../re/gameactionlist-grammar.md) for the stride trap behind it.
 
 ### The rest of the GM/Debug group
 

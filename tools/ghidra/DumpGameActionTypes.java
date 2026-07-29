@@ -13,7 +13,8 @@ public class DumpGameActionTypes extends GhidraScript {
 
     long TABLE = 0x025077c8L;   // descriptor table base
     long STATKEYS = 0x025073c0L; // byte-index -> real stat key
-    int STRIDE = 0x41;
+    int STRIDE = 0x104;  // FUN_008c3910: IMUL EAX,EAX,0x104. NOT 0x41 - and since 0x104 == 4*0x41 a wrong
+                         // 0x41 stride still divides evenly, so it silently yields 4x-inflated ids (crashed the client).
     int FIRST = 0xCF09, LAST = 0xD026;
 
     int u32(long a) throws Exception { return getInt(toAddr(a)); }

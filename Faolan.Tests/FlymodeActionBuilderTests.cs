@@ -16,17 +16,39 @@ namespace Faolan.Tests
 		[Fact]
 		public void StartFlymodeType_IsTheDescriptorIndexDerivedId()
 		{
-			// FUN_008bdf40 writes the name pointer at descriptor+0; the table base is 0x025077C8 with stride 0x41 and
-			// the first descriptor is type 0xCF09, so typeId = 0xCF09 + index. StartFlymode registers at 0x025102EC.
-			const long tableBase = 0x025077C8, stride = 0x41, firstType = 0xCF09, startFlymodeDescriptor = 0x025102EC;
+			// The client indexes the descriptor table as 0x025077C8 + (id - 0xCF09) * 0x104 (FUN_008c3910:
+			// `LEA EAX,[ESI + 0xffff30f7]; IMUL EAX,EAX,0x104; ADD EAX,0x25077c8`). StartFlymode registers at
+			// 0x025102EC => index 137 => 0xCF92, which is also the id the registration writes at descriptor+8.
+			const long tableBase = 0x025077C8, stride = 0x104, firstType = 0xCF09, startFlymodeDescriptor = 0x025102EC;
 
+			Assert.Equal(0, (startFlymodeDescriptor - tableBase) % stride);
 			var index = (startFlymodeDescriptor - tableBase) / stride;
-			Assert.Equal(0, (startFlymodeDescriptor - tableBase) % stride); // lands exactly on a descriptor
-			Assert.Equal(548, index);
+			Assert.Equal(137, index);
 			Assert.Equal(FlymodeActionBuilder.StartFlymodeType, (uint)(firstType + index));
+		}
 
-			// ...and it sits PAST 0xD026, which is why the 68-entry docs/re/gameaction_types.json never saw it.
-			Assert.True(FlymodeActionBuilder.StartFlymodeType > 0xD026);
+		// ⚠️ The regression that crashed the client (2026-07-29). Reading the same table with stride 0x41 - what
+		// tools/ghidra/DumpGameActionTypes.java used - gives index 548 and id 0xD12D. Because 0x104 == 4 * 0x41 the
+		// wrong index still divides evenly, so "it lands on a descriptor" proves nothing; only the RANGE does.
+		[Fact]
+		public void StartFlymodeType_IsInTheRangeTheClientAsserts()
+		{
+			Assert.True(GameActionTypeId.IsValid(FlymodeActionBuilder.StartFlymodeType));
+			Assert.Equal(0xCF92u, FlymodeActionBuilder.StartFlymodeType);
+
+			const uint fourTimesInflated = 0xD12D; // what the 0x41 stride produced
+			Assert.False(GameActionTypeId.IsValid(fourTimesInflated));
+			Assert.Equal(0x11Du, GameActionTypeId.End - 1 - GameActionTypeId.First); // (id - 0xCF09) <= 0x11D
+		}
+
+		// The builder must refuse an out-of-range type rather than hand it to the client, where it is an assert
+		// dialog and a disconnect rather than a dropped packet.
+		[Fact]
+		public void BuildingAnOutOfRangeTypeThrows()
+		{
+			Assert.Throws<ArgumentOutOfRangeException>(() => GameActionElement.Build(0xD12D, 0, 0, []));
+			Assert.Throws<ArgumentOutOfRangeException>(() => GameActionElement.Build(0xCF08, 0, 0, []));
+			Assert.Throws<ArgumentOutOfRangeException>(() => GameActionElement.Build(GameActionTypeId.End, 0, 0, []));
 		}
 
 		[Fact]

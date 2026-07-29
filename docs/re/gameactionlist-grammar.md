@@ -166,32 +166,44 @@ cast — base cooldowns are client-side (the client reads recast from its own RD
 (b) an *optional*, low-priority server override emit (cooldown resets / AA reductions) — now constructible via
 `ChangeRecastTime` the moment it's wanted.
 
-## The full type-id catalog — 260 types, recovered from the descriptor initialiser
+## The full type-id catalog — 260 types, and the id space the client asserts
 
-[`gameaction-type-ids.tsv`](gameaction-type-ids.tsv) lists every GameAction type the client registers, with both
-ids. It supersedes the 68-entry `gameaction_types.json` for *identity* (the JSON keeps its per-type **keyList**,
-which this cannot reach — see the caveat below).
+[`gameaction-type-ids.tsv`](gameaction-type-ids.tsv) lists every GameAction type the client registers. It extends
+the 68-entry `gameaction_types.json` in COVERAGE only — the ids are that file's `enumId`, which it agrees with on
+all 68 shared names. (⚠️ That file's **`typeId` column is not a wire id** — see the stride trap below.)
 
-`FUN_008bdf40` initialises the descriptor table at **`0x025077C8`, stride `0x41`**, and each registration writes
-the name pointer at `descriptor+0` and the enum id at `descriptor+8`. So the descriptor **index** yields the wire
-type id:
+**The client bounds the id space and asserts it.** Every reader checks
+`i_nGameAction >= e_Type_GC_GameAction && i_nGameAction < e_Type_GC_GameAction_End` (`SpellData.cpp:1577`),
+compiled as `(id - 0xCF09) <= 0x11D`:
 
 ```
-typeId = 0xCF09 + (descriptorAddress - 0x025077C8) / 0x41
+LEA EAX,[ESI + 0xffff30f7]   ; index = id - 0xCF09
+CMP EAX,0x11d                ; valid iff index <= 0x11D
+...
+IMUL EAX,EAX,0x104           ; descriptor = 0x025077C8 + index * 0x104
+ADD EAX,0x25077c8
 ```
 
-Two registration forms exist: 171 inline (`MOV [descriptor],<imm>`, giving the type id *directly* from the
-address) and 89 via `CALL FUN_008bde20` (the descriptor address is not visible, so those carry the enum id only).
-The two ids are related by `typeId = 53005 + 4*(enumId - 53002)`, which holds for **all 171 independently measured
-pairs with zero violations** and agrees with **all 49** overlapping `gameaction_types.json` entries — so the 89
-call-form type ids are derived from it (`source` column: `descriptor-index` vs `derived`).
+So the valid ids are **`0xCF09..0xD026`** — 286 slots, of which 260 are registered. Failing the assert is not a
+dropped packet: it pops an "Assertion Failed" dialog and takes the client down. `GameActionTypeId.Validate`
+enforces the range before anything is built.
 
-⚠️ **192 of the 260 sit past `0xD026`**, the end of the window `tools/ghidra/DumpGameActionTypes.java` scans, so
-they were invisible to the JSON — that is why `ProxyTeleport` (`0xD04D`) and `StartFlymode` (`0xD12D`) are absent
-from it rather than genuinely missing. Notable ones the window hid: `Fatality` `0xD331`, `SummonMount` `0xD2D5` /
-`BanishMount` `0xD2D9`, `ResurrectTarget` `0xD291`, `StartSpellWeavingMode` `0xD1FD`, `CinematicCamera` `0xD2B1`,
-`SetTradingPostAccess` `0xD075`, `OpenDialog` `0xD0D1`, `Knockback` `0xD269` / `AreaKnockback` `0xD2E1`.
+`FUN_008bdf40` initialises the table, writing the name pointer at `descriptor+0` and **the id at `descriptor+8`**.
+Reading the id from `descriptor+8` and deriving it from the address both give the same answer for all 171 inline
+registrations; the other 89 register via `CALL FUN_008bde20`, which passes the id in `ECX`.
 
-⚠️ **KeyLists are NOT recoverable statically.** The descriptor table is BSS — filled at runtime — so a static read
+### ⚠️ The stride trap — `0x104`, not `0x41`
+
+`tools/ghidra/DumpGameActionTypes.java` used a stride of `0x41`. The real stride is `0x104`, and because
+**`0x104 == 4 * 0x41`** a wrong `0x41` index still divides evenly — so "the address lands exactly on a descriptor"
+is worth nothing as a check, and every id derived that way comes out **four times too far up the table**. That is
+also exactly what the JSON's `typeId` column is: `53005 + 4*(enumId - 53002)`.
+
+This was not caught by review. `StartFlymode` came out as `0xD12D` instead of `0xCF92`, sailed past a
+"cross-checked, 0 mismatches" comparison (both sides shared the same 4x error), and **crashed the client** when
+sent (2026-07-29). Only the range assert caught it. The lesson: for a table index, validate against the client's
+own BOUNDS, never against another derivation of the same quantity.
+
+⚠️ **KeyLists are still NOT recoverable statically.** The descriptor table is BSS — filled at runtime — so a read
 of `descriptor+0xc` returns zeros; the JSON's key lists come from a live Frida dump. A type in this TSV but not in
 the JSON has an **unknown parameter list**, and assuming an empty one is a guess to be proven in-client.

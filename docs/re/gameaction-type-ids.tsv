@@ -1,261 +1,261 @@
-typeId	typeIdHex	enumId	name	source	inKeyListJson
-53005	0xCF0D	53002	e_Type_GC_GameAction_Hit	descriptor-index	yes
-53009	0xCF11	53003	e_Type_GC_GameAction_AddLayeredSkinnedMesh	descriptor-index	yes
-53013	0xCF15	53004	e_Type_GC_GameAction_StartParticleEffectOnHead	descriptor-index	yes
-53017	0xCF19	53005	e_Type_GC_GameAction_BindAtLocation	derived	yes
-53021	0xCF1D	53006	e_Type_GC_GameAction_TeleportToBindLocation	derived	yes
-53025	0xCF21	53007	e_Type_GC_GameAction_HitPercentage	descriptor-index	yes
-53029	0xCF25	53008	e_Type_GC_GameAction_Remove	descriptor-index	yes
-53033	0xCF29	53009	e_Type_GC_GameAction_Charge	descriptor-index	yes
-53037	0xCF2D	53010	e_Type_GC_GameAction_SetMorphValue	derived	yes
-53041	0xCF31	53011	e_Type_GC_GameAction_AudioEffect	descriptor-index	yes
-53045	0xCF35	53012	e_Type_GC_GameAction_Skill	descriptor-index	yes
-53049	0xCF39	53013	e_Type_GC_GameAction_DPSHit	descriptor-index	yes
-53053	0xCF3D	53014	e_Type_GC_GameAction_TimedEffect	descriptor-index	yes
-53057	0xCF41	53015	e_Type_GC_GameAction_AddFormation	descriptor-index	yes
-53061	0xCF45	53016	e_Type_GC_GameAction_Teleport	descriptor-index	yes
-53069	0xCF4D	53018	e_Type_GC_GameAction_AreaRangeFormula	descriptor-index	yes
-53073	0xCF51	53019	e_Type_GC_GameAction_Spell	descriptor-index	yes
-53077	0xCF55	53020	e_Type_GC_GameAction_Bandaging	descriptor-index	yes
-53081	0xCF59	53021	e_Type_GC_GameAction_RenewMana	descriptor-index	yes
-53085	0xCF5D	53022	e_Type_GC_GameAction_LayeredVisualLocation	descriptor-index	yes
-53089	0xCF61	53023	e_Type_GC_GameAction_CatMesh	descriptor-index	yes
-53093	0xCF65	53024	e_Type_GC_GameAction_SetFollowerScriptGroup	derived	yes
-53097	0xCF69	53025	e_Type_GC_GameAction_AddHateToPets	derived	yes
-53101	0xCF6D	53026	e_Type_GC_GameAction_Set	descriptor-index	yes
-53105	0xCF71	53027	e_Type_GC_GameAction_ItemText	descriptor-index	yes
-53109	0xCF75	53028	e_Type_GC_GameAction_PolyMorph	derived	yes
-53113	0xCF79	53029	e_Type_GC_GameAction_ChangeModifyPercent	descriptor-index	yes
-53117	0xCF7D	53030	e_Type_GC_GameAction_ChangeHitPercent	descriptor-index	yes
-53121	0xCF81	53031	e_Type_GC_GameAction_ChangeRecastTime	descriptor-index	yes
-53125	0xCF85	53032	e_Type_GC_GameAction_AOERadiusModification	descriptor-index	yes
-53129	0xCF89	53033	e_Type_GC_GameAction_ApplyFactionRank	derived	yes
-53133	0xCF8D	53034	e_Type_GC_GameAction_SummonFollower	derived	yes
-53137	0xCF91	53035	e_Type_GC_GameAction_EnterSiegeTargeting	descriptor-index	yes
-53141	0xCF95	53036	e_Type_GC_GameAction_SpawnQuest	derived	yes
-53145	0xCF99	53037	e_Type_GC_GameAction_Charmed	descriptor-index	yes
-53149	0xCF9D	53038	e_Type_GC_GameAction_PlaceTrap	derived	yes
-53157	0xCFA5	53040	e_Type_GC_GameAction_StartTracking	derived	yes
-53161	0xCFA9	53041	e_Type_GC_GameAction_ModifyBasedOnStat	descriptor-index	yes
-53165	0xCFAD	53042	e_Type_GC_GameAction_Modify_PowerSurge	descriptor-index	yes
-53169	0xCFB1	53043	e_Type_GC_GameAction_ExecuteBccAction	descriptor-index	yes
-53177	0xCFB9	53045	e_Type_GC_GameAction_Modify	descriptor-index	yes
-53181	0xCFBD	53046	e_Type_GC_GameAction_AddAbsorb	derived	yes
-53185	0xCFC1	53047	e_Type_GC_GameAction_CameraShake	derived	yes
-53189	0xCFC5	53048	e_Type_GC_GameAction_Name	descriptor-index	yes
-53193	0xCFC9	53049	e_Type_GC_GameAction_SpawnMonster	descriptor-index	yes
-53197	0xCFCD	53050	e_Type_GC_GameAction_RemoveBuffs	descriptor-index	yes
-53201	0xCFD1	53051	e_Type_GC_GameAction_CastNano	descriptor-index	yes
-53205	0xCFD5	53052	e_Type_GC_GameAction_StrTexture	descriptor-index	yes
-53209	0xCFD9	53053	e_Type_GC_GameAction_CameraRoll	derived	yes
-53213	0xCFDD	53054	e_Type_GC_GameAction_SpellStatModifier	derived	yes
-53217	0xCFE1	53055	e_Type_GC_GameAction_AttractorMesh	descriptor-index	yes
-53221	0xCFE5	53056	e_Type_GC_GameAction_RemoveCowardStatus	derived	yes
-53225	0xCFE9	53057	e_Type_GC_GameAction_HeadText	descriptor-index	yes
-53229	0xCFED	53058	e_Type_GC_GameAction_SpawnRemotePet	derived	yes
-53233	0xCFF1	53059	e_Type_GC_GameAction_LineTeleport	descriptor-index	yes
-53237	0xCFF5	53060	e_Type_GC_GameAction_MonsterShape	descriptor-index	yes
-53241	0xCFF9	53061	e_Type_GC_GameAction_BCCCastSpell	descriptor-index	yes
-53245	0xCFFD	53062	e_Type_GC_GameAction_SpellLineStatModifier	derived	yes
-53249	0xD001	53063	e_Type_GC_GameAction_SpawnMonsterACG	descriptor-index	yes
-53253	0xD005	53064	e_Type_GC_GameAction_SpawnItemOnCharacter	descriptor-index	yes
-53257	0xD009	53065	e_Type_GC_GameAction_CoreSpellStatModifier	derived	yes
-53261	0xD00D	53066	e_Type_GC_GameAction_TeamFormula	descriptor-index	yes
-53265	0xD011	53067	e_Type_GC_GameAction_ModifyAsRating	descriptor-index	yes
-53269	0xD015	53068	e_Type_GC_GameAction_InterpolatedModifyAsRating	descriptor-index	yes
-53273	0xD019	53069	e_Type_GC_GameAction_ChangeLineRecastTime	descriptor-index	yes
-53277	0xD01D	53070	e_Type_GC_GameAction_AddSpellLineProc	descriptor-index	yes
-53281	0xD021	53071	e_Type_GC_GameAction_DoorToAutoDoor	descriptor-index	yes
-53285	0xD025	53072	e_Type_GC_GameAction_StopAudioEffect	descriptor-index	yes
-53289	0xD029	53073	e_Type_GC_GameAction_AreaHit	descriptor-index	no
-53293	0xD02D	53074	e_Type_GC_GameAction_LineAOERadiusModification	descriptor-index	no
-53297	0xD031	53075	e_Type_GC_GameAction_ChangeLineHitPercent	descriptor-index	no
-53301	0xD035	53076	e_Type_GC_GameAction_CoreSpellLineStatModifier	derived	no
-53305	0xD039	53077	e_Type_GC_GameAction_SetSpellLineRecastTime	descriptor-index	no
-53309	0xD03D	53078	e_Type_GC_GameAction_CastSpellOnOwner	descriptor-index	no
-53313	0xD041	53079	e_Type_GC_GameAction_CastInvertibleBuff	descriptor-index	no
-53317	0xD045	53080	e_Type_GC_GameAction_PetFormula	descriptor-index	no
-53321	0xD049	53081	e_Type_GC_GameAction_ProxyForceTeleport	descriptor-index	no
-53325	0xD04D	53082	e_Type_GC_GameAction_ProxyTeleport	descriptor-index	no
-53329	0xD051	53083	e_Type_GC_GameAction_ProxyTeleportLine	descriptor-index	no
-53333	0xD055	53084	e_Type_GC_GameAction_ColumnFormula	descriptor-index	no
-53337	0xD059	53085	e_Type_GC_GameAction_Recovery	descriptor-index	no
-53341	0xD05D	53086	e_Type_GC_GameAction_EnableShieldTaunt	descriptor-index	no
-53345	0xD061	53087	e_Type_GC_GameAction_AreaFormula	descriptor-index	no
-53349	0xD065	53088	e_Type_GC_GameAction_FilteredAreaFormula	descriptor-index	no
-53353	0xD069	53089	e_Type_GC_GameAction_ItemFormula	descriptor-index	no
-53357	0xD06D	53090	e_Type_GC_GameAction_EnableCriminalStatus	derived	no
-53361	0xD071	53091	e_Type_GC_GameAction_FEDOCSTest	derived	no
-53365	0xD075	53092	e_Type_GC_GameAction_SetTradingPostAccess	descriptor-index	no
-53369	0xD079	53093	e_Type_GC_GameAction_LockMetaline	descriptor-index	no
-53373	0xD07D	53094	e_Type_GC_GameAction_RestoreChar	descriptor-index	no
-53377	0xD081	53095	e_Type_GC_GameAction_DisableMinigames	descriptor-index	no
-53381	0xD085	53096	e_Type_GC_GameAction_CoreFilteredAreaFormula	descriptor-index	no
-53385	0xD089	53097	e_Type_GC_GameAction_ChangeTokenPoints	derived	no
-53389	0xD08D	53098	e_Type_GC_GameAction_TargetSpellStatModifier	derived	no
-53393	0xD091	53099	e_Type_GC_GameAction_TargetSpellLineStatModifier	derived	no
-53397	0xD095	53100	e_Type_GC_GameAction_HateValueAdd	derived	no
-53401	0xD099	53101	e_Type_GC_GameAction_HateSetAdd	derived	no
-53405	0xD09D	53102	e_Type_GC_GameAction_HateModify	derived	no
-53409	0xD0A1	53103	e_Type_GC_GameAction_HatelistStepUp	derived	no
-53413	0xD0A5	53104	e_Type_GC_GameAction_HatelistStepDown	derived	no
-53417	0xD0A9	53105	e_Type_GC_GameAction_RemoveBuff	descriptor-index	no
-53421	0xD0AD	53106	e_Type_GC_GameAction_TriggerUse	descriptor-index	no
-53425	0xD0B1	53107	e_Type_GC_GameAction_HatelistStepToTop	derived	no
-53429	0xD0B5	53108	e_Type_GC_GameAction_AddBuffCounter	derived	no
-53433	0xD0B9	53109	e_Type_GC_GameAction_RemoveBuffCounter	derived	no
-53437	0xD0BD	53110	e_Type_GC_GameAction_TempChangeSkill	descriptor-index	no
-53441	0xD0C1	53111	e_Type_GC_GameAction_Assign	descriptor-index	no
-53445	0xD0C5	53112	e_Type_GC_GameAction_TransferBuffCounter	derived	no
-53449	0xD0C9	53113	e_Type_GC_GameAction_ModifyGameAction	descriptor-index	no
-53453	0xD0CD	53114	e_Type_GC_GameAction_RegisterTemplateSetEntry	derived	no
-53457	0xD0D1	53115	e_Type_GC_GameAction_OpenDialog	descriptor-index	no
-53461	0xD0D5	53116	e_Type_GC_GameAction_LockSpellLine	derived	no
-53465	0xD0D9	53117	e_Type_GC_GameAction_ModifySpellLineCooldown	derived	no
-53469	0xD0DD	53118	e_Type_GC_GameAction_ModifyTemplateCooldown	derived	no
-53473	0xD0E1	53119	e_Type_GC_GameAction_LockAllSpells	derived	no
-53477	0xD0E5	53120	e_Type_GC_GameAction_AddSkill	descriptor-index	no
-53481	0xD0E9	53121	e_Type_GC_GameAction_Feared	descriptor-index	no
-53485	0xD0ED	53122	e_Type_GC_GameAction_Stun	descriptor-index	no
-53489	0xD0F1	53123	e_Type_GC_GameAction_RemoveSpellLineBuff	descriptor-index	no
-53493	0xD0F5	53124	e_Type_GC_GameAction_CoreLockSpellLineTemplate	derived	no
-53497	0xD0F9	53125	e_Type_GC_GameAction_RndSpawnMonsterACG	descriptor-index	no
-53509	0xD105	53128	e_Type_GC_GameAction_AddTokenStateCounter	derived	no
-53513	0xD109	53129	e_Type_GC_GameAction_Root	descriptor-index	no
-53517	0xD10D	53130	e_Type_GC_GameAction_GrantAccessToPlayfield	derived	no
-53525	0xD115	53132	e_Type_GC_GameAction_GenerateName	descriptor-index	no
-53533	0xD11D	53134	e_Type_GC_GameAction_NewTextEffect	descriptor-index	no
-53537	0xD121	53135	e_Type_GC_GameAction_RemoveTokenStateCounter	derived	no
-53541	0xD125	53136	e_Type_GC_GameAction_TransferTokenStateCounter	derived	no
-53545	0xD129	53137	e_Type_GC_GameAction_StartParticleEffectOnMount	descriptor-index	no
-53549	0xD12D	53138	e_Type_GC_GameAction_StartFlymode	descriptor-index	no
-53553	0xD131	53139	e_Type_GC_GameAction_SetFlag	descriptor-index	no
-53557	0xD135	53140	e_Type_GC_GameAction_ClearFlag	descriptor-index	no
-53561	0xD139	53141	e_Type_GC_GameAction_ToggleFlag	descriptor-index	no
-53573	0xD145	53144	e_Type_GC_GameAction_TeleportToSaveSpot	descriptor-index	no
-53589	0xD155	53148	e_Type_GC_GameAction_PersistentStatChange	derived	no
-53597	0xD15D	53150	e_Type_GC_GameAction_ExecuteGenericAttack	derived	no
-53605	0xD165	53152	e_Type_GC_GameAction_ActivateFeatSpec	derived	no
-53609	0xD169	53153	e_Type_GC_GameAction_CorePersistentGroundEffect	derived	no
-53613	0xD16D	53154	e_Type_GC_GameAction_SummonTeamMember	descriptor-index	no
-53617	0xD171	53155	e_Type_GC_GameAction_SummonWholeTeam	descriptor-index	no
-53633	0xD181	53159	e_Type_GC_GameAction_CoreRandomPointAreaFormula	descriptor-index	no
-53637	0xD185	53160	e_Type_GC_GameAction_Clone	descriptor-index	no
-53645	0xD18D	53162	e_Type_GC_GameAction_NanoResistance	descriptor-index	no
-53649	0xD191	53163	e_Type_GC_GameAction_AddDiminishingReturn	derived	no
-53653	0xD195	53164	e_Type_GC_GameAction_SaveHere	descriptor-index	no
-53657	0xD199	53165	e_Type_GC_GameAction_ProxyTeleport_WithPetHandling	descriptor-index	no
-53661	0xD19D	53166	e_Type_GC_GameAction_TransferBuff	derived	no
-53665	0xD1A1	53167	e_Type_GC_GameAction_TransferSpellLine	derived	no
-53669	0xD1A5	53168	e_Type_GC_GameAction_StartEffect	descriptor-index	no
-53673	0xD1A9	53169	e_Type_GC_GameAction_DamageRedirect	derived	no
-53677	0xD1AD	53170	e_Type_GC_GameAction_InheritedComboAttack	derived	no
-53681	0xD1B1	53171	e_Type_GC_GameAction_InheritedComboHit	derived	no
-53685	0xD1B5	53172	e_Type_GC_GameAction_AdjustHitTable	descriptor-index	no
-53689	0xD1B9	53173	e_Type_GC_GameAction_AdjustSpellHitTable	descriptor-index	no
-53693	0xD1BD	53174	e_Type_GC_GameAction_AdjustSpellLineHitTable	descriptor-index	no
-53697	0xD1C1	53175	e_Type_GC_GameAction_AddLeech	derived	no
-53701	0xD1C5	53176	e_Type_GC_GameAction_DisplayLearnAbility	descriptor-index	no
-53705	0xD1C9	53177	e_Type_GC_GameAction_Dispell	descriptor-index	no
-53709	0xD1CD	53178	e_Type_GC_GameAction_MultiHit	derived	no
-53713	0xD1D1	53179	e_Type_GC_GameAction_TeleportToGuildCity	derived	no
-53717	0xD1D5	53180	e_Type_GC_GameAction_Tracer	descriptor-index	no
-53725	0xD1DD	53182	e_Type_GC_GameAction_SpecialAbility	descriptor-index	no
-53729	0xD1E1	53183	e_Type_GC_GameAction_AddSelfResurrectionSpell	derived	no
-53733	0xD1E5	53184	e_Type_GC_GameAction_StatMultiplier	descriptor-index	no
-53737	0xD1E9	53185	e_Type_GC_GameAction_Drain	descriptor-index	no
-53745	0xD1F1	53187	e_Type_GC_GameAction_Heal	derived	no
-53749	0xD1F5	53188	e_Type_GC_GameAction_DialogFeedback	descriptor-index	no
-53753	0xD1F9	53189	e_Type_GC_GameAction_AddPercentSkillModifier	derived	no
-53757	0xD1FD	53190	e_Type_GC_GameAction_StartSpellWeavingMode	descriptor-index	no
-53761	0xD201	53191	e_Type_GC_GameAction_AddComboHate	derived	no
-53765	0xD205	53192	e_Type_GC_GameAction_SpawnMonsterACGRot	descriptor-index	no
-53769	0xD209	53193	e_Type_GC_GameAction_PolymorphAttack	descriptor-index	no
-53773	0xD20D	53194	e_Type_GC_GameAction_Interrupt	descriptor-index	no
-53777	0xD211	53195	e_Type_GC_GameAction_DebuffDPS	descriptor-index	no
-53781	0xD215	53196	e_Type_GC_GameAction_SpecialHit	descriptor-index	no
-53785	0xD219	53197	e_Type_GC_GameAction_BCCCastSpellOnGround	descriptor-index	no
-53789	0xD21D	53198	e_Type_GC_GameAction_LearnRecipe	derived	no
-53793	0xD221	53199	e_Type_GC_GameAction_InheritedWeaponAttackHateFlag	derived	no
-53797	0xD225	53200	e_Type_GC_GameAction_LockPicking	derived	no
-53801	0xD229	53201	e_Type_GC_GameAction_RemoveSpell	descriptor-index	no
-53805	0xD22D	53202	e_Type_GC_GameAction_LockTemplate	derived	no
-53809	0xD231	53203	e_Type_GC_GameAction_PickPocket	derived	no
-53813	0xD235	53204	e_Type_GC_GameAction_AddBliss	derived	no
-53817	0xD239	53205	e_Type_GC_GameAction_AddSwaying	derived	no
-53821	0xD23D	53206	e_Type_GC_GameAction_AddFocus	derived	no
-53825	0xD241	53207	e_Type_GC_GameAction_Feedback	descriptor-index	no
-53829	0xD245	53208	e_Type_GC_GameAction_PerformCorruptionCheck	derived	no
-53833	0xD249	53209	e_Type_GC_GameAction_UpgradeCombo	derived	no
-53837	0xD24D	53210	e_Type_GC_GameAction_AddGuildRenown	derived	no
-53841	0xD251	53211	e_Type_GC_GameAction_AddSpellProc	descriptor-index	no
-53845	0xD255	53212	e_Type_GC_GameAction_AddComboProc	derived	no
-53849	0xD259	53213	e_Type_GC_GameAction_AddProc	descriptor-index	no
-53853	0xD25D	53214	e_Type_GC_GameAction_DrunkBrawlingSpecial	descriptor-index	no
-53857	0xD261	53215	e_Type_GC_GameAction_SetMaxModifier	descriptor-index	no
-53865	0xD269	53217	e_Type_GC_GameAction_Knockback	descriptor-index	no
-53869	0xD26D	53218	e_Type_GC_GameAction_EnableDefensiveStance	descriptor-index	no
-53873	0xD271	53219	e_Type_GC_GameAction_InterpolatedHit	descriptor-index	no
-53877	0xD275	53220	e_Type_GC_GameAction_InterpolatedModify	descriptor-index	no
-53881	0xD279	53221	e_Type_GC_GameAction_InterpolatedTempChangeSkill	descriptor-index	no
-53885	0xD27D	53222	e_Type_GC_GameAction_InterpolatedSpawnPetACG	descriptor-index	no
-53889	0xD281	53223	e_Type_GC_GameAction_CastingLevelModifier	descriptor-index	no
-53893	0xD285	53224	e_Type_GC_GameAction_TeamPropagatedBuff	descriptor-index	no
-53897	0xD289	53225	e_Type_GC_GameAction_InheritedWeaponAttack	descriptor-index	no
-53901	0xD28D	53226	e_Type_GC_GameAction_SetSpellRecastTime	descriptor-index	no
-53905	0xD291	53227	e_Type_GC_GameAction_ResurrectTarget	descriptor-index	no
-53909	0xD295	53228	e_Type_GC_GameAction_VisualLocation	descriptor-index	no
-53913	0xD299	53229	e_Type_GC_GameAction_StartClientSideScryScript	descriptor-index	no
-53917	0xD29D	53230	e_Type_GC_GameAction_StartServerSideScryScript	descriptor-index	no
-53921	0xD2A1	53231	e_Type_GC_GameAction_StopScryScript	descriptor-index	no
-53925	0xD2A5	53232	e_Type_GC_GameAction_DynamicKDTree	descriptor-index	no
-53929	0xD2A9	53233	e_Type_GC_GameAction_SetBaseAnim	descriptor-index	no
-53933	0xD2AD	53234	e_Type_GC_GameAction_InterpolatedMagicHit	derived	no
-53937	0xD2B1	53235	e_Type_GC_GameAction_CinematicCamera	descriptor-index	no
-53941	0xD2B5	53236	e_Type_GC_GameAction_CombatSpecialMove	descriptor-index	no
-53945	0xD2B9	53237	e_Type_GC_GameAction_PlayActionAnim	descriptor-index	no
-53949	0xD2BD	53238	e_Type_GC_GameAction_StartParticleEffect	descriptor-index	no
-53953	0xD2C1	53239	e_Type_GC_GameAction_StopParticleEffect	descriptor-index	no
-53957	0xD2C5	53240	e_Type_GC_GameAction_AddSkinnedMesh	descriptor-index	no
-53961	0xD2C9	53241	e_Type_GC_GameAction_SendScryEvent	descriptor-index	no
-53965	0xD2CD	53242	e_Type_GC_GameAction_Disarm	descriptor-index	no
-53969	0xD2D1	53243	e_Type_GC_GameAction_StartParticleEffectOnEquippedItem	descriptor-index	no
-53973	0xD2D5	53244	e_Type_GC_GameAction_SummonMount	descriptor-index	no
-53977	0xD2D9	53245	e_Type_GC_GameAction_BanishMount	descriptor-index	no
-53981	0xD2DD	53246	e_Type_GC_GameAction_RegisterSubSpellForSpellLine	derived	no
-53985	0xD2E1	53247	e_Type_GC_GameAction_AreaKnockback	descriptor-index	no
-53993	0xD2E9	53249	e_Type_GC_GameAction_ColumnAddTargets	descriptor-index	no
-53997	0xD2ED	53250	e_Type_GC_GameAction_ChangeInheritedWeaponAttack	derived	no
-54001	0xD2F1	53251	e_Type_GC_GameAction_CodeHooks	derived	no
-54005	0xD2F5	53252	e_Type_GC_GameAction_OverrideMostHatedTarget	descriptor-index	no
-54009	0xD2F9	53253	e_Type_GC_GameAction_ChargeSpecialAbility	descriptor-index	no
-54013	0xD2FD	53254	e_Type_GC_GameAction_UpdateCommunityCharacter	derived	no
-54017	0xD301	53255	e_Type_GC_GameAction_AddCleaveTargets	descriptor-index	no
-54021	0xD305	53256	e_Type_GC_GameAction_MagicHit	derived	no
-54025	0xD309	53257	e_Type_GC_GameAction_WeaponHit	derived	no
-54033	0xD311	53259	e_Type_GC_GameAction_ConeFormula	descriptor-index	no
-54037	0xD315	53260	e_Type_GC_GameAction_StartClientSideScryScriptWithParams	descriptor-index	no
-54041	0xD319	53261	e_Type_GC_GameAction_StartServerSideScryScriptWithParams	descriptor-index	no
-54045	0xD31D	53262	e_Type_GC_GameAction_DefensiveStance	descriptor-index	no
-54049	0xD321	53263	e_Type_GC_GameAction_ParryStance	descriptor-index	no
-54053	0xD325	53264	e_Type_GC_GameAction_FrenzyStance	descriptor-index	no
-54057	0xD329	53265	e_Type_GC_GameAction_ChangeSubstate	descriptor-index	no
-54061	0xD32D	53266	e_Type_GC_GameAction_SetCatMesh	descriptor-index	no
-54065	0xD331	53267	e_Type_GC_GameAction_Fatality	descriptor-index	no
-54069	0xD335	53268	e_Type_GC_GameAction_SetIdleBaseAnim	descriptor-index	no
-54073	0xD339	53269	e_Type_GC_GameAction_AddTexScript	descriptor-index	no
-54077	0xD33D	53270	e_Type_GC_GameAction_RemoveTexScript	descriptor-index	no
-54081	0xD341	53271	e_Type_GC_GameAction_Search	derived	no
-54085	0xD345	53272	e_Type_GC_GameAction_Sneak	derived	no
-54089	0xD349	53273	e_Type_GC_GameAction_AttackAddTargets	descriptor-index	no
-54093	0xD34D	53274	e_Type_GC_GameAction_RefreshAirSupply	derived	no
-54097	0xD351	53275	e_Type_GC_GameAction_ToggleSubstate	descriptor-index	no
-54101	0xD355	53276	e_Type_GC_GameAction_AddTexScriptWithParams	descriptor-index	no
-54105	0xD359	53277	e_Type_GC_GameAction_TryEnterDrunkenBrawling	derived	no
-54109	0xD35D	53278	e_Type_GC_GameAction_BindAtSetLocation	derived	no
-54121	0xD369	53281	e_Type_GC_GameAction_AddTag	derived	no
-54125	0xD36D	53282	e_Type_GC_GameAction_GlobalAOERadiusModification	descriptor-index	no
-54129	0xD371	53283	e_Type_GC_GameAction_GlobalSpellStatModifier	derived	no
-54133	0xD375	53284	e_Type_GC_GameAction_GlobalCoreSpellStatModifier	derived	no
-54137	0xD379	53285	e_Type_GC_GameAction_GlobalTargetSpellStatModifier	derived	no
-54141	0xD37D	53286	e_Type_GC_GameAction_GlobalModifyGameAction	descriptor-index	no
+typeId	typeIdHex	name	source	inKeyListJson
+53002	0xCF0A	e_Type_GC_GameAction_Hit	descriptor	yes
+53003	0xCF0B	e_Type_GC_GameAction_AddLayeredSkinnedMesh	descriptor	yes
+53004	0xCF0C	e_Type_GC_GameAction_StartParticleEffectOnHead	descriptor	yes
+53005	0xCF0D	e_Type_GC_GameAction_BindAtLocation	call-site	yes
+53006	0xCF0E	e_Type_GC_GameAction_TeleportToBindLocation	call-site	yes
+53007	0xCF0F	e_Type_GC_GameAction_HitPercentage	descriptor	yes
+53008	0xCF10	e_Type_GC_GameAction_Remove	descriptor	yes
+53009	0xCF11	e_Type_GC_GameAction_Charge	descriptor	yes
+53010	0xCF12	e_Type_GC_GameAction_SetMorphValue	call-site	yes
+53011	0xCF13	e_Type_GC_GameAction_AudioEffect	descriptor	yes
+53012	0xCF14	e_Type_GC_GameAction_Skill	descriptor	yes
+53013	0xCF15	e_Type_GC_GameAction_DPSHit	descriptor	yes
+53014	0xCF16	e_Type_GC_GameAction_TimedEffect	descriptor	yes
+53015	0xCF17	e_Type_GC_GameAction_AddFormation	descriptor	yes
+53016	0xCF18	e_Type_GC_GameAction_Teleport	descriptor	yes
+53018	0xCF1A	e_Type_GC_GameAction_AreaRangeFormula	descriptor	yes
+53019	0xCF1B	e_Type_GC_GameAction_Spell	descriptor	yes
+53020	0xCF1C	e_Type_GC_GameAction_Bandaging	descriptor	yes
+53021	0xCF1D	e_Type_GC_GameAction_RenewMana	descriptor	yes
+53022	0xCF1E	e_Type_GC_GameAction_LayeredVisualLocation	descriptor	yes
+53023	0xCF1F	e_Type_GC_GameAction_CatMesh	descriptor	yes
+53024	0xCF20	e_Type_GC_GameAction_SetFollowerScriptGroup	call-site	yes
+53025	0xCF21	e_Type_GC_GameAction_AddHateToPets	call-site	yes
+53026	0xCF22	e_Type_GC_GameAction_Set	descriptor	yes
+53027	0xCF23	e_Type_GC_GameAction_ItemText	descriptor	yes
+53028	0xCF24	e_Type_GC_GameAction_PolyMorph	call-site	yes
+53029	0xCF25	e_Type_GC_GameAction_ChangeModifyPercent	descriptor	yes
+53030	0xCF26	e_Type_GC_GameAction_ChangeHitPercent	descriptor	yes
+53031	0xCF27	e_Type_GC_GameAction_ChangeRecastTime	descriptor	yes
+53032	0xCF28	e_Type_GC_GameAction_AOERadiusModification	descriptor	yes
+53033	0xCF29	e_Type_GC_GameAction_ApplyFactionRank	call-site	yes
+53034	0xCF2A	e_Type_GC_GameAction_SummonFollower	call-site	yes
+53035	0xCF2B	e_Type_GC_GameAction_EnterSiegeTargeting	descriptor	yes
+53036	0xCF2C	e_Type_GC_GameAction_SpawnQuest	call-site	yes
+53037	0xCF2D	e_Type_GC_GameAction_Charmed	descriptor	yes
+53038	0xCF2E	e_Type_GC_GameAction_PlaceTrap	call-site	yes
+53040	0xCF30	e_Type_GC_GameAction_StartTracking	call-site	yes
+53041	0xCF31	e_Type_GC_GameAction_ModifyBasedOnStat	descriptor	yes
+53042	0xCF32	e_Type_GC_GameAction_Modify_PowerSurge	descriptor	yes
+53043	0xCF33	e_Type_GC_GameAction_ExecuteBccAction	descriptor	yes
+53045	0xCF35	e_Type_GC_GameAction_Modify	descriptor	yes
+53046	0xCF36	e_Type_GC_GameAction_AddAbsorb	call-site	yes
+53047	0xCF37	e_Type_GC_GameAction_CameraShake	call-site	yes
+53048	0xCF38	e_Type_GC_GameAction_Name	descriptor	yes
+53049	0xCF39	e_Type_GC_GameAction_SpawnMonster	descriptor	yes
+53050	0xCF3A	e_Type_GC_GameAction_RemoveBuffs	descriptor	yes
+53051	0xCF3B	e_Type_GC_GameAction_CastNano	descriptor	yes
+53052	0xCF3C	e_Type_GC_GameAction_StrTexture	descriptor	yes
+53053	0xCF3D	e_Type_GC_GameAction_CameraRoll	call-site	yes
+53054	0xCF3E	e_Type_GC_GameAction_SpellStatModifier	call-site	yes
+53055	0xCF3F	e_Type_GC_GameAction_AttractorMesh	descriptor	yes
+53056	0xCF40	e_Type_GC_GameAction_RemoveCowardStatus	call-site	yes
+53057	0xCF41	e_Type_GC_GameAction_HeadText	descriptor	yes
+53058	0xCF42	e_Type_GC_GameAction_SpawnRemotePet	call-site	yes
+53059	0xCF43	e_Type_GC_GameAction_LineTeleport	descriptor	yes
+53060	0xCF44	e_Type_GC_GameAction_MonsterShape	descriptor	yes
+53061	0xCF45	e_Type_GC_GameAction_BCCCastSpell	descriptor	yes
+53062	0xCF46	e_Type_GC_GameAction_SpellLineStatModifier	call-site	yes
+53063	0xCF47	e_Type_GC_GameAction_SpawnMonsterACG	descriptor	yes
+53064	0xCF48	e_Type_GC_GameAction_SpawnItemOnCharacter	descriptor	yes
+53065	0xCF49	e_Type_GC_GameAction_CoreSpellStatModifier	call-site	yes
+53066	0xCF4A	e_Type_GC_GameAction_TeamFormula	descriptor	yes
+53067	0xCF4B	e_Type_GC_GameAction_ModifyAsRating	descriptor	yes
+53068	0xCF4C	e_Type_GC_GameAction_InterpolatedModifyAsRating	descriptor	yes
+53069	0xCF4D	e_Type_GC_GameAction_ChangeLineRecastTime	descriptor	yes
+53070	0xCF4E	e_Type_GC_GameAction_AddSpellLineProc	descriptor	yes
+53071	0xCF4F	e_Type_GC_GameAction_DoorToAutoDoor	descriptor	yes
+53072	0xCF50	e_Type_GC_GameAction_StopAudioEffect	descriptor	yes
+53073	0xCF51	e_Type_GC_GameAction_AreaHit	descriptor	no
+53074	0xCF52	e_Type_GC_GameAction_LineAOERadiusModification	descriptor	no
+53075	0xCF53	e_Type_GC_GameAction_ChangeLineHitPercent	descriptor	no
+53076	0xCF54	e_Type_GC_GameAction_CoreSpellLineStatModifier	call-site	no
+53077	0xCF55	e_Type_GC_GameAction_SetSpellLineRecastTime	descriptor	no
+53078	0xCF56	e_Type_GC_GameAction_CastSpellOnOwner	descriptor	no
+53079	0xCF57	e_Type_GC_GameAction_CastInvertibleBuff	descriptor	no
+53080	0xCF58	e_Type_GC_GameAction_PetFormula	descriptor	no
+53081	0xCF59	e_Type_GC_GameAction_ProxyForceTeleport	descriptor	no
+53082	0xCF5A	e_Type_GC_GameAction_ProxyTeleport	descriptor	no
+53083	0xCF5B	e_Type_GC_GameAction_ProxyTeleportLine	descriptor	no
+53084	0xCF5C	e_Type_GC_GameAction_ColumnFormula	descriptor	no
+53085	0xCF5D	e_Type_GC_GameAction_Recovery	descriptor	no
+53086	0xCF5E	e_Type_GC_GameAction_EnableShieldTaunt	descriptor	no
+53087	0xCF5F	e_Type_GC_GameAction_AreaFormula	descriptor	no
+53088	0xCF60	e_Type_GC_GameAction_FilteredAreaFormula	descriptor	no
+53089	0xCF61	e_Type_GC_GameAction_ItemFormula	descriptor	no
+53090	0xCF62	e_Type_GC_GameAction_EnableCriminalStatus	call-site	no
+53091	0xCF63	e_Type_GC_GameAction_FEDOCSTest	call-site	no
+53092	0xCF64	e_Type_GC_GameAction_SetTradingPostAccess	descriptor	no
+53093	0xCF65	e_Type_GC_GameAction_LockMetaline	descriptor	no
+53094	0xCF66	e_Type_GC_GameAction_RestoreChar	descriptor	no
+53095	0xCF67	e_Type_GC_GameAction_DisableMinigames	descriptor	no
+53096	0xCF68	e_Type_GC_GameAction_CoreFilteredAreaFormula	descriptor	no
+53097	0xCF69	e_Type_GC_GameAction_ChangeTokenPoints	call-site	no
+53098	0xCF6A	e_Type_GC_GameAction_TargetSpellStatModifier	call-site	no
+53099	0xCF6B	e_Type_GC_GameAction_TargetSpellLineStatModifier	call-site	no
+53100	0xCF6C	e_Type_GC_GameAction_HateValueAdd	call-site	no
+53101	0xCF6D	e_Type_GC_GameAction_HateSetAdd	call-site	no
+53102	0xCF6E	e_Type_GC_GameAction_HateModify	call-site	no
+53103	0xCF6F	e_Type_GC_GameAction_HatelistStepUp	call-site	no
+53104	0xCF70	e_Type_GC_GameAction_HatelistStepDown	call-site	no
+53105	0xCF71	e_Type_GC_GameAction_RemoveBuff	descriptor	no
+53106	0xCF72	e_Type_GC_GameAction_TriggerUse	descriptor	no
+53107	0xCF73	e_Type_GC_GameAction_HatelistStepToTop	call-site	no
+53108	0xCF74	e_Type_GC_GameAction_AddBuffCounter	call-site	no
+53109	0xCF75	e_Type_GC_GameAction_RemoveBuffCounter	call-site	no
+53110	0xCF76	e_Type_GC_GameAction_TempChangeSkill	descriptor	no
+53111	0xCF77	e_Type_GC_GameAction_Assign	descriptor	no
+53112	0xCF78	e_Type_GC_GameAction_TransferBuffCounter	call-site	no
+53113	0xCF79	e_Type_GC_GameAction_ModifyGameAction	descriptor	no
+53114	0xCF7A	e_Type_GC_GameAction_RegisterTemplateSetEntry	call-site	no
+53115	0xCF7B	e_Type_GC_GameAction_OpenDialog	descriptor	no
+53116	0xCF7C	e_Type_GC_GameAction_LockSpellLine	call-site	no
+53117	0xCF7D	e_Type_GC_GameAction_ModifySpellLineCooldown	call-site	no
+53118	0xCF7E	e_Type_GC_GameAction_ModifyTemplateCooldown	call-site	no
+53119	0xCF7F	e_Type_GC_GameAction_LockAllSpells	call-site	no
+53120	0xCF80	e_Type_GC_GameAction_AddSkill	descriptor	no
+53121	0xCF81	e_Type_GC_GameAction_Feared	descriptor	no
+53122	0xCF82	e_Type_GC_GameAction_Stun	descriptor	no
+53123	0xCF83	e_Type_GC_GameAction_RemoveSpellLineBuff	descriptor	no
+53124	0xCF84	e_Type_GC_GameAction_CoreLockSpellLineTemplate	call-site	no
+53125	0xCF85	e_Type_GC_GameAction_RndSpawnMonsterACG	descriptor	no
+53128	0xCF88	e_Type_GC_GameAction_AddTokenStateCounter	call-site	no
+53129	0xCF89	e_Type_GC_GameAction_Root	descriptor	no
+53130	0xCF8A	e_Type_GC_GameAction_GrantAccessToPlayfield	call-site	no
+53132	0xCF8C	e_Type_GC_GameAction_GenerateName	descriptor	no
+53134	0xCF8E	e_Type_GC_GameAction_NewTextEffect	descriptor	no
+53135	0xCF8F	e_Type_GC_GameAction_RemoveTokenStateCounter	call-site	no
+53136	0xCF90	e_Type_GC_GameAction_TransferTokenStateCounter	call-site	no
+53137	0xCF91	e_Type_GC_GameAction_StartParticleEffectOnMount	descriptor	no
+53138	0xCF92	e_Type_GC_GameAction_StartFlymode	descriptor	no
+53139	0xCF93	e_Type_GC_GameAction_SetFlag	descriptor	no
+53140	0xCF94	e_Type_GC_GameAction_ClearFlag	descriptor	no
+53141	0xCF95	e_Type_GC_GameAction_ToggleFlag	descriptor	no
+53144	0xCF98	e_Type_GC_GameAction_TeleportToSaveSpot	descriptor	no
+53148	0xCF9C	e_Type_GC_GameAction_PersistentStatChange	call-site	no
+53150	0xCF9E	e_Type_GC_GameAction_ExecuteGenericAttack	call-site	no
+53152	0xCFA0	e_Type_GC_GameAction_ActivateFeatSpec	call-site	no
+53153	0xCFA1	e_Type_GC_GameAction_CorePersistentGroundEffect	call-site	no
+53154	0xCFA2	e_Type_GC_GameAction_SummonTeamMember	descriptor	no
+53155	0xCFA3	e_Type_GC_GameAction_SummonWholeTeam	descriptor	no
+53159	0xCFA7	e_Type_GC_GameAction_CoreRandomPointAreaFormula	descriptor	no
+53160	0xCFA8	e_Type_GC_GameAction_Clone	descriptor	no
+53162	0xCFAA	e_Type_GC_GameAction_NanoResistance	descriptor	no
+53163	0xCFAB	e_Type_GC_GameAction_AddDiminishingReturn	call-site	no
+53164	0xCFAC	e_Type_GC_GameAction_SaveHere	descriptor	no
+53165	0xCFAD	e_Type_GC_GameAction_ProxyTeleport_WithPetHandling	descriptor	no
+53166	0xCFAE	e_Type_GC_GameAction_TransferBuff	call-site	no
+53167	0xCFAF	e_Type_GC_GameAction_TransferSpellLine	call-site	no
+53168	0xCFB0	e_Type_GC_GameAction_StartEffect	descriptor	no
+53169	0xCFB1	e_Type_GC_GameAction_DamageRedirect	call-site	no
+53170	0xCFB2	e_Type_GC_GameAction_InheritedComboAttack	call-site	no
+53171	0xCFB3	e_Type_GC_GameAction_InheritedComboHit	call-site	no
+53172	0xCFB4	e_Type_GC_GameAction_AdjustHitTable	descriptor	no
+53173	0xCFB5	e_Type_GC_GameAction_AdjustSpellHitTable	descriptor	no
+53174	0xCFB6	e_Type_GC_GameAction_AdjustSpellLineHitTable	descriptor	no
+53175	0xCFB7	e_Type_GC_GameAction_AddLeech	call-site	no
+53176	0xCFB8	e_Type_GC_GameAction_DisplayLearnAbility	descriptor	no
+53177	0xCFB9	e_Type_GC_GameAction_Dispell	descriptor	no
+53178	0xCFBA	e_Type_GC_GameAction_MultiHit	call-site	no
+53179	0xCFBB	e_Type_GC_GameAction_TeleportToGuildCity	call-site	no
+53180	0xCFBC	e_Type_GC_GameAction_Tracer	descriptor	no
+53182	0xCFBE	e_Type_GC_GameAction_SpecialAbility	descriptor	no
+53183	0xCFBF	e_Type_GC_GameAction_AddSelfResurrectionSpell	call-site	no
+53184	0xCFC0	e_Type_GC_GameAction_StatMultiplier	descriptor	no
+53185	0xCFC1	e_Type_GC_GameAction_Drain	descriptor	no
+53187	0xCFC3	e_Type_GC_GameAction_Heal	call-site	no
+53188	0xCFC4	e_Type_GC_GameAction_DialogFeedback	descriptor	no
+53189	0xCFC5	e_Type_GC_GameAction_AddPercentSkillModifier	call-site	no
+53190	0xCFC6	e_Type_GC_GameAction_StartSpellWeavingMode	descriptor	no
+53191	0xCFC7	e_Type_GC_GameAction_AddComboHate	call-site	no
+53192	0xCFC8	e_Type_GC_GameAction_SpawnMonsterACGRot	descriptor	no
+53193	0xCFC9	e_Type_GC_GameAction_PolymorphAttack	descriptor	no
+53194	0xCFCA	e_Type_GC_GameAction_Interrupt	descriptor	no
+53195	0xCFCB	e_Type_GC_GameAction_DebuffDPS	descriptor	no
+53196	0xCFCC	e_Type_GC_GameAction_SpecialHit	descriptor	no
+53197	0xCFCD	e_Type_GC_GameAction_BCCCastSpellOnGround	descriptor	no
+53198	0xCFCE	e_Type_GC_GameAction_LearnRecipe	call-site	no
+53199	0xCFCF	e_Type_GC_GameAction_InheritedWeaponAttackHateFlag	call-site	no
+53200	0xCFD0	e_Type_GC_GameAction_LockPicking	call-site	no
+53201	0xCFD1	e_Type_GC_GameAction_RemoveSpell	descriptor	no
+53202	0xCFD2	e_Type_GC_GameAction_LockTemplate	call-site	no
+53203	0xCFD3	e_Type_GC_GameAction_PickPocket	call-site	no
+53204	0xCFD4	e_Type_GC_GameAction_AddBliss	call-site	no
+53205	0xCFD5	e_Type_GC_GameAction_AddSwaying	call-site	no
+53206	0xCFD6	e_Type_GC_GameAction_AddFocus	call-site	no
+53207	0xCFD7	e_Type_GC_GameAction_Feedback	descriptor	no
+53208	0xCFD8	e_Type_GC_GameAction_PerformCorruptionCheck	call-site	no
+53209	0xCFD9	e_Type_GC_GameAction_UpgradeCombo	call-site	no
+53210	0xCFDA	e_Type_GC_GameAction_AddGuildRenown	call-site	no
+53211	0xCFDB	e_Type_GC_GameAction_AddSpellProc	descriptor	no
+53212	0xCFDC	e_Type_GC_GameAction_AddComboProc	call-site	no
+53213	0xCFDD	e_Type_GC_GameAction_AddProc	descriptor	no
+53214	0xCFDE	e_Type_GC_GameAction_DrunkBrawlingSpecial	descriptor	no
+53215	0xCFDF	e_Type_GC_GameAction_SetMaxModifier	descriptor	no
+53217	0xCFE1	e_Type_GC_GameAction_Knockback	descriptor	no
+53218	0xCFE2	e_Type_GC_GameAction_EnableDefensiveStance	descriptor	no
+53219	0xCFE3	e_Type_GC_GameAction_InterpolatedHit	descriptor	no
+53220	0xCFE4	e_Type_GC_GameAction_InterpolatedModify	descriptor	no
+53221	0xCFE5	e_Type_GC_GameAction_InterpolatedTempChangeSkill	descriptor	no
+53222	0xCFE6	e_Type_GC_GameAction_InterpolatedSpawnPetACG	descriptor	no
+53223	0xCFE7	e_Type_GC_GameAction_CastingLevelModifier	descriptor	no
+53224	0xCFE8	e_Type_GC_GameAction_TeamPropagatedBuff	descriptor	no
+53225	0xCFE9	e_Type_GC_GameAction_InheritedWeaponAttack	descriptor	no
+53226	0xCFEA	e_Type_GC_GameAction_SetSpellRecastTime	descriptor	no
+53227	0xCFEB	e_Type_GC_GameAction_ResurrectTarget	descriptor	no
+53228	0xCFEC	e_Type_GC_GameAction_VisualLocation	descriptor	no
+53229	0xCFED	e_Type_GC_GameAction_StartClientSideScryScript	descriptor	no
+53230	0xCFEE	e_Type_GC_GameAction_StartServerSideScryScript	descriptor	no
+53231	0xCFEF	e_Type_GC_GameAction_StopScryScript	descriptor	no
+53232	0xCFF0	e_Type_GC_GameAction_DynamicKDTree	descriptor	no
+53233	0xCFF1	e_Type_GC_GameAction_SetBaseAnim	descriptor	no
+53234	0xCFF2	e_Type_GC_GameAction_InterpolatedMagicHit	call-site	no
+53235	0xCFF3	e_Type_GC_GameAction_CinematicCamera	descriptor	no
+53236	0xCFF4	e_Type_GC_GameAction_CombatSpecialMove	descriptor	no
+53237	0xCFF5	e_Type_GC_GameAction_PlayActionAnim	descriptor	no
+53238	0xCFF6	e_Type_GC_GameAction_StartParticleEffect	descriptor	no
+53239	0xCFF7	e_Type_GC_GameAction_StopParticleEffect	descriptor	no
+53240	0xCFF8	e_Type_GC_GameAction_AddSkinnedMesh	descriptor	no
+53241	0xCFF9	e_Type_GC_GameAction_SendScryEvent	descriptor	no
+53242	0xCFFA	e_Type_GC_GameAction_Disarm	descriptor	no
+53243	0xCFFB	e_Type_GC_GameAction_StartParticleEffectOnEquippedItem	descriptor	no
+53244	0xCFFC	e_Type_GC_GameAction_SummonMount	descriptor	no
+53245	0xCFFD	e_Type_GC_GameAction_BanishMount	descriptor	no
+53246	0xCFFE	e_Type_GC_GameAction_RegisterSubSpellForSpellLine	call-site	no
+53247	0xCFFF	e_Type_GC_GameAction_AreaKnockback	descriptor	no
+53249	0xD001	e_Type_GC_GameAction_ColumnAddTargets	descriptor	no
+53250	0xD002	e_Type_GC_GameAction_ChangeInheritedWeaponAttack	call-site	no
+53251	0xD003	e_Type_GC_GameAction_CodeHooks	call-site	no
+53252	0xD004	e_Type_GC_GameAction_OverrideMostHatedTarget	descriptor	no
+53253	0xD005	e_Type_GC_GameAction_ChargeSpecialAbility	descriptor	no
+53254	0xD006	e_Type_GC_GameAction_UpdateCommunityCharacter	call-site	no
+53255	0xD007	e_Type_GC_GameAction_AddCleaveTargets	descriptor	no
+53256	0xD008	e_Type_GC_GameAction_MagicHit	call-site	no
+53257	0xD009	e_Type_GC_GameAction_WeaponHit	call-site	no
+53259	0xD00B	e_Type_GC_GameAction_ConeFormula	descriptor	no
+53260	0xD00C	e_Type_GC_GameAction_StartClientSideScryScriptWithParams	descriptor	no
+53261	0xD00D	e_Type_GC_GameAction_StartServerSideScryScriptWithParams	descriptor	no
+53262	0xD00E	e_Type_GC_GameAction_DefensiveStance	descriptor	no
+53263	0xD00F	e_Type_GC_GameAction_ParryStance	descriptor	no
+53264	0xD010	e_Type_GC_GameAction_FrenzyStance	descriptor	no
+53265	0xD011	e_Type_GC_GameAction_ChangeSubstate	descriptor	no
+53266	0xD012	e_Type_GC_GameAction_SetCatMesh	descriptor	no
+53267	0xD013	e_Type_GC_GameAction_Fatality	descriptor	no
+53268	0xD014	e_Type_GC_GameAction_SetIdleBaseAnim	descriptor	no
+53269	0xD015	e_Type_GC_GameAction_AddTexScript	descriptor	no
+53270	0xD016	e_Type_GC_GameAction_RemoveTexScript	descriptor	no
+53271	0xD017	e_Type_GC_GameAction_Search	call-site	no
+53272	0xD018	e_Type_GC_GameAction_Sneak	call-site	no
+53273	0xD019	e_Type_GC_GameAction_AttackAddTargets	descriptor	no
+53274	0xD01A	e_Type_GC_GameAction_RefreshAirSupply	call-site	no
+53275	0xD01B	e_Type_GC_GameAction_ToggleSubstate	descriptor	no
+53276	0xD01C	e_Type_GC_GameAction_AddTexScriptWithParams	descriptor	no
+53277	0xD01D	e_Type_GC_GameAction_TryEnterDrunkenBrawling	call-site	no
+53278	0xD01E	e_Type_GC_GameAction_BindAtSetLocation	call-site	no
+53281	0xD021	e_Type_GC_GameAction_AddTag	call-site	no
+53282	0xD022	e_Type_GC_GameAction_GlobalAOERadiusModification	descriptor	no
+53283	0xD023	e_Type_GC_GameAction_GlobalSpellStatModifier	call-site	no
+53284	0xD024	e_Type_GC_GameAction_GlobalCoreSpellStatModifier	call-site	no
+53285	0xD025	e_Type_GC_GameAction_GlobalTargetSpellStatModifier	call-site	no
+53286	0xD026	e_Type_GC_GameAction_GlobalModifyGameAction	descriptor	no

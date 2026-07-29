@@ -48,6 +48,9 @@ namespace Faolan.Core.Network.Codecs.World
 		public static byte[] Build(uint typeId, uint field, uint subCount, IReadOnlyList<uint> keyValues, uint seed0x2f5 = CtorSeed0x2f5)
 		{
 			ArgumentNullException.ThrowIfNull(keyValues);
+			// An out-of-range type is an ASSERT DIALOG in the client, not a dropped packet - fail here instead
+			// (SpellData.cpp:1577; we shipped 0xD12D once and it took the client down).
+			GameActionTypeId.Validate(typeId, nameof(GameActionElement));
 			var s = new FaolanStream().WriteUInt32(typeId).WriteUInt32(field).WriteUInt32(Version).WriteUInt32(subCount)
 				.WriteUInt32(1)         // 0x2d5
 				.WriteUInt32(0)         // 0x2d6
