@@ -41,8 +41,16 @@ namespace Faolan.Core.Network.Codecs.World
 
 		// modes 2 Rotate / 10 SetPos: 7 u32 (to3 + quat4); mode 2 adds a trailing u16.
 		public uint[] Vec7 { get; set; } = new uint[7];
-		public ushort PathPacked1 { get; set; } // PathFlags & 1 branch
-		public ushort PathPacked2 { get; set; }
+		// PathFlags & 1 = the roam route is sent BY REFERENCE rather than by value: instead of an explicit waypoint
+		// list, these two u16 index the playfield's territory table (RDB 1010506, `GameData::PlayfieldTerritory_c`)
+		// which the CLIENT already holds. PathMoveTask::InitRoamPath resolves
+		// `territories[TerritoryIndex].paths[TerritoryPathIndex]` and walks it, bounds-checking both (#490). The rest
+		// of the plan - anchor, speed, duration, remaining - is sent either way, so the two forms are interchangeable
+		// encodings of one movement plan and every client reproduces the same route.
+		public ushort TerritoryIndex { get; set; }
+
+		// Index of the wander path WITHIN that territory. 0xFFFF means "no roam path" (the client's -1 guard).
+		public ushort TerritoryPathIndex { get; set; }
 		public ushort RotateTail { get; set; }
 
 		private bool HasHeaderFloats => (HeaderFlags & 1) == 0;
@@ -242,8 +250,8 @@ namespace Faolan.Core.Network.Codecs.World
 				PathFloat20 = r.ReadUInt32();
 			if ((PathFlags & 1) != 0)
 			{
-				PathPacked1 = r.ReadUInt16();
-				PathPacked2 = r.ReadUInt16();
+				TerritoryIndex = r.ReadUInt16();
+				TerritoryPathIndex = r.ReadUInt16();
 			}
 			else
 			{
@@ -281,7 +289,7 @@ namespace Faolan.Core.Network.Codecs.World
 			if ((PathFlags & 0x20) != 0)
 				s.WriteUInt32(PathFloat20!.Value);
 			if ((PathFlags & 1) != 0)
-				s.WriteUInt16(PathPacked1).WriteUInt16(PathPacked2);
+				s.WriteUInt16(TerritoryIndex).WriteUInt16(TerritoryPathIndex);
 			else
 			{
 				s.WriteUInt32(Waypoints.Count / 3);

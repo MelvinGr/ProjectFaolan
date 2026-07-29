@@ -2026,6 +2026,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<int>("ResolvedBy")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("RoamPathCount")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("NpcTemplateId");
@@ -2433,12 +2436,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("PathFloat20")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("PathPacked1")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("PathPacked2")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint?>("PathTrailerWord")
                         .HasColumnType("INTEGER");
 
@@ -2471,6 +2468,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Property<float?>("TargetZ")
                         .HasColumnType("REAL");
+
+                    b.Property<int?>("TerritoryIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("TerritoryPathIndex")
+                        .HasColumnType("INTEGER");
 
                     b.Property<byte?>("TrailerByte")
                         .HasColumnType("INTEGER");

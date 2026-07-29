@@ -14,6 +14,36 @@ creature `NpcTemplateId`, keyed by the stable `(MapId, GroupOrdinal)` pair, with
 `NpcSpawnAreaPoint` rows. The creature is inferred by `SpawnAreaResolver` (name / gated containment / guarded
 id-propagation, #363) since 1010506 carries no template — see the resolution note below.
 
+## What the CLIENT does with it
+
+The client's name for this resource is **`GameData::PlayfieldTerritory_c`**
+(`CoreGameFramework/Playfield/Data/Territory.h`). It registers an RDB constructor for the type through
+`RDBObject::RegisterConstructor` (`RDBObject.cpp`), and the reader accepts both this binary form and a legacy XML
+one — *"Non binary territory format for %u:%u, please reexport playfield"*. [V1: `AgeOfConan.exe`, the 1010506
+immediate inside `PlayfieldTerritory_c::ReadData`]
+
+Its job is **NPC roam paths**. `PathMoveTask::InitRoamPath` resolves
+`territories[territoryIndex].paths[pathIndex]` and walks it, bounds-checking both — the failure string prints
+`size=<territory count>, index=<territoryIndex>`, and a path index of `-1` means "no roam path". So a MoveTask
+can send a wander route **by reference** instead of by value: `PathFlags & 1` swaps the explicit waypoint list
+for those two u16, and the client supplies the geometry from its own copy of this resource. Everything else
+about the plan — anchor, speed, duration, remaining — is sent either way, so the two encodings are
+interchangeable and every client reproduces the same route. The link to a particular NPC is the entity handle in
+the MoveTask body; this resource carries no identity at all. See #490 and
+[`docs/subsystems/npc-three-tier-architecture.md`](../subsystems/npc-three-tier-architecture.md).
+
+Those two indices are `PatrolNode.TerritoryIndex` / `TerritoryPathIndex`, gated by
+`Faolan.Tests/TerritoryRoamPathTests.cs`: every captured value joins an existing `(MapId, GroupOrdinal)` and
+falls inside that territory's `RoamPathCount` — 56/56 captured nodes, zero misses.
+[V1: Faolan.Tests/TerritoryRoamPathTests.cs]
+
+The client also ships a **playfield debug GUI** that draws territories (`Views/PlayfieldDebugGUI/territories.xml`,
+`PDTerritoriesView_c`, `TerritoriesDrawButton`), and a Lua predicate `isinterritory`.
+
+⚠️ Do not conflate this with the OTHER "territory" in the client: `Territory Manager`, `TerritoryAddr`,
+`X-CONAN-TERRITORYID` and `Authenticate(..., territoryVersion)` are login/realm infrastructure, unrelated to
+spawn groups.
+
 ## Container
 
 Decompressed via the normal `IOz1`+zlib unwrap (`RdbReader.ReadDecompressed`). Unlike most RDB types there is

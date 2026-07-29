@@ -53,6 +53,12 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(NpcTemplateId))]
 		public virtual NpcTemplate? NpcTemplate { get; set; }
 
+		// How many wander PATHS this territory carries in the RDB (1010506 `pathCount`). The wire's MoveTask indexes
+		// into this list when it sends a roam route BY REFERENCE - `TerritoryPathIndex` on PatrolNode (#490) - so the
+		// count is what makes that index checkable. Not the paths themselves: they are space-filling samples of the
+		// roam AABB, and the AABB is the primitive the ambient spawner consumes.
+		public int RoamPathCount { get; set; }
+
 		// The primary spawn-point anchors of this group (the exact retail spots); cascade-delete with the area.
 		public virtual ICollection<NpcSpawnAreaPoint> Points { get; set; } = [];
 

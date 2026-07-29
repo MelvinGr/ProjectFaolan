@@ -35,8 +35,8 @@ namespace Faolan.Core.Network.Codecs.World
 						n.PathFloat20 = m.PathFloat20;
 					if ((m.PathFlags & 1) != 0)
 					{
-						n.PathPacked1 = m.PathPacked1;
-						n.PathPacked2 = m.PathPacked2;
+						n.TerritoryIndex = m.TerritoryIndex;
+						n.TerritoryPathIndex = m.TerritoryPathIndex;
 					}
 					else
 					{
@@ -138,8 +138,8 @@ namespace Faolan.Core.Network.Codecs.World
 						m.PathFloat20 = n.PathFloat20;
 					if ((m.PathFlags & 1) != 0)
 					{
-						m.PathPacked1 = (ushort)n.PathPacked1!.Value;
-						m.PathPacked2 = (ushort)n.PathPacked2!.Value;
+						m.TerritoryIndex = (ushort)n.TerritoryIndex!.Value;
+						m.TerritoryPathIndex = (ushort)n.TerritoryPathIndex!.Value;
 					}
 					else
 					{

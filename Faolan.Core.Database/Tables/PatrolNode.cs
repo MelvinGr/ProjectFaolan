@@ -106,8 +106,13 @@ namespace Faolan.Core.Database.Tables
 		public float? TargetRotationW { get; set; }
 
 		public int Ordinal { get; set; }
-		public int? PathPacked1 { get; set; } // PathFlags & 1 branch (u16 each)
-		public int? PathPacked2 { get; set; }
+		// PathFlags & 1: the roam route by REFERENCE into the playfield's RDB 1010506 territory table, instead of an
+		// explicit waypoint list (#490). Verified against captures - every value joins an existing
+		// NpcSpawnArea.GroupOrdinal on that NPC's map. Mutually exclusive with PatrolNodeWaypoints.
+		public int? TerritoryIndex { get; set; }
+
+		// The wander path within that territory. 0xFFFF = none.
+		public int? TerritoryPathIndex { get; set; }
 		public int? RotateTail { get; set; } // mode 2 trailing u16
 		public uint? ApproachTarget { get; set; }
 
