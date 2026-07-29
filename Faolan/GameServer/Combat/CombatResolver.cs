@@ -341,12 +341,34 @@ namespace Faolan.GameServer.Combat
 		//     level 2  163..268   (153)           level 5  481..567 (357)
 		//     level 3  264..282   (256)           level 6   613   (19)
 		//
-		// i.e. very close to 100 per level, which is also ~1.5% of a same-level player's health pool - and the same
-		// fraction the level-80 rows show, so the line holds across the range rather than fitting the beach.
+		// i.e. very close to 100 per level, which is also ~1.5% of a same-level player's health pool.
 		//
-		// MEASURED (the class header explains the method and how to re-run it). Sample sizes are in the table above:
-		// levels 1-6 are hundreds of hits each and trustworthy; there is effectively no data between 7 and 80, so
-		// this line is an EXTRAPOLATION past level 6 - see #479 for the capture that would settle it.
+		// ✅ NO LONGER AN EXTRAPOLATION (2026-07-29, #479). The high-level captures this line was waiting for exist
+		// (`NecroL80_mage-necromancer_login_combat{,2}`, a level-80 necromancer in Poitain), and the line HOLDS at the
+		// top of the range - `--report npc-damage`, the BY ATTACKER section, measured against a level-80 player:
+		//
+		//     level 75 Hired Bodyguard      7 hits   median 7324   vs 7500   = 0.98 x model
+		//     level 75 Zingaran Operative  10 hits   median 7200   vs 7500   = 0.96 x model
+		//
+		// Two unrelated templates, independently within 4% of `level * 100` at level 75. The second capture carries
+		// the client's own combat log for the same fight, so those wire figures are confirmed against what the player
+		// SAW (67-92 displayed, wire x100) rather than inferred.
+		//
+		// ⚠️ BUT the measured figure only matches this line when the mob is within ~5 LEVELS OF THE PLAYER. Sorted by
+		// the gap (player level - mob level) the observed damage collapses, and it is not armour - in one 90-second
+		// fight the same player with the same gear took 7-14 displayed from a level-72 mob and 67-92 from a level-75
+		// one:
+		//
+		//     gap 0-1 (beach)  0.77..1.52      gap 6   0.42       gap 8-10   0.10..0.14
+		//     gap 5            0.96..0.98      gap 7   0.11..0.13 gap 36+    0.01..0.11
+		//
+		// That is a retail SERVER-side rule - the client's tweak table (RDB 1000516) carries no level-difference
+		// constant, only TWK_TargetPerLevelArmor/Protection - and we do not model it. It does not affect THIS line
+		// (a server sends a mob at the player's own level through the un-penalised case), but it does mean the low
+		// `x model` ratios in the report are the penalty, not evidence against the constant. Tracked separately.
+		//
+		// A second per-archetype factor is visible and also unmodelled: RANGED mobs sit near 0.2 even at gap 0
+		// (`Poacher Marksman` 0.17, `Bat Pict Archer` 0.21) where same-level melee is ~1.0.
 		//
 		// ⚠️ The previous curve was `5 + 3 * level`, i.e. 8 at level 1 against a captured NPC/player health pool in
 		// the THOUSANDS - about 15x too weak, and the mismatch was invisible because nothing compared the two. The

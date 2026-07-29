@@ -11,6 +11,7 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -19,6 +20,7 @@ using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
+using Faolan.GameServer.Combat;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Faolan.Importer.Modules;
@@ -746,11 +748,25 @@ namespace Faolan.Importer.Cli
 			var toNpcSpell = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
 			var toNpc = new Dictionary<(uint Level, DamageSchool School), List<uint>>();
 
+			// Per-ATTACKER melee, the same hits as `fromNpc` but not collapsed into a level bucket (#479). A level
+			// bucket mixes archetypes - Poitain carries a 304,944-HP `Poitain Guard` and a 4,605-HP
+			// `Zingaran Alchemist` BOTH at level 80 - and the combat log proves how far apart they hit: a
+			// `Zingaran Stockpiler` at level 70/72 swings for 7-14 displayed while a `Hired Bodyguard` at 75 swings
+			// for 67-92, ~8x at +3 levels. Collapsed by level that reads as a sudden cliff at 74/75 and invites a
+			// curve to be fitted through it. `hitsToKill` below already makes this caveat; the melee table did not.
+			var fromNpcByAttacker = new Dictionary<(uint Template, uint Level), List<uint>>();
+			var attackerHealth = new Dictionary<(uint Template, uint Level), uint>();
+			var attackerNames = new Dictionary<uint, string>();
+			var attackerPlayerLevel = new Dictionary<(uint Template, uint Level), uint>();
+
 			foreach (var c in captures)
 			{
 				// handle -> level, for every NPC this capture spawned.
 				var levels = new Dictionary<uint, uint>();
 				var spawnHealth = new Dictionary<uint, uint>();
+				var names = new Dictionary<uint, string>();
+				var templates = new Dictionary<uint, uint>();
+				uint playerLevel = 0;
 				foreach (var e in NpcSpawnExtractor.Extract(c.Packets))
 				{
 					var spawnBody = e.Data is { Length: >= 12 }
@@ -759,9 +775,31 @@ namespace Faolan.Importer.Cli
 					if (spawnBody != null && PlayerSpawnReader.TryReadCharacterMessage(spawnBody, out var read) && read.Message.Stats is { } st)
 					{
 						levels[e.Handle] = st.Level;
+						if (!string.IsNullOrEmpty(e.Name))
+							names[e.Handle] = e.Name;
+						templates[e.Handle] = e.TemplateId;
 						if (st.Health > 0)
 							spawnHealth[e.Handle] = st.Health;
 					}
+				}
+
+				// The CAPTURING player's own level. NpcSpawnExtractor drops the player's spawn (handle >= the character
+				// instance base), which is exactly the record that carries it, so read it straight off the raw spawns.
+				// Needed because the interesting variable is not the mob's level but the GAP to the player's - see the
+				// `lvl gap` column below.
+				foreach (var p in c.Packets)
+				{
+					if (p is not { IsIirCarrier: true, SubOpcode: (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR })
+						continue;
+
+					var sb = p.Body;
+					if (sb.Length < 20 || sb.ReadU32Be(12) < EntityHandles.CharacterInstanceBase)
+						continue;
+
+					// `Body` is already past the packet prologue+header, so it IS the IIR body the reader wants -
+					// unlike NpcSpawnEntry.Data above, which is the whole packet and has to be sliced.
+					if (PlayerSpawnReader.TryReadCharacterMessage(sb, out var pread) && pread.Message.Stats is { } pst && pst.Level > playerLevel)
+						playerLevel = pst.Level;
 				}
 
 				// Track each entity's last-seen HealthCurrent from the stat updates, so a hit can be compared with the
@@ -819,14 +857,19 @@ namespace Faolan.Importer.Cli
 						if (cast.Delta >= 0)
 							continue;
 
+						// Same both-ends rule as the melee tables below: a pet is a spawned entity too, so checking only
+						// one end files the PET's own nukes as NPC casts, and a mob's DoT on the pet as damage to the player.
 						var magnitude = (uint)(-cast.Delta);
-						if (levels.TryGetValue(cast.Caster, out var casterLevel))
+						var casterIsNpc = levels.TryGetValue(cast.Caster, out var casterLevel);
+						var spellTargetIsNpc = levels.TryGetValue(cast.Target, out var spellTargetLevel);
+
+						if (casterIsNpc && !spellTargetIsNpc)
 						{
 							fromNpcSpell.TryAdd((casterLevel, cast.School), []);
 							fromNpcSpell[(casterLevel, cast.School)].Add(magnitude);
 						}
 
-						if (levels.TryGetValue(cast.Target, out var spellTargetLevel))
+						if (spellTargetIsNpc && !casterIsNpc)
 						{
 							toNpcSpell.TryAdd((spellTargetLevel, cast.School), []);
 							toNpcSpell[(spellTargetLevel, cast.School)].Add(magnitude);
@@ -853,17 +896,47 @@ namespace Faolan.Importer.Cli
 
 					pendingHits[hit.Target] = hit;
 
-					if (levels.TryGetValue(hit.Attacker, out var attackerLevel))
+					// ⚠️ BOTH directions need BOTH ends checked, not just one. `levels` holds every entity the capture
+					// spawned - which includes the player's own PETS - so testing only the attacker counted a mob
+					// hitting the necro's pet as "NPC -> PLAYER", and testing only the target counted the PET's hits
+					// as "PLAYER -> NPC". It showed: `Parasitic Soul` (a necro summon) sat in the NPC->player table
+					// as a level-80 attacker dealing 8556. An entity that is not a known spawn is the player.
+					var attackerIsNpc = levels.TryGetValue(hit.Attacker, out var attackerLevel);
+					var targetIsNpc = levels.TryGetValue(hit.Target, out var targetLevel);
+
+					if (attackerIsNpc && !targetIsNpc)
 					{
 						fromNpc.TryAdd((attackerLevel, hit.School), []);
 						fromNpc[(attackerLevel, hit.School)].Add(hit.Damage);
+
+						// ...and the same hit kept ATTRIBUTED, so the archetype spread stays visible.
+						// Keyed by TEMPLATE, never by NAME (#244): ~16 unrelated templates share the internal name
+						// "Halen van Dummy", and an elite variant routinely carries the SAME display name as its
+						// ordinary cousin - so a name key silently averages two different creatures together.
+						if (templates.TryGetValue(hit.Attacker, out var attackerTemplate))
+						{
+							var key = (attackerTemplate, attackerLevel);
+							fromNpcByAttacker.TryAdd(key, []);
+							fromNpcByAttacker[key].Add(hit.Damage);
+							if (spawnHealth.TryGetValue(hit.Attacker, out var attackerHp))
+								attackerHealth[key] = attackerHp;
+							if (names.TryGetValue(hit.Attacker, out var attackerName))
+								attackerNames[attackerTemplate] = attackerName;
+							if (playerLevel > 0)
+								attackerPlayerLevel[key] = playerLevel;
+						}
 					}
 
-					if (levels.TryGetValue(hit.Target, out var targetLevel))
+					// The kill-scale check asks "did this NPC take its own health in damage before it died", so it
+					// accumulates damage from ANY source - the player, their pet, a passing guard. Filtering it to
+					// player-only hits would undercount every mob a pet helped kill and drag the ratio down.
+					if (targetIsNpc)
+						dealtTo[hit.Target] = dealtTo.GetValueOrDefault(hit.Target) + hit.Damage;
+
+					if (targetIsNpc && !attackerIsNpc)
 					{
 						toNpc.TryAdd((targetLevel, hit.School), []);
 						toNpc[(targetLevel, hit.School)].Add(hit.Damage);
-						dealtTo[hit.Target] = dealtTo.GetValueOrDefault(hit.Target) + hit.Damage;
 
 						// ...and as a FRACTION of what that NPC actually had. A level bucket mixes a 63-health
 						// chicken with a 63,000-health elite, so a median damage figure across it means nothing;
@@ -901,7 +974,28 @@ namespace Faolan.Importer.Cli
 			foreach (var (ratio, n) in scaleRatios.OrderByDescending(k => k.Value).Take(6))
 				Console.WriteLine($"{ratio,8:F2} {n,6}");
 
-			Report("NPC -> PLAYER (what ResolveNpcAttackDamage should reproduce)", fromNpc, level => 5 + level * 3);
+			// The model is the SERVER's, called - not a copy of it. This column used to hardcode `5 + level * 3`, a
+			// formula the server had already replaced with `level * 100`, so it spent that time reporting our fit
+			// against a curve nothing ran (#479).
+			Report("NPC -> PLAYER (what ResolveNpcAttackDamage should reproduce)", fromNpc, CombatResolver.ResolveNpcAttackDamage);
+
+			// Per attacker, so the archetype spread is visible instead of averaged away. `x model` is the measured
+			// median over what the server would deal at that level: ~1.0 means the level curve fits this attacker.
+			Console.WriteLine($"\n=== NPC -> PLAYER, BY ATTACKER (the level buckets above mix archetypes) ===");
+			Console.WriteLine($"{"level",5} {"tpl",8} {"attacker",-24} {"hits",5} {"min",7} {"median",7} {"max",7} {"ours",7} {"x model",8} {"pc lvl",7} {"lvl gap",8}");
+			foreach (var ((template, level), hits) in fromNpcByAttacker.OrderBy(k => k.Key.Level).ThenBy(k => k.Key.Template))
+			{
+				var sorted = hits.Order().ToList();
+				var median = sorted[sorted.Count / 2];
+				var ours = CombatResolver.ResolveNpcAttackDamage(level);
+				var pcLvl = attackerPlayerLevel.GetValueOrDefault((template, level));
+				Console.WriteLine($"{level,5} {template,8} {Trunc(attackerNames.GetValueOrDefault(template, "?"), 24),-24} {sorted.Count,5} {sorted[0],7} {median,7} {sorted[^1],7} {ours,7} {(ours > 0 ? (double)median / ours : 0),8:F2} {(pcLvl > 0 ? pcLvl.ToString() : "-"),7} {(pcLvl > 0 ? ((int)pcLvl - (int)level).ToString() : "-"),8}");
+			}
+
+			static string Trunc(string s, int n)
+			{
+				return s.Length <= n ? s : s[..n];
+			}
 			Report("PLAYER -> NPC (the shape an NPC-armour model has to reproduce)", toNpc, null);
 			Console.WriteLine($"\n=== PLAYER -> NPC as a FRACTION of the target's own health ===");
 			Console.WriteLine($"{"level",5} {"hits",6} {"median %",9} {"hits-to-kill",13}");
