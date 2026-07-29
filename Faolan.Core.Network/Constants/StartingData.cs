@@ -21,6 +21,24 @@ namespace Faolan.Core.Network.Constants
 		// Universal: the Slave Manacles worn on the wrist (slot 0x12) by every fresh beach character.
 		public const uint StartingWristItem = 3361557; // Slave Manacles
 
+		// The 0x205A PerformSpecialAction selector that toggles a caster's SPELLWEAVE, per class. It is NOT one shared
+		// id: the necromancer's activate/deactivate is 0xFC and the demonologist's is 0x10C, and each class uses only
+		// its own - across the whole corpus the three NecroL80 (necromancer) spellweave captures carry 0xFC and never
+		// 0x10C, while both DemoL80 (demonologist) captures carry 0x10C and never 0xFC.
+		//
+		// What proves they are the SAME mechanic rather than two unrelated actions is the server's answer: both produce
+		// the identical player BehaviorControlCenterIIR pair - behaviour 42041 to open the trance, then 41302 to close
+		// it - with the same slot 1 and form 4. Two selectors, one behaviour pair.
+		//
+		// Priest of Mitra and Tempest of Set also weave (docs/subsystems/combos.md) but no capture shows either one
+		// doing it, so they are deliberately absent rather than guessed: an unmapped class logs and does nothing, which
+		// is visible, where a wrong id would silently start a weave on the wrong input.
+		public static readonly ImmutableDictionary<ConanClass, uint> SpellweaveToggleAction = new Dictionary<ConanClass, uint>
+		{
+			[ConanClass.Necromancer] = 0xFC,
+			[ConanClass.Demonologist] = 0x10C
+		}.ToImmutableDictionary();
+
 		// Each race's HOME city - where the Totem of Origins sends you. This is a DIFFERENT destination from the bind
 		// point: the Path of Asura spell recalls to the bound location (the bindstone/Wayfarer point the player last
 		// set), while the Totem returns you to your race's origin regardless of where you are bound. Both used to

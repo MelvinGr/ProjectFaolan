@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
@@ -48,6 +49,35 @@ namespace Faolan.Tests
 			var bytes = SpellweaveCodec.BuildStatGauge(0x0802E5D4, 602395, -31705, SpellweaveCodec.DotGauge, SpellweaveCodec.DotScale);
 			Assert.Equal("e9f241840000c3500802e5d4000009311b0000000000000000000000000000001b00000002ffff8427000000000000c3500802e5d400000001000000000037e69000000050000000000000000000000000",
 				Convert.ToHexStringLower(bytes));
+		}
+
+		// The spellweave toggle selector is PER CLASS (docs/subsystems/player-actions.md): necromancer 0xFC,
+		// demonologist 0x10C. It used to be a single 0xFC constant, which meant a demonologist could never weave -
+		// their 0x10C fell through the handler's switch and was only logged.
+		//
+		// The other half of this is what must NOT be in the map. 0x205A is the generic player-action channel, so a
+		// selector wrongly mapped here starts a trance on an unrelated keypress - which has happened: routing every
+		// 0x205A to spellweave made 0xFF (open the crafting recipe book) begin a weave on a necromancer. 0xFF and the
+		// four melee combo inputs are the selectors that regression is made of, so they are asserted absent.
+		[Fact]
+		public void SpellweaveToggleAction_IsPerClass_AndClaimsNoOtherSelector()
+		{
+			Assert.Equal(0xFCu, StartingData.SpellweaveToggleAction[ConanClass.Necromancer]);
+			Assert.Equal(0x10Cu, StartingData.SpellweaveToggleAction[ConanClass.Demonologist]);
+
+			// A shared id would silently re-create the original bug for one of the two classes.
+			Assert.Equal(StartingData.SpellweaveToggleAction.Count, StartingData.SpellweaveToggleAction.Values.Distinct().Count());
+
+			// Non-weaving selectors must never resolve to a trance for ANY class.
+			uint[] notWeaves = [0xFF, 0x6C, 0x6D, 0x70, 0xF0, 0x64, 0x68, 0x6A, 0x4E1, 0x4E2, 0x4E4, 0x4E6];
+			var collisions = StartingData.SpellweaveToggleAction.Where(kv => notWeaves.Contains(kv.Value))
+				.Select(kv => $"{kv.Key} -> 0x{kv.Value:X}").ToList();
+			Assert.True(collisions.Count == 0, $"Spellweave selectors collide with non-weave 0x205A actions: {string.Join(", ", collisions)}");
+
+			// Priest of Mitra and Tempest of Set weave in retail but no capture shows either doing it - deliberately
+			// unmapped rather than guessed. If a capture ever lands, add the row and delete these two lines.
+			Assert.False(StartingData.SpellweaveToggleAction.ContainsKey(ConanClass.PriestOfMitra));
+			Assert.False(StartingData.SpellweaveToggleAction.ContainsKey(ConanClass.TempestOfSet));
 		}
 
 		[Fact]

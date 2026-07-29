@@ -1307,21 +1307,26 @@ namespace Faolan.GameServer
 				case GameCharAgentOpcodes.PerformSpecialAction:
 				{
 					// 0x205A PerformSpecialAction is a GENERIC action opcode multiplexed by its body word, NOT a
-					// spellweave-only toggle: 0xFC = the necro spellweave activate/deactivate toggle (all 3 NecroL80
-					// spellweave captures), 0xFF = open the Crafting -> Recipes book, 0x6C/0x6D/0x70/0xF0 = melee
-					// combo inputs (Hoxxling/AssassinL23 combo captures). Only 0xFC drives the trance - blindly routing
-					// every 0x205A to spellweave made opening the recipe book start a weave on a necro.
+					// spellweave-only toggle. The selector catalog is docs/subsystems/player-actions.md; the ones routed
+					// here are the spellweave toggle (0xFC necro / 0x10C demonologist - PER CLASS, see
+					// StartingData.SpellweaveToggleAction) and the Path of Asura recall. 0xFF = open the Crafting ->
+					// Recipes book and 0x6C/0x6D/0x70/0xF0 = melee combo inputs, so neither may reach the trance -
+					// blindly routing every 0x205A to spellweave made opening the recipe book start a weave on a necro.
 					var action = body.ReadUInt32();
 
 					Logger.LogInformation("0x205A (PerformSpecialAction) param={Action:X4}", action);
 
+					// The spellweave selector is the CLASS's own, so a demonologist's 0x10C opens a trance while a
+					// necromancer's 0x10C does not (and vice-versa for 0xFC) - matching retail, where each class only
+					// ever sends its own id.
+					if (StartingData.SpellweaveToggleAction.TryGetValue(client.Session.Character.Class, out var weaveAction) && action == weaveAction)
+					{
+						await _spellweave.ToggleAsync(client, action);
+						break;
+					}
+
 					switch (action)
 					{
-						case SpellweaveToggleParam:
-						{
-							await _spellweave.ToggleAsync(client, action);
-							break;
-						}
 
 						// Path of Asura: a recall to the BOUND location (#206). NOT the same destination as the Totem of
 						// Origins, which returns to the racial home city. The client double-sends the action (capture

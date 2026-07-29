@@ -78,10 +78,9 @@ namespace Faolan.GameServer
 		private const uint ShieldOfTheRisenBase1 = 4061768; // 1h  (wire (base<<8) = 0x3DFA4800)
 		private const uint ShieldOfTheRisenBase2 = 3666828; // 10h (wire (base<<8) = 0x37F38C00)
 
-		// The 0x205A PerformSpecialAction body word that identifies the necro spellweave activate/deactivate toggle
-		// (0xFC across all NecroL80 spellweave captures). Other 0x205A actions (0xFF crafting book, combo inputs) are NOT
-		// spellweaves.
-		private const uint SpellweaveToggleParam = 0xFC;
+		// (The spellweave activate/deactivate selector used to live here as a single 0xFC constant. It is PER CLASS -
+		// necromancer 0xFC, demonologist 0x10C - so it moved to StartingData.SpellweaveToggleAction, which carries the
+		// corpus evidence for each row.)
 		// The create-flow packets build each endpoint through Endpoints.Endpoint(type, id) with the client instance
 		// (the character's real id) woven into the sender/receiver conversation id.
 

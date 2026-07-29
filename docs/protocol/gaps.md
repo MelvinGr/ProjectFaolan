@@ -127,3 +127,19 @@ and the id space follows. ⚠️ Note the magnitude while doing it — `0x01EDA8
 playfield table, the key is the token rather than the map id. We send the captured constant for every online friend,
 so today every online friend renders as whatever that id happens to name.
 
+
+### The `0x205A` selectors `0x10D` and `0x11C`
+**Tracked: Gitea #505.** [V0: 0x205A selectors 0x10D and 0x11C are unidentified] Two `PerformSpecialAction`
+selectors appear in the chat-annotated gameplay walkthrough with no annotation covering them and no other
+capture to cross-check against: `0x10D` (twice, bracketing the mount annotation) and `0x11C` (six times,
+between the combat toggle and the search/hide/rest triple). Both are single-capture sightings, which is exactly
+the evidence level the rest of [docs/subsystems/player-actions.md](../subsystems/player-actions.md) refuses to
+name a selector on.
+
+`0x11C` is the more interesting of the two: unlike every other selector in that capture it draws **no**
+player-addressed `BehaviorControlCenterIIR` at all, so either it is one of the few genuinely client-local
+actions or retail ignored it in that session. Six presses in five seconds also reads like a repeated key rather
+than a stance. `0x10D` does draw a BCC and sits either side of `got on blue snow mamoth mount`, so the mount
+call/dismiss is the obvious first hypothesis to test.
+
+A capture that walks the mount and the remaining action-bar buttons while annotating each one settles both.
