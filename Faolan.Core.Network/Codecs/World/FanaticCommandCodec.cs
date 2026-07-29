@@ -31,8 +31,11 @@ namespace Faolan.Core.Network.Codecs.World
 	//
 	// - `word0` is **2** for every command observed - it is not a command id, and the command itself is entirely in the
 	//   TEXT. So dispatch is a string parse, exactly as the client's own log ("Received command string : <text>") says.
-	// - If BOTH targetA and targetB are 0 the client substitutes the pair at obj+8, so 0/0 means "no explicit target",
-	//   which is what a self-targeted command sends.
+	// - The TARGET PAIR is `(entityClass, handle)` - a dynel reference, not two opaque words. Measured by running the
+	//   same `/cloak` with and without a target selected: nothing targeted sends `0/0`, and self-targeted sends
+	//   `0x0000C350 / 0x0802E5D4` - the Character class and the sender's own handle, which is the same handle the
+	//   carrier carries. `0/0` therefore means "no explicit target", and the client's reader treats it as such by
+	//   substituting its own obj+8 pair.
 	//
 	// ⚠️ The text's length prefix is a **u32**, not the u16 our wire strings normally use - `BinaryStream::ReadString`
 	//   reads four bytes and rejects anything over 0xFFFFFF with "string size is too long". Reading it as a u16 takes

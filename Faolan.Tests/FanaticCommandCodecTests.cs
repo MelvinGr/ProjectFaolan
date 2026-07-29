@@ -23,6 +23,28 @@ namespace Faolan.Tests
 		private const string TeleportRecord =
 			"00000030EE4AA85C0000C3500802E5D400000000020000000000000000000000132F74656C65706F727420676D2069736C616E64";
 
+		// The same `/cloak`, but with the sender targeting THEMSELVES - the only difference is the target pair.
+		private const string CloakSelfTargetedRecord =
+			"00000023EE4AA85C0000C3500802E5D400000000020000C3500802E5D4000000062F636C6F616B";
+
+		// The target pair is a dynel reference (entityClass, handle), not two opaque words: untargeted sends 0/0,
+		// self-targeted sends the Character class 0xC350 and the sender's own handle.
+		[Fact]
+		public void TargetPair_IsAnEntityClassAndHandle()
+		{
+			var none = FanaticCommandCodec.TryParse(Convert.FromHexString(CloakRecord))!.Value;
+			var self = FanaticCommandCodec.TryParse(Convert.FromHexString(CloakSelfTargetedRecord))!.Value;
+
+			Assert.Equal("/cloak", none.Text);
+			Assert.Equal("/cloak", self.Text);
+
+			Assert.Equal(0u, none.TargetA); // nothing targeted
+			Assert.Equal(0u, none.TargetB);
+
+			Assert.Equal(0xC350u, self.TargetA);       // entity class
+			Assert.Equal(self.Handle, self.TargetB);   // ...and the sender's own handle: self-target
+		}
+
 		[Theory]
 		[InlineData(CloakRecord, "/cloak")]
 		[InlineData(TeleportRecord, "/teleport gm island")]

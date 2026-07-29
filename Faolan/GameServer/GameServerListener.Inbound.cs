@@ -491,13 +491,36 @@ namespace Faolan.GameServer
 				case GameServer0X2000Opcodes.FanaticCommandIir:
 				{
 					var fanatic = FanaticCommandCodec.TryParse(rawPayload);
-					// The raw body rides along at Debug: the c2s grammar has no capture behind it (the corpus holds no
-					// GM session), so the bytes are the only way to check a parse against reality.
-					Logger.LogInformation("GameServer FanaticCommandIIR: text='{Text}' word0={Word0} ({RawLength} bytes) raw={Raw}",
-						fanatic?.Text, fanatic?.Word0, rawPayload.Length, Convert.ToHexString(rawPayload));
-					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, fanatic is { } f
-						? $"GM command received: '{f.Text}' (word0 {f.Word0}, targets {f.TargetA}/{f.TargetB}). The server's reply is not decoded yet (#448)."
-						: $"GM command received but the FanaticCommandIIR body did not parse ({rawPayload.Length} bytes).");
+					// The raw body rides along: the c2s grammar has no capture behind it (the corpus holds no GM
+					// session), so the bytes are the only way to check a parse against reality.
+					Logger.LogInformation("GameServer FanaticCommandIIR: text='{Text}' word0={Word0} targets=({TargetA:X8},{TargetB:X8}) ({RawLength} bytes) raw={Raw}",
+						fanatic?.Text, fanatic?.Word0, fanatic?.TargetA, fanatic?.TargetB, rawPayload.Length, Convert.ToHexString(rawPayload));
+
+					if (fanatic is not { } f)
+					{
+						await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+							$"GM command received but the FanaticCommandIIR body did not parse ({rawPayload.Length} bytes).");
+						break;
+					}
+
+					// The client's own GM commands run through the SAME table as our `.` ones: the command is entirely
+					// in the text (`word0` is a constant 2), and it arrives as "/verb args" - the exact shape
+					// HandleGmCommand already parses. So `/teleport` reaches the same implementation as `.teleport`,
+					// and every command we add is reachable both ways (#448).
+					//
+					// Still gated server-side on the account: the client only OFFERS these when gm_level is non-zero,
+					// but that is a value we send it, so it cannot be the authority on who may run them.
+					if (client.Session.Account!.Type < AccountType.GameMaster)
+					{
+						Logger.LogWarning("FanaticCommandIIR '{Text}' from non-GM account {Account} ignored.", f.Text, client.Session.Account.Id);
+						break;
+					}
+
+					if (f.Text.Length > 1 && f.Text[0] == '/')
+						await HandleGmCommand(client, f.Text);
+					else
+						await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+							$"GM command received with no verb ('{f.Text}').");
 					break;
 				}
 

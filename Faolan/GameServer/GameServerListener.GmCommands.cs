@@ -311,7 +311,11 @@ namespace Faolan.GameServer
 				}
 			}
 			else
-				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"Unknown command: '{command}' type .help for info");
+				// Echo the prefix the caller actually used: the same table serves our `.cmd` chat commands and the
+				// client's own `/cmd` GM commands (FanaticCommandIIR), and telling a `/teleport` user to "type .help"
+				// with the wrong prefix reads as a different tool.
+				await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
+					$"Unknown command: '{command}' - type {commandText[0]}help for info");
 		}
 
 		// QueuePetCommand (0x205B, GameCharAgent): the pet command bar. Body = [u32 type=0xC350][u32 petHandle]
@@ -346,6 +350,11 @@ namespace Faolan.GameServer
 				["help"] = (client, _) => SendGmHelpText(client.Session.Character.Id),
 				["maps"] = (client, arguments) => SendListAllMaps(client.Session.Character.Id, arguments),
 				["teleport"] = TeleportCommand,
+				// The retail client's own verbs for the same thing, so a GM's muscle memory works: the client
+				// registers /teleport, /teleportself and /tp all under the TeleportSelf privilege, and its
+				// FanaticCommandIIR routes through this same table (#448).
+				["teleportself"] = TeleportCommand,
+				["tp"] = TeleportCommand,
 				["position"] = (client, _) => PositionCommand(client),
 				["recall"] = (client, _) => RecallToBindCommand(client),
 				["level"] = SetLevelCommand,
