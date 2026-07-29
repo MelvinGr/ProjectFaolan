@@ -102,8 +102,19 @@ namespace Faolan.Importer.Modules
 				if (!npcByTemplate.TryGetValue(template, out var npc))
 					continue;
 
-				var existing = await ctx.Db.NpcChatter.Where(c => c.NpcTemplateId == npc.TemplateId).ToListAsync();
+				// Load the parameter CHILDREN too, and delete them explicitly. Removing a parent EF loaded without its
+				// children leaves EF unaware of them, so it cannot order their delete ahead of the new rows' insert -
+				// which collided on the child key the moment the slots became rows (#493).
+				var existing = await ctx.Db.NpcChatter.Include(c => c.Parameters).Where(c => c.NpcTemplateId == npc.TemplateId).ToListAsync();
+				ctx.Db.NpcChatterParameter.RemoveRange(existing.SelectMany(c => c.Parameters));
 				ctx.Db.NpcChatter.RemoveRange(existing);
+
+				// Deduped by the bark's KEY, not by its captured text. Two sightings of one bark differ in the text
+				// whenever it names the addressed player - `value="7;NecroL80"` vs `value="7;Sonja"` are two strings and
+				// one line - so a text-keyed set yields two rows on the same (template, channel, sayinchat) key. That
+				// was latent while a bark carried at most one name-only slot; it surfaced as a duplicate-key insert on
+				// the parameter child table as soon as the slots became rows (#493).
+				var byKey = new Dictionary<(string Channel, uint SayInChat), Core.Database.Tables.NpcChatter>();
 				foreach (var text in texts)
 				{
 					// COLUMNIZED, not stored verbatim: a bark whose token/attributes we cannot lift is REJECTED rather
@@ -121,9 +132,14 @@ namespace Faolan.Importer.Modules
 					if (RemoteFormatXml.BuildChatter(row, parameterValue) != text)
 						throw new InvalidOperationException($"NPC {npc.TemplateId} bark is not byte-exact round-trippable from columns: {text}");
 
-					ctx.Db.NpcChatter.Add(row);
-					lines++;
+					// First sighting wins. They describe the same line, and the differing part is exactly the session
+					// value that is not stored anyway - so there is nothing to choose between them.
+					if (byKey.TryAdd((row.Channel, row.SayInChat), row))
+						lines++;
 				}
+
+				foreach (var row in byKey.Values)
+					ctx.Db.NpcChatter.Add(row);
 
 				npcs++;
 			}
