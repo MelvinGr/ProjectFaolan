@@ -82,8 +82,17 @@ be correlated from captures. `NpcSpawnLayout.SpawnGroup` keeps the raw `Id` stri
   server-authoritative (sent on the wire at spawn), and is **not** in the client RDB — confirmed via the empty
   spawn-export types (`1000077/78/79`), MonsterData being a many-to-one render model, and the 4-char code being
   absent from every other resource. So the creature can only be inferred from captures (`SpawnAreaResolver`:
-  name / gated containment / guarded id-propagation), which resolves ~500 of the 2,664 areas; the rest await
+  name / gated containment / guarded id-propagation), which resolves **186 of the 2,664 areas**; the rest await
   captures or a manual pass. See #363.
+
+  Id-propagation is deliberately narrow: a numeric id names a *family*, not a species, so a creature learned for
+  a `(Category, CommunityId)` key is propagated only to areas on a map where that key was itself resolved by
+  name or containment (#489). Without that gate it reached 329 areas on just 6 creatures — Poitain's 29 groups
+  all read `Panther` off a key whose only captured panthers are in Tortage, while Poitain's own captures say
+  Wild Pig and Wild Cow. With it the tier covers 10 areas. `SpawnAreaResolver` also resets its own machine
+  assignments before re-deriving, so it is idempotent and a rules change actually reaches existing rows; a
+  `Manual` assignment (`.setnpcgroup`) is never touched. Re-run it over the DB alone with
+  `dotnet run --project Faolan.Importer -- --report resolve-spawn-areas`.
 - **`NpcSpawnArea` is kept separate from the capture-derived `NpcSpawn` set** — the former is the RDB-authoritative
   ambient population (roaming groups), the latter is exact hand-placed / named / scripted entities. The long-term
   plan is for a captured NPC confirmed to belong to an area to graduate out of `NpcSpawn` into its area.

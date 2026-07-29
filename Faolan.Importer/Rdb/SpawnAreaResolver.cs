@@ -14,9 +14,14 @@ namespace Faolan.Importer.Rdb
 	// many but never WHICH (#363). Three confidence tiers, applied in order, never overwriting a Manual assignment:
 	//   1. Name         - the group name / Name-id (4-char tag stripped) matches a spawnable NpcTemplate by name.
 	//   2. Containment  - the most-common captured NpcSpawn inside the roam bounds (unanimous, >= 2). Captured maps only.
-	//   3. IdPropagation- an id->creature learned from tiers 1-2, propagated to a same-id group, GUARDED: a group whose
-	//                     own name contradicts the id's creature (Slaver1 under Poacher's Community 60) is left alone.
-	// Measured coverage on the current data: ~500 of 2,664 areas (~21% of points). The rest await captures / a manual pass.
+	//   3. IdPropagation- an id->creature learned from tiers 1-2, propagated to a same-id group, doubly GUARDED:
+	//                     the group's own name must not contradict the id's creature (Slaver1 under Poacher's
+	//                     Community 60 is left alone), AND the id must have been resolved by tier 1-2 on THAT MAP
+	//                     (#489) - a numeric id names a family, not a species, so an observation on one playfield
+	//                     says nothing about the same family on another.
+	// Machine assignments are RESET at the start, so this is idempotent and a rules change reaches existing rows;
+	// a Manual assignment is never touched. Measured coverage: 186 of 2,664 areas. The rest await captures / a
+	// manual `.setnpcgroup` pass - honestly unknown rather than wrongly guessed.
 	public static class SpawnAreaResolver
 	{
 		private const float ContainPad = 10f; // captured-spawn search: pad the roam AABB by this (world units), X/Z
@@ -76,6 +81,19 @@ namespace Faolan.Importer.Rdb
 			var contain = 0;
 			var idprop = 0;
 
+			// ---- Reset every MACHINE assignment first (#489) ----
+			// Without this the resolver is not idempotent and a rule change cannot take effect: tier 3 only ever
+			// touches areas still at None, so an area already carrying a (now-disallowed) IdPropagation guess would
+			// simply be skipped and keep it forever. Manual is a human's answer and is never touched.
+			foreach (var a in areas)
+			{
+				if (a.ResolvedBy == SpawnResolutionSource.Manual)
+					continue;
+
+				a.NpcTemplateId = null;
+				a.ResolvedBy = SpawnResolutionSource.None;
+			}
+
 			// ---- Tier 1: name ----
 			foreach (var a in areas)
 			{
@@ -117,6 +135,10 @@ namespace Faolan.Importer.Rdb
 			// Learn (category, id) -> creature + the defining name-families, from tier-1/2 resolutions.
 			var idVotes = new Dictionary<(string, uint), Dictionary<uint, int>>();
 			var idDefiningFamilies = new Dictionary<(string, uint), HashSet<string>>();
+			// Which MAPS a key was actually observed on (#489). A numeric id names a family, not a species, so an
+			// observation on one playfield says nothing about the same family on another - Poitain's 29 groups all
+			// became Panther off a (Superfamily, 4) key whose only captured panthers are in Tortage.
+			var idEvidenceMaps = new HashSet<(string, uint, uint)>();
 			foreach (var a in areas)
 			{
 				if (a.ResolvedBy is not (SpawnResolutionSource.Name or SpawnResolutionSource.Containment) || a.NpcTemplateId is not { } tid)
@@ -131,6 +153,7 @@ namespace Faolan.Importer.Rdb
 				if (!idDefiningFamilies.TryGetValue(key, out var fams))
 					idDefiningFamilies[key] = fams = [];
 				fams.Add(Family(a.GroupName));
+				idEvidenceMaps.Add((a.Category, cid, a.MapId));
 			}
 
 			var idMap = new Dictionary<(string, uint), uint>();
@@ -150,6 +173,13 @@ namespace Faolan.Importer.Rdb
 
 				var key = (a.Category, cid);
 				if (!idMap.TryGetValue(key, out var creatureTid))
+					continue;
+
+				// SAME-MAP EVIDENCE (#489): the key must have been resolved by name/containment on THIS playfield.
+				// Without it, 319 of 329 propagations (3697 NPCs across 17 maps) rested on an observation made
+				// somewhere else entirely. An area with no local evidence stays None - honestly unknown, and
+				// `.setnpcgroup` remains the way to answer it.
+				if (!idEvidenceMaps.Contains((a.Category, cid, a.MapId)))
 					continue;
 
 				var fam = Family(a.GroupName);

@@ -58,13 +58,16 @@ unrotated case is ruled out. The full-resolution visual overlay decides it in on
   ratio against the map surface, which is why every group also carries a direct label and the `.txt` table
   ships beside the PNG. Do not drop either.
 - A **dashed** group edge means its creature was `IdPropagation` — learned from one `Name`/`Containment`
-  resolution and stamped onto every same-id group, so it is a guess, not a match. This is a deliberate secondary
-  encoding rather than a fourth hue: confidence is a different question from category, and palette slot 4 would
-  fail the all-pairs floors against slot 2 anyway. It matters — across the DB `IdPropagation` covers 329 areas
-  but only **6 distinct creatures**, versus 170 areas / 14 creatures for the trustworthy `Name` tier. On Poitain
-  all 29 "resolved" groups are id-propagated to `Panther` from a `(Superfamily, 4)` key whose only captured
-  Panthers are 14 spawns in Tortage; a superfamily is a whole family, so one species standing for all of it is
-  very likely wrong. The `.txt` table carries the same provenance in a `via` column.
+  resolution and propagated to a same-id group, so it is an inference rather than a match. This is a deliberate
+  secondary encoding rather than a fourth hue: confidence is a different question from category, and palette
+  slot 4 would fail the all-pairs floors against slot 2 anyway. The `.txt` table carries the same provenance in
+  a `via` column (`name` / `containment` / `id-prop` / `manual` / `unresolved`).
+
+  This encoding is what surfaced #489: id-propagation used to run without requiring the creature to have been
+  seen on the target map, so 319 of 329 propagations (3697 NPCs across 17 maps) were unsupported — Poitain's 29
+  groups all read `Panther` from a `(Superfamily, 4)` key whose only captured panthers are in Tortage, while
+  Poitain's own captures say Wild Pig and Wild Cow. With the same-map evidence gate the tier is down to 10 areas
+  and Poitain renders 2 containment-resolved groups against 34 honest unknowns.
 - Each group's label is `<name> ×<MaxCount>` — its population. `MaxCount` equals the group's anchor-point count
   for all 2664 areas in the DB, so the one number says both. Because group boxes overlap and abut, labels are
   decluttered by nudging each one down (into its own box) until it clears the already-placed ones and the

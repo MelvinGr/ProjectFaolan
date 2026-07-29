@@ -266,6 +266,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "resolve-spawn-areas":
+				{
+					await ResolveSpawnAreas();
+					return 0;
+				}
+
 				case "spell-template":
 				{
 					var rdbDir = RdbDir();
@@ -2555,6 +2561,36 @@ namespace Faolan.Importer.Cli
 			}
 
 			Console.WriteLine($"terrain-export: {written} maps written ({totalBytes / 1024 / 1024} MB total), {skipped} maps with no terrain, into {outDir}.");
+		}
+
+		// Re-run the NpcSpawnArea creature resolver over the DB alone - no RDB, no captures (#363/#489). The resolver
+		// resets its own machine assignments and re-derives all three tiers, so this is idempotent and is how a
+		// change to the resolution RULES reaches the committed faolan.db without a full RDB spawn re-import. Manual
+		// assignments (`.setnpcgroup`) are never touched. Run:
+		//   dotnet run --project Faolan.Importer -- --report resolve-spawn-areas
+		private static async Task ResolveSpawnAreas()
+		{
+			await using var db = OpenDb();
+
+			async Task<string> Tally()
+			{
+				var rows = await db
+					.NpcSpawnAreas.GroupBy(a => a.ResolvedBy)
+					.Select(g => new
+					{
+						Tier = g.Key,
+						Areas = g.Count(),
+						Pop = g.Sum(a => a.MaxCount),
+						Creatures = g.Select(a => a.NpcTemplateId).Distinct().Count()
+					})
+					.ToListAsync();
+				return string.Join("\n", rows.OrderBy(r => r.Tier).Select(r => $"    {r.Tier,-14} areas={r.Areas,5}  population={r.Pop,6}  distinct creatures={r.Creatures}"));
+			}
+
+			Console.WriteLine("before:\n" + await Tally());
+			var stats = await SpawnAreaResolver.ResolveAsync(db);
+			Console.WriteLine($"resolved: name={stats.Name} containment={stats.Containment} id-propagation={stats.IdProp}");
+			Console.WriteLine("after:\n" + await Tally());
 		}
 
 		// The playfield's world-unit width (1070003 <tilemap Width>), for the heightmap cell size. 0 if unavailable.

@@ -92,6 +92,90 @@ namespace Faolan.Tests
 			}
 		}
 
+		// #489: a numeric id names a FAMILY, not a species, so an observation on one playfield says nothing about the
+		// same family on another. Before this gate 319 of 329 propagations (3697 NPCs across 17 maps) rested on
+		// evidence from a different map - Poitain's 29 groups all became "Panther" off a (Superfamily, 4) key whose
+		// only captured panthers are in Tortage, while that map's own captures say Wild Pig / Wild Cow.
+		[Fact]
+		public async Task IdPropagation_Requires_Same_Map_Evidence()
+		{
+			var path = Path.Combine(Path.GetTempPath(), $"faolan-resolver-x-{Guid.NewGuid():N}.db");
+			try
+			{
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					await Seed(db);
+					db.Maps.Add(new Map
+					{
+						Id = 4020,
+						Name = "City of Tortage"
+					});
+					// Same Race 31 key, but on a map with no local name/containment resolution of it.
+					db.NpcSpawnAreas.Add(Area(4020, 0, "Ape7", "Race", 31, 500, 500, 510, 510));
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+					await SpawnAreaResolver.ResolveAsync(db);
+				}
+
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					var onEvidenceMap = await db.NpcSpawnAreas.SingleAsync(a => a.MapId == 4010 && a.GroupOrdinal == 3, TestContext.Current.CancellationToken);
+					Assert.Equal(101u, onEvidenceMap.NpcTemplateId); // Ape5, same map as the Ape2 that defined Race 31
+					Assert.Equal(SpawnResolutionSource.IdPropagation, onEvidenceMap.ResolvedBy);
+
+					var offEvidenceMap = await db.NpcSpawnAreas.SingleAsync(a => a.MapId == 4020, TestContext.Current.CancellationToken);
+					Assert.Null(offEvidenceMap.NpcTemplateId); // no Race 31 evidence on 4020 - honestly unknown
+					Assert.Equal(SpawnResolutionSource.None, offEvidenceMap.ResolvedBy);
+				}
+			}
+			finally
+			{
+				TestDb.Delete(path);
+			}
+		}
+
+		// The resolver must be IDEMPOTENT: it resets machine assignments before re-deriving, so a rule change can
+		// actually take effect. Tier 3 only ever fills areas still at None, so without the reset an area already
+		// carrying a now-disallowed guess would be skipped and keep it forever.
+		[Fact]
+		public async Task Stale_Machine_Assignment_Is_Cleared_When_No_Longer_Supported()
+		{
+			var path = Path.Combine(Path.GetTempPath(), $"faolan-resolver-r-{Guid.NewGuid():N}.db");
+			try
+			{
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					db.Maps.Add(new Map
+					{
+						Id = 4010,
+						Name = "Tortage Island"
+					});
+					db.NpcTemplates.Add(Spawnable(101, "Jungle Ape"));
+					// A guess left over from an earlier run, with nothing in this DB supporting it.
+					var stale = Area(4010, 0, "Territory1", "Superfamily", 4);
+					stale.NpcTemplateId = 101;
+					stale.ResolvedBy = SpawnResolutionSource.IdPropagation;
+					db.NpcSpawnAreas.Add(stale);
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+					await SpawnAreaResolver.ResolveAsync(db);
+				}
+
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					var a = await db.NpcSpawnAreas.SingleAsync(TestContext.Current.CancellationToken);
+					Assert.Null(a.NpcTemplateId);
+					Assert.Equal(SpawnResolutionSource.None, a.ResolvedBy);
+				}
+			}
+			finally
+			{
+				TestDb.Delete(path);
+			}
+		}
+
 		private static NpcSpawnArea Area(uint map, int ord, string groupName, string cat, uint? communityId, float minX = 0, float minZ = 0, float maxX = 0, float maxZ = 0)
 		{
 			return new NpcSpawnArea
