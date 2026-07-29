@@ -91,7 +91,13 @@ namespace Faolan.Importer.Captures
 				var minLevel = (byte)Math.Clamp(g.Min(x => (int)x.Level), 1, 255);
 				if (existing.TryGetValue(g.Key, out var row))
 				{
-					if (row.Level != minLevel)
+					// LOWER only. The level means "the earliest level this class is observed to have this ability", so
+					// the answer across two sources is the min of both - and this pass's evidence is weaker than the
+					// create pass's: a level-80 character holding an ability says nothing about when it unlocked, while
+					// a create dump IS the level-1 grant burst. Assigning unconditionally let the weaker source win and
+					// stamped the universal kit at the holder's level (23/80/24/80) for the four classes we have a
+					// character for, hiding it from every fresh character of those classes.
+					if (row.Level > minLevel)
 					{
 						row.Level = minLevel;
 						updated++;
@@ -170,6 +176,7 @@ namespace Faolan.Importer.Captures
 			var abilityIds = (await db.Abilities.Select(a => a.Id).ToListAsync()).ToHashSet();
 			var existing = await db.ClassAbilities.ToDictionaryAsync(x => (x.Class, x.AbilityId));
 			var inserted = 0;
+			var corrected = 0;
 
 			foreach (var cls in Enum.GetValues<ConanClass>())
 				foreach (var abilityId in kit)
@@ -177,8 +184,23 @@ namespace Faolan.Importer.Captures
 					if (!abilityIds.Contains(abilityId))
 						continue; // a grant for an ability we never cataloged would be a catalog gap, not a fake id. Does not fire today: the kit is 8 distinct ids and all 8 are cataloged.
 
-					if (existing.ContainsKey((cls, abilityId)))
-						continue; // already known; DeriveClassAbilitiesAsync owns the level for those
+					// The kit is level 1 BY DEFINITION - a create dump is the grant burst a level-1 character receives -
+					// so an existing row carrying a higher level is wrong and is corrected down, not left alone. This
+					// used to `continue` on any existing row, ceding the level to DeriveClassAbilitiesAsync below, which
+					// derives it from the CHARACTERS we imported. No create-flow character is in that table (only four
+					// leveled ones), so for exactly their four classes the min-of-holders was the leveled character's
+					// own level and the universal kit was stamped 23/80/24/80 instead of 1. A level-1 Assassin then
+					// matched NO abilities, was granted nothing, and - because the create flow keyed enter-world on the
+					// client barring a grant - never entered the world at all (#433, fixed separately).
+					if (existing.TryGetValue((cls, abilityId), out var row))
+					{
+						if (row is not { Level: > 1 })
+							continue;
+
+						row.Level = 1;
+						corrected++;
+						continue;
+					}
 
 					db.ClassAbilities.Add(new ClassAbility
 					{
@@ -191,8 +213,9 @@ namespace Faolan.Importer.Captures
 				}
 
 			await db.SaveChangesAsync();
-			logger?.LogInformation("CaptureAbilityImporter: universal kit of {Kit} abilities (from {Dumps} create dumps) -> {Inserted} new class-ability rows across {Classes} classes.", kit.Count,
-				dumps, inserted, Enum.GetValues<ConanClass>().Length);
+			logger?.LogInformation(
+				"CaptureAbilityImporter: universal kit of {Kit} abilities (from {Dumps} create dumps) -> {Inserted} new class-ability rows across {Classes} classes ({Corrected} rows corrected back to level 1).", kit.Count,
+				dumps, inserted, Enum.GetValues<ConanClass>().Length, corrected);
 			return (inserted, kit.Count);
 		}
 
