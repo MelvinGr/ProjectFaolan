@@ -28,6 +28,11 @@ namespace Faolan.GameServer.World
 		// is never sent to a still-loading client - the pcDynel-NULL hang the earlier heartbeat experiment hit.
 		Task BroadcastNpcHeartbeat(WorldEntity npc);
 
+		// #502 scripted encounters. The tick decides WHEN (proximity, in WorldState); these do the wire side: replace a
+		// lure with its boss on the same spot, and put the lure back once the boss is gone.
+		Task<WorldEntity?> SwapEncounterLureForBoss(WorldEntity lure);
+		Task<WorldEntity?> RestoreEncounterLure(WorldEntity boss);
+
 		// Broadcast an NPC's tick step (its MoveTask transform) to the players who can see it - chasing a target or
 		// returning home - so they watch it move.
 		Task BroadcastNpcMove(WorldEntity npc);

@@ -65,6 +65,7 @@ namespace Faolan.Core.Database
 		DbSet<MapLootEntry> MapLootEntries { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<NpcChatter> NpcChatter { get; }
+		DbSet<NpcEncounter> NpcEncounters { get; }
 		DbSet<NpcEquipment> NpcEquipment { get; }
 		DbSet<NpcMorph> NpcMorphs { get; }
 		DbSet<NpcSpawn> NpcSpawns { get; }
@@ -153,6 +154,7 @@ namespace Faolan.Core.Database
 		public DbSet<MapLootEntry> MapLootEntries { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<NpcChatter> NpcChatter { get; set; }
+		public DbSet<NpcEncounter> NpcEncounters { get; set; }
 		public DbSet<NpcEquipment> NpcEquipment { get; set; }
 		public DbSet<NpcMorph> NpcMorphs { get; set; }
 		public DbSet<NpcSpawn> NpcSpawns { get; set; }

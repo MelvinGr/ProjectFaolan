@@ -816,6 +816,33 @@ namespace Faolan.GameServer.World
 									break;
 								}
 
+								case WorldTickEffectType.EncounterBark:
+								{
+									// #502: the lure calls for help as a player closes. Cosmetic - it is the swap that
+									// matters - but it is the tell that the encounter is armed, and it is a real captured
+									// line (its `event(2)` channel is what marks these apart from ambient chatter).
+									var lure = effect.Entity;
+									if (lure.ChatterLines is not { Length: > 0 } barkLines)
+										break;
+
+									var heard = new HashSet<uint>();
+									foreach (var near in World.ZoneForEntity(lure).PlayersInRange(lure.Position, SayRangeUnits, lure.Handle))
+										heard.Add(near.Handle);
+									if (heard.Count > 0)
+										await _agents.CharacterSay(lure.Handle, barkLines[Random.Shared.Next(barkLines.Length)], heard);
+									break;
+								}
+
+								case WorldTickEffectType.EncounterTrigger:
+									// The trap springs: the lure is replaced by its boss on the same spot.
+									await _output.SwapEncounterLureForBoss(effect.Entity);
+									break;
+
+								case WorldTickEffectType.EncounterReset:
+									// The boss's corpse has cleared - put the lure back so it can fire again.
+									await _output.RestoreEncounterLure(effect.Entity);
+									break;
+
 								case WorldTickEffectType.NpcChatter:
 								{
 									// Ambient bystander bark: the NPC local-says a random RenownBystanderLovers line (chat

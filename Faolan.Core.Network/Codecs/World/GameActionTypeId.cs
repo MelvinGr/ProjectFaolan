@@ -25,7 +25,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 		public static bool IsValid(uint typeId)
 		{
-			return typeId >= First && typeId < End;
+			return typeId is >= First and < End;
 		}
 
 		// Throws rather than letting an out-of-range id reach the client, where it is an assert dialog and a

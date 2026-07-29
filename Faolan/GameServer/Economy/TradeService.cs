@@ -185,7 +185,7 @@ namespace Faolan.GameServer.Economy
 		private async Task Exchange(TradeSide from, TradeSide to)
 		{
 			var receiverRows = await _database.GetCharacterInventory(to.CharacterId);
-			var used = receiverRows.Where(r => r.Container == ContainerKind.Bag && r.ItemId != null).Select(r => r.Slot).ToHashSet();
+			var used = receiverRows.Where(r => r is { Container: ContainerKind.Bag, ItemId: not null }).Select(r => r.Slot).ToHashSet();
 
 			foreach (var (_, offered) in from.Items)
 			{

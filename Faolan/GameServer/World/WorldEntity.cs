@@ -85,6 +85,25 @@ namespace Faolan.GameServer.World
 		// are the area's points, so it roams the group's area.
 		public uint? SpawnAreaId { get; set; }
 
+		// #502 scripted encounter. On a LURE: the boss type it swaps into, plus the two measured radii. On the BOSS:
+		// EncounterLureTemplateId names the lure to restore once the boss is gone. An entity carries one side or the
+		// other, never both - the swap replaces the entity rather than re-templating it, which is what the capture
+		// shows (different handles in the same second).
+		public uint? EncounterBossTemplateId { get; set; }
+		public float EncounterBarkRadius { get; set; }
+		public float EncounterTriggerRadius { get; set; }
+
+		// Set once the lure has cried for help, so the bark fires on the APPROACH rather than every tick the player
+		// stands inside the radius.
+		public bool EncounterBarked { get; set; }
+
+		// On the boss: the lure type to put back, and where. Position comes from the boss itself - it spawned on the
+		// lure's exact spot, so restoring means spawning the lure type where the boss stood.
+		public uint? EncounterLureTemplateId { get; set; }
+
+		// True once the reset has been emitted, so a boss corpse cannot restore its lure twice.
+		public bool EncounterResetDone { get; set; }
+
 		// Active buffs/effects on this entity, keyed by buff (spell) id - reapplying refreshes the entry.
 		// On a server-initiated cancel the server pushes the decoded buff-removal IIR (#253: the ApplySpell rank-1
 		// "end" twin with an empty payload) so the client clears the icon live. On the client-initiated CancelBuff

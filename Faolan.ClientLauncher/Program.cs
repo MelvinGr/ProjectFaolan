@@ -193,7 +193,7 @@ namespace Faolan.ClientLauncher
 			// (ClientExePatcher). Cross-platform (a byte swap, no ptrace/process memory - the old in-memory patch was
 			// Linux-only). Done here, before the md5, so -clienthash matches the launched file; persists like the
 			// LocalConfig redirects (undo with --restore). Idempotent - a no-op if already patched.
-			if (options.PatchLogin && !options.DryRun)
+			if (options is { PatchLogin: true, DryRun: false })
 			{
 				// Load the DH keys from the SAME config the server reads (faolan.json < these flags < environment), so a
 				// deployment that overrides Login:PrivateKey patches the matching public key without a second setting to
@@ -221,7 +221,7 @@ namespace Faolan.ClientLauncher
 
 			// Redirect the client's hardcoded launcher-notes URL (retail's msgs.ageofconan.com is dead) - same on-disk
 			// swap, covered by the exe .bak. Done before the md5 so -clienthash matches the launched file.
-			if (options.LauncherNotes is { } launcherNotes && !options.DryRun)
+			if (options is { LauncherNotes: { } launcherNotes, DryRun: false })
 			{
 				switch (ClientExePatcher.PatchLauncherNotes(exe, launcherNotes))
 				{

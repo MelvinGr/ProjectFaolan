@@ -209,7 +209,17 @@ namespace Faolan.GameServer.World
 						if (entity.NoRespawn)
 						{
 							if (entity.TickPostDeathDespawn(deltaSeconds))
+							{
 								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.LootExpired));
+								// #502: an encounter BOSS carries the lure it replaced. Once its corpse clears, put the
+								// lure back where it stood so the encounter can fire again. Guarded so a corpse cannot
+								// restore twice.
+								if (entity is { EncounterLureTemplateId: not null, EncounterResetDone: false })
+								{
+									entity.EncounterResetDone = true;
+									effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterReset));
+								}
+							}
 						}
 						else if (entity.TickRespawn(deltaSeconds))
 							effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcRespawned));
@@ -266,6 +276,34 @@ namespace Faolan.GameServer.World
 
 					if (entity.Vitals == null)
 						continue;
+
+					// #502 scripted encounter: a LURE is a harmless NPC that watches for an approaching player and, at
+					// two measured distances, cries out and then swaps itself for a boss. Checked before the aggro block
+					// because a lure is not hostile and would otherwise never look at players at all.
+					if (entity.EncounterBossTemplateId != null)
+					{
+						var approaching = NearestPlayerInRange(zone, entity, MathF.Max(entity.EncounterBarkRadius, entity.EncounterTriggerRadius));
+						if (approaching != null)
+						{
+							var edx = approaching.Position.X - entity.Position.X;
+							var edz = approaching.Position.Z - entity.Position.Z;
+							var edist = MathF.Sqrt(edx * edx + edz * edz);
+
+							// The trigger wins when both are satisfied - a player who arrives inside the inner radius in
+							// one step should spring the trap, not merely be shouted at.
+							if (edist <= entity.EncounterTriggerRadius)
+							{
+								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterTrigger, approaching));
+								continue; // the lure is about to be replaced; skip the rest of its tick
+							}
+
+							if (!entity.EncounterBarked && edist <= entity.EncounterBarkRadius)
+							{
+								entity.EncounterBarked = true;
+								effects.Add(new WorldTickEffect(entity, WorldTickEffectType.EncounterBark, approaching));
+							}
+						}
+					}
 
 					// Only hostile NPCs (mobs) aggro; talk-to NPCs (quest-givers/vendors) never attack.
 					var target = entity.Hostile

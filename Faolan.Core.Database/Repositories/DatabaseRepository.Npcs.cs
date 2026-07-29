@@ -15,6 +15,9 @@ namespace Faolan.Core.Database.Repositories
 		Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap();
 		Task<ConanClass[]> GetImportedSpawnClasses(uint mapId);
 		Task<NpcTemplate?> GetNpcByName(string name);
+		Task<NpcTemplate?> GetNpcByTemplateId(uint templateId);
+		Task<NpcEncounter?> GetNpcEncounter(uint mapId, uint lureTemplateId);
+		Task<NpcEncounter[]> GetNpcEncounters(uint mapId);
 		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
 		Task<NpcSpawn?> GetNpcSpawnByName(string name);
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId, ConanClass? forClass);
@@ -86,6 +89,32 @@ namespace Faolan.Core.Database.Repositories
 				.ToListAsync();
 
 			return escorts.GroupBy(x => x.TrailingRefId).ToDictionary(g => g.Key, g => g.First().QuestDefinitionId);
+		}
+
+		// The same include set as GetNpcByName, keyed by the TYPE id - what a runtime spawn from a type needs (#502:
+		// the encounter boss has no NpcSpawn row, so she can only be looked up this way).
+		public async Task<NpcTemplate?> GetNpcByTemplateId(uint templateId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcTemplates.Include(t => t.Spells)
+				.Include(t => t.StatCore)
+				.Include(t => t.Equipment)
+				.ThenInclude(e => e.Item)
+				.Include(t => t.Morphs)
+				.FirstOrDefaultAsync(t => t.TemplateId == templateId);
+		}
+
+		public async Task<NpcEncounter?> GetNpcEncounter(uint mapId, uint lureTemplateId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.NpcEncounters.FirstOrDefaultAsync(e => e.MapId == mapId && e.LureNpcTemplateId == lureTemplateId);
+		}
+
+		public async Task<NpcEncounter[]> GetNpcEncounters(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.NpcEncounters.Where(e => e.MapId == mapId).ToArrayAsync();
 		}
 
 		public async Task<NpcTemplate?> GetNpcByName(string name)

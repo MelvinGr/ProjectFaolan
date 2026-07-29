@@ -18,6 +18,9 @@ namespace Faolan.GameServer.World
 		NpcFollow, // a companion NPC (Entity) stepped toward the PLAYER it follows (Target); broadcast its MoveTask, ungated (not combat) (#262)
 		NpcHeartbeat, // the continuous idle-behavior pulse: (re-)assert the NPC's (Entity) short-form BehaviorControlCenterIIR so it keeps playing its idle animation instead of freezing (#225)
 		TimedDespawn, // a summon with a lifetime (Entity) ran out of time; fade it for nearby players + remove it (the Frozen Hatred fatality pet, #140)
+		EncounterBark, // a scripted-encounter LURE (Entity) noticed an approaching player (Target) at its bark radius - cry for help once (#502)
+		EncounterTrigger, // a player (Target) closed to the LURE's (Entity) trigger radius - swap the lure for its boss (#502)
+		EncounterReset, // a scripted-encounter BOSS (Entity) is gone; put its lure back where it stood (#502)
 		NpcChatter // an ambient bystander bark: the NPC (Entity) local-says a random RenownBystanderLovers line to nearby players (chat server), purely cosmetic
 	}
 

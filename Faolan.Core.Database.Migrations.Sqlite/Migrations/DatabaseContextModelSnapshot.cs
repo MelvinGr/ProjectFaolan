@@ -1851,6 +1851,35 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("NpcChatterParameter");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcEncounter", b =>
+                {
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("LureNpcTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("BarkRadius")
+                        .HasColumnType("REAL");
+
+                    b.Property<uint>("BossNpcTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ResetSeconds")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("TriggerRadius")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("MapId", "LureNpcTemplateId");
+
+                    b.HasIndex("BossNpcTemplateId");
+
+                    b.HasIndex("LureNpcTemplateId");
+
+                    b.ToTable("NpcEncounters");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcEquipment", b =>
                 {
                     b.Property<uint>("NpcTemplateId")
@@ -4188,6 +4217,33 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("Chatter");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcEncounter", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "BossNpcTemplate")
+                        .WithMany()
+                        .HasForeignKey("BossNpcTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "LureNpcTemplate")
+                        .WithMany()
+                        .HasForeignKey("LureNpcTemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
+                        .WithMany()
+                        .HasForeignKey("MapId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BossNpcTemplate");
+
+                    b.Navigation("LureNpcTemplate");
+
+                    b.Navigation("Map");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcEquipment", b =>

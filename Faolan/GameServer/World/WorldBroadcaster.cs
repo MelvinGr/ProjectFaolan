@@ -887,6 +887,9 @@ namespace Faolan.GameServer.World
 				return;
 
 			var npcs = await _database.GetNpcSpawns(mapId, forClass);
+
+			// #502: the map's scripted encounters, by LURE type - one query per zone load rather than per placement.
+			var encounters = (await _database.GetNpcEncounters(mapId)).ToDictionary(e => e.LureNpcTemplateId);
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
 
 			// #363 dev labels: the map's RDB spawn areas, so each NPC carries its area label ready for the live
@@ -1026,6 +1029,11 @@ namespace Faolan.GameServer.World
 					entity.SpawnAreaId = linkedAreaId;
 					entity.NoRespawn = true;
 				}
+
+				// #502: a placement whose TYPE has a scripted encounter on this map becomes a LURE - it watches for an
+				// approaching player and swaps itself for its boss. Every placement of the type is armed, since the
+				// definition is keyed by (map, type) rather than by one spot.
+				ArmEncounter(entity, encounters.GetValueOrDefault(npc.NpcTemplateId));
 
 				zone.Add(entity);
 			}
@@ -1451,7 +1459,7 @@ namespace Faolan.GameServer.World
 			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag))
 				return;
 
-			if (position is { } pos && pos >= 0 && pos < bag.LootItems.Count)
+			if (position is { } pos and >= 0 && pos < bag.LootItems.Count)
 				bag.LootItems[pos] = itemTemplateId;
 			else
 				bag.LootItems.Add(itemTemplateId);
@@ -1943,6 +1951,98 @@ namespace Faolan.GameServer.World
 
 			zone.Add(entity);
 			return entity;
+		}
+
+		// #502 scripted encounter: replace a LURE with its BOSS, on the lure's exact spot. An entity SWAP, not a
+		// re-template - which is what the capture shows (Damsel handle 0x0002db79 out, Eerika 0x0002ddd1 in, same
+		// second). The boss carries the lure's type so its corpse can restore it (EncounterReset).
+		//
+		// The boss is spawned FROM ITS TYPE: she has no NpcSpawn row and must not have one, existing only inside a
+		// triggered encounter (#501).
+		public async Task<WorldEntity?> SwapEncounterLureForBoss(WorldEntity lure)
+		{
+			ArgumentNullException.ThrowIfNull(lure);
+			if (lure.EncounterBossTemplateId is not { } bossTemplateId)
+				return null;
+
+			var boss = await _database.GetNpcByTemplateId(bossTemplateId);
+			if (boss?.StatCore?.Health is not { } bossHealth || boss.StatCore.Level is not { } bossLevel)
+			{
+				// Loudly, not silently: an encounter whose boss type never got harvested would otherwise delete its
+				// lure and put nothing in its place, leaving an empty encounter no player could ever trigger again.
+				_logger.LogWarning("Encounter: lure {Lure} on map {Map} has no usable boss type {Boss} - leaving the lure in place.", lure.Name, lure.MapId, bossTemplateId);
+				return null;
+			}
+
+			var zone = _sim.World.ZoneForEntity(lure);
+			var position = lure.Position;
+			var rotation = lure.Rotation;
+
+			// Remove the lure for every viewer that has it, then drop it from the model - the same pair
+			// DespawnEntityForPlayer does, but driven from the entity rather than a caller's client.
+			await BroadcastEntityDespawn(lure);
+			_sim.World.Remove(lure);
+
+			var handle = NextRuntimeHandle();
+			var body = NpcSpawnBuilder.BuildFromType(boss, handle, position, rotation, zone.PlayfieldToken);
+			var entity = WorldEntity.ForNpc(handle, zone.MapId, position, rotation, boss.Name, EntityVitals.FromMax(bossHealth, 0, bossHealth), boss.TemplateId);
+			entity.InstanceId = zone.InstanceId;
+			entity.Level = bossLevel;
+			entity.Disposition = WorldEntity.DispositionHostile; // the trap sprung - she attacks
+			entity.Hostile = true;
+			entity.LootContainer = boss.LootContainerTemplateId;
+			entity.SpawnBody = body;
+			entity.NoRespawn = true; // her corpse fades; the LURE comes back instead (EncounterReset)
+			entity.EncounterLureTemplateId = lure.NpcTemplateId;
+			foreach (var sp in boss.Spells)
+				entity.Spells.Add(new NpcSpellCast(sp.SpellId, new NpcSpellEffect(sp.SpellId, sp.Duration, sp.Magnitude, sp.Rank, sp.FlagA, sp.FlagB, sp.FlagC).ToArray()));
+
+			// Added to the zone only: the interest manager streams a new entity to nearby players on its next pass,
+			// which is how the ambient pools spawn members mid-session too. No explicit broadcast to get wrong.
+			zone.Add(entity);
+			_logger.LogInformation("Encounter: {Lure} on map {Map} sprang into {Boss} (level {Level}) at ({X:F1}, {Z:F1}).", lure.Name, lure.MapId, boss.Name, entity.Level, position.X, position.Z);
+			return entity;
+		}
+
+		// #502: the boss is gone - put her lure back where she stood, so the encounter can fire again. Spawned from the
+		// lure's TYPE at the boss's position: the boss took the lure's exact spot, so that position IS the lure's home.
+		public async Task<WorldEntity?> RestoreEncounterLure(WorldEntity boss)
+		{
+			ArgumentNullException.ThrowIfNull(boss);
+			if (boss.EncounterLureTemplateId is not { } lureTemplateId)
+				return null;
+
+			var lure = await _database.GetNpcByTemplateId(lureTemplateId);
+			if (lure?.StatCore?.Health is not { } lureHealth || lure.StatCore.Level is not { } lureLevel)
+				return null;
+
+			var zone = _sim.World.ZoneForEntity(boss);
+			var encounter = await _database.GetNpcEncounter(zone.MapId, lureTemplateId);
+			var handle = NextRuntimeHandle();
+			var entity = WorldEntity.ForNpc(handle, zone.MapId, boss.Position, boss.Rotation, lure.Name, EntityVitals.FromMax(lureHealth, 0, lureHealth), lure.TemplateId);
+			entity.InstanceId = zone.InstanceId;
+			entity.Level = lureLevel;
+			entity.SpawnBody = NpcSpawnBuilder.BuildFromType(lure, handle, boss.Position, boss.Rotation, zone.PlayfieldToken);
+			entity.NoRespawn = true;
+			ArmEncounter(entity, encounter);
+
+			zone.Add(entity);
+			_logger.LogInformation("Encounter: {Lure} restored on map {Map} at ({X:F1}, {Z:F1}).", lure.Name, zone.MapId, boss.Position.X, boss.Position.Z);
+			return entity;
+		}
+
+		// Copies an encounter definition onto a live lure. Central so the spawn path and the reset path arm it
+		// identically - an unarmed lure is just a harmless NPC and the encounter silently never fires.
+		public static void ArmEncounter(WorldEntity lure, NpcEncounter? encounter)
+		{
+			ArgumentNullException.ThrowIfNull(lure);
+			if (encounter == null)
+				return;
+
+			lure.EncounterBossTemplateId = encounter.BossNpcTemplateId;
+			lure.EncounterBarkRadius = encounter.BarkRadius;
+			lure.EncounterTriggerRadius = encounter.TriggerRadius;
+			lure.EncounterBarked = false;
 		}
 
 		// Spawns a standalone IsLoot bag (its OWN handle) at a position, rendered for everyone in range - the decoupled

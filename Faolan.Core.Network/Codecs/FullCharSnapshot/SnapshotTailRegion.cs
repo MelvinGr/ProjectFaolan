@@ -58,7 +58,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			get
 			{
 				foreach (var list in Lists)
-					if (list.Stride == 8 && list.Words.Count >= 4 && IsDoubled(list))
+					if (list is { Stride: 8, Words.Count: >= 4 } && IsDoubled(list))
 						return list;
 
 				return null;

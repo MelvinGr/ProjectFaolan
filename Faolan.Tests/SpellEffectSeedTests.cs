@@ -19,7 +19,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Seed_CarriesTheTwelveCapturedPetSummons()
 		{
-			var summons = SpellEffectsModule.BuildRows().Where(r => r.Trigger == SpellEffectTrigger.OnCast && r.Kind == SpellEffectKind.SummonPet).ToList();
+			var summons = SpellEffectsModule.BuildRows().Where(r => r is { Trigger: SpellEffectTrigger.OnCast, Kind: SpellEffectKind.SummonPet }).ToList();
 
 			Assert.Equal(12, summons.Count);
 			Assert.Equal("Arcanist", summons.Single(s => s.SpellId == 0x0005E2F5).Template);
