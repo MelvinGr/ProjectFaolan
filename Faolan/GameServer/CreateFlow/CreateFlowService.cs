@@ -44,6 +44,11 @@ namespace Faolan.GameServer.CreateFlow
 		internal const string CreateWorldScriptToken =
 			"<remoteformat token=\"playorskip(72)|onclientconnected(1)|NEW_character_creation Slave Galley (server-side)\" category=\"50023\" key=\"&quot;B]SZ.AGRGrAyOGe*BG-\" knubot=\"0\"  ></remoteformat>";
 
+		// How long after CharCreationFinished the enter-world handoff goes out (#433). Retail's own gap across the 13
+		// create captures that reach a redirect is 8.90-9.52s; 9.0 sits inside that band, near its floor, so the
+		// client gets its creation fade at the retail length without an added wait.
+		private static readonly TimeSpan EnterWorldHandoffDelay = TimeSpan.FromSeconds(9.0);
+
 		internal static readonly ProtoEndpoint MorphAckSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x0C);
 
 		// The create-editor's own grant conversation (GameCharAgent 0x0C); the login/world grants ride a different one.
@@ -83,6 +88,12 @@ namespace Faolan.GameServer.CreateFlow
 		// The listener's burst-less world entry (GameServerListener.WorldEntry.cs) - the constructed live-char world the
 		// create-flow enters before the destiny cutscene overlay. Injected as a seam (shared with the login replay).
 		private readonly Func<INetworkClient, uint, Task> _sendBurstlessWorldEntry;
+
+		// The listener-owned "wash the new character ashore and hand it to the world server" op (change-map prep +
+		// the 0x2002 redirect). A narrow Func seam like _sendBurstlessWorldEntry rather than a back-reference to the
+		// listener - see the composed-collaborator note above.
+		private readonly Func<INetworkClient, Task> _sendEnterWorldHandoff;
+
 		private readonly IDatabaseRepository _database;
 
 		private readonly ILogger _logger;
@@ -91,12 +102,14 @@ namespace Faolan.GameServer.CreateFlow
 		// cutscene actor-binding (LiveNpcHandle) to re-address the destiny cinematic to OUR live Kalanthes.
 		private readonly WorldSimulation _simulation;
 
-		public CreateFlowService(ILogger logger, IDatabaseRepository database, WorldSimulation simulation, Func<INetworkClient, uint, Task> sendBurstlessWorldEntry)
+		public CreateFlowService(ILogger logger, IDatabaseRepository database, WorldSimulation simulation, Func<INetworkClient, uint, Task> sendBurstlessWorldEntry,
+			Func<INetworkClient, Task> sendEnterWorldHandoff)
 		{
 			_logger = logger;
 			_database = database;
 			_simulation = simulation;
 			_sendBurstlessWorldEntry = sendBurstlessWorldEntry;
+			_sendEnterWorldHandoff = sendEnterWorldHandoff;
 		}
 
 		// Handles the client->server 0xA36D3B74 character-creation script callbacks.
@@ -714,13 +727,62 @@ namespace Faolan.GameServer.CreateFlow
 			// casters get spells and melee get none (matching the barbarian capture the burst was seeded from).
 			// With the client's bar drags now persisted, these land on the bar (the client only bars what it was
 			// granted); without it a fresh caster's bar has abilities but no spells.
-			// Hand the client the kit its bar is built from. It answers each grant with an AddShortcut (0x206E), and
-			// the first of those is what the enter-world handoff keys on - so this is not decoration, it is what moves
-			// the flow forward.
+			// Hand the client the kit its bar is built from. It answers each grant with an AddShortcut (0x206E), which
+			// the shortcut handler persists. This is the character's starting bar - it is NO LONGER what moves the flow
+			// forward (#433); see ScheduleEnterWorldHandoff.
 			await CharacterLoadout.GrantToClient(client, _database, _logger, CreateGrantSender);
 
-			// The client will now send 0x206E (enter world); answer it with the 0x2002 world handoff.
+			// Creation is finished; the world handoff is now on a timer, not on the client barring something (#433).
+			ScheduleEnterWorldHandoff(client);
+		}
+
+		// Arms the enter-world handoff (#433). The handoff USED TO be sent in reply to the client's first 0x206E
+		// AddShortcut - i.e. it fired only if the character had been granted something the client chose to auto-bar.
+		// That is not a signal about entering the world at all, and it stranded creation completely whenever the kit
+		// came back empty: an Assassin created 2026-07-29 got 0 abilities and 0 spells (every ClassAbilities row for
+		// the class carries the LEVEL OF THE CAPTURED CHARACTER it was harvested from - 23 - so a level-1 character
+		// matches none), barred nothing, sent no 0x206E, and sat on a black screen forever while the server waited for
+		// a message the client had no reason to send. The ticket predicted this exact failure a month before it hit.
+		//
+		// Retail's trigger is TIME, measured from CharCreationFinished, and is independent of the bar. Across all 13
+		// create captures that reach a redirect, CharCreationFinished -> s2c 0x2002 is 8.90-9.52s (median 9.21; one
+		// 10.16s outlier on a slow session), while the LAST c2s before the redirect scatters over 0.31-1.65s and is
+		// not even the same message each time - AddShortcut in 11, a StatIIR PassBlob in one, and a bare Ping in
+		// another (Fwfnwfjwk_soldier-guardian_create). A trigger cannot be a packet that is sometimes absent.
+		//
+		// So: arm at creation-finished, fire once, whatever the client does or does not put on its bar.
+		private void ScheduleEnterWorldHandoff(INetworkClient client)
+		{
+			ScheduleEnterWorldHandoff(client, EnterWorldHandoffDelay);
+		}
+
+		// The delay is a parameter only so the tests can arm it at zero; production always uses the retail-measured
+		// EnterWorldHandoffDelay above.
+		internal void ScheduleEnterWorldHandoff(INetworkClient client, TimeSpan delay)
+		{
 			client.Session.AwaitingEnterWorld = true;
+
+			_ = Task.Run(async () =>
+			{
+				try
+				{
+					await Task.Delay(delay);
+
+					// Single-shot: the latch is cleared by whoever gets there first, so a handoff can never be sent
+					// twice (a second 0x2002 mid-handoff would re-redirect a client that is already reconnecting).
+					if (!client.Session.AwaitingEnterWorld)
+						return;
+
+					client.Session.AwaitingEnterWorld = false;
+					await _sendEnterWorldHandoff(client);
+				}
+				catch (Exception e)
+				{
+					// Never silent: this is the step whose failure looks exactly like the bug above - a client waiting
+					// forever on a black screen - so the reason has to be in the log (see the no-silent-fallbacks rule).
+					_logger.LogError(e, "Create-editor: failed to send the enter-world handoff; the client will hang on the loading screen.");
+				}
+			});
 		}
 		// Verbatim replay of the retail create-editor INITIAL download from
 		// Captures/account-stricken998-character-create-no-worldenter.tshark.json (GameServer port 7030),

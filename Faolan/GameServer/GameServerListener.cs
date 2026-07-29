@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
+using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -238,7 +239,15 @@ namespace Faolan.GameServer
 			// server does NOT read the client RDB. Degrades gracefully when the dir is unset/absent.
 			var terrain = new TerrainService(configuration["TerrainDir"], logger);
 			_simulation = new WorldSimulation(this, database, agentServerDispatcher, logger, terrain);
-			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry); // create-editor/cutscene/enter-world flow
+			// create-editor/cutscene/enter-world flow. The handoff seam washes the new character ashore before the
+			// redirect (#234: changemap-prep IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7 to the Tortage Beach
+			// spawn - Blablabla create capture f444/449, dest map 0x0FAA, pos 322.5,150,704.9, descriptor 0x32 - else
+			// the player stays at the drowning cutscene's underwater end position), then hands off like DoTeleport.
+			_createFlow = new CreateFlowService(logger, database, _simulation, SendBurstlessWorldEntry, async client =>
+			{
+				await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
+				await SendWorldHandoff(client);
+			});
 			_persistence = new PlayerPersistenceService(database, logger, _simulation);
 			_trade = new TradeService(database, logger, this); // player<->player trade (#101); reaches the wire via ITradeOutbound
 			// Constructed before the broadcaster (needs only the sim + DB) so the broadcaster's interest stream can call

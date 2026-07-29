@@ -1395,18 +1395,10 @@ namespace Faolan.GameServer
 					// fresh character loses its retail starting bar and falls back to our seeded default.
 					await _shortcutBar.HandleAddShortcut(client, packet, body);
 
-					// On the editor connection the FIRST post-world-prep 0x206E also signals "ready to enter world":
-					// answer it once with the 0x2002 handoff. #234: wash the new char ashore first with a changemap-prep
-					// (IntendedTeleport 0x10D27BC0 + n3Teleport 0x5A32F0D7) to the Tortage Beach spawn - Blablabla create
-					// capture f444/449 (dest map 0x0FAA, pos 322.5,150,704.9, descriptor 0x32) - else the player stays
-					// at the drowning cutscene's underwater end position. Mirrors GMCommands.DoTeleport (prep -> handoff).
-					if (client.Session is { EntryMode: WorldEntryMode.CreateEditor, AwaitingEnterWorld: true })
-					{
-						client.Session.AwaitingEnterWorld = false;
-						await SendChangeMapPrep(client, Map.TortageBeachId, Map.NewPlayerSpawnSpawnPoint.Position, 0x32);
-						await SendWorldHandoff(client);
-					}
-
+					// This 0x206E used to ALSO trigger the enter-world handoff on the editor connection. It no longer
+					// does (#433): the client barring something is not a statement about being ready for the world, and
+					// keying on it stranded creation whenever the starting kit was empty. The handoff is now armed on a
+					// retail-measured timer at CharCreationFinished - CreateFlowService.ScheduleEnterWorldHandoff.
 					break;
 				}
 
