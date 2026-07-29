@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 590 NPC types / 1,105 placements · 3,253 items · 20,847 spells · 265 abilities · 242 conversation nodes · 29 shops · 2,036 quests · 1,126 world objects · 138 patrol routes
+**Imported content** (the DB is the server's source of truth): 530 maps · 591 NPC types / 1,108 placements · 3,322 items · 20,848 spells · 265 abilities · 19,777 feats · 242 conversation nodes · 29 shops · 2,036 quests · 1,126 world objects · 177 patrol routes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -32,17 +32,22 @@ we've seen_, and names the gaps). Regenerate with
 <!-- coverage:start -->
 - **NPC conversations** — 34/37 greeted dialogue NPCs imported (91.9%)
 - **Vendor shops** — 21/21 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 3,480/77,631 decrypted, **4.5% of the total encrypted**. Keys held per category: 3,215 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 3,549/77,631 decrypted, **4.6% of the total encrypted**. Keys held per category: 3,284 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
 
-- ✅ **Log in and play** — the full login handshake (encrypted; any password is accepted until the client is
-  key-patched), character roster and selection, and world entry with your existing characters
-- ✅ **Create a character** — the appearance editor (face morphs, race/sex options) and the Tortage opening tableau,
-  for every one of the twelve classes: each starts with its own class base pools, its starting kit and its feats,
-  and walks into the world without a relog
-- 🟡 New characters occasionally import the wrong look (hair/mustache/size) — fixed, pending an in-client confirm (#314)
+- ✅ **Log in and play** — the full login handshake (encrypted, single-use challenge per login; any password is
+  accepted until the client is key-patched), character roster and selection, and world entry
+- ✅ **Your own character sheet** — level, vitals, attributes, wallet, kills and deaths all come from your character
+  rather than from the captured one the login snapshot was built out of; its last opaque regions are decoded, and
+  every stat in them is named (#393, #447)
+- ✅ **Create a character** — the appearance editor and the Tortage opening tableau, for every one of the twelve
+  classes: each starts with its own class base pools, starting kit and feats, and walks into the world without a
+  relog. The editor offers the client's full option set per race and sex — heads, hair, colours, tattoos, beards,
+  piercings, face morphs and voices — including the **Khitan** race (#469)
+- ✅ **Appearance renders as chosen** — hair, beard, body size, face markings and tattoos, confirmed in-client
+  (#240, #288, #314)
 - 🟡 The create→world intro cutscene plays and Kalanthes speaks; a few background actors still render from raw
   capture data (#234)
 
@@ -57,8 +62,12 @@ we've seen_, and names the gaps). Regenerate with
 
 - ✅ **A living world, built from data** — the world, its objects, and its NPCs are all constructed from the
   database and streamed to you as you move, never replayed from a recording
-- ✅ **NPC AI** — enemies aggro and give chase, leash back and heal when you break away, and walk patrol routes;
-  friendly and neutral NPCs never attack and show green names, hostiles red
+- ✅ **Spawns are fully decoded** — the player and NPC spawn streams are typed end to end with no opaque regions
+  left, and every one of the 11,632 captured spawns re-encodes byte-exact; a buffed humanoid no longer spawns bald
+  (#475, #477)
+- ✅ **NPC AI** — enemies aggro and give chase, leash back and heal when you break away, and walk patrol routes
+  (177 of them, harvested across the whole corpus — #425); friendly and neutral NPCs never attack and show green
+  names, hostiles red
 - ✅ **Interactive objects** — doors and gates open when used; anything not yet interactive tells you so instead of
   silently doing nothing
 - ✅ **Zone-line doors** — a doorway that changes your location teleports you, both within a zone and across a
@@ -74,7 +83,7 @@ we've seen_, and names the gaps). Regenerate with
   in-game tools (#332, #363)
 - 🟡 **Line-of-sight & terrain** — NPCs won't aggro over a hill or through a wall, and loot and corpses settle to
   the ground, driven by baked per-map terrain; the aggro gating is pending an in-client confirm (#284)
-- 🟡 **Sit on benches** — the sit animation plays; making the pose hold is wired and pending an in-client confirm (#355)
+- ✅ **Sit on benches** — sitting down, switching seats and standing up, verified in a real client (#355)
 - 🟡 **Fuller simulation** — a continuous AI heartbeat and smoother movement are in progress (#190, #225, #272)
 
 ### Combat
@@ -84,61 +93,59 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Floating damage numbers & combat log** for your hits, matching retail's distinct melee and spell number styles,
   each tagged with the correct damage school (physical, fire, cold, …) the way retail sends it
 - ✅ **Interrupts** — moving mid-cast cancels the spell and shows the "Interrupted" message, exactly like retail (#347)
-- ✅ **Health, mana & stamina regen** — your pools refill smoothly out of combat over retail's own per-tick regen
-  channel (RegenIIR), and stop the moment a fight starts (retail's out-of-combat-only regen). The RATES are retail's
-  own: driven by your attributes with the client's own tweak constants, and each one confirmed against the per-second
-  deltas retail sent in the captures — those carry the rate ×100, so they pin the formulas to two decimals (#442)
-- ✅ **Max health, mana & stamina** — your pools are built the way the client builds them: the real per-class,
-  per-level base curve read out of the client's own data table, plus your gear, your class's feat template, and any
-  buff that raises a pool. The base is verified against every captured level-up, and each class has its own — a
-  Guardian, an Assassin and a Necromancer start with different pools, and casters have no stamina bar at all (#450)
+- ✅ **Health, mana & stamina regen** — pools refill out of combat on retail's own regen channel and stop the moment
+  a fight starts; the rates come from your attributes and match retail's captured per-second deltas (#442)
+- ✅ **Max health, mana & stamina** — per-class, per-level base curve from the client's own table, plus gear, feats
+  and any buff that raises a pool. Verified against every captured level-up; casters have no stamina bar (#450)
 - ✅ **Death & resurrection** — the release screen lists the resurrection points you've discovered, nearest first,
   and each revives you at its own strength (10/50/100%) rather than always full (#372, #375)
 - ✅ **Discovering resurrection points** — walking near a new point pops retail's "point discovered" banner and adds
   it to your list in one frame; works for all **538** imported points, verified in a real client (#372)
 - ✅ **Buffs & debuffs** — apply, tick (damage-over-time), expire on a timer, and right-click to cancel; self-buffs
-  and enemy debuffs both verified in-client (#274, #370)
+  and enemy debuffs both verified in-client. Each damage-over-time spell ticks at its own measured rate, 0.5 to 11
+  seconds, instead of one 2-second constant (#274, #370, #437)
+- 🟡 **Damage scale** — NPC swing damage is measured from the captures (it had been ~15x too weak) and caster NPCs
+  land their spells with the right school. Only levels 1-6 are well sampled; above that the curve is extrapolated
+  and wants an in-client pass (#401, #479)
 - ✅ **Shield of the Risen** — the newcomer protection buff, re-applied on login and each zone, dropping the moment
   you act aggressively (#361)
 - ✅ **NPC death animations** — enemies play a proper death on the killing blow instead of vanishing or teleporting
   back to spawn; verified in-client per creature type, with more being harvested (#362)
-- 🟡 **Gear-driven combat stats** — your equipped gear feeds the fight: weapon damage rolls per swing, worn armour and
-  magical Protection mitigate incoming physical/spell hits, and Critical Rating / Critical Damage Rating produce crits
-  (the larger "critical" numbers). The damage/mitigation/crit curves are provisional pending in-client tuning (#395,
-  #401)
-- 🟡 **Weapon-set swap** — switching between your two weapon loadouts changes which set's stats the server counts
-  and is relayed to nearby players so they see you draw the other weapons; equipping/unequipping gear now rides the
-  same viewer-relay, so other players see your gear change too. Pending in-client verification (#400)
+- 🟡 **Gear-driven combat stats** — weapon damage rolls per swing, worn armour and magical Protection mitigate
+  incoming hits on retail's own mitigation formula and coefficients, and Critical Rating / Critical Damage Rating
+  produce crits. The crit curve and the NPC side of mitigation stay provisional — retail decides both server-side
+  and never tells the client (#395, #401)
+- 🟡 **Weapon-set swap** — switching loadouts changes which set's stats count and is relayed to nearby players, as is
+  equipping and unequipping gear. Pending in-client verification (#400)
 - 🟡 **Ground-targeted AoE** (e.g. Deathly Blizzard) — ticks damage with floating numbers; the per-spell radius and
   cadence are still approximate (#349)
-- 🟡 **Buff stat effects** — a buff's per-stat bonuses and penalties are decoded from the spell templates and applied
-  to your live stats, coming back off when it expires, is cancelled or you die. Flat ones (armour, ratings,
-  attributes) add; percentage ones ("+2% Critical Rating") scale the total; and one that raises a max pool now moves
-  the *pool*, so a buffed bar fills to where the buff put it instead of stalling at your unbuffed max. Awaiting an
-  in-client check of the applied values (#367, #435, #436, #450)
+- 🟡 **Buff stat effects** — a buff's per-stat bonuses and penalties apply to your live stats and come back off when
+  it expires, is cancelled or you die; flat ones add, percentage ones scale, and one that raises a max pool moves
+  the pool so the bar fills to it. Awaiting an in-client check of the applied values (#367, #435, #436, #450)
 - 🟡 **Spell cooldowns** — fully reverse-engineered; the client runs the recast timer from its own data (retail
   sends nothing), pending an in-client confirm of the server-override case (#271)
 - 🟡 **Spellweaving** (necromancer) — built and playable; the energy-bar drain is the last piece (#141)
 - 🟡 **Combat shields** — the guard-arc render is not yet decoded (#20)
-- 🟡 **Fatalities** — a killing blow rolls the client's own chance table (5% at level 1 up to 30% at 80) and sends the
-  buff burst retail sends, including the necromancer's Frozen Hatred proc and its 60-second pet; the finishing-move
-  *animation* stays client-side (#140)
+- 🟡 **Fatalities** — the roll (5% at level 1 to 30% at 80), both fatality buffs, the necromancer's Frozen Hatred
+  proc and its pet all work in-client (#140); the finishing-move *animation* never plays and the trigger for it is
+  client-side (#440)
 - ⬜ **Real directional combat** with defensive shield arcs (#20) · **combos** — the client already drives the whole
   combo chain; the finisher's bonus damage needs server-side data not present in the client (#139)
 
 ### Character progression
 
 - ✅ **Learn spells, abilities & combos** — granted on login and at each level-up, with every rank learned and
-  shown (collapsing a family to its top rank is a client-side UI choice)
+  shown; all twelve classes now get their level-1 kit (four were getting none)
 - ✅ Combos stick across relogs, not just at level-up
-- 🟡 **Feat trees** — training, resetting, the untrain confirmation, and the feat-point budget all work against the
-  live protocol (driven by a GM command for now); what's missing is the feat *catalog* itself — which feats exist,
-  their tiers and prerequisites, per-feat costs, and each class's tree layout (#251)
-- ✅ **Attributes** — your Strength/Constitution/Intelligence/Wisdom/Dexterity come from the real per-class,
-  per-level base plus your gear and buffs, so the formulas that read them (regen, armour mitigation) get real inputs.
-  Retail never sends these — the client computes them locally from its own asset files — so the base had to be decoded
-  out of the client's own data and checked against a live client, one class at a time. All twelve classes at all
-  eighty levels (#444)
+- 🟡 **Feats** — the catalog is imported from the client: **19,777 feats** with trees, ranks and tooltips, 23,321
+  stat effects, a 5,501-edge prerequisite graph, and the wire↔catalog id map that joins a character's trained feats
+  to it. Trained feats grant their stats, training enforces prerequisites and the real point budget (79 at level
+  80), and a character's several named specs are each kept with their own build. Missing: per-feat cost and tier and
+  each class's tree layout (server-side data the client is never sent), and the retail training trigger — so
+  training runs off a GM command for now (#251, #467, #474)
+- ✅ **Attributes** — Strength/Constitution/Intelligence/Wisdom/Dexterity from the per-class, per-level base plus
+  gear and buffs, so the formulas that read them (regen, mitigation) get real inputs. Retail never sends these; the
+  base was decoded from the client and checked in-client for all twelve classes at all eighty levels (#444)
 - 🟡 XP curve is a provisional ramp; the real thresholds are partly harvested (#297)
 - 🟡 Class spell / combo / ability catalogs are still filling in; empty spell and item names were backfilled from the
   client's own English string table (LDB), so far fewer entries render nameless (#291, #296, #303, #300)
@@ -153,16 +160,15 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Item claims** — the account claim/redeem window (Claim, Claim All), including infinite and multi-charge
   claims like Double XP, delivered straight to your bag (#359)
 - ✅ **Consumables** — right-click a potion, food, or drink to use it and apply its effect
-- ✅ **Creature loot** — killed enemies drop a lootable bag or chest, chosen per creature type (#363)
-- 🟡 **Gear stat bonuses** — worn gear now actually matters. Each item's whole tooltip stat list is decoded from its
-  RDB template (validated against in-game tooltips, ~17 rating types named): a +HP/+Mana ring fills your bar past the
-  class base, better weapons hit harder (min–max per swing), armour and magical Protection reduce incoming damage,
-  Critical Rating / Critical Damage Rating drive crits, Magic Damage boosts spells, Combat Rating boosts melee, and
-  Natural Mana/Stamina Regen speed the bars. High-level gear used to come out blank — its stats were assumed to be
-  derived from item level and quality, when in fact the parser simply could not see them (the records are not 4-byte
-  aligned, and the scan was); reading them byte-granular took the corpus from 1398 to **4223** stat rows over 1705
-  items, matching the client's own per-item values (#441). The exact per-hit damage/mitigation/crit formulas are
-  provisional (server-side in retail) pending in-client tuning (#3, #395, #401)
+- ✅ **Creature loot** — killed enemies drop a lootable bag or chest, chosen per creature type (#363), and a looted
+  item lands in the backpack slot you dragged it onto (#462)
+- ✅ **Inventory stays in sync** — a server-side change to your bags (a quest taking the slave manacles off) pushes
+  both containers whole, the way retail does (#380)
+- ✅ **Complete tooltips** — item, spell and ability descriptions are no longer clipped at 512 characters mid-word
+- 🟡 **Gear stat bonuses** — each item's whole tooltip stat list is decoded from its template (4,223 stat rows over
+  1,705 items, matching the client's own values): +HP/+Mana, weapon min–max damage, armour and Protection, the crit
+  ratings, Magic Damage, Combat Rating and the regen stats all feed the fight. The per-hit damage/mitigation/crit
+  formulas are provisional pending in-client tuning (#3, #395, #401, #441)
 - 🟡 Guild bank (#132)
 - ⬜ Tradeskills — gathering and crafting professions (#148) · gem socketing for attribute bonuses (#311)
 
@@ -170,9 +176,14 @@ we've seen_, and names the gaps). Regenerate with
 
 - ✅ **Chat** — say, channels, system messages, and whispers
 - ✅ **Guilds** — create, invite and accept, guild tag, and renown, with the guild window appearing instantly on
-  create (no relog) (#306)
-- ✅ **Groups (teams)** — invite, accept, decline, leave, kick, leader promotion on the leader leaving, and the team
-  dissolving at one member; the `~Team` chat channel appears and disappears with it (#101)
+  create (no relog) (#306). A new guild keeps the governing form you picked, and the rank ladder is per form, as the
+  client's own tables have it (#469)
+- ✅ **Groups (teams)** — invite (with the inviter's message, #459), accept, decline, leave, kick, leader promotion
+  on the leader leaving, and the team dissolving at one member; the `~Team` chat channel appears and disappears
+  with it (#101)
+- ✅ **/who and the guild browser** — the character search answers from the players actually online, filtered on
+  level range, class, race, playfield and name and paged as the client asks; guild search filters the realm's
+  guilds. Players are reported at their real level, in search results, team rosters and invites alike (#460)
 - ✅ **Friends list** — add, remove, persistence across a relog, and presence: your entry is pushed to everyone
   watching when you log in or out, which is what makes the list render at all (the client hides offline friends)
   (#99)
@@ -190,8 +201,12 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Quests** — kill / loot / talk objectives, the journal, and the Casilda Tortage intro chain end to end
   (kill → loot → free → follow)
 - ✅ **NPC conversations** — branching dialogue driven by the client's dialogue engine
+- ✅ **Dropping a quest sticks** — abandoning one removes it from the journal and confirms it the way retail does,
+  instead of the quest returning on the next login; the live J-panel refresh that rides along still needs a
+  capture (#457, #482)
 - 🟡 Escort completion (#262) · turn-in and reward dialogs (#260) · Lua quest scripting
-- ⬜ Tortage day/night destiny phasing (#149)
+- ✅ Day and night Tortage are two ordinary playfields (4020 / 4022), both imported — there is no phasing mechanism
+  to build, and the lighting is the client's own (#149)
 
 ### Mounts & pets
 
@@ -222,17 +237,17 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **Client launcher** — drives the game client unattended, straight into the world
 - ✅ **Content-CDN mirror** — serves the client's streamed assets so it loads cleanly offline
 - ✅ **In-process MCP server** — live database + session inspection for tooling
-- ✅ **Client debug channels** — switches on the retail client's OWN logging (`--debug-channels`), so it reports what
-  it computed instead of us inferring it from screenshots: every stat it applies with the previous value, each one
-  attributable to the item or template that caused it (#443)
+- ✅ **Client debug channels** — switches on the retail client's OWN logging (`--debug-channels`), so it reports
+  every stat it applies and what caused it, instead of us inferring from screenshots (#443)
 - ✅ **Web armory & 3D viewer** — browser character/equipment viewer plus GM tools
-- 🟡 **GM mode in the retail client** — a GameMaster or Administrator account flips the stock client into GM mode,
-  unlocking its own built-in command set (`/teleport`, `/summon`, `/kill`, `/cloak`, `/setname`, … 133 of them) and
-  its GM/Debug hotkeys, flying included. The one wire field that does it turned out to be a *bitmask* of 25 named
-  privileges rather than a level — decoded from the client along with what each command requires (#449,
-  [docs](docs/subsystems/gm-commands.md)). What the server should send back when one of those commands is used is
-  still undecoded
-- 🟡 **Importer** — rebuilds the game database from captures + the client's asset files
+- ✅ **GM commands** — our own `.commands`, plus the retail client's built-in ones: a GameMaster account flips the
+  stock client into GM mode and its `/teleport`, `/cloak`, `/kill`, `/setname`, … now route into the same server
+  command table, so both spellings work. `.setstat` measures how the client scales a stat for display. Flying is the
+  client's own `/luke` and needs no server support (#449, [docs](docs/subsystems/gm-commands.md))
+- 🟡 What the server should send back for each of the client's 133 GM commands is per-command work; most are not
+  answered yet (#449)
+- 🟡 **Importer** — rebuilds the game database from captures + the client's asset files, plus read-only `--report`
+  diagnostics (NPC damage curve, item stat-region census, content coverage)
 
 ## Build
 
@@ -263,10 +278,14 @@ database schema, and hosts an in-process MCP endpoint on `http://127.0.0.1:7099/
 ### `faolan.db` and `faolan.sql`
 
 The game data lives in **`faolan.db`** (SQLite, built by the importer, committed). Alongside it, **`faolan.sql`**
-is a plain-text `.dump` of the same database, regenerated automatically by the `.githooks/pre-commit` hook
-whenever `faolan.db` is committed — so a data change is **reviewable in a diff** instead of showing up as
-`Bin 8839168 -> 8839168 bytes`. It is generated: never hand-edit it, and don't bother regenerating it yourself
-(the hook dumps the *staged* blob, so it always matches the commit).
+is the same data as plain text, regenerated automatically by the `.githooks/pre-commit` hook whenever `faolan.db`
+is committed — so a data change is **reviewable in a diff** instead of showing up as `Bin 8839168 -> 8839168
+bytes`. It is generated: never hand-edit it, and don't bother regenerating it yourself (the hook dumps the
+*staged* blob, so it always matches the commit).
+
+It is written from the EF model rather than by `sqlite3 .dump`, so it loads into SQLite _and_ PostgreSQL, and it
+doubles as the **seed**: a database with no game content is filled from it at startup (delete `faolan.db` and the
+server rebuilds it), while a populated one is never touched. Characters are excluded — per-developer play state.
 
 Both are deliberately interim. The end state (#379) is a real database with the schema + seed data kept as SQL in
 the repo and the binary dropped — running the two in parallel now means that migration is a deletion rather than
@@ -290,7 +309,8 @@ state across them); run one process per realm for isolation.
 Every server-side executable — the server, the importer, `Faolan.Web`, the `Faolan.Web.Content` CDN mirror,
 and the `Faolan.Mcp` chat-bridge — shares **one** config model: **environment variables > command line >
 `faolan.json`**, with `faolan.json` **optional** (a container can be configured entirely by env vars, with no
-file baked into the image). It lives at the repo root.
+file baked into the image). It lives at the repo root, and is found by searching up from the working directory —
+so a tool started from its own project directory still uses the repo's file (`FAOLAN_CONFIG` overrides).
 
 Related keys are grouped into sections; the remaining shared keys stay flat:
 
@@ -363,7 +383,7 @@ dotnet run --project Faolan.Importer -- --report terrain-export   # writes Terra
 ## Project layout
 
 | Project                  | Purpose                                                                                                                                                                                |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ------------------------ |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `Faolan/`                | The server host — runs every protocol listener as a hosted service.                                                                                                                    |
 | `Faolan.Core/`           | Shared base types, protobuf, crypto, and enums, with the layered `Faolan.Core.Database`, `Faolan.Core.Network`, and `Faolan.Core.Rdb` projects on top.                                 |
 | `Faolan.Importer/`       | CLI that (re)builds `faolan.db` from packet captures + the client RDB.                                                                                                                 |
@@ -373,7 +393,7 @@ dotnet run --project Faolan.Importer -- --report terrain-export   # writes Terra
 | `Faolan.Wireshark/`      | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool).                                                                                       |
 | `Faolan.Web/`            | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail, a generic `faolan.db` editor) gated to GameMaster accounts. |
 | `Faolan.Tests/`          | The unit/golden test suite.                                                                                                                                                            |
-| `Captures/`              | Reference packet traces + Python dissectors used for protocol comparison.                                                                                                              |
+| `tools/`                 | The capture/RE toolchain: Python dissectors + the tshark dump script, Ghidra scripts, Frida scripts.                                                                                   |
 
 ## Documentation
 
@@ -407,15 +427,17 @@ captures against the local server (no root needed) and retail-session captures a
 
 **Captures that would directly unblock currently-blocked features:**
 
+- **High-level and caster-NPC combat**, with the client's own `/logcombat on` running alongside the pcap → the
+  damage curves are only sampled to level 6, and the log names what the packets cannot: crits and absorbs
+  (#479, #401)
 - A **spell cast of a known-cooldown spell** → the `SetSpellRecastTime` GameAction (#271)
 - **Guild-bank** deposit/withdraw, and **guild** member kick/promote/demote (#132, #104)
-- A **progressed quest journal** (non-empty objective/progress lists) → the opaque `WTHD` block (#304)
-- **Clean per-type** NPC/character captures (not bloated session logins) → retire the verbatim spawn scaffolds
-  (#185, and thereby #304 / #234)
-- A **necromancer pet summon in the open world** (#307), a **friend** add/remove + come-online (#99), a
-  **player↔player trade** (#101)
-- A **combo landing on a live target** and a **melee-class fatality** on a killing blow → the combo-finisher bonus
-  damage and the fatality trigger wire (both server-authored, so un-recoverable from the client alone; #139, #140)
+- A **necromancer pet summon in the open world** (#307), and the **s2c side of a trade cancel / decline /
+  remove-item** — the c2s half is handled, but cancelling currently leaves the partner's window open (#427)
+- A **combo landing on a live target** → the combo-finisher's bonus damage, which retail decides server-side and so
+  cannot be recovered from the client alone (#139)
+- A second **quest abandoned** in a live session → the `QuestLogList` refresh variant retail sends with it; two
+  samples do not pin a grammar, and a malformed list takes the whole route down (#482)
 - **Level-up** captures across more classes/levels → fill the combo/spell/XP tables (#296, #297)
 - A **dungeon run**, the **faction/reputation** UI, and an **item socket** action → the roadmap features
   (#309, #310, #311)
