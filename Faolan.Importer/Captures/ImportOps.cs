@@ -168,27 +168,33 @@ namespace Faolan.Importer.Captures
 			var spawns = new List<NpcSpawnEntry>();
 			var patrols = new List<PatrolPathEntry>();
 
-			var burstNamesByMap = new Dictionary<uint, HashSet<string>>();
-			foreach (var map in allMaps)
+			// PER (map, TYPE), not per map (#486). The login burst is an INSTANT - one snapshot of what is standing
+			// there - so it gives true density without counting a respawn twice, and it stays the preferred source.
+			// But electing ONE capture for a whole map and then locking every type it saw to that capture does not
+			// survive a large, interest-streamed zone.
+			//
+			// Poitain is the case: `..._combat` entered it by a mid-session MAP CHANGE and the client polled almost
+			// immediately, so its burst window holds 5 spawns while 875 more arrive after the poll; `..._combat2` is a
+			// fresh LOGIN into the same zone and its burst holds 59. The 59 legitimately won the map, which then
+			// locked all 59 type names - and that excluded the first capture's 875 later observations from the
+			// non-burst pass entirely. Poitain Guard 13 -> 2, Zingaran Alchemist 12 -> 3.
+			//
+			// So each type takes whichever single capture saw the most of it, preferring a burst when the burst is at
+			// least as complete. One capture per type is still the rule (#266) - this only stops a type being pinned
+			// to a capture that barely saw it. `Merge` dedups the result by position, so a respawn on the same anchor
+			// inside the chosen capture still collapses.
+			foreach (var (map, name) in perCap.SelectMany(p => p.All).Select(e => (e.MapId, Name: e.Name ?? "")).Distinct())
 			{
-				var best = perCap.OrderByDescending(p => p.Burst.Count(e => e.MapId == map)).First();
-				var burstSpawns = best.Burst.Where(e => e.MapId == map).ToList();
-				if (burstSpawns.Count == 0)
-					continue;
+				var bestBurst = perCap.OrderByDescending(p => p.Burst.Count(e => e.MapId == map && (e.Name ?? "") == name)).First();
+				var burstCount = bestBurst.Burst.Count(e => e.MapId == map && (e.Name ?? "") == name);
 
-				Take(burstSpawns, best.Routes);
-				burstNamesByMap[map] = burstSpawns.Select(e => e.Name ?? "").ToHashSet();
-			}
+				var bestAll = perCap.OrderByDescending(p => p.All.Count(e => e.MapId == map && (e.Name ?? "") == name)).First();
+				var allCount = bestAll.All.Count(e => e.MapId == map && (e.Name ?? "") == name);
 
-			var nonBurstTypes = perCap
-				.SelectMany(p => p.All)
-				.Select(e => (e.MapId, Name: e.Name ?? ""))
-				.Where(t => !(burstNamesByMap.TryGetValue(t.MapId, out var ns) && ns.Contains(t.Name)))
-				.Distinct();
-			foreach (var (map, name) in nonBurstTypes)
-			{
-				var best = perCap.OrderByDescending(p => p.All.Count(e => e.MapId == map && (e.Name ?? "") == name)).First();
-				Take(best.All.Where(e => e.MapId == map && (e.Name ?? "") == name).ToList(), best.Routes);
+				if (burstCount >= allCount && burstCount > 0)
+					Take(bestBurst.Burst.Where(e => e.MapId == map && (e.Name ?? "") == name).ToList(), bestBurst.Routes);
+				else if (allCount > 0)
+					Take(bestAll.All.Where(e => e.MapId == map && (e.Name ?? "") == name).ToList(), bestAll.Routes);
 			}
 
 			// Pets are content of the creature TYPE (lifted onto the type columns by CapturePetImporter, spawned from the type
