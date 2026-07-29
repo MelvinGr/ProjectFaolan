@@ -69,11 +69,27 @@ namespace Faolan.Tests
 		[InlineData("", "")]
 		[InlineData("plain text", "plain text")] // fast path: untouched when there is nothing to escape
 		[InlineData("a & b", "a &amp; b")]
-		[InlineData("say \"hi\"", "say &quot;hi&quot;")]
-		[InlineData("it's", "it&apos;s")]
+		// Quotes and apostrophes ride through UNTOUCHED. The client does not decode &apos;, so escaping it put the
+		// literal text "&apos;" in the chat window (#448 GM-command reply, 2026-07-29). Settled against the client's
+		// own LDB content: &apos; appears 0 times in 2,164,982 strings while 228,544 carry a literal apostrophe.
+		[InlineData("say \"hi\"", "say \"hi\"")]
+		[InlineData("it's", "it's")]
+		[InlineData("'' and \"\"", "'' and \"\"")] // the exact shape that showed as &apos;&apos;
 		public void Escape_Cases(string? input, string expected)
 		{
 			Assert.Equal(expected, ChatMarkup.Escape(input));
+		}
+
+		// The injection guard is unchanged by leaving quotes alone: only & < > can open a tag or an entity, so a
+		// player-supplied string still cannot inject markup into another player's chat window.
+		[Theory]
+		[InlineData("<font color=red>fake</font>", "&lt;font color=red&gt;fake&lt;/font&gt;")]
+		[InlineData("<br />", "&lt;br /&gt;")]
+		[InlineData("it's <b>bold</b>", "it's &lt;b&gt;bold&lt;/b&gt;")]
+		public void Escape_StillNeutralisesMarkup(string input, string expected)
+		{
+			Assert.Equal(expected, ChatMarkup.Escape(input));
+			Assert.DoesNotContain("<", ChatMarkup.Escape(input));
 		}
 	}
 }

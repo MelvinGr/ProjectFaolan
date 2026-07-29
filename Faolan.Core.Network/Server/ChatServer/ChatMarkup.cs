@@ -16,9 +16,10 @@ namespace Faolan.Core.Network.Server.ChatServer
 	///         <c>SendSystemMessage(id, $"target {name}")</c> is escaped (including the interpolated value), while markup
 	///         is opted into explicitly with <see cref="Raw" /> - which is then easy to grep for and review.
 	///     </para>
-	///     Only the five entities XML/HTML actually needs are replaced, in an order that cannot double-escape (ampersand
-	///     first). Nothing else is touched: the payload is a length-prefixed LATIN-1 string on the wire, not a URL or a
-	///     JS context, so quote/angle/ampersand escaping is the whole job.
+	///     Only the three entities the client actually decodes are replaced, in an order that cannot double-escape
+	///     (ampersand first) - see <see cref="Escape" />, which explains why quotes and apostrophes are left alone.
+	///     Nothing else is touched: the payload is a length-prefixed LATIN-1 string on the wire, not a URL or a JS
+	///     context, so ampersand/angle escaping is the whole job.
 	/// </remarks>
 	public readonly record struct ChatMarkup(string Value)
 	{
@@ -59,17 +60,37 @@ namespace Faolan.Core.Network.Server.ChatServer
 			return new ChatMarkup(string.Join("<br />", Array.ConvertAll(lines, l => l.Value)));
 		}
 
-		/// <summary>The five XML entities, ampersand first so an escape can never be escaped twice.</summary>
+		/// <summary>
+		///     The three entities the client actually decodes, ampersand first so an escape can never be escaped twice.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ <b>Quotes and apostrophes are deliberately NOT escaped</b> - escaping them is visible corruption. The
+		///     client's renderer does not decode <c>&amp;apos;</c>, so <c>'x'</c> reached the chat window as the literal
+		///     text <c>&amp;apos;x&amp;apos;</c> (seen 2026-07-29 on the #448 GM-command reply).
+		///     <para>
+		///         Settled against the client's own content rather than by taste - across all 2,164,982 LDB strings:
+		///         <c>&amp;apos;</c> appears <b>0</b> times while 228,544 strings carry a literal <c>'</c>, and
+		///         <c>&amp;quot;</c> appears 7 times against 183,200 carrying a literal <c>"</c> (the client writes
+		///         <c>You can "auto-complete" the group name</c> with markup in the same line). Angle brackets are the
+		///         opposite: <c>&amp;lt;</c>/<c>&amp;gt;</c> appear 81 times each, exactly where a literal bracket must not
+		///         parse as a tag - <c>&amp;lt;no target&amp;gt;</c>, <c>&lt;font color=red&gt;Usage: /emote
+		///         &amp;lt;emote-name&amp;gt;&lt;/font&gt;</c> - which is the positive proof that those three ARE decoded.
+		///     </para>
+		///     That keeps the injection guard intact: <c>&amp;</c>, <c>&lt;</c> and <c>&gt;</c> are the only characters
+		///     that can open a tag or an entity, so escaping them is the whole job. A quote is inert in element content,
+		///     and no call site interpolates untrusted text into an attribute (<see cref="Color" /> takes a
+		///     developer-supplied colour).
+		/// </remarks>
 		public static string Escape(string? text)
 		{
 			if (string.IsNullOrEmpty(text))
 				return "";
 
 			// Fast path: the overwhelming majority of lines carry none of these at all.
-			if (text.IndexOfAny(['&', '<', '>', '"', '\'']) < 0)
+			if (text.IndexOfAny(['&', '<', '>']) < 0)
 				return text;
 
-			return text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
+			return text.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
 		}
 
 		/// <summary>Escapes on the way in - so passing a string anywhere a <see cref="ChatMarkup" /> is expected is safe.</summary>

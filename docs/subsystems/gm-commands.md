@@ -137,7 +137,7 @@ ALT+F7 is not the only way in, and it is not the reliable one — the whole GM/D
 The client also ships a plain chat command for it, `SkywalkingCommand`, and it is **entirely client-local**: its
 execute (`FUN_013f6130`) sends no packet at all, so **it works against our server today with no server support**.
 
-The verb is **`/luke`** — Luke *Skywalker*. It is an LDB string, which is why grepping the exe for "fly" or
+The verb is **`/luke`** — Luke *Skywalker*. **Confirmed working in-client 2026-07-29.** It is an LDB string, which is why grepping the exe for "fly" or
 "skywalk" never finds it: `SkywalkingCommand_Name` ELF-hashes to id 47110773 in category 10002, whose value is
 `luke` (see [`../rdb/ldb-string-index.md`](../rdb/ldb-string-index.md) for the hash rule). Its description, id
 97813470, reads *"This command enables skywalking."*, and it reports `Skywalking enabled` / `Skywalking disabled`.
