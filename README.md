@@ -48,8 +48,9 @@ we've seen_, and names the gaps). Regenerate with
   piercings, face morphs and voices — including the **Khitan** race (#469)
 - ✅ **Appearance renders as chosen** — hair, beard, body size, face markings and tattoos, confirmed in-client
   (#240, #288, #314)
-- 🟡 The create→world intro cutscene plays and Kalanthes speaks; a few background actors still render from raw
-  capture data (#234)
+- ✅ **The Tortage intro cutscene** — drowning, washing ashore, Kalanthes walking up and speaking his lines, all
+  in-client; the world it drops you into is constructed from the database like any other login, not replayed
+- 🟡 The tutorial tail after it (combat tutorial → approach Casilda) is not wired yet (#234, #261, #262)
 
 ### Realms & deployment
 
