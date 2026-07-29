@@ -29,13 +29,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		//
 		// `morphRegistry` is the MorphTarget catalog by ref name (IDatabaseRepository.GetMorphTargetRegistry - 1072
 		// rows of static seed content, cached for the process). It is what turns the character's stored editor
-		// choices into the spawn's weighted appearance entries; without it the character wears the default face.
+		// choices into the spawn's weighted appearance entries; it is REQUIRED, because without it the character
+		// used to wear Dikketest's captured face and nothing said so.
 		//
 		// A character with no scaffold rows THROWS. It used to return null so the caller could fall back to splicing a
 		// captured spawn, but that path is gone (construct-don't-replay) and the rows are seeded at character creation,
 		// so a character without them is corruption - and the "fallback" it enabled was a player nobody could see.
 		public static byte[] BuildFromScratch(uint handle, ulong playfield, Vector3 position, Quaternion rotation, ProtoCoreCharacterIIR characterIir, Character scaffoldCharacter,
-			IReadOnlyDictionary<string, MorphTarget>? morphRegistry)
+			IReadOnlyDictionary<string, MorphTarget> morphRegistry)
 		{
 			ArgumentNullException.ThrowIfNull(characterIir);
 

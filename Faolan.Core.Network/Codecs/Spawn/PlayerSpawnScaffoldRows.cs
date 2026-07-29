@@ -78,15 +78,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			]
 		};
 
-		// Dikketest's 6 weighted attributes (weight 1.0). The tags are per-character (likely the chosen
-		// race/class/head presets - mapping not yet cracked), so fresh characters keep Dikketest's proven set.
-		// The character's morph entries are generated from its CharacterBody (see CharacterMorphs), not stored here.
-		private static readonly ScaffoldEntry[] FreshWeightedAttributes =
-		[
-			new ScaffoldEntry(1, 0x00B0, 0x3F800000), new ScaffoldEntry(2, 0x0147, 0x3F800000), new ScaffoldEntry(3, 0x0154, 0x3F800000), new ScaffoldEntry(4, 0x0191, 0x3F800000),
-			new ScaffoldEntry(5, 0x010B, 0x3F800000), new ScaffoldEntry(6, 0x01DE, 0x3F800000)
-		];
-
 		// Per-class fresh feat/ability ID list (all rank 0). The FIRST id is the PROFESSION feat and equals
 		// (class enum) * 100 (1800=Barbarian, 2000=Guardian, 2900=BearShaman, 3400=Assassin, 4100=Necromancer,
 		// 2200=Conqueror, 4300=HeraldOfXotli, 4400=Demonologist...), matching the retail self-spawns (Captures/
@@ -100,41 +91,63 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// Builds the weighted (1.0) appearance entries from the character's chosen editor resources, resolved
 		// against the imported client registry (MorphTarget; wire tag = registry id - 1). Wire order = editor
-		// send order (Sequence). Category 2 (face paint, e.g. the always-sent *texscript_183875) is never
-		// emitted in captured spawns and is skipped; unresolvable refs are skipped too. Returns null when
-		// nothing resolves - the caller then falls back to the Dikketest defaults.
-		public static List<ScaffoldEntry>? BuildWeightedEntries(IEnumerable<CharacterBodyResource>? resources, IReadOnlyDictionary<string, MorphTarget>? registry)
+		// send order (Sequence).
+		//
+		// A character wears the resources it chose or the build FAILS - there is no substitute face. This used to
+		// return null (registry missing, no ref resolved, or nothing but category 2) and the caller then spliced in
+		// DIKKETEST's captured 6 attributes, which is a wrong hair plus two face-marking texscripts presented as the
+		// player's own choices - a wrong appearance that renders as if it worked. The two null cases it collapsed are
+		// different problems and both are now loud: a missing registry is seed corruption (MorphTargets is 1072 rows
+		// of static seed content that every spawn resolves through), and a ref the registry does not know is content
+		// the importer never took in.
+		//
+		// The ONE thing still skipped is category 2 (face paint, e.g. the always-sent *texscript_183875): captured
+		// spawns never carry it, so emitting it would be inventing wire. That is proven grammar, not a fallback - a
+		// character whose only choice is category 2 legitimately builds an EMPTY entry list.
+		public static List<ScaffoldEntry> BuildWeightedEntries(IEnumerable<CharacterBodyResource>? resources, IReadOnlyDictionary<string, MorphTarget> registry)
 		{
-			if (resources == null || registry == null)
-				return null;
+			ArgumentNullException.ThrowIfNull(registry);
 
 			var entries = new List<ScaffoldEntry>();
-			foreach (var resource in resources.OrderBy(r => r.Sequence))
+			if (resources == null)
+				return entries;
+
+			var ordered = resources.OrderBy(r => r.Sequence).ToList();
+
+			var unresolved = ordered.Where(r => !registry.ContainsKey(r.Ref)).Select(r => r.Ref).ToArray();
+			if (unresolved.Length > 0)
 			{
-				if (!registry.TryGetValue(resource.Ref, out var target) || target.Category == 2)
+				throw new InvalidOperationException(
+					$"Character {ordered[0].CharacterId:X8} chose appearance resource(s) {string.Join(", ", unresolved)}, which are not in MorphTargets - its own looks cannot be built. Import them (Faolan.Importer --only rdb-morph-targets).");
+			}
+
+			foreach (var resource in ordered)
+			{
+				var target = registry[resource.Ref];
+				if (target.Category == 2)
 					continue;
 
 				entries.Add(new ScaffoldEntry((uint)entries.Count + 1, (ushort)target.Id, BitConverter.SingleToUInt32Bits(target.Weight)));
 			}
 
-			return entries.Count > 0
-				? entries
-				: null;
+			return entries;
 		}
 
 		// The scaffold's ENTRY TABLE, built WHOLE from the character's appearance model - the one generator, used by
 		// every spawn. In wire order: the weighted appearance entries (the character's chosen editor resources,
-		// resolved through the registry by BuildWeightedEntries, or Dikketest's proven set when none resolve), then
-		// the character's OWN editor morphs (CharacterMorphs - absent sliders yield no entry, the captured shape of an
+		// resolved through the registry by BuildWeightedEntries - EMPTY when it chose none, never somebody else's
+		// face), then the character's OWN editor morphs (CharacterMorphs - absent sliders yield no entry, the captured shape of an
 		// unmorphed character), then the closing record. Indices are 1..n in that order.
 		//
 		// NB retail's captured indices are NOT always 1..n: they are per-character SLOT ids that survive appearance
 		// edits, so a re-barbered character carries gaps and appends its new hair/beard after its morphs
 		// (SpawnNecroKingsCastle starts at 2, SpawnDemoRandomActions runs 4..13,24,23). Nothing derives them, and
 		// nothing needs to - every character we create spawns with 1..n and renders correctly in-client.
-		public static List<ScaffoldEntry> BuildAppearanceEntries(Character character, IReadOnlyList<ScaffoldEntry>? weightedAppearance)
+		public static List<ScaffoldEntry> BuildAppearanceEntries(Character character, IReadOnlyList<ScaffoldEntry> weightedAppearance)
 		{
-			var entries = new List<ScaffoldEntry>(weightedAppearance ?? FreshWeightedAttributes);
+			ArgumentNullException.ThrowIfNull(weightedAppearance);
+
+			var entries = new List<ScaffoldEntry>(weightedAppearance);
 			entries.AddRange(CharacterMorphs.BuildEntries(character.Body, (uint)entries.Count + 1));
 
 			var closer = FreshCloser(character.Class);
@@ -371,9 +384,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// character with no editor choices legitimately wears the default face.
 		//
 		// `registry` is the MorphTarget catalog by ref name; it resolves the character's editor choices into the
-		// weighted entries. Refs that do not resolve fall back to the proven Dikketest set - the default face rather
-		// than none - which is what the create flow reports on (CreateFlowService.ReportUnresolvableAppearance).
-		public static bool TryApplyFrom(Character character, PlayerSpawnScaffold scaffold, IReadOnlyDictionary<string, MorphTarget>? registry)
+		// weighted entries. A ref it does not know THROWS rather than being dropped or swapped for a default face
+		// (BuildWeightedEntries) - the create flow says the same thing once, at creation, where it is still
+		// actionable (CreateFlowService.ReportUnresolvableAppearance).
+		public static bool TryApplyFrom(Character character, PlayerSpawnScaffold scaffold, IReadOnlyDictionary<string, MorphTarget> registry)
 		{
 			if (character?.Skills is not { Count: > 0 })
 				return false;

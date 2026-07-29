@@ -570,28 +570,17 @@ namespace Faolan.GameServer.CreateFlow
 				return;
 
 			var registry = await _database.GetMorphTargetRegistry();
-			if (PlayerSpawnScaffoldRows.BuildWeightedEntries(character.BodyResources, registry) != null)
-				return;
 
-			// Falling back to the defaults means wearing DIKKETEST's face, so be precise about why, instead of the old
-			// one-size warning: BuildWeightedEntries returns null for two unrelated reasons and only one of them is a
-			// problem.
-			//   - a ref the registry does not know  -> a GAP. MorphTargets ships in the seed (1072 rows), so an
-			//     unknown ref means the editor sent something we never imported, and this character will not look like
-			//     what the player built.
-			//   - every ref resolved but all were CATEGORY 2 (face paint, e.g. the always-sent *texscript_183875) ->
-			//     by design: captured spawns never carry those, so there is nothing to express and the defaults are the
-			//     correct baseline.
+			// A ref the registry does not know is a GAP: MorphTargets ships in the seed (1072 rows), so an unknown ref
+			// means the editor sent something we never imported. It is checked HERE, directly, rather than by asking
+			// BuildWeightedEntries - which no longer answers "could not build" with a default face but by throwing, and
+			// throwing at creation would fail the create over a cosmetic gap. Saying it once, here, is what makes the
+			// gap actionable before the character's every future spawn hits it.
 			var unresolved = character.BodyResources.Select(r => r.Ref).Where(r => !registry.ContainsKey(r)).ToArray();
 			if (unresolved.Length > 0)
 			{
-				_logger.LogError("Character {CharacterId:X8}: appearance resource(s) {Refs} are not in MorphTargets, so its own looks cannot be built and it gets the default face. Import them.",
+				_logger.LogError("Character {CharacterId:X8}: appearance resource(s) {Refs} are not in MorphTargets, so its spawn cannot be built at all. Import them.",
 					character.Id, string.Join(", ", unresolved));
-			}
-			else
-			{
-				_logger.LogInformation("Character {CharacterId:X8}: all {Count} appearance resource(s) are cosmetic-only (category 2), which spawns never carry - using the default entries.",
-					character.Id, character.BodyResources.Count);
 			}
 		}
 

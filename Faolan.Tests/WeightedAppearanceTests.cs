@@ -32,14 +32,35 @@ namespace Faolan.Tests
 
 		private static readonly ushort[] FaolanxWire = [0x02BB, 0x012C, 0x0193, 0x00E3, 0x0112, 0x01CF, 0x0323];
 
+		// There is NO substitute face. Each of these used to return null, and the caller then spliced in Dikketest's
+		// captured 6 weighted attributes - a hair the player never chose plus two face-marking texscripts - and
+		// rendered it as that character's own appearance. A character now wears what it chose, nothing, or the build
+		// fails loudly; it never wears somebody else's.
 		[Fact]
-		public void BuildWeightedEntries_SkipsUnresolvedAndReturnsNullWhenEmpty()
+		public void BuildWeightedEntries_ChoosingNothingBuildsNothing()
 		{
-			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(null!, RegistryDict()));
-			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(FaolanxRefs), null!));
-			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(["*texscript_999999"]), RegistryDict()));
-			// Only the never-emitted face-paint category resolves -> null (fall back to defaults).
-			Assert.Null(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(["*texscript_183875"]), RegistryDict()));
+			Assert.Empty(PlayerSpawnScaffoldRows.BuildWeightedEntries(null, RegistryDict()));
+
+			// Only the never-emitted face-paint category (2) resolved: captured spawns never carry it, so an empty
+			// entry list is the CORRECT wire, not a missing one.
+			Assert.Empty(PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(["*texscript_183875"]), RegistryDict()));
+		}
+
+		// The registry is 1072 rows of static seed content that every spawn resolves through, so its absence is seed
+		// corruption - not a cue to dress the character in the capture's face.
+		[Fact]
+		public void BuildWeightedEntries_WithoutTheRegistry_Throws()
+		{
+			Assert.Throws<ArgumentNullException>(() => PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(FaolanxRefs), null!));
+		}
+
+		// A ref the registry does not know is content the importer never took in. Dropping it silently cost the
+		// character a chosen resource (and, when it was the only one, its whole face).
+		[Fact]
+		public void BuildWeightedEntries_WithAnUnimportedRef_ThrowsNamingIt()
+		{
+			var ex = Assert.Throws<InvalidOperationException>(() => PlayerSpawnScaffoldRows.BuildWeightedEntries(Resources(["*texscript_999999"]), RegistryDict()));
+			Assert.Contains("*texscript_999999", ex.Message);
 		}
 
 		[Fact]

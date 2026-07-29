@@ -124,7 +124,7 @@ namespace Faolan.Tests
 				Class = ConanClass.Assassin
 			};
 
-			var closer = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, null).Last();
+			var closer = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, []).Last();
 			Assert.Equal(0x3F10, closer.Tag); // 14 feats -> (14+2)*0x3F1
 			Assert.Equal(300u, closer.Value);
 		}
@@ -144,7 +144,7 @@ namespace Faolan.Tests
 			};
 			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 
-			var closer = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, null).Last();
+			var closer = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, []).Last();
 			var expectedTag = (ushort)((character.Skills.Count + 2) * 0x3F1);
 			Assert.Equal(expectedTag, closer.Tag);
 		}
@@ -198,11 +198,16 @@ namespace Faolan.Tests
 			Assert.Equal((uint)@class * 100, feats.First());
 		}
 
-		// The fresh-character defaults are Dikketest's extracted scaffold, with the morph entries GENERATED from the
-		// character's editor sliders: a character that carries Dikketest's CharacterBody (the raw editor stream from
-		// his create capture, zigzag-decoded by CharacterMorphs.TryApply) and NO resource refs - so the weighted half
-		// falls back to the proven defaults - must reproduce his captured spawn byte-for-byte. This is the
-		// brand-new-character path, the one every created character takes.
+		// A character that carries Dikketest's appearance MODEL - his CharacterBody (the raw editor stream from his
+		// create capture, zigzag-decoded by CharacterMorphs.TryApply) and his chosen resource refs - must reproduce
+		// his captured spawn byte-for-byte. This is the brand-new-character path, the one every created character
+		// takes: BOTH halves of the entry table are generated, the weighted half from the refs through the real
+		// registry and the morph half from the sliders.
+		//
+		// It used to pass his body and NO refs, so the weighted half came from a hardcoded copy of his own 6 captured
+		// entries - the golden was reproducing a constant, and would have gone on passing if resolving refs to tags
+		// broke entirely. Those refs are recovered from his captured entry table through the registry, which is
+		// exactly what ExtractTo does when it imports a captured character.
 		[Fact]
 		public void FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture()
 		{
@@ -216,7 +221,17 @@ namespace Faolan.Tests
 				// profession feat 1800 = Class.Barbarian * 100), so the fresh rows must be generated for that class
 				// to reproduce his spawn byte-for-byte (#239 - the feat tree is the client's class source).
 				Class = ConanClass.Barbarian,
-				Body = new CharacterBody()
+				Body = new CharacterBody(),
+				// His editor choices, in send order: hair, hair colour, body marking, face marking, eye colour, face
+				// marking. No skin colour and no beard - he chose neither, and nothing invents one for him.
+				BodyResources = new[] { "*hairmesh_208094", "*texscript_1108153", "*texscript_1136777", "*texscript_198071", "*texscript_213930", "*texscript_3114637" }
+					.Select((r, i) => new CharacterBodyResource
+					{
+						CharacterId = 0x02000005,
+						Sequence = i,
+						Ref = r
+					})
+					.ToList()
 			};
 			foreach (var (morph, raw) in new (string, uint)[] { ("arm", 59), ("arse", 14), ("bosom", 30), ("chest", 59), ("leg", 59), ("stomach", 14), ("thigh", 59) })
 				// raw = Dikketest's captured wire values; decode as the read side does before storing.
@@ -242,11 +257,14 @@ namespace Faolan.Tests
 				Class = ConanClass.Barbarian
 			};
 
-			var entries = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, null);
-			Assert.Equal(7, entries.Count);
+			// A character that chose nothing and morphed nothing carries ONLY the closer. It used to carry 7 entries:
+			// Dikketest's 6 captured weighted attributes stood in for the appearance nobody had chosen, so an
+			// appearance-less character shipped somebody else's hair and face markings.
+			var entries = PlayerSpawnScaffoldRows.BuildAppearanceEntries(character, []);
+			Assert.Single(entries);
 
 			var closer = entries[^1];
-			Assert.Equal(7u, closer.Index);
+			Assert.Equal(1u, closer.Index);
 			Assert.Equal(0x56B6, closer.Tag);
 			Assert.Equal(300u, closer.Value);
 		}
