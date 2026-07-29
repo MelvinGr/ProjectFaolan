@@ -92,8 +92,8 @@ fields (compressed on-disk bytes).
 | 1010004 | * FCTX1 texture (DXT/MIXD; #275/#293) | 35,299 | 24,214 | 11,085 | 17.7 GB |
 | 1010006 | FCTX2 texture | 969 | 375 | 594 | 216.1 MB |
 | 1010008 | PNG | 3,713 | 3,713 | 0 | 33.7 MB |
-| 1010012 | MTI1 material? | 74 | 68 | 6 | 293.3 KB |
-| 1010013 | JPEG | 653 | 73 | 580 | 762.6 MB |
+| 1010012 | * `MTI1` tile index (accompanies some 1010013 map images) | 74 | 68 | 6 | 293.3 KB |
+| 1010013 | * In-game map image (JPEG tile pyramid, by playfield; see [map-image-tiles-1010013.md](map-image-tiles-1010013.md)) | 653 | 73 | 580 | 762.6 MB |
 | 1010026 | RTriMesh (runtime tri-mesh) | 84 | 84 | 0 | 1.2 MB |
 | 1010028 | SCRIPTGROUP2 | 2,011 | 2,011 | 0 | 19.1 MB |
 | 1010030 | * MESHINDEXFILE (mesh manifest XML; #275) | 29,854 | 29,854 | 0 | 38.5 MB |
