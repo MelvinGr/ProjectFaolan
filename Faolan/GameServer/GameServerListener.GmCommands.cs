@@ -368,8 +368,7 @@ namespace Faolan.GameServer
 				["graduatenpcgroup"] = GraduateNpcGroupCommand,
 				["weaponset"] = WeaponSetCommand,
 				["time"] = TimeCommand,
-				["setstat"] = SetStatCommand,
-				["fly"] = (client, _) => FlyCommand(client)
+				["setstat"] = SetStatCommand
 			};
 		}
 
@@ -903,33 +902,6 @@ namespace Faolan.GameServer
 			await _agentServerDispatcher.SendSystemMessage(characterId, entity.GodMode
 				? ChatMarkup.Raw($"God mode {ChatMarkup.Color("lime", "ON")} - you take no damage.")
 				: ChatMarkup.Raw($"God mode {ChatMarkup.Color("red", "OFF")}."));
-		}
-
-		// .fly  - push the client's own FLY mode (GameAction e_Type_GC_GameAction_StartFlymode, type 0xD12D) at
-		// yourself. Flying is client-side state - "alignment mode" 5 in the client's movement state machine - and it is
-		// NOT a wire field, so this GameAction is the only server-side lever; see FlymodeActionBuilder for the type-id
-		// derivation. The client's ALT+F7 hotkey (`DebugToggleFlyingMode`, the gmlevel="-1" group in
-		// Data/Gui/Default/Hotkeys.xml) reaches the same client state but is not wired to anything we send.
-		//
-		// ⚠️ If you just want to FLY, type `/luke` instead - the client's own SkywalkingCommand is client-local (it
-		// sends no packet) and toggles the same state, so it works regardless of what the server does. This command is
-		// the server-driven alternative, for granting flight rather than the player toggling it.
-		//
-		// ⚠️ UNVERIFIED on the wire: the GameAction's parameter list lives in a runtime-filled descriptor table, so an
-		// empty one is an assumption (FlymodeActionBuilder). There is also no "stop" counterpart in the client's type
-		// list, so this is one-way until that is decoded - relog to land.
-		private async Task FlyCommand(INetworkClient client)
-		{
-			var characterId = client.Session.Character.Id;
-			if (_simulation.PlayerWorldEntity(client) == null)
-			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "You're not in the world yet.");
-				return;
-			}
-
-			await WorldIir.Send(client, FlymodeActionBuilder.BuildStartFlymodeBody(characterId));
-			await _agentServerDispatcher.SendSystemMessage(characterId,
-				ChatMarkup.Raw($"Fly mode {ChatMarkup.Color("lime", "requested")} - StartFlymode GameAction sent (unverified; relog to land)."));
 		}
 
 		// .invisible  - toggle aggro invisibility on yourself: hostile NPCs won't target/aggro you (skipped in the

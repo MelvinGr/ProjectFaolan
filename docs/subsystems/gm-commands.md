@@ -158,13 +158,12 @@ about it rides `CharDCMove`, whose MovingType is a layout bitfield with no movem
 ([`../re/chardcmove-grammar.md`](../re/chardcmove-grammar.md)) — so there is no server-side "make them fly" field,
 only the client's own state.
 
-The one server-side lever the client exposes is the GameAction `e_Type_GC_GameAction_StartFlymode`
-(`0xCF92`), which the `.fly` GM command sends; that path is **unverified** (its parameter list lives in a
-runtime-filled descriptor table). `/luke` is the route that is decoded end to end and confirmed working.
-
-⚠️ `.fly` first shipped with the id `0xD12D`, which is outside the range the client asserts
-(`0xCF09..0xD026`, `SpellData.cpp:1577`) and **crashed the client**. See
-[`../re/gameactionlist-grammar.md`](../re/gameactionlist-grammar.md) for the stride trap behind it.
+The client also exposes a server-driven lever, the GameAction `e_Type_GC_GameAction_StartFlymode` (`0xCF92`) -
+but sending it does **nothing** (tested in-client 2026-07-29), so we do not ship a command for it. Its parameter
+list lives in a runtime-filled descriptor table and is still unknown, which is the likeliest reason. ⚠️ An earlier
+attempt sent `0xD12D`, outside the range the client asserts (`0xCF09..0xD026`, `SpellData.cpp:1577`), and **crashed
+the client**; see [`../re/gameactionlist-grammar.md`](../re/gameactionlist-grammar.md) for the stride trap behind
+that. `/luke` is the route that works.
 
 ### The rest of the GM/Debug group
 
