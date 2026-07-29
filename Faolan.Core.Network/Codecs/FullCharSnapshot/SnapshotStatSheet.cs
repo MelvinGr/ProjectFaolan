@@ -34,7 +34,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		[
 			CharacterStatId.PlayfieldToken, CharacterStatId.GmLevel, CharacterStatId.Sex,
 			CharacterStatId.Level, CharacterStatId.Exp, CharacterStatId.MaxExp, CharacterStatId.ExpCurrentLevelBase,
-			CharacterStatId.Money, CharacterStatId.Kills, CharacterStatId.Deaths, CharacterStatId.PlayerId
+			CharacterStatId.Money, CharacterStatId.Kills, CharacterStatId.Deaths, CharacterStatId.PlayerId,
+			// Authored CONDITIONALLY - only for the levels SkillPointCurve has actually measured (#507). Declared here
+			// regardless, because the slot varies across captured characters and this is where that is accounted for.
+			CharacterStatId.SkillPoints
 		];
 
 		/// <summary>
@@ -114,6 +117,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			yield return (CharacterStatId.Exp, character.Experience);
 			yield return (CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			yield return (CharacterStatId.ExpCurrentLevelBase, 0);
+
+			// The SKILL-POINT pool (#507), which is purely level-derived - so like Level above, a captured sheet holds
+			// the value for whatever level the character was imported at and goes stale the moment it dings.
+			// Deliberately conditional: only 5 of the 80 levels have ever been captured (SkillPointCurve.Measured), and
+			// the curve has no formula to interpolate with, so an unmeasured level yields NOTHING and keeps the
+			// baseline's own value rather than having a guess written over it.
+			if (SkillPointCurve.For(character.Level) is { } skillPoints)
+				yield return (CharacterStatId.SkillPoints, skillPoints);
 		}
 
 		// Writes a value at EVERY occurrence of a stat id. A stat can appear in both lists (and twice within

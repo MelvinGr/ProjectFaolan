@@ -286,7 +286,12 @@ namespace Faolan.Core.Enums
 		Expansions = 0x185,
 		PlayerId = 0x25F,
 		LastKillNumber = 0x06A,
-		Unknown32 = 0x0F3,
+		// The SKILL-POINT pool (#507) - the number the client reports as "gained N skillpoints". Identified from the
+		// annotation `gained 1892 skillpoints after the relog`: exactly ONE stat in that login's 630 KB
+		// FullPlayerCharacterIIR equals 1892, and it is this one. Purely LEVEL-derived - see SkillPointCurve for the
+		// measured values and why there is no formula. It has no LDB name (the stat-name table jumps 242 -> 248), which
+		// fits an internal pool the UI labels itself rather than a displayed stat.
+		SkillPoints = 0x0F3,
 		Skulk = 0x445,
 		RunSpeed = 0x43D,
 		Hiding = 0x33C,

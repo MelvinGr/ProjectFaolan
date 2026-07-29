@@ -53,7 +53,6 @@ namespace Faolan.Tests
 
 			// Named-unknown slots that vary: undecoded, so there is nothing to derive them FROM yet (#464).
 			[CharacterStatId.Unknown15] = "undecoded slot (#464)",
-			[CharacterStatId.Unknown32] = "undecoded slot (#464)",
 			[CharacterStatId.Unknown46] = "undecoded slot (#464)",
 			[CharacterStatId.ElderFrostSpecialization] = "undecoded slot (#464)"
 		};

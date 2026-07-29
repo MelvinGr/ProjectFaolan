@@ -62,7 +62,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			(CharacterStatId.DeadTimer, 0x0), (CharacterStatId.Sex, 0x3), (CharacterStatId.MaxExp, 0x64), (CharacterStatId.ExpCurrentLevelBase, 0x0), (CharacterStatId.Level, 0x1),
 			(CharacterStatId.PvpLevel, 0x0), (CharacterStatId.PvpExp, 0x0), (CharacterStatId.Exp, 0x0), (CharacterStatId.PreviousHealth, 0x3E8), (CharacterStatId.Played, 0xBA),
 			(CharacterStatId.Side, 0x0), (CharacterStatId.AwardedOmniTekTokens, 0x0), (CharacterStatId.GmLevel, 0x0), (CharacterStatId.Expansions, 0x0), (CharacterStatId.PlayerId, 0x59EA506E),
-			(CharacterStatId.LastKillNumber, 0x14), (CharacterStatId.Unknown32, 0x0), (CharacterStatId.Skulk, 0x0), (CharacterStatId.RunSpeed, 0x0), (CharacterStatId.Perception, 0x0),
+			(CharacterStatId.LastKillNumber, 0x14), (CharacterStatId.SkillPoints, 0x0), (CharacterStatId.Skulk, 0x0), (CharacterStatId.RunSpeed, 0x0), (CharacterStatId.Perception, 0x0),
 			(CharacterStatId.Hiding, 0x0), (CharacterStatId.Resilence, 0x0), (CharacterStatId.TrapDisarm, 0x0), (CharacterStatId.Climbing, 0x0), (CharacterStatId.MagicalResist, 0x64),
 			(CharacterStatId.MagicRating, 0x64), (CharacterStatId.AttackRating, 0x64), (CharacterStatId.DefenseRating, 0x64), (CharacterStatId.MemorizeDelay, 0x0), (CharacterStatId.ElderFrostSpecialization, 0x0),
 			(CharacterStatId.Unknown46, 0x0), (CharacterStatId.PetPoints, 0x0), (CharacterStatId.Unknown48, 0x0), (CharacterStatId.Money, 0x0), (CharacterStatId.Unknown50, 0x0),

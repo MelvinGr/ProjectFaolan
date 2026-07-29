@@ -758,12 +758,14 @@ namespace Faolan.GameServer.CreateFlow
 				{
 					await Task.Delay(delay);
 
-					// Single-shot: the latch is cleared by whoever gets there first, so a handoff can never be sent
-					// twice (a second 0x2002 mid-handoff would re-redirect a client that is already reconnecting).
-					if (!client.Session.AwaitingEnterWorld)
+					// Single-shot, and it has to be ATOMIC: this used to read the latch and then clear it as two steps,
+					// which is not single-shot at all - two armed tasks both passed the read before either wrote, and
+					// both sent. That surfaced as EnterWorldHandoffTriggerTests.TheHandoffIsSingleShot failing only
+					// under full-suite CPU load (the "undiagnosable" suite flake), and in production as a second 0x2002
+					// re-redirecting a client that is already reconnecting.
+					if (!client.Session.TryClaimEnterWorldHandoff())
 						return;
 
-					client.Session.AwaitingEnterWorld = false;
 					await _sendEnterWorldHandoff(client);
 				}
 				catch (Exception e)

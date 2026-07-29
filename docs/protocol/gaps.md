@@ -163,3 +163,18 @@ smaller boss, is 3 — so 2 and 3 are not simply two tiers of the same "named" l
 on (`tools/ghidra/DumpNpcTypeRank.java` establishes this — PART A finds no hit). Naming 1 and 2 means finding the
 NpcStats field-14 reader through the generated parser and following it to the nameplate decoration, or finding a
 client data table that enumerates the kinds.
+
+### The skill-point curve above level 1, 5, 23, 24 and 80
+**Tracked: Gitea #507.** [V0: the skill-point pool for the 75 uncaptured levels] `CharacterStatId.SkillPoints`
+(stat `0x0F3`) is the pool the client reports as "gained N skillpoints", and it is a pure function of LEVEL —
+identical for every character at a level regardless of class (two level-23 characters of different classes both
+carry 402; two level-24 characters both carry 642). So it is not an award to grant on a trigger.
+
+What is missing is 75 of the 80 rows. The five measured are 0, 154, 402, 642, 1892 at levels 1, 5, 23, 24, 80,
+and that is **not** a smooth curve — 23→24 jumps 240 in one level while 5→23 averages under 14 — so it is a
+per-level table with no formula to interpolate. `SkillPointCurve` therefore returns null for an unmeasured level
+rather than inventing a value the client would display as authoritative.
+
+⚠️ It is not in the client data tables: 1000505–1000508, 1000511, 1000513, 1000514 and 1000516 were dumped and
+none contains 154, 402, 642 or 1892 in either endianness. The cheap source is captures, not RE — one login
+snapshot per level fills a row with no decoding at all.

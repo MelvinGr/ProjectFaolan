@@ -43,10 +43,17 @@ namespace Faolan.Tests
 			var service = Service(() => Interlocked.Increment(ref handoffs));
 			var client = new RecordingNetworkClient(0x0802E5D4);
 
-			// Two arms racing on one session (an AddShortcut path left armed, a retry, a re-entered flow). A second
-			// 0x2002 would re-redirect a client that is already reconnecting, so exactly one must win.
-			service.ScheduleEnterWorldHandoff(client, TimeSpan.Zero);
-			service.ScheduleEnterWorldHandoff(client, TimeSpan.Zero);
+			// Arms racing on one session (an AddShortcut path left armed, a retry, a re-entered flow). A second 0x2002
+			// would re-redirect a client that is already reconnecting, so exactly one must win.
+			//
+			// Deliberately MANY arms, not two. With two, the losing interleaving is rare enough that this passed on its
+			// own and failed only inside the full suite under CPU load - which read as an undiagnosable flake for a
+			// while. The claim used to be a non-atomic "read the latch, then clear it", so every arm that got through
+			// the read before anyone wrote also sent. Widening the race makes the bug deterministic instead of load-
+			// dependent, and the fix is the Interlocked claim in TryClaimEnterWorldHandoff.
+			for (var i = 0; i < 64; i++)
+				service.ScheduleEnterWorldHandoff(client, TimeSpan.Zero);
+
 			await WaitFor(() => Volatile.Read(ref handoffs) > 0);
 			await Task.Delay(150, TestContext.Current.CancellationToken); // give a second send a chance to appear before asserting it did not
 
@@ -65,6 +72,61 @@ namespace Faolan.Tests
 			await WaitFor(() => !client.Session.AwaitingEnterWorld);
 
 			Assert.False(client.Session.AwaitingEnterWorld);
+		}
+
+		// The primitive the single-shot property rests on: claim once, and the claim clears the latch.
+		//
+		// ⚠️ Be honest about what this can and cannot do. It does NOT reliably catch the non-atomic latch - the racy
+		// "if (!AwaitingEnterWorld) return; AwaitingEnterWorld = false;" was measured to pass this too, because the
+		// window between the read and the write is a couple of instructions and threads rarely land inside it. So the
+		// argument for TryClaimEnterWorldHandoff being an Interlocked compare-and-swap is that it is atomic BY
+		// CONSTRUCTION, not that a test can demonstrate the alternative failing on demand.
+		//
+		// What this gate is actually for is the contract - exactly one winner, latch cleared in the same step - so a
+		// future "simplification" back to a plain bool property has something to fail against on the days it does
+		// lose the race. The real evidence that the race is live is the suite: the integration test above failed at
+		// 1579/1580 under full-suite CPU load and passed in isolation, every time, until the CAS landed.
+		[Fact]
+		public void ClaimingTheHandoff_HasExactlyOneWinner_UnderContention()
+		{
+			for (var attempt = 0; attempt < 50; attempt++)
+			{
+				var session = new RecordingNetworkClient(0x0802E5D4).Session;
+				session.AwaitingEnterWorld = true;
+
+				var winners = 0;
+				var threads = new Thread[Math.Max(4, Environment.ProcessorCount)];
+				using var gate = new ManualResetEventSlim(false);
+
+				for (var i = 0; i < threads.Length; i++)
+				{
+					threads[i] = new Thread(() =>
+					{
+						gate.Wait();
+						if (session.TryClaimEnterWorldHandoff())
+							Interlocked.Increment(ref winners);
+					});
+					threads[i].Start();
+				}
+
+				gate.Set(); // release them all at once, so the claims genuinely overlap
+				foreach (var t in threads)
+					t.Join();
+
+				Assert.Equal(1, Volatile.Read(ref winners));
+				Assert.False(session.AwaitingEnterWorld); // and the claim cleared the latch
+			}
+		}
+
+		// An unarmed session has no handoff to claim, so nobody wins - otherwise a stray retry after the handoff
+		// already completed would send a second 0x2002.
+		[Fact]
+		public void ClaimingAnUnarmedHandoff_Fails()
+		{
+			var session = new RecordingNetworkClient(0x0802E5D4).Session;
+
+			Assert.False(session.AwaitingEnterWorld);
+			Assert.False(session.TryClaimEnterWorldHandoff());
 		}
 
 		private static CreateFlowService Service(Action onHandoff)

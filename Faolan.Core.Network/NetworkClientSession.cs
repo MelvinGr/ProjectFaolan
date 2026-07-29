@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Threading;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -57,6 +58,13 @@ namespace Faolan.Core.Network
 		// Set after CharCreationFinished + the world-prep burst: the creator is now waiting for the client's
 		// 0x206E enter-world signal, which we answer with the 0x2002 world-address handoff.
 		bool AwaitingEnterWorld { get; set; }
+
+		// Atomically claim the enter-world handoff: true for exactly ONE caller, false for every other, and clears the
+		// latch in the same step. The handoff is armed on a background task and can legitimately be armed twice (an
+		// AddShortcut path left armed, a retry, a re-entered flow), so "read the flag then clear it" is not enough -
+		// two tasks can both pass the read before either writes, and a second 0x2002 re-redirects a client that is
+		// already reconnecting. This is that compare-and-swap.
+		bool TryClaimEnterWorldHandoff();
 		bool EnergyLoopActive { get; set; } // guards against spawning more than one energy-mirror loop
 
 		bool HasPendingPost205FFollowUp { get; set; }
@@ -196,7 +204,18 @@ namespace Faolan.Core.Network
 		public Vector3? SeatedPosition { get; set; }
 		public WorldEntryMode EntryMode { get; set; } = WorldEntryMode.Login;
 
-		public bool AwaitingEnterWorld { get; set; }
+		// Backed by an int so the claim below can be a real Interlocked compare-and-swap; the bool property keeps the
+		// call sites (and the "is it armed?" reads) unchanged.
+		private int _awaitingEnterWorld;
+
+		public bool AwaitingEnterWorld
+		{
+			get => Volatile.Read(ref _awaitingEnterWorld) != 0;
+			set => Volatile.Write(ref _awaitingEnterWorld, value ? 1 : 0);
+		}
+
+		public bool TryClaimEnterWorldHandoff() => Interlocked.CompareExchange(ref _awaitingEnterWorld, 0, 1) == 1;
+
 		public bool EnergyLoopActive { get; set; }
 		public bool HasPendingPost205FFollowUp { get; set; }
 		public bool IsSpellweaving { get; set; }
