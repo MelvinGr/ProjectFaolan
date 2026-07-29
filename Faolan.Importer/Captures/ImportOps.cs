@@ -70,8 +70,9 @@ namespace Faolan.Importer.Captures
 		}
 
 		// The clean burst-truth NPC spawn set (#266): per capture one entry per distinct mob (dedup by handle),
-		// each type taken from its single authoritative session. `petNames` are the summonable pet creature types
-		// (the SpellEffect summons) - they are excluded from the placements, see below.
+		// each type taken from its single authoritative session. SUMMONED creatures are excluded two ways - by the
+		// wire's own owner-binding (`SummonedHandles`, the general rule) and by `petNames`, the seeded summon-template
+		// names (the fallback for summons whose binding was never captured). See both call sites below.
 		// How near a spawn must stand to a candidate patrol route's nearest waypoint to be counted as walking it (#425).
 		// Measured, not chosen: over the 139 spawns that carry their own route by handle, spawn-to-nearest-waypoint is
 		// 0.0 at the median, 4.4 at p90 and 7.8 at p95.
@@ -79,9 +80,18 @@ namespace Faolan.Importer.Captures
 
 		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures, IReadOnlySet<string> petNames)
 		{
+			// SUMMONS ARE DROPPED PER CAPTURE, BEFORE ANYTHING ELSE SEES THEM. A pet handle is session-scoped, so the
+			// exclusion has to be, too - and doing it here rather than at the placement step keeps a summon out of the
+			// morph/equipment/route backfills and out of the richest-capture election as well, not just out of the
+			// final placement list.
 			var perCap = captures
-				.Select(c => (All: DistinctByHandle(NpcSpawnExtractor.Extract(c.Packets)), Burst: DistinctByHandle(NpcSpawnExtractor.ExtractLoginBurst(c.Packets)),
-					Routes: PatrolPathExtractor.ExtractByHandle(c.Packets)))
+				.Select(c =>
+				{
+					var summoned = SummonedHandles(c.Packets);
+					return (All: DistinctByHandle(NpcSpawnExtractor.Extract(c.Packets).Where(e => !summoned.Contains(e.Handle))),
+						Burst: DistinctByHandle(NpcSpawnExtractor.ExtractLoginBurst(c.Packets).Where(e => !summoned.Contains(e.Handle))),
+						Routes: PatrolPathExtractor.ExtractByHandle(c.Packets));
+				})
 				.ToList();
 			var allMaps = perCap.SelectMany(p => p.All.Select(e => e.MapId)).Distinct().ToList();
 
@@ -184,8 +194,15 @@ namespace Faolan.Importer.Captures
 			// Pets are content of the creature TYPE (lifted onto the type columns by CapturePetImporter, spawned from the type
 			// at summon time - #307/#244), NEVER world placements. A captured session's SUMMONED pets otherwise leak in
 			// here as permanent NpcSpawns and stand around forever where the player summoned them (the necro pet cluster
-			// on Old Tarantia). Drop the summonable pet creatures (the SpellEffect SummonPet templates) from the
-			// placement set.
+			// on Old Tarantia).
+			//
+			// This is the SECOND of two nets, and it is the weaker one. `SummonedHandles` above is the general rule -
+			// it asks the wire who owns the creature - and this one only knows the names we happened to seed. Both are
+			// kept because each catches what the other misses, MEASURED on the corpus:
+			//   * owner-binding only:  Parasitic Soul x2, Demon Avenger, Tamed Puma  (none of them in the name roster)
+			//   * name roster only:    Mutilator x10                                 (no PetIIR ever captured for it)
+			// So dropping either one regresses. If a capture ever observes the Mutilator's owner-binding, this net
+			// becomes redundant and can go.
 			var placements = spawns.Where(e => !petNames.Contains((e.Name ?? string.Empty).ToLowerInvariant())).ToList();
 
 			return (NpcSpawnExtractor.Merge(placements), patrols);
@@ -1290,6 +1307,33 @@ namespace Faolan.Importer.Captures
 
 			quest.NextQuestId = nextQuestId;
 			await db.SaveChangesAsync();
+		}
+
+		// Every entity handle this session's server bound to an OWNER, i.e. every summoned creature - read off the
+		// wire's own owner-binding (`PetIIR` mode 0 assign / mode 1 dismiss, #307) instead of a roster of pet names.
+		//
+		// Why not names: the name roster is the seeded `SpellEffect` SummonPet templates, so it only ever excludes
+		// summons we already knew about, and it fails SILENTLY for any we don't. It did: the necromancer's
+		// `Parasitic Soul` (Parasitic Soul Swarm) is not in the seed, so two captured sessions that had one out
+		// planted it as permanent scenery on maps 2010 and 2070. Owner-binding is the general fact - a creature is a
+		// pet exactly when the server said it belongs to somebody - and it covers summons of any class, named or not.
+		//
+		// Handles are per-session, so this set is only valid for the capture it came from.
+		private static HashSet<uint> SummonedHandles(IReadOnlyList<CapturedPacket> packets)
+		{
+			var summoned = new HashSet<uint>();
+			foreach (var p in packets)
+			{
+				if (p is not { IsIirCarrier: true, SubOpcode: (uint)GameServer0X2000Opcodes.PetIIR })
+					continue;
+
+				// Body slices the packet on every access, so take it once.
+				var body = p.Body;
+				if (body.Length > 4 && PetIirCodec.TryParse(body.AsSpan(4), out var pet))
+					summoned.Add(pet.Pet);
+			}
+
+			return summoned;
 		}
 
 		private static List<NpcSpawnEntry> DistinctByHandle(IEnumerable<NpcSpawnEntry> entries)

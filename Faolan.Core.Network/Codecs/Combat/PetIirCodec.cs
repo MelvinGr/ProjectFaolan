@@ -1,4 +1,7 @@
+using System;
+using System.Diagnostics.CodeAnalysis;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat
@@ -38,6 +41,30 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(kind.F3)
 				.ToArray();
 		}
+
+		// Read counterpart to the two builders: recovers the owner-binding from a captured record. Takes the IIR
+		// content ([u32 subop][...], i.e. the carrier body PAST its u32 length prefix), like MapChangeCodec.TryParse.
+		//
+		// This is what lets the importer answer "is this entity somebody's summon?" from the WIRE rather than from a
+		// roster of pet NAMES: a creature is a pet exactly when the server bound it to an owner, whatever it is called.
+		// The kind triple is deliberately not read - mode and the two handles are the whole owner-binding.
+		public static bool TryParse(ReadOnlySpan<byte> iirContent, [NotNullWhen(true)] out Parsed? parsed)
+		{
+			parsed = null;
+			if (iirContent.Length < 25 || iirContent.ReadU32Be(0) != Opcode)
+				return false;
+
+			var mode = iirContent.ReadU32Be(13);
+			if (mode > 1)
+				return false; // PetIIR_c::ReadSubClass only reads the two handles for mode 0/1
+
+			parsed = new Parsed(mode, iirContent.ReadU32Be(8), iirContent.ReadU32Be(21));
+			return true;
+		}
+
+		// An owner-binding as it appeared on the wire. Mode 0 = assign (on summon), 1 = remove (on dismiss); either
+		// way `Pet` is a summoned creature, which is the question the importer asks.
+		public sealed record Parsed(uint Mode, uint Owner, uint Pet);
 
 		// mode-1 remove/update: sent on dismiss alongside the n3ToClientQuit despawn.
 		public static byte[] BuildRemove(uint owner, uint pet)
