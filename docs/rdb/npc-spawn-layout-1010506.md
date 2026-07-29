@@ -112,8 +112,16 @@ be correlated from captures. `NpcSpawnLayout.SpawnGroup` keeps the raw `Id` stri
   server-authoritative (sent on the wire at spawn), and is **not** in the client RDB — confirmed via the empty
   spawn-export types (`1000077/78/79`), MonsterData being a many-to-one render model, and the 4-char code being
   absent from every other resource. So the creature can only be inferred from captures (`SpawnAreaResolver`:
-  name / gated containment / guarded id-propagation), which resolves **186 of the 2,664 areas**; the rest await
+  name / gated containment / guarded id-propagation), which resolves **188 of the 2,669 areas**; the rest await
   captures or a manual pass. See #363.
+
+  The containment tier votes on captured spawns standing **on the group's wander path**, not merely inside its
+  roam AABB (#491). The box also holds the hand-placed NPCs standing in it — a village overlapping a territory,
+  or a named boss beside its trash — and their votes broke unanimity or won it outright. Members roam along the
+  polyline: 59–81% of captured spawns inside a territory sit within 1 world unit of a path segment, and the tail
+  beyond is overwhelmingly hand-placed. The whole box remains a fallback for members caught mid-stride between
+  samples, gated by the same name guard tier 3 uses. That took containment from 5 areas to 9 and dropped
+  `Rabbits 3 → Warg`, whose disappearance also removed six id-propagated Wargs that had descended from it.
 
   Id-propagation is deliberately narrow: a numeric id names a *family*, not a species, so a creature learned for
   a `(Category, CommunityId)` key is propagated only to areas on a map where that key was itself resolved by

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -268,7 +269,7 @@ namespace Faolan.Importer.Cli
 
 				case "resolve-spawn-areas":
 				{
-					await ResolveSpawnAreas();
+					await ResolveSpawnAreas(RdbDir());
 					return 0;
 				}
 
@@ -2563,14 +2564,33 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine($"terrain-export: {written} maps written ({totalBytes / 1024 / 1024} MB total), {skipped} maps with no terrain, into {outDir}.");
 		}
 
-		// Re-run the NpcSpawnArea creature resolver over the DB alone - no RDB, no captures (#363/#489). The resolver
-		// resets its own machine assignments and re-derives all three tiers, so this is idempotent and is how a
-		// change to the resolution RULES reaches the committed faolan.db without a full RDB spawn re-import. Manual
-		// assignments (`.setnpcgroup`) are never touched. Run:
-		//   dotnet run --project Faolan.Importer -- --report resolve-spawn-areas
-		private static async Task ResolveSpawnAreas()
+		// Re-run the NpcSpawnArea creature resolver (#363/#489). The resolver resets its own machine assignments and
+		// re-derives every tier, so this is idempotent and is how a change to the resolution RULES reaches the
+		// committed faolan.db without a full RDB spawn re-import. Manual assignments (`.setnpcgroup`) are never touched.
+		//
+		// It needs the RDB only for the groups' wander polylines, which the containment tier uses as its membership
+		// test (#491) and which are deliberately not stored in the DB. Running without them would silently apply
+		// WEAKER rules than the importer and produce a different faolan.db, so the RDB is required rather than
+		// optional. Run:
+		//   dotnet run --project Faolan.Importer -- --report resolve-spawn-areas --RdbDir <dir>
+		private static async Task ResolveSpawnAreas(string rdbDir)
 		{
 			await using var db = OpenDb();
+			using var rdb = new RdbReader(rdbDir, ImportContext.DefaultProxyBase);
+			var roamPaths = new Dictionary<uint, IReadOnlyList<IReadOnlyList<Vector3>>>();
+			foreach (var mapId in await db.Maps.Select(m => m.Id).ToListAsync())
+			{
+				if (!rdb.TryGet(NpcSpawnLayout.ResourceType, mapId, out var e) || !e.IsLocal)
+					continue;
+				if (!NpcSpawnLayout.TryParse(rdb.ReadDecompressed(e), out var layout) || layout == null)
+					continue;
+
+				for (var gi = 0; gi < layout.Groups.Count; gi++)
+					if (layout.Groups[gi].RoamPaths.Count > 0)
+						roamPaths[NpcSpawnArea.ComputeId(mapId, gi)] = layout.Groups[gi].RoamPaths;
+			}
+
+			Console.WriteLine($"roam paths loaded for {roamPaths.Count} areas");
 
 			async Task<string> Tally()
 			{
@@ -2588,7 +2608,7 @@ namespace Faolan.Importer.Cli
 			}
 
 			Console.WriteLine("before:\n" + await Tally());
-			var stats = await SpawnAreaResolver.ResolveAsync(db);
+			var stats = await SpawnAreaResolver.ResolveAsync(db, roamPaths);
 			Console.WriteLine($"resolved: name={stats.Name} containment={stats.Containment} id-propagation={stats.IdProp}");
 			Console.WriteLine("after:\n" + await Tally());
 		}

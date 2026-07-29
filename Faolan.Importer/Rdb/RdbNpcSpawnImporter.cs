@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Interfaces;
@@ -34,6 +36,10 @@ namespace Faolan.Importer.Rdb
 			// Clean rebuild: child points cascade with their area, so clearing the areas clears everything.
 			db.NpcSpawnAreas.RemoveRange(db.NpcSpawnAreas);
 			await db.SaveChangesAsync();
+
+			// The group's wander polylines, kept by area id for the resolver's containment test (#491). Not persisted -
+			// corpus-wide they are ~740k points, which would dwarf the seed for data only the resolver reads.
+			var roamPaths = new Dictionary<uint, IReadOnlyList<IReadOnlyList<Vector3>>>();
 
 			int maps = 0, areas = 0, points = 0, emptyMaps = 0, unreadable = 0;
 			foreach (var e in rdb.EntriesOfType(NpcSpawnLayout.ResourceType).Where(e => e.IsLocal && ourMaps.Contains(e.Id)))
@@ -95,6 +101,9 @@ namespace Faolan.Importer.Rdb
 						});
 					}
 
+					if (g.RoamPaths.Count > 0)
+						roamPaths[area.Id] = g.RoamPaths;
+
 					db.NpcSpawnAreas.Add(area);
 					areas++;
 					points += g.SpawnPoints.Count;
@@ -123,7 +132,7 @@ namespace Faolan.Importer.Rdb
 				await db.SaveChangesAsync();
 
 			// Infer the creature (NpcTemplateId) per area where we can - name / gated containment / guarded id-prop.
-			var resolved = await SpawnAreaResolver.ResolveAsync(db);
+			var resolved = await SpawnAreaResolver.ResolveAsync(db, roamPaths);
 
 			return new Result(maps, areas, points, emptyMaps, unreadable, resolved);
 		}

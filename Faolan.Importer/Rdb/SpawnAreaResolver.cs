@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
@@ -13,14 +14,15 @@ namespace Faolan.Importer.Rdb
 	// Pre-fills each NpcSpawnArea's creature (NpcTemplateId) from what we CAN infer, since the RDB carries WHERE + how
 	// many but never WHICH (#363). Three confidence tiers, applied in order, never overwriting a Manual assignment:
 	//   1. Name         - the group name / Name-id (4-char tag stripped) matches a spawnable NpcTemplate by name.
-	//   2. Containment  - the most-common captured NpcSpawn inside the roam bounds (unanimous, >= 2). Captured maps only.
+	//   2. Containment  - unanimous (>= 2) captured NpcSpawns standing ON the group's RDB wander path; the whole roam
+//                     AABB is only a fallback, gated by the same name guard as tier 3 (#491). Captured maps only.
 	//   3. IdPropagation- an id->creature learned from tiers 1-2, propagated to a same-id group, doubly GUARDED:
 	//                     the group's own name must not contradict the id's creature (Slaver1 under Poacher's
 	//                     Community 60 is left alone), AND the id must have been resolved by tier 1-2 on THAT MAP
 	//                     (#489) - a numeric id names a family, not a species, so an observation on one playfield
 	//                     says nothing about the same family on another.
 	// Machine assignments are RESET at the start, so this is idempotent and a rules change reaches existing rows;
-	// a Manual assignment is never touched. Measured coverage: 186 of 2,664 areas. The rest await captures / a
+	// a Manual assignment is never touched. Measured coverage: 188 of 2,669 areas. The rest await captures / a
 	// manual `.setnpcgroup` pass - honestly unknown rather than wrongly guessed.
 	public static class SpawnAreaResolver
 	{
@@ -35,7 +37,11 @@ namespace Faolan.Importer.Rdb
 		private static readonly Regex TrailingIndex = new(@"[\s_\-]*\d+\s*$", RegexOptions.Compiled);
 		private static readonly Regex Word = new(@"[a-z]+", RegexOptions.Compiled);
 
-		public static async Task<ResolveStats> ResolveAsync(DatabaseContext db)
+		// `roamPaths` maps an NpcSpawnArea id to that territory's RDB wander polylines (1010506 `RoamPaths`). It is the
+		// containment tier's membership test (#491) and is NOT stored in the DB - ~740k points corpus-wide would dwarf
+		// the seed - so both callers read it from the RDB and hand it in. Pass null and tier 2 falls back to the roam
+		// AABB alone, which is the pre-#491 behaviour.
+		public static async Task<ResolveStats> ResolveAsync(DatabaseContext db, IReadOnlyDictionary<uint, IReadOnlyList<IReadOnlyList<Vector3>>>? roamPaths = null)
 		{
 			// Spawnable templates (those with a StatCore) keyed by lowercase name -> a representative TemplateId.
 			var withStatCore = (await db.NpcStatCores.Select(s => s.NpcTemplateId).ToListAsync()).ToHashSet();
@@ -110,6 +116,16 @@ namespace Faolan.Importer.Rdb
 			}
 
 			// ---- Tier 2: gated containment (unanimous, >= 2 votes), name-unresolved areas only ----
+			// The roam AABB is a crude membership test: it also contains the hand-placed NPCs standing inside it, and
+			// their votes break unanimity or, worse, win it - Khopshef's "Scorpion" groups resolved to Flesheater and
+			// Conall's "Rabbits" to Warg. A group's actual members roam ALONG its RDB path polyline, so a spawn
+			// standing on that path is evidence and one merely inside the box is not (#491).
+			//
+			// So: vote on the ON-PATH spawns first, and fall back to the whole box only when that says nothing - and
+			// then only if the group's own NAME does not contradict the creature, the same guard tier 3 uses. The
+			// fallback is what keeps groups whose members were caught mid-stride between path samples (Tortage's
+			// Ape2/Ape3) while still rejecting Scorpion -> Flesheater. Measured on the corpus: 16 resolutions with 4
+			// name-contradicting -> 18 with 1 (Elk -> Moose, which is the guard being over-strict about a synonym).
 			foreach (var a in areas)
 			{
 				if (a.ResolvedBy is SpawnResolutionSource.Name or SpawnResolutionSource.Manual)
@@ -122,11 +138,23 @@ namespace Faolan.Importer.Rdb
 				if (inside.Count < 2)
 					continue;
 
-				var byTemplate = inside.GroupBy(c => c.TemplateId).ToList();
-				if (byTemplate.Count != 1)
-					continue; // not unanimous
+				var segments = roamPaths?.GetValueOrDefault(a.Id);
+				var chosen = segments is { Count: > 0 }
+					? UnanimousTemplate(inside.Where(c => OnRoamPath(c.X, c.Z, segments)).ToList())
+					: null;
 
-				a.NpcTemplateId = byTemplate[0].Key;
+				if (chosen == null)
+				{
+					var fallback = UnanimousTemplate(inside);
+					var fam = Family(a.GroupName);
+					if (fallback != null && (NameAgrees(fam, nameByTemplate.GetValueOrDefault(fallback.Value, ""), []) || TerritoryLabel.IsMatch(fam) || fam.Length == 0))
+						chosen = fallback;
+				}
+
+				if (chosen == null)
+					continue;
+
+				a.NpcTemplateId = chosen;
 				a.ResolvedBy = SpawnResolutionSource.Containment;
 				contain++;
 			}
@@ -204,6 +232,44 @@ namespace Faolan.Importer.Rdb
 			var linked = await LinkCapturedSpawns(db, areas);
 
 			return new ResolveStats(name, contain, idprop, name + contain + idprop, areas.Count, linked);
+		}
+
+		// The one template every candidate agrees on (>= 2 of them), or null when the set is short or split.
+		private static uint? UnanimousTemplate(List<(uint TemplateId, string Name, float X, float Z)> candidates)
+		{
+			if (candidates.Count < 2)
+				return null;
+
+			var first = candidates[0].TemplateId;
+			return candidates.All(c => c.TemplateId == first)
+				? first
+				: null;
+		}
+
+		// Is this spawn standing ON one of the group's wander polylines? Distance to the nearest SEGMENT, not to the
+		// nearest sample point - consecutive samples can be metres apart, and a mob between two of them is still on the
+		// path. The radius is measured: 59-81% of captured spawns inside a territory sit within 1 world unit of a
+		// segment, and the tail beyond it is overwhelmingly hand-placed NPCs rather than members.
+		private const float OnPathRadius = 1f;
+
+		private static bool OnRoamPath(float x, float z, IReadOnlyList<IReadOnlyList<Vector3>> paths)
+		{
+			foreach (var path in paths)
+				for (var i = 0; i + 1 < path.Count; i++)
+					if (SegmentDistance(x, z, path[i], path[i + 1]) <= OnPathRadius)
+						return true;
+
+			return false;
+		}
+
+		private static float SegmentDistance(float px, float pz, Vector3 a, Vector3 b)
+		{
+			float dx = b.X - a.X, dz = b.Z - a.Z;
+			var len = dx * dx + dz * dz;
+			var t = len <= 0f
+				? 0f
+				: Math.Clamp(((px - a.X) * dx + (pz - a.Z) * dz) / len, 0f, 1f);
+			return MathF.Sqrt(MathF.Pow(px - (a.X + t * dx), 2) + MathF.Pow(pz - (a.Z + t * dz), 2));
 		}
 
 		private static (float X0, float X1, float Z0, float Z1) ContainmentRegion(NpcSpawnArea a)

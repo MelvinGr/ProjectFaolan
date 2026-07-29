@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
@@ -174,6 +176,75 @@ namespace Faolan.Tests
 			{
 				TestDb.Delete(path);
 			}
+		}
+
+		// #491: the roam AABB also contains hand-placed NPCs standing inside it, and their votes break the containment
+		// tier's unanimity. A group's real members roam ALONG its RDB path polyline, so the vote is taken on the
+		// ON-PATH spawns; the whole box is only a fallback, and then only when the group's name does not contradict
+		// the creature.
+		[Fact]
+		public async Task Containment_Votes_On_The_Roam_Path_Not_The_Whole_Box()
+		{
+			var path = Path.Combine(Path.GetTempPath(), $"faolan-resolver-p-{Guid.NewGuid():N}.db");
+			try
+			{
+				var areaId = NpcSpawnArea.ComputeId(4010, 0);
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					db.Maps.Add(new Map
+					{
+						Id = 4010,
+						Name = "Tortage Island"
+					});
+					db.NpcTemplates.AddRange(Spawnable(101, "Jungle Ape"), Spawnable(102, "Hand Picked"));
+					// Two apes ON the path at z=0, and two vendors standing off it inside the same box. Under a plain
+					// AABB vote the box is split 2-2 and resolves to nothing.
+					db.NpcSpawns.AddRange(
+						Spawn(4010, 101, 2, 0), Spawn(4010, 101, 8, 0),
+						Spawn(4010, 102, 2, 40), Spawn(4010, 102, 8, 40));
+					db.NpcSpawnAreas.Add(Area(4010, 0, "Ape9", "Race", 31, 0, 0, 50, 50));
+					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+					// One path segment running along z=0, so only the apes are standing on it.
+					var paths = new Dictionary<uint, IReadOnlyList<IReadOnlyList<Vector3>>>
+					{
+						[areaId] = new[]
+						{
+							new[]
+							{
+								new Vector3(0, 0, 0),
+								new Vector3(50, 0, 0)
+							}
+						}
+					};
+					await SpawnAreaResolver.ResolveAsync(db, paths);
+				}
+
+				await using (var db = new DatabaseContext(TestDb.Options(path)))
+				{
+					var a = await db.NpcSpawnAreas.SingleAsync(TestContext.Current.CancellationToken);
+					Assert.Equal(101u, a.NpcTemplateId); // the apes on the path win; the vendors beside it do not vote
+					Assert.Equal(SpawnResolutionSource.Containment, a.ResolvedBy);
+				}
+			}
+			finally
+			{
+				TestDb.Delete(path);
+			}
+		}
+
+		private static NpcSpawn Spawn(uint map, uint template, float x, float z)
+		{
+			return new NpcSpawn
+			{
+				Id = NpcSpawn.ComputeId(map, x, 0, z),
+				MapId = map,
+				NpcTemplateId = template,
+				PositionX = x,
+				PositionY = 0,
+				PositionZ = z
+			};
 		}
 
 		private static NpcSpawnArea Area(uint map, int ord, string groupName, string cat, uint? communityId, float minX = 0, float minZ = 0, float maxX = 0, float maxZ = 0)

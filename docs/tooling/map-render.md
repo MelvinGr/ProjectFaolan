@@ -70,7 +70,7 @@ unrotated case is ruled out. The full-resolution visual overlay decides it in on
   seen on the target map, so 319 of 329 propagations (3697 NPCs across 17 maps) were unsupported — Poitain's 29
   groups all read `Panther` from a `(Superfamily, 4)` key whose only captured panthers are in Tortage, while
   Poitain's own captures say Wild Pig and Wild Cow. With the same-map evidence gate the tier is down to 10 areas
-  and Poitain renders 2 containment-resolved groups against 34 honest unknowns.
+  and Poitain renders its containment-resolved groups against honest unknowns.
 - Each group's label is `<name> ×<MaxCount>` — its population. `MaxCount` equals the group's anchor-point count
   for all 2664 areas in the DB, so the one number says both. Because group boxes overlap and abut, labels are
   decluttered by nudging each one down (into its own box) until it clears the already-placed ones and the
