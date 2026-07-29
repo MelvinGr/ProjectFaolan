@@ -81,7 +81,7 @@ namespace Faolan.Importer.Captures
 		// `classSpecificMaps` = the maps whose population is per class (Map.ClassSpecific - the city armories). A spawn
 		// harvested on one of them is evidence about ONE class's copy of the playfield, so it is stamped with the class
 		// the capture was played on and elected only against captures of that same class.
-		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures, IReadOnlySet<string> petNames,
+		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols, List<NpcSpawnEntry> ObservedTypes) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures, IReadOnlySet<string> petNames,
 			IReadOnlySet<uint> classSpecificMaps)
 		{
 			// SUMMONS ARE DROPPED PER CAPTURE, BEFORE ANYTHING ELSE SEES THEM. A pet handle is session-scoped, so the
@@ -230,7 +230,14 @@ namespace Faolan.Importer.Captures
 			// becomes redundant and can go.
 			var placements = spawns.Where(e => !petNames.Contains((e.Name ?? string.Empty).ToLowerInvariant())).ToList();
 
-			return (NpcSpawnExtractor.Merge(placements), patrols);
+			// The placements are position-deduped; the TYPES are not. A creature that loses the position dedup is
+			// still a creature we observed, and its type must survive even though its placement does not - the
+			// encounter boss `Eerika of the Maidens` spawns on the exact spot her lure vacated, so `Merge` (which keys
+			// on position and keeps the first) dropped her, and with her every trace: no NpcTemplate, no NpcStatCore,
+			// level 80 and 8519 HP thrown away (#501). Harvesting the type off the UNMERGED list keeps her, while she
+			// correctly gets no placement - a trigger spawn is not a world placement, and a type with no NpcSpawn row
+			// is an established shape (pets and mounts, 18 templates today).
+			return (NpcSpawnExtractor.Merge(placements), patrols, placements);
 
 			// The one unambiguous candidate route this spawn is standing on, or null.
 			PatrolPathEntry? BackfilledRoute(NpcSpawnEntry e)
@@ -587,9 +594,12 @@ namespace Faolan.Importer.Captures
 		}
 
 		// Upsert by (map, spawn point); never wipe. Ensures NpcTemplate TYPE rows exist first (#244).
-		public static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns)
+		// `observedTypes` is the UNMERGED observation list - every creature seen, including ones whose placement lost
+		// the position dedup. Types come from it, placements from `spawns` (#501). Passing null falls back to the
+		// placements, which is what a caller with no wider view should do.
+		public static async Task ImportNpcSpawns(DatabaseContext db, List<NpcSpawnEntry> spawns, List<NpcSpawnEntry>? observedTypes = null)
 		{
-			var typeByTemplate = await UpsertNpcTypes(db, spawns);
+			var typeByTemplate = await UpsertNpcTypes(db, observedTypes ?? spawns);
 
 			foreach (var e in spawns)
 			{

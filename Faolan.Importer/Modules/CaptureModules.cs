@@ -463,7 +463,7 @@ namespace Faolan.Importer.Modules
 			// The maps whose population is per class (the city armories). Read from the DB, not hardcoded, so flagging
 			// another map is a data change - and so a run against an empty DB simply harvests everything class-agnostic.
 			var classSpecificMaps = await ctx.Db.Maps.Where(m => m.ClassSpecific).Select(m => m.Id).ToHashSetAsync();
-			var (spawns, patrols) = ImportOps.BuildBurstTruthSpawns(ctx.Captures, petNames, classSpecificMaps);
+			var (spawns, patrols, observedTypes) = ImportOps.BuildBurstTruthSpawns(ctx.Captures, petNames, classSpecificMaps);
 
 			// SCOPED overwrite (#419): the wipe covers only the MAPS this run actually saw. The spawn set is
 			// burst-truth, so it cannot be row-merged - a walked NPC accretes a second row at its new spot, and the
@@ -502,7 +502,7 @@ namespace Faolan.Importer.Modules
 					entry.State = EntityState.Detached;
 			}
 
-			await ImportOps.ImportNpcSpawns(ctx.Db, spawns);
+			await ImportOps.ImportNpcSpawns(ctx.Db, spawns, observedTypes);
 			var npcSpells = NpcSpellExtractor.Merge(ctx.Captures.SelectMany(c => NpcSpellExtractor.Extract(c.Packets)));
 			var spellsAdded = await ImportOps.ImportNpcSpells(ctx.Db, npcSpells);
 			await ImportOps.ImportPatrolPaths(ctx.Db, patrols);
