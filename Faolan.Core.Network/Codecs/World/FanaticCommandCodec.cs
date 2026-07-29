@@ -11,22 +11,28 @@ namespace Faolan.Core.Network.Codecs.World
 	// surface is gated on, and the one command registered without a permission record so anyone can reach it. The mask,
 	// the 133-command catalog and each command's required bit are in docs/subsystems/gm-commands.md.
 	//
-	// GRAMMAR. ⚠️ The client's reader and writer do NOT agree, and this used to claim they did - which is why every
-	// inbound command parsed as empty. They are the two DIRECTIONS, and only the writer describes what we receive:
+	// GRAMMAR - measured against real bytes from a live GM session (2026-07-29), not inferred:
 	//
-	//   c2s (what we parse)  [u32 word0][u32 textLength][textLength bytes]
-	//   s2c (what it expects) [u32 word0][u32 targetA][u32 targetB][string]
+	//   [u32 reclen][u32 subop][u32 class][u32 handle]   the 0x2000 IIR carrier
+	//   [u8 flag]                                        the carrier's trailing flag byte, always 0 so far
+	//   [u32 word0][u32 targetA][u32 targetB]            ReadSubClass's obj+0x2C / +0x30 / +0x34
+	//   [u32 textLength][textLength bytes]               the command string, LATIN-1
 	//
-	// - WriteSubClass (slot 9, FUN_00663ae0) - the SEND path, so this is the inbound layout - emits obj+0x2C through
-	//   the FanaticIIR_t base write (FUN_00663450, which writes that ONE u32 and nothing else), then the command text
-	//   as a u32 length followed by the bytes. There is no target pair on the wire in this direction.
-	// - ReadSubClass (slot 8, FUN_00663860) is the RECEIVE path: three u32s into obj+0x2C/0x30/0x34 - and if targetA
-	//   and targetB both read 0 it substitutes the pair at obj+8 - then the text via `BinaryStream::ReadString`
-	//   (FUN_00663c20). That shape is what a server REPLY has to be built in, not what a command arrives in.
+	// `/cloak`               -> flag 0, word0 2, targets 0/0, len 6,  "/cloak"
+	// `/teleport gm island`  -> flag 0, word0 2, targets 0/0, len 19, "/teleport gm island"
 	//
-	// Parsing inbound with the s2c layout consumed two extra u32s before the length, so the length was read out of the
-	// middle of the command string and the text always came out empty: a `/cloak` and a `/teleport` both reported
-	// `word0 0, targets 33554432/0, text ''` - 33554432 is 0x02000000, i.e. the misread length word.
+	// ⚠️ The FLAG BYTE is what made every command parse as empty, and it is easy to lose: it belongs to the carrier
+	// (GameActionListCodec writes the same `[u8 0]` after its handle), not to this record, so a reader that starts the
+	// record at the handle is off by ONE and every field after it slides. The symptom was not a parse failure but
+	// plausible garbage - `word0 0, targets 33554432/0, text ''`, where 33554432 is 0x02000000 = word0's 2 read one
+	// byte early. ⚠️ It is also NOT the case that the client's reader and writer disagree - a previous fix "corrected"
+	// this by dropping the target pair, on a misreading of the write path. ReadSubClass (slot 8, FUN_00663860) is
+	// right: three u32s then `BinaryStream::ReadString` (FUN_00663c20).
+	//
+	// - `word0` is **2** for every command observed - it is not a command id, and the command itself is entirely in the
+	//   TEXT. So dispatch is a string parse, exactly as the client's own log ("Received command string : <text>") says.
+	// - If BOTH targetA and targetB are 0 the client substitutes the pair at obj+8, so 0/0 means "no explicit target",
+	//   which is what a self-targeted command sends.
 	//
 	// ⚠️ The text's length prefix is a **u32**, not the u16 our wire strings normally use - `BinaryStream::ReadString`
 	//   reads four bytes and rejects anything over 0xFFFFFF with "string size is too long". Reading it as a u16 takes
@@ -68,15 +74,19 @@ namespace Faolan.Core.Network.Codecs.World
 			s.ReadUInt32(); // entity class
 			var handle = s.ReadUInt32();
 
-			if (s.Position + 4 > body.Length)
+			// The carrier's flag byte, then the record. Skipping it is what slid every field by one and turned the
+			// command text into nothing (see the grammar note above).
+			if (s.Position + 13 > body.Length)
 				return null;
 
+			var flag = s.ReadByte();
 			var word0 = s.ReadUInt32();
+			var targetA = s.ReadUInt32();
+			var targetB = s.ReadUInt32();
 
-			// The command text: [u32 length][bytes], immediately after word0 - the base write emits no target pair in
-			// this direction. Bounds-check against the BODY rather than trusting the declared length: this is a path we
-			// cannot round-trip against a capture, so a malformed body must degrade to "no text" rather than throw into
-			// the inbound loop.
+			// The command text: [u32 length][bytes]. Bounds-check against the BODY rather than trusting the declared
+			// length - this is a path we cannot round-trip against a capture, so a malformed body must degrade to
+			// "no text" rather than throw into the inbound loop.
 			var text = "";
 			if (s.Position + 4 <= body.Length)
 			{
@@ -85,9 +95,9 @@ namespace Faolan.Core.Network.Codecs.World
 					text = Encoding.Latin1.GetString(body, (int)s.Position, (int)length);
 			}
 
-			return new Parsed(handle, word0, text);
+			return new Parsed(handle, flag, word0, targetA, targetB, text);
 		}
 
-		public readonly record struct Parsed(uint Handle, uint Word0, string Text);
+		public readonly record struct Parsed(uint Handle, byte Flag, uint Word0, uint TargetA, uint TargetB, string Text);
 	}
 }

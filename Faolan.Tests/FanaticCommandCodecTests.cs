@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Xunit;
 
@@ -8,74 +9,74 @@ namespace Faolan.Tests
 {
 	// FanaticCommandIIR_t (0xEE4AA85C) - what the client sends when a GM runs one of its commands (#448/#449).
 	//
-	// ⚠️ These tests previously built their fixture in the SAME shape the parser read, so they passed while both were
-	// wrong: the codec was parsing inbound with the s2c layout (an extra target pair before the length), and every real
-	// command arrived with an empty text. A builder that mirrors the parser proves only that the file agrees with
-	// itself. The layout below comes from the client's WriteSubClass (FUN_00663ae0) - the send path, hence the inbound
-	// one - whose base write (FUN_00663450) emits exactly one u32 before the length-prefixed text.
+	// ⚠️ These tests used to build their fixture in the SAME shape the parser read, so they passed while both were
+	// wrong and every real command arrived with an empty text. A builder that mirrors its parser proves only that the
+	// file agrees with itself. The two records below are REAL BYTES off the wire from a live GM session
+	// (2026-07-29) - they are the oracle, and the synthetic builder is checked against them.
 	public class FanaticCommandCodecTests
 	{
-		// A c2s body as the inbound path sees it: the IIR carrier header, then [u32 word0][u32 len][text].
-		private static byte[] Body(uint word0, string text, int lengthPrefixBytes = 4)
+		// `/cloak` typed in-client.
+		private const string CloakRecord =
+			"00000023EE4AA85C0000C3500802E5D400000000020000000000000000000000062F636C6F616B";
+
+		// `/teleport gm island` typed in-client.
+		private const string TeleportRecord =
+			"00000030EE4AA85C0000C3500802E5D400000000020000000000000000000000132F74656C65706F727420676D2069736C616E64";
+
+		[Theory]
+		[InlineData(CloakRecord, "/cloak")]
+		[InlineData(TeleportRecord, "/teleport gm island")]
+		public void Parses_TheRealRecordsOffTheWire(string hex, string expectedText)
 		{
-			var bytes = new List<byte>();
-			void U32(uint v) => bytes.AddRange([(byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v]);
-
-			U32(0); // record length
-			U32(FanaticCommandCodec.Opcode);
-			U32(0x4E); // entity class
-			U32(0x0131_6D2B); // handle
-			U32(word0);
-
-			var raw = Encoding.Latin1.GetBytes(text);
-			if (lengthPrefixBytes == 4)
-				U32((uint)raw.Length);
-			else
-				bytes.AddRange([(byte)(raw.Length >> 8), (byte)raw.Length]);
-
-			bytes.AddRange(raw);
-			return [.. bytes];
-		}
-
-		[Fact]
-		public void Parses_TheRecordAndItsU32LengthPrefixedText()
-		{
-			var parsed = FanaticCommandCodec.TryParse(Body(7, "/whereis NecroL80"));
+			var parsed = FanaticCommandCodec.TryParse(Convert.FromHexString(hex));
 
 			Assert.NotNull(parsed);
-			Assert.Equal(0x0131_6D2Bu, parsed!.Value.Handle);
-			Assert.Equal(7u, parsed.Value.Word0);
-			Assert.Equal("/whereis NecroL80", parsed.Value.Text);
+			Assert.Equal(expectedText, parsed!.Value.Text);
+			Assert.Equal(0x0802E5D4u, parsed.Value.Handle);
+			Assert.Equal(0, parsed.Value.Flag);   // the carrier flag byte
+			Assert.Equal(2u, parsed.Value.Word0); // constant across commands - NOT a command id
+			Assert.Equal(0u, parsed.Value.TargetA); // 0/0 = "no explicit target"; the client substitutes its own pair
+			Assert.Equal(0u, parsed.Value.TargetB);
 		}
 
-		// The regression that made every GM command look empty: two extra u32s were consumed before the length, so the
-		// length was read out of the middle of the command string. `/cloak` and `/teleport` both reported
-		// `word0 0, targets 33554432/0, text ''` in-client - 33554432 == 0x02000000, the misread length word.
+		// The regression: the carrier's flag byte belongs BEFORE the record, and dropping it slides every field by one.
+		// The symptom was not a parse failure but plausible garbage - word0 0, targets 33554432/0, empty text - where
+		// 33554432 is 0x02000000, i.e. word0's 2 read one byte early.
 		[Fact]
-		public void TheS2cLayout_WouldEatTheText()
+		public void MissingTheCarrierFlagByte_ProducesPlausibleGarbage()
 		{
-			Assert.Equal("/cloak on", FanaticCommandCodec.TryParse(Body(0, "/cloak on"))!.Value.Text);
+			var body = Convert.FromHexString(CloakRecord);
+			uint U32(int at) => body.ReadU32Be(at);
 
-			// The same record with a target pair spliced in - the s2c shape - must NOT yield the command text.
-			var s2c = new List<byte>(Body(0, "/cloak on"));
-			s2c.InsertRange(20, new byte[8]); // two u32 targets after word0
-			Assert.NotEqual("/cloak on", FanaticCommandCodec.TryParse([.. s2c])!.Value.Text);
+			// The old framing started the record at the handle+4, i.e. it skipped the flag byte, so each field was read
+			// one byte early. Asserted straight off the captured bytes - no need to keep the broken parser around.
+			Assert.Equal(0u, U32(16));          // "word0"  -> actually the flag byte plus word0's top three bytes
+			Assert.Equal(0x02000000u, U32(20)); // "targetA" -> 33554432, the number that showed in-client
+			Assert.Equal(0u, U32(24));          // "targetB"
+			Assert.Equal(0u, U32(28));          // "textLength" -> zero, which is why the command vanished
+
+			// Read one byte later - past the flag - and every field is the real one.
+			Assert.Equal(2u, U32(17));  // word0
+			Assert.Equal(0u, U32(21));  // targetA
+			Assert.Equal(0u, U32(25));  // targetB
+			Assert.Equal(6u, U32(29));  // textLength == "/cloak".Length
+			Assert.Equal("/cloak", FanaticCommandCodec.TryParse(body)!.Value.Text);
 		}
 
-		// The other framing bug this codec shipped with: the text's length prefix is a u32, not the u16 our wire
-		// strings normally use. Reading it as a u16 takes the HIGH half, which is 0 for every real command.
-		[Fact]
-		public void AU16LengthPrefix_WouldHaveEatenTheText()
+		// The synthetic builder must reproduce the real records byte-for-byte, or it is not modelling the wire.
+		[Theory]
+		[InlineData(CloakRecord, "/cloak")]
+		[InlineData(TeleportRecord, "/teleport gm island")]
+		public void Builder_ReproducesTheCapturedBytes(string hex, string text)
 		{
-			var wrong = FanaticCommandCodec.TryParse(Body(0, "/cloak on", lengthPrefixBytes: 2));
-			Assert.NotEqual("/cloak on", wrong!.Value.Text);
+			Assert.Equal(hex, Convert.ToHexString(Body(2, 0, 0, text)));
 		}
 
 		// An empty command text is legitimate (`/gm` on its own), and must not be confused with a parse failure.
 		[Fact]
 		public void EmptyText_ParsesAsEmptyNotNull()
 		{
-			var parsed = FanaticCommandCodec.TryParse(Body(0, ""));
+			var parsed = FanaticCommandCodec.TryParse(Body(2, 0, 0, ""));
 
 			Assert.NotNull(parsed);
 			Assert.Equal("", parsed!.Value.Text);
@@ -86,15 +87,37 @@ namespace Faolan.Tests
 		public void MalformedBodies_Degrade_RatherThanThrow()
 		{
 			Assert.Null(FanaticCommandCodec.TryParse([1, 2, 3]));
-			Assert.Null(FanaticCommandCodec.TryParse(new byte[16])); // header only, no record
+			Assert.Null(FanaticCommandCodec.TryParse(new byte[16])); // carrier only, no record
 
 			// A length field larger than the body: the text is dropped, the rest of the record still reads.
-			var lying = Body(9, "abc");
+			var lying = Body(9, 0, 0, "abc");
 			lying[^4] = 0x7F; // blow up the declared text length
 			var parsed = FanaticCommandCodec.TryParse(lying);
 			Assert.NotNull(parsed);
 			Assert.Equal(9u, parsed!.Value.Word0);
 			Assert.Equal("", parsed.Value.Text);
+		}
+
+		// Builds a c2s body the way the client does: carrier, flag byte, three u32s, then the u32-length-prefixed text.
+		private static byte[] Body(uint word0, uint targetA, uint targetB, string text)
+		{
+			var raw = Encoding.Latin1.GetBytes(text);
+			var bytes = new List<byte>();
+			void U32(uint v) => bytes.AddRange([(byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v]);
+
+			// Record length counts everything AFTER itself: subop + class + handle + flag + 3 u32s + the u32 length,
+			// i.e. 29 bytes, plus the text. (35 for "/cloak", 48 for "/teleport gm island" - both as captured.)
+			U32((uint)(29 + raw.Length));
+			U32(FanaticCommandCodec.Opcode);
+			U32(0xC350); // entity class
+			U32(0x0802E5D4); // handle
+			bytes.Add(0x00); // carrier flag
+			U32(word0);
+			U32(targetA);
+			U32(targetB);
+			U32((uint)raw.Length);
+			bytes.AddRange(raw);
+			return [.. bytes];
 		}
 	}
 }
