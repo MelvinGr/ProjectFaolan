@@ -50,6 +50,12 @@ namespace Faolan.GameServer.World
 		// wall-clock dt, not the nominal period, so a late tick doesn't desync the rates.
 		private const double BaseTickSeconds = 0.1;
 
+		// Slow-tick reporting: how often the loop may complain that it is behind, and how far under nominal counts as
+		// behind. 0.9 leaves room for ordinary timer jitter (PeriodicTimer fires on the thread pool, so a tick landing
+		// a few ms late is normal and is not a load problem).
+		private const double SlowTickReportSeconds = 30.0;
+		private const double SlowTickThreshold = 0.9;
+
 		// How long after dealing/taking damage a player counts as "in combat" (HP + mana regen halted). Provisional.
 		private const double CombatRegenPause = 6.0;
 
@@ -113,6 +119,10 @@ namespace Faolan.GameServer.World
 
 		// The live world model + the connected players' authoritative world entities (transform + vitals).
 		public WorldState World { get; }
+
+		// How the tick loop is actually running (achieved rate + busy fraction). Read by the keep-alive Ping reply for
+		// the client's dev "Server Framerate" overlay, and by the slow-tick warning below. See TickMetrics.
+		public TickMetrics Metrics { get; } = new TickMetrics(1.0 / BaseTickSeconds);
 
 		public WorldSimulation(IWorldOutbound output, IDatabaseRepository database, IChatServerDispatcher agents, ILogger logger, TerrainService? terrain = null)
 		{
@@ -685,6 +695,7 @@ namespace Faolan.GameServer.World
 			using var timer = new PeriodicTimer(TimeSpan.FromSeconds(BaseTickSeconds));
 			var regen = new TickAccumulator(RegenIntervalSeconds);
 			var ambientMaintain = new TickAccumulator(AmbientMaintainIntervalSeconds);
+			var healthReport = new TickAccumulator(SlowTickReportSeconds);
 			var lastTimestamp = Stopwatch.GetTimestamp();
 			var consecutiveFailures = 0;
 			try
@@ -861,6 +872,22 @@ namespace Faolan.GameServer.World
 						consecutiveFailures++;
 						if (consecutiveFailures == 1 || consecutiveFailures % 100 == 0)
 							_logger.LogError(ex, "Game tick failed ({Count} consecutive); the world keeps ticking.", consecutiveFailures);
+					}
+
+					// Measure the tick's WORK (start-of-work -> here), not the period - the period is the timer's and
+					// says nothing about load. A failed tick is still a tick and is still measured: a loop that throws
+					// instantly would otherwise report a perfectly healthy rate while doing nothing.
+					Metrics.RecordTick(Stopwatch.GetElapsedTime(now).TotalSeconds);
+
+					// Surface a loop that is not keeping up instead of leaving it to be noticed as "the world feels
+					// laggy". Throttled to one line per SlowTickReportSeconds - the condition is by definition
+					// persistent, so logging it per tick would bury it.
+					if (healthReport.Advance(dt, out _))
+					{
+						var health = Metrics.Current;
+						if (health.TicksPerSecond > 0 && health.TicksPerSecond < Metrics.NominalTicksPerSecond * SlowTickThreshold)
+							_logger.LogWarning("World tick is behind: {Rate:F1} of a nominal {Nominal:F1} Hz ({Busy:P0} of the tick budget in use).",
+								health.TicksPerSecond, Metrics.NominalTicksPerSecond, health.BusyFraction);
 					}
 				}
 			}

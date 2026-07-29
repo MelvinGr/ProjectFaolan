@@ -773,7 +773,7 @@ namespace Faolan.GameServer
 
 				case GameAgentOpcodes.UpdateGameServerStats: // client 0x2005 (empty) -> server Pong 0x2009
 				{
-					await KeepAliveService.HandlePing(client);
+					await _keepAlive.HandlePing(client);
 
 					break;
 				}

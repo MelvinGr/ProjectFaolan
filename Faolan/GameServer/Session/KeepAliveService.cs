@@ -6,15 +6,16 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
+using Faolan.GameServer.World;
 
 namespace Faolan.GameServer.Session
 {
 	// The connection keep-alive / latency replies the client polls with in-world:
 	//   LatencyCheck (c2s 0x2085) -> Pong (0x2082): echo the counter + a server tick.
 	//   Ping         (c2s 0x2005) -> GameServerStats (0x2009): a server-load readout float.
-	// Both are fixed-shape replies with a tiny bit of per-reply data (the echoed counter / the tick). Extracted
-	// out of the GameServerListener dispatch switch as a composed collaborator (#200); the two switch cases are
-	// now thin one-liners delegating here. No deps - it just builds + sends on the client.
+	// Both are fixed-shape replies with a tiny bit of per-reply data (the echoed counter / the tick / the measured tick
+	// rate). Extracted out of the GameServerListener dispatch switch as a composed collaborator (#200); the two switch
+	// cases are now thin one-liners delegating here. Its one dependency is the simulation's TickMetrics gauge.
 	//
 	// PILOT for the structured send boundary (Gitea #406, phase 4): these build an Rpc and hand it to
 	// client.SendAsync(Rpc) instead of a hand-framed PacketStream. The wire output is byte-identical (locked by
@@ -24,6 +25,15 @@ namespace Faolan.GameServer.Session
 		// LatencyCheck rides the GameCharAgent conversation (sub-id 0x08); Ping rides GameAgent (sub-id 0x08).
 		private static readonly ProtoEndpoint LatencySender = Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08);
 		private static readonly ProtoEndpoint PingSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x08);
+
+		// The simulation loop's live health readout - the source of the frame rate the Ping reply reports. Taken as the
+		// narrow metric object rather than the WorldSimulation so this stays a keep-alive service that reads a gauge.
+		private readonly TickMetrics _metrics;
+
+		public KeepAliveService(TickMetrics metrics)
+		{
+			_metrics = metrics;
+		}
 
 		// LatencyCheck (0x2085): reply body = [counter echoed][0x00000012][server tick]. The tick is a
 		// monotonically increasing microsecond timer (gameplay dumps: ~5,000,000 per ~5s interval, ms precision).
@@ -36,13 +46,26 @@ namespace Faolan.GameServer.Session
 				b => b.WriteUInt32(counter).WriteUInt32(0x00000012).WriteUInt32(tick)));
 		}
 
-		// Ping (0x2005, empty): reply on GameAgent with GameServerStats. Body = [float][0][0]; retail's leading
-		// float is a varying server-load/fps metric (~80-83 in dumps) - we have no equivalent, so a fixed
-		// plausible value (0x42B32A07 = ~89.6) is sent. The client just treats it as a readout.
-		public static Task HandlePing(INetworkClient client)
+		// Ping (0x2005, empty): reply on GameAgent with GameServerStats. Client signature (docs/re/aoc-client-rpc-methods.md)
+		// is DispatchGameServerStats(nGSFrameRate, uGSFrameCount, nGSCpuUsage) -> body = [float BE][u32][u32]; the
+		// client renders the first field as "Server Framerate" in its developer overlay.
+		//
+		// The frame rate is MEASURED (our simulation loop's achieved ticks/sec - TickMetrics), not a constant. It used
+		// to be a fixed 0x42B32A07 (~89.6) picked to look like retail, which meant the one field on the overlay that
+		// exists to show server health read the same number on a healthy server, an overloaded one and a server whose
+		// world loop had died. Our nominal cadence is 10 Hz, so a healthy reading is ~10.0 - an order of magnitude
+		// under retail's ~99 because retail's was a much finer server frame, not because anything is wrong. What
+		// matters is the reading against ITS OWN nominal.
+		//
+		// The other two fields stay ZERO because retail's are: all 4243 s2c GameServerStats in the capture corpus carry
+		// frame count 0 and CPU usage 0, so retail never populated them and 0 is the proven-safe value. Tick count and
+		// tick busy-fraction are exposed server-side (TickMetrics.Current) rather than invented onto the wire.
+		public Task HandlePing(INetworkClient client)
 		{
+			var frameRate = (float)_metrics.Current.TicksPerSecond;
+
 			return client.SendAsync(new Rpc(PingSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchGameServerStats,
-				b => b.WriteUInt32(0x42B32A07).WriteUInt32(0).WriteUInt32(0)));
+				b => b.WriteFloat(frameRate).WriteUInt32(0).WriteUInt32(0)));
 		}
 	}
 }

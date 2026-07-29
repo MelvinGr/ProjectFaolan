@@ -143,6 +143,38 @@ reaches a variable-length read rather than guessing. Confirm each hit by opening
 method up in the signature catalog above rather than inventing a grammar. The first pass found nine real
 cases; a clean run reports zero. [V1: tools/capture/audit_unread_bodies.py]
 
+## GameServerStats: what retail's server frame rate actually was
+
+`Ping` (c2s `0x2005`, empty body) is answered with `GameServerStats` (`0x2009`). The client signature is
+`DispatchGameServerStats(nGSFrameRate, uGSFrameCount, nGSCpuUsage)` → body = `[f32 BE][u32][u32]`, and the client
+renders the first field as **"Server Framerate"** in its developer overlay.
+
+Across the **4243** s2c `GameServerStats` in the corpus (107 captures):
+
+| | value |
+|---|---|
+| ceiling | **99.34039 Hz** = 10.0664 ms per frame [V2: DemoL80_mage-demonologist_login_randomActions-very_long_loading_screen_after_field_change.tshark.json frame 2920] |
+| median | 98.94 Hz |
+| share above 99.0 Hz | 45.8% |
+| floor | **0.1315 Hz** [V2: DemoL80_mage-demonologist_login_randomActions-very_long_loading_screen_after_field_change.tshark.json frame 5043] |
+
+So retail's game server ran a **~100 Hz / 10 ms frame loop**. The value never once exceeds 99.34, and sits pinned
+just under it for most of every session — that is a nominal 100 Hz achieving ~10.07 ms in practice, not a
+free-running rate. Its interest is the *degradation*: the ceiling and the floor above come from the SAME capture,
+whose name records what happened in between (a very long loading screen after a field change) — the stall is
+visible in the metric, three orders of magnitude down.
+
+**`uGSFrameCount` and `nGSCpuUsage` are zero in all 4243 packets.** Retail declared them and never populated them,
+so `0` is the proven-safe value and we send `0` for both.
+
+Our own reply reports the **measured** rate of our simulation loop (`TickMetrics` → `KeepAliveService`), not a
+constant: a healthy reading is ~10.0 against our nominal 10 Hz base tick, and a stalled or dead world loop reads
+0 rather than a plausible-looking number. The reading that matters is against its own nominal — ours is an order
+of magnitude under retail's because our base tick is a coarse gameplay tick, not a server frame.
+[V3: TickMetricsTests.AfterAFullWindow_ReportsTheAchievedRateAndBusyFraction]
+[V3: KeepAliveRpcPilotTests.HandlePing_ReportsTheMeasuredTickRate]
+[V3: KeepAliveRpcPilotTests.HandlePing_ReportsZeroWhenTheWorldLoopIsNotTicking]
+
 ## See also
 
 - [`03-iir-carrier.md`](03-iir-carrier.md) — opcode `0x2000` is itself a carrier for a second, 32-bit-hashed
