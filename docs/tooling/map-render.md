@@ -28,9 +28,12 @@ and the script exits saying so. See [`docs/rdb/rdb-type-catalog.md`](../rdb/rdb-
 
 ## Orientation
 
-The source PNG's **row 0 is SOUTH**, so it is flipped vertically for a north-up render — the convention
-`Faolan.Web/wwwroot/js/radar.js` already encodes for the live radar. This is a property of the format, not of
-one map.
+The source PNG's **row 0 is SOUTH** — the convention `Faolan.Web/wwwroot/js/radar.js` already encodes for the
+live radar. This is a property of the format, not of one map. The renderer satisfies it with
+`imshow(origin="lower")`, which draws array row 0 at the bottom of the extent; flipping the array as well
+double-flips it and mirrors the terrain against the overlay. That failure is **silent** — the marks stay in
+correct world coordinates and only the background moves — so verify it against a landmark whose world position
+is known independently (Tortage's lava spans world Z 150–1064) rather than by eye.
 
 Confirmed independently on Poitain (2070) against the baked collision mesh: plot the vertices of
 `Terrain/2070.terrain` over the image in each of the four candidate orientations. On an outdoor playfield that

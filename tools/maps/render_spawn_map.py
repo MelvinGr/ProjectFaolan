@@ -31,13 +31,19 @@ Everything it needs already exists in the tree; there is no C# to add:
 Only 66 (outdoor) playfields have a 1010209 entry at all; interiors/dungeons simply have none, so this is an
 outdoor-map tool. `--extent N` substitutes for `--playfield` when you already know the tilemap width.
 
-⚠️ ORIENTATION. The source PNG's row 0 is SOUTH, so it is flipped vertically for a north-up render - the same
-convention `Faolan.Web/wwwroot/js/radar.js` encodes. This is a property of the FORMAT, not of one map, and it
-has been confirmed independently: overlay a map's baked collision mesh (`Terrain/<mapId>.terrain`, which on an
-outdoor playfield is largely the boundary wall and the river banks) and only under this flip does the wall trace
-the image's river channels. Do NOT try to re-derive it from aggregate statistics - brightness correlation,
-"find the buildings" blob masks and filled-interior IoU all come back within noise across all four candidate
-orientations. The full-resolution visual overlay decides it in one look.
+⚠️ ORIENTATION. The source PNG's row 0 is SOUTH - a property of the FORMAT, not of one map, and the same
+convention `Faolan.Web/wwwroot/js/radar.js` encodes. Confirmed independently by overlaying a map's baked
+collision mesh (`Terrain/<mapId>.terrain`, on an outdoor playfield largely the boundary wall and river banks):
+only under that reading does the wall trace the image's river channels. Do NOT try to re-derive it from
+aggregate statistics - brightness correlation, "find the buildings" blob masks and filled-interior IoU all come
+back within noise across all four candidate orientations.
+
+Here the convention is satisfied by `imshow(origin="lower")`, which draws array row 0 at the bottom of the
+extent. Do NOT flip the array as well: that double-flips it, and the bug is SILENT - the overlay marks stay in
+correct world coordinates and only the terrain moves, so the output is a believable map of the wrong place. It
+shipped once, because the orientation was verified with a direct image composite rather than the draw path that
+actually runs. Check it against a landmark with an independently known world position instead: Tortage
+(4010)'s lava spans world Z 150..1064.
 
 The map image is deliberately contrast-expanded and then dimmed: the shipped PNGs use only a narrow luminance
 band (Poitain's spans 33..133 of 255), so a raw draw is muddy while a full stretch leaves the surface too bright
@@ -197,8 +203,11 @@ def main():
         "community": (C_COMMUNITY, "Community group"),
     }
 
-    # Row 0 of the source is SOUTH - flip for north-up (see the module docstring).
-    src = load_map_image(args.map_image).convert("RGB").transpose(Image.FLIP_TOP_BOTTOM)
+    # Row 0 of the source is SOUTH (see the module docstring), and `imshow(origin="lower")` below already draws
+    # array row 0 at the BOTTOM of the extent - so the convention is satisfied with no flip here. Flipping as well
+    # double-flips and mirrors the terrain against the overlay, which is a silent error: the marks stay in correct
+    # world coordinates and only the background moves, so it reads as a plausible map of the wrong place.
+    src = load_map_image(args.map_image).convert("RGB")
     if args.bg_scale > 1:
         src = src.resize((src.width * args.bg_scale, src.height * args.bg_scale), Image.LANCZOS)
     raw = np.asarray(src).astype(float)
