@@ -1056,6 +1056,17 @@ namespace Faolan.GameServer.World
 
 					buff.LastDotTick = now;
 
+					// .godmode has to cover DAMAGE OVER TIME, not just the swing that applied it. The two direct
+					// NPC-damage paths check GodMode; this one did not, so a GM in god mode was killed by a bleed -
+					// and by one the NPC cast path had applied THROUGH god mode, since it creates the buff before its
+					// own GodMode return. The tick is the single choke point every DoT source funnels through, which
+					// is why the guard belongs here rather than at each application site.
+					//
+					// The stamp above still advances, so a debuff that ticked through god mode does not burst-catch-up
+					// the moment it is switched off. HEALS over time are unaffected: god mode blocks harm, not healing.
+					if (entity.GodMode && buff.DotDelta < 0)
+						continue;
+
 					vitals.ApplyHealthDelta(buff.DotDelta);
 					await _output.SendStatDamage(client, entity.Handle, vitals.Health, buff.DotDelta, buff.DotType, buff.CasterHandle, buff.BuffId >> 8);
 					await _output.PushVitals(client, vitals);
