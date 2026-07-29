@@ -722,9 +722,25 @@ That is what exposed the long-standing `5 + 3 * level` NPC swing: 8 damage at le
 the thousands, ~15x too weak, invisible because nothing in the code compared damage with the health it is
 subtracted from.
 
-⚠️ **Only levels 1-6 are well sampled** (hundreds of hits each). Above that the corpus gives single digits, so
-the measured curves are extrapolated - [#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479)
-tracks the captures that would settle the high end.
+**The NPC swing line is confirmed at the top of the range** (2026-07-29). A level-80 necromancer fighting in
+Poitain gives two unrelated templates at level 75, both within 4% of `level * 100` against a level-80 player -
+`Hired Bodyguard` 7324 and `Zingaran Operative` 7200 versus a model of 7500 - and the same fight's combat log
+shows the player seeing 67-92, so the wire figures are cross-checked rather than inferred. `level * 100` is no
+longer an extrapolation from the beach.
+
+⚠️ **Read `--report npc-damage`'s BY ATTACKER section, not its level buckets.** A level bucket mixes a
+304,944-HP `Poitain Guard` with a 4,605-HP `Zingaran Alchemist`, both level 80, and it also mixes attackers
+whose level sits at very different distances from the player's. Attributed per template, with the capturing
+player's level alongside, two effects separate out that the buckets render as one apparent cliff:
+
+- a **level-GAP penalty** - full damage within ~5 levels of the player, collapsing to ~0.10 by 7, and running
+  the other way when the mob is *above* the player. Retail applies it server-side (the client tweak table
+  carries no level-difference constant), and we model none of it -
+  [#488](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/488).
+- **ranged mobs deal ~0.2 of same-level melee** even at gap 0 (`Poacher Marksman` 0.17, `Bat Pict Archer` 0.21).
+
+Still thin: caster NPCs above level ~10, and any capture pinning the player's own Critical Damage Rating -
+[#479](https://git.groenendaal.io/MelvinGr/projectfaolan/issues/479).
 
 ## The client's own COMBAT LOG - an instrument the packets cannot replace (2026-07-28)
 
