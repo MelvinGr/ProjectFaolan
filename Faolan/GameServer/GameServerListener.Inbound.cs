@@ -491,10 +491,12 @@ namespace Faolan.GameServer
 				case GameServer0X2000Opcodes.FanaticCommandIir:
 				{
 					var fanatic = FanaticCommandCodec.TryParse(rawPayload);
-					Logger.LogInformation("GameServer FanaticCommandIIR: text='{Text}' word0={Word0} targets=({TargetA},{TargetB}) ({RawLength} bytes)",
-						fanatic?.Text, fanatic?.Word0, fanatic?.TargetA, fanatic?.TargetB, rawPayload.Length);
+					// The raw body rides along at Debug: the c2s grammar has no capture behind it (the corpus holds no
+					// GM session), so the bytes are the only way to check a parse against reality.
+					Logger.LogInformation("GameServer FanaticCommandIIR: text='{Text}' word0={Word0} ({RawLength} bytes) raw={Raw}",
+						fanatic?.Text, fanatic?.Word0, rawPayload.Length, Convert.ToHexString(rawPayload));
 					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, fanatic is { } f
-						? $"GM command received: '{f.Text}' (word0 {f.Word0}, targets {f.TargetA}/{f.TargetB}). The server's reply is not decoded yet (#448)."
+						? $"GM command received: '{f.Text}' (word0 {f.Word0}). The server's reply is not decoded yet (#448)."
 						: $"GM command received but the FanaticCommandIIR body did not parse ({rawPayload.Length} bytes).");
 					break;
 				}
