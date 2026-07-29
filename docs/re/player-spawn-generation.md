@@ -46,9 +46,11 @@ every edit path; the table is gone. The registry it resolves through reaches the
 
 Characters without scaffold rows are seeded ONCE at creation
 (`CreateFlowService.SeedSpawnScaffold` → `IDatabaseRepository.SaveCharacterScaffold`) with the
-**fresh-character defaults** in `PlayerSpawnScaffoldRows`: Dikketest's extracted scaffold (a just-created
-character at world entry — 6 weighted attributes, 7 morph entries, the closer, 20 feat ids, fresh pre-frame).
-Locked by the test `FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture`.
+**fresh-character defaults** in `PlayerSpawnScaffoldRows`: the progression a character starts with (feat/skill
+ids, an empty spec, the fresh pre-frame). The APPEARANCE is deliberately NOT among them — it is derived from
+`CharacterBody` + `CharacterBodyResource` on every send, so there is nothing to seed and no default face to
+inherit. Locked by the test `FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture`, which reproduces
+Dikketest's captured spawn from his own appearance model (his refs through the registry, his sliders).
 
 **Retail's entry indices are per-character SLOT ids, not positions** — they survive appearance edits, so a
 re-barbered character carries gaps and appends its re-chosen resources after its morphs (`NecroL80` runs
@@ -250,9 +252,14 @@ The weighted (1.0) entries at the top of the entry table are the character's **c
   for the sliders.
 - Implementation: `Faolan.Importer --only rdb-morphs` imports the registry → `MorphTarget` (Id = wire tag);
   the create-flow `RecordBodyResource` records the editor's refs → `CharacterBodyResource` (send order); the
-  SPAWN resolves refs → `PlayerSpawnScaffoldRows.BuildWeightedEntries` on every send (falls back to
-  Dikketest's set when nothing resolves, which `CreateFlowService.ReportUnresolvableAppearance` says out loud
-  once, at creation). Locked by `WeightedAppearanceTests` (faolanx 7/7) and, against the shipped catalog in
+  SPAWN resolves refs → `PlayerSpawnScaffoldRows.BuildWeightedEntries` on every send. A character wears what
+  it chose, nothing, or the build FAILS: a missing registry and a ref the registry does not know both throw,
+  and choosing nothing (or only category 2) yields an EMPTY entry list. There is no substitute face — it used
+  to fall back to Dikketest's 6 captured attributes, whose hair `*hairmesh_208094` belongs to exactly one
+  per-race/sex list (race 3 / sex 3), so every other character that hit it wore a hairstyle authored for a
+  different race's head plus two face markings nobody chose (Gitea #288).
+  `CreateFlowService.ReportUnresolvableAppearance` still names an unimported ref once, at creation, where it
+  is still actionable. Locked by `WeightedAppearanceTests` (faolanx 7/7) and, against the shipped catalog in
   both directions, by `PlayerSpawnScaffoldRowsTests`.
 - **The closing record is session state, not character data**: its tag is always a multiple of **0x3F1**
   (the grammar's magic: Dikketest 22×0x3F1, Hoxxling 18/19/22/32×0x3F1 across his logins — same char,
