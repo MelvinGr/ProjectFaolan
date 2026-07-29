@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Network.Codecs.Text;
@@ -32,7 +33,7 @@ namespace Faolan.Tests
 			Assert.Equal("RenownBystanderLovers", row.Group);
 			Assert.Equal(50015u, row.Category);
 			Assert.Equal(0u, row.Knubot);
-			Assert.Null(row.ParameterName);
+			Assert.Empty(row.Parameters);
 
 			// The key keeps its XML entity exactly as captured - re-escaping is not round-trip safe.
 			Assert.Equal("]&#39;siB8WQ*b25XY8J7Gd*", row.FormatKey);
@@ -56,7 +57,8 @@ namespace Faolan.Tests
 			Assert.Equal("sendtell", row.Channel);
 			Assert.Equal(57u, row.SayInChat);
 			Assert.Equal("RenownCrier", row.Group);
-			Assert.Equal("DetectedChar.name", row.ParameterName);
+			Assert.Equal("DetectedChar.name", Assert.Single(row.Parameters).Name);
+			Assert.Null(Assert.Single(row.Parameters).Value); // session slot - the captured name is NOT stored
 			Assert.Equal("Sonja", parameterValue);
 
 			// Byte-exact when the captured value is handed back - what the importer gates on.
@@ -82,6 +84,44 @@ namespace Faolan.Tests
 		public void ParseChatter_RejectsAnythingThatIsNotABark(string xml)
 		{
 			Assert.Null(RemoteFormatXml.ParseChatter(xml));
+		}
+
+		// #493: the Damsel in Distress bark carries TWO slots, one of them CONTENT. Before this the grammar allowed
+		// one and the importer aborted the entire run on it. The two must round-trip together AND be treated
+		// differently: `Target.Name` is the addressed player (regenerated, never stored), while `helptext` is a
+		// `<localized>` element that IS the line's content and must survive into the DB.
+		[Fact]
+		public void ParseChatter_KeepsBothSlotsOfATwoParameterBark_ContentStoredSessionBlanked()
+		{
+			const string captured =
+				"<remoteformat token=\"sayinchat(9)|event(2)|RnBLadyInDistressBrainScript\" category=\"50015\" key=\"!i*X_QMyCa&#39;5_jz!CSRU\" knubot=\"0\"  >"
+				+ "<parameter value=\"7;Sonja\" name=\"Target.Name\" />"
+				+ "<parameter value=\"7;&lt;localized token=&quot;helptext(8)|RnBLadyInDistressBrainScript|initialvalue&quot; category=&quot;50025&quot; flags=&quot;&quot; key=&quot;Q(0WTe92/HbY`P?vHEv@&quot; &gt;\" name=\"helptext\" />"
+				+ "</remoteformat>";
+
+			var row = RemoteFormatXml.ParseChatter(captured, out var parameterValue);
+
+			Assert.NotNull(row);
+			Assert.Equal("event", row.Channel);
+			Assert.Equal(9u, row.SayInChat);
+			Assert.Equal("RnBLadyInDistressBrainScript", row.Group);
+			Assert.Equal(2, row.Parameters.Count);
+
+			var slots = row.Parameters.OrderBy(x => x.Ordinal).ToList();
+			Assert.Equal("Target.Name", slots[0].Name);
+			Assert.Null(slots[0].Value); // session state - the capturing player's name is NOT stored (#417)
+			Assert.Equal("helptext", slots[1].Name);
+			Assert.Contains("localized", slots[1].Value!, StringComparison.Ordinal); // content - kept verbatim
+			Assert.Equal("Sonja", parameterValue);
+
+			// Byte-exact when the captured session value is handed back - what the import gate requires.
+			Assert.Equal(captured, RemoteFormatXml.BuildChatter(row, parameterValue));
+
+			// The row alone renders the session slot empty but keeps the content slot intact, and ORDER is preserved.
+			var alone = RemoteFormatXml.BuildChatter(row);
+			Assert.DoesNotContain("Sonja", alone, StringComparison.Ordinal);
+			Assert.Contains("name=\"helptext\"", alone, StringComparison.Ordinal);
+			Assert.True(alone.IndexOf("Target.Name", StringComparison.Ordinal) < alone.IndexOf("helptext", StringComparison.Ordinal));
 		}
 
 		// Whole-table CONSISTENCY, not fidelity - the same distinction as InnerElementXmlTests. The value it builds

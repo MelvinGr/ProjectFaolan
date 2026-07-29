@@ -1815,13 +1815,37 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Knubot")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("ParameterName")
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
                     b.HasKey("NpcTemplateId", "Channel", "SayInChat");
 
                     b.ToTable("NpcChatter");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatterParameter", b =>
+                {
+                    b.Property<uint>("NpcTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Channel")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint>("SayInChat")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("NpcTemplateId", "Channel", "SayInChat", "Ordinal");
+
+                    b.ToTable("NpcChatterParameter");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcEquipment", b =>
@@ -4149,6 +4173,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("NpcTemplate");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatterParameter", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.NpcChatter", "Chatter")
+                        .WithMany("Parameters")
+                        .HasForeignKey("NpcTemplateId", "Channel", "SayInChat")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Chatter");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcEquipment", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
@@ -4589,6 +4624,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Objects");
 
                     b.Navigation("RespawnPoints");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>
+                {
+                    b.Navigation("Parameters");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcSpawn", b =>

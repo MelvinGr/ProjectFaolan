@@ -24,13 +24,26 @@ namespace Faolan.Core.Network.Codecs.Text
 
 		// The ambient-bark root: the same shape as RootRx but keyed by `token=`, whose value is structured
 		// `sayinchat(N)|<channel>(K)|<Group>`. The channel is NOT always a numbered conversation - the corpus has
-		// `conversation1`, `conversation2` and `sendtell` - so it is captured as a name. A bark carries at most one
-		// `<parameter>` (only the sendtell crier line does). Anchored and fully specified so anything that is NOT a
-		// bark fails to match rather than being half-read.
+		// `conversation1`, `conversation2` and `sendtell` - so it is captured as a name. Anchored and fully specified
+		// so anything that is NOT a bark fails to match rather than being half-read.
+		//
+		// The slots are matched SEPARATELY (ChatterParamRx) rather than inlined here: a bark was assumed to carry at
+		// most one, and the Damsel in Distress line carries two (#493).
 		private static readonly Regex ChatterRootRx = new Regex(
 			"^<remoteformat token=\"sayinchat\\((?<say>\\d+)\\)\\|(?<channel>[A-Za-z][A-Za-z0-9]*)\\((?<count>\\d+)\\)\\|(?<group>[^\"|]*)\" category=\"(?<cat>[^\"]*)\" key=\"(?<key>[^\"]*)\" knubot=\"(?<knubot>[^\"]*)\"  >"
-			+ "(?:<parameter value=\"7;(?<pvalue>[^\"]*)\" name=\"(?<pname>[^\"]*)\" />)?</remoteformat>$",
+			+ "(?<params>(?:<parameter value=\"7;[^\"]*\" name=\"[^\"]*\" />)*)</remoteformat>$",
 			RegexOptions.Compiled);
+
+		private static readonly Regex ChatterParamRx = new Regex("<parameter value=\"7;(?<pvalue>[^\"]*)\" name=\"(?<pname>[^\"]*)\" />", RegexOptions.Compiled);
+
+		// A bark slot whose value is the ADDRESSED PLAYER rather than content, so it is regenerated per send and its
+		// captured value must never be stored (#417). Every such slot in the corpus names a character and ends in
+		// `.name` - `DetectedChar.name` (the sendtell crier) and `Target.Name` (the Damsel) - while the one content
+		// slot, `helptext`, does not. Checked case-insensitively because the two differ in case.
+		public static bool IsSessionBarkSlot(string name)
+		{
+			return name.EndsWith(".name", StringComparison.OrdinalIgnoreCase);
+		}
 
 		// Root attrs, then the `knubot="X" {antitag} >` slot - antitag sits between two spaces (empty when absent,
 		// giving the double space `knubot="0"  >`), so the optional group must NOT eat the trailing space.
@@ -73,10 +86,14 @@ namespace Faolan.Core.Network.Codecs.Text
 			// Written out rather than routed through Build(): only the first attribute differs, but patching `id=` to
 			// `token=` afterwards would be a blind string replace over a payload that also carries a content hash.
 			// The trailing DOUBLE space is Build()'s empty-antitag slot, which these barks always have.
-			var parameter = row.ParameterName is { } name
-				? $"<parameter value=\"7;{Escape(detectedCharName)}\" name=\"{name}\" />"
-				: "";
-			return $"<remoteformat token=\"{ChatterToken(row)}\" category=\"{row.Category}\" key=\"{row.FormatKey}\" knubot=\"{row.Knubot}\"  >{parameter}</remoteformat>";
+			// A SESSION slot renders the live player; a CONTENT slot renders its stored value verbatim, escaped
+			// exactly as captured (it is already-escaped XML - a `<localized>` element - so it is emitted as-is).
+			var parameters = string.Concat(row
+				.Parameters.OrderBy(x => x.Ordinal)
+				.Select(x => IsSessionBarkSlot(x.Name)
+					? $"<parameter value=\"7;{Escape(detectedCharName)}\" name=\"{x.Name}\" />"
+					: $"<parameter value=\"7;{x.Value}\" name=\"{x.Name}\" />"));
+			return $"<remoteformat token=\"{ChatterToken(row)}\" category=\"{row.Category}\" key=\"{row.FormatKey}\" knubot=\"{row.Knubot}\"  >{parameters}</remoteformat>";
 		}
 
 		public static byte[] BuildChatterBytes(NpcChatter row, string detectedCharName = "")
@@ -108,10 +125,25 @@ namespace Faolan.Core.Network.Codecs.Text
 			if (!m.Success)
 				return null;
 
-			if (m.Groups["pvalue"].Success)
-				parameterValue = Unescape(m.Groups["pvalue"].Value);
+			var slots = new List<NpcChatterParameter>();
+			foreach (Match pm in ChatterParamRx.Matches(m.Groups["params"].Value))
+			{
+				var name = pm.Groups["pname"].Value;
+				var raw = pm.Groups["pvalue"].Value;
+				if (IsSessionBarkSlot(name))
+					parameterValue = Unescape(raw); // the live value, for the importer's round-trip gate only
 
-			return new NpcChatter
+				slots.Add(new NpcChatterParameter
+				{
+					Ordinal = slots.Count,
+					Name = name,
+					Value = IsSessionBarkSlot(name)
+						? null
+						: raw
+				});
+			}
+
+			var row = new NpcChatter
 			{
 				SayInChat = uint.Parse(m.Groups["say"].Value, CultureInfo.InvariantCulture),
 				Channel = m.Groups["channel"].Value,
@@ -120,10 +152,11 @@ namespace Faolan.Core.Network.Codecs.Text
 				Category = uint.Parse(m.Groups["cat"].Value, CultureInfo.InvariantCulture),
 				FormatKey = m.Groups["key"].Value,
 				Knubot = uint.Parse(m.Groups["knubot"].Value, CultureInfo.InvariantCulture),
-				ParameterName = m.Groups["pname"].Success
-					? m.Groups["pname"].Value
-					: null
 			};
+			foreach (var slot in slots)
+				row.Parameters.Add(slot);
+
+			return row;
 		}
 
 		public static Screen Parse(string xml)

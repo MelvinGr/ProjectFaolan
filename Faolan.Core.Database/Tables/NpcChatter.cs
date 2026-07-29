@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,7 @@ namespace Faolan.Core.Database.Tables
 	// NPC). Keyed by the NPC type, like NpcSpell: the dialogue is SPECIFIC per NPC - each references its own
 	// conversation group - so lines are stored per type.
 	//
-	// COLUMNIZED, like its StockPhrase sibling (#410): the bark is a PARAMETER-LESS remoteformat root
+	// COLUMNIZED, like its StockPhrase sibling (#410): the bark is a remoteformat root, usually parameter-less
 	//   <remoteformat token="sayinchat(16)|conversation1(3)|RenownBystanderLovers" category="50015" key="..." knubot="0"  >
 	// so these columns ARE the whole payload and the wire string is rebuilt with RemoteFormatXml.BuildChatter. The
 	// raw blob it replaced is gone. Same root grammar as a dialogue screen, with `token=` where a screen has `id=`.
@@ -55,12 +56,10 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(64)]
 		public string FormatKey { get; set; } = null!;
 
-		// The NAME of this bark's single `<parameter>` slot, or null when it has none (11 of the 12 captured barks).
-		// The one that has it is the `sendtell` crier line, whose slot is `DetectedChar.name` - the player being
-		// addressed. That is SESSION state, exactly like a dialogue screen's name/guildname (#417), so only the slot
-		// NAME is stored and the value is regenerated per send: the capture's value is the capturing player's real
-		// character name, which must never ride the DB into faolan.sql.
-		[MaxLength(64)]
-		public string? ParameterName { get; set; }
+		// The bark's `<parameter>` slots in render order, empty for most lines (#493). Was a single name-only column
+		// on the assumption that a bark carries at most one - the Damsel in Distress line carries two, one of them
+		// CONTENT (`helptext`, a `<localized>` element) rather than session state, so it had to become a collection
+		// that stores values as well as names. See NpcChatterParameter.
+		public virtual ICollection<NpcChatterParameter> Parameters { get; set; } = [];
 	}
 }
