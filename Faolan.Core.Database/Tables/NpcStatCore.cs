@@ -103,6 +103,28 @@ namespace Faolan.Core.Database.Tables
 		// matching the client's green default. This replaces the wrong `Community > 0` aggro test (#256/aggro).
 		public uint? Disposition { get; set; }
 		public uint? TemplateId { get; set; }
+
+		// The client's own `npc_type` (NpcStats field 14) - the NPC's KIND, and the field that decides the nameplate
+		// rank decoration: **3 is the boss/elite rank the client draws SKULLS next to** (#508).
+		//
+		// Identified from the chat-annotated gameplay capture, which says `talked to npc keira (skulls next to name.
+		// like king conan)`. Keaira (template 15090) and King Conan (1917) are the pair that annotation compares, and
+		// they are the ONLY thing it names - both carry npc_type 3. The 56 rows sharing that value then read as a
+		// roster of exactly what the marker is for: Harbinger of Kao, Wulfhere, Hadrathus, Thunder River Demon Lord,
+		// Verdandi the Ghost King, The Ravager, Saddur, Ape King, Commander Vakarr/Ramn/Magni, Yeti, Mama Bear.
+		//
+		// The four observed values, characterised by what each group can DO rather than by guessing at names:
+		//   1 (55)  plain creatures - ZERO are vendors and ZERO have a conversation; mostly hostile trash
+		//   2 (10)  a small named group, mixing Tortage destiny NPCs (Delia, Sakumbe, Valerius) with named enemies
+		//           (Eerika of the Maidens, Pict Chief, Torgrim Blackfrost, Arnulf Iceblade) - see the V0 below
+		//   3 (56)  named bosses / elites - the SKULL rank; 27 of 56 hostile, only 3 have any conversation
+		//   4 (897) ordinary interactive NPCs - 534 are shop vendors and 513 have a conversation
+		//
+		// ⚠️ NULL would silently drop the rank, so every NPC renders unranked - which is why NpcStatCoreRankTests
+		// gates the column as fully populated rather than trusting that it happens to be. Nothing here needed
+		// building: the live spawn path already emits it (NpcSpawnBuilder -> NpcStatCoreCodec.ToNpcStats), so the
+		// skull was always reaching the client; the field was simply undocumented, which is why #508 read as missing
+		// plumbing. Types 1 vs 2 are not fully separated - [V0: what npc_type 1 and 2 mean].
 		public uint? NpcType { get; set; }
 		public uint? NpcFlags { get; set; }
 		public uint? Normalset { get; set; }

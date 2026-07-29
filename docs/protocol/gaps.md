@@ -143,3 +143,23 @@ than a stance. `0x10D` does draw a BCC and sits either side of `got on blue snow
 call/dismiss is the obvious first hypothesis to test.
 
 A capture that walks the mount and the remaining action-bar buttons while annotating each one settles both.
+
+### What `npc_type` 1 and 2 mean
+**Tracked: Gitea #508.** [V0: what npc_type 1 and 2 mean] `NpcStats.npc_type` (field 14) is the NPC kind that
+drives the nameplate rank, and **3 is the boss/elite rank the client draws skulls next to** — identified from the
+annotation `talked to npc keira (skulls next to name. like king conan)`, whose two NPCs both carry 3, and
+corroborated by the 56-row roster that value selects. **4** is equally clear from behaviour: 534 of its 897 rows
+are shop vendors and 513 have a conversation, i.e. ordinary interactive NPCs.
+
+The two small groups are not separated. **1** (55 rows) is cleanly non-interactive — zero vendors, zero
+conversations, mostly hostile trash — so "plain creature" fits, but nothing rules out a narrower meaning.
+**2** (10 rows) is the genuinely unexplained one: it mixes Tortage destiny NPCs (Delia, Sakumbe, Valerius) with
+named enemies (Eerika of the Maidens, Pict Chief, Torgrim Blackfrost, Arnulf Iceblade) and two Wharf Rat
+Scoundrels, which is not one obvious category. Note Eerika is #502's encounter boss yet is 2 while Saddur, a
+smaller boss, is 3 — so 2 and 3 are not simply two tiers of the same "named" ladder.
+
+⚠️ The obvious RE route is closed: the client stores its protobuf field names only inside the serialized
+`FileDescriptorProto` blobs, so `npc_type` is **not** a defined string in `AgeOfConan.exe` and cannot be anchored
+on (`tools/ghidra/DumpNpcTypeRank.java` establishes this — PART A finds no hit). Naming 1 and 2 means finding the
+NpcStats field-14 reader through the generated parser and following it to the nameplate decoration, or finding a
+client data table that enumerates the kinds.
