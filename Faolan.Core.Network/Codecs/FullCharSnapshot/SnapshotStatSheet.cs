@@ -37,7 +37,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			CharacterStatId.Money, CharacterStatId.Kills, CharacterStatId.Deaths, CharacterStatId.PlayerId,
 			// Authored CONDITIONALLY - only for the levels SkillPointCurve has actually measured (#507). Declared here
 			// regardless, because the slot varies across captured characters and this is where that is accounted for.
-			CharacterStatId.SkillPoints
+			CharacterStatId.SkillPoints,
+			// The murder-point pool, now derived from the character rather than carried as a fixed 0 (#503).
+			CharacterStatId.MurderPoints
 		];
 
 		/// <summary>
@@ -125,6 +127,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// baseline's own value rather than having a guess written over it.
 			if (SkillPointCurve.For(character.Level) is { } skillPoints)
 				yield return (CharacterStatId.SkillPoints, skillPoints);
+
+			// The PvP murder-point pool (#503). Stat 0x449, which the client's own LDB string table names "Murder
+			// Points"; the wire value is what the capture shows moving at a player kill. Carried unconditionally - 0 is
+			// the correct value for a character that has never murdered anyone, and it is what every captured character
+			// holds, so this replaces the fixed 0 with the same number derived from the column that now tracks it.
+			yield return (CharacterStatId.MurderPoints, character.MurderPoints);
 		}
 
 		// Writes a value at EVERY occurrence of a stat id. A stat can appear in both lists (and twice within

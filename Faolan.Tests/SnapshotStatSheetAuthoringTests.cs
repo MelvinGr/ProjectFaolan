@@ -21,9 +21,10 @@ namespace Faolan.Tests
 		{
 			// Progression/statistics we do not track yet: play time, money, the PvP and kill/death counters, the
 			// skill ratings. All read as character state we simply have no source for, not as protocol unknowns.
-			// NB the list holds only what actually VARIES: MurderPoints, MinigamesAbandoned, SiegeWins/Losses and
-			// Fatalities are 0 on every captured character, so carrying them as 0 is a fact, not a shortcut - and
-			// the anti-rot half of the gate below rejects them if listed.
+			// NB the list holds only what actually VARIES: MinigamesAbandoned, SiegeWins/Losses and Fatalities are 0
+			// on every captured character, so carrying them as 0 is a fact, not a shortcut - and the anti-rot half of
+			// the gate below rejects them if listed. (MurderPoints used to be in that group; it is now AUTHORED from
+			// Character.MurderPoints - #503 - since the criminal system needs it to move.)
 			[CharacterStatId.Played] = "play time not tracked",
 			[CharacterStatId.LastKillNumber] = "a per-kill sequence number, semantics unknown",
 			[CharacterStatId.PreviousHealth] = "derived from combat history we do not keep",

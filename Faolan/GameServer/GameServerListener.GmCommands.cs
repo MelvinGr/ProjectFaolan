@@ -358,6 +358,7 @@ namespace Faolan.GameServer
 				["position"] = (client, _) => PositionCommand(client),
 				["recall"] = (client, _) => RecallToBindCommand(client),
 				["recallhome"] = (client, _) => RecallToRacialHomeCommand(client),
+				["criminal"] = CriminalCommand,
 				["level"] = SetLevelCommand,
 				["feat"] = _feats.FeatCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
@@ -580,6 +581,46 @@ namespace Faolan.GameServer
 			}
 
 			await DoTeleport(character.Id, point.MapId, point.Position);
+		}
+
+		// .criminal [seconds]  - flag the calling character CRIMINAL for `seconds` (default the retail 300 s), or
+		// `.criminal 0` to clear it. The standard test bootstrap: the retail trigger is killing another player, and PvP
+		// player-vs-player combat is not modelled, so without this the criminal branches in ShopService are
+		// unreachable. Also awards the measured murder points so the stat moves as it does in the capture.
+		private async Task CriminalCommand(INetworkClient client, string arguments)
+		{
+			var character = client.Session.Character;
+			var parts = (arguments ?? "").Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+			var seconds = CriminalStatus.CriminalSeconds;
+			if (parts.Length > 0 && !int.TryParse(parts[0], out seconds))
+			{
+				await _agentServerDispatcher.SendSystemMessage(character.Id, $"Usage: .criminal [seconds]  (default {CriminalStatus.CriminalSeconds}, 0 clears)");
+				return;
+			}
+
+			if (seconds <= 0)
+			{
+				character.CriminalUntil = null;
+				character.MurderPoints = 0;
+				await Database.SetCharacterCriminalState(character.Id, null, 0);
+				await SendBuffRemoval(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8);
+				await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, 0), character.Id);
+				await _agentServerDispatcher.SendSystemMessage(character.Id, "Criminal status cleared.");
+				return;
+			}
+
+			character.CriminalUntil = DateTime.UtcNow.AddSeconds(seconds);
+			character.MurderPoints += CriminalStatus.PointsPerPlayerKill;
+			await Database.SetCharacterCriminalState(character.Id, character.CriminalUntil, character.MurderPoints);
+
+			// The wire side: the "Criminal" debuff plus the murder-point stat, the two things the capture shows moving.
+			var spell = await Database.GetSpell(CriminalStatus.CriminalSpellId);
+			await SendMagicBuffIir(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8,
+				SelfBuffCodec.BuildBuffDataLong(CriminalStatus.CriminalSpellId, (uint)(seconds * 100), DefaultSelfBuffEffectNonce, CasterLevel(client)));
+			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, character.MurderPoints), character.Id);
+
+			await _agentServerDispatcher.SendSystemMessage(character.Id,
+				$"Criminal for {seconds}s ({spell?.Name ?? "Criminal"} {CriminalStatus.CriminalSpellId}); murder points {character.MurderPoints}.");
 		}
 
 		// .recallhome  - use the Totem of Origins: return to the character's RACIAL home city, which is NOT the bind

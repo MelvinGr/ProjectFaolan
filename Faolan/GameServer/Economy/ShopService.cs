@@ -11,6 +11,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
+using Faolan.Core.Progression;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
@@ -74,6 +75,15 @@ namespace Faolan.GameServer.Economy
 				return;
 			}
 
+			// The trade-open gate above already refuses a criminal, so reaching here means the player went criminal
+			// with the window already open. Re-checked rather than assumed: the open shop is remembered per session, so
+			// without this a buy would still go through on a stale window (#503).
+			if (character.IsCriminal && !CriminalStatus.TradesWithCriminals(shop.VendorName))
+			{
+				_logger.LogInformation("BuyItem: \"{Vendor}\" refuses {Character} - criminal until {Until:u} (#503).", shop.VendorName, character.Name, character.CriminalUntil);
+				return;
+			}
+
 			// No `?? 0` on the price: a ware pointing at an item row we do not have is a broken shop, and pricing it at
 			// zero would sell it for free. The grant below happens to fail for the same missing row today, so this only
 			// ever showed up as an aborted purchase - one refactor away from being a free-item exploit.
@@ -121,6 +131,15 @@ namespace Faolan.GameServer.Economy
 			var slot = body.ReadUInt32();
 
 			var character = client.Session.Character;
+
+			// "Normal vendors will not trade with you" cuts both ways - a criminal cannot sell either (#503). The open
+			// shop is per-session, so like BuyItem this must be re-checked rather than left to the trade-open gate.
+			if (character.IsCriminal && _openShop.TryGetValue(client, out var openShop))
+				if (!CriminalStatus.TradesWithCriminals(openShop.VendorName))
+				{
+					_logger.LogInformation("SellItem: \"{Vendor}\" refuses {Character} - criminal until {Until:u} (#503).", openShop.VendorName, character.Name, character.CriminalUntil);
+					return;
+				}
 
 			var row = (await _database.GetCharacterInventory(character.Id)).FirstOrDefault(i => i.Container == (ContainerKind)container && i.Slot == (int)slot);
 			if (row?.Item == null)
@@ -178,6 +197,22 @@ namespace Faolan.GameServer.Economy
 		// content. `rawPayload` is the inbound Interact exactly as received (the echo re-frames it).
 		public async Task HandleVendorTradeOpen(INetworkClient client, byte[] rawPayload, uint mode, Shop shop, uint npcHandle)
 		{
+			// A CRIMINAL is refused by normal vendors (#503) - the annotated `npc refued to deal with me because of
+			// ciminal`, followed by `now it works (debuf gone)` once the debuff expired. Not our rule: the captured
+			// "Criminal" spell's own description says "normal vendors will not trade with you... you can seek out
+			// smugglers at outlaw camps instead", so the smuggler exception is part of the same sentence.
+			//
+			// Refused at the trade-OPEN rather than at the buy: the annotation is about the NPC not dealing at all.
+			// ⚠️ No refusal message is sent because none is decoded - retail evidently shows the player something, but
+			// the capture's refusal was on a travel NPC and the packet is not identified. Logged so a silent no-op is
+			// still explicable from the server side.
+			if (client.Session.Character.IsCriminal && !CriminalStatus.TradesWithCriminals(shop.VendorName))
+			{
+				_logger.LogInformation("Shop: \"{Vendor}\" refuses {Character} - criminal until {Until:u} (#503).",
+					shop.VendorName, client.Session.Character.Name, client.Session.Character.CriminalUntil);
+				return;
+			}
+
 			var instance = client.Session.Character.Id;
 			await SendWorldPacket(client, ShopOpenBuilder.BuildTradeSelectEcho(instance, npcHandle));
 			await SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, mode));

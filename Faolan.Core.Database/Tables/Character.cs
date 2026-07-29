@@ -154,6 +154,24 @@ namespace Faolan.Core.Database.Tables
 		public uint Kills { get; set; }
 		public uint Deaths { get; set; }
 
+		// The PvP MURDER POINTS pool (#503), in WIRE units - the value that goes on stat 0x449 ("Murder Points", named
+		// by the client's own LDB string table). Retail put 3500 on it for a single player kill, and the player read
+		// that off the UI as "36", so the display divides by roughly 100 (see CriminalStatus.PointsPerPlayerKill).
+		// Persisted because it is what the criminal ladder is scored from and it must survive relog.
+		public uint MurderPoints { get; set; }
+
+		// When the character stops being a CRIMINAL, or null when it is not one. A timestamp rather than a bool
+		// because retail's is a timed debuff (the captured "Criminal" spell 3827287 runs 300 s) and it PERSISTS: in the
+		// annotated capture the debuff outlived a zone change into another instance, so it cannot live on the session.
+		// `IsCriminal` is the question every consumer actually asks.
+		public DateTime? CriminalUntil { get; set; }
+
+		// True while the criminal debuff is running. Criminals are refused by normal vendors and by the wagoneer /
+		// ship-captain travel NPCs - that is not our rule, it is what the client's own spell description says
+		// (CriminalStatus). Smugglers at outlaw camps still trade.
+		[NotMapped]
+		public bool IsCriminal => CriminalUntil is { } until && until > DateTime.UtcNow;
+
 		// Which Tortage tutorial hints this character has already been shown, as a BITMASK of the step ids the client
 		// reports through GameCharAgent.SetTutorialStats (#461). A set and not a "current step": across the captures
 		// the values are not monotone and each session reports only the hints newly seen that session - Faolanx sends

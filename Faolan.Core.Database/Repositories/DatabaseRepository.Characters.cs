@@ -67,6 +67,11 @@ namespace Faolan.Core.Database.Repositories
 		Task SetCharacterMoney(uint characterId, ulong money);
 		Task SetCharacterKillCounts(uint characterId, uint kills, uint deaths);
 
+		// The PvP criminal state (#503): when the criminal debuff expires (null = not a criminal) and the murder-point
+		// pool. Persisted immediately, like the kill counters - the debuff has to survive a relog and a zone change,
+		// which is what the annotated capture shows it doing.
+		Task SetCharacterCriminalState(uint characterId, System.DateTime? criminalUntil, uint murderPoints);
+
 		Task SetCharacterProgress(uint characterId, uint experience, ushort level);
 		Task SetCharacterQuest(uint characterId, uint questId, QuestState state, uint goalProgress = 0, uint goalRequired = 0, string? goalTargetName = null);
 
@@ -792,6 +797,15 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			await ctx.Characters.Where(c => c.Id == characterId).ExecuteUpdateAsync(s => s.SetProperty(c => c.Kills, kills).SetProperty(c => c.Deaths, deaths));
+		}
+
+		// See the interface note: the criminal debuff must outlive the session, so it is a persisted expiry rather
+		// than session state.
+		public async Task SetCharacterCriminalState(uint characterId, System.DateTime? criminalUntil, uint murderPoints)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Characters.Where(c => c.Id == characterId)
+				.ExecuteUpdateAsync(s => s.SetProperty(c => c.CriminalUntil, criminalUntil).SetProperty(c => c.MurderPoints, murderPoints));
 		}
 
 		public async Task SetCharacterProgress(uint characterId, uint experience, ushort level)
