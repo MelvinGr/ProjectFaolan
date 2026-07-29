@@ -696,6 +696,25 @@ namespace Faolan.Core.Database.Repositories
 			ctx.CharacterSkills.AddRange(character.Skills);
 			ctx.CharacterScaffoldPairs.AddRange(character.ScaffoldPairs);
 
+			// Feat SPECS are ENSURED, never delete+reinserted like the two above: CharacterFeat's foreign key is
+			// (CharacterId, SpecIndex), so dropping a spec drops every feat trained in it - a scaffold save would
+			// silently wipe a character's feats.
+			//
+			// This has to happen here because TrySeedFreshRows builds the fresh character's single unnamed spec IN
+			// MEMORY and this is the only code that writes the scaffold. It didn't, so the spec was discarded at the
+			// end of the create session; the next connection re-loaded the character with zero spec rows and the
+			// spawn builder threw out of SpecsOf ("has no CharacterFeatSpec rows"), stranding the client on a
+			// loading screen that never progressed. Every imported character has exactly one, so a character with
+			// none was a shape no other code expected.
+			var existingSpecs = await ctx.CharacterFeatSpecs.Where(s => s.CharacterId == character.Id).Select(s => s.Index).ToListAsync();
+			foreach (var spec in character.FeatSpecs.Where(s => !existingSpecs.Contains(s.Index)))
+				ctx.CharacterFeatSpecs.Add(new CharacterFeatSpec
+				{
+					CharacterId = character.Id,
+					Index = spec.Index,
+					Name = spec.Name
+				});
+
 			await ctx.SaveChangesAsync();
 		}
 

@@ -164,8 +164,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			character.ScaffoldPairs = [];
 
 			// A fresh character has trained no feats - but it DOES have the one unnamed spec every character carries,
-			// which is what the frame's sublist entry is. No spec rows at all would still generate correctly
-			// (SpecsOf falls back to it), but persisting it keeps the row set the same shape as an imported char's.
+			// which is what the frame's sublist entry is. Seeding it is REQUIRED, not cosmetic: SpecsOf throws on a
+			// character with no spec rows (it cannot tell "never trained" from "loaded without Include(FeatSpecs)"),
+			// so a character that reaches a spawn without one cannot be built at all. It must also be PERSISTED -
+			// see the ensure-specs block in DatabaseRepository.SaveCharacterScaffold, which is what writes it.
 			character.Feats = [];
 			character.FeatSpecs =
 			[
