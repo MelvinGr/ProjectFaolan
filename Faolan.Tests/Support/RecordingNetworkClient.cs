@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Network;
 
 namespace Faolan.Tests.Support
@@ -25,9 +26,16 @@ namespace Faolan.Tests.Support
 			};
 			// For a logged-in player handle == ClientInstance == Character.Id, so mirror that: world-entry code
 			// reads Character.Id. Tests that need more character fields replace or mutate this.
+			//
+			// Level 1 and a real class because a Character is never legitimately at level 0 - creation allocates at 1,
+			// and the class-derived paths (e.g. the create editor's RDB 1000511 base push) THROW on a 0 rather than
+			// inventing a curve. A default-constructed stand-in would fail those for a reason that says nothing about
+			// the behaviour under test.
 			Session.Character = new Character
 			{
-				Id = clientInstance
+				Id = clientInstance,
+				Level = 1,
+				Class = ConanClass.Barbarian
 			};
 		}
 

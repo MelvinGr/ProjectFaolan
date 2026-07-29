@@ -1353,12 +1353,35 @@ namespace Faolan.GameServer.CreateFlow
 		private static async Task SendPostMorphBurst(INetworkClient client)
 		{
 			var instance = client.Session.Account.ClientInstance;
+			var character = client.Session.Character;
 
 			await SendCreateEditor2000(client, (uint)GameServer0X2000Opcodes.StatIIR, [0x01, 0x00, 0x00, 0x05, 0x78, 0x00, 0x00, 0x00, 0x00], instance);
 			await SendCreateEditor2000Record(client, ScryScript.BuildStartScriptGroup(instance, 35820)); // StartScriptGroupOnClient (#223)
-			await SendCreateEditor2000(client, (uint)GameServer0X2000Opcodes.StatUpdateIIR,
-				[0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x2A, 0xF8, 0x00, 0x00, 0x01, 0xF9, 0x00, 0x00, 0x43, 0x30, 0x00, 0x00, 0x01, 0xFB, 0x00, 0x00, 0x00, 0x00],
-				instance);
+
+			// The editor's class-base push: stat 0x0001 / 0x01F9 / 0x01FB for the class the player just chose. Retail
+			// sends THIS CHARACTER's base here - the Blablabla guardian create carries 12000/17250/0 at f2613, which is
+			// RDB 1000511's Guardian row (12000, 17250) to the unit, and the value is re-derived per class.
+			//
+			// It used to be a verbatim captured blob: 11000 / 17200 / 0. That is the BARBARIAN row - harvested from a
+			// barbarian create dump and then replayed at every class alike, so an Assassin (9000 / 23000) was handed a
+			// health base 20 too high and a stamina base 58 too low, and a mage was handed a stamina pool it does not
+			// have. Exactly the "wrong-looking constant that is really a captured value for ONE case" this codebase
+			// warns about; the class curve is the same source the snapshot's own max slots already use.
+			var (health, mana, stamina) = CharacterMaxStats.ClassBaseHundredths(character.Class, character.Level);
+			await SendCreateEditor2000(client, (uint)GameServer0X2000Opcodes.StatUpdateIIR, BuildClassBaseStatUpdate(health, mana, stamina), instance);
+		}
+
+		// The post-morph class-base StatUpdate body: [u32 0][u8 count][statId u32][value u32] x3, ids in retail's order
+		// (health, stamina, mana - see the captured f2613 body).
+		internal static byte[] BuildClassBaseStatUpdate(uint health, uint mana, uint stamina)
+		{
+			var stream = new FaolanStream();
+			stream.WriteUInt32(0);
+			stream.WriteByte(3);
+			stream.WriteUInt32((uint)CharacterStatId.HealthMax).WriteUInt32(health);
+			stream.WriteUInt32((uint)CharacterStatId.StaminaMax).WriteUInt32(stamina);
+			stream.WriteUInt32((uint)CharacterStatId.ManaMax).WriteUInt32(mana);
+			return stream.ToArray();
 		}
 
 		// A ScryScriptIIR step on the GameAgent->GameInterface conversation (the framing the verbatim burst uses).
