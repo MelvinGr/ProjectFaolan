@@ -1,14 +1,25 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
 	// One entry of the client's character-customization registry (RDB type 1000076 id 0): every selectable
 	// appearance target - the face/body morph sliders AND the choosable resources (*hairmesh_N / *beardmesh_N /
 	// *piercingmesh_N / *texscript_N for hair/eye/skin color, tattoos, scars, face paint). Imported by
-	// Faolan.Importer --rdb. The spawn scaffold's weighted (1.0) entry-table records reference these by
-	// WireTag = registry id - 1 (verified: faolanx's 7 weighted entries resolve 7/7 against his create-editor
-	// resource refs; the few retail mismatches are live-server/client data-version drift). See
+	// Faolan.Importer --rdb. The spawn scaffold's weighted (1.0) entry-table records reference these by Id
+	// VERBATIM - the id leads each RDB record and is the wire tag (verified: faolanx's 7 weighted entries
+	// resolve 7/7 against his create-editor resource refs, and strie's captured spawn resolves to exactly one
+	// entry per category). It is NOT `id - 1`: that was a compensation for a parser that read each record's id
+	// off the END, i.e. the NEXT record's, which cancels only while ids ascend by one (#240). See
 	// docs/re/player-spawn-generation.md "Weighted attributes".
+	//
+	// Name is UNIQUE, and that is load-bearing rather than cosmetic: the registry is consumed as a by-NAME
+	// dictionary (GetMorphTargetRegistry -> ToDictionaryAsync(t => t.Name)), which THROWS on a repeat, and
+	// CharacterBodyResource.Ref addresses rows by that name. The index makes a duplicate impossible to import
+	// instead of a crash on the next spawn. There is deliberately no FK from CharacterBodyResource.Ref to it:
+	// the importer delete+reinserts this whole table (RdbMorphTargetImporter), which a restricting FK would
+	// block and a cascading one would answer by wiping every character's appearance.
+	[Index(nameof(Name), IsUnique = true)]
 	public class MorphTarget : BaseEntity
 	{
 		// The registry's category: 0 face sliders, 1 body sliders, 2 face paint (never emitted in spawns),
@@ -17,7 +28,7 @@ namespace Faolan.Core.Database.Tables
 
 		// The registry weight (1.0 for resources; sliders carry 0.1/0.3/0.5).
 		public float Weight { get; set; }
-		// Id (from BaseEntity) = the wire tag = the registry's 1-based id minus 1.
+		// Id (from BaseEntity) = the wire tag = the id that LEADS the RDB record, verbatim.
 
 		// The registry name: a slider name ("arm", "02_BrowLow") or a resource ref ("*texscript_1108153").
 		[MaxLength(128)]

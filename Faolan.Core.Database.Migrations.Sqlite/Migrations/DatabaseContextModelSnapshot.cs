@@ -1778,6 +1778,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Name")
+                        .IsUnique();
+
                     b.ToTable("MorphTargets");
                 });
 

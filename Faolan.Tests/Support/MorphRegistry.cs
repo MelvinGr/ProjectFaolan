@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Faolan.Tests.Support
 {
 	// The client's character-customization catalog (MorphTarget), read once from the seed fixture that TestDb builds
-	// out of faolan.sql - so it needs no capture corpus and no committed side-fixture, and it is the SAME 1072 rows
+	// out of faolan.sql - so it needs no capture corpus and no committed side-fixture, and it is the SAME rows
 	// the server resolves a spawn's appearance through.
 	//
 	// The spawn goldens need both directions: ByName is what generation resolves a character's editor refs through

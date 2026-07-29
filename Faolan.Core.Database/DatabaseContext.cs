@@ -364,8 +364,8 @@ namespace Faolan.Core.Database
 			// A shop's wares delete with the shop (the importer replaces a shop's items wholesale on re-import).
 			modelBuilder.Entity<Shop>().HasMany(s => s.Items).WithOne(i => i.Shop).OnDelete(DeleteBehavior.Cascade);
 
-			// MorphTarget.Id IS the wire tag (the client registry's 1-based id minus 1) - assigned by the
-			// importer, never generated.
+			// MorphTarget.Id IS the wire tag - the id that LEADS each RDB 1000076 record, verbatim (not offset;
+			// see RdbMorphTargetImporter) - assigned by the importer, never generated.
 			modelBuilder.Entity<MorphTarget>().Property(t => t.Id).ValueGeneratedNever();
 
 			// The dialogue tree (node -> packet -> screen -> parameter) is keyed by POSITION all the way down, so a

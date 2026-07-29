@@ -90,7 +90,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		private static readonly uint[] CommonFreshSkillIds = [6900, 8100, 8305, 8400, 13600, 14600, 328900, 331300];
 
 		// Builds the weighted (1.0) appearance entries from the character's chosen editor resources, resolved
-		// against the imported client registry (MorphTarget; wire tag = registry id - 1). Wire order = editor
+		// against the imported client registry (MorphTarget.Id IS the wire tag). Wire order = editor
 		// send order (Sequence).
 		//
 		// A character wears the resources it chose or the build FAILS - there is no substitute face. This used to

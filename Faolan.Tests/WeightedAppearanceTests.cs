@@ -11,7 +11,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks the weighted-appearance pipeline: the create editor's resource refs (SetMorphValue "*..." values),
-	// resolved through the client registry (RDB 1000076 -> MorphTarget, wire tag = registry id - 1), must
+	// resolved through the client registry (RDB 1000076 -> MorphTarget; the record's leading id IS the wire tag), must
 	// reproduce the weighted (1.0) entries of the captured spawn. faolanx is the reference case: his 7
 	// weighted entries resolve 7/7 bit-exact against this client's registry (the other captured characters
 	// have 1-2 entries of live-server data-version drift; see the plan doc).
@@ -96,35 +96,67 @@ namespace Faolan.Tests
 			}
 		}
 
+		// The id LEADS its record and IS the wire tag. The ids here deliberately JUMP (3 -> 0x148): the old
+		// parser started 4 bytes late and read the id off the END of each record, i.e. the id of the record
+		// AFTER it, then subtracted one - which is right only while ids ascend by exactly one. A gap is the
+		// case that told them apart, and is what mis-tagged `*texscript_4747783` as a beard in #240.
 		[Fact]
 		public void ParseRegistry_ReadsRecordsAndAssignsWireTags()
 		{
-			// Synthetic registry payload: 24-byte header + 2 records + a truncated tail (as in the shipped client).
+			// Synthetic registry payload: [12 bytes][u32 count][u32 version=2] then records.
 			var payload = new List<byte>();
-			payload.AddRange(new byte[24]);
+			payload.AddRange(new byte[12]);
+			payload.AddRange(BitConverter.GetBytes(2u)); // count
+			payload.AddRange(BitConverter.GetBytes(2u)); // version
 
-			Record("02_BrowLow", 0, 1f, 3);
-			Record("*texscript_1108153", 6, 1f, 0x148);
-			payload.AddRange(BitConverter.GetBytes(5u));
-			payload.AddRange(Encoding.ASCII.GetBytes("trunc"));
+			Record(3, "02_BrowLow", 0, 1f);
+			Record(0x148, "*texscript_1108153", 6, 1f);
 
 			var targets = RdbMorphTargetImporter.ParseRegistry(payload.ToArray());
 
 			Assert.Equal(2, targets.Count);
-			Assert.Equal(2u, targets[0].Id); // wire tag = id - 1
+			Assert.Equal(3u, targets[0].Id); // verbatim, NOT id - 1
 			Assert.Equal("02_BrowLow", targets[0].Name);
-			Assert.Equal(0x147u, targets[1].Id);
+			Assert.Equal(0x148u, targets[1].Id);
 			Assert.Equal(6, targets[1].Category);
+			Assert.Equal(1f, targets[1].Weight);
 			return;
 
-			void Record(string name, uint category, float weight, uint id)
+			void Record(uint id, string name, uint category, float weight)
 			{
+				payload.AddRange(BitConverter.GetBytes(id));
+				payload.AddRange(BitConverter.GetBytes((uint)name.Length));
+				payload.AddRange(Encoding.ASCII.GetBytes(name));
+				payload.AddRange(BitConverter.GetBytes(category));
+				payload.AddRange(BitConverter.GetBytes(0u)); // default
+				payload.AddRange(BitConverter.GetBytes(weight));
+			}
+		}
+
+		// A repeated id would silently overwrite another entry - exactly the #240 failure - so the parser refuses.
+		[Fact]
+		public void ParseRegistry_WithADuplicateId_Throws()
+		{
+			var payload = new List<byte>();
+			payload.AddRange(new byte[12]);
+			payload.AddRange(BitConverter.GetBytes(2u));
+			payload.AddRange(BitConverter.GetBytes(2u));
+
+			Record(7, "*hairmesh_1", 3);
+			Record(7, "*hairmesh_2", 3);
+
+			var ex = Assert.Throws<InvalidOperationException>(() => RdbMorphTargetImporter.ParseRegistry(payload.ToArray()));
+			Assert.Contains("duplicate morph-target id 7", ex.Message);
+			return;
+
+			void Record(uint id, string name, uint category)
+			{
+				payload.AddRange(BitConverter.GetBytes(id));
 				payload.AddRange(BitConverter.GetBytes((uint)name.Length));
 				payload.AddRange(Encoding.ASCII.GetBytes(name));
 				payload.AddRange(BitConverter.GetBytes(category));
 				payload.AddRange(BitConverter.GetBytes(0u));
-				payload.AddRange(BitConverter.GetBytes(weight));
-				payload.AddRange(BitConverter.GetBytes(id));
+				payload.AddRange(BitConverter.GetBytes(1f));
 			}
 		}
 

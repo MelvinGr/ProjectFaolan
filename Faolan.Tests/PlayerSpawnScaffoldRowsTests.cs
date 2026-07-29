@@ -222,9 +222,16 @@ namespace Faolan.Tests
 				// to reproduce his spawn byte-for-byte (#239 - the feat tree is the client's class source).
 				Class = ConanClass.Barbarian,
 				Body = new CharacterBody(),
-				// His editor choices, in send order: hair, hair colour, body marking, face marking, eye colour, face
-				// marking. No skin colour and no beard - he chose neither, and nothing invents one for him.
-				BodyResources = new[] { "*hairmesh_208094", "*texscript_1108153", "*texscript_1136777", "*texscript_198071", "*texscript_213930", "*texscript_3114637" }
+				// His editor choices, in send order: hair, hair colour, body marking, face marking, eye colour, skin
+				// colour - exactly ONE per category. No beard: he chose none, and nothing invents one for him.
+				//
+				// This list is recovered from his captured entry table THROUGH the registry, so until #240 it
+				// inherited the registry's own off-by-one-record error and named two of his choices wrongly: the hair
+				// (tag 176) read as `*hairmesh_208094` instead of `*hairmesh_208096`, and the skin colour (tag 478)
+				// read as `*texscript_3114637`, a category-10 FACE MARKING - which is why the old comment here
+				// claimed he chose no skin colour and two face markings. That is the same mis-tagging that put an
+				// unwanted marking on a player's face in #240, preserved in a golden.
+				BodyResources = new[] { "*hairmesh_208096", "*texscript_1108153", "*texscript_1136777", "*texscript_198071", "*texscript_213930", "*texscript_3113362" }
 					.Select((r, i) => new CharacterBodyResource
 					{
 						CharacterId = 0x02000005,

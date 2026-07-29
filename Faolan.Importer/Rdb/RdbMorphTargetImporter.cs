@@ -40,34 +40,50 @@ namespace Faolan.Importer.Rdb
 			return n;
 		}
 
-		// Registry payload: [u32 type][u32 0][u32 ver=1][u32 count][u32 2][u32 ?] then count records of
-		// [u32 nameLen][name][u32 category][u32 defaultBits][f32 weight][u32 id]. The last record can be
-		// truncated mid-stream in the shipped client (the final *texscript record lacks its id) - such a
-		// tail is skipped.
+		// Registry payload: [12 bytes][u32 count][u32 version==2] then count records of
+		// [u32 id][u32 nameLen][name][u32 category][f32 default][f32 weight]. The id LEADS its record and IS
+		// the wire tag - it is not offset.
+		//
+		// Recovered from the client's own parser (`e_RDB_MorphNameIDs`, FUN_0103f380, reached from the
+		// LoadStaticData registration for RDB type 1000076): it skips 12, reads count, asserts version 2, then
+		// per record reads a u32, a string, a u32 into +0x1c and two floats into +0x20/+0x24 - the u32 it reads
+		// FIRST is what it keys the entry by.
+		//
+		// ⚠️ This used to start at 24 and read the id LAST, then subtract one. Both errors together are a
+		// one-FIELD shift that mostly cancels: starting at 24 skips record 0's id, so every record was tagged
+		// with the id of the record AFTER it, and ids ascend densely, so `next - 1` gives the right answer
+		// almost everywhere - which is why faolanx's 7 captured tags validated 7/7. It breaks wherever the
+		// sequence jumps: `*texscript_4747783` took 590 (the id of the *beardmesh that follows it, minus one)
+		// instead of its own, so the client drew a BEARD for a skin-colour tag (#240). The old "the final
+		// record is truncated and lacks its id" note was the same bug seen from the other end - the trailing
+		// id it went looking for belongs to a record that does not exist.
 		public static List<MorphTarget> ParseRegistry(byte[] payload)
 		{
 			var targets = new List<MorphTarget>();
-			var i = 24;
-			while (i + 4 <= payload.Length)
+			var seen = new HashSet<uint>();
+			var i = 20;
+			while (i + 8 <= payload.Length)
 			{
-				var nameLen = (int)payload.ReadU32Le(i);
-				if (nameLen <= 0 || nameLen > 64 || i + 4 + nameLen + 16 > payload.Length)
+				var id = payload.ReadU32Le(i);
+				var nameLen = (int)payload.ReadU32Le(i + 4);
+				if (nameLen <= 0 || nameLen > 64 || i + 8 + nameLen + 12 > payload.Length)
 					break;
 
-				var name = Encoding.ASCII.GetString(payload, i + 4, nameLen);
-				i += 4 + nameLen;
+				var name = Encoding.ASCII.GetString(payload, i + 8, nameLen);
+				i += 8 + nameLen;
 
 				var category = payload.ReadU32Le(i);
 				var weight = BitConverter.UInt32BitsToSingle(payload.ReadU32Le(i + 8));
-				var id = payload.ReadU32Le(i + 12);
-				i += 16;
+				i += 12;
 
-				if (id == 0)
-					continue;
+				// The id is the primary key, so a repeat would be a silent overwrite of somebody else's entry -
+				// the exact failure #240 was. Never observed; loud if the layout ever shifts again.
+				if (!seen.Add(id))
+					throw new InvalidOperationException($"RDB 1000076: duplicate morph-target id {id} (second holder '{name}') - the record layout no longer matches the client's parser.");
 
 				targets.Add(new MorphTarget
 				{
-					Id = id - 1, // the wire tag
+					Id = id, // the wire tag, verbatim
 					Name = name,
 					Category = (byte)category,
 					Weight = weight
