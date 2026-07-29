@@ -213,6 +213,21 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
    built by `SendA36DCallback`). All byte-exact (`ScryScriptCreateBurstTests`). With `BehaviorControlCenterIIR`
    long form + `RegenIIR` (already done), **no `*IIR` record type in the create-editor bursts is verbatim**.
 
+   **The post-morph class-base `StatUpdateIIR` is PER CLASS (2026-07-29).** The trio the editor sends once the
+   customization batch drains is `StatIIR` + `StartScriptGroupOnClient` + a `StatUpdateIIR` carrying the three
+   base pools — stat `0x0001` health, `0x01F9` stamina, `0x01FB` mana. That third record used to be a verbatim
+   captured blob, `11000 / 17200 / 0`, and it is **RDB 1000511's Barbarian row**: harvested from a barbarian
+   create dump and then replayed at every class alike. Retail sends the character's OWN base there — the guardian
+   create carries `12000 / 17250 / 0`, the Guardian row to the unit
+   [V2: Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json frame 2613].
+   It is now built from `CharacterMaxStats.ClassBaseHundredths`, the same table the snapshot's own max slots use
+   [V3: CreateEditorClassBaseTests.GuardianLevel1_ReproducesTheCapturedEditorPush_ByteExact].
+
+   ⚠️ **`0x96B8DC59` carries a HANDLE at body offset 12 and it must be filtered on.** The create captures are
+   full of `HpCur/StamCur/ManaCur = 6300` triples that read as the player's vitals being overwritten; they go to a
+   different handle each time and are **scene NPCs**. Reading them as the avatar's is what made a per-class
+   constant look like an editor-wide one.
+
    **Still verbatim** (deferred): `ApplySpell` (the `MagicBuffIIR` setup blob still emitted verbatim in the
    CreationScript burst, `CreateFlowService` line 930). (The former verbatim beach NPC intro conversation,
    `RetailNpcConversationBurst`/`SendNpcIntroConversation`, was retired — the beach click now routes through the

@@ -36,15 +36,25 @@ packet is the authoritative vitals broadcast; combat damage/heals land here as u
 count-prefixed (a 1-byte count, then N × 8-byte records).** Confirmed lengths: count 1/3/6 → inner 25/41/65.
 
 **Implemented** (2026-06-08): `CharacterStatBlock` (`Faolan.Core.Network/Codecs/FullCharSnapshot/CharacterStatBlock.cs`) builds the
-count-prefixed record block (applies the ×100 vitals / ×10 attribute scale); `SendStatUpdate` / `SendVitals`
-(`GameServerListener.Outbound.cs`, wire codec `Faolan.Core.Network/Codecs/World/StatUpdateCodec.cs`) write the full packet. `SendVitals(client)` sources Health/Stamina/Mana from the
+count-prefixed record block (applies the ×100 vitals / ×10 attribute scale); `SendStatUpdate`
+(`GameServerListener.Outbound.cs`, wire codec `Faolan.Core.Network/Codecs/World/StatUpdateCodec.cs`) writes the full packet.
+⚠️ The `SendVitals` helpers this paragraph described are **deleted** (#450): they emitted the three CURRENT ids
+alone, on the belief that "max rides the snapshot" — true at world entry and wrong for every later change, which
+left a levelled character's bar pinned to its seed max. A vitals push now emits the whole
+`EntityVitals.ToVitalsBlock` (current AND max), and a path that CHANGES a max calls
+`CombatService.ReseedFromMaxStats` first. `BuildVitals(client)` sources Health/Stamina/Mana from the
 character's persisted **`CharacterMaxStats`** (now an active DbSet/table with a 1-1 cascade to Character,
-schema since squashed into the `InitialCreate` migration), seeded on creation via `CharacterMaxStats.CreateDefaults(class, level)` —
-rough class/level defaults anchored on AssassinL23 (Assassin lvl 23 ≈ 1281/1143/73 vs sheet 1270/1148/74); legacy
-characters with no row fall back to computed defaults in-memory. The create-editor commits the chosen class
+schema since squashed into the `InitialCreate` migration), seeded on creation via `CharacterMaxStats.CreateDefaults(class, level)`;
+legacy characters with no row fall back to computed defaults in-memory. Those defaults are no longer "rough class/level
+values anchored on AssassinL23": the LEVEL-1 anchors are retail-verified per class (decoded out of the world-entry
+vitals push in the create captures — Guardian 130, Conqueror 168, Dark Templar 128, Barbarian 118, Ranger 133,
+Necromancer / Herald of Xotli 89, Assassin 98), and the per-class BASE curve is the client's own `HitsManaAndStamina_c`
+table (RDB 1000511, `CharacterMaxStats.ClassBaseHundredths`), which reproduces all 16 captured level-up pushes exactly. The create-editor commits the chosen class
 before naming, so `CommitCharacterName` calls `Character.RegenerateMaxStats()` (updates the seeded row in place)
-to replace the level-1 rogue baseline with the chosen class's vitals. (The `.setstat` / `.setstatrange` / `.vitals`
-GM commands used for live stat testing have since been removed.) Round-trip tests
+to replace the level-1 rogue baseline with the chosen class's vitals. (Of the live stat-testing GM commands, `.setstatrange` and
+`.vitals` were removed; **`.setstat` is still registered** and is the instrument for measuring a stat's DISPLAY
+scale — send a known raw value, read the rendered number. It is also how the two vitals CHANNELS were told apart:
+`.setstat 1 <v>` moves the health bar's max, `.setstat 27 <v>` moves nothing the bar draws.) Round-trip tests
 (`CharacterStatBlockTests`, `CharacterMaxStatsTests`, `DatabaseRepositoryTests.CreateCharacter_SeedsDefaultMaxStats`)
 cover bytes, defaults, and cascade. `ApplySpell` (0x6B87E316) was already implemented (caster + `0000` + spellId +
 `0000C350` + target + data); its builders now live in `Faolan.Core.Network/Codecs/Combat/` (`SelfBuffCodec`,

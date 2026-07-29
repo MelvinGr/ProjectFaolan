@@ -39,7 +39,9 @@ we've seen_, and names the gaps). Regenerate with
 
 - ✅ **Log in and play** — the full login handshake (encrypted; any password is accepted until the client is
   key-patched), character roster and selection, and world entry with your existing characters
-- ✅ **Create a character** — the appearance editor (face morphs, race/sex options) and the Tortage opening tableau
+- ✅ **Create a character** — the appearance editor (face morphs, race/sex options) and the Tortage opening tableau,
+  for every one of the twelve classes: each starts with its own class base pools, its starting kit and its feats,
+  and walks into the world without a relog
 - 🟡 New characters occasionally import the wrong look (hair/mustache/size) — fixed, pending an in-client confirm (#314)
 - 🟡 The create→world intro cutscene plays and Kalanthes speaks; a few background actors still render from raw
   capture data (#234)
@@ -86,6 +88,10 @@ we've seen_, and names the gaps). Regenerate with
   channel (RegenIIR), and stop the moment a fight starts (retail's out-of-combat-only regen). The RATES are retail's
   own: driven by your attributes with the client's own tweak constants, and each one confirmed against the per-second
   deltas retail sent in the captures — those carry the rate ×100, so they pin the formulas to two decimals (#442)
+- ✅ **Max health, mana & stamina** — your pools are built the way the client builds them: the real per-class,
+  per-level base curve read out of the client's own data table, plus your gear, your class's feat template, and any
+  buff that raises a pool. The base is verified against every captured level-up, and each class has its own — a
+  Guardian, an Assassin and a Necromancer start with different pools, and casters have no stamina bar at all (#450)
 - ✅ **Death & resurrection** — the release screen lists the resurrection points you've discovered, nearest first,
   and each revives you at its own strength (10/50/100%) rather than always full (#372, #375)
 - ✅ **Discovering resurrection points** — walking near a new point pops retail's "point discovered" banner and adds

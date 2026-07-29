@@ -84,3 +84,35 @@ Shield-of-the-Risen buff, the post-ready world/quest record stream, and the wall
 different set of records — `0x2024`, the `0x2052` ability grants, the `CharInPlayIIR` echo, `RegenIIR` and
 `SyncCanSprint` (`Blablatest` create fr324/325). Sending the login burst instead added a combo book, a stat prompt,
 a quest marker and the post-`0x2024` record stream that retail does not send there, and omitted `RegenIIR`.
+
+## Leaving the editor: the create→world handoff is on a TIMER, not on the client's bar (Gitea #433)
+
+Once the name is committed, the editor connection must hand the client to the world server with a `0x2002`
+`DispatchRedirectToServer`. The trigger for that is **time measured from `CharCreationFinished`**, and nothing else.
+
+It used to be the client's **first `0x206E` `AddShortcut`**. That packet is the client auto-barring a grant it was
+just given, which is not a statement about being ready for the world — and it made creation depend on the character
+having been granted something. When the starting kit came back empty the client barred nothing, sent no `0x206E`,
+and sat on a **black screen forever** while the server waited for a message the client had no reason to send. That
+is exactly how it failed for a level-1 Assassin on 2026-07-29 (every `ClassAbilities` row for the class carried the
+level of the captured character it was harvested from, so a level-1 lookup matched none).
+
+Retail's trigger is bar-independent, and the corpus is unambiguous. Across **all 13** create captures that reach a
+redirect, `CharCreationFinished` → s2c `0x2002` is **8.90–9.52 s** (median 9.21; one 10.16 s outlier on a slow
+session). Meanwhile the last c2s before the redirect scatters over 0.31–1.65 s and is not even the same message:
+`AddShortcut` in 11 of them, a `StatIIR` `PassBlob` in one, and a bare `Ping` in another
+[V2: Fwfnwfjwk_soldier-guardian_create.tshark.json]. **A trigger cannot be a packet that is sometimes absent.**
+
+So `CreateFlowService.ScheduleEnterWorldHandoff` arms a single-shot 9.0 s timer at creation-finished and fires the
+change-map prep + handoff whatever the client does or does not put on its bar. The `0x206E` case now only persists
+the starting bar. [V3: EnterWorldHandoffTriggerTests.TheHandoffFiresWithoutTheClientBarringAnything]
+[V3: EnterWorldHandoffTriggerTests.TheHandoffIsSingleShot]
+
+A fresh character also needs its single unnamed `CharacterFeatSpec` **persisted**, not merely seeded in memory:
+`PlayerSpawnScaffoldRows.SpecsOf` throws on a character with no spec rows (it cannot tell "never trained" from
+"loaded without `Include(FeatSpecs)`"), so a character that reaches a spawn without one cannot be built at all and
+the client stalls on the loading screen instead. `DatabaseRepository.SaveCharacterScaffold` ensures it —
+**ensure-exists, never delete+reinsert**, because `CharacterFeat`'s foreign key is `(CharacterId, SpecIndex)` and
+replacing the specs would cascade every trained feat away.
+[V3: SaveCharacterScaffoldSpecTests.AFreshCharactersSeededSpecIsPersisted]
+[V3: SaveCharacterScaffoldSpecTests.SavingTheScaffoldDoesNotDropTrainedFeats]
