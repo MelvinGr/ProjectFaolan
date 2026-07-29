@@ -146,3 +146,45 @@ from typed columns.
       SOLE spawn-body path — there is no longer a `Data`-splice fallback in `NpcSpawnBuilder`. The residual
       no-morph-humanoid recordCounts noted above were closed by the importer's minimal-form lift
       (`NpcStatCore.MinimalPostIirRecordCount`).
+
+## Class-specific playfields (the city armories)
+
+A few playfields hold a **different NPC set per character class**. The proven case is the **Conarch Armory
+(map 5007)**, the instance behind Conarch Village's `Armory` zone-line door: the two captures that walk into it —
+`NecroL80_mage-necromancer_login_gameplay_armory` and `Hakotep_hox_login_gameplay0` — see the same five
+quartermaster **posts** occupied by different NPCs.
+
+| post (x, z) | Necromancer | Herald of Xotli |
+| --- | --- | --- |
+| 263.6, 242.1 | Quartermaster Zahur | Quartermaster Sabola |
+| 266.6, 224.2 | Quartermaster Haji | Quartermaster Haji |
+| 270.9, 225.9 | Quartermaster Akila | Quartermaster Imogen |
+| 272.4, 251.9 | Quartermaster Pancras | Quartermaster Ofir |
+| 280.5, 240.3 | Quartermaster Ebo | Quartermaster Chuma |
+
+Both characters are the **mage archetype**, so the split is per **class**, not per archetype. Retail instances the
+playfield to match: the `IntendedTeleport` into 5007 carries a nonzero playfield-instance token, unlike an
+open-world destination.
+
+**How it is modelled.** `Map.ClassSpecific` marks such a map (and forces `MapInstanceMode.Solo` — two classes cannot
+share one zone copy of it), and `NpcSpawn.ClassId` says which class a placement belongs to. `ClassId` is null
+everywhere else, which is what keeps every ordinary spawn behaving exactly as before:
+
+- It joins the spawn's unique index **and** its derived key — but only **when set**, so the ~1900 class-agnostic
+  spawns keep the ids they already had. Both are required, not optional: the two classes' quartermasters stand on
+  *identical* coordinates, so a `(map, position)` key collapses them and one whole set is silently lost.
+- The importer's per-type burst-truth election (`ImportOps.BuildBurstTruthSpawns`) keys on `(map, class, name)` and
+  stamps each spawn with the class of the capture's own played character (`CaptureCharacterImporter.DetectPlayedClass`).
+  A spawn on such a map from a capture whose class cannot be determined is dropped rather than kept class-agnostic —
+  null means "every class sees this", which is the bug, not a safe default.
+- The `npcs` module's scoped overwrite covers the `(map, class)` pairs a run produced, so importing one class's
+  capture never deletes another's copy of the armory.
+
+**Runtime.** `WorldBroadcaster.EnsureZoneNpcs` takes the entering character's class and populates the copy from
+`GetNpcSpawns(mapId, forClass)`; class-agnostic rows always belong, class-stamped ones only to their own class.
+A class we hold no capture for is a **gap, and is reported as one**: `WorldBroadcaster.DescribeMissingClassImport`
+makes the zone-line refuse with an in-game message instead of dropping the player into an empty room (which, on a map
+with no captured world objects, would have no door back out) — the same rule as an un-imported vendor.
+
+Khemi (5001) and Tarantia (5013) are the same fixture in the other two cities and carry the flag on that basis;
+neither has any import yet, so both simply report the gap for every class.

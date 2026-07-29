@@ -15,6 +15,10 @@ namespace Faolan.Importer.Extractors
 	{
 		public uint TemplateId { get; init; }
 
+		// The CLASS this placement belongs to, on a class-specific map (Map.ClassSpecific - the city armories).
+		// Stamped by BuildBurstTruthSpawns from the class of the capture's own played character; null everywhere else.
+		public ConanClass? ClassId { get; init; }
+
 		// The humanoid appearance/morph table lifted from the post-IIR (#185), empty for animals. Lets the spawn's
 		// post-IIR generate from rows instead of the Data blob.
 		public IReadOnlyList<NpcAppearanceMorph> Morphs { get; init; } = [];
@@ -135,9 +139,12 @@ namespace Faolan.Importer.Extractors
 		// Dedup by (map, spawn point); keep the first seen.
 		public static List<NpcSpawnEntry> Merge(IEnumerable<NpcSpawnEntry> all)
 		{
-			var seen = new Dictionary<(uint, float, float, float), NpcSpawnEntry>();
+			// Keyed by (map, position, CLASS): on a class-specific map two classes' quartermasters legitimately stand
+			// on the same spot, and collapsing them would silently drop one class's set. Null class (every ordinary
+			// map) keeps the historical (map, position) behaviour.
+			var seen = new Dictionary<(uint, float, float, float, ConanClass?), NpcSpawnEntry>();
 			foreach (var e in all)
-				seen.TryAdd((e.MapId, e.X, e.Y, e.Z), e);
+				seen.TryAdd((e.MapId, e.X, e.Y, e.Z, e.ClassId), e);
 
 			return seen.Values.ToList();
 		}

@@ -238,7 +238,7 @@ namespace Faolan.Tests
 		{
 			return new NpcSpawn
 			{
-				Id = NpcSpawn.ComputeId(map, x, 0, z),
+				Id = NpcSpawn.ComputeId(map, x, 0, z, null),
 				MapId = map,
 				NpcTemplateId = template,
 				PositionX = x,
@@ -282,7 +282,7 @@ namespace Faolan.Tests
 			// importer sets them - the table has no store-generated key, and two rows left at 0 collide on Add.
 			db.NpcSpawns.AddRange(new NpcSpawn
 			{
-				Id = NpcSpawn.ComputeId(4010, 5, 0, 5),
+				Id = NpcSpawn.ComputeId(4010, 5, 0, 5, null),
 				MapId = 4010,
 				NpcTemplateId = 101,
 				PositionX = 5,
@@ -290,7 +290,7 @@ namespace Faolan.Tests
 				PositionZ = 5
 			}, new NpcSpawn
 			{
-				Id = NpcSpawn.ComputeId(4010, 6, 0, 6),
+				Id = NpcSpawn.ComputeId(4010, 6, 0, 6, null),
 				MapId = 4010,
 				NpcTemplateId = 101,
 				PositionX = 6,

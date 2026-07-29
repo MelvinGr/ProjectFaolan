@@ -59,6 +59,16 @@ namespace Faolan.Core.Database.Tables
 		// Solo/Group, which are sized by character/party).
 		public int PopulationCap { get; set; }
 
+		// This map's POPULATION is per CLASS: the same playfield holds a different NPC set depending on the entering
+		// character's class, so its spawns carry NpcSpawn.ClassId and only the matching ones are loaded into a copy.
+		// The city armories are the case (Conarch/Khemi/Tarantia); a class-specific map is necessarily InstanceMode.Solo,
+		// because two classes cannot share one zone copy of it.
+		//
+		// ⚠️ Only the Conarch Armory (5007) is capture-proven - see NpcSpawn.ClassId. Khemi (5001) and Tarantia (5013)
+		// are the same fixture in the other two cities and are flagged on that basis; neither has any import at all, so
+		// they behave as "not imported" for every class either way and the flag costs nothing if the inference is wrong.
+		public bool ClassSpecific { get; set; }
+
 		[MaxLength(128)]
 		public string Name { get; set; } = null!;
 

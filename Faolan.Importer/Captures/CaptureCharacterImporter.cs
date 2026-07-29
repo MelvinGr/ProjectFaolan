@@ -46,6 +46,56 @@ namespace Faolan.Importer.Captures
 		// minLevel (0 = no filter): captured characters at or below this level are skipped as fresh/tutorial chars
 		// (no trained feats, base ability scaffold). The module sets the reference-set policy; direct callers/tests
 		// default to importing every level.
+		// The CLASS of the character this capture was played on, or null when the capture never shows one (a
+		// create-editor dump before class selection, or a trace that carries no player spawn).
+		//
+		// The local player is the one the server sends a personal FullChar snapshot for (FullPlayerCharacterIIR is only
+		// ever delivered for your own character - the same test the own-character prune below uses), which gives its
+		// instance; the matching FA015807 player spawn then yields the class the same way ImportAsync reads it, from
+		// the pre-IIR value island's low byte at body offset 136.
+		//
+		// Used by the class-specific map import (Map.ClassSpecific): a capture of the Conarch Armory is evidence about
+		// ONE class's copy of it, so its spawns are stamped with this.
+		public static ConanClass? DetectPlayedClass(IReadOnlyList<CapturedPacket> capture)
+		{
+			var localInstances = new HashSet<uint>();
+			var classByHandle = new Dictionary<uint, uint>();
+
+			foreach (var p in capture)
+			{
+				if (!p.IsIirCarrier)
+					continue;
+
+				var body = GetScaffoldBody(p);
+				if (body.Length < 38)
+					continue;
+
+				var subop = body.ReadU32Be(4);
+				if (subop == InventorySnapshotSubOpcode)
+				{
+					localInstances.Add(body.ReadU32Be(12));
+					continue;
+				}
+
+				if (subop != (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR || body.Length <= 136)
+					continue;
+
+				// Editor-preview spawns (empty sublist) carry no real class byte - the same frame ImportAsync rejects.
+				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || scaffold.Frame.Sublist.Count == 0)
+					continue;
+
+				classByHandle[scaffold.Handle] = body[136];
+			}
+
+			foreach (var instance in localInstances)
+			{
+				if (classByHandle.TryGetValue(instance, out var classId) && Enum.IsDefined((ConanClass)classId))
+					return (ConanClass)classId;
+			}
+
+			return null;
+		}
+
 		public static async Task<(int Seen, int Added, int Skipped)> ImportAsync(DatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, uint minLevel = 0)
 		{
 			// Best (largest) parseable player spawn body per character name, with the map active when it

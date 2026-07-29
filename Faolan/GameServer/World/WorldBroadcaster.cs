@@ -847,16 +847,46 @@ namespace Faolan.GameServer.World
 			return entity;
 		}
 
+		// Why a class-specific destination may not be enterable yet, or null when it is.
+		//
+		// A class-specific playfield (Map.ClassSpecific - the city armories) holds a different NPC set per class, and we
+		// only have the classes some capture actually walked into. Teleporting a class we hold no set for would drop the
+		// player into an empty room - and on a map with no captured world objects either, one with no door back out. So
+		// the zone-line reports the gap in-game instead of teleporting, the same rule as an un-imported vendor.
+		public async Task<string?> DescribeMissingClassImport(uint mapId, ConanClass forClass)
+		{
+			var map = await _database.GetMap(mapId);
+			if (map is not { ClassSpecific: true })
+				return null;
+
+			var imported = await _database.GetImportedSpawnClasses(mapId);
+			if (imported.Contains(forClass))
+				return null;
+
+			var have = imported.Length > 0
+				? $"imported so far: {string.Join(", ", imported.Select(c => c.ToString()).OrderBy(n => n))}"
+				: "no class imported yet";
+			var name = string.IsNullOrEmpty(map.Name)
+				? $"Map {mapId}"
+				: map.Name;
+			return $"{name} is class-specific and has no import for {forClass} - {have}.";
+		}
+
 		// Loads a map's NPCs from NpcSpawns into the world model ONCE (on first entry), so the server has an
 		// authoritative shared view of the map's NPCs - the model fix at the heart of the roadmap (NPCs are otherwise
 		// only per-player burst replays the server doesn't track). The tick/AI/combat will drive these; clients still
 		// render them from the burst for now, so this is model bookkeeping (no wire change).
-		public async Task EnsureZoneNpcs(uint mapId, uint instanceId)
+		//
+		// `forClass` is the class of the character this copy is being populated for. It only matters on a
+		// class-specific map (Map.ClassSpecific - the city armories), where the playfield holds a different NPC set per
+		// class; such a map is necessarily Solo, so the copy has exactly one owner and one class. Everywhere else every
+		// spawn is class-agnostic and this is ignored.
+		public async Task EnsureZoneNpcs(uint mapId, uint instanceId, ConanClass forClass)
 		{
 			if (!_npcLoadedZones.TryAdd((mapId, instanceId), 0))
 				return;
 
-			var npcs = await _database.GetNpcSpawns(mapId);
+			var npcs = await _database.GetNpcSpawns(mapId, forClass);
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
 
 			// #363 dev labels: the map's RDB spawn areas, so each NPC carries its area label ready for the live

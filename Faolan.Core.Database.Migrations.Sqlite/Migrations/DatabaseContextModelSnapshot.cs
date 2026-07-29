@@ -1676,6 +1676,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Id")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("ClassSpecific")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("InstanceMode")
                         .HasColumnType("INTEGER");
 
@@ -1901,6 +1904,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("ApprenticeLevel")
                         .HasColumnType("INTEGER");
 
+                    b.Property<byte?>("ClassId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint?>("GuildId")
                         .HasColumnType("INTEGER");
 
@@ -1988,7 +1994,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.HasIndex("NpcTemplateId");
 
-                    b.HasIndex("MapId", "PositionX", "PositionY", "PositionZ")
+                    b.HasIndex("MapId", "PositionX", "PositionY", "PositionZ", "ClassId")
                         .IsUnique();
 
                     b.ToTable("NpcSpawns");

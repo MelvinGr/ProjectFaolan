@@ -15,7 +15,12 @@ namespace Faolan.Importer.Extractors
 	// the capture handle, and the columnarized task tree Root (#316).
 	// Carries the wire task AST, not a columnarized tree: the importer converts it per spawn via PatrolNodeMapper so
 	// there is exactly one wire->row conversion and no hand-maintained copy to fall behind a new column.
-	public sealed record PatrolPathEntry(uint MapId, Vector3 Position, IReadOnlyList<Vector3> Waypoints, uint Handle, MoveTaskNode Task);
+	// ClassId is set only for a route on a class-specific map (Map.ClassSpecific), where (map, position) no longer
+	// identifies one spawn - two classes' NPCs can stand on the same spot. Null everywhere else.
+	public sealed record PatrolPathEntry(uint MapId, Vector3 Position, IReadOnlyList<Vector3> Waypoints, uint Handle, MoveTaskNode Task)
+	{
+		public ConanClass? ClassId { get; init; }
+	}
 
 	// Extracts NPC patrol routes from a capture's MoveTask packets (MoveTaskIIR 0x96C46740): tracks the current map
 	// (MapChange 5D85BFC7), parses every MoveTask via the fully-decoded recursive grammar (MoveTaskComposite,

@@ -78,7 +78,11 @@ namespace Faolan.Importer.Captures
 		// 0.0 at the median, 4.4 at p90 and 7.8 at p95.
 		private const float RouteMatchRadius = 10f;
 
-		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures, IReadOnlySet<string> petNames)
+		// `classSpecificMaps` = the maps whose population is per class (Map.ClassSpecific - the city armories). A spawn
+		// harvested on one of them is evidence about ONE class's copy of the playfield, so it is stamped with the class
+		// the capture was played on and elected only against captures of that same class.
+		public static (List<NpcSpawnEntry> Spawns, List<PatrolPathEntry> Patrols) BuildBurstTruthSpawns(IReadOnlyList<NamedCapture> captures, IReadOnlySet<string> petNames,
+			IReadOnlySet<uint> classSpecificMaps)
 		{
 			// SUMMONS ARE DROPPED PER CAPTURE, BEFORE ANYTHING ELSE SEES THEM. A pet handle is session-scoped, so the
 			// exclusion has to be, too - and doing it here rather than at the placement step keeps a summon out of the
@@ -88,8 +92,11 @@ namespace Faolan.Importer.Captures
 				.Select(c =>
 				{
 					var summoned = SummonedHandles(c.Packets);
-					return (All: DistinctByHandle(NpcSpawnExtractor.Extract(c.Packets).Where(e => !summoned.Contains(e.Handle))),
-						Burst: DistinctByHandle(NpcSpawnExtractor.ExtractLoginBurst(c.Packets).Where(e => !summoned.Contains(e.Handle))),
+					var playedClass = classSpecificMaps.Count > 0
+						? CaptureCharacterImporter.DetectPlayedClass(c.Packets)
+						: null;
+					return (All: DistinctByHandle(StampClass(NpcSpawnExtractor.Extract(c.Packets).Where(e => !summoned.Contains(e.Handle)), playedClass, c.Name)),
+						Burst: DistinctByHandle(StampClass(NpcSpawnExtractor.ExtractLoginBurst(c.Packets).Where(e => !summoned.Contains(e.Handle)), playedClass, c.Name)),
 						Routes: PatrolPathExtractor.ExtractByHandle(c.Packets));
 				})
 				.ToList();
@@ -183,18 +190,30 @@ namespace Faolan.Importer.Captures
 			// least as complete. One capture per type is still the rule (#266) - this only stops a type being pinned
 			// to a capture that barely saw it. `Merge` dedups the result by position, so a respawn on the same anchor
 			// inside the chosen capture still collapses.
-			foreach (var (map, name) in perCap.SelectMany(p => p.All).Select(e => (e.MapId, Name: e.Name ?? "")).Distinct())
+			//
+			// On a class-specific map the key also carries the CLASS, so each class's copy of the armory elects its own
+			// truth capture independently and the two sets never compete (a necromancer capture and a herald capture see
+			// disjoint quartermasters on map 5007 - without the class in the key they would simply be unioned onto one
+			// map and every class served all of them).
+			foreach (var (map, cls, name) in perCap.SelectMany(p => p.All).Select(e => (e.MapId, e.ClassId, Name: e.Name ?? "")).Distinct())
 			{
-				var bestBurst = perCap.OrderByDescending(p => p.Burst.Count(e => e.MapId == map && (e.Name ?? "") == name)).First();
-				var burstCount = bestBurst.Burst.Count(e => e.MapId == map && (e.Name ?? "") == name);
+				var bestBurst = perCap.OrderByDescending(p => p.Burst.Count(Matches)).First();
+				var burstCount = bestBurst.Burst.Count(Matches);
 
-				var bestAll = perCap.OrderByDescending(p => p.All.Count(e => e.MapId == map && (e.Name ?? "") == name)).First();
-				var allCount = bestAll.All.Count(e => e.MapId == map && (e.Name ?? "") == name);
+				var bestAll = perCap.OrderByDescending(p => p.All.Count(Matches)).First();
+				var allCount = bestAll.All.Count(Matches);
 
 				if (burstCount >= allCount && burstCount > 0)
-					Take(bestBurst.Burst.Where(e => e.MapId == map && (e.Name ?? "") == name).ToList(), bestBurst.Routes);
+					Take(bestBurst.Burst.Where(Matches).ToList(), bestBurst.Routes);
 				else if (allCount > 0)
-					Take(bestAll.All.Where(e => e.MapId == map && (e.Name ?? "") == name).ToList(), bestAll.Routes);
+					Take(bestAll.All.Where(Matches).ToList(), bestAll.Routes);
+
+				continue;
+
+				bool Matches(NpcSpawnEntry e)
+				{
+					return e.MapId == map && e.ClassId == cls && (e.Name ?? "") == name;
+				}
 			}
 
 			// Pets are content of the creature TYPE (lifted onto the type columns by CapturePetImporter, spawned from the type
@@ -224,6 +243,43 @@ namespace Faolan.Importer.Captures
 				return inRange.Count == 1
 					? inRange[0]
 					: null;
+			}
+
+			// Tags the spawns this capture saw on a CLASS-SPECIFIC map with the class it was played on, and leaves every
+			// other spawn class-agnostic (null).
+			//
+			// A spawn on a class-specific map from a capture whose class could not be determined is DROPPED, not kept as
+			// null: null means "every class sees this", so keeping it would put one class's quartermasters in front of
+			// all twelve - precisely the bug the column exists to fix. Losing a few rows from an unattributable trace is
+			// the cheap side of that trade, and it is reported rather than silent.
+			List<NpcSpawnEntry> StampClass(IEnumerable<NpcSpawnEntry> entries, ConanClass? playedClass, string captureName)
+			{
+				var result = new List<NpcSpawnEntry>();
+				var dropped = 0;
+				foreach (var e in entries)
+				{
+					if (!classSpecificMaps.Contains(e.MapId))
+					{
+						result.Add(e);
+						continue;
+					}
+
+					if (playedClass is not { } cls)
+					{
+						dropped++;
+						continue;
+					}
+
+					result.Add(e with
+					{
+						ClassId = cls
+					});
+				}
+
+				if (dropped > 0)
+					Console.WriteLine($"NPC spawns: dropped {dropped} spawn(s) on class-specific map(s) from '{captureName}' - the played class could not be determined.");
+
+				return result;
 			}
 
 			// A route's identity for the agreement test: its waypoint polyline, rounded so float noise across captures
@@ -279,11 +335,17 @@ namespace Faolan.Importer.Captures
 					// template, so a session that simply did not catch this NPC walking no longer costs it its path.
 					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
 					{
-						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Waypoints, 0, r.Task));
+						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Waypoints, 0, r.Task)
+						{
+							ClassId = e.ClassId
+						});
 					}
 					else if (BackfilledRoute(e) is { } backfilled)
 					{
-						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), backfilled.Waypoints, 0, backfilled.Task));
+						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), backfilled.Waypoints, 0, backfilled.Task)
+						{
+							ClassId = e.ClassId
+						});
 					}
 				}
 			}
@@ -531,10 +593,12 @@ namespace Faolan.Importer.Captures
 
 			foreach (var e in spawns)
 			{
+				// The lookup key is the placement's full identity, class included: on a class-specific map two classes'
+				// NPCs share a spot, and matching on position alone would have each class's import overwrite the other's row.
 				var existing = await db
 					.NpcSpawns.Include(n => n.Morphs)
 					.Include(n => n.Equipment)
-					.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z);
+					.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.X && n.PositionY == e.Y && n.PositionZ == e.Z && n.ClassId == e.ClassId);
 
 				// NpcTemplateId is required now (no phantom rows), so a spawn whose type doesn't resolve is dropped - the same
 				// rule ImportNpcSpells applies to typeless casters, and consistent with the phantom-scrub invariant.
@@ -546,11 +610,12 @@ namespace Faolan.Importer.Captures
 				// row already carries it.
 				var row = existing ?? new NpcSpawn
 				{
-					Id = NpcSpawn.ComputeId(e.MapId, e.X, e.Y, e.Z),
+					Id = NpcSpawn.ComputeId(e.MapId, e.X, e.Y, e.Z, e.ClassId),
 					MapId = e.MapId,
 					PositionX = e.X,
 					PositionY = e.Y,
-					PositionZ = e.Z
+					PositionZ = e.Z,
+					ClassId = e.ClassId
 				};
 				Populate(row, e);
 				row.NpcTemplateId = npc.TemplateId;
@@ -750,7 +815,10 @@ namespace Faolan.Importer.Captures
 			var bySpawn = new Dictionary<uint, (NpcSpawn Spawn, MoveTaskNode Task)>();
 			foreach (var e in paths)
 			{
-				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(n => n.MapId == e.MapId && n.PositionX == e.Position.X && n.PositionY == e.Position.Y && n.PositionZ == e.Position.Z);
+				// Class included: on a class-specific map (map, position) matches two rows, and a route would otherwise
+				// be handed to whichever class the query happened to return first.
+				var spawn = await db.NpcSpawns.FirstOrDefaultAsync(n =>
+					n.MapId == e.MapId && n.PositionX == e.Position.X && n.PositionY == e.Position.Y && n.PositionZ == e.Position.Z && n.ClassId == e.ClassId);
 				if (spawn == null)
 				{
 					// Say so rather than dropping it quietly: a route is only extracted for a spawn the same capture

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.World;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -22,6 +23,10 @@ namespace Faolan.Tests
 	// ratchet that fights every legitimate data change. Runs against the fixture built from faolan.sql.
 	public class SeedContentTests
 	{
+		// Conarch Armory - the class-specific instance behind Conarch Village's `Armory` door, and the only one any
+		// capture has walked into (Hakotep as a Herald of Xotli, NecroL80 as a Necromancer).
+		private const uint ConarchArmoryMapId = 5007;
+
 		[Fact]
 		public async Task EveryEssentialTable_CarriesItsContent()
 		{
@@ -137,6 +142,71 @@ namespace Faolan.Tests
 			}
 
 			Assert.True(failures.Count == 0, $"{failures.Count} shipped patrol(s) cannot be rebuilt: {string.Join(" | ", failures.Take(5))}");
+		}
+
+		// A CLASS-SPECIFIC map (the city armories) holds a different NPC set per class, so every spawn on one must say
+		// which class it belongs to. A row left class-agnostic there is the pre-#494 bug in miniature: it is served to
+		// all twelve classes ON TOP of their own set, so an armory shows one class's quartermasters to everybody.
+		//
+		// Also gates the mode: two classes cannot share one zone copy of a playfield whose population differs by class,
+		// so a class-specific map has to be Solo. Shared would hand the second entrant whichever class's copy the first
+		// one caused to be built.
+		[Fact]
+		public async Task EveryClassSpecificMap_IsSoloAndFullyAttributed()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var maps = await db.Maps.Where(m => m.ClassSpecific).AsNoTracking().ToListAsync(ct);
+			Assert.NotEmpty(maps);
+
+			var notSolo = maps.Where(m => m.InstanceMode != MapInstanceMode.Solo).Select(m => $"{m.Id} {m.Name} ({m.InstanceMode})").ToList();
+			Assert.True(notSolo.Count == 0, $"Class-specific map(s) not instanced Solo: {string.Join(", ", notSolo)}");
+
+			var mapIds = maps.Select(m => m.Id).ToList();
+			var unattributed = await db
+				.NpcSpawns.Where(n => mapIds.Contains(n.MapId) && n.ClassId == null)
+				.Select(n => new
+				{
+					n.Id,
+					n.MapId
+				})
+				.AsNoTracking()
+				.ToListAsync(ct);
+
+			Assert.True(unattributed.Count == 0,
+				$"{unattributed.Count} spawn(s) on a class-specific map carry no class, so every class sees them: " + string.Join(" | ", unattributed.Take(5).Select(n => $"{n.Id} map {n.MapId}")));
+		}
+
+		// The Conarch Armory is the capture-proven case, and the shape is specific: the SAME five quartermaster posts
+		// hold a different NPC per class (Zahur/Sabola, Akila/Imogen, Ebo/Chuma, Pancras/Ofir at identical positions),
+		// which is exactly why the class had to join the spawn's unique index and its derived key. Without that, the
+		// second class's import collided with the first and one whole set was silently dropped.
+		[Fact]
+		public async Task ConarchArmory_CarriesMoreThanOneClassSet()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var spawns = await db
+				.NpcSpawns.Where(n => n.MapId == ConarchArmoryMapId)
+				.Select(n => new
+				{
+					n.ClassId,
+					n.NpcTemplateId,
+					n.PositionX,
+					n.PositionZ
+				})
+				.AsNoTracking()
+				.ToListAsync(ct);
+
+			var classes = spawns.Select(s => s.ClassId).Distinct().ToList();
+			Assert.True(classes.Count >= 2, $"The Conarch Armory ({ConarchArmoryMapId}) carries only {classes.Count} class set(s) - the per-class population was lost.");
+
+			// At least one post is genuinely SHARED between two classes with a different NPC on it. This is the
+			// assertion a (map, position) key cannot survive.
+			var contested = spawns.GroupBy(s => (s.PositionX, s.PositionZ)).Any(g => g.Select(s => s.NpcTemplateId).Distinct().Count() > 1);
+			Assert.True(contested, "No armory post is held by a different NPC per class - the two class sets are no longer sharing positions, so this gate no longer proves anything.");
 		}
 	}
 }

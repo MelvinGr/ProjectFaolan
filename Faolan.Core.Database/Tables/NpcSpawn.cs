@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
@@ -20,17 +21,24 @@ namespace Faolan.Core.Database.Tables
 	// on every re-harvest, so an AUTOINCREMENT id renumbered all 1086 rows (~15 times over) and dragged the
 	// equipment/morph/patrol children with it. A DERIVED id rather than a composite key because the identity
 	// contains floats and this is the root of a three-level tree - see DerivedKey.
-	[Index(nameof(MapId), nameof(PositionX), nameof(PositionY), nameof(PositionZ), IsUnique = true)]
+	// On a CLASS-SPECIFIC map (Map.ClassSpecific - the city armories) the identity carries the class as well: the
+	// same spot holds a different NPC per class, and two of them legitimately share a position.
+	[Index(nameof(MapId), nameof(PositionX), nameof(PositionY), nameof(PositionZ), nameof(ClassId), IsUnique = true)]
 	public class NpcSpawn : Base3DEntity, IDerivedKey
 	{
-		public static uint ComputeId(uint mapId, float x, float y, float z)
+		public static uint ComputeId(uint mapId, float x, float y, float z, ConanClass? classId)
 		{
-			return DerivedKey.From(mapId, x, y, z);
+			// The class is appended ONLY when set, so every class-agnostic spawn (all but the armories) keys exactly
+			// as it did before the column existed. Folding it in unconditionally would have renumbered ~1000 rows and
+			// their equipment/morph/patrol children for zero semantic change - the churn the derived key exists to avoid.
+			return classId is { } cls
+				? DerivedKey.From(mapId, x, y, z, (byte)cls)
+				: DerivedKey.From(mapId, x, y, z);
 		}
 
 		public uint ComputeId()
 		{
-			return ComputeId(MapId, PositionX, PositionY, PositionZ);
+			return ComputeId(MapId, PositionX, PositionY, PositionZ, ClassId);
 		}
 
 		public uint? GuildId { get; set; }
@@ -38,6 +46,16 @@ namespace Faolan.Core.Database.Tables
 
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; } = null!;
+
+		// The CLASS this placement belongs to, on a map whose population is per-class (Map.ClassSpecific). Null = the
+		// normal case: the spawn is visible to every class.
+		//
+		// Proven on the Conarch Armory (5007), the class-specific instance behind Conarch Village's `Armory` door: the
+		// two captures that enter it - Hakotep (Herald of Xotli) and NecroL80 (Necromancer) - see DISJOINT quartermaster
+		// sets (Chuma/Imogen/Ofir/Sabola vs Akila/Ebo/Pancras/Zahur), with only Haji and the two dummies shared. Both
+		// are the MAGE archetype, so the split is per CLASS, not per archetype. Without this column the importer merged
+		// both sets onto one map and every class was served whichever capture won the election.
+		public ConanClass? ClassId { get; set; }
 
 		// #363 MEMBERSHIP of an RDB ambient spawn AREA: set when this captured spawn is confirmed to belong to a spawn
 		// group the area's pool replaces (by the resolver's auto-link, or by hand via `.setnpcgroup`). `.graduatenpcgroup`

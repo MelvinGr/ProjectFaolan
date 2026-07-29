@@ -532,7 +532,7 @@ namespace Faolan.GameServer
 
 			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
-			await _broadcaster.EnsureZoneNpcs(mapId, instanceId);
+			await _broadcaster.EnsureZoneNpcs(mapId, instanceId, character.Class);
 			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them
 			// from there instead of re-querying per entry.
 			await _broadcaster.EnsureZoneWorldObjects(mapId, instanceId);

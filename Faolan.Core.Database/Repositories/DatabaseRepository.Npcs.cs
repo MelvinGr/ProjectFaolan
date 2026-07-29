@@ -13,10 +13,11 @@ namespace Faolan.Core.Database.Repositories
 		Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
 		Task<ConversationNode[]> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
 		Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap();
+		Task<ConanClass[]> GetImportedSpawnClasses(uint mapId);
 		Task<NpcTemplate?> GetNpcByName(string name);
 		Task<NpcSpawnArea[]> GetNpcSpawnAreas(uint mapId);
 		Task<NpcSpawn?> GetNpcSpawnByName(string name);
-		Task<NpcSpawn[]> GetNpcSpawns(uint mapId);
+		Task<NpcSpawn[]> GetNpcSpawns(uint mapId, ConanClass? forClass);
 		Task<NpcSpell[]> GetNpcSpellsByName(string name);
 		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
 		Task<Dictionary<string, uint>> GetQuestGiverMap();
@@ -124,7 +125,26 @@ namespace Faolan.Core.Database.Repositories
 				.FirstOrDefaultAsync();
 		}
 
-		public async Task<NpcSpawn[]> GetNpcSpawns(uint mapId)
+		// The classes a class-specific map (Map.ClassSpecific) actually has an imported population for - i.e. which
+		// captures of it we hold. Empty means no class's copy has been imported at all. This is what the armory door
+		// checks before teleporting: entering a class-specific playfield we have no set for would drop the player into
+		// an empty room, so the gap is reported in-game instead (the same rule as an un-imported vendor).
+		public async Task<ConanClass[]> GetImportedSpawnClasses(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.NpcSpawns.Where(n => n.MapId == mapId && n.ClassId != null)
+				.Select(n => n.ClassId!.Value)
+				.Distinct()
+				.ToArrayAsync();
+		}
+
+		// `forClass` selects the population of a CLASS-SPECIFIC map (Map.ClassSpecific - the city armories): a spawn
+		// stamped with another class is not part of that character's copy of the playfield, while class-agnostic spawns
+		// (ClassId null - every ordinary map) always belong. Pass null for NO class filter at all: the whole map, every
+		// class, which is what an inspection/tooling caller wants and what the world entry must never ask for.
+		// Deliberately not defaulted - a caller populating a live zone has to say whose copy it is building.
+		public async Task<NpcSpawn[]> GetNpcSpawns(uint mapId, ConanClass? forClass)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
@@ -143,7 +163,7 @@ namespace Faolan.Core.Database.Repositories
 				// rebuilding a wrong record, so a missing Include would break every patrol (#410).
 				.Include(n => n.PatrolNodes)
 				.ThenInclude(pn => pn.Words)
-				.Where(n => n.MapId == mapId)
+				.Where(n => n.MapId == mapId && (forClass == null || n.ClassId == null || n.ClassId == forClass))
 				.ToArrayAsync();
 		}
 

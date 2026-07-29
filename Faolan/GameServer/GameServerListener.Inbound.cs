@@ -1952,6 +1952,12 @@ namespace Faolan.GameServer
 									await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
 										ChatMarkup.Color("red", $"Zone-line '{dest.DestinationName}' has no known destination yet."));
 								}
+								else if (await _broadcaster.DescribeMissingClassImport(dest.DestMapId, client.Session.Character.Class) is { } missingImport)
+								{
+									// The destination is a CLASS-SPECIFIC playfield (an armory) we hold no capture of for this
+									// character's class - report it rather than teleporting into an empty, possibly exit-less room.
+									await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, ChatMarkup.Color("red", missingImport));
+								}
 								else if (dest.DestMapId == currentMap && dest.ArrivalPosition is { } samePos)
 									// Same-playfield door (e.g. the Thirsty Dog Inn): relocate in place, no loading screen.
 									await _simulation.RelocateSameMap(client, samePos);

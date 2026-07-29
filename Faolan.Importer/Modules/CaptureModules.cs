@@ -460,25 +460,41 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var petNames = await SpellEffectsModule.PetTemplateNames(ctx.Db);
-			var (spawns, patrols) = ImportOps.BuildBurstTruthSpawns(ctx.Captures, petNames);
+			// The maps whose population is per class (the city armories). Read from the DB, not hardcoded, so flagging
+			// another map is a data change - and so a run against an empty DB simply harvests everything class-agnostic.
+			var classSpecificMaps = await ctx.Db.Maps.Where(m => m.ClassSpecific).Select(m => m.Id).ToHashSetAsync();
+			var (spawns, patrols) = ImportOps.BuildBurstTruthSpawns(ctx.Captures, petNames, classSpecificMaps);
 
 			// SCOPED overwrite (#419): the wipe covers only the MAPS this run actually saw. The spawn set is
 			// burst-truth, so it cannot be row-merged - a walked NPC accretes a second row at its new spot, and the
 			// Noble District guards went to 41 against a true burst of 29 - but the whole-table wipe is what made a
 			// single dump destructive: importing one capture deleted every other map's spawns. Replacing per map keeps
 			// the burst-truth guarantee where the dump has authority and leaves the rest of the world alone.
+			//
+			// On a CLASS-SPECIFIC map the same argument applies one level down: this run has authority over the classes
+			// it actually saw, and none over the others. Wiping map 5007 wholesale while importing a necromancer trace
+			// would delete the herald's armory - so the wipe is scoped to the (map, class) pairs produced. An ordinary
+			// map yields the single pair (map, null) and behaves exactly as before.
 			var maps = spawns.Select(s => s.MapId).Concat(patrols.Select(p => p.MapId)).Distinct().ToList();
+			var classSpecificSeen = maps.Where(classSpecificMaps.Contains).ToList();
+			// Nullable element type so the test is a plain `Contains(n.ClassId)` EF can turn into an IN. A class-agnostic
+			// row (ClassId null) STANDING ON a class-specific map the run saw is wiped as well: on such a map every
+			// placement belongs to some class by definition, so a null one is pre-flag data that would otherwise be
+			// served to all twelve classes on top of their own set.
+			var classesSeen = spawns.Where(s => s.ClassId != null).Select(s => (ConanClass?)s.ClassId!.Value).Distinct().ToList();
+			var plainMaps = maps.Where(m => !classSpecificMaps.Contains(m)).ToList();
+
 			var removed = 0;
 			if (ctx.ModeFor(Name) == WriteMode.Overwrite && maps.Count > 0)
 			{
-				removed = await ctx.Db.NpcSpawns.CountAsync(n => maps.Contains(n.MapId));
+				removed = await ctx.Db.NpcSpawns.CountAsync(n => plainMaps.Contains(n.MapId) || (classSpecificSeen.Contains(n.MapId) && (n.ClassId == null || classesSeen.Contains(n.ClassId))));
 
 				// Children first - they FK the spawn (#316), and on SQLite a cascade would fire on the parent delete
 				// anyway; being explicit keeps the order obvious and works the same on Postgres.
-				await ctx.Db.PatrolNodes.Where(n => maps.Contains(n.NpcSpawn.MapId)).ExecuteDeleteAsync();
-				await ctx.Db.NpcSpawnMorphs.Where(m => maps.Contains(m.NpcSpawn.MapId)).ExecuteDeleteAsync();
-				await ctx.Db.NpcSpawnEquipment.Where(e => maps.Contains(e.NpcSpawn.MapId)).ExecuteDeleteAsync();
-				await ctx.Db.NpcSpawns.Where(n => maps.Contains(n.MapId)).ExecuteDeleteAsync();
+				await ctx.Db.PatrolNodes.Where(n => plainMaps.Contains(n.NpcSpawn.MapId) || (classSpecificSeen.Contains(n.NpcSpawn.MapId) && (n.NpcSpawn.ClassId == null || classesSeen.Contains(n.NpcSpawn.ClassId)))).ExecuteDeleteAsync();
+				await ctx.Db.NpcSpawnMorphs.Where(m => plainMaps.Contains(m.NpcSpawn.MapId) || (classSpecificSeen.Contains(m.NpcSpawn.MapId) && (m.NpcSpawn.ClassId == null || classesSeen.Contains(m.NpcSpawn.ClassId)))).ExecuteDeleteAsync();
+				await ctx.Db.NpcSpawnEquipment.Where(e => plainMaps.Contains(e.NpcSpawn.MapId) || (classSpecificSeen.Contains(e.NpcSpawn.MapId) && (e.NpcSpawn.ClassId == null || classesSeen.Contains(e.NpcSpawn.ClassId)))).ExecuteDeleteAsync();
+				await ctx.Db.NpcSpawns.Where(n => plainMaps.Contains(n.MapId) || (classSpecificSeen.Contains(n.MapId) && (n.ClassId == null || classesSeen.Contains(n.ClassId)))).ExecuteDeleteAsync();
 
 				// ExecuteDelete bypasses the change tracker, so anything this context still holds would collide on
 				// the identity map when the same derived spawn ids are re-added.
