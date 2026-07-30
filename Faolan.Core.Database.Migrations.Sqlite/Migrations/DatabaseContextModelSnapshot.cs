@@ -3096,6 +3096,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<float>("RotationZ")
                         .HasColumnType("REAL");
 
+                    b.Property<bool>("Shady")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("MapId");

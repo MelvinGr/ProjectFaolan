@@ -30,9 +30,9 @@ namespace Faolan.Importer.Rdb
 	// (#372); it lives in the LDB string index or server-side. Don't go looking for it here again.
 	//
 	// Imported alongside position/discoverable: RestorationLevel (a PERCENT - observed 7/10/20/25/30/50/70/100, with
-	// 344 points at 10 and 176 at 100) and Orientation (a YAW in RADIANS - all 553 values in [0, 2pi), 265 non-zero -
+	// 344 points at 10 and 176 at 100), Orientation (a YAW in RADIANS - all 553 values in [0, 2pi), 265 non-zero -
 	// stored as the yaw-only facing quaternion; the importer previously wrote no rotation at all, leaving every point
-	// at the identity).
+	// at the identity), and `shady` - the OUTLAW variant of a point (RespawnPoint.Shady, see that column).
 	public static class RdbRespawnImporter
 	{
 		private const uint ResurrectionPointsType = 1000090;
@@ -131,6 +131,11 @@ namespace Faolan.Importer.Rdb
 					point.MapId = e.Id;
 					point.Name = Attr(m, "name") ?? "";
 					point.AlwaysKnown = string.Equals(Attr(m, "discoverable"), "false", StringComparison.OrdinalIgnoreCase);
+
+					// The OUTLAW variant (RespawnPoint.Shady). ABSENT is false, not unknown: 222 elements in the older
+					// export dialect carry no `shady` at all, and not one of them is outlaw-named, so defaulting them to
+					// normal cannot mis-file a criminal point.
+					point.Shady = string.Equals(Attr(m, "shady"), "true", StringComparison.OrdinalIgnoreCase);
 					point.RestorationLevel = Num(m, "RestorationLevel");
 					point.PositionX = float.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture);
 					point.PositionY = float.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture);

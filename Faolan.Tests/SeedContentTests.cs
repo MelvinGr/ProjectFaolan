@@ -93,6 +93,33 @@ namespace Faolan.Tests
 			Assert.True(broken.Count == 0, $"Totem of Origins destinations that do not resolve: {string.Join("; ", broken)}");
 		}
 
+		// The OUTLAW resurrection points survived the harvest. RespawnPoint.Shady comes from a single RDB attribute that
+		// 222 of the exported elements omit entirely, so a parser or dialect regression does not fail loudly - it just
+		// silently files every criminal point as a normal one, and the whole outlaw revive destination quietly becomes
+		// "wherever a law-abiding player would go". A bare RespawnPoints row count cannot see that, which is precisely
+		// why this asserts on the FLAG rather than the table.
+		[Fact]
+		public async Task OutlawRespawnPoints_AreInTheSeed()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var shady = await db.RespawnPoints.Where(r => r.Shady).ToListAsync(ct);
+			Assert.True(shady.Count >= 40, $"The seed carries {shady.Count} outlaw (shady) respawn points; the import yields 49 across the major playfields.");
+
+			// One per playfield, and known without discovery - an outlaw is sent there, they do not go looking for it.
+			Assert.All(shady, p => Assert.True(p.AlwaysKnown, $"Outlaw point {p.Id} on map {p.MapId} is not AlwaysKnown."));
+			Assert.Equal(shady.Count, shady.Select(p => p.MapId).Distinct().Count());
+
+			// The flag must agree with the designers' labels: no point NAMED for the outlaw system may be filed normal.
+			// That is the regression this catches - the naming and the attribute agree exactly in the client's export.
+			var misfiled = await db
+				.RespawnPoints.Where(r => !r.Shady && (r.Name.Contains("Outlaw") || r.Name.Contains("Shady")))
+				.Select(r => $"{r.Id} '{r.Name}'")
+				.ToListAsync(ct);
+			Assert.True(misfiled.Count == 0, $"Outlaw-named points filed as normal: {string.Join(", ", misfiled)}");
+		}
+
 		// A shop with no wares is a shop the player cannot buy from - the exact shape of the loss above, and the one
 		// a bare row count on ShopItems would still miss if a single vendor were emptied.
 		[Fact]
