@@ -307,6 +307,49 @@ So we discover a resurrection point from roughly **twice** the distance retail r
 — and the two large ones are a different mechanic (zone discovery) that we do not implement at all. Tracked in
 Gitea #519.
 
+## The `teleport` bucket is a WALK-IN mechanism we do not have
+
+43 regions over 24 maps, and this is the first bucket that is neither a duplicate nor a dead end: it describes
+transitions we cannot currently express.
+
+**It is not our doors.** Our zone lines are `UseObject` on a `WorldObject` (`DoorFullUpdateIIR`/SimpleDynel), 22
+of them configured with a destination. The two sets are **disjoint**: only map 1020 has both, and there the door
+(`To Ymir's Pass`, at 1149/226) and the region (`ArenaTeleport`, at 232/554) are nowhere near each other. **No
+door falls inside any teleport region.** These are additional transitions, and they fire on *entering a volume*
+rather than on interacting with an object.
+
+**It is not the NPC travel system either.** `TravelDestination` is NPC-mediated, paid, cross-map travel (two
+wagoner rows). The regions named `*LocalTeleport*` mean *within-map*: `BA_TheCrypticTrail_LocalTeleport_Ground`
+(y 32–42) and `_Middle` (y 115–125) are two 8 × 10 pads at nearly the same (x, z) some 83 units apart
+vertically — a climb shortcut on Kara Korum's Cryptic Trail. That is our `RelocateSameMap` path, not travel.
+
+Four sub-families:
+
+| family | example | destination recoverable? |
+|---|---|---|
+| named destination | `BA_Teleport_ChosainProvince`, `BA_teleport_paikang`, `BA_TeleportToConarch` ×3 | **yes, from the name** — 9 resolve straight to a `Map` row, 12 with a `To…` strip |
+| zone-line **edge strips** | `BA_Teleport_NorthernGrasslands` (737 × 109), `BA_Teleport_ChosainProvince` (582 × 89) on Kara Korum, lying along the map border at z ≈ −60…49 | yes — this is the outdoor Khitai zone line: walk off the edge, arrive in the neighbour |
+| `BA_TeleportOut` ×7 | Blessed Caves, Cavern of Malice, Crevice of Malice, Enigmata of Yag | **no** — "out" implies the parent zone and never names it |
+| lettered **pairs** | The Enigmata of Yag's `BA_TeleportA_1`/`A_2`, `B_1`/`B_2`, `C_1`/`C_2`, `D_1`/`D_2` | **self-sufficient** — the pairing IS the data; walk into one pad, arrive at its twin |
+
+One reciprocal pair spans two playfields and confirms the family is two-ended: `BA_Teleport_TheMaze` on Wild
+Lands of Zelata (2080) and `BA_Teleport_WLoZ` on The Maze (2082).
+
+### ⚠️ The blocker: a region says where you LEAVE, never where you ARRIVE
+
+The `<boundedarea>` element carries no destination field of any kind — its whole attribute set is collision
+behaviour and editor cosmetics. So even where the name gives the destination *map*, the arrival **position** is
+absent, and a teleport needs one. Our door mechanism only has arrival coordinates because
+`WorldTeleportExtractor` harvests them out of captured `N3Teleport` bodies, and none of these playfields is in
+the corpus.
+
+The **lettered pairs are the exception** and the one importable case: the twin region's centre is the arrival
+point, so `A_1`↔`A_2` is complete information with no capture and no name resolution required.
+
+(A naming inconsistency worth knowing: Cradle of Decay's exit box is `BA_Teleport_FotD` on the real playfield
+1026 but `BA_Teleport_WLoZ` on the 967 audio variant — the same geometry with two different claimed
+destinations. Trust the real playfield.)
+
 ## Import
 
 `RdbHazardImporter` (the opt-in `rdb-hazards` module) reads the lava volumes into `MapHazard` +
