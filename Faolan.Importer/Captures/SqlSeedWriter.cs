@@ -117,7 +117,7 @@ namespace Faolan.Importer.Captures
 				var storeObject = StoreObjectIdentifier.Table(table, entity.GetSchema());
 				var (columns, clrTypes) = ColumnsOf(group);
 
-				var rows = ReadRows(db, table, columns);
+				var rows = ReadRows(db, table, columns, KeyOf(group));
 				rowTotal += rows.Count;
 				written++;
 
@@ -186,14 +186,27 @@ namespace Faolan.Importer.Captures
 			return sb.ToString();
 		}
 
-		public static List<object?[]> ReadRows(DatabaseContext db, string table, List<string> columns)
+		// `orderBy` (the table's primary-key columns) makes the emit DETERMINISTIC, and the seed is worthless as a
+		// reviewable mirror without it. An unordered SELECT returns rows in whatever order the storage engine happens
+		// to hold them, which is stable only until something rewrites a page: a single UPDATE to one QuestGoalDefinition
+		// moved 8 unrelated WorldObjectWords rows to the front of their table, churning 25 lines of faolan.sql for zero
+		// semantic change - and that is the benign version. The damaging one is the same noise hiding a REAL row change
+		// in a diff nobody can read.
+		//
+		// Ordering by the PK (not by rowid, which Postgres does not have) also means the two providers emit the same
+		// file, which the "loads into both" promise needs.
+		public static List<object?[]> ReadRows(DatabaseContext db, string table, List<string> columns, List<string>? orderBy = null)
 		{
 			var connection = db.Database.GetDbConnection();
 			if (connection.State != System.Data.ConnectionState.Open)
 				connection.Open();
 
+			var order = orderBy is { Count: > 0 }
+				? $" ORDER BY {string.Join(", ", orderBy.Select(Quote))}"
+				: "";
+
 			using var command = connection.CreateCommand();
-			command.CommandText = $"SELECT {string.Join(", ", columns.Select(Quote))} FROM {Quote(table)}";
+			command.CommandText = $"SELECT {string.Join(", ", columns.Select(Quote))} FROM {Quote(table)}{order}";
 			using var reader = command.ExecuteReader();
 			var rows = new List<object?[]>();
 			while (reader.Read())

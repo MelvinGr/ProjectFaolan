@@ -33,21 +33,39 @@ A quest completes when **every** goal reaches its `RequiredCount`; completing a 
 
 `QuestGoalDefinition.Separator` — a captured field long treated as framing — is the goal's **verb**. It is the
 client's own statement of what the objective asks for, as opposed to `GoalType`, which is our server-trigger
-wiring. Decoded against the goals whose semantics were independently established from captures:
+wiring. It was decoded against the goals whose semantics were independently established from captures, and each
+value is now confirmed against a **second, independent source** — the goal's own objective text, readable
+since #520. `--report ldb-quest-text` prints the two side by side for all 168 goals; the "verbs" column below is
+that text's leading verb, counted:
 
-| `Separator` | kind | evidence |
-|---:|---|---|
-| `0` | untargeted (talk / loot a corpse) | the Tortage chain — Laranga, Tina, Turach, Casilda; Saddur's and Tuut's bags |
-| `5` | acquire one named item | the drink-tasting quests (*Visionwine*, *Musewater*, *Ale of Auspice*) |
-| `9` | reach a **named region** | goal 1448 → `Trappers Haven` |
-| `12` | kill | Saddur, Scavenger Tuut (targets are `npc_template` / monster-category refs) |
-| `20` | **deliver** the item | goal 3497 — Turach's three bricks |
-| `22` | reach a **point** (marker only, no region ref) | our nine reach goals + the Casilda escort |
-| `23` | **collect** a quantity | goal 3495, and every large count (*Poisonous Gland* ×20, *Shadeleaf* ×10, a ×50) |
+| `Separator` | kind | goals | verbs in the text | evidence |
+|---:|---|---:|---|---|
+| `0` | `Untargeted` — no typed target ref | 9 | speak, talk, free, get, give, return, unlock | the Tortage chain — Laranga, Tina, Turach, Casilda; Saddur's and Tuut's bags. This one is about the *reference*, not the verb, hence the spread |
+| `5` | `Craft` | 9 | **make** (9/9) | *"Make Visionwine"*, *"Make Ale of Auspice"* (quests 13141/13143/13145) |
+| `9` | `RegionScoped` | 3 | enter, overcome, locate | goal 1448 → `Trappers Haven`; only 1 of the 3 is a reach |
+| `10` | `Use` | 1 | use | *"Use the Vial to Capture Gas"* (11252) |
+| `12` | `Kill` | 30 | kill, beat, cleanse, destroy, slaughter | Saddur, Scavenger Tuut (targets are `npc_template` / monster-category refs) |
+| `20` | `Deliver` | 12 | deliver, give, bring | goal 3497 — *"Deliver 3 stone bricks to Turach"* |
+| `22` | `Generic` | 52 | ~19 different verbs | the catch-all; carries a map pin but no single semantics |
+| `23` | `Collect` | 41 | get, collect, gather, recover, remove, search, steal | goal 3495, and every large count (*Poisonous Gland* ×20, *Shadeleaf* ×10, a ×50) |
+| `24` | `Investigate` | 1 | investigate | *"Investigate the Ancient Gateway"* (8278) |
+| `25` | `DestroyObject` | 9 | destroy | *"Destroy Bowl of Set"* (×7 in quest 13473), *"Destroy the Wolves' Saddles"* (count 2) |
 
 The clincher that it describes the **verb and not the target**: quest 12371's two goals reference the *same*
 item id with the *same* count and still differ — `23` for "collect 3 quarry bricks", `20` for "deliver 3 to
 Turach". Values seen in the corpus only; the gaps are unmapped rather than absent. The enum is `QuestGoalKind`.
+
+⚠️ The cross-check **corrected three readings** that had been taken from the target reference rather than the
+verb, which is exactly what it is for:
+
+- `5` was *"acquire one named item"* — read off the item names (*Visionwine*, *Musewater*). The verb is **Make**,
+  so these are crafting objectives.
+- `9` was *"reach a named region"*. Two of its three goals are not reaches (*"Overcome the Emperor's Manifested
+  Nightmares"*, *"Locate the Red-Hand Leader"*), so the region **scopes** the objective as often as it is one.
+- `22` was *"reach a point"*. Its 52 goals span ~19 verbs including vanquish, talk, escort and kill — the marker
+  is real, the "reach" is not. It is the **generic** kind.
+
+And it found `10`, `24` and `25` — three values the enum did not have at all.
 
 ### A goal's target is a TYPED LDB reference
 
@@ -70,7 +88,7 @@ LDB categories, and the key is the `key=` attribute the server sends alongside t
 as `ObjectiveKey`. See [`../rdb/ldb-string-index.md`](../rdb/ldb-string-index.md) for the cipher.
 
 So the client's own words are now a source for goal wiring, alongside the kind tag and the captures. They agree:
-goal 1448 is *"Enter the jungle"* (`ReachRegion`), 3490 *"Kill slavemaster Saddur"* (`Kill`), 3495 *"Get 3 stone
+goal 1448 is *"Enter the jungle"* (`RegionScoped`), 3490 *"Kill slavemaster Saddur"* (`Kill`), 3495 *"Get 3 stone
 bricks"* (`Collect`), 3497 *"Deliver 3 stone bricks to Turach"* (`Deliver`).
 
 ## Collect goals do not care how the item arrives
@@ -108,7 +126,7 @@ Worked example — the beach starter, quest 10238 goal 1448: `TrailingRefId 180`
 
 ⚠️ A `51200` reference does **not** by itself make a goal a reach objective. Goal 11712 carries one with
 `RequiredCount 3`, so its region *scopes* the objective rather than being it — confirmed by its now-readable
-text, *"Overcome the emperor's manifested nightmares"*, which is a defeat objective inside that room.
+text, *"Overcome the Emperor's Manifested Nightmares"*, which is a defeat objective inside that room.
 
 ## Wiring is bootstrap-only
 
@@ -118,19 +136,34 @@ skips a goal that is already wired. So a hand edit — or the `/admin/quests` ed
 re-import, while a freshly harvested quest still bootstraps.
 
 `TypeItemGoalsFromTrailingCategory` is the general rule rather than a per-quest seed: an unwired goal whose
-trailing reference is an item, and whose **kind tag says it acquires one**, becomes `CollectItem`. It replaced 62
+trailing reference is an item, and whose kind tag is **not** `Deliver`, becomes `CollectItem`. It replaced 62
 goals sitting at the `Kill` default with no target — inert fetch quests that could never complete. They were
 harmless as well as useless: NPC template ids run 38–22,982 and these item refs 110,891–4,675,657, so no kill
 could ever have matched one.
 
-⚠️ The 11 **`Deliver`** goals are left inert, but no longer for want of a recipient: their objective text names
-one in every case (*"Give the Letter to Sien on the Lacheish Plains"*, *"Deliver the Remedy to Amun"*). Typing
-them `CollectItem` would still be wrong — the quest would complete the moment the player picks the item up,
-skipping the delivery, a silent chain bug where inert is at least visibly stuck.
+`TypeDeliverGoalsFromRecipient` is the same shape for the 12 **`Deliver`** goals (kind `20`). Their recipient is
+not on the row, but it *is* in the objective text — *"Deliver a Supply Crate to Croiss at the refugee camp"*,
+*"Give the Letter to Sien on the Lacheish Plains"* — so they type as `TalkToNpc` at that NPC. The talk trigger
+solves a goal in one interaction, so "deliver N" completes without the count being involved. (Typing them
+`CollectItem` instead would be wrong: the quest would complete the moment the player picks the item up, skipping
+the delivery — a silent chain bug, where inert is at least visibly stuck.)
 
-What actually gates them is the WORLD: only **3 of 12** recipients (Turach, Amun, Croiss) exist as spawned NPCs;
-the other 9 live on uncaptured maps and have no `NpcTemplate`, so a wired goal there still could not complete.
-And a plain `TalkToNpc` does not check the player is HOLDING the item, which a faithful hand-in would. Tracked in
-Gitea #521.
+What gates the rest is the **WORLD, and specifically per-map spawn coverage**: only **2 of 12** recipients are
+NPCs we hold — Turach (City of Tortage) and Croiss (Conarch Village). The other 10 stand on maps that have a
+`Maps` row and **zero `NpcSpawns`**: Khopshef Province (3020), Kheshatta (3030), Lacheish Plains (1040), Wild
+Lands of Zelata (2080), Chosain Province (6300), Gateway to Khitai (6001). So the wiring step gates on the
+recipient being in `NpcTemplate` — a goal wired to an NPC that does not exist can never complete, which is no
+better than inert and worse in that it *looks* wired. They light up on their own when those maps are imported.
+
+⚠️ Do not match those names loosely. `Amun` (quest 12766's recipient, in Khopshef) substring-matches the
+unrelated **`Amunarton`** — a Conall's Valley quest *giver*, and the giver of 14615 whose own recipient is
+Shabaka. A `LIKE` match reads as a hit and wires the goal to the wrong NPC on the wrong continent.
+
+⚠️ Two goals are deliberately **excluded** from the rule: 11880 and 11881 carry a **rank precondition** in their
+text (*"Give Note of Recommendation to Itsing When You Have Become an Acolyte (Rank 1)"*), so a bare talk trigger
+would complete them early. They need the rank gate first.
+
+⚠️ A plain `TalkToNpc` does not check the player is **holding** the item, which a faithful hand-in would. That is
+a new mechanic (an item precondition on a talk goal), not wiring. Tracked in Gitea #521.
 
 Open work is tracked in Gitea (#262, #358, #521).

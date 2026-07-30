@@ -179,7 +179,7 @@ The descriptor table also finishes off the quest-goal reference model. A `QuestG
 
 | pair | category | points at | readable? |
 |---|---|---|---|
-| `ObjectiveRefId` + `ObjectiveCategory` | **50304** `quest_goal_templates.goal_name` on all 168 goals; `ObjectiveRefId == GoalId` | the goal's own **display text** ("Kill slavemaster Saddur") | **NO — encrypted** |
+| `ObjectiveRefId` + `ObjectiveCategory` | **50304** `quest_goal_templates.goal_name` on all 168 goals; `ObjectiveRefId == GoalId` | the goal's own **display text** ("Kill slavemaster Saddur") | **yes — encrypted, and we hold the keys** (see below) |
 | `TrailingRefId` + `TrailingCategory` | 50200 `item.name`, 51000 `npc_template.name`, 51100 `categorytree.description`, 51200 `bounded_areas` | the goal's **target** | **yes — plaintext** |
 
 `TrailingCategory` is therefore a **type tag on the target reference**, and it resolves completely: all **107**
@@ -191,14 +191,15 @@ all seven languages silently yields French.)
 
 ⚠️ **A 51200 reference does NOT by itself mean the goal is a `ReachArea`.** Only three goals carry one:
 
-| goal | quest | map | count | region | reading |
-|---|---|---|---|---|---|
-| 1448 | 10238 | 4010 | 1 | `Trappers Haven` | a true reach objective — already `ReachArea`, and the region **contains the goal's own marker** |
-| 11712 | 17608 | 6400 | **3** | `NightmareRoomBA` | a count of 3 says the region *scopes* the objective ("3 of something in the Nightmare Room"), not that entering it is the objective |
-| 14073 | 19364 | (none) | 1 | `BossRoom` | the goal carries no MapId, yet the name is unique to playfield 2027, so it still resolves |
+| goal | quest | map | count | region | objective text | reading |
+|---|---|---|---|---|---|---|
+| 1448 | 10238 | 4010 | 1 | `Trappers Haven` | "Enter the jungle" | a true reach objective — `ReachArea`, and the region **contains the goal's own marker** |
+| 11712 | 17608 | 6400 | **3** | `NightmareRoomBA` | "Overcome the Emperor's Manifested Nightmares" | the region *scopes* the objective — 3 things to overcome inside it, not a place to walk into |
+| 14073 | 19364 | (none) | 1 | `BossRoom` | "Locate the Red-Hand Leader" | the goal carries no MapId, yet the name is unique to playfield 2027, so it still resolves |
 
-Which of the three is a reach goal cannot be settled from here, because the field that would say — the goal's own
-objective text — is in encrypted category 50304. That is the concrete cost of #520.
+**Settled: only 1448 is a reach goal**, and the objective text is what settles it — the column that used to be
+blocked on #520. That is also why the kind value `9` is `RegionScoped` and not `ReachRegion`: two of its three
+goals are not reaches.
 
 ### The 74 item goals (`50200`) are inert fetch objectives — and the reference does not type them
 
@@ -213,8 +214,9 @@ They are unmistakably gather objectives once named, and `RequiredCount` is real 
 ⚠️ **The category says the ref is an item; it does not say how the item is obtained.** The set mixes at least
 three mechanics — mob drops (pelts, glands, heads, organs → `LootFromNpc`), world pickups (*Quarry Stonebrick*,
 the one already wired → `CollectItem`), and consumables that read as bought or gathered (*Soothing Remedy*,
-*Pink Salt*, *Visionwine*). Telling them apart needs the goal's objective text, which is encrypted (#520), or a
-capture of the quest being played. Same shape as the `51200` ambiguity above.
+*Pink Salt*, *Visionwine*). Telling them apart needs the goal's objective text — which is now readable, so
+`--report ldb-quest-text` answers it: the *Visionwine* family are `Make <item>` **crafting** goals (kind `5`),
+and the `Deliver` goals (kind `20`) name their **recipient** in the text, which is what wires them.
 
 Two facts bound what could be wired even with the type known:
 
@@ -268,8 +270,8 @@ The encrypted eleven are exactly the **NPC conversation text** (`50000`–`50003
 4. The plaintext is UTF-8, NUL-padded to the 8-byte block.
 
 Verified end to end on both halves of the encrypted set. All **168** quest objective texts decrypt —
-`LDB[50304][1448]` = **"Enter the jungle"**, `[3490]` = **"Kill slavemaster Saddur"**, `[3497]` = **"Bring the
-three stone bricks to Turach"**, `[11712]` = "Overcome the emperor's manifested nightmares" — and so does the NPC
+`LDB[50304][1448]` = **"Enter the jungle"**, `[3490]` = **"Kill slavemaster Saddur"**, `[3497]` = **"Deliver 3
+stone bricks to Turach"**, `[11712]` = "Overcome the Emperor's Manifested Nightmares" — and so does the NPC
 dialogue, inline directives and all:
 
 ```
@@ -294,6 +296,26 @@ the **128-bit TEA key** (`ProtoDecryptionKey`, the same shape an item template's
 string: the string is a pure base-85 rendering of those four words and `LdbKey.ToWire` regenerates it exactly,
 escaping included. That is also why the retail client renders our quest journal correctly — we replay the
 captured keys, so it can decrypt its own LDB.
+
+### Reading it back: `--report ldb-quest-text`
+
+The join — ciphertext from the client's LDB pages, keys from our own tables — is a committed diagnostic rather
+than a scratch script:
+
+```zsh
+dotnet run --project Faolan.Importer -- --report ldb-quest-text --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report ldb-quest-text --report-arg 3497,5792 --RdbDir <rdb-dir>
+```
+
+It prints every goal's **kind tag beside its decrypted objective text**, which is the cross-check that matters:
+the tag and the text are two independent statements of what the goal asks for, so a disagreement is a bug or an
+unmapped kind value. It reports **168/168 decrypted, 0 failed**, and a `DECRYPT FAILED` row would mean the stored
+key and the shipped ciphertext disagree — not a padding artefact. `--report-arg` takes goal and/or quest ids.
+
+Two filters in it are load-bearing: the **English** pages come from the language record (a text sniffer unions
+languages and yields French), and the **encrypted** pages come from the page header's own `flags` word. The
+ciphertext must be read as raw bytes (`LdbStringIndex.ParseRaw`) — the NUL padding is part of the *plaintext*, so
+anything that trims or text-decodes the blob first destroys it. `LdbKey.Decrypt` is the whole step.
 
 A string we have never captured a key for stays unreadable — but that is **not a limit of this decode**, it is
 the same content model item templates already use: an item enters the catalog when a capture yields its

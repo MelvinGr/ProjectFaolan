@@ -135,5 +135,36 @@ namespace Faolan.Core.Crypt
 				? ""
 				: Escape(Encode(key));
 		}
+
+		// The other half of the recipe: an encrypted LDB string's blob bytes + the key that addresses it -> the
+		// plaintext. TEA-ECB with the key's four words, then strip the NUL padding, then UTF-8.
+		//
+		// The padding is part of the PLAINTEXT (the ciphertext length is always a whole number of 8-byte blocks), so it
+		// can only be stripped AFTER decrypting - which is why the ciphertext has to be read as raw bytes
+		// (LdbStringIndex.ParseRaw) rather than as a string.
+		//
+		// Returns null for an absent/empty key or a blob that is not a whole number of blocks, and for a plaintext that
+		// is not valid UTF-8 - all three mean "this is not the right key for these bytes", which is a normal outcome
+		// (the wrong language's page, a key harvested against a different string) and not a corrupt input.
+		public static string? Decrypt(ReadOnlySpan<byte> ciphertext, ProtoDecryptionKey? key)
+		{
+			if (key == null || key.IsEmpty || ciphertext.Length == 0 || ciphertext.Length % 8 != 0)
+				return null;
+
+			var plain = Tea.DecryptEcb(ciphertext, [key.Key1, key.Key2, key.Key3, key.Key4]);
+
+			var end = Array.IndexOf(plain, (byte)0);
+			if (end < 0)
+				end = plain.Length;
+
+			try
+			{
+				return new UTF8Encoding(false, true).GetString(plain, 0, end);
+			}
+			catch (DecoderFallbackException)
+			{
+				return null; // not the right key for these bytes
+			}
+		}
 	}
 }

@@ -426,7 +426,7 @@ reached before the category table was known, and which guessed `Jungle Main` whe
 
 ⚠️ A 51200 reference does **not** by itself make a goal a reach objective — 11712 wants **3** of something, so
 its region reads as a *scope* ("3 of something in the Nightmare Room") rather than the objective. Settling that
-is answered by the goal's own objective text, readable since #520: 11712 is *"Overcome the emperor's manifested
+is answered by the goal's own objective text, readable since #520: 11712 is *"Overcome the Emperor's Manifested
 nightmares"*, a defeat objective the region merely scopes, while 1448 is *"Enter the jungle"* — a true reach. So
 both halves are now mechanical: the kind from the text, the polygon from the reference.
 

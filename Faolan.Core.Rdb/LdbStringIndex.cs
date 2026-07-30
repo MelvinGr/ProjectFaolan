@@ -50,8 +50,29 @@ namespace Faolan.Core.Rdb
 				: span.ReadU32Le(4);
 		}
 
-		// Yields every (category, id, value) entry in the page. Empty if the body is not a well-formed TDC2 page.
+		// Yields every (category, id, value) entry in the page, decoded as a UTF-8 string. Empty if the body is not a
+		// well-formed TDC2 page.
+		//
+		// ⚠️ Only meaningful for a PLAINTEXT page. On one of the eleven ENCRYPTED categories the blob is ciphertext, and
+		// both steps this does - truncating at the first NUL and UTF-8 decoding - destroy it. Use ParseRaw there and
+		// decrypt the bytes first (LdbKey + Tea.DecryptEcb); the NUL padding is part of the PLAINTEXT, so it is stripped
+		// after decryption, not before.
 		public static IEnumerable<Entry> Parse(byte[] body)
+		{
+			foreach (var (category, id, bytes) in ParseRaw(body))
+			{
+				var strBytes = bytes.AsSpan();
+				var nul = strBytes.IndexOf((byte)0);
+				if (nul >= 0)
+					strBytes = strBytes[..nul];
+				yield return new Entry(category, id, Encoding.UTF8.GetString(strBytes));
+			}
+		}
+
+		// The same walk, but handing back each entry's blob bytes VERBATIM - no NUL truncation, no text decoding. This
+		// is the form an encrypted category needs: its blob is a TEA-ECB ciphertext whose length is a multiple of 8 and
+		// which contains NUL bytes freely, so anything that treats it as text loses data before it can be decrypted.
+		public static IEnumerable<RawEntry> ParseRaw(byte[] body)
 		{
 			if (body.Length < 48)
 				yield break;
@@ -83,14 +104,23 @@ namespace Faolan.Core.Rdb
 				if ((long)off + len > size)
 					continue;
 
-				var strBytes = body.AsSpan(blobStart + (int)off, (int)len);
-				var nul = strBytes.IndexOf((byte)0);
-				if (nul >= 0)
-					strBytes = strBytes[..nul];
-				yield return new Entry(category, id, Encoding.UTF8.GetString(strBytes));
+				yield return new RawEntry(category, id, body.AsSpan(blobStart + (int)off, (int)len).ToArray());
 			}
 		}
 
+		// The page header's `flags` word, which is an ENCRYPTION flag: 1 on the eleven encrypted categories (the NPC
+		// dialogue 50000-50003 and the quest text 50300-50306) and 0 on the other 147. See docs/rdb/ldb-string-index.md
+		// - it separates the two sets perfectly, so it is the page's own statement of whether ParseRaw + decrypt is
+		// required rather than something to infer from the bytes.
+		public static uint FlagsOf(ReadOnlySpan<byte> body)
+		{
+			return body.Length < 48 || body[12..].ReadU32Le(0) != Magic
+				? 0u
+				: body[12..].ReadU32Le(8);
+		}
+
 		public readonly record struct Entry(uint Category, uint Id, string Value);
+
+		public readonly record struct RawEntry(uint Category, uint Id, byte[] Bytes);
 	}
 }

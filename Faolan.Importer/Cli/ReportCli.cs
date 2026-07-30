@@ -68,6 +68,13 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB (ciphertext) + DB (the captured per-string keys), no corpus: the encrypted quest text (#520).
+			if (report == "ldb-quest-text")
+			{
+				await LdbQuestText(RdbDir(), arg);
+				return 0;
+			}
+
 			// Every report below reads the corpus. It is NOT in this repo (private ProjectFaolan-Data), so say where
 			// to point rather than letting Directory.EnumerateFiles throw a bare path error.
 			if (!Directory.Exists(capturesDir))
@@ -538,7 +545,7 @@ namespace Faolan.Importer.Cli
 
 				default:
 				{
-					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets, ldb-strings, ldb-resolve.");
+					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets, ldb-strings, ldb-resolve, ldb-quest-text, bounded-areas.");
 					return 1;
 				}
 			}

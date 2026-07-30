@@ -137,35 +137,63 @@ namespace Faolan.Core.Database.Tables
 	// still differ: "collect 3 quarry bricks" is 23 and "deliver 3 to Turach" is 20. So the tag describes the goal,
 	// not its target.
 	//
+	// CONFIRMED against a second, independent source: the goal's own OBJECTIVE TEXT, which is readable now that the
+	// encrypted LDB categories are (#520). `--report ldb-quest-text` prints the tag beside the text for all 168 goals,
+	// and that cross-check is what each value below cites - the tag is no longer inferred from the target reference.
+	// It also CORRECTED three readings that had been taken from the targets rather than the verb; see 5, 9 and 22.
+	//
 	// ⚠️ Values seen in the corpus only - this is not the client's full enum, and the gaps are unmapped rather than
 	// absent. `Separator` keeps its wire-derived name on the row because it is a captured field; this enum is the
 	// meaning, not a rename.
 	public enum QuestGoalKind : uint
 	{
 		// No typed target reference (TrailingCategory 0). The talk-to and loot-from-corpse goals of the Tortage chain
-		// (Laranga, Tina, Turach, Casilda; Saddur's and Scavenger Tuut's bags) all sit here.
+		// (Laranga, Tina, Turach, Casilda; Saddur's and Scavenger Tuut's bags) all sit here. This one IS about the
+		// reference and not the verb, which is why its 9 goals span speak/talk/free/get/give/return/unlock.
 		Untargeted = 0,
 
-		// Acquire ONE of a named/unique item - the drink-tasting quests (Visionwine, Musewater, Ale of Auspice).
-		AcquireUnique = 5,
+		// CRAFT the named item: all 9 goals read "Make <item>" - Violet Cureall, Ambrosial Gold, Quicksilver Spirits,
+		// Khat Blackbeer, Darkwinter Wine, Bitterbrisk, Visionwine, Musewater, Ale of Auspice (quests 13141/13143/13145).
+		// ⚠️ Was `AcquireUnique`, "acquire ONE of a named/unique item". That read the ITEM NAMES and not the verb: the
+		// text says Make, so these are recipe objectives, not gather-one objectives.
+		Craft = 5,
 
-		// Reach a NAMED REGION: the target is a bounded-area reference (TrailingCategory 51200), so the trigger volume
-		// is recoverable. Goal 1448's "Trappers Haven". Contrast ReachPoint, which has only a marker.
-		ReachRegion = 9,
+		// REGION-SCOPED: the target is a bounded-area reference (TrailingCategory 51200), so the trigger volume is
+		// recoverable. Only 3 goals carry one, and ⚠️ only ONE of the three is a reach - "Enter the jungle" (1448).
+		// The others are "Overcome the Emperor's Manifested Nightmares" (11712, count 3) and "Locate the Red-Hand
+		// Leader" (14073). So the region SCOPES the objective ("3 of something in there") as often as it IS the
+		// objective, and this tag does not by itself make a goal a ReachArea.
+		RegionScoped = 9,
 
-		// Kill: the target is an npc_template (51000) or a monster category (51100).
+		// Kill: the target is an npc_template (51000) or a monster category (51100). The cleanest value in the set -
+		// all 30 goals are kill verbs (kill, beat, cleanse, destroy, slaughter).
 		Kill = 12,
 
-		// DELIVER the item to someone - it leaves the player rather than arriving. Goal 3497 hands Turach his three
-		// bricks. ⚠️ The goal carries the ITEM but not the recipient, so these cannot be wired from the row alone.
+		// DELIVER the item to someone - it leaves the player rather than arriving. All 12 goals read deliver/give/bring.
+		// ⚠️ The ROW carries the item but never the recipient; the recipient is named in the objective TEXT, which is
+		// how these are wired (ImportOps.TypeDeliverGoalsFromRecipient). It is not unrecoverable, just not on the row.
 		Deliver = 20,
 
-		// Reach a POINT: marker coordinates with no region reference (TrailingCategory 100, TrailingRefId 0).
-		ReachPoint = 22,
+		// The GENERIC kind - by far the largest (52 goals) and the one with no single verb: vanquish, talk, use, find,
+		// speak, ask, report, enter, escort, extinguish, investigate, kill, lead, order, replace, win, destroy, get.
+		// ⚠️ Was `ReachPoint`, "marker coordinates with no region reference". The marker part is true and the "reach"
+		// part is not - a goal lands here when nothing more specific applies, and it happens to carry a map pin.
+		Generic = 22,
 
-		// COLLECT a quantity - the bulk of the gather objectives, and the only kind carrying large counts
-		// (Poisonous Gland x20, Shadeleaf x10, and a x50).
-		Collect = 23
+		// COLLECT a quantity - the bulk of the gather objectives (41 goals: get, collect, gather, recover, remove,
+		// search, steal), and the only kind carrying large counts (Poisonous Gland x20, Shadeleaf x10, and a x50).
+		Collect = 23,
+
+		// USE a named object. One goal: "Use the Vial to Capture Gas" (11252).
+		Use = 10,
+
+		// INVESTIGATE a place/object. One goal: "Investigate the Ancient Gateway" (8278).
+		Investigate = 24,
+
+		// DESTROY a world object, and it takes a COUNT: "Destroy Bowl of Set" (x7 separate goals in quest 13473),
+		// "Destroy the Wolves' Saddles" (count 2), "Destroy the Wolves' Weapons" (count 5). Distinct from Kill, whose
+		// target is an NPC template.
+		DestroyObject = 25
 	}
 
 	public enum QuestGoalType
