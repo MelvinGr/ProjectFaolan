@@ -4,6 +4,9 @@ using System.Text;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 
+using Faolan.Core.Crypt;
+using Faolan.Core.Protobuf;
+
 namespace Faolan.Core.Network.Codecs.Quest
 {
 	// Quest state packets, decoded from captures (docs/re/quests-and-combat.md). These build the 0x2000 IIR record
@@ -245,6 +248,18 @@ namespace Faolan.Core.Network.Codecs.Quest
 			w.WriteUInt32(ListFrame.Empty); // an EMPTY count-framed list
 			w.WriteUInt32(0); // list B (empty)
 			return w.ToArray();
+		}
+
+		// Stored-key overloads: the DB holds the LDB key as the 128-bit TEA key (#520), rendered to its 20-character
+		// base-85 wire form here. See QuestcRegion.RemoteFormat(.., ProtoDecryptionKey).
+		public static byte[] Localized(int id, int category, string flags, ProtoDecryptionKey? key)
+		{
+			return Localized(id, category, flags, LdbKey.ToWire(key));
+		}
+
+		public static byte[] RemoteFormat(int id, int category, ProtoDecryptionKey? key)
+		{
+			return RemoteFormat(id, category, LdbKey.ToWire(key));
 		}
 
 		public static byte[] Localized(int id, int category, string flags, string key)

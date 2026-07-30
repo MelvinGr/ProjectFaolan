@@ -276,6 +276,15 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Item>().OwnsOne(i => i.Key, OwnKey);
 			modelBuilder.Entity<Ability>().OwnsOne(a => a.Key, OwnKey);
 
+			// The LDB per-string decryption keys (#520) are the SAME 128-bit TEA key type, so they get the same owned
+			// mapping - just prefixed, since these owners carry more than one. Columns are <Name>1..<Name>4.
+			modelBuilder.Entity<QuestGoalDefinition>().OwnsOne(g => g.ObjectiveKey, k => OwnNamedKey(k, "ObjectiveKey"));
+			modelBuilder.Entity<QuestGoalDefinition>().OwnsOne(g => g.TrailingKey, k => OwnNamedKey(k, "TrailingKey"));
+			modelBuilder.Entity<QuestTextRef>().OwnsOne(r => r.KeyText, k => OwnNamedKey(k, "KeyText"));
+			modelBuilder.Entity<QuestArea>().OwnsOne(a => a.AreaTitleKey, k => OwnNamedKey(k, "AreaTitleKey"));
+			modelBuilder.Entity<QuestArea>().OwnsOne(a => a.MapKey, k => OwnNamedKey(k, "MapKey"));
+			modelBuilder.Entity<QuestArea>().OwnsOne(a => a.RegionKey, k => OwnNamedKey(k, "RegionKey"));
+
 			// The item's equipped stat bonuses (#3); cascade-delete with the item.
 			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade); // #367
@@ -473,10 +482,17 @@ namespace Faolan.Core.Database
 			// "these four words are a key" instead of five copies of Data1..4.
 			static void OwnKey<T>(OwnedNavigationBuilder<T, ProtoDecryptionKey> k) where T : class
 			{
-				k.Property(p => p.Key1).HasColumnName("Key1");
-				k.Property(p => p.Key2).HasColumnName("Key2");
-				k.Property(p => p.Key3).HasColumnName("Key3");
-				k.Property(p => p.Key4).HasColumnName("Key4");
+				OwnNamedKey(k, "Key");
+			}
+
+			// The same, under a chosen column prefix, for the owners that carry SEVERAL keys (a quest goal has an
+			// objective key and a trailing one; a quest area has three).
+			static void OwnNamedKey<T>(OwnedNavigationBuilder<T, ProtoDecryptionKey> k, string name) where T : class
+			{
+				k.Property(p => p.Key1).HasColumnName(name + "1");
+				k.Property(p => p.Key2).HasColumnName(name + "2");
+				k.Property(p => p.Key3).HasColumnName(name + "3");
+				k.Property(p => p.Key4).HasColumnName(name + "4");
 			}
 		}
 	}

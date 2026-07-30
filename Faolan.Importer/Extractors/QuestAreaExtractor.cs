@@ -1,3 +1,4 @@
+using Faolan.Core.Crypt;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
@@ -42,13 +43,13 @@ namespace Faolan.Importer.Extractors
 						TableField1 = area.TableField1,
 						AreaTitleRefId = title.RefId,
 						AreaTitleCategory = title.Category,
-						AreaTitleKey = title.Key,
+						AreaTitleKey = LdbKey.Decode(title.Key) ?? new(),
 						MapRefId = map.RefId,
 						MapCategory = map.Category,
-						MapKey = map.Key,
+						MapKey = LdbKey.Decode(map.Key) ?? new(),
 						RegionRefId = region.RefId,
 						RegionCategory = region.Category,
-						RegionKey = region.Key
+						RegionKey = LdbKey.Decode(region.Key) ?? new()
 					};
 				}
 			}

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs;
@@ -474,9 +475,9 @@ namespace Faolan.Tests
 			{
 				AreaId = 241,
 				Magic = 0x57365154,
-				AreaTitleKey = "k",
-				MapKey = "k",
-				RegionKey = "k"
+				AreaTitleKey = LdbKey.Decode("pARATX1!DX]\\So+0*A9B")!,
+				MapKey = LdbKey.Decode("pARATX1!DX]\\So+0*A9B")!,
+				RegionKey = LdbKey.Decode("pARATX1!DX]\\So+0*A9B")!
 			};
 			var quest = new QuestDefinition
 			{

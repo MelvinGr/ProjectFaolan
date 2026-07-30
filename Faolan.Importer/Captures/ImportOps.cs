@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -735,11 +736,11 @@ namespace Faolan.Importer.Captures
 					row.Extra6 = g.Extra6;
 					row.ObjectiveRefId = g.Objective.RefId;
 					row.ObjectiveCategory = g.Objective.Category;
-					row.ObjectiveKey = g.Objective.Key;
+					row.ObjectiveKey = LdbKey.Decode(g.Objective.Key) ?? new();
 					row.ObjectiveToken = g.Objective.Token;
 					row.TrailingRefId = g.Trailing?.RefId ?? 0;
 					row.TrailingCategory = g.Trailing?.Category ?? 0;
-					row.TrailingKey = g.Trailing?.Key;
+					row.TrailingKey = LdbKey.Decode(g.Trailing?.Key) ?? new();
 					row.TrailingFlags = g.Trailing?.Flags;
 					row.TrailingToken = g.Trailing?.Token;
 					row.TrailingLocalized = g.Trailing?.IsLocalized ?? false;
@@ -784,12 +785,12 @@ namespace Faolan.Importer.Captures
 					RequiredCount = g.RequiredCount,
 					ObjectiveRefId = g.Objective.RefId,
 					ObjectiveCategory = g.Objective.Category,
-					ObjectiveKey = g.Objective.Key,
+					ObjectiveKey = LdbKey.Decode(g.Objective.Key) ?? new(),
 					ObjectiveToken = g.Objective.Token,
 					TrailingToken = g.Trailing?.Token,
 					TrailingRefId = g.Trailing?.RefId ?? 0,
 					TrailingCategory = g.Trailing?.Category ?? 0,
-					TrailingKey = g.Trailing?.Key,
+					TrailingKey = LdbKey.Decode(g.Trailing?.Key) ?? new(),
 					TrailingFlags = g.Trailing?.Flags,
 					TrailingLocalized = g.Trailing?.IsLocalized ?? false
 				});
@@ -1372,7 +1373,7 @@ namespace Faolan.Importer.Captures
 				Slot = slot,
 				RefId = text.RefId,
 				Category = text.Category,
-				KeyText = text.Key,
+				KeyText = LdbKey.Decode(text.Key) ?? new(),
 				Flags = text.Flags,
 				IsLocalized = text.IsLocalized
 			});
@@ -1530,10 +1531,10 @@ namespace Faolan.Importer.Captures
 			goal1.Extra6 = 0;
 			goal1.ObjectiveRefId = 1448;
 			goal1.ObjectiveCategory = 50304;
-			goal1.ObjectiveKey = "pARATX1!DX]&#92;So+0*A9B";
+			goal1.ObjectiveKey = LdbKey.Decode("pARATX1!DX]&#92;So+0*A9B") ?? new();
 			goal1.TrailingRefId = 180;
 			goal1.TrailingCategory = 51200;
-			goal1.TrailingKey = "b2Y2],LfVfAVps*9JX*G";
+			goal1.TrailingKey = LdbKey.Decode("b2Y2],LfVfAVps*9JX*G") ?? new();
 			goal1.TrailingLocalized = false;
 			goal1.TrailingFlags = "";
 			// #262: goal 1448 = "Enter the jungle" - a REACH objective (region ref 180/cat 51200, NOT a kill). Solved
@@ -1554,10 +1555,10 @@ namespace Faolan.Importer.Captures
 			goal2.Extra6 = 0x36314C56;
 			goal2.ObjectiveRefId = 3490;
 			goal2.ObjectiveCategory = 50304;
-			goal2.ObjectiveKey = "cA!(EbPpfzUK&#92;WPN@!H!";
+			goal2.ObjectiveKey = LdbKey.Decode("cA!(EbPpfzUK&#92;WPN@!H!") ?? new();
 			goal2.TrailingRefId = 9500;
 			goal2.TrailingCategory = 51000;
-			goal2.TrailingKey = "]+/sUK&#39;G3mO)clF`)9Jh";
+			goal2.TrailingKey = LdbKey.Decode("]+/sUK&#39;G3mO)clF`)9Jh") ?? new();
 			goal2.TrailingLocalized = true;
 			goal2.TrailingFlags = "m";
 

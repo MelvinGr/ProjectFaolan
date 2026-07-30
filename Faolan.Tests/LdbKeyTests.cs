@@ -92,29 +92,40 @@ namespace Faolan.Tests
 			Assert.Null(LdbKey.Decode("pARATX1!DX]:So+0*A9B")); // ':' is outside the alphabet
 		}
 
-		// ⚠️ THE gate: every key the seed ships must survive string -> 4 words -> string byte-identically, or the
-		// packets we build from the stored key stop reproducing the capture.
+		// ⚠️ THE gate: every key the seed ships must survive key -> 20-char wire string -> key. The stored form is now
+		// the four words, so this is the direction that matters at send time - a rendering the client cannot decode,
+		// or one that decodes to a DIFFERENT key, silently blanks the text it addresses.
+		//
+		// The naive encoder (emitting `:;<=>` for digits 25..29 instead of `vwxyz`) fails this on ~72% of real keys
+		// while looking correct on the rest, which is why it is a whole-corpus gate and not a handful of samples.
 		[Fact]
 		public async Task EveryShippedKey_RoundTripsExactly()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
 
-			var stored = (await db.QuestGoalDefinitions.Select(g => g.ObjectiveKey).ToListAsync(ct))
-				.Concat(await db.QuestGoalDefinitions.Select(g => g.TrailingKey).ToListAsync(ct))
-				.Concat(await db.QuestTextRefs.Select(r => r.KeyText).ToListAsync(ct))
-				.Concat(await db.QuestAreas.Select(a => a.AreaTitleKey).ToListAsync(ct))
-				.Concat(await db.QuestAreas.Select(a => a.MapKey).ToListAsync(ct))
-				.Concat(await db.QuestAreas.Select(a => a.RegionKey).ToListAsync(ct))
-				.Where(k => !string.IsNullOrEmpty(k))
+			var keys = (await db.QuestGoalDefinitions.AsNoTracking().Select(g => g.ObjectiveKey).ToListAsync(ct))
+				.Concat(await db.QuestGoalDefinitions.AsNoTracking().Select(g => g.TrailingKey).ToListAsync(ct))
+				.Concat(await db.QuestTextRefs.AsNoTracking().Select(r => r.KeyText).ToListAsync(ct))
+				.Concat(await db.QuestAreas.AsNoTracking().Select(a => a.AreaTitleKey).ToListAsync(ct))
+				.Concat(await db.QuestAreas.AsNoTracking().Select(a => a.MapKey).ToListAsync(ct))
+				.Concat(await db.QuestAreas.AsNoTracking().Select(a => a.RegionKey).ToListAsync(ct))
+				.Where(k => k != null && !k.IsEmpty)
 				.Distinct()
 				.ToList();
 
-			Assert.True(stored.Count > 100, $"only {stored.Count} keys in the seed - the gate would be vacuous");
+			Assert.True(keys.Count > 100, $"only {keys.Count} keys in the seed - the gate would be vacuous");
 
-			var broken = stored.Where(k => LdbKey.ToWire(LdbKey.Decode(k)) != k).ToList();
-			Assert.True(broken.Count == 0,
-				$"{broken.Count} of {stored.Count} keys do not round-trip, e.g. {string.Join(", ", broken.Take(3).Select(k => $"{k} -> {LdbKey.ToWire(LdbKey.Decode(k))}"))}");
+			var broken = keys.Where(k => LdbKey.Decode(LdbKey.ToWire(k)) != k).ToList();
+			Assert.True(broken.Count == 0, $"{broken.Count} of {keys.Count} keys do not round-trip, e.g. {broken.FirstOrDefault()}");
+
+			// Every rendering is a well-formed 20-character key drawn from the alphabet - what the client asserts.
+			Assert.All(keys, k =>
+			{
+				var raw = LdbKey.Encode(k);
+				Assert.Equal(LdbKey.KeyLength, raw.Length);
+				Assert.All(raw, c => Assert.Contains(c, LdbKey.Alphabet));
+			});
 		}
 	}
 }

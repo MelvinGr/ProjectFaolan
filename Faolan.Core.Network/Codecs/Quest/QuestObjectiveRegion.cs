@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 
+using Faolan.Core.Crypt;
+using Faolan.Core.Protobuf;
+
 namespace Faolan.Core.Network.Codecs.Quest
 {
 	// The @609 OBJECTIVE-DETAIL region of the 0x737A6DF9 FullChar snapshot tails - the bytes between the Quest_c
@@ -121,6 +124,17 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// A text record addresses its string EITHER by numeric id OR by a name token - `token="Noname"` rather than
 		// `id="0"`. Modelling only the id form emitted `id="0"` where the wire carries a token, which is 8 bytes short
 		// and desynced everything after it. Same split as the feedback records in #372.
+		// Stored-key overloads; see QuestcRegion.RemoteFormat(.., ProtoDecryptionKey).
+		public static string Localized(uint id, uint category, string flags, ProtoDecryptionKey? key)
+		{
+			return Localized(id, category, flags, LdbKey.ToWire(key));
+		}
+
+		public static string LocalizedToken(string token, uint category, string flags, ProtoDecryptionKey? key)
+		{
+			return LocalizedToken(token, category, flags, LdbKey.ToWire(key));
+		}
+
 		public static string LocalizedToken(string token, uint category, string flags, string? key)
 		{
 			return $"<localized token=\"{token}\" category=\"{category}\" flags=\"{flags}\" key=\"{key}\" >";

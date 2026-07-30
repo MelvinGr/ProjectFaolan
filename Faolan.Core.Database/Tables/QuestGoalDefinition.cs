@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Database.Tables
 {
@@ -67,8 +68,12 @@ namespace Faolan.Core.Database.Tables
 
 		public bool TrailingLocalized { get; set; }
 
-		[MaxLength(128)]
-		public string? ObjectiveKey { get; set; }
+		// The per-string LDB DECRYPTION KEY for the objective text (LdbKey) - stored as the 128-bit TEA key, the same
+		// ProtoDecryptionKey shape an item template's key uses, rather than as the 20-character wire string. The
+		// string is a pure base-85 rendering of these four words and regenerates from them exactly (LdbKey.ToWire),
+		// so nothing is lost; it is never a key or a lookup here, only payload written into the outgoing attribute.
+		// An all-zero key means the capture carried none - see ProtoDecryptionKey.IsEmpty.
+		public virtual ProtoDecryptionKey ObjectiveKey { get; set; } = new();
 
 		// A text record addresses its string by numeric id OR by a name TOKEN (`token="Noname"`). Non-null selects the
 		// token form; the RefId is then unused. Modelling only the id form rendered `id="0"` where the wire had a
@@ -88,8 +93,8 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(64)]
 		public string? TrailingFlags { get; set; }
 
-		[MaxLength(128)]
-		public string? TrailingKey { get; set; }
+		// The trailing text record's LDB decryption key; see ObjectiveKey.
+		public virtual ProtoDecryptionKey TrailingKey { get; set; } = new();
 
 		[MaxLength(128)]
 		public string? TrailingToken { get; set; }

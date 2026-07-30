@@ -278,11 +278,12 @@ exes, the patcher, 2,612 decompressed RDB records and 95 MB of decoded wire payl
 scanner was positive-controlled. It was looking for a 16-byte binary constant; the key is a **20-character
 base-85 string, different for every string, delivered per reference**.
 
-⚠️ **We already hold these keys** — they were harvested from captures and are sitting in
-`QuestGoalDefinition.ObjectiveKey` / `TrailingKey`, `QuestArea.AreaTitleKey` / `MapKey` / `RegionKey` and
-`QuestTextRef.KeyText`, stored in their **escaped wire form** because they are reproduced byte-exact into the
-XML attribute. That is also why the retail client renders our quest journal correctly: we replay the captured
-keys, so it can decrypt its own LDB.
+⚠️ **We already hold these keys** — harvested from captures into `QuestGoalDefinition.ObjectiveKey` /
+`TrailingKey`, `QuestArea.AreaTitleKey` / `MapKey` / `RegionKey` and `QuestTextRef.KeyText`. They are stored as
+the **128-bit TEA key** (`ProtoDecryptionKey`, the same shape an item template's key uses), not as the wire
+string: the string is a pure base-85 rendering of those four words and `LdbKey.ToWire` regenerates it exactly,
+escaping included. That is also why the retail client renders our quest journal correctly — we replay the
+captured keys, so it can decrypt its own LDB.
 
 The corollary is the limit: **a string we have never captured a key for stays unreadable.** The cipher is broken;
 the coverage is bounded by the corpus.

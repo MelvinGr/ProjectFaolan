@@ -1,3 +1,4 @@
+using Faolan.Core.Crypt;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -308,7 +309,7 @@ namespace Faolan.Importer.Extractors
 
 			existing.RefId = rec.Id;
 			existing.Category = rec.Category;
-			existing.KeyText = rec.Key;
+			existing.KeyText = LdbKey.Decode(rec.Key) ?? new();
 			existing.IsLocalized = rec.Tag == "localized";
 			existing.Flags = rec.Flags;
 		}
@@ -348,7 +349,7 @@ namespace Faolan.Importer.Extractors
 			goal.MarkerY = markerY;
 			goal.ObjectiveRefId = objective.Id;
 			goal.ObjectiveCategory = objective.Category;
-			goal.ObjectiveKey = objective.Key;
+			goal.ObjectiveKey = LdbKey.Decode(objective.Key) ?? new();
 		}
 
 		private sealed record TextRecord(int Offset, int Length, string Tag, uint Id, uint Category, string Key, string Flags);

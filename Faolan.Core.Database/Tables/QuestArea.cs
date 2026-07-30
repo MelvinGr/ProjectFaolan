@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using Faolan.Core.Protobuf;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Faolan.Core.Database.Tables
@@ -31,14 +32,12 @@ namespace Faolan.Core.Database.Tables
 		// The quests grouped under this area - the middle tier of the client's Region > Area > quest journal tree.
 		public virtual ICollection<QuestDefinition> Quests { get; set; } = [];
 
-		[MaxLength(256)]
-		public string? AreaTitleKey { get; set; }
-
-		[MaxLength(256)]
-		public string? MapKey { get; set; }
-
-		[MaxLength(256)]
-		public string? RegionKey { get; set; }
+		// The three header text records' LDB DECRYPTION KEYS, stored as 128-bit TEA keys (LdbKey) rather than as the
+		// 20-character wire strings - the same ProtoDecryptionKey an item template carries. The string regenerates
+		// from the words exactly (LdbKey.ToWire), and it is payload here, never a key or a lookup.
+		public virtual ProtoDecryptionKey AreaTitleKey { get; set; } = new();
+		public virtual ProtoDecryptionKey MapKey { get; set; } = new();
+		public virtual ProtoDecryptionKey RegionKey { get; set; } = new();
 
 		public uint AreaTitleCategory { get; set; }
 

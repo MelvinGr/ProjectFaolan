@@ -86,8 +86,8 @@ namespace Faolan.Tests
 				return WorldQuest.RemoteFormat(0, 0, "");
 
 			return r.IsLocalized
-				? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText ?? "")
-				: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText ?? "");
+				? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText)
+				: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText);
 		}
 
 

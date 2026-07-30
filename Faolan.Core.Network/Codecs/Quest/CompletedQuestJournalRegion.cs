@@ -90,9 +90,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 				var group = new AreaGroup
 				{
 					AreaId = area.AreaId,
-					AreaTitle = QuestcRegion.RemoteFormat(area.AreaTitleRefId, area.AreaTitleCategory, area.AreaTitleKey ?? ""),
-					MapName = QuestcRegion.RemoteFormat(area.MapRefId, area.MapCategory, area.MapKey ?? ""),
-					RegionName = QuestcRegion.RemoteFormat(area.RegionRefId, area.RegionCategory, area.RegionKey ?? ""),
+					AreaTitle = QuestcRegion.RemoteFormat(area.AreaTitleRefId, area.AreaTitleCategory, area.AreaTitleKey),
+					MapName = QuestcRegion.RemoteFormat(area.MapRefId, area.MapCategory, area.MapKey),
+					RegionName = QuestcRegion.RemoteFormat(area.RegionRefId, area.RegionCategory, area.RegionKey),
 					Magic = area.Magic,
 					TableField1 = area.TableField1
 				};
@@ -181,8 +181,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 				return QuestcRegion.RemoteFormat(0, 0, "");
 
 			return r.IsLocalized
-				? QuestObjectiveRegion.Localized(r.RefId, r.Category, r.Flags ?? "", r.KeyText ?? "")
-				: QuestcRegion.RemoteFormat(r.RefId, r.Category, r.KeyText ?? "");
+				? QuestObjectiveRegion.Localized(r.RefId, r.Category, r.Flags ?? "", r.KeyText)
+				: QuestcRegion.RemoteFormat(r.RefId, r.Category, r.KeyText);
 		}
 
 		// One area's completed quests, with the area/region/map header the client's tree groups them under.

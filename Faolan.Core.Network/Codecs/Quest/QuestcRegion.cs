@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 
+using Faolan.Core.Crypt;
+using Faolan.Core.Protobuf;
+
 namespace Faolan.Core.Network.Codecs.Quest
 {
 	// The Quest_c (List A) region at the START of the 0x737A6DF9 FullChar snapshot tails - the quest JOURNAL.
@@ -96,6 +99,19 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public static string RemoteFormatToken(string token, uint category, string? key)
 		{
 			return $"<remoteformat token=\"{token}\" category=\"{category}\" key=\"{key}\" knubot=\"0\"  ></remoteformat>";
+		}
+
+		// The stored-key overloads. The DB holds the LDB key as the 128-bit TEA key (#520), so the 20-character
+		// base-85 string is rendered here, at the wire boundary, and escaped the way retail escapes it - LdbKey.ToWire.
+		// An empty key renders as `key=""`, which is what a capture with no key carried.
+		public static string RemoteFormat(uint id, uint category, ProtoDecryptionKey? key)
+		{
+			return RemoteFormat(id, category, LdbKey.ToWire(key));
+		}
+
+		public static string RemoteFormatToken(string token, uint category, ProtoDecryptionKey? key)
+		{
+			return RemoteFormatToken(token, category, LdbKey.ToWire(key));
 		}
 	}
 }
