@@ -1281,12 +1281,54 @@ namespace Faolan.Importer.Captures
 		// Trigger/chain seeds are BOOTSTRAP-ONLY (see SeedGoal/Chain), so a re-run never reverts a Quest-editor edit.
 		public static async Task WireQuests(DatabaseContext db)
 		{
+			await TypeItemGoalsFromTrailingCategory(db);
 			await SeedBeachQuestGoals(db);
 			await SeedShipwreckedCityChain(db);
 			await SeedCaptureReachQuests(db);
 			await SeedCasildaChain(db);
 			await SeedCasildaQuestSnapshot(db);
 			await SeedQuestWorldEffects(db);
+		}
+
+		// A goal whose TRAILING REFERENCE is an ITEM is a gather objective, so type it `CollectItem` (#521). The goal
+		// row already says so without any RDB or LDB lookup: `TrailingCategory` is a typed reference and 50200 is the
+		// client's own `item.name` table (docs/rdb/ldb-string-index.md), so the ref IS an item id.
+		//
+		// This is a RULE, not a per-quest seed - which is the point. 72 of the 74 such goals sat at the fresh-harvest
+		// `Kill` default with no target, i.e. inert: a fetch quest that can never complete, because the kill matcher
+		// was looking for an NPC whose template id happens to equal an item id (it never does - NPC ids run 38..22,982
+		// and these refs 110,891..4,675,657, so they were harmless as well as useless).
+		//
+		// ⚠️ It does NOT try to distinguish HOW the item is obtained. The client's data does not say, and the set mixes
+		// mob drops (Mangy Yeti Pelt, Hyena Testicles), world pickups (Quarry Stonebrick) and bought/gathered
+		// consumables (Pink Salt, Visionwine). It does not need to: a gather objective is satisfied by HOLDING the
+		// item, so the runtime ticks these on the item reaching the inventory from any source
+		// (QuestProgressionService.AdvanceCollectGoals off the single grant choke point). Guessing
+		// LootFromNpc-vs-CollectItem per quest would buy nothing and a wrong guess makes the quest silently
+		// un-completable.
+		//
+		// BOOTSTRAP-ONLY like every other wiring step: an already-wired goal (IsWired - anything but the bare Kill
+		// default) is left exactly as it is, so a Quest-editor edit or a hand seed survives a re-import.
+		private static async Task TypeItemGoalsFromTrailingCategory(DatabaseContext db)
+		{
+			const uint itemNameCategory = 50200; // LDB `item.name`
+
+			var goals = await db
+				.QuestGoalDefinitions.Where(g => g.TrailingCategory == itemNameCategory && g.TrailingRefId > 0)
+				.ToListAsync();
+
+			var typed = 0;
+			foreach (var goal in goals)
+			{
+				if (IsWired(goal))
+					continue;
+
+				goal.GoalType = QuestGoalType.CollectItem;
+				typed++;
+			}
+
+			if (typed > 0)
+				await db.SaveChangesAsync();
 		}
 
 		// Flattens the task tree into path.Nodes (every node gets PatrolPathId; the Parent/Children navs stay so EF

@@ -1993,12 +1993,13 @@ namespace Faolan.GameServer
 							default:
 							{
 								// #262: a quest-item PICKUP (QuestItemEffect dynel, e.g. a quarry Stone Brick) - grant the
-								// collect goal's item + advance it + vanish the node, but ONLY while a matching collect quest
-								// is active (TryAdvanceCollectPickup returns null otherwise, so the brick is inert for a player
-								// without Shipwrecked V). Handled here before the generic open path.
+								// collect goal's item + vanish the node, but ONLY while a matching collect quest is active
+								// (ResolveCollectPickupItem returns null otherwise, so the brick is inert for a player
+								// without Shipwrecked V). Handled here before the generic open path. The goal is advanced by
+								// the GRANT, not here - GrantItemToBackpack ticks it, so a pickup counts exactly once.
 								if (await _broadcaster.IsQuestPickup(client, target))
 								{
-									if (await _questProgression.TryAdvanceCollectPickup(client) is { } pickedItem)
+									if (await _questProgression.ResolveCollectPickupItem(client) is { } pickedItem)
 									{
 										await GrantItemToBackpack(client, pickedItem);
 										await WorldBroadcaster.HidePickupObject(client, target);

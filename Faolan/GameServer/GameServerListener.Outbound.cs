@@ -270,6 +270,11 @@ namespace Faolan.GameServer
 					FullPlayerCharacterBuilder.RecordId(characterId, kind, (ulong)slot.Value), count, item, item.Hash)
 				.Item;
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
+
+			// The item is now in the player's inventory, so any collect objective asking for it ticks - HOWEVER it got
+			// here (quest-pickup node, corpse bag, vendor, harvest, claim, .additem). This is the one choke point every
+			// grant passes through, which is why the hook lives here rather than in each caller.
+			await _questProgression.AdvanceCollectGoals(client, itemTemplateId, count);
 			return slot;
 		}
 

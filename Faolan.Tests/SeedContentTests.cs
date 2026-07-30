@@ -178,6 +178,29 @@ namespace Faolan.Tests
 			});
 		}
 
+		// No gather objective is left at the fresh-harvest `Kill` default (#521). A goal whose trailing reference is an
+		// ITEM (LDB category 50200 = `item.name`) is a collect objective; 72 of them shipped as `Kill` with no target,
+		// which is a quest that can never complete - the kill matcher looking for an NPC whose template id equals an
+		// item id. `TypeItemGoalsFromTrailingCategory` types them, and this is what stops a re-harvest reintroducing
+		// them: the row count never moves, only the GoalType does.
+		[Fact]
+		public async Task ItemGoals_AreNotLeftAsKillGoals()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var inert = await db
+				.QuestGoalDefinitions.Where(g => g.TrailingCategory == 50200 && g.TrailingRefId > 0 && g.GoalType == QuestGoalType.Kill)
+				.Select(g => $"goal {g.GoalId} (quest {g.QuestDefinitionId}, item {g.TrailingRefId})")
+				.ToListAsync(ct);
+
+			Assert.True(inert.Count == 0, $"item-reference goals still typed as Kill: {string.Join(", ", inert)}");
+
+			// ...and the typing actually happened rather than the category vanishing from the harvest.
+			var collect = await db.QuestGoalDefinitions.CountAsync(g => g.TrailingCategory == 50200 && g.GoalType == QuestGoalType.CollectItem, ct);
+			Assert.True(collect >= 70, $"only {collect} item goals are CollectItem; the harvest carries 73.");
+		}
+
 		// A shop with no wares is a shop the player cannot buy from - the exact shape of the loss above, and the one
 		// a bare row count on ShopItems would still miss if a single vendor were emptied.
 		[Fact]

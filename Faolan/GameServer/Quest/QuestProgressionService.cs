@@ -144,10 +144,14 @@ namespace Faolan.GameServer.Quest
 		}
 
 		// #262: the player interacted with a quest-pickup world object (a QuestItemEffect dynel, e.g. a quarry stone
-		// brick). Advance the first active, still-incomplete CollectItem goal and return the item it grants (its
-		// TrailingRefId) so the caller can add it to the bag; null when no collect quest is active (the pickup is then
-		// inert - that's what makes the brick nodes only respond while Shipwrecked V is active). One item per call.
-		public async Task<uint?> TryAdvanceCollectPickup(INetworkClient client)
+		// brick). Returns the item the node should hand over - the TrailingRefId of the first active, still-incomplete
+		// CollectItem goal - or null when no collect quest is active, which is what makes the brick nodes inert for a
+		// player without Shipwrecked V. One item per call.
+		//
+		// ⚠️ RESOLVE ONLY - it deliberately does NOT advance the goal. The caller grants the item, and the GRANT is
+		// what ticks the goal now (AdvanceCollectGoals, off GrantItemToBackpack). Advancing here as well double-counted
+		// every pickup.
+		public async Task<uint?> ResolveCollectPickupItem(INetworkClient client)
 		{
 			var character = client.Session.Character;
 
@@ -164,11 +168,24 @@ namespace Faolan.GameServer.Quest
 				if (await GoalProgressOf(character.Id, quest, def!, goal) >= GoalRequired(quest, def!, goal))
 					continue; // this collect goal is already full
 
-				await Advance(client!, QuestGoalType.CollectItem, null!, goal.TrailingRefId);
 				return goal.TrailingRefId;
 			}
 
 			return null;
+		}
+
+		// An item reached the player's inventory - advance any active CollectItem goal asking for it. Fired from the
+		// one grant choke point (GrantItemToBackpack), so it covers EVERY way an item arrives: a quest-pickup node, a
+		// mob's corpse bag, a vendor purchase, a harvest, a claim, `.additem`.
+		//
+		// That is the point: a gather objective is "hold N of item X", and the client's own quest data says nothing
+		// about HOW the item is obtained - the goal's typed reference (LDB category 50200) names an item and stops
+		// there. Wiring per-source triggers instead would mean guessing loot-vs-pickup-vs-bought per quest, and a
+		// wrong guess makes the quest silently un-completable. Counting arrivals needs no such guess.
+		public Task AdvanceCollectGoals(INetworkClient client, uint itemTemplateId, uint count = 1)
+		{
+			// `count` is the stack size granted; a stack of 3 advances a collect goal by 3.
+			return Advance(client, QuestGoalType.CollectItem, null!, itemTemplateId, Math.Max(1u, count));
 		}
 
 		// Advance the goal of `triggerType`/`targetName` for each of the player's active quests. #357: a quest can have
@@ -176,7 +193,9 @@ namespace Faolan.GameServer.Quest
 		// goal has reached its required count. A tick that leaves the quest incomplete (this goal not yet done, or a
 		// sibling goal still pending) just refreshes the HUD and stays Active; a complete quest supersedes to the next
 		// stage, or (chainless kill) awaits turn-in at the giver - the legacy #47 path.
-		private async Task Advance(INetworkClient client, QuestGoalType triggerType, string targetName, uint? targetTemplateId = null)
+		// `step` is how much a single trigger is worth - 1 for a kill/talk/loot, but a granted STACK advances a collect
+		// goal by its whole count (picking up 3 bricks at once is 3 of the 3).
+		private async Task Advance(INetworkClient client, QuestGoalType triggerType, string targetName, uint? targetTemplateId = null, uint step = 1)
 		{
 			var character = client.Session.Character;
 			if (character == null || (string.IsNullOrEmpty(targetName) && targetTemplateId is null))
@@ -217,7 +236,7 @@ namespace Faolan.GameServer.Quest
 
 				var progress = triggerType == QuestGoalType.TalkToNpc
 					? required
-					: current + 1;
+					: Math.Min(required, current + step);
 
 				changed = true;
 				await PersistGoalProgress(character.Id, quest, def, goal, progress);
