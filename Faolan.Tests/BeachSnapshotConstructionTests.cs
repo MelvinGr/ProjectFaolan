@@ -77,18 +77,41 @@ namespace Faolan.Tests
 			Assert.True(reparsed.SubClass.ToArray().SequenceEqual(tails));
 		}
 
-		// Extracts the server-owned beach tails template asset from the capture (run once; the asset is committed).
+		// VERIFIES that the committed beach tails template still matches what the capture yields - it does not rewrite
+		// it. Set FAOLAN_UPDATE_ASSETS=1 to regenerate, the same convention ProtocolDocsTests uses for the generated
+		// docs.
+		//
+		// ⚠️ It used to call File.WriteAllBytes(TemplatePath, ...) unconditionally, on every run, and that was the
+		// cause of the long-standing "suite flakes once in a while with no diagnosable failure". SIX other test classes
+		// READ this asset (SubClassStatBlockTests, QuestcRegionTests, AccessWindowCatalogTests, KnownSpellListTests,
+		// BeachSubClassFromScratchTests, BeachTailsFromScratchTests) and xUnit runs test CLASSES in parallel - so a
+		// reader landing mid-write saw a truncated file and blew up somewhere deep in a parser, e.g.
+		// "EndOfStreamException at QuestcRegion.Read". It presented as a DIFFERENT test each time, which is exactly why
+		// it never looked like one bug. Caught by re-running the suite in a loop and keeping the failing run's output
+		// (10 iterations).
+		//
+		// Verifying rather than regenerating is also strictly better than just gating the write: if the asset ever
+		// drifts from the capture it now FAILS instead of silently rewriting itself.
 		[Fact]
-		public void ExtractBeachTailsTemplate()
+		public void BeachTailsTemplate_MatchesTheCapture()
 		{
 			var (_, _, tails) = SplitBeach();
-			Directory.CreateDirectory(Path.GetDirectoryName(TemplatePath)!);
-			File.WriteAllBytes(TemplatePath, tails);
-			_o.WriteLine($"wrote {tails.Length} bytes to {TemplatePath}");
 			Assert.Equal(9282, tails.Length);
 
 			// Round-trips through the structured model.
 			Assert.True(FullCharSnapshotSubClass.Deserialize(tails).ToArray().SequenceEqual(tails));
+
+			if (Environment.GetEnvironmentVariable("FAOLAN_UPDATE_ASSETS") == "1")
+			{
+				Directory.CreateDirectory(Path.GetDirectoryName(TemplatePath)!);
+				File.WriteAllBytes(TemplatePath, tails);
+				_o.WriteLine($"FAOLAN_UPDATE_ASSETS=1: wrote {tails.Length} bytes to {TemplatePath}");
+				return;
+			}
+
+			Assert.True(File.Exists(TemplatePath), $"{TemplatePath} is missing - regenerate with FAOLAN_UPDATE_ASSETS=1");
+			Assert.True(File.ReadAllBytes(TemplatePath).SequenceEqual(tails),
+				"the committed BeachTailsTemplate.bin no longer matches what the capture yields - regenerate with FAOLAN_UPDATE_ASSETS=1 if that is intended");
 		}
 
 		// Decode result (UnknownBefore progression block): two different L1 beach characters' tails are byte-

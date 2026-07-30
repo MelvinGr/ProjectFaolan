@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 591 NPC types / 1,108 placements · 3,322 items · 20,848 spells · 265 abilities · 19,777 feats · 242 conversation nodes · 29 shops · 2,036 quests · 1,126 world objects · 177 patrol routes
+**Imported content** (the DB is the server's source of truth): 530 maps · 1,018 NPC types / 3,046 placements · 4,185 items · 20,848 spells · 265 abilities · 19,777 feats · 467 conversation nodes · 70 shops · 2,037 quests · 2,375 world objects · 871 patrol routes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -30,9 +30,9 @@ we've seen_, and names the gaps). Regenerate with
 `dotnet run --project Faolan.Importer -- --report coverage --report-arg readme`:
 
 <!-- coverage:start -->
-- **NPC conversations** — 34/37 greeted dialogue NPCs imported (91.9%)
-- **Vendor shops** — 21/21 captured vendors imported (100.0%)
-- **RDB template catalog** (type 1000020, TEA-encrypted) — 3,549/77,631 decrypted, **4.6% of the total encrypted**. Keys held per category: 3,284 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
+- **NPC conversations** — 74/78 greeted dialogue NPCs imported (94.9%)
+- **Vendor shops** — 48/48 captured vendors imported (100.0%)
+- **RDB template catalog** (type 1000020, TEA-encrypted) — 4,408/77,631 decrypted, **5.7% of the total encrypted**. Keys held per category: 4,143 items, 265 abilities, 0 feats (feat keys absent from captures). (+20,417 plaintext catalog entries, no key needed.)
 <!-- coverage:end -->
 
 ### Connection & session
@@ -242,9 +242,10 @@ we've seen_, and names the gaps). Regenerate with
 ### Group PvE content (not started)
 
 - ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter
-  scripting; #309). Two pieces are now scoped from captures: instances are entered at a chosen **difficulty**
-  (normal vs epic) and can refuse you with a reason (#511), and a group instance is owned by the **team** rather
-  than per character (#512)
+  scripting; #309). Two pieces are now **decoded** off the wire, though neither is built: the **difficulty** an
+  instance is entered at (normal vs epic) rides one word we had modelled as a constant (#511), and a group
+  instance really is owned by the **team** — its entry carries the team's own id where a solo one carries nobody
+  (#512). Notably the mode is *not* part of the `(map, instance)` key, so it needs somewhere of its own
 - ⬜ Factions & reputation — the Khitai / _Rise of the Godslayer_ system: faction ranks, faction vendors, and
   faction companions. The in-game Factions window already populates with standings for imported characters; what's
   missing is the catalog and the reputation _changes_ from quests and kills (#310, #315)
@@ -255,9 +256,9 @@ we've seen_, and names the gaps). Regenerate with
   and gates, rank-gated structures, and hired NPC guards (#147)
 - ⬜ Sieges — massed guild-vs-guild siege warfare (siege weapons, destructible walls) fought over those keeps (#147)
 - 🟡 **Criminal status** — killing a player makes you a criminal for five minutes, and while you are one normal
-  vendors refuse to trade with you; smugglers at outlaw camps still will. The rules come from the client's own
-  spell text. Missing the trigger, since player-vs-player combat is not modelled — so it runs off a GM command —
-  plus the murder-point ladder up to Murderer (#503)
+  vendors refuse to trade with you **and wagoners refuse to carry you**; smugglers at outlaw camps still will.
+  Both halves come from one sentence of the client's own spell text. Missing the trigger, since player-vs-player
+  combat is not modelled — so it runs off a GM command — plus the murder-point ladder up to Murderer (#503)
 - ⬜ PvP progression — open-world PvP, PvP minigames, and the PvP-resource / consequence layer that feeds base
   building (#146)
 
@@ -468,6 +469,9 @@ captures against the local server (no root needed) and retail-session captures a
   cannot be recovered from the client alone (#139)
 - A second **quest abandoned** in a live session → the `QuestLogList` refresh variant retail sends with it; two
   samples do not pin a grammar, and a malformed list takes the whole route down (#482)
+- A **guild-city piece taking damage** (a siege, or any attack on a plot structure) → the destructible bodies are
+  already decoded and placed, but nothing in the corpus ever shows one being damaged, so there is no destruction
+  or construction grammar to reproduce (#498)
 - **Level-up** captures across more classes/levels → fill the combo/spell/XP tables (#296, #297)
 - A **dungeon run**, the **faction/reputation** UI, and an **item socket** action → the roadmap features
   (#309, #310, #311)
