@@ -240,8 +240,9 @@ Both fire on **distance to an NPC**, not on entering a region, so their radii we
 regions. Proximity-on-NPC and volume-entry are two different mechanisms, and only the second one is here. The
 `NpcEncounter` radii stay measured from capture tracks.
 
-(Map 4000 `Stygian Galley` — the opening scene — has **no 1000053 record at all**, so "no regions" there is the
-absence of the record, not an empty one.)
+Saddur is the sharper of the two tests, because he is a *known* proximity encounter on a **real, well-covered
+playfield**: Tortage Island carries 51 regions including ambush volumes elsewhere on the map (`BA_PictAmbush`,
+44 units away), so the table is clearly populated there — it simply has nothing for him.
 
 Two incidental observations from that test: `Headless Hollow` and `Jungle Main` are the place-name family this
 page declines to classify by regex, confirming it exists and is identifiable only against a place-name catalog;
