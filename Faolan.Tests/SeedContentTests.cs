@@ -308,16 +308,15 @@ namespace Faolan.Tests
 			}
 		}
 
-		// A `Deliver` goal is wired as a talk-to at the RECIPIENT named in its (decrypted) objective text, and the
-		// recipient must be an NPC we actually hold. Wiring one we don't produces a goal that can never complete - no
-		// better than the inert state it replaced, and worse in that it LOOKS wired.
+		// A `Deliver` goal hands its item over by TALKING to the recipient, so the trigger must be TalkToNpc - never
+		// CollectItem, which would complete the quest the moment the player picks the item up and skip the delivery.
 		//
-		// This is the invariant, not the current membership: 10 of the 12 recipients stand on maps with zero NpcSpawns,
-		// so they stay unwired until those maps are imported, at which point the importer picks them up on its own.
-		// Asserting "TargetName resolves" rather than "exactly these two are wired" is what lets that happen without
-		// this test having to be edited.
+		// ⚠️ It deliberately does NOT require the recipient to be an NPC we hold. The name comes from the client's own
+		// objective text, the goal is inert either way, and recording it means the goal works the moment its map is
+		// imported. Coverage over precision was an explicit call; what is NOT allowed is a wrong TRIGGER, which would
+		// mis-complete a quest we can actually play.
 		[Fact]
-		public async Task DeliverGoals_AreOnlyWiredToRecipientsWeHave()
+		public async Task DeliverGoals_HandInByTalking()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
@@ -327,24 +326,18 @@ namespace Faolan.Tests
 				.Select(g => new { g.GoalId, g.GoalType, Target = g.TargetName! })
 				.ToListAsync(ct);
 
-			var npcNames = await db.Set<NpcTemplate>().Select(t => t.Name).ToListAsync(ct);
-			var haveNpc = npcNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+			Assert.NotEmpty(wired);
 
-			var dangling = wired.Where(g => !haveNpc.Contains(g.Target)).Select(g => $"goal {g.GoalId} -> '{g.Target}'").ToList();
-			Assert.True(dangling.Count == 0, $"Deliver goals wired to an NPC that is not in NpcTemplates: {string.Join(", ", dangling)}");
-
-			// A hand-in advances on the TALK, so any other trigger would never fire (or, as CollectItem, would fire on
-			// merely obtaining the item and skip the delivery).
 			var wrongTrigger = wired.Where(g => g.GoalType != QuestGoalType.TalkToNpc).Select(g => $"goal {g.GoalId} is {g.GoalType}").ToList();
 			Assert.True(wrongTrigger.Count == 0, $"Deliver goals with a target but not TalkToNpc: {string.Join(", ", wrongTrigger)}");
 
-			// The two whose recipients we do hold, pinned by name so a re-harvest that dropped one is caught.
+			// The two whose recipients we DO hold are the playable ones, pinned by name so a re-harvest that dropped or
+			// mis-parsed either is caught. `Amun` in particular must not have become `Amunarton` (an exact-match test).
 			Assert.Equal("Turach", wired.Single(g => g.GoalId == 3497).Target);
 			Assert.Equal("Croiss", wired.Single(g => g.GoalId == 5792).Target);
+			Assert.Equal("Amun", wired.Single(g => g.GoalId == 4334).Target);
 		}
 
-		// A shop with no wares is a shop the player cannot buy from - the exact shape of the loss above, and the one
-		// a bare row count on ShopItems would still miss if a single vendor were emptied.
 		[Fact]
 		public async Task EveryShop_HasWares()
 		{
