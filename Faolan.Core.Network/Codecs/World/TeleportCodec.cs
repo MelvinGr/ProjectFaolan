@@ -131,7 +131,7 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteByte(0x01); // env
 
 			// The CURRENT playfield, pinned, with the reviving player in slot 3.
-			(PlayfieldProxy.ForInstance(mapId, playfieldToken) with { CharacterHandle = playerHandle }).Write(s);
+			(PlayfieldProxy.ForInstance(mapId, playfieldToken) with { OwnerId = playerHandle }).Write(s);
 
 			return s.WriteByte(0x01).ToArray(); // IntendedTeleportIIR trailing bool = 1
 		}

@@ -237,7 +237,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			// [21:55] the embedded PlayfieldProxy. Slot [2] is the per-map fieldA and slot [5] the small count -
 			// two slots the teleport and team-member embeddings both read as constants; see PlayfieldProxy.
-			new PlayfieldProxy(mapId, PlayfieldProxy.PlayfieldClass, charInstance, count, PlayfieldProxy.PinnedInstanceWord, playfieldToken, Slot2: fieldA).Write(s);
+			new PlayfieldProxy(mapId, PlayfieldProxy.PlayfieldClass, charInstance, count, PlayfieldProxy.PinnedInstanceWord, playfieldToken, OwnerType: fieldA).Write(s);
 
 			return s
 				.WriteUInt32(sceneWord) // [55:59] -> obj+0x54
