@@ -61,6 +61,21 @@ namespace Faolan.Core.Database.Tables
 		public virtual NpcTemplate? NpcTemplate { get; set; }
 
 		public uint TypeId { get; set; }
+
+		// TRUE when retail opened this conversation ITSELF - a KnubotOpenChatWindow with no player TalkToNpc in front
+		// of it - rather than the player clicking the NPC (#523). Casilda's city-door farewell is the worked example:
+		// the player opens the door, the escort goal completes, and the server then opens her window unprompted.
+		//
+		// It is NOT reachable by talking, so the runtime's talk lookup must never serve it; it needs whatever EVENT
+		// triggered it. That trigger is not modelled yet, so these nodes are imported and parked - the point of #523 is
+		// that they were being DROPPED, taking their {resolvegoal}/{gameactiononnpc} payload with them.
+		//
+		// Not part of ComputeId. It cannot collide with a talk node in practice because a server-opened conversation has
+		// no BCC action to take a TypeId from and so carries 0, while every captured talk node carries its action id
+		// (42008 on all 467 of them) - and if that ever stopped holding, the importer's distinct-id assertion fails the
+		// import rather than letting one screen overwrite another.
+		public bool ServerInitiated { get; set; }
+
 		public virtual ICollection<ConversationPacket> Packets { get; set; } = [];
 		public QuestState? ConditionQuestState { get; set; }
 

@@ -86,6 +86,21 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
+				// A SERVER-opened conversation (#523) is exempt from the managed-NPC drop below. That drop exists to stop
+				// an unclassified capture polluting a managed NPC's per-STATE TALK tree - and a server-opened node is not
+				// in that tree at all: it carries TypeId 0 and ServerInitiated, so it shares no key with any greeting
+				// variant and the runtime's talk lookup cannot reach it.
+				//
+				// Without this exemption the rule silently ate the very thing #523 is about: Casilda is managed, and her
+				// city-door farewell was captured in `xxx_mage-*_beach-to-enter-tortage_city`, for which there is no rule
+				// (nor should there be - it classifies GREETING state, which a server-opened window does not have).
+				if (e.ServerInitiated)
+				{
+					yield return e;
+
+					continue;
+				}
+
 				var managed = !string.IsNullOrEmpty(e.NpcName) && ManagedNpcs.Contains(e.NpcName);
 				// Match the rule for this (capture, NPC) whose RequiredContextId is AnyContext or equals the entry's
 				// captured quest state (#264). A context-specific rule only claims its own state's screens; the rest of

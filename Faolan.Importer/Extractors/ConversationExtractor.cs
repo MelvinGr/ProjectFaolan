@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
+using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -32,7 +34,8 @@ namespace Faolan.Importer.Extractors
 		uint? ConditionQuestId = null,
 		QuestState? ConditionQuestState = null,
 		uint GrantQuestId = 0,
-		uint QuestContextId = 0);
+		uint QuestContextId = 0,
+		bool ServerInitiated = false);
 
 	// Reconstructs each NPC's dialogue as a TREE of screens keyed by answer-index PATH, from the captured request/
 	// response flow. The grammar (memory protocol_conversation_routing): a conversation INSTANCE = TalkToNpc(f3=0)
@@ -52,8 +55,14 @@ namespace Faolan.Importer.Extractors
 		// unambiguous "here is the new quest" marker; the runtime guards against re-granting, so this is safe.)
 		private const uint QuestFullUpdateSubOpcode = (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR;
 
+		private const uint CloseChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR;
+		private const uint OpenChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR;
 		private const uint SpawnSubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 		private const uint TalkToNpcActionType = 0x16;
+
+		// The speaker's template id inside a screen's `npcname` parameter - see NpcTemplateFromText.
+		private static readonly Regex NpcNameParameter =
+			new(@"<parameter\s+value=""[^""]*?id=&quot;(\d+)&quot;[^""]*?category=&quot;51000&quot;[^""]*""\s+name=""npcname""", RegexOptions.Compiled);
 
 		// The Knubot conversation-display response sub-opcodes (642CD3D6 echo excluded: it is a generic interact ack):
 		// OpenChatWindow (045B0B0F), AppendText (4A3D899A), AnswerList (F164A4A5), CloseChatWindow (C4AF39EB).
@@ -69,11 +78,24 @@ namespace Faolan.Importer.Extractors
 			// handle -> NPC TEMPLATE id (#244): the runtime gates the conversation on the clicked NPC's template so a
 			// same-named NPC (25 share "Halen van Dummy") can't open another's dialogue.
 			var templatesByHandle = NpcSpawnExtractor.Extract(packets).Where(e => e.Handle != 0 && e.TemplateId != 0).GroupBy(e => e.Handle).ToDictionary(g => g.Key, g => g.First().TemplateId);
+
+			// template -> name, joined over the handle the two maps share. A SERVER-opened conversation (#523) has no
+			// clicked handle to name its NPC by, but its text carries an `npcname` parameter holding the template id -
+			// so this is how those get attributed.
+			var namesByTemplate = new Dictionary<uint, string>();
+			foreach (var (handle, template) in templatesByHandle)
+			{
+				if (namesByHandle.TryGetValue(handle, out var n) && !string.IsNullOrEmpty(n))
+					namesByTemplate.TryAdd(template, n);
+			}
+
 			var entries = new List<ConversationEntry>();
 
 			// Per-conversation-instance state, reset at each greeting (TalkToNpc f3=0).
 			var active = false;
 			uint typeId = 0, npc = 0, instance = 0;
+			var serverInitiated = false; // this instance was opened BY THE SERVER, with no player TalkToNpc (#523)
+			uint serverNpcTemplate = 0; // its NPC, read out of the text's `npcname` parameter (there is no clicked handle)
 			var path = ""; // answer-index path of the CURRENT screen (the one whose responses we're collecting)
 			var screen = new List<byte[]>();
 			uint grant = 0; // a quest the server granted while collecting THIS screen's responses (0 = none)
@@ -100,6 +122,8 @@ namespace Faolan.Importer.Extractors
 					// A greeting opens a new conversation instance: flush the previous one's last screen, then reset.
 					Flush();
 					active = true;
+					serverInitiated = false;
+					serverNpcTemplate = 0;
 					typeId = parsedTypeId;
 					npc = parsedNpc;
 					instance = body.ReadU32Be(12);
@@ -107,6 +131,25 @@ namespace Faolan.Importer.Extractors
 					screen = [];
 					grant = 0;
 					instanceContext = currentQuest; // the quest active WHEN the player opened this conversation (#264)
+				}
+				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: OpenChatWindowSubOpcode } && !active)
+				{
+					// #523: retail also opens a conversation ITSELF, with no player TalkToNpc in front of it - Casilda's
+					// city-door farewell is the worked example. Every one of those used to be dropped on the floor, taking
+					// its {resolvegoal}/{gameactiononnpc} payload with it, because only a greeting could start an instance.
+					//
+					// An OpenChatWindow arriving while NO instance is active is exactly that case: a window opened inside
+					// an active instance is that instance's own, and is collected as a response below.
+					Flush();
+					active = true;
+					serverInitiated = true;
+					serverNpcTemplate = 0; // resolved from the first text screen's `npcname` parameter
+					typeId = 0; // there is no BCC action to take one from - see ConversationNode.ServerInitiated
+					npc = 0;
+					path = "";
+					screen = [p.Bytes];
+					grant = 0;
+					instanceContext = currentQuest;
 				}
 				else if (p is { IsDownload: false, IsIirCarrier: true, SubOpcode: KnubotAnswerSubOpcode } && active)
 				{
@@ -142,8 +185,28 @@ namespace Faolan.Importer.Extractors
 							questsSeen.Add(questId);
 					}
 				}
-				else if (p.IsDownload && active && (p.Opcode == Opcode2015 || (p.IsIirCarrier && ResponseSubOpcodes.Contains(p.SubOpcode))))
+				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: CloseChatWindowSubOpcode } && active)
+				{
+					// The window CLOSES: the instance is over. The close packet is part of the exchange, so it joins the
+					// screen before the flush.
+					//
+					// ⚠️ Nothing used to end an instance - `active` was set at the first greeting and never cleared - so
+					// every Knubot packet for the rest of the capture was glued onto whatever screen was last open. That
+					// is what hid the server-opened conversations: they could not start one (an instance was always
+					// "active"), and their screens were appended to an unrelated NPC's last screen instead. OpenChatWindow
+					// and CloseChatWindow are exactly paired on the wire (4 and 4 in the beach-to-city capture), so the
+					// close is the reliable boundary.
 					screen.Add(p.Bytes);
+					Flush();
+					active = false;
+					screen = [];
+				}
+				else if (p.IsDownload && active && (p.Opcode == Opcode2015 || (p.IsIirCarrier && ResponseSubOpcodes.Contains(p.SubOpcode))))
+				{
+					screen.Add(p.Bytes);
+					if (serverInitiated && serverNpcTemplate == 0)
+						serverNpcTemplate = NpcTemplateFromText(p);
+				}
 			}
 
 			Flush();
@@ -151,12 +214,24 @@ namespace Faolan.Importer.Extractors
 
 			void Flush()
 			{
-				if (active && screen.Count > 0)
-				{
-					entries.Add(new ConversationEntry(typeId, path, npc, [.. screen], namesByHandle.GetValueOrDefault(npc)!, templatesByHandle.TryGetValue(npc, out var tpl)
+				if (!active || screen.Count == 0)
+					return;
+
+				// A server-opened instance is named through its template (there is no clicked handle); a player-opened
+				// one through the handle it clicked. Either can fail to resolve, and the fallback keeps the entry
+				// DISTINCT and addressable rather than dropping it - a silent skip here is data loss.
+				var (name, template) = serverInitiated
+					? (namesByTemplate.GetValueOrDefault(serverNpcTemplate) ?? (serverNpcTemplate != 0
+						? $"#tpl{serverNpcTemplate}"
+						: ""), serverNpcTemplate == 0
+						? (uint?)null
+						: serverNpcTemplate)
+					: (namesByHandle.GetValueOrDefault(npc)!, templatesByHandle.TryGetValue(npc, out var tpl)
 						? tpl
-						: null, GrantQuestId: grant, QuestContextId: instanceContext));
-				}
+						: null);
+
+				entries.Add(new ConversationEntry(typeId, path, npc, [.. screen], name, template,
+					GrantQuestId: grant, QuestContextId: instanceContext, ServerInitiated: serverInitiated));
 			}
 		}
 
@@ -282,6 +357,30 @@ namespace Faolan.Importer.Extractors
 			// target is a ProtoID32 { type, instance }; the NPC handle is its instance. (The old model called this
 			// field a "SpellTarget" and its first word a spell_id - it is an ENTITY CLASS, e.g. 0xC350.)
 			return (args.BccActionId, args.CommandqueueClientId, args.CommandqueueServerId, args.Target?.Instance ?? 0);
+		}
+
+		// The NPC TEMPLATE id a conversation screen names itself with, or 0.
+		//
+		// Every screen retail sends carries an `npcname` parameter holding a typed LDB reference to the speaker:
+		//   <parameter value="7;&lt;localized id=&quot;9411&quot; category=&quot;51000&quot; … &gt;" name="npcname" />
+		// Category 51000 is `npc_template.name`, so the `id` IS the template id - 9411 being Casilda. That is the only
+		// statement of WHO is talking in a server-opened conversation, which has no clicked handle to resolve.
+		//
+		// The value is XML-escaped inside the attribute, so the inner id is matched as `&quot;`-wrapped rather than by
+		// unescaping the whole document. Returns 0 for any screen that carries no such parameter.
+		private static uint NpcTemplateFromText(CapturedPacket p)
+		{
+			if (ConversationScreenDecoder.Decode(p.Bytes)?.Screens is not { } screens)
+				return 0;
+
+			foreach (var xml in screens)
+			{
+				var m = NpcNameParameter.Match(xml);
+				if (m.Success && uint.TryParse(m.Groups[1].Value, out var template))
+					return template;
+			}
+
+			return 0;
 		}
 
 		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.

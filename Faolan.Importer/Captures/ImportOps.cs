@@ -492,6 +492,7 @@ namespace Faolan.Importer.Captures
 					GrantQuestId = e.GrantQuestId == 0
 						? null
 						: e.GrantQuestId,
+					ServerInitiated = e.ServerInitiated,
 					Packets = e.Packets.Select((p, i) => BuildPacket(p, i)).ToList()
 				});
 			}

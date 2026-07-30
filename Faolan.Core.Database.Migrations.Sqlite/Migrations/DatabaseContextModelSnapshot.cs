@@ -1185,6 +1185,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("NpcTemplateId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("ServerInitiated")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("TypeId")
                         .HasColumnType("INTEGER");
 
