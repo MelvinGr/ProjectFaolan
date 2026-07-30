@@ -927,13 +927,13 @@ namespace Faolan.Importer.Captures
 					TableField1 = wire?.TableField1 ?? 0,
 					AreaTitleRefId = wire?.AreaTitleRefId ?? 0,
 					AreaTitleCategory = wire?.AreaTitleCategory ?? 0,
-					AreaTitleKey = wire?.AreaTitleKey,
+					AreaTitleKey = wire?.AreaTitleKey ?? new(),
 					MapRefId = wire?.MapRefId ?? 0,
 					MapCategory = wire?.MapCategory ?? 0,
-					MapKey = wire?.MapKey,
+					MapKey = wire?.MapKey ?? new(),
 					RegionRefId = wire?.RegionRefId ?? 0,
 					RegionCategory = wire?.RegionCategory ?? 0,
-					RegionKey = wire?.RegionKey
+					RegionKey = wire?.RegionKey ?? new()
 				});
 				added++;
 			}
@@ -1668,10 +1668,10 @@ namespace Faolan.Importer.Captures
 				goal.Extra6 = 0x54375554;
 				goal.ObjectiveRefId = 5744;
 				goal.ObjectiveCategory = 50304;
-				goal.ObjectiveKey = quest.TextRefs.FirstOrDefault(t => t.Slot == QuestTextSlot.Objective)?.KeyText;
+				goal.ObjectiveKey = quest.TextRefs.FirstOrDefault(t => t.Slot == QuestTextSlot.Objective)?.KeyText ?? new();
 				goal.TrailingRefId = 11561;
 				goal.TrailingCategory = 51000;
-				goal.TrailingKey = quest.TextRefs.FirstOrDefault(t => t.Slot == QuestTextSlot.ObjectiveLocalized)?.KeyText;
+				goal.TrailingKey = quest.TextRefs.FirstOrDefault(t => t.Slot == QuestTextSlot.ObjectiveLocalized)?.KeyText ?? new();
 				goal.TrailingLocalized = true;
 				goal.TrailingFlags = "m";
 			}

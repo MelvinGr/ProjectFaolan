@@ -73,9 +73,9 @@ namespace Faolan.Core.Crypt
 				return "";
 
 			var sb = new StringBuilder(KeyLength);
+			Span<char> digits = stackalloc char[WordDigits]; // hoisted: a stackalloc inside the loop would grow the frame per word
 			foreach (var word in new[] { key.Key1, key.Key2, key.Key3, key.Key4 })
 			{
-				Span<char> digits = stackalloc char[WordDigits];
 				var value = word;
 				for (var i = WordDigits - 1; i >= 0; i--)
 				{
