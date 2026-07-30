@@ -205,8 +205,15 @@ ends when the player **opens the city door**:
 farewell is a separate, server-initiated beat that follows.
 
 **That is how the escort is wired.** `GameServerListener.Inbound`'s `ActionType.UseObject` case asks which NPCs
-this object opens a server-initiated conversation for and completes their `Escort` goals — before the teleport,
-matching the capture's order. Which door is **data-driven, not hard-coded**: the object that plays the escortee's
+this object opens a server-initiated conversation for, completes their `Escort` goals, and then opens the farewell
+(`ConversationService.TryOpenTriggeredConversation`) — in the capture's order.
+
+⚠️ **The use that plays the farewell does NOT teleport; the player uses the door again to go through.** Retail
+behaves the same way: in both beach-to-city captures the door-use begin phase is followed by the escort completing
+and the window opening, and then 1,200+ further packets with **no playfield handoff at all**. The farewell also
+opens with `{hidegoodbye}`, which pins the player until it is done — teleporting mid-dialogue would strand the
+window on a map the NPC is not on. It is gated on the escort being *in progress*, so it plays once and the zone
+line behaves normally on every later use. Which door is **data-driven, not hard-coded**: the object that plays the escortee's
 farewell is by definition where the escort was leading, so `ConversationNode.TriggerWorldObjectId` supplies it and
 the goal needs no new column. Gated by `SeedContentTests.EscortGoal_HasAWorldObjectThatCanCompleteIt`, which
 checks the escort → escortee → trigger → `WorldObject` chain still holds in the shipped data.

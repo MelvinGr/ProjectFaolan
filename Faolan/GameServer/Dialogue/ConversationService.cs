@@ -24,6 +24,10 @@ namespace Faolan.GameServer.Dialogue
 	// collaborator; quest-journal pushes go through the WorldBroadcaster, branch conditions match the player's quest state.
 	public sealed class ConversationService
 	{
+		// The TypeId every SERVER-INITIATED conversation node carries (#523): a server-opened window has no BCC action
+		// to take an action id from. It doubles as the guard that keeps these out of the talk path.
+		public const uint ServerInitiatedTypeId = 0;
+
 		// The GameAgent sender instance to use when a packet has none stored (retail's most common value); the real
 		// per-conversation instance comes from ConversationPacket.SenderInstance.
 		private const uint DefaultSenderInstance = 0x08;
@@ -85,6 +89,37 @@ namespace Faolan.GameServer.Dialogue
 			}
 
 			await ServeScreen(client, screen, npcHandle);
+		}
+
+		// #523: open a conversation the SERVER initiates - one with no player TalkToNpc in front of it, served because
+		// some EVENT fired. Casilda's city-door farewell is the worked example: the player uses the door, the escort
+		// completes, and retail opens her window unprompted.
+		//
+		// These nodes carry TypeId 0 (there is no BCC action to take one from), which is also why the ordinary talk path
+		// can never reach them: GetConversationScreens matches on TypeId, and every captured talk node carries 42008.
+		// Serving goes through the SAME ServeGreeting as a talk, so the session's answer-path state is armed identically
+		// and the player's KnubotAnswer picks walk the tree normally.
+		//
+		// Returns false when the NPC is not spawned for this player - the conversation simply does not open, which is
+		// the right outcome for an escortee who is not there.
+		public async Task<bool> TryOpenTriggeredConversation(INetworkClient client, string npcName, uint worldObjectId)
+		{
+			var handle = client.Session.SpawnedNpcNamesByHandle
+				.FirstOrDefault(kv => string.Equals(kv.Value, npcName, StringComparison.OrdinalIgnoreCase))
+				.Key;
+			if (handle == 0)
+				return false; // the escortee is not spawned for this player - the conversation simply does not open
+
+			// Selected by TRIGGER, not by the name/type/path lookup ServeGreeting uses: an NPC can have several
+			// server-opened conversations and they all sit at AnswerPath "" (Casilda has two), so only the trigger tells
+			// them apart. From the first pick onwards the paths are deeper and unambiguous, so the ordinary
+			// AdvanceConversation walk takes over unchanged.
+			var opening = await _database.GetTriggeredConversation(npcName, worldObjectId);
+			if (opening == null)
+				return false;
+
+			await ServeScreen(client, opening, handle);
+			return true;
 		}
 
 		// Serves `npcName`'s greeting screen through the live CONSTRUCT path (PickConversationScreen -> ServeScreen,

@@ -16,6 +16,9 @@ namespace Faolan.Core.Database.Repositories
 
 		// The NPCs whose SERVER-OPENED conversation is triggered by using world object `worldObjectId` (#523).
 		Task<string[]> GetServerInitiatedConversationNpcs(uint worldObjectId);
+
+		// The OPENING screen ("" path) of the server-opened conversation `worldObjectId` triggers for `npcName` (#523).
+		Task<ConversationNode?> GetTriggeredConversation(string npcName, uint worldObjectId);
 		Task<ConanClass[]> GetImportedSpawnClasses(uint mapId);
 		Task<NpcTemplate?> GetNpcByName(string name);
 		Task<NpcTemplate?> GetNpcByTemplateId(uint templateId);
@@ -76,6 +79,22 @@ namespace Faolan.Core.Database.Repositories
 				.Select(n => n.NpcName)
 				.Distinct()
 				.ToArrayAsync();
+		}
+
+		// The OPENING screen of the conversation this world object triggers for this NPC (#523).
+		//
+		// ⚠️ It selects on the TRIGGER, not through the ordinary name/type/path lookup, because an NPC can have SEVERAL
+		// server-opened conversations and they all sit at AnswerPath "" - Casilda has two. The name+path lookup cannot
+		// tell them apart and would serve whichever came back first; the trigger is exactly what distinguishes them,
+		// which is why it is part of the node's identity.
+		public async Task<ConversationNode?> GetTriggeredConversation(string npcName, uint worldObjectId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.ConversationNodes.Include(n => n.Packets)
+				.ThenInclude(p => p.Screens)
+				.ThenInclude(s => s.Parameters)
+				.FirstOrDefaultAsync(n => n.ServerInitiated && n.TriggerWorldObjectId == worldObjectId && n.NpcName == npcName && n.AnswerPath == "");
 		}
 
 		public async Task<ConversationNode[]> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId)

@@ -1963,11 +1963,29 @@ namespace Faolan.GameServer
 						// conversation for (ConversationNode.TriggerWorldObjectId), because the object that plays the
 						// escortee's farewell is by definition the place the escort was leading to. Costs one indexed
 						// lookup on a door use and yields nothing for every ordinary door.
-						if (interaction.WorldObjectId is { } usedObjectId)
+						var playedFarewell = false;
+						if (interaction.WorldObjectId is { } usedObjectId && behaviorType == 0x0003)
 						{
 							foreach (var escortee in await Database.GetServerInitiatedConversationNpcs(usedObjectId))
+							{
+								// Gate on the escort actually being IN PROGRESS. That is what separates the one door use
+								// that ends it from every later use of the same door: the farewell plays once, and the zone
+								// line behaves normally afterwards.
+								if (!await _questProgression.HasActiveEscortGoal(client.Session.Character.Id, escortee))
+									continue;
+
 								await _questProgression.AdvanceEscortGoals(client, escortee);
+								playedFarewell |= await _conversation.TryOpenTriggeredConversation(client, escortee, usedObjectId);
+							}
 						}
+
+						// ⚠️ The use that plays the farewell does NOT teleport. Retail's does not either: in BOTH
+						// beach-to-city captures the door-use begin phase is followed by the escort completing and the
+						// conversation opening, and then 1,200+ further packets with no playfield handoff at all. The
+						// farewell also opens with {hidegoodbye}, which pins the player until it is done - teleporting
+						// them mid-dialogue would strand the window on a map the NPC is not on. The next use goes through.
+						if (playedFarewell)
+							break;
 
 						switch (interaction.Action)
 						{

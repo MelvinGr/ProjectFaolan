@@ -85,6 +85,29 @@ namespace Faolan.GameServer.Quest
 			return Advance(client, QuestGoalType.Escort, npcName);
 		}
 
+		// Whether the player is CURRENTLY escorting `npcName` - an active quest with an unfinished Escort goal naming it.
+		//
+		// The caller needs this BEFORE advancing, to tell the one door use that ends an escort from every later use of
+		// the same door: the farewell plays once, and the zone line behaves normally afterwards.
+		public async Task<bool> HasActiveEscortGoal(uint characterId, string npcName)
+		{
+			foreach (var quest in await _database.GetCharacterQuests(characterId))
+			{
+				if (quest.State != QuestState.Active)
+					continue;
+
+				var def = await _database.GetQuestDefinition(quest.QuestId);
+				var goal = def?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort && string.Equals(g.TargetName, npcName, StringComparison.OrdinalIgnoreCase));
+				if (goal == null)
+					continue;
+
+				if (await GoalProgressOf(characterId, quest, def!, goal) < GoalRequired(quest, def!, goal))
+					return true;
+			}
+
+			return false;
+		}
+
 		// #262: the ReachArea goals the player still needs to reach, as in-memory targets for the move-handler proximity
 		// check (WorldEntity.PendingReachGoals). Loaded ONCE at first move so the per-move test hits no DB; skips goals
 		// already solved (a relog past the area doesn't re-fire) and every non-ReachArea goal. A ReachArea goal has no
