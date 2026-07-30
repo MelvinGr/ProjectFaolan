@@ -360,6 +360,7 @@ namespace Faolan.GameServer
 				["recallhome"] = (client, _) => RecallToRacialHomeCommand(client),
 				["criminal"] = CriminalCommand,
 				["travel"] = TravelCommand,
+				["knockback"] = KnockbackCommand,
 				["level"] = SetLevelCommand,
 				["feat"] = _feats.FeatCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
@@ -907,6 +908,52 @@ namespace Faolan.GameServer
 		// so `.teleport Khemi` works) then hands off to DoTeleport. Also accepts `.teleport <x> <y> <z>` (three numeric
 		// tokens) to move to a position on the CURRENT map. Gives a usage/echo message instead of throwing on a
 		// missing/garbled argument (the old `uint.Parse(arguments)` surfaced a raw FormatException to the player).
+		// .knockback [distance] - shoves the player away from their current TARGET (or, with no target, away from the
+		// direction they are facing) using the real wire path: the forced-move MoveTask + SetPos pair plus the
+		// "Knockback immunity" buff retail applies alongside it (#496).
+		//
+		// This is the standard GM bootstrap for a feature whose retail trigger is not wired. Here the trigger is
+		// genuinely unknown rather than merely unbuilt: the corpus has ONE knockback and the ApplySpell in that batch
+		// names the immunity guard, not the ability that did the knocking, so nothing says which attacks knock back.
+		private async Task KnockbackCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var entity = _simulation.PlayerWorldEntity(client);
+			if (entity == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", "You are not in the world."));
+				return;
+			}
+
+			var distance = Knockback.DefaultDistance;
+			var arg = (arguments ?? string.Empty).Trim();
+			if (arg.Length > 0 && !float.TryParse(arg, NumberStyles.Float, CultureInfo.InvariantCulture, out distance))
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .knockback [distance]");
+				return;
+			}
+
+			// The SOURCE is what the player is pushed away from. Their current target is the natural stand-in for the
+			// attacker; with none, push away from a point just in front of them so the command still demonstrates the
+			// mechanic (being shoved backwards) instead of doing nothing.
+			var zone = _simulation.World.ZoneForEntity(entity);
+			Vector3 source;
+			if (client.Session.SelectedTargetHandle is { } target && zone != null && zone.TryGet(target, out var targetEntity))
+			{
+				source = targetEntity.Position;
+			}
+			else
+			{
+				var facing = Vector3.Transform(new Vector3(0f, 0f, 1f), entity.Rotation);
+				source = entity.Position - facing;
+			}
+
+			if (await _knockback.Knock(entity, source, distance))
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"Knocked back {distance:F2} units.");
+			else
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", "Not displaced (no direction to push along, or fully resisted)."));
+		}
+
 		// .travel <npc name> [destination map id] - drives local travel (#506) the way retail's conversation would.
 		// With no map id it LISTS what that NPC offers; with one it runs the real flow - criminal gate, fee, the scry
 		// confirmation box, and the trip once the player clicks through it.

@@ -99,6 +99,38 @@ apply must come AFTER our own death-strip, or the strip removes the penalty it j
 A fourth death inside 30 minutes adds nothing — there is no "Death Penalty 4" anywhere in the corpus.
 [V3: DeathPenaltyTests.FourthDeath_AddsNothing]
 
+## Knockback (#496)
+
+Not environmental strictly speaking — it is a creature ability — but it lands in the same place: the server moves
+the player without the player asking, and it shares the "displace a victim, then pin it" plumbing.
+
+**There is no knockback message.** The displacement is a `MoveTaskIIR` in **mode 0x05**, a *forced move*, addressed
+to the victim's own handle:
+
+```
+[u16 0][from vec3][0x05][0x00][3 floats 1.0, 1.0, 0.0][anchor vec3][to vec3][0x00]     65-byte body
+```
+
+What identifies it is rarity. In the annotated dungeon capture there are **1,219** s2c `MoveTaskIIR`s; only **11**
+name the player as *subject*, nine of those are trivial 31–32 byte anchors, and exactly **one** is this long form —
+at the instant the player's own annotation says `knockbacked`. A **`SetPosIIR`** pins the destination 1.7 s later,
+and that record appears **twice in the whole capture**: world entry, and here.
+
+The batch also applies spell **4784832**, which the database names **"Knockback immunity"** (10 ms) — the mechanic
+naming itself, and the strongest single confirmation in the window.
+[V3: KnockbackTests.ForcedMove_IsByteIdenticalToTheCapturedKnockback]
+
+⚠️ **One sample, and the split matters.** The packets are decoded and reproduced byte-exact. Everything *around*
+them is a single measurement: the displacement was **3.01 units**, the direction is away from the attacker (which a
+head-on observation cannot distinguish from "along the attacker's facing"), and the three floats are deliberately
+left unnamed because duration/speed/gravity are all equally plausible. `KnockbackResistance` (0x040D) exists and is
+read, but its scaling curve is **invented** — the captured victim's value is unknown, so no curve is derivable.
+
+⚠️ **Nothing triggers it.** The captured knockback came from an NPC ability, but the `ApplySpell` in that batch is
+the immunity guard rather than the ability that did the knocking, so the corpus does not say which attacks knock
+back — and guessing would put a shove on attacks that never had one. It runs from `.knockback [distance]` until a
+capture names an ability.
+
 ## Not yet built
 
 Open work is tracked in Gitea — see #504 and the follow-ups it links. The short version: only the lava hazard

@@ -176,6 +176,10 @@ namespace Faolan.GameServer
 		// World/EnvironmentService.cs.
 		private readonly EnvironmentService _environment;
 
+		// Composed collaborator: knockback - the server shoving an entity along a segment it did not walk (#496). See
+		// World/KnockbackService.cs.
+		private readonly KnockbackService _knockback;
+
 		// Composed collaborator: local travel - the NPCs who move a player for a fee (#506). See World/TravelService.cs.
 		private readonly TravelService _travel;
 		private readonly FeatService _feats;
@@ -291,6 +295,8 @@ namespace Faolan.GameServer
 			_environment = new EnvironmentService(database, this, logger);
 			// #506: local travel. Reaches the wire through ITravelOutbound (GameServerListener.Travel.cs).
 			_travel = new TravelService(database, this, logger);
+			// #496: knockback. The buff apply is a single shared op, so it comes in as a delegate seam rather than a port.
+			_knockback = new KnockbackService(_simulation, _broadcaster, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id), logger);
 
 			InitGmCommands();
 		}

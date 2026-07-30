@@ -609,6 +609,52 @@ namespace Faolan.GameServer.World
 		// to our endpoint - both self-buffs (e.g. player 0x01316e68 at frame 3809) and offensive casts (player
 		// 0x01316cee on NPC targets). Gated on the viewer's Known set (#245: never relay for a handle the viewer's
 		// client hasn't built). No-op solo / when the caster is unseen.
+		// Knockback (#496): shove a PLAYER from where they stand to `to`, and make everyone who can see them watch it.
+		//
+		// Two records, in retail's own order (the annotated dungeon capture, 18:49:54.284 -> 18:49:56.020):
+		//   1. the forced-move MoveTask (mode 0x05) carrying from -> to, which is what the client ANIMATES;
+		//   2. a SetPos pinning the destination ~1.7 s later, which is what makes it authoritative.
+		//
+		// Both go to the victim AND to nearby viewers - the victim's client plays the shove, and a viewer who only got
+		// the SetPos would see the other player teleport. The model position is advanced first so interest, aggro and
+		// the next move all agree with where the player now is; skipping that is how a displaced player ends up
+		// invisible to the NPCs still chasing their old position.
+		//
+		// ⚠️ The caller is expected to have ground-snapped `to`. This does NOT clamp it: a knockback is allowed to put
+		// a player somewhere they could not have walked (off a ledge - which then costs them fall damage, #495), and
+		// clamping here would quietly cancel that.
+		public async Task BroadcastKnockback(WorldEntity victim, Vector3 to)
+		{
+			var from = victim.Position;
+			var move = MoveTaskCodec.BuildForcedMoveBody(victim.Handle, from, to);
+			var pin = SetPosCodec.Build(victim.Handle, to, 0f, 0f, 0f, 0f, 0x01);
+
+			victim.Position = to;
+
+			if (victim.Client != null)
+			{
+				await WorldIir.Send(victim.Client, move);
+				await WorldIir.Send(victim.Client, pin);
+			}
+
+			var zone = _sim.World.ZoneForEntity(victim);
+			if (zone == null)
+				return;
+
+			foreach (var viewer in zone.Entities)
+			{
+				if (!viewer.IsPlayer || viewer.Handle == victim.Handle || viewer.Client == null)
+					continue;
+				if (!viewer.Known.Contains(victim.Handle))
+					continue; // only players whose client already holds the victim's handle
+
+				await WorldIir.Send(viewer.Client, move);
+				await WorldIir.Send(viewer.Client, pin);
+			}
+
+			_logger.LogInformation("Knockback: {Victim} shoved {Distance:F2} units from {From} to {To}.", victim.Name, Vector3.Distance(from, to), from, to);
+		}
+
 		public async Task BroadcastSpellToViewers(INetworkClient caster, byte[] body)
 		{
 			var entity = _sim.PlayerWorldEntity(caster);

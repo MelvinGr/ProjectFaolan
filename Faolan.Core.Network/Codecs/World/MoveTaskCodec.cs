@@ -23,10 +23,14 @@ namespace Faolan.Core.Network.Codecs.World
 
 		// The MoveTask "mode" byte (at body offset 26, after the from-position) selects the form (decoded from the
 		// captures, #53): 0x00 = a bare position, 0x02 = the stationary from/to/facing below, 0x04 = a multi-waypoint
-		// path (the PatrolPath source, still variable-length), 0x08 = approach/face a target entity.
+		// path (the PatrolPath source, still variable-length), 0x05 = a forced move (knockback, #496), 0x08 =
+		// approach/face a target entity.
 		public const byte ModeBarePosition = 0x00;
 		public const byte ModePath = 0x01;
 		public const byte ModeStationary = 0x02;
+
+		// The server DISPLACING an entity - see BuildForcedMoveBody. Knockback's wire form.
+		public const byte ModeForcedMove = 0x05;
 
 		public const int BodyLength = 57;
 
@@ -58,6 +62,41 @@ namespace Faolan.Core.Network.Codecs.World
 				.WriteUInt32(targetHandle)
 				.WriteByte(0x01)
 				.WriteUInt64(0)
+				.WriteByte(0x00)
+				.ToArray();
+		}
+
+		// mode-05: a FORCED MOVE - the server displacing an entity along a segment it did not ask for. This is how
+		// knockback reaches the wire (#496); there is no dedicated knockback message.
+		//
+		//   [u16 0][from 3 floats][0x05][0x00][3 floats 1.0, 1.0, 0.0][anchor 3 floats][to 3 floats][0x00]
+		//   65-byte body / 69-byte frame.
+		//
+		// What makes this form identifiable at all is its RARITY. In the annotated dungeon capture there are 1,219
+		// s2c MoveTaskIIRs; only 11 name the player as SUBJECT, nine of those are the trivial 31-32 byte anchor
+		// records, and exactly ONE is this long form - at the instant the player's own annotation says `knockbacked`.
+		// Its `to` is the position the player ends up at, which a SetPosIIR then pins 1.7 s later (and SetPosIIR
+		// occurs twice in the whole capture: world entry, and here).
+		//
+		// ⚠️ ONE SAMPLE. `anchor` equals `from` in it, so whether the two can ever differ is unknown - the parameter
+		// is kept separate rather than collapsed, because collapsing it would bake in an assumption the capture does
+		// not test. The three floats (1.0, 1.0, 0.0) are likewise single-observation and deliberately NOT named:
+		// duration/speed/gravity are all plausible and nothing distinguishes them. Sent verbatim.
+		public static byte[] BuildForcedMoveBody(uint handle, Vector3 from, Vector3 to, Vector3? anchor = null)
+		{
+			return new FaolanStream()
+				.WriteUInt32(GameServer0X2000Opcodes.MoveTaskIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(handle)
+				.WriteUInt16(0)
+				.WriteVector3(from)
+				.WriteByte(ModeForcedMove)
+				.WriteByte(0x00)
+				.WriteFloat(1f)
+				.WriteFloat(1f)
+				.WriteFloat(0f)
+				.WriteVector3(anchor ?? from)
+				.WriteVector3(to)
 				.WriteByte(0x00)
 				.ToArray();
 		}
