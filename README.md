@@ -71,6 +71,12 @@ we've seen_, and names the gaps). Regenerate with
   names, hostiles red
 - ✅ **Interactive objects** — doors and gates open when used; anything not yet interactive tells you so instead of
   silently doing nothing
+- 🟡 **Resource harvesting** — mining a rock, chopping a tree or picking a shrub yields a stack of the matching
+  resource, across all 141 nodes already in the world; the node empties and disappears, and comes back on zone
+  reload. Missing: the per-swing depletion (retail's nodes are shared, so the captures can't show it), a real
+  respawn timer, and Elm/Slate, whose resource items aren't in the client data we have (#494)
+- 🟡 **Boss nameplates** — elite and boss NPCs carry the rank that draws the skull marker beside their name (56 of
+  them, King Conan and Keaira among them); pending an in-client confirm (#508)
 - ✅ **Zone-line doors** — a doorway that changes your location teleports you, both within a zone and across a
   loading screen, with destinations learned from captures (a handful of rarer ones still just play the open
   animation, #341)
@@ -102,6 +108,9 @@ we've seen_, and names the gaps). Regenerate with
   and each revives you at its own strength (10/50/100%) rather than always full (#372, #375)
 - ✅ **Discovering resurrection points** — walking near a new point pops retail's "point discovered" banner and adds
   it to your list in one frame; works for all **538** imported points, verified in a real client (#372)
+- 🟡 **Recalls** — the Path of Asura spell returns you to where you are bound, while the Totem of Origins returns
+  you to your race's home city; these are two different destinations and used to be one. Capture-verified for
+  Stygian, the other three races by the same rule (#206, #510)
 - ✅ **Buffs & debuffs** — apply, tick (damage-over-time), expire on a timer, and right-click to cancel; self-buffs
   and enemy debuffs both verified in-client. Each damage-over-time spell ticks at its own measured rate, 0.5 to 11
   seconds, instead of one 2-second constant (#274, #370, #437)
@@ -125,7 +134,9 @@ we've seen_, and names the gaps). Regenerate with
   the pool so the bar fills to it. Awaiting an in-client check of the applied values (#367, #435, #436, #450)
 - 🟡 **Spell cooldowns** — fully reverse-engineered; the client runs the recast timer from its own data (retail
   sends nothing), pending an in-client confirm of the server-override case (#271)
-- 🟡 **Spellweaving** (necromancer) — built and playable; the energy-bar drain is the last piece (#141)
+- 🟡 **Spellweaving** (necromancer and demonologist) — built and playable; the toggle turned out to be a different
+  key per class, so demonologists could not weave at all. The energy-bar drain is the last piece, and Priest of
+  Mitra / Tempest of Set are unmapped because no capture shows either weaving (#141, #505)
 - 🟡 **Combat shields** — the guard-arc render is not yet decoded (#20)
 - 🟡 **Fatalities** — the roll (5% at level 1 to 30% at 80), both fatality buffs, the necromancer's Frozen Hatred
   proc and its pet all work in-client (#140); the finishing-move *animation* never plays and the trigger for it is
@@ -148,6 +159,9 @@ we've seen_, and names the gaps). Regenerate with
   gear and buffs, so the formulas that read them (regen, mitigation) get real inputs. Retail never sends these; the
   base was decoded from the client and checked in-client for all twelve classes at all eighty levels (#444)
 - 🟡 XP curve is a provisional ramp; the real thresholds are partly harvested (#297)
+- 🟡 **Skill points** — the pool is a pure function of level, not an award, so it is stated on login rather than
+  granted. Only five levels have been captured, and the curve has no formula to fill the rest in, so the other
+  levels keep whatever the character already had rather than showing an invented number (#507)
 - 🟡 Class spell / combo / ability catalogs are still filling in; empty spell and item names were backfilled from the
   client's own English string table (LDB), so far fewer entries render nameless (#291, #296, #303, #300)
 - ⬜ Alternate Advancement / veteran / mastery (#150) · offline training (#143) · apprentice/mentor (#144)
@@ -219,7 +233,9 @@ we've seen_, and names the gaps). Regenerate with
 ### Group PvE content (not started)
 
 - ⬜ Dungeons & instances — solo and group encounters, epic dungeons, raids (instanced zones + encounter
-  scripting; #309)
+  scripting; #309). Two pieces are now scoped from captures: instances are entered at a chosen **difficulty**
+  (normal vs epic) and can refuse you with a reason (#511), and a group instance is owned by the **team** rather
+  than per character (#512)
 - ⬜ Factions & reputation — the Khitai / _Rise of the Godslayer_ system: faction ranks, faction vendors, and
   faction companions. The in-game Factions window already populates with standings for imported characters; what's
   missing is the catalog and the reputation _changes_ from quests and kills (#310, #315)
@@ -229,6 +245,10 @@ we've seen_, and names the gaps). Regenerate with
 - ⬜ Guild base — player-built **guild cities** and **battlekeeps** in the Border Kingdoms: the central keep, walls
   and gates, rank-gated structures, and hired NPC guards (#147)
 - ⬜ Sieges — massed guild-vs-guild siege warfare (siege weapons, destructible walls) fought over those keeps (#147)
+- 🟡 **Criminal status** — killing a player makes you a criminal for five minutes, and while you are one normal
+  vendors refuse to trade with you; smugglers at outlaw camps still will. The rules come from the client's own
+  spell text. Missing the trigger, since player-vs-player combat is not modelled — so it runs off a GM command —
+  plus the murder-point ladder up to Murderer (#503)
 - ⬜ PvP progression — open-world PvP, PvP minigames, and the PvP-resource / consequence layer that feeds base
   building (#146)
 
