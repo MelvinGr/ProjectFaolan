@@ -2245,22 +2245,22 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("SpellId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<byte>("CastingLevel")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("DescriptorSlot0")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("DescriptorSlot3")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("DescriptorSlot8")
+                        .HasColumnType("INTEGER");
+
                     b.Property<ushort>("Duration")
                         .HasColumnType("INTEGER");
 
                     b.Property<byte>("FlagA")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<byte>("FlagB")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<byte>("FlagC")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<byte>("Magnitude")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<byte>("Rank")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("NpcTemplateId", "SpellId");

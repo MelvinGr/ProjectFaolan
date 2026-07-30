@@ -1071,7 +1071,7 @@ namespace Faolan.GameServer.World
 				if (npc.NpcTemplate.Spells is { Count: > 0 } typeSpells)
 				{
 					foreach (var s in typeSpells)
-						entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
+						entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8).ToArray()));
 				}
 
 				// Ambient chatter lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent).
@@ -1394,7 +1394,7 @@ namespace Faolan.GameServer.World
 			if (entity.Name is { Length: > 0 } spellName)
 			{
 				foreach (var s in await _database.GetNpcSpellsByName(spellName))
-					entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
+					entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8).ToArray()));
 			}
 
 			_sim.World.ZoneForEntity(player).Add(entity);
@@ -1444,7 +1444,7 @@ namespace Faolan.GameServer.World
 			entity.NoRespawn = true;
 
 			foreach (var s in npcType.Spells)
-				entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
+				entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8).ToArray()));
 
 			_sim.World.ZoneForEntity(player).Add(entity);
 			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
@@ -2044,7 +2044,7 @@ namespace Faolan.GameServer.World
 			entity.PatrolWaypoints = pool.Points; // roam the group's area via the #266 wander (no new movement code)
 			entity.ArmPatrolCycle(); // stagger the first wander so they don't all step at once
 			foreach (var s in pool.Type.Spells)
-				entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.Magnitude, s.Rank, s.FlagA, s.FlagB, s.FlagC).ToArray()));
+				entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8).ToArray()));
 
 			zone.Add(entity);
 			return entity;
@@ -2092,7 +2092,7 @@ namespace Faolan.GameServer.World
 			entity.NoRespawn = true; // her corpse fades; the LURE comes back instead (EncounterReset)
 			entity.EncounterLureTemplateId = lure.NpcTemplateId;
 			foreach (var sp in boss.Spells)
-				entity.Spells.Add(new NpcSpellCast(sp.SpellId, new NpcSpellEffect(sp.SpellId, sp.Duration, sp.Magnitude, sp.Rank, sp.FlagA, sp.FlagB, sp.FlagC).ToArray()));
+				entity.Spells.Add(new NpcSpellCast(sp.SpellId, new NpcSpellEffect(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8).ToArray()));
 
 			// Added to the zone only: the interest manager streams a new entity to nearby players on its next pass,
 			// which is how the ambient pools spawn members mid-session too. No explicit broadcast to get wrong.

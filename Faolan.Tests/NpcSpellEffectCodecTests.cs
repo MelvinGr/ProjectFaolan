@@ -29,9 +29,9 @@ namespace Faolan.Tests
 
 			Assert.Equal(700, effect.Duration);
 			Assert.Equal(0x31644900u, effect.SpellId);
-			Assert.Equal(1, effect.Magnitude);
-			Assert.Equal(1, effect.Rank);
-			Assert.Equal(1, effect.FlagB);
+			Assert.Equal(1, effect.DescriptorSlot3);
+			Assert.Equal(1, effect.CastingLevel);
+			Assert.Equal(1, effect.DescriptorSlot0);
 		}
 	}
 }

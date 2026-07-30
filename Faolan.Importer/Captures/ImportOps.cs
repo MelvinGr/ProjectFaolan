@@ -1336,11 +1336,11 @@ namespace Faolan.Importer.Captures
 
 			var fx = NpcSpellEffect.Parse(payload);
 			s.Duration = fx.Duration;
-			s.Magnitude = fx.Magnitude;
-			s.Rank = fx.Rank;
+			s.DescriptorSlot3 = fx.DescriptorSlot3;
+			s.CastingLevel = fx.CastingLevel;
 			s.FlagA = fx.FlagA;
-			s.FlagB = fx.FlagB;
-			s.FlagC = fx.FlagC;
+			s.DescriptorSlot0 = fx.DescriptorSlot0;
+			s.DescriptorSlot8 = fx.DescriptorSlot8;
 		}
 
 		// Upsert (never wipe): refresh from a clean slate so stale handle-keyed (un-named) nodes don't linger. One

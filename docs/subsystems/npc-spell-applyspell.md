@@ -84,6 +84,14 @@ fields) against different spells (spell params), and modelled as `NpcSpell` colu
 did the original diff has been retired). Every one of its offsets is the **low byte** of a u32 in the table
 above, so the two readings agree everywhere; the column names are what changes:
 
+The columns have since been RENAMED to the client's reading (#480): `NpcSpell.FlagB/Magnitude/FlagC/Rank` are now
+`DescriptorSlot0/DescriptorSlot3/DescriptorSlot8/CastingLevel`, and the old `Counter` is gone — it was the low half
+of the u64 expiry stamp, which is session state rather than per-type content.
+
+⚠️ If you ever redo that rename on another table, note that EF's scaffolder paired the old and new names
+**alphabetically** and got three of the four backwards; the migration had to be hand-corrected offset-for-offset,
+and the wrong version migrates and builds cleanly while transposing the bytes.
+
 | empirical | client | reading |
 |---|---|---|
 | `@10–11` u16 `Duration` | `@8` u32 `Duration` | same field, low half — the wide read is the client's |
