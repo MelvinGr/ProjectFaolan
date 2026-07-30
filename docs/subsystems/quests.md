@@ -182,6 +182,54 @@ on the right quest talking to the right NPC, so silence reads as a broken quest.
 ⚠️ It **checks**, it does not **consume**. Retail presumably takes the item, but nothing in the corpus shows the
 removal, and destroying a player's item on an unproven inference is the worse error. Open on Gitea #521.
 
+### The escort ends at the city DOOR, and the farewell follows the completion
+
+Decoded from `xxx_mage-necromancer_login_play_beach-to-enter-tortage_city` (and identical in the `mage-demo`
+twin). The Tortage escort (12407, goal 3544, Casilda) does **not** end on a conversation or a zone change — it
+ends when the player **opens the city door**:
+
+| frame | dir | packet | what |
+|---|---|---|---|
+| 11355 | c2s | `LookAtIIR` (SelectDeselect) | the player selects the door |
+| 11357 | c2s | `BehaviorControlCenterIIR` | the player acts on it — "opens" it |
+| 11363 | s2c | `BehaviorControlCenterIIR` | server acks the action |
+| **11365** | s2c | `QuestGoalIIR` quest `0x3077`=12407, goal `0x0DD8`=3544, 1/1 | **the escort goal completes** |
+| 11365 | s2c | `QuestIIR` state `2` then `4` | Active → Completed |
+| 11366 | s2c | `QuestLogListIIR` | journal refresh |
+| 11370 | s2c | `SetPosIIR` | Casilda is repositioned |
+| **11395** | s2c | `KnubotOpenChatWindowIIR` + `DispatchSetDialogueCamera` + `KnubotAppendTextIIR` + `KnubotAnswerListIIR` | **the farewell conversation opens** |
+| 11401/11413/11418 | c2s | `KnubotAnswerIIR` | the player's three picks |
+| 11419 | s2c | `KnubotCloseChatWindowIIR` | she is done |
+
+⚠️ **Order matters: the quest completes BEFORE the conversation, not because of it.** The door is the trigger; the
+farewell is a separate, server-initiated beat that follows.
+
+The conversation (Casilda, `npcname` = `<localized id="9411" category="51000">`, her template id and goal 3544's
+`TrailingRefId`) reads:
+
+```
+NPC     {camera player size=5 emphasis=1}{hidegoodbye}Friend?
+player  Another gate...
+NPC     {camera size=3 emphasis=1}{social scout}At least this one seems to be unlocked. On the other side, the
+        city awaits us. We're close enough for me to make my own way from here. … but speak with me inside the
+        city, and I'm sure we can come to...some kind of arrangement. {resolvegoal NKBO}
+player  I'll see you inside the city walls.
+NPC     Just remember to say nothing about escaping your captors or killing any slavers. … {resolvegoal NKBO}
+        {gameactiononnpc SendScryEvent EventString RunToTortage}{showgoodbye}
+player  Goodbye!
+NPC     We'll meet again.
+```
+
+`{hidegoodbye}` opens it (the player cannot walk away) and `{showgoodbye}` releases them;
+`{gameactiononnpc SendScryEvent EventString RunToTortage}` is what sends her off. `{resolvegoal <TOKEN>}` is the
+same inline directive that resolves her earlier stage (`BJGY` for 13480) — see Gitea #356.
+
+⚠️ **None of these screens are in `ConversationScreens`.** The extractor keys on a player-initiated
+`TalkToNpc(field3=0)` greeting, and this conversation is opened by the SERVER
+(`KnubotOpenChatWindowIIR`) with no c2s talk, so the whole exchange was skipped at import — screen `13228` and
+its four siblings are absent while the 23 screens reachable by talking to Casilda are present. Tracked in Gitea
+#523.
+
 ### Typing the remaining inert goals is mechanical — the data is what is missing
 
 85 goals are still at the fresh-harvest default. With the objective text readable, typing them is a rule rather

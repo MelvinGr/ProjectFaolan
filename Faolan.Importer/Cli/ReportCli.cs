@@ -75,6 +75,20 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// The NPC-dialogue half of the same encrypted set (categories 50000-50003); --report-arg filters by NPC name.
+			if (report == "ldb-dialogue")
+			{
+				await LdbDialogue(RdbDir(), arg);
+				return 0;
+			}
+
+			// One encrypted string, from a key pasted out of a capture: --report-arg <category>:<id>:<wire key>.
+			if (report == "ldb-decrypt")
+			{
+				LdbDecryptOne(RdbDir(), arg);
+				return 0;
+			}
+
 			// Every report below reads the corpus. It is NOT in this repo (private ProjectFaolan-Data), so say where
 			// to point rather than letting Directory.EnumerateFiles throw a bare path error.
 			if (!Directory.Exists(capturesDir))

@@ -132,6 +132,145 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
+		// `--report ldb-dialogue [--report-arg <npc name>]` - the NPC half of the encrypted set (categories 50000-50003).
+		//
+		// Same join as the quest half: ciphertext from the client's LDB pages, keys from our own tables. A conversation
+		// SCREEN carries its own (Category, ScreenId, Key1..4), so each line of dialogue decrypts independently.
+		//
+		// Ordered by the node's ANSWER PATH, because that is the shape of the conversation: "" is the greeting, and each
+		// deeper path is what the NPC says after the option the player picked. Reading a whole NPC in path order is how
+		// you find a specific beat - a farewell, a hand-off, a quest grant - rather than guessing which screen it is.
+		private static async Task LdbDialogue(string rdbDir, string? npcFilter)
+		{
+			var ciphertext = EncryptedLdbBlobs(rdbDir);
+			if (ciphertext.Count == 0)
+			{
+				Console.WriteLine("ldb-dialogue: no ENGLISH encrypted LDB pages found - is RdbDir pointing at the client's RDB folder?");
+				return;
+			}
+
+			await using var db = OpenDb();
+
+			var nodes = await db
+				.Set<ConversationNode>().AsNoTracking()
+				.Where(n => npcFilter == null || n.NpcName == npcFilter)
+				.Select(n => new { n.Id, n.NpcName, n.TypeId, n.AnswerPath, n.ConditionQuestId, n.ConditionQuestState, n.GrantQuestId })
+				.ToListAsync();
+
+			if (nodes.Count == 0)
+			{
+				Console.WriteLine($"ldb-dialogue: no conversation nodes for '{npcFilter}'.");
+				return;
+			}
+
+			var ids = nodes.Select(n => n.Id).ToHashSet();
+			var screens = await db
+				.Set<ConversationScreen>().AsNoTracking()
+				.Where(s => ids.Contains(s.ConversationNodeId))
+				.Select(s => new { s.ConversationNodeId, s.PacketSequence, s.Sequence, s.Category, s.ScreenId, s.Key })
+				.ToListAsync();
+
+			var byNode = screens.ToLookup(s => s.ConversationNodeId);
+
+			Console.WriteLine($"=== dialogue: {nodes.Count} node(s), {screens.Count} screen(s) ===");
+			int ok = 0, failed = 0;
+			foreach (var node in nodes.OrderBy(n => n.NpcName).ThenBy(n => n.AnswerPath.Length).ThenBy(n => n.AnswerPath))
+			{
+				// The gate is the interesting part on a quest NPC: a screen served only while quest N is in state S is
+				// how retail scripts a hand-off, so print it beside the path rather than leaving it in the DB.
+				var gate = node.ConditionQuestId is { } q
+					? $"  [if quest {q} state {node.ConditionQuestState}]"
+					: "";
+				var grant = node.GrantQuestId is { } g
+					? $"  [grants quest {g}]"
+					: "";
+				Console.WriteLine($"\n-- {node.NpcName}  type={node.TypeId}  path='{node.AnswerPath}'{gate}{grant}");
+
+				foreach (var s in byNode[node.Id].OrderBy(s => s.PacketSequence).ThenBy(s => s.Sequence))
+				{
+					string text;
+					if (s.Key.IsEmpty)
+						text = "(no key captured)";
+					else if (!ciphertext.TryGetValue((s.Category, s.ScreenId), out var blob))
+						text = $"(no LDB[{s.Category}][{s.ScreenId}] on an English page)";
+					else
+					{
+						var plain = LdbKey.Decrypt(blob, s.Key);
+						if (plain == null)
+						{
+							text = "(DECRYPT FAILED)";
+							failed++;
+						}
+						else
+						{
+							text = plain;
+							ok++;
+						}
+					}
+
+					Console.WriteLine($"   [{s.PacketSequence}.{s.Sequence}] cat {s.Category} id {s.ScreenId}: {Flatten(text)}");
+				}
+			}
+
+			Console.WriteLine($"\ndecrypted {ok}/{screens.Count}; {failed} FAILED");
+		}
+
+		// `--report ldb-decrypt --report-arg <category>:<id>:<wire key>` - decrypt ONE encrypted LDB string from a key
+		// supplied on the command line rather than from our tables.
+		//
+		// This is the ad-hoc counterpart to the two reports above, and it exists because the readable set is bounded by
+		// what we have HARVESTED, not by what we can decrypt: find a `<remoteformat id=.. category=.. key=..>` in a
+		// capture and you can read it immediately, without first teaching the importer to store it. That is how the
+		// screens we do not hold get identified in the first place.
+		//
+		// The key is taken in its WIRE form, escaped exactly as it appears in the XML attribute - LdbKey.Decode
+		// unescapes it - so it can be pasted straight out of a capture with no hand-editing.
+		private static void LdbDecryptOne(string rdbDir, string? arg)
+		{
+			// SEVERAL triples may be given, separated by '='. Reading a whole conversation out of a capture is the normal
+			// case, and the LDB pages are parsed ONCE for the batch rather than per string.
+			//
+			// ⚠️ The separator has to survive BOTH the alphabet and the XML ESCAPING. Only ':;<=>' are outside the base-85
+			// alphabet, which rules out ',' - but ';' is no good either, because it TERMINATES an entity and a wire key is
+			// escaped (`&amp;`, `&quot;`, `&#92;`): splitting on ';' tears `H1w&amp;.6T...` into pieces. ':' is already
+			// the field separator inside a triple, so '=' it is.
+			var entries = (arg ?? "").Split('=', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+			if (entries.Length == 0)
+			{
+				Console.WriteLine("ldb-decrypt: --report-arg <category>:<id>:<wire key>[=<category>:<id>:<wire key>...]");
+				return;
+			}
+
+			var ciphertext = EncryptedLdbBlobs(rdbDir);
+			foreach (var entry in entries)
+			{
+				var parts = entry.Split(':', 3);
+				if (parts.Length != 3 || !uint.TryParse(parts[0], out var category) || !uint.TryParse(parts[1], out var id))
+				{
+					Console.WriteLine($"  '{entry}': expected <category>:<id>:<wire key>");
+					continue;
+				}
+
+				var key = LdbKey.Decode(parts[2]);
+				if (key == null)
+				{
+					Console.WriteLine($"  LDB[{category}][{id}]: '{parts[2]}' is not a well-formed key (it must unescape to exactly {LdbKey.KeyLength} characters from the base-85 alphabet).");
+					continue;
+				}
+
+				if (!ciphertext.TryGetValue((category, id), out var blob))
+				{
+					Console.WriteLine($"  LDB[{category}][{id}]: not on any ENGLISH encrypted page ({ciphertext.Count} strings loaded).");
+					continue;
+				}
+
+				var plain = LdbKey.Decrypt(blob, key);
+				Console.WriteLine(plain == null
+					? $"  LDB[{category}][{id}]: did NOT decrypt with that key - they belong to different strings."
+					: $"  LDB[{category}][{id}] = {plain}");
+			}
+		}
+
 		// Every quest's decryptable quest-level slots (title, summary, solved text, ...), keyed by quest id. Only slots
 		// whose category is one of the encrypted ones AND whose key decrypts are included - a plaintext slot is already
 		// readable elsewhere and a keyless one has nothing to say here.
