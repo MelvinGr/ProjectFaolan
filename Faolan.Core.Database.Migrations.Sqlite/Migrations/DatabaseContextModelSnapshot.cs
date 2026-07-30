@@ -1756,6 +1756,72 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("MapAreas");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazard", b =>
+                {
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Damage")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("EffectSpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Lethal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("MaxX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("MaxY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("MaxZ")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("MinX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("MinY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("MinZ")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MapId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("MapHazards");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazardVertex", b =>
+                {
+                    b.Property<uint>("HazardId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("X")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("Z")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("HazardId", "Sequence");
+
+                    b.ToTable("MapHazardVertices");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapLootEntry", b =>
                 {
                     b.Property<uint>("MapId")
@@ -4192,6 +4258,28 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Map");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazard", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
+                        .WithMany()
+                        .HasForeignKey("MapId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Map");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazardVertex", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.MapHazard", "Hazard")
+                        .WithMany("Vertices")
+                        .HasForeignKey("HazardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Hazard");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapLootEntry", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
@@ -4692,6 +4780,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Objects");
 
                     b.Navigation("RespawnPoints");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazard", b =>
+                {
+                    b.Navigation("Vertices");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>

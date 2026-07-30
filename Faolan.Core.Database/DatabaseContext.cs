@@ -62,6 +62,8 @@ namespace Faolan.Core.Database
 		DbSet<MailAttachment> MailAttachments { get; }
 		DbSet<Map> Maps { get; }
 		DbSet<MapArea> MapAreas { get; }
+		DbSet<MapHazard> MapHazards { get; }
+		DbSet<MapHazardVertex> MapHazardVertices { get; }
 		DbSet<MapLootEntry> MapLootEntries { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<NpcChatter> NpcChatter { get; }
@@ -152,6 +154,8 @@ namespace Faolan.Core.Database
 		public DbSet<MailAttachment> MailAttachments { get; set; }
 		public DbSet<Map> Maps { get; set; }
 		public DbSet<MapArea> MapAreas { get; set; }
+		public DbSet<MapHazard> MapHazards { get; set; }
+		public DbSet<MapHazardVertex> MapHazardVertices { get; set; }
 		public DbSet<MapLootEntry> MapLootEntries { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<NpcChatter> NpcChatter { get; set; }
@@ -271,6 +275,10 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade); // #367
 			modelBuilder.Entity<Spell>().HasMany<SpellEffect>().WithOne(e => e.Spell).OnDelete(DeleteBehavior.Cascade);
 
+			// A hazard's boundary polygon (#504); cascade-delete with the hazard so a re-import of the RDB volumes never
+			// leaves orphan vertices behind.
+			modelBuilder.Entity<MapHazard>().HasMany(h => h.Vertices).WithOne(v => v.Hazard).OnDelete(DeleteBehavior.Cascade);
+
 			// Both ends cascade: deleting a character drops its own list AND its entries in everyone else's, so no
 			// friend row can outlive either character. Fluent because no attribute expresses OnDelete, and NoAction on
 			// the second FK would be needed on a provider that rejects two cascade paths to one table - SQLite and
@@ -385,6 +393,7 @@ namespace Faolan.Core.Database
 			// BaseEntity) - an attribute cannot be applied to an inherited property.
 			modelBuilder.Entity<NpcSpawn>().Property(n => n.Id).ValueGeneratedNever();
 			modelBuilder.Entity<NpcSpawnArea>().Property(a => a.Id).ValueGeneratedNever();
+			modelBuilder.Entity<MapHazard>().Property(h => h.Id).ValueGeneratedNever();
 			modelBuilder.Entity<WorldObject>().Property(o => o.Id).ValueGeneratedNever();
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<ConversationPacket>().HasMany(p => p.Screens).WithOne(s => s.Packet).OnDelete(DeleteBehavior.Cascade);

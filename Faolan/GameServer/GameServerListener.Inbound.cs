@@ -155,6 +155,15 @@ namespace Faolan.GameServer
 					if (moveEntity != null)
 						await CheckPlayerReachGoals(client, moveEntity, livePosition);
 
+					// #495/#504: the world's own damage sources. Fall damage lands HERE rather than on the world tick
+					// because a fall's size is only known on the record that reports the landing, and a hazard's client-
+					// named trigger is `playerenter` - i.e. the crossing. Runs on the ACCEPTED position, so a rooted
+					// spellweaver cannot be walked into lava by a move the server rejected. It reads no "previous
+					// position" (the entity's is already committed above): the fall's apex is seeded from
+					// WorldEntity.LastGroundedY, which the service maintains itself.
+					if (moveEntity != null)
+						await _environment.OnPlayerMoved(client, moveEntity, livePosition, moveFlags);
+
 					// Moving cancels an in-flight cast (#347): a real TRANSLATION invalidates the deferred Resolve()
 					// via the cast token. Turning in place leaves the position unchanged, so aiming a ground-target
 					// reticle never self-cancels, and a pinned spellweave (delta 0) can't cancel its own trance. The

@@ -23,6 +23,76 @@ namespace Faolan.Core.Network.Codecs.Combat
 		{
 			return new StatDamage(target, statValue, delta, (DamageSchool)school, caster, idx, spellBaseId).ToArray();
 		}
+
+		// The ENVIRONMENTAL variant of the same record - what retail sends for fall damage (#495/#504). See
+		// EnvironmentalDamage for why it is a separate shape rather than a StatDamage with zeroed fields.
+		public static byte[] BuildEnvironmentalDamage(uint target, uint amount, uint statId, uint school)
+		{
+			return new EnvironmentalDamage(target, amount, statId, school).ToArray();
+		}
+	}
+
+	// StatDamageIIR (0xE9F24184), the ENVIRONMENTAL form: the record retail sends when the WORLD damages a player
+	// rather than a creature - decoded from all 28 fall events in the corpus (#495/#504). Same IIR type and the same
+	// 17 trailing words as StatDamage, but a different GRAMMAR, which is why it is its own codec:
+	//
+	//   [subop][class][target][env=0][u32 amount][0][0][0][u32 statId][u32 0][i32 -amount][u32 school][0 x9]
+	//
+	// Three differences from the combat form, all load-bearing:
+	//
+	//   * The word StatDamage calls `statValue` is the DAMAGE MAGNITUDE here, not the target's resulting health, and
+	//     the delta is exactly its negation. Proven by consecutive falls: in chat-annotated-3 three falls 7 s apart
+	//     carry 50994 -> 14076 -> 219125, which cannot be a health track (nothing heals 2050 health in 7 s, and the
+	//     second record's own delta implies a starting value the first contradicts). The client applies the delta to
+	//     the health it already holds; nothing here tells it a total.
+	//   * The count word (StatDamage's constant 2) is **0**, and every word after the school is 0 too - no
+	//     EntityClass marker, no caster handle, no effect idx, no spell id, and not the trailing 1. There is no
+	//     caster: the world is not an entity.
+	//   * The school is 12, outside the 0..10 the combat DamageSchools occupy (FallDamage.EnvironmentalSchool).
+	//
+	// ⚠️ No DamageResultIIR accompanies it - a fall renders no floating combat number, so do not pair this with
+	// SendDamageNumber the way the melee path does.
+	public sealed record EnvironmentalDamage(uint Target, uint Amount, uint StatId, uint School) : ICodec<EnvironmentalDamage>
+	{
+		public static EnvironmentalDamage Read(FaolanStream s)
+		{
+			s.ReadUInt32(); // subop (StatDamageIIR)
+			s.ReadUInt32(); // class
+			var target = s.ReadUInt32();
+			s.ReadByte(); // env 0
+			var amount = s.ReadUInt32();
+			s.ReadUInt32(); // 0
+			s.ReadUInt32(); // 0
+			s.ReadUInt32(); // 0
+			var statId = s.ReadUInt32();
+			s.ReadUInt32(); // 0 - the count word, which the combat form sets to 2
+			s.ReadUInt32(); // -amount
+			var school = s.ReadUInt32();
+			for (var i = 0; i < 9; i++)
+				s.ReadUInt32(); // the whole caster/spell tail, absent from an environmental hit
+
+			return new EnvironmentalDamage(target, amount, statId, school);
+		}
+
+		public void Write(FaolanStream s)
+		{
+			s
+				.WriteUInt32(GameServer0X2000Opcodes.StatDamageIIR)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(Target)
+				.WriteByte(0)
+				.WriteUInt32(Amount)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(StatId)
+				.WriteUInt32(0)
+				.WriteUInt32((uint)-(int)Amount)
+				.WriteUInt32(School);
+
+			for (var i = 0; i < 9; i++)
+				s.WriteUInt32(0);
+		}
 	}
 
 	// DamageResultIIR (0xFEC4158A): the floating combat-damage number shown over the target. Decoded fields:

@@ -3,6 +3,7 @@ using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Progression;
 using Xunit;
 
 namespace Faolan.Tests
@@ -27,6 +28,33 @@ namespace Faolan.Tests
 			var rt = DamageResult.Read(new FaolanStream(built));
 			Assert.Equal(83u, rt.Damage);
 			Assert.Equal(DamageSchool.Piercing, rt.School);
+			Assert.Equal(built, rt.ToArray());
+		}
+
+		// The ENVIRONMENTAL form of StatDamageIIR - fall damage (#495/#504). Golden:
+		// NecroL80_mage-necromancer_login_gameplay_chat-annotated-3 frame 11451 (19:43:30.109), the 11.9-unit fall that
+		// also applied Bruised Body. Stat 0x1B (Health), school 12, and every caster/spell word zero.
+		//
+		// This being a SEPARATE codec from StatDamage is the point of the test: the combat form's `statValue` is the
+		// target's resulting health and its count word is 2, while here the first word is the DAMAGE MAGNITUDE (219125 =
+		// 2191.25 health), the delta is exactly its negation, and the count word is 0. Building this with the combat
+		// builder would put an EntityClass marker at word 8 and a 1 at word 13, neither of which retail sends.
+		[Fact]
+		public void EnvironmentalDamage_IsByteIdentical()
+		{
+			var captured = Convert.FromHexString(
+				"e9f241840000c3500802e5d400000357f50000000000000000000000000000001b00000000fffca80b0000000c000000000000000000000000000000000000000000000000000000000000000000000000");
+
+			var built = CombatEffectBuilder.BuildEnvironmentalDamage(0x0802E5D4, 219125, (uint)CharacterStatId.HealthCurrent, FallDamage.EnvironmentalSchool);
+
+			Assert.Equal(captured, built);
+
+			// ICodec round-trip.
+			var rt = EnvironmentalDamage.Read(new FaolanStream(built));
+			Assert.Equal(0x0802E5D4u, rt.Target);
+			Assert.Equal(219125u, rt.Amount);
+			Assert.Equal((uint)CharacterStatId.HealthCurrent, rt.StatId);
+			Assert.Equal(FallDamage.EnvironmentalSchool, rt.School);
 			Assert.Equal(built, rt.ToArray());
 		}
 

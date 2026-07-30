@@ -33,7 +33,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : RpcServer, IWorldOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, IGameServerProvider
+	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -171,6 +171,10 @@ namespace Faolan.GameServer
 		// Persists equip/unequip/inventory-move/drop/split actions to the DB (no packet sends). The Inbound
 		// handlers call into it. Composed collaborator, like CombatService. See Inventory/EquipmentService.cs.
 		private readonly EquipmentService _equipment;
+
+		// Composed collaborator: non-combat damage - fall damage + the scripted hazard volumes (#495/#504). See
+		// World/EnvironmentService.cs.
+		private readonly EnvironmentService _environment;
 		private readonly FeatService _feats;
 
 		private readonly IChatServerDispatcher _agentServerDispatcher;
@@ -278,6 +282,10 @@ namespace Faolan.GameServer
 			_bank = new BankService(database, logger, this);
 			_claims = new ClaimService(database, logger, this, agentServerDispatcher);
 			_feats = new FeatService(database, logger, agentServerDispatcher, DoTeleport);
+			// #495/#504: "the world damaged you" - fall damage and the scripted hazard volumes. Driven from the move
+			// handler (both triggers are edges on the player's own position stream), reaching the wire through
+			// IEnvironmentOutbound, which this listener implements (GameServerListener.Combat.cs).
+			_environment = new EnvironmentService(database, this, logger);
 
 			InitGmCommands();
 		}

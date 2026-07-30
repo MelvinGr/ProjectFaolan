@@ -75,6 +75,10 @@ namespace Faolan.GameServer.World
 		// apply: equal for a self-buff, applyTo=player + applyFrom=NPC for an NPC-cast debuff (#274).
 		Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId);
 
+		// Apply a spell to the player as a self-buff (ApplySpell, caster == subject), taking the WIRE id
+		// ((base << 8) | rank). The tick needs it for the death penalty, which is applied at the moment of death.
+		Task ApplySelfBuff(INetworkClient client, uint wireSpellId);
+
 		// The floating combat-damage number over the player when an NPC hits them: DamageResultIIR (0xFEC4158A),
 		// target=player + attacker=NPC (the player-attacks-NPC direction already rides CombatService). #274.
 		Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage);

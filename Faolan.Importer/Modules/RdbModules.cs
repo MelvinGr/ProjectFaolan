@@ -288,6 +288,35 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// Lava hazard volumes from the client's bounded-area trigger table (RDB type 1000053, #504). Clean rebuild - the
+	// set is fully derived from the fixed client RDB, so Overwrite-only.
+	public sealed class RdbHazardsModule : IImportModule
+	{
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Overwrite
+		};
+
+		public ImportSource Source => ImportSource.Rdb;
+
+		public string Description => "Lava hazard volumes from the RDB bounded-area trigger table (1000053, #504).";
+		public string Name => "rdb-hazards";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var r = await RdbHazardImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
+			// Every rejected lava-named area is REPORTED with its reason rather than silently dropped - a quiet skip in
+			// an importer is data loss nobody notices for months.
+			foreach (var note in r.Notes)
+				ctx.Out.WriteLine($"  rdb-hazards skipped {note}");
+
+			return new ImportResult($"{r.Hazards} lava hazard volumes ({r.Vertices} vertices) across {r.Maps} playfields " +
+			                        $"({r.SkippedAreas} lava-named areas skipped, {r.Unreadable} unreadable).");
+		}
+	}
+
 	// Authoritative open-world NPC spawn points from the RDB "NPC roam/movement" layout (type 1010506, #332). Clean
 	// rebuild - the set is fully derived from the fixed client RDB, so Overwrite-only.
 	public sealed class RdbNpcSpawnsModule : IImportModule

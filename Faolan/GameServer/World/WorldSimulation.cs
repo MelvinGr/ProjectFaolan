@@ -13,6 +13,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.Core.Progression;
 using Faolan.GameServer.Combat;
 using Microsoft.Extensions.Logging;
 
@@ -1136,10 +1137,25 @@ namespace Faolan.GameServer.World
 					// debuff icon stuck on the bar (counting down) after resurrect - we must send each one's end-twin
 					// removal so the client drops the icon too. Do it BEFORE the dead-state BccIIR (these are plain
 					// debuff removals, not the wave-triggering death-effect spell SendDeathScreen deliberately skips).
+					// The death penalty is chosen from what the player is STILL carrying, so read it before the strip.
+					// The tiers STACK (DeathPenalty documents the wire evidence): the Nth concurrent penalty is the spell
+					// named "Death Penalty N", so the live buff set is the death counter.
+					var penalty = DeathPenalty.NextTier(pair.Value.ActiveBuffs.Keys.Select(id => id >> 8));
+
 					foreach (var buff in pair.Value.ActiveBuffs)
 						await _output.SendBuffRemoval(client, pair.Value.Handle, buff.Value.CasterHandle, buff.Key);
 					pair.Value.ActiveBuffs.Clear();
 					await _output.SyncBuffStats(client); // #367: death strips the buffs, so it strips their stats too
+
+					// AFTER the strip, never before. Retail sends the new penalty's apply in the same batch as the
+					// end-twins of everything else (chat-annotated-4, 20:24:08), so applying it first would just have the
+					// strip above remove it again. A fourth death inside 30 minutes adds nothing - there is no
+					// "Death Penalty 4" anywhere in the corpus - and NextTier returns 0 for that.
+					if (penalty != 0)
+					{
+						await _output.ApplySelfBuff(client, penalty << 8);
+						_logger.LogInformation("Combat: {Player} picked up death penalty spell {Penalty}.", character.Name, penalty);
+					}
 					// Persist the dead state (#214) so a logout-while-dead returns dead - the login snapshot then
 					// carries current-health = 0 and the client shows the release window at world entry.
 					character.IsDead = true;

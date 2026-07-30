@@ -12,6 +12,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<RespawnPoint?> GetDefaultSpawn(uint mapId);
 		Task<Map?> GetMap(uint id);
 		Task<MapArea[]> GetMapAreas(uint mapId);
+		Task<MapHazard[]> GetMapHazards(uint mapId);
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<Map[]> GetMaps();
 		Task<QuestArea[]> GetQuestAreas();
@@ -50,6 +51,18 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.MapAreas.Where(a => a.MapId == mapId).ToArrayAsync();
+		}
+
+		// The scripted hazard areas of a playfield - the regions that hurt or kill on entry (#504). Includes the
+		// boundary polygon: containment is a point-in-polygon test, so a hazard without its vertices is not a hazard.
+		// (Lazy loading is deliberately off, so the Include is required - see CLAUDE.md.)
+		public async Task<MapHazard[]> GetMapHazards(uint mapId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.MapHazards.Where(h => h.MapId == mapId)
+				.Include(h => h.Vertices)
+				.ToArrayAsync();
 		}
 
 		public async Task<Item[]> GetMapLootSample(uint mapId, int count)

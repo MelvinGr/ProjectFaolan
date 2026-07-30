@@ -56,6 +56,30 @@ namespace Faolan.GameServer.World
 		// persisted: it exists so the tick can tell a CROSSING (banner) from merely still being inside the area.
 		public uint CurrentAreaNameId { get; set; }
 
+		// Fall tracking (#495/#504). The client tells us it is off the ground in every move record: `flag1` clears
+		// NoAccelerationVector while airborne, because it starts sending an acceleration vector the instant the
+		// character leaves the ground (see MoveFlag). So the server needs no physics of its own - it watches that bit
+		// and measures the drop between the airborne run's HIGHEST point and where the run ended.
+		//
+		// The apex, not the takeoff height: a jump rises before it falls, and the fall that hurts is measured from the
+		// top of the arc. In chat-annotated-3's 19:43:30 fall the player jumps from y=324.6 up to 327.0 and lands at
+		// 315.1 - 11.9 units of fall, not the 9.5 the takeoff height would give.
+		public bool Airborne { get; set; }
+
+		// The highest Y reached during the current airborne run; meaningless while grounded.
+		public float AirborneApexY { get; set; }
+
+		// The Y of the last move that was still on the GROUND. This, not the previous position, is what seeds a fall's
+		// apex: a fall off a ledge has no rising samples at all, so its highest point is the ground it left. Tracked
+		// here rather than read from Position because the move handler commits the new position BEFORE the fall check
+		// runs, at which point "the previous position" is no longer available to compare against.
+		public float LastGroundedY { get; set; }
+
+		// The MapHazard.Id the player is currently standing in, or null for none (#504). Same crossing-vs-inside role
+		// as CurrentAreaNameId above: a hazard fires on ENTRY (the client's own feedback token names the trigger
+		// `playerenter(3)`), so re-firing it every tick while the player burns would be wrong.
+		public uint? CurrentHazardId { get; set; }
+
 		// The creature's death-animation behaviorId (the death BccIIR field-1, #362), from its NpcTemplate. Defaults to
 		// the humanoid biped death (WorldDeath.HumanoidDeathBehaviorId); overridden per-type where harvested (demon /
 		// quadruped). Read by CombatService.OnNpcKilled when it sends the death BccIIR.

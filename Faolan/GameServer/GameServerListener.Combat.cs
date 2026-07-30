@@ -83,5 +83,29 @@ namespace Faolan.GameServer
 		{
 			return CombatService.SendStatDamage(client, targetHandle, statValue, delta, type, casterHandle, spellBaseId);
 		}
+
+		// IEnvironmentOutbound (#495/#504). The StatDamageIIR ENVIRONMENTAL form - no caster, no spell, and NO paired
+		// DamageResult, because retail renders no floating combat number for a fall (CombatEffectBuilder).
+		Task IEnvironmentOutbound.SendEnvironmentalDamage(INetworkClient client, uint targetHandle, uint amount, uint statId, uint school)
+		{
+			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(CombatEffectBuilder.BuildEnvironmentalDamage(targetHandle, amount, statId, school))));
+		}
+
+		Task IEnvironmentOutbound.PushVitals(INetworkClient client, EntityVitals vitals)
+		{
+			return ((IWorldOutbound)this).PushVitals(client, vitals);
+		}
+
+		Task IEnvironmentOutbound.ApplySelfBuff(INetworkClient client, uint wireSpellId)
+		{
+			return ((ISpellEffectOutbound)this).ApplySelfBuff(client, wireSpellId);
+		}
+
+		// Same op, third port: the world tick applies the death penalty at the moment of death (#504).
+		Task IWorldOutbound.ApplySelfBuff(INetworkClient client, uint wireSpellId)
+		{
+			return ((ISpellEffectOutbound)this).ApplySelfBuff(client, wireSpellId);
+		}
 	}
 }
