@@ -249,6 +249,64 @@ page declines to classify by regex, confirming it exists and is identifiable onl
 and `NpcStatCore.ClientScryScript` — the obvious place an NPC-attached trigger script would live — is **NULL for
 all 1,018 rows**, so nothing in our data currently describes the NPC-side mechanism either.
 
+## The `quest-goal` bucket — and the discovery volumes hiding in it
+
+57 regions over 30 maps by name, holding four different things:
+
+- **Named quest regions** — `QUEST Threat of the Vanir`, `Quest_TheCowardWay`, `Quest_Who_Is_Wretched`,
+  `BA_CasildaScreamAndQuestNPCTutorial` (our #261 Casilda tutorial, on Tortage Island).
+- **Quest FAIL volumes** — `FailQuestBetrayer`, `FailQuestToungues` on Gateway to Khitai. Leaving a region fails
+  the quest; we have no such mechanic.
+- **Discovery volumes** — `BA_*_RezDiscovery`, `FrostFields_Discovery`, `FotD_Discovery`, `BA_CampDiscovery`.
+- A generic `BA_Quest_GenericPlayerSolveGoal` on Conarch Village.
+
+⚠️ **The bucket under-counts the real quest regions**, because retail names a region after the PLACE, not the
+quest — the "enter the jungle" region below is called `Jungle Main` and classifies as uncategorised. Name-based
+bucketing finds the ones a designer happened to label `Quest*`; it cannot find the rest.
+
+### ReachArea goals: one real match, and no id link
+
+We hold 10 `QuestGoalType.ReachArea` goals, but **only one is a retail region goal**: quest 10238 goal 1448
+("Enter the jungle") carries `TrailingRefId 180` in `TrailingCategory 51200`, a region reference. The other nine
+are our own seeds, marked by the `TrailingCategory = 100` we assign, so there is nothing retail to look up for
+them.
+
+For that one goal the client's region is obvious and our approximation is poor:
+
+| | trigger |
+|---|---|
+| ours | a **40-unit radius** around the goal's marker (416, 701) |
+| the client | `Jungle Main`, a 13-vertex polygon spanning **392 × 529** units |
+
+The marker sits inside it, and so does Saddur (521, 757) — the quest's *second* goal — further into the same
+jungle, which is the order the quest is played in. So the marker is a **map pin**, not the trigger; the trigger is
+a named region many times larger.
+
+⚠️ But there is **no id link to exploit**. Tortage Island's regions carry no `<Guid>` at all, and `BoundedAreaID`
+is a per-playfield index (`Jungle Main` is `-65516`, i.e. low word 20) rather than the goal's `180`. So a goal
+would have to be matched to a region by geometry plus a judgement call on the name — and even goal 1448's marker
+falls inside **four** regions (`Jungle Main`, `Jungle Main Music`, `Trappers Haven`, a beach collision volume).
+Picking the right one is a human decision, not a lookup.
+
+### The discovery volumes DO map onto data we hold
+
+The one place in this bucket where the client's geometry lines up with something we already run. **13 of the 16
+discovery-named regions contain one of our `RespawnPoint` rows**, by name as well as position —
+`BA_MountainGlade_RezDiscovery`, `BA_CascadeFalls_RezDiscovery`, `BA_CimmerianSettlement_RezDiscovery` on Conall's
+Valley, `BA_HoCRezDiscovery` on House of Crom and its three instance copies.
+
+And they say our radius is wrong. `WorldSimulation.RespawnDiscoveryRange` is a hardcoded **30 units** — a 60 × 60
+box with no vertical bound — while the real volumes are:
+
+| kind | footprint | prism height |
+|---|---|---|
+| res-point discovery (11 regions) | **16 × 20 to 29 × 33** | ~10 units |
+| area discovery (`FrostFields_Discovery`, `FotD_Discovery`) | 157 × 185, 114 × 74 | 50–60 units |
+
+So we discover a resurrection point from roughly **twice** the distance retail requires, ignoring height entirely
+— and the two large ones are a different mechanic (zone discovery) that we do not implement at all. Tracked in
+Gitea #519.
+
 ## Import
 
 `RdbHazardImporter` (the opt-in `rdb-hazards` module) reads the lava volumes into `MapHazard` +
