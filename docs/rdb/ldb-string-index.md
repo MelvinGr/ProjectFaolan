@@ -48,7 +48,8 @@ bundles several — the one at hand carries seven for the spell-name category:
 | Korean | 3987257 |
 
 The per-entry second u32 (`langOrFlags`) is *not* a clean language selector (it is `0` for almost every entry),
-and the page header's `flags` word is `0` on every page — so neither says the language.
+and the page header's `flags` word is an ENCRYPTION flag rather than a language one (see below) — so neither
+says the language.
 
 ### The client declares it: the language record (RDB type `1030001`, `TDL1`)
 
@@ -235,7 +236,7 @@ carries, and writing `TargetName` from the LDB would be **cosmetic**, not enabli
 on the two goals where a human did set it — Saddur, Scavenger Tuut — `TargetName` equals `NpcTemplates.Name` for
 that exact ref.)
 
-## Eleven categories are ENCRYPTED, and the key is not in the client
+## Eleven categories are ENCRYPTED — SOLVED: the server sends a per-string key
 
 The page header's `flags` word is an **encryption flag** — the earlier note that it "is `0` on every page" was
 written from plaintext categories only. It separates the two sets perfectly:
@@ -248,28 +249,43 @@ written from plaintext categories only. It separates the two sets perfectly:
 The encrypted eleven are exactly the **NPC conversation text** (`50000`–`50003`) and the **quest text**
 (`50300`–`50306`) — quest names, task names, descriptions, solved text and goal names for the whole game.
 
-What the ciphertext shows: an **8-byte block cipher in ECB** with no per-page nonce. Identical plaintext blocks
-produce identical ciphertext across *different language pages* (id 188's 40 bytes are byte-identical on the
-French, German, English and Spanish pages, and ids 233/234/235 share leading blocks pairwise), and 11.2 % of all
-10.8 M ciphertext blocks repeat. The 16 bytes at `[32..48)` are **not** the key — they are genuinely the MD5 of
-the encrypted blob, verified.
+### The recipe
 
-**The key was searched for and not found.** A brute-forcer tries every 16-byte window at **stride 1** as a
-TEA/XTEA key, decrypts the first block of eight different strings and requires every plaintext byte to be
-printable ASCII or NUL — positive-controlled against a planted key in a random haystack (found, no false
-positives). Searched, with the block set taken from each of the seven language pages in turn:
+**Every encrypted string is addressed by a `<remoteformat>` the SERVER sends, and that element carries the key.**
 
-| target | candidates | hits |
-|---|---:|---:|
-| `AgeOfConan.exe`, `AgeOfConanDX10.exe` | 34.6 M + 34.5 M each × 7 pages | 0 |
-| `ConanPatcher.exe`, `SimpleConfig.exe` | 4.2 M | 0 |
-| every decompressed LDB / bounded-area / language / resurrection record | 2,612 files | 0 |
-| the decoded wire corpus — every `BodyHex`/`HeaderExtraHex` of 412,159 packets over 119 captures | 95.1 MB | 0 |
+```xml
+<remoteformat id="1448" category="50304" key="pARATX1!DX]&#92;So+0*A9B" knubot="0"  ></remoteformat>
+```
 
-So the key is not a contiguous 16-byte constant in any client binary, in the RDB records examined, or anywhere in
-the captured traffic. That leaves it assembled from separate constants at runtime, derived (a KDF over something),
-or a cipher other than TEA/XTEA. Note the wire result is the weakest of the four: a key delivered inside an
-encrypted login block would not appear as plaintext there. Open work: Gitea #520.
+1. The `key` attribute is **XML-escaped on the wire** (310,070 of the corpus's 442,301 `key=` attributes carry an
+   entity). Unescape it: the result is **exactly 20 characters** — the client asserts exactly that,
+   `sKey.length() == 20` in `ldbface.cpp:37`.
+2. Split the 20 characters into **4 groups of 5**, each decoded as **base-85** into one key word:
+   `w = w * 85 + (c - 0x21)`, after aliasing `'v'..'z'` (0x76–0x7a) down by `0x3c`. That is the client's
+   `FUN_00622080`.
+3. Those four words are a **128-bit TEA key**. Decrypt **TEA-ECB, 32 rounds, little-endian block words** — the
+   client's `FUN_00a8f550`, which is byte-for-byte the `Tea.DecryptEcb` we already have for item templates.
+4. The plaintext is UTF-8, NUL-padded to the 8-byte block.
+
+Verified end to end: all **168** quest objective texts we hold a key for decrypt to sensible English —
+`LDB[50304][1448]` = **"Enter the jungle"**, `[3490]` = **"Kill slavemaster Saddur"**, `[3497]` = **"Bring the
+three stone bricks to Turach"**, `[11712]` = "Overcome the emperor's manifested nightmares".
+
+### Why this is a *server* secret, not a client one
+
+The key never lives in the client, which is why searching for it there failed: a stride-1 TEA/XTEA scan of both
+exes, the patcher, 2,612 decompressed RDB records and 95 MB of decoded wire payloads found nothing, and the
+scanner was positive-controlled. It was looking for a 16-byte binary constant; the key is a **20-character
+base-85 string, different for every string, delivered per reference**.
+
+⚠️ **We already hold these keys** — they were harvested from captures and are sitting in
+`QuestGoalDefinition.ObjectiveKey` / `TrailingKey`, `QuestArea.AreaTitleKey` / `MapKey` / `RegionKey` and
+`QuestTextRef.KeyText`, stored in their **escaped wire form** because they are reproduced byte-exact into the
+XML attribute. That is also why the retail client renders our quest journal correctly: we replay the captured
+keys, so it can decrypt its own LDB.
+
+The corollary is the limit: **a string we have never captured a key for stays unreadable.** The cipher is broken;
+the coverage is bounded by the corpus.
 
 ## Still open
 
