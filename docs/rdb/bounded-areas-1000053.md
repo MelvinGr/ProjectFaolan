@@ -204,6 +204,50 @@ cannot populate a single one of them — the blocker is the creature CATALOG (tr
 
 **Nothing from this bucket is imported.** It is checked, and the check is the result.
 
+## The `encounter` bucket is real trigger volumes — but not for proximity encounters
+
+625 regions over 138 maps, and they behave like genuine server-side triggers:
+
+- **574 of 625 carry `scryid 0`** — no client script, so the behaviour is the SERVER's. The client ships only the
+  geometry, exactly the split the lava volumes showed.
+- **Small boxes.** Median footprint 25 units across, 347 of them under 30 — the shape of "walk in here, fire an
+  event", not an ambient region.
+- **Concentrated in instances**: Kara Korum 32, The Jade Citadel 28, Threshold of Divinity 26, The Vile Nativity
+  25, Halls of Eternal Frost 14 — plus Conall's Valley (18), a scripted levelling zone.
+- Names say what they are: 354 mention `ambush`, 191 `trigger`, 54 `encounter`, 52 `cutscene`/`scene`, 30 a
+  `start`, 16 a `boss`/`miniboss`.
+
+They also **name the creature**, which the spawn camps did not do usefully: **169 of the 625** contain a word that
+matches a spawnable `NpcTemplate`. Some are specific enough to be unambiguous — `TriggerRaboz` → Raboz,
+`SpiderBossTrigger1` → Spider Queen, `BA_DemonTrigger`, `AriasMageTriggerSensor`. Conall's Valley is the clean
+worked example, where the name carries creature + location + a lettered series:
+
+```
+VanirAmbushGormleyA/B/C   SpiderAmbushGormleyD/E/F   WolfAmbushA/B/C/D   VanirAmbushA/B/E/F/G
+```
+
+### ⚠️ They are NOT the radii behind our proximity encounters
+
+The obvious hope — that these supply retail's real volumes where `NpcEncounter` carries hand-seeded radii — does
+**not** hold, and the two encounters we know about both say so:
+
+| encounter | map | contained by |
+|---|---|---|
+| `Damsel in Distress` (the #502 lure, at 1130.1, 1141.7) | Poitain 2070 — 24 regions total | `PlayfieldBorder` only, i.e. the whole playfield. The nearest region of ANY kind is **166 units away**. |
+| `Saddur` tpl 9500 (Tortage beach, at 521.4, 757.2) | Tortage Island 4010 — 51 regions | `Headless Hollow`, `Jungle Main`, `TutorialLockedGate`, `Flies_Roam2`, `Jungle Main Music` — place-name, gate and audio regions. No trigger volume. |
+
+Both fire on **distance to an NPC**, not on entering a region, so their radii were never going to be in a table of
+regions. Proximity-on-NPC and volume-entry are two different mechanisms, and only the second one is here. The
+`NpcEncounter` radii stay measured from capture tracks.
+
+(Map 4000 `Stygian Galley` — the opening scene — has **no 1000053 record at all**, so "no regions" there is the
+absence of the record, not an empty one.)
+
+Two incidental observations from that test: `Headless Hollow` and `Jungle Main` are the place-name family this
+page declines to classify by regex, confirming it exists and is identifiable only against a place-name catalog;
+and `NpcStatCore.ClientScryScript` — the obvious place an NPC-attached trigger script would live — is **NULL for
+all 1,018 rows**, so nothing in our data currently describes the NPC-side mechanism either.
+
 ## Import
 
 `RdbHazardImporter` (the opt-in `rdb-hazards` module) reads the lava volumes into `MapHazard` +
