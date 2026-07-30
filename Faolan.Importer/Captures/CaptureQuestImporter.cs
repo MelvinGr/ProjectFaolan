@@ -22,7 +22,7 @@ namespace Faolan.Importer.Captures
 	//     per-entry state).
 	//   - QuestIIR (0x97E02314): per-quest STATE events; the last state per (char, quest) WINS over the log-list Active
 	//     entry - retail sends a completed quest as Active then Completed, so this is what marks a quest Completed.
-	//   - QuestGoal (0x0774C8C1): goal progress count for the matching quest.
+	//   - QuestGoal (0x0774C8C1): the goal update KIND for the matching quest (met / partial / closed) - not a count (#525).
 	//   - the FullChar SNAPSHOT's Quest_c JOURNAL region (SnapshotJournalReader): the character's J-panel at login, one
 	//     record per HELD quest. Authoritative for what a character actually holds - it overrides the completed sweep
 	//     below, whose regex cannot tell a journal title record from a completed-archive one.
@@ -41,13 +41,15 @@ namespace Faolan.Importer.Captures
 		public static async Task<(int Characters, int Quests)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			var stateByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> wire state
-			var progressByChar = new Dictionary<uint, Dictionary<uint, uint>>(); // char -> questId -> goal count
+			// char -> questId -> the LAST QuestGoalIIR update seen. The packet carries an update KIND, not a running
+			// count (#525), so this says whether the goal is met - not how far along it is.
+			var goalUpdateByChar = new Dictionary<uint, Dictionary<uint, QuestGoalUpdate>>();
 			var logListByChar = new Dictionary<uint, HashSet<uint>>(); // char -> quest ids from the QuestLogList (the J-panel log)
 			var completedByChar = new Dictionary<uint, HashSet<uint>>(); // char -> completed quest ids from the snapshot log
 			var journalByChar = new Dictionary<uint, HashSet<uint>>(); // char -> HELD quest ids from the snapshot's Quest_c region
 			foreach (var packet in rawPackets)
 			{
-				TryRead(packet, stateByChar, progressByChar, logListByChar, completedByChar);
+				TryRead(packet, stateByChar, goalUpdateByChar, logListByChar, completedByChar);
 
 				// The snapshot's Quest_c region IS the character's J-panel at login - one record per HELD quest. Without
 				// it the completed-title regex below swept those same quests into the COMPLETED archive (their title
@@ -113,17 +115,22 @@ namespace Faolan.Importer.Captures
 				}
 
 				var existing = await db.CharacterQuests.Where(q => q.CharacterId == characterId).ToDictionaryAsync(q => q.QuestId);
-				var progress = progressByChar.GetValueOrDefault(characterId) ?? [];
+				var goalUpdates = goalUpdateByChar.GetValueOrDefault(characterId) ?? [];
 				var touched = false;
 				foreach (var (questId, state) in merged)
 				{
-					var goalProgress = progress.GetValueOrDefault(questId);
+					// A QuestGoalIIR states a KIND, not a count (#525): Satisfied/Advanced mean the goal is MET, Progress
+					// means it moved by an amount the packet never carries. So only a met goal can be turned into a
+					// number here - it becomes the required count (at least 1) - and a partial tick leaves whatever the
+					// row already had, rather than inventing a figure. Before #525 the raw word was stored as the count,
+					// which seeded captured characters with a GoalProgress of 1, 2 or 3 that meant nothing.
+					var met = goalUpdates.TryGetValue(questId, out var update) && update != QuestGoalUpdate.Progress;
 
 					if (existing.TryGetValue(questId, out var row))
 					{
 						row.State = state;
-						if (goalProgress > 0)
-							row.GoalProgress = goalProgress;
+						if (met)
+							row.GoalProgress = Math.Max(row.GoalRequired, 1u);
 					}
 					else
 					{
@@ -132,7 +139,7 @@ namespace Faolan.Importer.Captures
 							CharacterId = characterId,
 							QuestId = questId,
 							State = state,
-							GoalProgress = goalProgress
+							GoalProgress = met ? 1u : 0u
 						});
 					}
 
@@ -151,7 +158,7 @@ namespace Faolan.Importer.Captures
 			return (charactersSeeded, questsWritten);
 		}
 
-		private static void TryRead(byte[] packetBytes, Dictionary<uint, Dictionary<uint, uint>> stateByChar, Dictionary<uint, Dictionary<uint, uint>> progressByChar,
+		private static void TryRead(byte[] packetBytes, Dictionary<uint, Dictionary<uint, uint>> stateByChar, Dictionary<uint, Dictionary<uint, QuestGoalUpdate>> goalUpdateByChar,
 			Dictionary<uint, HashSet<uint>> logListByChar, Dictionary<uint, HashSet<uint>> completedByChar)
 		{
 			try
@@ -209,14 +216,14 @@ namespace Faolan.Importer.Captures
 						? m
 						: stateByChar[handle] = [])[questId] = state;
 				}
-				else if (WorldQuest.TryParseQuestGoal(inner, out handle, out questId, out _, out var count))
+				else if (WorldQuest.TryParseQuestGoal(inner, out handle, out questId, out _, out var update))
 				{
 					if (questId == 0)
 						return;
 
-					(progressByChar.TryGetValue(handle, out var m)
+					(goalUpdateByChar.TryGetValue(handle, out var m)
 						? m
-						: progressByChar[handle] = [])[questId] = count;
+						: goalUpdateByChar[handle] = [])[questId] = update;
 				}
 			}
 			catch

@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Faolan.Core.Enums;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network;
 
@@ -36,8 +37,9 @@ namespace Faolan.GameServer.Quest
 		// value only to override.
 		Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint? level = null);
 
-		// QuestGoal (0x0774C8C1): the objective counter for `questId` is now `count`.
-		Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, uint count);
+		// QuestGoal (0x0774C8C1): tell the client what just happened to `goalId` - met, partially advanced, or closed
+		// so the quest can move to its next goal. It carries no running count; the journal holds that (#525).
+		Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update);
 
 		// QuestIIR (0x97E02314): add/update `questId` in the journal at `state` (StateActive 2 / StateCompleted 4).
 		Task SendQuestIir(INetworkClient client, uint questId, uint state);

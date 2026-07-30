@@ -170,8 +170,14 @@ inventory-delivery mechanism — see memory `protocol_containeradditem`).
 Quest state is driven by four IIR records (decoded from `hoxxling-login-gameplay`, quest `0x34A7`=13479):
 - **`0x97E02314` `QuestIIR`** (add/update/remove): `[ack][playerHandle][0][0x01][u32 state][u32 questId][0]` —
   state `2` = active/added (the only confirmed code). 29 B.
-- **`0x0774C8C1` `QuestGoal`**: `[ack][playerHandle][0x01][u32 questId][u32 goalId][u32 count][0][0]` — objective
-  progress. 33 B.
+- **`0x0774C8C1` `QuestGoal`**: `[ack][playerHandle][0x01][u32 questId][u32 goalId][u32 w1][u32 w2][u32 w3]` —
+  what just happened to the goal. 33 B. The three trailing words are ONE value, the update kind
+  (`QuestGoalUpdate`), and carry no running count — the journal holds that. Only three combinations exist in the
+  corpus: `(1,0,0)` **Satisfied** (the goal is met), `(2,0,1)` **Progress** (a multi-count goal moved but is not
+  met), `(3,2,0)` **Advanced** (the goal is closed and the quest moves to its next goal). Advanced always sits
+  between this goal's Satisfied and the next goal's Satisfied, which is what identifies it as a hand-off marker.
+  `[V2: xxx_mage-necromancer_login_play2_tortage_city_first-quests.tshark.json — with Hoxxling_mage-heraldofxotli,
+  66 QuestGoalIIR packets over the whole corpus: 52 Satisfied / 4 Progress / 10 Advanced, no other combination]`
 - **`0x63268258` `QuestFullUpdate`** / **`0x79F8C7A1` `QuestJournal`**: questId + `remoteformat` text refs
   (categories 50300–50302); the client renders the title/description/journal text from its RDB **by id**, so the
   server only sends ids + state, never the text.

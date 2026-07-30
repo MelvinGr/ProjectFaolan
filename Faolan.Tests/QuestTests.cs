@@ -63,11 +63,23 @@ namespace Faolan.Tests
 			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestFullUpdateIIR), Convert.ToHexString(body).ToLowerInvariant());
 		}
 
-		[Fact]
-		public void BuildQuestGoal_MatchesCapture()
+		// All three update spellings, byte-exact against retail. The Satisfied case is the original Casilda fixture; the
+		// other two are quest 12371 goal 3495 ("Get 3 stone bricks") from
+		// xxx_mage-necromancer_login_play2_tortage_city_first-quests - the multi-count collect goal that is the only
+		// thing in the corpus which sends anything but (1,0,0). Together they cover 66/66 captured QuestGoalIIR packets.
+		[Theory]
+		[InlineData(QuestGoalUpdate.Satisfied, 0x01316E71u, 0x34A7u, 0x1670u,
+			"0774c8c10000c35001316e7101000034a700001670000000010000000000000000")]
+		[InlineData(QuestGoalUpdate.Satisfied, 0x01317CF8u, 0x3053u, 0x0DA7u,
+			"0774c8c10000c35001317cf8010000305300000da7000000010000000000000000")]
+		[InlineData(QuestGoalUpdate.Progress, 0x01317CF8u, 0x3053u, 0x0DA7u,
+			"0774c8c10000c35001317cf8010000305300000da7000000020000000000000001")]
+		[InlineData(QuestGoalUpdate.Advanced, 0x01317CF8u, 0x3053u, 0x0DA7u,
+			"0774c8c10000c35001317cf8010000305300000da7000000030000000200000000")]
+		public void BuildQuestGoal_MatchesCapture(QuestGoalUpdate update, uint player, uint quest, uint goal, string expected)
 		{
-			var body = WorldQuest.BuildQuestGoal(0x01316E71, 0x34A7, 0x1670, 1);
-			Assert.Equal("0774c8c10000c35001316e7101000034a700001670000000010000000000000000", Convert.ToHexString(body).ToLowerInvariant());
+			var body = WorldQuest.BuildQuestGoal(player, quest, goal, update);
+			Assert.Equal(expected, Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]
@@ -419,21 +431,35 @@ namespace Faolan.Tests
 			}
 		}
 
-		[Fact]
-		public void TryParseQuestGoal_RoundTripsBuild()
+		[Theory]
+		[InlineData(QuestGoalUpdate.Satisfied)]
+		[InlineData(QuestGoalUpdate.Progress)]
+		[InlineData(QuestGoalUpdate.Advanced)]
+		public void TryParseQuestGoal_RoundTripsBuild(QuestGoalUpdate update)
 		{
-			var body = WorldQuest.BuildQuestGoal(0x01316E71, 0x34A7, 0x1670, 1);
+			var body = WorldQuest.BuildQuestGoal(0x01316E71, 0x34A7, 0x1670, update);
 
-			Assert.True(WorldQuest.TryParseQuestGoal(body, out var player, out var quest, out var goal, out var count));
+			Assert.True(WorldQuest.TryParseQuestGoal(body, out var player, out var quest, out var goal, out var parsed));
 			Assert.Equal(0x01316E71u, player);
 			Assert.Equal(0x34A7u, quest);
 			Assert.Equal(0x1670u, goal);
-			Assert.Equal(1u, count);
+			Assert.Equal(update, parsed);
 
 			Assert.False(WorldQuest.TryParseQuestGoal(new byte[32], out _, out _, out _, out _)); // wrong length
 			var corrupt = (byte[])body.Clone();
 			corrupt[12] = 0x00; // marker must be 0x01
 			Assert.False(WorldQuest.TryParseQuestGoal(corrupt, out _, out _, out _, out _));
+		}
+
+		// A word-triple retail never sends must NOT parse. The old reader accepted anything in the first word (it only
+		// required the last two to be zero), so (9,0,0) read as "count 9" - and conversely it REJECTED the real
+		// Progress/Advanced packets. Both halves of that are what this pins.
+		[Fact]
+		public void TryParseQuestGoal_RejectsAnUnknownUpdateTriple()
+		{
+			var body = WorldQuest.BuildQuestGoal(0x01316E71, 0x34A7, 0x1670, QuestGoalUpdate.Satisfied);
+			body[^9] = 0x09; // first update word 1 -> 9, a combination that appears nowhere in the corpus
+			Assert.False(WorldQuest.TryParseQuestGoal(body, out _, out _, out _, out _));
 		}
 
 		[Fact]

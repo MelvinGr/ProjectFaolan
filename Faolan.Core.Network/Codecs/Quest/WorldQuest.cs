@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
@@ -141,9 +142,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return w.ToArray();
 		}
 
-		// QuestGoal (33 B): [subop][ack][playerHandle][0x01][u32 questId][u32 goalId][u32 count][0][0].
-		public static byte[] BuildQuestGoal(uint playerHandle, uint questId, uint goalId, uint count)
+		// QuestGoal (33 B): [subop][ack][playerHandle][0x01][u32 questId][u32 goalId][u32 w1][u32 w2][u32 w3].
+		//
+		// The three trailing words are ONE value - the update kind (QuestGoalUpdate) - not a count plus padding.
+		// They were modelled as [count][0][0] because every single-count goal sends (1,0,0), which is 52 of the 66
+		// QuestGoalIIR packets in the corpus; the multi-count collect goal is what shows the other two spellings.
+		public static byte[] BuildQuestGoal(uint playerHandle, uint questId, uint goalId, QuestGoalUpdate update)
 		{
+			var (w1, w2, w3) = GoalUpdateWords(update);
 			return new FaolanStream()
 				.WriteUInt32(GameServer0X2000Opcodes.QuestGoalIIR)
 				.WriteUInt32(EntityClass.Character)
@@ -151,10 +157,22 @@ namespace Faolan.Core.Network.Codecs.Quest
 				.WriteByte(0x01)
 				.WriteUInt32(questId)
 				.WriteUInt32(goalId)
-				.WriteUInt32(count)
-				.WriteUInt32(0) // trailing [0][0]
-				.WriteUInt32(0)
+				.WriteUInt32(w1)
+				.WriteUInt32(w2)
+				.WriteUInt32(w3)
 				.ToArray();
+		}
+
+		// The only three word-triples retail sends. Kept as one table so the build and parse sides cannot drift.
+		private static (uint W1, uint W2, uint W3) GoalUpdateWords(QuestGoalUpdate update)
+		{
+			return update switch
+			{
+				QuestGoalUpdate.Satisfied => (1u, 0u, 0u),
+				QuestGoalUpdate.Progress => (2u, 0u, 1u),
+				QuestGoalUpdate.Advanced => (3u, 2u, 0u),
+				_ => throw new ArgumentOutOfRangeException(nameof(update), update, "unknown QuestGoalIIR update kind")
+			};
 		}
 
 		// QuestIIR (29 B): [subop][ack][playerHandle][0][0x01 marker][u32 state][u32 questId][0].
@@ -276,19 +294,24 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return new FaolanStream().WriteString(xml).ToArray();
 		}
 
-		// The inverse of BuildQuestGoal: recovers (playerHandle, questId, goalId, count) from a 33-byte QuestGoal body.
-		// Validates the sub-opcode, ack TypeTag, the 0x01 marker and the trailing zero words. Proven by the QuestTests
+		// The inverse of BuildQuestGoal: recovers (playerHandle, questId, goalId, update) from a 33-byte QuestGoal body.
+		// Validates the sub-opcode, ack TypeTag, the 0x01 marker and the update triple. Proven by the QuestTests
 		// round-trip (#87 quest-packets codec consolidation).
+		//
+		// It used to require the last two words to be ZERO, which rejected 14 of the 66 QuestGoalIIR packets in the
+		// corpus - every Progress and Advanced update - i.e. the reader refused real retail traffic. It now accepts
+		// exactly the three triples retail sends and still rejects anything else, so an unknown fourth spelling
+		// surfaces as a parse failure rather than being silently read as a count.
 		//
 		// Read SEQUENTIALLY through FaolanStream rather than by fixed offsets: the offsets ran 8 -> 13 -> 17 -> 21,
 		// and that non-uniform step was the only trace of the single-byte marker sitting between them. Reading in
 		// order states the layout instead of encoding it in arithmetic the reader has to diff.
-		public static bool TryParseQuestGoal(byte[] body, out uint playerHandle, out uint questId, out uint goalId, out uint count)
+		public static bool TryParseQuestGoal(byte[] body, out uint playerHandle, out uint questId, out uint goalId, out QuestGoalUpdate update)
 		{
 			playerHandle = 0;
 			questId = 0;
 			goalId = 0;
-			count = 0;
+			update = default;
 			if (body is not { Length: 33 })
 				return false;
 
@@ -304,14 +327,22 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 			var quest = r.ReadUInt32();
 			var goal = r.ReadUInt32();
-			var amount = r.ReadUInt32();
-			if (r.ReadUInt32() != 0 || r.ReadUInt32() != 0) // trailing zero words
+			var words = (r.ReadUInt32(), r.ReadUInt32(), r.ReadUInt32());
+
+			QuestGoalUpdate kind;
+			if (words == GoalUpdateWords(QuestGoalUpdate.Satisfied))
+				kind = QuestGoalUpdate.Satisfied;
+			else if (words == GoalUpdateWords(QuestGoalUpdate.Progress))
+				kind = QuestGoalUpdate.Progress;
+			else if (words == GoalUpdateWords(QuestGoalUpdate.Advanced))
+				kind = QuestGoalUpdate.Advanced;
+			else
 				return false;
 
 			playerHandle = handle;
 			questId = quest;
 			goalId = goal;
-			count = amount;
+			update = kind;
 			return true;
 		}
 

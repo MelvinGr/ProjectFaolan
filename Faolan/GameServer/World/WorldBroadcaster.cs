@@ -280,10 +280,10 @@ namespace Faolan.GameServer.World
 		}
 
 		// Sends a QuestGoal (objective progress) to the player.
-		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, uint count)
+		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update)
 		{
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(WorldQuest.BuildQuestGoal(client.Session.Character.Id, questId, goalId, count))));
+				s => s.WriteArrayUInt32Length(WorldQuest.BuildQuestGoal(client.Session.Character.Id, questId, goalId, update))));
 		}
 
 		// Sends a QuestIIR (add/update a quest in the player's journal) to the player.
