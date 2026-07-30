@@ -373,7 +373,7 @@ Those read exactly like the banners the client shows on entry, which is the subs
 regions do ship with the client**, and #348's note that they are "server-side and only reconstructible from
 captures" is true only of the banner TEXT, not of the geometry.
 
-### But the pairing is still a judgement call, and the text is unreadable
+### But the pairing is still a judgement call
 
 Two things stop this being a mechanical import:
 
@@ -426,8 +426,9 @@ reached before the category table was known, and which guessed `Jungle Main` whe
 
 ⚠️ A 51200 reference does **not** by itself make a goal a reach objective — 11712 wants **3** of something, so
 its region reads as a *scope* ("3 of something in the Nightmare Room") rather than the objective. Settling that
-needs the goal's own objective text, which is in encrypted LDB category 50304 (#520). So the mechanical part is
-the geometry: given a goal known to be a `ReachArea`, its exact polygon is now recoverable.
+is answered by the goal's own objective text, readable since #520: 11712 is *"Overcome the emperor's manifested
+nightmares"*, a defeat objective the region merely scopes, while 1448 is *"Enter the jungle"* — a true reach. So
+both halves are now mechanical: the kind from the text, the polygon from the reference.
 
 ## Import
 

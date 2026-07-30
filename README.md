@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 1,018 NPC types / 3,046 placements · 4,185 items · 20,848 spells · 265 abilities · 19,777 feats · 467 conversation nodes · 70 shops · 2,037 quests · 2,375 world objects · 871 patrol routes
+**Imported content** (the DB is the server's source of truth): 530 maps · 1,018 NPC types / 3,046 placements · 4,185 items · 20,848 spells · 265 abilities · 19,777 feats · 467 conversation nodes · 70 shops · 2,037 quests · 2,375 world objects · 871 patrol routes · 14 client trigger volumes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -124,6 +124,11 @@ we've seen_, and names the gaps). Regenerate with
   and each revives you at its own strength (10/50/100%) rather than always full (#372, #375)
 - ✅ **Discovering resurrection points** — walking near a new point pops retail's "point discovered" banner and adds
   it to your list in one frame; works for all **538** imported points, verified in a real client (#372)
+- 🟡 **Discovery uses the client's own volumes** where it ships them — 11 of the points carry a real trigger box
+  (16×20 to 29×33 units, ~10 tall) instead of our 30-unit radius, which discovered from roughly twice the
+  distance retail requires and from any height; the rest keep the radius (#519, needs an in-client check)
+- 🟡 **Outlaw resurrection points** — the client marks 49 of them (one per major playfield) as the criminal
+  destination; imported, but the revive path still sends everyone to the normal point (#517, #503)
 - 🟡 **Recalls** — the Path of Asura spell returns you to where you are bound, while the Totem of Origins returns
   you to your race's home city; these are two different destinations and used to be one. Capture-verified for
   Stygian, the other three races by the same rule (#206, #510)
@@ -229,8 +234,16 @@ we've seen_, and names the gaps). Regenerate with
 
 ### Quests & dialogue
 
-- ✅ **Quests** — kill / loot / talk objectives, the journal, and the Casilda Tortage intro chain end to end
-  (kill → loot → free → follow)
+- ✅ **Quests** — kill / loot / talk / collect / reach objectives, the journal, and the Casilda Tortage intro chain
+  end to end (kill → loot → free → follow)
+- ✅ **Gather quests work however you get the item** — a collect objective ticks when the item reaches your bags,
+  from a corpse, a pickup node, a vendor or a reward; 62 quests that shipped inert (typed as kills with no target)
+  now run (#521)
+- ✅ **The client's quest text is readable** — eleven of its localized-text categories are encrypted, and the key
+  turns out to be sent by the server per string; all 168 objective texts, the journal titles and summaries, and
+  the NPC dialogue now decrypt (#520)
+- 🟡 **Reach objectives use the client's real trigger volume** where the goal names one, instead of a 40-unit
+  circle around the map pin (#521, needs an in-client check)
 - ✅ **NPC conversations** — branching dialogue driven by the client's dialogue engine
 - ✅ **Dropping a quest sticks** — abandoning one removes it from the journal and confirms it the way retail does,
   instead of the quest returning on the next login; the live J-panel refresh that rides along still needs a

@@ -64,10 +64,14 @@ Turach". Values seen in the corpus only; the gaps are unmapped rather than absen
 All 107 resolve. That reference is the target, so `TargetName` is mostly a label: kill goals already match on the
 template id and only fall back to the name.
 
-⚠️ **The goal's own objective TEXT is not readable.** Every goal's `ObjectiveCategory` is `50304`
-(`quest_goal_templates.goal_name`) with `ObjectiveRefId == GoalId`, and 50304 is one of eleven **encrypted** LDB
-categories (Gitea #520). So the server cannot render, or read, what a goal asks the player to do — which is why
-goal wiring is sourced from captures and the reference above rather than from the client's text.
+**The goal's own objective TEXT is readable** (as of #520). Every goal's `ObjectiveCategory` is `50304`
+(`quest_goal_templates.goal_name`) with `ObjectiveRefId == GoalId`. That category is one of eleven **encrypted**
+LDB categories, and the key is the `key=` attribute the server sends alongside the reference — stored on the goal
+as `ObjectiveKey`. See [`../rdb/ldb-string-index.md`](../rdb/ldb-string-index.md) for the cipher.
+
+So the client's own words are now a source for goal wiring, alongside the kind tag and the captures. They agree:
+goal 1448 is *"Enter the jungle"* (`ReachRegion`), 3490 *"Kill slavemaster Saddur"* (`Kill`), 3495 *"Get 3 stone
+bricks"* (`Collect`), 3497 *"Deliver 3 stone bricks to Turach"* (`Deliver`).
 
 ## Collect goals do not care how the item arrives
 
@@ -103,8 +107,8 @@ Worked example — the beach starter, quest 10238 goal 1448: `TrailingRefId 180`
 `"Trappers Haven"` → a 7-vertex region on Tortage Island containing the goal's own marker.
 
 ⚠️ A `51200` reference does **not** by itself make a goal a reach objective. Goal 11712 carries one with
-`RequiredCount 3`, so its region *scopes* the objective rather than being it. Distinguishing the two needs the
-objective text, i.e. #520.
+`RequiredCount 3`, so its region *scopes* the objective rather than being it — confirmed by its now-readable
+text, *"Overcome the emperor's manifested nightmares"*, which is a defeat objective inside that room.
 
 ## Wiring is bootstrap-only
 
@@ -119,9 +123,14 @@ goals sitting at the `Kill` default with no target — inert fetch quests that c
 harmless as well as useless: NPC template ids run 38–22,982 and these item refs 110,891–4,675,657, so no kill
 could ever have matched one.
 
-⚠️ The 11 **`Deliver`** goals are deliberately left inert. They hand the item over rather than acquiring it, and
-the goal does not carry the recipient — typing them collect would complete the quest the moment the player picks
-the item up, skipping the delivery, which is a silent chain bug where inert is at least visibly stuck. They need
-the recipient, from a capture or from #520's objective text.
+⚠️ The 11 **`Deliver`** goals are left inert, but no longer for want of a recipient: their objective text names
+one in every case (*"Give the Letter to Sien on the Lacheish Plains"*, *"Deliver the Remedy to Amun"*). Typing
+them `CollectItem` would still be wrong — the quest would complete the moment the player picks the item up,
+skipping the delivery, a silent chain bug where inert is at least visibly stuck.
+
+What actually gates them is the WORLD: only **3 of 12** recipients (Turach, Amun, Croiss) exist as spawned NPCs;
+the other 9 live on uncaptured maps and have no `NpcTemplate`, so a wired goal there still could not complete.
+And a plain `TalkToNpc` does not check the player is HOLDING the item, which a faithful hand-in would. Tracked in
+Gitea #521.
 
 Open work is tracked in Gitea (#262, #358, #521).
