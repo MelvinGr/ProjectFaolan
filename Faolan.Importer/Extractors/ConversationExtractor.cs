@@ -57,6 +57,11 @@ namespace Faolan.Importer.Extractors
 		// unambiguous "here is the new quest" marker; the runtime guards against re-granting, so this is safe.)
 		private const uint QuestFullUpdateSubOpcode = (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR;
 
+		// The journal STATE flip retail sends as a quest starts and finishes: QuestIIR carries [state][questId], state 2
+		// = Active and 4 = Completed (QuestState). Tracked so a server-opened conversation can be gated on the quest it
+		// is about - see the lastQuest* locals.
+		private const uint QuestIirSubOpcode = (uint)GameServer0X2000Opcodes.QuestIIR;
+
 		private const uint CloseChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR;
 		private const uint OpenChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR;
 		private const uint SpawnSubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
@@ -134,6 +139,12 @@ namespace Faolan.Importer.Extractors
 			var serverInitiated = false; // this instance was opened BY THE SERVER, with no player TalkToNpc (#523)
 			uint serverNpcTemplate = 0; // its NPC, read out of the text's `npcname` parameter (there is no clicked handle)
 			uint? serverTrigger = null; // the world object whose use opened it, when one is close enough behind
+			// The quest whose state changed most recently, and that state. A server-opened conversation is ABOUT a quest
+			// beat, and this is the cheapest honest reading of which: at Casilda's two openings it is 12407 both times,
+			// Active at the first and Completed at the second - which is exactly what tells her two "" screens apart.
+			uint lastQuestId = 0;
+			QuestState? lastQuestState = null;
+			(uint? Quest, QuestState? State) serverCondition = (null, null);
 			uint lastUseObjectHandle = 0;
 			var lastUseObjectAt = int.MinValue; // packet index of that UseObject, for the window test
 			var index = -1;
@@ -190,6 +201,7 @@ namespace Faolan.Importer.Extractors
 					serverInitiated = false;
 					serverNpcTemplate = 0;
 					serverTrigger = null;
+					serverCondition = (null, null);
 					typeId = parsedTypeId;
 					npc = parsedNpc;
 					instance = body.ReadU32Be(12);
@@ -210,6 +222,13 @@ namespace Faolan.Importer.Extractors
 					active = true;
 					serverInitiated = true;
 					serverNpcTemplate = 0; // resolved from the first text screen's `npcname` parameter
+					// Gate the conversation on the quest beat it belongs to (#523). Casilda's two server-opened screens
+					// both sit at AnswerPath "" and both are about quest 12407 - the first while it is Active, the second
+					// once the door has Completed it - so the state is what tells them apart, through the SAME
+					// ConditionQuestId/State the talk tree already uses (and which ComputeId already keys on).
+					serverCondition = (lastQuestId == 0
+						? null
+						: (uint?)lastQuestId, lastQuestState);
 					serverTrigger = index - lastUseObjectAt <= UseObjectTriggerWindow
 						? worldObjectIdByHandle.GetValueOrDefault(lastUseObjectHandle) is var w and not 0
 							? w
@@ -238,6 +257,22 @@ namespace Faolan.Importer.Extractors
 					screen = [];
 					grant = 0;
 				}
+				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: QuestIirSubOpcode })
+				{
+					// [ ... ][u32 state][u32 questId]; only the two states the journal actually flips through are taken.
+					var body = p.Body;
+					if (body.Length >= 33)
+					{
+						var state = body.ReadU32Be(21);
+						if (state is 2 or 4)
+						{
+							lastQuestId = body.ReadU32Be(25);
+							lastQuestState = state == 2
+								? QuestState.Active
+								: QuestState.Completed;
+						}
+					}
+				}
 				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: QuestFullUpdateSubOpcode })
 				{
 					// A quest full-update. body @16 = [00000000][01][u32 questId]. It's a GRANT (vs a login restore or a
@@ -250,6 +285,12 @@ namespace Faolan.Importer.Extractors
 					{
 						var questId = body.ReadU32Be(21);
 						currentQuest = questId; // track the active quest for the per-greeting QuestContextId (#264)
+
+						// A full-update is also how a quest BECOMES active (the grant), and the escort arrives that way -
+						// 12407 is granted by a full-update with no accompanying state flip - so it must count here too or
+						// the gate for anything opened during it reads as "no quest".
+						lastQuestId = questId;
+						lastQuestState = QuestState.Active;
 						if (active && path.Length != 0 && questsSeen.Add(questId))
 							grant = questId;
 						else
@@ -303,6 +344,12 @@ namespace Faolan.Importer.Extractors
 
 
 				entries.Add(new ConversationEntry(typeId, path, npc, [.. screen], name, template,
+					ConditionQuestId: serverInitiated
+						? serverCondition.Quest
+						: null,
+					ConditionQuestState: serverInitiated
+						? serverCondition.State
+						: null,
 					GrantQuestId: grant, QuestContextId: instanceContext, ServerInitiated: serverInitiated,
 					TriggerWorldObjectId: serverTrigger));
 			}

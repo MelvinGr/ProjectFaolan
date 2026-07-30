@@ -114,7 +114,16 @@ namespace Faolan.GameServer.Dialogue
 			// server-opened conversations and they all sit at AnswerPath "" (Casilda has two), so only the trigger tells
 			// them apart. From the first pick onwards the paths are deeper and unambiguous, so the ordinary
 			// AdvanceConversation walk takes over unchanged.
-			var opening = await _database.GetTriggeredConversation(npcName, worldObjectId);
+			var variants = await _database.GetTriggeredConversations(npcName, worldObjectId);
+			if (variants.Length == 0)
+				return false;
+
+			// One trigger can still have quest-state VARIANTS, and the gate is real harvested data: Casilda's farewell is
+			// gated on the escort (12407) being Completed, which the door use has just made true. Conditioned variants
+			// come first and the unconditional one is the fallback - the same rule PickConversationScreen uses for talk
+			// dialogue, so a stale gate cannot hijack a player who is not in that state.
+			var quests = await _database.GetCharacterQuests(client.Session.Character.Id);
+			var opening = variants.FirstOrDefault(v => QuestConditionMet(v, quests)) ?? variants.FirstOrDefault(v => v.ConditionQuestId == null);
 			if (opening == null)
 				return false;
 
