@@ -39,6 +39,9 @@ dotnet run --project Faolan.Importer -- --only rdb-maps --RdbDir <dir> # rdb-* +
 dotnet run --project Faolan.Importer -- --report burst-coverage       # read-only diagnostics (was --burst-coverage / --dump-*)
 dotnet run --project Faolan.Importer -- --report sql-seed             # (re)write faolan.sql + the counter sidecars from the DB
 dotnet run --project Faolan.Importer -- --report apply-seed --dry-run # upgrade an EXISTING db's content FROM faolan.sql (#412)
+dotnet run --project Faolan.Importer -- --report timeline --report-arg <capture>.tshark.json --RdbDir <dir>
+# ^ ONE capture as a flat chronological story, ids resolved + LDB text decrypted inline (`./run.sh --timeline <dump>`;
+#   see the `capture-timeline` skill). Decode lives in the CODECS - add one there, never inline in the report.
 # Modes: --mode insert|upsert(default)|overwrite (per-module: --mode npcs=overwrite,items=insert). NO old-flag
 # aliases - the legacy one-off flags (--reseed-*, --rdb-maps, --archive, --dump-*) don't exist; use the module CLI.
 

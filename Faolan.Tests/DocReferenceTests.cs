@@ -62,7 +62,7 @@ namespace Faolan.Tests
 			// to resolve them against. They used to be checked against a name list carried in the corpus extract's
 			// manifest, which meant shipping an index of the private corpus in every checkout - see
 			// ProtocolCitationTests.V2Citations_AreWellFormed for what replaced it.
-			var pathRe = new Regex(@"((?:Faolan[\w.]*|docs)/[\w./+-]+\.(?:cs|md|py|json|proto|bin|sh|slnx))", RegexOptions.Compiled);
+			var pathRe = new Regex(@"((?:Faolan[\w.]*|docs|tools)/[\w./+-]+\.(?:cs|md|py|json|proto|bin|sh|slnx))", RegexOptions.Compiled);
 
 			var docsDir = Path.Combine(repo, "docs");
 			var failures = new List<string>();
