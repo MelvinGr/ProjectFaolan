@@ -129,6 +129,84 @@ Result on the current data: **1 spell** (222675) and **1015 items** backfilled (
 Diagnostic: `--report ldb-resolve` dumps the whole id→string map, the per-category / per-language breakdown, and
 the spell + item crib scores.
 
+## The client names every category itself — the descriptor table in `TDL1` (2026-07-30)
+
+Each language record (`1030001`) carries **1,603 trailing bytes after its page table** that the grammar above did
+not account for. They are a **category descriptor table**: `u32 count` (47), then per entry `u32 category` plus
+two length-prefixed strings — the source TABLE and the source FIELD the strings came from. No NUL terminators
+here, unlike the record's leading strings.
+
+So a category's meaning is not something to infer by intersecting id spaces; the client states it:
+
+| cat | table | field | | cat | table | field |
+|---|---|---|---|---|---|---|
+| `50000` | `nc_stockphrases` | stockphrasetext 🔒 | | `50300` | `main_quest_templates` | name 🔒 |
+| `50001` | `nc_questions` | questiontext 🔒 | | `50301` | `quest_templates` | task_name 🔒 |
+| `50002` | `nc_text` | text 🔒 | | `50302` | `quest_templates` | description 🔒 |
+| `50003` | `nc_trade` | tradename 🔒 | | `50303` | `quest_templates` | solvedtext 🔒 |
+| `50013`–`50026` | `showsubtitle`, `sayinchat`, `showfifomessage`, … | the feedback channels | | `50304` | `quest_goal_templates` | goal_name 🔒 |
+| `50100` | `pvp_area` | city_name | | `50305` | `quest_cooldown_template` | cooldown_text 🔒 |
+| `50200`/`50201` | `item` | name / description | | `50306` | `QUEST_MISSION_TYPES` | name 🔒 |
+| `50210`/`50211` | `special` | name / description | | `51000` | `npc_template` | name |
+| `50220`/`50221` | `feat` | name / — | | **`51200`** | **`bounded_areas`** | **bounded_area** |
+| `53000` | `feat_specialized_trees` | name | | **`52000`** | **`regions`** | **region** |
+| `54000` | `breedenum` | breed | | `55000` | `simpledynels` | name |
+| `55100`/`55150` | `tradeskill_groups` / `tradeskill` | name / group_name | | `55200`/`55300` | `stackinglines` / `spelllines` | linename |
+| `51100` | `categorytree` | description | | `55500` | `doorgroup_door` | name |
+
+🔒 = encrypted, see below. Note this corrects the earlier reading of `50210`/`50211` as *spell* name/description:
+the client calls that table `special`, and the id space is the spell id, which is why the intersection test landed
+on `1040005`.
+
+### `51200` is the bounded-area name table, and quest goals reference it
+
+`bounded_areas` (**400 entries, plaintext**) is the id → name table for the client's trigger volumes
+([1000053](bounded-areas-1000053.md)). **374 of its 381 distinct strings are an exact `<name>` of a region in
+that table**, which is what identifies it; the handful left over are long HTML zone blurbs sharing the id space.
+
+This is a real cross-reference, not a coincidence: a quest goal's `TrailingCategory`/`TrailingRefId` pair points
+straight into it. Quest 10238's goal 1448 ("Enter the jungle") carries `TrailingCategory 51200`,
+`TrailingRefId 180`, and **`LDB[51200][180]` = `"Trappers Haven"`** — a 7-vertex region on Tortage Island (4010)
+spanning (402, 642)–(498, 725), which contains that goal's own marker at (416, 701). So a `ReachArea` goal's
+trigger volume resolves mechanically: `goal → (51200, refId) → region name → the polygon in that playfield's
+1000053 record`.
+
+## Eleven categories are ENCRYPTED, and the key is not in the client
+
+The page header's `flags` word is an **encryption flag** — the earlier note that it "is `0` on every page" was
+written from plaintext categories only. It separates the two sets perfectly:
+
+| `flags` | categories | strings | length ≡ 0 (mod 8) | printable ASCII |
+|---|---|---|---|---|
+| `0` | 147 | 1,414,200 | 13.4 % | 63.4 % |
+| `1` | **11** | 750,782 | **100.0 %** | **0.0 %** |
+
+The encrypted eleven are exactly the **NPC conversation text** (`50000`–`50003`) and the **quest text**
+(`50300`–`50306`) — quest names, task names, descriptions, solved text and goal names for the whole game.
+
+What the ciphertext shows: an **8-byte block cipher in ECB** with no per-page nonce. Identical plaintext blocks
+produce identical ciphertext across *different language pages* (id 188's 40 bytes are byte-identical on the
+French, German, English and Spanish pages, and ids 233/234/235 share leading blocks pairwise), and 11.2 % of all
+10.8 M ciphertext blocks repeat. The 16 bytes at `[32..48)` are **not** the key — they are genuinely the MD5 of
+the encrypted blob, verified.
+
+**The key was searched for and not found.** A brute-forcer tries every 16-byte window at **stride 1** as a
+TEA/XTEA key, decrypts the first block of eight different strings and requires every plaintext byte to be
+printable ASCII or NUL — positive-controlled against a planted key in a random haystack (found, no false
+positives). Searched, with the block set taken from each of the seven language pages in turn:
+
+| target | candidates | hits |
+|---|---:|---:|
+| `AgeOfConan.exe`, `AgeOfConanDX10.exe` | 34.6 M + 34.5 M each × 7 pages | 0 |
+| `ConanPatcher.exe`, `SimpleConfig.exe` | 4.2 M | 0 |
+| every decompressed LDB / bounded-area / language / resurrection record | 2,612 files | 0 |
+| the decoded wire corpus — every `BodyHex`/`HeaderExtraHex` of 412,159 packets over 119 captures | 95.1 MB | 0 |
+
+So the key is not a contiguous 16-byte constant in any client binary, in the RDB records examined, or anywhere in
+the captured traffic. That leaves it assembled from separate constants at runtime, derived (a KDF over something),
+or a cipher other than TEA/XTEA. Note the wire result is the weakest of the four: a key delivered inside an
+encrypted login block would not appear as plaintext there. Open work: Gitea #520.
+
 ## Still open
 
 - **Descriptions are imported, nothing reads them** — cat `50201` (item id → tooltip text) fills

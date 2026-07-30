@@ -282,11 +282,11 @@ The marker sits inside it, and so does Saddur (521, 757) — the quest's *second
 jungle, which is the order the quest is played in. So the marker is a **map pin**, not the trigger; the trigger is
 a named region many times larger.
 
-⚠️ But there is **no id link to exploit**. Tortage Island's regions carry no `<Guid>` at all, and `BoundedAreaID`
-is a per-playfield index (`Jungle Main` is `-65516`, i.e. low word 20) rather than the goal's `180`. So a goal
-would have to be matched to a region by geometry plus a judgement call on the name — and even goal 1448's marker
-falls inside **four** regions (`Jungle Main`, `Jungle Main Music`, `Trappers Haven`, a beach collision volume).
-Picking the right one is a human decision, not a lookup.
+⚠️ **Superseded — there IS an id link**, found later via the client's category descriptor table; see "LDB
+category 51200" below. `TrailingRefId 180` resolves to the region named **`Trappers Haven`**, which is one of the
+four regions containing the marker, and is 96 × 82 rather than `Jungle Main`'s 392 × 529. What follows was the
+reading before that: the regions carry no `<Guid>`, and `BoundedAreaID` is a per-playfield index (`Jungle Main` is
+`-65516`, low word 20) rather than the goal's `180`, so matching looked like geometry plus a judgement call.
 
 ### The discovery volumes DO map onto data we hold
 
@@ -377,11 +377,10 @@ captures" is true only of the banner TEXT, not of the geometry.
 
 Two things stop this being a mechanical import:
 
-- **No id link.** The banner's `AreaNameId` is an LDB string id, and it is **not** the ELF-28 hash of the region
-  name. Tested exhaustively: 13 spellings of all 5,308 distinct region names in the table, hashed against all 22
-  ids — **zero hits**. (Hashing the token name is normally the way to resolve an LDB id offline; see
-  `docs/rdb/ldb-string-index.md`. It does not apply here.) Nor can the text be read back to confirm a pairing:
-  area titles live in LDB category 50300, which our reader currently returns as garbage.
+- **No id link *for the banner*.** The banner's `AreaNameId` is not the ELF-28 hash of the region name (13
+  spellings of all 5,308 distinct region names against all 22 ids — zero hits), and it is not an LDB string id at
+  all: **none of the 22 ids appears in any of the 1,103 LDB pages**. That independently confirms this issue's
+  original finding. The banner text is genuinely not in the client.
 - **Containment is ambiguous.** Every hull also sits inside larger audio and collision regions, and for the
   bigger hulls the smallest place-named region does **not** contain both hull corners — `3373522` is the
   best-sampled banner we have (18 sightings) and its hull spills outside both `Building_1_auction_house` and
@@ -390,6 +389,32 @@ Two things stop this being a mechanical import:
 
 The prize is real all the same: 11 of `MapArea`'s 22 rows rest on a **single sample**, i.e. a zero-area point that
 only works with a runtime slack, and the client ships true polygons for the same places.
+
+⚠️ An earlier version of this page said the area titles live in LDB category 50300 and that decoding it was the
+unlock. **Both halves were wrong.** The client's own category descriptor table (recovered from the language
+record — see [`ldb-string-index.md`](ldb-string-index.md)) names 50300 as `main_quest_templates.name`, and the
+bounded-area names are category **51200 `bounded_areas.bounded_area`, which is not encrypted at all**. Decoding
+50300 would yield quest names and would still never name a banner.
+
+## The client's own name table for these regions: LDB category 51200
+
+`bounded_areas.bounded_area` — **400 entries, plaintext**, and **374 of its 381 distinct strings are an exact
+`<name>` of a region in this table**, which is what identifies it.
+
+It matters because it is a **real id cross-reference**, the thing the per-banner matching above lacks. A quest
+goal's `TrailingCategory`/`TrailingRefId` points into it: quest 10238's goal 1448 ("Enter the jungle") carries
+`TrailingCategory 51200`, `TrailingRefId 180`, and `LDB[51200][180]` = **`"Trappers Haven"`** — a 7-vertex region
+on Tortage Island spanning (402, 642)–(498, 725) that contains the goal's own marker at (416, 701).
+
+So a `ReachArea` goal's real trigger volume resolves **mechanically**, with no geometry guessing:
+
+```
+goal.TrailingRefId --(LDB cat 51200)--> region name --(that playfield's 1000053 record)--> the polygon
+```
+
+That supersedes the "no id link, pick a region by judgement" reading in the quest-goal section above — which was
+reached before the category table was known, and which guessed `Jungle Main` where the client actually says
+`Trappers Haven` (a 96 × 82 region rather than a 392 × 529 one).
 
 ## Import
 
