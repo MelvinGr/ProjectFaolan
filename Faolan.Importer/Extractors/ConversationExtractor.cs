@@ -77,6 +77,15 @@ namespace Faolan.Importer.Extractors
 		// attributing none, since none merely leaves the node waiting for the proximity model.
 		private const int UseObjectTriggerWindow = 90;
 
+		// How recently a quest must have changed state for that change to be read as the beat a server-opened
+		// conversation is ABOUT. Same reasoning as the trigger window, and the same failure it prevents: without it the
+		// "most recent" change can be arbitrarily stale - Saddur's beach confrontation was gated on quest 12407, whose
+		// grant was 6,600 packets earlier, when it plainly belongs to 10238 ("kill Saddur"), which completes moments
+		// AFTER it. Casilda's farewell sits 30 packets after its 12407 completion, so a window of a few hundred keeps
+		// the real gate and drops the stale one. A WRONG gate is worse than none: it hides the conversation from every
+		// player not in that state.
+		private const int QuestStateGateWindow = 300;
+
 		// The speaker's template id inside a screen's `npcname` parameter - see NpcTemplateFromText.
 		private static readonly Regex NpcNameParameter =
 			new(@"<parameter\s+value=""[^""]*?id=&quot;(\d+)&quot;[^""]*?category=&quot;51000&quot;[^""]*""\s+name=""npcname""", RegexOptions.Compiled);
@@ -144,6 +153,7 @@ namespace Faolan.Importer.Extractors
 			// Active at the first and Completed at the second - which is exactly what tells her two "" screens apart.
 			uint lastQuestId = 0;
 			QuestState? lastQuestState = null;
+			var lastQuestAt = int.MinValue;
 			(uint? Quest, QuestState? State) serverCondition = (null, null);
 			uint lastUseObjectHandle = 0;
 			var lastUseObjectAt = int.MinValue; // packet index of that UseObject, for the window test
@@ -226,9 +236,9 @@ namespace Faolan.Importer.Extractors
 					// both sit at AnswerPath "" and both are about quest 12407 - the first while it is Active, the second
 					// once the door has Completed it - so the state is what tells them apart, through the SAME
 					// ConditionQuestId/State the talk tree already uses (and which ComputeId already keys on).
-					serverCondition = (lastQuestId == 0
-						? null
-						: (uint?)lastQuestId, lastQuestState);
+					serverCondition = lastQuestId != 0 && index - lastQuestAt <= QuestStateGateWindow
+						? ((uint?)lastQuestId, lastQuestState)
+						: (null, null); // nothing changed recently enough to be what this conversation is about
 					serverTrigger = index - lastUseObjectAt <= UseObjectTriggerWindow
 						? worldObjectIdByHandle.GetValueOrDefault(lastUseObjectHandle) is var w and not 0
 							? w
@@ -270,6 +280,7 @@ namespace Faolan.Importer.Extractors
 							lastQuestState = state == 2
 								? QuestState.Active
 								: QuestState.Completed;
+							lastQuestAt = index;
 						}
 					}
 				}
@@ -291,6 +302,7 @@ namespace Faolan.Importer.Extractors
 						// the gate for anything opened during it reads as "no quest".
 						lastQuestId = questId;
 						lastQuestState = QuestState.Active;
+						lastQuestAt = index;
 						if (active && path.Length != 0 && questsSeen.Add(questId))
 							grant = questId;
 						else
