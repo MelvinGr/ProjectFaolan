@@ -35,6 +35,33 @@ namespace Faolan.Tests
 		private static readonly Dictionary<string, string> FluentForeignKeyAllowlist = new(StringComparer.Ordinal);
 		private static readonly Regex FluentForeignKey = new(@"\.Has(Foreign|Principal)Key\s*[(<]");
 
+		// ⚠️ Timestamps are DateTimeOffset, never DateTime (Melvin's standing rule). A DateTime carries no offset, so
+		// the instant it records is ambiguous the moment the process, host or deployment changes timezone - and it
+		// round-trips through SQLite with its Kind reset to Unspecified, so a value written as UTC reads back
+		// comparing wrong against a local `now`. DateTimeOffset carries the offset and cannot lose it.
+		//
+		// This scans the model's own source rather than the EF metadata so the failure names the FILE and LINE to fix.
+		[Fact]
+		public void Timestamps_AreDateTimeOffset_NotDateTime()
+		{
+			var tables = Path.Combine(TestPaths.Repo("Faolan.Core.Database"), "Tables");
+			var declaration = new Regex(@"^\s*public\s+(?:virtual\s+)?DateTime(\?)?\s+\w+\s*\{", RegexOptions.Multiline);
+			var offenders = new List<string>();
+
+			foreach (var file in Directory.EnumerateFiles(tables, "*.cs", SearchOption.AllDirectories))
+			{
+				var lines = File.ReadAllLines(file);
+				for (var i = 0; i < lines.Length; i++)
+				{
+					if (declaration.IsMatch(lines[i]))
+						offenders.Add($"{Path.GetFileName(file)}:{i + 1} {lines[i].Trim()}");
+				}
+			}
+
+			Assert.True(offenders.Count == 0,
+				$"DateTime columns in the model - use DateTimeOffset:{Environment.NewLine}{string.Join(Environment.NewLine, offenders)}");
+		}
+
 		[Fact]
 		public void ForeignKeys_AreDeclaredByAttribute_NotFluently()
 		{

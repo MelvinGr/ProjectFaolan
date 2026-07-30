@@ -611,7 +611,7 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			character.CriminalUntil = DateTime.UtcNow.AddSeconds(seconds);
+			character.CriminalUntil = DateTimeOffset.UtcNow.AddSeconds(seconds);
 			character.MurderPoints += CriminalStatus.PointsPerPlayerKill;
 			await Database.SetCharacterCriminalState(character.Id, character.CriminalUntil, character.MurderPoints);
 

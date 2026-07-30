@@ -241,7 +241,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<DateTimeOffset>("CreationDate")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime?>("CriminalUntil")
+                    b.Property<DateTimeOffset?>("CriminalUntil")
                         .HasColumnType("TEXT");
 
                     b.Property<uint>("Deaths")
