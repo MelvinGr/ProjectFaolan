@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Cli;
+using Faolan.Core.Database.Tables;
 using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules
@@ -322,6 +323,36 @@ namespace Faolan.Importer.Modules
 	//
 	// Depends on rdb-respawns and the quest import: it links regions to the RespawnPoints and QuestGoalDefinitions
 	// that are already in the DB, so running it against a database without them imports nothing and reports so.
+	// Quest wiring read from the goals' own DECRYPTED objective text (#520/#521). RDB-backed, so it is opt-in and
+	// separate from the capture-driven `quest-wiring`.
+	public sealed class RdbQuestTextModule : IImportModule
+	{
+		public IReadOnlyList<string> DependsOn => [nameof(QuestsModule), nameof(NpcsModule)];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Upsert
+		};
+
+		public ImportSource Source => ImportSource.Rdb;
+		public bool InDefaultSet => false;
+
+		public string Description => "Quest wiring from the goals' decrypted objective text (#520/#521, opt-in).";
+		public string Name => "rdb-quest-text";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var r = await RdbQuestTextImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			// Every goal it did NOT wire is accounted for by reason - a silent skip here is indistinguishable from a
+			// decode regression.
+			return new ImportResult(
+				$"{r.Wired} goal(s) typed from their objective text ({r.WiredWithoutNpc} of them naming an NPC we do not hold yet, " +
+				$"so inert until its map is imported, {r.WiredWithoutDialogue} held but with no dialogue captured so the talk " +
+				$"cannot fire yet); {r.AlreadyWired} already wired, {r.PreconditionGated} rank/level-gated, " +
+				$"{r.NotOurShape} not a deliver/talk shape, {r.NoNameInText} no name in the text, {r.Unreadable} unreadable, of {r.Goals} goals.");
+		}
+	}
+
 	public sealed class RdbRegionsModule : IImportModule
 	{
 		public IReadOnlyList<string> DependsOn => ["rdb-respawns"];

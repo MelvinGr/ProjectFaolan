@@ -279,7 +279,33 @@ conversations and both key to `AnswerPath ""`, so the longer wins. Their identit
 the decode above matters — and adding it to `ConversationNode.ComputeId` only for `ServerInitiated` rows keeps it
 a pure function of the row while leaving all 467 talk-node ids untouched. Open on #523.
 
-### Typing the remaining inert goals is mechanical — the data is what is missing
+### The importer types goals from their own objective text
+
+`--only rdb-quest-text` (RDB-backed, opt-in) decrypts each goal's objective line and types it from the client's own
+words. It replaced a hand-written recipient table — the point being that this is a **rule**, not a seed:
+
+- a **`Deliver`** goal (kind 20) names its recipient — *"Deliver a Supply Crate to **Croiss** at the refugee camp"*
+- a **talk objective** in any kind names its target — *"Speak with **Kern Wolfeye**"*, *"Report to **Mei-zhu**"*
+
+Both become `TalkToNpc` at that NPC. The name is the LAST `to`/`with <Name>` in the line, because the item can
+contain one (*"Deliver the Head of Athyr-Bast to Hashima"*) and the person always closes the phrase.
+
+One pass takes the wired talk goals from **6 to 21**, and every one of the 168 goals is accounted for by reason:
+15 typed, 83 already wired, 5 rank/level-gated, 63 not a deliver/talk shape, 2 with no name in the text.
+
+⚠️ **A rank/level precondition is still refused** — *"…to Itsing When You Have Become an Acolyte (Rank 1)"*,
+*"Talk to Sharak (level 30)"*. A bare talk trigger completes those EARLY, which is a silent chain bug rather
+than a coverage gap; it is the one place accuracy beats coverage here.
+
+⚠️ **A name is wired even when we do not hold that NPC** (12 of the 15). It is the client's own statement of who
+the goal is about, the goal is inert either way, and recording it means it works the moment its map is imported —
+no second pass. The run says how many, so "wired" is never mistaken for "playable": a wired goal whose NPC is
+missing, or who has no captured dialogue (1 of the 15), still cannot complete.
+
+⚠️ Names are matched EXACTLY. `Amun` substring-matches the unrelated `Amunarton` — a different NPC on a different
+continent — which reads as a hit and wires the goal to the wrong target.
+
+### What is left is the data, not the rule
 
 85 goals are still at the fresh-harvest default. With the objective text readable, typing them is a rule rather
 than per-quest sourcing: `Talk to X` / `Speak to X` / `Speak with X` / `Report to X` → `TalkToNpc` at `X`.

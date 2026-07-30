@@ -1,0 +1,162 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using Faolan.Core.Crypt;
+using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Rdb;
+using Microsoft.EntityFrameworkCore;
+
+namespace Faolan.Importer.Rdb
+{
+	// Wires quest goals from their own DECRYPTED objective text (#520/#521).
+	//
+	// The client states what every goal asks for, in encrypted LDB category 50304, and we hold the per-string key on
+	// the goal itself (`ObjectiveKey`). So the wiring that used to need a hand-written table is a RULE over the
+	// client's own words: `Deliver` goals name their recipient, and this reads it.
+	//
+	// ⚠️ RDB-BACKED, therefore its own opt-in module rather than part of the capture-driven `quest-wiring`: the
+	// ciphertext lives in the client's install, and the capture modules deliberately run without an RdbDir. Nothing is
+	// lost when it does not run - the wiring is bootstrap-only and already-wired goals are skipped, so the rows stay as
+	// they are.
+	public static class RdbQuestTextImporter
+	{
+		// `quest_goal_templates.goal_name` - the goal's own display text.
+		private const uint GoalNameCategory = 50304;
+
+		// The NPC in an objective line: the LAST "to <Name>" / "with <Name>" in it. LAST, not first, because the item
+		// can contain one ("Deliver the Head of Athyr-Bast to Hashima") and the person always closes the phrase. A name
+		// is one or two Capitalised words, allowing the apostrophes and hyphens real names carry (`Jen-ta`,
+		// `Akil-Atsu`), which also stops it at the trailing qualifier retail appends ("at the refugee camp", "on the
+		// Lacheish Plains").
+		private static readonly Regex Recipient = new(@"\b(?:to|with)\s+([A-Z][\w'\-]*(?:\s+[A-Z][\w'\-]*)?)", RegexOptions.Compiled);
+
+		// A goal whose text ASKS the player to go and speak to someone - the same TalkToNpc trigger a delivery uses,
+		// just without an item changing hands. "Speak with Kern Wolfeye", "Report to Mei-zhu", "Talk to King Conan of
+		// Aquilonia".
+		private static readonly Regex TalkObjective = new(@"^\s*(?:Talk|Speak|Report)\s+(?:to|with)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		// A goal whose text carries a RANK/LEVEL precondition is deliberately left unwired: a bare talk trigger would
+		// complete it early. "Give Note of Recommendation to Itsing When You Have Become an Acolyte (Rank 1)",
+		// "Talk to Sharak (level 30)".
+		private static readonly Regex Precondition = new(@"When You Have Become|\(\s*(?:level|rank)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
+		{
+			var ciphertext = EnglishEncryptedStrings(rdbDir);
+			// Every goal, not just the deliveries: the same "who does this name" rule types a talk objective too.
+			var goals = await db.QuestGoalDefinitions.ToListAsync();
+			var npcNames = (await db.NpcTemplates.Select(t => t.Name).ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+			// A TalkToNpc goal advances only once a GREETING is served, so an NPC with no ConversationNode rows can never
+			// complete one however correctly it is wired. Counted separately from "NPC missing" because the fix differs:
+			// one needs the map's spawns, the other needs a capture of the dialogue.
+			var withDialogue = (await db.ConversationNodes.Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+			int wired = 0, unreadable = 0, gated = 0, noName = 0, notOurShape = 0, alreadyWired = 0, withoutNpc = 0, withoutDialogue = 0;
+			foreach (var goal in goals)
+			{
+				// Bootstrap-only, like every other wiring step: a Quest-editor edit or a hand seed survives a re-import.
+				if (goal.GoalType != QuestGoalType.Kill || goal.TargetName != null)
+				{
+					alreadyWired++;
+					continue;
+				}
+
+				// Only the two shapes this rule can type: a DELIVERY (kind 20 - hand the item over) and an objective
+				// that asks the player to go and talk to someone. Everything else is left to its own decode.
+				var isDeliver = goal.Separator == (uint)QuestGoalKind.Deliver;
+
+				var category = goal.ObjectiveCategory == 0
+					? GoalNameCategory
+					: goal.ObjectiveCategory;
+				if (!ciphertext.TryGetValue((category, goal.ObjectiveRefId), out var blob) || LdbKey.Decrypt(blob, goal.ObjectiveKey) is not { } text)
+				{
+					unreadable++;
+					continue;
+				}
+
+				if (!isDeliver && !TalkObjective.IsMatch(text))
+				{
+					notOurShape++;
+					continue;
+				}
+
+				// A RANK/LEVEL precondition stays unwired even now: a bare talk trigger would complete it EARLY, which
+				// is a silent chain bug rather than a coverage gap. This is the one place accuracy beats coverage.
+				if (Precondition.IsMatch(text))
+				{
+					gated++;
+					continue;
+				}
+
+				var match = Recipient.Matches(text).LastOrDefault();
+				if (match == null)
+				{
+					noName++;
+					continue;
+				}
+
+				var recipient = match.Groups[1].Value.Trim();
+
+				// The name is wired whether or not we hold that NPC. It is the client's own statement of who the goal
+				// is about, so recording it is right regardless of spawn coverage - and the goal then works the moment
+				// its map is imported, with no second pass through here. It is inert either way until then.
+				//
+				// ⚠️ Counted, not silent: a wired goal whose NPC is missing LOOKS wired, so the run says how many.
+				if (!npcNames.Contains(recipient))
+					withoutNpc++;
+				else if (!withDialogue.Contains(recipient))
+					withoutDialogue++;
+
+				goal.GoalType = QuestGoalType.TalkToNpc;
+				goal.TargetName = recipient;
+				wired++;
+			}
+
+			if (wired > 0)
+				await db.SaveChangesAsync();
+
+			return new Result(goals.Count, wired, unreadable, gated, noName, notOurShape, alreadyWired, withoutNpc, withoutDialogue);
+		}
+
+		// (category, id) -> ciphertext over the ENGLISH pages of the ENCRYPTED categories. The language comes from the
+		// client's own language records rather than from the text (whole pages ship untranslated, so a sniffer unions
+		// languages and yields French), and the encrypted set from the page header's own flags word.
+		private static Dictionary<(uint Category, uint Id), byte[]> EnglishEncryptedStrings(string rdbDir)
+		{
+			using var rdb = new RdbReader(rdbDir);
+			var language = LdbLanguageIndex.LanguageByPage(rdb);
+			var blobs = new Dictionary<(uint, uint), byte[]>();
+
+			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(x => x.IsLocal))
+			{
+				if (!language.TryGetValue(e.Id, out var lang) || lang != LdbLanguageIndex.English)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue;
+				}
+
+				if (LdbStringIndex.CategoryOf(body) == 0 || LdbStringIndex.FlagsOf(body) != 1)
+					continue;
+
+				foreach (var entry in LdbStringIndex.ParseRaw(body))
+					blobs[(entry.Category, entry.Id)] = entry.Bytes;
+			}
+
+			return blobs;
+		}
+
+		// Every goal is accounted for by REASON - wired, or one of the five ways it was not. A silent skip here would be
+		// indistinguishable from a decode regression, so the counts are expected to sum to DeliverGoals.
+		public readonly record struct Result(int Goals, int Wired, int Unreadable, int PreconditionGated, int NoNameInText, int NotOurShape, int AlreadyWired, int WiredWithoutNpc, int WiredWithoutDialogue);
+	}
+}

@@ -1285,7 +1285,6 @@ namespace Faolan.Importer.Captures
 		public static async Task WireQuests(DatabaseContext db)
 		{
 			await TypeItemGoalsFromTrailingCategory(db);
-			await TypeDeliverGoalsFromRecipient(db);
 			await SeedBeachQuestGoals(db);
 			await SeedShipwreckedCityChain(db);
 			await SeedCaptureReachQuests(db);
@@ -1336,81 +1335,6 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				goal.GoalType = QuestGoalType.CollectItem;
-				typed++;
-			}
-
-			if (typed > 0)
-				await db.SaveChangesAsync();
-		}
-
-		// A `Deliver` goal (QuestGoalKind 20) hands its item to a NAMED NPC, and the recipient is in the goal's own
-		// objective text - which is readable now that the encrypted LDB categories are (#520). So these type as
-		// `TalkToNpc` at the recipient: the talk trigger SOLVES a goal in one interaction, so "deliver N" completes
-		// correctly without the count being involved.
-		//
-		// The recipient comes from the DECRYPTED objective text (LDB category 50304), reproducible with
-		// `--report ldb-quest-text` - which prints each goal's kind tag beside its text, so the two independent
-		// statements of what the goal asks for can be compared. It is carried as a table here rather than decrypted
-		// during the import because the ciphertext is in the client's RDB, and the capture-driven modules deliberately
-		// do not require an RdbDir.
-		//
-		// ⚠️ It only wires a goal whose recipient IS in the NPC catalog. That is not caution about the names - all 12 are
-		// confirmed - it is that 10 of the 12 recipients stand on maps with a `Maps` row and ZERO `NpcSpawns`
-		// (Khopshef 3020, Kheshatta 3030, Lacheish Plains 1040, Wild Lands 2080, Chosain 6300, Gateway to Khitai 6001).
-		// Wiring one of those produces a goal that can never complete, which is no better than the inert state it
-		// replaces - and gating on the catalog means they light up on their own when those maps' spawns are imported,
-		// with no second pass through here.
-		//
-		// ⚠️ A `TalkToNpc` does NOT check the player is HOLDING the item; retail presumably does. Adding that is a new
-		// mechanic (an item precondition on a talk goal), not wiring - Gitea #521.
-		private static async Task TypeDeliverGoalsFromRecipient(DatabaseContext db)
-		{
-			// goalId -> the recipient named in the goal's decrypted objective text.
-			//   3497  "Deliver 3 stone bricks to Turach"                 3742  "Give Akil-Atsu's Head to Captain Menes"
-			//   4334  "Deliver the Remedy to Amun"                       5792  "Deliver a Supply Crate to Croiss at the refugee camp"
-			//   6179  "Bring the Head of Athyr-Bast to Hashima"          7205  "Give the Letter to Sien on the Lacheish Plains"
-			//   7211  "Give the Dossier to Glaith on the Lacheish Plains" 7387 "Deliver Amunarton's Amulet to Shabaka"
-			//   7388  "Deliver the Cimmerian Furs to Keyx"              11895  "Deliver the Cimmerian Furs to Jen-ta"
-			// ⚠️ 11880/11881 are deliberately ABSENT: their text carries a RANK precondition ("Give Note of
-			// Recommendation to Itsing When You Have Become an Acolyte (Rank 1)"), so a bare talk trigger would complete
-			// them early. They need the rank gate first.
-			var recipients = new Dictionary<uint, string>
-			{
-				[3497] = "Turach",
-				[3742] = "Captain Menes",
-				[4334] = "Amun",
-				[5792] = "Croiss",
-				[6179] = "Hashima",
-				[7205] = "Sien",
-				[7211] = "Glaith",
-				[7387] = "Shabaka",
-				[7388] = "Keyx",
-				[11895] = "Jen-ta"
-			};
-
-			var goals = await db.QuestGoalDefinitions.Where(g => recipients.Keys.Contains(g.GoalId)).ToListAsync();
-
-			// EXACT names only. A LIKE/contains match here is actively dangerous: "Amun" substring-matches the unrelated
-			// `Amunarton` (a Conall's Valley quest GIVER, and the giver of 14615 whose own recipient is Shabaka), which
-			// reads as a hit and wires the goal to the wrong NPC on the wrong continent.
-			var known = await db
-				.Set<NpcTemplate>().Where(t => recipients.Values.Contains(t.Name))
-				.Select(t => t.Name)
-				.ToListAsync();
-			var haveNpc = known.ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-			var typed = 0;
-			foreach (var goal in goals)
-			{
-				if (IsWired(goal))
-					continue;
-
-				var recipient = recipients[goal.GoalId];
-				if (!haveNpc.Contains(recipient))
-					continue; // recipient's map has no spawns yet - see the note above
-
-				goal.GoalType = QuestGoalType.TalkToNpc;
-				goal.TargetName = recipient;
 				typed++;
 			}
 
