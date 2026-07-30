@@ -1,3 +1,4 @@
+using Faolan.Core.Crypt;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -23,7 +24,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 				Sequence = sequence,
 				ScreenId = uint.Parse(s.Id, CultureInfo.InvariantCulture),
 				Category = uint.Parse(s.Category, CultureInfo.InvariantCulture),
-				Key = s.Key,
+				Key = LdbKey.Decode(s.Key) ?? new(),
 				Knubot = uint.Parse(s.Knubot, CultureInfo.InvariantCulture),
 				Antitag = s.Antitag == null
 					? null
@@ -76,7 +77,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		public static string InnerRawOf(ConversationScreenParameter p)
 		{
 			ArgumentNullException.ThrowIfNull(p);
-			return new InnerElement(p.Kind, p.LocalizedId, p.LocalizedToken, p.Category, p.Flags, p.ContentKey, p.Text, null).Build();
+			return new InnerElement(p.Kind, p.LocalizedId, p.LocalizedToken, p.Category, p.Flags, LdbKey.ToWire(p.ContentKey), p.Text, null).Build();
 		}
 
 		// Lift a captured inner element into the parameter's columns, refusing anything the columns cannot hold: an
@@ -97,7 +98,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			row.LocalizedToken = element.Token;
 			row.Category = element.Category;
 			row.Flags = element.Flags;
-			row.ContentKey = element.Key;
+			row.ContentKey = LdbKey.Decode(element.Key) ?? new();
 			row.Text = element.Text;
 		}
 
@@ -105,7 +106,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		{
 			var pars = row.Parameters.OrderBy(p => p.Sequence).Select(p => new RemoteFormatXml.Parameter(p.Name, InnerRawOf(p))).ToList();
 
-			return new RemoteFormatXml.Screen(row.ScreenId.ToString(CultureInfo.InvariantCulture), row.Category.ToString(CultureInfo.InvariantCulture), row.Key,
+			return new RemoteFormatXml.Screen(row.ScreenId.ToString(CultureInfo.InvariantCulture), row.Category.ToString(CultureInfo.InvariantCulture), LdbKey.ToWire(row.Key),
 				row.Knubot.ToString(CultureInfo.InvariantCulture), row.Antitag?.ToString(CultureInfo.InvariantCulture), pars);
 		}
 

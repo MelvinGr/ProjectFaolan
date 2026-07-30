@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Faolan.Core.Protobuf;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
 using System.Numerics;
@@ -157,9 +158,14 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(16)]
 		public string? DisplayFlags { get; set; }
 
-		// The client-validated content hash, as the raw ATTRIBUTE TEXT the capture carries (entities included).
-		[MaxLength(64)]
-		public string? DisplayKey { get; set; }
+		// The per-string LDB DECRYPTION KEY (LdbKey), stored as the 128-bit TEA key - the same ProtoDecryptionKey an
+		// item template carries - rather than as the 20-character wire string, which LdbKey.ToWire regenerates from it
+		// exactly, retail's attribute escaping included.
+		//
+		// ⚠️ Long described here as a "client-validated content hash" carried as raw attribute text. It is neither: the
+		// client is not validating anything, it is DECRYPTING - eleven LDB categories are encrypted and this is the key
+		// (#520). Text that came out blank was the client failing to decrypt, not failing a checksum.
+		public virtual ProtoDecryptionKey DisplayKey { get; set; } = new();
 
 		public uint? DisplayKnubot { get; set; }
 

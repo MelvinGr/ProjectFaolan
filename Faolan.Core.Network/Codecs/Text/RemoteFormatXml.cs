@@ -1,3 +1,4 @@
+using Faolan.Core.Crypt;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -68,7 +69,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		// replaced is gone. Latin-1 because that is the wire's string encoding.
 		public static byte[] BuildStockPhrase(StockPhrase row)
 		{
-			return Encoding.Latin1.GetBytes(Build(new Screen($"{row.RemoteFormatId}", $"{row.Category}", row.FormatKey, $"{row.Knubot}", null, [])));
+			return Encoding.Latin1.GetBytes(Build(new Screen($"{row.RemoteFormatId}", $"{row.Category}", LdbKey.ToWire(row.FormatKey), $"{row.Knubot}", null, [])));
 		}
 
 		// The ambient NPC bark payload: the same PARAMETER-LESS root as a stock phrase, but its first attribute is
@@ -93,7 +94,7 @@ namespace Faolan.Core.Network.Codecs.Text
 				.Select(x => IsSessionBarkSlot(x.Name)
 					? $"<parameter value=\"7;{Escape(detectedCharName)}\" name=\"{x.Name}\" />"
 					: $"<parameter value=\"7;{x.Value}\" name=\"{x.Name}\" />"));
-			return $"<remoteformat token=\"{ChatterToken(row)}\" category=\"{row.Category}\" key=\"{row.FormatKey}\" knubot=\"{row.Knubot}\"  >{parameters}</remoteformat>";
+			return $"<remoteformat token=\"{ChatterToken(row)}\" category=\"{row.Category}\" key=\"{LdbKey.ToWire(row.FormatKey)}\" knubot=\"{row.Knubot}\"  >{parameters}</remoteformat>";
 		}
 
 		public static byte[] BuildChatterBytes(NpcChatter row, string detectedCharName = "")
@@ -150,7 +151,7 @@ namespace Faolan.Core.Network.Codecs.Text
 				ChannelCount = uint.Parse(m.Groups["count"].Value, CultureInfo.InvariantCulture),
 				Group = m.Groups["group"].Value,
 				Category = uint.Parse(m.Groups["cat"].Value, CultureInfo.InvariantCulture),
-				FormatKey = m.Groups["key"].Value,
+				FormatKey = LdbKey.Decode(m.Groups["key"].Value) ?? new(),
 				Knubot = uint.Parse(m.Groups["knubot"].Value, CultureInfo.InvariantCulture),
 			};
 			foreach (var slot in slots)

@@ -1,3 +1,4 @@
+using Faolan.Core.Crypt;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -87,7 +88,7 @@ namespace Faolan.Importer.Captures
 				row.RemoteFormatId = uint.Parse(screen.Id);
 				row.Category = uint.Parse(screen.Category);
 				row.Knubot = uint.Parse(screen.Knubot);
-				row.FormatKey = screen.Key;
+				row.FormatKey = LdbKey.Decode(screen.Key) ?? new();
 
 				if (existing == null)
 				{

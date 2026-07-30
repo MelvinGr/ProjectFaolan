@@ -284,6 +284,11 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<QuestArea>().OwnsOne(a => a.AreaTitleKey, k => OwnNamedKey(k, "AreaTitleKey"));
 			modelBuilder.Entity<QuestArea>().OwnsOne(a => a.MapKey, k => OwnNamedKey(k, "MapKey"));
 			modelBuilder.Entity<QuestArea>().OwnsOne(a => a.RegionKey, k => OwnNamedKey(k, "RegionKey"));
+			modelBuilder.Entity<ConversationScreen>().OwnsOne(c => c.Key, k => OwnNamedKey(k, "Key"));
+			modelBuilder.Entity<ConversationScreenParameter>().OwnsOne(p => p.ContentKey, k => OwnNamedKey(k, "ContentKey"));
+			modelBuilder.Entity<StockPhrase>().OwnsOne(p => p.FormatKey, k => OwnNamedKey(k, "FormatKey"));
+			modelBuilder.Entity<NpcChatter>().OwnsOne(c => c.FormatKey, k => OwnNamedKey(k, "FormatKey"));
+			modelBuilder.Entity<WorldObject>().OwnsOne(o => o.DisplayKey, k => OwnNamedKey(k, "DisplayKey"));
 
 			// The item's equipped stat bonuses (#3); cascade-delete with the item.
 			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).OnDelete(DeleteBehavior.Cascade);

@@ -110,11 +110,18 @@ namespace Faolan.Tests
 				.Concat(await db.QuestAreas.AsNoTracking().Select(a => a.AreaTitleKey).ToListAsync(ct))
 				.Concat(await db.QuestAreas.AsNoTracking().Select(a => a.MapKey).ToListAsync(ct))
 				.Concat(await db.QuestAreas.AsNoTracking().Select(a => a.RegionKey).ToListAsync(ct))
+				// ...and the DIALOGUE half of the encrypted set (categories 50000-50003): conversation screens and
+				// their parameters, stock phrases, NPC barks, world-object display text.
+				.Concat(await db.ConversationScreens.AsNoTracking().Select(c => c.Key).ToListAsync(ct))
+				.Concat(await db.ConversationScreenParameters.AsNoTracking().Select(p => p.ContentKey).ToListAsync(ct))
+				.Concat(await db.StockPhrases.AsNoTracking().Select(p => p.FormatKey).ToListAsync(ct))
+				.Concat(await db.NpcChatter.AsNoTracking().Select(c => c.FormatKey).ToListAsync(ct))
+				.Concat(await db.WorldObjects.AsNoTracking().Select(o => o.DisplayKey).ToListAsync(ct))
 				.Where(k => k != null && !k.IsEmpty)
 				.Distinct()
 				.ToList();
 
-			Assert.True(keys.Count > 100, $"only {keys.Count} keys in the seed - the gate would be vacuous");
+			Assert.True(keys.Count > 5000, $"only {keys.Count} keys in the seed - the gate would be vacuous");
 
 			var broken = keys.Where(k => LdbKey.Decode(LdbKey.ToWire(k)) != k).ToList();
 			Assert.True(broken.Count == 0, $"{broken.Count} of {keys.Count} keys do not round-trip, e.g. {broken.FirstOrDefault()}");

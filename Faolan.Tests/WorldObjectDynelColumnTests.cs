@@ -1,3 +1,5 @@
+using Faolan.Core.Crypt;
+using Faolan.Core.Protobuf;
 using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -22,7 +24,7 @@ namespace Faolan.Tests
 			using var con = new SqliteConnection($"Data Source={db};Mode=ReadOnly");
 			con.Open();
 			using var cmd = con.CreateCommand();
-			cmd.CommandText = "SELECT Name,DisplayKind,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,GeometryAssetType,DisplayId,DisplayToken,DisplayCategory,DisplayFlags,DisplayKey,DisplayKnubot " + "FROM WorldObjects WHERE DisplayKind IS NOT NULL";
+			cmd.CommandText = "SELECT Name,DisplayKind,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,GeometryAssetType,DisplayId,DisplayToken,DisplayCategory,DisplayFlags,DisplayKey1,DisplayKey2,DisplayKey3,DisplayKey4,DisplayKnubot " + "FROM WorldObjects WHERE DisplayKind IS NOT NULL";
 			using var r = cmd.ExecuteReader();
 			int total = 0, ok = 0, noTail = 0, mismatch = 0;
 			while (r.Read())
@@ -58,12 +60,17 @@ namespace Faolan.Tests
 					DisplayFlags = r.IsDBNull(12)
 						? null
 						: r.GetString(12),
-					DisplayKey = r.IsDBNull(13)
+					// The LDB key is four columns now (#520); rebuild it from them rather than from a string.
+					DisplayKey = new ProtoDecryptionKey
+					{
+						Key1 = (uint)r.GetInt64(13),
+						Key2 = (uint)r.GetInt64(14),
+						Key3 = (uint)r.GetInt64(15),
+						Key4 = (uint)r.GetInt64(16)
+					},
+					DisplayKnubot = r.IsDBNull(17)
 						? null
-						: r.GetString(13),
-					DisplayKnubot = r.IsDBNull(14)
-						? null
-						: (uint)r.GetInt64(14)
+						: (uint)r.GetInt64(17)
 				};
 
 				// The geometry record always names an RDB asset (1010030 MESHINDEXFILE / 1010001 RenderMesh /

@@ -1265,11 +1265,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Category")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
                     b.Property<uint>("Knubot")
                         .HasColumnType("INTEGER");
 
@@ -1297,10 +1292,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Property<uint?>("Category")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("ContentKey")
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
 
                     b.Property<string>("Flags")
                         .IsRequired()
@@ -1936,11 +1927,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Property<uint>("ChannelCount")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("FormatKey")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
 
                     b.Property<string>("Group")
                         .IsRequired()
@@ -3319,11 +3305,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Category")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("FormatKey")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
                     b.Property<uint>("Knubot")
                         .HasColumnType("INTEGER");
 
@@ -3474,10 +3455,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Property<uint?>("DisplayId")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("DisplayKey")
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
 
                     b.Property<byte?>("DisplayKind")
                         .HasColumnType("INTEGER");
@@ -4193,6 +4170,44 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "Key", b1 =>
+                        {
+                            b1.Property<uint>("ConversationScreenConversationNodeId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int>("ConversationScreenPacketSequence")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int>("ConversationScreenSequence")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("Key1");
+
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("Key2");
+
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("Key3");
+
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("Key4");
+
+                            b1.HasKey("ConversationScreenConversationNodeId", "ConversationScreenPacketSequence", "ConversationScreenSequence");
+
+                            b1.ToTable("ConversationScreens");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ConversationScreenConversationNodeId", "ConversationScreenPacketSequence", "ConversationScreenSequence");
+                        });
+
+                    b.Navigation("Key")
+                        .IsRequired();
+
                     b.Navigation("Packet");
                 });
 
@@ -4202,6 +4217,47 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .WithMany("Parameters")
                         .HasForeignKey("ConversationNodeId", "PacketSequence", "ScreenSequence")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "ContentKey", b1 =>
+                        {
+                            b1.Property<uint>("ConversationScreenParameterConversationNodeId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int>("ConversationScreenParameterPacketSequence")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int>("ConversationScreenParameterScreenSequence")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<int>("ConversationScreenParameterSequence")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("ContentKey1");
+
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("ContentKey2");
+
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("ContentKey3");
+
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("ContentKey4");
+
+                            b1.HasKey("ConversationScreenParameterConversationNodeId", "ConversationScreenParameterPacketSequence", "ConversationScreenParameterScreenSequence", "ConversationScreenParameterSequence");
+
+                            b1.ToTable("ConversationScreenParameters");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ConversationScreenParameterConversationNodeId", "ConversationScreenParameterPacketSequence", "ConversationScreenParameterScreenSequence", "ConversationScreenParameterSequence");
+                        });
+
+                    b.Navigation("ContentKey")
                         .IsRequired();
 
                     b.Navigation("Screen");
@@ -4394,6 +4450,44 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .WithMany("Chatter")
                         .HasForeignKey("NpcTemplateId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "FormatKey", b1 =>
+                        {
+                            b1.Property<uint>("NpcChatterNpcTemplateId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<string>("NpcChatterChannel")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<uint>("NpcChatterSayInChat")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("FormatKey1");
+
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("FormatKey2");
+
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("FormatKey3");
+
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("FormatKey4");
+
+                            b1.HasKey("NpcChatterNpcTemplateId", "NpcChatterChannel", "NpcChatterSayInChat");
+
+                            b1.ToTable("NpcChatter");
+
+                            b1.WithOwner()
+                                .HasForeignKey("NpcChatterNpcTemplateId", "NpcChatterChannel", "NpcChatterSayInChat");
+                        });
+
+                    b.Navigation("FormatKey")
                         .IsRequired();
 
                     b.Navigation("NpcTemplate");
@@ -4959,6 +5053,41 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Spell");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.StockPhrase", b =>
+                {
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "FormatKey", b1 =>
+                        {
+                            b1.Property<string>("StockPhraseKey")
+                                .HasColumnType("TEXT");
+
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("FormatKey1");
+
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("FormatKey2");
+
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("FormatKey3");
+
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("FormatKey4");
+
+                            b1.HasKey("StockPhraseKey");
+
+                            b1.ToTable("StockPhrases");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StockPhraseKey");
+                        });
+
+                    b.Navigation("FormatKey")
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.TradepostListing", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Item", "Item")
@@ -5003,6 +5132,38 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .WithMany("Objects")
                         .HasForeignKey("MapId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "DisplayKey", b1 =>
+                        {
+                            b1.Property<uint>("WorldObjectId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("DisplayKey1");
+
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("DisplayKey2");
+
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("DisplayKey3");
+
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("DisplayKey4");
+
+                            b1.HasKey("WorldObjectId");
+
+                            b1.ToTable("WorldObjects");
+
+                            b1.WithOwner()
+                                .HasForeignKey("WorldObjectId");
+                        });
+
+                    b.Navigation("DisplayKey")
                         .IsRequired();
 
                     b.Navigation("Map");

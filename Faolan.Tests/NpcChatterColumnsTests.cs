@@ -1,3 +1,4 @@
+using Faolan.Core.Crypt;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -35,8 +36,9 @@ namespace Faolan.Tests
 			Assert.Equal(0u, row.Knubot);
 			Assert.Empty(row.Parameters);
 
-			// The key keeps its XML entity exactly as captured - re-escaping is not round-trip safe.
-			Assert.Equal("]&#39;siB8WQ*b25XY8J7Gd*", row.FormatKey);
+			// The key is stored decoded (the 128-bit TEA key) and RENDERS back to the captured attribute exactly,
+			// XML entity included - that round-trip is the claim, not the storage form.
+			Assert.Equal("]&#39;siB8WQ*b25XY8J7Gd*", LdbKey.ToWire(row.FormatKey));
 			Assert.Equal(CapturedBark, RemoteFormatXml.BuildChatter(row));
 		}
 

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Faolan.Core.Protobuf;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
@@ -50,11 +51,13 @@ namespace Faolan.Core.Database.Tables
 		public uint Category { get; set; } // always 50015 in the captures - the ambient-chatter category
 		public uint Knubot { get; set; }
 
-		// The remoteformat's own `key=` attribute: the harvested, client-validated per-line content hash. Stored as
-		// the raw ATTRIBUTE TEXT the capture carries, XML entities and all (`&#39;`, `&quot;`) - the client is fed
-		// these bytes verbatim and re-escaping is not round-trip safe. Same rule as StockPhrase.FormatKey.
-		[MaxLength(64)]
-		public string FormatKey { get; set; } = null!;
+		// The remoteformat's own `key=` attribute: the per-string LDB DECRYPTION KEY (LdbKey), stored as the 128-bit
+		// TEA key - the same ProtoDecryptionKey an item template carries - rather than as the 20-character wire
+		// string, which LdbKey.ToWire regenerates from it exactly, escaping included.
+		//
+		// ⚠️ Previously described as a "client-validated per-line content hash". It is the DECRYPTION key: eleven LDB
+		// categories are encrypted and this unlocks them (#520).
+		public virtual ProtoDecryptionKey FormatKey { get; set; } = new();
 
 		// The bark's `<parameter>` slots in render order, empty for most lines (#493). Was a single name-only column
 		// on the assumption that a bark carries at most one - the Damsel in Distress line carries two, one of them

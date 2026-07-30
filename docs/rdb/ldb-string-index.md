@@ -267,9 +267,17 @@ The encrypted eleven are exactly the **NPC conversation text** (`50000`–`50003
    client's `FUN_00a8f550`, which is byte-for-byte the `Tea.DecryptEcb` we already have for item templates.
 4. The plaintext is UTF-8, NUL-padded to the 8-byte block.
 
-Verified end to end: all **168** quest objective texts we hold a key for decrypt to sensible English —
+Verified end to end on both halves of the encrypted set. All **168** quest objective texts decrypt —
 `LDB[50304][1448]` = **"Enter the jungle"**, `[3490]` = **"Kill slavemaster Saddur"**, `[3497]` = **"Bring the
-three stone bricks to Turach"**, `[11712]` = "Overcome the emperor's manifested nightmares".
+three stone bricks to Turach"**, `[11712]` = "Overcome the emperor's manifested nightmares" — and so does the NPC
+dialogue, inline directives and all:
+
+```
+screen 33605  cat 50002  Are you certain? The Border Kingdoms are full of angry bastards…
+screen 21146  cat 50001  Sign me up.
+screen 18243  cat 50002  {camera size=5 emphasis=1}{turn 0}Eh? What's this now?
+screen 16905  cat 50002  Have a pleasant eve.{social vixen_stand_squirming3}
+```
 
 ### Why this is a *server* secret, not a client one
 
@@ -278,8 +286,10 @@ exes, the patcher, 2,612 decompressed RDB records and 95 MB of decoded wire payl
 scanner was positive-controlled. It was looking for a 16-byte binary constant; the key is a **20-character
 base-85 string, different for every string, delivered per reference**.
 
-⚠️ **We already hold these keys** — harvested from captures into `QuestGoalDefinition.ObjectiveKey` /
-`TrailingKey`, `QuestArea.AreaTitleKey` / `MapKey` / `RegionKey` and `QuestTextRef.KeyText`. They are stored as
+⚠️ **We already hold 27,037 of these keys**, harvested from captures across eleven columns — the QUEST half
+(`QuestGoalDefinition.ObjectiveKey`/`TrailingKey`, `QuestTextRef.KeyText`, `QuestArea.AreaTitleKey`/`MapKey`/
+`RegionKey`) and the DIALOGUE half (`ConversationScreen.Key`, `ConversationScreenParameter.ContentKey`,
+`StockPhrase.FormatKey`, `NpcChatter.FormatKey`, `WorldObject.DisplayKey`). They are stored as
 the **128-bit TEA key** (`ProtoDecryptionKey`, the same shape an item template's key uses), not as the wire
 string: the string is a pure base-85 rendering of those four words and `LdbKey.ToWire` regenerates it exactly,
 escaping included. That is also why the retail client renders our quest journal correctly — we replay the

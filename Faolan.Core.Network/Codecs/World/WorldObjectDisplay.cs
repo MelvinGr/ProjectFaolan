@@ -1,3 +1,4 @@
+using Faolan.Core.Crypt;
 using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -20,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			ArgumentNullException.ThrowIfNull(row);
 			return row.DisplayKind is { } kind
-				? new InnerElement(kind, row.DisplayId, row.DisplayToken, row.DisplayCategory, row.DisplayFlags ?? "", row.DisplayKey, null, row.DisplayKnubot).Build()
+				? new InnerElement(kind, row.DisplayId, row.DisplayToken, row.DisplayCategory, row.DisplayFlags ?? "", LdbKey.ToWire(row.DisplayKey), null, row.DisplayKnubot).Build()
 				: null;
 		}
 
@@ -49,7 +50,7 @@ namespace Faolan.Core.Network.Codecs.World
 			row.DisplayToken = element.Token;
 			row.DisplayCategory = element.Category;
 			row.DisplayFlags = element.Flags;
-			row.DisplayKey = element.Key;
+			row.DisplayKey = LdbKey.Decode(element.Key) ?? new();
 			row.DisplayKnubot = element.Knubot;
 			return true;
 		}
@@ -62,7 +63,7 @@ namespace Faolan.Core.Network.Codecs.World
 			row.DisplayToken = null;
 			row.DisplayCategory = null;
 			row.DisplayFlags = null;
-			row.DisplayKey = null;
+			row.DisplayKey = new();
 			row.DisplayKnubot = null;
 		}
 	}
