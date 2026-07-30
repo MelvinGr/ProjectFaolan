@@ -63,9 +63,14 @@ namespace Faolan.GameServer.World
 		// Applies damage/heal-over-time from active DoT debuffs (#274). Each tracked buff with a DotDelta bleeds (or
 		// heals) the target's HealthCurrent on a fixed cadence, mirroring the captured StatDamageIIR cycle: the tick
 		// moves the player's vitals by the delta and sends the byte-exact StatDamageIIR (+ a PushVitals for the bar).
-		// The fallback DoT cadence, for a spell whose interval was never observed. Retail's bleeds tick roughly every
-		// couple of seconds, which is what this was for EVERY DoT until the interval was measured per spell (#437) -
-		// see Spell.DotIntervalMs.
+		// The fallback DoT cadence, for a spell whose interval the captures never established. This was once a guess
+		// ("bleeds tick roughly every couple of seconds") applied to EVERY DoT, until the interval was measured per
+		// spell (#437) - see Spell.DotIntervalMs.
+		//
+		// It survived the measurement as the MEDIAN of the 53 intervals now measured, which is the most defensible
+		// thing to guess for the 31 still unmeasured. Worth knowing that it is not the most COMMON value: the
+		// measured set peaks at 1 s (16 spells) against 2 s (14), so the fallback is deliberately the middle of the
+		// range rather than its mode, and it is still wrong for any individual spell that lands on it.
 		private const double DotTickSeconds = 2.0;
 
 		// Vitals regen cadence (rate-based; dt-scaled by the real elapsed time when it fires).

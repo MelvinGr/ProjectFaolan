@@ -713,6 +713,20 @@ a real cast. ⚠️ The word after `delta` in StatDamage is the damage **school*
 stat finds nothing and reads as "retail has no caster NPCs", which is how the magical branch went missing on a
 first pass. Filtering by school instead shows magical casters at levels 1-6.
 
+**A DoT's cadence is measured, not read.** The record carries no period, so consecutive ticks of one spell on
+one target are one tick train and the gap between them *is* that spell's interval — harvested by the
+`dot-effects` importer module into `Spell.DotIntervalMs`. 53 of the 84 DoT spells in the corpus have one;
+values are round half-seconds from 500 ms to 11 s, peaking at 1 s (16 spells) and 2 s (14). A spell with no
+measured interval ticks at the 2 s fallback, which is the median of the measured set.
+
+⚠️ A tick train is scoped to **one capture**: its key includes the target and caster entity handles, and those
+are session-volatile and recycled, so pooling ticks across captures splices unrelated trains. Pooling the
+resulting *gaps* is fine — a gap is a duration. Note also that the distortion is one-sided: a dropped or
+unobserved tick merges two periods into one long gap and can never produce a short one, so the gaps of a real
+DoT cluster at the interval with a long upper tail. That is why `DotIntervalEstimator` accepts on how tightly
+gaps *concentrate* around the median rather than on their spread — a quartile bound rejects good data precisely
+because a quarter of its gaps are doubled periods.
+
 ⚠️ **The school NUMBERING was wrong until #487, so any pre-#487 census output names the wrong elements.** Cold
 sat at 5 with everything after it one too high, which made a necromancer's unholy nukes read as *Holy* and their
 frost as *Siege*. The real order appends Cold after the nine — `Slashing 1 · Piercing 2 · Crushing 3 · Fire 4 ·

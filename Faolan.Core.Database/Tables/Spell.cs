@@ -48,13 +48,19 @@ namespace Faolan.Core.Database.Tables
 
 		// How often the DoT ticks, in milliseconds. MEASURED from the captures rather than lifted from the RDB (#437):
 		// a StatDamageIIR carries its spell's base id at word 12, so the gap between consecutive ticks of one spell on
-		// one target IS the interval. Over 38 spells the quartiles are tight (Ripper Volley 0.92/0.98/1.12, Ether Drain
-		// 4.92/4.95/5.11), and the values are round - 500 ms to 11 s.
+		// one target IS the interval. The gaps of a real DoT cluster tightly and the values are round - 500 ms to 11 s.
 		//
 		// Which is why this column exists at all: the tick used ONE constant, 2 s, for every DoT. That is right for the
 		// Incinerate family and wrong everywhere else - Ripper Volley and Archfiend tick twice as fast as we ran them,
 		// Ether Drain two and a half times slower, Hellfire Breath five times slower. 0 = unmeasured, and the tick
-		// falls back to the old 2 s.
+		// falls back to 2 s.
+		//
+		// Measured by the `dot-effects` importer module, NOT by hand: the first 38 came from a one-off scan that was
+		// never shipped, so the number could not be improved without redoing the work. Now it is 53 of the 84 DoT
+		// spells, and re-running the module is all it takes to widen that as the corpus grows. What decides whether
+		// observed gaps establish an interval at all is DotIntervalEstimator, which rejects rather than guesses -
+		// the remaining 31 have no interval because their ticks were never observed often enough, not because
+		// nobody looked.
 		public uint DotIntervalMs { get; set; }
 
 		// Buff/effect duration in milliseconds. Imported from RDB field 0x008, which is in CENTISECONDS (×10ms - the
