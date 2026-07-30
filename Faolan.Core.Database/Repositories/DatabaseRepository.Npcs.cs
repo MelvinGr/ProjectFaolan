@@ -19,6 +19,12 @@ namespace Faolan.Core.Database.Repositories
 
 		// The OPENING screen ("" path) of the server-opened conversation `worldObjectId` triggers for `npcName` (#523).
 		Task<ConversationNode[]> GetTriggeredConversations(string npcName, uint worldObjectId);
+
+		// The NPCs whose SERVER-OPENED conversation fires on APPROACH rather than on using an object (#523).
+		Task<string[]> GetApproachConversationNpcs();
+
+		// The opening screens of the approach-triggered conversation for `npcName` (#523).
+		Task<ConversationNode[]> GetApproachConversations(string npcName);
 		Task<ConanClass[]> GetImportedSpawnClasses(uint mapId);
 		Task<NpcTemplate?> GetNpcByName(string name);
 		Task<NpcTemplate?> GetNpcByTemplateId(uint templateId);
@@ -96,6 +102,31 @@ namespace Faolan.Core.Database.Repositories
 				.ThenInclude(s => s.Parameters)
 				.Where(n => n.ServerInitiated && n.TriggerWorldObjectId == worldObjectId && n.NpcName == npcName && n.AnswerPath == "")
 				.OrderByDescending(n => n.ConditionQuestId != null) // conditioned first; the unconditional one is the fallback
+				.ToArrayAsync();
+		}
+
+		// The NPCs with an APPROACH-triggered server conversation: server-opened, but with no world object behind them
+		// (#523). Saddur's beach confrontation is the worked example - walking up to him is what opens it. Small and
+		// static, so the caller caches it and the per-move check stays a pure in-memory name test.
+		public async Task<string[]> GetApproachConversationNpcs()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.ConversationNodes.Where(n => n.ServerInitiated && n.TriggerWorldObjectId == null && n.AnswerPath == "")
+				.Select(n => n.NpcName)
+				.Distinct()
+				.ToArrayAsync();
+		}
+
+		public async Task<ConversationNode[]> GetApproachConversations(string npcName)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.ConversationNodes.Include(n => n.Packets)
+				.ThenInclude(p => p.Screens)
+				.ThenInclude(s => s.Parameters)
+				.Where(n => n.ServerInitiated && n.TriggerWorldObjectId == null && n.NpcName == npcName && n.AnswerPath == "")
+				.OrderByDescending(n => n.ConditionQuestId != null)
 				.ToArrayAsync();
 		}
 

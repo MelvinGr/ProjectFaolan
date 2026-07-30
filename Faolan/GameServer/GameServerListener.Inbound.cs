@@ -154,6 +154,7 @@ namespace Faolan.GameServer
 					// any whose area this position falls in. In-memory distance test (targets cached on the entity).
 					if (moveEntity != null)
 						await CheckPlayerReachGoals(client, moveEntity, livePosition);
+						await CheckPlayerApproachConversations(client, moveEntity, livePosition); // #523
 
 					// #495/#504: the world's own damage sources. Fall damage lands HERE rather than on the world tick
 					// because a fall's size is only known on the record that reports the landing, and a hazard's client-

@@ -99,6 +99,42 @@ namespace Faolan.GameServer
 			return SendValidResurrectionSpots(client, referencePosition, spots);
 		}
 
+		// #523: open a conversation the player has just walked up to an NPC for - the APPROACH trigger. Saddur's beach
+		// confrontation is the worked example: "{hidegoodbye}Who stands before Saddur?" fires on approach, with no
+		// click and no object.
+		//
+		// The radius is MEASURED, not chosen: across three independent captures the window opens at 12.9, 13.8 and 10.9
+		// units from Saddur's spawn, so 15 covers all three with a little slack and stays far short of the next NPC
+		// (Casilda at 153+). It is deliberately small - a generous radius would open the conversation across a room.
+		//
+		// ⚠️ This is proximity to the NPC, NOT a bounded-area volume. Only volume-entry is in RDB 1000053 and the two
+		// are different mechanisms (#513), so nothing here needs region geometry.
+		//
+		// Fires ONCE per NPC per session (`ApproachedConversationNpcs`): Saddur's nodes carry no quest gate, so without
+		// a latch the window would re-open on every step taken near him. The names that have one at all are cached on
+		// the listener, so a player walking past ordinary NPCs pays one hash lookup and no DB hit.
+		private async Task CheckPlayerApproachConversations(INetworkClient client, WorldEntity player, Vector3 position)
+		{
+			var names = _approachConversationNpcs ??= [.. await Database.GetApproachConversationNpcs()];
+			if (names.Count == 0 || client.Session.ConversationAnswerPath != null)
+				return; // nothing to open, or a conversation is already up
+
+			var zone = _simulation.World.ZoneForEntity(player);
+			foreach (var npc in zone.EntitiesInRange(position, ApproachConversationRadius, player.Handle))
+			{
+				if (npc.IsPlayer || npc.Name == null || !names.Contains(npc.Name))
+					continue;
+				if (!client.Session.ApproachedConversationNpcs.Add(npc.Handle))
+					continue; // already opened for this NPC this session
+
+				if (await _conversation.TryOpenApproachConversation(client, npc.Name, npc.Handle))
+				{
+					Logger.LogInformation("#523: player {Char} approached {Npc} - opening its server-initiated conversation.", client.Session.Character.Name, npc.Name);
+					return; // one conversation at a time
+				}
+			}
+		}
+
 		// #262: solve any ReachArea quest goal the player has just walked into range of. Called from the move handler
 		// on every accepted player move; the goal targets are cached on the player WorldEntity (lazily loaded once, so
 		// this stays a pure in-memory distance test with no DB hit until a goal actually fires). A solved target is

@@ -157,6 +157,14 @@ namespace Faolan.GameServer
 		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
 		// collaborator; uses the broadcaster for quest pushes + C# ConditionQuestId/State gates for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
+
+		// #523: how close the player must come to an NPC for its APPROACH-triggered conversation to open. MEASURED at
+		// 12.9 / 13.8 / 10.9 units across three independent captures of Saddur's beach confrontation.
+		private const float ApproachConversationRadius = 15f;
+
+		// The NPC names that HAVE an approach-triggered conversation, cached on first use - a small static set, so the
+		// per-move check costs one hash lookup for the overwhelming majority of players who are near nobody special.
+		private HashSet<string>? _approachConversationNpcs;
 		private readonly FatalityService _fatality;
 
 		// #439: the spell effects the server acts on itself - pet summons and triggered procs, from the SpellEffect

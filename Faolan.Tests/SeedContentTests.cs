@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.GameServer.Dialogue;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Microsoft.EntityFrameworkCore;
@@ -234,6 +235,41 @@ namespace Faolan.Tests
 
 			Assert.Equal((uint)QuestGoalKind.RegionScoped, goals.Single(g => g.GoalId == 1448).Separator);
 			Assert.Equal((uint)QuestGoalKind.Kill, goals.Single(g => g.GoalId == 3490).Separator);
+		}
+
+		// Every server-opened conversation is REACHABLE: it has a trigger the runtime can fire, and an NPC to speak it.
+		//
+		// The two kinds are complementary and exhaustive - a world object (use it) or an approach (walk up to the NPC) -
+		// so a node with neither is dead data: imported, keyed, and unreachable by any code path. That is precisely the
+		// state #523 existed to fix, so it is worth failing on rather than rediscovering.
+		[Fact]
+		public async Task ServerOpenedConversations_AreReachable()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var openings = await db
+				.Set<ConversationNode>().Where(n => n.ServerInitiated && n.AnswerPath == "")
+				.Select(n => new { n.Id, n.NpcName, n.TypeId, n.TriggerWorldObjectId })
+				.ToListAsync(ct);
+
+			Assert.NotEmpty(openings); // Casilda's city-door farewell and Saddur's beach confrontation are shipped content
+
+			foreach (var o in openings)
+			{
+				// TypeId 0 is what keeps these OUT of the talk path: GetConversationScreens matches on it, and every
+				// captured talk node carries its BCC action id (42008). A non-zero one here would make the node
+				// reachable by clicking the NPC, which is not how retail opens it.
+				Assert.Equal(ConversationService.ServerInitiatedTypeId, o.TypeId);
+
+				// An approach trigger needs no column - the NPC is the target - but it does need an NPC that exists.
+				Assert.True(await db.Set<NpcTemplate>().AnyAsync(t => t.Name == o.NpcName, ct),
+					$"server-opened conversation for '{o.NpcName}' has no NpcTemplate - nothing can speak it.");
+
+				if (o.TriggerWorldObjectId is { } obj)
+					Assert.True(await db.Set<WorldObject>().AnyAsync(w => w.Id == obj, ct),
+						$"'{o.NpcName}' is triggered by world object {obj}, which is not in WorldObjects.");
+			}
 		}
 
 		// The escort can actually END. Its completion is data-driven off the escortee's SERVER-OPENED conversation

@@ -102,6 +102,26 @@ namespace Faolan.GameServer.Dialogue
 		//
 		// Returns false when the NPC is not spawned for this player - the conversation simply does not open, which is
 		// the right outcome for an escortee who is not there.
+		// #523: the APPROACH-triggered counterpart - walking up to the NPC is what opens it, with no object to use.
+		// Saddur's beach confrontation ("{hidegoodbye}Who stands before Saddur?") is the worked example.
+		//
+		// ⚠️ This is proximity to the NPC, NOT entry into a bounded area. Only volume-entry lives in RDB 1000053, and
+		// the two are different mechanisms (Gitea #513's own research says so), which is why this needs no region.
+		public async Task<bool> TryOpenApproachConversation(INetworkClient client, string npcName, uint npcHandle)
+		{
+			var variants = await _database.GetApproachConversations(npcName);
+			if (variants.Length == 0)
+				return false;
+
+			var quests = await _database.GetCharacterQuests(client.Session.Character.Id);
+			var opening = variants.FirstOrDefault(v => QuestConditionMet(v, quests)) ?? variants.FirstOrDefault(v => v.ConditionQuestId == null);
+			if (opening == null)
+				return false;
+
+			await ServeScreen(client, opening, npcHandle);
+			return true;
+		}
+
 		public async Task<bool> TryOpenTriggeredConversation(INetworkClient client, string npcName, uint worldObjectId)
 		{
 			var handle = client.Session.SpawnedNpcNamesByHandle

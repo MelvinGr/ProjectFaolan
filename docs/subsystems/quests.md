@@ -251,9 +251,22 @@ Exactly one row matches: **`WorldObjects.Id 1044692756`** — map 4010, `Geometr
 `DestinationMapId` 4020. So the escort's completion trigger is *use that object*, which is also the zone line into
 the city.
 
-⚠️ Not every server-opened conversation is interaction-triggered. Seven exist across the corpus (4 captures), and
-only the two door ones have an interaction anywhere near them; the other five are preceded by **movement alone**,
-which points at a proximity/region trigger rather than a click. So the trigger model needs at least two kinds.
+There are **two trigger kinds**, and they are complementary. Seven server-opened conversations exist across the
+corpus (4 captures): the two door ones are interaction-triggered, and the other five are preceded by **movement
+alone**.
+
+⚠️ The five are **proximity to the NPC**, not entry into a bounded area. Saddur's is
+*"{hidegoodbye}Who stands before Saddur?"* — the beach confrontation you get by walking up to him. Only
+volume-entry lives in RDB `1000053`, and [`bounded-areas-1000053.md`](../rdb/bounded-areas-1000053.md)'s own
+research already established that proximity-on-NPC and volume-entry are different mechanisms. **So this needs no
+region geometry at all** — the NPC is the target, and the only unknown was the radius.
+
+The radius is **measured, not chosen**: across three independent captures Saddur's window opens at **12.9, 13.8
+and 10.9** units from his spawn, so `ApproachConversationRadius` is 15 — covering all three with slack while
+staying far short of the next NPC (Casilda at 153+). `CheckPlayerApproachConversations` runs beside the
+`ReachArea` check on each accepted move, and latches per NPC per session
+(`ApproachedConversationNpcs`): Saddur's nodes carry no quest gate, so without it the window would re-open on
+every step taken near him.
 
 These screens are imported as of `c76593a9` (Gitea #523): the extractor used to key only on a player-initiated
 `TalkToNpc(field3=0)` greeting, and nothing ever ENDED an instance, so a server-opened window could not start one

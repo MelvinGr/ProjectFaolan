@@ -147,6 +147,10 @@ namespace Faolan.Core.Network
 		// The NPC of the ACTIVE dialogue, or null when no conversation is open.
 		uint? ConversationNpcHandle { get; set; }
 
+		// Handles whose APPROACH-triggered conversation has already opened this session (#523) - the latch that stops
+		// it re-firing on every step taken near the NPC. Per session, like the rest of the conversation state.
+		HashSet<uint> ApproachedConversationNpcs { get; }
+
 		// The universal ENERGY pool (the yellow sprint bar, DispatchUpdateSprintbar 0x200E). Tracked server-side so
 		// spellweaving drains from the CURRENT value (not always full) and the server can apply Exhausted at 0. The
 		// client owns the visual during sprint; the server mirrors the drain/regen silently. EnergyMax 0 = uninitialised.
@@ -241,6 +245,7 @@ namespace Faolan.Core.Network
 		public uint? ConversationAgentInstance { get; set; }
 		public uint? ConversationEndedNpcHandle { get; set; }
 		public uint? ConversationNpcHandle { get; set; }
+		public HashSet<uint> ApproachedConversationNpcs { get; } = [];
 		public uint Energy { get; set; }
 		public uint EnergyMax { get; set; }
 		public uint MorphAckCounter { get; set; }
