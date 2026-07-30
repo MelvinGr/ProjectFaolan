@@ -1,5 +1,9 @@
 # Capture event → packet survey
 
+> For a chronological, id-resolved account of a SINGLE capture (login handoff, quest chain, dialogue,
+> combat, loot, chat, plus what our catalogs cannot name), use `tools/capture/timeline.py` — see the
+> `capture-timeline` skill. This page is the cross-corpus event→sub-opcode map instead.
+
 The `Captures/*.json` filenames describe the events performed while recording. This maps each named event to the
 packets that carry it, found by: per-capture sub-opcode profiling vs a plain login baseline, and extracting the
 human-readable `remoteformat`/`localized` XML + object/NPC name strings (with the carrying sub-opcode). Generated
