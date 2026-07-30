@@ -315,6 +315,8 @@ namespace Faolan.Importer.Cli
 		// from the text, because whole pages ship untranslated and a text sniffer therefore unions several languages and
 		// silently yields French. And the encryption flag is the page header's own `flags` word, so the encrypted set is
 		// the page's statement rather than something inferred from how the bytes look.
+		internal static Dictionary<(uint Category, uint Id), byte[]> EncryptedLdbBlobsFor(string rdbDir) => EncryptedLdbBlobs(rdbDir);
+
 		private static Dictionary<(uint Category, uint Id), byte[]> EncryptedLdbBlobs(string rdbDir)
 		{
 			using var rdb = new RdbReader(rdbDir);

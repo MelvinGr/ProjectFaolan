@@ -51,6 +51,16 @@ case "$command" in
             "$@"
         ;;
 
+    # One capture, told as a story (--report timeline). The RDB dir is what lets it decrypt the LDB
+    # dialogue/quest text inline; without it those lines print as LDB[category][id].
+    --timeline)
+        shift
+        dotnet run --project ./Faolan.Importer/Faolan.Importer.csproj -- \
+            --report timeline \
+            --report-arg "${1:?usage: $0 --timeline <capture>.tshark.json}" \
+            --RdbDir "${RDB_DIR:-/mnt/btrfs/@games/debian-installation/steamapps/common/Age of Conan/RDB}"
+        ;;
+
     --claude)
         shift
         claude --dangerously-load-development-channels server:faolan-chat \
@@ -64,7 +74,7 @@ case "$command" in
 
     *)
         echo "Unknown command: $command" >&2
-        echo "Usage: $0 [--faolan|--web|--cdn|--client|--client2|--claude|--clean] [extra args...]" >&2
+        echo "Usage: $0 [--faolan|--web|--cdn|--client|--client2|--timeline <dump>|--claude|--clean] [extra args...]" >&2
         exit 1
         ;;
 esac

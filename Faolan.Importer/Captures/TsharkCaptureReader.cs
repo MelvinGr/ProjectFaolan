@@ -23,7 +23,15 @@ namespace Faolan.Importer.Captures
 	// crc32 = CRC32 over [headerLen][header][body].
 	public static class TsharkCaptureReader
 	{
-		public static List<CapturedPacket> Read(string path)
+		// `includeAllProtocols` keeps the ChatServer stream as well as the Conan connections, for the timeline report -
+		// a session's global/system chat is part of what happened. It is OPT-IN because every importer wants the
+		// Conan-only set it has always had, and widening the default would change what the whole corpus imports.
+		//
+		// ⚠️ A ChatServer packet carries NO endpoints (no SenderClass/ReceiverClass/Crc32), so Rebuild cannot frame
+		// it. Under the opt-in it is given a SYNTHETIC frame - [len][crc 0][headerLen 0][body] - so `.Body` returns
+		// its payload like any other packet. That frame is not byte-exact and is not meant to be: `Protocol` is what
+		// tells a consumer which packets have real framing.
+		public static List<CapturedPacket> Read(string path, bool includeAllProtocols = false)
 		{
 			var list = new List<CapturedPacket>();
 
@@ -46,8 +54,12 @@ namespace Faolan.Importer.Captures
 				foreach (var p in packets.EnumerateArray())
 				{
 					seq++;
-					// Conan = the game/agent connections (the conversation lives here); skip the ChatServer chat stream.
-					if (!p.TryGetProperty("Protocol", out var proto) || proto.GetString() != "Conan")
+					// Conan = the game/agent connections (the conversation lives here); the ChatServer chat stream is
+					// skipped unless the caller asked for everything.
+					var protocol = p.TryGetProperty("Protocol", out var proto)
+						? proto.GetString() ?? ""
+						: "";
+					if (protocol != "Conan" && !includeAllProtocols)
 						continue;
 					if (!p.TryGetProperty("BodyHex", out var bodyHex) || bodyHex.ValueKind != JsonValueKind.String)
 						continue;
@@ -79,13 +91,40 @@ namespace Faolan.Importer.Captures
 						? timestamp.UtcTicks
 						: seq;
 
-					var full = Rebuild(p, body, opcode);
-					if (full != null)
-						list.Add(new CapturedPacket(tick, isDownload, opcode, subOpcode, full));
+					var full = Rebuild(p, body, opcode) ?? (includeAllProtocols ? Synthesise(body) : null);
+					if (full == null)
+						continue;
+
+					var direction = p.TryGetProperty("Direction", out var dir)
+						? dir.GetString() ?? ""
+						: "";
+					list.Add(new CapturedPacket(tick, isDownload, opcode, subOpcode, full,
+						p.TryGetProperty("Frame", out var fr) && fr.TryGetInt32(out var frame) ? frame : 0,
+						direction, PortOf(p, direction), protocol, ParseHex(p, "SenderClass"), ParseHex(p, "ReceiverClass")));
 				}
 			}
 
 			return list;
+		}
+
+		// The GAME side's port, which is what names the service tier (7010 universe, 7011 player-agent, 7012 CS,
+		// 7001 chat, 7017 game). On a c2s packet that is the DESTINATION, on s2c the SOURCE.
+		private static int PortOf(JsonElement p, string direction)
+		{
+			var end = direction == "c2s" ? "Destination" : "Source";
+			return p.TryGetProperty(end, out var e) && e.TryGetProperty("Port", out var port) && port.TryGetInt32(out var value)
+				? value
+				: 0;
+		}
+
+		// A minimal frame for a packet with no endpoints (the ChatServer stream): [len][crc 0][headerLen 0][body], so
+		// CapturedPacket.Body returns the payload. Deliberately NOT byte-exact - there is no header to reproduce.
+		private static byte[] Synthesise(byte[] body)
+		{
+			var full = new byte[12 + body.Length];
+			BinaryPrimitives.WriteUInt32BigEndian(full, (uint)full.Length);
+			body.CopyTo(full, 12);
+			return full;
 		}
 
 		// Rebuilds the exact on-wire packet from the dump's framing fields + body. Returns null if a required field

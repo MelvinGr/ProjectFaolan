@@ -82,6 +82,14 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// ONE capture, told as a story: --report-arg <capture>.tshark.json. Reads that dump directly rather than
+			// the corpus, and wants the RDB only to decrypt the LDB text it quotes (it degrades without it).
+			if (report == "timeline")
+			{
+				await Timeline(arg ?? "", RdbDir());
+				return 0;
+			}
+
 			// One encrypted string, from a key pasted out of a capture: --report-arg <category>:<id>:<wire key>.
 			if (report == "ldb-decrypt")
 			{

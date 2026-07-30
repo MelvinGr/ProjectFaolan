@@ -11,7 +11,14 @@ namespace Faolan.Importer.Extractors
 	// consumers does not look like somewhere to put shared behaviour. So the framing walk was copy-pasted into six
 	// extractors verbatim, three MORE reached across into `WorldObjectExtractor.GetBody` for it, and a seventh copy
 	// in CaptureCharacterImporter had already drifted to a stricter guard - the drift the duplication predicts.
-	public readonly record struct CapturedPacket(long Ticks, bool IsDownload, uint Opcode, uint SubOpcode, byte[] Bytes)
+	// The trailing four are DUMP METADATA rather than wire content: they describe where a packet sat in the capture,
+	// not what it says. Every extractor ignores them and every existing construction site keeps compiling, because
+	// they default. They exist for the `--report timeline` reader, which has to say WHEN, on which service tier and
+	// in which direction something happened - questions the bytes alone cannot answer.
+	public readonly record struct CapturedPacket(
+		long Ticks, bool IsDownload, uint Opcode, uint SubOpcode, byte[] Bytes,
+		int Frame = 0, string Direction = "", int Port = 0, string Protocol = "Conan",
+		uint SenderClass = 0, uint ReceiverClass = 0)
 	{
 		// Whether this packet is the PassBlob IIR CARRIER - the one whose body is a length-prefixed IIR record rather
 		// than a typed RPC argument list. Almost every extractor opens by filtering on it.

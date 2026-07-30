@@ -54,10 +54,10 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `KnubotOpenChatWindowIIR` | `0x045B0B0F` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
 | V3 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTrade` | [V3: V1IirCodecTests.KnubotStartTrade_FramesAndCarriesTheDialoguePayloadVerbatim] |
 | V3 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChanged` | [V3: V1IirCodecTests.LockedToChanged_RoundTripsCapturedBody] |
-| V3 | `LookAtIIR` | `0x0D155695` | `ShopOpenBuilder`, `WorldDeath` | [V3: ShopOpenBuilderTests.BuildTradeSelectEcho_IsByteIdenticalToFrame1189] |
+| V3 | `LookAtIIR` | `0x0D155695` | `LookAtCodec`, `ShopOpenBuilder`, `WorldDeath` | [V3: MagicBuffLookAtCodecTests.LookAt_ParsesSelectAndDeselect] |
 | V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootContainerTemplate` | [V3: LootBagMessageTests.BuildContents_RoundTripsByteExact] |
 | V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
-| V3 | `MagicBuffIIR` | `0x6B87E316` | `NpcSpellCastBuilder`, `WorldDeath` | [V3: NpcSpellCastBuilderTests.Build_EmptyPayload_IsTheBuffRemovalEndTwin] |
+| V3 | `MagicBuffIIR` | `0x6B87E316` | `MagicBuffCodec`, `NpcSpellCastBuilder`, `WorldDeath` | [V3: MagicBuffLookAtCodecTests.MagicBuff_RoundTripsBuild] |
 | V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` | [V3: MoveTaskCodecTests.ApproachTargetBody_MatchesCapture] |
 | V3 | `N3TeleportIIR` | `0x5A32F0D7` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
 | V3 | `N3ToClientFadeIIR` | `0x66180B20` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
