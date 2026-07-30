@@ -1,6 +1,6 @@
 using System;
 
-namespace Faolan.Core.Network.Codecs
+namespace Faolan.Core.Extensions
 {
 	// The protocol's COUNT-FRAMED LIST word: a u32 == (elementCount + 1) * 0x3F1, written ahead of the elements.
 	// The client's readers assert `word % 0x3F1 == 0` and take `count = word / 0x3F1 - 1`, so the word is DERIVED

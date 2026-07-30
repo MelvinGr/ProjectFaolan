@@ -1,4 +1,5 @@
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Combat

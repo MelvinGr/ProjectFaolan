@@ -24,9 +24,10 @@ namespace Faolan.Core.Extensions
 	// Both are offered at every width, deliberately - a missing overload is what sends the next call site back to a
 	// hand-sliced BinaryPrimitives call.
 	//
-	// NOT here: the count-framed list word. `ListFrame` lives in Faolan.Core.Network.Codecs, one layer up, so a codec
-	// reads a list as `ListFrame.CountOf(r.ReadU32Be())` rather than `r.ReadListCount()`. That keeps the one home for
-	// the 0x3F1 rule where the codec-convention tests already watch it.
+	// ReadListCount() is here because `ListFrame` moved down into this namespace alongside it. That matters for
+	// diagnostics rather than tidiness: ListFrame.CountOf on its own can only say "0x1234 is not a framing word",
+	// while the reader knows WHERE it read it - and the count-framed list is the protocol's most trap-laden
+	// primitive (see ListFrame's own header for the three subsystems that shipped a 0x7E2 "constant").
 	public ref struct SpanReader
 	{
 		private readonly ReadOnlySpan<byte> _data;
@@ -93,6 +94,23 @@ namespace Faolan.Core.Extensions
 		public void Skip(int count)
 		{
 			Take(count);
+		}
+
+		// The element count of a count-framed list: a u32 == (count + 1) * 0x3F1, which the client's own readers
+		// divide rather than compare. A word that is not a valid multiple is a decode failure, reported WITH the
+		// offset - the thing ListFrame.CountOf cannot say on its own.
+		//
+		// ⚠️ Reading this as a constant is the single most repeated mistake in this protocol: 0x7E2 is a ONE-element
+		// list and 0x3F1 is an EMPTY one, and both have shipped as "magic terminators". If a grammar has a constant
+		// where a list could be, it is probably this. See ListFrame.
+		public int ReadListCount()
+		{
+			var offset = _position;
+			var word = ReadU32Be();
+			if (!ListFrame.TryCountOf(word, out var count))
+				throw CodecParseException.Unexpected(_codec, offset, $"a count-framed list word (a non-zero multiple of 0x{ListFrame.Unit:X})", $"0x{word:X8}");
+
+			return count;
 		}
 
 		// ---- byte blocks -------------------------------------------------------------------------------------

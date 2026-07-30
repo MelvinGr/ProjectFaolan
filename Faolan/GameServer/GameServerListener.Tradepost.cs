@@ -1,16 +1,17 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network;
 using Faolan.Core.Protobuf;
+using Faolan.Core;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer

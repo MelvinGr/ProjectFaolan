@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs;
 using Faolan.Tests.Support;
 using Xunit;
@@ -33,7 +34,16 @@ namespace Faolan.Tests
 		// functions in AgeOfConan.exe that touch 0x3F1/0x7E2, 77 divide by 0x3F1 to read a count and 59 multiply to
 		// write one - ZERO compare it to a constant (tools/ghidra/DumpListFraming.java). Every "0x7E2 constant"
 		// we ever wrote down was a 1-element list. If you are about to add an entry here, that is the prior.
-		private static readonly Dictionary<string, string> ListWordLiteralAllowlist = new(StringComparer.Ordinal);
+		private static readonly Dictionary<string, string> ListWordLiteralAllowlist = new(StringComparer.Ordinal)
+		{
+			// The one genuine COLLISION rather than a mistaken constant, surfaced when Faolan.Core joined the scan
+			// roots (#530): CharacterStatId is a dense catalog enum and stat 1009 - CombatRatingHoly - is written
+			// 0x03F1. It is a stat id that happens to equal the framing unit, not a framing word: nothing here
+			// frames a list, and the value comes from the client's stat table, not from a count. Note this is the
+			// OPPOSITE of the failure the rule exists for (a count mistaken for a constant), which is why it is an
+			// allowlist entry and not a reason to narrow the scan.
+			["CharacterStatId.cs"] = "stat id 1009 (CombatRatingHoly) numerically collides with 0x3F1; it is not a list frame"
+		};
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 
 		// 8-hex-digit literals; IIR opcodes are 32-bit BKDR-31 hashes so they always appear in this form.
@@ -178,7 +188,12 @@ namespace Faolan.Tests
 			// Codecs/ is not enough: the character-list framing lives in the PlayerAgent listener and the guild lists
 			// in CSPlayerAgent, both of which open-coded it (as decimal 1009 and a 14th local name) while this test
 			// scanned only Codecs/ and passed. A wire-shape rule has to cover everywhere the wire is written.
-			var roots = new[] { TestPaths.Repo("Faolan.Core.Network", "Codecs"), TestPaths.Repo("Faolan") };
+			//
+			// Faolan.Core joined the roots when ListFrame moved there (#530): the registry itself is allowlisted by
+			// filename, so without this root the one assembly that OWNS the rule would be the one place nothing
+			// checked it - and SpanReader/FaolanStream, which sit beside it, are exactly where a stray framing word
+			// would now be written.
+			var roots = new[] { TestPaths.Repo("Faolan.Core.Network", "Codecs"), TestPaths.Repo("Faolan"), TestPaths.Repo("Faolan.Core") };
 			var offenders = new List<string>();
 
 			foreach (var file in roots.SelectMany(root => Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)))

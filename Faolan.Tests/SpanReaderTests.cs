@@ -155,6 +155,34 @@ namespace Faolan.Tests
 			Assert.True(r.AtEnd);
 		}
 
+		// The count-framed list word, read WITH its offset. 0x3F1 is an empty list and 0x7E2 a one-element one -
+		// both have shipped as "magic terminators", so the reader divides rather than compares, exactly like the
+		// client's own readers.
+		[Fact]
+		public void ReadListCount_DividesTheFramingWord()
+		{
+			var r = new SpanReader([0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x07, 0xE2, 0x00, 0x00, 0x0B, 0xD3]);
+			Assert.Equal(0, r.ReadListCount());
+			Assert.Equal(1, r.ReadListCount());
+			Assert.Equal(2, r.ReadListCount());
+			Assert.True(r.AtEnd);
+		}
+
+		[Fact]
+		public void ReadListCount_OnANonFramingWord_ThrowsWithTheOffset()
+		{
+			// The whole reason ListFrame moved next to the reader: CountOf alone cannot say WHERE.
+			var ex = AssertThrows([0xAA, 0xBB, 0xCC, 0xDD, 0x00, 0x00, 0x12, 0x34], "GuildRankings", (ref SpanReader r) =>
+			{
+				r.ReadU32Be();
+				r.ReadListCount();
+			});
+
+			Assert.Equal(4, ex.Offset);
+			Assert.Contains("0x00001234", ex.Message);
+			Assert.Contains("0x3F1", ex.Message);
+		}
+
 		[Fact]
 		public void ReadVarint_DecodesMultiByteValues()
 		{

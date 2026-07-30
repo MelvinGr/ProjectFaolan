@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -35,7 +36,9 @@ namespace Faolan.Tests
 		// A `new FaolanStream()` that is not introduced by `using` - the leak rule 6 exists for.
 		private static readonly Regex UndisposedStream = new(@"(?<!using\s)(?<!using\s\w{0,20}\s?=\s?)new FaolanStream\(");
 
-		private static IEnumerable<Type> CodecTypes => typeof(ListFrame).Assembly.GetTypes()
+		// Anchored on Endpoints (Faolan.Core.Network/Constants) rather than on a codec: codec names are being
+		// rewritten by this very refactor, and ListFrame - the obvious anchor - lives in Faolan.Core now.
+		private static IEnumerable<Type> CodecTypes => typeof(Endpoints).Assembly.GetTypes()
 			.Where(t => t.Namespace != null && t.Namespace.StartsWith(CodecsNamespace, StringComparison.Ordinal));
 
 		// A codec MODULE: the static classes that carry Build/Parse. Value records are not modules.
