@@ -224,19 +224,47 @@ Two things already run ahead of that move:
 
 **Codec conventions** (`Faolan.Core.Network/Codecs/`, enforced by `Faolan.Tests/CodecConventionTests.cs`):
 
-- Codecs come in **two shapes** — don't try to unify them under one interface (a C# `static class` cannot
-  implement one, and most codecs are static):
-  - **Wire value (DTO):** an instance `record`/`class` that knows its own layout → implements `ICodec<T>`
-    (`Write(stream)` + `static Read(stream)`, a matched round-trip pair).
-  - **Codec module:** a `static class` of stateless ops → `Build(...)` / `Parse(...)` / `TryParse(...)`.
-    No interface.
-- **Every codec that emits an IIR declares which one**, in one uniform place: `public const uint Opcode =
+⚠️ **These rules describe the TARGET shape and are binding on new/edited codecs from now on.** The existing 152
+are being converted folder by folder — migration tracked in Gitea #530, which also carries the per-codec rename
+table. `ICodec<T>` is being retired; do not add implementations of it.
+
+- **One codec shape: two public method NAMES, nothing else.** A codec is a `static class` exposing exactly
+  `byte[] Build(...)` and `T Parse(in ReadOnlySpan<byte> data)`, plus its `Opcode` / `HandledTypes`
+  declaration. No `Encode`/`Decode`/`TryParse`/`BuildBody`/`ToArray`/public `Read`/`Write`.
+  - **`Build(T value)` is canonical and is the ONLY method that writes bytes.** `Build` may be overloaded in
+    any shape (loose scalars, a DB row — whatever the caller holds), but every other overload *delegates* to
+    `Build(T)`. `Parse` is never overloaded. One encoding path per codec is what makes the round-trip gate
+    binding on all of them.
+  - **`Parse` is strict — it throws `CodecParseException`** on a short/overlong body, a wrong type word, or a
+    field it cannot account for. Never a null, never a `false`, never a default. Callers scanning a mixed
+    stream dispatch on the type word at offset 0 first.
+  - **The value `T` is a plain record** named for the client IIR *verbatim* (`MagicBuffCodec.Parse` →
+    `MagicBuffIIR`). It does NOT serialize itself — no `ToArray()`, no `ICodec<T>`.
+  - **Composition is `internal`:** `internal static T Read(ref SpanReader)` /
+    `internal static void Write(FaolanStream, T)`. `InternalsVisibleTo Faolan.Tests` is global, so these stay
+    testable.
+- **Read sequentially through `SpanReader` (`Faolan.Core/Extensions`); no const offsets; `Parse` ends with
+  `EnsureAtEnd()`.** A `private const int FooOffset = 17` means the bytes before 17 were never decoded, so the
+  codec cannot tell a correct body from one that merely has the right word at 17. `SpanReader` also owns the
+  bounds checks — a codec never writes `if (body.Length < 26) return false;`.
+- **`Build` returns the body WITHOUT the length prefix.** The u32 length belongs to the framing sender.
+- **Dispose the stream:** `using var s = new FaolanStream(); … return s.ToArray();` — never
+  `return new FaolanStream().Write(…).ToArray();` (`FaolanStream : MemoryStream` is `IDisposable`).
+- **Every codec with a standalone body declares its opcode**, in one uniform place: `public const uint Opcode =
   (uint)GameServer0X2000Opcodes.<Type>;` (single type) or `public static readonly GameServer0X2000Opcodes[]
-  HandledTypes` (more than one). An IIR opcode must **never** appear as a bare hex literal in `Codecs/` —
+  HandledTypes` (a genuine family). An IIR opcode must **never** appear as a bare hex literal in `Codecs/` —
   the test fails on it. This is what makes `grep GameServer0X2000Opcodes.<Type>` find every emitter, and it
   is what `docs/protocol/gen/coverage.md` reads to attribute each type to its builder.
-- Codecs with no opcode (sub-record helpers: `CharacterStatBlock`, `StatList`, `SnapshotItemBuilder`) declare
-  nothing — that's fine and expected.
+  **One IIR, one codec** — two codecs declaring the same opcode are the same codec and must be merged.
+  **RPC-message codecs** (whole method bodies: `GuildSearchResult`, `MailMessageCodec`, …) do the same against
+  their own interface enum (`(ushort)CSPlayerInterfaceOpcodes.<Method>`) and are named for the client's RPC
+  method. **Sub-record codecs** (`CharacterStatBlock`, `StatList`, `MoveTaskNode`, …) are composed inside a
+  larger body, never sent alone, and so declare nothing — that's expected, not an omission.
+- **Wire encode/decode lives in `Codecs/`, nowhere else.** A service, listener or importer that needs a message
+  calls its codec; it does not hand-roll the bytes. Concretely: an IIR opcode may only be *named* inside
+  `Codecs/` (the listener's dispatch switch aside). The **frame** layer is the exception and stays put —
+  `Protocol/Rpc.cs`, `ChatServerMessage`, the framers — because it owns the length prefix and CRC, which a
+  codec must not touch.
 - **Count-framed lists come from `ListFrame`, never a hand-rolled `0x3F1`.** A list is prefixed by a u32
   `(count + 1) * 0x3F1` (guilds, AH, quests, spell book, shortcut bar, stat lists, spawn scaffold, resurrection
   spots). ⚠️ A ONE-element list frames as `0x7E2`, and single-element lists are the common case in captures — so
