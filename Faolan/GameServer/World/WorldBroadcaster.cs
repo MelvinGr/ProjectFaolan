@@ -11,6 +11,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Progression;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
@@ -200,7 +201,19 @@ namespace Faolan.GameServer.World
 				return;
 
 			var zone = _sim.World.ZoneFor(mapId, instanceId);
-			zone.WorldObjects = [.. (await _database.GetWorldObjects(mapId)).Select(row => new LiveWorldObject(zone.AllocateHandle(), row))];
+			zone.WorldObjects =
+			[
+				.. (await _database.GetWorldObjects(mapId)).Select(row => new LiveWorldObject(zone.AllocateHandle(), row)
+				{
+					// A harvest node starts FULL on every zone load (#494). Retail's nodes are shared across the whole
+					// playfield and regrow, and neither the sharing nor a respawn cadence is measured - so a fresh zone
+					// giving a full node is the closest honest model, and it means a harvested node comes back rather
+					// than being gone for good. Null for everything that is not a node.
+					Health = HarvestCatalog.IsHarvestable(row.Name)
+						? HarvestCatalog.NodeMaxHealth
+						: null
+				})
+			];
 		}
 
 		// The world objects within interest range at ENTRY, as ready-to-send records in the position retail puts them -
@@ -1135,7 +1148,45 @@ namespace Faolan.GameServer.World
 			return true;
 		}
 
-		// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
+		// The resource NODE the player clicked, or null when the object is not one (#494). A query, so the listener can
+		// own the grant the way it already owns the quest-item pickup's - see the UseObject handler.
+		public LiveWorldObject? HarvestNodeAt(INetworkClient client, uint handle)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null || !_sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var live))
+				return null;
+
+			return HarvestCatalog.IsHarvestable(live.Row.Name)
+				? live
+				: null;
+		}
+
+		// Remove an EXHAUSTED harvest node from the live world for everyone who can see it, without touching its row.
+		//
+		// Deliberately NOT DeleteWorldObjectForPlayer: that deletes the row, which would make a harvested node gone for
+		// good in every future session. The row stays and only this zone stops streaming it, so the node is back on the
+		// next map load - the closest thing to retail's regrowth we can do without a measured respawn cadence.
+		//
+		// Wire handling mirrors DeleteWorldObjectForPlayer: a world object is quit by its OWN class word, not Character
+		// (#366), and world objects aren't tracked in Known so the gate is "has this viewer entered the world".
+		public async Task DespawnHarvestedNode(INetworkClient client, LiveWorldObject node)
+		{
+			var player = _sim.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			var zone = _sim.World.ZoneForEntity(player);
+			var classWord = WorldObjectBuilder.TypeTagForClass(node.SubOpcode);
+			foreach (var viewer in zone.PlayersInRange(node.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client.Session.WorldEntered)
+					await SendWorldDespawn(viewer.Client, zone.PlayfieldToken, node.Handle, classWord);
+			}
+
+			zone.RemoveWorldObject(node.Handle);
+		}
+
+// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
 		// zone). 0x00 when it isn't a quest-giver in view. Lets the poll reply (SendSpawnCheckResponse) carry the
 		// correct, state-driven marker instead of a hardcoded value.
 		public async Task<byte> QuestMarkerStateForHandle(INetworkClient client, uint handle)

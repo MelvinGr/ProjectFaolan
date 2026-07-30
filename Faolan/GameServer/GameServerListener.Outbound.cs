@@ -543,6 +543,20 @@ namespace Faolan.GameServer
 				b => AddItemBody.WriteAddItemBody(b, containerType, charId, itemPos, AddItemBody.SerializeInventoryEntry(entry), feedback)));
 		}
 
+		// DispatchDisplayItemLootChatMessage (0x2012) - the "you receive N x <item>" chat line. Body is
+		// [u32 itemId][u32 itemId][u32 0][u32 count] followed by the two 24-byte identity halves the capture repeats,
+		// which we send as zero: the client renders the item from the id, and the halves it echoes are the same value
+		// twice, so there is nothing per-session to reproduce.
+		//
+		// Decoded from the harvesting span of the chat-annotated capture (#494), where the loot line lands beside its
+		// annotation each time - Granite 161206 x40 (`just mined`), Oak 161213 x60 (`gethering wood`), Iron 161196 x40
+		// (`mining iron`). The item id is repeated in the first two words in every observed record.
+		private static Task SendItemLootChatMessage(INetworkClient client, uint itemId, uint count)
+		{
+			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchDisplayItemLootChatMessage,
+				b => b.WriteUInt32(itemId).WriteUInt32(itemId).WriteUInt32(0u).WriteUInt32(count).WriteArray(new byte[48])));
+		}
+
 		// #348: the top-of-screen FIFO banner naming the SUB-AREA the player just walked into. Retail fires one on
 		// every sub-area crossing, not once per playfield - Old Tarantia alone has six (Bridge of Vilerus I, The East
 		// Gate, The West Gate, ...) - so the world tick drives this off MapArea, and the entry banner is simply the

@@ -1991,6 +1991,15 @@ namespace Faolan.GameServer
 									break; // inert (no active collect quest) still swallows the use - don't open a window on a brick
 								}
 
+								// A resource NODE (#494) is harvested, not opened: it yields a stack of its matching resource
+								// and must not also play the door open-animation, so it takes the whole interaction.
+								// Handled here, beside the quest-pickup above, because the item grant lives on the listener.
+								if (_broadcaster.HarvestNodeAt(client, target) is { } node)
+								{
+									await HarvestResourceNode(client, node);
+									break;
+								}
+
 								// Not a column-driven teleporter: a BENCH seats the player (the sit animation), else the
 								// animated-door open path (DB world object by CapturedHandle), else the loot-bag window.
 								if (await _broadcaster.TrySitOnObject(client, target))

@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Progression;
+using Faolan.GameServer.World;
 using Faolan.Core.Network.Codecs.Combat;
 using Microsoft.Extensions.Logging;
 
@@ -14,6 +16,49 @@ namespace Faolan.GameServer
 		// city (#206) - NOT to the bind point, which is what the Path of Asura spell does. The only special-cased use
 		// left - buff consumables are all data-driven via Items.OnUseSpell.
 		private const uint TotemOfOriginsId = 3514741; // TODO: Move to consts
+
+		// Harvest a resource node (#494): grant the matching resource stack and retire the node.
+		//
+		// The captured payoff is the ORDINARY item path - DispatchAddItem into the backpack plus a
+		// DispatchDisplayItemLootChatMessage carrying (itemId, itemId, 0, count) - so nothing new goes on the wire, and
+		// the resource items already ship in faolan.db. Lives here beside UseInventoryItem because the grant does.
+		//
+		// One harvest empties the node. That is measured at the ends, not invented in the middle: node health bottoms
+		// out at 1 in every capture and the node then despawns. The partial values the captures show (901, 701, 382, ...)
+		// are OTHER players harvesting the same shared world node, so they cannot be read as a per-swing decrement -
+		// which is exactly why no decrement curve is modelled here. [V0: the harvest health decrement per swing]
+		private async Task HarvestResourceNode(INetworkClient client, LiveWorldObject node)
+		{
+			var character = client.Session.Character;
+			var name = node.Row.Name;
+			if (HarvestCatalog.ResourceFor(name) is not { } resourceId)
+				return;
+
+			if (!node.IsHarvestable)
+			{
+				// Never silent: a clickable but exhausted node means a despawn we failed to deliver.
+				Logger.LogInformation("Harvest: '{Node}' 0x{Handle:X8} is already exhausted; nothing granted to {Player}.", name, node.Handle, character.Name);
+				await _agentServerDispatcher.CharacterSay(node.Handle, $"({name}: already harvested)", [character.Id]);
+				return;
+			}
+
+			var count = HarvestCatalog.YieldFor(name);
+			if (await GrantItemToBackpack(client, resourceId, count) == null)
+			{
+				// Bag full: refuse the harvest ENTIRELY rather than consuming the node for nothing. The node keeps its
+				// health, so the player can come back - the same grant-before-consume order the shop's buy path uses.
+				Logger.LogInformation("Harvest: {Player}'s bag is full, so '{Node}' was not harvested (it keeps its health).", character.Name, name);
+				await _agentServerDispatcher.CharacterSay(node.Handle, "(bag full)", [character.Id]);
+				return;
+			}
+
+			node.Health = HarvestCatalog.ExhaustedHealth;
+			await SendItemLootChatMessage(client, resourceId, count);
+			await _broadcaster.DespawnHarvestedNode(client, node);
+
+			Logger.LogInformation("Harvest: {Player} harvested {Count}x item {Item} from '{Node}' 0x{Handle:X8}; node exhausted and despawned.",
+				character.Name, count, resourceId, name, node.Handle);
+		}
 
 		// Apply a consumable's on-use self-buff (Spell `spellBase`, wire id base<<8) and consume one from the slot. The
 		// buff uses the LONG (54-byte) MagicBuffIIR blob (SelfBuffCodec.BuildBuffDataLong) - the client rejects the

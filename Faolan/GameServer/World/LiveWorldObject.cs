@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Progression;
 
 namespace Faolan.GameServer.World
 {
@@ -21,6 +22,18 @@ namespace Faolan.GameServer.World
 		public Vector3 Position => Row.Position;
 
 		public uint SubOpcode => Row.SubOpcode;
+
+		// A harvest node's remaining health (#494). LIVE state, not a column, for the same reason the handle is: it is
+		// per-loaded-zone. Retail streams each node with whatever health the shared world has left it at, and nodes
+		// regrow - we model neither the sharing nor a respawn timer, so a node starts full on every map load. That is a
+		// deliberate simplification, not an oversight: no respawn cadence has been measured.
+		//
+		// Null for everything that is not a harvest node, so this doubles as "is this being harvested".
+		public uint? Health { get; set; }
+
+		// True while this node still has something to give. Health bottoms out at 1 in every capture, never 0, and the
+		// node despawns there - so exhausted is <= ExhaustedHealth rather than == 0.
+		public bool IsHarvestable => HarvestCatalog.IsHarvestable(Row.Name) && (Health ?? HarvestCatalog.NodeMaxHealth) > HarvestCatalog.ExhaustedHealth;
 
 		// The quest gate travels with the row (#262): an object no player-quest reveals is absent entirely.
 		public bool SpawnsFor(IReadOnlySet<uint> quests)
