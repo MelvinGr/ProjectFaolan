@@ -199,6 +199,42 @@ all seven languages silently yields French.)
 Which of the three is a reach goal cannot be settled from here, because the field that would say — the goal's own
 objective text — is in encrypted category 50304. That is the concrete cost of #520.
 
+### The 74 item goals (`50200`) are inert fetch objectives — and the reference does not type them
+
+The largest slice of the trailing references is `item.name`, and it describes a whole family of quests we do not
+run: **72 of the 74 sit at `GoalType.Kill` with no `QuestItemId` and no `TargetName`** — the fresh-harvest
+default, i.e. never wired. Only the Quarry Stonebrick pair (`CollectItem` + a `TalkToNpc` hand-in) is live.
+
+They are unmistakably gather objectives once named, and `RequiredCount` is real and varied (1, 3, 4, 7, 8, 10,
+20): *Stolen Goods* ×8, *Poisonous Gland* ×20, *Shadeleaf* ×10, *Grey Wolf Pelt* ×7, *Vanir Weapons* ×4,
+*Mangy Yeti Pelt*, *Akil-Atsu's Head*, *Vulture Brain*, *Scorpion Heart*, *Hyena Testicles*, *Bowl of Set*.
+
+⚠️ **The category says the ref is an item; it does not say how the item is obtained.** The set mixes at least
+three mechanics — mob drops (pelts, glands, heads, organs → `LootFromNpc`), world pickups (*Quarry Stonebrick*,
+the one already wired → `CollectItem`), and consumables that read as bought or gathered (*Soothing Remedy*,
+*Pink Salt*, *Visionwine*). Telling them apart needs the goal's objective text, which is encrypted (#520), or a
+capture of the quest being played. Same shape as the `51200` ambiguity above.
+
+Two facts bound what could be wired even with the type known:
+
+- **Only 23 of the 74 referenced items are in the `Items` catalog**, and `QuestItemId` is a foreign key to it.
+- The other 51 **do ship** — 12 of 12 sampled have an RDB `1000020` template — but the template is `RDBH`-wrapped,
+  i.e. TEA-encrypted with a per-item key that only a capture yields. So the catalog gap is a KEY gap, not a data
+  gap, and it is the same one that leaves 76,546 LDB-named templates against 3,245 catalog rows.
+
+✅ **Inert, but harmless.** These goals sit in the kill-matching pool (`GoalType.Kill`), and `MatchingKillGoal`
+matches `TrailingRefId == templateId` before falling back to a name — so an item ref there could in principle be
+advanced by killing an NPC whose template id collided. It cannot: NPC template ids span **38–22,982** and these
+item refs span **110,891–4,675,657**, disjoint. Fixing them is a feature gap, not a bug.
+
+### …and the 24 NPC goals (`51000`) already work
+
+Worth recording so nobody "fixes" them: all 24 are `GoalType.Kill` referencing an `npc_template`, and
+`MatchingKillGoal` resolves by `TrailingRefId` first. So the kill matches on the template id the goal already
+carries, and writing `TargetName` from the LDB would be **cosmetic**, not enabling. (It does validate the decode:
+on the two goals where a human did set it — Saddur, Scavenger Tuut — `TargetName` equals `NpcTemplates.Name` for
+that exact ref.)
+
 ## Eleven categories are ENCRYPTED, and the key is not in the client
 
 The page header's `flags` word is an **encryption flag** — the earlier note that it "is `0` on every page" was
