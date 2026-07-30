@@ -1005,6 +1005,13 @@ namespace Faolan.GameServer
 					var scriptThreadCtxId = body.ReadUInt32();
 					var ctxCookie = body.ReadUInt64();
 
+					// #506: a LOCAL TRAVEL confirmation is one of these, and the echoed thread-context id is what
+					// identifies it - the client hands our own correlation id straight back, so no script thread is
+					// needed to resume the trip. Any other box still falls through to the log below: the create flow and
+					// the castle transitions raise boxes we never track, and treating those as an error would be wrong.
+					if (await _travel.ConfirmTravel(client, answer, scriptThreadCtxId))
+						break;
+
 					Logger.LogInformation("ScryMessageBoxAnswer {Answer} for script thread 0x{Thread:X8} (cookie 0x{Cookie:X16}) - no script thread to resume.", answer, scriptThreadCtxId, ctxCookie);
 
 					break;

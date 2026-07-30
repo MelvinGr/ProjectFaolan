@@ -72,5 +72,21 @@ namespace Faolan.Core.Progression
 		/// </remarks>
 		public static bool TradesWithCriminals(string? vendorName) =>
 			vendorName != null && vendorName.Contains("Smuggler", System.StringComparison.OrdinalIgnoreCase);
+
+		/// <summary>
+		///     Whether this travel NPC will still carry a criminal (#506). The client's own Criminal description is the
+		///     rule and it names both halves of the same sentence: <i>"Wagoneers &amp; ship captains will not transport
+		///     you and normal vendors will not trade with you. You can seek out smugglers at outlaw camps instead."</i>
+		///     The vendor half is <see cref="TradesWithCriminals" />; this is the transport half.
+		/// </summary>
+		/// <remarks>
+		///     The smuggler exception is written to cover transport too. The description offers smugglers as the
+		///     alternative without restricting that to trade, and a smuggler who sells to outlaws but refuses to move
+		///     them would make the sentence's own "instead" meaningless. ⚠️ That reading is not separately confirmed by
+		///     a capture - the corpus has no criminal attempting to travel - so it is the same name-based rule with the
+		///     same caveat, and it is the conservative direction (a criminal is refused by every NPC that is not
+		///     explicitly an outlaw fence).
+		/// </remarks>
+		public static bool TransportsCriminals(string? npcName) => TradesWithCriminals(npcName);
 	}
 }

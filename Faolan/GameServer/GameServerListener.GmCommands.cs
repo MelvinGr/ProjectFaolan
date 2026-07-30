@@ -359,6 +359,7 @@ namespace Faolan.GameServer
 				["recall"] = (client, _) => RecallToBindCommand(client),
 				["recallhome"] = (client, _) => RecallToRacialHomeCommand(client),
 				["criminal"] = CriminalCommand,
+				["travel"] = TravelCommand,
 				["level"] = SetLevelCommand,
 				["feat"] = _feats.FeatCommand,
 				["godmode"] = (client, _) => ToggleGodModeCommand(client),
@@ -906,6 +907,58 @@ namespace Faolan.GameServer
 		// so `.teleport Khemi` works) then hands off to DoTeleport. Also accepts `.teleport <x> <y> <z>` (three numeric
 		// tokens) to move to a position on the CURRENT map. Gives a usage/echo message instead of throwing on a
 		// missing/garbled argument (the old `uint.Parse(arguments)` surfaced a raw FormatException to the player).
+		// .travel <npc name> [destination map id] - drives local travel (#506) the way retail's conversation would.
+		// With no map id it LISTS what that NPC offers; with one it runs the real flow - criminal gate, fee, the scry
+		// confirmation box, and the trip once the player clicks through it.
+		//
+		// This exists because the retail TRIGGER is not wired: the pick happens inside the NPC's captured Knubot
+		// conversation, and marking a conversation node as "this one sells a trip to map N" is hand-authored wiring we
+		// have not done (the quest-wiring module is the precedent). So the command is the standard GM bootstrap for a
+		// feature whose trigger isn't wired yet - everything downstream of the pick is the real path, not a shortcut.
+		private async Task TravelCommand(INetworkClient client, string arguments)
+		{
+			var characterId = client.Session.Character.Id;
+			var arg = (arguments ?? string.Empty).Trim();
+			if (arg.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .travel <npc name> [destination map id]");
+				return;
+			}
+
+			// The map id, when present, is the LAST whitespace-separated token - NPC names contain spaces, so splitting
+			// from the front would break on every real traveller.
+			var split = arg.LastIndexOf(' ');
+			var npcName = arg;
+			uint? mapId = null;
+			if (split > 0 && uint.TryParse(arg[(split + 1)..], out var parsed))
+			{
+				npcName = arg[..split].Trim();
+				mapId = parsed;
+			}
+
+			var destinations = await _travel.DestinationsOf(npcName);
+			if (destinations.Length == 0)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"\"{npcName}\" offers no travel destinations."));
+				return;
+			}
+
+			if (mapId == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, $"\"{npcName}\" travels to:");
+				foreach (var destination in destinations)
+				{
+					var map = await Database.GetMap(destination.DestinationMapId);
+					await _agentServerDispatcher.SendSystemMessage(characterId,
+						$"  {destination.DestinationMapId} {(string.IsNullOrEmpty(map?.Name) ? "" : map.Name)} - {destination.Cost} tin");
+				}
+
+				return;
+			}
+
+			await _travel.BeginTravel(client, npcName, mapId.Value);
+		}
+
 		private async Task TeleportCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;

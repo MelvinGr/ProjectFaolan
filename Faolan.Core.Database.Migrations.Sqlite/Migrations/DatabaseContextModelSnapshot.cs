@@ -3352,6 +3352,33 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("TradepostListings");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.TravelDestination", b =>
+                {
+                    b.Property<string>("NpcName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint>("DestinationMapId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float?>("ArrivalX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float?>("ArrivalY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float?>("ArrivalZ")
+                        .HasColumnType("REAL");
+
+                    b.Property<uint>("Cost")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("NpcName", "DestinationMapId");
+
+                    b.HasIndex("DestinationMapId");
+
+                    b.ToTable("TravelDestinations");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.WorldObject", b =>
                 {
                     b.Property<uint>("Id")
@@ -4677,6 +4704,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Realm");
 
                     b.Navigation("TemplateItem");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.TravelDestination", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Map", "DestinationMap")
+                        .WithMany()
+                        .HasForeignKey("DestinationMapId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DestinationMap");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.WorldObject", b =>

@@ -33,7 +33,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, IGameServerProvider
+	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -175,6 +175,9 @@ namespace Faolan.GameServer
 		// Composed collaborator: non-combat damage - fall damage + the scripted hazard volumes (#495/#504). See
 		// World/EnvironmentService.cs.
 		private readonly EnvironmentService _environment;
+
+		// Composed collaborator: local travel - the NPCs who move a player for a fee (#506). See World/TravelService.cs.
+		private readonly TravelService _travel;
 		private readonly FeatService _feats;
 
 		private readonly IChatServerDispatcher _agentServerDispatcher;
@@ -286,6 +289,8 @@ namespace Faolan.GameServer
 			// handler (both triggers are edges on the player's own position stream), reaching the wire through
 			// IEnvironmentOutbound, which this listener implements (GameServerListener.Combat.cs).
 			_environment = new EnvironmentService(database, this, logger);
+			// #506: local travel. Reaches the wire through ITravelOutbound (GameServerListener.Travel.cs).
+			_travel = new TravelService(database, this, logger);
 
 			InitGmCommands();
 		}

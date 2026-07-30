@@ -13,6 +13,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Map?> GetMap(uint id);
 		Task<MapArea[]> GetMapAreas(uint mapId);
 		Task<MapHazard[]> GetMapHazards(uint mapId);
+		Task<TravelDestination[]> GetTravelDestinations(string npcName);
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<Map[]> GetMaps();
 		Task<QuestArea[]> GetQuestAreas();
@@ -51,6 +52,14 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.MapAreas.Where(a => a.MapId == mapId).ToArrayAsync();
+		}
+
+		// The destinations a local-travel NPC offers, keyed by its NAME (#506) - the stable key, since a spawn handle is
+		// session-volatile. Empty for an NPC that is not a traveller, which is the common case and not an error.
+		public async Task<TravelDestination[]> GetTravelDestinations(string npcName)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.TravelDestinations.Where(d => d.NpcName == npcName).ToArrayAsync();
 		}
 
 		// The scripted hazard areas of a playfield - the regions that hurt or kill on entry (#504). Includes the

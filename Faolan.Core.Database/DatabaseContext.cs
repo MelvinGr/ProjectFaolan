@@ -64,6 +64,7 @@ namespace Faolan.Core.Database
 		DbSet<MapArea> MapAreas { get; }
 		DbSet<MapHazard> MapHazards { get; }
 		DbSet<MapHazardVertex> MapHazardVertices { get; }
+		DbSet<TravelDestination> TravelDestinations { get; }
 		DbSet<MapLootEntry> MapLootEntries { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
 		DbSet<NpcChatter> NpcChatter { get; }
@@ -156,6 +157,7 @@ namespace Faolan.Core.Database
 		public DbSet<MapArea> MapAreas { get; set; }
 		public DbSet<MapHazard> MapHazards { get; set; }
 		public DbSet<MapHazardVertex> MapHazardVertices { get; set; }
+		public DbSet<TravelDestination> TravelDestinations { get; set; }
 		public DbSet<MapLootEntry> MapLootEntries { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
 		public DbSet<NpcChatter> NpcChatter { get; set; }
