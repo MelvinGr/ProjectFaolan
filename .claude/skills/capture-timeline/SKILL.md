@@ -28,9 +28,18 @@ TCP-reassembled form and includes the compressed download packets.
 python3 tools/capture/timeline.py <data-repo>/Captures/<name>.tshark.json
 ```
 
-Sections: `summary`, `handoff`, `timeline`, `quests`, `dialogue`, `chat`, `combat`, `coverage`.
-Use `--section NAME` (repeatable) to narrow, `--all-packets` for every packet rather than the marker
-events, `--db PATH` to point at a different database.
+Sections: `summary`, `handoff`, `timeline`, `detailed`, `quests`, `dialogue`, `chat`, `combat`,
+`coverage`. Use `--section NAME` (repeatable) to narrow, `--db PATH` for a different database.
+
+**`--detailed` is the one to reach for when reading a session as it happened.** The sectioned default
+splits a session across eight headings, so an event and its consequence land under different ones;
+`--detailed` is the same data as ONE flat chronological stream, one line per event, each carrying its
+time, frame number, tier, direction, resolved description AND its raw body — so a packet the decoder
+cannot describe still shows its bytes instead of an empty column. It suppresses only per-frame
+movement/heartbeat traffic and prints a count of what it dropped; `--all-packets` keeps everything.
+
+It is what makes a multi-step mechanic legible. The quarry ambush reads straight off it: the brick
+pickup, the dynel's state sequence, then the Bat Demon spawning 3s later already hating the player.
 
 **Read `coverage` first.** It lists what this capture contains that our data cannot name — unresolved
 IIR types, `Ox####` placeholder methods, item templates missing from `Items`, abilities missing from
@@ -100,6 +109,12 @@ Two things are excluded rather than matched, or they take the name of whatever t
 **player**, and summoned **pets** (a pet matched a "Brutal Pirate" 22 units away). A match is printed
 with its distance (`Bat Demon (+10u)`) whenever it is not near-exact — an **ambush** spawns where it
 was triggered rather than at its home point, so that offset is a finding, not noise.
+
+**Target selection** is `LookAtIIR` (c2s), rendered as `the player 0x… selects Turach 0x27929`; a zero
+target at offset 21 is the player CLEARING their selection, printed as `deselects`.
+
+⚠️ Handles at or above `0x1000000` are CHARACTER ids — other players — and are never position-matched.
+One stood within 2u of a vendor and came out labelled "Trader" before that rule existed.
 
 ⚠️ **Position also tells you WHO acted.** Harvest-node animations keep firing for other players in a
 retail capture; correlate the player's own `CharDCMoveIIR` position (raw body, BIG-endian floats at

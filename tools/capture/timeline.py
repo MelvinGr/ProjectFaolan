@@ -10,8 +10,9 @@ data (Opcodes.cs for the wire types, faolan.db for quests/items/abilities/NPCs).
 
 Options:
     --db PATH        faolan.db to resolve ids against (default: ./faolan.db; --db "" to skip)
-    --section NAME   only this section (summary/handoff/timeline/quests/dialogue/chat/combat/coverage)
-    --all-packets    every packet, not just the marker events (very long)
+    --section NAME   only this section (summary/handoff/timeline/detailed/quests/dialogue/chat/combat/coverage)
+    --detailed       one flat chronological stream, one line per event, each with its raw body
+    --all-packets    every packet, including the per-frame movement/heartbeat traffic (very long)
 
 It deliberately resolves rather than dumps hex: an unresolved id in the output is a REAL gap in our
 data, which is the point - the timeline doubles as a coverage check on the catalogs. `coverage`
@@ -52,7 +53,7 @@ MARKERS = {
     "CombatShieldIIR", "PetIIR", "N3ToClientFadeIIR", "SetPosIIR",
     "RequestBindLocation", "DispatchUpdateBindLocation", "DispatchValidResurrectionSpots",
     "CoreClaimIIR", "FormatFeedbackIIR", "SystemMessage", "ChannelChat", "CharacterChat",
-    "ChatVicinity", "DispatchShortcutBarReply", "GameActionListIIR",
+    "ChatVicinity", "DispatchShortcutBarReply", "GameActionListIIR", "LookAtIIR",
 }
 
 
@@ -158,6 +159,10 @@ def resolve_entities(P, db):
     point - the quarry Bat Demon spawns 10 units off its NpcSpawns row, and that gap is a finding, not
     noise to hide.
     """
+    # A character id is orders of magnitude larger than an entity handle (player_handle_equals_character_id):
+    # 6 of 67 spawn handles in the necromancer capture sit >= 0x1000000 and all six are real players. They
+    # must never be position-matched - one stood inside 2u of a vendor and came out labelled "Trader".
+    CHARACTER_ID_FLOOR = 0x1000000
     label, pets, player = {}, set(), None
     map_id = 0
     for p in P:
@@ -179,6 +184,9 @@ def resolve_entities(P, db):
         h = be(p["_raw"], 12)
         if h in label:
             continue
+        if h >= CHARACTER_ID_FLOOR:
+            label[h] = "another player"
+            continue
         pos = spawn_position(p["_raw"])
         table = npcs if p["_kind"] == "SimpleCharFullUpdateIIR" else objs
         if not pos or not table:
@@ -189,6 +197,21 @@ def resolve_entities(P, db):
         if best[3] and d <= 25:
             label[h] = best[3] if d < 2 else f"{best[3]} (+{d:.0f}u)"
     return label
+
+
+def others_in(raw, label):
+    """Every KNOWN entity handle appearing anywhere in a body, at any 4-byte aligned-ish offset.
+
+    Relational packets (hate list, threat, look-at) each place their second entity at a different offset,
+    so a fixed offset produces confident nonsense - `0x500003b2` is what reading HateList at LookAt's
+    offset yields. Matching against handles the capture has already introduced is layout-independent.
+    """
+    found = []
+    for i in range(0, max(0, len(raw) - 3)):
+        v = int.from_bytes(raw[i:i + 4], "big")
+        if v in label and v not in found:
+            found.append(v)
+    return found
 
 
 def ent(label, h):
@@ -205,6 +228,11 @@ def load(path, names):
         sys.exit("timeline: the dump has no packets")
     t0 = datetime.fromisoformat(packets[0]["TimeUtc"].replace("Z", "+00:00"))
     for p in packets:
+        # A dump can carry a packet the dissector could not attribute a direction/frame to (one chat
+        # packet in Strie_rogue-assassin_login), so normalise here rather than letting every consumer
+        # trip over a None.
+        p["Direction"] = p.get("Direction") or "?"
+        p["Frame"] = p.get("Frame") or 0
         p["_t"] = (datetime.fromisoformat(p["TimeUtc"].replace("Z", "+00:00")) - t0).total_seconds()
         port = p["Destination"]["Port"] if p["Direction"] == "c2s" else p["Source"]["Port"]
         p["_tier"] = TIERS.get(port, str(port))
@@ -274,6 +302,28 @@ def describe(p, db, label=None):
         return f"pet 0x{be(raw, 25):x} " + ("dismissed" if raw[20:21] == b"\x01" else "summoned")
     if k in ("N3ToClientFadeIIR",):
         return f"despawn {ent(label, be(raw, 12))}"
+    if k == "N3ToClientQuitIIR":
+        return f"quit {ent(label, be(raw, 12))}"
+    if k in ("SimpleCharFullUpdateIIR", "SimpleDynelFullUpdateIIR", "DoorFullUpdateIIR",
+             "LootBagFullUpdateIIR", "TombStoneFullUpdateIIR", "ClimbingDynelFullUpdateIIR"):
+        pos = spawn_position(raw)
+        at = f" at ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f})" if pos else ""
+        return f"spawn {ent(label, be(raw, 12))}{at}"
+    if k == "SimpleDynelVisualChangeIIR":
+        # The state byte drives a harvest/use animation on a world object. ⚠️ These keep firing for
+        # OTHER players in a retail capture - check the player's own position before crediting one.
+        return f"{ent(label, be(raw, 12))} visual state 0x{raw[20]:02x}" if len(raw) > 20 else ""
+    if k == "LookAtIIR":
+        # TARGET SELECTION - the client tells the server what the player has selected. Target is a fixed
+        # [21..25], and ZERO means the player cleared their target rather than picked a new one.
+        target = be(raw, 21)
+        return f"{ent(label, be(raw, 12))} " + (f"selects {ent(label, target)}" if target else "deselects")
+    if k in ("HateListUpdateIIR", "ThreatLevelIIR"):
+        # These do NOT share LookAt's or DamageResult's layout, so scan the body for a handle we already
+        # know rather than trusting an offset - reading HateList at LookAt's offset yields "0x500003b2".
+        subject = be(raw, 12)
+        others = [h for h in others_in(raw, label) if h != subject]
+        return f"{ent(label, subject)} -> {ent(label, others[0])}" if others else ent(label, subject)
     if k in ("DispatchOpenLootBag", "DispatchCloseLootBag", "TryLootAll", "TryLootCash"):
         return f"bag {ent(label, be(raw, 4))}"
     if k in ("ChannelChat", "CharacterChat", "SystemMessage", "ChatVicinity", "FormatFeedbackIIR",
@@ -407,6 +457,44 @@ def section_timeline(P, db, everything, label=None):
         print(f"  {p['_t']:7.1f} {p['_tier']:6s} {p['Direction']} {p['_kind']:30s} {d}")
 
 
+# Per-FRAME traffic: movement, heartbeats, aggro polling and the stat/energy stream. These are the bulk
+# of a capture (5 of every 6 packets) and carry no event, so --detailed suppresses them and SAYS SO
+# rather than quietly shortening its own output. --all-packets keeps them.
+DETAIL_NOISE = {
+    "CharDCMoveIIR", "MoveTaskIIR", "RequestAggroStatus", "DispatchUpdateAggroStatus",
+    "SetSprintInputState", "DispatchSetIsSprinting", "DispatchSyncCanSprint", "Ping", "DispatchPong",
+    "UpdateGameServerStats", "DispatchGameServerStats", "StatIIR", "EnergyIIR", "RegenIIR",
+    "DispatchSyncRegenDelayed", "UpdateQuestMarkerNPC", "DispatchSetQuestMarker",
+}
+
+
+def section_detailed(P, db, everything, label=None):
+    """One line per EVENT, in one flat chronological stream, with everything decodable on the line.
+
+    The sectioned view splits a session across eight headings, which is the right shape for answering a
+    question but the wrong one for reading the session as it happened - an event and its consequence
+    land under different headings. This is the same data as one stream, ordered, with the resolved
+    description AND the raw body tail, so nothing is hidden behind the decoder's own coverage: a packet
+    this script cannot describe still shows its bytes rather than an empty column.
+    """
+    print("\n=== detailed ===")
+    print(f"  {'time':>7}  {'frame':>6}  {'tier':11} {'d':1} {'event':32} details")
+    suppressed = collections.Counter()
+    for p in P:
+        if not everything and p["_kind"] in DETAIL_NOISE:
+            suppressed[p["_kind"]] += 1
+            continue
+        d = describe(p, db, label)
+        h = p["BodyHex"]
+        extra = f"   [{h[:72]}{'…' if len(h) > 72 else ''}]" if h else ""
+        print(f"  {p['_t']:7.1f}  {p['Frame']:6d}  {p['_tier']:11} {p['Direction'][0]} {p['_kind']:32} {d}{extra}")
+    if suppressed:
+        total = sum(suppressed.values())
+        top = ", ".join(f"{k} x{v}" for k, v in suppressed.most_common(6))
+        print(f"\n  ({total} per-frame packets suppressed: {top}{', …' if len(suppressed) > 6 else ''}"
+              f" - pass --all-packets to include them)")
+
+
 def section_quests(P, db, label=None):
     print("\n=== quests ===")
     for p in P:
@@ -485,6 +573,7 @@ def section_coverage(P, db, names):
 
 SECTIONS = {
     "summary": section_summary, "handoff": section_handoff, "timeline": section_timeline,
+    "detailed": section_detailed,
     "quests": section_quests, "dialogue": section_dialogue, "chat": section_chat,
     "combat": section_combat, "coverage": section_coverage,
 }
@@ -496,6 +585,8 @@ def main():
     ap.add_argument("--db", default=os.path.join(REPO, "faolan.db"))
     ap.add_argument("--section", choices=sorted(SECTIONS), action="append")
     ap.add_argument("--all-packets", action="store_true")
+    ap.add_argument("--detailed", action="store_true",
+                    help="one flat chronological stream, one line per event, with the raw body on each line")
     a = ap.parse_args()
 
     if a.dump.endswith(".pcapng"):
@@ -509,11 +600,13 @@ def main():
     P, t0 = load(a.dump, names)
     label = resolve_entities(P, db)
 
-    for name in (a.section or ["summary", "handoff", "timeline", "quests", "dialogue", "chat", "combat", "coverage"]):
+    default = ["summary", "detailed", "quests", "dialogue", "coverage"] if a.detailed \
+        else ["summary", "handoff", "timeline", "quests", "dialogue", "chat", "combat", "coverage"]
+    for name in (a.section or default):
         fn = SECTIONS[name]
         if fn is section_summary:
             fn(P, t0, db, names)
-        elif fn is section_timeline:
+        elif fn in (section_timeline, section_detailed):
             fn(P, db, a.all_packets, label)
         elif fn is section_coverage:
             fn(P, db, names)
