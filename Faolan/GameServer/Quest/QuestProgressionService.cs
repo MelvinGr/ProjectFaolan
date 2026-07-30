@@ -226,6 +226,17 @@ namespace Faolan.GameServer.Quest
 				if (goal == null)
 					continue;
 
+				// #521: a DELIVER goal is a HAND-IN, so the player must actually be CARRYING what it hands over.
+				// Without this the talk alone solves it and "deliver a supply crate to Croiss" completes by walking up
+				// empty-handed - the goal would be wired but not really played.
+				if (!await HoldsDeliveryItem(character.Id, goal))
+				{
+					// Say so rather than no-op: the player IS on the right quest talking to the right NPC, so silence
+					// reads as a broken quest. This only fires once the goal has already matched.
+					await _agents.SendSystemMessage(character.Id, "You are not carrying what this delivery needs.");
+					continue;
+				}
+
 				var required = GoalRequired(quest, def, goal);
 				// A talk goal is binary - talking to the NPC SOLVES it (jumps to required), regardless of the display
 				// count. This lets a "deliver N to X" hand-in (e.g. Shipwrecked V's "deliver 3 bricks to Turach",
@@ -257,6 +268,23 @@ namespace Faolan.GameServer.Quest
 			// re-run the player's interest pass so gated visibility tracks the new quest state immediately.
 			if (changed)
 				await _outbound.RefreshQuestVisibility(client!);
+		}
+
+		// Whether the player is carrying what a DELIVER goal hands over (#521); the rule itself is QuestProgress.CanHandIn
+		// and this only supplies the count. Non-deliveries never touch the DB - IsDelivery is checked first, so a kill or
+		// a collect pays nothing for this.
+		//
+		// ⚠️ It checks, it does not CONSUME. Retail presumably takes the item on hand-in, but nothing in the corpus shows
+		// the removal, and destroying a player's item on an unproven inference is the worse error. Open on #521.
+		private async Task<bool> HoldsDeliveryItem(uint characterId, QuestGoalDefinition goal)
+		{
+			if (!QuestProgress.IsDelivery(goal))
+				return true;
+
+			// Summed across slots: a stack can be split over several cells, and a split stack is still the items.
+			var inventory = await _database.GetCharacterInventory(characterId);
+			var held = inventory.Where(i => i.ItemId == goal.TrailingRefId).Aggregate(0u, (sum, i) => sum + Math.Max(1u, i.Count));
+			return QuestProgress.CanHandIn(goal, held);
 		}
 
 		// Whether every goal of the quest has now reached its required count. `justTicked`/`justProgress` is the goal we

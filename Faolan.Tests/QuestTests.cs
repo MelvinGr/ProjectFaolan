@@ -162,6 +162,66 @@ namespace Faolan.Tests
 			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 999)); // no collect goal for that item
 			Assert.Null(QuestProgress.MatchingCollectGoal(goals, 0)); // no item -> no match (never the TalkToNpc goal)
 		}
+		[Fact]
+		public void CanHandIn_DeliveryNeedsTheItemInHand_OthersUnaffected()
+		{
+			// Shipwrecked V's hand-in (3497): kind tag Deliver (20), trailing ref = item 193400 in LDB cat 50200,
+			// RequiredCount 3 - "Deliver 3 stone bricks to Turach".
+			var deliver = new QuestGoalDefinition
+			{
+				GoalId = 3497,
+				GoalType = QuestGoalType.TalkToNpc,
+				TargetName = "Turach",
+				Separator = (uint)QuestGoalKind.Deliver,
+				TrailingCategory = QuestProgress.ItemNameCategory,
+				TrailingRefId = 193400,
+				RequiredCount = 3
+			};
+
+			Assert.True(QuestProgress.IsDelivery(deliver));
+			Assert.False(QuestProgress.CanHandIn(deliver, 0)); // empty-handed - the whole point of the check
+			Assert.False(QuestProgress.CanHandIn(deliver, 2)); // partial: 3 bricks means 3
+			Assert.True(QuestProgress.CanHandIn(deliver, 3));
+			Assert.True(QuestProgress.CanHandIn(deliver, 4)); // extras are fine
+
+			// An ORDINARY talk goal is not a delivery (no kind tag, no item ref) and must not be gated - Casilda would
+			// otherwise become un-freeable.
+			var talk = GoalSeq(1, 13480, QuestGoalType.TalkToNpc, "Casilda");
+			Assert.False(QuestProgress.IsDelivery(talk));
+			Assert.True(QuestProgress.CanHandIn(talk, 0));
+
+			// Nor is a COLLECT goal, even though it carries the very same item reference - only the kind tag separates
+			// them, which is what makes the tag load-bearing here.
+			var collect = new QuestGoalDefinition
+			{
+				GoalId = 3495,
+				GoalType = QuestGoalType.CollectItem,
+				Separator = (uint)QuestGoalKind.Collect,
+				TrailingCategory = QuestProgress.ItemNameCategory,
+				TrailingRefId = 193400,
+				RequiredCount = 3
+			};
+			Assert.False(QuestProgress.IsDelivery(collect));
+			Assert.True(QuestProgress.CanHandIn(collect, 0));
+
+			// A Deliver-kind goal with no item reference cannot be gated on an item; it must stay playable.
+			var untyped = new QuestGoalDefinition { GoalId = 1, Separator = (uint)QuestGoalKind.Deliver };
+			Assert.False(QuestProgress.IsDelivery(untyped));
+			Assert.True(QuestProgress.CanHandIn(untyped, 0));
+
+			// RequiredCount 0 behaves as 1, like every other count rule.
+			var single = new QuestGoalDefinition
+			{
+				GoalId = 5792,
+				Separator = (uint)QuestGoalKind.Deliver,
+				TrailingCategory = QuestProgress.ItemNameCategory,
+				TrailingRefId = 110891,
+				RequiredCount = 0
+			};
+			Assert.False(QuestProgress.CanHandIn(single, 0));
+			Assert.True(QuestProgress.CanHandIn(single, 1));
+		}
+
 		// --- Quest objective-tracking rules (#261/#357) ---------------------------------------------------------------
 
 		[Fact]

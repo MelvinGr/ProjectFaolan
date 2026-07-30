@@ -16,6 +16,35 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return goals.All(g => progressOf(g) >= Math.Max(g.RequiredCount, 1));
 		}
 
+		// LDB category 50200 is `item.name`, so a goal whose TrailingCategory is 50200 has an ITEM TEMPLATE ID in its
+		// TrailingRefId (docs/rdb/ldb-string-index.md).
+		public const uint ItemNameCategory = 50200;
+
+		// Whether a goal is a DELIVERY - a hand-in that takes something OUT of the player's hands, rather than an
+		// objective that puts something in them. Identified by the goal's own captured data: the client's kind tag
+		// (`Separator`) says `Deliver`, and the trailing reference types the thing being handed over as an item.
+		//
+		// Keyed on the captured fields rather than on GoalType, which is OUR wiring - a hand-in is typed TalkToNpc
+		// (the talk is what triggers it), so testing GoalType could not tell a delivery from an ordinary talk goal.
+		public static bool IsDelivery(QuestGoalDefinition goal)
+		{
+			return goal != null && goal.Separator == (uint)QuestGoalKind.Deliver
+			                    && goal.TrailingCategory == ItemNameCategory && goal.TrailingRefId != 0;
+		}
+
+		// Whether `heldCount` of the delivered item is enough to hand `goal` in (#521). Non-deliveries always pass, so
+		// this is a no-op on kills, collects and reaches.
+		//
+		// The FULL count is required: "deliver 3 stone bricks to Turach" is not satisfied by carrying one. RequiredCount
+		// is clamped to >= 1 to match every other count rule here (a goal seeded 0 needs one).
+		//
+		// Without this a delivery completes on the TALK alone, so the player hands over nothing and the objective still
+		// closes - the goal reads as wired while never actually being played.
+		public static bool CanHandIn(QuestGoalDefinition goal, uint heldCount)
+		{
+			return !IsDelivery(goal) || heldCount >= Math.Max(1u, goal.RequiredCount);
+		}
+
 		// The CollectItem goal for `itemId` (#262): the lowest-Sequence CollectItem goal whose TrailingRefId is that item
 		// (the item a quest-pickup grants, e.g. Shipwrecked V's stone brick 193400). Null if none - the pickup is inert
 		// unless a matching collect quest is active, which is what gates the brick nodes to quest-holders.

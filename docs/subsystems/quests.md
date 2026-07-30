@@ -163,7 +163,42 @@ Shabaka. A `LIKE` match reads as a hit and wires the goal to the wrong NPC on th
 text (*"Give Note of Recommendation to Itsing When You Have Become an Acolyte (Rank 1)"*), so a bare talk trigger
 would complete them early. They need the rank gate first.
 
-⚠️ A plain `TalkToNpc` does not check the player is **holding** the item, which a faithful hand-in would. That is
-a new mechanic (an item precondition on a talk goal), not wiring. Tracked in Gitea #521.
+### A delivery checks that the player is carrying the goods
+
+A hand-in advances on the **talk**, so without a precondition it completes by walking up to the recipient
+empty-handed — wired, but never actually played. `QuestProgress.CanHandIn` gates it, and
+`QuestProgressionService` supplies the count from the inventory.
+
+The gate keys on the goal's **captured data**, not on our wiring: kind tag `Deliver` **and** a trailing reference
+into `50200` `item.name` (so `TrailingRefId` is the item template id). It cannot key on `GoalType`, because a
+hand-in *is* typed `TalkToNpc` — that is what triggers it — so `GoalType` cannot tell a delivery from an ordinary
+talk goal. An ordinary talk (freeing Casilda) and a collect goal carrying the *same* item reference are both
+correctly left ungated; only the kind tag separates the last pair.
+
+The full count is required — "deliver 3 stone bricks" is not satisfied by carrying one — summed across slots,
+since a stack can be split. A failed hand-in says so on-screen rather than silently doing nothing: the player is
+on the right quest talking to the right NPC, so silence reads as a broken quest.
+
+⚠️ It **checks**, it does not **consume**. Retail presumably takes the item, but nothing in the corpus shows the
+removal, and destroying a player's item on an unproven inference is the worse error. Open on Gitea #521.
+
+### Typing the remaining inert goals is mechanical — the data is what is missing
+
+85 goals are still at the fresh-harvest default. With the objective text readable, typing them is a rule rather
+than per-quest sourcing: `Talk to X` / `Speak to X` / `Speak with X` / `Report to X` → `TalkToNpc` at `X`.
+
+Applying it today wires **nothing**, and the reason is worth recording so it is not re-derived:
+
+| goal | text | why not |
+|---|---|---|
+| 10038, 10056, 11455, 12175, 14075 | *"Report to Mei-zhu"*, *"Talk to King Conan of Aquilonia"*, … | no `NpcTemplate` — uncaptured maps (mostly Khitai) |
+| 11882, 5374, 6642 | *"…When You Have Become a Thug (Rank 1)"*, *"Talk to Sharak (level 30)"* | a **rank/level precondition** a bare talk would skip |
+| 2977 | *"Speak with Kern Wolfeye"* | the NPC exists and the maps agree, but he has **no conversation nodes** |
+| 6351 | *"Speak to Chulainn"* | the goal's marker is Atzel's Fortress (1085); our only Chulainn is in the Castle of King Conan (2040) |
+
+⚠️ **A talk goal needs conversation data, not just an NPC.** `AdvanceTalkGoals` runs only after a greeting is
+served (`TryReplayConversation` returns early when no screen matches), so an NPC with no `ConversationNode` rows
+can never complete one. Any future auto-typing rule must gate on **both** — exactly as the delivery rule gates on
+the recipient being in the catalog. Tracked in Gitea #358 / #521.
 
 Open work is tracked in Gitea (#262, #358, #521).
