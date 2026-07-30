@@ -285,8 +285,10 @@ string: the string is a pure base-85 rendering of those four words and `LdbKey.T
 escaping included. That is also why the retail client renders our quest journal correctly — we replay the
 captured keys, so it can decrypt its own LDB.
 
-The corollary is the limit: **a string we have never captured a key for stays unreadable.** The cipher is broken;
-the coverage is bounded by the corpus.
+A string we have never captured a key for stays unreadable — but that is **not a limit of this decode**, it is
+the same content model item templates already use: an item enters the catalog when a capture yields its
+`Data1..4`, and an LDB string becomes readable when a capture yields its `key=`. Same axis, and a friendlier one
+here, since a captured quest carries the keys for its own text along with it.
 
 ## Still open
 
