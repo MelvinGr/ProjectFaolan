@@ -171,6 +171,34 @@ spanning (402, 642)–(498, 725), which contains that goal's own marker at (416,
 trigger volume resolves mechanically: `goal → (51200, refId) → region name → the polygon in that playfield's
 1000053 record`.
 
+### A quest goal's two LDB references, decoded
+
+The descriptor table also finishes off the quest-goal reference model. A `QuestGoalDefinition` carries **two**
+`(category, refId)` pairs, and they mean different things:
+
+| pair | category | points at | readable? |
+|---|---|---|---|
+| `ObjectiveRefId` + `ObjectiveCategory` | **50304** `quest_goal_templates.goal_name` on all 168 goals; `ObjectiveRefId == GoalId` | the goal's own **display text** ("Kill slavemaster Saddur") | **NO — encrypted** |
+| `TrailingRefId` + `TrailingCategory` | 50200 `item.name`, 51000 `npc_template.name`, 51100 `categorytree.description`, 51200 `bounded_areas` | the goal's **target** | **yes — plaintext** |
+
+`TrailingCategory` is therefore a **type tag on the target reference**, and it resolves completely: all **107**
+goals with a non-zero `TrailingRefId` resolve in their declared category, giving `Stolen Goods`, `Mangy Yeti
+Pelt`, `Gormley's Buried Treasure`, `Quarry Stonebrick`, `Taskmaster Olaf`, `Vanir Master Polluter`,
+`Akil-Atsu's Head`, … where `QuestGoalDefinition.TargetName` is currently filled in for only a couple of
+hand-seeded goals. (Use the **English** pages — the language record names them — and decode **UTF-8**; merging
+all seven languages silently yields French.)
+
+⚠️ **A 51200 reference does NOT by itself mean the goal is a `ReachArea`.** Only three goals carry one:
+
+| goal | quest | map | count | region | reading |
+|---|---|---|---|---|---|
+| 1448 | 10238 | 4010 | 1 | `Trappers Haven` | a true reach objective — already `ReachArea`, and the region **contains the goal's own marker** |
+| 11712 | 17608 | 6400 | **3** | `NightmareRoomBA` | a count of 3 says the region *scopes* the objective ("3 of something in the Nightmare Room"), not that entering it is the objective |
+| 14073 | 19364 | (none) | 1 | `BossRoom` | the goal carries no MapId, yet the name is unique to playfield 2027, so it still resolves |
+
+Which of the three is a reach goal cannot be settled from here, because the field that would say — the goal's own
+objective text — is in encrypted category 50304. That is the concrete cost of #520.
+
 ## Eleven categories are ENCRYPTED, and the key is not in the client
 
 The page header's `flags` word is an **encryption flag** — the earlier note that it "is `0` on every page" was

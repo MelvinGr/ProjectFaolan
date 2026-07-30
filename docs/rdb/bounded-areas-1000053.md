@@ -416,6 +416,19 @@ That supersedes the "no id link, pick a region by judgement" reading in the ques
 reached before the category table was known, and which guessed `Jungle Main` where the client actually says
 `Trappers Haven` (a 96 × 82 region rather than a 392 × 529 one).
 
+**Only three goals in the whole catalog carry a 51200 reference**, and all three regions exist:
+
+| goal | quest | map | count | region | on playfield |
+|---|---|---|---|---|---|
+| 1448 | 10238 | 4010 | 1 | `Trappers Haven` | 4010 ✓ — contains the goal's own marker (416, 701) |
+| 11712 | 17608 | 6400 | 3 | `NightmareRoomBA` | 6400 ✓ |
+| 14073 | 19364 | — | 1 | `BossRoom` | 2027 ✓ (the goal has no MapId; the name is unique to one playfield) |
+
+⚠️ A 51200 reference does **not** by itself make a goal a reach objective — 11712 wants **3** of something, so
+its region reads as a *scope* ("3 of something in the Nightmare Room") rather than the objective. Settling that
+needs the goal's own objective text, which is in encrypted LDB category 50304 (#520). So the mechanical part is
+the geometry: given a goal known to be a `ReachArea`, its exact polygon is now recoverable.
+
 ## Import
 
 `RdbHazardImporter` (the opt-in `rdb-hazards` module) reads the lava volumes into `MapHazard` +
