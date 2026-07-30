@@ -473,7 +473,7 @@ namespace Faolan.Importer.Captures
 				var npcName = string.IsNullOrEmpty(e.NpcName)
 					? $"#{e.CapturedNpcHandle}"
 					: e.NpcName;
-				var id = ConversationNode.ComputeId(npcName, e.TypeId, e.AnswerPath, e.ConditionQuestId, e.ConditionQuestState);
+				var id = ConversationNode.ComputeId(npcName, e.TypeId, e.AnswerPath, e.ConditionQuestId, e.ConditionQuestState, e.ServerInitiated, e.TriggerWorldObjectId);
 				var identity = $"{npcName}/{e.TypeId}/'{e.AnswerPath}'/{e.ConditionQuestId}/{e.ConditionQuestState}";
 				if (!byId.TryAdd(id, identity))
 					throw new InvalidOperationException($"Conversation node id 0x{id:X8} is not unique: '{identity}' collides with '{byId[id]}'.");
@@ -493,6 +493,7 @@ namespace Faolan.Importer.Captures
 						? null
 						: e.GrantQuestId,
 					ServerInitiated = e.ServerInitiated,
+					TriggerWorldObjectId = e.TriggerWorldObjectId,
 					Packets = e.Packets.Select((p, i) => BuildPacket(p, i)).ToList()
 				});
 			}

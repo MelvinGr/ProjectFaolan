@@ -67,14 +67,25 @@ namespace Faolan.Core.Database.Tables
 		// the player opens the door, the escort goal completes, and the server then opens her window unprompted.
 		//
 		// It is NOT reachable by talking, so the runtime's talk lookup must never serve it; it needs whatever EVENT
-		// triggered it. That trigger is not modelled yet, so these nodes are imported and parked - the point of #523 is
-		// that they were being DROPPED, taking their {resolvegoal}/{gameactiononnpc} payload with them.
+		// triggered it (TriggerWorldObjectId below, for the interaction kind). Nothing serves these yet - the point of
+		// #523 was that they were being DROPPED, taking their {resolvegoal}/{gameactiononnpc} payload with them.
 		//
-		// Not part of ComputeId. It cannot collide with a talk node in practice because a server-opened conversation has
-		// no BCC action to take a TypeId from and so carries 0, while every captured talk node carries its action id
-		// (42008 on all 467 of them) - and if that ever stopped holding, the importer's distinct-id assertion fails the
-		// import rather than letting one screen overwrite another.
+		// It SELECTS which identity ComputeId uses rather than being hashed into it: a server-opened node is identified
+		// by its trigger, a talk node is not. See ComputeId.
 		public bool ServerInitiated { get; set; }
+
+		// For a ServerInitiated node: the WORLD OBJECT whose use opened this conversation (#523). Null on a talk node,
+		// and null on a server-opened one whose trigger is not an interaction - five of the seven in the corpus are
+		// preceded by movement alone, so they are proximity-triggered and need a different target.
+		//
+		// Casilda's city-door farewell is the worked example: ActionType.UseObject (0x12) on WorldObjects.Id 1044692756
+		// (map 4010, `object_closed`, DestinationMapId 4020 - the zone line into Tortage), reproduced in both
+		// beach-to-city captures. SetNull rather than Cascade: losing the object should degrade the conversation to
+		// "trigger unknown", not delete the dialogue.
+		public uint? TriggerWorldObjectId { get; set; }
+
+		[ForeignKey(nameof(TriggerWorldObjectId))]
+		public virtual WorldObject? TriggerWorldObject { get; set; }
 
 		public virtual ICollection<ConversationPacket> Packets { get; set; } = [];
 		public QuestState? ConditionQuestState { get; set; }
@@ -96,14 +107,26 @@ namespace Faolan.Core.Database.Tables
 		// screen a DISTINCT screen, so two nodes agreeing on all of them are the same node and must collide. The
 		// importer asserts the ids it computes are distinct, so a collision fails the import rather than silently
 		// dropping a screen.
-		public static uint ComputeId(string npcName, uint typeId, string answerPath, uint? conditionQuestId, QuestState? conditionQuestState)
+		// ⚠️ The trigger joins the identity ONLY for a SERVER-INITIATED node, and that asymmetry is deliberate. A
+		// server-opened conversation is identified by WHAT FIRED IT - Casilda has two, and both sit at AnswerPath "",
+		// so without the trigger one merges away (her `{hidegoodbye}Friend?` opener lost to the other). A talk node is
+		// identified by what the player clicked and walked, and carries no trigger at all.
+		//
+		// Making it unconditional would have been simpler and much worse: DerivedKey.From NUL-JOINS its parts, so an
+		// extra component - even a null one - shifts EVERY hash, re-keying all 467 talk nodes and cascading through
+		// ~17k packet/screen/parameter children for no semantic change. Branching keeps this a pure function of the
+		// row's own columns, which is all the derived-key contract asks.
+		public static uint ComputeId(string npcName, uint typeId, string answerPath, uint? conditionQuestId, QuestState? conditionQuestState,
+			bool serverInitiated = false, uint? triggerWorldObjectId = null)
 		{
-			return DerivedKey.From(npcName, typeId, answerPath, conditionQuestId, conditionQuestState);
+			return serverInitiated
+				? DerivedKey.From(npcName, typeId, answerPath, conditionQuestId, conditionQuestState, triggerWorldObjectId)
+				: DerivedKey.From(npcName, typeId, answerPath, conditionQuestId, conditionQuestState);
 		}
 
 		public uint ComputeId()
 		{
-			return ComputeId(NpcName, TypeId, AnswerPath, ConditionQuestId, ConditionQuestState);
+			return ComputeId(NpcName, TypeId, AnswerPath, ConditionQuestId, ConditionQuestState, ServerInitiated, TriggerWorldObjectId);
 		}
 
 		public override string ToString()

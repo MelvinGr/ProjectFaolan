@@ -9,6 +9,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
 using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Importer.Captures;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -35,7 +36,8 @@ namespace Faolan.Importer.Extractors
 		QuestState? ConditionQuestState = null,
 		uint GrantQuestId = 0,
 		uint QuestContextId = 0,
-		bool ServerInitiated = false);
+		bool ServerInitiated = false,
+		uint? TriggerWorldObjectId = null);
 
 	// Reconstructs each NPC's dialogue as a TREE of screens keyed by answer-index PATH, from the captured request/
 	// response flow. The grammar (memory protocol_conversation_routing): a conversation INSTANCE = TalkToNpc(f3=0)
@@ -59,6 +61,16 @@ namespace Faolan.Importer.Extractors
 		private const uint OpenChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR;
 		private const uint SpawnSubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 		private const uint TalkToNpcActionType = 0x16;
+		private const uint UseObjectActionType = 0x12; // ActionType.UseObject - 'use a world object' (the city door)
+
+		// How far back a UseObject may sit and still be taken as the TRIGGER for a server-opened window. MEASURED over
+		// the whole corpus: both door conversations open 45 packets after their UseObject, and the nearest interaction
+		// behind any of the five proximity-triggered ones is 134 - so the two populations are cleanly separated and 90
+		// sits between them with margin on both sides.
+		//
+		// Deliberately not "the last UseObject, whenever it was": attributing the WRONG trigger is worse than
+		// attributing none, since none merely leaves the node waiting for the proximity model.
+		private const int UseObjectTriggerWindow = 90;
 
 		// The speaker's template id inside a screen's `npcname` parameter - see NpcTemplateFromText.
 		private static readonly Regex NpcNameParameter =
@@ -89,6 +101,31 @@ namespace Faolan.Importer.Extractors
 					namesByTemplate.TryAdd(template, n);
 			}
 
+			// handle -> the STABLE WorldObjects.Id of the object with that handle in this capture, so a UseObject trigger
+			// resolves to a row rather than to a session-volatile handle. Same identity function the world-objects import
+			// uses, so the two agree by construction.
+			var worldObjectIdByHandle = new Dictionary<uint, uint>();
+			foreach (var w in WorldObjectExtractor.Extract(packets))
+			{
+				if (w.Handle == 0)
+					continue;
+
+				try
+				{
+					worldObjectIdByHandle[w.Handle] = ImportOps.PopulateObject(new WorldObject
+					{
+						MapId = w.MapId,
+						PositionX = w.X,
+						PositionY = w.Y,
+						PositionZ = w.Z
+					}, w).ComputeId();
+				}
+				catch
+				{
+					// An object whose blob will not populate cannot be a trigger target; it is not a conversation error.
+				}
+			}
+
 			var entries = new List<ConversationEntry>();
 
 			// Per-conversation-instance state, reset at each greeting (TalkToNpc f3=0).
@@ -96,6 +133,10 @@ namespace Faolan.Importer.Extractors
 			uint typeId = 0, npc = 0, instance = 0;
 			var serverInitiated = false; // this instance was opened BY THE SERVER, with no player TalkToNpc (#523)
 			uint serverNpcTemplate = 0; // its NPC, read out of the text's `npcname` parameter (there is no clicked handle)
+			uint? serverTrigger = null; // the world object whose use opened it, when one is close enough behind
+			uint lastUseObjectHandle = 0;
+			var lastUseObjectAt = int.MinValue; // packet index of that UseObject, for the window test
+			var index = -1;
 			var path = ""; // answer-index path of the CURRENT screen (the one whose responses we're collecting)
 			var screen = new List<byte[]>();
 			uint grant = 0; // a quest the server granted while collecting THIS screen's responses (0 = none)
@@ -105,16 +146,40 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
+				index++;
 				if (p is { IsDownload: false, IsIirCarrier: true, SubOpcode: InteractSubOpcode })
 				{
 					var body = p.Body;
-					if (body.Length < 26 || body.ReadU32Be(18) != TalkToNpcActionType)
+					if (body.Length < 26)
 						continue;
 
-					var argLen = (int)body.ReadU32Be(22);
-					if (26 + argLen > body.Length)
+					var action = body.ReadU32Be(18);
+					var bodyArgLen = (int)body.ReadU32Be(22);
+					if (26 + bodyArgLen > body.Length)
 						continue;
 
+					// A USE-OBJECT is remembered, not acted on: it is the trigger for a window the server opens a moment
+					// LATER (#523), so it only means anything once an unattributed OpenChatWindow shows up behind it.
+					if (action == UseObjectActionType)
+					{
+						// ⚠️ The object handle is in the TRAILER after the args ([from][target]), NOT in args.Target - which
+						// on a UseObject holds the PLAYER's own instance. A TalkToNpc is the other way round (its NPC handle
+						// IS args.Target.Instance and it carries only a short trailer), so the two cannot share a read.
+						// See GameServerListener.Inbound's from/target handling.
+						var trailer = 26 + bodyArgLen;
+						if (trailer + 8 <= body.Length)
+						{
+							lastUseObjectHandle = body.ReadU32Be(trailer + 4);
+							lastUseObjectAt = index;
+						}
+
+						continue;
+					}
+
+					if (action != TalkToNpcActionType)
+						continue;
+
+					var argLen = bodyArgLen;
 					var (parsedTypeId, _, field3, parsedNpc) = ParseArgs(body.AsSpan(26, argLen));
 					if (field3 != 0)
 						continue; // a non-greeting TalkToNpc (retransmit / options re-request) - not an instance boundary
@@ -124,6 +189,7 @@ namespace Faolan.Importer.Extractors
 					active = true;
 					serverInitiated = false;
 					serverNpcTemplate = 0;
+					serverTrigger = null;
 					typeId = parsedTypeId;
 					npc = parsedNpc;
 					instance = body.ReadU32Be(12);
@@ -144,6 +210,11 @@ namespace Faolan.Importer.Extractors
 					active = true;
 					serverInitiated = true;
 					serverNpcTemplate = 0; // resolved from the first text screen's `npcname` parameter
+					serverTrigger = index - lastUseObjectAt <= UseObjectTriggerWindow
+						? worldObjectIdByHandle.GetValueOrDefault(lastUseObjectHandle) is var w and not 0
+							? w
+							: null
+						: null; // no interaction close enough behind it -> a proximity trigger we cannot name yet
 					typeId = 0; // there is no BCC action to take one from - see ConversationNode.ServerInitiated
 					npc = 0;
 					path = "";
@@ -230,8 +301,10 @@ namespace Faolan.Importer.Extractors
 						? tpl
 						: null);
 
+
 				entries.Add(new ConversationEntry(typeId, path, npc, [.. screen], name, template,
-					GrantQuestId: grant, QuestContextId: instanceContext, ServerInitiated: serverInitiated));
+					GrantQuestId: grant, QuestContextId: instanceContext, ServerInitiated: serverInitiated,
+					TriggerWorldObjectId: serverTrigger));
 			}
 		}
 
@@ -288,7 +361,7 @@ namespace Faolan.Importer.Extractors
 		// removing it: 242 merge keys, 29 with more than one candidate, and the winner changed in ZERO of them.
 		public static List<ConversationEntry> Merge(IEnumerable<ConversationEntry> all)
 		{
-			var best = new Dictionary<(string, uint, string, uint?, QuestState?), (int score, ConversationEntry entry)>();
+			var best = new Dictionary<(string, uint, string, uint?, QuestState?, uint?), (int score, ConversationEntry entry)>();
 			foreach (var e in all)
 			{
 				var identity = string.IsNullOrEmpty(e.NpcName)
@@ -296,7 +369,11 @@ namespace Faolan.Importer.Extractors
 					: e.NpcName;
 				// The quest-state gate is part of the key so a NPC's conditioned variants (e.g. Casilda's pre- vs
 				// post-first-quest greeting) stay SEPARATE rows instead of merging into one mixed screen.
-				var key = (identity, e.TypeId, e.AnswerPath, e.ConditionQuestId, e.ConditionQuestState);
+				// The TRIGGER is part of the key for the same reason it is part of ConversationNode's identity: an NPC can
+				// have SEVERAL server-opened conversations, and they all sit at AnswerPath "". Without it Casilda's two
+				// collapse into one here - before the importer ever computes an id - and the shorter (her city-door
+				// "{hidegoodbye}Friend?" opener) loses to the longer.
+				var key = (identity, e.TypeId, e.AnswerPath, e.ConditionQuestId, e.ConditionQuestState, e.TriggerWorldObjectId);
 				var score = e.Packets.Count;
 				if (!best.TryGetValue(key, out var cur) || score > cur.score)
 				{

@@ -1188,6 +1188,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<bool>("ServerInitiated")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("TriggerWorldObjectId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("TypeId")
                         .HasColumnType("INTEGER");
 
@@ -1196,6 +1199,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasIndex("GrantQuestId");
 
                     b.HasIndex("NpcTemplateId");
+
+                    b.HasIndex("TriggerWorldObjectId");
 
                     b.HasIndex("NpcName", "TypeId", "AnswerPath");
 
@@ -4149,9 +4154,15 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasForeignKey("NpcTemplateId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Faolan.Core.Database.Tables.WorldObject", "TriggerWorldObject")
+                        .WithMany()
+                        .HasForeignKey("TriggerWorldObjectId");
+
                     b.Navigation("GrantQuest");
 
                     b.Navigation("NpcTemplate");
+
+                    b.Navigation("TriggerWorldObject");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationPacket", b =>
