@@ -858,9 +858,18 @@ namespace Faolan.Importer.Cli
 							continue;
 						}
 
-						// ⚠️ The record's "StatId" slot is the damage SCHOOL for a damage record - every observed value
-						// is 0..10, i.e. exactly the DamageSchool range, and treating it as a stat id makes Rend
-						// reduce stat 1 rather than deal Slashing. So the magical branch IS represented here.
+						// ⚠️ The record's "StatId" slot is the damage SCHOOL for a damage record, not a stat id - treating
+						// it as one makes Rend reduce stat 1 rather than deal Slashing. So the magical branch IS
+						// represented here.
+						//
+						// The old justification for that ("every observed value is 0..10, i.e. exactly the DamageSchool
+						// range") was WRONG on both halves and is what #487 unpicked: the corpus also carries 12
+						// (Environmental - fall damage) and 23 (Heal), and the 0..10 numbering itself had Cold in the
+						// wrong slot. Fitting inside a range never identified the mapping.
+						//
+						// Non-damage rows drop out here rather than needing their own filter: Heal is excluded because
+						// all 110 of its occurrences carry a non-negative delta, and Environmental because a fall has no
+						// caster and its target is a player, so neither NPC branch below claims it.
 						if (cast.Delta >= 0)
 							continue;
 
@@ -1026,7 +1035,7 @@ namespace Faolan.Importer.Cli
 				foreach (var ((level, school), hits) in byLevel.OrderBy(k => k.Key.Level).ThenBy(k => k.Key.School))
 				{
 					var sorted = hits.Order().ToList();
-					var branch = school is DamageSchool.Slashing or DamageSchool.Piercing or DamageSchool.Crushing or DamageSchool.Unholy
+					var branch = school is DamageSchool.Slashing or DamageSchool.Piercing or DamageSchool.Crushing or DamageSchool.Poison
 						? "physical"
 						: "magical";
 					var line = $"{level,5} {school,-12} {branch,-9} {sorted.Count,6} {sorted[0],6} {sorted[sorted.Count / 2],7} {sorted.Select(v => (double)v).Average(),7:F1} {sorted[^1],6}";

@@ -64,10 +64,11 @@ namespace Faolan.Core.Progression
 	public static class FallDamage
 	{
 		/// <summary>
-		///     The <c>DamageSchool</c>-slot value every captured fall carries. Outside the 0..10 range the combat
-		///     schools occupy, which is why it reads as a marker for "the world did this" rather than an element.
+		///     The <c>DamageSchool</c>-slot value every captured fall carries - <c>DamageSchool.Environmental</c>.
+		///     Outside the range the real schools occupy, which is why it reads as "the world did this" rather than an
+		///     element. (#487 recovered that range: the schools run 1..10 with Cold appended at 10, not inserted at 5.)
 		/// </summary>
-		public const uint EnvironmentalSchool = 12;
+		public const uint EnvironmentalSchool = (uint)Enums.DamageSchool.Environmental;
 
 		/// <summary>Wire-observed fall debuffs (both already in <c>Spells</c> with their real durations).</summary>
 		public const uint BruisedBodySpellId = 3744225;
