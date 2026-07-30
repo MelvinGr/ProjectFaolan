@@ -344,8 +344,8 @@ namespace Faolan.GameServer
 				{
 					// ProtoDeleteItemIIR, NOT the sibling move message: { container_id, item_pos, template_id }. The
 					// two alias on the wire for fields 1-3, so this parsed as a move for a long time and quietly read
-					// the item TEMPLATE id as a destination container - see InventoryDeleteCodec.
-					var (_, drop) = InventoryDeleteCodec.Parse(body);
+					// the item TEMPLATE id as a destination container - see DeleteItemCodec.
+					var drop = DeleteItemCodec.Parse(body.ReadRemainingArray()).Delete;
 
 					Logger.LogInformation($"DropItem: {drop}");
 
@@ -370,7 +370,7 @@ namespace Faolan.GameServer
 					// the 0x737A6DF9 field-6 chain) "behaves like a container-owner handle" - it is the container's
 					// ProtoID32.instance, not a per-item id. No server->client packet follows these moves.
 
-					var (_, move) = InventoryMoveCodec.Parse(body);
+					var move = MoveInventoryItemCodec.Parse(body.ReadRemainingArray()).Move;
 
 					Logger.LogInformation($"MoveItemInInventory: {move}");
 
@@ -842,7 +842,7 @@ namespace Faolan.GameServer
 				// everything from the window opening onward is these five methods. ------------------------------------
 				case GameCharAgentOpcodes.StartTrade: // 0x2065 - the TARGET opens the window, creating the session
 				{
-					await _trade.Start(client.Session.Character.Id, TeamMessageCodec.ParseCharacterId(body));
+					await _trade.Start(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
 					break;
 				}
 
@@ -884,7 +884,7 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.DeclineTrade:
 				{
-					TeamMessageCodec.ParseCharacterId(body); // the requester, echoed by the client
+					EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)); // the requester, echoed by the client
 					_trade.Abandon(client.Session.Character.Id);
 					break;
 				}
@@ -900,7 +900,7 @@ namespace Faolan.GameServer
 				// 0x2009 KickFromTeam([ID32 target]): the leader removes a member. TeamService checks the leadership.
 				case GameCharAgentOpcodes.KickFromTeam:
 				{
-					await _csPlayerAgentDispatcher.KickFromTeam(client.Session.Character.Id, TeamMessageCodec.ParseCharacterId(body));
+					await _csPlayerAgentDispatcher.KickFromTeam(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
 					break;
 				}
 
@@ -908,7 +908,7 @@ namespace Faolan.GameServer
 				// ClientRequestGuildInfo resolves a guild banner. Answer with that character's record.
 				case GameCharAgentOpcodes.RequestTeamInvite:
 				{
-					var subject = TeamMemberRecord.Read(body);
+					var subject = TeamInviteCodec.Parse(body.ReadRemainingArray()).Member;
 
 					if (await Database.GetCharacter(subject.CharacterId) is { } character)
 						// Two things about the header, both of which cost an invite window when missed:
@@ -924,7 +924,7 @@ namespace Faolan.GameServer
 						// still did not when fed retail's own captured bytes, because the bytes were never the problem.
 						await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType),
 							GameCharInterfaceOpcodes.DispatchReplyTeamInvite, (byte[])[0x01],
-							TeamMessageCodec.BuildReplyInvite(TeamMessageCodec.MemberOf(character, GetCharacterLiveState(character.Id)?.MapId ?? character.MapId))));
+							ReplyTeamInviteCodec.Build(TeamMemberRecord.FromCharacter(character, GetCharacterLiveState(character.Id)?.MapId ?? character.MapId))));
 
 					break;
 				}
@@ -1052,7 +1052,7 @@ namespace Faolan.GameServer
 				// which is also the only answer we can give: we model no hostility between players.
 				case GameCharAgentOpcodes.RequestNewJoinHasHostileInFriends:
 				{
-					var who = TeamMemberRecord.Read(body);
+					var who = TeamInviteCodec.Parse(body.ReadRemainingArray()).Member;
 
 					Logger.LogDebug("RequestNewJoinHasHostileInFriends for {Name} ({CharacterId:X8}) - no hostility modelled, so no reply.", who.Name, who.CharacterId);
 

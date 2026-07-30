@@ -57,7 +57,7 @@ there — the byte-exact goal is the header/member-record (deterministic); the t
 - **Tail decoded + constructed:** the 225-byte tail is the SAME `CoreGuild_c::Read` renown block as the 0x203F
   (FUN_00565900, case 1→3), written in its create-time form: `Flag=0` (the full update uses 1) and an EMPTY StatIds
   list (so 225 = 277 − 52), zeroed renown, the feat defaults `List2 = 0x410/0x816/0xBEA`, and create-time constants
-  in `Counters64C[0..2]`/`Counters64D`. `WriteGuildCreatedBody` now emits `GuildRenownBlock.ForGuildCreate().Encode()`
-  (byte-exact — `GuildRenownBlockTests.ForGuildCreate_EncodesToTheCapturedCreateTail`), replacing the verbatim blob.
+  in `Counters64C[0..2]`/`Counters64D`. `WriteGuildCreatedBody` now emits `GuildRenownBlockCodec.Build(GuildRenownBlock.ForGuildCreate())`
+  (byte-exact — `GuildRenownBlockCodecTests.ForGuildCreate_EncodesToTheCapturedCreateTail`), replacing the verbatim blob.
 - **Remaining follow-up:** fan out the `0x003c` guild + officer chat-CHANNEL subs (step 3 below) so the guild chat
   tabs appear. Does not block the window opening.

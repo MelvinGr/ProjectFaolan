@@ -68,49 +68,48 @@ namespace Faolan.Tests
 		{
 			// Read the captured record and write it back: the codec must reproduce retail's bytes exactly, which is
 			// what proves the 82-byte trailing block is fully accounted for rather than approximately right.
-			using var read = new FaolanStream(Convert.FromHexString(hex));
-			var member = TeamMemberRecord.Read(read);
+			var member = TeamMemberRecordCodec.Parse(Convert.FromHexString(hex));
 
 			Assert.Equal(name, member.Name);
 			Assert.Equal(4020u, member.MapId);
-			Assert.Equal(hex, Convert.ToHexString(TeamMessageCodec.BuildMemberOnly(member)).ToLowerInvariant());
+			Assert.Equal(hex, Convert.ToHexString(TeamMemberRecordCodec.Build(member)).ToLowerInvariant());
 		}
 
 		[Fact]
 		public void MemberRecord_BuildsFromColumns_ByteExact()
 		{
 			// The DB-source direction: a member built from typed values, not round-tripped, must equal the capture.
-			Assert.Equal(DemonologistMemberHex, Convert.ToHexString(TeamMessageCodec.BuildMemberOnly(Demonologist())).ToLowerInvariant());
-			Assert.Equal(NecromancerMemberHex, Convert.ToHexString(TeamMessageCodec.BuildMemberOnly(Necromancer())).ToLowerInvariant());
+			Assert.Equal(DemonologistMemberHex, Convert.ToHexString(TeamMemberRecordCodec.Build(Demonologist())).ToLowerInvariant());
+			Assert.Equal(NecromancerMemberHex, Convert.ToHexString(TeamMemberRecordCodec.Build(Necromancer())).ToLowerInvariant());
 		}
 
 		// f678 DispatchYouInvitedToTeam / f1159 DispatchYouGotKickedFromTeam - the member alone.
 		[Fact]
 		public void MemberOnlyMessages_AreByteExact()
 		{
-			Assert.Equal(DemonologistMemberHex, Convert.ToHexString(TeamMessageCodec.BuildMemberOnly(Demonologist())).ToLowerInvariant());
+			Assert.Equal(DemonologistMemberHex, Convert.ToHexString(TeamMemberRecordCodec.Build(Demonologist())).ToLowerInvariant());
 		}
 
 		// f682 RequestTeamInvite / f680 DispatchTeamInvite - member + u16 0.
 		[Fact]
 		public void Invite_IsByteExact()
 		{
-			Assert.Equal(NecromancerMemberHex + "0000", Convert.ToHexString(TeamMessageCodec.BuildInvite(Necromancer())).ToLowerInvariant());
+			Assert.Equal(NecromancerMemberHex + "0000", Convert.ToHexString(TeamInviteCodec.Build(Necromancer())).ToLowerInvariant());
 		}
 
 		// f683 DispatchReplyTeamInvite - member + u16 0 + byte 0.
 		[Fact]
 		public void ReplyInvite_IsByteExact()
 		{
-			Assert.Equal(NecromancerMemberHex + "000000", Convert.ToHexString(TeamMessageCodec.BuildReplyInvite(Necromancer())).ToLowerInvariant());
+			Assert.Equal(NecromancerMemberHex + "000000", Convert.ToHexString(ReplyTeamInviteCodec.Build(Necromancer())).ToLowerInvariant());
 		}
 
 		// f693 DispatchTeamJoin, f917 DispatchTeamLeave and f918 DispatchSetNewTeamLeader share one layout.
 		[Fact]
 		public void TeamMemberEvent_IsByteExact()
 		{
-			Assert.Equal("0000dea90051dd9a" + DemonologistMemberHex, Convert.ToHexString(TeamMessageCodec.BuildTeamMemberEvent(0x0051DD9A, Demonologist())).ToLowerInvariant());
-			Assert.Equal("0000dea90051dd9a" + NecromancerMemberHex, Convert.ToHexString(TeamMessageCodec.BuildTeamMemberEvent(0x0051DD9A, Necromancer())).ToLowerInvariant());
+			Assert.Equal("0000dea90051dd9a" + DemonologistMemberHex, Convert.ToHexString(TeamMemberEventCodec.Build(0x0051DD9A, Demonologist())).ToLowerInvariant());
+			Assert.Equal("0000dea90051dd9a" + NecromancerMemberHex, Convert.ToHexString(TeamMemberEventCodec.Build(0x0051DD9A, Necromancer())).ToLowerInvariant());
 		}
 
 		// f693 DispatchYouJoinedTeam - the whole roster. The member list is COUNT-FRAMED: retail's 0x00000BD3 is
@@ -120,27 +119,29 @@ namespace Faolan.Tests
 		{
 			var expected = "0000dea90051dd9a" + "0000c35001317cf8" + "00000bd3" + NecromancerMemberHex + DemonologistMemberHex + "000000000100000000000000000000000002";
 
-			Assert.Equal(expected, Convert.ToHexString(TeamMessageCodec.BuildRoster(0x0051DD9A, 0x01317CF8, [Necromancer(), Demonologist()])).ToLowerInvariant());
+			Assert.Equal(expected, Convert.ToHexString(TeamRosterCodec.Build(0x0051DD9A, 0x01317CF8, [Necromancer(), Demonologist()])).ToLowerInvariant());
 		}
 
-		// f694 - a join pushes AddToGroupIIR onto the world connection, one per member. The leading 0x0000001D is the
-		// carrier's own length prefix, and it is part of what the builder emits: without it the client reads the IIR
-		// type as a 234 MB payload length and drops the connection.
+		// f694 - a join pushes AddToGroupIIR onto the world connection, one per member. Retail's packet also carries the
+		// carrier's [u32 0x0000001D] length prefix ahead of these bytes; that belongs to the SENDER (#530 rule 2), so
+		// WorldIir.Send writes it and the codec does not. Getting the pairing wrong is expensive in one direction: an
+		// unframed record through the verbatim sender made the client read the IIR type as a 234 MB payload length and
+		// drop the connection.
 		[Fact]
 		public void AddToGroupIir_IsByteExact()
 		{
-			Assert.Equal("0000001d0df44b730000c35001317cf8000000dea90051dd9a0000c35001317cf8",
-				Convert.ToHexString(GroupMembershipCodec.BuildAdd(0x01317CF8, 0x0051DD9A, 0x01317CF8)).ToLowerInvariant());
-			Assert.Equal("0000001d0df44b730000c350013184ae000000dea90051dd9a0000c35001317cf8",
-				Convert.ToHexString(GroupMembershipCodec.BuildAdd(0x013184AE, 0x0051DD9A, 0x01317CF8)).ToLowerInvariant());
+			Assert.Equal("0df44b730000c35001317cf8000000dea90051dd9a0000c35001317cf8",
+				Convert.ToHexString(GroupMembershipCodec.Build(new AddToGroupIIR(0x01317CF8, 0x0051DD9A, 0x01317CF8))).ToLowerInvariant());
+			Assert.Equal("0df44b730000c350013184ae000000dea90051dd9a0000c35001317cf8",
+				Convert.ToHexString(GroupMembershipCodec.Build(new AddToGroupIIR(0x013184AE, 0x0051DD9A, 0x01317CF8))).ToLowerInvariant());
 		}
 
 		// f919 - and a leave pushes RemoveFromGroupIIR.
 		[Fact]
 		public void RemoveFromGroupIir_IsByteExact()
 		{
-			Assert.Equal("00000015e4ff0c850000c35001317cf8000000dea90051dd9a", Convert.ToHexString(GroupMembershipCodec.BuildRemove(0x01317CF8, 0x0051DD9A)).ToLowerInvariant());
-			Assert.Equal("00000015e4ff0c850000c350013184ae000000dea90051dd9a", Convert.ToHexString(GroupMembershipCodec.BuildRemove(0x013184AE, 0x0051DD9A)).ToLowerInvariant());
+			Assert.Equal("e4ff0c850000c35001317cf8000000dea90051dd9a", Convert.ToHexString(GroupMembershipCodec.Build(new RemoveFromGroupIIR(0x01317CF8, 0x0051DD9A))).ToLowerInvariant());
+			Assert.Equal("e4ff0c850000c350013184ae000000dea90051dd9a", Convert.ToHexString(GroupMembershipCodec.Build(new RemoveFromGroupIIR(0x013184AE, 0x0051DD9A))).ToLowerInvariant());
 		}
 
 		// f1260 DispatchRequestTrade, f1268 DispatchStartTrade, f1481 DispatchPartnerAcceptedTrade - one shape.

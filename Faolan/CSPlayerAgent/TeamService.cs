@@ -64,10 +64,10 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// The member record, stamped with the member's LIVE playfield from the world listener rather than the
-		// Character.MapId column, which only updates at save points - see TeamMessageCodec.MemberOf.
+		// Character.MapId column, which only updates at save points - see TeamMemberRecord.FromCharacter.
 		private TeamMemberRecord MemberOf(Character character)
 		{
-			return TeamMessageCodec.MemberOf(character, _gameServerDispatcher.GetCharacterLiveState(character.Id)?.MapId ?? character.MapId);
+			return TeamMemberRecord.FromCharacter(character, _gameServerDispatcher.GetCharacterLiveState(character.Id)?.MapId ?? character.MapId);
 		}
 
 		// 0x2009 DeclineTeamInvite: forget the pending invite. Retail puts nothing on the wire for it.
@@ -105,9 +105,9 @@ namespace Faolan.CSPlayerAgent
 
 			_pendingInvites[target.Id] = inviter.Id;
 
-			await Send(inviterClient, CSPlayerInterfaceOpcodes.DispatchYouInvitedToTeam, TeamMessageCodec.BuildMemberOnly(MemberOf(target)));
+			await Send(inviterClient, CSPlayerInterfaceOpcodes.DispatchYouInvitedToTeam, TeamMemberRecordCodec.Build(MemberOf(target)));
 
-			await Push(target.Id, CSPlayerInterfaceOpcodes.DispatchTeamInvite, TeamMessageCodec.BuildInvite(MemberOf(inviter), message));
+			await Push(target.Id, CSPlayerInterfaceOpcodes.DispatchTeamInvite, TeamInviteCodec.Build(MemberOf(inviter), message));
 			_logger.LogInformation("Team: {Inviter} invited {Target}.", inviter.Name, target.Name);
 		}
 
@@ -132,7 +132,7 @@ namespace Faolan.CSPlayerAgent
 			_teamByCharacter[accepterId] = team.Id;
 
 			await BroadcastRoster(team);
-			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchTeamJoin, TeamMessageCodec.BuildTeamMemberEvent(team.Id, MemberOf(accepter)));
+			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchTeamJoin, TeamMemberEventCodec.Build(team.Id, MemberOf(accepter)));
 			await PushMembership(team, accepterId, true);
 			_logger.LogInformation("Team 0x{Team:X8}: {Character} joined ({Count} member(s), leader {Leader}).", team.Id, accepter.Name, team.Members.Count, inviter.Name);
 		}
@@ -160,7 +160,7 @@ namespace Faolan.CSPlayerAgent
 			}
 
 			if (CharacterOf(targetId) is { } target)
-				await Push(targetId, CSPlayerInterfaceOpcodes.DispatchYouGotKickedFromTeam, TeamMessageCodec.BuildMemberOnly(MemberOf(target)));
+				await Push(targetId, CSPlayerInterfaceOpcodes.DispatchYouGotKickedFromTeam, TeamMemberRecordCodec.Build(MemberOf(target)));
 
 			await Remove(targetId, CSPlayerInterfaceOpcodes.DispatchTeamLeave, "was kicked");
 			return true;
@@ -181,7 +181,7 @@ namespace Faolan.CSPlayerAgent
 			{
 				// The leaver is told too - retail sends DispatchTeamLeave to the whole former roster, not just those
 				// remaining, so the leaver's own client closes its team window.
-				var body = TeamMessageCodec.BuildTeamMemberEvent(team.Id, MemberOf(leaver));
+				var body = TeamMemberEventCodec.Build(team.Id, MemberOf(leaver));
 				await Broadcast(team, opcode, body);
 				await Push(characterId, opcode, body);
 			}
@@ -194,7 +194,7 @@ namespace Faolan.CSPlayerAgent
 			{
 				team.LeaderId = team.Members[0];
 				if (CharacterOf(team.LeaderId) is { } newLeader)
-					await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchSetNewTeamLeader, TeamMessageCodec.BuildTeamMemberEvent(team.Id, MemberOf(newLeader)));
+					await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchSetNewTeamLeader, TeamMemberEventCodec.Build(team.Id, MemberOf(newLeader)));
 			}
 
 			_logger.LogInformation("Team 0x{Team:X8}: {Character} {Why} ({Count} member(s) left).", team.Id, leaver?.Name ?? $"0x{characterId:X8}", why, team.Members.Count);
@@ -211,7 +211,7 @@ namespace Faolan.CSPlayerAgent
 				team.Remove(last);
 				_teamByCharacter.TryRemove(last, out _);
 				if (CharacterOf(last) is { } member)
-					await Push(last, CSPlayerInterfaceOpcodes.DispatchTeamLeave, TeamMessageCodec.BuildTeamMemberEvent(team.Id, MemberOf(member)));
+					await Push(last, CSPlayerInterfaceOpcodes.DispatchTeamLeave, TeamMemberEventCodec.Build(team.Id, MemberOf(member)));
 
 				await _gameServerDispatcher.SendGroupMembership(last, last, team.Id, 0, false);
 			}
@@ -228,7 +228,7 @@ namespace Faolan.CSPlayerAgent
 			if (records.Count == 0)
 				return;
 
-			var body = TeamMessageCodec.BuildRoster(team.Id, team.LeaderId, records);
+			var body = TeamRosterCodec.Build(team.Id, team.LeaderId, records);
 			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchYouJoinedTeam, body);
 		}
 

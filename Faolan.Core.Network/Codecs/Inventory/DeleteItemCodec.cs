@@ -1,4 +1,6 @@
+using System;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Inventory
@@ -9,6 +11,9 @@ namespace Faolan.Core.Network.Codecs.Inventory
 	// ProtoDeleteItemIIR = { container_id (ProtoID32), item_pos (int32), template_id (ProtoID32) } - the dropped
 	// slot plus the template that was in it. No s2c reply; the server persists the removal and pushes the live
 	// DispatchRemoveItem itself (the drop has no implicit client-side removal, #230).
+	//
+	// PARSE-ONLY: a c2s message we never emit, so there is no Build. (One would have to re-encode the protobuf
+	// payload, which is not byte-stable across encoders - see the protobuf re-encode oracle, #385.)
 	//
 	// ⚠️ This used to be parsed as ProtoMoveInventoryItemIIR, on the claim that "despite the name it carries the
 	// same body". It does not - and the mistake was invisible because the two messages ALIAS on the wire:
@@ -27,19 +32,31 @@ namespace Faolan.Core.Network.Codecs.Inventory
 	// and fills exactly three fields, while the MoveInventoryItemIIR_t constructor (FUN_008d6090) sets
 	// ProtoMoveInventoryItemIIR::vftable and fills a FOURTH (hasbit | 8). Recovered by
 	// tools/ghidra/DumpDeleteItemIir.java + DumpDeleteItemFns.java -> tools/ghidra/output/delete_item_fns.txt.
-	public static class InventoryDeleteCodec
+	public static class DeleteItemCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.DeleteItemIIR;
 
-		// Parse the [0xC350][charInstance][reserved][protobuf] framing, returning the character instance and the
-		// drop descriptor. `body` must be positioned at the IIR body start (just past the [len][subop] prefix).
-		public static (uint CharInstance, ProtoDeleteItemIIR Delete) Parse(FaolanStream body)
+		public static DeleteItemIIR Parse(in ReadOnlySpan<byte> data)
 		{
-			body.ReadUInt32(); // EntityClass.Character entity-class tag
-			var charInstance = body.ReadUInt32();
-			body.ReadUInt32(); // reserved
-			var delete = body.ReadProtobufByteLength<ProtoDeleteItemIIR>();
-			return (charInstance, delete);
+			var r = new SpanReader(data, nameof(DeleteItemCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+
+			return value;
+		}
+
+		internal static DeleteItemIIR Read(ref SpanReader r)
+		{
+			var entityClass = r.ReadU32Be();
+			var charInstance = r.ReadU32Be();
+			var reserved = r.ReadU32Be();
+
+			return new DeleteItemIIR(entityClass, charInstance, reserved, r.ReadProtobufByteLength<ProtoDeleteItemIIR>());
 		}
 	}
+
+	// EntityClass is EntityClass.Character in every observed frame and Reserved is 0; both are CARRIED rather than
+	// asserted, because the carrier is generic - what class an inbound drop names is the handler's business, not
+	// the reader's.
+	public sealed record DeleteItemIIR(uint EntityClass, uint CharInstance, uint Reserved, ProtoDeleteItemIIR Delete);
 }

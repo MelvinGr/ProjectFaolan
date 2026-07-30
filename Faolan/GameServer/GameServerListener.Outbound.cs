@@ -76,9 +76,9 @@ namespace Faolan.GameServer
 			if (client?.Session.Account == null)
 				return false;
 
-			await WorldIir.SendFramed(client, joined
-				? GroupMembershipCodec.BuildAdd(memberId, teamId, leaderId)
-				: GroupMembershipCodec.BuildRemove(memberId, teamId));
+			await WorldIir.Send(client, GroupMembershipCodec.Build(joined
+				? new AddToGroupIIR(memberId, teamId, leaderId)
+				: new RemoveFromGroupIIR(memberId, teamId)));
 			return true;
 		}
 
@@ -426,13 +426,13 @@ namespace Faolan.GameServer
 			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(GameTimeCodec.Build(dayTimeSeconds, now)));
 		}
 
-		// Frames the GuildUpdateIIR_c (GuildTagBody) on the world conversation: [RpcHeader][DispatchPassBlob]
-		// [u32 len][GuildTagBody]. Sent on login for guilded characters and pushed live by the CsPlayerAgent
-		// guild-accept flow through the dispatcher seam. The body grammar + round-trip live on GuildTagBody.
+		// Frames the GuildUpdateIIR_c (GuildUpdateCodec) on the world conversation: [RpcHeader][DispatchPassBlob]
+		// [u32 len][GuildUpdateIIR]. Sent on login for guilded characters and pushed live by the CsPlayerAgent
+		// guild-accept flow through the dispatcher seam. The body grammar + round-trip live on GuildUpdateCodec.
 		internal static Rpc BuildGuildTag(INetworkClient client, uint characterId, string guildName)
 		{
 			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(x => new GuildTagBody(characterId, guildName).Write(x)));
+				s => s.WriteArrayUInt32Length(GuildUpdateCodec.Build(characterId, guildName)));
 		}
 
 		// 0x5D85BFC7 MapChange = the PlayfieldFIIR: tells the client which playfield/instance the player is entering.

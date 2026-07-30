@@ -631,7 +631,7 @@ namespace Faolan.Core.Enums
 		CoreClaimIIR = 0x06EC1255, // CoreClaimIIR  (x8) - "InventoryClaimsButton"
 		CrimeIIR = 0xC7954504, // CrimeIIR_c  (x3)
 		DamageResultIIR = 0xFEC4158A, // DamageResultIIR_c  (x1134) - combat damage result
-		DeleteItemIIR = 0x72491DE9, // DeleteItemIIR_t - "DropItem"; body = ProtoDeleteItemIIR (NOT the sibling move message - they alias on the wire; see InventoryDeleteCodec)
+		DeleteItemIIR = 0x72491DE9, // DeleteItemIIR_t - "DropItem"; body = ProtoDeleteItemIIR (NOT the sibling move message - they alias on the wire; see DeleteItemCodec)
 		DestructibleFullUpdateIIR = 0x6BD56736, // DestructibleFullUpdateIIR_c  (x189)
 		DoorFullUpdateIIR = 0x33A56FB0, // DoorFullUpdateIIR_c  (x89) - world door/object full update
 		EnergyIIR = 0x40749B8A, // EnergyIIR  (x1039)

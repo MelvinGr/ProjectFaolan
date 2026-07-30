@@ -11,7 +11,7 @@
 //
 // which are INDISTINGUISHABLE on the wire for fields 1-3 and differ only in whether field 4 exists. So parsing a
 // delete as a move "works" (it reads only fields 1-2) while silently misfiling template_id as a destination
-// container. InventoryMoveCodec asserts "despite the name it carries the same ProtoMoveInventoryItemIIR body" -
+// container. MoveInventoryItemCodec asserted "despite the name it carries the same ProtoMoveInventoryItemIIR body" -
 // an unverified claim that the client's own schema argues against.
 //
 //   /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe -noanalysis \

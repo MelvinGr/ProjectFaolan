@@ -10,7 +10,7 @@ namespace Faolan.Tests
 	// The oracle is a retail body carrying THREE characters, which is what made this message worth decoding: the "who"
 	// result reuses TeamMemberRecord verbatim, and three characters at three different levels identified the field the
 	// team captures could not - both of their members were level 5, so the word sat in the codec as a constant.
-	public class CharacterSearchResultTests
+	public class CharacterSearchResultCodecTests
 	{
 		// Hoxxling_mage-heraldofxotli_login: the answer to a CharacterSearch for levels 5..10. Ryuuen (level 8),
 		// Coombos (7) and Revicta (7) - every one inside the requested range, which is the confirmation that the word
@@ -36,7 +36,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Decode_ReadsTheThreeCapturedCharacters()
 		{
-			var result = CharacterSearchResult.Decode(Captured());
+			var result = CharacterSearchResultCodec.Parse(Captured());
 
 			Assert.Equal(3, result.Characters.Count);
 
@@ -57,7 +57,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void EveryReturnedLevel_IsInsideTheRequestedRange()
 		{
-			foreach (var c in CharacterSearchResult.Decode(Captured()).Characters)
+			foreach (var c in CharacterSearchResultCodec.Parse(Captured()).Characters)
 				Assert.InRange(c.Level, 5u, 10u);
 		}
 
@@ -66,7 +66,7 @@ namespace Faolan.Tests
 		{
 			var captured = Captured();
 
-			Assert.Equal(captured, CharacterSearchResult.Decode(captured).Encode());
+			Assert.Equal(captured, CharacterSearchResultCodec.Build(CharacterSearchResultCodec.Parse(captured)));
 		}
 
 		// An empty result still carries the frame AND the trailer - dropping the trailer is the #408 failure mode that
@@ -74,7 +74,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void EmptyResult_KeepsTheFrameAndTheTrailer()
 		{
-			var body = new CharacterSearchResult().Encode();
+			var body = CharacterSearchResultCodec.Build(new CharacterSearchResult([]));
 
 			Assert.Equal(new byte[] { 0x00, 0x00, 0x03, 0xF1, 0x00 }, body);
 		}
@@ -82,22 +82,18 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuiltFromColumns_RoundTrips()
 		{
-			var built = new CharacterSearchResult
-			{
-				Characters =
-				[
-					new TeamMemberRecord
-					{
-						CharacterId = 0x0131FFFF,
-						Name = "Faolan",
-						Class = ConanClass.Necromancer,
-						Level = 42,
-						MapId = 4010
-					}
-				]
-			};
+			var built = new CharacterSearchResult([
+				new TeamMemberRecord
+				{
+					CharacterId = 0x0131FFFF,
+					Name = "Faolan",
+					Class = ConanClass.Necromancer,
+					Level = 42,
+					MapId = 4010
+				}
+			]);
 
-			var round = CharacterSearchResult.Decode(built.Encode());
+			var round = CharacterSearchResultCodec.Parse(CharacterSearchResultCodec.Build(built));
 
 			Assert.Single(round.Characters);
 			Assert.Equal("Faolan", round.Characters[0].Name);

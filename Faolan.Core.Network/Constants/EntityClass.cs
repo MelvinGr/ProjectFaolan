@@ -19,6 +19,7 @@ namespace Faolan.Core.Network.Constants
 		public const uint LootBag = 0x0000C87A; // 51322 - loot bags / containers (F096251E)
 		public const uint Shop = 0x0000C75B; // 50011 - vendor shop containers (the ID32 type a shop's content is addressed by)
 		public const uint SimpleDynel = 0x0000C878; // 51320 - static decor / props (66AEDD50)
+		public const uint Team = 0x0000DEA9; // 57001 - player teams/groups (the ID32 a team is addressed by)
 		public const uint ZoneLabel = 0x0000C748; // 51016 - zone/city label objects (33A56FB0)
 
 		// NOT entity classes, despite sitting numerically nearby - listed so the next reader does not add them:

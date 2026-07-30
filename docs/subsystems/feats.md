@@ -187,7 +187,7 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
   trained feats; the player spawn regenerates the pre-IIR feat list from them (`PlayerSpawnScaffoldRows`).
 - **Train + reset: implemented (2026-07-14).** `GameServerListener.Feats.cs`:
   - **Train** — c2s `FeatIIR` state `0x04` → `Database.AddCharacterFeats` (append, dedup) → s2c `FeatIIR` state
-    `0x05` ack (echoes the list, byte-exact via `FeatIirCodec`).
+    `0x05` ack (echoes the list, byte-exact via `FeatCodec`).
   - **Reset** (untrain-all) — c2s `UntrainFeat` (`0x2041`) → server sends the **confirm dialog**
     `DispatchFeatUntrainMessageBox` (`0x2064`, `FeatUntrainMessageBoxCodec`, byte-exact) → client confirms with
     `FeatUntrainAnswer` (`0x203E`, echoes the dialog's 16-byte payload + a leading `0x01`) → `Database.ClearCharacterFeats`

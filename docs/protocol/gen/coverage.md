@@ -59,13 +59,13 @@ the margins, but never invents a golden that isn't there.
 | V3 | `DestructibleFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `DoorFullUpdateIIR` | `DynelFullUpdateCodec` |
 | V3 | `EnergyIIR` | `CombatPacketCodec` |
-| V3 | `FeatIIR` | `FeatIirCodec` |
+| V3 | `FeatIIR` | `FeatCodec` |
 | V3 | `FeedbackIIR` | `FeedbackIir` |
 | V3 | `FormatFeedbackIIR` | `FormatFeedbackCodec` |
 | V3 | `FullPlayerCharacterIIR` | `FullPlayerCharacterBuilder` |
 | V3 | `GameActionListIIR` | `GameActionListCodec` |
 | V3 | `GameTimeIIR` | `GameTimeCodec` |
-| V3 | `GuildUpdateIIR` | `GuildTagBody` |
+| V3 | `GuildUpdateIIR` | `GuildUpdateCodec` |
 | V3 | `HateListUpdateIIR` | `HateListCodec` |
 | V3 | `IntendedTeleportIIR` | `TeleportCodec` |
 | V3 | `KnubotAnswerIIR` | `KnubotCodec` |
@@ -117,6 +117,6 @@ the margins, but never invents a golden that isn't there.
 | V3 | `TradeskillRequestIIR` | `TradeskillRecipeCodec` |
 | V3 | `UpdateInventoryIIR` | `UpdateInventory` |
 | V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
-| V2 | `DeleteItemIIR` | `InventoryDeleteCodec` |
+| V2 | `DeleteItemIIR` | `DeleteItemCodec` |
 | V2 | `FanaticCommandIir` | `FanaticCommandCodec` |
-| V2 | `MoveInventoryItemIIR` | `InventoryMoveCodec` |
+| V2 | `MoveInventoryItemIIR` | `MoveInventoryItemCodec` |

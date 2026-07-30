@@ -37,13 +37,13 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `DestructibleFullUpdateIIR` | `0x6BD56736` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `DoorFullUpdateIIR` | `0x33A56FB0` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `EnergyIIR` | `0x40749B8A` | `CombatPacketCodec` | [V3: CombatPacketCodecTests.DamageResultBody_MatchesExpectedLayout] |
-| V3 | `FeatIIR` | `0x28DA68A0` | `FeatIirCodec` | [V3: FeatIirCodecTests.Build_MatchesTheCapturedAck] |
+| V3 | `FeatIIR` | `0x28DA68A0` | `FeatCodec` | [V3: FeatCodecTests.Build_MatchesTheCapturedAck] |
 | V3 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackIir` | [V3: V1IirCodecTests.Feedback_RoundTripsCapturedBody] |
 | V3 | `FormatFeedbackIIR` | `0x8D5A8B6B` | `FormatFeedbackCodec` | [V3: FormatFeedbackCodecTests.BuildAreaNameXml_MatchesCapturedBanner] |
 | V3 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `FullPlayerCharacterBuilder` | [V3: FullCharIirRoundTripTests.BuildRoot_FromCapturedFields_ReEncodesByteIdentically] |
 | V3 | `GameActionListIIR` | `0xF508F4C1` | `GameActionListCodec` | [V3: GameActionListCodecTests.Parse_ThenBuild_RoundTripsByteExact] |
 | V3 | `GameTimeIIR` | `0x4F57DC08` | `GameTimeCodec` | [V3: GameTimeCodecTests.Build_AtTheCapturedInstant_MatchesCapturedSnapshot] |
-| V3 | `GuildUpdateIIR` | `0x2550C99A` | `GuildTagBody` | [V3: GuildPacketTests.GuildTagBody_Matches_ExpectedLayout] |
+| V3 | `GuildUpdateIIR` | `0x2550C99A` | `GuildUpdateCodec` | [V3: GuildPacketTests.GuildUpdate_Matches_ExpectedLayout] |
 | V3 | `HateListUpdateIIR` | `0x8A01E5A1` | `HateListCodec` | [V3: CombatRecordCodecTests.HateList_BuildsByteExact] |
 | V3 | `IntendedTeleportIIR` | `0x10D27BC0` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
 | V3 | `KnubotAnswerIIR` | `0x4D7D9123` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
@@ -95,9 +95,9 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `TradeskillRequestIIR` | `0x06B9CD94` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventory` | [V3: V1IirCodecTests.UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf] |
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
-| V2 | `DeleteItemIIR` | `0x72491DE9` | `InventoryDeleteCodec` |  |
+| V2 | `DeleteItemIIR` | `0x72491DE9` | `DeleteItemCodec` |  |
 | V2 | `FanaticCommandIir` | `0xEE4AA85C` | `FanaticCommandCodec` |  |
-| V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `InventoryMoveCodec` |  |
+| V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `MoveInventoryItemCodec` |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see
 [`gaps.md`](../gaps.md)). A V3 row with an empty golden column is byte-exact via a codec whose test the

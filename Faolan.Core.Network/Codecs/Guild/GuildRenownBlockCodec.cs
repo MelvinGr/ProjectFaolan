@@ -11,21 +11,119 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// EXACTLY on the following member record (tools/capture/decode_guild_renown.py --walk, validated against both
 	// 0x203F snapshots in the guild_invite capture); the ONLY byte that differs between snapshots is
 	// RenownCounters[1] (param_1[0x40]), the renown total that ticked. The two embedded count-framed lists use the
-	// shared 0x3F1 invariant (word=(count+1)*0x3F1).
+	// shared 0x3F1 invariant (ListFrame).
 	//
-	// Each field below maps to a CoreGuild_c::Read helper call + the param_1 offset it stores into (FUN_0048f900=
-	// ReadU32, FUN_0048f720=ReadU64, FUN_0048f6d0/FUN_004e0390=ReadByte, FUN_004d4c70=ReadList). Field SEMANTICS
-	// are only partly known: the stat-id list + RenownCounters are proven (RenownCounters[1] is the live renown
-	// total - it is the per-guild value ForRenown splices in); the rest are the captured guild's feat/city/cap
-	// values whose meanings the stripped binary doesn't name, so neutral structural names are kept. Caps like
-	// 0x01C9C380 (30,000,000, Group4[1]) and 0x3A1D51C0 (975,000,000, Counters64D) are constants, NOT renown.
-	public sealed class GuildRenownBlock : ICodec<GuildRenownBlock>
+	// A SUB-RECORD codec: the block is always composed into a larger guild body, so it declares no opcode. Its two
+	// forms differ only in the leading flag and the stat-id list, so they differ in LENGTH too (277 for the full
+	// update, 225 for the create-time form) - which is why Parse reads the lists rather than assuming a size.
+	public static class GuildRenownBlockCodec
 	{
+		// The full-update form's length. The create-time form (an empty stat-id list) is 52 bytes shorter.
 		public const int Length = 277;
 
-		// 0x3F1 list-framing invariant: the first word of a count-framed u32 list is (count+1)*0x3F1.
-		private const uint ListMultiplier = ListFrame.Unit;
+		public static byte[] Build(GuildRenownBlock value)
+		{
+			using var s = new FaolanStream();
+			Write(s, value);
 
+			return s.ToArray();
+		}
+
+		public static GuildRenownBlock Parse(in ReadOnlySpan<byte> data)
+		{
+			var r = new SpanReader(data, nameof(GuildRenownBlockCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+
+			return value;
+		}
+
+		internal static GuildRenownBlock Read(ref SpanReader r)
+		{
+			return new GuildRenownBlock
+			{
+				Flag = r.ReadU8(),
+				StatIds = ReadList(ref r),
+				BoolA = r.ReadU8(),
+				BoolB = r.ReadU8(),
+				Group1 = ReadU32s(ref r, 3),
+				BoolC = r.ReadU8(),
+				BoolD = r.ReadU8(),
+				Group2 = ReadU32s(ref r, 2),
+				List2 = ReadList(ref r),
+				Group3 = ReadU32s(ref r, 6),
+				RenownCounters = ReadU64s(ref r, 6),
+				Group4 = ReadU32s(ref r, 2),
+				Counters64B = ReadU64s(ref r, 8),
+				Counters64C = ReadU64s(ref r, 3),
+				Group5 = r.ReadU32Be(),
+				Counters64D = r.ReadU64Be()
+			};
+		}
+
+		internal static void Write(FaolanStream s, GuildRenownBlock v)
+		{
+			s.WriteByte(v.Flag);
+			WriteList(s, v.StatIds);
+			s.WriteByte(v.BoolA).WriteByte(v.BoolB);
+			foreach (var x in v.Group1)
+				s.WriteUInt32(x);
+			s.WriteByte(v.BoolC).WriteByte(v.BoolD);
+			foreach (var x in v.Group2)
+				s.WriteUInt32(x);
+			WriteList(s, v.List2);
+			foreach (var x in v.Group3)
+				s.WriteUInt32(x);
+			foreach (var x in v.RenownCounters)
+				s.WriteUInt64(x);
+			foreach (var x in v.Group4)
+				s.WriteUInt32(x);
+			foreach (var x in v.Counters64B)
+				s.WriteUInt64(x);
+			foreach (var x in v.Counters64C)
+				s.WriteUInt64(x);
+			s.WriteUInt32(v.Group5).WriteUInt64(v.Counters64D);
+		}
+
+		private static uint[] ReadList(ref SpanReader r)
+		{
+			return ReadU32s(ref r, r.ReadListCount());
+		}
+
+		private static uint[] ReadU32s(ref SpanReader r, int n)
+		{
+			var result = new uint[n];
+			for (var i = 0; i < n; i++)
+				result[i] = r.ReadU32Be();
+
+			return result;
+		}
+
+		private static ulong[] ReadU64s(ref SpanReader r, int n)
+		{
+			var result = new ulong[n];
+			for (var i = 0; i < n; i++)
+				result[i] = r.ReadU64Be();
+
+			return result;
+		}
+
+		private static void WriteList(FaolanStream s, uint[] items)
+		{
+			s.WriteUInt32(ListFrame.ForCount(items.Length));
+			foreach (var v in items)
+				s.WriteUInt32(v);
+		}
+	}
+
+	// Each field maps to a CoreGuild_c::Read helper call + the param_1 offset it stores into (FUN_0048f900=ReadU32,
+	// FUN_0048f720=ReadU64, FUN_0048f6d0/FUN_004e0390=ReadByte, FUN_004d4c70=ReadList). Field SEMANTICS are only
+	// partly known: the stat-id list + RenownCounters are proven (RenownCounters[1] is the live renown total - it is
+	// the per-guild value ForRenown splices in); the rest are the captured guild's feat/city/cap values whose meanings
+	// the stripped binary doesn't name, so neutral structural names are kept. Caps like 0x01C9C380 (30,000,000,
+	// Group4[1]) and 0x3A1D51C0 (975,000,000, Counters64D) are constants, NOT renown.
+	public sealed record GuildRenownBlock
+	{
 		// The 13 guild stat-slot ids (the first 0x3F1 list). Constant across guilds - the structural scaffold a
 		// fresh-guild block reproduces (ascending, the classic AoC stat-id stepping).
 		public static readonly uint[] StatSlotIds = [0x4FFB0, 0x4FFB1, 0x50014, 0x50078, 0x500DC, 0x50140, 0x501A4, 0x50208, 0x50209, 0x5026C, 0x5026D, 0x502D0, 0x50334];
@@ -56,45 +154,8 @@ namespace Faolan.Core.Network.Codecs.Guild
 		// the two captured snapshots, and the value ForRenown sets. Zeroed for a fresh guild.
 		public ulong[] RenownCounters { get; set; } = new ulong[6];
 
-		// ICodec stream Read: the block is a fixed 277 bytes; delegate to the span-based Decode (the zero-copy entry
-		// point used when the block is a sub-region of the 0x203F guild-update body).
-		public static GuildRenownBlock Read(FaolanStream s)
-		{
-			return Decode(s.ReadArray(Length));
-		}
-
-		public void Write(FaolanStream s)
-		{
-			s.WriteByte(Flag);
-			WriteList(s, StatIds);
-			s.WriteByte(BoolA).WriteByte(BoolB);
-			foreach (var v in Group1)
-				s.WriteUInt32(v);
-			s.WriteByte(BoolC).WriteByte(BoolD);
-			foreach (var v in Group2)
-				s.WriteUInt32(v);
-			WriteList(s, List2);
-			foreach (var v in Group3)
-				s.WriteUInt32(v);
-			foreach (var v in RenownCounters)
-				s.WriteUInt64(v);
-			foreach (var v in Group4)
-				s.WriteUInt32(v);
-			foreach (var v in Counters64B)
-				s.WriteUInt64(v);
-			foreach (var v in Counters64C)
-				s.WriteUInt64(v);
-			s.WriteUInt32(Group5).WriteUInt64(Counters64D);
-		}
-
-		// Serializes to the 277-byte wire block (byte-identical to the captured block when round-tripped).
-		public byte[] Encode()
-		{
-			return this.ToArray();
-		}
-
 		// The captured "Sepulchra Invictus" block as structured fields (replaces the old hand-transcribed verbatim
-		// blob, which had dropped 3 bytes -> 274 not 277, misaligning the roster). Encode() reproduces the capture
+		// blob, which had dropped 3 bytes -> 274 not 277, misaligning the roster). Building it reproduces the capture
 		// byte-for-byte (GuildRenownBlockTests). Used as the cosmetic placeholder until a guild's own renown is
 		// wired; the large values (caps 0x01C9C380 / 0x3A1D51C0, the feat/city stats) are this guild's, not generic.
 		public static GuildRenownBlock CapturedPlaceholder()
@@ -112,40 +173,6 @@ namespace Faolan.Core.Network.Codecs.Guild
 				Counters64C = [25111741, 42286280, 26217713],
 				Counters64D = 975000000
 			};
-		}
-
-		// Decodes a 277-byte block. Throws on a malformed 0x3F1 list word or wrong length (the block is fixed-size
-		// for govForm 1; a different govForm would have a different layout/length and is out of scope).
-		public static GuildRenownBlock Decode(ReadOnlySpan<byte> block)
-		{
-			if (block.Length < Length)
-				throw new ArgumentException($"renown block must be {Length} bytes, got {block.Length}");
-
-			var o = 0;
-			var b = new GuildRenownBlock
-			{
-				Flag = block[o++],
-				StatIds = ReadList(block, ref o),
-				BoolA = block[o++],
-				BoolB = block[o++],
-				Group1 = ReadU32s(block, ref o, 3),
-				BoolC = block[o++],
-				BoolD = block[o++],
-				Group2 = ReadU32s(block, ref o, 2),
-				List2 = ReadList(block, ref o),
-				Group3 = ReadU32s(block, ref o, 6),
-				RenownCounters = ReadU64s(block, ref o, 6),
-				Group4 = ReadU32s(block, ref o, 2),
-				Counters64B = ReadU64s(block, ref o, 8),
-				Counters64C = ReadU64s(block, ref o, 3),
-				Group5 = ReadU32(block, ref o),
-				Counters64D = ReadU64(block, ref o)
-			};
-
-			if (o != Length)
-				throw new InvalidOperationException($"renown block decoded {o} bytes, expected {Length}");
-
-			return b;
 		}
 
 		// A brand-new guild's 0x203F full-update block (#335). A fresh guild's full-update IS its create-time (0x2044)
@@ -166,6 +193,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 			b.Flag = 0x01; // full-update form (create writes 0)
 			b.BoolA = 1; // full-update form (create writes 0)
 			b.StatIds = (uint[])StatSlotIds.Clone(); // full-update populates the 13 stat-slot ids (create leaves them empty)
+
 			return b;
 		}
 
@@ -196,53 +224,8 @@ namespace Faolan.Core.Network.Codecs.Guild
 		{
 			var b = ForFreshGuild();
 			b.RenownCounters[1] = renown;
+
 			return b;
-		}
-
-		private static uint[] ReadList(ReadOnlySpan<byte> b, ref int o)
-		{
-			var word = ReadU32(b, ref o);
-			if (word % ListMultiplier != 0)
-				throw new InvalidOperationException($"0x3F1 list word {word:X} not a multiple of {ListMultiplier:X}");
-
-			return ReadU32s(b, ref o, (int)(word / ListMultiplier) - 1);
-		}
-
-		private static uint ReadU32(ReadOnlySpan<byte> b, ref int o)
-		{
-			var v = b.ReadU32Be(o);
-			o += 4;
-			return v;
-		}
-
-		private static uint[] ReadU32s(ReadOnlySpan<byte> b, ref int o, int n)
-		{
-			var r = new uint[n];
-			for (var i = 0; i < n; i++)
-				r[i] = ReadU32(b, ref o);
-			return r;
-		}
-
-		private static ulong ReadU64(ReadOnlySpan<byte> b, ref int o)
-		{
-			var v = b.ReadU64Be(o);
-			o += 8;
-			return v;
-		}
-
-		private static ulong[] ReadU64s(ReadOnlySpan<byte> b, ref int o, int n)
-		{
-			var r = new ulong[n];
-			for (var i = 0; i < n; i++)
-				r[i] = ReadU64(b, ref o);
-			return r;
-		}
-
-		private static void WriteList(FaolanStream s, uint[] items)
-		{
-			s.WriteUInt32((items.Length + 1) * ListMultiplier);
-			foreach (var v in items)
-				s.WriteUInt32(v);
 		}
 	}
 }

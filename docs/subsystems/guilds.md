@@ -63,7 +63,7 @@ At login while guilded, the server pushes `0x203F` immediately after the Authent
 The whole body is the `i_pcGuild` argument deserialized by `CoreGuild_c::Read` (FUN_00565900). NOTE the first
 byte is the **CoreGuild_c streaming version (==3)**, NOT the government form (an earlier note mislabeled it); the
 **government form is the byte after guildId (==1)**, which selects the reader's case 1 → fall-through case 3
-layout. The 277-byte block is now a **typed codec** (`GuildRenownBlock`, byte-exact, `GuildRenownBlockTests`),
+layout. The 277-byte block is now a **typed codec** (`GuildRenownBlockCodec`, byte-exact, `GuildRenownBlockCodecTests`),
 built per-guild from `Guild.Renown` (`GuildRenownBlock.ForRenown`) — no longer a verbatim blob. The full reader
 walk (``GuildPacketTests` --walk`) deserializes the whole arg and lands byte-exact on the next
 member record, proving the field grammar; only `RenownCounters[1]` (param_1[0x40]) varies between snapshots (the
@@ -94,11 +94,11 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
   multiple, so the client aborted `GuildUpdate`, never registered the guild, and re-polled every 30s — THIS was the
   "not in guild after relog" bug. Verified in-client: with the count-word correct the CsPlayerAgent connection stays
   persistent (1 connect, matching retail) instead of the 30s reconnect loop. Shared multiplier: `GuildListMultiplier`
-  / `GuildRankings.ListMultiplier` (= the renown block's `0x3F1` list framing).
+  / `ListFrame.Unit` (= the renown block's `0x3F1` list framing).
 - **Rankings (0x2038):** the global guild-renown leaderboard (the "Guild Renown Rankings" window, tabs
-  Total/Valor/Glory/Artistry) is now CONSTRUCTED from the realm's guilds via `GuildRankings`
-  (`Faolan.Core.Network/Codecs/Guild/GuildRankings.cs`, byte-exact against the capture — `GuildRankingsTests`,
-  decoder `GuildRankingsTests`), no longer a verbatim retail blob. Its body is three nested
+  Total/Valor/Glory/Artistry) is now CONSTRUCTED from the realm's guilds via `GuildRankingsCodec`
+  (`Faolan.Core.Network/Codecs/Guild/GuildRankingsCodec.cs`, byte-exact against the capture —
+  `GuildRankingsCodecTests`), no longer a verbatim retail blob. Its body is three nested
   0x3F1-framed lists: `[guildList][sectionsList (always 4 tabs)][u32 nextUpdateUnix]`, each section
   `[u32 tabIndex][entryList]`. The four renown categories live on the `Guild` table
   (`RenownValor`/`RenownGlory`/`RenownArtistry`, plus `Level`; the Total column is their sum, `RenownTotal`); a guild
@@ -110,7 +110,7 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
   the client targets the class with instance 0, and captures always show a nonzero server instance on replies.
 - **Search / matchmaking requests** (`Faolan/CSPlayerAgent/Packets.cs`): the client's remaining CS-agent requests are
   now all answered so no window is left hanging. `SearchForGuilds` (0x2043 → `0x205C`) is CONSTRUCTED from the realm's
-  guilds via `GuildSearchResult` (byte-exact codec, `GuildSearchResultTests`) — the guild-finder browse list.
+  guilds via `GuildSearchResultCodec` (byte-exact, `GuildSearchResultCodecTests`) — the guild-finder browse list.
   `RequestRenownHistory` (0x2040 → `0x2039`) returns a zeroed 112-byte history (we track no time series). The
   character/team/PvP-matchmaking searches (`0x200A`→`0x2010`, `0x200B`→`0x200F`, `0x2054`→`0x2092`) return well-formed
   empty `0x3F1` lists (retail's own no-result bodies), and `0x2055` gets no reply (retail sends none).
@@ -147,5 +147,5 @@ strings (name/desc/motd), then the renown block = `ReadByte(flag)` + `ReadList`(
 where `[0x40]` is the live renown total) + 2×u32 + 8×u64 + 3×u64 + u32 + u64. ``GuildPacketTests`
 --walk` replays this exact sequence and lands byte-exact on the following member record (helpers: FUN_0048f900
 ReadU32, FUN_0048f720 ReadU64, FUN_0048f6d0/FUN_004e0390 ReadByte, FUN_0048f840 ReadString, FUN_004d4c70
-ReadList). The C# field↔offset map is in `GuildRenownBlock`. The per-guild meaning of the feat/city/cap fields is
+ReadList). The C# field↔offset map is in `GuildRenownBlock`/`GuildRenownBlockCodec`. The per-guild meaning of the feat/city/cap fields is
 not recoverable from the stripped binary (no symbol names; only RenownCounters[1] varies in capture).

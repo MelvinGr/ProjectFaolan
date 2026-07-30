@@ -7,12 +7,12 @@ namespace Faolan.Tests
 {
 	// Locks the 0x2038 DispatchGuildRankingsUpdate codec (the guild-renown leaderboard) byte-exact against the
 	// captured retail packet, and checks the DB builder produces a well-formed body the same decoder round-trips.
-	public class GuildRankingsTests
+	public class GuildRankingsCodecTests
 	{
 		[Fact]
 		public void Decode_ParsesRecordsAndSections()
 		{
-			var r = GuildRankings.Decode(Golden.Bytes("GuildRankings"));
+			var r = GuildRankingsCodec.Parse(Golden.Bytes("GuildRankings"));
 
 			Assert.Equal(48, r.Records.Count);
 			Assert.All(r.Sections, s => Assert.Equal(20, s.Count)); // retail lists the top 20 per tab
@@ -30,7 +30,7 @@ namespace Faolan.Tests
 		public void Decode_ReEncode_IsByteIdentical()
 		{
 			var golden = Golden.Bytes("GuildRankings");
-			Assert.Equal(golden, GuildRankings.Decode(golden).Encode());
+			Assert.Equal(golden, GuildRankingsCodec.Build(GuildRankingsCodec.Parse(golden)));
 		}
 
 		[Fact]
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 			Assert.Equal([(1u, 15ul, 0u)], built.Sections[3].Select(e => (e.Id, e.Renown, e.PrevRank)));
 
 			// The builder's body decodes back to an equal structure.
-			var round = GuildRankings.Decode(built.Encode());
+			var round = GuildRankingsCodec.Parse(GuildRankingsCodec.Build(built));
 			Assert.Equal(built.Records.Select(r => r.Id), round.Records.Select(r => r.Id));
 			Assert.Equal(built.Sections[0].Count, round.Sections[0].Count);
 		}

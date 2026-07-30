@@ -7,7 +7,7 @@
 // Output: $FAOLAN_GHIDRA_OUT/delete_item_fns.txt. The answer:
 //   FUN_008d62f0 "DeleteItemIIR_t"        -> unaff_ESI[7] = ProtoDeleteItemIIR::vftable,        3 fields
 //   FUN_008d6090 "MoveInventoryItemIIR_t" -> unaff_ESI[7] = ProtoMoveInventoryItemIIR::vftable, 4 fields
-// so the drop carries ProtoDeleteItemIIR - see Faolan.Core.Network/Codecs/Inventory/InventoryDeleteCodec.cs.
+// so the drop carries ProtoDeleteItemIIR - see Faolan.Core.Network/Codecs/Inventory/DeleteItemCodec.cs.
 import ghidra.app.decompiler.*;
 import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;

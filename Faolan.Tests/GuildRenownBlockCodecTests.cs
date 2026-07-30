@@ -11,14 +11,14 @@ namespace Faolan.Tests
 	// capture; Golden/GuildRenownBlock.bin is the captured "Sepulchra Invictus" block. The round-trip + the
 	// structured CapturedPlaceholder both reproduce it, which is how the from-DB path replaces the old verbatim
 	// blob (which had been hand-transcribed 3 bytes short -> 274 not 277, misaligning the roster after it).
-	public class GuildRenownBlockTests
+	public class GuildRenownBlockCodecTests
 	{
 		// The structured factory (no captured blob) reproduces the capture byte-for-byte - so GuildService can
 		// emit a constructed block instead of carrying the verbatim (and previously malformed) template.
 		[Fact]
 		public void CapturedPlaceholder_EncodesToTheCapturedBlock()
 		{
-			Assert.Equal(Golden.Bytes("GuildRenownBlock"), GuildRenownBlock.CapturedPlaceholder().Encode());
+			Assert.Equal(Golden.Bytes("GuildRenownBlock"), GuildRenownBlockCodec.Build(GuildRenownBlock.CapturedPlaceholder()));
 		}
 
 		[Fact]
@@ -26,17 +26,13 @@ namespace Faolan.Tests
 		{
 			var golden = Golden.Bytes("GuildRenownBlock");
 
-			var block = GuildRenownBlock.Decode(golden);
-			Assert.Equal(golden, block.Encode());
-
-			// ICodec stream Read/ToArray round-trips too.
-			Assert.Equal(golden, GuildRenownBlock.Read(new FaolanStream(golden)).ToArray());
+			Assert.Equal(golden, GuildRenownBlockCodec.Build(GuildRenownBlockCodec.Parse(golden)));
 		}
 
 		[Fact]
 		public void Decode_RecoversTheKnownScaffold()
 		{
-			var block = GuildRenownBlock.Decode(Golden.Bytes("GuildRenownBlock"));
+			var block = GuildRenownBlockCodec.Parse(Golden.Bytes("GuildRenownBlock"));
 
 			Assert.Equal((byte)0x01, block.Flag);
 			Assert.Equal(GuildRenownBlock.StatSlotIds, block.StatIds);
@@ -70,7 +66,7 @@ namespace Faolan.Tests
 			// ...while the two FORM fields switch to the full-update shape (create writes Flag 0 + an empty stat list).
 			Assert.Equal((byte)0x01, fresh.Flag);
 			Assert.Equal(GuildRenownBlock.StatSlotIds, fresh.StatIds);
-			Assert.Equal(GuildRenownBlock.Length, fresh.Encode().Length); // still 277 bytes -> roster stays aligned
+			Assert.Equal(GuildRenownBlockCodec.Length, GuildRenownBlockCodec.Build(fresh).Length); // still 277 bytes -> roster stays aligned
 		}
 
 		// The create-time block (0x2044 tail) is the same codec, Flag=0 + empty StatIds -> 225 bytes. This reproduces
@@ -81,8 +77,8 @@ namespace Faolan.Tests
 		{
 			var block = GuildRenownBlock.ForGuildCreate();
 
-			Assert.Equal(Golden.Bytes("GuildCreateRenownBlock"), block.Encode());
-			Assert.Equal(225, block.Encode().Length);
+			Assert.Equal(Golden.Bytes("GuildCreateRenownBlock"), GuildRenownBlockCodec.Build(block));
+			Assert.Equal(225, GuildRenownBlockCodec.Build(block).Length);
 			Assert.Equal((byte)0x00, block.Flag);
 			Assert.Empty(block.StatIds);
 		}
@@ -97,14 +93,14 @@ namespace Faolan.Tests
 
 			Assert.Equal(54321ul, block.RenownCounters[1]);
 			Assert.Equal(0ul, block.RenownCounters[0]); // only the total slot is set
-			Assert.Equal(GuildRenownBlock.Length, block.Encode().Length);
+			Assert.Equal(GuildRenownBlockCodec.Length, GuildRenownBlockCodec.Build(block).Length);
 		}
 
 		// A guild with no accumulated renown is byte-identical to the fresh-guild scaffold.
 		[Fact]
 		public void ForRenown_ZeroEqualsFreshGuild()
 		{
-			Assert.Equal(GuildRenownBlock.ForFreshGuild().Encode(), GuildRenownBlock.ForRenown(0).Encode());
+			Assert.Equal(GuildRenownBlockCodec.Build(GuildRenownBlock.ForFreshGuild()), GuildRenownBlockCodec.Build(GuildRenownBlock.ForRenown(0)));
 		}
 	}
 }

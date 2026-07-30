@@ -29,12 +29,12 @@ namespace Faolan.CSPlayerAgent
 	{
 		// The AoC count-framed-list multiplier (ListFrame.Unit): every such list on the wire starts with a u32 word ==
 		// (count+1)*0x3F1 (the client's readers divide by it - 77 such readers in the exe). Shared by the renown
-		// block's stat-lists (GuildRenownBlock), the 0x203F member list, and the 0x2038 rankings lists.
+		// block's stat-lists (GuildRenownBlockCodec), the 0x203F member list, and the 0x2038 rankings lists.
 		internal const uint GuildListMultiplier = ListFrame.Unit;
 
 		// CoreGuild_c::Read (the client deserializer, FUN_00565900) asserts streaming version == 3; the byte after
 		// guildId is the GOVERNMENT FORM, whose value selects the body layout. Form 1 (which falls through into the
-		// form-3 field block in the reader) is the layout GuildRenownBlock encodes, so both are fixed here. The old
+		// form-3 field block in the reader) is the layout GuildRenownBlockCodec encodes, so both are fixed here. The old
 		// code wrote guild.GovernmentForm into the version slot - harmless only because it defaulted to 3, but a
 		// non-3 value would have tripped the client's "streaming version mismatch" assert (#219, docs/subsystems/guilds.md).
 		private const byte CoreGuildStreamVersion = 0x03; // first body byte - CoreGuild_c streaming version (must be 3)
@@ -388,7 +388,7 @@ namespace Faolan.CSPlayerAgent
 				.WriteString(guild.Name)
 				.WriteString(guild.Description ?? "")
 				.WriteString(guild.MessageOfTheDay ?? "")
-				.WriteArray(GuildRenownBlock.ForRenown(guild.Renown).Encode());
+				.WriteArray(GuildRenownBlockCodec.Build(GuildRenownBlock.ForRenown(guild.Renown)));
 
 			WriteGuildMemberRecord(body, self); // i_pcMember: the authenticated member
 
@@ -465,7 +465,7 @@ namespace Faolan.CSPlayerAgent
 				.WriteString(guild.Name)
 				.WriteString(guild.Description ?? "")
 				.WriteString(guild.MessageOfTheDay ?? "")
-				.WriteArray(GuildRenownBlock.ForGuildCreate().Encode());
+				.WriteArray(GuildRenownBlockCodec.Build(GuildRenownBlock.ForGuildCreate()));
 		}
 
 		// 0x202A guild invite: [guild ID32][guildName s16][invitee ID32][inviterName s16]. Shows the client's

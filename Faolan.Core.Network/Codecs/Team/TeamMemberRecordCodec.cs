@@ -1,4 +1,7 @@
+using System;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 
@@ -12,6 +15,74 @@ namespace Faolan.Core.Network.Codecs.Team
 	//
 	//   [u32 0xC350][u32 characterId][u16 len][name LATIN1] then twenty u32 and a u16.
 	//
+	// It is BOTH a sub-record (every other team message composes it) and, on its own, the whole body of two RPC
+	// methods - DispatchYouInvitedToTeam and DispatchYouGotKickedFromTeam send nothing but the member - which is why
+	// it declares HandledOpcodes rather than a single Opcode.
+	public static class TeamMemberRecordCodec
+	{
+		// The two methods whose body is a bare member record.
+		public static readonly CSPlayerInterfaceOpcodes[] HandledOpcodes = [CSPlayerInterfaceOpcodes.DispatchYouInvitedToTeam, CSPlayerInterfaceOpcodes.DispatchYouGotKickedFromTeam];
+
+		// The constants, in wire order. Named by position deliberately: every captured record agrees on them, so a
+		// name would be a guess. Field7Head is the first THREE bytes of what used to be `Field7 = 0x00000162` - its
+		// fourth byte was the PlayfieldProxy version.
+		private const uint Field4 = 0x00000000;
+		private const uint Field5 = 0x00000006;
+		private const uint Field6 = 0x00000000;
+		private static readonly byte[] Field7Head = [0x00, 0x00, 0x01];
+
+		public static byte[] Build(TeamMemberRecord value)
+		{
+			using var s = new FaolanStream();
+			Write(s, value);
+
+			return s.ToArray();
+		}
+
+		public static TeamMemberRecord Parse(in ReadOnlySpan<byte> data)
+		{
+			var r = new SpanReader(data, nameof(TeamMemberRecordCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+
+			return value;
+		}
+
+		internal static TeamMemberRecord Read(ref SpanReader r)
+		{
+			r.ReadU32Be(); // EntityClass.Character
+			var m = new TeamMemberRecord
+			{
+				CharacterId = r.ReadU32Be(),
+				Name = r.ReadStringU16Length(),
+				Class = (ConanClass)r.ReadU32Be()
+			};
+			m.Level = r.ReadU32Be();
+			m.MapId = r.ReadU32Be();
+			m.PerCharacterWord = r.ReadU32Be();
+			r.ReadU32Be(); // Field4
+			r.ReadU32Be(); // Field5
+			r.ReadU32Be(); // Field6
+			r.ReadBytes(Field7Head.Length);
+			m.Playfield = PlayfieldProxy.Read(ref r);
+			m.OpaqueA = r.ReadU32Be();
+			m.OpaqueB = r.ReadU32Be();
+			r.ReadBytes(9); // nine zero bytes
+
+			return m;
+		}
+
+		internal static void Write(FaolanStream s, TeamMemberRecord v)
+		{
+			s.WriteUInt32(EntityClass.Character).WriteUInt32(v.CharacterId).WriteString(v.Name).WriteUInt32((uint)v.Class).WriteUInt32(v.Level).WriteUInt32(v.MapId)
+				.WriteUInt32(v.PerCharacterWord).WriteUInt32(Field4).WriteUInt32(Field5).WriteUInt32(Field6).WriteArray(Field7Head);
+
+			(v.Playfield ?? PlayfieldProxy.ForInstance(v.MapId, TeamMemberRecord.CapturedPlayfieldToken)).Write(s);
+
+			s.WriteUInt32(v.OpaqueA).WriteUInt32(v.OpaqueB).WriteArray(new byte[9]);
+		}
+	}
+
 	// 102 bytes for a 10-character name. The first trailing u32 is the CLASS: the two captured members carry 0x29 and
 	// 0x2C, which are exactly Class.Necromancer and Class.Demonologist, and the chat server's friend-add reply ends
 	// with the same byte for the same character. (Read as a LEVEL at first, because 0x29/0x2C are also plausible levels
@@ -28,8 +99,13 @@ namespace Faolan.Core.Network.Codecs.Team
 	// SAME record for several characters at once, and across the five captured bodies that word reads 5, 7, 8 and 10 -
 	// every value inside the 5..10 range the client's CharacterSearch asked for, and `Nefalis` appears at 7 in one
 	// capture and 8 in a later one. That is a level (#460).
-	public sealed class TeamMemberRecord : ICodec<TeamMemberRecord>
+	public sealed record TeamMemberRecord
 	{
+		// The playfield-instance token both captured members carry. They are two DIFFERENT characters in the same map
+		// (4020) carrying the same value, which is what identifies it as an instance token rather than anything
+		// per-character. Retained as the default so a from-columns member still builds the captured bytes.
+		public const uint CapturedPlayfieldToken = 0x01EDA8B2;
+
 		public uint CharacterId { get; set; }
 		public string Name { get; set; } = "";
 
@@ -73,50 +149,22 @@ namespace Faolan.Core.Network.Codecs.Team
 		public uint OpaqueA { get; set; }
 		public uint OpaqueB { get; set; }
 
-		// The constants, in wire order. Named by position deliberately: every captured record agrees on them, so a
-		// name would be a guess. Field7Head is the first THREE bytes of what used to be `Field7 = 0x00000162` - its
-		// fourth byte was the PlayfieldProxy version.
-		private const uint Field4 = 0x00000000;
-		private const uint Field5 = 0x00000006;
-		private const uint Field6 = 0x00000000;
-		private static readonly byte[] Field7Head = [0x00, 0x00, 0x01];
-
-		// The playfield-instance token both captured members carry. They are two DIFFERENT characters in the same map
-		// (4020) carrying the same value, which is what identifies it as an instance token rather than anything
-		// per-character. Retained as the default so a from-columns member still builds the captured bytes.
-		public const uint CapturedPlayfieldToken = 0x01EDA8B2;
-
-		public static TeamMemberRecord Read(FaolanStream s)
+		// A member record from a character row. The 9-byte per-character opaque is left at ZERO: it is CS-tier state we
+		// cannot derive (see gaps.md), so we send nothing rather than something invented.
+		//
+		// `mapId` is passed in so the caller can use the member's LIVE playfield: Character.MapId is only written at
+		// save points, so it lags a player who has since changed map. The client shows the playfield in the team window
+		// and treats members in another one differently, so it is worth taking from the live world where there is one.
+		public static TeamMemberRecord FromCharacter(Character character, uint mapId)
 		{
-			s.ReadUInt32(); // EntityClass.Character
-			var m = new TeamMemberRecord
+			return new TeamMemberRecord
 			{
-				CharacterId = s.ReadUInt32(),
-				Name = s.ReadString(),
-				Class = (ConanClass)s.ReadUInt32()
+				CharacterId = character.Id,
+				Name = character.Name ?? "", // a nameless character cannot happen post-create, but the wire needs a string
+				Class = character.Class,
+				Level = character.Level,
+				MapId = mapId
 			};
-			m.Level = s.ReadUInt32();
-			m.MapId = s.ReadUInt32();
-			m.PerCharacterWord = s.ReadUInt32();
-			s.ReadUInt32(); // Field4
-			s.ReadUInt32(); // Field5
-			s.ReadUInt32(); // Field6
-			s.ReadArray((uint)Field7Head.Length);
-			m.Playfield = PlayfieldProxy.Read(s);
-			m.OpaqueA = s.ReadUInt32();
-			m.OpaqueB = s.ReadUInt32();
-			s.ReadArray(9); // nine zero bytes
-			return m;
-		}
-
-		public void Write(FaolanStream s)
-		{
-			s.WriteUInt32(EntityClass.Character).WriteUInt32(CharacterId).WriteString(Name).WriteUInt32((uint)Class).WriteUInt32(Level).WriteUInt32(MapId).WriteUInt32(PerCharacterWord).WriteUInt32(Field4)
-				.WriteUInt32(Field5).WriteUInt32(Field6).WriteArray(Field7Head);
-
-			(Playfield ?? PlayfieldProxy.ForInstance(MapId, CapturedPlayfieldToken)).Write(s);
-
-			s.WriteUInt32(OpaqueA).WriteUInt32(OpaqueB).WriteArray(new byte[9]);
 		}
 	}
 }

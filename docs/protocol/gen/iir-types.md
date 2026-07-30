@@ -64,7 +64,7 @@ external doc; the enum + the hash function are the whole source.
 | `0x6C300937` | `TemplateActionIIR_t` ✓ | `TemplateActionIIR` | TemplateActionIIR_t  (x7) |
 | `0x6D314743` | `NewLevelIIR_t` ✓ | `NewLevelIIR` | NewLevelIIR_t - level-up notification (built by NewLevelIirCodec) |
 | `0x70010162` | `LootRemoveItemsIIR_c` ✓ | `LootRemoveItemsIIR` | LootRemoveItemsIIR_c  (x42) |
-| `0x72491DE9` | `DeleteItemIIR_t` ✓ | `DeleteItemIIR` | DeleteItemIIR_t - "DropItem"; body = ProtoDeleteItemIIR (NOT the sibling move message - they alias on the wire; see InventoryDeleteCodec) |
+| `0x72491DE9` | `DeleteItemIIR_t` ✓ | `DeleteItemIIR` | DeleteItemIIR_t - "DropItem"; body = ProtoDeleteItemIIR (NOT the sibling move message - they alias on the wire; see DeleteItemCodec) |
 | `0x737A6DF9` | `FullPlayerCharacterIIR` ✓ | `FullPlayerCharacterIIR` | FullPlayerCharacterIIR  (x33) - the whole player character (inc. inventory); see carve-out below |
 | `0x7446F3FA` | `KnubotFinishTradeIIR_c` ✓ | `KnubotFinishTradeIIR` | KnubotFinishTradeIIR_c  (x2) |
 | `0x79F8C7A1` | `QuestJournalIIR_c` ✓ | `QuestJournalIIR` | QuestJournalIIR_c  (x17) |

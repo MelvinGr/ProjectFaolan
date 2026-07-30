@@ -9,6 +9,7 @@ using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Feats;
 using Faolan.Core.Network.Constants;
@@ -109,17 +110,28 @@ namespace Faolan.GameServer.Feats
 		// the FeatIIR body (from the sub-opcode) is everything after that prefix.
 		public async Task HandleFeatTrain(INetworkClient client, byte[] rawPayload)
 		{
-			if (rawPayload.Length < 4 || !FeatIirCodec.TryParse(rawPayload[4..], out var handle, out var state, out var featIds))
+			FeatIIR request;
+			try
 			{
-				_logger.LogDebug("Unparseable FeatIIR ({Length} bytes).", rawPayload.Length);
+				request = FeatCodec.Parse(rawPayload.AsSpan(4));
+			}
+			catch (CodecParseException e)
+			{
+				// The codec is STRICT (#530 rule 4), so a body we cannot account for throws rather than decoding into
+				// something plausible. Caught HERE because a malformed c2s frame is the peer's problem, not a reason to
+				// tear the session down - but it is logged with the offset the reader stopped at.
+				_logger.LogDebug("Unparseable FeatIIR ({Length} bytes): {Reason}", rawPayload.Length, e.Message);
 				return;
 			}
 
-			if (state != FeatIirCodec.StateTrainRequest)
+			if (request.State != FeatCodec.StateTrainRequest)
 			{
-				_logger.LogDebug("FeatIIR state 0x{State:X2} (not a train request) - ignored.", state);
+				_logger.LogDebug("FeatIIR state 0x{State:X2} (not a train request) - ignored.", request.State);
 				return;
 			}
+
+			var handle = request.CharHandle;
+			var featIds = request.FeatIds;
 
 			var character = client.Session.Character;
 
@@ -134,7 +146,7 @@ namespace Faolan.GameServer.Feats
 			// Ack: echo the requested id list back (state 0x05), byte-for-byte as retail does. The client renders the
 			// trained feats off this; the next spawn regenerates them from the persisted CharacterFeat rows.
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(FeatIirCodec.Build(handle, FeatIirCodec.StateAck, featIds))));
+				b => b.WriteArrayUInt32Length(FeatCodec.Build(handle, FeatCodec.StateAck, featIds))));
 
 			_logger.LogInformation("Character {CharacterId} trained {Added} feat(s) [{Ids}].", character.Id, added, string.Join(",", featIds));
 		}
@@ -145,15 +157,22 @@ namespace Faolan.GameServer.Feats
 		{
 			var character = client.Session.Character;
 
-			var answerBytes = body.ReadRemainingArray();
-			if (!FeatUntrainMessageBoxCodec.TryParseAnswer(answerBytes, out var answer, out var token))
+			FeatUntrainAnswer reply;
+			try
+			{
+				reply = FeatUntrainAnswerCodec.Parse(body.ReadRemainingArray());
+			}
+			catch (CodecParseException e)
+			{
+				_logger.LogDebug("Unparseable FeatUntrainAnswer: {Reason}", e.Message);
 				return;
+			}
 
 			var pending = client.Session.PendingFeatUntrainToken;
 			client.Session.PendingFeatUntrainToken = null;
-			if (answer != FeatUntrainMessageBoxCodec.AnswerConfirm || pending == null || token != pending)
+			if (reply.Answer != FeatUntrainAnswerCodec.AnswerConfirm || pending == null || reply.Echo.Token != pending)
 			{
-				_logger.LogDebug("Feat untrain answer {Answer:X2} (token {Token:X8}, pending {Pending:X8}) - not confirming.", answer, token, pending ?? 0);
+				_logger.LogDebug("Feat untrain answer {Answer:X2} (token {Token:X8}, pending {Pending:X8}) - not confirming.", reply.Answer, reply.Echo.Token, pending ?? 0);
 				return;
 			}
 

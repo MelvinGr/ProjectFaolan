@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Numerics;
 using System.Text;
+using ProtoBuf;
 
 namespace Faolan.Core.Extensions
 {
@@ -195,6 +196,13 @@ namespace Faolan.Core.Extensions
 		public string ReadStringU8Length()
 		{
 			return Encoding.Latin1.GetString(ReadBytesU8Length());
+		}
+
+		// A length-prefixed protobuf message - the read counterpart to FaolanStream.WriteProtobufByteLength. The
+		// prefix is a single BYTE, which is what the Conan carrier messages use around their protobuf payloads.
+		public T ReadProtobufByteLength<T>() where T : IExtensible
+		{
+			return ReadBytesU8Length().FromProtobuf<T>();
 		}
 
 		// A base-128 varint (protobuf LEB128) - the read counterpart to FaolanStream.WriteVarint.

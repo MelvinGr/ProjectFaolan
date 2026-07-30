@@ -48,7 +48,7 @@ namespace Faolan.Tests
 		// fills three fields, while MoveInventoryItemIIR_t installs ProtoMoveInventoryItemIIR::vftable and fills a
 		// fourth (tools/ghidra/DumpDeleteItemFns.java).
 		[Fact]
-		public void InventoryDelete_RoundTrips_FramingAndDescriptor()
+		public void DeleteItem_RoundTrips_FramingAndDescriptor()
 		{
 			var drop = new ProtoDeleteItemIIR
 			{
@@ -66,16 +66,17 @@ namespace Faolan.Tests
 			};
 			var body = new FaolanStream().WriteUInt32(0x0000C350u).WriteUInt32(0xABCDu).WriteUInt32(0u).WriteProtobufByteLength(drop).ToArray();
 
-			var (charInstance, parsed) = InventoryDeleteCodec.Parse(new FaolanStream(body));
+			var value = DeleteItemCodec.Parse(body);
+			var parsed = value.Delete;
 
-			Assert.Equal(0xABCDu, charInstance);
+			Assert.Equal(0xABCDu, value.CharInstance);
 			Assert.Equal(104u, parsed.ContainerId.Type);
 			Assert.Equal(7, parsed.ItemPos);
 			Assert.Equal(3774542u, parsed.TemplateId.Type);
 		}
 
 		[Fact]
-		public void InventoryMove_RoundTrips_FramingAndDescriptor()
+		public void MoveInventoryItem_RoundTrips_FramingAndDescriptor()
 		{
 			// MoveInventoryItemIIR: [u32 0xC350][u32 charInstance][u32 reserved][protobuf ProtoMoveInventoryItemIIR].
 			var move = new ProtoMoveInventoryItemIIR
@@ -95,9 +96,10 @@ namespace Faolan.Tests
 			};
 			var body = new FaolanStream().WriteUInt32(0x0000C350u).WriteUInt32(0xABCDu).WriteUInt32(0u).WriteProtobufByteLength(move).ToArray();
 
-			var (charInstance, parsed) = InventoryMoveCodec.Parse(new FaolanStream(body));
+			var value = MoveInventoryItemCodec.Parse(body);
+			var parsed = value.Move;
 
-			Assert.Equal(0xABCDu, charInstance);
+			Assert.Equal(0xABCDu, value.CharInstance);
 			Assert.Equal(104u, parsed.SourceContainerId.Type);
 			Assert.Equal(5, parsed.SourceItemPos);
 			Assert.Equal(105u, parsed.DestinationContainerId.Type);

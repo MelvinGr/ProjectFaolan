@@ -6,17 +6,14 @@ namespace Faolan.Tests
 {
 	// Locks the 0x205C DispatchGuildSearchResult codec (the guild-finder browse list) byte-exact against the
 	// captured retail packet (50 guilds) and checks a built list round-trips.
-	public class GuildSearchResultTests
+	public class GuildSearchResultCodecTests
 	{
 		[Fact]
 		public void Build_RoundTrips()
 		{
-			var built = new GuildSearchResult
-			{
-				Guilds = [new GuildSearchResult.Entry(1, "Faolan", "NecroL80", 3, 0, 0), new GuildSearchResult.Entry(2, "Second", "Leader", 12, 4500, 1)]
-			};
+			var built = new GuildSearchResult([new GuildSearchEntry(1, "Faolan", "NecroL80", 3, 0, 0), new GuildSearchEntry(2, "Second", "Leader", 12, 4500, 1)]);
 
-			var round = GuildSearchResult.Decode(built.Encode());
+			var round = GuildSearchResultCodec.Parse(GuildSearchResultCodec.Build(built));
 			Assert.Equal(2, round.Guilds.Count);
 			Assert.Equal("Faolan", round.Guilds[0].Name);
 			Assert.Equal("NecroL80", round.Guilds[0].LeaderName);
@@ -26,7 +23,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Decode_ParsesGuildRows()
 		{
-			var r = GuildSearchResult.Decode(Golden.Bytes("GuildSearchResult"));
+			var r = GuildSearchResultCodec.Parse(Golden.Bytes("GuildSearchResult"));
 
 			Assert.Equal(50, r.Guilds.Count);
 			Assert.Equal("Legacy of Crom [Legacy of Deathwhisper]", r.Guilds[0].Name);
@@ -38,7 +35,7 @@ namespace Faolan.Tests
 		public void Decode_ReEncode_IsByteIdentical()
 		{
 			var golden = Golden.Bytes("GuildSearchResult");
-			Assert.Equal(golden, GuildSearchResult.Decode(golden).Encode());
+			Assert.Equal(golden, GuildSearchResultCodec.Build(GuildSearchResultCodec.Parse(golden)));
 		}
 	}
 }

@@ -14,7 +14,7 @@ namespace Faolan.CSPlayerAgent
 	public partial class CsPlayerAgentListener
 	{
 		// 0x2038 DispatchGuildRankingsUpdate: the global guild-renown leaderboard (the "Guild Renown Rankings" window,
-		// tabs Total/Valor/Glory/Artistry). Built from the realm's guilds via GuildRankings (byte-exact codec,
+		// tabs Total/Valor/Glory/Artistry). Built from the realm's guilds via GuildRankingsCodec (byte-exact,
 		// GuildRankingsTests) - no longer the captured retail leaderboard. A guild appears on a tab only once it has
 		// renown in that category, so a fresh server shows an empty board rather than fake guilds.
 		private async Task SendGuildList(INetworkClient client, Rpc packet)
@@ -25,11 +25,11 @@ namespace Faolan.CSPlayerAgent
 			var rankings = GuildRankings.FromGuilds(
 				guilds.Select(g => new GuildRankings.Row(g.Id, g.Name ?? "", g.RenownValor, g.RenownGlory, g.RenownArtistry, (uint)(g.Members?.Count ?? 0), g.Level)));
 
-			await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GuildRankings.Opcode, rankings.Encode()));
+			await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GuildRankingsCodec.Opcode, GuildRankingsCodec.Build(rankings)));
 		}
 
 		// 0x205C DispatchGuildSearchResult: the guild-finder browse list (client requests it with 0x2043
-		// SearchForGuilds). Built from the realm's guilds via GuildSearchResult (byte-exact codec,
+		// SearchForGuilds). Built from the realm's guilds via GuildSearchResultCodec (byte-exact,
 		// GuildSearchResultTests); the leader is the highest-ranked member.
 		//
 		// The 0x2043 criteria are APPLIED (#460). Every captured search sends the wide-open defaults - the browse
@@ -53,15 +53,12 @@ namespace Faolan.CSPlayerAgent
 				Logger.LogDebug("SearchForGuilds members {MinMembers}..{MaxMembers}, level {MinLevel}..{MaxLevel}, name '{Name}': {Matched} of {Total} guilds.", minMembers, maxMembers, minLevel, maxLevel,
 					nameSearch, matches.Count, guilds.Length);
 
-			var result = new GuildSearchResult
-			{
-				Guilds = matches
-					.Select(g => new GuildSearchResult.Entry(g.Id, g.Name ?? "", g.Members?.OrderByDescending(m => m.GuildRank).FirstOrDefault()?.Name ?? "", (ushort)(g.Members?.Count ?? 0),
-						(uint)g.RenownTotal, 0))
-					.ToList()
-			};
+			var result = new GuildSearchResult(matches
+				.Select(g => new GuildSearchEntry(g.Id, g.Name ?? "", g.Members?.OrderByDescending(m => m.GuildRank).FirstOrDefault()?.Name ?? "", (ushort)(g.Members?.Count ?? 0),
+					(uint)g.RenownTotal, 0))
+				.ToList());
 
-			await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GuildSearchResult.Opcode, result.Encode()));
+			await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GuildSearchResultCodec.Opcode, GuildSearchResultCodec.Build(result)));
 		}
 
 		// An inclusive range where 0 means "unbounded" at either end. The search widgets send 0/0 when the player has
@@ -73,7 +70,7 @@ namespace Faolan.CSPlayerAgent
 		}
 
 		// 0x2010 DispatchCharacterSearchResult: the character/"who" search result (answer to 0x200A CharacterSearch),
-		// built by CharacterSearchResult (byte-exact against the captured 3-character body, CharacterSearchResultTests).
+		// built by CharacterSearchResultCodec (byte-exact against the captured 3-character body, CharacterSearchResultTests).
 		//
 		// Answered from the ONLINE players, because this is a /who and not a database browse: an offline character has
 		// no playfield to report and the client greys members by playfield. GetWorldSessions() is the whole population,
@@ -98,15 +95,12 @@ namespace Faolan.CSPlayerAgent
 				.OrderBy(m => m.Character.Name, StringComparer.OrdinalIgnoreCase)
 				.Skip((int)Math.Min(skipResults, int.MaxValue))
 				.Take(MaxCharacterSearchResults)
-				.Select(m => TeamMessageCodec.MemberOf(m.Character, m.MapId))
+				.Select(m => TeamMemberRecord.FromCharacter(m.Character, m.MapId))
 				.ToList();
 
 			Logger.LogDebug("CharacterSearch: {Count} online character(s) matched.", matches.Count);
 
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CharacterSearchResult.Opcode, new CharacterSearchResult
-			{
-				Characters = matches
-			}.Encode()));
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CharacterSearchResultCodec.Opcode, CharacterSearchResultCodec.Build(new CharacterSearchResult(matches))));
 		}
 
 		// One page of "who" results. The client's own request carries i_nSkipResults, so it pages, and the reply method

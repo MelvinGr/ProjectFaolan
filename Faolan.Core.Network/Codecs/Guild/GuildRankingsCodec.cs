@@ -27,44 +27,90 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// doesn't appear on any tab - which is why we no longer replay the captured retail leaderboard). All the framing
 	// words are DERIVED from the counts - a 0x3F1-invalid word (e.g. the old verbatim 0 for an empty list) is exactly
 	// what makes the client abort the dispatch and drop the CsPlayerAgent connection.
-	public sealed class GuildRankings
+	public static class GuildRankingsCodec
 	{
-		// The CSPlayerInterface opcode this body is the payload of (0x2038).
-		public const CSPlayerInterfaceOpcodes Opcode = CSPlayerInterfaceOpcodes.DispatchGuildRankingsUpdate;
-		public const int CategoryCount = 4; // Total(0), Valor(1), Glory(2), Artistry(3)
-		public const int MaxRanked = 20; // retail lists the top 20 guilds per tab
+		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchGuildRankingsUpdate;
 
-		public const uint ListMultiplier = ListFrame.Unit; // count-framed-list word == (count + 1) * 0x3F1
-
-		// Sections[category] = the ranked entries for that tab (index 0..3 == Total/Valor/Glory/Artistry).
-		public List<Ranked>[] Sections { get; set; } = [[], [], [], []];
-		public List<Row> Records { get; set; } = [];
-
-		public uint NextUpdateUnix { get; set; }
-
-		public byte[] Encode()
+		public static byte[] Build(GuildRankings value)
 		{
-			var s = new FaolanStream();
+			using var s = new FaolanStream();
 
-			s.WriteUInt32(ListWord(Records.Count));
-			foreach (var r in Records)
+			s.WriteUInt32(ListFrame.ForCount(value.Records.Count));
+			foreach (var r in value.Records)
 			{
 				s.WriteUInt32(EntityClass.Guild).WriteUInt32(r.Id).WriteString(r.Name);
 				s.WriteUInt64(r.Total).WriteUInt64(r.Valor).WriteUInt64(r.Glory).WriteUInt64(r.Artistry);
 				s.WriteUInt32(r.Members).WriteUInt32(r.Level);
 			}
 
-			s.WriteUInt32(ListWord(CategoryCount));
-			for (var category = 0; category < CategoryCount; category++)
+			s.WriteUInt32(ListFrame.ForCount(GuildRankings.CategoryCount));
+			for (var category = 0; category < GuildRankings.CategoryCount; category++)
 			{
-				s.WriteUInt32(category).WriteUInt32(ListWord(Sections[category].Count));
-				foreach (var e in Sections[category])
+				s.WriteUInt32(category).WriteUInt32(ListFrame.ForCount(value.Sections[category].Count));
+				foreach (var e in value.Sections[category])
 					s.WriteUInt32(EntityClass.Guild).WriteUInt32(e.Id).WriteUInt64(e.Renown).WriteUInt32(e.PrevRank);
 			}
 
-			s.WriteUInt32(NextUpdateUnix);
-			return s.ToArray();
+			return s.WriteUInt32(value.NextUpdateUnix).ToArray();
 		}
+
+		public static GuildRankings Parse(in ReadOnlySpan<byte> data)
+		{
+			var r = new SpanReader(data, nameof(GuildRankingsCodec));
+
+			var recordCount = r.ReadListCount();
+			var records = new List<GuildRankings.Row>(recordCount);
+			for (var i = 0; i < recordCount; i++)
+			{
+				r.ExpectU32Be(EntityClass.Guild, "the guild entity class");
+				var id = r.ReadU32Be();
+				var name = r.ReadStringU16Length();
+				var total = r.ReadU64Be();
+				var valor = r.ReadU64Be();
+				var glory = r.ReadU64Be();
+				var artistry = r.ReadU64Be();
+				var members = r.ReadU32Be();
+				var level = r.ReadU32Be();
+				if (valor + glory + artistry != total)
+					throw new CodecParseException($"{nameof(GuildRankingsCodec)}: guild {id:X} total {total} != valor+glory+artistry {valor + glory + artistry}");
+
+				records.Add(new GuildRankings.Row(id, name, valor, glory, artistry, members, level));
+			}
+
+			var sectionCount = r.ReadListCount();
+			if (sectionCount != GuildRankings.CategoryCount)
+				throw new CodecParseException($"{nameof(GuildRankingsCodec)}: expected {GuildRankings.CategoryCount} ranking sections, got {sectionCount}");
+
+			var sections = new IReadOnlyList<GuildRankings.Ranked>[GuildRankings.CategoryCount];
+			for (var category = 0; category < GuildRankings.CategoryCount; category++)
+			{
+				var index = r.ReadU32Be();
+				if (index != category)
+					throw new CodecParseException($"{nameof(GuildRankingsCodec)}: section {category} carries index {index}");
+
+				var entryCount = r.ReadListCount();
+				var entries = new List<GuildRankings.Ranked>(entryCount);
+				for (var i = 0; i < entryCount; i++)
+				{
+					r.ExpectU32Be(EntityClass.Guild, "the guild entity class");
+					entries.Add(new GuildRankings.Ranked(r.ReadU32Be(), r.ReadU64Be(), r.ReadU32Be()));
+				}
+
+				sections[category] = entries;
+			}
+
+			var nextUpdateUnix = r.ReadU32Be();
+			r.EnsureAtEnd();
+
+			return new GuildRankings(records, sections, nextUpdateUnix);
+		}
+	}
+
+	// Sections[category] = the ranked entries for that tab (index 0..3 == Total/Valor/Glory/Artistry).
+	public sealed record GuildRankings(IReadOnlyList<GuildRankings.Row> Records, IReadOnlyList<GuildRankings.Ranked>[] Sections, uint NextUpdateUnix)
+	{
+		public const int CategoryCount = 4; // Total(0), Valor(1), Glory(2), Artistry(3)
+		public const int MaxRanked = 20; // retail lists the top 20 guilds per tab
 
 		// The renown value a given category ranks by, for a record row.
 		public static ulong CategoryRenown(Row row, int category)
@@ -79,57 +125,6 @@ namespace Faolan.Core.Network.Codecs.Guild
 			};
 		}
 
-		public static GuildRankings Decode(byte[] body)
-		{
-			var s = new FaolanStream(body);
-			var rankings = new GuildRankings();
-
-			var recordCount = ListCount(s.ReadUInt32());
-			for (var i = 0; i < recordCount; i++)
-			{
-				RequireGuildClass(s.ReadUInt32());
-				var id = s.ReadUInt32();
-				var name = s.ReadString();
-				var total = s.ReadUInt64();
-				var valor = s.ReadUInt64();
-				var glory = s.ReadUInt64();
-				var artistry = s.ReadUInt64();
-				var members = s.ReadUInt32();
-				var level = s.ReadUInt32();
-				if (valor + glory + artistry != total)
-					throw new InvalidOperationException($"guild {id:X} total {total} != valor+glory+artistry {valor + glory + artistry}");
-
-				rankings.Records.Add(new Row(id, name, valor, glory, artistry, members, level));
-			}
-
-			var sectionCount = ListCount(s.ReadUInt32());
-			if (sectionCount != CategoryCount)
-				throw new InvalidOperationException($"expected {CategoryCount} ranking sections, got {sectionCount}");
-
-			for (var category = 0; category < CategoryCount; category++)
-			{
-				var index = s.ReadUInt32();
-				if (index != category)
-					throw new InvalidOperationException($"section {category}: unexpected index {index}");
-
-				var entryCount = ListCount(s.ReadUInt32());
-				var entries = new List<Ranked>(entryCount);
-				for (var i = 0; i < entryCount; i++)
-				{
-					RequireGuildClass(s.ReadUInt32());
-					entries.Add(new Ranked(s.ReadUInt32(), s.ReadUInt64(), s.ReadUInt32()));
-				}
-
-				rankings.Sections[category] = entries;
-			}
-
-			rankings.NextUpdateUnix = s.ReadUInt32();
-			if (s.Position != s.Length)
-				throw new InvalidOperationException($"rankings decoded {s.Position} of {s.Length} bytes");
-
-			return rankings;
-		}
-
 		// Builds the rankings from the server's guilds. Records are sorted by total desc; each category section is the
 		// top MaxRanked guilds with renown > 0 in that category (desc, 0-based rank). nextUpdateUnix drives the
 		// window's "NEXT RANKINGS UPDATE" countdown (0 = an already-elapsed timer, which is what a stale retail
@@ -137,15 +132,10 @@ namespace Faolan.Core.Network.Codecs.Guild
 		public static GuildRankings FromGuilds(IEnumerable<Row> guilds, uint nextUpdateUnix = 0)
 		{
 			var rows = guilds.OrderByDescending(g => g.Total).ThenBy(g => g.Id).ToList();
-			var rankings = new GuildRankings
-			{
-				NextUpdateUnix = nextUpdateUnix,
-				Records = rows
-			};
-
+			var sections = new IReadOnlyList<Ranked>[CategoryCount];
 			for (var category = 0; category < CategoryCount; category++)
 			{
-				rankings.Sections[category] = rows
+				sections[category] = rows
 					.Where(r => CategoryRenown(r, category) > 0)
 					.OrderByDescending(r => CategoryRenown(r, category))
 					.ThenBy(r => r.Id)
@@ -154,27 +144,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 					.ToList();
 			}
 
-			return rankings;
-		}
-
-		// The element count encoded in a count-framed-list word (throws if the word isn't a 0x3F1 multiple - the same
-		// check the client's readers make before aborting the dispatch).
-		public static int ListCount(uint word)
-		{
-			return ListFrame.CountOf(word);
-		}
-
-		// The count-framed-list word for a given element count. The framing is protocol-wide, not a guild thing -
-		// these stay as the guild codec's local spelling but delegate, so there is ONE implementation (ListFrame).
-		public static uint ListWord(int count)
-		{
-			return ListFrame.ForCount(count);
-		}
-
-		private static void RequireGuildClass(uint word)
-		{
-			if (word != EntityClass.Guild)
-				throw new InvalidOperationException($"expected guild class {EntityClass.Guild:X8}, got {word:X8}");
+			return new GuildRankings(rows, sections, nextUpdateUnix);
 		}
 
 		// One guild's catalog row. Total is derived (valor + glory + artistry) - the wire carries it explicitly but it

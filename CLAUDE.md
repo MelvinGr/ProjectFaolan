@@ -256,10 +256,14 @@ table. `ICodec<T>` is being retired; do not add implementations of it.
   the test fails on it. This is what makes `grep GameServer0X2000Opcodes.<Type>` find every emitter, and it
   is what `docs/protocol/gen/coverage.md` reads to attribute each type to its builder.
   **One IIR, one codec** — two codecs declaring the same opcode are the same codec and must be merged.
-  **RPC-message codecs** (whole method bodies: `GuildSearchResult`, `MailMessageCodec`, …) do the same against
+  **RPC-message codecs** (whole method bodies: `GuildSearchResultCodec`, `MailMessageCodec`, …) do the same against
   their own interface enum (`(ushort)CSPlayerInterfaceOpcodes.<Method>`) and are named for the client's RPC
-  method. **Sub-record codecs** (`CharacterStatBlock`, `StatList`, `MoveTaskNode`, …) are composed inside a
-  larger body, never sent alone, and so declare nothing — that's expected, not an omission.
+  method. When several METHODS genuinely share one body — `DispatchTeamJoin`/`DispatchTeamLeave`/
+  `DispatchSetNewTeamLeader` are the same layout with the verb in the opcode — declare
+  `public static readonly <Interface>Opcodes[] HandledOpcodes`, the RPC twin of `HandledTypes`; picking one of the
+  three as *the* `Opcode` would be a lie about the other two. **Sub-record codecs** (`CharacterStatBlock`,
+  `StatList`, `MoveTaskNode`, …) are composed inside a larger body, never sent alone, and so declare nothing —
+  that's expected, not an omission.
 - **Wire encode/decode lives in `Codecs/`, nowhere else.** A service, listener or importer that needs a message
   calls its codec; it does not hand-roll the bytes. Concretely: an IIR opcode may only be *named* inside
   `Codecs/` (the listener's dispatch switch aside). The **frame** layer is the exception and stays put —

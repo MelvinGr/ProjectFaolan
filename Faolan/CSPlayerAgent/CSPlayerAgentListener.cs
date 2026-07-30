@@ -123,13 +123,14 @@ namespace Faolan.CSPlayerAgent
 				// an EMPTY message and the flag - which is why only the first 8 read for so long.
 				case CSPlayerAgentOpcodes.TeamInvite:
 				{
-					var targetId = TeamMessageCodec.ParseInviteTarget(body);
-					var inviteMessage = body.ReadString();
-					var checkCriminalStatus = body.ReadByte() != 0;
+					var invite = TeamInviteRequestCodec.Parse(body.ReadRemainingArray());
+					var targetId = invite.Target.Id;
+					var inviteMessage = invite.Message;
+					var checkCriminalStatus = invite.CheckCriminalStatus;
 
 					if (await Database.GetCharacter(targetId) is { } target)
 						// The MESSAGE now rides the s2c push: DispatchTeamInvite's trailing "zero u16" is that string's
-						// empty encoding (#459, see TeamMessageCodec.BuildInvite).
+						// empty encoding (#459, see TeamInviteCodec).
 						await _teams.Invite(client, client.Session.Character, target, inviteMessage);
 					else
 						Logger.LogWarning("TeamInvite for unknown character {TargetId:X8}.", targetId);
@@ -148,7 +149,7 @@ namespace Faolan.CSPlayerAgent
 				// invite rather than the body, so a forged body cannot pull someone into a team they never invited to.
 				case CSPlayerAgentOpcodes.AcceptTeamInvite:
 				{
-					TeamMessageCodec.ParseCharacterId(body); // the inviter, echoed by the client
+					EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)); // the inviter, echoed by the client
 					await _teams.AcceptInvite(client.Session.Character.Id);
 					break;
 				}

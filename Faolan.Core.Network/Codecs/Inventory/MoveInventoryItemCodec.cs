@@ -1,4 +1,6 @@
+using System;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.Inventory
@@ -10,22 +12,34 @@ namespace Faolan.Core.Network.Codecs.Inventory
 	// four fields. No s2c reply; the server persists the slot change and (for a cross-container/bank move) pushes
 	// the relevant add/remove itself. See GameServerListener.Inbound (the MoveInventoryItemIIR case).
 	//
+	// PARSE-ONLY, for the same reason as its sibling: we never emit it.
+	//
 	// The sibling DeleteItemIIR ("DropItem") shares this carrier framing but carries a DIFFERENT payload -
-	// ProtoDeleteItemIIR, three fields - and has its own InventoryDeleteCodec. It used to be parsed here as a move;
+	// ProtoDeleteItemIIR, three fields - and has its own DeleteItemCodec. It used to be parsed here as a move;
 	// see that codec for why the two alias on the wire and how the client settled it.
-	public static class InventoryMoveCodec
+	public static class MoveInventoryItemCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.MoveInventoryItemIIR;
 
-		// Parse the [0xC350][charInstance][reserved][protobuf] framing, returning the character instance and the move
-		// descriptor. `body` must be positioned at the IIR body start (just past the [len][subop] carrier prefix).
-		public static (uint CharInstance, ProtoMoveInventoryItemIIR Move) Parse(FaolanStream body)
+		public static MoveInventoryItemIIR Parse(in ReadOnlySpan<byte> data)
 		{
-			body.ReadUInt32(); // EntityClass.Character entity-class tag
-			var charInstance = body.ReadUInt32();
-			body.ReadUInt32(); // reserved
-			var move = body.ReadProtobufByteLength<ProtoMoveInventoryItemIIR>();
-			return (charInstance, move);
+			var r = new SpanReader(data, nameof(MoveInventoryItemCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+
+			return value;
+		}
+
+		internal static MoveInventoryItemIIR Read(ref SpanReader r)
+		{
+			var entityClass = r.ReadU32Be();
+			var charInstance = r.ReadU32Be();
+			var reserved = r.ReadU32Be();
+
+			return new MoveInventoryItemIIR(entityClass, charInstance, reserved, r.ReadProtobufByteLength<ProtoMoveInventoryItemIIR>());
 		}
 	}
+
+	// EntityClass / Reserved are carried, not asserted - see DeleteItemIIR.
+	public sealed record MoveInventoryItemIIR(uint EntityClass, uint CharInstance, uint Reserved, ProtoMoveInventoryItemIIR Move);
 }

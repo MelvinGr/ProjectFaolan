@@ -1,3 +1,5 @@
+using Faolan.Core.Extensions;
+
 namespace Faolan.Core.Network.Codecs.World
 {
 	// The PlayfieldProxy stream (client `FUN_00a6a600`): `[u8 version 'b'][u32 x8][u8 bool]` - a reference to a
@@ -73,6 +75,23 @@ namespace Faolan.Core.Network.Codecs.World
 		public const uint Ready = 0x00000001;
 
 		public const byte Version = 0x62; // 'b'
+
+		// The SpanReader twin of Read(FaolanStream), for codecs already converted to the uniform surface (#530). The
+		// stream form goes away when this file's own wave lands; until then both read the same ten slots.
+		internal static PlayfieldProxy Read(ref SpanReader r)
+		{
+			r.ReadU8(); // version 'b'
+			var classWord = r.ReadU32Be();
+			var mapId = r.ReadU32Be();
+			var ownerType = r.ReadU32Be(); // [2] - the owner's ID32 type, see the slot notes
+			var ownerId = r.ReadU32Be(); // [3] - the owner's ID32 instance
+			r.ReadU32Be(); // [4] - 0 in every capture
+			var slot5 = r.ReadU32Be();
+			var instanceWord = r.ReadU32Be();
+			var token = r.ReadU32Be();
+
+			return new PlayfieldProxy(mapId, classWord, ownerId, slot5, instanceWord, token, r.ReadU8() != 0, ownerType);
+		}
 
 		public static PlayfieldProxy Read(FaolanStream s)
 		{

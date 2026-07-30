@@ -79,7 +79,7 @@ CASE = re.compile(r"case\s+([A-Za-z0-9_]+Opcodes)\.([A-Za-z0-9_]+)\s*:")
 READ = re.compile(r"\b(?:body|reader|stream|s)\.(Read[A-Za-z0-9]*)\s*[(<]")
 WHOLE_BODY = re.compile(r"\bbody\.(ToArray|GetBuffer|Remaining)\b")
 # Every `name(` on a line that mentions `body`. Deliberately not one-regex-per-call: calls NEST
-# (`_trade.Start(id, TeamMessageCodec.ParseCharacterId(body))`) and a single non-overlapping match would
+# (`_trade.Start(id, EntityIdCodec.Parse(...).Id)`) and a single non-overlapping match would
 # swallow the inner one - which is exactly the codec helper that does the reading.
 CALL = re.compile(r"\b([A-Za-z0-9_]+)\s*(?:<[^>]*>)?\s*\(")
 MENTIONS_BODY = re.compile(r"\bbody\b")

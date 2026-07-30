@@ -16,10 +16,14 @@ namespace Faolan.Tests
 	// this file pins the SHAPE: every codec is `byte[] Build(...)` + `T Parse(in ReadOnlySpan<byte>)` and nothing
 	// else public, reading sequentially through SpanReader to the end of the body.
 	//
-	// ⚠️ EVERY TEST HERE IS SKIPPED, deliberately, and each Skip names the wave that un-skips it. The conversion runs
-	// folder by folder; a gate that went live in wave 0 would be red for the whole sweep and would just get muted.
-	// The bodies are written NOW so that un-skipping is a one-line change and so the rule has an executable
-	// definition rather than only prose. Removing a Skip is part of landing that wave - not a separate cleanup.
+	// ⚠️ Most tests here are still SKIPPED, deliberately, and each Skip names the wave that un-skips it. The conversion
+	// runs folder by folder; a gate that went live in wave 0 would be red for the whole sweep and would just get muted.
+	// The bodies are written so that un-skipping is a one-line change and so the rule has an executable definition
+	// rather than only prose. Removing a Skip is part of landing that wave - not a separate cleanup.
+	//
+	// The LIVE gates assert over `MigratedFolders` only, which is what lets them go live a wave at a time: the gate
+	// tightens as the sweep advances instead of waiting for the end, when nothing would be left to catch. Wave 9 drops
+	// the filter.
 	//
 	// Wave order (see #530): 1 Inventory/Feats/Team/Guild · 2 Text/Dialogue/Economy · 3 World · 4 Combat ·
 	// 5 Spawn/Quest · 6 FullCharSnapshot (+#447) · 7 Faolan/ moves in · 8 Faolan.Importer/ stops hand-decoding ·
@@ -28,18 +32,25 @@ namespace Faolan.Tests
 	{
 		private const string CodecsNamespace = "Faolan.Core.Network.Codecs";
 
+		// The folders converted to the uniform surface so far. ADD A FOLDER AS ITS WAVE LANDS - that is what makes the
+		// gates below binding on it, and leaving it out is how a converted folder silently stops being checked.
+		private static readonly string[] MigratedFolders = ["Inventory", "Feats", "Team", "Guild"];
+
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 		private static readonly Regex ConstOffset = new(@"\bconst\s+int\s+\w*(Offset|Pos)\b");
 		private static readonly Regex LineComment = new(@"//.*$", RegexOptions.Multiline);
 		private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\]|\\\\.)*\"");
 
-		// A `new FaolanStream()` that is not introduced by `using` - the leak rule 6 exists for.
-		private static readonly Regex UndisposedStream = new(@"(?<!using\s)(?<!using\s\w{0,20}\s?=\s?)new FaolanStream\(");
+		// A `new FaolanStream()` that is not introduced by `using` - the leak rule 6 exists for. The lookbehind is
+		// VARIABLE-LENGTH (a .NET regex extension) because the declaration between `using` and the `new` is:
+		// `using var s = `, `using (var s = `, `using FaolanStream s = ` - a fixed-width lookbehind matched none of
+		// them and flagged every correct call site.
+		private static readonly Regex UndisposedStream = new(@"(?<!\busing\b[^;]{0,60})new FaolanStream\(");
 
 		// Anchored on Endpoints (Faolan.Core.Network/Constants) rather than on a codec: codec names are being
 		// rewritten by this very refactor, and ListFrame - the obvious anchor - lives in Faolan.Core now.
 		private static IEnumerable<Type> CodecTypes => typeof(Endpoints).Assembly.GetTypes()
-			.Where(t => t.Namespace != null && t.Namespace.StartsWith(CodecsNamespace, StringComparison.Ordinal));
+			.Where(t => t.Namespace != null && MigratedFolders.Any(f => t.Namespace == $"{CodecsNamespace}.{f}"));
 
 		// A codec MODULE: the static classes that carry Build/Parse. Value records are not modules.
 		private static IEnumerable<Type> CodecModules => CodecTypes
@@ -48,7 +59,7 @@ namespace Faolan.Tests
 
 		// ---- rule 1: the public surface -------------------------------------------------------------------
 
-		[Fact(Skip = "un-skip per wave; live from wave 9")]
+		[Fact]
 		public void PublicSurfaceIsBuildAndParseOnly()
 		{
 			var offenders = (from t in CodecModules
@@ -61,7 +72,7 @@ namespace Faolan.Tests
 				string.Join("\n  ", offenders));
 		}
 
-		[Fact(Skip = "un-skip per wave; live from wave 9")]
+		[Fact]
 		public void BuildReturnsBytes()
 		{
 			var offenders = (from t in CodecModules
@@ -72,7 +83,7 @@ namespace Faolan.Tests
 			Assert.True(offenders.Count == 0, "Build must return byte[]:\n  " + string.Join("\n  ", offenders));
 		}
 
-		[Fact(Skip = "un-skip per wave; live from wave 9")]
+		[Fact]
 		public void ParseTakesASpanAndReturnsAValue()
 		{
 			var offenders = new List<string>();
@@ -94,7 +105,7 @@ namespace Faolan.Tests
 			Assert.True(offenders.Count == 0, "Parse signature:\n  " + string.Join("\n  ", offenders));
 		}
 
-		[Fact(Skip = "un-skip per wave; live from wave 9")]
+		[Fact]
 		public void ParseIsNotOverloaded()
 		{
 			var offenders = CodecModules
@@ -106,7 +117,7 @@ namespace Faolan.Tests
 				"exactly one Parse per codec - overloaded readers are how `which one decodes this body?` ambiguity gets in:\n  " + string.Join("\n  ", offenders));
 		}
 
-		[Fact(Skip = "un-skip per wave; live from wave 9")]
+		[Fact]
 		public void EveryCodecHasABuildTakingItsParseResult()
 		{
 			var offenders = new List<string>();
@@ -130,25 +141,35 @@ namespace Faolan.Tests
 		}
 
 		// The delegation constraint: overloads are free BECAUSE only one of them encodes. A non-canonical Build must
-		// be a single `=> Build(...)` expression, not a second encoder that can drift from the first.
-		[Fact(Skip = "un-skip per wave; live from wave 9")]
+		// delegate, not be a second encoder that can drift from the first.
+		//
+		// Which overload is canonical comes from REFLECTION, not from the parameter's spelling: it is the one whose
+		// single parameter is exactly what Parse returns. An earlier draft matched the type name against `*IIR`, which
+		// silently exempted every codec whose value is an RPC message or a sub-record rather than an IIR - i.e. more
+		// than half of them.
+		[Fact]
 		public void OnlyTheCanonicalBuildWritesBytes()
 		{
+			var canonical = CodecModules
+				.Select(t => (t.Name, Parse: Methods(t).SingleOrDefault(m => m.Name == "Parse")))
+				.Where(x => x.Parse != null)
+				.ToDictionary(x => x.Name, x => x.Parse!.ReturnType.Name, StringComparer.Ordinal);
+
 			var offenders = new List<string>();
 			foreach (var file in CodecSourceFiles())
 			{
 				var src = Strip(File.ReadAllText(file));
+				var valueType = canonical.GetValueOrDefault(Path.GetFileNameWithoutExtension(file));
+
 				foreach (Match m in Regex.Matches(src, @"public static byte\[\] Build\s*\(([^)]*)\)\s*(=>|\{)", RegexOptions.Singleline))
 				{
-					// The canonical overload takes exactly one parameter whose type ends in IIR (or is the codec's
-					// value record) - it is allowed to encode. Everything else must delegate.
 					var parameters = m.Groups[1].Value;
-					if (parameters.Split(',').Length == 1 && Regex.IsMatch(parameters, @"\b\w*(IIR|Iir)\b"))
-						continue;
+					if (valueType != null && parameters.Split(',').Length == 1 && Regex.IsMatch(parameters, $@"\b{Regex.Escape(valueType)}\b"))
+						continue; // the canonical overload - the one method allowed to write bytes
 
-					var body = m.Groups[2].Value == "=>" ? src[m.Index..Math.Min(src.Length, m.Index + m.Length + 200)] : BodyOf(src, m.Index + m.Length - 1);
+					var body = m.Groups[2].Value == "=>" ? ExpressionBodyOf(src, m.Index + m.Length) : BodyOf(src, m.Index + m.Length - 1);
 					if (body.Contains("new FaolanStream", StringComparison.Ordinal) || Regex.IsMatch(body, @"\.Write[A-Z]\w*\("))
-						offenders.Add($"{Path.GetFileName(file)}: Build({parameters.Trim()}) encodes instead of delegating to Build(T)");
+						offenders.Add($"{Path.GetFileName(file)}: Build({parameters.Trim()}) encodes instead of delegating to Build({valueType ?? "T"})");
 				}
 			}
 
@@ -157,7 +178,9 @@ namespace Faolan.Tests
 
 		// ---- rule 3: sequential reading -------------------------------------------------------------------
 
-		[Fact(Skip = "un-skip per wave; live from wave 9 (SpawnPacketBuilder's 12 patch offsets need the captured template retired first - see #530 §7)")]
+		// ⚠️ Scoped to MigratedFolders like the rest. SpawnPacketBuilder's 12 patch offsets are the last holdouts and
+		// need the captured template retired first (#530 §7), so Spawn only joins once that is done.
+		[Fact]
 		public void NoConstOffsetsInCodecs()
 		{
 			var offenders = (from file in CodecSourceFiles()
@@ -173,11 +196,13 @@ namespace Faolan.Tests
 
 		// ---- rule 6: stream disposal ----------------------------------------------------------------------
 
-		[Fact(Skip = "un-skip per wave; live from wave 9")]
+		// Scoped to the migrated codec folders for now. It WIDENS to all of Faolan.Core.Network + Faolan/ +
+		// Faolan.Importer/ in wave 8, once those assemblies stop hand-rolling wire code - a resource rule has to cover
+		// everywhere the stream is constructed, but it cannot go live over code the sweep has not reached.
+		[Fact]
 		public void FaolanStreamsAreDisposed()
 		{
-			string[] roots = [TestPaths.Repo("Faolan.Core.Network"), TestPaths.Repo("Faolan"), TestPaths.Repo("Faolan.Importer")];
-			var offenders = (from file in SourceFiles(roots)
+			var offenders = (from file in CodecSourceFiles()
 				let lines = File.ReadAllLines(file)
 				from i in Enumerable.Range(0, lines.Length)
 				let code = Strip(lines[i])
@@ -191,7 +216,7 @@ namespace Faolan.Tests
 
 		// ---- rule 5: identity and naming -------------------------------------------------------------------
 
-		[Fact(Skip = "un-skip in wave 6 - 39 renames land per folder (see the table in #530 §3)")]
+		[Fact]
 		public void SingleOpcodeCodecIsNamedForItsIir()
 		{
 			var offenders = new List<string>();
@@ -205,7 +230,9 @@ namespace Faolan.Tests
 			Assert.True(offenders.Count == 0, "a codec is named for the IIR it emits:\n  " + string.Join("\n  ", offenders));
 		}
 
-		[Fact(Skip = "un-skip in wave 6 - today 11 IIRs have >1 emitter; this is the MERGE gate (see #530 §3)")]
+		// The MERGE gate. Scoped, so it only sees duplicates INSIDE the migrated set until wave 9 drops the filter -
+		// the 11 cross-folder duplicate emitters (#530 §3) collapse in waves 3-4.
+		[Fact]
 		public void EachIirHasExactlyOneCodec()
 		{
 			var byOpcode = new Dictionary<GameServer0X2000Opcodes, List<string>>();
@@ -218,7 +245,7 @@ namespace Faolan.Tests
 			Assert.True(dupes.Count == 0, "one IIR, one codec - two codecs declaring the same opcode ARE the same codec and must be merged:\n  " + string.Join("\n  ", dupes));
 		}
 
-		[Fact(Skip = "un-skip per wave; live from wave 9")]
+		[Fact]
 		public void ParseResultIsNamedForItsIir()
 		{
 			var offenders = new List<string>();
@@ -235,7 +262,7 @@ namespace Faolan.Tests
 			Assert.True(offenders.Count == 0, "the wire value is named for the client IIR:\n  " + string.Join("\n  ", offenders));
 		}
 
-		[Fact(Skip = "un-skip in wave 2 - only 4 of the ~14 RPC-message codecs declare their method today")]
+		[Fact(Skip = "un-skip in wave 7 - GuildRenownBlockCodec is a SUB-record whose parent body is still hand-built in GuildService, so it reads as standalone until that moves into Codecs/")]
 		public void RpcMessageCodecsDeclareTheirMethodOpcode()
 		{
 			// A codec with a standalone body but no IIR opcode is an RPC-message codec: it must declare its method
@@ -356,9 +383,18 @@ namespace Faolan.Tests
 			return src[braceIndex..];
 		}
 
+		// An expression-bodied member's body: from `=>` to its terminating `;`. Taking a fixed window instead reads
+		// into the NEXT member, which is how a `=> Build(...)` delegation gets flagged for the `s.WriteUInt32` in the
+		// method below it.
+		private static string ExpressionBodyOf(string src, int arrowEnd)
+		{
+			var end = src.IndexOf(';', arrowEnd);
+			return end < 0 ? src[arrowEnd..] : src[arrowEnd..end];
+		}
+
 		private static IEnumerable<string> CodecSourceFiles()
 		{
-			return SourceFiles([TestPaths.Repo("Faolan.Core.Network", "Codecs")]);
+			return SourceFiles(MigratedFolders.Select(f => TestPaths.Repo("Faolan.Core.Network", "Codecs", f)));
 		}
 
 		private static IEnumerable<GameServer0X2000Opcodes> DeclaredOpcodes(Type t)
