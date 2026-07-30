@@ -68,7 +68,10 @@
 					<div class="se-fields">
 						<label>Id<input value="@_spell.Id" disabled/></label>
 						<label>Name<input @bind="_spell.Name"/></label>
-						<label title="RDB field 123">Level<input class="n" @bind="_spell.Level"/></label>
+						<label>Level<input class="n" @bind="_spell.Level"/></label>
+						<label title="RDB field 123, carried RAW. The rank for MOST spells but not all: measured over the 883 spells whose name also carries a &quot;(Rank N)&quot; suffix, 669 agree and 214 are a clean rank × 10. The scale differs by spell FAMILY, so do not read this as a rank without checking.">
+							Rank (raw)<input class="n" @bind="_spell.Rank"/>
+						</label>
 						<label title="milliseconds — RDB field 0x126 × 10">Cast time (ms)<input class="n" @bind="_spell.CastTime"/></label>
 						<label title="SECONDS, not ms — matches the source that carries it">Cooldown (s)<input class="n" @bind="_spell.Cooldown"/></label>
 						<label>Mana cost<input class="n" @bind="_spell.ManaCost"/></label>
@@ -79,8 +82,19 @@
 						</label>
 						<label title="per-tick HealthCurrent delta while the debuff is active; negative = a bleed">DoT delta<input class="n" @bind="_spell.DotDelta"/></label>
 						<label title="the +45 damage-school flag carried into the rebuilt StatDamageIIR">DoT type<input class="n" @bind="_spell.DotType"/></label>
+						<label title="gap between DoT ticks, measured from captured StatDamageIIR records (500 ms … 11 s). 0 = unmeasured, and the world tick falls back to the old 2 s constant — which is right for the Incinerate family and wrong everywhere else.">
+							DoT interval (ms)<input class="n" @bind="_spell.DotIntervalMs"/>
+						</label>
 						<label>Effect spell<input class="n" @bind="_spell.EffectSpell"/></label>
 					</div>
+
+					@if (_spell.DotDelta != 0 && _spell.DotIntervalMs == 0)
+					{
+						<p class="chainhint warnhint">
+							This spell is a DoT (<b>DoT delta @_spell.DotDelta</b>) with <b>no measured tick interval</b>, so the world
+							tick runs it at the fallback 2 s. That is right for the Incinerate family and wrong for most others.
+						</p>
+					}
 
 					@if (_spell.DurationMs == 0 && StatEffectCount(_spell.Id) > 0)
 					{

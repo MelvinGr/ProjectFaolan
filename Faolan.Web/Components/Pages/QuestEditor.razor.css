@@ -219,6 +219,77 @@
 	margin-top: 1rem;
 }
 
+/* the column-group header row: says which fields are OURS to set and which are the client's */
+.qe-goals tr.grp th {
+	border-bottom: 0;
+	color: var(--muted);
+	font-size: .68rem;
+	letter-spacing: .04em;
+	padding-bottom: .1rem;
+	text-align: left;
+	text-transform: uppercase;
+}
+
+.qe-goals tr.grp th:not(:empty) { border-left: 1px solid var(--line); }
+
+/* a read-only cell is dimmed rather than merely un-editable, so it reads as captured data at a glance */
+.qe-goals td.ro {
+	color: var(--muted);
+	opacity: .82;
+	white-space: nowrap;
+}
+
+.qe-goals td.kind { font-variant: small-caps; }
+
+.qe-goals td.region { max-width: 10rem; overflow: hidden; text-overflow: ellipsis; }
+
+.qe-fx-head {
+	align-items: center;
+	display: flex;
+	gap: 1rem;
+	margin: 1.4rem 0 .4rem;
+}
+
+.qe-fx-head h2 {
+	font-size: 1.1rem;
+	margin: 0;
+}
+
+.qe-fx-head .ro {
+	color: var(--muted);
+	font-size: .72rem;
+	font-weight: 400;
+	margin-left: .4rem;
+}
+
+.qe-goals.convos { opacity: .9; }
+
+.qe-goals .badge {
+	border-radius: 3px;
+	font-size: .68rem;
+	margin-right: .3rem;
+	padding: 0 .3rem;
+	white-space: nowrap;
+}
+
+.qe-goals .badge.grant {
+	background: #1d3320;
+	color: #7fc48c;
+}
+
+.qe-goals .badge.gate {
+	background: #3a2d15;
+	color: var(--gold);
+}
+
+.qe-goals td.empty {
+	color: var(--muted);
+	font-style: italic;
+	text-align: center;
+}
+
+.hint a { color: var(--gold); }
+
 @media (max-width: 900px) {
 	.qe-grid { grid-template-columns: 1fr; }
 }

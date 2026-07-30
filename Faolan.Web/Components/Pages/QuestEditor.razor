@@ -72,6 +72,14 @@
 					<div class="tablewrap">
 						<table class="qe-goals">
 							<thead>
+							<tr class="grp">
+								<th colspan="2"></th>
+								<th colspan="4">Server trigger</th>
+								<th colspan="1" class="ro">Client</th>
+								<th colspan="5">World</th>
+								<th colspan="3">Precondition</th>
+								<th></th>
+							</tr>
 							<tr>
 								<th title="objective order">Seq</th>
 								<th title="goal id (wire)">GoalId</th>
@@ -79,10 +87,15 @@
 								<th title="Kill/Loot/Talk/Escort target NPC name">TargetName</th>
 								<th title="Kill: NPC template id · Collect: item id (the STABLE match key)">TrailingRefId</th>
 								<th title="how many (⚠ in the byte-exact objective region)">Req</th>
+								<th title="the client's own kind tag for this goal (the wire `Separator` word) — read-only: it is captured data, and it is the evidence Type should follow">Kind</th>
 								<th title="ReachArea/marker map">MapId</th>
 								<th title="ReachArea trigger / marker X (world)">MarkerX</th>
 								<th title="ReachArea trigger / marker Y (world)">MarkerY</th>
+								<th title="the client's trigger VOLUME for this goal — a real region, unlike the marker, which is only a map pin">Region</th>
 								<th title="granted quest item id">ItemId</th>
+								<th title="minimum character level the objective text states">Lvl</th>
+								<th title="faction title the objective text names (verbatim — the faction system does not exist yet)">Rank title</th>
+								<th title="the rank number that goes with the title">Rank</th>
 								<th></th>
 							</tr>
 							</thead>
@@ -113,6 +126,7 @@
 									<td>
 										<input class="n" @bind="g.RequiredCount"/>
 									</td>
+									<td class="ro kind">@KindLabel(g.Separator)</td>
 									<td>
 										<input class="n" @bind="g.MapId" placeholder="—"/>
 									</td>
@@ -122,8 +136,27 @@
 									<td>
 										<input class="n" @bind="g.MarkerY" placeholder="—"/>
 									</td>
+									<td class="ro region">
+										@if (RegionName(g.RegionId) is { } rn)
+										{
+											<span title="region @g.RegionId">@rn</span>
+										}
+										else
+										{
+											<span class="muted" title="no bounded-area reference — this goal falls back to the marker-radius test">—</span>
+										}
+									</td>
 									<td>
 										<input class="n" @bind="g.QuestItemId" placeholder="—"/>
+									</td>
+									<td>
+										<input class="n" @bind="g.RequiredLevel" placeholder="—"/>
+									</td>
+									<td>
+										<input @bind="g.RequiredRankTitle" placeholder="—"/>
+									</td>
+									<td>
+										<input class="n" @bind="g.RequiredRank" placeholder="—"/>
 									</td>
 									<td>
 										<button class="del" title="Remove goal" @onclick="() => RemoveGoal(g)">✕</button>
@@ -136,7 +169,81 @@
 					<p class="hint">
 						<b>Type</b> is the runtime trigger (server-side): <b>Kill</b>/<b>CollectItem</b> match by <b>TrailingRefId</b>
 						(template / item id); <b>LootFromNpc</b>/<b>TalkToNpc</b>/<b>Escort</b> match by <b>TargetName</b>;
-						<b>ReachArea</b> fires at (MapId, MarkerX, MarkerY). Editing markers/Req can break byte-exact quests.
+						<b>ReachArea</b> fires at (MapId, MarkerX, MarkerY), or inside <b>Region</b> when the goal names one.
+						Editing markers/Req can break byte-exact quests.
+					</p>
+					<p class="hint">
+						<b>Kind</b> is the client's own tag for the goal, read-only — it is what the objective text asks for
+						(<i>Kill</i>, <i>Collect</i>, <i>Deliver</i>, <i>Craft</i>…), and <b>Type</b> is our wiring of it. They are
+						allowed to differ (a <i>RegionScoped</i> goal is not automatically a ReachArea), but a disagreement is
+						worth a second look. <b>Precondition</b> is stated in that same objective text and enforced at the
+						trigger, not at wiring time: a goal whose precondition fails does not advance, so it cannot complete
+						early. The rank columns are recorded only — faction ranks do not exist yet, so a rank gate never passes.
+					</p>
+
+					<div class="qe-fx-head">
+						<h2>Conversations <span class="ro">read-only</span></h2>
+					</div>
+					<div class="tablewrap">
+						<table class="qe-goals convos">
+							<thead>
+							<tr>
+								<th title="the conversation's NPC (the stable routing key)">NPC</th>
+								<th title="the NPC's template id — the gate that stops a same-named NPC opening this tree">Template</th>
+								<th title="the answer-index path to the screen: empty = the greeting">Path</th>
+								<th title="what this screen does for THIS quest">Role</th>
+								<th title="the quest state the gated variant applies in">State</th>
+								<th title="TRUE when retail opens this window itself, with no player click in front of it">Server-opened</th>
+								<th title="for a server-opened screen: the world object whose use fired it">Trigger object</th>
+							</tr>
+							</thead>
+							<tbody>
+							@foreach (var c in Conversations(_quest))
+							{
+								<tr>
+									<td>@c.NpcName</td>
+									<td class="n">@(c.NpcTemplateId?.ToString() ?? "—")</td>
+									<td>@(string.IsNullOrEmpty(c.AnswerPath)
+										      ? "(greeting)"
+										      : c.AnswerPath)</td>
+									<td>
+										@if (c.GrantQuestId == _quest.QuestId)
+										{
+											<span class="badge grant">grants</span>
+										}
+										@if (c.ConditionQuestId == _quest.QuestId)
+										{
+											<span class="badge gate">gated on</span>
+										}
+									</td>
+									<td>@(c.ConditionQuestId == _quest.QuestId
+										      ? c.ConditionQuestState?.ToString() ?? "any"
+										      : "—")</td>
+									<td>@(c.ServerInitiated
+										      ? "yes"
+										      : "—")</td>
+									<td class="n">@(c.TriggerWorldObjectId?.ToString() ?? "—")</td>
+								</tr>
+							}
+							@if (!Conversations(_quest).Any())
+							{
+								<tr>
+									<td colspan="7" class="empty">
+										No conversation grants or gates this quest — nothing in game starts it, so it is reachable only
+										by a GM command.
+									</td>
+								</tr>
+							}
+							</tbody>
+						</table>
+					</div>
+					<p class="hint">
+						How a quest is ENTERED and how its dialogue changes while it runs. A <b>grants</b> screen persists the quest
+						the moment the player walks that branch of the tree; a <b>gated on</b> screen is a variant the NPC serves
+						only while the player holds this quest in the given state. A <b>server-opened</b> row is one retail opens
+						itself, with no player click in front of it — it is not reachable by talking, so it needs its trigger.
+						Edit these in the <a href="/admin/db">DB editor</a> (<code>ConversationNodes</code>); they are shown here
+						because a quest nothing grants looks perfectly well-formed on the rows above.
 					</p>
 
 					<div class="qe-actions">
