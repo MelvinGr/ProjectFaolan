@@ -711,7 +711,15 @@ number, which is the point - a row built on four hits is visibly not a curve.
 level 1. `StatDamageIIR` (0xE9F24184) is spell hits and DoT TICKS - small and repeating for a bleed, large for
 a real cast. ⚠️ The word after `delta` in StatDamage is the damage **school**, not a stat id; censusing it as a
 stat finds nothing and reads as "retail has no caster NPCs", which is how the magical branch went missing on a
-first pass. Filtering by school instead shows Fire / Cold / Electrical / Siege casters at levels 1-6.
+first pass. Filtering by school instead shows magical casters at levels 1-6.
+
+⚠️ **The school NUMBERING was wrong until #487, so any pre-#487 census output names the wrong elements.** Cold
+sat at 5 with everything after it one too high, which made a necromancer's unholy nukes read as *Holy* and their
+frost as *Siege*. The real order appends Cold after the nine — `Slashing 1 · Piercing 2 · Crushing 3 · Fire 4 ·
+Electrical 5 · Holy 6 · Unholy 7 · Poison 8 · Siege 9 · Cold 10` — plus `12` = environmental (fall damage,
+[`environmental-damage.md`](environmental-damage.md)) and `23` = a heal, the one value that never carries a
+negative delta. See `DamageSchool`, which also records the trap: the client's **PvP** invulnerability block does
+list Cold in fifth place, so re-deriving the order from that block reproduces the bug.
 
 **The scale is settled**, which is what allows a damage number to be compared with a health pool. Pairing a hit
 with the target's next health update does not work (4 usable pairs in the whole corpus - retail does not push
