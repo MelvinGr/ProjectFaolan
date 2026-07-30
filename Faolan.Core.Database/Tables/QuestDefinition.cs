@@ -128,6 +128,46 @@ namespace Faolan.Core.Database.Tables
 	}
 
 	// The server-side trigger that advances a quest goal (Gitea #261). Persisted as an int; ordering is stable.
+	// The goal's own kind tag, carried on the wire as `QuestGoalDefinition.Separator` - the VERB the objective asks
+	// for. Distinct from QuestGoalType below, which is OUR server-trigger wiring: this one comes from the client's
+	// data and is the evidence that wiring should be derived from.
+	//
+	// Decoded by cross-referencing the goals whose semantics were independently established from captures. The
+	// clincher is quest 12371 (Shipwrecked V), whose two goals reference the SAME item id with the SAME count and
+	// still differ: "collect 3 quarry bricks" is 23 and "deliver 3 to Turach" is 20. So the tag describes the goal,
+	// not its target.
+	//
+	// ⚠️ Values seen in the corpus only - this is not the client's full enum, and the gaps are unmapped rather than
+	// absent. `Separator` keeps its wire-derived name on the row because it is a captured field; this enum is the
+	// meaning, not a rename.
+	public enum QuestGoalKind : uint
+	{
+		// No typed target reference (TrailingCategory 0). The talk-to and loot-from-corpse goals of the Tortage chain
+		// (Laranga, Tina, Turach, Casilda; Saddur's and Scavenger Tuut's bags) all sit here.
+		Untargeted = 0,
+
+		// Acquire ONE of a named/unique item - the drink-tasting quests (Visionwine, Musewater, Ale of Auspice).
+		AcquireUnique = 5,
+
+		// Reach a NAMED REGION: the target is a bounded-area reference (TrailingCategory 51200), so the trigger volume
+		// is recoverable. Goal 1448's "Trappers Haven". Contrast ReachPoint, which has only a marker.
+		ReachRegion = 9,
+
+		// Kill: the target is an npc_template (51000) or a monster category (51100).
+		Kill = 12,
+
+		// DELIVER the item to someone - it leaves the player rather than arriving. Goal 3497 hands Turach his three
+		// bricks. ⚠️ The goal carries the ITEM but not the recipient, so these cannot be wired from the row alone.
+		Deliver = 20,
+
+		// Reach a POINT: marker coordinates with no region reference (TrailingCategory 100, TrailingRefId 0).
+		ReachPoint = 22,
+
+		// COLLECT a quantity - the bulk of the gather objectives, and the only kind carrying large counts
+		// (Poisonous Gland x20, Shadeleaf x10, and a x50).
+		Collect = 23
+	}
+
 	public enum QuestGoalType
 	{
 		Kill = 0, // kill the TargetName NPC

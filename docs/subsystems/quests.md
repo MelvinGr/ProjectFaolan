@@ -29,6 +29,26 @@ A quest completes when **every** goal reaches its `RequiredCount`; completing a 
 | `ReachArea` | the move handler, per accepted move | the goal's **region** if it has one, else a 40-unit radius around its map marker |
 | `CollectItem` | **any item reaching the inventory** | `TrailingRefId == item template id` |
 
+### The goal carries its own KIND tag
+
+`QuestGoalDefinition.Separator` — a captured field long treated as framing — is the goal's **verb**. It is the
+client's own statement of what the objective asks for, as opposed to `GoalType`, which is our server-trigger
+wiring. Decoded against the goals whose semantics were independently established from captures:
+
+| `Separator` | kind | evidence |
+|---:|---|---|
+| `0` | untargeted (talk / loot a corpse) | the Tortage chain — Laranga, Tina, Turach, Casilda; Saddur's and Tuut's bags |
+| `5` | acquire one named item | the drink-tasting quests (*Visionwine*, *Musewater*, *Ale of Auspice*) |
+| `9` | reach a **named region** | goal 1448 → `Trappers Haven` |
+| `12` | kill | Saddur, Scavenger Tuut (targets are `npc_template` / monster-category refs) |
+| `20` | **deliver** the item | goal 3497 — Turach's three bricks |
+| `22` | reach a **point** (marker only, no region ref) | our nine reach goals + the Casilda escort |
+| `23` | **collect** a quantity | goal 3495, and every large count (*Poisonous Gland* ×20, *Shadeleaf* ×10, a ×50) |
+
+The clincher that it describes the **verb and not the target**: quest 12371's two goals reference the *same*
+item id with the *same* count and still differ — `23` for "collect 3 quarry bricks", `20` for "deliver 3 to
+Turach". Values seen in the corpus only; the gaps are unmapped rather than absent. The enum is `QuestGoalKind`.
+
 ### A goal's target is a TYPED LDB reference
 
 `TrailingCategory` says what kind of thing `TrailingRefId` points at — the client's own category table names them
@@ -93,9 +113,15 @@ The harvested goal carries the wire fields; the *server trigger* fields (`GoalTy
 skips a goal that is already wired. So a hand edit — or the `/admin/quests` editor in Faolan.Web — survives a
 re-import, while a freshly harvested quest still bootstraps.
 
-`TypeItemGoalsFromTrailingCategory` is the general rule rather than a per-quest seed: any unwired goal whose
-trailing reference is an item becomes `CollectItem`. It replaced 72 goals sitting at the `Kill` default with no
-target — inert fetch quests that could never complete. They were harmless as well as useless: NPC template ids
-run 38–22,982 and these item refs 110,891–4,675,657, so no kill could ever have matched one.
+`TypeItemGoalsFromTrailingCategory` is the general rule rather than a per-quest seed: an unwired goal whose
+trailing reference is an item, and whose **kind tag says it acquires one**, becomes `CollectItem`. It replaced 62
+goals sitting at the `Kill` default with no target — inert fetch quests that could never complete. They were
+harmless as well as useless: NPC template ids run 38–22,982 and these item refs 110,891–4,675,657, so no kill
+could ever have matched one.
+
+⚠️ The 11 **`Deliver`** goals are deliberately left inert. They hand the item over rather than acquiring it, and
+the goal does not carry the recipient — typing them collect would complete the quest the moment the player picks
+the item up, skipping the delivery, which is a silent chain bug where inert is at least visibly stuck. They need
+the recipient, from a capture or from #520's objective text.
 
 Open work is tracked in Gitea (#262, #358, #521).

@@ -1323,6 +1323,14 @@ namespace Faolan.Importer.Captures
 				if (IsWired(goal))
 					continue;
 
+				// ⚠️ NOT every item goal is a collect - the goal's own `Separator` is the VERB (see QuestGoalKind), and
+				// `Deliver` (20) hands the item OVER rather than acquiring it. Typing a hand-in as a collect would
+				// complete the quest the moment the player obtains the item, skipping the delivery entirely - a silent
+				// chain-progression bug, where leaving it unwired is at least visibly stuck. Those need the target NPC,
+				// which the goal does not carry, so they stay for a capture or #520's objective text.
+				if (goal.Separator == (uint)QuestGoalKind.Deliver)
+					continue;
+
 				goal.GoalType = QuestGoalType.CollectItem;
 				typed++;
 			}

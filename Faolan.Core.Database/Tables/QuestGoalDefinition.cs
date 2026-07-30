@@ -117,7 +117,9 @@ namespace Faolan.Core.Database.Tables
 		// set, treated as 1 by QuestObjectiveRegion.Build (preserves byte-exact for rows seeded before this field).
 		public uint RequiredCount { get; set; }
 
-		public uint Separator { get; set; } // the [1][k] separator's k word (9, 12 in the beach capture)
+		// The [1][k] separator's k word - and it is the goal's KIND TAG, not a framing artefact: see QuestGoalKind for
+		// the decode and its evidence. Kept under its wire-derived name because it is a captured field.
+		public uint Separator { get; set; }
 		public uint Sequence { get; set; } // the per-goal ordinal `N` (1, 2, ...)
 		public uint TrailingCategory { get; set; }
 

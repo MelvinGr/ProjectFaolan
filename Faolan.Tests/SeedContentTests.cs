@@ -178,27 +178,62 @@ namespace Faolan.Tests
 			});
 		}
 
-		// No gather objective is left at the fresh-harvest `Kill` default (#521). A goal whose trailing reference is an
-		// ITEM (LDB category 50200 = `item.name`) is a collect objective; 72 of them shipped as `Kill` with no target,
-		// which is a quest that can never complete - the kill matcher looking for an NPC whose template id equals an
-		// item id. `TypeItemGoalsFromTrailingCategory` types them, and this is what stops a re-harvest reintroducing
-		// them: the row count never moves, only the GoalType does.
+		// No GATHER objective is left at the fresh-harvest `Kill` default (#521). A goal whose trailing reference is an
+		// item (LDB category 50200) and whose kind tag says it acquires one is a collect objective; they shipped as
+		// `Kill` with no target, which is a quest that can never complete - the kill matcher looking for an NPC whose
+		// template id equals an item id. `TypeItemGoalsFromTrailingCategory` types them, and this stops a re-harvest
+		// reintroducing the inert form: the row count never moves, only the GoalType does.
+		//
+		// ⚠️ `Deliver` (kind 20) is EXCLUDED on purpose and must stay excluded. It hands the item over rather than
+		// acquiring it, and the goal does not carry the recipient - typing it collect would complete the quest the
+		// moment the player picks the item up, skipping the delivery. That is a silent chain bug; inert is at least
+		// visibly stuck. This asserts the exclusion holds, so a future "tidy up the last inert goals" pass has to
+		// deal with the recipient rather than just widening the rule.
 		[Fact]
-		public async Task ItemGoals_AreNotLeftAsKillGoals()
+		public async Task ItemGoals_AreTypedByTheirKindTag()
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
 			var ct = TestContext.Current.CancellationToken;
 
 			var inert = await db
-				.QuestGoalDefinitions.Where(g => g.TrailingCategory == 50200 && g.TrailingRefId > 0 && g.GoalType == QuestGoalType.Kill)
-				.Select(g => $"goal {g.GoalId} (quest {g.QuestDefinitionId}, item {g.TrailingRefId})")
+				.QuestGoalDefinitions.Where(g => g.TrailingCategory == 50200 && g.TrailingRefId > 0
+				                                 && g.GoalType == QuestGoalType.Kill
+				                                 && g.Separator != (uint)QuestGoalKind.Deliver)
+				.Select(g => $"goal {g.GoalId} (quest {g.QuestDefinitionId}, kind {g.Separator})")
 				.ToListAsync(ct);
 
-			Assert.True(inert.Count == 0, $"item-reference goals still typed as Kill: {string.Join(", ", inert)}");
+			Assert.True(inert.Count == 0, $"acquire-kind item goals still typed as Kill: {string.Join(", ", inert)}");
 
 			// ...and the typing actually happened rather than the category vanishing from the harvest.
 			var collect = await db.QuestGoalDefinitions.CountAsync(g => g.TrailingCategory == 50200 && g.GoalType == QuestGoalType.CollectItem, ct);
-			Assert.True(collect >= 70, $"only {collect} item goals are CollectItem; the harvest carries 73.");
+			Assert.True(collect >= 60, $"only {collect} item goals are CollectItem; the harvest carries 62.");
+
+			// The deliver goals are NOT quietly collect-typed.
+			var mistyped = await db.QuestGoalDefinitions.CountAsync(
+				g => g.Separator == (uint)QuestGoalKind.Deliver && g.GoalType == QuestGoalType.CollectItem, ct);
+			Assert.True(mistyped == 0, $"{mistyped} Deliver-kind goals are typed CollectItem - they would complete without the hand-in.");
+		}
+
+		// The kind tag agrees with the wiring wherever a human established the goal's semantics from a capture. This is
+		// what the QuestGoalKind decode rests on, so it is worth failing loudly if a re-harvest disturbs it - most of
+		// all the pair that proves the tag describes the VERB and not the target: quest 12371's two goals reference the
+		// same item with the same count, and are 23 (collect) and 20 (deliver).
+		[Fact]
+		public async Task GoalKindTag_AgreesWithTheHandWiredGoals()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+			var goals = await db.QuestGoalDefinitions.Where(g => g.GoalId == 1448 || g.GoalId == 3490 || g.QuestDefinitionId == 12371).ToListAsync(ct);
+
+			var collect = goals.Single(g => g.GoalId == 3495);
+			var deliver = goals.Single(g => g.GoalId == 3497);
+			Assert.Equal(collect.TrailingRefId, deliver.TrailingRefId); // the SAME item...
+			Assert.Equal(collect.RequiredCount, deliver.RequiredCount); // ...and the same count...
+			Assert.Equal((uint)QuestGoalKind.Collect, collect.Separator); // ...but different kinds
+			Assert.Equal((uint)QuestGoalKind.Deliver, deliver.Separator);
+
+			Assert.Equal((uint)QuestGoalKind.ReachRegion, goals.Single(g => g.GoalId == 1448).Separator);
+			Assert.Equal((uint)QuestGoalKind.Kill, goals.Single(g => g.GoalId == 3490).Separator);
 		}
 
 		// A shop with no wares is a shop the player cannot buy from - the exact shape of the loss above, and the one
