@@ -224,11 +224,33 @@ NPC     We'll meet again.
 `{gameactiononnpc SendScryEvent EventString RunToTortage}` is what sends her off. `{resolvegoal <TOKEN>}` is the
 same inline directive that resolves her earlier stage (`BJGY` for 13480) — see Gitea #356.
 
-⚠️ **None of these screens are in `ConversationScreens`.** The extractor keys on a player-initiated
-`TalkToNpc(field3=0)` greeting, and this conversation is opened by the SERVER
-(`KnubotOpenChatWindowIIR`) with no c2s talk, so the whole exchange was skipped at import — screen `13228` and
-its four siblings are absent while the 23 screens reachable by talking to Casilda are present. Tracked in Gitea
-#523.
+**The trigger is `ActionType.UseObject` (0x12) on the city door**, and it reproduces across both beach-to-city
+captures — necro `fr11357 → fr11395`, demo `fr10180 → fr10213`, same action, same 60-byte body, ~35 frames ahead
+of the window opening. The door is a `WorldObject`, so the trigger is stable rather than session-volatile:
+
+| capture | door handle | spawn IIR | geometry | destination |
+|---|---|---|---|---|
+| necro | `0x0000106D` | `0x33A56FB0` | `object_closed` → `object_open` | "City of Tortage" |
+| demo | `0x00001027` | `0x33A56FB0` | `object_closed` → `object_open` | "City of Tortage" |
+
+Exactly one row matches: **`WorldObjects.Id 1044692756`** — map 4010, `GeometryName` `object_closed`,
+`DestinationMapId` 4020. So the escort's completion trigger is *use that object*, which is also the zone line into
+the city.
+
+⚠️ Not every server-opened conversation is interaction-triggered. Seven exist across the corpus (4 captures), and
+only the two door ones have an interaction anywhere near them; the other five are preceded by **movement alone**,
+which points at a proximity/region trigger rather than a click. So the trigger model needs at least two kinds.
+
+These screens are imported as of `c76593a9` (Gitea #523): the extractor used to key only on a player-initiated
+`TalkToNpc(field3=0)` greeting, and nothing ever ENDED an instance, so a server-opened window could not start one
+and its packets were appended to whatever screen was last open — misattributed rather than merely lost.
+`KnubotOpenChatWindow`/`CloseChatWindow` are exactly paired on the wire, so the close is the instance boundary,
+and `ConversationNode.ServerInitiated` marks the result.
+
+⚠️ **One screen is still merged away: `13228`**, the `{hidegoodbye}Friend?` opener. Casilda has TWO server-opened
+conversations and both key to `AnswerPath ""`, so the longer wins. Their identity needs the TRIGGER, which is why
+the decode above matters — and adding it to `ConversationNode.ComputeId` only for `ServerInitiated` rows keeps it
+a pure function of the row while leaving all 467 talk-node ids untouched. Open on #523.
 
 ### Typing the remaining inert goals is mechanical — the data is what is missing
 
