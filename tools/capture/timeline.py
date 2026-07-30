@@ -31,6 +31,7 @@ from datetime import datetime
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OPCODES = os.path.join(REPO, "Faolan.Core", "Enums", "Opcodes.cs")
+STAT_NAMES_DOC = os.path.join(REPO, "docs", "re", "ldb-stat-names.md")
 
 # The service tiers, by the port the GAME side of the connection sits on. 7010 is the only fixed one
 # (UniverseAgent); the rest are handed to the client in the preceding tier's payload, so these are the
@@ -72,6 +73,19 @@ def load_names():
     return names
 
 
+def load_stat_names():
+    """stat id -> name, parsed from docs/re/ldb-stat-names.md rather than duplicated here."""
+    out = {}
+    if not os.path.exists(STAT_NAMES_DOC):
+        return out
+    for m in re.finditer(r"^\|\s*(\d+)\s*\|\s*0x[0-9A-Fa-f]+\s*\|\s*(.+?)\s*\|", open(STAT_NAMES_DOC).read(), re.M):
+        out.setdefault(int(m.group(1)), m.group(2))
+    return out
+
+
+STATS = load_stat_names()
+
+
 class Db:
     """Optional id -> name resolution out of faolan.db. Every lookup degrades to None."""
 
@@ -108,6 +122,9 @@ class Db:
 
     def ability_by_slot(self, slot):
         return self.one("SELECT Name FROM Abilities WHERE Slot=?", (slot,))
+
+    def spell(self, sid):
+        return self.one("SELECT Name FROM Spells WHERE Id=?", (sid,))
 
     def playfield(self, pid):
         return self.one("SELECT Name FROM Maps WHERE Id=?", (pid,))
@@ -313,6 +330,30 @@ def describe(p, db, label=None):
         # The state byte drives a harvest/use animation on a world object. ⚠️ These keep firing for
         # OTHER players in a retail capture - check the player's own position before crediting one.
         return f"{ent(label, be(raw, 12))} visual state 0x{raw[20]:02x}" if len(raw) > 20 else ""
+    if k == "MagicBuffIIR":
+        # SPELL APPLICATION (the doc's "ApplySpell"). The spell id is a u32 at 17 in BOTH body shapes -
+        # the long one echoes it again further in, which is what pins the offset. All 155 in the
+        # necromancer capture resolve against the Spells catalog.
+        sid = be(raw, 17)
+        name = db.spell(sid)
+        target = be(raw, 26) if len(raw) >= 30 else 0
+        who = f" -> {ent(label, target)}" if target and target != be(raw, 12) else ""
+        # Neutral verb on purpose: the same message carries a fresh cast, a refresh, and the whole
+        # standing buff set replayed at login (t=7.3 in the necromancer capture), and the flag that
+        # separates them is not decoded. "buff" states what the message is without inventing which.
+        return f"{ent(label, be(raw, 12))} buff {name or f'spell {sid}'}{who}"
+    if k == "StatDamageIIR":
+        # A STAT DELTA with its cause: [.. 20]=flag, then u32 words - [3]=stat id, [5]=SIGNED delta,
+        # [7..8]=source class+handle, [11]=the spell that did it. Like combat damage the delta is
+        # display-scaled x100, so -3725 renders as -37.25.
+        w = [be(raw, i) for i in range(21, len(raw) - 3, 4)]
+        if len(w) < 12:
+            return ""
+        delta = w[5] - (1 << 32) if w[5] > 0x7FFFFFFF else w[5]
+        stat = STATS.get(w[3], f"stat {w[3]}")
+        cause = db.spell(w[11]) or (f"spell {w[11]}" if w[11] else "")
+        return (f"{ent(label, be(raw, 12))} {stat} {delta / 100:+.2f} "
+                f"from {ent(label, w[8])}" + (f" via {cause}" if cause else ""))
     if k == "LookAtIIR":
         # TARGET SELECTION - the client tells the server what the player has selected. Target is a fixed
         # [21..25], and ZERO means the player cleared their target rather than picked a new one.
