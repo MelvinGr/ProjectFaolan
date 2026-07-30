@@ -90,6 +90,10 @@ we've seen_, and names the gaps). Regenerate with
   in-game tools (#332, #363)
 - 🟡 **Line-of-sight & terrain** — NPCs won't aggro over a hill or through a wall, and loot and corpses settle to
   the ground, driven by baked per-map terrain; the aggro gating is pending an in-client confirm (#284)
+- 🟡 **Knockback** — a blow can shove you: the server moves you along a path you did not walk and pins where you
+  land, using the client's own forced-move record. The packets are reproduced exactly from the one captured
+  knockback; the distance, the direction rule and how `KnockbackResistance` scales it rest on that single sample,
+  and no attack triggers it yet, so it runs from a GM command (#496)
 - 🟡 **Environmental damage** — the world can hurt you now, where before every point of damage came from a
   creature. **Falls** cost health scaled to your own maximum and leave a bruise or a broken bone depending on how
   far you dropped; **lava** burns and kills, using the client's own 105 lava volumes across 22 playfields rather
