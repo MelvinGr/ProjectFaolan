@@ -89,3 +89,19 @@ for f in sorted(glob.glob('<data-repo>/Captures/*.tshark.json')):
 print(hits)
 PY
 ```
+
+## Resolving entity handles
+
+Combat/despawn lines name their entities: `Panther 0x3a6da <- the player 0x1317cf8`. Handles are
+**session-volatile**, so they cannot be looked up — they are resolved through the capture itself, by
+matching each spawn body's POSITION against `NpcSpawns` / `WorldObjects` on that playfield.
+
+Two things are excluded rather than matched, or they take the name of whatever they stood near: the
+**player**, and summoned **pets** (a pet matched a "Brutal Pirate" 22 units away). A match is printed
+with its distance (`Bat Demon (+10u)`) whenever it is not near-exact — an **ambush** spawns where it
+was triggered rather than at its home point, so that offset is a finding, not noise.
+
+⚠️ **Position also tells you WHO acted.** Harvest-node animations keep firing for other players in a
+retail capture; correlate the player's own `CharDCMoveIIR` position (raw body, BIG-endian floats at
+offset 18) against the node before attributing an interaction to them. Two "extra" brick pickups in
+the necromancer capture happened 29u and 77u from the player — other people's.

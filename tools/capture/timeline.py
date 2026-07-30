@@ -24,6 +24,7 @@ import json
 import os
 import re
 import sqlite3
+import struct
 import sys
 from datetime import datetime
 
@@ -110,9 +111,88 @@ class Db:
     def playfield(self, pid):
         return self.one("SELECT Name FROM Maps WHERE Id=?", (pid,))
 
+    def rows(self, sql, args):
+        if not self.con:
+            return []
+        try:
+            return self.con.execute(sql, args).fetchall()
+        except sqlite3.Error:
+            return []
+
+    def npc_spawns(self, map_id):
+        return self.rows(
+            "SELECT s.PositionX, s.PositionY, s.PositionZ, t.Name FROM NpcSpawns s "
+            "LEFT JOIN NpcTemplates t ON t.TemplateId = s.NpcTemplateId WHERE s.MapId = ?", (map_id,))
+
+    def world_objects(self, map_id):
+        return self.rows(
+            "SELECT PositionX, PositionY, PositionZ, Name FROM WorldObjects WHERE MapId = ?", (map_id,))
+
 
 def be(raw, off, n=4):
     return int.from_bytes(raw[off:off + n], "big") if len(raw) >= off + n else 0
+
+
+def spawn_position(raw):
+    """The (x, y, z) a *FullUpdate spawn body opens with: protobuf field 1, three little-endian floats."""
+    for f, wt, v in protobuf(raw[17:]):
+        if f == 1 and wt == 2 and isinstance(v, list):
+            xs = [struct.unpack("<f", sv.to_bytes(4, "little"))[0] for sf, swt, sv in v if swt == 5]
+            if len(xs) >= 3:
+                return tuple(xs[:3])
+    return None
+
+
+def resolve_entities(P, db):
+    """handle -> label, so combat/despawn lines read as names instead of raw handles.
+
+    Entity handles are SESSION-VOLATILE (no_session_volatile_columns), so they cannot be looked up -
+    they have to be resolved through what the capture itself says. A spawn body carries a POSITION, and
+    position is the one thing that IS stable between a capture and our NpcSpawns/WorldObjects rows, so
+    the match is nearest-spawn-on-this-playfield.
+
+    ⚠️ Two classes must be excluded rather than matched, or they silently take the name of whatever
+    static spawn they happened to be standing near: the PLAYER, and summoned PETS (which move with the
+    player and matched 'Brutal Pirate' from 22 units away). Distance is printed whenever the match is
+    not near-exact, because an AMBUSH spawn appears where it was triggered rather than at its home
+    point - the quarry Bat Demon spawns 10 units off its NpcSpawns row, and that gap is a finding, not
+    noise to hide.
+    """
+    label, pets, player = {}, set(), None
+    map_id = 0
+    for p in P:
+        if p["_kind"] == "PlayfieldFIIR":
+            map_id = be(p["_raw"], 34)
+        elif p["_kind"] == "FullPlayerCharacterIIR":
+            player = be(p["_raw"], 12)
+        elif p["_kind"] == "PetIIR":
+            pets.add(be(p["_raw"], 25))
+    if player:
+        label[player] = "the player"
+    for h in pets:
+        label[h] = "pet"
+
+    npcs, objs = db.npc_spawns(map_id), db.world_objects(map_id)
+    for p in P:
+        if p["_kind"] not in ("SimpleCharFullUpdateIIR", "SimpleDynelFullUpdateIIR"):
+            continue
+        h = be(p["_raw"], 12)
+        if h in label:
+            continue
+        pos = spawn_position(p["_raw"])
+        table = npcs if p["_kind"] == "SimpleCharFullUpdateIIR" else objs
+        if not pos or not table:
+            continue
+        x, y, z = pos
+        best = min(table, key=lambda r: (r[0] - x) ** 2 + (r[1] - y) ** 2 + (r[2] - z) ** 2)
+        d = ((best[0] - x) ** 2 + (best[1] - y) ** 2 + (best[2] - z) ** 2) ** 0.5
+        if best[3] and d <= 25:
+            label[h] = best[3] if d < 2 else f"{best[3]} (+{d:.0f}u)"
+    return label
+
+
+def ent(label, h):
+    return f"{label.get(h, '?')} 0x{h:x}" if h in label else f"0x{h:x}"
 
 
 def ascii_of(raw):
@@ -134,9 +214,10 @@ def load(path, names):
     return packets, t0
 
 
-def describe(p, db):
+def describe(p, db, label=None):
     """The human-readable tail of a timeline line: what this packet actually says."""
     k, raw = p["_kind"], p["_raw"]
+    label = label or {}
 
     if k == "InitiateAuthentication" and len(raw) > 2:
         return f'account "{raw[2:2 + be(raw, 0, 2)].decode("latin-1", "replace")}"'
@@ -184,7 +265,7 @@ def describe(p, db):
         return f"cash {be(raw, 4)} (+{be(raw, 8)})"
     if k == "DamageResultIIR":
         # Wire damage is DISPLAY-scaled (x100): 945 on the wire renders as 9.45.
-        return (f"target 0x{be(raw, 12):x} <- attacker 0x{be(raw, 21):x}, "
+        return (f"{ent(label, be(raw, 12))} <- {ent(label, be(raw, 21))}, "
                 f"{be(raw, 25)} ({be(raw, 25) / 100:.2f} shown), school {be(raw, 29)}")
     if k == "ChainKillIIR":
         return f"chain {be(raw, 17)}"
@@ -192,9 +273,9 @@ def describe(p, db):
         # [20] is the verb (0 summon / 1 dismiss); [21..25] is the pet's CLASS and [25..29] its handle.
         return f"pet 0x{be(raw, 25):x} " + ("dismissed" if raw[20:21] == b"\x01" else "summoned")
     if k in ("N3ToClientFadeIIR",):
-        return f"despawn 0x{be(raw, 12):x}"
+        return f"despawn {ent(label, be(raw, 12))}"
     if k in ("DispatchOpenLootBag", "DispatchCloseLootBag", "TryLootAll", "TryLootCash"):
-        return f"bag 0x{be(raw, 4):x}"
+        return f"bag {ent(label, be(raw, 4))}"
     if k in ("ChannelChat", "CharacterChat", "SystemMessage", "ChatVicinity", "FormatFeedbackIIR",
              "KnubotCloseChatWindowIIR", "DispatchDisplayItemLootChatMessage"):
         return chat_text(raw)
@@ -309,29 +390,29 @@ def section_summary(P, t0, db, names):
         print(f"  {v:6d}  {k}")
 
 
-def section_handoff(P, db):
+def section_handoff(P, db, label=None):
     print("\n=== login handoff ===")
     for p in P:
         if p["_tier"] in ("universe", "playeragent", "cs") or p["_kind"] in ("Authenticate2", "PlayfieldFIIR", "CharInPlayIIR"):
-            d = describe(p, db)
+            d = describe(p, db, label)
             print(f"  {p['_t']:7.1f} {p['_tier']:11s} {p['Direction']} {p['_kind']:28s} {d}")
 
 
-def section_timeline(P, db, everything):
+def section_timeline(P, db, everything, label=None):
     print("\n=== timeline ===")
     for p in P:
         if not everything and p["_kind"] not in MARKERS:
             continue
-        d = describe(p, db)
+        d = describe(p, db, label)
         print(f"  {p['_t']:7.1f} {p['_tier']:6s} {p['Direction']} {p['_kind']:30s} {d}")
 
 
-def section_quests(P, db):
+def section_quests(P, db, label=None):
     print("\n=== quests ===")
     for p in P:
         if p["_kind"] not in ("QuestIIR", "QuestGoalIIR", "QuestFullUpdateIIR"):
             continue
-        print(f"  {p['_t']:7.1f} {p['_kind']:22s} {describe(p, db)}")
+        print(f"  {p['_t']:7.1f} {p['_kind']:22s} {describe(p, db, label)}")
     print("\n  Names: dotnet run --project Faolan.Importer -- --report ldb-quest-text \\\n"
           "           --report-arg <quest ids> --RdbDir <client>/RDB")
 
@@ -363,18 +444,18 @@ def section_dialogue(P, db):
         print("  (no conversations in this capture)")
 
 
-def section_chat(P, db):
+def section_chat(P, db, label=None):
     print("\n=== chat ===")
     for p in P:
         if p["_kind"] in ("ChannelChat", "CharacterChat", "SystemMessage", "ChatVicinity"):
-            print(f"  {p['_t']:7.1f} {p['_kind']:16s} {describe(p, db)}")
+            print(f"  {p['_t']:7.1f} {p['_kind']:16s} {describe(p, db, label)}")
 
 
-def section_combat(P, db):
+def section_combat(P, db, label=None):
     print("\n=== combat ===")
     for p in P:
         if p["_kind"] in ("DamageResultIIR", "ChainKillIIR", "PerformSpecialAction", "PetIIR", "CombatShieldIIR"):
-            print(f"  {p['_t']:7.1f} {p['_kind']:22s} {describe(p, db)}")
+            print(f"  {p['_t']:7.1f} {p['_kind']:22s} {describe(p, db, label)}")
 
 
 def section_coverage(P, db, names):
@@ -426,17 +507,20 @@ def main():
     if a.db and not db.con:
         print(f"timeline: no readable DB at {a.db} - ids will not resolve to names\n", file=sys.stderr)
     P, t0 = load(a.dump, names)
+    label = resolve_entities(P, db)
 
     for name in (a.section or ["summary", "handoff", "timeline", "quests", "dialogue", "chat", "combat", "coverage"]):
         fn = SECTIONS[name]
         if fn is section_summary:
             fn(P, t0, db, names)
         elif fn is section_timeline:
-            fn(P, db, a.all_packets)
+            fn(P, db, a.all_packets, label)
         elif fn is section_coverage:
             fn(P, db, names)
-        else:
+        elif fn is section_dialogue:
             fn(P, db)
+        else:
+            fn(P, db, label)
 
 
 if __name__ == "__main__":
