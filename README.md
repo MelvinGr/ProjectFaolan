@@ -90,6 +90,15 @@ we've seen_, and names the gaps). Regenerate with
   in-game tools (#332, #363)
 - 🟡 **Line-of-sight & terrain** — NPCs won't aggro over a hill or through a wall, and loot and corpses settle to
   the ground, driven by baked per-map terrain; the aggro gating is pending an in-client confirm (#284)
+- 🟡 **Environmental damage** — the world can hurt you now, where before every point of damage came from a
+  creature. **Falls** cost health scaled to your own maximum and leave a bruise or a broken bone depending on how
+  far you dropped; **lava** burns and kills, using the client's own 105 lava volumes across 22 playfields rather
+  than a guess at where the flows are. Dying stacks a 30-minute death penalty, and a second death stacks another
+  on top. Pending an in-client confirm (#495, #504)
+- 🟡 **Local travel** — wagoners move you for a fee: pick a destination, pay, confirm, and arrive at its entrance,
+  either across a loading screen or in place within the map. Criminals are refused, as the client's own rules say.
+  The retail trigger (the pick inside the NPC's conversation) is not wired yet, so it runs from a GM command
+  (#506, #514)
 - ✅ **Sit on benches** — sitting down, switching seats and standing up, verified in a real client (#355)
 - 🟡 **Fuller simulation** — a continuous AI heartbeat and smoother movement are in progress (#190, #225, #272)
 
