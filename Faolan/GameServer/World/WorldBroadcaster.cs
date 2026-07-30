@@ -1290,7 +1290,7 @@ namespace Faolan.GameServer.World
 			var teleport = obj.DestinationMapId is { } destMap
 				? new ZoneLineDestination(destMap, obj.DestinationPosition, name)
 				: new ZoneLineDestination(0, null, name);
-			return new UsedObjectInteraction(obj.InteractAction, teleport);
+			return new UsedObjectInteraction(obj.InteractAction, teleport, obj.Id);
 		}
 
 		// #398: the per-NPC follow-ups for the entry-burst NPCs (BuildEntryNpcBurst) - the quest markers and the
@@ -2468,7 +2468,9 @@ namespace Faolan.GameServer.World
 		// teleporter, the resolved Teleport destination. Action is None when the handle isn't a DB world object at all
 		// (e.g. a loot bag, a zone entity) - the caller falls through to the open-animation / loot path. Lets the
 		// UseObject handler switch on the action rather than special-casing one kind.
-		public readonly record struct UsedObjectInteraction(InteractAction Action, ZoneLineDestination Teleport);
+		// WorldObjectId is the used object's STABLE row id (null when the handle resolved to nothing), so a caller can
+		// look the object up in the DB - the handle itself is session-volatile and useless as a key (#523).
+		public readonly record struct UsedObjectInteraction(InteractAction Action, ZoneLineDestination Teleport, uint? WorldObjectId = null);
 
 	}
 }

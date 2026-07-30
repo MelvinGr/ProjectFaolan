@@ -236,6 +236,42 @@ namespace Faolan.Tests
 			Assert.Equal((uint)QuestGoalKind.Kill, goals.Single(g => g.GoalId == 3490).Separator);
 		}
 
+		// The escort can actually END. Its completion is data-driven off the escortee's SERVER-OPENED conversation
+		// (#521/#523): using the world object that plays her farewell is what completes the goal, so the chain closes
+		// only if the shipped data still connects escort goal -> escortee -> a server-initiated node with a trigger.
+		//
+		// Worth a gate because the link spans three tables and a re-harvest could quietly break any leg of it - and the
+		// symptom would be an escort that silently never ends, which is exactly the state this replaced.
+		[Fact]
+		public async Task EscortGoal_HasAWorldObjectThatCanCompleteIt()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var escorts = await db
+				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Escort && g.TargetName != null)
+				.Select(g => new { g.GoalId, Target = g.TargetName! })
+				.ToListAsync(ct);
+
+			Assert.NotEmpty(escorts); // the Tortage escort (12407/3544, Casilda) is shipped content
+
+			foreach (var escort in escorts)
+			{
+				var trigger = await db
+					.Set<ConversationNode>()
+					.Where(n => n.NpcName == escort.Target && n.ServerInitiated && n.TriggerWorldObjectId != null)
+					.Select(n => n.TriggerWorldObjectId)
+					.FirstOrDefaultAsync(ct);
+
+				Assert.True(trigger != null,
+					$"escort goal {escort.GoalId} targets '{escort.Target}', who has no server-opened conversation with a world-object trigger - nothing can complete the escort.");
+
+				// ...and that object must still exist, or the trigger points at nothing.
+				Assert.True(await db.Set<WorldObject>().AnyAsync(w => w.Id == trigger, ct),
+					$"escort goal {escort.GoalId}'s trigger object {trigger} is not in WorldObjects.");
+			}
+		}
+
 		// A `Deliver` goal is wired as a talk-to at the RECIPIENT named in its (decrypted) objective text, and the
 		// recipient must be an NPC we actually hold. Wiring one we don't produces a goal that can never complete - no
 		// better than the inert state it replaced, and worse in that it LOOKS wired.

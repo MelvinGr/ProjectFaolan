@@ -1953,6 +1953,22 @@ namespace Faolan.GameServer
 						// the DB): a zone-line teleports to another playfield; everything else (a SimpleDynel door
 						// that opens, a loot bag) is handled by the open/loot path.
 						var interaction = await _broadcaster.ResolveUseObject(client, target);
+
+						// #521/#523: using this object ENDS any escort it is the destination of. Retail's order is exactly
+						// this - both beach-to-city captures show the door use, then QuestGoal 12407/3544 1/1 and
+						// QuestIIR Active->Completed, and only ~30 frames LATER Casilda's farewell window - so the goal is
+						// completed here, before the teleport, rather than out of the conversation.
+						//
+						// Data-driven, not a hard-coded door: the escortee is whoever this object opens a server-initiated
+						// conversation for (ConversationNode.TriggerWorldObjectId), because the object that plays the
+						// escortee's farewell is by definition the place the escort was leading to. Costs one indexed
+						// lookup on a door use and yields nothing for every ordinary door.
+						if (interaction.WorldObjectId is { } usedObjectId)
+						{
+							foreach (var escortee in await Database.GetServerInitiatedConversationNpcs(usedObjectId))
+								await _questProgression.AdvanceEscortGoals(client, escortee);
+						}
+
 						switch (interaction.Action)
 						{
 							case InteractAction.Teleport:

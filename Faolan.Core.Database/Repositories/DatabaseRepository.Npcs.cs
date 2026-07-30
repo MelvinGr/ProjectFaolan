@@ -13,6 +13,9 @@ namespace Faolan.Core.Database.Repositories
 		Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
 		Task<ConversationNode[]> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
 		Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap();
+
+		// The NPCs whose SERVER-OPENED conversation is triggered by using world object `worldObjectId` (#523).
+		Task<string[]> GetServerInitiatedConversationNpcs(uint worldObjectId);
 		Task<ConanClass[]> GetImportedSpawnClasses(uint mapId);
 		Task<NpcTemplate?> GetNpcByName(string name);
 		Task<NpcTemplate?> GetNpcByTemplateId(uint templateId);
@@ -57,6 +60,22 @@ namespace Faolan.Core.Database.Repositories
 				.ThenInclude(p => p.Screens)
 				.ThenInclude(s => s.Parameters)
 				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath && (n.NpcTemplateId == null || n.NpcTemplateId == clickedTemplateId));
+		}
+
+		// The distinct NPCs whose server-opened conversation this world object triggers (#523). Retail's city door is
+		// the worked example: using it opens Casilda's farewell.
+		//
+		// It is also what ENDS her escort, with no extra data: the object that opens the escortee's farewell is the
+		// object the escort was leading to. That keeps the escort's completion data-driven off the trigger we already
+		// harvested rather than needing a hard-coded door or a new column on the goal.
+		public async Task<string[]> GetServerInitiatedConversationNpcs(uint worldObjectId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.ConversationNodes.Where(n => n.ServerInitiated && n.TriggerWorldObjectId == worldObjectId)
+				.Select(n => n.NpcName)
+				.Distinct()
+				.ToArrayAsync();
 		}
 
 		public async Task<ConversationNode[]> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId)

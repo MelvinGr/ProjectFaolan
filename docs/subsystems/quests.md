@@ -25,7 +25,7 @@ A quest completes when **every** goal reaches its `RequiredCount`; completing a 
 | `Kill` | `CombatService` on an NPC death | `TrailingRefId == NpcTemplateId` first, `TargetName` as fallback |
 | `LootFromNpc` | `LootService` when an item leaves a corpse bag | the bag's source NPC **and** the item id |
 | `TalkToNpc` | `ConversationService` on the NPC greeting | `TargetName`. **Solves** the goal (jumps to required) rather than +1, so a "deliver N to X" hand-in completes in one talk |
-| `Escort` | — | not wired |
+| `Escort` | the `UseObject` handler, on the object that plays the escortee's farewell | `TargetName`, resolved from `ConversationNode.TriggerWorldObjectId` — see below |
 | `ReachArea` | the move handler, per accepted move | the goal's **region** if it has one, else a 40-unit radius around its map marker |
 | `CollectItem` | **any item reaching the inventory** | `TrailingRefId == item template id` |
 
@@ -203,6 +203,13 @@ ends when the player **opens the city door**:
 
 ⚠️ **Order matters: the quest completes BEFORE the conversation, not because of it.** The door is the trigger; the
 farewell is a separate, server-initiated beat that follows.
+
+**That is how the escort is wired.** `GameServerListener.Inbound`'s `ActionType.UseObject` case asks which NPCs
+this object opens a server-initiated conversation for and completes their `Escort` goals — before the teleport,
+matching the capture's order. Which door is **data-driven, not hard-coded**: the object that plays the escortee's
+farewell is by definition where the escort was leading, so `ConversationNode.TriggerWorldObjectId` supplies it and
+the goal needs no new column. Gated by `SeedContentTests.EscortGoal_HasAWorldObjectThatCanCompleteIt`, which
+checks the escort → escortee → trigger → `WorldObject` chain still holds in the shipped data.
 
 The conversation (Casilda, `npcname` = `<localized id="9411" category="51000">`, her template id and goal 3544's
 `TrailingRefId`) reads:

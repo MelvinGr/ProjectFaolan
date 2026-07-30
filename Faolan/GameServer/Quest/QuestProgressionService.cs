@@ -71,6 +71,20 @@ namespace Faolan.GameServer.Quest
 			return Advance(client, QuestGoalType.TalkToNpc, npcName);
 		}
 
+		// The escort reached its destination: complete any active Escort goal for `npcName` (#521/#523).
+		//
+		// Retail ends the Tortage escort when the player USES THE CITY DOOR - decoded from both beach-to-city captures:
+		// c2s UseObject -> QuestGoal 12407/3544 1/1 -> QuestIIR Active then Completed, and only THEN does Casilda's
+		// farewell open. So the door is the trigger and the conversation is a consequence, not the cause.
+		//
+		// Which door is data-driven, not hard-coded: the object that opens the escortee's server-opened farewell is the
+		// object the escort was leading to (ConversationNode.TriggerWorldObjectId), so the caller resolves the NPC from
+		// the used object and this just completes the goal.
+		public Task AdvanceEscortGoals(INetworkClient client, string npcName)
+		{
+			return Advance(client, QuestGoalType.Escort, npcName);
+		}
+
 		// #262: the ReachArea goals the player still needs to reach, as in-memory targets for the move-handler proximity
 		// check (WorldEntity.PendingReachGoals). Loaded ONCE at first move so the per-move test hits no DB; skips goals
 		// already solved (a relog past the area doesn't re-fire) and every non-ReachArea goal. A ReachArea goal has no
