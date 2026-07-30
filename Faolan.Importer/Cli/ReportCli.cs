@@ -734,7 +734,8 @@ namespace Faolan.Importer.Cli
 						$"{await db.Items.CountAsync():N0} items · {await db.Spells.CountAsync():N0} spells · {await db.Abilities.CountAsync():N0} abilities · " +
 						$"{await db.Feats.CountAsync():N0} feats · " +
 						$"{await db.ConversationNodes.CountAsync():N0} conversation nodes · {await db.Shops.CountAsync():N0} shops · {await db.QuestDefinitions.CountAsync():N0} quests · " +
-						$"{await db.WorldObjects.CountAsync():N0} world objects · {await db.PatrolNodes.Where(n => n.ParentPath == null).CountAsync():N0} patrol routes";
+						$"{await db.WorldObjects.CountAsync():N0} world objects · {await db.PatrolNodes.Where(n => n.ParentPath == null).CountAsync():N0} patrol routes · " +
+						$"{await db.MapRegions.CountAsync():N0} client trigger volumes";
 			Console.WriteLine("\n" + stats);
 
 			if (string.Equals(arg, "readme", StringComparison.OrdinalIgnoreCase))

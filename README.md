@@ -21,7 +21,7 @@ Open work is tracked as Gitea issues; the `#NNN` refs point to the relevant issu
 **Legend:** ✅ working · 🟡 partial / needs work · ⬜ not started (roadmap)
 
 <!-- stats:start -->
-**Imported content** (the DB is the server's source of truth): 530 maps · 1,018 NPC types / 3,046 placements · 4,185 items · 20,848 spells · 265 abilities · 19,777 feats · 467 conversation nodes · 70 shops · 2,037 quests · 2,375 world objects · 871 patrol routes · 14 client trigger volumes
+**Imported content** (the DB is the server's source of truth): 530 maps · 1,018 NPC types / 3,046 placements · 4,185 items · 20,848 spells · 265 abilities · 19,777 feats · 485 conversation nodes · 70 shops · 2,037 quests · 2,375 world objects · 871 patrol routes · 14 client trigger volumes
 <!-- stats:end -->
 
 **Content coverage** — of the NPCs/vendors we've actually interacted with in our capture dumps, how many are
@@ -134,7 +134,8 @@ we've seen_, and names the gaps). Regenerate with
   Stygian, the other three races by the same rule (#206, #510)
 - ✅ **Buffs & debuffs** — apply, tick (damage-over-time), expire on a timer, and right-click to cancel; self-buffs
   and enemy debuffs both verified in-client. Each damage-over-time spell ticks at its own measured rate, 0.5 to 11
-  seconds, instead of one 2-second constant (#274, #370, #437)
+  seconds, instead of one 2-second constant — 53 of the 84 DoT spells in the captures have a measured cadence, and
+  the rest fall back to 2 s, the median of those measured (#274, #370, #437, #524)
 - 🟡 **Damage scale** — NPC swing damage is measured from the captures (it had been ~15x too weak) and caster NPCs
   land their spells with the right school. Only levels 1-6 are well sampled; above that the curve is extrapolated
   and wants an in-client pass (#401, #479)
@@ -442,7 +443,7 @@ dotnet run --project Faolan.Importer -- --report terrain-export   # writes Terra
 | `Faolan.ClientLauncher/` | Launches the game client unattended (patcher stand-in).                                                                                                                                |
 | `Faolan.Web.Content/`    | Store-and-forward proxy for the client's content CDN (fixes the loading hang).                                                                                                         |
 | `Faolan.Wireshark/`      | A Wireshark/tshark C plugin that fully dissects the Conan protocol (the canonical capture tool).                                                                                       |
-| `Faolan.Web/`            | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail, a generic `faolan.db` editor) gated to GameMaster accounts. |
+| `Faolan.Web/`            | Blazor web app: public character/equipment 3D viewer + armory, plus admin/GM tools (live map radar, GM console, ban, mail, and three content editors — a generic `faolan.db` one plus purpose-built quest and spell screens) gated to GameMaster accounts. |
 | `Faolan.Tests/`          | The unit/golden test suite.                                                                                                                                                            |
 | `tools/`                 | The capture/RE toolchain: Python dissectors + the tshark dump script, Ghidra scripts, Frida scripts.                                                                                   |
 

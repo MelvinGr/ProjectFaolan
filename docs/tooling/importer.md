@@ -63,7 +63,7 @@ Capture-sourced (default group, run in dependency order):
 | `items` | — |
 | `maps` | — |
 | `spells` | — |
-| `dot-effects` | `spells` |
+| `dot-effects` (per-tick delta + the measured tick interval) | `spells` |
 | `spell-effects` (pet summons + the fatality proc; DB-sourced, needs no captures) | — |
 | `abilities` (+ the rehomed ability-slot seed) | — |
 | `class-spells` | — |

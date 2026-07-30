@@ -135,6 +135,13 @@ The harvested goal carries the wire fields; the *server trigger* fields (`GoalTy
 skips a goal that is already wired. So a hand edit — or the `/admin/quests` editor in Faolan.Web — survives a
 re-import, while a freshly harvested quest still bootstraps.
 
+That editor shows a quest and all its goals on one screen, with the wiring fields editable and three things
+alongside them that are *not* ours to set: the goal's **kind tag** (the client's own verb for the objective —
+the evidence `GoalType` should follow, so a disagreement between the two is visible rather than hidden), the
+name of its **trigger region**, and the **conversations** that grant the quest or gate a screen on holding it.
+That last one is why it is worth showing: a quest that nothing grants is unreachable in game, and nothing about
+the goal rows says so.
+
 `TypeItemGoalsFromTrailingCategory` is the general rule rather than a per-quest seed: an unwired goal whose
 trailing reference is an item, and whose kind tag is **not** `Deliver`, becomes `CollectItem`. It replaced 62
 goals sitting at the `Kill` default with no target — inert fetch quests that could never complete. They were
