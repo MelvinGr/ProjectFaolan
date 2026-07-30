@@ -93,7 +93,11 @@ namespace Faolan.GameServer.Quest
 					if (await GoalProgressOf(characterId, quest, def, goal) >= required)
 						continue; // already reached
 
-					targets.Add(new ReachGoalTarget(quest.QuestId, goal.GoalId, goal.MapId ?? 0, goal.MarkerX ?? 0, goal.MarkerY ?? 0, ReachRadius * ReachRadius));
+					// The client's real trigger volume where the goal carries one (#521), else the marker radius. The
+					// region's own MapId wins when the goal has none: goal 14073 carries no map at all, and its
+					// region (`BossRoom`) is what says which playfield it is on.
+					targets.Add(new ReachGoalTarget(quest.QuestId, goal.GoalId, goal.Region?.MapId ?? goal.MapId ?? 0, goal.MarkerX ?? 0, goal.MarkerY ?? 0,
+						ReachRadius * ReachRadius, goal.Region));
 				}
 			}
 

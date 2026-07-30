@@ -28,6 +28,19 @@ namespace Faolan.Core.Database.Tables
 		// itself is #503).
 		public bool Shady { get; set; }
 
+		// The client's DISCOVERY volume for this point (#519): walk into it and the point becomes known. Null for
+		// the 525 points the client ships no volume for, which fall back to WorldSimulation's proximity radius.
+		//
+		// The volume is not a courtesy - it is measurably tighter than the radius it replaces. The 13 shipped ones
+		// are 16x20 to 29x33 units and only ~10 units tall, against a 30-unit radius (a 60x60 box) with no vertical
+		// bound at all, so we currently discover a point from roughly twice the distance retail requires and from
+		// any height. SetNull rather than cascade: losing the volume must degrade to the radius, never delete the
+		// respawn point.
+		public uint? DiscoveryRegionId { get; set; }
+
+		[ForeignKey(nameof(DiscoveryRegionId))]
+		public virtual MapRegion? DiscoveryRegion { get; set; }
+
 		// The RDB's `RestorationLevel`: the PERCENT of max health/mana you revive with here (observed 7/10/20/25/30/
 		// 50/70/100; 344 of the 538 points restore 10, 157 restore 100). Applied by the revive path via
 		// EntityVitals.ReviveTo (#375), and it GOES ON THE WIRE - it is the field the resurrection-spots body used to

@@ -104,7 +104,13 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<QuestDefinition?> GetQuestDefinition(uint questId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.QuestDefinitions.Include(q => q.TextRefs).Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
+			// Goals bring their ReachArea region + ring (#521); same reason as GetRespawnPoints - lazy loading is off,
+			// so an un-Included navigation is silently null/empty rather than loaded on touch.
+			return await ctx
+				.QuestDefinitions.Include(q => q.TextRefs)
+				.Include(q => q.Goals)
+				.ThenInclude(g => g.Region!.Vertices)
+				.FirstOrDefaultAsync(q => q.QuestId == questId);
 		}
 
 		// Every quest of an area, ordered by its position within that area (JournalSequence) - the quest index's
@@ -124,7 +130,14 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<RespawnPoint[]> GetRespawnPoints(uint mapId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.RespawnPoints.Where(r => r.MapId == mapId).ToArrayAsync();
+			// The discovery volume + its ring come along: WorldSimulation tests containment per player per second, and
+			// a lazy load there would be a query per point per tick (lazy loading is off anyway, so it would silently
+			// be an EMPTY ring instead - a region that can never contain anyone).
+			return await ctx
+				.RespawnPoints.Include(r => r.DiscoveryRegion)
+				.ThenInclude(g => g!.Vertices)
+				.Where(r => r.MapId == mapId)
+				.ToArrayAsync();
 		}
 
 		// Include the WORD rows: they are not decoration, they are part of the wire record. WorldObjectGeometryCodec

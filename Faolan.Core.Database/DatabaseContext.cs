@@ -64,6 +64,8 @@ namespace Faolan.Core.Database
 		DbSet<MapArea> MapAreas { get; }
 		DbSet<MapHazard> MapHazards { get; }
 		DbSet<MapHazardVertex> MapHazardVertices { get; }
+		DbSet<MapRegion> MapRegions { get; }
+		DbSet<MapRegionVertex> MapRegionVertices { get; }
 		DbSet<TravelDestination> TravelDestinations { get; }
 		DbSet<MapLootEntry> MapLootEntries { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
@@ -157,6 +159,8 @@ namespace Faolan.Core.Database
 		public DbSet<MapArea> MapAreas { get; set; }
 		public DbSet<MapHazard> MapHazards { get; set; }
 		public DbSet<MapHazardVertex> MapHazardVertices { get; set; }
+		public DbSet<MapRegion> MapRegions { get; set; }
+		public DbSet<MapRegionVertex> MapRegionVertices { get; set; }
 		public DbSet<TravelDestination> TravelDestinations { get; set; }
 		public DbSet<MapLootEntry> MapLootEntries { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
@@ -280,6 +284,7 @@ namespace Faolan.Core.Database
 			// A hazard's boundary polygon (#504); cascade-delete with the hazard so a re-import of the RDB volumes never
 			// leaves orphan vertices behind.
 			modelBuilder.Entity<MapHazard>().HasMany(h => h.Vertices).WithOne(v => v.Hazard).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<MapRegion>().HasMany(r => r.Vertices).WithOne(v => v.Region).OnDelete(DeleteBehavior.Cascade);
 
 			// Both ends cascade: deleting a character drops its own list AND its entries in everyone else's, so no
 			// friend row can outlive either character. Fluent because no attribute expresses OnDelete, and NoAction on
@@ -396,6 +401,7 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<NpcSpawn>().Property(n => n.Id).ValueGeneratedNever();
 			modelBuilder.Entity<NpcSpawnArea>().Property(a => a.Id).ValueGeneratedNever();
 			modelBuilder.Entity<MapHazard>().Property(h => h.Id).ValueGeneratedNever();
+			modelBuilder.Entity<MapRegion>().Property(r => r.Id).ValueGeneratedNever();
 			modelBuilder.Entity<WorldObject>().Property(o => o.Id).ValueGeneratedNever();
 			modelBuilder.Entity<ConversationNode>().HasMany(n => n.Packets).WithOne(p => p.Node).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<ConversationPacket>().HasMany(p => p.Screens).WithOne(s => s.Packet).OnDelete(DeleteBehavior.Cascade);

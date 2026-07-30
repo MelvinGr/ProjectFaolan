@@ -452,7 +452,16 @@ namespace Faolan.GameServer.World
 				{
 					if (point.AlwaysKnown || discovered.Contains(point.Id))
 						continue;
-					if (Vector3.Distance(point.Position, entity.Position) > RespawnDiscoveryRange)
+
+					// The client's own discovery VOLUME where we have one (#519), the proximity radius otherwise.
+					// The volume is not a nicety: the 11 shipped ones are 16x20 to 29x33 units and ~10 units tall,
+					// where RespawnDiscoveryRange is a 60x60 box with no vertical bound at all - so the radius
+					// discovers a point from roughly twice the distance retail requires, and from any height. Only
+					// 11 of 554 points carry one, so the radius stays as the fallback rather than going away.
+					var inVolume = point.DiscoveryRegion != null
+						? EnvironmentService.Contains(point.DiscoveryRegion, entity.Position)
+						: Vector3.Distance(point.Position, entity.Position) <= RespawnDiscoveryRange;
+					if (!inVolume)
 						continue;
 
 					await _database.DiscoverRespawnPoint(character.Id, point.Id);

@@ -1835,6 +1835,66 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("MapLootEntries");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.MapRegion", b =>
+                {
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("MapId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("MaxX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("MaxY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("MaxZ")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("MinX")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("MinY")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("MinZ")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint>("ScryId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MapId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("MapRegions");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.MapRegionVertex", b =>
+                {
+                    b.Property<uint>("RegionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("X")
+                        .HasColumnType("REAL");
+
+                    b.Property<float>("Z")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("RegionId", "Sequence");
+
+                    b.ToTable("MapRegionVertices");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.MorphTarget", b =>
                 {
                     b.Property<uint>("Id")
@@ -2853,6 +2913,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("QuestItemId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("RegionId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("RegionOrder")
                         .HasColumnType("INTEGER");
 
@@ -2906,6 +2969,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasIndex("QuestDefinitionId");
 
                     b.HasIndex("QuestItemId");
+
+                    b.HasIndex("RegionId");
 
                     b.ToTable("QuestGoalDefinitions");
                 });
@@ -3064,6 +3129,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<bool>("AlwaysKnown")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("DiscoveryRegionId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("MapId")
                         .HasColumnType("INTEGER");
 
@@ -3100,6 +3168,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DiscoveryRegionId");
 
                     b.HasIndex("MapId");
 
@@ -4321,6 +4391,28 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Map");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.MapRegion", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
+                        .WithMany()
+                        .HasForeignKey("MapId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Map");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.MapRegionVertex", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.MapRegion", "Region")
+                        .WithMany("Vertices")
+                        .HasForeignKey("RegionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Region");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
@@ -4582,11 +4674,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .WithMany()
                         .HasForeignKey("QuestItemId");
 
+                    b.HasOne("Faolan.Core.Database.Tables.MapRegion", "Region")
+                        .WithMany()
+                        .HasForeignKey("RegionId");
+
                     b.Navigation("Map");
 
                     b.Navigation("Quest");
 
                     b.Navigation("QuestItem");
+
+                    b.Navigation("Region");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestTextRef", b =>
@@ -4621,11 +4719,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.RespawnPoint", b =>
                 {
+                    b.HasOne("Faolan.Core.Database.Tables.MapRegion", "DiscoveryRegion")
+                        .WithMany()
+                        .HasForeignKey("DiscoveryRegionId");
+
                     b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
                         .WithMany("RespawnPoints")
                         .HasForeignKey("MapId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("DiscoveryRegion");
 
                     b.Navigation("Map");
                 });
@@ -4824,6 +4928,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.MapHazard", b =>
+                {
+                    b.Navigation("Vertices");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.MapRegion", b =>
                 {
                     b.Navigation("Vertices");
                 });

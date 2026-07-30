@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
@@ -203,23 +204,40 @@ namespace Faolan.GameServer.World
 		// a lot of safe ground, so an AABB hit means "worth walking", never "inside".
 		public static bool Contains(MapHazard hazard, Vector3 p)
 		{
-			if (p.Y < hazard.MinY || p.Y > hazard.MaxY)
-				return false;
-			if (p.X < hazard.MinX || p.X > hazard.MaxX || p.Z < hazard.MinZ || p.Z > hazard.MaxZ)
-				return false;
-
 			// Ordered by Sequence: a polygon is only meaningful in ring order, and EF gives no ordering guarantee on a
 			// navigation collection. Reading them as loaded produced a self-intersecting ring on some hazards.
-			var ring = hazard.Vertices.OrderBy(v => v.Sequence).ToArray();
-			if (ring.Length < 3)
+			return InPrism(p, hazard.MinY, hazard.MaxY, hazard.MinX, hazard.MaxX, hazard.MinZ, hazard.MaxZ,
+				hazard.Vertices.OrderBy(v => v.Sequence).Select(v => (v.X, v.Z)));
+		}
+
+		// The same test for an imported bounded-area region (MapRegion): resurrection-point discovery volumes (#519)
+		// and quest ReachArea goal regions (#521). One routine for both tables rather than a second copy of a ray
+		// cast - the ordering trap above applies identically, and it is not the kind of thing to rediscover twice.
+		public static bool Contains(MapRegion region, Vector3 p)
+		{
+			return InPrism(p, region.MinY, region.MaxY, region.MinX, region.MaxX, region.MinZ, region.MaxZ,
+				region.Vertices.OrderBy(v => v.Sequence).Select(v => (v.X, v.Z)));
+		}
+
+		// Y range -> AABB reject -> even-odd ray cast over the ring, wrapping the closing edge back to vertex 0 (the
+		// RDB does not repeat the first point). `ring` must already be in Sequence order.
+		private static bool InPrism(Vector3 p, float minY, float maxY, float minX, float maxX, float minZ, float maxZ,
+			IEnumerable<(float X, float Z)> ring)
+		{
+			if (p.Y < minY || p.Y > maxY)
+				return false;
+			if (p.X < minX || p.X > maxX || p.Z < minZ || p.Z > maxZ)
 				return false;
 
-			// Even-odd ray cast, wrapping the closing edge back to vertex 0 (the RDB does not repeat the first point).
+			var ordered = ring.ToArray();
+			if (ordered.Length < 3)
+				return false;
+
 			var inside = false;
-			for (int i = 0, j = ring.Length - 1; i < ring.Length; j = i++)
+			for (int i = 0, j = ordered.Length - 1; i < ordered.Length; j = i++)
 			{
-				if (ring[i].Z > p.Z != ring[j].Z > p.Z &&
-				    p.X < (ring[j].X - ring[i].X) * (p.Z - ring[i].Z) / (ring[j].Z - ring[i].Z) + ring[i].X)
+				if (ordered[i].Z > p.Z != ordered[j].Z > p.Z &&
+				    p.X < (ordered[j].X - ordered[i].X) * (p.Z - ordered[i].Z) / (ordered[j].Z - ordered[i].Z) + ordered[i].X)
 					inside = !inside;
 			}
 

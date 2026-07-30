@@ -5,8 +5,13 @@ namespace Faolan.Core.Database.Tables
 {
 	// One goal of a quest as it appears in the snapshot's @609 objective-detail region (decoded:
 	// tools/capture/decode_snapshot_609.py, codec QuestObjectiveRegion). Construct, don't replay: the numeric fields +
-	// the two text refs (objective cat 50304, trailing cat 51200 remoteformat / 51000 localized) regenerate the
-	// per-goal record byte-exact via QuestObjectiveGoal.BuildSingle.
+	// the two text refs regenerate the per-goal record byte-exact via QuestObjectiveGoal.BuildSingle.
+	//
+	// The two refs are TYPED LDB references, and the client's own category table names them (see
+	// docs/rdb/ldb-string-index.md): the OBJECTIVE ref is always category 50304 `quest_goal_templates.goal_name` -
+	// the goal's display text, which is ENCRYPTED and so unreadable (#520) - while the TRAILING ref names the goal's
+	// TARGET and is plaintext, its category saying what kind of thing it points at: 50200 `item.name`, 51000
+	// `npc_template.name`, 51100 `categorytree.description`, 51200 `bounded_areas.bounded_area`.
 	public class QuestGoalDefinition
 	{
 		// The goal's wire objective id - globally unique, so it is the PK (no synthetic Id / BaseEntity dropped). It is
@@ -128,7 +133,29 @@ namespace Faolan.Core.Database.Tables
 		public uint Unknown2 { get; set; }
 
 		// The marker coordinates, null exactly when MapId is - the three travel as one block on the wire.
+		//
+		// ⚠️ The marker is a MAP PIN, not a trigger. For a ReachArea goal the real volume is `Region` below, and the
+		// two are not the same shape: goal 1448's marker (416, 701) sits inside `Trappers Haven`, a 96 x 82 region,
+		// while the marker-radius fallback tests a 40-unit circle centred on the pin.
 		public uint? MarkerX { get; set; }
 		public uint? MarkerY { get; set; }
+
+		// The client's trigger volume for this goal (#521), resolved from the typed reference the goal already
+		// carries: `TrailingCategory` 51200 is `bounded_areas.bounded_area`, so LDB[51200][TrailingRefId] is the
+		// region's NAME and that names a region in the playfield's RDB 1000053 record. Verified end to end on the
+		// beach starter - goal 1448 -> LDB[51200][180] = "Trappers Haven" -> a 7-vertex region on map 4010 that
+		// contains the goal's own marker.
+		//
+		// Null for every goal that carries no 51200 reference (only 3 in the whole catalog do), and those keep the
+		// marker-radius test. SetNull so dropping a region degrades the goal rather than deleting it.
+		//
+		// ⚠️ A 51200 reference does NOT by itself make a goal a ReachArea - goal 11712 has RequiredCount 3, so its
+		// region scopes the objective ("3 of something in there") instead of being it. Settling that needs the
+		// goal's own objective text, which is in ENCRYPTED LDB category 50304 (#520). So this column is the
+		// geometry only; GoalType stays whatever the wiring says.
+		public uint? RegionId { get; set; }
+
+		[ForeignKey(nameof(RegionId))]
+		public virtual MapRegion? Region { get; set; }
 	}
 }

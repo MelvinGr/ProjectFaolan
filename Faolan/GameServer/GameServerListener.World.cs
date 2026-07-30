@@ -113,13 +113,23 @@ namespace Faolan.GameServer
 			// InvalidateReachGoals (PendingReachGoals -> null, reloaded next move), so we must not index the live list
 			// across a solve. Removes are null-safe; a target solved after an invalidation is simply excluded from the
 			// reload (LoadReachGoals skips completed goals), so no double-fire.
-			var reached = pending.Where(t => t.MapId == player.MapId && (position.X - t.X) * (position.X - t.X) + (position.Z - t.Z) * (position.Z - t.Z) <= t.RadiusSq).ToList();
+			var reached = pending.Where(t => t.MapId == player.MapId && ReachedTarget(t, position)).ToList();
 			foreach (var target in reached)
 			{
 				player.PendingReachGoals?.Remove(target);
 				Logger.LogInformation("#262: player {Char} reached quest {Quest} goal {Goal} area ({X},{Z}).", client.Session.Character.Name, target.QuestId, target.GoalId, target.X, target.Z);
 				await _questProgression.SolveGoal(client, target.GoalId);
 			}
+		}
+
+		// Inside the goal's CLIENT trigger volume where it has one (#521) - the full prism test, so a goal region
+		// stacked over another does not fire from the wrong floor - else within the marker radius (the #262
+		// fallback, a horizontal circle around the goal's map pin).
+		private static bool ReachedTarget(ReachGoalTarget t, Vector3 position)
+		{
+			return t.Region != null
+				? EnvironmentService.Contains(t.Region, position)
+				: (position.X - t.X) * (position.X - t.X) + (position.Z - t.Z) * (position.Z - t.Z) <= t.RadiusSq;
 		}
 	}
 }

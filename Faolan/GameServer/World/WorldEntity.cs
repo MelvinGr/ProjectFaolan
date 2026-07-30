@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
@@ -698,8 +699,17 @@ namespace Faolan.GameServer.World
 	// payload (interim verbatim). Sourced from the NpcSpell table by NPC name.
 	public readonly record struct NpcSpellCast(uint SpellId, byte[] Payload);
 
-	// A pending ReachArea quest goal (#262): the goal is solved when the player is within `RadiusSq` (horizontal, on
-	// map `MapId`) of the world point (X, Z) - the goal's map marker, which IS the objective's world location
-	// (verified: Saddur's kill-goal marker == his spawn). QuestId is kept so a solved goal names its quest in logs.
-	public readonly record struct ReachGoalTarget(uint QuestId, uint GoalId, uint MapId, float X, float Z, float RadiusSq);
+	// A pending ReachArea quest goal (#262), solved when the player enters it on map `MapId`. Two shapes, and
+	// `Region` decides which:
+	//
+	//   - `Region` set (#521): the CLIENT'S OWN trigger volume, resolved from the goal's typed LDB reference
+	//     (`TrailingCategory` 51200 -> region name -> that playfield's RDB 1000053 record). Containment is the
+	//     polygon prism, exactly as for a hazard.
+	//   - `Region` null: the fallback - within `RadiusSq` (horizontal) of the goal's map marker (X, Z).
+	//
+	// ⚠️ The marker is a map PIN, not the trigger, so the fallback is an approximation and the region is not. Goal
+	// 1448's marker (416, 701) sits inside `Trappers Haven`, a 96 x 82 region, while the fallback tests a 40-unit
+	// circle centred on the pin - overlapping, but neither contains the other. Only 3 goals carry a region today.
+	// QuestId is kept so a solved goal names its quest in logs.
+	public readonly record struct ReachGoalTarget(uint QuestId, uint GoalId, uint MapId, float X, float Z, float RadiusSq, MapRegion? Region = null);
 }

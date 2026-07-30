@@ -317,6 +317,37 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// The bounded-area trigger volumes a subsystem actually consumes (RDB 1000053, #519/#521), into MapRegion. Clean
+	// rebuild - the set is derived from the fixed client RDB - so Overwrite-only, like the hazards.
+	//
+	// Depends on rdb-respawns and the quest import: it links regions to the RespawnPoints and QuestGoalDefinitions
+	// that are already in the DB, so running it against a database without them imports nothing and reports so.
+	public sealed class RdbRegionsModule : IImportModule
+	{
+		public IReadOnlyList<string> DependsOn => ["rdb-respawns"];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Overwrite
+		};
+
+		public ImportSource Source => ImportSource.Rdb;
+
+		public string Description => "Consumed bounded-area trigger volumes -> MapRegion (1000053, #519/#521).";
+		public string Name => "rdb-regions";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var r = await RdbRegionImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
+			// Anything a consumer asked for and did not get is named, not swallowed.
+			foreach (var note in r.Notes)
+				ctx.Out.WriteLine($"  rdb-regions unresolved: {note}");
+
+			return new ImportResult($"{r.Regions} regions ({r.Vertices} vertices); linked {r.DiscoveryLinks} respawn discovery volume(s) " +
+			                        $"and {r.GoalLinks} quest goal region(s).");
+		}
+	}
+
 	// Authoritative open-world NPC spawn points from the RDB "NPC roam/movement" layout (type 1010506, #332). Clean
 	// rebuild - the set is fully derived from the fixed client RDB, so Overwrite-only.
 	public sealed class RdbNpcSpawnsModule : IImportModule

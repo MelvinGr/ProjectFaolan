@@ -120,6 +120,64 @@ namespace Faolan.Tests
 			Assert.True(misfiled.Count == 0, $"Outlaw-named points filed as normal: {string.Join(", ", misfiled)}");
 		}
 
+		// The imported bounded-area regions and, more importantly, their LINKS (#519/#521). A MapRegion nothing points
+		// at is dead weight: the whole point of the table is that only regions a consumer resolves to are imported, so
+		// an unlinked row means the resolution silently stopped working while the row count looked healthy.
+		[Fact]
+		public async Task MapRegions_AreLinkedToTheirConsumers()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var regions = await db.MapRegions.Include(r => r.Vertices).ToListAsync(ct);
+			Assert.NotEmpty(regions);
+
+			// Every region is a testable prism: a real ring and a real height range. A degenerate one can never
+			// contain anybody, so it would disable the consumer it was imported for without failing anything.
+			Assert.All(regions, r =>
+			{
+				Assert.True(r.Vertices.Count >= 3, $"region {r.Name} on map {r.MapId} has {r.Vertices.Count} vertices");
+				Assert.True(r.MaxY > r.MinY, $"region {r.Name} on map {r.MapId} has an empty height range");
+				Assert.Equal(Enumerable.Range(0, r.Vertices.Count), r.Vertices.OrderBy(v => v.Sequence).Select(v => v.Sequence));
+			});
+
+			var discovery = await db.RespawnPoints.CountAsync(p => p.DiscoveryRegionId != null, ct);
+			var goals = await db.QuestGoalDefinitions.CountAsync(g => g.RegionId != null, ct);
+			Assert.True(discovery >= 11, $"{discovery} respawn points carry a discovery volume; the import resolves 11.");
+			Assert.True(goals >= 3, $"{goals} quest goals carry a region; the import resolves 3.");
+
+			var linked = (await db.RespawnPoints.Where(p => p.DiscoveryRegionId != null).Select(p => p.DiscoveryRegionId!.Value).ToListAsync(ct))
+				.Concat(await db.QuestGoalDefinitions.Where(g => g.RegionId != null).Select(g => g.RegionId!.Value).ToListAsync(ct))
+				.ToHashSet();
+			var orphans = regions.Where(r => !linked.Contains(r.Id)).Select(r => $"{r.MapId}/{r.Name}").ToList();
+			Assert.True(orphans.Count == 0, $"MapRegions nothing links to: {string.Join(", ", orphans)}");
+		}
+
+		// The #519 claim, asserted on the shipped data rather than in prose: a discovery volume is TIGHTER than the
+		// 30-unit radius it replaces. If a future harvest widened them, the "our radius is too generous" premise the
+		// column exists for would be false and nobody would notice.
+		[Fact]
+		public async Task DiscoveryVolumes_AreTighterThanTheFallbackRadius()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var volumes = await db
+				.RespawnPoints.Where(p => p.DiscoveryRegionId != null)
+				.Select(p => p.DiscoveryRegion!)
+				.Distinct()
+				.ToListAsync(ct);
+
+			Assert.NotEmpty(volumes);
+			Assert.All(volumes, r =>
+			{
+				// The fallback is a 30-unit radius: a 60 x 60 footprint, unbounded vertically.
+				Assert.True(r.MaxX - r.MinX < 60f && r.MaxZ - r.MinZ < 60f,
+					$"{r.Name} is {r.MaxX - r.MinX:F0} x {r.MaxZ - r.MinZ:F0}, no tighter than the 60 x 60 radius box it replaces");
+				Assert.True(r.MaxY - r.MinY < 60f, $"{r.Name} is {r.MaxY - r.MinY:F0} units tall - the volumes are ~10");
+			});
+		}
+
 		// A shop with no wares is a shop the player cannot buy from - the exact shape of the loss above, and the one
 		// a bare row count on ShopItems would still miss if a single vendor were emptied.
 		[Fact]

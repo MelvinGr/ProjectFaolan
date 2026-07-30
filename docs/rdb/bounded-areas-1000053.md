@@ -431,6 +431,25 @@ the geometry: given a goal known to be a `ReachArea`, its exact polygon is now r
 
 ## Import
 
+Two modules read this table, and both import a DELIBERATELY SMALL slice of it — the regions some subsystem
+actually consumes. The server has no RDB access, so anything the runtime needs has to come through here; what
+nothing reads stays out.
+
+`RdbRegionImporter` (the opt-in `rdb-regions` module) imports **14 regions / 59 vertices** into `MapRegion` +
+`MapRegionVertex` and links each to its consumer:
+
+- **11 resurrection-point discovery volumes** (#519) → `RespawnPoint.DiscoveryRegionId`, matched by containment:
+  the smallest `*RezDiscovery* `region containing the point. `WorldSimulation` then tests the polygon instead of
+  its 30-unit radius, which was a 60 × 60 box with no vertical bound against volumes of 16 × 20 to 29 × 33 and
+  ~10 units tall.
+  ⚠️ `Rez` is load-bearing and is the client's own discriminator. The looser `_Discovery` spelling also matches
+  `FrostFields_Discovery` and `FotD_Discovery` — **area** discovery, 157 × 185 and 114 × 74 — and each of those
+  contains a respawn point of the *same name*, so a containment test alone happily links them and widens two
+  points' discovery to a box 25× the size. Different mechanic, matching name.
+- **3 quest goal regions** (#521) → `QuestGoalDefinition.RegionId`, resolved through the goal's typed LDB
+  reference (see below). `BossRoom` resolves even though goal 14073 carries no `MapId`, because the name occurs on
+  exactly one hosted playfield; ambiguity is reported rather than guessed.
+
 `RdbHazardImporter` (the opt-in `rdb-hazards` module) reads the lava volumes into `MapHazard` +
 `MapHazardVertex`: **105 volumes / 5,396 vertices over 22 playfields**, from Tortage Volcano and the Acheronian
 Ruins through Ymir's Pass, the Amphitheatre of Karutonia, Dragon's Spine and the Catacombs.

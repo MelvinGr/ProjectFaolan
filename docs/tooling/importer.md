@@ -86,7 +86,8 @@ Opt-in capture-sourced (run only when named via `--only`): `mounts`, `pets`, `re
 RDB-sourced (require `--rdb`, **not** in the default group — opt-in via `--only`):
 `rdb-inventory` (read-only type-count report), `rdb-morphs`, `rdb-appearance`, `rdb-spells`, `rdb-abilities`,
 `rdb-combos`, `rdb-maps`, `rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt),
-`class-attributes` (the per-class/level attribute + health BASE, #444 — see below).
+`rdb-hazards` (lava volumes), `rdb-regions` (the bounded-area trigger volumes a subsystem consumes — depends on
+`rdb-respawns`), `class-attributes` (the per-class/level attribute + health BASE, #444 — see below).
 
 TSV-sourced (default group; each self-skips if its `.tsv` is absent): `ellatha-levels`, `ellatha-combos`,
 `wiki-class-spells`, `wiki-spell-levels`. Plus `starter-spells` — capture-sourced but registered late
