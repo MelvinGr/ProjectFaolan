@@ -350,6 +350,47 @@ point, so `A_1`↔`A_2` is complete information with no capture and no name reso
 1026 but `BA_Teleport_WLoZ` on the 967 audio variant — the same geometry with two different claimed
 destinations. Trust the real playfield.)
 
+## The zone / area-name regions exist — found by containment, not by name
+
+This page declines to classify a `zone-name` bucket by regex, because the regions are named after the PLACE. That
+makes them invisible to a name rule but **not** invisible: they can be found from the other end, by asking which
+region contains a banner we have already observed. `MapArea` (#348) is exactly that observation set — 22 rows over
+7 playfields, each an `AreaNameId` plus a hull over the positions the banner was seen firing at.
+
+**Every one of the 22 hulls falls inside a region, and 18 of them inside a recognisably PLACE-NAMED one:**
+
+| banner (`AreaNameId`) | map | smallest place-named region containing it |
+|---|---|---|
+| 3385037 / 3385038 | Old Tarantia 2000 | `BA_EastGate` (413 u²) / `BA_WestGate` (651 u²) |
+| 3373525 | Old Tarantia 2000 | `BA_MarketWard` (3,102 u²) |
+| 3373519 | Old Tarantia 2000 | `BA_Bridge` (4,615 u²) |
+| 3906077 | Old Tarantia 2000 | `Outlaw Camp` (2,701 u²) |
+| 3147973 / 3474586 | Tarantia Noble District 2010 | `The Southern Bridge` (578 u²) / `Castle Approach` (25,314 u²) |
+| 277763 / 277804 / 277805 | Field of the Dead 1020 | `Clan Laeda Burial Mounds` / `Scout Camp` / `Clan Gaud Burial Party Camp` |
+| 269294 | Ymir's Pass 1090 | `POI A - The Last Cimmerian House` — the client's own "point of interest" prefix |
+
+Those read exactly like the banners the client shows on entry, which is the substantive result: **the area-banner
+regions do ship with the client**, and #348's note that they are "server-side and only reconstructible from
+captures" is true only of the banner TEXT, not of the geometry.
+
+### But the pairing is still a judgement call, and the text is unreadable
+
+Two things stop this being a mechanical import:
+
+- **No id link.** The banner's `AreaNameId` is an LDB string id, and it is **not** the ELF-28 hash of the region
+  name. Tested exhaustively: 13 spellings of all 5,308 distinct region names in the table, hashed against all 22
+  ids — **zero hits**. (Hashing the token name is normally the way to resolve an LDB id offline; see
+  `docs/rdb/ldb-string-index.md`. It does not apply here.) Nor can the text be read back to confirm a pairing:
+  area titles live in LDB category 50300, which our reader currently returns as garbage.
+- **Containment is ambiguous.** Every hull also sits inside larger audio and collision regions, and for the
+  bigger hulls the smallest place-named region does **not** contain both hull corners — `3373522` is the
+  best-sampled banner we have (18 sightings) and its hull spills outside both `Building_1_auction_house` and
+  `BA_TradingPost`. So the hull and the region disagree at the edges, and picking the right region per banner is
+  a human decision. 4 of the 22 have no place-named container at all.
+
+The prize is real all the same: 11 of `MapArea`'s 22 rows rest on a **single sample**, i.e. a zero-area point that
+only works with a runtime slack, and the client ships true polygons for the same places.
+
 ## Import
 
 `RdbHazardImporter` (the opt-in `rdb-hazards` module) reads the lava volumes into `MapHazard` +
