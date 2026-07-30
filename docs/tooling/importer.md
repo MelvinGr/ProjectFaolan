@@ -200,7 +200,10 @@ naming the character. `--report class-attribute-runs` prints the per-class block
 
 Read-only inspection modes are **not** imports and don't share the import runner. They are routed through
 `--report <name>` (`conversation-states`, `anim`, `worldobj`, `spell-fields`, `rdb-assets`,
-`class-attribute-runs`, `item-stat-scaling`, `rdb-dump` (takes `<type>` or `<type>:<id>`), … — the report's
+`class-attribute-runs`, `item-stat-scaling`, `rdb-dump` (takes `<type>` or `<type>:<id>`),
+`bounded-areas` (the client's trigger-volume survey — no arg prints the census, `--report-arg <bucket>` lists one
+bucket and cross-checks it against what we already hold; see
+[bounded-areas-1000053.md](../rdb/bounded-areas-1000053.md)), … — the report's
 target comes from `--report-arg`), read captures or the DB, and never write — independent of `--dry-run`.
 
 ## Decisions

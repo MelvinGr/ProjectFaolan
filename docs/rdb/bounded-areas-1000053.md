@@ -2,7 +2,8 @@
 
 The client's **trigger-volume table**: one record per playfield holding every named region the playfield reacts
 to — hazards, spawn camps, resurrection points, encounter triggers, collision blockers, audio regions. **478
-records, 8,323 areas over 478 playfields.** The RDB record id **== the playfield id** (== `Map.Id`), the same
+records holding 9,692 regions; 8,917 of them over the 393 records whose id is a real playfield** (the other 85 are
+the variant `0x40000000`-based numbering). The RDB record id **== the playfield id** (== `Map.Id`), the same
 convention [type 1010506](npc-spawn-layout-1010506.md) uses.
 
 This matters because the project had assumed regions like these were server-side and therefore only
@@ -96,28 +97,75 @@ The first sample inside the polygon precedes the server's feedback by **262 ms**
 on, to within one ~200 ms position sample — which is why the runtime containment test uses the polygon **with no
 tolerance at all**. [V3: MapHazardGeometryTests.CapturedTrack_CrossesTheClientPolygonWhereRetailFired]
 
-## What is in the 8,323 areas
+## What is in the 8,917 areas
 
 Classified by name. Only the **lava** row is imported today (see `MapHazard` for why the rest are deliberately
 left out — they are hazard-shaped by name with no wire evidence, and a mis-guessed kill volume is worse than a
-missing one). The remaining buckets are unexploited and each touches an open subsystem.
+missing one). The remaining buckets each touch an open subsystem.
+
+The table is **generated**, not maintained by hand — `BoundedAreaClassifier` is the classification and
+`--report bounded-areas` prints it, so it is recomputed from the real parser rather than from a script nobody can
+re-run:
+
+```zsh
+dotnet run --project Faolan.Importer -- --report bounded-areas --RdbDir <rdb-dir>
+dotnet run --project Faolan.Importer -- --report bounded-areas --report-arg spawn-camp --RdbDir <rdb-dir>
+```
+
+**8,917 regions over 393 playfield records**, excluding the 85 records in the variant (`0x40000000`-based) id
+space, which are not `Map.Id`s. 544 of the regions carry fewer than 3 vertices and so have no testable footprint.
 
 | bucket | areas | maps | related |
 |---|---:|---:|---|
-| collision blockers | 1,542 | 160 | collision / line-of-sight (#284) |
-| encounter + event start triggers | 757 | 176 | scripted encounters (#502) — retail's real trigger volumes, where ours are hand-seeded radii |
-| audio / SFX / music regions | 541 | 122 | — |
-| hazards: fire / death / misc | 445 | 79 | #504 |
-| hazards: trap / spike | 185 | 29 | #504 |
-| **hazards: lava** | **111** | **24** | **#504 — imported** |
-| spawn camps | 111 | 20 | ambient spawns (#332/#363) |
-| quest goal areas | 95 | 38 | `ReachArea` goals (#262) |
-| resurrection points | 61 | 23 | resurrection spots (#372) |
-| teleport / port areas | 44 | 25 | local travel + zone lines (#506) |
-| zone / area names | 24 | 8 | area banners (#348) |
-| hazards: drown / water damage | 14 | 12 | #504 |
-| dismount areas | 8 | 2 | mounts (#27) |
-| uncategorised | 4,385 | 343 | — |
+| `collision` | 2,205 | 252 | collision / line-of-sight (#284) |
+| `encounter` — encounter + event start triggers | 625 | 138 | scripted encounters (#502) — retail's real trigger volumes, where ours are hand-seeded radii |
+| `audio` — SFX / music regions | 600 | 161 | — |
+| `spawn-camp` | 198 | 55 | ambient spawns (#332/#363) — **checked, see below** |
+| `hazard-fire-death` | 147 | 31 | #504 |
+| **`hazard-lava`** | **111** | **24** | **#504 — imported** |
+| `resurrection` | 96 | 46 | resurrection spots (#372) — **checked, see below** |
+| `hazard-trap` | 79 | 8 | #504 |
+| `quest-goal` | 57 | 30 | `ReachArea` goals (#262) |
+| `teleport` | 43 | 24 | local travel + zone lines (#506) |
+| `dismount` | 14 | 4 | mounts (#27) |
+| `hazard-drown` | 7 | 5 | #504 |
+| `uncategorised` | 4,735 | 326 | — |
+
+⚠️ The buckets are a **naming heuristic**, and the ordering is load-bearing: rules are applied in the order above
+and first match wins, so an audio twin (`Vanir_camp_music`, `BA_Lava_music`) is audio rather than the thing it is
+named after, a resurrection pad named for its camp (`ShadyCampRezz`) is a resurrection point rather than a camp,
+and an ambush inside a camp (`TacticianCampAmbush`) is a trigger. `BoundedAreaClassifierTests` gates exactly those
+contested names, since a mis-ordered rule silently mis-sorts a whole family.
+
+There is deliberately **no rule for a "zone / area names" family**. Those regions are named after the place
+(`Acheronian Ruins`, `The Iron Tower`, `Onyx Chambers`), so identifying one means matching the name against the
+place-name catalog — a data lookup, not a pattern, and `MapArea`'s banner ids are LDB string ids rather than text.
+That is #348's job.
+
+## The client also ships a purpose-built table for two of these buckets
+
+Two buckets describe something the client ALSO exports in a dedicated record type — and in both cases the
+dedicated table carries strictly more, so the trigger volume is a **cross-check on what we imported, not a source
+to import from**. `--report bounded-areas --report-arg <bucket>` prints the overlap in both directions.
+
+| bucket | dedicated table | what we already hold |
+|---|---|---|
+| `spawn-camp` | **1010506** `NpcSpawnLayout` | `NpcSpawnArea` — 2,669 roam groups: bounds, population, and the exact spawn points |
+| `resurrection` | **1000090** `RESURRECTIONPOINTSEXPORT` | `RespawnPoint` — 538 points: `Guid`, position, orientation, restoration %, discoverable, `shady` |
+
+**Resurrection — redundant.** 91 of the 96 regions contain a 1000090 point already in `RespawnPoint`, and between
+them they cover only 103 of our 538 points. So the bucket is a set of markers drawn around a subset of the points
+we hold, with no id, no restoration level and no orientation. It corroborates the 1000090 import and adds nothing
+to it.
+
+**Spawn camps — corroborating, but not a source.** Only 56 of the 198 camps contain any 1010506 group (160 of
+2,669 groups covered). Where both exist the correspondence is exact and the bounded area is the **parent**: on
+Eiglophian Mountains (1050) `Camp23 White Hands` encloses the four groups `Camp23 White Hands A`–`D`, `Camp19
+White Hands` encloses six, and the 1010506 group names are already the same strings. The other 142 camps carry
+geometry only — no creature and no population — and the ambient spawner (`LoadAmbientSpawns`) spawns at the
+1010506 **points** and needs a resolved `NpcTemplateId`, so a polygon has no consumer. The blocker on those maps is
+the creature CATALOG, not geometry: map 1050's 87 groups are all unresolved because `Mammoth`, `Cannibal`, `Ice
+Worm` and `White Hand` are not in `NpcTemplate` at all.
 
 ## Import
 

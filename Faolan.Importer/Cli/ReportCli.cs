@@ -61,6 +61,13 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB (+ DB for the cross-checks), no corpus: the bounded-area trigger-volume survey (#513).
+			if (report == "bounded-areas")
+			{
+				await BoundedAreas(RdbDir(), arg);
+				return 0;
+			}
+
 			// Every report below reads the corpus. It is NOT in this repo (private ProjectFaolan-Data), so say where
 			// to point rather than letting Directory.EnumerateFiles throw a bare path error.
 			if (!Directory.Exists(capturesDir))
