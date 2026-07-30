@@ -158,14 +158,51 @@ them they cover only 103 of our 538 points. So the bucket is a set of markers dr
 we hold, with no id, no restoration level and no orientation. It corroborates the 1000090 import and adds nothing
 to it.
 
-**Spawn camps — corroborating, but not a source.** Only 56 of the 198 camps contain any 1010506 group (160 of
-2,669 groups covered). Where both exist the correspondence is exact and the bounded area is the **parent**: on
-Eiglophian Mountains (1050) `Camp23 White Hands` encloses the four groups `Camp23 White Hands A`–`D`, `Camp19
-White Hands` encloses six, and the 1010506 group names are already the same strings. The other 142 camps carry
-geometry only — no creature and no population — and the ambient spawner (`LoadAmbientSpawns`) spawns at the
-1010506 **points** and needs a resolved `NpcTemplateId`, so a polygon has no consumer. The blocker on those maps is
-the creature CATALOG, not geometry: map 1050's 87 groups are all unresolved because `Mammoth`, `Cannibal`, `Ice
-Worm` and `White Hand` are not in `NpcTemplate` at all.
+**Spawn camps — corroborating, but not a source.** Only 56 of the 198 camps contain any 1010506 group: 189
+(camp, group) containments over **160 distinct groups** of 2,669 (the two numbers differ because camps nest — on
+Eiglophian Mountains `Vanir Camps` encloses 21 groups that `Camp27`/`28`/`29 Vanir` also enclose).
+
+Where both exist the correspondence is exact, and the camp is the **parent** rather than a peer:
+
+- **30 camps enclose exactly one group** — there the polygon is that group's authoritative footprint.
+- **26 camps enclose 2–21** (`Camp23 White Hands` → `A`–`D`, `Camp24 White Hands` → 7, `Vanir Camps` → 21). The
+  parent polygon is *looser* than each sub-group's own AABB, so it cannot stand in for one: all the sub-groups
+  would collapse onto a single shared region and lose their distinct spots.
+
+The 1010506 group names are already the same strings (`Camp18 Mammoths` is both a bounded area and an
+`NpcSpawnArea.GroupName`), so the camp adds no naming either.
+
+### The camps carry no creature, and neither table carries a template id
+
+Field for field, this is everything the two sources hold:
+
+| | 1000053 bounded-area camp | 1010506 group (`NpcSpawnArea`) |
+|---|---|---|
+| shape | **polygon** (x, z ring) + `heights` prism | AABB (min/max XYZ) |
+| spawn points | — | the exact anchors (23,782 `NpcSpawnAreaPoint` rows) |
+| population | — | `MaxCount` |
+| roam paths | — | `pathCount` + the wander polylines |
+| creature | only as free text inside `<name>` | `Category` + `GroupKey` |
+| other | collision-behaviour flags, `scryid`, editor colours (`Color`, `Capped`, `BoundingBoxColor`) | — |
+
+A `<boundedarea>`'s **entire** attribute set is collision behaviour and editor cosmetics —
+`StaticCollisionEnabled`, `PathingCollisionEnabled`, `MovementCollisionBehaviour`, `LOSCombatCollisionBehaviour`,
+`CameraCollisionBehaviour`, `IsLocked`, `IsVisible`, `FollowsHeightmap`, `HeightmapOffset`, `ShowBoundingBox`,
+`BoundingBoxColor` — with `<name>`, `<heights>`, `<vertice>`, `<scryid>`, `<Guid>`, `<BoundedAreaID>` as the
+children. Nothing about what lives there.
+
+**Neither side carries an `NpcTemplate` id** — the creature is server-authoritative in both — but 1010506 says
+much more about it: 179 `Name` groups name the creature outright (`Yeti`, `Shar Kihn (4YQ1)`, `Refuge
+Corpse-Waker (7CSI)`) and the remaining 2,490 give a numeric family id (`Race` 926, `Community` 1,038,
+`Superfamily` 229). So a camp name is *strictly weaker* evidence than a `Name` group's `GroupKey`.
+
+That is also where the ceiling is. Only 22 of those 179 explicitly-named groups resolve; the other 157 name a
+creature absent from `NpcTemplate`, which is 1,018 capture-derived rows. Map 1050's 87 groups are all unresolved
+because `Mammoth`, `Cannibal`, `Ice Worm` and `White Hand` are simply not in it. The ambient spawner
+(`LoadAmbientSpawns`) spawns at the 1010506 **points** and needs a resolved `NpcTemplateId`, so more geometry
+cannot populate a single one of them — the blocker is the creature CATALOG (tracked in Gitea #518).
+
+**Nothing from this bucket is imported.** It is checked, and the check is the result.
 
 ## Import
 
