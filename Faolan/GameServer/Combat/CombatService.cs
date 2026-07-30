@@ -563,7 +563,8 @@ namespace Faolan.GameServer.Combat
 			}
 
 			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, character.Level, levelsGained))
-				await SendWorldFeedback(killer, AttributeChangedFeedback.Build(instance, attributeId, amount));
+				await SendWorldFeedback(killer,
+					FormatFeedbackCodec.Build(instance, AttributeChangedCodec.TypeFlags, AttributeChangedCodec.Footer, AttributeChangedCodec.Build(attributeId, amount)));
 
 			var vitals = await ReseedFromMaxStats(killer);
 

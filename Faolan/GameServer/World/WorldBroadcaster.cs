@@ -1077,7 +1077,7 @@ namespace Faolan.GameServer.World
 				// Ambient chatter lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent).
 				// CONSTRUCTED from the columnized token/category/key rather than replayed from a stored blob.
 				if (npc.NpcTemplate.Chatter is { Count: > 0 } chatter)
-					entity.ChatterLines = chatter.Select(c => RemoteFormatXml.BuildChatter(c)).ToArray();
+					entity.ChatterLines = chatter.Select(c => NpcChatterCodec.Build(c)).ToArray();
 
 				// #363: a captured spawn LINKED to an ambient area is a member of that area's POOL (the softer alternative
 				// to graduating/deleting it). It renders with its captured appearance but the POOL owns its respawn (fades

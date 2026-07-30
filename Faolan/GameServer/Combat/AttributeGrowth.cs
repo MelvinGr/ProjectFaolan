@@ -20,8 +20,8 @@ namespace Faolan.GameServer.Combat
 				? 1u
 				: levelsGained;
 
-			var gains = new List<(uint, uint)>(AttributeChangedFeedback.PrimaryAttributeIds.Length);
-			foreach (var id in AttributeChangedFeedback.PrimaryAttributeIds)
+			var gains = new List<(uint, uint)>(AttributeChangedCodec.PrimaryAttributeIds.Length);
+			foreach (var id in AttributeChangedCodec.PrimaryAttributeIds)
 				gains.Add((id, amount));
 
 			return gains;

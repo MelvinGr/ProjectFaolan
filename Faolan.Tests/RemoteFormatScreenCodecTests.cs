@@ -8,7 +8,7 @@ namespace Faolan.Tests
 	// Byte-exact parse/build of a remoteformat dialogue screen (#188): proves a Knubot screen can be GENERATED from
 	// structured fields (id/category/key/knubot/antitag + named parameters) byte-for-byte, so the captured XML
 	// doesn't have to be replayed. Oracles are real screens from the captured ConversationPackets.
-	public class RemoteFormatXmlTests
+	public class RemoteFormatScreenCodecTests
 	{
 		// Real AppendText screen with all three inner parameter shapes (localized token, stringentry, localized id).
 		// The `name` session slot holds a PLACEHOLDER, not the captured player (#417) - the grammar under test is the
@@ -23,14 +23,14 @@ namespace Faolan.Tests
 		public void Build_FromScratch_WithLiveStringEntry()
 		{
 			// Generate a screen with a live player-name parameter built from session data (no captured value).
-			var screen = new RemoteFormatXml.Screen("33600", "50002", "djaj!xgdVQpMtKta6Csp", "0", "0",
-				[RemoteFormatXml.StringEntry("name", "Conan", "m"), RemoteFormatXml.StringEntry("guildname", "Cimmerians")]);
+			var screen = new RemoteFormatScreen("33600", "50002", "djaj!xgdVQpMtKta6Csp", "0", "0",
+				[RemoteFormatSession.StringEntry("name", "Conan", "m"), RemoteFormatSession.StringEntry("guildname", "Cimmerians")]);
 
-			var xml = RemoteFormatXml.Build(screen);
+			var xml = RemoteFormatScreenCodec.Build(screen);
 			Assert.Contains("string=&quot;Conan&quot; flags=&quot;m&quot;", xml);
 			Assert.Contains("string=&quot;Cimmerians&quot;", xml);
 			// Round-trips.
-			Assert.Equal(xml, RemoteFormatXml.Build(RemoteFormatXml.Parse(xml)));
+			Assert.Equal(xml, RemoteFormatScreenCodec.Build(RemoteFormatScreenCodec.Parse(xml)));
 		}
 
 		// The DB columnization (#188): a captured screen -> ConversationScreen row (+ parameter children) -> back to
@@ -39,21 +39,21 @@ namespace Faolan.Tests
 		[Theory, InlineData(CloseXml), InlineData(AppendXml)]
 		public void ColumnRow_RoundTrips_ByteExact(string xml)
 		{
-			var row = ConversationScreenColumns.ToRow(xml, 0);
-			Assert.Equal(xml, RemoteFormatXml.Build(ConversationScreenColumns.ToScreen(row)));
+			var row = ConversationScreenCodec.Parse(xml);
+			Assert.Equal(xml, RemoteFormatScreenCodec.Build(ConversationScreenColumns.ToScreen(row)));
 		}
 
 		[Theory, InlineData(CloseXml), InlineData(AppendXml)]
 		public void ParseThenBuild_IsByteExact(string xml)
 		{
-			var screen = RemoteFormatXml.Parse(xml);
-			Assert.Equal(xml, RemoteFormatXml.Build(screen));
+			var screen = RemoteFormatScreenCodec.Parse(xml);
+			Assert.Equal(xml, RemoteFormatScreenCodec.Build(screen));
 		}
 
 		[Fact]
 		public void Parse_Append_ExtractsStructure()
 		{
-			var s = RemoteFormatXml.Parse(AppendXml);
+			var s = RemoteFormatScreenCodec.Parse(AppendXml);
 			Assert.Equal("33600", s.Id);
 			Assert.Equal("50002", s.Category);
 			Assert.Equal("0", s.Antitag);
@@ -68,7 +68,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_Close_HasNoAntitagOrParameters()
 		{
-			var s = RemoteFormatXml.Parse(CloseXml);
+			var s = RemoteFormatScreenCodec.Parse(CloseXml);
 			Assert.Null(s.Antitag);
 			Assert.Empty(s.Parameters);
 			Assert.Equal("100", s.Category);
@@ -77,8 +77,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void WithLivePlayer_RegeneratesTheSessionSlots_KeepingTheRest()
 		{
-			var s = RemoteFormatXml.WithLivePlayer(RemoteFormatXml.Parse(AppendXml), "Conan", "Cimmerians", RemoteFormatXml.NotInGuildLabel("Project Faolan"));
-			var xml = RemoteFormatXml.Build(s);
+			var s = RemoteFormatSession.WithLivePlayer(RemoteFormatScreenCodec.Parse(AppendXml), "Conan", "Cimmerians", RemoteFormatSession.NotInGuildLabel("Project Faolan"));
+			var xml = RemoteFormatScreenCodec.Build(s);
 
 			// Player name regenerated (captured flags="m" preserved), guild filled, the captured player gone.
 			Assert.Contains("string=&quot;Conan&quot; flags=&quot;m&quot;", xml);
@@ -123,7 +123,7 @@ namespace Faolan.Tests
 			var row = ConversationScreenColumns.ToStoredRow(xml, 0);
 			Assert.Equal(token, ConversationScreenColumns.InnerRawOf(row.Parameters.Single(p => p.Name == "npcguildname")));
 
-			var live = RemoteFormatXml.WithLivePlayer(ConversationScreenColumns.ToScreen(row), "Conan", "", RemoteFormatXml.NotInGuildLabel("Project Faolan"));
+			var live = RemoteFormatSession.WithLivePlayer(ConversationScreenColumns.ToScreen(row), "Conan", "", RemoteFormatSession.NotInGuildLabel("Project Faolan"));
 			Assert.Equal(token, live.Parameters.Single(p => p.Name == "npcguildname").InnerRaw);
 		}
 	}

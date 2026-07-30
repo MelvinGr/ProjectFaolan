@@ -1,3 +1,4 @@
+using Faolan.Core.Extensions;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
@@ -14,7 +15,7 @@ namespace Faolan.Tests
 	// These were the last serialized-XML blobs in the model; storing them as columns is only safe if the columns
 	// rebuild the captured bytes EXACTLY, because the client is fed them verbatim (the `key` is a client-validated
 	// content hash and `flags` drives the localized declension).
-	public class InnerElementXmlTests
+	public class InnerElementCodecTests
 	{
 		[Theory]
 		// An LDB reference by name token, with an entity-escaped key - the dominant dialogue-parameter shape.
@@ -28,37 +29,37 @@ namespace Faolan.Tests
 		[InlineData("<remoteformat id=\"3217121\" category=\"50200\" key=\"0@5S/y3Ly5j(Wq*H1/Y3\" knubot=\"0\"  ></remoteformat>")]
 		public void Parse_ThenBuild_IsByteExact(string xml)
 		{
-			var element = InnerElement.Parse(xml);
+			var element = InnerElementCodec.Parse(xml);
 
 			Assert.NotNull(element);
-			Assert.Equal(xml, element.Build());
+			Assert.Equal(xml, InnerElementCodec.Build(element));
 		}
 
 		[Fact]
 		public void Parse_ReadsEachShapeIntoTheRightColumns()
 		{
-			var byToken = InnerElement.Parse("<localized token=\"Stranger\" category=\"100\" flags=\"\" key=\"K\" >");
+			var byToken = InnerElementCodec.Parse("<localized token=\"Stranger\" category=\"100\" flags=\"\" key=\"K\" >");
 			Assert.Equal(InnerElementKind.Localized, byToken.Kind);
 			Assert.Equal("Stranger", byToken.Token);
 			Assert.Null(byToken.Id);
 			Assert.Equal(100u, byToken.Category);
 
-			var byId = InnerElement.Parse("<localized id=\"15148\" category=\"51000\" flags=\"m\" key=\"K\" >");
+			var byId = InnerElementCodec.Parse("<localized id=\"15148\" category=\"51000\" flags=\"m\" key=\"K\" >");
 			Assert.Equal(15148u, byId.Id);
 			Assert.Null(byId.Token);
 			Assert.Equal("m", byId.Flags);
 
-			var literal = InnerElement.Parse("<stringentry string=\"Sonja\" flags=\"f\" >");
+			var literal = InnerElementCodec.Parse("<stringentry string=\"Sonja\" flags=\"f\" >");
 			Assert.Equal(InnerElementKind.StringEntry, literal.Kind);
 			Assert.Equal("Sonja", literal.Text);
 
-			var nested = InnerElement.Parse("<remoteformat id=\"7\" category=\"50200\" key=\"K\" knubot=\"0\"  ></remoteformat>");
+			var nested = InnerElementCodec.Parse("<remoteformat id=\"7\" category=\"50200\" key=\"K\" knubot=\"0\"  ></remoteformat>");
 			Assert.Equal(InnerElementKind.RemoteFormat, nested.Kind);
 			Assert.Equal(0u, nested.Knubot);
 		}
 
 		// Anything outside the three shapes must FAIL rather than be half-read - there is no blob column left, so a
-		// null is the only way an unknown shape can surface at import.
+		// throw is the only way an unknown shape can surface at import (#530 rule 4; this used to return null).
 		[Theory]
 		[InlineData(null)]
 		[InlineData("")]
@@ -66,9 +67,9 @@ namespace Faolan.Tests
 		[InlineData("<localized token=\"T\" category=\"100\" key=\"K\" >")] // no flags
 		[InlineData("<stringentry string=\"S\" >")] // no flags
 		[InlineData("<remoteformat id=\"7\" category=\"1\" key=\"K\" knubot=\"0\" ></remoteformat>")] // single space, not the antitag slot
-		public void Parse_RejectsAnythingOutsideTheGrammar(string xml)
+		public void Parse_RejectsAnythingOutsideTheGrammar(string? xml)
 		{
-			Assert.Null(InnerElement.Parse(xml));
+			Assert.Throws<CodecParseException>(() => InnerElementCodec.Parse(xml!));
 		}
 
 		// Whole-table CONSISTENCY, not fidelity. Every shipped row must produce an element the parser reads back
@@ -94,9 +95,8 @@ namespace Faolan.Tests
 
 			foreach (var raw in parameters.Select(ConversationScreenColumns.InnerRawOf).Concat(objects.Select(WorldObjectDisplay.Build)).Where(x => !string.IsNullOrEmpty(x)))
 			{
-				var element = InnerElement.Parse(raw);
-				Assert.True(element != null, $"inner element outside the known grammar: {raw}");
-				Assert.Equal(raw, element.Build());
+				var element = InnerElementCodec.Parse(raw!); // throws when the element is outside the known grammar
+				Assert.Equal(raw, InnerElementCodec.Build(element));
 			}
 		}
 	}

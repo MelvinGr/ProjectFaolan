@@ -281,7 +281,7 @@ namespace Faolan.GameServer
 					// The player picked a dialogue option. The chosen option INDEX is the last u32 of the body; it
 					// selects the branch, so route to the child screen at the extended answer-path (AdvanceConversation).
 					// No active conversation -> no-op.
-					await _conversation.AdvanceConversation(client, KnubotCodec.ParseAnswerIndex(rawPayload));
+					await _conversation.AdvanceConversation(client, KnubotAnswerCodec.Parse(rawPayload).Index);
 
 					break;
 				}

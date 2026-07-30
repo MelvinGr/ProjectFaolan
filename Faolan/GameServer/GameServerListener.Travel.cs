@@ -32,7 +32,7 @@ namespace Faolan.GameServer
 			var id = client.Session.Character.Id;
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id),
 				GameCharInterfaceOpcodes.DispatchScryShowMessageBox,
-				ScryMessageBoxCodec.BuildShowMapConfirm(destinationMapId, TravelConfirmKey, threadCtxId, cookie)));
+				ScryShowMessageBoxCodec.Build(destinationMapId, TravelConfirmKey, threadCtxId, cookie)));
 		}
 
 		Task ITravelOutbound.SendTravelRefusal(INetworkClient client, string reason)

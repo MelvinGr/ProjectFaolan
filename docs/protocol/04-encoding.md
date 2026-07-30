@@ -55,7 +55,7 @@ A length prefix is always validated against the bytes actually remaining before 
 Strings are length-prefixed UTF-8, **no null terminator**, using whichever length width the surrounding grammar
 specifies. remoteformat XML (localized token + parameters) is carried as such a string; it is how the server sends
 a localized system line without shipping literal text.
-[V3: ChatTextCodecTests.Build_FromArbitraryXml_FramesLengthAndSubopcode]
+[V3: ChatTextCodecTests.Build_FromArbitraryXml_LeadsWithTheSubopcode]
 
 ## See also
 

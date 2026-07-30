@@ -24,10 +24,10 @@ cost of choosing, and the box only confirms.
 ⚠️ **The `id` in the confirmation box is the DESTINATION MAP ID**, not a message id. All three captured boxes name
 the map that the redirect then delivers — 1020 Field of the Dead, 1090 Ymir's Pass, 1092 the Amphitheatre of
 Karutonia — and category 520 is the client's map-name category.
-[V3: ScryMessageBoxCodecTests.YmirsPassConfirm_IsByteIdentical]
+[V3: ScryShowMessageBoxCodecTests.YmirsPassConfirm_IsByteIdentical]
 
 The answer is a pure echo of the box's `(threadCtxId, cookie)` plus the button index, which is what lets a
-pending trip be resumed with no server-side script thread — see `ScryMessageBoxCodec`.
+pending trip be resumed with no server-side script thread — see `ScryShowMessageBoxCodec` and `ScryMessageBoxAnswerCodec`.
 
 ## A destination is not always another map
 

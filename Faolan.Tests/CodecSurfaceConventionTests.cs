@@ -34,7 +34,7 @@ namespace Faolan.Tests
 
 		// The folders converted to the uniform surface so far. ADD A FOLDER AS ITS WAVE LANDS - that is what makes the
 		// gates below binding on it, and leaving it out is how a converted folder silently stops being checked.
-		private static readonly string[] MigratedFolders = ["Inventory", "Feats", "Team", "Guild"];
+		private static readonly string[] MigratedFolders = ["Inventory", "Feats", "Team", "Guild", "Text", "Dialogue"];
 
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 		private static readonly Regex ConstOffset = new(@"\bconst\s+int\s+\w*(Offset|Pos)\b");
@@ -72,15 +72,18 @@ namespace Faolan.Tests
 				string.Join("\n  ", offenders));
 		}
 
+		// `string` is legal alongside `byte[]` because of rule 1a: a handful of codecs carry the remoteformat TEXT
+		// that sits INSIDE a byte codec, and forcing byte[] on them would be a worse shape, not a better one. Widened,
+		// not exempted - everything else in rules 1-7 still applies to them.
 		[Fact]
 		public void BuildReturnsBytes()
 		{
 			var offenders = (from t in CodecModules
 				from m in Methods(t).Where(m => m.Name == "Build")
-				where m.ReturnType != typeof(byte[])
+				where m.ReturnType != typeof(byte[]) && m.ReturnType != typeof(string)
 				select $"{t.Name}.Build -> {m.ReturnType.Name}").ToList();
 
-			Assert.True(offenders.Count == 0, "Build must return byte[]:\n  " + string.Join("\n  ", offenders));
+			Assert.True(offenders.Count == 0, "Build must return byte[] (or string, for a rule-1a text codec):\n  " + string.Join("\n  ", offenders));
 		}
 
 		[Fact]
@@ -93,9 +96,13 @@ namespace Faolan.Tests
 				if (parse == null)
 					continue;
 
+				// Rule 1a: a TEXT codec takes the string instead. One shape or the other, never a mix - that is
+				// ParseIsNotOverloaded's job, so all this has to decide is whether the single Parse is legal.
 				var ps = parse.GetParameters();
-				if (ps.Length != 1 || ps[0].ParameterType != typeof(ReadOnlySpan<byte>).MakeByRefType() || !ps[0].IsIn)
-					offenders.Add($"{t.Name}.Parse must take a single `in ReadOnlySpan<byte>`");
+				var span = ps.Length == 1 && ps[0].ParameterType == typeof(ReadOnlySpan<byte>).MakeByRefType() && ps[0].IsIn;
+				var text = ps.Length == 1 && ps[0].ParameterType == typeof(string);
+				if (!span && !text)
+					offenders.Add($"{t.Name}.Parse must take a single `in ReadOnlySpan<byte>` (or a `string`, for a rule-1a text codec)");
 				if (parse.ReturnType == typeof(void) || parse.ReturnType == typeof(bool))
 					offenders.Add($"{t.Name}.Parse must return the decoded value, not {parse.ReturnType.Name}");
 				if (ps.Any(p => p.IsOut))

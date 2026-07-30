@@ -125,7 +125,7 @@ stays undecoded and is **not** a property of the point — point 790836 appears 
 **Discovery = a banner + a re-send (#372), verified in-client.** Walking near an undiscovered point sends TWO
 things in the same frame [V2: Hoxxling_mage-heraldofxotli_login_gameplay.tshark.json frame 7862]:
 
-1. a **`FormatFeedbackIIR` FIFO banner** — the toast the player sees (`FormatFeedbackCodec.BuildRespawnPointDiscoveredXml`,
+1. a **`FormatFeedbackIIR` FIFO banner** — the toast the player sees (`RespawnPointDiscoveredCodec`,
    `typeFlags` = FIFO banner, footer 1, same framing as the area-name banner);
 2. the **spots re-send** above, with the new point now in the list, so the release screen has it next death.
 
@@ -246,7 +246,7 @@ on-screen feedback lines — **one per primary attribute that rose** (the 5 cate
 then a `0x96B8DC59` vitals push with the new Health/Stamina/Mana maxima. There is **no** "You reached level N"
 banner in any capture, and the Level number is never pushed as a standalone `0x36` stat (the client tracks it from
 the snapshot/quest stream). The attribute lines are `FormatFeedbackIIR` payloads — see `docs/subsystems/on-screen-feedback.md`
-and `AttributeChangedFeedback` (decode `AttributeChangedFeedbackTests`, golden `AttributeChangedFeedbackTests`).
+and `AttributeChangedCodec` (golden `AttributeChangedCodecTests`).
 Wired into both paths: GM `.level` (`SetLevelCommand`) and `CombatService.PushLevelUp`. Which attributes rise / by
 how much is provisional (`Combat.AttributeGrowth`, flat +1/primary) — no per-class growth tables exist in captures.
 
@@ -371,7 +371,7 @@ aggressive action**.
 the shield the instant the player commits an aggressive action — an offensive cast (target ≠ self), a ground AoE,
 or a melee/unarmed swing — matching retail's "protected until you attack." For a *cast* it fires at **cast begin**
 (the aggression is known upfront from the target/ground-cast), not when the cast time elapses. It sends the
-**`LostGraceEffect`** on-screen feedback line (byte-exact `FormatFeedbackCodec.BuildLostGraceEffectXml`, verified
+**`LostGraceEffect`** on-screen feedback line (byte-exact `FeedbackXml.LostGraceEffect`, verified
 against `NecroL80_..._conans-castle-exit` rec#508 where the loss happens mid-combat) **before** the rank-1 removal
 twin, then drops the live buff and clears `Session.ActiveShieldSpellBase`. A self-buff cast never breaks it (the
 helper no-ops when no shield is tracked). A pure **playfield swap** of the shield does NOT send `LostGraceEffect`

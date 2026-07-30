@@ -1,5 +1,7 @@
+using System;
 using System.Text;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Text
@@ -8,7 +10,8 @@ namespace Faolan.Core.Network.Codecs.Text
 	// mechanism (NOT chat). The client renders the carried `remoteformat` string as on-screen text; with the
 	// `showfifomessagefromserver(...)` token family it drives the top-of-screen FIFO message banners (zone-name
 	// reveal `GenericDisplayAreaName`, pickup notices `GenericSimpleDynelPickup`, PvP trackers, ...). Plain tokens
-	// (`AttributeChanged`/`Increased`, `LostGraceEffect`, ...) render the smaller feedback lines.
+	// (`AttributeChanged`/`Increased`, `LostGraceEffect`, ...) render the smaller feedback lines. The CATALOG of
+	// those strings is FeedbackXml next door; this codec only carries one, whatever it says.
 	//
 	// Carried as an IIR on the WORLD conversation (opcode 0x2000; sender = GameServerListener.WorldSenderEndpoint 0xB171CE13/0x58,
 	// receiver = the player's GameInterface = GameInterfaceType + ClientInstance). The IIR body's `instance` equals
@@ -16,8 +19,7 @@ namespace Faolan.Core.Network.Codecs.Text
 	// 0x02165EFF), so a live send is fully addressable from the session, not just a replay.
 	//
 	// Wire grammar (big-endian, decoded 2026-06-14 from the gameplay/Has-inventory captures, golden-tested in
-	// FormatFeedbackCodecTests):
-	//   [u32 len]          = byte length of everything after this field
+	// FormatFeedbackCodecTests). The carrier's [u32 len] belongs to the SENDER (#530 rule 2) - WorldIir.Send writes it:
 	//   [u32 0x8D5A8B6B]   FormatFeedbackIIR sub-opcode
 	//   [u32 0x0000C350]   standard IIR marker
 	//   [u32 instance]     the target GameInterface object (= the receiver endpoint instance / ClientInstance)
@@ -37,104 +39,62 @@ namespace Faolan.Core.Network.Codecs.Text
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.FormatFeedbackIIR; // 0x8D5A8B6B
 		private const byte LeadFlag = 0x01;
 
+		public static byte[] Build(FormatFeedbackIIR value)
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			using var s = new FaolanStream();
+			Write(s, value);
+
+			return s.ToArray();
+		}
+
 		public static byte[] Build(uint instance, uint typeFlags, uint footer, byte[] xml)
 		{
-			return new Message(instance, typeFlags, footer, xml).ToArray();
+			return Build(new FormatFeedbackIIR(instance, typeFlags, footer, xml));
 		}
 
-		// The GenericDisplayAreaName FIFO-banner XML (the top-of-screen zone/area-name reveal) for a given client
-		// localized-text id. Byte-exact against the captured banners (all carry this same token/category/key; only the
-		// text id varies per area - the ids are per-SUB-REGION, sourced from the client's region volumes, #348). Send
-		// the result via Build(instance, FifoBannerTypeFlags, 1, xml).
-		public static byte[] BuildAreaNameXml(uint textId)
+		// The XML is Latin1 on the wire (FeedbackXml composes it as text), so a caller holding the string never has to
+		// spell the encoding.
+		public static byte[] Build(uint instance, uint typeFlags, uint footer, string xml)
 		{
-			return Encoding.Latin1.GetBytes("<remoteformat token=\"showfifomessagefromserver(8)|main(1)|GenericDisplayAreaName\" category=\"50018\" " +
-			                                "key=\"pcAdIWYhSXfTFDe5I1g7\" knubot=\"0\"  ><parameter value=\"7;&lt;localized category=&#39;50025&#39; " +
-			                                $"token=&#39;DisplayedText(3)|GenericDisplayAreaName|{textId}&#39;&gt;\" name=\"DisplayedText\" /></remoteformat>");
+			return Build(new FormatFeedbackIIR(instance, typeFlags, footer, Encoding.Latin1.GetBytes(xml)));
 		}
 
-		// The LostGraceEffect feedback XML - the "you have lost the grace" on-screen line retail shows the instant a
-		// player LOSES the Shield of the Risen protection (an aggressive action), sent right before the buff-removal
-		// twin (NecroL80_..._conans-castle-exit rec#508: LostGraceEffect feedback -> 0x37f38c01 shield remove, while the
-		// aggro-status stream shows the player in combat). NOT sent on a playfield swap of the shield (rec#206/#1750
-		// swap the 1h<->10h with no LostGraceEffect). Byte-exact against that record; send via
-		// Build(instance, EffectLineTypeFlags, 1, xml). The key is the capture-verbatim per-token key (same treatment
-		// as BuildAreaNameXml's fixed key).
-		public static byte[] BuildLostGraceEffectXml()
+		public static FormatFeedbackIIR Parse(in ReadOnlySpan<byte> data)
 		{
-			return Encoding.Latin1.GetBytes("<remoteformat token=\"LostGraceEffect\" category=\"100\" key=\"RO5SQlZn.h/DvvaH&#36;WGu\" knubot=\"0\"  ></remoteformat>");
+			var r = new SpanReader(data, nameof(FormatFeedbackCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+
+			return value;
 		}
 
-		// The "trade completed" toast both parties get the instant a player trade commits (#101), immediately after the
-		// empty 0x206D. Verbatim from login_2-clients_group-trade-friend f1335/f1337 - the `key` is a client-validated
-		// content hash, so it cannot be derived or edited.
-		public static byte[] BuildTradeCompletedXml()
+		internal static FormatFeedbackIIR Read(ref SpanReader r)
 		{
-			return Encoding.Latin1.GetBytes("<remoteformat token=\"TradeCompletedSuccessfully\" category=\"100\" key=\"O?&#36;+s,!?Ry4)b+&#39;?h(_n\" knubot=\"0\"  ></remoteformat>");
+			r.ExpectU32Be(Opcode, "the FormatFeedbackIIR sub-opcode");
+			r.ExpectU32Be(EntityClass.Character, "the character entity class");
+			var instance = r.ReadU32Be();
+			r.ExpectU8(LeadFlag, "the lead flag");
+			r.ExpectU64Be(0, "the reserved word");
+			var typeFlags = r.ReadU32Be();
+			var xml = r.ReadBytesU16Length().ToArray();
+
+			return new FormatFeedbackIIR(instance, typeFlags, r.ReadU32Be(), xml);
 		}
 
-		// The "resurrection point discovered" FIFO banner (#372) - retail's toast when a player walks near a point
-		// they had not found yet. Sent alongside the DispatchValidResurrectionSpots re-send that adds the point to the
-		// player's list (ResurrectionSpotsBody); the banner is what the player actually SEES. Send via
-		// Build(instance, FifoBannerTypeFlags, 1, xml) - same framing as the area-name banner.
-		//
-		// This message identifies its string by `id=` rather than the `token=` the other feedback XML uses, which is
-		// why a scan for `remoteformat token="..."` finds no discovery message and wrongly suggests none exists (#372
-		// was stuck on exactly that). The parameter is a NESTED `<localized>` naming the point by its own id under
-		// category 270 - the LDB category holding the point names ("Water's Edge", "Secluded Cove", ...). So no name
-		// ever crosses the wire; the client resolves it.
-		//
-		// `nameKey` is the per-POINT key of that category-270 string: constant per point, different between points
-		// (784237 and 784238 have different ones), unlike the outer key which is fixed per message id. Pass the
-		// capture-verbatim ESCAPED form. Null omits the attribute - the area-name banner's nested `<localized>` has no
-		// key at all and renders, so it is not obviously required for every string.
-		public static byte[] BuildRespawnPointDiscoveredXml(uint pointId, string? nameKey)
+		internal static void Write(FaolanStream s, FormatFeedbackIIR v)
 		{
-			var key = nameKey == null
-				? ""
-				: $"key=&quot;{nameKey}&quot; ";
-			return Encoding.Latin1.GetBytes("<remoteformat id=\"218327236\" category=\"100\" key=\"KsATGOK`H%9l@@z[1mo,\" knubot=\"0\"  >" +
-			                                $"<parameter value=\"7;&lt;localized id=&quot;{pointId}&quot; category=&quot;270&quot; " + $"flags=&quot;&quot; {key}&gt;\" /></remoteformat>");
-		}
-
-		public static Message Parse(byte[] body)
-		{
-			return Message.Read(new FaolanStream(body));
-		}
-
-		// The decoded FormatFeedbackIIR body as a self-serializing codec (ICodec): Write frames the whole
-		// [len][subop][marker][instance][lead][reserved][typeFlags][xmlLen][xml][footer]; Read recovers the fields.
-		public sealed record Message(uint Instance, uint TypeFlags, uint Footer, byte[] Xml) : ICodec<Message>
-		{
-			public static Message Read(FaolanStream s)
-			{
-				s.ReadUInt32(); // len
-				s.ReadUInt32(); // subop (0x8D5A8B6B)
-				s.ReadUInt32(); // EntityClass.Character
-				var instance = s.ReadUInt32();
-				s.ReadArray(1); // lead flag 0x01
-				s.ReadUInt64(); // reserved 0
-				var typeFlags = s.ReadUInt32();
-				var xmlLen = s.ReadUInt16();
-				var xml = s.ReadArray(xmlLen);
-				var footer = s.ReadUInt32();
-				return new Message(instance, typeFlags, footer, xml);
-			}
-
-			public void Write(FaolanStream s)
-			{
-				s.WriteArrayUInt32Length(content =>
-					content
-						.WriteUInt32(Opcode)
-						.WriteUInt32(EntityClass.Character)
-						.WriteUInt32(Instance)
-						.WriteByte(LeadFlag)
-						.WriteUInt64(0ul)
-						.WriteUInt32(TypeFlags)
-						.WriteUInt16(Xml.Length)
-						.WriteArray(Xml)
-						.WriteUInt32(Footer));
-			}
+			s.WriteUInt32(Opcode)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(v.Instance)
+				.WriteByte(LeadFlag)
+				.WriteUInt64(0ul)
+				.WriteUInt32(v.TypeFlags)
+				.WriteUInt16(v.Xml.Length)
+				.WriteArray(v.Xml)
+				.WriteUInt32(v.Footer);
 		}
 	}
+
+	public sealed record FormatFeedbackIIR(uint Instance, uint TypeFlags, uint Footer, byte[] Xml);
 }

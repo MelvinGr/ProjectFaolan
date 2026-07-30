@@ -8,8 +8,8 @@
 ## Headline
 
 - **826** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **80** IIR carrier types: **77 V3** (byte-exact builder), **3 V2** (built, no golden), **0 V1** (no builder found).
-- **64** codec classes, **61** with a byte-exact test.
+- **80** IIR carrier types: **76 V3** (byte-exact builder), **4 V2** (built, no golden), **0 V1** (no builder found).
+- **64** codec classes, **60** with a byte-exact test.
 - **8** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -68,12 +68,11 @@ the margins, but never invents a golden that isn't there.
 | V3 | `GuildUpdateIIR` | `GuildUpdateCodec` |
 | V3 | `HateListUpdateIIR` | `HateListCodec` |
 | V3 | `IntendedTeleportIIR` | `TeleportCodec` |
-| V3 | `KnubotAnswerIIR` | `KnubotCodec` |
-| V3 | `KnubotAnswerListIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
-| V3 | `KnubotAppendTextIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
-| V3 | `KnubotCloseChatWindowIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
+| V3 | `KnubotAnswerListIIR` | `KnubotCodec` |
+| V3 | `KnubotAppendTextIIR` | `KnubotCodec` |
+| V3 | `KnubotCloseChatWindowIIR` | `KnubotCodec` |
 | V3 | `KnubotFinishTradeIIR` | `KnubotFinishTrade` |
-| V3 | `KnubotOpenChatWindowIIR` | `ConversationScreenDecoder`, `KnubotCodec` |
+| V3 | `KnubotOpenChatWindowIIR` | `KnubotCodec` |
 | V3 | `KnubotStartTradeIIR` | `KnubotStartTrade` |
 | V3 | `LockedToChangedIIR` | `LockedToChanged` |
 | V3 | `LookAtIIR` | `LookAtCodec`, `ShopOpenBuilder`, `WorldDeath` |
@@ -96,7 +95,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `QuestLogListIIR` | `WorldQuest` |
 | V3 | `RegenIIR` | `Regen` |
 | V3 | `RemoveFromGroupIIR` | `GroupMembershipCodec` |
-| V3 | `ScryScriptIIR` | `ScryScript` |
+| V3 | `ScryScriptIIR` | `ScryScriptCodec` |
 | V3 | `SetMorphValueIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetNameIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetPosIIR` | `SetPosCodec` |
@@ -119,4 +118,5 @@ the margins, but never invents a golden that isn't there.
 | V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
 | V2 | `DeleteItemIIR` | `DeleteItemCodec` |
 | V2 | `FanaticCommandIir` | `FanaticCommandCodec` |
+| V2 | `KnubotAnswerIIR` | `KnubotAnswerCodec` |
 | V2 | `MoveInventoryItemIIR` | `MoveInventoryItemCodec` |

@@ -20,7 +20,7 @@ namespace Faolan.Tests
 		public void BuildStartScriptGroup_MatchesTheHandWrittenBytes()
 		{
 			// ...0E 08 05 10 00 18 FEF702 32 04 08 00 10 00 - version 5, type 0, the raw 48126, id_parameter {0,0}.
-			Assert.Equal("A36D3B740000C3500802E5D4000000000E0805100018FEF702320408001000", Convert.ToHexString(ScryScript.BuildStartScriptGroup(Handle, 48126)));
+			Assert.Equal("A36D3B740000C3500802E5D4000000000E0805100018FEF702320408001000", Convert.ToHexString(ScryScriptCodec.Build(Handle, 48126)));
 		}
 
 		[Fact]
@@ -28,13 +28,13 @@ namespace Faolan.Tests
 		{
 			// mode 7 + a resource list + a non-zero id_parameter pair (50000, 0x2c1c).
 			Assert.Equal("A36D3B740000C3500802E5D4000000003008051007180022164E45575F6368617261637465725F6372656174696F6E2A07313A323B333A34320708D08603109C58",
-				Convert.ToHexString(ScryScript.BuildStep(Handle, "NEW_character_creation", 7, 0, "1:2;3:4", 50000, 0x2c1c)));
+				Convert.ToHexString(ScryScriptCodec.Build(Handle, "NEW_character_creation", 7, 0, "1:2;3:4", 50000, 0x2c1c)));
 		}
 
 		[Fact]
 		public void BuildStep_SimpleToken_MatchesTheHandWrittenBytes()
 		{
-			Assert.Equal("A36D3B740000C3500802E5D400000000190805100218002209496E74726F446F6E652A00320408001000", Convert.ToHexString(ScryScript.BuildStep(Handle, "IntroDone")));
+			Assert.Equal("A36D3B740000C3500802E5D400000000190805100218002209496E74726F446F6E652A00320408001000", Convert.ToHexString(ScryScriptCodec.Build(Handle, "IntroDone")));
 		}
 	}
 }

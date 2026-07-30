@@ -199,7 +199,7 @@ namespace Faolan.Tests
 		[InlineData("013184ae00056a64ad512c", 0x013184AEu, false, 5, ConanClass.Demonologist, 0x6A64AD51u)] // the OFFLINE one
 		public void Friend_State_IsByteExact(string hex, uint id, bool online, byte level, ConanClass classId, uint stamp)
 		{
-			Assert.Equal(hex, Convert.ToHexString(FriendListCodec.BuildState(id, online, level, classId, stamp)).ToLowerInvariant());
+			Assert.Equal(hex, Convert.ToHexString(FriendStateCodec.Build(id, online, level, classId, stamp)).ToLowerInvariant());
 		}
 
 		// f866 / f949 / f989 / f1038 / f1076 - the id -> NAME binding, the message whose absence renders NOTHING.
@@ -211,7 +211,7 @@ namespace Faolan.Tests
 		[InlineData("0131840500000000000846656e6978617267", 0x01318405u, "Fenixarg")]
 		public void Friend_NameBinding_IsByteExact(string hex, uint id, string name)
 		{
-			Assert.Equal(hex, Convert.ToHexString(FriendListCodec.BuildNameBinding(id, name)).ToLowerInvariant());
+			Assert.Equal(hex, Convert.ToHexString(ChatSenderInfoCodec.Build(id, name)).ToLowerInvariant());
 		}
 
 		// f862 / f944 / f987 / f1032 / f1072 - the presence push. Five different name lengths, which is what exposed the
@@ -224,14 +224,14 @@ namespace Faolan.Tests
 		[InlineData("000000000000000001e85c14000b53000846656e6978617267", "Fenixarg")]
 		public void Friend_Presence_IsByteExact(string hex, string name)
 		{
-			Assert.Equal(hex, Convert.ToHexString(FriendListCodec.BuildPresence(name)).ToLowerInvariant());
+			Assert.Equal(hex, Convert.ToHexString(FriendPresenceCodec.Build(name)).ToLowerInvariant());
 		}
 
 		// f2249 - a removal is echoed back verbatim.
 		[Fact]
 		public void Friend_Remove_IsByteExact()
 		{
-			Assert.Equal("013184ae", Convert.ToHexString(FriendListCodec.BuildCharacterRef(0x013184AE)).ToLowerInvariant());
+			Assert.Equal("013184ae", Convert.ToHexString(FriendRefCodec.Build(0x013184AE)).ToLowerInvariant());
 		}
 	}
 }

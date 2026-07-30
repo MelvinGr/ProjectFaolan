@@ -76,7 +76,7 @@ namespace Faolan.Importer.Captures
 			foreach (var (key, rf) in phrases)
 			{
 				seen++;
-				var screen = RemoteFormatXml.Parse(Encoding.Latin1.GetString(rf));
+				var screen = RemoteFormatScreenCodec.Parse(Encoding.Latin1.GetString(rf));
 				if (screen.Parameters.Count > 0 || screen.Antitag != null)
 					throw new InvalidOperationException(
 						$"Stock phrase {key} has {screen.Parameters.Count} parameter(s)/antitag - the StockPhrases columns only model a bare root tag, so this would not round-trip. Extend the table before importing it.");

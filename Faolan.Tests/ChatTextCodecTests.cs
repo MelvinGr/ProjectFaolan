@@ -24,32 +24,43 @@ namespace Faolan.Tests
 		                                        "6b65793d2671756f743b4d7052662e43782e255e4d476446585426616d703b71756f743b3958282671756f743b202667743b22" +
 		                                        "202f3e3c2f72656d6f7465666f726d61743e0040000001";
 
+		// The record now LEADS with its sub-opcode: the carrier's [u32 len] is the sender's (#530 rule 2), written by
+		// WorldIir.Send. So every captured oracle here is compared against `Record(...)` - the capture minus its
+		// first four bytes. No wire byte moved.
 		[Fact]
-		public void Build_FromArbitraryXml_FramesLengthAndSubopcode()
+		public void Build_FromArbitraryXml_LeadsWithTheSubopcode()
 		{
 			var xml = Encoding.ASCII.GetBytes("<remoteformat id=\"0\" ></remoteformat>");
 			var body = ChatTextCodec.Build(0x00ABCDEFu, xml);
 
-			Assert.Equal(ChatTextCodec.Opcode, body.ReadU32Be(4));
-			Assert.Equal((uint)(body.Length - 4), body.ReadU32Be(0));
+			Assert.Equal(ChatTextCodec.Opcode, body.ReadU32Be(0));
 			Assert.Equal(0x00ABCDEFu, ChatTextCodec.Parse(body).Instance);
 		}
 
 		[Fact]
 		public void Build_FromParsedFields_MatchesCapture()
 		{
-			var captured = Convert.FromHexString(CriteriaLineBody);
-			var p = ChatTextCodec.Parse(captured);
+			var p = ChatTextCodec.Parse(Record(CriteriaLineBody));
 
-			var rebuilt = ChatTextCodec.Build(p.Instance, p.Xml);
+			var rebuilt = ChatTextCodec.Build(p);
 
-			Assert.Equal(CriteriaLineBody, Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(RecordHex(CriteriaLineBody), Convert.ToHexStringLower(rebuilt));
+		}
+
+		private static byte[] Record(string capturedHex)
+		{
+			return Convert.FromHexString(RecordHex(capturedHex));
+		}
+
+		private static string RecordHex(string capturedHex)
+		{
+			return capturedHex[8..];
 		}
 
 		[Fact]
 		public void Parse_DecodesTheSystemLine()
 		{
-			var p = ChatTextCodec.Parse(Convert.FromHexString(CriteriaLineBody));
+			var p = ChatTextCodec.Parse(Record(CriteriaLineBody));
 
 			Assert.Equal(0x110099bdu, p.Instance);
 			var xml = Encoding.ASCII.GetString(p.Xml);

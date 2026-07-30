@@ -39,7 +39,7 @@ namespace Faolan.Tests
 			var npc = captured.ReadU32Be(body + 4);
 			var player = captured.ReadU32Be(body + 12);
 
-			var rebuilt = DialogueCameraBody.BuildDialogueCameraPacket(cols.SenderInstance!.Value, player, npc, DialogueCameraBody.BuildParams(new ConversationPacket
+			var rebuilt = ConversationService.BuildDialogueCameraPacket(cols.SenderInstance!.Value, player, npc, ConversationService.CameraArgsOf(new ConversationPacket
 			{
 				ShotSize = cols.Camera!.ShotSize, ShotType = cols.Camera.ShotType, ShotEmphasis = cols.Camera.ShotEmphasis, ShotFov = cols.Camera.ShotFov,
 				ShotTilt = cols.Camera.ShotTilt, Autoface = cols.Camera.Autoface, HeadPaddingY = cols.Camera.HeadPaddingY
@@ -67,21 +67,25 @@ namespace Faolan.Tests
 					Flag = cols.Flag
 				};
 				for (var i = 0; i < cols.Screens!.Count; i++)
-					p.Screens.Add(ConversationScreenColumns.ToRow(cols.Screens[i], i));
+				{
+					var screen = ConversationScreenCodec.Parse(cols.Screens[i]);
+					screen.Sequence = i;
+					p.Screens.Add(screen);
+				}
 
 				var fromColumns = ConversationService.BuildKnubotFromColumns(p, LiveInstance, ClickedNpc, "", "");
-				Assert.Equal(Convert.ToHexStringLower(ExpectedConstruct(record)), Convert.ToHexStringLower(fromColumns));
+				Assert.Equal(Convert.ToHexStringLower(ExpectedConstruct(record[4..])), Convert.ToHexStringLower(fromColumns));
 			}
 		}
 
 		[Fact]
 		public void Construct_AnswerList_IsByteIdenticalToSubstitution()
 		{
-			var captured = Convert.FromHexString(KnubotCodecTestData.AnswerListBody);
+			var captured = KnubotCodecTests.Record(KnubotCodecTestData.AnswerListBody);
 			const uint capturedInst = 0x0802E5D4, capturedNpc = 0x00031815;
 
-			var p = KnubotCodec.ParseStringList(captured);
-			var construct = KnubotCodec.BuildAnswerList(LiveInstance, ClickedNpc, p.Strings, p.Env);
+			var p = (KnubotAnswerListIIR)KnubotCodec.Parse(captured);
+			var construct = KnubotCodec.Build(p with { PlayerInstance = LiveInstance, NpcHandle = ClickedNpc });
 			var substitute = SubstituteU32(SubstituteU32(captured, capturedInst, LiveInstance), capturedNpc, ClickedNpc);
 
 			Assert.Equal(Convert.ToHexStringLower(substitute), Convert.ToHexStringLower(construct));
@@ -90,11 +94,11 @@ namespace Faolan.Tests
 		[Fact]
 		public void Construct_AppendText_IsByteIdenticalToSubstitution()
 		{
-			var captured = Convert.FromHexString(KnubotCodecTestData.AppendTextBody);
+			var captured = KnubotCodecTests.Record(KnubotCodecTestData.AppendTextBody);
 
 			// construct: parse the captured record, rebuild with the live endpoints
-			var p = KnubotCodec.ParseAppendText(captured);
-			var construct = KnubotCodec.BuildAppendText(LiveInstance, ClickedNpc, p.Xml, p.Field, p.Trailing, p.Env);
+			var p = (KnubotAppendTextIIR)KnubotCodec.Parse(captured);
+			var construct = KnubotCodec.Build(p with { PlayerInstance = LiveInstance, NpcHandle = ClickedNpc });
 
 			// replay: substitute the two handles in the captured record
 			var substitute = SubstituteU32(SubstituteU32(captured, CapturedInstance, LiveInstance), CapturedNpc, ClickedNpc);
@@ -105,11 +109,11 @@ namespace Faolan.Tests
 		[Fact]
 		public void Construct_CloseChatWindow_IsByteIdenticalToSubstitution()
 		{
-			var captured = Convert.FromHexString(KnubotCodecTestData.CloseChatWindowBody);
+			var captured = KnubotCodecTests.Record(KnubotCodecTestData.CloseChatWindowBody);
 			const uint capturedInst = 0x01316D8A, capturedNpc = 0x00002C7C;
 
-			var p = KnubotCodec.ParseStringList(captured);
-			var construct = KnubotCodec.BuildCloseChatWindow(LiveInstance, ClickedNpc, p.Strings, p.Env);
+			var p = (KnubotCloseChatWindowIIR)KnubotCodec.Parse(captured);
+			var construct = KnubotCodec.Build(p with { PlayerInstance = LiveInstance, NpcHandle = ClickedNpc });
 			var substitute = SubstituteU32(SubstituteU32(captured, capturedInst, LiveInstance), capturedNpc, ClickedNpc);
 
 			Assert.Equal(Convert.ToHexStringLower(substitute), Convert.ToHexStringLower(construct));
@@ -118,11 +122,11 @@ namespace Faolan.Tests
 		[Fact]
 		public void Construct_OpenChatWindow_IsByteIdenticalToSubstitution()
 		{
-			var captured = Convert.FromHexString(KnubotCodecTestData.OpenChatWindowBody);
+			var captured = KnubotCodecTests.Record(KnubotCodecTestData.OpenChatWindowBody);
 			const uint capturedInst = 0x01316D8A, capturedNpc = 0x00002C7C;
 
-			var p = KnubotCodec.ParseOpenChatWindow(captured);
-			var construct = KnubotCodec.BuildOpenChatWindow(LiveInstance, ClickedNpc, p.Value, p.Env);
+			var p = (KnubotOpenChatWindowIIR)KnubotCodec.Parse(captured);
+			var construct = KnubotCodec.Build(p with { PlayerInstance = LiveInstance, NpcHandle = ClickedNpc });
 			var substitute = SubstituteU32(SubstituteU32(captured, capturedInst, LiveInstance), capturedNpc, ClickedNpc);
 
 			Assert.Equal(Convert.ToHexStringLower(substitute), Convert.ToHexStringLower(construct));
@@ -154,18 +158,20 @@ namespace Faolan.Tests
 		}
 
 		// The codec-construct oracle: rebuild the record straight from the parsed raw record (the path KnubotCodecTests
-		// gates against the captures), for comparison with the from-columns build.
+		// gates against the captures), for comparison with the from-columns build. Takes the record WITHOUT the
+		// carrier's [u32 len], which is the sender's now (#530 rule 2).
 		private static byte[] ExpectedConstruct(byte[] record)
 		{
-			var sub = record.ReadU32Be(4);
-			if (sub == (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR)
-			{
-				var a = KnubotCodec.ParseAppendText(record);
-				return KnubotCodec.BuildAppendText(LiveInstance, ClickedNpc, a.Xml, a.Field, a.Trailing, a.Env);
-			}
+			var parsed = KnubotCodec.Parse(record);
 
-			var s = KnubotCodec.ParseStringList(record);
-			return KnubotCodec.BuildStringList(sub, LiveInstance, ClickedNpc, s.Strings, s.Env);
+			return KnubotCodec.Build(parsed switch
+			{
+				KnubotAppendTextIIR a => a with { PlayerInstance = LiveInstance, NpcHandle = ClickedNpc },
+				KnubotAnswerListIIR l => l with { PlayerInstance = LiveInstance, NpcHandle = ClickedNpc },
+				KnubotCloseChatWindowIIR c => c with { PlayerInstance = LiveInstance, NpcHandle = ClickedNpc },
+				KnubotOpenChatWindowIIR o => o with { PlayerInstance = LiveInstance, NpcHandle = ClickedNpc },
+				_ => throw new InvalidOperationException("not a Knubot record")
+			});
 		}
 
 		// Replaces every big-endian u32 occurrence of oldVal with newVal - the record-level handle substitution the

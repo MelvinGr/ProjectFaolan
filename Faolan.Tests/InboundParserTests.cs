@@ -1,3 +1,4 @@
+using Faolan.Core.Extensions;
 using Faolan.Core;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Inventory;
@@ -111,14 +112,16 @@ namespace Faolan.Tests
 		{
 			// The chosen dialogue option is the last u32 (big-endian) of the answer body.
 			var body = new FaolanStream().WriteUInt32(0x0000C350u).WriteUInt32(0x11u).WriteUInt32(3u).ToArray();
-			Assert.Equal(3u, KnubotCodec.ParseAnswerIndex(body));
+			Assert.Equal(3u, KnubotAnswerCodec.Parse(body).Index);
 		}
 
+		// Strict parse (#530 rule 4): a body too short to carry an index is a decode FAILURE, not a silent 0 that
+		// would route the player to option zero.
 		[Fact]
-		public void KnubotAnswerIndex_TooShort_IsZero()
+		public void KnubotAnswerIndex_TooShort_Throws()
 		{
-			Assert.Equal(0u, KnubotCodec.ParseAnswerIndex([0x01, 0x02])); // < 4 bytes -> no selection
-			Assert.Equal(0u, KnubotCodec.ParseAnswerIndex([]));
+			Assert.Throws<CodecParseException>(() => KnubotAnswerCodec.Parse([0x01, 0x02]));
+			Assert.Throws<CodecParseException>(() => KnubotAnswerCodec.Parse([]));
 		}
 	}
 }

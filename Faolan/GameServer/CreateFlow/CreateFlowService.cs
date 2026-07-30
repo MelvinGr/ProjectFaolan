@@ -380,15 +380,15 @@ namespace Faolan.GameServer.CreateFlow
 			// by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
 			await SendIir(client, Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameServer0X2000Opcodes.EnergyIIR,
 				CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, id, 0x01, 0x36B0));
-			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 48126));
+			await SendScry(client, ScryScriptCodec.Build(id, 48126));
 			await SendScry(client,
-				ScryScript.BuildStep(id,
+				ScryScriptCodec.Build(id,
 					"<remoteformat token=\"playorskip(100)|onclientconnected(1)|character_creation Tortage Beach (server-side)\" category=\"50023\" key=\"*&#36;!0mcl&#36;Z!5Ii0UG!TV?\" knubot=\"0\"  ></remoteformat>",
 					6,
 					resources:
 					"1010003:3147889;1010003:3147890;1010003:3147891;1010003:3147892;1010003:3147893;1010003:3147894;1010003:137283;1010003:202270;1010003:210528;1010003:205370;1010003:3147896;1010003:3147895;1010003:3147897;1010003:3147898;1010003:3147899;1010003:3147900;1010003:208235;1010003:3203880;1010003:3203879;1010003:3203881;1010003:3203876;1010003:3203877;1010003:3203878",
 					f6Field1: 4617355, f6Field2: 7004418));
-			await SendScry(client, ScryScript.BuildStartScriptGroup(id, 385910));
+			await SendScry(client, ScryScriptCodec.Build(id, 385910));
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, id),
 				GameInterfaceOpcodes.DispatchPassBlob, (byte[])[0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x00]));
 		}
@@ -643,7 +643,7 @@ namespace Faolan.GameServer.CreateFlow
 					// Bind OUR live Kalanthes (streamed by EnsureZoneNpcs, within range) or fall back if unloaded.
 					// Retail sends this in RESPONSE to PlayResult (AFTER the player commits to playing the cutscene) -
 					// binding BEFORE the cinematic starts (on ClientLoadingDone) loses the actor when it initialises.
-					await SendScry(client, ScryScript.BuildStep(id, "ThisIsKalanthes", f6Field1: 50000, f6Field2: LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
+					await SendScry(client, ScryScriptCodec.Build(id, "ThisIsKalanthes", f6Field1: 50000, f6Field2: LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
 					// Position Kalanthes next to the washed-ashore player (his cutscene start), so the walk-up reads
 					// (his DB spawn is back by the rocks). The walk path itself follows on the Move callback.
 					await QuestHandlerService.SendKalanthesMoveTask(client, QuestHandlerService.BuildKalanthesIntroMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
@@ -660,11 +660,11 @@ namespace Faolan.GameServer.CreateFlow
 				{
 					// Echo back the StartGroup the client just requested (same id) - the confirmation that actually
 					// RUNS the group on the client. Retail sends exactly this in response to each StartScript.
-					await SendScry(client, ScryScript.BuildStartScriptGroup(id, groupId));
+					await SendScry(client, ScryScriptCodec.Build(id, groupId));
 					// 7088774 is Kalanthes's welcome-dialogue group; retail follows its StartGroup with the
 					// WelcomeTutorial step (~2.7s later, no triggering callback) - bundle it here, callback-driven.
 					if (groupId == 7088774)
-						await SendScry(client, ScryScript.BuildStep(id, "WelcomeTutorial"));
+						await SendScry(client, ScryScriptCodec.Build(id, "WelcomeTutorial"));
 					break;
 				}
 
@@ -672,14 +672,14 @@ namespace Faolan.GameServer.CreateFlow
 				{
 					// Kalanthes walks up to the player (f890 path), then kneels.
 					await QuestHandlerService.SendKalanthesMoveTask(client, QuestHandlerService.BuildKalanthesWalkMove(LiveNpcHandle(client, "Kalanthes", 0x2c1c)));
-					await SendScry(client, ScryScript.BuildStep(id, "Kneel"));
+					await SendScry(client, ScryScriptCodec.Build(id, "Kneel"));
 					break;
 				}
 
 				case "IntroDone":
 				{
-					await SendScry(client, ScryScript.BuildStep(id, "StartFixed3d"));
-					await SendScry(client, ScryScript.BuildStartScriptGroup(id, 7727158));
+					await SendScry(client, ScryScriptCodec.Build(id, "StartFixed3d"));
+					await SendScry(client, ScryScriptCodec.Build(id, 7727158));
 					break;
 				}
 			}
@@ -1077,8 +1077,8 @@ namespace Faolan.GameServer.CreateFlow
 				CreateEditorRecordBuilder.BuildStatUpdateIir(id, [(0x1Bu, 0x1F40u), (0xBAu, 0x00u), (0x1FFu, 0x00u), (0x200u, 0x301u), (0x201u, 0x00u), (0x25Fu, 0x59EA5C54u)]));
 
 			// ScryScriptIIR: the create-world "PlayOrSkip(72) Slave Galley" remoteformat + its RDB resource manifest, 			// then the "PlayOrSkip" ScriptMessage (decoded by tools/capture/decode_scryscript.py).
-			await IirRecord(ScryScript.BuildStep(id, CreateWorldScriptToken, 7, resources: CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303));
-			await IirRecord(ScryScript.BuildStep(id, "PlayOrSkip"));
+			await IirRecord(ScryScriptCodec.Build(id, CreateWorldScriptToken, 7, resources: CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303));
+			await IirRecord(ScryScriptCodec.Build(id, "PlayOrSkip"));
 
 			// SetMorphValue setup (hair meshes, then a texscript) on the editor entities.
 			await Iir(GameServer0X2000Opcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF94u, "hairmesh_207920", 1.0f, 0x00, 0x00000001u));
@@ -1348,7 +1348,7 @@ namespace Faolan.GameServer.CreateFlow
 			var character = client.Session.Character;
 
 			await SendCreateEditor2000(client, (uint)GameServer0X2000Opcodes.StatIIR, [0x01, 0x00, 0x00, 0x05, 0x78, 0x00, 0x00, 0x00, 0x00], instance);
-			await SendCreateEditor2000Record(client, ScryScript.BuildStartScriptGroup(instance, 35820)); // StartScriptGroupOnClient (#223)
+			await SendCreateEditor2000Record(client, ScryScriptCodec.Build(instance, 35820)); // StartScriptGroupOnClient (#223)
 
 			// The editor's class-base push: stat 0x0001 / 0x01F9 / 0x01FB for the class the player just chose. Retail
 			// sends THIS CHARACTER's base here - the Blablabla guardian create carries 12000/17250/0 at f2613, which is

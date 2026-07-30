@@ -25,7 +25,7 @@ emits:
 `AgeOfConan.log`, gated on `DAT_021a2c29`). ScriptCommands run inside **ScriptGroups** (the Scry/cinematic
 system: `ScriptGroup_t`, XML `<scriptcommand name=".." id="..">`, RDB-stored by `rdbid`) — the SAME engine as
 the destiny steps (`ScryScriptIIR`). The server can start a scriptgroup on the client via
-`ScryScriptIIR ... StartScriptGroupOnClient` (the `0xA36D3B74` driver we already build, `ScryScript.cs`).
+`ScryScriptIIR ... StartScriptGroupOnClient` (the `0xA36D3B74` driver we already build, `ScryScriptCodec.cs`).
 Related ScriptCommands in the binary: `GetStatScriptCommand`, `statcheckscriptcommand`, `IsInStateScriptCommand`,
 `statcheckintervalscriptcommand`, plus GUI/chat/`DistributedValue` commands.
 
@@ -39,12 +39,12 @@ A hands-free assert-in-client harness is buildable, but it is a **project**, not
    line (`--console` already tails the log).
 
 Open work to make it real: (a) find/author an RDB scriptgroup that checks the value we care about (e.g. a
-quest in the journal, a stat), (b) wire a server-side "start test scriptgroup" path (extend `ScryScript`),
+quest in the journal, a stat), (b) wire a server-side "start test scriptgroup" path (extend `ScryScriptCodec`),
 (c) parse the testreport line out of the log. Until then, the achievable check is the coarse one: drive the
 client in and grep `AgeOfConan.log` for FullChar/IIR errors (`stream bad`, `Wrong IIR_t version`, `Dispatcher
 call ... failed`) to confirm a world packet (e.g. the snapshot-quest injection, `FAOLAN_SNAPSHOT_QUESTS`) is
 *accepted* — note the headless visual render itself has been env-blocked (RDB thrash), but world-entry packet
 processing happens before that.
 
-Related: `docs/tooling/client-launcher.md`, [[lua_vm]] (the RDB Lua/script layer), `Faolan.Core.Network/Codecs/Dialogue/ScryScript.cs`,
+Related: `docs/tooling/client-launcher.md`, [[lua_vm]] (the RDB Lua/script layer), `Faolan.Core.Network/Codecs/Dialogue/ScryScriptCodec.cs`,
 [[protocol_quest_state]].

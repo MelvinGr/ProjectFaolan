@@ -142,7 +142,7 @@ at `0x205F` where retail sends `0x2068`), so their opcodes need a capture. Open 
 
 ## Friend list
 
-On the **ChatServer** (`FriendListCodec`). Sweeping the whole capture for a game-tier friend opcode finds only
+On the **ChatServer** (`FriendStateCodec`, `ChatSenderInfoCodec`, `FriendPresenceCodec`, `FriendRefCodec`). Sweeping the whole capture for a game-tier friend opcode finds only
 `c2s 0x2092 RequestNewJoinHasHostileInFriends`, a team-invite safety check — the list itself is chat-tier:
 
 ```

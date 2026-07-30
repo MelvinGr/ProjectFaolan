@@ -1,4 +1,5 @@
 using Faolan.Core.Crypt;
+using Faolan.Core.Extensions;
 using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -21,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			ArgumentNullException.ThrowIfNull(row);
 			return row.DisplayKind is { } kind
-				? new InnerElement(kind, row.DisplayId, row.DisplayToken, row.DisplayCategory, row.DisplayFlags ?? "", LdbKey.ToWire(row.DisplayKey), null, row.DisplayKnubot).Build()
+				? InnerElementCodec.Build(new InnerElement(kind, row.DisplayId, row.DisplayToken, row.DisplayCategory, row.DisplayFlags ?? "", LdbKey.ToWire(row.DisplayKey), null, row.DisplayKnubot))
 				: null;
 		}
 
@@ -37,7 +38,19 @@ namespace Faolan.Core.Network.Codecs.World
 			if (displayName == null)
 				return false;
 
-			if (InnerElement.Parse(displayName) is not { } element || element.Build() != displayName)
+			// InnerElementCodec.Parse THROWS on a shape it cannot account for (#530 rule 4); here that is one of the
+			// two "not lifted" outcomes rather than an error, so it is caught and reported as false.
+			InnerElement element;
+			try
+			{
+				element = InnerElementCodec.Parse(displayName);
+			}
+			catch (CodecParseException)
+			{
+				return false;
+			}
+
+			if (InnerElementCodec.Build(element) != displayName)
 				return false;
 
 			// StringEntry has no column here: no captured world object carries a literal (they are LDB references or

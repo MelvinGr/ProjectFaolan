@@ -49,7 +49,7 @@ namespace Faolan.Tests
 			Assert.True(phrases.TryGetValue(stockKey, out var phrase), $"no StockPhrases row for {stockKey}");
 			// #410: the payload is REBUILT from the row's columns (the raw blob column is gone), so this gate now
 			// also proves the columnization is lossless - the bytes must still equal the captured reply exactly.
-			var body = StockConversationService.BuildReceivedStockPhraseBody(threadCtx, RemoteFormatXml.BuildStockPhrase(phrase));
+			var body = StockConversationService.BuildReceivedStockPhraseBody(threadCtx, RemoteFormatScreenCodec.Build(phrase));
 			Assert.Equal(expectedHex, Convert.ToHexStringLower(body));
 		}
 

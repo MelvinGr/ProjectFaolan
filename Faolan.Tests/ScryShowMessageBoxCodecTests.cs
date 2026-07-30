@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Xunit;
 
@@ -9,7 +10,7 @@ namespace Faolan.Tests
 	//
 	// The point worth gating is that `id` is the DESTINATION MAP ID: all three boxes name the map the player is about
 	// to be moved to, and each is followed by a redirect and a MapChange to exactly that map.
-	public class ScryMessageBoxCodecTests
+	public class ScryShowMessageBoxCodecTests
 	{
 		// 20:17:20 - the box for Ymir's Pass (map 1090), which the redirect at 20:17:23 and the MapChange at 20:17:24
 		// then deliver.
@@ -20,7 +21,7 @@ namespace Faolan.Tests
 				"004d3c6c6f63616c697a65642069643d2231303930222063617465676f72793d223532302220666c6167733d2222206b65793d22257a262333363b6e5f7a7735436f6d4e694863716f57346a22203e" +
 				"0000006f00000070000000710250b94c0a31c0d3000000000025e738000000000000487589b0");
 
-			var built = ScryMessageBoxCodec.BuildShowMapConfirm(1090, "%z&#36;n_zw5ComNiHcqoW4j", 0x0025E738, 0x00000000487589B0);
+			var built = ScryShowMessageBoxCodec.Build(1090, "%z&#36;n_zw5ComNiHcqoW4j", 0x0025E738, 0x00000000487589B0);
 
 			Assert.Equal(captured, built);
 		}
@@ -34,7 +35,7 @@ namespace Faolan.Tests
 				"004d3c6c6f63616c697a65642069643d2231303230222063617465676f72793d223532302220666c6167733d2222206b65793d227274455e5148233930446839262339323b2859522b622c4b22203e" +
 				"0000006f00000070000000710250b94c0a31c0d30000000000373cd3000000000000354394e0");
 
-			var built = ScryMessageBoxCodec.BuildShowMapConfirm(1020, "rtE^QH#90Dh9&#92;(YR+b,K", 0x00373CD3, 0x00000000354394E0);
+			var built = ScryShowMessageBoxCodec.Build(1020, "rtE^QH#90Dh9&#92;(YR+b,K", 0x00373CD3, 0x00000000354394E0);
 
 			Assert.Equal(captured, built);
 		}
@@ -47,10 +48,11 @@ namespace Faolan.Tests
 		[InlineData("00000001002e4097000000004b29eda0", 1u, 0x002E4097u, 0x000000004B29EDA0ul)]
 		public void Answer_Parses(string hex, uint expectedAnswer, uint expectedCtx, ulong expectedCookie)
 		{
-			Assert.True(ScryMessageBoxCodec.TryParseAnswer(Convert.FromHexString(hex), out var answer, out var ctx, out var cookie));
-			Assert.Equal(expectedAnswer, answer);
-			Assert.Equal(expectedCtx, ctx);
-			Assert.Equal(expectedCookie, cookie);
+			var parsed = ScryMessageBoxAnswerCodec.Parse(Convert.FromHexString(hex));
+
+			Assert.Equal(expectedAnswer, parsed.Answer);
+			Assert.Equal(expectedCtx, parsed.ThreadCtxId);
+			Assert.Equal(expectedCookie, parsed.Cookie);
 		}
 
 		// The show and the answer must agree on the correlation pair - a round trip through both halves of the codec.
@@ -59,7 +61,7 @@ namespace Faolan.Tests
 		{
 			const uint ctx = 0x00300001;
 			const ulong cookie = 0x0000002A00300001;
-			var show = ScryMessageBoxCodec.BuildShowMapConfirm(4020, "rtE^QH#90Dh9&#92;(YR+b,K", ctx, cookie);
+			var show = ScryShowMessageBoxCodec.Build(4020, "rtE^QH#90Dh9&#92;(YR+b,K", ctx, cookie);
 
 			// The trailing 12 bytes of the show are exactly what the answer echoes after its button index.
 			var answer = new byte[16];
@@ -68,22 +70,24 @@ namespace Faolan.Tests
 			Array.Copy(show, show.Length - 14, answer, 4, 4);
 			Array.Copy(show, show.Length - 8, answer, 8, 8);
 
-			Assert.True(ScryMessageBoxCodec.TryParseAnswer(answer, out var a, out var gotCtx, out var gotCookie));
-			Assert.Equal(1u, a);
-			Assert.Equal(ctx, gotCtx);
-			Assert.Equal(cookie, gotCookie);
+			var parsed = ScryMessageBoxAnswerCodec.Parse(answer);
+
+			Assert.Equal(ScryMessageBoxAnswerCodec.Confirm, parsed.Answer);
+			Assert.Equal(ctx, parsed.ThreadCtxId);
+			Assert.Equal(cookie, parsed.Cookie);
 		}
 
+		// Strict parse (#530 rule 4): a short body is a decode FAILURE, not a `false` the caller can drop.
 		[Fact]
 		public void ShortAnswer_IsRejected()
 		{
-			Assert.False(ScryMessageBoxCodec.TryParseAnswer(new byte[15], out _, out _, out _));
+			Assert.Throws<CodecParseException>(() => ScryMessageBoxAnswerCodec.Parse(new byte[15]));
 		}
 
 		[Fact]
 		public void ContextMustBeSixWords()
 		{
-			Assert.Throws<ArgumentException>(() => ScryMessageBoxCodec.BuildShow("<localized />", [1, 2, 3], 0, 0));
+			Assert.Throws<ArgumentException>(() => ScryShowMessageBoxCodec.Build(new ScryShowMessageBox("<localized />", [1, 2, 3], 0, 0)));
 		}
 	}
 }

@@ -78,6 +78,39 @@ namespace Faolan.Core.Extensions
 			return actual;
 		}
 
+		// The same assertion at the other widths. Constant lead flags, reserved words and version words are just as
+		// much part of a grammar as the type word, and a codec that merely SKIPS them cannot tell a correct body from
+		// one carrying something else there.
+		public ushort ExpectU16Be(ushort expected, string? what = null)
+		{
+			var offset = _position;
+			var actual = ReadU16Be();
+			if (actual != expected)
+				throw CodecParseException.Unexpected(_codec, offset, $"{what ?? "word"} 0x{expected:X4}", $"0x{actual:X4}");
+
+			return actual;
+		}
+
+		public ulong ExpectU64Be(ulong expected, string? what = null)
+		{
+			var offset = _position;
+			var actual = ReadU64Be();
+			if (actual != expected)
+				throw CodecParseException.Unexpected(_codec, offset, $"{what ?? "word"} 0x{expected:X16}", $"0x{actual:X16}");
+
+			return actual;
+		}
+
+		public byte ExpectU8(byte expected, string? what = null)
+		{
+			var offset = _position;
+			var actual = ReadU8();
+			if (actual != expected)
+				throw CodecParseException.Unexpected(_codec, offset, $"{what ?? "byte"} 0x{expected:X2}", $"0x{actual:X2}");
+
+			return actual;
+		}
+
 		// The remaining bytes WITHOUT consuming them - for discriminating a message family before committing to a
 		// shape. Prefer ExpectU32Be/PeekU32Be; this is the escape hatch.
 		public readonly ReadOnlySpan<byte> PeekRemaining()

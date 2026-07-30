@@ -243,6 +243,15 @@ table. `ICodec<T>` is being retired; do not add implementations of it.
   - **Composition is `internal`:** `internal static T Read(ref SpanReader)` /
     `internal static void Write(FaolanStream, T)`. `InternalsVisibleTo Faolan.Tests` is global, so these stay
     testable.
+- **String codecs: the same rules, `string` in place of `byte[]`.** A handful of codecs carry TEXT rather than
+  bytes — the `remoteformat` XML layer that sits *inside* a byte codec, plus the row↔XML mappers around it
+  (`InnerElementCodec`, `RemoteFormatScreenCodec`, `NpcChatterCodec`, `ConversationScreenCodec`,
+  `AttributeChangedCodec`, …). They expose `string Build(T)` / `T Parse(string)`; everything above applies
+  unchanged — two public method names, `Build(T)` canonical and the only thing that composes text, `Parse`
+  strict and total (a throw, never a null), the value a plain record, one message one codec. The `byte[]` form
+  stays as a **delegating** overload wherever the text IS the whole wire payload
+  (`=> Encoding.Latin1.GetBytes(Build(value))` — Latin1 because that is the wire's string encoding). A codec is
+  one shape or the other, never a mix of both `Parse` forms.
 - **Read sequentially through `SpanReader` (`Faolan.Core/Extensions`); no const offsets; `Parse` ends with
   `EnsureAtEnd()`.** A `private const int FooOffset = 17` means the bytes before 17 were never decoded, so the
   codec cannot tell a correct body from one that merely has the right word at 17. `SpanReader` also owns the

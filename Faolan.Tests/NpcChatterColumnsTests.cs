@@ -1,4 +1,5 @@
 using Faolan.Core.Crypt;
+using Faolan.Core.Extensions;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,7 +12,7 @@ namespace Faolan.Tests
 {
 	// Ambient NPC barks are stored COLUMNIZED, like their StockPhrase sibling (#410): the captured
 	//   <remoteformat token="sayinchat(16)|conversation1(3)|RenownBystanderLovers" category="50015" key="..." knubot="0"  >
-	// is lifted into typed columns and rebuilt at send time (WorldBroadcaster -> RemoteFormatXml.BuildChatter), so
+	// is lifted into typed columns and rebuilt at send time (WorldBroadcaster -> NpcChatterCodec.Build), so
 	// there is no verbatim blob left to replay. These tests are what makes that safe: the constructed string must be
 	// byte-identical to what retail sent, because the client is fed these bytes as-is - the `key` is a
 	// client-validated content hash and the token addresses a specific line in a specific conversation.
@@ -25,7 +26,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ParseChatter_ThenBuild_ReproducesTheCapturedBark_ByteForByte()
 		{
-			var row = RemoteFormatXml.ParseChatter(CapturedBark);
+			var row = NpcChatterColumns.ToRow(NpcChatterCodec.Parse(CapturedBark));
 
 			Assert.NotNull(row);
 			Assert.Equal(16u, row.SayInChat);
@@ -39,7 +40,7 @@ namespace Faolan.Tests
 			// The key is stored decoded (the 128-bit TEA key) and RENDERS back to the captured attribute exactly,
 			// XML entity included - that round-trip is the claim, not the storage form.
 			Assert.Equal("]&#39;siB8WQ*b25XY8J7Gd*", LdbKey.ToWire(row.FormatKey));
-			Assert.Equal(CapturedBark, RemoteFormatXml.BuildChatter(row));
+			Assert.Equal(CapturedBark, NpcChatterCodec.Build(row));
 		}
 
 		// The `sendtell` crier bark, the only captured one with a parameter - and its value is the CAPTURING PLAYER'S
@@ -53,7 +54,9 @@ namespace Faolan.Tests
 			const string captured =
 				"<remoteformat token=\"sayinchat(57)|sendtell(3)|RenownCrier\" category=\"50015\" key=\".&#39;eMV&#92;79&quot;!GSlWOqs*sl\" knubot=\"0\"  ><parameter value=\"7;Sonja\" name=\"DetectedChar.name\" /></remoteformat>";
 
-			var row = RemoteFormatXml.ParseChatter(captured, out var parameterValue);
+			var bark = NpcChatterCodec.Parse(captured);
+			var parameterValue = NpcChatterColumns.SessionValueOf(bark);
+			var row = NpcChatterColumns.ToRow(bark);
 
 			Assert.NotNull(row);
 			Assert.Equal("sendtell", row.Channel);
@@ -64,14 +67,14 @@ namespace Faolan.Tests
 			Assert.Equal("Sonja", parameterValue);
 
 			// Byte-exact when the captured value is handed back - what the importer gates on.
-			Assert.Equal(captured, RemoteFormatXml.BuildChatter(row, parameterValue));
+			Assert.Equal(captured, NpcChatterCodec.Build(row, parameterValue));
 
 			// ...but the row alone renders the slot EMPTY, carrying no captured name.
-			Assert.DoesNotContain("Sonja", RemoteFormatXml.BuildChatter(row), StringComparison.Ordinal);
-			Assert.Contains("name=\"DetectedChar.name\"", RemoteFormatXml.BuildChatter(row), StringComparison.Ordinal);
+			Assert.DoesNotContain("Sonja", NpcChatterCodec.Build(row), StringComparison.Ordinal);
+			Assert.Contains("name=\"DetectedChar.name\"", NpcChatterCodec.Build(row), StringComparison.Ordinal);
 
 			// And a live player's name renders into the slot at send time.
-			Assert.Contains("7;Valeria", RemoteFormatXml.BuildChatter(row, "Valeria"), StringComparison.Ordinal);
+			Assert.Contains("7;Valeria", NpcChatterCodec.Build(row, "Valeria"), StringComparison.Ordinal);
 		}
 
 		// Anything that is not a bark must FAIL to parse rather than be half-read into columns - the importer turns a
@@ -85,7 +88,7 @@ namespace Faolan.Tests
 		[InlineData("<remoteformat token=\"sayinchat(1)|conversation1(3)|Grp\" category=\"50015\" key=\"k\" knubot=\"0\" >")] // truncated: no closing tag
 		public void ParseChatter_RejectsAnythingThatIsNotABark(string xml)
 		{
-			Assert.Null(RemoteFormatXml.ParseChatter(xml));
+			Assert.Throws<CodecParseException>(() => NpcChatterCodec.Parse(xml));
 		}
 
 		// #493: the Damsel in Distress bark carries TWO slots, one of them CONTENT. Before this the grammar allowed
@@ -101,7 +104,9 @@ namespace Faolan.Tests
 				+ "<parameter value=\"7;&lt;localized token=&quot;helptext(8)|RnBLadyInDistressBrainScript|initialvalue&quot; category=&quot;50025&quot; flags=&quot;&quot; key=&quot;Q(0WTe92/HbY`P?vHEv@&quot; &gt;\" name=\"helptext\" />"
 				+ "</remoteformat>";
 
-			var row = RemoteFormatXml.ParseChatter(captured, out var parameterValue);
+			var bark = NpcChatterCodec.Parse(captured);
+			var parameterValue = NpcChatterColumns.SessionValueOf(bark);
+			var row = NpcChatterColumns.ToRow(bark);
 
 			Assert.NotNull(row);
 			Assert.Equal("event", row.Channel);
@@ -117,10 +122,10 @@ namespace Faolan.Tests
 			Assert.Equal("Sonja", parameterValue);
 
 			// Byte-exact when the captured session value is handed back - what the import gate requires.
-			Assert.Equal(captured, RemoteFormatXml.BuildChatter(row, parameterValue));
+			Assert.Equal(captured, NpcChatterCodec.Build(row, parameterValue));
 
 			// The row alone renders the session slot empty but keeps the content slot intact, and ORDER is preserved.
-			var alone = RemoteFormatXml.BuildChatter(row);
+			var alone = NpcChatterCodec.Build(row);
 			Assert.DoesNotContain("Sonja", alone, StringComparison.Ordinal);
 			Assert.Contains("name=\"helptext\"", alone, StringComparison.Ordinal);
 			Assert.True(alone.IndexOf("Target.Name", StringComparison.Ordinal) < alone.IndexOf("helptext", StringComparison.Ordinal));
@@ -138,10 +143,10 @@ namespace Faolan.Tests
 
 			foreach (var row in rows)
 			{
-				var built = RemoteFormatXml.BuildChatter(row);
-				var reparsed = RemoteFormatXml.ParseChatter(built);
+				var built = NpcChatterCodec.Build(row);
+				var reparsed = NpcChatterColumns.ToRow(NpcChatterCodec.Parse(built));
 				Assert.NotNull(reparsed);
-				Assert.Equal(built, RemoteFormatXml.BuildChatter(reparsed));
+				Assert.Equal(built, NpcChatterCodec.Build(reparsed));
 				Assert.Equal(50015u, row.Category); // the ambient-chatter category, uniform across the corpus
 			}
 		}

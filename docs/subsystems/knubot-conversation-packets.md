@@ -16,9 +16,9 @@ raw `Data` blob is **gone** (the importer REJECTS, rather than stores, a packet 
 sub-opcode, so there is nothing left to replay). The remoteformat screen(s) are stored as
 **typed `ConversationScreen` rows** (`id`/`category`/`key`/`knubot`/`antitag` + ordered `ConversationScreenParameter`
 child rows of `name`/`InnerRaw`) — the old JSON-array-of-XML `ScreensJson` blob is **gone**. The importer
-columnizes each screen via `ConversationScreenColumns.ToRow`, which throws unless the typed round-trip
+columnizes each screen via `ConversationScreenCodec.Parse`, which throws unless the typed round-trip
 reproduces the captured XML byte-for-byte (652/652 screens, 6090 parameters); the runtime rebuilds the wire XML
-from the rows via `ConversationScreenColumns.ToScreen` → `RemoteFormatXml.Build`, with **no fallback** — the
+from the rows via `ConversationScreenColumns.ToScreen` → `RemoteFormatScreenCodec.Build`, with **no fallback** — the
 columns are authoritative. The screen TEXT (`key`) is the captured template; the content `key` is non-computable
 (same as the item TEA keys).
 
@@ -47,15 +47,15 @@ its capture stores the `#<handle>` fallback the merge already dedups on.
 
 A screen carries no dialogue text: `id`+`category` name a string in the CLIENT's LDB and each `<parameter>` fills
 one of that template's placeholders. Three of them are **session state** rather than content, and all three are
-regenerated per send by `RemoteFormatXml.WithLivePlayer` from the live character, their guild and the realm:
+regenerated per send by `RemoteFormatSession.WithLivePlayer` from the live character, their guild and the realm:
 
 | parameter | captured value | what we send |
 |---|---|---|
 | `name` | the capturing player's character | the live character's name (captured `flags` kept — the gender the localized text declines against) |
 | `guildname` | their guild, or empty | the live character's guild (empty when guildless), looked up by `Character.GuildId` |
-| `npcguildname` | `Not in guild [<retail server>]` | `Not in guild [<our realm's name>]` (`RemoteFormatXml.NotInGuildLabel`) |
+| `npcguildname` | `Not in guild [<retail server>]` | `Not in guild [<our realm's name>]` (`RemoteFormatSession.NotInGuildLabel`) |
 
-The importer therefore stores them **blank** (`ConversationScreenColumns.ToStoredRow`, applied after `ToRow`'s
+The importer therefore stores them **blank** (`ConversationScreenColumns.ToStoredRow`, applied after `ConversationScreenCodec.Parse`'s
 byte-exact gate): the slot stays — the client parses the screen by parameter name and order, and `flags` matters —
 but the string goes, so no captured character / guild / retail-server name reaches `faolan.db` or the committed
 `faolan.sql` seed. `SeedSessionDataTests` gates that on the shipped seed. `npcguildname` also has a second captured
@@ -115,7 +115,7 @@ entities + params:
 They carry no `remoteformat` text, but they ARE structured (#188): `ConversationScreenDecoder.Decode`
 stores the GameCharAgent sender instance + the param bytes in the `SenderInstance`/`CameraParams`
 columns, and the runtime BUILDS the packet from those columns via
-`DialogueCameraBody.BuildDialogueCameraPacket` re-addressed to the live player + NPC handles (byte-exact in
+`SetDialogueCameraCodec` (framed by `ConversationService.BuildDialogueCameraPacket`) re-addressed to the live player + NPC handles (byte-exact in
 `ConversationConstructTests`). The interleaved quest-grant packets are built by the `WorldQuest` builders.
 
 Open work is tracked in Gitea #188.

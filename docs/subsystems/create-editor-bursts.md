@@ -208,8 +208,8 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
      above, not a capture-handle carrier.)
 
    **`ScryScriptIIR` now CONSTRUCTED (#223):** the two CreationScript records (the "Slave Galley" PreloadAssets
-   step + "PlayOrSkip") are built by `ScryScript.BuildStep`, and the post-morph `StartScriptGroupOnClient`
-   callback by `ScryScript.BuildStartScriptGroup` (the NicknameOk/CharCreationFinished callbacks were already
+   step + "PlayOrSkip") are built by `ScryScriptCodec.Build`, and the post-morph `StartScriptGroupOnClient`
+   callback by its script-group `Build` overload (the NicknameOk/CharCreationFinished callbacks were already
    built by `SendA36DCallback`). All byte-exact (`ScryScriptCreateBurstTests`). With `BehaviorControlCenterIIR`
    long form + `RegenIIR` (already done), **no `*IIR` record type in the create-editor bursts is verbatim**.
 

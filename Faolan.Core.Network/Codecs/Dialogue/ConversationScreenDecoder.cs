@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -7,31 +8,28 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
-	// Decodes a captured conversation packet's raw Conan Data into the structured Knubot-screen columns (#188), so
-	// the importer can populate ConversationPacket.{SubOpcode,Env,Field,Flag} + the Screens rows (each decoded here as
-	// raw remoteformat XML, columnized by ConversationScreenColumns.ToRow) and the runtime builds the screen from
-	// fields. Pure byte-slicing (no codec dependency); returns null for non-Knubot packets, which keep
-	// replaying from Data. Mirrors KnubotCodec's framing: carrier = Data[12 + headerLen ..] = [u32 len][u32 sub]
-	// [u32 0xC350][u32 instance][u8 env][u16 ver][u32 0xC350][u32 npc][ body ].
+	// Lifts a captured conversation PACKET (rpcHeader included) into the structured Knubot-screen columns (#188), so
+	// the importer can populate ConversationPacket.{SubOpcode,Env,Field,Flag} + the Screens rows (each decoded here
+	// as raw remoteformat XML, columnized by ConversationScreenCodec.Parse) and the runtime builds the screen from
+	// fields.
+	//
+	// ⚠️ NOT a message codec, and deliberately not on the #530 uniform surface: it is a FRAME-level scanner over
+	// whole captured packets, so it owns the rpcHeader (§9 D keeps frame code out of the codec shape) and it must be
+	// able to say "this packet is not a conversation packet" while sweeping a mixed capture. It no longer DECODES
+	// anything itself - the bodies go through KnubotCodec / SetDialogueCameraCodec, which is what retires the
+	// duplicate Knubot HandledTypes declaration this file used to carry (#530 §3). Its own conversion rides wave 8
+	// with the rest of the importer's reading.
 	//
 	// The non-Knubot packets in a conversation node (~48 of 355 in faolan.db) are NOT dialogue text - they are
 	// DispatchSetDialogueCamera (opcode 0x2015, GameCharAgent 0xA9ECB95D -> GameCharInterface 0x8B87F791): the
-	// cinematic conversation camera, body = [0xC350][npcHandle][0xC350][playerHandle][camera params]. No remoteformat
-	// text, so nothing to structure; they (plus the interleaved quest-grant packets) replay from Data re-addressed.
+	// cinematic conversation camera. No remoteformat text, so nothing to structure.
 	public static class ConversationScreenDecoder
 	{
 		public const uint AnswerList = (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR; // 0xF164A4A5
 		public const uint AppendText = (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR; // 0x4A3D899A
 		public const uint CloseChatWindow = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR; // 0xC4AF39EB
 		public const uint OpenChatWindow = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR; // 0x045B0B0F
-		public const uint SetDialogueCamera = (uint)GameCharInterfaceOpcodes.DispatchSetDialogueCamera; // GameCharAgent -> GameCharInterface (a 16-bit opcode, not an IIR sub)
-
-		// The four Knubot screen IIR types this decoder recognizes (SetDialogueCamera is an RPC opcode, not an IIR).
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
-		[
-			GameServer0X2000Opcodes.KnubotAnswerListIIR, GameServer0X2000Opcodes.KnubotAppendTextIIR, GameServer0X2000Opcodes.KnubotCloseChatWindowIIR,
-			GameServer0X2000Opcodes.KnubotOpenChatWindowIIR
-		];
+		public const uint SetDialogueCamera = SetDialogueCameraCodec.Opcode; // a 16-bit RPC opcode, not an IIR sub
 
 		public static Columns? Decode(byte[] data)
 		{
@@ -43,101 +41,61 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			if (start + 8 > data.Length)
 				return null;
 
-			var sub = U32(4);
+			var sub = data.ReadU32Be(start + 4);
 			if (sub is not (OpenChatWindow or AppendText or AnswerList or CloseChatWindow))
 				return DecodeCamera(data, headerLen, start);
-			if (start + 27 > data.Length || U32(8) != EntityClass.Character)
-				return null;
 
-			var env = data[start + 16];
-			var o = 27; // past [len][sub][marker][instance][env][ver][marker2][npc]
-			uint? field = null;
-			byte? flag = null;
-			var screens = new List<string>();
-
-			switch (sub)
+			// The carrier's [u32 len] is the frame's; everything after it is the IIR record the codec owns.
+			KnubotIIR record;
+			try
 			{
-				case OpenChatWindow:
-				{
-					flag = data[start + o];
-					break;
-				}
-
-				case AnswerList:
-				{
-					var count = U32(o);
-					o += 4;
-					for (var i = 0; i < count; i++)
-						ReadScreen();
-					break;
-				}
-
-				case AppendText:
-				{
-					field = U32(o);
-					o += 4;
-					ReadScreen();
-					flag = data[start + o];
-					break;
-				}
-
-				default: // CloseChatWindow
-				{
-					field = U32(o);
-					o += 4;
-					ReadScreen();
-					break;
-				}
+				record = KnubotCodec.Parse(data.AsSpan(start + 4));
+			}
+			catch (CodecParseException)
+			{
+				return null; // a mixed-capture sweep: a body that is not a well-formed Knubot record is not ours
 			}
 
-			return new Columns((ConversationSubOpcode)sub, env, field, flag, screens, RpcCallerInstance(data));
+			var senderInstance = RpcCallerInstance(data);
 
-			uint U32(int rel)
+			return record switch
 			{
-				return data.ReadU32Be(start + rel);
-			}
+				KnubotOpenChatWindowIIR open => new Columns((ConversationSubOpcode)sub, open.Env, null, open.Value, [], senderInstance),
+				KnubotAppendTextIIR text => new Columns((ConversationSubOpcode)sub, text.Env, text.Field, text.Trailing, [Latin1(text.Xml)], senderInstance),
+				KnubotAnswerListIIR list => new Columns((ConversationSubOpcode)sub, list.Env, null, null, list.Strings.Select(Latin1).ToList(), senderInstance),
 
-			ushort U16(int rel)
-			{
-				return data.ReadU16Be(start + rel);
-			}
-
-			void ReadScreen()
-			{
-				var ln = U16(o);
-				o += 2;
-				screens.Add(Encoding.Latin1.GetString(data, start + o, ln));
-				o += ln;
-			}
+				// The close's stored Field is its string COUNT - the column has carried that since the grammar was
+				// read as [u32 field][one screen], which for the single-element case every capture holds is the same
+				// word. Kept so a re-import produces the same rows.
+				KnubotCloseChatWindowIIR close => new Columns((ConversationSubOpcode)sub, close.Env, (uint)close.Strings.Count, null, close.Strings.Select(Latin1).ToList(), senderInstance),
+				_ => null
+			};
 		}
 
-		private const int CameraParamsLength = 10;
-
-		// DispatchSetDialogueCamera (opcode 0x2015 in the rpcHeader, not an IIR sub). Payload (after the rpcHeader)
-		// = [u32 0xC350][u32 npc][u32 0xC350][u32 player][CameraParams]. We store the GameCharAgent sender instance
-		// (varies per conversation) + the param bytes; the npc/player are re-addressed live at send time.
+		// DispatchSetDialogueCamera (opcode 0x2015 in the rpcHeader, not an IIR sub). We store the GameCharAgent
+		// sender instance (varies per conversation) + the typed camera args; the npc/player are re-addressed live at
+		// send time.
 		private static Columns? DecodeCamera(byte[] data, int headerLen, int start)
 		{
 			// opcode is the 16-bit word ending the rpcHeader (at headerLen-2 from the header start @ offset 12).
 			if (10 + headerLen + 2 > data.Length || data.ReadU16Be(10 + headerLen) != SetDialogueCamera)
 				return null;
 
-			// Body must be [0xC350][npc][0xC350][player][>=0 params].
-			if (start + 16 > data.Length || data.ReadU32Be(start) != EntityClass.Character || data.ReadU32Be(start + 8) != EntityClass.Character)
+			try
+			{
+				var camera = SetDialogueCameraCodec.Parse(data.AsSpan(start));
+
+				return new Columns((ConversationSubOpcode)SetDialogueCamera, null, null, null, null, RpcCallerInstance(data), camera.Camera);
+			}
+			catch (CodecParseException)
+			{
 				return null;
+			}
+		}
 
-			var agentInstance = RpcCallerInstance(data);
-			var paramsBytes = data.AsSpan(start + 16);
-
-			// The client's signature after the two endpoint handles is (nShotSize, nShotType, nShotEmphasis, nShotFov,
-			// nShotTilt, bAutoface, i_vHeadPaddingY) = 5 bytes + a bool byte + a big-endian float = exactly 10.
-			if (paramsBytes.Length != CameraParamsLength)
-				return null;
-
-			var camera = new CameraArgs(paramsBytes[0], paramsBytes[1], paramsBytes[2], paramsBytes[3], paramsBytes[4], paramsBytes[5] != 0,
-				BitConverter.Int32BitsToSingle(paramsBytes.ReadI32Be(6)));
-
-			return new Columns((ConversationSubOpcode)SetDialogueCamera, null, null, null, null, agentInstance, camera);
+		private static string Latin1(byte[] xml)
+		{
+			return Encoding.Latin1.GetString(xml);
 		}
 
 		// The caller endpoint instance from the rpcHeader: [0x0A len][0x0D class:u32][0x10 instance:varint].
@@ -171,16 +129,11 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		}
 
 		// The decoded columns of one conversation packet. Screens is the raw remoteformat screen XML list (the
-		// importer columnizes each into ConversationScreen rows via ConversationScreenColumns.ToRow). SenderInstance
-		// is the rpcHeader caller endpoint instance (retail varies it per conversation), stored so the send path
-		// re-frames from columns instead of the raw Data blob; CameraParams is the SetDialogueCamera payload.
-		// Camera* are the SetDialogueCamera arguments, split out of the wire bytes (#410): nShotSize, nShotType,
-		// nShotEmphasis, nShotFov, nShotTilt, bAutoface, i_vHeadPaddingY - null on every Knubot packet.
+		// importer columnizes each into ConversationScreen rows via ConversationScreenColumns.ToStoredRow).
+		// SenderInstance is the rpcHeader caller endpoint instance (retail varies it per conversation), stored so the
+		// send path re-frames from columns instead of the raw Data blob; Camera holds the SetDialogueCamera
+		// arguments (#410), null on every Knubot packet.
 		public sealed record Columns(ConversationSubOpcode SubOpcode, byte? Env, uint? Field, byte? Flag, IReadOnlyList<string>? Screens, uint? SenderInstance = null,
 			CameraArgs? Camera = null);
-
-		// Exactly the ten wire bytes, typed. A camera packet that is not ten bytes long is NOT decodable into these
-		// columns, so DecodeCamera rejects it rather than importing a row that would rebuild different bytes.
-		public sealed record CameraArgs(byte ShotSize, byte ShotType, byte ShotEmphasis, byte ShotFov, byte ShotTilt, bool Autoface, float HeadPaddingY);
 	}
 }

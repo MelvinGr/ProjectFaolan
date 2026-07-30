@@ -194,7 +194,7 @@ namespace Faolan.GameServer
 			// (before the cutscene) is a DUPLICATE retail doesn't have (loopback f649) and re-engages the cinematic.
 			if (client.Session.EntryMode != WorldEntryMode.CreateWorld)
 			{
-				var startFixed3d = ScryScript.BuildStep(instance, "StartFixed3d");
+				var startFixed3d = ScryScriptCodec.Build(instance, "StartFixed3d");
 				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(startFixed3d)));
 			}
@@ -207,7 +207,7 @@ namespace Faolan.GameServer
 						.WriteUInt32(instance)
 						.WriteArray(0x00, 0x00, 0x00, 0x00, 0x0E, 0x08, 0x05, 0x10, 0x00, 0x18, 0xF6, 0xC6, 0x17, 0x32, 0x04, 0x08, 0x00, 0x10, 0x00)));
 
-				var welcomeTutorial = ScryScript.BuildStep(instance, "WelcomeTutorial");
+				var welcomeTutorial = ScryScriptCodec.Build(instance, "WelcomeTutorial");
 				await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
 					s => s.WriteArrayUInt32Length(welcomeTutorial)));
 			}

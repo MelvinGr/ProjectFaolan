@@ -1,4 +1,6 @@
+using System;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Text
@@ -13,8 +15,7 @@ namespace Faolan.Core.Network.Codecs.Text
 	// instance, so a live send is fully addressable from the session.
 	//
 	// Wire grammar (big-endian, decoded 2026-06-16 from DemoL80 randomActions #7564, golden-tested in
-	// ChatTextCodecTests):
-	//   [u32 len]          = byte length of everything after this field
+	// ChatTextCodecTests). The carrier's [u32 len] belongs to the SENDER (#530 rule 2) - WorldIir.Send writes it:
 	//   [u32 0xE0B51102]   ChatTextIIR sub-opcode
 	//   [u32 0x0000C350]   standard IIR marker (Character class)
 	//   [u32 instance]     the target GameInterface object (= the receiver endpoint instance / ClientInstance)
@@ -36,47 +37,52 @@ namespace Faolan.Core.Network.Codecs.Text
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.ChatTextIIR; // 0xE0B51102
 		private const byte LeadFlag = 0x00;
 
+		public static byte[] Build(ChatTextIIR value)
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			using var s = new FaolanStream();
+			Write(s, value);
+
+			return s.ToArray();
+		}
+
 		public static byte[] Build(uint instance, byte[] xml)
 		{
-			return new Message(instance, xml).ToArray();
+			return Build(new ChatTextIIR(instance, xml));
 		}
 
-		public static Message Parse(byte[] body)
+		public static ChatTextIIR Parse(in ReadOnlySpan<byte> data)
 		{
-			return Message.Read(new FaolanStream(body));
+			var r = new SpanReader(data, nameof(ChatTextCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+
+			return value;
 		}
 
-		// The decoded ChatTextIIR body as a self-serializing codec (ICodec): Write frames the whole
-		// [len][subop][marker][instance][lead][xmlLen][xml][trailer]; Read recovers the (instance, xml).
-		public sealed record Message(uint Instance, byte[] Xml, byte ChatTextType = DefaultChatTextType, uint TypeFlags = DefaultTypeFlags) : ICodec<Message>
+		internal static ChatTextIIR Read(ref SpanReader r)
 		{
-			public static Message Read(FaolanStream s)
-			{
-				s.ReadUInt32(); // len
-				s.ReadUInt32(); // subop (0xE0B51102)
-				s.ReadUInt32(); // EntityClass.Character
-				var instance = s.ReadUInt32();
-				s.ReadArray(1); // lead flag 0x00
-				var xmlLen = s.ReadUInt16();
-				var xml = s.ReadArray(xmlLen);
-				var chatTextType = s.ReadByte(); // NPCChatTextType_e
-				var typeFlags = s.ReadUInt32(); // flags/format word (big-endian)
-				return new Message(instance, xml, chatTextType, typeFlags);
-			}
+			r.ExpectU32Be(Opcode, "the ChatTextIIR sub-opcode");
+			r.ExpectU32Be(EntityClass.Character, "the character entity class");
+			var instance = r.ReadU32Be();
+			r.ExpectU8(LeadFlag, "the lead flag");
+			var xml = r.ReadBytesU16Length().ToArray();
 
-			public void Write(FaolanStream s)
-			{
-				s.WriteArrayUInt32Length(content =>
-					content
-						.WriteUInt32(Opcode)
-						.WriteUInt32(EntityClass.Character)
-						.WriteUInt32(Instance)
-						.WriteByte(LeadFlag)
-						.WriteUInt16(Xml.Length)
-						.WriteArray(Xml)
-						.WriteByte(ChatTextType)
-						.WriteUInt32(TypeFlags));
-			}
+			return new ChatTextIIR(instance, xml, r.ReadU8(), r.ReadU32Be());
+		}
+
+		internal static void Write(FaolanStream s, ChatTextIIR v)
+		{
+			s.WriteUInt32(Opcode)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(v.Instance)
+				.WriteByte(LeadFlag)
+				.WriteUInt16(v.Xml.Length)
+				.WriteArray(v.Xml)
+				.WriteByte(v.ChatTextType)
+				.WriteUInt32(v.TypeFlags);
 		}
 	}
+
+	public sealed record ChatTextIIR(uint Instance, byte[] Xml, byte ChatTextType = ChatTextCodec.DefaultChatTextType, uint TypeFlags = ChatTextCodec.DefaultTypeFlags);
 }

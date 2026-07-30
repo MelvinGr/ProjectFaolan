@@ -119,9 +119,20 @@ namespace Faolan.Importer.Modules
 				{
 					// COLUMNIZED, not stored verbatim: a bark whose token/attributes we cannot lift is REJECTED rather
 					// than kept as a blob, and the columns must rebuild the captured string byte-for-byte - the runtime
-					// has no raw-text path to fall back to. Same rule as ConversationScreenColumns.ToRow.
-					if (RemoteFormatXml.ParseChatter(text, out var parameterValue) is not { } row)
-						throw new InvalidOperationException($"NPC {npc.TemplateId} bark is not a recognised chatter remoteformat: {text}");
+					// has no raw-text path to fall back to. Same rule as ConversationScreenCodec.Parse.
+					// NpcChatterCodec.Parse THROWS on a non-bark (#530 rule 4); re-thrown here naming the template.
+					NpcChatterBark bark;
+					try
+					{
+						bark = NpcChatterCodec.Parse(text);
+					}
+					catch (CodecParseException e)
+					{
+						throw new InvalidOperationException($"NPC {npc.TemplateId} bark is not a recognised chatter remoteformat: {text}", e);
+					}
+
+					var parameterValue = NpcChatterColumns.SessionValueOf(bark);
+					var row = NpcChatterColumns.ToRow(bark);
 
 					row.NpcTemplateId = npc.TemplateId;
 
@@ -129,7 +140,7 @@ namespace Faolan.Importer.Modules
 					// is the sendtell crier's `DetectedChar.name`, whose captured value is the capturing player's real
 					// character name - session state the runtime regenerates, and which must never reach faolan.sql
 					// (#417). Proving the round trip first means a bark we cannot reproduce still fails here.
-					if (RemoteFormatXml.BuildChatter(row, parameterValue) != text)
+					if (NpcChatterCodec.Build(row, parameterValue) != text)
 						throw new InvalidOperationException($"NPC {npc.TemplateId} bark is not byte-exact round-trippable from columns: {text}");
 
 					// First sighting wins. They describe the same line, and the differing part is exactly the session

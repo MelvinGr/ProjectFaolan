@@ -29,9 +29,8 @@ Plain tokens (no `showfifomessagefromserver` wrapper) render the smaller feedbac
 **The `AttributeChanged`/`Increased` line is the level-up feedback** (#209): there is **no** "You reached level N"
 banner in any capture — when a character dings (or a quest awards attribute points) retail sends one
 `AttributeChanged` message **per primary attribute that rose** (the 5 category-615 ids 804/806/808/810/814), then
-a `0x96B8DC59` vitals push with the new maxima. Built by `AttributeChangedFeedback` (`Faolan.Core.Network`, reuses
-`FormatFeedbackCodec`), decoded in `AttributeChangedFeedbackTests`, byte-exact in
-`AttributeChangedFeedbackTests`. typeFlags = `0x40000006`, footer = `0` (invariant across all 33 captured
+a `0x96B8DC59` vitals push with the new maxima. Built by `AttributeChangedCodec` (`Faolan.Core.Network`, a string codec whose text
+`FormatFeedbackCodec` carries), byte-exact in `AttributeChangedCodecTests`. typeFlags = `0x40000006`, footer = `0` (invariant across all 33 captured
 messages). The three `key="..."` are per-burst nonces the client does not validate (reuse is in-client proven).
 Wired into both ding paths: GM `.level` and the XP-driven `CombatService.PushLevelUp`. The growth amounts are
 provisional (`Combat.AttributeGrowth`) pending real per-class tables.
@@ -66,9 +65,9 @@ from the session** — not just a verbatim replay.
   (on a live session, Darktemplarchar, it popped the "Castle approach" banner at the top of the screen, separate
   from chat); that throwaway test command has since been retired in the GM-command cleanup, but the verified send
   path (`SendFeedback`) remains and now fires from the level-up attribute feedback below.
-- ✅ **`AttributeChanged` level-up feedback** (#209): byte-exact builder `AttributeChangedFeedback` + golden test +
+- ✅ **`AttributeChanged` level-up feedback** (#209): byte-exact builder `AttributeChangedCodec` + golden test +
   decode script, wired into the GM `.level` and combat ding paths. Awaits in-client verification (`needs-testing`).
-- ✅ **`LostGraceEffect` shield-loss line**: byte-exact `FormatFeedbackCodec.BuildLostGraceEffectXml` (typeFlags
+- ✅ **`LostGraceEffect` shield-loss line**: byte-exact `FeedbackXml.LostGraceEffect` (typeFlags
   `0x42000020`, footer `1`) + golden test, sent by `BreakShieldOnAggression` right before the Shield-of-the-Risen
   removal twin when the shield is lost to an aggressive action (see combat.md). The token+key is a fixed constant
   (byte-identical in two independent captures), not a per-send nonce.
@@ -77,7 +76,7 @@ from the session** — not just a verbatim replay.
   The plain-token lines (`AttributeChanged`, ...) are also token-driven. A literal-text path is the remaining
   decode (compare how the ChatServer system-message remoteformat embeds literal text).
 - ✅ **Resurrection-point discovered banner** (#372, verified in-client): byte-exact
-  `FormatFeedbackCodec.BuildRespawnPointDiscoveredXml` + goldens, sent by `WorldSimulation.DiscoverNearbyRespawnPoints`
+  `RespawnPointDiscoveredCodec` + goldens, sent by `WorldSimulation.DiscoverNearbyRespawnPoints`
   alongside the spots re-send. Replaces a chat-routed `"Resurrection point discovered: X"` `SendSystemMessage` that
   was never capture-derived (and printed the RDB dev label, "ResurrectionAIPoint2"). Its `<parameter>` is a nested
   `<localized>` naming the point by its own id under category 270 — the client resolves the text, so no name crosses

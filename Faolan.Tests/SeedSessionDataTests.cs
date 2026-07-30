@@ -28,12 +28,12 @@ namespace Faolan.Tests
 			// Every session slot is present-but-empty: the parameter still exists (the client parses the screen by
 			// parameter name and order, and `flags` drives the localized declension) with no string in it. Now that
 			// the inner element is columnized, "no string in it" is simply an empty Text column.
-			foreach (var p in parameters.Where(p => RemoteFormatXml.SessionSlots.Contains(p.Name) && p.Kind == InnerElementKind.StringEntry))
+			foreach (var p in parameters.Where(p => RemoteFormatSession.SessionSlots.Contains(p.Name) && p.Kind == InnerElementKind.StringEntry))
 				Assert.Equal("", p.Text);
 
 			// And nothing ELSE in a screen is a literal string entry: every other parameter is a <localized …>
 			// reference into the client's LDB, which is content. So a captured literal can only be a session slot.
-			var literals = parameters.Where(p => p.Kind == InnerElementKind.StringEntry && !RemoteFormatXml.SessionSlots.Contains(p.Name)).ToList();
+			var literals = parameters.Where(p => p.Kind == InnerElementKind.StringEntry && !RemoteFormatSession.SessionSlots.Contains(p.Name)).ToList();
 			Assert.True(literals.Count == 0, $"Unexpected literal string entries in dialogue screens: {string.Join(", ", literals.Take(5).Select(p => $"{p.Name}={p.Text}"))}");
 		}
 	}

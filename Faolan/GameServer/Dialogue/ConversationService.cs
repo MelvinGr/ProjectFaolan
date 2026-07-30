@@ -319,7 +319,7 @@ namespace Faolan.GameServer.Dialogue
 			var guildName = character?.GuildId is { } guildId
 				? (await _database.GetGuild(guildId))?.Name ?? ""
 				: "";
-			var npcGuildName = RemoteFormatXml.NotInGuildLabel(character != null
+			var npcGuildName = RemoteFormatSession.NotInGuildLabel(character != null
 				? (await _database.GetRealm(character.RealmId))?.Name ?? ""
 				: "");
 
@@ -370,7 +370,7 @@ namespace Faolan.GameServer.Dialogue
 				// from the typed screen columns re-addressed to the live player + clicked NPC.
 				var senderInstance = p.SenderInstance ?? DefaultSenderInstance;
 				if (subOp == ConversationSubOpcode.SetDialogueCamera)
-					await SendDialogueCamera(client, senderInstance, liveInstance, clickedNpcHandle, DialogueCameraBody.BuildParams(p));
+					await SendDialogueCamera(client, senderInstance, liveInstance, clickedNpcHandle, CameraArgsOf(p));
 				else
 					await SendConstructedKnubot(client, senderInstance, liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName, npcGuildName));
 			}
@@ -479,28 +479,39 @@ namespace Faolan.GameServer.Dialogue
 
 			// CONSTRUCT the close via KnubotCodec from the captured empty-remoteformat reply, re-addressed to the live
 			// player AND the live NPC (the captured string is reused verbatim), on the same sender (GameAgent:0x08).
-			var captured = KnubotCodec.ParseStringList(KnubotCloseChatWindowBody);
-			var record = KnubotCodec.BuildCloseChatWindow(id, target ?? captured.NpcHandle, captured.Strings, captured.Env);
+			// AsSpan(4): the captured blob is the whole carrier payload, and its leading [u32 len] belongs to the
+			// sender now (#530 rule 2) - SendConstructedKnubot writes it back on.
+			var captured = (KnubotCloseChatWindowIIR)KnubotCodec.Parse(KnubotCloseChatWindowBody.AsSpan(4));
+			var record = KnubotCodec.Build(captured with
+			{
+				PlayerInstance = id,
+				NpcHandle = target ?? captured.NpcHandle
+			});
+
 			return SendConstructedKnubot(client, agentInstance, id, record);
 		}
 
 		// Construct a Knubot record from the STRUCTURED columns (#188) - the screen is rebuilt from its typed
-		// ConversationScreen rows (RemoteFormatXml.Build) with the live player name/guild regenerated in. The rows are
-		// gated byte-exact at import (ConversationScreenColumns.ToRow), so this build is authoritative - no Data-path
-		// fallback. Byte-identical to the raw-capture construct for the same inputs (ConversationConstructTests).
+		// ConversationScreen rows (RemoteFormatScreenCodec.Build) with the live player name/guild regenerated in. The
+		// rows are gated byte-exact at import (ConversationScreenCodec.Parse), so this build is authoritative - no
+		// Data-path fallback. Byte-identical to the raw-capture construct for the same inputs
+		// (ConversationConstructTests). The record carries NO length prefix - the sender frames it (#530 rule 2).
 		internal static byte[] BuildKnubotFromColumns(ConversationPacket p, uint liveInstance, uint npcHandle, string playerName, string guildName, string npcGuildName = "")
 		{
 			var env = p.Env ?? 0;
-			var screens = ConversationScreenColumns.ToScreens(p.Screens); // ordered RemoteFormatXml.Screen list
+			var screens = ConversationScreenColumns.ToScreens(p.Screens); // ordered RemoteFormatScreen list
 
 			if (p.SubOpcode == ConversationSubOpcode.KnubotOpenChatWindow)
-				return KnubotCodec.BuildOpenChatWindow(liveInstance, npcHandle, p.Flag ?? 0, env);
+				return KnubotCodec.Build(new KnubotOpenChatWindowIIR(liveInstance, npcHandle, env, p.Flag ?? 0));
 			if (p.SubOpcode == ConversationSubOpcode.KnubotAppendText)
-				return KnubotCodec.BuildAppendText(liveInstance, npcHandle, Screen(0), p.Field ?? 1, p.Flag ?? 1, env);
+				return KnubotCodec.Build(new KnubotAppendTextIIR(liveInstance, npcHandle, env, p.Field ?? 1, Screen(0), p.Flag ?? 1));
 
 			// AnswerList + CloseChatWindow: the string-list grammar.
 			var strings = screens.Select((_, i) => Screen(i)).ToList();
-			return KnubotCodec.BuildStringList((uint)p.SubOpcode!.Value, liveInstance, npcHandle, strings, env);
+
+			return KnubotCodec.Build(p.SubOpcode == ConversationSubOpcode.KnubotCloseChatWindow
+				? new KnubotCloseChatWindowIIR(liveInstance, npcHandle, env, strings)
+				: new KnubotAnswerListIIR(liveInstance, npcHandle, env, strings));
 
 			byte[] Screen(int i)
 			{
@@ -509,8 +520,9 @@ namespace Faolan.GameServer.Dialogue
 				// (player name, their guild, the NPC guild label) from the live values.
 				var screen = string.IsNullOrEmpty(playerName)
 					? screens[i]
-					: RemoteFormatXml.WithLivePlayer(screens[i], playerName, guildName ?? "", npcGuildName ?? "");
-				return Encoding.Latin1.GetBytes(RemoteFormatXml.Build(screen));
+					: RemoteFormatSession.WithLivePlayer(screens[i], playerName, guildName ?? "", npcGuildName ?? "");
+
+				return Encoding.Latin1.GetBytes(RemoteFormatScreenCodec.Build(screen));
 			}
 		}
 
@@ -527,18 +539,34 @@ namespace Faolan.GameServer.Dialogue
 		// 0x2000. Retail VARIES the GameAgent instance per conversation (0x07..0x5a observed; 0x08 the most common),
 		// and the client addresses its KnubotAnswer back to whatever instance sent the screen - so we PRESERVE the
 		// captured packet's sender instance rather than hardcoding one, matching the replay path byte-for-byte.
+		// The carrier's [u32 len] is written HERE (#530 rule 2) - KnubotCodec emits the record alone.
 		private static Task SendConstructedKnubot(INetworkClient client, uint senderInstance, uint liveInstance, byte[] record)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, senderInstance), Endpoints.Endpoint(Endpoints.GameInterfaceType, liveInstance),
-				GameInterfaceOpcodes.DispatchPassBlob, record));
+				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 		}
 
 		// Constructs the dialogue camera (DispatchSetDialogueCamera 0x2015) from the structured columns (#188):
 		// GameCharAgent:<agentInstance> -> GameCharInterface:<player>, body [0xC350][npc][0xC350][player][params].
 		// Byte-identical to the captured packet re-addressed (gated by the construct test).
-		private static Task SendDialogueCamera(INetworkClient client, uint agentInstance, uint liveInstance, uint npcHandle, byte[] cameraParams)
+		internal static Rpc BuildDialogueCameraPacket(uint agentInstance, uint liveInstance, uint npcHandle, CameraArgs camera)
 		{
-			return client.SendAsync(DialogueCameraBody.BuildDialogueCameraPacket(agentInstance, liveInstance, npcHandle, cameraParams));
+			return new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, agentInstance), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, liveInstance),
+				SetDialogueCameraCodec.Opcode, SetDialogueCameraCodec.Build(npcHandle, liveInstance, camera));
+		}
+
+		private static Task SendDialogueCamera(INetworkClient client, uint agentInstance, uint liveInstance, uint npcHandle, CameraArgs camera)
+		{
+			return client.SendAsync(BuildDialogueCameraPacket(agentInstance, liveInstance, npcHandle, camera));
+		}
+
+		// The camera arguments as they sit on the wire, rebuilt from the packet row's typed columns (#410 - these
+		// were one opaque 10-byte CameraParams blob).
+		internal static CameraArgs CameraArgsOf(ConversationPacket row)
+		{
+			ArgumentNullException.ThrowIfNull(row);
+
+			return new CameraArgs(row.ShotSize ?? 0, row.ShotType ?? 0, row.ShotEmphasis ?? 0, row.ShotFov ?? 0, row.ShotTilt ?? 0, row.Autoface == true, row.HeadPaddingY ?? 0f);
 		}
 	}
 }

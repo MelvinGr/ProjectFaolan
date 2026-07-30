@@ -21,14 +21,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayOrSkipStep_BuildsTheCapturedRecord()
 		{
-			var body = ScryScript.BuildStep(Handle, "PlayOrSkip");
+			var body = ScryScriptCodec.Build(Handle, "PlayOrSkip");
 			Assert.Equal(Expected(Rec2Suffix), Convert.ToHexStringLower(body));
 		}
 
 		[Fact]
 		public void PreloadAssetsStep_BuildsTheCapturedRecord()
 		{
-			var body = ScryScript.BuildStep(Handle, CreateFlowService.CreateWorldScriptToken, 7, resources: CreateFlowService.CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303);
+			var body = ScryScriptCodec.Build(Handle, CreateFlowService.CreateWorldScriptToken, 7, resources: CreateFlowService.CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303);
 			Assert.Equal(Expected(Rec1Suffix), Convert.ToHexStringLower(body));
 		}
 
@@ -37,7 +37,7 @@ namespace Faolan.Tests
 		public void StartScriptGroup_BuildsTheCapturedRecord()
 		{
 			// captured suffix [flag=00][u32 pbLen=0E][08 05 10 00 18 EC 97 02 32 04 08 00 10 00]
-			var body = ScryScript.BuildStartScriptGroup(Handle, 35820);
+			var body = ScryScriptCodec.Build(Handle, 35820);
 			Assert.Equal(Expected("000000000e0805100018ec9702320408001000"), Convert.ToHexStringLower(body));
 		}
 

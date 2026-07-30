@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**80** IIR carrier types · **77 V3** (77 with an auto-cited golden). The
+**80** IIR carrier types · **76 V3** (76 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -46,12 +46,11 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `GuildUpdateIIR` | `0x2550C99A` | `GuildUpdateCodec` | [V3: GuildPacketTests.GuildUpdate_Matches_ExpectedLayout] |
 | V3 | `HateListUpdateIIR` | `0x8A01E5A1` | `HateListCodec` | [V3: CombatRecordCodecTests.HateList_BuildsByteExact] |
 | V3 | `IntendedTeleportIIR` | `0x10D27BC0` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
-| V3 | `KnubotAnswerIIR` | `0x4D7D9123` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
-| V3 | `KnubotAnswerListIIR` | `0xF164A4A5` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
-| V3 | `KnubotAppendTextIIR` | `0x4A3D899A` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
-| V3 | `KnubotCloseChatWindowIIR` | `0xC4AF39EB` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
+| V3 | `KnubotAnswerListIIR` | `0xF164A4A5` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
+| V3 | `KnubotAppendTextIIR` | `0x4A3D899A` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
+| V3 | `KnubotCloseChatWindowIIR` | `0xC4AF39EB` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
 | V3 | `KnubotFinishTradeIIR` | `0x7446F3FA` | `KnubotFinishTrade` | [V3: V1IirCodecTests.KnubotFinishTrade_RoundTripsCapturedBody] |
-| V3 | `KnubotOpenChatWindowIIR` | `0x045B0B0F` | `ConversationScreenDecoder`, `KnubotCodec` | [V3: ConversationConstructTests.BuildDialogueCameraPacket_ReproducesTheCapturedPacket] |
+| V3 | `KnubotOpenChatWindowIIR` | `0x045B0B0F` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
 | V3 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTrade` | [V3: V1IirCodecTests.KnubotStartTrade_FramesAndCarriesTheDialoguePayloadVerbatim] |
 | V3 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChanged` | [V3: V1IirCodecTests.LockedToChanged_RoundTripsCapturedBody] |
 | V3 | `LookAtIIR` | `0x0D155695` | `LookAtCodec`, `ShopOpenBuilder`, `WorldDeath` | [V3: MagicBuffLookAtCodecTests.LookAt_ParsesSelectAndDeselect] |
@@ -74,7 +73,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `QuestLogListIIR` | `0x504B7924` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `RegenIIR` | `0x28D0AC99` | `Regen` | [V3: V1IirCodecTests.Regen_RoundTripsCapturedBody] |
 | V3 | `RemoveFromGroupIIR` | `0xE4FF0C85` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
-| V3 | `ScryScriptIIR` | `0xA36D3B74` | `ScryScript` | [V3: ScryScriptCodecTests.BuildStartScriptGroup_MatchesTheHandWrittenBytes] |
+| V3 | `ScryScriptIIR` | `0xA36D3B74` | `ScryScriptCodec` | [V3: ScryScriptCodecTests.BuildStartScriptGroup_MatchesTheHandWrittenBytes] |
 | V3 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `SetNameIIR` | `0xADCE0CDA` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `SetPosIIR` | `0x04B80B24` | `SetPosCodec` | [V3: DeadReckoningCodecTests.SetPos_RoundTripsByteExact] |
@@ -97,6 +96,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `DeleteItemCodec` |  |
 | V2 | `FanaticCommandIir` | `0xEE4AA85C` | `FanaticCommandCodec` |  |
+| V2 | `KnubotAnswerIIR` | `0x4D7D9123` | `KnubotAnswerCodec` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `MoveInventoryItemCodec` |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see
