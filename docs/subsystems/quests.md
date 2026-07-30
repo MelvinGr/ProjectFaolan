@@ -293,9 +293,31 @@ contain one (*"Deliver the Head of Athyr-Bast to Hashima"*) and the person alway
 One pass takes the wired talk goals from **6 to 21**, and every one of the 168 goals is accounted for by reason:
 15 typed, 83 already wired, 5 rank/level-gated, 63 not a deliver/talk shape, 2 with no name in the text.
 
-⚠️ **A rank/level precondition is still refused** — *"…to Itsing When You Have Become an Acolyte (Rank 1)"*,
-*"Talk to Sharak (level 30)"*. A bare talk trigger completes those EARLY, which is a silent chain bug rather
-than a coverage gap; it is the one place accuracy beats coverage here.
+#### Preconditions are RECORDED, and enforced at the trigger
+
+Five goals state a precondition in their own text, and both shapes are captured rather than discarded:
+
+| text | columns |
+|---|---|
+| *"Talk to Sharak **(level 30)**"* | `RequiredLevel` 30 |
+| *"…to Itsing **When You Have Become an Acolyte (Rank 1)**"* | `RequiredRankTitle` `Acolyte`, `RequiredRank` 1 |
+
+The goal is **wired normally** and the gate is enforced at the TRIGGER, by
+`QuestProgress.PreconditionMet`. That split is deliberate: refusing to wire would throw the information away and
+need a re-harvest the day the gate can be evaluated.
+
+- **Level works today** — checked against the character's level.
+- **Faction rank cannot be evaluated yet** (no faction system, Gitea #310), so it resolves to `null` and
+  **unknown is NOT met**. The three rank-gated goals stay inert exactly as they were, and start working the moment
+  `QuestProgressionService.ResolveFactionRank` can answer — no goal re-wired, no capture re-harvested. That method
+  is the single seam; it is a real function returning `null`, not a TODO buried in a caller.
+
+⚠️ Unknown must never read as *met*: a bare talk trigger would otherwise complete those quests EARLY, which is
+silent and looks like an engine bug.
+
+⚠️ The name is extracted from the text with the precondition clause REMOVED. *"…to Itsing When You Have Become an
+Acolyte"* otherwise yields the recipient **"Itsing When"** — the name pattern takes up to two Capitalised words and
+`When` is one, so the clause silently becomes part of the name and no NPC ever matches it.
 
 ⚠️ **A name is wired even when we do not hold that NPC** (12 of the 15). It is the client's own statement of who
 the goal is about, the goal is inert either way, and recording it means it works the moment its map is imported —

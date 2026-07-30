@@ -85,6 +85,17 @@ namespace Faolan.GameServer.Quest
 			return Advance(client, QuestGoalType.Escort, npcName);
 		}
 
+		// The player's rank in the named faction, or NULL when that cannot be answered - which is the case today,
+		// because the faction/reputation system does not exist yet (Gitea #310).
+		//
+		// ⚠️ This is the ONE place that changes when it does. Null means "not met" in QuestProgress.PreconditionMet, so
+		// the three rank-gated goals stay inert exactly as they are now, and start working the moment this can answer -
+		// no goal has to be re-wired and no capture re-harvested. Deliberately a seam, not a TODO buried in a caller.
+		private static uint? ResolveFactionRank(string factionTitle)
+		{
+			return null;
+		}
+
 		// Whether the player is CURRENTLY escorting `npcName` - an active quest with an unfinished Escort goal naming it.
 		//
 		// The caller needs this BEFORE advancing, to tell the one door use that ends an escort from every later use of
@@ -262,6 +273,17 @@ namespace Faolan.GameServer.Quest
 				};
 				if (goal == null)
 					continue;
+
+				// #521: a stated PRECONDITION must hold before the goal can advance. Enforced HERE, at the trigger, rather
+				// than by refusing to wire the goal: the level check works today, and the faction-rank one starts working
+				// the day #310 gives ResolveFactionRank a real answer - with no re-harvest and no re-wiring.
+				if (!QuestProgress.PreconditionMet(goal, character.Level, ResolveFactionRank))
+				{
+					await _agents.SendSystemMessage(character.Id, goal.RequiredLevel is { } lvl
+						? $"You must be level {lvl} for this."
+						: "You are not of high enough standing for this yet.");
+					continue;
+				}
 
 				// #521: a DELIVER goal is a HAND-IN, so the player must actually be CARRYING what it hands over.
 				// Without this the talk alone solves it and "deliver a supply crate to Croiss" completes by walking up

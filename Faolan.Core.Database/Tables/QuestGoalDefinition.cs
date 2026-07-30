@@ -90,6 +90,26 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? TargetName { get; set; }
 
+		// A PRECONDITION the client states in the goal's own objective text, decoded with it (#520). Two shapes exist in
+		// the corpus and both are recorded even though only one can be enforced yet:
+		//
+		//   "Talk to Sharak (level 30)"                                     -> RequiredLevel 30
+		//   "…to Itsing When You Have Become an Acolyte (Rank 1)"           -> RequiredRankTitle "Acolyte", RequiredRank 1
+		//
+		// ⚠️ These are recorded RATHER THAN acted on at wiring time deliberately. A goal with an unmet precondition must
+		// not advance - a bare talk trigger would complete it EARLY, a silent chain bug - so the goal is wired normally
+		// and the gate is enforced at the TRIGGER (QuestProgress.PreconditionMet), which is the one place that knows the
+		// live player. That means the day faction ranks exist (#310), only the rank branch of that predicate changes;
+		// nothing has to be re-harvested and no goal has to be re-wired.
+		public uint? RequiredLevel { get; set; }
+
+		// The faction TITLE the client names ("Acolyte", "Pickpocket", "Thug"), verbatim. A string rather than an FK
+		// because the faction system does not exist yet (#310) - when it does, this is what resolves to it.
+		[MaxLength(64)]
+		public string? RequiredRankTitle { get; set; }
+
+		public uint? RequiredRank { get; set; }
+
 		[MaxLength(64)]
 		public string? TrailingFlags { get; set; }
 

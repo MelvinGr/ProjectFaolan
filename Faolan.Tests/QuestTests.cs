@@ -222,6 +222,38 @@ namespace Faolan.Tests
 			Assert.True(QuestProgress.CanHandIn(single, 1));
 		}
 
+		[Fact]
+		public void PreconditionMet_LevelChecksNow_RankIsUnmetUntilFactionsExist()
+		{
+			var none = GoalSeq(1, 100, QuestGoalType.TalkToNpc, "Casilda");
+			Assert.True(QuestProgress.PreconditionMet(none, 1)); // no precondition -> a no-op for almost every goal
+
+			// "Talk to Sharak (level 30)" - checkable TODAY against the character's level.
+			var level = new QuestGoalDefinition { GoalId = 5374, TargetName = "Sharak", RequiredLevel = 30 };
+			Assert.False(QuestProgress.PreconditionMet(level, 29));
+			Assert.True(QuestProgress.PreconditionMet(level, 30));
+			Assert.True(QuestProgress.PreconditionMet(level, 80));
+
+			// "…to Itsing When You Have Become an Acolyte (Rank 1)" - needs the faction system (#310).
+			var rank = new QuestGoalDefinition { GoalId = 11880, TargetName = "Itsing", RequiredRankTitle = "Acolyte", RequiredRank = 1 };
+
+			// UNKNOWN IS NOT MET. This is the safety property the whole design rests on: with no resolver the goal stays
+			// inert, rather than completing early the first time the player talks to Itsing.
+			Assert.False(QuestProgress.PreconditionMet(rank, 80));
+			Assert.False(QuestProgress.PreconditionMet(rank, 80, _ => null));
+
+			// ...and it starts working the day a resolver can answer - no re-harvest, no re-wiring.
+			Assert.False(QuestProgress.PreconditionMet(rank, 80, t => t == "Acolyte" ? 0u : null));
+			Assert.True(QuestProgress.PreconditionMet(rank, 80, t => t == "Acolyte" ? 1u : null));
+			Assert.True(QuestProgress.PreconditionMet(rank, 80, t => t == "Acolyte" ? 5u : null));
+			Assert.False(QuestProgress.PreconditionMet(rank, 80, t => t == "Thug" ? 5u : null)); // right rank, wrong faction
+
+			// Both kinds on one goal: each must hold independently.
+			var both = new QuestGoalDefinition { GoalId = 1, RequiredLevel = 30, RequiredRankTitle = "Thug", RequiredRank = 1 };
+			Assert.False(QuestProgress.PreconditionMet(both, 29, _ => 5u)); // rank ok, level short
+			Assert.True(QuestProgress.PreconditionMet(both, 30, _ => 5u));
+		}
+
 		// --- Quest objective-tracking rules (#261/#357) ---------------------------------------------------------------
 
 		[Fact]

@@ -45,6 +45,32 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return !IsDelivery(goal) || heldCount >= Math.Max(1u, goal.RequiredCount);
 		}
 
+		// Whether the player meets a goal's stated PRECONDITION (#521). True when the goal has none, so this is a no-op
+		// for the overwhelming majority.
+		//
+		// `factionRank` resolves the player's rank in a named faction, or null when that is not knowable. It is a
+		// parameter rather than a lookup because the faction system does not exist yet (#310): passing a resolver that
+		// always returns null makes every rank-gated goal correctly UNMET, which is the safe reading - the alternative
+		// (assume met) completes those quests early, which is silent and wrong.
+		//
+		// ⚠️ Unknown is NOT met. That is the whole point of enforcing here rather than refusing to wire the goal: the
+		// goal is wired and inert today, and becomes playable the day the resolver can answer - with no re-harvest and
+		// no re-wiring.
+		public static bool PreconditionMet(QuestGoalDefinition goal, uint playerLevel, Func<string, uint?>? factionRank = null)
+		{
+			if (goal == null)
+				return true;
+
+			if (goal.RequiredLevel is { } level && playerLevel < level)
+				return false;
+
+			if (goal.RequiredRankTitle is not { Length: > 0 } title)
+				return true;
+
+			var held = factionRank?.Invoke(title);
+			return held is { } rank && rank >= Math.Max(1u, goal.RequiredRank ?? 1u);
+		}
+
 		// The CollectItem goal for `itemId` (#262): the lowest-Sequence CollectItem goal whose TrailingRefId is that item
 		// (the item a quest-pickup grants, e.g. Shipwrecked V's stone brick 193400). Null if none - the pickup is inert
 		// unless a matching collect quest is active, which is what gates the brick nodes to quest-holders.

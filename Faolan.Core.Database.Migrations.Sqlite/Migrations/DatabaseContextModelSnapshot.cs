@@ -2900,6 +2900,16 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("RequiredCount")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("RequiredLevel")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("RequiredRank")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RequiredRankTitle")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
                     b.Property<uint>("Separator")
                         .HasColumnType("INTEGER");
 

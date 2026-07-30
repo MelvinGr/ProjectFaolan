@@ -38,10 +38,14 @@ namespace Faolan.Importer.Rdb
 		// Aquilonia".
 		private static readonly Regex TalkObjective = new(@"^\s*(?:Talk|Speak|Report)\s+(?:to|with)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-		// A goal whose text carries a RANK/LEVEL precondition is deliberately left unwired: a bare talk trigger would
-		// complete it early. "Give Note of Recommendation to Itsing When You Have Become an Acolyte (Rank 1)",
-		// "Talk to Sharak (level 30)".
-		private static readonly Regex Precondition = new(@"When You Have Become|\(\s*(?:level|rank)\s", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+		// The two PRECONDITION shapes the client states in a goal's text. They are RECORDED, not used to refuse the
+		// wiring: the goal is typed normally and QuestProgress.PreconditionMet enforces it at the trigger, where the
+		// live player is known. See QuestGoalDefinition.RequiredLevel.
+		//   "Talk to Sharak (level 30)"
+		private static readonly Regex LevelPrecondition = new(@"\(\s*level\s+(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+		//   "…to Itsing When You Have Become an Acolyte (Rank 1)"  -> title "Acolyte", rank 1
+		private static readonly Regex RankPrecondition = new(@"When You Have Become (?:an?\s+)?([A-Za-z][\w \-']*?)\s*\(\s*Rank\s+(\d+)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 		public static async Task<Result> ImportAsync(DatabaseContext db, string rdbDir)
 		{
@@ -83,15 +87,31 @@ namespace Faolan.Importer.Rdb
 					continue;
 				}
 
-				// A RANK/LEVEL precondition stays unwired even now: a bare talk trigger would complete it EARLY, which
-				// is a silent chain bug rather than a coverage gap. This is the one place accuracy beats coverage.
-				if (Precondition.IsMatch(text))
+				// The precondition is RECORDED and the goal is still wired. Refusing to wire it would have thrown the
+				// information away and needed a re-harvest the day the gate can be evaluated; carrying it means only
+				// QuestProgress.PreconditionMet has to learn a new answer.
+				var rank = RankPrecondition.Match(text);
+				if (LevelPrecondition.Match(text) is { Success: true } lvl)
 				{
+					goal.RequiredLevel = uint.Parse(lvl.Groups[1].Value);
 					gated++;
-					continue;
 				}
 
-				var match = Recipient.Matches(text).LastOrDefault();
+				if (rank.Success)
+				{
+					goal.RequiredRankTitle = rank.Groups[1].Value.Trim();
+					goal.RequiredRank = uint.Parse(rank.Groups[2].Value);
+					gated++;
+				}
+
+				// ⚠️ Match the NAME on the text with the precondition clause REMOVED. "…to Itsing When You Have Become an
+				// Acolyte" otherwise yields "Itsing When": the name pattern takes up to two Capitalised words and `When`
+				// is one, so the clause silently becomes part of the recipient and no NPC ever matches it.
+				var nameText = rank.Success
+					? text[..rank.Index]
+					: text;
+
+				var match = Recipient.Matches(nameText).LastOrDefault();
 				if (match == null)
 				{
 					noName++;
