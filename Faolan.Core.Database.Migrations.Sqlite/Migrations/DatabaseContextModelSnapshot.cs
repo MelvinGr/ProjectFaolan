@@ -2885,6 +2885,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("Partial")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("QuestDefinitionId")
                         .HasColumnType("INTEGER");
 

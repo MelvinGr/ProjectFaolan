@@ -21,6 +21,10 @@ namespace Faolan.Importer.Cli
 	// `Separator`) and its objective text are two INDEPENDENT statements of what the goal asks for, so printing them
 	// side by side is a cross-check: where they disagree, one of them is wrong or the kind value is unmapped. It is also
 	// the only place a `Deliver` goal's RECIPIENT is written down - the row carries the item but never the target NPC.
+	//
+	// A PARTIAL goal prints `(partial)` instead of a type and count. Those columns default to Kill/0 on a row the wire
+	// never typed (QuestGoalDefinition.Partial), and printing the defaults here would read as a decoded fact - in an
+	// output whose whole purpose is to be the evidence other typings are taken from.
 	public static partial class ReportCli
 	{
 		// The quest half of the encrypted set. 50304 is `quest_goal_templates.goal_name` (the per-goal objective line);
@@ -54,6 +58,7 @@ namespace Faolan.Importer.Cli
 					g.ObjectiveKey,
 					g.Separator,
 					g.GoalType,
+					g.Partial,
 					g.TargetName,
 					g.RequiredCount
 				})
@@ -109,7 +114,7 @@ namespace Faolan.Importer.Cli
 					: $"?{g.Separator}";
 
 				Console.WriteLine(
-					$"{g.GoalId}\t{g.QuestDefinitionId}\t{kind}\t{g.GoalType}\t{g.RequiredCount}\t{g.TargetName ?? "-"}\t{Flatten(text)}");
+					$"{g.GoalId}\t{g.QuestDefinitionId}\t{kind}\t{(g.Partial ? "(partial)" : g.GoalType.ToString())}\t{(g.Partial ? "-" : g.RequiredCount.ToString())}\t{g.TargetName ?? "-"}\t{Flatten(text)}");
 			}
 
 			Console.WriteLine();

@@ -46,6 +46,24 @@ namespace Faolan.Tests
 			Assert.True(QuestProgress.AllGoalsComplete(goals, g => progress[g.GoalId])); // now every goal met
 		}
 
+		// A PARTIAL goal must not gate its quest. Such a row is recovered from a full-update's secondary objective
+		// record, so it has no verb, target or count - nothing can ever advance it - and GoalType defaults to Kill(0)
+		// with RequiredCount 0, which clamps to 1. Counting it would leave quests 12369 and 10287 permanently
+		// incompletable the moment their real second goals were harvested (#525 follow-up).
+		[Fact]
+		public void AllGoalsComplete_IgnoresPartialGoals()
+		{
+			var real = GoalReq(100, 1);
+			var partial = GoalReq(7134, 0);
+			partial.Partial = true;
+
+			Assert.True(QuestProgress.AllGoalsComplete([real, partial], g => g.GoalId == 100 ? 1u : 0u));
+
+			// Same shape without the flag is exactly the trap: the quest can never complete.
+			partial.Partial = false;
+			Assert.False(QuestProgress.AllGoalsComplete([real, partial], g => g.GoalId == 100 ? 1u : 0u));
+		}
+
 		[Fact]
 		public void BuildQuestFullUpdate_MatchesCasildaCapture()
 		{

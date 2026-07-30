@@ -119,7 +119,11 @@ namespace Faolan.Importer.Extractors
 			var questId = body.ReadU32Be(21);
 			var records = Records(body, 16).ToList();
 
-			var objective = records.FirstOrDefault(r => r is { Tag: "remoteformat", Category: 50304 });
+			// A full-update carries ONE 50304 objective record PER GOAL, in goal order - reading only the first is how
+			// two-goal quests came to look like one-goal quests (12369 dropped 7134, 10287 dropped 7363; the corpus
+			// also has a three-goal quest, 6499/6514/6515). The first is the PRIMARY goal, which owns the marker block.
+			var objectives = records.Where(r => r is { Tag: "remoteformat", Category: 50304 }).ToList();
+			var objective = objectives.FirstOrDefault();
 			var objectiveLocalized = records.FirstOrDefault(r => r.Tag == "localized");
 			var title = records.FirstOrDefault(r => r.Category == 50301);
 			var summary = records.FirstOrDefault(r => r.Category == 50302);
@@ -166,7 +170,8 @@ namespace Faolan.Importer.Extractors
 			// find-or-create by GoalId, so this completes with the server-side-only fields (TargetName/GoalType/
 			// QuestItemId) and any multi-goal @609 detail rather than being duplicated. This is the goal the wire
 			// carries; a quest's non-primary goals only appear in the @609 snapshot region (seeded where captured).
-			UpsertGoal(def, objective.Id, def.MapId, def.MarkerX, def.MarkerY, objective);
+			for (var i = 0; i < objectives.Count; i++)
+				UpsertGoal(def, objectives[i].Id, def.MapId, def.MarkerX, def.MarkerY, objectives[i], (uint)(i + 1), i > 0);
 		}
 
 		private static void MergeJournal(byte[] body, Dictionary<uint, QuestDefinition> byQuest)
@@ -331,7 +336,12 @@ namespace Faolan.Importer.Extractors
 
 		// Find-or-create the goal by GoalId within the quest and set the WIRE fields (map/marker/objective ref). Leaves
 		// the server-side-only fields untouched so a later Seed* overlay can complete them.
-		private static void UpsertGoal(QuestDefinition def, uint goalId, uint mapId, uint markerX, uint markerY, TextRecord objective)
+		//
+		// `sequence` is the goal's 1-based position in the full-update's objective list, and `partial` marks every goal
+		// after the first: the packet's marker block describes the PRIMARY goal only, so a secondary goal is recovered
+		// with its identity and objective text but no verb, target or count (see QuestGoalDefinition.Partial). A goal
+		// the snapshot already supplied in full is never downgraded - Partial only ever goes false here.
+		private static void UpsertGoal(QuestDefinition def, uint goalId, uint mapId, uint markerX, uint markerY, TextRecord objective, uint sequence = 1, bool partial = false)
 		{
 			var goal = def.Goals.FirstOrDefault(g => g.GoalId == goalId);
 			if (goal == null)
@@ -339,17 +349,28 @@ namespace Faolan.Importer.Extractors
 				def.Goals.Add(goal = new QuestGoalDefinition
 				{
 					GoalId = goalId,
-					Sequence = 1,
-					RequiredCount = 1
+					Sequence = sequence,
+					RequiredCount = 1,
+					Partial = partial
 				});
 			}
+			else if (!partial)
+			{
+				goal.Partial = false;
+			}
+
+			goal.ObjectiveRefId = objective.Id;
+			goal.ObjectiveCategory = objective.Category;
+			goal.ObjectiveKey = LdbKey.Decode(objective.Key) ?? new();
+
+			// The marker block belongs to the primary goal; attaching it to a secondary would place its map pin on the
+			// wrong objective.
+			if (partial)
+				return;
 
 			goal.MapId = mapId;
 			goal.MarkerX = markerX;
 			goal.MarkerY = markerY;
-			goal.ObjectiveRefId = objective.Id;
-			goal.ObjectiveCategory = objective.Category;
-			goal.ObjectiveKey = LdbKey.Decode(objective.Key) ?? new();
 		}
 
 		private sealed record TextRecord(int Offset, int Length, string Tag, uint Id, uint Category, string Key, string Flags);

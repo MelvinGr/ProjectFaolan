@@ -1011,16 +1011,29 @@ namespace Faolan.Importer.Captures
 						{
 							GoalId = hg.GoalId,
 							Sequence = hg.Sequence,
-							RequiredCount = hg.RequiredCount
+							RequiredCount = hg.RequiredCount,
+							Partial = hg.Partial
 						});
 					}
+					else if (!hg.Partial)
+					{
+						// A goal the snapshot supplied in full stays full: Partial only ever CLEARS on an existing row,
+						// so re-harvesting a quest whose secondary goal is now fully known upgrades it, and never the
+						// other way round.
+						g.Partial = false;
+					}
+
+					g.ObjectiveRefId = hg.ObjectiveRefId;
+					g.ObjectiveCategory = hg.ObjectiveCategory;
+					g.ObjectiveKey = hg.ObjectiveKey;
+
+					// The marker block describes the primary goal only (QuestDefinitionExtractor.UpsertGoal).
+					if (hg.Partial)
+						continue;
 
 					g.MapId = hg.MapId;
 					g.MarkerX = hg.MarkerX;
 					g.MarkerY = hg.MarkerY;
-					g.ObjectiveRefId = hg.ObjectiveRefId;
-					g.ObjectiveCategory = hg.ObjectiveCategory;
-					g.ObjectiveKey = hg.ObjectiveKey;
 				}
 
 				updated++;

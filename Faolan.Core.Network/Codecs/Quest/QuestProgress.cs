@@ -11,9 +11,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// True when EVERY goal of the quest has reached its RequiredCount (#357) - the completion gate for a multi-goal
 		// quest. `progressOf` returns a goal's current progress (the primary goal's scalar, or a secondary's per-goal
 		// row). RequiredCount is clamped to >= 1 (a goal seeded 0 completes on its first tick). Empty goal set = complete.
+		// PARTIAL goals are skipped: they were harvested mid-session, so the row has no verb, target or required count
+		// and nothing can ever advance one. Counting them would make their quest permanently incompletable - see
+		// QuestGoalDefinition.Partial. A quest of nothing but partial goals therefore completes on its known goals,
+		// which is the same behaviour as before those rows existed.
 		public static bool AllGoalsComplete(IEnumerable<QuestGoalDefinition> goals, Func<QuestGoalDefinition, uint> progressOf)
 		{
-			return goals.All(g => progressOf(g) >= Math.Max(g.RequiredCount, 1));
+			return goals.Where(g => !g.Partial).All(g => progressOf(g) >= Math.Max(g.RequiredCount, 1));
 		}
 
 		// LDB category 50200 is `item.name`, so a goal whose TrailingCategory is 50200 has an ITEM TEMPLATE ID in its
@@ -127,7 +131,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 			if (goals == null)
 				return null;
 
-			var kills = goals.Where(g => g.GoalType == QuestGoalType.Kill).OrderBy(g => g.Sequence).ToList();
+			// PARTIAL goals are excluded. They are untyped rows that DEFAULT to Kill with TrailingRefId 0, so the by-id
+			// branch below would match any kill whose template id is 0 - a spurious advance on a goal the server has no
+			// definition for. The name branch already cannot match one (their TargetName is null).
+			var kills = goals.Where(g => g.GoalType == QuestGoalType.Kill && !g.Partial).OrderBy(g => g.Sequence).ToList();
 
 			if (templateId is { } id && kills.FirstOrDefault(g => g.TrailingRefId == id) is { } byId)
 				return byId;

@@ -93,7 +93,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 		{
 			ArgumentNullException.ThrowIfNull(def);
 			var region = new QuestObjectiveRegion();
-			foreach (var g in def.Goals.OrderBy(g => g.RegionOrder).ThenBy(g => g.Sequence))
+			// PARTIAL goals are left OUT. A mid-session harvest recovers a goal's identity, marker and objective text
+			// but none of the numeric fields a record is built from, so emitting one would produce bytes that are
+			// certainly wrong - and this region is gated on reproducing the capture EXACTLY (ObjectiveRegionVerified;
+			// a region the client cannot parse asserts it on statlist.cpp:134). Skipping them keeps every verified
+			// region byte-identical: the region stays exactly what it was before those rows were harvested.
+			foreach (var g in def.Goals.Where(g => !g.Partial).OrderBy(g => g.RegionOrder).ThenBy(g => g.Sequence))
 			{
 				var objective = g.ObjectiveToken is { Length: > 0 } ot
 					? QuestcRegion.RemoteFormatToken(ot, g.ObjectiveCategory, g.ObjectiveKey)
