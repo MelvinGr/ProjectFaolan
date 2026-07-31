@@ -36,8 +36,18 @@ namespace Faolan.GameServer.World
 	public sealed class WorldBroadcaster : IQuestOutbound
 	{
 		// DispatchSetQuestMarker (0x2008) state byte (decoded #241): 0x02 = '!' (quest available), 0x04 = '?' (ready
-		// to turn in), 0x00 = none.
-		private const byte QuestMarkerNone = 0x00, QuestMarkerAvailable = 0x02, QuestMarkerTurnIn = 0x04;
+		// to turn in), 0x00 = none. 0x01 = the SILVER '!' - a quest NPC with nothing for you right now (#559).
+		//
+		// The silver state was missed by #241, which only saw three values. It is the second most common on the wire:
+		// of the 301 replies in xxx_mage-necromancer_login_play2, 181 are 0x00, 74 are 0x01, 30 are 0x02, 16 are 0x04.
+		// Turach and Laranga mirror each other across that capture and pin what it means - Turach is 0x01 at login
+		// (his quest needs Laranga first), 0x04 once she points at him, 0x01 again while his own quest is in progress,
+		// 0x04 when the bricks are collected, 0x01 after the hand-in. So 0x01 covers BOTH "prerequisite not met" and
+		// "held, or already turned in - nothing more here".
+		//
+		// ⚠️ 0x00 and 0x01 are NOT interchangeable: 52 NPCs in that capture only ever returned 0x00, and they are the
+		// ones that give no quest at all. Silver says "this NPC is part of a chain"; none says "this NPC is scenery".
+		private const byte QuestMarkerNone = 0x00, QuestMarkerUnavailable = 0x01, QuestMarkerAvailable = 0x02, QuestMarkerTurnIn = 0x04;
 
 		// How long a dropped loot bag lingers before the tick fades + removes it (the IsLoot expiry).
 		private const double LootBagExpirySeconds = 120.0;
@@ -1752,13 +1762,15 @@ namespace Faolan.GameServer.World
 
 			var held = Array.Find(quests, q => q.QuestId == questId);
 			// '!' when the quest isn't held yet; '?' once its objective is done but it's still ACTIVE (awaiting turn-in
-			// at the giver - the quest is only marked Completed on turn-in, not on the kill, #47/#241); no marker while
-			// in progress or after it's been turned in (Completed).
+			// at the giver - the quest is only marked Completed on turn-in, not on the kill, #47/#241); and the SILVER
+			// '!' while it is in progress or after it has been turned in. That last case used to send 0x00, which drew
+			// no marker at all where retail draws the greyed one (#559) - the NPC is still part of the chain, it just
+			// has nothing for you at this moment.
 			return held == null
 				? QuestMarkerAvailable
 				: held is { State: QuestState.Active, GoalRequired: > 0 } && held.GoalProgress >= held.GoalRequired
 					? QuestMarkerTurnIn
-					: QuestMarkerNone;
+					: QuestMarkerUnavailable;
 		}
 
 		// Dispatches interest events. `move` (the mover's Move components) is required to forward Move events and is
