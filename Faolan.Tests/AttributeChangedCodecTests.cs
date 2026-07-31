@@ -26,7 +26,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void Build_Convenience_IsParsableFeedback()
 		{
-			var body = FormatFeedbackCodec.Build(0x12345678, AttributeChangedCodec.TypeFlags, AttributeChangedCodec.Footer, AttributeChangedCodec.Build(806, 2));
+			// Through the PAYLOAD seam (#539): the record carries its own typeFlags/footer, so the caller no longer
+			// restates them - which is what let two services frame this message differently.
+			var body = FormatFeedbackCodec.Build(0x12345678, new AttributeChanged(806, 2));
 			var p = FormatFeedbackCodec.Parse(body);
 
 			Assert.Equal(0x12345678u, p.Instance);
@@ -41,9 +43,9 @@ namespace Faolan.Tests
 		public void Build_FromFields_MatchesCapturedLevelUpMessage()
 		{
 			// The captured per-burst key nonces of frame 9939's Strength message (verbatim, wire-escaped).
-			var xml = AttributeChangedCodec.Build(new AttributeChanged(804, 3, "W8Kfv/@l29p&#36;ea0.&#36;r?.", "?m3qJZNrTSBky8rp2l,w", "akfLdN&amp;#39;`0h^/eax0GI?K"));
+			var value = new AttributeChanged(804, 3, "W8Kfv/@l29p&#36;ea0.&#36;r?.", "?m3qJZNrTSBky8rp2l,w", "akfLdN&amp;#39;`0h^/eax0GI?K");
 
-			var body = FormatFeedbackCodec.Build(0x01316d8a, AttributeChangedCodec.TypeFlags, AttributeChangedCodec.Footer, Encoding.ASCII.GetBytes(xml));
+			var body = FormatFeedbackCodec.Build(0x01316d8a, value);
 
 			Assert.Equal(FormatFeedbackCodecTests.RecordHex(Attr804Plus3), Convert.ToHexStringLower(body));
 		}

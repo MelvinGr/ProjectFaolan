@@ -60,6 +60,30 @@ namespace Faolan.Core.Network.Codecs.Text
 			return Build(new FormatFeedbackIIR(instance, typeFlags, footer, Encoding.Latin1.GetBytes(xml)));
 		}
 
+		// THE PAYLOAD FORM (#539). The parent composes the child: each `FeedbackPayload` knows its own typeFlags and
+		// footer - which the SERVICE used to pass alongside the child's text, so `AttributeChangedCodec.TypeFlags` was
+		// spelled at two call sites in `Faolan/` and the payload codecs read as standalone messages with no declared
+		// identity.
+		public static byte[] Build(uint instance, FeedbackPayload payload)
+		{
+			ArgumentNullException.ThrowIfNull(payload);
+
+			return Build(instance, payload.TypeFlags, payload.Footer, Xml(payload));
+		}
+
+		// The child codec for each payload form. This is the one place that maps a feedback message to its text.
+		private static string Xml(FeedbackPayload payload)
+		{
+			return payload switch
+			{
+				AreaNameBanner banner => AreaNameBannerCodec.Build(banner),
+				RespawnPointDiscovered point => RespawnPointDiscoveredCodec.Build(point),
+				AttributeChanged attribute => AttributeChangedCodec.Build(attribute),
+				FeedbackLiteral literal => literal.Xml,
+				_ => throw new ArgumentOutOfRangeException(nameof(payload), payload, "unknown FormatFeedbackIIR payload")
+			};
+		}
+
 		public static FormatFeedbackIIR Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(FormatFeedbackCodec));
@@ -97,4 +121,25 @@ namespace Faolan.Core.Network.Codecs.Text
 	}
 
 	public sealed record FormatFeedbackIIR(uint Instance, uint TypeFlags, uint Footer, byte[] Xml);
+
+	// One feedback MESSAGE, as the thing FormatFeedbackCodec carries. Each form owns the `typeFlags`/`footer` retail
+	// sends it with, because those are properties of the message and not of the sender - passing them at the call site
+	// is how the same message came to be framed two different ways in two services (#539).
+	//
+	// `Parse` still returns the OPAQUE `FormatFeedbackIIR`: a captured body can carry any remoteformat, including ones
+	// we have no payload type for, and the round-trip has to reproduce it verbatim.
+	public abstract record FeedbackPayload
+	{
+		public abstract uint TypeFlags { get; }
+		public abstract uint Footer { get; }
+	}
+
+	// A captured remoteformat with nothing substituted into it (FeedbackXml's two literals), or a plain string a
+	// service already holds. It exists so a fieldless message needs no parameterless record of its own - the wave-2
+	// ruling - while still travelling through the payload seam.
+	public sealed record FeedbackLiteral(string Xml, uint TypeFlags = FormatFeedbackCodec.FifoBannerTypeFlags, uint Footer = 1) : FeedbackPayload
+	{
+		public override uint TypeFlags { get; } = TypeFlags;
+		public override uint Footer { get; } = Footer;
+	}
 }

@@ -131,7 +131,7 @@ namespace Faolan.GameServer
 			// Also unnamed in the catalog. It lands on BOTH connections, empty, as the trade commits.
 			await SendTradeRpc(recipientId, GameCharInterfaceOpcodes.Reserved0x206D, []);
 			if (ClientForCharacter(recipientId) is { } client)
-				await SendFeedback(client, FeedbackXml.TradeCompletedSuccessfully);
+				await SendFeedback(client, new FeedbackLiteral(FeedbackXml.TradeCompletedSuccessfully));
 		}
 
 		Task ITradeOutbound.SendWalletUpdate(uint characterId, ulong balanceTin)
@@ -568,7 +568,7 @@ namespace Faolan.GameServer
 		// playfield (it had picked "The West Gate" for Old Tarantia, an arbitrary one of the six).
 		private static Task SendAreaNameBanner(INetworkClient client, uint areaNameId)
 		{
-			return SendFeedback(client, AreaNameBannerCodec.Build(areaNameId));
+			return SendFeedback(client, new AreaNameBanner(areaNameId));
 		}
 
 		// Pushes one bank-slot stat update (0x201c on container 105): [kind=105][charInstance][slot][statId][value], 		// byte-exact to the capture (F376/F377/F364/F398). Rides the same GameCharAgent conversation as the bank
@@ -579,13 +579,15 @@ namespace Faolan.GameServer
 				SetItemStatCodec.Build(SetItemStats.BankSlot(client.Session.Character.Id, slot, statId, value))));
 		}
 
-		// Pushes a FormatFeedback message (raw remoteformat XML) to the client's on-screen feedback. typeFlags =
-		// FifoBannerTypeFlags for the top-of-screen FIFO banner. Addressed to the player's GameInterface instance.
-		private static Task SendFeedback(INetworkClient client, string xml, uint typeFlags = FormatFeedbackCodec.FifoBannerTypeFlags, uint footer = 1)
+		// Pushes a FormatFeedback message to the client's on-screen feedback, addressed to their GameInterface
+		// instance. The PAYLOAD carries its own typeFlags/footer (#539) - this used to take the child's text plus those
+		// two words, which is how the same message came to be framed differently in two services.
+		//
+		// The carrier's [u32 len] is the SENDER's (#530 rule 2), which is what WorldIir.Send writes - the codec emits
+		// the record alone.
+		private static Task SendFeedback(INetworkClient client, FeedbackPayload payload)
 		{
-			// The carrier's [u32 len] is the SENDER's (#530 rule 2), which is what WorldIir.Send writes - the codec
-			// emits the record alone. Identical bytes to the pre-#530 self-framing build.
-			return WorldIir.Send(client, FormatFeedbackCodec.Build(client.Session.Character.Id, typeFlags, footer, xml));
+			return WorldIir.Send(client, FormatFeedbackCodec.Build(client.Session.Character.Id, payload));
 		}
 
 		// Pushes a live item removal to the client (the inverse of SendAddItem).
@@ -602,7 +604,7 @@ namespace Faolan.GameServer
 		// sees; only the point id goes on the wire (the client resolves the name from LDB category 270).
 		private static Task SendRespawnPointDiscoveredBanner(INetworkClient client, uint pointId, string? nameKey)
 		{
-			return SendFeedback(client, RespawnPointDiscoveredCodec.Build(pointId, nameKey));
+			return SendFeedback(client, new RespawnPointDiscovered(pointId, nameKey));
 		}
 
 		// Sends the proven captured system line - the test bootstrap for the ChatTextIIR path until a literal-text

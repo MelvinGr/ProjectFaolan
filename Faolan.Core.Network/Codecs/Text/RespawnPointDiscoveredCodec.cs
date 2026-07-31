@@ -35,5 +35,10 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	public sealed record RespawnPointDiscovered(uint PointId, string? NameKey);
+	// A FIFO-banner payload - the same framing as the area-name banner.
+	public sealed record RespawnPointDiscovered(uint PointId, string? NameKey) : FeedbackPayload
+	{
+		public override uint TypeFlags => FormatFeedbackCodec.FifoBannerTypeFlags;
+		public override uint Footer => 1;
+	}
 }

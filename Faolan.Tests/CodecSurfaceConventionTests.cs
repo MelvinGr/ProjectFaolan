@@ -286,19 +286,20 @@ namespace Faolan.Tests
 			Assert.True(offenders.Count == 0, "the wire value is named for the client IIR:\n  " + string.Join("\n  ", offenders));
 		}
 
-		// Wave 7 moved GuildService's five bodies into Codecs/, which was the reason recorded here for deferring this
-		// gate - GuildRenownBlockCodec now passes. It did NOT pass, and what is left is not a gate bug: five codecs
-		// produce a PAYLOAD that a parent codec should compose but the SERVICE composes instead -
-		// `AreaNameBannerCodec` / `RespawnPointDiscoveredCodec` / `AttributeChangedCodec` (the service pipes their XML
-		// into `FormatFeedbackCodec.Build`), `NpcChatterCodec` (the broadcaster caches its lines on the entity) and
-		// `MagicBuffDataCodec` (whose parent deliberately carries `Data` as opaque bytes, #530 wave 4). Each is a real
-		// "the parent should take the value" change in a different codec's design, tracked in Gitea #539 - not
-		// something wave 7's scope (moving `Faolan/`'s OWN wire code in) reaches.
+		// #539: a codec that produces a PAYLOAD its parent should compose reads as standalone whenever the SERVICE does
+		// the composing instead. Five failed when this was first un-skipped; the three FEEDBACK payloads are fixed -
+		// `FormatFeedbackCodec.Build(instance, FeedbackPayload)` now takes the value and the payload owns its own
+		// typeFlags/footer. What is left is three DIFFERENT deferral shapes, none of them a gate bug:
+		//   * `NpcChatterCodec` - its parent is the chat server's CharacterChat body, which is still hand-built in
+		//     `Faolan/ChatServer/Packets.cs` (a §9 B group the issue never enumerated, like the character list).
+		//   * `TradepostMailBodyCodec` - its text is stored on `Mail.BodyXml` and encoded a request LATER, so the
+		//     composition is deferred through the DATABASE, not skipped.
+		//   * `MagicBuffDataCodec` - its parent deliberately carries `Data` as opaque bytes (#530 wave 4).
 		//
-		// Two blind spots WERE fixed while proving that: the field scan missed `HandledOpcodes` (so the two Team
+		// Two blind spots WERE fixed while proving the list: the field scan missed `HandledOpcodes` (so the two Team
 		// codecs that do declare their identity were flagged), and "standalone" ignored §6's own definition, which is
 		// "nothing else composes it" - that alone cleared `RemoteFormatScreenCodec`.
-		[Fact(Skip = "un-skip in wave 9 - five payload codecs still get composed by the SERVICE rather than by their parent codec (Gitea #539)")]
+		[Fact(Skip = "un-skip in wave 9 - 3 of #539's 5 payload codecs are fixed; NpcChatter needs the ChatServer bodies to become codecs, TradepostMailBody composes through the DB, MagicBuffData through an opaque parent field")]
 		public void RpcMessageCodecsDeclareTheirMethodOpcode()
 		{
 			// A codec with a standalone body but no IIR opcode is an RPC-message codec: it must declare its method

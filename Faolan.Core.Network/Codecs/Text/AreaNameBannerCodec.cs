@@ -21,5 +21,10 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
-	public sealed record AreaNameBanner(uint TextId);
+	// A FIFO-banner payload: FormatFeedbackCodec frames it with the banner typeFlags and footer 1.
+	public sealed record AreaNameBanner(uint TextId) : FeedbackPayload
+	{
+		public override uint TypeFlags => FormatFeedbackCodec.FifoBannerTypeFlags;
+		public override uint Footer => 1;
+	}
 }

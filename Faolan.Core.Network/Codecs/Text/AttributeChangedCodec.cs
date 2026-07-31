@@ -50,10 +50,16 @@ namespace Faolan.Core.Network.Codecs.Text
 		}
 	}
 
+	// An effect-LINE payload, not a banner: retail frames it with typeFlags 0x40000006 and footer 0, which is why
+	// those two used to be passed at every call site (#539).
 	public sealed record AttributeChanged(
 		uint AttributeId,
 		uint Amount,
 		string OuterKey = AttributeChangedCodec.DefaultOuterKey,
 		string AttributeKey = AttributeChangedCodec.DefaultAttributeKey,
-		string IncreasedKey = AttributeChangedCodec.DefaultIncreasedKey);
+		string IncreasedKey = AttributeChangedCodec.DefaultIncreasedKey) : FeedbackPayload
+	{
+		public override uint TypeFlags => AttributeChangedCodec.TypeFlags;
+		public override uint Footer => AttributeChangedCodec.Footer;
+	}
 }
