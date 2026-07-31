@@ -34,19 +34,17 @@ namespace Faolan.Tests
 		// (repeated uint32, field 1) is PACKED on the wire in all 81 captured roots that carry it - never repeated
 		// varints - so the schema marks it [packed=true] (#385).
 		//
-		// ONE residual divergence is accepted, and asserted narrowly rather than excluded: protobuf-net writes a
-		// repeated primitive holding EXACTLY ONE element as an unpacked varint (`08 <v>`, 1 byte shorter) even when
-		// IsPacked is set - verified to be the library's own optimization, identical for uint[] and List<uint>, and
-		// not reachable from the schema. Two or more elements pack correctly. Both forms are valid protobuf and the
-		// client accepts either, so this is a cosmetic byte-count difference, not a wire break. The assert below
-		// still pins it exactly: the ONLY tolerated difference is that leading field-1 encoding on a single-tag
-		// root, and every other byte must match. Any new drift fails.
+		// It used to tolerate ONE residual divergence, asserted narrowly: protobuf-net writes a repeated primitive
+		// holding EXACTLY ONE element as an unpacked varint (`08 <v>`, 1 byte shorter) even when IsPacked is set -
+		// the library's own optimization, not reachable from the schema, so 7 of the 151 roots came back a byte
+		// short (#538). `ProtobufExtensions.ToProtobuf` re-packs those fields after the fact now, so the tolerance
+		// is GONE and this is a plain byte-for-byte equality over every captured root.
 		[Fact]
 		public void EveryCapturedSnapshotRoot_ReEncodesByteIdentically()
 		{
 			var checkedRoots = 0;
 			var withCharacterTags = 0;
-			var singleTagUnpacked = 0;
+			var singleTag = 0;
 
 			foreach (var (source, body) in CapturedBodies((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
 			{
@@ -64,22 +62,22 @@ namespace Faolan.Tests
 
 				var root = original.FromProtobuf<ProtoFullCharacterIIR>();
 
-				var reencoded = root.ToProtobuf();
-				if (!original.SequenceEqual(reencoded))
-				{
-					AssertOnlyDifferenceIsSingleTagPacking(source, original, reencoded, root);
-					singleTagUnpacked++;
-				}
+				Assert.True(original.SequenceEqual(root.ToProtobuf()), $"{source}: the snapshot root must re-encode byte-identically");
 
 				checkedRoots++;
 				if (root.CharacterTags is { Length: > 0 })
 					withCharacterTags++;
+				if (root.CharacterTags is { Length: 1 })
+					singleTag++;
 			}
 
-			_output.WriteLine($"{checkedRoots} snapshot roots re-encoded ({withCharacterTags} carrying character_tag, " + $"{singleTagUnpacked} differing only by the single-tag packing quirk)");
+			_output.WriteLine($"{checkedRoots} snapshot roots re-encoded ({withCharacterTags} carrying character_tag, {singleTag} carrying exactly one)");
 			Assert.True(checkedRoots > 0, "no snapshot roots found in the capture corpus");
 			// The whole point of this gate: without tag-carrying roots it proves nothing the L1 fixtures didn't.
 			Assert.True(withCharacterTags > 0, "corpus has no character_tag-carrying root - this gate would be vacuous");
+			// And specifically the SINGLE-tag case, which is the one protobuf-net writes unpacked (#538). A corpus
+			// without it would pass this gate while the re-pack was broken.
+			Assert.True(singleTag > 0, "corpus has no single-character_tag root - the #538 packing case would go untested");
 		}
 
 		// ProtoCoreCharacterIIR (the FA015807 spawn's character message) must re-encode byte-identically.
@@ -106,22 +104,6 @@ namespace Faolan.Tests
 
 			_output.WriteLine($"{checkedMessages} spawn character messages re-encoded ({withGenericStats} carrying generic_stats)");
 			Assert.True(checkedMessages > 0, "no spawn character messages found in the capture corpus");
-		}
-
-		// The only tolerated re-encode difference: a root holding exactly ONE character_tag, where the capture has
-		// `0A <len> <payload>` (packed) and protobuf-net emits `08 <payload>` (unpacked). Everything after that
-		// leading field must be byte-identical.
-		private static void AssertOnlyDifferenceIsSingleTagPacking(string source, byte[] original, byte[] reencoded, ProtoFullCharacterIIR root)
-		{
-			Assert.True(root.CharacterTags is { Length: 1 }, $"{source}: root re-encode differs but does not hold exactly one character_tag");
-
-			// Captured: 0A <len> <payload>. Regenerated: 08 <payload>. Same payload, one byte apart.
-			Assert.Equal(0x0A, original[0]);
-			Assert.Equal(0x08, reencoded[0]);
-			var payloadLength = original[1];
-			Assert.Equal(original.Length - 1, reencoded.Length);
-			Assert.True(original.AsSpan(2, payloadLength).SequenceEqual(reencoded.AsSpan(1, payloadLength)), $"{source}: the single tag's payload bytes must match");
-			Assert.True(original.AsSpan(2 + payloadLength).SequenceEqual(reencoded.AsSpan(1 + payloadLength)), $"{source}: every byte after character_tag must be identical");
 		}
 
 		// Yields the record body (everything after the leading u32 length) of every packet whose IIR type is

@@ -30,12 +30,15 @@ namespace Faolan.Tests
 			_output = output;
 		}
 
-		// The TAILS must survive the typed model byte-for-byte on every captured snapshot - the #384 regression
-		// surface. (The protobuf ROOT does not yet re-encode byte-exactly on characters that carry character_tag:
-		// protobuf-net writes that repeated field UNPACKED while retail packs it. Separate defect, tracked on its
-		// own issue; it is why this asserts on SubClass rather than the whole body.)
+		// The WHOLE RECORD must survive the typed model byte-for-byte on every captured snapshot - the #384
+		// regression surface, plus the prefix and the protobuf root.
+		//
+		// It asserted on the SUB-CLASS alone until #538 landed: 7 of the 151 captured roots re-encoded exactly one
+		// byte shorter, because protobuf-net writes a single-element `[packed=true]` repeated field UNPACKED while
+		// retail packs it (`character_tag`). `ProtobufExtensions.ToProtobuf` takes that decision back now, so the
+		// gate covers what actually goes on the wire rather than two thirds of it.
 		[Fact]
-		public void EveryCapturedSnapshot_TailsRoundTrip_ByteExact()
+		public void EveryCapturedSnapshot_RoundTrips_ByteExact()
 		{
 			var checkedBodies = 0;
 			var progressed = 0;
@@ -44,12 +47,8 @@ namespace Faolan.Tests
 			{
 				var parts = FullPlayerCharacterCodec.Parse(body);
 
-				// The tails as they arrived: everything after [subop][typeTag][instance][prefix][root]. Scoped to the
-				// SUB-CLASS deliberately: the whole-RECORD round-trip fails on 7 of 151 captures because their
-				// protobuf ROOT re-encodes exactly one byte shorter (#538) - a separate, real gap that a refactor
-				// wave must not widen this gate into. Widen to FullPlayerCharacterCodec.Build(parts) when #538 lands.
-				Assert.True(SnapshotPackets.SubClassBytes(body).SequenceEqual(FullCharSnapshotSubClassCodec.Build(parts.SubClass)),
-					$"{source}: tails must survive the typed model byte-identically");
+				Assert.True(body.SequenceEqual(FullPlayerCharacterCodec.Build(parts)),
+					$"{source}: the snapshot record must survive the typed model byte-identically");
 
 				checkedBodies++;
 				if (parts.SubClass.Quests.Records.Count > 1)

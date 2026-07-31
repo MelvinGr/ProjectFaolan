@@ -56,10 +56,10 @@ namespace Faolan.Tests
 		//   QuestJournalCodec (31/38 bodies)  - "RRL3" is not a magic and the tracked-quest pointer's list is not
 		//                                       empty: Gitea #544
 		//   QuestLogListCodec (8/46 bodies)   - three asserted constants that are not constant: Gitea #545
-		//   FullPlayerCharacterCodec (7/151)  - the protobuf ROOT re-encodes one byte shorter: Gitea #538
 		// ⚠️ Entries are per CODEC, not per body, so an entry hides the codec's PASSING bodies too. Delete one the
-		// moment its issue closes - the value of this gate is that the list is short and shrinking.
-		private static readonly string[] UnreadableInTheCorpus = ["QuestJournalCodec", "QuestLogListCodec", "FullPlayerCharacterCodec"];
+		// moment its issue closes - the value of this gate is that the list is short and shrinking. `FullPlayerCharacterCodec`
+		// was the third and came off when #538 landed: all 151 captured snapshot roots re-encode byte-exact now.
+		private static readonly string[] UnreadableInTheCorpus = ["QuestJournalCodec", "QuestLogListCodec"];
 
 		// The ROOT of Codecs/ itself - the codecs that sit in `Faolan.Core.Network.Codecs` with no domain folder.
 		// Spelled as a sentinel rather than "" so the two places that expand it read as deliberate.
