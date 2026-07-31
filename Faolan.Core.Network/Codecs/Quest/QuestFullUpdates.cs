@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 
@@ -16,15 +17,6 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// The `n` slot (QuestcRecord.Unknown14) the live full-update carries. NOT a ListFrame word (1042 is not a
 		// multiple of 1009) and NOT a goal count - see QuestcRecord.Unknown14.
 		public const uint LiveUnknown14 = 0x412;
-
-		// The u64 the goal record's reserved[5..6] pair carries in the snapshot tails.
-		//
-		// ⚠️ It is NOT a timestamp, despite the name it has carried since the first decode: split into its two words it
-		// is (70099, 0x54375554) - exactly the (constant 70099, random 4-character tag) pair QuestObjectiveGoal.Reserved
-		// documents at [1..2] and [5..6]. The live sender passes the current unix time here instead, which lands as
-		// (0, seconds); that is what retail's own bytes are compared against by the goldens, so it is left alone here
-		// and tracked as a decode/behaviour gap rather than "fixed" inside a refactor.
-		public const ulong SnapshotQuestAcceptTime = 0x000111D354375554UL;
 
 		// The quest a full-update record is ABOUT, without decoding the record around it.
 		//
@@ -61,11 +53,21 @@ namespace Faolan.Core.Network.Codecs.Quest
 		private const uint LiveFieldF0 = 0x64;
 		private const uint LiveGoalSeparator = 0x0C;
 
-		// One quest's full journal entry for `playerHandle`. `reserved` fills the goal record's reserved[5..6] pair
-		// (see SnapshotQuestAcceptTime).
-		public static QuestFullUpdateIIR ForQuest(uint playerHandle, QuestDefinition def, uint level, ulong reserved)
+		// One quest's full journal entry for `playerHandle`.
+		//
+		// The goal record's reserved words come from the GOAL ROW, like every other captured field (#537). They used to
+		// be a `reserved` u64 parameter the live sender filled with `DateTimeOffset.UtcNow`, under the name
+		// "acceptTime": split into its two words the captured value is (70099, "T7UT"), i.e. the (marker, random
+		// 4-character tag) pair QuestObjectiveGoal.Reserved documents at [1..2] and [5..6] - not a time at all. The
+		// clock wrote (0, unix-seconds) into that pair, a shape retail never sends.
+		//
+		// The goal's OTHER structural words stay synthesized below: this is the live-grant shape, and reading the whole
+		// row here is QuestObjectiveRegions.ForGoal's job (the snapshot path), not a rename.
+		public static QuestFullUpdateIIR ForQuest(uint playerHandle, QuestDefinition def, uint level)
 		{
 			ArgumentNullException.ThrowIfNull(def);
+
+			var row = def.Goals.FirstOrDefault(g => g.GoalId == def.GoalId);
 
 			var goal = new QuestObjectiveGoal
 			{
@@ -77,7 +79,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 				N = 1,
 				GoalIdRepeat = def.GoalId,
 				RequiredCount = 1,
-				Reserved = [0, 0, 0, 0, 0, (uint)(reserved >> 32), (uint)reserved],
+				Reserved = row != null
+					? [row.Extra0, row.Extra1, row.Extra2, row.Extra3, row.Extra4, row.Extra5, row.Extra6]
+					: new uint[7],
 				SubId = 0,
 				MapId = def.MapId,
 				MarkerX = def.MarkerX,

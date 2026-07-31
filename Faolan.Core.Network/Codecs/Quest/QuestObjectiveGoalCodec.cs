@@ -150,11 +150,19 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// the flag byte lands FIRST and the remaining three are padding. Set on 318 goals. Meaning still unknown.
 		public uint Unknown2 { get; init; }
 
-		// The 7 "reserved" words hold TWO (marker, token) pairs - at [1..2] and [5..6] - each a constant 70099 next to
-		// a RANDOM 4-character tag (0x36314C56 "61LV", 0x30474454 "0GDT", ...). Not zero-except-the-last-two, which is
-		// what an earlier note here claimed: quest 14615 carries [0,70099,810042964,0,0,70099,1415075403]. Carried per
-		// goal like QuestcRecord's undecoded scalars; the tags being random is why they must be stored rather than
-		// derived (see the WTHD note in questc-region-decode).
+		// The 7 "reserved" words are a lead word plus THREE optional (marker, token) SLOTS - [1..2], [3..4], [5..6] -
+		// each a marker word next to a RANDOM 4-character tag (0x36314C56 "61LV", 0x30474454 "0GDT", ...). Measured
+		// over the 170 shipped goals: every nonzero word in a marker position IS a marker, with no exceptions, and the
+		// slots are genuinely independent (63 goals use none, 63 use [1] alone, 30 use [5] alone, 13 use [1]+[5], one
+		// - goal 11252 - uses [1]+[3]). So the pairs FLOAT; an earlier note here pinned them to [1..2] and [5..6],
+		// which is where they happen to sit in most captures.
+		//
+		// ⚠️ The marker is not one constant either: it is 70099 on 118 slots and 50003 on 3 (goals 11252, 12555,
+		// 12766). The lead word [0] is a small number - 0 on 155 goals, then 1/2/4/6 - and is not a count of the
+		// occupied slots (goal 3508 carries 4 with one pair; 11252 carries 0 with two).
+		//
+		// Carried per goal like QuestcRecord's undecoded scalars; the tags being random is why they must be stored
+		// rather than derived (see the WTHD note in questc-region-decode). What the pairs MEAN is Gitea #546.
 		public uint[] Reserved { get; init; } = new uint[7];
 	}
 }

@@ -261,7 +261,10 @@ namespace Faolan.GameServer.World
 		}
 
 		// Sends a QuestFullUpdate (one quest's full detail: description, summary, objective + map marker) built from
-		// its seeded definition. acceptTime is the per-character "accepted at" stamp (display/sort field).
+		// its seeded definition.
+		//
+		// Nothing per-character rides along: what used to be passed here as an "accept time" is the goal record's
+		// reserved (marker, 4CC-tag) pair, which is quest DATA and now comes off the goal row (#537).
 		public Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint? level = null)
 		{
 			// The per-quest level is a constant harvested into the definition (#352); fall back to the captured default
@@ -269,7 +272,7 @@ namespace Faolan.GameServer.World
 			var levelValue = level ?? (def.Level != 0
 				? def.Level
 				: QuestFullUpdateCodec.DefaultQuestLevel);
-			var body = QuestFullUpdateCodec.Build(QuestFullUpdates.ForQuest(client.Session.Character.Id, def, levelValue, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()));
+			var body = QuestFullUpdateCodec.Build(QuestFullUpdates.ForQuest(client.Session.Character.Id, def, levelValue));
 
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));

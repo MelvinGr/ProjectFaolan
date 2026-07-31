@@ -37,7 +37,7 @@ namespace Faolan.Tests
 			// The previously-assumed authoring path produces a 869 B block that starts [questId][1][questId][3]...,
 			// whereas the template region is 559 B starting [0x0BD3][1][9][instance]... - a different grammar.
 			var def = await LoadDefinition(10238);
-			var iir = QuestFullUpdates.ForQuest(0x02165EFF, def, QuestFullUpdateCodec.DefaultQuestLevel, QuestFullUpdates.SnapshotQuestAcceptTime);
+			var iir = QuestFullUpdates.ForQuest(0x02165EFF, def, QuestFullUpdateCodec.DefaultQuestLevel);
 			var full = QuestFullUpdateCodec.Build(iir);
 
 			// The full-update's payload IS the quest's journal record (#530 wave 5), so the "content block" the older

@@ -32,7 +32,14 @@ namespace Faolan.Importer.Extractors
 				{
 					var body = p.Body;
 					if (body.Length >= 24)
-						MergeFullUpdate(body, byQuest);
+					{
+						// The codec's own decode rides ALONGSIDE the scan below rather than replacing it (#540 is still
+						// open): it is what the goals' reserved words are lifted from, and it is null only for a body the
+						// capture cut short.
+						MergeFullUpdate(body, p.TryParse(QuestFullUpdateCodec.Parse, out var full)
+							? full.Record
+							: null, byQuest);
+					}
 				}
 				else if (p.SubOpcode == QuestJournalCodec.Opcode)
 				{
@@ -87,7 +94,7 @@ namespace Faolan.Importer.Extractors
 		// full-update as a `QuestcRecord`, which carries the title/summary/area/region strings but NOT the per-goal
 		// 50304 objective list, the level word or the marker block - naming those on the record is DECODE, which this
 		// refactor does not do. Tracked in Gitea #540.
-		private static void MergeFullUpdate(byte[] body, Dictionary<uint, QuestDefinition> byQuest)
+		private static void MergeFullUpdate(byte[] body, QuestcRecord? record, Dictionary<uint, QuestDefinition> byQuest)
 		{
 			// content @16: [00000000][01][u32 questId]...
 			var questId = body.ReadU32Be(21);
@@ -146,6 +153,30 @@ namespace Faolan.Importer.Extractors
 			// carries; a quest's non-primary goals only appear in the @609 snapshot region (seeded where captured).
 			for (var i = 0; i < objectives.Count; i++)
 				UpsertGoal(def, objectives[i].Id, def.MapId, def.MarkerX, def.MarkerY, objectives[i], (uint)(i + 1), i > 0);
+
+			// The goal's reserved words - two (marker, random 4-character tag) pairs, see QuestObjectiveGoal.Reserved -
+			// come off the CODEC's decode of the same body, not the scan. They are the goal's own data and cannot be
+			// derived, so a quest the captures only ever full-updated (no snapshot journal, where ObjectiveGoalExtractor
+			// harvests them) would otherwise carry zeros - and the live sender used to fill the [5..6] pair with a clock
+			// reading instead, which retail never sends (#537).
+			foreach (var g in record?.Objectives?.Goals ?? [])
+			{
+				if (g.Reserved.Length == ReservedWords && def.Goals.FirstOrDefault(x => x.GoalId == g.GoalId) is { } row)
+					SetReserved(row, g.Reserved);
+			}
+		}
+
+		private const int ReservedWords = 7;
+
+		private static void SetReserved(QuestGoalDefinition row, uint[] reserved)
+		{
+			row.Extra0 = reserved[0];
+			row.Extra1 = reserved[1];
+			row.Extra2 = reserved[2];
+			row.Extra3 = reserved[3];
+			row.Extra4 = reserved[4];
+			row.Extra5 = reserved[5];
+			row.Extra6 = reserved[6];
 		}
 
 		// The journal LIST (0x79f8c7a1) carries the one slot a full-update does not: the panel's per-quest sub-line

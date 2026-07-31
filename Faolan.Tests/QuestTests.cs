@@ -73,7 +73,8 @@ namespace Faolan.Tests
 			var goal = new QuestObjectiveGoal
 			{
 				K = 0x0C, Instance = 0x0131720B, QuestId = 0x34A7, GoalId = 0x1670, N = 1, GoalIdRepeat = 0x1670, RequiredCount = 1,
-				// The "acceptTime" u64 is really the goal's (70099, 4CC-tag) reserved pair - see QuestFullUpdates.
+				// The u64 once read as an "acceptTime" is really the goal's (70099, 4CC-tag) reserved pair (#537):
+				// 0x000111D3 = 70099, 0x54375554 = "T7UT".
 				Reserved = [0, 0, 0, 0, 0, 0x000111D3, 0x54375554],
 				MapId = 4010, MarkerX = 0x147, MarkerY = 0x2A6,
 				Objective = QuestTextTokens.RemoteFormat(5744, 50304, "M8Zw&quot;&quot;xo*V@DWHQ&amp;oPn1"),
@@ -421,8 +422,12 @@ namespace Faolan.Tests
 			var journal = QuestJournalCodec.Build(QuestJournals.ForQuests(0x01316D8A, [def]));
 			Assert.Equal(CaptureBody(JournalFixture, GameServer0X2000Opcodes.QuestJournalIIR), Convert.ToHexString(journal).ToLowerInvariant());
 
-			// Full update - byte-exact against frame 687 when fed the captured reserved pair.
-			var iir = QuestFullUpdates.ForQuest(0x0131720B, def, 3, QuestFullUpdates.SnapshotQuestAcceptTime);
+			// Full update - byte-exact against frame 687. The goal's reserved (70099, "T7UT") pair is not passed in: the
+			// extractor lifts it off the same body through the codec, so it rides the harvested definition (#537).
+			var primary = def.Goals.Single(g => g.GoalId == 0x1670);
+			Assert.Equal(70099u, primary.Extra5);
+			Assert.Equal(0x54375554u, primary.Extra6); // "T7UT"
+			var iir = QuestFullUpdates.ForQuest(0x0131720B, def, 3);
 			var full = QuestFullUpdateCodec.Build(iir);
 			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestFullUpdateIIR), Convert.ToHexString(full).ToLowerInvariant());
 

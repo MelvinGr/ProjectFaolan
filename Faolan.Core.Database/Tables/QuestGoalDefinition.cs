@@ -134,6 +134,12 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? TrailingToken { get; set; }
 
+		// The goal record's 7 "reserved" words, verbatim - a lead word then three optional (marker, random-4CC-token)
+		// slots at [1..2]/[3..4]/[5..6]. Stored rather than derived because the tokens are random per entry; what they
+		// MEAN is Gitea #546, and QuestObjectiveGoal.Reserved carries the measured shape.
+		//
+		// Harvested from BOTH wire sources - the snapshot journal (ObjectiveGoalExtractor) and the live QuestFullUpdate
+		// (QuestDefinitionExtractor, #537) - which agree on every goal seen by both.
 		public uint Extra0 { get; set; }
 		public uint Extra1 { get; set; }
 		public uint Extra2 { get; set; }
@@ -163,12 +169,9 @@ namespace Faolan.Core.Database.Tables
 		public uint Sequence { get; set; } // the per-goal ordinal `N` (1, 2, ...)
 		public uint TrailingCategory { get; set; }
 
-		// Two of the "reserved" header words: 0 for most goals; the beach goal 2 carries a number + a 4-char tag
-		// (70099 / 0x36314C56 = "61LV") here. Undecoded, carried per goal.
-		// The reserved words' two (70099, random-4CC-token) pairs, at Reserved[1..2] and Reserved[5..6]. Stored, not
-		// derived: the tags are random per entry.
 		// The word after the marker block - "Zero1" in the codec until it turned out to be nonzero on 24 of the 158
-		// captured goals. Stable per goal across every capture, so it is quest data.
+		// captured goals. Stable per goal across every capture, so it is quest data. (The two comment blocks that used
+		// to sit above this one described the Extra* words; they are now on those properties.)
 		public uint Unknown1 { get; set; }
 
 		// The second word after the marker block; "Zero2" in the codec, but nonzero on 318 captured goals.

@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// ⚠️ The payload IS a Quest_c journal record - the same 12 scalars, 5 text slots, 4 object lists and interleaved
 	// @609 objective region the snapshot tails carry (QuestcRecordCodec). It was hand-rolled here under a different
 	// set of names until #530 wave 5, which is why the two never lined up: the "level" is the record's `state` slot,
-	// the "acceptTime" u64 lands in the goal record's reserved (70099, 4CC-tag) pair rather than in a time field, and
+	// the "acceptTime" u64 is the goal record's reserved (70099, 4CC-tag) pair and not a time field at all (#537), and
 	// the trailing "stat/objective run" is one QuestObjectiveGoal. Proven by the byte-exact Casilda golden, which the
 	// composed build reproduces unchanged.
 	//

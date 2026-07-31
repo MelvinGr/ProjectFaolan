@@ -1028,6 +1028,17 @@ namespace Faolan.Importer.Captures
 					g.ObjectiveCategory = hg.ObjectiveCategory;
 					g.ObjectiveKey = hg.ObjectiveKey;
 
+					// The reserved (marker, 4CC-tag) pairs, lifted off the full-update body by the codec (#537). The same
+					// words the snapshot path harvests, so a goal seen by both gets the same value from either - and a
+					// goal seen ONLY in a full-update stops carrying zeros. Refreshed like the other wire fields.
+					g.Extra0 = hg.Extra0;
+					g.Extra1 = hg.Extra1;
+					g.Extra2 = hg.Extra2;
+					g.Extra3 = hg.Extra3;
+					g.Extra4 = hg.Extra4;
+					g.Extra5 = hg.Extra5;
+					g.Extra6 = hg.Extra6;
+
 					// The marker block describes the primary goal only (QuestDefinitionExtractor.UpsertGoal).
 					if (hg.Partial)
 						continue;
