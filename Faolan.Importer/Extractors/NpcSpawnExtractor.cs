@@ -7,6 +7,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -52,9 +53,7 @@ namespace Faolan.Importer.Extractors
 	// (>= 0x02000000), whereas NPC handles are small. Dedup key is (map, position); the handle/name vary.
 	public static class NpcSpawnExtractor
 	{
-		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
 		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the pre-poll login burst window
-		private const uint SpawnSubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
 
 		// Every FA015807 spawn in the capture (login burst AND mid-session interest/respawn spawns), all maps. This
 		// accretes the cross-session UNION - the same physical NPC at slightly different spots across sessions - so
@@ -69,22 +68,17 @@ namespace Faolan.Importer.Extractors
 				if (!p.IsIirCarrier)
 					continue;
 
-				var body = p.Body;
-				if (body.Length < 38)
-					continue;
-
-				var subop = body.ReadU32Be(4);
-
-				if (subop == MapChangeSubOpcode)
+				if (p.SubOpcode == PlayfieldFCodec.Opcode)
 				{
-					currentMap = body.ReadU32Be(34);
+					if (p.TryParse(PlayfieldFCodec.Parse, out var change))
+						currentMap = change.MapId;
 					continue;
 				}
 
-				if (subop != SpawnSubOpcode || currentMap == 0)
+				if (p.SubOpcode != SimpleCharFullUpdateCodec.Opcode || currentMap == 0)
 					continue;
 
-				if (TryBuildEntry(body, p.Bytes, currentMap, out var entry))
+				if (TryBuildEntry(p.Body, p.Bytes, currentMap, out var entry))
 					entries.Add(entry);
 			}
 
@@ -103,14 +97,12 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				var body = p.Body;
-				var subop = body.Length >= 8
-					? body.ReadU32Be(4)
-					: 0;
-
-				if (p is { IsIirCarrier: true, IsDownload: true } && subop == MapChangeSubOpcode && body.Length >= 38)
+				if (p is { IsIirCarrier: true, IsDownload: true, SubOpcode: PlayfieldFCodec.Opcode })
 				{
-					currentMap = body.ReadU32Be(34);
+					if (!p.TryParse(PlayfieldFCodec.Parse, out var change))
+						continue;
+
+					currentMap = change.MapId;
 					sawPoll = false;
 					continue;
 				}
@@ -124,12 +116,12 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
-				if (sawPoll || !p.IsIirCarrier || !p.IsDownload || subop != SpawnSubOpcode)
+				if (sawPoll || p is not { IsIirCarrier: true, IsDownload: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
 					continue;
 				if (allowedMaps != null && !allowedMaps.Contains(currentMap))
 					continue;
 
-				if (TryBuildEntry(body, p.Bytes, currentMap, out var entry))
+				if (TryBuildEntry(p.Body, p.Bytes, currentMap, out var entry))
 					entries.Add(entry);
 			}
 
@@ -237,6 +229,11 @@ namespace Faolan.Importer.Extractors
 			};
 		}
 
+		// The transform floats, at the offsets `SpawnPacketBuilder` publishes. Those offsets are CODEC-owned and
+		// deferred by #530 §7 along with the captured template they patch - this reads them rather than declaring its
+		// own. The whole-record route (`SpawnBodyReader.TryParse`) is deliberately not taken here: it is strict, and
+		// the rest of TryBuildEntry is built to lift identity/appearance out of bodies the strict codec rejects
+		// (#243's mid-session humanoids), so gating the entry on it would drop spawns rather than decode them.
 		private static float ReadLE(byte[] body, int offset)
 		{
 			return body.ReadF32Le(offset);

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
@@ -35,26 +36,30 @@ namespace Faolan.Importer.Extractors
 
 				var headerLen = (int)p.Bytes.ReadU32Be(8);
 				var bodyStart = 12 + headerLen;
-				if (bodyStart + 12 != p.Bytes.Length) // the reply body is exactly 12 bytes
+				if (bodyStart > p.Bytes.Length)
 					continue;
 
 				// Confirm it's a RequestAggroStatus reply (GameCharAgentProject sender), so we don't pick up other
-				// 12-byte 0xC350-tagged replies.
+				// 0xC350-tagged replies that share the 0x2000 method index on another interface.
 				var header = p.Bytes.AsSpan(12, headerLen);
 				if (header.IndexOf(SenderClassTag) < 0)
 					continue;
 
-				var body = p.Bytes.AsSpan(bodyStart);
-				if (body.ReadU32Be(0) != EntityClass.Character)
+				UpdateAggroStatus reply;
+				try
+				{
+					reply = UpdateAggroStatusCodec.Parse(p.Bytes.AsSpan(bodyStart));
+				}
+				catch (CodecParseException)
+				{
+					continue; // not the 12-byte disposition reply
+				}
+
+				if (reply.Target.Class != EntityClass.Character || reply.Category > 2)
 					continue;
 
-				var target = body.ReadU32Be(4);
-				var category = body.ReadU32Be(8);
-				if (category > 2)
-					continue;
-
-				if (names.TryGetValue(target, out var name) && !string.IsNullOrEmpty(name))
-					votes.Add((name, category));
+				if (names.TryGetValue(reply.Target.Id, out var name) && !string.IsNullOrEmpty(name))
+					votes.Add((name, reply.Category));
 			}
 
 			return votes;

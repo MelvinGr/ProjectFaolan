@@ -18,12 +18,6 @@ namespace Faolan.Importer.Extractors
 
 	public static class NpcSpellExtractor
 	{
-		// Body offsets (inside the 0x2000 IIR carrier): [u32 len][u32 subop][u32 c350][u32 applyTo][u16 0]
-		// [u32 spellId][u32 c350][u32 applyFrom][payload...]. The header fields are read by MagicBuffCodec;
-		// PayloadOffset (30) is the fixed header length used as the minimum-body guard.
-		private const int PayloadOffset = 30;
-		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
-
 		public static List<NpcSpellEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			// applyFrom (NPC entity handle) -> NPC name, from THIS capture's spawns (handles are session-scoped).
@@ -37,24 +31,20 @@ namespace Faolan.Importer.Extractors
 			var entries = new List<NpcSpellEntry>();
 			foreach (var p in packets)
 			{
-				if (!p.IsIirCarrier)
-					continue;
-
-				var body = p.Body;
-				if (body.Length < PayloadOffset)
-					continue;
-				if (body.ReadU32Be(4) != ApplySpellSubOpcode)
+				if (p is not { IsIirCarrier: true, SubOpcode: MagicBuffCodec.Opcode })
 					continue;
 
 				// The ApplySpell content is [subop][c350][applyTo][env][spellBaseId][form][c350][applyFrom][data] -
-				// MagicBuffCodec's record, so parse it with that codec instead of re-reading applyTo@12 / spellId@18 /
-				// applyFrom@26. Bound the span to the declared IIR length so Data matches the old len-bounded slice.
-				var len = (int)body.ReadU32Be(0);
-				var end = Math.Min(body.Length, 4 + len);
-				if (end < PayloadOffset) // a length shorter than the fixed header: the old code yielded an empty payload -> skip
+				// MagicBuffCodec's record. A record too short to be one is a truncated capture, not a cast.
+				MagicBuffIIR cast;
+				try
+				{
+					cast = MagicBuffCodec.Parse(p.Record);
+				}
+				catch (CodecParseException)
+				{
 					continue;
-
-				var cast = MagicBuffCodec.Parse(body.AsSpan(4, end - 4));
+				}
 
 				if (cast.ApplyFrom == cast.ApplyTo) // a self-buff, not an offensive cast
 					continue;

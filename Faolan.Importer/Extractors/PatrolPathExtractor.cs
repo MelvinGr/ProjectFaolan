@@ -29,9 +29,6 @@ namespace Faolan.Importer.Extractors
 	// same-session mob identity); dedup by (map, position) joins a route to its NPC. Sibling of NpcSpawnExtractor.
 	public static class PatrolPathExtractor
 	{
-		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
-		private const uint MoveTaskSubOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
-
 		// One patrol route per NPC HANDLE in a capture (#266 patrol). The real route is the mode-1 PathMoveTask
 		// waypoint list, usually nested in a mode-4 ListMoveTask; the whole tree is parsed and columnarized. Keyed by
 		// handle so the importer correlates a route to its spawn; keeps the RICHEST route per handle (the most
@@ -46,31 +43,20 @@ namespace Faolan.Importer.Extractors
 				if (!p.IsIirCarrier)
 					continue;
 
-				var body = p.Body;
-				if (body.Length < 8)
-					continue;
-
-				var subop = body.ReadU32Be(4);
-				if (subop == MapChangeSubOpcode)
+				if (p.SubOpcode == PlayfieldFCodec.Opcode)
 				{
-					if (body.Length >= 38)
-						currentMap = body.ReadU32Be(34);
+					if (p.TryParse(PlayfieldFCodec.Parse, out var change))
+						currentMap = change.MapId;
 					continue;
 				}
 
-				if (subop != MoveTaskSubOpcode || currentMap == 0)
+				if (p.SubOpcode != MoveTaskCodec.Opcode || currentMap == 0)
 					continue;
 
-				MoveTaskIIR task;
-				// Parse expects the record starting at the subop; the packet Body includes the leading [u32 len], so skip it.
-				try
-				{
-					task = MoveTaskCodec.Parse(body.AsSpan(4));
-				}
-				catch
-				{
+				// A form the grammar can't parse should not happen (6225/6225 round-trip), so this only drops a capture
+				// truncated mid-record.
+				if (!p.TryParse(MoveTaskCodec.Parse, out var task))
 					continue;
-				} // a form the grammar can't parse (should not happen - 6225/6225) - skip defensively
 
 				if (task.Handle == 0 || task.Handle >= EntityHandles.CharacterInstanceBase)
 					continue; // a player's MoveTask, not an NPC patrol

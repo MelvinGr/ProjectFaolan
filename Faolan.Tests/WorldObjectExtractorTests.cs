@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
@@ -45,21 +47,28 @@ namespace Faolan.Tests
 			Assert.Equal(transient, WorldObjectExtractor.IsTransientLootContainer(name));
 		}
 
+		// A REAL PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte (#530
+		// rule 3), so a synthetic body with the map id at the right offset is not a MapChange any more.
 		private static CapturedPacket MapChange(uint mapId)
 		{
-			var content = new byte[38];
-			content.WriteU32Be(4, 0x5D85BFC7); // body@4 = subop
-			content.WriteU32Be(34, mapId); // body@34 = map
-			var full = new byte[12 + content.Length]; // headerLen = 0
-			content.CopyTo(full, 12);
-			return new CapturedPacket(0, true, 0x2000, 0, full);
+			var record = PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0);
+			var body = new byte[4 + record.Length];
+			body.WriteU32Be(0, (uint)record.Length);
+			record.CopyTo(body, 4);
+			return Packet(body);
 		}
 
 		private static CapturedPacket RawObject(byte[] body)
 		{
+			return Packet(body);
+		}
+
+		// The sub-opcode is body[4:8], exactly as TsharkCaptureReader derives it from a real dump.
+		private static CapturedPacket Packet(byte[] body)
+		{
 			var full = new byte[12 + body.Length]; // headerLen = 0
 			body.CopyTo(full, 12);
-			return new CapturedPacket(0, true, 0x2000, 0, full);
+			return new CapturedPacket(0, true, 0x2000, body.Length >= 8 ? body.ReadU32Be(4) : 0, full);
 		}
 	}
 }

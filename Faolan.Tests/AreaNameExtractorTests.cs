@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Extensions;
 using Faolan.Importer.Extractors;
@@ -63,14 +64,11 @@ namespace Faolan.Tests
 
 		private static CapturedPacket Banner(uint areaNameId)
 		{
-			// Only the GenericDisplayAreaName|<id> token is read out of the FormatFeedback XML; the real frames wrap it
-			// in a <remoteformat>/<parameter> pair whose surroundings this harvest ignores.
-			var xml = Encoding.Latin1.GetBytes($"<localized category='50025' token='DisplayedText(3)|GenericDisplayAreaName|{areaNameId}'>");
-			var body = new byte[8 + xml.Length];
-			body.WriteU32Be(0, (uint)body.Length);
-			body.WriteU32Be(4, (uint)GameServer0X2000Opcodes.FormatFeedbackIIR);
-			xml.CopyTo(body, 8);
-			return Packet(true, (uint)GameServer0X2000Opcodes.FormatFeedbackIIR, body);
+			// A REAL FormatFeedbackIIR, built by the codec - same reasoning as MapChange below. Only the
+			// GenericDisplayAreaName|<id> token is read out of the XML; the real frames wrap it in a
+			// <remoteformat>/<parameter> pair whose surroundings this harvest ignores.
+			var xml = $"<localized category='50025' token='DisplayedText(3)|GenericDisplayAreaName|{areaNameId}'>";
+			return Carrier(true, FormatFeedbackCodec.Opcode, FormatFeedbackCodec.Build(0x0012D687, FormatFeedbackCodec.FifoBannerTypeFlags, 1, xml));
 		}
 
 		private static byte[] Frame(byte[] body)
@@ -86,26 +84,19 @@ namespace Faolan.Tests
 			// (#530 rule 3), so a synthetic body with the map id at the right offset and zeros everywhere else is
 			// not a MapChange any more - and a fixture shaped like the parser proves only that the file agrees
 			// with itself.
-			var record = PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0);
-			byte[] body = [0, 0, 0, 0, .. record];
-			body.WriteU32Be(0, (uint)record.Length);
-			return Packet(true, (uint)GameServer0X2000Opcodes.PlayfieldFIIR, body);
+			return Carrier(true, PlayfieldFCodec.Opcode, PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0));
 		}
 
 		private static CapturedPacket Move(float x, float y, float z)
 		{
-			// The c2s CharDCMove carries the position as three big-endian floats at body offset 18.
-			var body = new byte[18 + 12];
-			body.WriteU32Be(0, (uint)body.Length);
-			body.WriteU32Be(4, (uint)GameServer0X2000Opcodes.CharDCMoveIIR);
-			body.WriteF32Be(18, x);
-			body.WriteF32Be(22, y);
-			body.WriteF32Be(26, z);
-			return Packet(false, (uint)GameServer0X2000Opcodes.CharDCMoveIIR, body);
+			return Carrier(false, CharDCMoveCodec.Opcode, CharDCMoveCodec.Build(0x0012D687, new Vector3(x, y, z), Quaternion.Identity));
 		}
 
-		private static CapturedPacket Packet(bool isDownload, uint subOpcode, byte[] body)
+		// A 0x2000 carrier around one IIR record: the body is [u32 recordLen][record].
+		private static CapturedPacket Carrier(bool isDownload, uint subOpcode, byte[] record)
 		{
+			byte[] body = [0, 0, 0, 0, .. record];
+			body.WriteU32Be(0, (uint)record.Length);
 			return new CapturedPacket(0, isDownload, 0x2000, subOpcode, Frame(body));
 		}
 	}

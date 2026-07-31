@@ -51,18 +51,15 @@ namespace Faolan.Importer.Extractors
 			characterId = 0;
 			records = [];
 			index = null;
-			if (packet == null || packet.Length < 32)
-				return false;
 
-			var body = Body(packet);
-			if (body.Length < 20 || body.ReadU32Be(4) != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
+			var record = CapturedRecords.Record(packet);
+			if (record.Length < 16 || record.ReadU32Be(0) != FullPlayerCharacterCodec.Opcode)
 				return false;
 
 			try
 			{
 				// The full record: the journal lives in the SUB-CLASS (tails), so the root-only reader will not do.
-				// The body opens with the record's own carrier length, which belongs to the sender (#530 rule 2).
-				var parts = FullPlayerCharacterCodec.Parse(body.AsSpan(4));
+				var parts = FullPlayerCharacterCodec.Parse(record);
 				characterId = parts.Instance; // the snapshot is addressed to its own player
 				records = parts.SubClass.Quests.Records;
 				// The quest index follows the journal; since #391 it parses for every held-quest snapshot, so surface
@@ -84,16 +81,14 @@ namespace Faolan.Importer.Extractors
 		public static bool TryReadCompleted(byte[] packet, out CompletedQuestJournalRegion? completed)
 		{
 			completed = null;
-			if (packet == null || packet.Length < 32)
-				return false;
 
-			var body = Body(packet);
-			if (body.Length < 20 || body.ReadU32Be(4) != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
+			var record = CapturedRecords.Record(packet);
+			if (record.Length < 16 || record.ReadU32Be(0) != FullPlayerCharacterCodec.Opcode)
 				return false;
 
 			try
 			{
-				completed = FullPlayerCharacterCodec.Parse(body.AsSpan(4)).SubClass.CompletedQuests;
+				completed = FullPlayerCharacterCodec.Parse(record).SubClass.CompletedQuests;
 				return completed is { Areas.Count: > 0 };
 			}
 			catch
@@ -102,14 +97,5 @@ namespace Faolan.Importer.Extractors
 			}
 		}
 
-		// The 0x2000 body within a full on-wire packet: [len4][crc4][headerLen4][header][body].
-		private static byte[] Body(byte[] full)
-		{
-			var headerLen = (int)full.ReadU32Be(8);
-			var start = 12 + headerLen;
-			return start > 0 && start < full.Length
-				? full[start..]
-				: [];
-		}
 	}
 }

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Numerics;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
@@ -61,12 +63,11 @@ namespace Faolan.Tests
 			Assert.Equal(333.2f, npc.X, 0.1f);
 		}
 
+		// A REAL PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte (#530
+		// rule 3), so a synthetic body with the map id at the right offset is not a MapChange any more.
 		private static CapturedPacket MapChange(uint mapId)
 		{
-			var content = new byte[34];
-			content.WriteU32Be(0, 0x5D85BFC7);
-			content.WriteU32Be(30, mapId);
-			return Packet(content);
+			return Packet(PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0));
 		}
 
 		// Frames content as [bodyLen4][content] then a full packet [len4][crc4][headerLen4=0][body].
@@ -75,19 +76,21 @@ namespace Faolan.Tests
 			var body = new byte[4 + content.Length];
 			body.WriteU32Be(0, (uint)content.Length);
 			content.CopyTo(body, 4);
-
-			var full = new byte[12 + body.Length]; // headerLen (full[8..12]) stays 0
-			body.CopyTo(full, 12);
-
-			return new CapturedPacket(0, true, 0x2000, 0, full);
+			return Wrap(body);
 		}
 
 		// Wraps a raw FA015807 body (golden = the post-header body) as a 0x2000 packet (12-byte zero header).
 		private static CapturedPacket RawSpawn(byte[] body)
 		{
-			var full = new byte[12 + body.Length];
+			return Wrap(body);
+		}
+
+		// The sub-opcode is body[4:8], exactly as TsharkCaptureReader derives it from a real dump.
+		private static CapturedPacket Wrap(byte[] body)
+		{
+			var full = new byte[12 + body.Length]; // headerLen (full[8..12]) stays 0
 			body.CopyTo(full, 12);
-			return new CapturedPacket(0, true, 0x2000, 0, full);
+			return new CapturedPacket(0, true, 0x2000, body.Length >= 8 ? body.ReadU32Be(4) : 0, full);
 		}
 
 		private static CapturedPacket Spawn(uint handle, float x, float y, float z, string name)

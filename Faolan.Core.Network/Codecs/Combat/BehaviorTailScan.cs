@@ -32,5 +32,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 				? tail.ReadU32Be(0)
 				: 0;
 		}
+
+		// The entity a UseObject (ActionType 0x12) acted on: the SECOND word of the tail's leading `[from][target]`
+		// pair, `from` being the object's typetag. 0 when the tail is too short.
+		//
+		// ⚠️ NOT `args.Target` - on a UseObject that holds the PLAYER's own instance, and the object is only in the
+		// tail. A TalkToNpc is the other way round (its NPC handle IS `args.Target.Instance`), so the two interacts
+		// cannot share a read. Both importer readers of this word had the offset spelled out by hand.
+		public static uint InteractTargetHandle(ReadOnlySpan<byte> tail)
+		{
+			return tail.Length >= 2 * sizeof(uint)
+				? tail.ReadU32Be(sizeof(uint))
+				: 0;
+		}
 	}
 }

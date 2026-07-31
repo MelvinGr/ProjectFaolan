@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Extensions;
 using Faolan.Importer.Extractors;
 using Xunit;
@@ -67,17 +69,15 @@ namespace Faolan.Tests
 			return new CapturedPacket(0, true, 0x2000, 0xF096251E, FramePacket(payload));
 		}
 
+		// A REAL PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte (#530
+		// rule 3), so a synthetic body with the map id at the right offset is not a MapChange any more.
 		private static CapturedPacket MapChange(uint mapId)
 		{
-			var content = new byte[38];
-			content.WriteU32Be(4, 0x5D85BFC7); // body@4 = subop
-			content.WriteU32Be(34, mapId); // body@34 = map
-			return Wrap(0x5D85BFC7, content);
-		}
-
-		private static CapturedPacket Wrap(uint subOpcode, byte[] body)
-		{
-			return new CapturedPacket(0, true, 0x2000, subOpcode, FramePacket(body));
+			var record = PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0);
+			var body = new byte[4 + record.Length];
+			body.WriteU32Be(0, (uint)record.Length);
+			record.CopyTo(body, 4);
+			return new CapturedPacket(0, true, 0x2000, PlayfieldFCodec.Opcode, FramePacket(body));
 		}
 	}
 }

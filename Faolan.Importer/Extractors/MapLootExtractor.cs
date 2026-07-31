@@ -18,9 +18,6 @@ namespace Faolan.Importer.Extractors
 	// Sibling of WorldObjectExtractor (which keeps the bag as a world object); this one lifts only the contents.
 	public static class MapLootExtractor
 	{
-		private const uint LootBagSubOpcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR;
-		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
-
 		public static List<MapLootPoolEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var entries = new List<MapLootPoolEntry>();
@@ -31,18 +28,17 @@ namespace Faolan.Importer.Extractors
 				if (!p.IsIirCarrier)
 					continue;
 
-				if (p.SubOpcode == MapChangeSubOpcode)
+				if (p.SubOpcode == PlayfieldFCodec.Opcode)
 				{
-					var body = p.Body;
-					if (body.Length >= 38)
-						currentMap = body.ReadU32Be(34);
+					if (p.TryParse(PlayfieldFCodec.Parse, out var change))
+						currentMap = change.MapId;
 					continue;
 				}
 
-				if (p.SubOpcode != LootBagSubOpcode || currentMap == 0)
+				if (p.SubOpcode != LootContainerTemplate.ContainerClass || currentMap == 0)
 					continue;
 
-				foreach (var template in ReadLootTemplates(p.Body))
+				foreach (var template in ReadLootTemplates(p))
 					entries.Add(new MapLootPoolEntry(currentMap, template));
 			}
 
@@ -57,15 +53,10 @@ namespace Faolan.Importer.Extractors
 
 
 		// The item template ids inside a loot-bag IIR record (mirrors ItemHashHarvester.ExtractFromLootBag, but yields
-		// only the template ids - the identity quad/hash is harvested separately by the items module). `body` is the
-		// packet body after the framing header: [u32 payloadLen][u32 subOpcode][record]; the ProtoLootBagIIR record the
-		// codec parses starts at offset 4 (after the length word).
-		private static IEnumerable<uint> ReadLootTemplates(byte[] body)
+		// only the template ids - the identity quad/hash is harvested separately by the items module).
+		private static IEnumerable<uint> ReadLootTemplates(CapturedPacket packet)
 		{
-			if (body.Length < 8 || body.ReadU32Be(4) != LootBagSubOpcode)
-				yield break;
-
-			if (!WorldObjectColumns.TryLocateContents(body.AsSpan(4), out var contents, out _) || contents.Inventory?.Items == null)
+			if (!WorldObjectColumns.TryLocateContents(packet.Record, out var contents, out _) || contents.Inventory?.Items == null)
 				yield break;
 
 			foreach (var listEntry in contents.Inventory.Items)

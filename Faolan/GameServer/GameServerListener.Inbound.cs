@@ -1503,11 +1503,8 @@ namespace Faolan.GameServer
 
 		private async Task HandleRequestAggroStatus(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			// RequestAggroStatus(const ID32& charId, const ID32& targetId): each ID32 is [u32 type][u32 instance].
-			body.ReadUInt32(); // charId.type   (0x0000C350)
-			body.ReadUInt32(); // charId.instance (the polling player)
-			var targetType = body.ReadUInt32(); // targetId.type (0x0000C350)
-			var targetInstance = body.ReadUInt32();
+			var request = RequestAggroStatusCodec.Parse(body.ReadRemainingArray());
+			var targetInstance = request.Target.Id;
 
 			var instance = client.Session.Character.Id;
 
@@ -1528,7 +1525,7 @@ namespace Faolan.GameServer
 				category = target.Disposition;
 
 			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),
-				GameInterfaceOpcodes.DispatchPassBlob, b => b.WriteUInt32(targetType).WriteUInt32(targetInstance).WriteUInt32(category))); // cCategory: 0 = friendly, 1 = hostile, 2 = neutral
+				UpdateAggroStatusCodec.Opcode, UpdateAggroStatusCodec.Build(new UpdateAggroStatus(request.Target, category))));
 
 			Logger.LogDebug("RequestAggroStatus(target=0x{Target:X8}) -> cCategory={Category}.", targetInstance, category);
 		}

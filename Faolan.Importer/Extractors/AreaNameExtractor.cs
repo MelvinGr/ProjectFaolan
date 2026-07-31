@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 
@@ -32,9 +33,6 @@ namespace Faolan.Importer.Extractors
 	// West Gate"); MapArea replaces it.
 	public static class AreaNameExtractor
 	{
-		private const uint FeedbackSubOpcode = (uint)GameServer0X2000Opcodes.FormatFeedbackIIR; // 0x8D5A8B6B
-		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR; // 0x5D85BFC7
-		private const uint MoveSubOpcode = (uint)GameServer0X2000Opcodes.CharDCMoveIIR; // 0x4517AA81
 		private static readonly Regex AreaId = new("GenericDisplayAreaName[|/](\\d+)", RegexOptions.Compiled);
 
 		public static List<MapAreaName> Extract(IReadOnlyList<CapturedPacket> packets)
@@ -56,24 +54,26 @@ namespace Faolan.Importer.Extractors
 				if (!p.IsIirCarrier)
 					continue;
 
-				var body = p.Body;
-				if (body.Length < 30)
-					continue; // a CharDCMove body is shorter than the 38 a MapChange needs; each check re-validates its own length
-
-				if (p is { SubOpcode: MapChangeSubOpcode, IsDownload: true } && body.Length >= 38 && TryReadMapId(body, out var map))
+				if (p is { SubOpcode: PlayfieldFCodec.Opcode, IsDownload: true })
 				{
-					if (map != currentMap)
-					{
-						currentMap = map;
-						pos = null; // a stale position from the previous playfield would place the banner nowhere
-						pending.Clear(); // ditto: a pending banner belongs to the playfield it fired on
-					}
+					// A short/partial one is not a map announcement we can trust - PlayfieldFCodec.Parse is strict
+					// (#530 rule 4).
+					if (!p.TryParse(PlayfieldFCodec.Parse, out var change) || change.MapId == currentMap)
+						continue;
 
+					currentMap = change.MapId;
+					pos = null; // a stale position from the previous playfield would place the banner nowhere
+					pending.Clear(); // ditto: a pending banner belongs to the playfield it fired on
 					continue;
 				}
 
-				if (p is { SubOpcode: MoveSubOpcode, IsDownload: false } && TryReadMovePosition(body, out var moved))
+				if (p is { SubOpcode: CharDCMoveCodec.Opcode, IsDownload: false })
 				{
+					// A C2S move is the client reporting its OWN position, so no handle check is needed.
+					if (!p.TryParse(CharDCMoveCodec.Parse, out var move))
+						continue;
+
+					var moved = (move.Position.X, move.Position.Y, move.Position.Z);
 					pos = moved;
 					foreach (var areaId in pending)
 						results.Add(new MapAreaName(currentMap, areaId, moved.X, moved.Y, moved.Z));
@@ -81,10 +81,13 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
-				if (currentMap == 0 || !p.IsDownload || p.SubOpcode != FeedbackSubOpcode)
+				if (currentMap == 0 || !p.IsDownload || p.SubOpcode != FormatFeedbackCodec.Opcode)
 					continue;
 
-				var m = AreaId.Match(Encoding.Latin1.GetString(body));
+				if (!p.TryParse(FormatFeedbackCodec.Parse, out var feedback))
+					continue;
+
+				var m = AreaId.Match(Encoding.Latin1.GetString(feedback.Xml));
 				if (!m.Success)
 					continue;
 
@@ -142,40 +145,8 @@ namespace Faolan.Importer.Extractors
 			return byArea.Values.ToList();
 		}
 
-		private static float ReadFloat(byte[] b, int at)
-		{
-			return BitConverter.Int32BitsToSingle(b.ReadI32Be(at));
-		}
 
-		// CharDCMoveIIR body: [u32 subop][u32 0xC350][u32 handle][u8 env][u8 flag1][float x][float y][float z] -
-		// the position is ALWAYS present and always first (docs/re/chardcmove-grammar.md). Raw-body floats are
-		// big-endian. A C2S move is the client reporting its OWN position, so no handle check is needed.
-		private static bool TryReadMovePosition(byte[] body, out (float X, float Y, float Z) pos)
-		{
-			pos = default;
-			var at = 18; // 4 subop + 4 C350 + 4 handle + 1 env + 1 flag1, after the 4-byte length word
-			if (body.Length < at + 12)
-				return false;
 
-			pos = (ReadFloat(body, at), ReadFloat(body, at + 4), ReadFloat(body, at + 8));
-			return true;
-		}
-
-		// The MapChange's map id, or false when the body is not a full PlayfieldFIIR (PlayfieldFCodec.Parse is strict,
-		// #530 rule 4 - a short one is not a map announcement we can trust).
-		private static bool TryReadMapId(byte[] body, out uint mapId)
-		{
-			try
-			{
-				mapId = PlayfieldFCodec.Parse(body.AsSpan(4)).MapId;
-				return true;
-			}
-			catch (CodecParseException)
-			{
-				mapId = 0;
-				return false;
-			}
-		}
 
 	}
 }

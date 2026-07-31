@@ -51,5 +51,18 @@ namespace Faolan.Importer.Extractors
 					: [];
 			}
 		}
+
+		// The IIR RECORD an IsIirCarrier packet carries: the body is `[u32 len][record]`, and a codec owns the record
+		// from its type word on - the length word belongs to the framing sender (#530 rule 2), so handing a codec the
+		// whole body would fail its `EnsureAtEnd()` by four bytes at the front.
+		//
+		// This is FRAME work, not decode (§9 D): it slices the carrier, it does not read a field. It exists because
+		// wave 8 turned every extractor's `body.AsSpan(4)` into a codec call, and the three spellings of that slice in
+		// the importer disagreed on whether to bound by the declared length - which decides whether a codec sees
+		// trailing bytes. It is bounded here, once: a record that declares less than the body holds is a record with a
+		// tail that is not its own.
+		//
+		// Empty when the packet cannot carry one (too short, or a header length running past the end).
+		public ReadOnlySpan<byte> Record => CapturedRecords.Record(Bytes);
 	}
 }

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 
@@ -30,15 +30,6 @@ namespace Faolan.Importer.Extractors
 	// labels, 6BD56736 destructibles, 1FD6412B climbing dynels. Sibling of NpcSpawnExtractor; dedup key is (map, pos).
 	public static class WorldObjectExtractor
 	{
-		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
-		private const uint SimpleDynelSubOpcode = (uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR;
-
-		private static readonly HashSet<uint> ObjectSubOpcodes =
-		[
-			(uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR, (uint)GameServer0X2000Opcodes.DoorFullUpdateIIR,
-			(uint)GameServer0X2000Opcodes.DestructibleFullUpdateIIR, (uint)GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR
-		];
-
 		public static List<WorldObjectEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var entries = new List<WorldObjectEntry>();
@@ -49,32 +40,32 @@ namespace Faolan.Importer.Extractors
 				if (!p.IsIirCarrier)
 					continue;
 
-				var body = p.Body;
-				if (body.Length < 38)
-					continue;
-
-				var subop = body.ReadU32Be(4);
-
-				if (subop == MapChangeSubOpcode)
+				if (p.SubOpcode == PlayfieldFCodec.Opcode)
 				{
-					currentMap = body.ReadU32Be(34);
+					if (p.TryParse(PlayfieldFCodec.Parse, out var change))
+						currentMap = change.MapId;
 					continue;
 				}
 
-				if (!ObjectSubOpcodes.Contains(subop) || currentMap == 0)
+				if (!WorldObjectClasses.Placed.Contains(p.SubOpcode) || currentMap == 0)
 					continue;
-				if (body.Length < SpawnPacketBuilder.RotWOffset + 4)
-					continue; // too short to hold the transform
 
-				var handle = body.ReadU32Be(12);
-				// For a SimpleDynel the identity message is a ProtoSimpleDynelIIR that SimpleDynelIdentityCodec parses -
-				// the SAME message ReadIdentity below reads for DisplayName - so take the id (kdtree) + name from it
-				// instead of the hand-rolled protobuf walker. LootBag and the Door/Destructible/Climbing trio keep
-				// ReadMessage (LootBag's name and the trio's geometry-tail name are not exposed by that codec).
-				var (objectId, name) = subop == SimpleDynelSubOpcode && WorldObjectColumns.TryReadIdentity(body.AsSpan(4), out var dynel)
-					? (dynel.Kdtree, dynel.Name ?? string.Empty)
-					: ReadMessage(body);
-				var displayName = WorldObjectColumns.ReadIdentity(body);
+				if (!p.TryParse(WorldObjectCodec.Parse, out var obj))
+					continue; // a capture truncated mid-record
+
+				// EVERY class in the family carries the same identity message in the same place - kdtree in field 1,
+				// name in field 2 - so one codec read replaces both the hand-rolled protobuf walker this file used to
+				// carry and the separate DisplayName read next to it.
+				if (!WorldObjectColumns.TryReadIdentity(p.Record, out var identity))
+					continue;
+
+				var handle = obj.Handle;
+				var objectId = identity.Kdtree;
+				var name = identity.Name ?? string.Empty;
+				var displayName = identity.DisplayName ?? string.Empty;
+				var transform = obj.Transform.FromProtobuf<ProtoGameCodeDynelIIR>();
+				var position = transform.Position;
+				var rotation = transform.Rotation;
 
 				// LootBagFullUpdateIIR (F096251E) is shared by TWO things: transient loot-container DROPS and static
 				// world-builder-PLACED containers. A drop - a plain "Bag of loot" OR a boss/raid CHEST ("Large Chest",
@@ -83,16 +74,15 @@ namespace Faolan.Importer.Extractors
 				// on the Tortage beach - #363). Placed containers are constructed the SAME way (bigger container is just
 				// a bigger LootBagTemplate.Variant), so the NAME can't tell a drop from a placement; the signal is the
 				// world-builder [script-tag] in the name ([N7FU]/[QRON]/...), which only a PLACED object carries.
-				if (subop == (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR && IsTransientLootContainer(name))
+				if (p.SubOpcode == LootContainerTemplate.ContainerClass && IsTransientLootContainer(name))
 					continue;
 
-				entries.Add(new WorldObjectEntry(currentMap, subop, handle, ReadLE(body, SpawnPacketBuilder.PosXOffset), ReadLE(body, SpawnPacketBuilder.PosYOffset),
-					ReadLE(body, SpawnPacketBuilder.PosZOffset), p.Bytes)
+				entries.Add(new WorldObjectEntry(currentMap, p.SubOpcode, handle, position.X, position.Y, position.Z, p.Bytes)
 				{
-					RotX = ReadLE(body, SpawnPacketBuilder.RotXOffset),
-					RotY = ReadLE(body, SpawnPacketBuilder.RotYOffset),
-					RotZ = ReadLE(body, SpawnPacketBuilder.RotZOffset),
-					RotW = ReadLE(body, SpawnPacketBuilder.RotWOffset),
+					RotX = rotation.X,
+					RotY = rotation.Y,
+					RotZ = rotation.Z,
+					RotW = rotation.W,
 					ObjectId = objectId,
 					Name = name,
 					DisplayName = displayName
@@ -113,9 +103,6 @@ namespace Faolan.Importer.Extractors
 			return seen.Values.ToList();
 		}
 
-		// Internal (shared with WorldTeleportExtractor, #zone-lines): strip the 12-byte lead + variable header, yielding
-		// the IIR body whose [0:4]=len, [4:8]=subop, [12:16]=handle.
-
 		// A LootBagFullUpdateIIR object is a TRANSIENT loot-container DROP (skip it) unless it was PLACED by the world
 		// builder, which every placed/scripted container in the corpus signals with a bracketed [script-tag] in its
 		// NAME ([N7FU], [QRON], ...). The container NAME alone is NOT the signal: a boss-drop chest is named exactly
@@ -126,122 +113,8 @@ namespace Faolan.Importer.Extractors
 			return !(name ?? "").Contains('[');
 		}
 
-		internal static float ReadLE(byte[] body, int offset)
-		{
-			return body.ReadF32Le(offset);
-		}
 
-		// The object message is [u32 BE length][message] right after the 0x2C transform group (no pre-IIR block).
-		// Reads field 1 (id, varint) and field 2 (name, string). Returns (0, "") if the layout is unexpected.
-		internal static (uint Id, string Name) ReadMessage(byte[] body)
-		{
-			var start = TransformEnd(body);
-			if (start < 0 || start + 4 > body.Length)
-				return (0, string.Empty);
 
-			var len = (int)body.ReadU32Be(start);
-			var i = start + 4;
-			var end = i + len;
-			if (len <= 0 || end > body.Length)
-				return (0, string.Empty);
 
-			uint id = 0;
-			var name = string.Empty;
-			while (i < end)
-			{
-				if (!TryReadVarint(body, ref i, end, out var tag))
-					break;
-
-				var field = tag >> 3;
-				var wire = tag & 7;
-				switch (wire)
-				{
-					case 0:
-					{
-						if (!TryReadVarint(body, ref i, end, out var v))
-							return (id, name);
-
-						if (field == 1)
-							id = (uint)v;
-						break;
-					}
-
-					case 2:
-					{
-						if (!TryReadVarint(body, ref i, end, out var sl) || i + (int)sl > end)
-							return (id, name);
-
-						if (field == 2)
-							name = Encoding.ASCII.GetString(body, i, (int)sl);
-						i += (int)sl;
-						break;
-					}
-
-					case 5:
-					{
-						i += 4;
-						break;
-					}
-
-					case 1:
-					{
-						i += 8;
-						break;
-					}
-
-					default:
-					{
-						return (id, name);
-					}
-				}
-			}
-
-			return (id, name);
-		}
-
-		// Offset just after the 0x2C transform group (where the object message's u32 length prefix begins):
-		// 0x2C, 0x0A vec3, 0x12 quat, optional 0x25 scale, 0x18 playfield-varint. Returns -1 if malformed.
-		private static int TransformEnd(byte[] b)
-		{
-			var i = 20;
-			if (b.Length <= i || b[i] != 0x2C)
-				return -1;
-
-			i++;
-			if (i + 1 >= b.Length || b[i] != 0x0A)
-				return -1;
-
-			i += 2 + b[i + 1]; // 0A vec3
-			if (i + 1 >= b.Length || b[i] != 0x12)
-				return -1;
-
-			i += 2 + b[i + 1]; // 12 quat
-			if (i < b.Length && b[i] == 0x25)
-				i += 5; // optional 25 scale
-			if (i >= b.Length || b[i] != 0x18)
-				return -1;
-
-			i++;
-			return TryReadVarint(b, ref i, b.Length, out _)
-				? i
-				: -1;
-		}
-
-		private static bool TryReadVarint(byte[] b, ref int i, int end, out ulong value)
-		{
-			value = 0;
-			var shift = 0;
-			while (i < end)
-			{
-				var x = b[i++];
-				value |= (ulong)(x & 0x7F) << shift;
-				if ((x & 0x80) == 0)
-					return true;
-
-				shift += 7;
-			}
-
-			return false;
-		}
 	}
 }
