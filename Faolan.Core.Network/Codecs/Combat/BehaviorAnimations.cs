@@ -215,7 +215,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				ActivationTime = f12
 			}.ToProtobuf();
 
-			// The result block is BehaviorAcks' - the player's targeted-hit ack sends the same 132 bytes with the roles
+			// The result block is BehaviorAcks' - the player's targeted-hit ack sends the same 81 bytes with the roles
 			// swapped, and it was written out in both files until #530 wave 7.
 			return new BehaviorControlCenterIIR(npcHandle, NpcAttackAckSeq, NormalAttackBehaviorId, args, BehaviorAcks.HitResultBlock(playerHandle, damage, resultType, resultK1, resultK2));
 		}

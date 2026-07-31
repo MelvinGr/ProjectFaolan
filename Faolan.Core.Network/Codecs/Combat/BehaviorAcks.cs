@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -81,15 +82,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 
 		// The TARGETED-HIT ack (#19/#228): the echo-ack's header and args, with the echoed tail REPLACED by the
-		// 132-byte result block naming the victim and the damage. It is what makes the client play the hit-react on the
+		// result block naming the victim and the damage. It is what makes the client play the hit-react on the
 		// entity the block names, which is why an air swing must get `EchoAck` instead - naming the player there made
-		// them visibly bleed when swinging at nothing.
+		// them visibly bleed when swinging at nothing. (An air swing is a real captured shape, not just our
+		// workaround: 130 of the 3687 captured attack tails carry zero targets AND zero results.)
 		//
 		// ⚠️ Two deliberate differences from `EchoAck`, both preserving the bytes the server has always sent:
 		//   * the seq is `requestSeq + 1`, not `AckSeq(requestSeq)`. Every captured normal-attack request carries
 		//     0x0003, so the two agree in traffic; changing it here would be a wire change, not a refactor.
 		//   * the behaviourId is the NormalAttack constant rather than the request's own.
-		// The result block is the SAME 132 bytes `BehaviorAnimations.NpcAttackAck` sends the other way round - it was
+		// The result block is the SAME 81 bytes `BehaviorAnimations.NpcAttackAck` sends the other way round - it was
 		// written out twice, once here and once there, which is the duplicate-layout pattern #530 keeps finding.
 		public static BehaviorControlCenterIIR HitResultAck(byte[] rawPayload, uint instance, uint phase, uint victimHandle, uint damage)
 		{
@@ -99,39 +101,73 @@ namespace Faolan.Core.Network.Codecs.Combat
 				HitResultBlock(victimHandle, damage));
 		}
 
-		// The single-entry result block that closes a targeted-hit ack:
-		//   [0][0][count=1] [6 x u32 entry = 0] [1][class][victim][0] [u8 0x06][resultType][0][k1][damage][k2][0][0]
-		// `victim` is the entity that plays the hit-react/blood - it was once the ATTACKER's own handle on the player
+		// The result block that closes a targeted-hit ack. DECODED (#536) - it used to be written out as one flat run
+		// of literals described as "the 132-byte result block", which is neither 132 bytes (it is 81) nor one block:
+		//
+		//   [u32 targetCount][targetCount x (u32 class, u32 handle)]   the entities the swing REACHED
+		//   [8 x u32]                                                  see MiddleWords
+		//   [u32 resultCount][resultCount x 41-byte HitResult]         one per entity actually affected
+		//
+		// Verified over the corpus: this accounts for ALL 3687 captured s2c attack tails (Combat:Melee / :Ranged /
+		// :Unarmed), with Combat:Ranged adding one trailing 0x00 - which is the whole reason its tails read one byte
+		// longer than Melee's.
+		//
+		// ⚠️ The middle is 8 words USUALLY and 9 sometimes, selected by its own second word: 1 -> eight (3659 tails),
+		// 2 or 3 -> nine (28). Missing that selector is what left a stubborn 11 bodies unexplained, because a
+		// mis-sized middle puts the result COUNT one word out and the length then fits nothing.
+		//
+		// ⚠️ The two counts move together in most captures (one extra target produces one extra result), which is why
+		// the lengths look like a single 49-byte stride - 49 is 8 + 41, not one record. Do not model it as one.
+		//
+		// `Victim` is the entity that plays the hit-react/blood - it was once the ATTACKER's own handle on the player
 		// path, which is #228 ("attack hits myself"). The result codes are capture-derived and not semantically
 		// decoded; 0xCB is the value the captured BccAck result block carries (it was once written as 0xCD).
 		internal static byte[] HitResultBlock(uint victimHandle, uint damage, byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2)
 		{
+			return HitResultBlock([], [new HitResult(victimHandle, damage, resultType, resultK1, resultK2)]);
+		}
+
+		// The words between the target list and the result count, in the EIGHT-word form we send. Word 1 is the
+		// selector described above and must stay 1; across the corpus word 0 carries a float (the swing's charge)
+		// and two of the rest carry ids on some hits, so they are undecoded rather than known-zero - which is why
+		// this is a named constant and not silently inlined.
+		private static readonly uint[] MiddleWords = [0, 1, 0, 0, 0, 0, 0, 0];
+
+		internal static byte[] HitResultBlock(IReadOnlyList<uint> targets, IReadOnlyList<HitResult> results)
+		{
+			ArgumentNullException.ThrowIfNull(targets);
+			ArgumentNullException.ThrowIfNull(results);
+
 			using var s = new FaolanStream();
-			s
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(1) // [0][0][count=1]
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0) // 6 x u32 entry (zero in the single-hit case)
-				.WriteUInt32(1)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(victimHandle)
-				.WriteUInt32(0)
-				.WriteByte(0x06)
-				.WriteUInt32(resultType)
-				.WriteUInt32(0)
-				.WriteUInt32(resultK1)
-				.WriteUInt32(damage)
-				.WriteUInt32(resultK2)
-				.WriteUInt32(0)
-				.WriteUInt32(0);
+			s.WriteUInt32(targets.Count);
+			foreach (var target in targets)
+				s.WriteUInt32(EntityClass.Character).WriteUInt32(target);
+
+			foreach (var word in MiddleWords)
+				s.WriteUInt32(word);
+
+			s.WriteUInt32(results.Count);
+			foreach (var r in results)
+			{
+				s
+					.WriteUInt32(EntityClass.Character)
+					.WriteUInt32(r.VictimHandle)
+					.WriteUInt32(0)
+					.WriteByte(0x06)
+					.WriteUInt32(r.ResultType)
+					.WriteUInt32(0)
+					.WriteUInt32(r.K1)
+					.WriteUInt32(r.Damage)
+					.WriteUInt32(r.K2)
+					.WriteUInt32(0)
+					.WriteUInt32(0);
+			}
 
 			return s.ToArray();
 		}
+
+		// One 41-byte result record: who was hit, for how much, and the still-undecoded result codes.
+		internal readonly record struct HitResult(uint VictimHandle, uint Damage, byte ResultType = 0xCB, uint K1 = 1, uint K2 = 2);
 
 		// The behaviour id an attack ack carries, whatever the request said. The client calls it Combat:Melee; this
 		// codebase called it "NormalAttack", which is our invention (#536).

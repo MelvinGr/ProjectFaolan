@@ -85,16 +85,40 @@ Two results fall straight out of that table and settle 83% of the traffic:
 * **Melee and Unarmed share a reader**, which is why `BehaviorAcks` measured exactly those two padding an echoed
   tail, and why the attack tail lengths form one family across `0x0F`/`0x10`/`0x11`.
 
-The attack reader is the residue: `FUN_0084d5f0` (its base) reads 6 × u32, then 7 × u32 inline, then a COUNT
-and a per-record loop. Sizing the record exactly needs the loop's conditional (`0x1b4`) resolved — it is skipped
-on one path — so the count→length arithmetic is not closed yet.
+### The attack tail — `Combat:Melee` / `:Ranged` / `:Unarmed`
+
+The reader takes a base read, seven u32, then a COUNT and a per-record loop. Decoded against the corpus:
+
+```
+[u32 targetCount][targetCount x (u32 class, u32 handle)]   the entities the swing REACHED
+[8 x u32]                                                  one float + two ids on some hits; else zero
+[u32 resultCount][resultCount x 41-byte result]            one per entity actually affected
+[Combat:Ranged only: u8 0x00]
+```
+
+so `len = 40 + 8*targets + 41*results` (+1 for Ranged). That accounts for **all 3687** captured s2c attack
+tails. ⚠️ The middle is **8 words usually and 9 sometimes**, selected by its own second word — `1` → eight
+(3659 tails), `2` or `3` → nine (28). Missing that selector leaves 11 bodies stubbornly unexplained, because a
+mis-sized middle puts the result count one word out and the length then fits nothing. The 41-byte result is
+`[u32 class][u32 handle][u32 0][u8 0x06][u32 resultType][u32 0][u32 k1][u32 damage][u32 k2][u32 0][u32 0]` —
+exactly what `BehaviorAcks.HitResultBlock` builds, which is 81 bytes (a 40-byte head plus one result), not the
+"132-byte result block" the code called it for years.
+
+⚠️ **The two counts move together in most captures** — one extra target produces one extra result — so the
+lengths look like a single 49-byte stride. **49 is 8 + 41, not one record.** Reading it as one stride is what
+made this tail look unmodellable, and it is why the `0x1b4` conditional in the decompiled loop never had to be
+resolved: the arithmetic closes without it.
+
+The AIR SWING is a real captured shape, not just our workaround for #228: 130 tails carry zero targets *and*
+zero results.
 
 ## Status
 
 Grammar SHAPE decoded (type switch + commandId + per-command reader); the commandId → COMMAND map is enumerated
-with the client's own names; and the per-Command readers are walked for every FIXED-tail command (above), which
-is 83% of the captured traffic. The residue is the attack family's counted record loop. Open work tracked in
-Gitea #536.
+with the client's own names; the per-Command readers are walked for every fixed-tail command (83% of the
+captured traffic); and the attack family's counted tail accounts for 100% of its captured bodies. The residue is
+what the middle words MEAN (one is a float, two carry ids) and the per-command readers for the remaining
+variable-tail commands (Magic:Attack, PlayAnimation, ObjectInteraction). Open work tracked in Gitea #536.
 
 ## Registration form (the create-burst / world-entry BccIIR) — #234
 

@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using Faolan.Core.Extensions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Protobuf;
@@ -90,6 +92,43 @@ namespace Faolan.Tests
 				"642cd3d60000c350021663dd0004000000090000000c089ac80210021802280a300000000006000000000000000000000000000000000000000000000000b290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627cab290805c29e627ca000000000000000000000000");
 
 			Assert.Equal(expected, BehaviorControlCenterCodec.Build(BehaviorAcks.EquipMoveAck(request, Instance, 2, null!)));
+		}
+
+		// The hit-result block is `[u32 targetCount][targets][8 x u32][u32 resultCount][41-byte results]` (#536),
+		// decoded from the corpus after the client's reader showed the attack commands read a COUNTED record loop.
+		// This pins the arithmetic the decode rests on - `40 + 8*targets + 41*results` - which accounts for ALL 3687
+		// captured s2c attack tails, so a change to the block's layout has to face it. (The middle is 9 words rather
+		// than 8 on 28 of them, selected by its own second word; we always send the 8-word form, whose selector is
+		// 1.)
+		//
+		// ⚠️ The single-target form is the one production sends and it must stay byte-identical: the counts move
+		// together in most captures (one extra target, one extra result), which makes the lengths look like a single
+		// 49-byte stride. 49 is 8 + 41, not one record - modelling it as one is the trap this test exists to hold
+		// shut.
+		[Theory]
+		[InlineData(0, 0, 40)] // the air swing - 130 captured tails carry no targets and no results
+		[InlineData(0, 1, 81)] // the ordinary single hit - what HitResultAck sends
+		[InlineData(1, 2, 130)]
+		[InlineData(2, 3, 179)]
+		public void HitResultBlock_LengthIsHeadPlusTargetsPlusResults(int targets, int results, int expected)
+		{
+			var block = BehaviorAcks.HitResultBlock(
+				[.. Enumerable.Range(1, targets).Select(i => (uint)(0x1000 + i))],
+				[.. Enumerable.Range(1, results).Select(i => new BehaviorAcks.HitResult((uint)(0x2000 + i), (uint)(10 * i)))]);
+
+			Assert.Equal(expected, block.Length);
+			Assert.Equal((uint)targets, block.ReadU32Be(0));
+			Assert.Equal((uint)results, block.ReadU32Be(4 + 8 * targets + 32));
+		}
+
+		// The convenience form production calls still builds exactly the single-target block - the decode was a
+		// re-expression, not a wire change.
+		[Fact]
+		public void HitResultBlock_SingleTargetForm_IsUnchanged()
+		{
+			Assert.Equal(
+				BehaviorAcks.HitResultBlock([], [new BehaviorAcks.HitResult(0x2001, 77)]),
+				BehaviorAcks.HitResultBlock(0x2001, 77));
 		}
 
 		private static byte[] Hex(string s)

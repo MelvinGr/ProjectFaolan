@@ -6,7 +6,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// Named reads out of a `BehaviorControlCenterIIR.Tail`.
 	//
 	// NOT a codec, and deliberately not a decode: the tail is genuinely four different shapes discriminated by
-	// `behaviorId` (an echoed client tail, an equip identity block, the 132-byte hit-result block, or a per-behaviour
+	// `behaviorId` (an echoed client tail, an equip identity block, the 81-byte hit-result block, or a per-behaviour
 	// literal) and stays an opaque region until #536 settles it. What the server needs from it today is two single
 	// words, and this is where they are NAMED - the shape `PlayfieldTokenScan` and `CastGroundTargetScan` set for
 	// reading a field out of a region the codec carries verbatim.

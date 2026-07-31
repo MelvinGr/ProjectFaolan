@@ -258,7 +258,7 @@ namespace Faolan.GameServer.Combat
 				damage = (uint)CombatResolver.ApplyCritDamage((int)damage, attackerEntity?.CriticalDamageRating ?? 0);
 			const DamageSchool school = DamageSchool.Crushing; // the player's physical-melee damage school (capture-derived)
 
-			// 1) BehaviorControlCenterIIR ack - releases the swing. The record (header, echoed args, 132-byte result
+			// 1) BehaviorControlCenterIIR ack - releases the swing. The record (header, echoed args, 81-byte result
 			// block naming the VICTIM) is BehaviorAcks.HitResultAck's; this path used to write all of it inline, which
 			// made it the sixth hand-rolled copy of a message that has one codec (#530 wave 7).
 			await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.HitResultAck(rawPayload, instance, phase, targetHandle, damage)));
