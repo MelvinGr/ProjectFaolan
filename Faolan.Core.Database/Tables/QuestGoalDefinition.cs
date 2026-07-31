@@ -67,14 +67,19 @@ namespace Faolan.Core.Database.Tables
 		public QuestGoalType GoalType { get; set; } = QuestGoalType.Kill;
 
 		// TRUE when this row came from MID-SESSION traffic (a QuestFullUpdate) instead of a login snapshot's Quest_c
-		// record. The snapshot carries a goal's whole definition; the mid-session packet carries only its identity,
-		// its world marker and its objective text ref - never the verb (`Separator`), the target, or the required
-		// count. So the row exists to be DISPLAYED, and must not be EVALUATED.
+		// record. So the row exists to be DISPLAYED, and must not be EVALUATED: it has no TARGET.
 		//
-		// ⚠️ This flag is load-bearing, not bookkeeping. `GoalType` defaults to Kill (0) and `RequiredCount` to 0, so
-		// an unflagged partial row reads as "kill something unnamed" - a goal nothing can ever advance - and
-		// AllGoalsComplete requires EVERY goal of a quest, which would leave its quest permanently incompletable.
-		// QuestProgress.AllGoalsComplete skips these for exactly that reason (#525 follow-up).
+		// ⚠️ CORRECTED in #548. This used to say the mid-session packet carries "never the verb (`Separator`), the
+		// target, or the required count". It carries the verb and the count for EVERY goal, and both are harvested
+		// now - measured against the snapshot journal, the source thought to hold them alone: of the 34 goals the
+		// corpus shows in BOTH, all 34 agree on both fields. What a full-update genuinely does not carry is the
+		// TARGET, and it never did: `TargetName` is not on the wire in either source (see its own comment) - it is
+		// sourced by capture correlation and domain knowledge.
+		//
+		// ⚠️ Still load-bearing, for the narrower reason: with no `TargetName` a Kill/LootFromNpc/TalkToNpc goal has
+		// nothing for a trigger to match, so nothing can ever advance it, and AllGoalsComplete requires EVERY goal of
+		// a quest - which would leave its quest permanently incompletable. QuestProgress.AllGoalsComplete skips these
+		// for exactly that reason (#525 follow-up).
 		//
 		// Why they are worth having anyway: without them a two-goal quest silently looks like a one-goal quest. The
 		// wire proves 12369 (7134 -> 3492) and 10287 (400 -> 7363) each have two, and both missing goals appear in

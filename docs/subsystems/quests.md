@@ -40,16 +40,23 @@ that text's leading verb, counted:
 
 | `Separator` | kind | goals | verbs in the text | evidence |
 |---:|---|---:|---|---|
-| `0` | `Untargeted` — no typed target ref | 9 | speak, talk, free, get, give, return, unlock | the Tortage chain — Laranga, Tina, Turach, Casilda; Saddur's and Tuut's bags. This one is about the *reference*, not the verb, hence the spread |
 | `5` | `Craft` | 9 | **make** (9/9) | *"Make Visionwine"*, *"Make Ale of Auspice"* (quests 13141/13143/13145) |
 | `9` | `RegionScoped` | 3 | enter, overcome, locate | goal 1448 → `Trappers Haven`; only 1 of the 3 is a reach |
 | `10` | `Use` | 1 | use | *"Use the Vial to Capture Gas"* (11252) |
 | `12` | `Kill` | 30 | kill, beat, cleanse, destroy, slaughter | Saddur, Scavenger Tuut (targets are `npc_template` / monster-category refs) |
-| `20` | `Deliver` | 12 | deliver, give, bring | goal 3497 — *"Deliver 3 stone bricks to Turach"* |
-| `22` | `Generic` | 52 | ~19 different verbs | the catch-all; carries a map pin but no single semantics |
-| `23` | `Collect` | 41 | get, collect, gather, recover, remove, search, steal | goal 3495, and every large count (*Poisonous Gland* ×20, *Shadeleaf* ×10, a ×50) |
+| `20` | `Deliver` | 13 | deliver, give, bring | goal 3497 — *"Deliver 3 stone bricks to Turach"* |
+| `22` | `Generic` | 60 | ~19 different verbs | the catch-all; carries a map pin but no single semantics |
+| `23` | `Collect` | 44 | get, collect, gather, recover, remove, search, steal | goal 3495, and every large count (*Poisonous Gland* ×20, *Shadeleaf* ×10, a ×50) |
 | `24` | `Investigate` | 1 | investigate | *"Investigate the Ancient Gateway"* (8278) |
 | `25` | `DestroyObject` | 9 | destroy | *"Destroy Bowl of Set"* (×7 in quest 13473), *"Destroy the Wolves' Saddles"* (count 2) |
+
+⚠️ **There is no kind `0`.** This table used to open with one — `Untargeted`, 9 goals, "about the *reference*,
+not the verb, hence the spread" across speak/talk/free/get/give/return/unlock. It was the **un-harvested
+default** (#548): those goals are exactly the ones the corpus only ever full-updates, and the importer's
+full-update path never set `Separator` at all. The wire sends `0` in neither source — across all 158 snapshot
+goals and all 111 full-update goals the tag takes only the values above — and once the full-update's tag is
+lifted, not one shipped row carries `0`. The nine scattered into `Generic`, `Collect` and `Deliver`, where
+their verbs read as those kinds' do.
 
 The clincher that it describes the **verb and not the target**: quest 12371's two goals reference the *same*
 item id with the *same* count and still differ — `23` for "collect 3 quarry bricks", `20` for "deliver 3 to

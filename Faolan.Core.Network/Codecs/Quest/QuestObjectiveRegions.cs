@@ -13,11 +13,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// The region for one quest's goals, addressed to the live player's client instance (the records carry raw
 		// entity references, re-addressed like the rest of the tails).
 		//
-		// PARTIAL goals are left OUT. A mid-session harvest recovers a goal's identity, marker and objective text but
-		// none of the numeric fields a record is built from, so emitting one would produce bytes that are certainly
-		// wrong - and this region is gated on reproducing the capture EXACTLY (ObjectiveRegionVerified; a region the
-		// client cannot parse asserts it on statlist.cpp:134). Skipping them keeps every verified region
-		// byte-identical: the region stays exactly what it was before those rows were harvested.
+		// PARTIAL goals are left OUT, and this region is gated on reproducing the capture EXACTLY
+		// (ObjectiveRegionVerified; a region the client cannot parse asserts it on statlist.cpp:134), so skipping
+		// them keeps every verified region byte-identical - the region stays exactly what it was before those rows
+		// were harvested.
+		//
+		// ⚠️ The REASON is no longer "a mid-session harvest recovers none of the numeric fields a record is built
+		// from" (#548): it recovers the kind tag, the count, the reserved pairs and the per-goal pin. What has never
+		// been verified is that a region rebuilt to INCLUDE them reproduces the wire, and that is the bar here - so
+		// widening this is a byte-exact regeneration job, not a comment change.
 		public static QuestObjectiveRegion ForQuest(QuestDefinition def, uint instance)
 		{
 			ArgumentNullException.ThrowIfNull(def);

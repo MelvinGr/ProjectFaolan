@@ -1017,7 +1017,6 @@ namespace Faolan.Importer.Captures
 						{
 							GoalId = hg.GoalId,
 							Sequence = hg.Sequence,
-							RequiredCount = hg.RequiredCount,
 							Partial = hg.Partial
 						});
 					}
@@ -1032,6 +1031,13 @@ namespace Faolan.Importer.Captures
 					g.ObjectiveRefId = hg.ObjectiveRefId;
 					g.ObjectiveCategory = hg.ObjectiveCategory;
 					g.ObjectiveKey = hg.ObjectiveKey;
+
+					// The goal's KIND TAG and required amount (#548). A full-update carries both for every goal - the
+					// same values the snapshot path harvests where both exist (34 of 34 agree) - so refreshing them
+					// here is the same "the capture is the truth source for every wire field" rule the goals module
+					// applies, and it is what stops a full-update-only goal reading as "kill one unnamed thing".
+					g.Separator = hg.Separator;
+					g.RequiredCount = hg.RequiredCount;
 
 					// The reserved (marker, 4CC-tag) pairs, lifted off the full-update body by the codec (#537). The same
 					// words the snapshot path harvests, so a goal seen by both gets the same value from either - and a

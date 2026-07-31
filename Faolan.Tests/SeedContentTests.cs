@@ -237,6 +237,34 @@ namespace Faolan.Tests
 			Assert.Equal((uint)QuestGoalKind.Kill, goals.Single(g => g.GoalId == 3490).Separator);
 		}
 
+		// ⚠️ NO SHIPPED GOAL CARRIES KIND 0, because the wire never sends one (#548). `QuestGoalKind` used to declare
+		// `Untargeted = 0` on the strength of 11 rows holding it - which were not a kind at all but the importer's
+		// un-harvested default: the full-update path set `Separator` nowhere, so every goal the corpus only ever
+		// full-updates read as 0. The tag takes 5/9/10/12/20/22/23/24/25 across all 158 snapshot goals AND all 111
+		// full-update ones, and 0 is not among them.
+		//
+		// This is the gate on that, and it is a REGRESSION gate rather than a decode claim: a re-harvest that stops
+		// lifting the tag would silently repopulate the phantom, and every one of those goals would go back to
+		// reading as an untargeted verb-less objective.
+		[Fact]
+		public async Task NoGoalCarriesTheUnharvestedKindZero()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var untagged = await db
+				.QuestGoalDefinitions.Where(g => g.Separator == 0)
+				.Select(g => $"goal {g.GoalId} (quest {g.QuestDefinitionId})")
+				.ToListAsync(ct);
+
+			Assert.True(untagged.Count == 0, "goals with no kind tag - the full-update's `K` word is not being harvested:\n  " + string.Join("\n  ", untagged));
+
+			// ...and the tag is only ever a kind the corpus actually shows, so a stray value is caught too.
+			var known = Enum.GetValues<QuestGoalKind>().Select(k => (uint)k).ToHashSet();
+			var stray = await db.QuestGoalDefinitions.Select(g => g.Separator).Distinct().ToListAsync(ct);
+			Assert.All(stray, s => Assert.Contains(s, known));
+		}
+
 		// Every server-opened conversation is REACHABLE: it has a trigger the runtime can fire, and an NPC to speak it.
 		//
 		// The two kinds are complementary and exhaustive - a world object (use it) or an approach (walk up to the NPC) -

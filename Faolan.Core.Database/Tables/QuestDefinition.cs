@@ -152,10 +152,14 @@ namespace Faolan.Core.Database.Tables
 	// meaning, not a rename.
 	public enum QuestGoalKind : uint
 	{
-		// No typed target reference (TrailingCategory 0). The talk-to and loot-from-corpse goals of the Tortage chain
-		// (Laranga, Tina, Turach, Casilda; Saddur's and Scavenger Tuut's bags) all sit here. This one IS about the
-		// reference and not the verb, which is why its 9 goals span speak/talk/free/get/give/return/unlock.
-		Untargeted = 0,
+		// ⚠️ THERE IS NO KIND 0. This enum used to declare `Untargeted = 0`, "no typed target reference", with 9 goals
+		// spanning speak/talk/free/get/give/return/unlock - a spread explained away as "this one is about the
+		// reference, not the verb". It was the UN-HARVESTED DEFAULT (#548): those goals are exactly the ones the
+		// corpus only ever full-updates, and the full-update path seeded `Separator` not at all. The wire never sends
+		// 0 - across all 158 snapshot goals and all 111 full-update goals the tag takes 5/9/10/12/20/22/23/24/25 and
+		// nothing else - and once the full-update's tag is lifted, not one shipped row carries 0. The nine scattered
+		// into Generic (Laranga, Turach, Casilda, Saddur), Collect (Scavenger Tuut's bag) and Deliver (Tina), where
+		// their verbs read as the rest of those kinds do.
 
 		// CRAFT the named item: all 9 goals read "Make <item>" - Violet Cureall, Ambrosial Gold, Quicksilver Spirits,
 		// Khat Blackbeer, Darkwinter Wine, Bitterbrisk, Visionwine, Musewater, Ale of Auspice (quests 13141/13143/13145).
@@ -174,18 +178,18 @@ namespace Faolan.Core.Database.Tables
 		// all 30 goals are kill verbs (kill, beat, cleanse, destroy, slaughter).
 		Kill = 12,
 
-		// DELIVER the item to someone - it leaves the player rather than arriving. All 12 goals read deliver/give/bring.
+		// DELIVER the item to someone - it leaves the player rather than arriving. All 13 goals read deliver/give/bring.
 		// ⚠️ The ROW carries the item but never the recipient; the recipient is named in the objective TEXT, which is
 		// how these are wired (ImportOps.TypeDeliverGoalsFromRecipient). It is not unrecoverable, just not on the row.
 		Deliver = 20,
 
-		// The GENERIC kind - by far the largest (52 goals) and the one with no single verb: vanquish, talk, use, find,
+		// The GENERIC kind - by far the largest (60 goals) and the one with no single verb: vanquish, talk, use, find,
 		// speak, ask, report, enter, escort, extinguish, investigate, kill, lead, order, replace, win, destroy, get.
 		// ⚠️ Was `ReachPoint`, "marker coordinates with no region reference". The marker part is true and the "reach"
 		// part is not - a goal lands here when nothing more specific applies, and it happens to carry a map pin.
 		Generic = 22,
 
-		// COLLECT a quantity - the bulk of the gather objectives (41 goals: get, collect, gather, recover, remove,
+		// COLLECT a quantity - the bulk of the gather objectives (44 goals: get, collect, gather, recover, remove,
 		// search, steal), and the only kind carrying large counts (Poisonous Gland x20, Shadeleaf x10, and a x50).
 		Collect = 23,
 

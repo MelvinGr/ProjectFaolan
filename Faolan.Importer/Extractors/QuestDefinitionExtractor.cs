@@ -160,7 +160,7 @@ namespace Faolan.Importer.Extractors
 				// the captures only ever full-updated (no snapshot journal, where ObjectiveGoalExtractor harvests them)
 				// would otherwise carry zeros - and the live sender used to fill the [5..6] slot with a clock reading
 				// instead, which retail never sends (#537).
-				var row = UpsertGoal(def, text.Id, goal.MapId, goal.MarkerX, goal.MarkerY, text, (uint)(i + 1), i > 0);
+				var row = UpsertGoal(def, goal, text, (uint)(i + 1), i > 0);
 				if (goal.Reserved.Length == ReservedWords)
 					SetReserved(row, goal.Reserved);
 			}
@@ -289,23 +289,27 @@ namespace Faolan.Importer.Extractors
 					: "remoteformat", AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags")!);
 		}
 
-		// Find-or-create the goal by GoalId within the quest and set the WIRE fields (map/marker/objective ref). Leaves
-		// the server-side-only fields untouched so a later Seed* overlay can complete them.
+		// Find-or-create the goal by GoalId within the quest and set the WIRE fields off the goal RECORD. Leaves the
+		// server-side-only fields (TargetName/GoalType/QuestItemId) untouched so a later Seed* overlay can complete
+		// them.
 		//
-		// `sequence` is the goal's 1-based position in the full-update's objective list, and `partial` marks every goal
-		// after the first: the packet's marker block describes the PRIMARY goal only, so a secondary goal is recovered
-		// with its identity and objective text but no verb, target or count (see QuestGoalDefinition.Partial). A goal
-		// the snapshot already supplied in full is never downgraded - Partial only ever goes false here.
-		private static QuestGoalDefinition UpsertGoal(QuestDefinition def, uint goalId, uint mapId, uint markerX, uint markerY, TextRecord objective, uint sequence = 1, bool partial = false)
+		// `sequence` is the goal's 1-based position in the full-update's objective list, and `partial` marks every
+		// goal after the first (see QuestGoalDefinition.Partial). A goal the snapshot already supplied in full is
+		// never downgraded - Partial only ever goes false here.
+		//
+		// ⚠️ The record's `GoalId` word and its objective text record's `id` are THE SAME NUMBER on all 111 captured
+		// goal records, which is what lets this path and ObjectiveGoalExtractor's snapshot path merge onto one row:
+		// the snapshot keys by the word, this one used to key by the text id. Read off the word now, so the two say
+		// the same thing rather than agreeing by coincidence.
+		private static QuestGoalDefinition UpsertGoal(QuestDefinition def, QuestObjectiveGoal record, TextRecord objective, uint sequence = 1, bool partial = false)
 		{
-			var goal = def.Goals.FirstOrDefault(g => g.GoalId == goalId);
+			var goal = def.Goals.FirstOrDefault(g => g.GoalId == record.GoalId);
 			if (goal == null)
 			{
 				def.Goals.Add(goal = new QuestGoalDefinition
 				{
-					GoalId = goalId,
+					GoalId = record.GoalId,
 					Sequence = sequence,
-					RequiredCount = 1,
 					Partial = partial
 				});
 			}
@@ -318,13 +322,22 @@ namespace Faolan.Importer.Extractors
 			goal.ObjectiveCategory = objective.Category;
 			goal.ObjectiveKey = LdbKey.Decode(objective.Key) ?? new();
 
+			// The goal's KIND TAG and its required amount (#548). The full-update carries both for EVERY goal, not
+			// just the primary - measured against the snapshot journal, which is the source that was thought to hold
+			// them alone: of the 34 goals the corpus shows in BOTH, all 34 agree on both fields, and across the
+			// full-updates the tag takes five values (9/12/20/22/23) and the count four (1/3/7/10). So neither is a
+			// constant this path was papering over - `RequiredCount` was seeded to a flat 1 here and `Separator` was
+			// never set at all, which left every full-update-only goal reading as "kill one unnamed thing".
+			goal.Separator = record.K;
+			goal.RequiredCount = record.RequiredCount;
+
 			// Every goal has its own pin, so a secondary one is set too - see the ⚠️ in MergeFullUpdate. A goal the
 			// wire pins nowhere (quest 19314's twelve all read 0/0/0) keeps whatever a snapshot already gave it.
-			if (mapId != 0 || markerX != 0 || markerY != 0)
+			if (record.MapId != 0 || record.MarkerX != 0 || record.MarkerY != 0)
 			{
-				goal.MapId = mapId;
-				goal.MarkerX = markerX;
-				goal.MarkerY = markerY;
+				goal.MapId = record.MapId;
+				goal.MarkerX = record.MarkerX;
+				goal.MarkerY = record.MarkerY;
 			}
 
 			return goal;
