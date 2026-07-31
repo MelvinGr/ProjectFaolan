@@ -34,11 +34,7 @@ namespace Faolan.Tests
 			"MapWorldBurstExtractor",
 			"Faolan.PacketAnalyzer.Tests/ArchiveDataImporterTests.cs",
 			"Faolan/Helpers/ArchiveDataImporter.cs",
-			"tools/capture/extract_conversations.py",
-
-			// docs/subsystems/create-editor-bursts.md names the golden this burst used to be proven against, while
-			// explaining that the burst itself was REMOVED as redundant (0683e84d). The path is meant to be dead.
-			"Faolan.Tests/Golden/WorldPrepBurst.bin"
+			"tools/capture/extract_conversations.py"
 		};
 
 		private static readonly Regex TypeDef = new(@"\b(?:class|struct|record|interface|enum)\s+([A-Z]\w+)", RegexOptions.Compiled);

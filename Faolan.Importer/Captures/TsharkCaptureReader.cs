@@ -129,7 +129,7 @@ namespace Faolan.Importer.Captures
 
 		// Rebuilds the exact on-wire packet from the dump's framing fields + body. Returns null if a required field
 		// is missing/malformed (so a partial record is skipped rather than corrupting the stream).
-		// internal so CorpusExtractWriter can store the FULL rebuilt packet, not just the body: the extractors
+		// internal so FixtureArchiveWriter can store the FULL rebuilt packet, not just the body: the extractors
 		// (QuestDefinitionExtractor, SnapshotJournalReader, ...) take CapturedPacket and strip the framing
 		// themselves, so an extract holding only bodies cannot feed them.
 		internal static byte[]? Rebuild(JsonElement p, byte[] body, uint opcode)
