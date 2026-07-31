@@ -215,7 +215,7 @@ namespace Faolan.Core.Enums
 		XpModifier = 0x013F,
 
 		// The VALUE at this slot in the FullChar-snapshot stat sheet is the PLAYFIELD-INSTANCE token (framed by stat ids
-		// 0xBF..0x40B in the snapshot; see WorldDespawn) - session/map state, not a real character stat. The snapshot is
+		// 0xBF..0x40B in the snapshot; see N3ToClientQuitCodec) - session/map state, not a real character stat. The snapshot is
 		// built with the live zone's token here.
 		PlayfieldToken = 0x00BF,
 

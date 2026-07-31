@@ -2759,7 +2759,7 @@ namespace Faolan.Importer.Cli
 				{
 					// Any handle will do: this prints a body for eyeballing/diffing the RENDER, and the handle is live
 					// state the zone mints at spawn (see LiveWorldObject), so no row carries one to be faithful to.
-					baseBody = WorldObjectBuilder.Build(row, DiagnosticHandle);
+					baseBody = WorldObjectCodec.Build(row, DiagnosticHandle);
 					baseOk = true;
 				}
 				catch (InvalidOperationException)

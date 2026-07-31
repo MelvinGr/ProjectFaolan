@@ -60,9 +60,8 @@ namespace Faolan.Importer.Extractors
 				if (body.Length < 30)
 					continue; // a CharDCMove body is shorter than the 38 a MapChange needs; each check re-validates its own length
 
-				if (p is { SubOpcode: MapChangeSubOpcode, IsDownload: true } && body.Length >= 38 && MapChangeCodec.TryParse(body.AsSpan(4), out var mc))
+				if (p is { SubOpcode: MapChangeSubOpcode, IsDownload: true } && body.Length >= 38 && TryReadMapId(body, out var map))
 				{
-					var map = mc.MapId;
 					if (map != currentMap)
 					{
 						currentMap = map;
@@ -161,5 +160,22 @@ namespace Faolan.Importer.Extractors
 			pos = (ReadFloat(body, at), ReadFloat(body, at + 4), ReadFloat(body, at + 8));
 			return true;
 		}
+
+		// The MapChange's map id, or false when the body is not a full PlayfieldFIIR (PlayfieldFCodec.Parse is strict,
+		// #530 rule 4 - a short one is not a map announcement we can trust).
+		private static bool TryReadMapId(byte[] body, out uint mapId)
+		{
+			try
+			{
+				mapId = PlayfieldFCodec.Parse(body.AsSpan(4)).MapId;
+				return true;
+			}
+			catch (CodecParseException)
+			{
+				mapId = 0;
+				return false;
+			}
+		}
+
 	}
 }

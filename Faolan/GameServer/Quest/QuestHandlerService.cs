@@ -120,7 +120,7 @@ namespace Faolan.GameServer.Quest
 		// The intro TRANSFORM: a stationary (from==to) mode-2 MoveTask placing Kalanthes at his cutscene start.
 		public static byte[] BuildKalanthesIntroMove(uint handle)
 		{
-			return MoveTaskCodec.BuildBody(handle, KalanthesIntroPos, KalanthesIntroPos, KalanthesIntroFacing);
+			return MoveTaskCodec.Build(new MoveTaskIIR(handle, KalanthesIntroPos, MoveTaskNodes.Rotate(KalanthesIntroPos, KalanthesIntroFacing)));
 		}
 
 		// The WALK: ListMoveTask[ PathMoveTask(from -> target) + WaitMoveTask ], the exact captured composite shape,
@@ -141,20 +141,13 @@ namespace Faolan.GameServer.Quest
 				Mode = 0,
 				HeaderFlags = 1
 			};
-			return new MoveTaskComposite
+			return MoveTaskCodec.Build(new MoveTaskIIR(handle, KalanthesIntroPos, new MoveTaskNode
 			{
-				Handle = handle,
-				FromX = B(KalanthesIntroPos.X),
-				FromY = B(KalanthesIntroPos.Y),
-				FromZ = B(KalanthesIntroPos.Z),
-				Task = new MoveTaskNode
-				{
-					Mode = 4,
-					HeaderFlags = 1,
-					ListMin = 0,
-					Children = [path, wait]
-				}
-			}.Encode();
+				Mode = 4,
+				HeaderFlags = 1,
+				ListMin = 0,
+				Children = [path, wait]
+			}));
 
 			static uint B(float f)
 			{

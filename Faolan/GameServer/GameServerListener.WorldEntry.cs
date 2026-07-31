@@ -689,7 +689,7 @@ namespace Faolan.GameServer
 			// Source the destination playfield token from the destination map's burst so the announce matches the token
 			// the reconnect's world-entry will stamp (#219 / #211) - it is per-playfield-instance, not a constant.
 			var destToken = await _broadcaster.ResolveMapPlayfieldToken(destMapId);
-			foreach (var body in new[] { TeleportCodec.BuildBegin(instance, destMapId), TeleportCodec.BuildDestination(instance, destMapId, position, destToken, destDescriptor) })
+			foreach (var body in new[] { TeleportCodec.Build(instance, destMapId), TeleportCodec.Build(instance, destMapId, position, destToken, destDescriptor) })
 			{
 				await client.SendAsync(new Rpc(CreateFlowService.MorphAckSender, CreateFlowService.Receiver(client), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 			}
@@ -829,7 +829,7 @@ namespace Faolan.GameServer
 			return BuildWorldEntrySpawn(client, PlayerSpawnBuilder.BuildFromScratch(character.Id, playfield, character.Position, rotation, message, character, morphRegistry));
 		}
 
-		// The burst-less world-object packets: each WorldObjects row built via WorldObjectBuilder and framed. Built on
+		// The burst-less world-object packets: each WorldObjects row built via WorldObjectCodec and framed. Built on
 		// the row's captured handle + the live playfield instance (the rewrite the live splice path applies).
 		// The character-creator (editor) phase: a not-yet-named character is connected. The client instance is
 		// the character's real id now, so the unnamed-character state alone identifies the editor flow.

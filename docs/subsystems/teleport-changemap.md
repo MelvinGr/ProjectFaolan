@@ -52,7 +52,7 @@ same burst**. The live change-map path now sources it via
 `Map.PlayfieldToken` column (falling back to `WorldState.DefaultPlayfieldToken` for a map with no captured
 token) — so the announce and the reconnect's world-entry stamp the **same** token (relevant to the #211
 loading-screen hang). The live world-entry recovers the same token from the burst snapshot via
-`WorldDespawn.TryExtractPlayfieldToken`. `TeleportCodec.BuildDestination` keeps the capture default only for
+`PlayfieldTokenScan.TryExtract`. `TeleportCodec.Build` keeps the capture default only for
 the golden test / a burst-less map.
 
 `destDescriptor` (`0x14` for map 2010, `0xBE` for map 2000) is the position blob's trailing word — a per-zone

@@ -59,7 +59,7 @@ namespace Faolan.Tests
 			var body = Convert.FromHexString(hex);
 
 			var p = GameActionListCodec.Parse(body);
-			var rebuilt = GameActionListCodec.BuildBody(p.FrameHandle, p.DynelHandle, p.Field3, p.ActionTail);
+			var rebuilt = GameActionListCodec.Build(p);
 
 			Assert.Equal(hex, Convert.ToHexStringLower(rebuilt));
 		}

@@ -61,7 +61,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		private const uint MoveTaskOpcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR; // 0x96C46740
 
 		// The death sequence is four distinct IIR records, so this builder declares the SET it emits rather than a
-		// single Opcode (same contract as DynelFullUpdateCodec/SimpleDynelMessageCodec).
+		// single Opcode (same contract as WorldObjectCodec/SimpleDynelIdentityCodec).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes =
 		[
 			GameServer0X2000Opcodes.SimpleCharKilledByUpdateIIR, GameServer0X2000Opcodes.BehaviorControlCenterIIR, GameServer0X2000Opcodes.MagicBuffIIR, GameServer0X2000Opcodes.MoveTaskIIR,

@@ -8,9 +8,10 @@ namespace Faolan.Tests
 	// Byte-exact round-trip for the dynel-family full-update records (#187, docs/re/iir-readers-combat-world.md):
 	// Door (typeWord 0xC748) and TombStone (0xC87B). Oracles are captured bodies (full record incl. length prefix).
 	// Proves the codec splits the record into [header][env][length-prefixed identity blob][opaque geometry tail] and
-	// rebuilds it byte-exact - the same lift SimpleDynelMessageCodec does, extended to the door/destructible/
-	// climbing/tombstone family.
-	public class DynelFullUpdateCodecTests
+	// rebuilds it byte-exact - the same lift SimpleDynelIdentityCodec does, extended to the door/destructible/
+	// climbing/tombstone family. The leading u32 record length belongs to the SENDER (#530 rule 2), so it is sliced
+	// off before the codec sees it.
+	public class WorldObjectCodecTests
 	{
 		private const string DoorBody =
 			"000000da33a56fb00000c74800000ab1000000002c0a0f0dd9e9624315319dc6421d4d950e4412140d00000000158735bdbe1d0000000025c6e06d3f1884ecc0020000006408b2dc45120641726d6f72791a4e3c6c6f63616c697a65642069643d2233383634303636222063617465676f72793d2235353030302220666c6167733d2222206b65793d22292c2c2b6e4f48784c695468284130643941682a22203e280138c88e03600100116e30000f696e0000000000000000bf751e973a523d4fbd69ae4f3f7544cc4069753e3cb93ab43f8e147b000000000000000000";
@@ -21,27 +22,32 @@ namespace Faolan.Tests
 		[Fact]
 		public void Door_PreservesTemplateName()
 		{
-			var p = DynelFullUpdateCodec.Parse(Convert.FromHexString(DoorBody));
+			var p = WorldObjectCodec.Parse(Record(DoorBody));
 			// the template name ("Armory") rides in the geometry tail; the codec preserves it verbatim
-			Assert.Contains("Armory", Encoding.ASCII.GetString(p.GeometryTail));
+			Assert.Contains("Armory", Encoding.ASCII.GetString(p.Tail));
 		}
 
 		[Theory, InlineData(DoorBody, 0x33A56FB0u, 0x0000C748u), InlineData(TombStoneBody, 0x0D80E7C9u, 0x0000C87Bu)]
 		public void DynelFullUpdate_RoundTripsByteExact(string hex, uint expectSub, uint expectType)
 		{
-			var captured = Convert.FromHexString(hex);
-			var p = DynelFullUpdateCodec.Parse(captured);
+			var p = WorldObjectCodec.Parse(Record(hex));
 
 			Assert.Equal(expectSub, p.SubOpcode);
-			Assert.Equal(expectType, p.TypeWord);
-			Assert.Equal(hex, Convert.ToHexStringLower(DynelFullUpdateCodec.Build(p)));
+			Assert.Equal(expectType, p.TypeTag);
+			Assert.Equal(hex[8..], Convert.ToHexStringLower(WorldObjectCodec.Build(p)));
+		}
+
+		// The captured record WITHOUT its leading u32 length (#530 rule 2).
+		private static byte[] Record(string hex)
+		{
+			return Convert.FromHexString(hex)[4..];
 		}
 
 		[Fact]
 		public void TombStone_PreservesName()
 		{
-			var p = DynelFullUpdateCodec.Parse(Convert.FromHexString(TombStoneBody));
-			Assert.Contains("Tombstone", Encoding.ASCII.GetString(p.GeometryTail));
+			var p = WorldObjectCodec.Parse(Record(TombStoneBody));
+			Assert.Contains("Tombstone", Encoding.ASCII.GetString(p.Tail));
 		}
 	}
 }

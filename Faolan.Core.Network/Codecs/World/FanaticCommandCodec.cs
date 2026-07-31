@@ -1,5 +1,7 @@
-using System.Text;
+using System;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
@@ -11,9 +13,10 @@ namespace Faolan.Core.Network.Codecs.World
 	// surface is gated on, and the one command registered without a permission record so anyone can reach it. The mask,
 	// the 133-command catalog and each command's required bit are in docs/subsystems/gm-commands.md.
 	//
-	// GRAMMAR - measured against real bytes from a live GM session (2026-07-29), not inferred:
+	// GRAMMAR - measured against real bytes from a live GM session (2026-07-29), not inferred. The body starts at the
+	// subop; the leading u32 record length belongs to the framing (#530 rule 2):
 	//
-	//   [u32 reclen][u32 subop][u32 class][u32 handle]   the 0x2000 IIR carrier
+	//   [u32 subop][u32 class][u32 handle]               the 0x2000 IIR carrier
 	//   [u8 flag]                                        the carrier's trailing flag byte, always 0 so far
 	//   [u32 word0][u32 targetA][u32 targetB]            ReadSubClass's obj+0x2C / +0x30 / +0x34
 	//   [u32 textLength][textLength bytes]               the command string, LATIN-1
@@ -54,53 +57,35 @@ namespace Faolan.Core.Network.Codecs.World
 	// contains a FanaticCommandIIR (the retail traces are ordinary play, not GM sessions), so any reply would be
 	// invented. Parsing it at least turns "Unknown 0x2000 Opcode: 0xEE4AA85C" into the command the client asked for,
 	// which is what a reply has to be built from. Open work: Gitea #448/#449.
+	//
+	// A malformed body now THROWS (#530 rule 4) rather than degrading to a half-read record: the inbound handler
+	// catches CodecParseException and tells the GM the body did not parse, which is the honest outcome on a path with
+	// no capture behind it.
 	public static class FanaticCommandCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.FanaticCommandIir;
 
-		/// <summary>
-		///     The client's own ceiling on the text length (`BinaryStream::ReadString` rejects anything larger), used
-		///     here as the same sanity bound rather than trusting a length off the wire.
-		/// </summary>
-		private const uint MaxTextLength = 0xFFFFFF;
-
-		public static Parsed? TryParse(byte[] body)
+		public static FanaticCommandIir Parse(in ReadOnlySpan<byte> data)
 		{
-			// [u32 len][u32 subop][u32 class][u32 handle] then the record; be defensive - this is an undecoded path and
-			// a short/odd body must return null rather than throw into the inbound loop.
-			if (body.Length < 16)
-				return null;
-
-			var s = new FaolanStream(body);
-			s.ReadUInt32(); // length
-			s.ReadUInt32(); // subop
-			s.ReadUInt32(); // entity class
-			var handle = s.ReadUInt32();
-
-			// The carrier's flag byte, then the record. Skipping it is what slid every field by one and turned the
-			// command text into nothing (see the grammar note above).
-			if (s.Position + 13 > body.Length)
-				return null;
-
-			var flag = s.ReadByte();
-			var word0 = s.ReadUInt32();
-			var targetA = s.ReadUInt32();
-			var targetB = s.ReadUInt32();
-
-			// The command text: [u32 length][bytes]. Bounds-check against the BODY rather than trusting the declared
-			// length - this is a path we cannot round-trip against a capture, so a malformed body must degrade to
-			// "no text" rather than throw into the inbound loop.
-			var text = "";
-			if (s.Position + 4 <= body.Length)
-			{
-				var length = s.ReadUInt32();
-				if (length <= MaxTextLength && s.Position + length <= body.Length)
-					text = Encoding.Latin1.GetString(body, (int)s.Position, (int)length);
-			}
-
-			return new Parsed(handle, flag, word0, targetA, targetB, text);
+			var r = new SpanReader(data, nameof(FanaticCommandCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+			return value;
 		}
 
-		public readonly record struct Parsed(uint Handle, byte Flag, uint Word0, uint TargetA, uint TargetB, string Text);
+		internal static FanaticCommandIir Read(ref SpanReader r)
+		{
+			r.ExpectU32Be(Opcode, "FanaticCommandIIR subop");
+			r.ExpectU32Be(EntityClass.Character, "entity class");
+			var handle = r.ReadU32Be();
+			var flag = r.ReadU8();
+			var word0 = r.ReadU32Be();
+			var targetA = r.ReadU32Be();
+			var targetB = r.ReadU32Be();
+			return new FanaticCommandIir(handle, flag, word0, targetA, targetB, r.ReadStringU32Length());
+		}
 	}
+
+	// FanaticCommandIIR_t (0xEE4AA85C).
+	public sealed record FanaticCommandIir(uint Handle, byte Flag, uint Word0, uint TargetA, uint TargetB, string Text);
 }

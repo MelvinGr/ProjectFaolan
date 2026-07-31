@@ -31,6 +31,7 @@ namespace Faolan.Importer.Extractors
 	public static class WorldObjectExtractor
 	{
 		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
+		private const uint SimpleDynelSubOpcode = (uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR;
 
 		private static readonly HashSet<uint> ObjectSubOpcodes =
 		[
@@ -66,14 +67,14 @@ namespace Faolan.Importer.Extractors
 					continue; // too short to hold the transform
 
 				var handle = body.ReadU32Be(12);
-				// For a SimpleDynel the identity message is a ProtoSimpleDynelIIR that SimpleDynelMessageCodec parses -
+				// For a SimpleDynel the identity message is a ProtoSimpleDynelIIR that SimpleDynelIdentityCodec parses -
 				// the SAME message ReadIdentity below reads for DisplayName - so take the id (kdtree) + name from it
 				// instead of the hand-rolled protobuf walker. LootBag and the Door/Destructible/Climbing trio keep
 				// ReadMessage (LootBag's name and the trio's geometry-tail name are not exposed by that codec).
-				var (objectId, name) = subop == SimpleDynelMessageCodec.Opcode && SimpleDynelMessageCodec.TryParse(body.AsSpan(8), out var dynel, out _, out _)
+				var (objectId, name) = subop == SimpleDynelSubOpcode && WorldObjectColumns.TryReadIdentity(body.AsSpan(4), out var dynel)
 					? (dynel.Kdtree, dynel.Name ?? string.Empty)
 					: ReadMessage(body);
-				var displayName = WorldObjectBuilder.ReadIdentity(body);
+				var displayName = WorldObjectColumns.ReadIdentity(body);
 
 				// LootBagFullUpdateIIR (F096251E) is shared by TWO things: transient loot-container DROPS and static
 				// world-builder-PLACED containers. A drop - a plain "Bag of loot" OR a boss/raid CHEST ("Large Chest",

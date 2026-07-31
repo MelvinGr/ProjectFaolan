@@ -40,7 +40,7 @@ namespace Faolan.Tests
 		public async Task BroadcastPlayerMove_ForwardsTheJumpVerbatim_ToAViewerWhoKnowsTheMover()
 		{
 			var record = Convert.FromHexString(CapturedJumpC2S);
-			var parsed = CharDCMoveCodec.Parse(record);
+			var parsed = CharDCMoveCodec.Parse(record.AsSpan(4)); // the carrier's [u32 len] is the sender's (#530 rule 2)
 			Assert.True(((MoveFlag)parsed.Flag1).HasFlag(MoveFlag.Airborne)); // this capture IS a jump
 
 			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance);
@@ -72,7 +72,7 @@ namespace Faolan.Tests
 		public async Task BroadcastPlayerMove_DoesNotRelay_ToAViewerThatHasNotBuiltTheMover()
 		{
 			var record = Convert.FromHexString(CapturedJumpC2S);
-			var parsed = CharDCMoveCodec.Parse(record);
+			var parsed = CharDCMoveCodec.Parse(record.AsSpan(4));
 
 			var sim = new WorldSimulation(null!, null!, null!, NullLogger.Instance);
 			var broadcaster = new WorldBroadcaster(sim, null!, NullLogger.Instance, null!);

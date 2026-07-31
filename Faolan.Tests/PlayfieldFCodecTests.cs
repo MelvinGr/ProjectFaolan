@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
@@ -8,7 +9,7 @@ namespace Faolan.Tests
 {
 	// PlayfieldFIIR / MapChange (0x5D85BFC7). The BODY builder has had a golden since #189
 	// (CreateEditorRecordTests.PlayfieldFiir_MatchesCapturedBytes); what was never pinned is the CARRIER - the
-	// [u32 subop][body] wrapper MapChangeCodec puts around it, and the offsets its parser reads back out. Both halves
+	// [u32 subop][body] wrapper PlayfieldFCodec puts around it, and what its parser reads back out. Both halves
 	// together are what actually goes on the wire, so this compares them against a whole captured record.
 	//
 	// ⚠️ A pass here does NOT mean the record is fully modelled. Across the 151 captured PlayfieldFIIRs, four body
@@ -19,7 +20,7 @@ namespace Faolan.Tests
 	//
 	// This golden uses a capture whose four words equal the values the create path supplies, which is exactly why it
 	// can pass while that half of the gap is open.
-	public class MapChangeCodecTests
+	public class PlayfieldFCodecTests
 	{
 		// Blablabla_soldier-guardian_create frame 1926 (s2c): the whole IIR content past the carrier's [u32 length],
 		// i.e. [u32 subop][103-byte PlayfieldFiir body]. Map 4000 (Stygian Galley), the create flow's first MapChange.
@@ -37,27 +38,27 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildIir_ReproducesTheCapturedRecord()
 		{
-			var built = MapChangeCodec.BuildIir(BuildCapturedBody());
+			var built = BuildCapturedBody();
 
-			Assert.Equal(CapturedIirContent, Convert.ToHexString(built).ToLowerInvariant());
+			Assert.Equal(CapturedIirContent[8..], Convert.ToHexString(built).ToLowerInvariant());
 		}
 
-		// The parser reads mapId and PlayfieldFlags by hardcoded offsets into the body, so it can drift away from the
-		// builder silently. Round-tripping the captured record through both is what stops that.
+		// Parse reads the record SEQUENTIALLY to its last byte (#530 rule 3), so a builder/parser drift cannot hide.
 		[Fact]
-		public void TryParse_ReadsBackWhatTheBuilderWrote()
+		public void Parse_ReadsBackWhatTheBuilderWrote()
 		{
-			Assert.True(MapChangeCodec.TryParse(Convert.FromHexString(CapturedIirContent), out var parsed));
+			var parsed = PlayfieldFCodec.Parse(Convert.FromHexString(CapturedIirContent));
 
-			Assert.Equal(0x00000FA0u, parsed!.MapId);
+			Assert.Equal(0x00000FA0u, parsed.MapId);
 			Assert.Equal(0x00000080u, parsed.Flags);
+			Assert.Equal(CapturedIirContent, Convert.ToHexString(PlayfieldFCodec.Build(parsed)).ToLowerInvariant());
 		}
 
 		[Fact]
-		public void TryParse_RejectsANonMapChangeAndAShortBody()
+		public void Parse_RejectsANonMapChangeAndAShortBody()
 		{
-			Assert.False(MapChangeCodec.TryParse(Convert.FromHexString("0eed7068" + new string('0', 200)), out _)); // ChainKillIIR's subop
-			Assert.False(MapChangeCodec.TryParse(Convert.FromHexString("5d85bfc7000000"), out _));
+			Assert.Throws<CodecParseException>(() => PlayfieldFCodec.Parse(Convert.FromHexString("0eed7068" + new string('0', 200)))); // ChainKillIIR's subop
+			Assert.Throws<CodecParseException>(() => PlayfieldFCodec.Parse(Convert.FromHexString("5d85bfc7000000")));
 		}
 	}
 }

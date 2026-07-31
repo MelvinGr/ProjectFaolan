@@ -25,7 +25,7 @@ namespace Faolan.Tests
 		}
 
 		// NOTE: the InitialBurst golden is asserted by CreateEditorSceneDynelTests.InitialBurst_WithDb_IsByteIdenticalToGolden
-		// instead - its galley scene-prop dynels are now SPAWNED FROM the DB (WorldObjectBuilder), so the burst needs a DB
+		// instead - its galley scene-prop dynels are now SPAWNED FROM the DB (WorldObjectCodec), so the burst needs a DB
 		// to reproduce the golden; a bare no-DB run here would omit them.
 
 		// NOTE: the WorldPrepBurst golden was retired with SendWorldPrepBurst - the create-flow world-prep grant burst

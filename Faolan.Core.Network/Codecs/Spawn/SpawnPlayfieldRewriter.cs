@@ -5,7 +5,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// Rewrites the per-session PLAYFIELD INSTANCE varint inside a built spawn/object body so a from-scratch
 	// placement (no live body to inherit the token from - e.g. the create-editor scene) carries the current
 	// session's world token instead of whatever session the stored row was captured in. Shared by NpcSpawnBuilder
-	// (FA015807 character spawns) and WorldObjectBuilder (66AEDD50 dynels): both bodies are the IIR carrier payload
+	// (FA015807 character spawns) and WorldObjectCodec (66AEDD50 dynels): both bodies are the IIR carrier payload
 	// [u32 len][u32 subOpcode][record], and the token lives at the `18 <varint>` that closes the 0x2C transform
 	// group. Session tokens are 4-byte LEB128 varints, so the rewrite is splice-free (no length field shifts).
 	// Spawn/object bodies are now built WHOLE from typed columns (#187/#244 done) with the token as a build input, so

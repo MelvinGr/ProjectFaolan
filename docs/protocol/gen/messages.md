@@ -27,15 +27,15 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `CharInPlayIIR` | `0x864CFEF8` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `CharacterActionIIR` | `0x6B6FD368` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `ChatTextIIR` | `0xE0B51102` | `ChatTextCodec` | [V3: ChatTextCodecTests.Build_FromParsedFields_MatchesCapture] |
-| V3 | `ClimbingDynelFullUpdateIIR` | `0x1FD6412B` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
+| V3 | `ClimbingDynelFullUpdateIIR` | `0x1FD6412B` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `CombatReactiveIIR` | `0x54C02089` | `SpellweaveCodec` | [V3: SpellweaveCodecTests.BuildReactiveList_ConsumedElementZeroed_MatchesCapture] |
 | V3 | `CombatShieldIIR` | `0xCFFD0519` | `CombatShieldCodec` | [V3: CombatShieldCodecTests.RoundTrips_ACapturedRecord_ByteExact] |
 | V3 | `ComboBookIIR` | `0xA8BBEB7F` | `ComboBookIirCodec` | [V3: ComboBookIirCodecTests.Build_MatchesCapturedLevelUpCombo] |
-| V3 | `CoreClaimIIR` | `0x06EC1255` | `CoreClaimListCodec` | [V3: CoreClaimListCodecTests.Build_MatchesCapturedClaim] |
+| V3 | `CoreClaimIIR` | `0x06EC1255` | `CoreClaimCodec` | [V3: CoreClaimCodecTests.Build_MatchesCapturedClaim] |
 | V3 | `CrimeIIR` | `0xC7954504` | `Crime` | [V3: V1IirCodecTests.Crime_RoundTripsCapturedBody] |
 | V3 | `DamageResultIIR` | `0xFEC4158A` | `CombatEffectBuilder`, `CombatPacketCodec` | [V3: CombatEffectBuilderTests.DamageResult_IsByteIdentical] |
-| V3 | `DestructibleFullUpdateIIR` | `0x6BD56736` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
-| V3 | `DoorFullUpdateIIR` | `0x33A56FB0` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
+| V3 | `DestructibleFullUpdateIIR` | `0x6BD56736` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
+| V3 | `DoorFullUpdateIIR` | `0x33A56FB0` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `EnergyIIR` | `0x40749B8A` | `CombatPacketCodec` | [V3: CombatPacketCodecTests.DamageResultBody_MatchesExpectedLayout] |
 | V3 | `FeatIIR` | `0x28DA68A0` | `FeatCodec` | [V3: FeatCodecTests.Build_MatchesTheCapturedAck] |
 | V3 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackIir` | [V3: V1IirCodecTests.Feedback_RoundTripsCapturedBody] |
@@ -54,18 +54,18 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTrade` | [V3: V1IirCodecTests.KnubotStartTrade_FramesAndCarriesTheDialoguePayloadVerbatim] |
 | V3 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChanged` | [V3: V1IirCodecTests.LockedToChanged_RoundTripsCapturedBody] |
 | V3 | `LookAtIIR` | `0x0D155695` | `LookAtCodec`, `ShopOpenBuilder`, `WorldDeath` | [V3: MagicBuffLookAtCodecTests.LookAt_ParsesSelectAndDeselect] |
-| V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `LootBagMessageCodec`, `LootContainerTemplate` | [V3: LootBagMessageTests.BuildContents_RoundTripsByteExact] |
-| V3 | `LootRemoveItemsIIR` | `0x70010162` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
+| V3 | `LootRemoveItemsIIR` | `0x70010162` | `LootRemoveItemsCodec` | [V3: WorldLootTakeTests.LootRemoveItems_MatchesCapture] |
 | V3 | `MagicBuffIIR` | `0x6B87E316` | `MagicBuffCodec`, `NpcSpellCastBuilder`, `WorldDeath` | [V3: MagicBuffLookAtCodecTests.MagicBuff_RoundTripsBuild] |
-| V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` | [V3: MoveTaskCodecTests.ApproachTargetBody_MatchesCapture] |
+| V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskCodec`, `WorldDeath` | [V3: MoveTaskCodecTests.ApproachTargetBody_MatchesCapture] |
 | V3 | `N3TeleportIIR` | `0x5A32F0D7` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
-| V3 | `N3ToClientFadeIIR` | `0x66180B20` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
-| V3 | `N3ToClientQuitIIR` | `0x04B82B2D` | `WorldDespawn` | [V3: WorldDespawnTests.BuildBody_MatchesRetailLayout] |
-| V3 | `NewAllowedLooterIIR` | `0x1E2E0139` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
-| V3 | `NewCurrentLooterIIR` | `0xD06568C8` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V3 | `N3ToClientFadeIIR` | `0x66180B20` | `N3ToClientFadeCodec` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
+| V3 | `N3ToClientQuitIIR` | `0x04B82B2D` | `N3ToClientQuitCodec` | [V3: N3ToClientQuitCodecTests.BuildBody_MatchesRetailLayout] |
+| V3 | `NewAllowedLooterIIR` | `0x1E2E0139` | `NewLooterCodec` | [V3: LootTests.BuildNewCurrentLooterBody_MatchesCapture] |
+| V3 | `NewCurrentLooterIIR` | `0xD06568C8` | `NewLooterCodec` | [V3: LootTests.BuildNewCurrentLooterBody_MatchesCapture] |
 | V3 | `NewLevelIIR` | `0x6D314743` | `NewLevelIirCodec` | [V3: NewLevelIirCodecTests.Build_Convenience_CarriesLevelWithZeroDeltas] |
 | V3 | `PetIIR` | `0x1F4CB0F7` | `PetIirCodec` | [V3: PetIirCodecTests.BuildAssign_Combat_MatchesCapture] |
-| V3 | `PlayfieldFIIR` | `0x5D85BFC7` | `MapChangeCodec` | [V3: MapChangeCodecTests.BuildIir_ReproducesTheCapturedRecord] |
+| V3 | `PlayfieldFIIR` | `0x5D85BFC7` | `PlayfieldFCodec` | [V3: PlayfieldFCodecTests.Parse_ReadsBackWhatTheBuilderWrote] |
 | V3 | `QuestFullUpdateIIR` | `0x63268258` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `QuestGoalIIR` | `0x0774C8C1` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
 | V3 | `QuestIIR` | `0x97E02314` | `WorldQuest` | [V3: QuestTests.BuildQuestFullUpdate_MatchesCasildaCapture] |
@@ -80,8 +80,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `SetShadowCoverageIIR` | `0xD6C1F0CC` | `SetShadowCoverage` | [V3: V1IirCodecTests.ChainKill_RoundTripsCapturedBody] |
 | V3 | `SimpleCharFullUpdateIIR` | `0xFA015807` | `PlayerSpawnScaffoldCodec` | [V3: PlayerSpawnScaffoldCodecTests.Generate_AfterCharacterIirSwap_StaysParseable] |
 | V3 | `SimpleCharKilledByUpdateIIR` | `0xB066AFC2` | `WorldDeath` | [V3: WorldDeathTests.BuildDeathBcc_ReproducesCapturedNpcDeath_ByteExact] |
-| V3 | `SimpleDynelFullUpdateIIR` | `0x66AEDD50` | `SimpleDynelMessageCodec` | [V3: SimpleDynelMessageTests.BuildMessage_RoundTripsByteExact] |
-| V3 | `SimpleDynelVisualChangeIIR` | `0xE7F4F8F8` | `SimpleDynelMessageCodec`, `WorldLoot` | [V3: SimpleDynelMessageTests.BuildMessage_RoundTripsByteExact] |
+| V3 | `SimpleDynelFullUpdateIIR` | `0x66AEDD50` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
+| V3 | `SimpleDynelVisualChangeIIR` | `0xE7F4F8F8` | `SimpleDynelVisualChangeCodec` | [V3: LootTests.BuildOpenWindowBody_MatchesCapture] |
 | V3 | `SpellBookIIR` | `0x6BA10936` | `SpellBook` | [V3: V1IirCodecTests.SpellBook_RoundTripsCapturedBody] |
 | V3 | `StatDamageIIR` | `0xE9F24184` | `CombatEffectBuilder`, `SpellweaveCodec`, `StatDamageCodec` | [V3: CombatEffectBuilderTests.DamageResult_IsByteIdentical] |
 | V3 | `StatIIR` | `0xF98E10B3` | `SpellweaveCodec` | [V3: SpellweaveCodecTests.BuildReactiveList_ConsumedElementZeroed_MatchesCapture] |
@@ -89,11 +89,11 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `StopIIR` | `0xD751EBB4` | `StopCodec` | [V3: DeadReckoningCodecTests.Stop_RoundTripsByteExact] |
 | V3 | `TemplateActionIIR` | `0x6C300937` | `TemplateAction` | [V3: V1IirCodecTests.TemplateAction_RoundTripsCapturedBody] |
 | V3 | `ThreatLevelIIR` | `0x1745EF6C` | `ThreatLevel` | [V3: CombatRecordCodecTests.ThreatLevel_BuildsByteExact] |
-| V3 | `TombStoneFullUpdateIIR` | `0x0D80E7C9` | `DynelFullUpdateCodec` | [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact] |
+| V3 | `TombStoneFullUpdateIIR` | `0x0D80E7C9` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `TradeskillReplyIIR` | `0x9062D559` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `TradeskillRequestIIR` | `0x06B9CD94` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventory` | [V3: V1IirCodecTests.UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf] |
-| V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `WorldLoot` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
+| V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `UpdateSimpleDynelCodec` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `DeleteItemCodec` |  |
 | V2 | `FanaticCommandIir` | `0xEE4AA85C` | `FanaticCommandCodec` |  |
 | V2 | `KnubotAnswerIIR` | `0x4D7D9123` | `KnubotAnswerCodec` |  |

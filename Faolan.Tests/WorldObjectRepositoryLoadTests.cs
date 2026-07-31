@@ -18,7 +18,7 @@ namespace Faolan.Tests
 	// class that owns words went out short (4 bytes for Door and ClimbingDynel, 20 for Destructible) and the client
 	// dropped it: "ReadSubClass for IIR 866480048 (DoorFullUpdateIIR_c) failed ... datasize left in stream=0".
 	//
-	// WorldObjectBuilderTests did not catch it because it builds its row FROM a captured body, so the words are always
+	// WorldObjectFromColumnsTests did not catch it because it builds its row FROM a captured body, so the words are always
 	// populated in memory; the create-editor burst golden did not either, because every editor scene prop is a
 	// SimpleDynel, the one class that owns no words. Neither exercised the repository. This does.
 	public class WorldObjectRepositoryLoadTests
@@ -50,7 +50,7 @@ namespace Faolan.Tests
 						withWords++;
 
 					Assert.Equal(reference.Words.Count, row.Words.Count);
-					Assert.Equal(WorldObjectGeometryCodec.Build(reference), WorldObjectGeometryCodec.Build(row));
+					Assert.Equal(WorldObjectGeometryColumns.ToWire(reference), WorldObjectGeometryColumns.ToWire(row));
 					checkedObjects++;
 				}
 			}

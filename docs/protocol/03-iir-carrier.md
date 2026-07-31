@@ -50,7 +50,7 @@ coverage is exact, not name-guessed.
 
 Some record shapes are shared by several sub-opcodes. The dynel-family full-update (door, destructible,
 tombstone, climbing) is one codec reading the type from the record; it declares all four via `HandledTypes` and
-round-trips each byte-exact. [V3: DynelFullUpdateCodecTests.DynelFullUpdate_RoundTripsByteExact]
+round-trips each byte-exact. [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact]
 
 ## Construct, don't replay
 

@@ -6,7 +6,7 @@
 > loaded-playfield map and silently drops a miss before it ever polls (`0x2020`) the handle. The login burst rendered
 > only because it was replayed from the same session whose token IS the live one. Fix: `SendWorldSpawn`
 > now re-stamps the token to the live `Zone.PlayfieldToken` via `SpawnPlayfieldRewriter` (loot bags are built from
-> scratch with the live `Zone.PlayfieldToken` stamped in directly by `WorldObjectBuilder.BuildBody`, no rewriter
+> scratch with the live `Zone.PlayfieldToken` stamped in directly by `WorldObjectCodec.Build`, no rewriter
 > pass; commit `0827af5`). **Verified in-client:** spawning a Crocodile mid-session drew the first mid-session
 > `0x2020` poll + `0x2008` SpawnCheck in the project's history and rendered. This fixes mid-session NPC spawns,
 > mounts, interest-streaming, NPC respawn, and loot bags.
@@ -84,7 +84,7 @@ mid-session world-conversation sender as unknown / "0").
   burst is `0x000818xx`; the char-id/player is `~0x0802xxxx`. Our allocator was `0x40000000` → out of range; fixed
   `0x40000000`→`0x0F000000`→**`0x00090000`** (`WorldBroadcaster._nextLootHandle`). All three failed to render —
   small is necessary/correct but not sufficient.
-- **Body byte-correctness** — proven builders (`NpcSpawnBuilder`, `WorldObjectBuilder`); the captured loot bag
+- **Body byte-correctness** — proven builders (`NpcSpawnBuilder`, `WorldObjectCodec`); the captured loot bag
   carried the correct beach playfield token `0x01EA985C`.
 - **Missing registration packet** — none. The subop-set diff vs retail is only movement/combat/map types
   (`StopIIR`, `ClimbingDynel`, `ApplySpell`); the rendering mount has no `0x201c`/registration precursor.
@@ -228,7 +228,7 @@ step; it's a deep thiscall ctor chain — `FUN_008e0df0` Playfield ctor.)
 `Map.PlayfieldToken` (#305), falling back to `WorldState.DefaultPlayfieldToken` (`0x004FE428`, the beach id) for a
 map with no captured token, with a minted `0x00A00000+` fallback (`WorldState._nextPlayfieldToken`) for
 server-generated zones. (Originally this came from extracting the token back out of the `0x737A6DF9` snapshot body
-via `WorldDespawn.TryExtractPlayfieldToken`; that extract path is now retired in favour of the per-map source.)
+via `PlayfieldTokenScan.TryExtract`; that extract path is now retired in favour of the per-map source.)
 If the value the client registers as `pf->GetInstance()` (+0x94, from
 the world-load descriptor) is NOT the same as the zone token we stamp into spawns, every mid-session
 spawn misses the playfield map → dropped. The burst renders because its spawns carry the captured token verbatim

@@ -67,7 +67,7 @@ namespace Faolan.GameServer.CreateFlow
 		private static readonly byte[] EditorAvatarSnapshot = Program.LoadEmbeddedResource("Faolan.CreateEditorAvatarSnapshot.bin");
 
 		// The 18 galley scene-prop dynels the create-editor initial burst streams, in retail send order. Each is a
-		// WorldObjects row on the editor map (4000), built byte-exact via WorldObjectBuilder (see
+		// WorldObjects row on the editor map (4000), built byte-exact via WorldObjectCodec (see
 		// LoadEditorSceneDynels + CreateEditorSceneDynelTests). The client also renders the galley from its own RDB on
 		// the MapChange; retail streams these so their handles are server-known.
 		//
@@ -790,7 +790,7 @@ namespace Faolan.GameServer.CreateFlow
 			var receiver = Endpoints.Endpoint(Endpoints.GameInterfaceType, id);
 
 			// The galley scene props are WorldObjects rows on the editor map (4000), loaded here keyed by captured
-			// handle and streamed below (after the MapChange) built byte-exact from their columns via WorldObjectBuilder
+			// handle and streamed below (after the MapChange) built byte-exact from their columns via WorldObjectCodec
 			// - no verbatim bytes. Requires a DB in production; a bare no-DB golden run simply omits them.
 			var dynelRows = await LoadEditorSceneDynels(database);
 
@@ -802,7 +802,7 @@ namespace Faolan.GameServer.CreateFlow
 					CreateEditorCharBuilder.EditorPlayfieldInstance, 15.0f, BitConverter.UInt32BitsToSingle(0x415DA9E7u), 0x00000080, 1u));
 
 			// The 18 galley scene props: SPAWNED FROM their map-4000 WorldObjects rows (built byte-exact by
-			// WorldObjectBuilder, re-addressed to the captured handle + editor playfield), in retail send order.
+			// WorldObjectCodec, re-addressed to the captured handle + editor playfield), in retail send order.
 			foreach (var (handle, displayId) in EditorSceneDynels)
 			{
 				if (dynelRows == null)
@@ -816,8 +816,8 @@ namespace Faolan.GameServer.CreateFlow
 					continue;
 				}
 
-				var dynel = WorldObjectBuilder.Build(dynelRow, handle, CreateEditorCharBuilder.EditorPlayfieldInstance);
-				await Iir(GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, dynel[8..]);
+				var dynel = WorldObjectCodec.Build(dynelRow, handle, CreateEditorCharBuilder.EditorPlayfieldInstance);
+				await Iir(GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, dynel[4..]);
 			}
 
 			// The editor scene pedestals: each SimpleChar is RECONSTRUCTED from its own bytes via IirChar (#189) -
@@ -969,11 +969,11 @@ namespace Faolan.GameServer.CreateFlow
 					.WriteArray(EditorAvatarSnapshot)));
 
 			// GameTime: CONSTRUCTED from the captured day-time + rate (#189 item 3). The resync timestamp is generated
-			// from the wall clock the same way the world-entry clock is (GameTimeCodec.ResyncTimestamp) rather than
+			// from the wall clock the same way the world-entry clock is (GameClock.ResyncTimestamp) rather than
 			// replaying the capture's; dayTime stays captured until its unit is pinned (#351).
 			// The editor's captured time of day (0x4743EB00 = 50155s = 13:55) with a generated resync anchor. The backdrop
 			// has no day/night to track, so this stays the captured value rather than the live clock.
-			var (editorGameDay, editorUnixSeconds) = GameTimeCodec.ResyncAnchor(now ?? DateTimeOffset.UtcNow);
+			var (editorGameDay, editorUnixSeconds) = GameClock.ResyncAnchor(now ?? DateTimeOffset.UtcNow);
 			await Iir(GameServer0X2000Opcodes.GameTimeIIR, CreateEditorRecordBuilder.BuildGameTimeIir(BitConverter.UInt32BitsToSingle(0x4743EB00), 1u, editorGameDay, editorUnixSeconds));
 
 			// #189: constructed via BuildStatIir (was verbatim). flag=0 for 0x0F4266, then a flag=1 / value=0 run 0x0F4285..0x0F428C.
@@ -1140,7 +1140,7 @@ namespace Faolan.GameServer.CreateFlow
 			// template ids 50000:65525x), delivered on two GameActionListIIR (0xF508F4C1) records for dynel 0xD00C.
 			// The two captured variants differ ONLY in the leading action-id word; the property-map action-tail
 			// grammar is still opaque (#190) so it rides verbatim, while the record HEADER is constructed via
-			// GameActionListCodec.BuildBody (construct-don't-replay - see SendGameActionListRecord).
+			// GameActionListCodec.Build (construct-don't-replay - see SendGameActionListRecord).
 			await SendGameActionListRecord(client, 0x59, id, 0xD00Cu,
 			[
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x39, 0xBF, 0x93, 0x00, 0x50, 0x4D, 0x61, 0x6C, 0x65, 0x54, 0x65, 0x6D, 0x70, 0x6C, 0x61, 0x74, 0x65,
@@ -1283,12 +1283,12 @@ namespace Faolan.GameServer.CreateFlow
 		}
 
 		// Emits a GameActionListIIR (0xF508F4C1) carrier for `dynel`, delivered to frame `id`. The fixed record
-		// header (subop/type/Head/four/one, decoded 570/570) is CONSTRUCTED via GameActionListCodec.BuildBody and
+		// header (subop/type/Head/four/one, decoded 570/570) is CONSTRUCTED via GameActionListCodec.Build and
 		// the still-opaque property-map action tail rides verbatim; the carrier length is computed from the body.
 		private static Task SendGameActionListRecord(INetworkClient client, byte agentSub, uint id, uint dynel, byte[] actionTail)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, agentSub), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(GameActionListCodec.BuildBody(id, dynel, 0u, actionTail))));
+				s => s.WriteArrayUInt32Length(GameActionListCodec.Build(new GameActionListIIR(id, dynel, 0u, actionTail)))));
 		}
 
 		// The create-flow send idiom: one 0x2000 record ([u32 len][u32 iir opcode][body]) delivered via DispatchPassBlob.

@@ -291,6 +291,14 @@ table. `ICodec<T>` is being retired; do not add implementations of it.
   write one — **zero** compare it to a constant (`tools/ghidra/DumpListFraming.java`). So when a "constant" equals
   `n * 0x3F1` it IS a list count; distrust any grammar pinned only by single-element captures. Enforced across
   `Codecs/` **and** `Faolan/` by `CodecConventionTests` — a wire rule must cover everywhere the wire is written.
+- **A `Build` overload is not the only way to offer a convenience form.** Where several semantic forms of one
+  message share a parameter list (`MoveTaskCodec`'s path and patrol are both "a waypoint list plus a float"),
+  the forms become VALUE factories beside the codec (`MoveTaskNodes.Path` / `.Patrol`), not overloads on it —
+  choosing between them by signature is exactly the ambiguity rule 1 removes. The same applies to everything
+  next to a codec that is not encode/decode: row↔column mappers (`WorldObjectColumns`,
+  `ConversationScreenColumns`), live-value policy (`RemoteFormatSession`, `GameClock`) and route/geometry math
+  (`PatrolRoute`) are named for what they are and stay off the codec's surface. Row↔value mapping proper is
+  Gitea #533.
 - Files are one-type-per-file named after that type (a tightly cohesive group may share one file, e.g.
   `FullCharSnapshot/FullCharSnapshotSubClass.cs`), filed under their domain folder.
 

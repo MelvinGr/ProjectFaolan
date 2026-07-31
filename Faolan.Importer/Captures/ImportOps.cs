@@ -1198,7 +1198,7 @@ namespace Faolan.Importer.Captures
 
 			// Per-placement stat pools (#244): lift the remaining level-scaled/per-placement values from this spawn's
 			// capture (via the same codec the type core uses), overriding the type StatCore when the body is built.
-			var placeBody = WorldObjectBuilder.ExtractBody(e.Data);
+			var placeBody = WorldObjectColumns.ExtractBody(e.Data);
 			if (placeBody != null && PlayerSpawnReader.TryReadCharacterMessage(placeBody, out var placeRead))
 			{
 				var core = NpcStatCoreCodec.Lift(placeRead.Message);
@@ -1255,7 +1255,7 @@ namespace Faolan.Importer.Captures
 			row.RotationW = e.RotW;
 
 			// Lift the identity columns + geometry tail from the dump body (the captured Data is no longer stored).
-			SimpleDynelMessageCodec.TryLiftColumns(row, WorldObjectBuilder.ExtractBody(e.Data)!);
+			WorldObjectColumns.TryLiftColumns(row, WorldObjectColumns.RecordOf(WorldObjectColumns.ExtractBody(e.Data)!));
 			return row;
 		}
 
@@ -1816,7 +1816,7 @@ namespace Faolan.Importer.Captures
 				if (e.TemplateId == 0 || minimalRcByTemplate.ContainsKey(e.TemplateId))
 					continue;
 
-				var b = WorldObjectBuilder.ExtractBody(e.Data);
+				var b = WorldObjectColumns.ExtractBody(e.Data);
 				if (b != null && NpcSpawnScaffold.TryReadNoMorphWord2(b, out var rc))
 					minimalRcByTemplate[e.TemplateId] = rc;
 			}
@@ -1847,7 +1847,7 @@ namespace Faolan.Importer.Captures
 				// type that decodes), so a spawn body can be constructed from typed columns instead of the Data blob.
 				if (npc.StatCore == null || npc.StatCore.IirHeader == null)
 				{
-					var body = WorldObjectBuilder.ExtractBody(e.Data);
+					var body = WorldObjectColumns.ExtractBody(e.Data);
 					if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 					{
 						npc.StatCore ??= NpcStatCoreCodec.Lift(read.Message);

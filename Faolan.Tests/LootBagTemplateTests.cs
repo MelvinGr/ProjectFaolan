@@ -19,12 +19,13 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildBounds_ReproducesTheCapturedKdTreeGeometry_ByteForByte()
 		{
-			var golden = Golden.Bytes("LootBagBody");
-			Assert.True(LootBagMessageCodec.TryParse(golden.AsSpan(8), out _, out var contentsStart));
+			var record = Golden.Bytes("LootBagBody").AsSpan(4).ToArray(); // the carrier's [u32 len] is the sender's (#530 rule 2)
+			Assert.True(WorldObjectColumns.TryLocateContents(record, out _, out var contentsStart));
 
 			// The kd-tree bounds are the bytes immediately before the trailing [u32 len][ProtoLootBagIIR] content.
 			var bounds = LootContainerTemplate.BuildBounds();
-			var capturedBounds = golden.AsSpan(8 + contentsStart - bounds.Length, bounds.Length).ToArray();
+			var tail = WorldObjectCodec.Parse(record).Tail;
+			var capturedBounds = tail.AsSpan(contentsStart - bounds.Length, bounds.Length).ToArray();
 			Assert.Equal(capturedBounds, bounds);
 		}
 
@@ -32,6 +33,7 @@ namespace Faolan.Tests
 		public void BuildFromScratch_ReproducesIdentityAndGeometry_WithCleanScaffold()
 		{
 			var golden = Golden.Bytes("LootBagBody");
+			var record = golden.AsSpan(4).ToArray();
 			var handle = golden.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 			var typeTag = golden.ReadU32Be(8); // the loot typetag (0xC87A)
 			var pos = new Vector3(golden.ReadF32Le(SpawnPacketBuilder.PosXOffset), golden.ReadF32Le(SpawnPacketBuilder.PosYOffset), golden.ReadF32Le(SpawnPacketBuilder.PosZOffset));
@@ -39,16 +41,16 @@ namespace Faolan.Tests
 				golden.ReadF32Le(SpawnPacketBuilder.RotWOffset));
 			const uint playfieldToken = 0x01EA9852; // the captured bag's transform playfield varint (d2 b0 aa 0f)
 
-			Assert.True(LootBagMessageCodec.TryParse(golden.AsSpan(8), out _, out var contentsStart));
-			var body = WorldObjectBuilder.BuildBody(LootContainerTemplate.Create(LootContainerTemplateId.Bag), handle, pos, rot, typeTag, playfieldToken);
+			Assert.True(WorldObjectColumns.TryLocateContents(record, out _, out var contentsStart));
+			var body = WorldObjectCodec.Build(LootContainerTemplate.Create(LootContainerTemplateId.Bag), handle, pos, rot, typeTag, playfieldToken);
 
 			// Identity message + kd-tree geometry (everything up to the content blob) are byte-identical to the capture.
-			// (The carrier length at [0..4] and the content blob differ: the from-scratch bag carries a clean EMPTY
-			// scaffold, not the captured bag's stale owner + item.)
-			Assert.Equal(golden.AsSpan(8, contentsStart).ToArray(), body.AsSpan(8, contentsStart).ToArray());
+			// (The content blob differs: the from-scratch bag carries a clean EMPTY scaffold, not the captured bag's
+			// stale owner + item.)
+			Assert.Equal(WorldObjectCodec.Parse(record).Tail.AsSpan(0, contentsStart).ToArray(), WorldObjectCodec.Parse(body).Tail.AsSpan(0, contentsStart).ToArray());
 
 			// The scaffold is a well-formed, EMPTY loot bag with no baked owner.
-			Assert.True(LootBagMessageCodec.TryParse(body.AsSpan(8), out var contents, out _));
+			Assert.True(WorldObjectColumns.TryLocateContents(body, out var contents, out _));
 			Assert.Empty(contents.Inventory.Items);
 			Assert.Equal(0u, contents.OwnerId.Instance);
 		}

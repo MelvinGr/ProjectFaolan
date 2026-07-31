@@ -20,6 +20,9 @@ namespace Faolan.Core.Network.Codecs.World
 	// frameHandle = the receiving player's instance; dynelHandle = the entity the action list is about; field3 is
 	// usually 0 (a small id in some captures, undecoded); the 0x7E2 / 4 / 1 words are constant across all 570 captures.
 	//
+	// ⚠️ Those five words are ALSO the first five of the GameActionData element (typeId / field / version=4 /
+	// subCount=0 / 0x2d5=1) - which is why the "tail" starts at GameActionDataCodec.PrefixThrough0x2d5.
+	//
 	// The 0x7E2 is NOT a constant: it is the count-framed list word for ONE GameActionData element (ListFrame). The
 	// captures cannot show this - all 1305 GameActionListIIR frames carry 0x7E2 across 28 body lengths, which fits
 	// "a constant" and "a 1-element count with variable-length blobs" equally well. The CLIENT settles it
@@ -39,72 +42,90 @@ namespace Faolan.Core.Network.Codecs.World
 	public static class GameActionListCodec
 	{
 		// How many GameActionData elements this codec emits/expects. The wire word is ListFrame.ForCount(ActionCount)
-		// - the client divides it by 0x3F1 and reads that many blobs (see the class comment). One, because BuildBody
-		// carries exactly one `actionTail` blob; a multi-action body would need the tail split per element first.
+		// - the client divides it by 0x3F1 and reads that many blobs (see the class comment). One, because the body
+		// carries exactly one `ActionTail` blob; a multi-action body would need the tail split per element first.
 		public const int ActionCount = 1;
 
-		public const uint ConstFour = 4;
-
-		// The IIR type this codec emits (#317 convention; read by the coverage matrix).
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameActionListIIR;
-		public const ulong ConstOne = 1;
 
-		// Builds the GameActionList body for `dynelHandle`, delivered to `frameHandle`, carrying `actionTail` verbatim.
-		public static byte[] BuildBody(uint frameHandle, uint dynelHandle, uint field3, byte[] actionTail)
+		private const uint ConstFour = 4;
+		private const ulong ConstOne = 1;
+
+		// The ReadSubClass trailer: GameActionListIIR_t::ReadSubClass (FUN_008679f0) reads the element list and THEN a
+		// [u8 flag] (+0x3c) and a [u32] (+0x40). Every captured body ends in those five zero bytes, so a CONSTRUCTED
+		// body has to carry them or the client reads past the record.
+		public static readonly byte[] ReadSubClassTrailer = [0x00, 0x00, 0x00, 0x00, 0x00];
+
+		// CANONICAL - the only method here that writes bytes.
+		public static byte[] Build(GameActionListIIR value)
 		{
-			ArgumentNullException.ThrowIfNull(actionTail);
-			return new FaolanStream()
-				.WriteUInt32(GameServer0X2000Opcodes.GameActionListIIR)
+			ArgumentNullException.ThrowIfNull(value);
+			using var s = new FaolanStream();
+			Write(s, value);
+			return s.ToArray();
+		}
+
+		// Wraps one GameActionData element as a complete body delivered to `frameHandle`. The list header already
+		// writes the element's first five words, so only the remainder rides as the action tail - building the whole
+		// element first and slicing keeps the two construction paths in agreement.
+		// `trailer` appends the ReadSubClass [u8][u32] every captured body ends with. It defaults to FALSE only because
+		// the pre-existing recast builder was written without it and is construct-only (never sent); anything actually
+		// going on the wire wants it true.
+		public static byte[] Build(uint frameHandle, GameActionData action, bool trailer = false)
+		{
+			var element = GameActionDataCodec.Build(action);
+			var tail = element[GameActionDataCodec.PrefixThrough0x2d5..];
+			if (trailer)
+				tail = [.. tail, .. ReadSubClassTrailer];
+			return Build(new GameActionListIIR(frameHandle, action.TypeId, action.Field, tail));
+		}
+
+		public static GameActionListIIR Parse(in ReadOnlySpan<byte> data)
+		{
+			var r = new SpanReader(data, nameof(GameActionListCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+			return value;
+		}
+
+		internal static GameActionListIIR Read(ref SpanReader r)
+		{
+			r.ExpectU32Be(Opcode, "GameActionListIIR subop");
+			r.ExpectU32Be(EntityClass.Character, "entity class");
+			var frameHandle = r.ReadU32Be();
+			r.ExpectU8(0, "carrier flag");
+
+			// Validated AS A COUNT (the client aborts the stream on a non-multiple - "Inconsistent spell list.."), not
+			// compared to 0x7E2: this used to demand `head == 0x7E2` exactly, which would have rejected any
+			// multi-action body as malformed. We only BUILD one element, but rejecting more on parse was asserting a
+			// constant that isn't one.
+			var actionCount = r.ReadListCount();
+			if (actionCount != ActionCount)
+				throw CodecParseException.Unexpected(nameof(GameActionListCodec), r.Position - 4, $"{ActionCount} action (the tail is verbatim)", $"{actionCount}");
+
+			var dynelHandle = r.ReadU32Be();
+			var field3 = r.ReadU32Be();
+			r.ExpectU32Be(ConstFour, "GameActionData version");
+			r.ExpectU64Be(ConstOne, "subCount + fixed int 0x2d5");
+			return new GameActionListIIR(frameHandle, dynelHandle, field3, r.ReadRemaining().ToArray());
+		}
+
+		internal static void Write(FaolanStream s, GameActionListIIR v)
+		{
+			s.WriteUInt32(Opcode)
 				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(frameHandle)
+				.WriteUInt32(v.FrameHandle)
 				.WriteByte(0x00)
-				.WriteUInt32(ListFrame.ForCount(1)) // one GameActionData element - `actionTail` is that one blob
-				.WriteUInt32(dynelHandle)
-				.WriteUInt32(field3)
+				.WriteUInt32(ListFrame.ForCount(ActionCount)) // one GameActionData element - `ActionTail` is that one blob
+				.WriteUInt32(v.DynelHandle)
+				.WriteUInt32(v.Field3)
 				.WriteUInt32(ConstFour)
 				.WriteUInt64(ConstOne)
-				.WriteArray(actionTail)
-				.ToArray();
+				.WriteArray(v.ActionTail);
 		}
-
-		// Parses a captured/built body back into its header fields + the verbatim action tail (the inverse of BuildBody).
-		// The list word is validated AS A COUNT (the client aborts the stream on a non-multiple - "Inconsistent spell
-		// list.."), not compared to 0x7E2: this used to demand `head == 0x7E2` exactly, which would have rejected any
-		// multi-action body as malformed. We only BUILD one element, but rejecting more on parse was asserting a
-		// constant that isn't one.
-		public static Parsed Parse(byte[] body)
-		{
-			ArgumentNullException.ThrowIfNull(body);
-			var r = new FaolanStream(body);
-
-			var subop = r.ReadUInt32();
-			if (subop != (uint)GameServer0X2000Opcodes.GameActionListIIR)
-				throw new InvalidOperationException($"GameActionList: subop 0x{subop:X} != 0x{(uint)GameServer0X2000Opcodes.GameActionListIIR:X}");
-
-			r.ReadUInt32(); // EntityClass.Character
-			var frameHandle = r.ReadUInt32();
-
-			var flag = r.ReadByte();
-			if (flag != 0)
-				throw new InvalidOperationException($"GameActionList: flag 0x{flag:X} != 0");
-
-			var head = r.ReadUInt32();
-			if (!ListFrame.TryCountOf(head, out var actionCount))
-				throw new InvalidOperationException($"GameActionList: head 0x{head:X} is not a count-framed list word");
-			if (actionCount != ActionCount)
-				throw new InvalidOperationException($"GameActionList: {actionCount} actions; only {ActionCount} is modelled (the tail is verbatim)");
-
-			var dynelHandle = r.ReadUInt32();
-			var field3 = r.ReadUInt32();
-			var four = r.ReadUInt32();
-			var one = r.ReadUInt64();
-			if (four != ConstFour || one != ConstOne)
-				throw new InvalidOperationException($"GameActionList: constants four=0x{four:X}/one=0x{one:X} != 4/1");
-
-			var tail = r.ReadArray(r.Length - r.Position);
-			return new Parsed(frameHandle, dynelHandle, field3, tail);
-		}
-
-		public sealed record Parsed(uint FrameHandle, uint DynelHandle, uint Field3, byte[] ActionTail);
 	}
+
+	// GameActionListIIR_t (0xF508F4C1). DynelHandle/Field3 are also the element's typeId/field; ActionTail is the rest
+	// of that element (from GameActionDataCodec.PrefixThrough0x2d5), still opaque per action type.
+	public sealed record GameActionListIIR(uint FrameHandle, uint DynelHandle, uint Field3, byte[] ActionTail);
 }

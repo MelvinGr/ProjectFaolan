@@ -49,15 +49,15 @@ the margins, but never invents a golden that isn't there.
 | V3 | `CharInPlayIIR` | `CreateEditorRecordBuilder` |
 | V3 | `CharacterActionIIR` | `CreateEditorRecordBuilder` |
 | V3 | `ChatTextIIR` | `ChatTextCodec` |
-| V3 | `ClimbingDynelFullUpdateIIR` | `DynelFullUpdateCodec` |
+| V3 | `ClimbingDynelFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `CombatReactiveIIR` | `SpellweaveCodec` |
 | V3 | `CombatShieldIIR` | `CombatShieldCodec` |
 | V3 | `ComboBookIIR` | `ComboBookIirCodec` |
-| V3 | `CoreClaimIIR` | `CoreClaimListCodec` |
+| V3 | `CoreClaimIIR` | `CoreClaimCodec` |
 | V3 | `CrimeIIR` | `Crime` |
 | V3 | `DamageResultIIR` | `CombatEffectBuilder`, `CombatPacketCodec` |
-| V3 | `DestructibleFullUpdateIIR` | `DynelFullUpdateCodec` |
-| V3 | `DoorFullUpdateIIR` | `DynelFullUpdateCodec` |
+| V3 | `DestructibleFullUpdateIIR` | `WorldObjectCodec` |
+| V3 | `DoorFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `EnergyIIR` | `CombatPacketCodec` |
 | V3 | `FeatIIR` | `FeatCodec` |
 | V3 | `FeedbackIIR` | `FeedbackIir` |
@@ -76,18 +76,18 @@ the margins, but never invents a golden that isn't there.
 | V3 | `KnubotStartTradeIIR` | `KnubotStartTrade` |
 | V3 | `LockedToChangedIIR` | `LockedToChanged` |
 | V3 | `LookAtIIR` | `LookAtCodec`, `ShopOpenBuilder`, `WorldDeath` |
-| V3 | `LootBagFullUpdateIIR` | `LootBagMessageCodec`, `LootContainerTemplate` |
-| V3 | `LootRemoveItemsIIR` | `WorldLoot` |
+| V3 | `LootBagFullUpdateIIR` | `WorldObjectCodec` |
+| V3 | `LootRemoveItemsIIR` | `LootRemoveItemsCodec` |
 | V3 | `MagicBuffIIR` | `MagicBuffCodec`, `NpcSpellCastBuilder`, `WorldDeath` |
-| V3 | `MoveTaskIIR` | `MoveTaskCodec`, `MoveTaskComposite`, `WorldDeath` |
+| V3 | `MoveTaskIIR` | `MoveTaskCodec`, `WorldDeath` |
 | V3 | `N3TeleportIIR` | `TeleportCodec` |
-| V3 | `N3ToClientFadeIIR` | `WorldLoot` |
-| V3 | `N3ToClientQuitIIR` | `WorldDespawn` |
-| V3 | `NewAllowedLooterIIR` | `WorldLoot` |
-| V3 | `NewCurrentLooterIIR` | `WorldLoot` |
+| V3 | `N3ToClientFadeIIR` | `N3ToClientFadeCodec` |
+| V3 | `N3ToClientQuitIIR` | `N3ToClientQuitCodec` |
+| V3 | `NewAllowedLooterIIR` | `NewLooterCodec` |
+| V3 | `NewCurrentLooterIIR` | `NewLooterCodec` |
 | V3 | `NewLevelIIR` | `NewLevelIirCodec` |
 | V3 | `PetIIR` | `PetIirCodec` |
-| V3 | `PlayfieldFIIR` | `MapChangeCodec` |
+| V3 | `PlayfieldFIIR` | `PlayfieldFCodec` |
 | V3 | `QuestFullUpdateIIR` | `WorldQuest` |
 | V3 | `QuestGoalIIR` | `WorldQuest` |
 | V3 | `QuestIIR` | `WorldQuest` |
@@ -102,8 +102,8 @@ the margins, but never invents a golden that isn't there.
 | V3 | `SetShadowCoverageIIR` | `SetShadowCoverage` |
 | V3 | `SimpleCharFullUpdateIIR` | `PlayerSpawnScaffoldCodec` |
 | V3 | `SimpleCharKilledByUpdateIIR` | `WorldDeath` |
-| V3 | `SimpleDynelFullUpdateIIR` | `SimpleDynelMessageCodec` |
-| V3 | `SimpleDynelVisualChangeIIR` | `SimpleDynelMessageCodec`, `WorldLoot` |
+| V3 | `SimpleDynelFullUpdateIIR` | `WorldObjectCodec` |
+| V3 | `SimpleDynelVisualChangeIIR` | `SimpleDynelVisualChangeCodec` |
 | V3 | `SpellBookIIR` | `SpellBook` |
 | V3 | `StatDamageIIR` | `CombatEffectBuilder`, `SpellweaveCodec`, `StatDamageCodec` |
 | V3 | `StatIIR` | `SpellweaveCodec` |
@@ -111,11 +111,11 @@ the margins, but never invents a golden that isn't there.
 | V3 | `StopIIR` | `StopCodec` |
 | V3 | `TemplateActionIIR` | `TemplateAction` |
 | V3 | `ThreatLevelIIR` | `ThreatLevel` |
-| V3 | `TombStoneFullUpdateIIR` | `DynelFullUpdateCodec` |
+| V3 | `TombStoneFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `TradeskillReplyIIR` | `TradeskillRecipeCodec` |
 | V3 | `TradeskillRequestIIR` | `TradeskillRecipeCodec` |
 | V3 | `UpdateInventoryIIR` | `UpdateInventory` |
-| V3 | `UpdateSimpleDynelIIR` | `WorldLoot` |
+| V3 | `UpdateSimpleDynelIIR` | `UpdateSimpleDynelCodec` |
 | V2 | `DeleteItemIIR` | `DeleteItemCodec` |
 | V2 | `FanaticCommandIir` | `FanaticCommandCodec` |
 | V2 | `KnubotAnswerIIR` | `KnubotAnswerCodec` |

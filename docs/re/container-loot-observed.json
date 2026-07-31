@@ -1,7 +1,7 @@
 {
   "_comment": [
     "Captured loot contents of the 15 static world containers (chests), recovered from the WorldObjects.KdTreeTail",
-    "blob before it was retired in #410 (commit 814933ad). Decoded with LootBagMessageCodec from the container's",
+    "blob before it was retired in #410 (commit 814933ad). Decoded with LootBagContentsCodec from the container's",
     "wire trailer: [u32 len][ProtoLootBagIIR].",
     "",
     "This is a SAMPLE, not a loot table: it is whatever each chest happened to hold at the moment of capture, so it",

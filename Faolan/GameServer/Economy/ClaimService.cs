@@ -20,8 +20,8 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.GameServer.Economy
 {
 	// Item claims / "Redeem" window (CoreClaimIIR 0x06EC1255). The client requests its claims (sub 0x0007), the
-	// server answers with the list (sub 0x0001, CoreClaimListCodec); redeeming (sub 0x0003 + 1-based index) grants
-	// the item to the backpack and drops the claim. The "new claims available" glow (sub 0x0009, CoreClaimListCodec.BuildNewClaimsGlow) is
+	// server answers with the list (sub 0x0001, CoreClaimCodec); redeeming (sub 0x0003 + 1-based index) grants
+	// the item to the backpack and drops the claim. The "new claims available" glow (sub 0x0009, CoreClaimNewClaimsIIR) is
 	// pushed at world entry only when the account has unseen claims. Claims are account-scoped (AccountClaim), seeded
 	// by the .claim GM command for now. See docs/subsystems/item-claims.md. Extracted from GameServerListener as a
 	// composed collaborator (#200): item-grant rides the IEconomyOutbound port, system messages the chat dispatcher.
@@ -210,7 +210,7 @@ namespace Faolan.GameServer.Economy
 			client.Session.ClaimSlots = rows.Select(r => r.Id).ToList();
 
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(CoreClaimListCodec.Build(handle, entries))));
+				b => b.WriteArrayUInt32Length(CoreClaimCodec.Build(handle, entries))));
 
 			// Opening the window counts as seeing the claims - clear the account's glow flag (DB + the live session copy
 			// so a re-entry this session doesn't re-glow).
@@ -229,7 +229,7 @@ namespace Faolan.GameServer.Economy
 				return;
 
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(CoreClaimListCodec.BuildNewClaimsGlow(client.Session.Character.Id))));
+				b => b.WriteArrayUInt32Length(CoreClaimCodec.Build(new CoreClaimNewClaimsIIR(client.Session.Character.Id)))));
 		}
 
 		// Map DB rows to wire entries: assign 1-based indices in Id order and, per row, emit the item's real TEA key
@@ -304,7 +304,7 @@ namespace Faolan.GameServer.Economy
 			var entry = new ClaimEntry(index, claim.ItemTemplateId, claim.Level, code, ItemKeyBytes(claim.Item), guid, claim.ClaimType, remaining, claim.MaxCharges ?? 0);
 
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(CoreClaimListCodec.BuildRedeemAck(client.Session.Character.Id, entry))));
+				b => b.WriteArrayUInt32Length(CoreClaimCodec.Build(new CoreClaimRedeemAckIIR(client.Session.Character.Id, entry)))));
 		}
 	}
 }

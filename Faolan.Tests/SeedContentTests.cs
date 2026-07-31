@@ -367,7 +367,7 @@ namespace Faolan.Tests
 		//
 		// ToTask throws loudly on a missing column by design (a patrol that cannot be rebuilt byte-exact must not be
 		// silently emitted short), which makes simply calling it the whole assertion.
-		// A shipped world object with NO display element never lifted, so WorldObjectBuilder refuses to build it and it
+		// A shipped world object with NO display element never lifted, so WorldObjectCodec refuses to build it and it
 		// silently never spawns - dead weight in the seed. One such row shipped (the map 11040 "Siege Camp", whose
 		// `show_popup_on_use` had no column) and only turned up because a re-import collided with it on the derived key.
 		// The grammar side of this is WorldObjectCorpusLiftTests; this is the seed side, and it also catches a row left

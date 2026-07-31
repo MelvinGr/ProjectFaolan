@@ -14,7 +14,7 @@ namespace Faolan.Tests
 	// fully buildable from its typed columns - it carries its geometry columns (#410) and its identity message
 	// round-trips (columns -> ProtoSimpleDynelIIR -> record -> re-parse == same columns). The captured Data blob is
 	// retired, so this is the standing gate that nothing regressed back into needing it. The capture-grounded byte-exact
-	// golden for a single record lives in SimpleDynelMessageTests / WorldObjectBuilderTests.
+	// golden for a single record lives in SimpleDynelIdentityCodecTests / WorldObjectFromColumnsTests.
 	public class WorldObjectDynelColumnTests
 	{
 		[Fact]
@@ -32,7 +32,7 @@ namespace Faolan.Tests
 				total++;
 				var row = new WorldObject
 				{
-					SubOpcode = SimpleDynelMessageCodec.Opcode,
+					SubOpcode = (uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR,
 					Name = r.GetString(0),
 					DisplayKind = (InnerElementKind)r.GetInt64(1),
 					CarsGroup = (uint)r.GetInt64(2),
@@ -82,8 +82,8 @@ namespace Faolan.Tests
 				}
 
 				// The identity message builds from columns without error (byte-exact reproduction is gated by
-				// WorldObjectBuilderTests against captured goldens); here we assert every lifted row is expressible.
-				var identity = SimpleDynelMessageCodec.BuildMessage(SimpleDynelMessageCodec.ToMessage(row));
+				// WorldObjectFromColumnsTests against captured goldens); here we assert every lifted row is expressible.
+				var identity = SimpleDynelIdentityCodec.Build(WorldObjectColumns.ToMessage(row));
 				if (identity is { Length: > 0 })
 					ok++;
 				else

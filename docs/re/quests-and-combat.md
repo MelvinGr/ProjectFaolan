@@ -128,7 +128,7 @@ Per-packet byte layouts (server→client):
 
 1. **`0xF096251E` `LootBagFullUpdateIIR_c`** (spawn, server→client) — a **world object** (`0x2C` transform group +
    object id + name "Chest [N7FU]"/"Bag of loot" + a `remoteformat … category=50026` TreasureChestScript). Built by
-   `WorldObjectBuilder` already. **Contents are not in this body** — they arrive on open.
+   `WorldObjectCodec` already. **Contents are not in this body** — they arrive on open.
 2. **`0x642CD3D6` Interact** (open, client→server) — `… [playerHandle] [seq] 00000012 [pbLen] <protobuf> [c87a]
    [bagHandle] 00000001`, where `0x12`=18 = `startobjectaction(18)` = USE; the bag's typetag+handle ride the tail. A
    larger variant carries the full `lootbag_open` TreasureChestScript remoteformat; the server echoes it.

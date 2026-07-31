@@ -28,7 +28,7 @@ namespace Faolan.Importer.Captures
 		public static async Task<(int Inserted, int Reflagged)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
 			// mapId -> the three per-map rule words (each null when the body was too short to carry it).
-			var found = new Dictionary<uint, MapChangeCodec.Parsed>();
+			var found = new Dictionary<uint, PlayfieldFIIR>();
 			foreach (var packet in rawPackets)
 				TryReadMapChange(packet, found);
 
@@ -47,21 +47,26 @@ namespace Faolan.Importer.Captures
 				if (existing.TryGetValue(id, out var map))
 				{
 					var before = (map.PlayfieldFlags, map.PlayfieldFieldA, map.PlayfieldFieldC);
-					map.PlayfieldFlags = mc.Flags ?? map.PlayfieldFlags;
-					map.PlayfieldFieldA = mc.FieldA ?? map.PlayfieldFieldA;
-					map.PlayfieldFieldC = mc.FieldC ?? map.PlayfieldFieldC;
+					map.PlayfieldFlags = mc.Flags;
+					map.PlayfieldFieldA = mc.FieldA;
+					map.PlayfieldFieldC = mc.FieldC;
 					if (before != (map.PlayfieldFlags, map.PlayfieldFieldA, map.PlayfieldFieldC))
 						reflagged++;
 
 					continue;
 				}
 
-				// A brand-new map keeps the entity defaults for any word the capture did not carry, rather than
-				// zeroing it - a zero FieldC is a REAL value on four maps, so it must not double as "unknown".
-				var row = new Map { Id = id, Name = string.Empty };
-				row.PlayfieldFlags = mc.Flags ?? row.PlayfieldFlags;
-				row.PlayfieldFieldA = mc.FieldA ?? row.PlayfieldFieldA;
-				row.PlayfieldFieldC = mc.FieldC ?? row.PlayfieldFieldC;
+				// Every word comes from a record that parsed WHOLE (#530 rule 4 - PlayfieldFCodec.Parse throws rather
+				// than reporting a half-read body), so there is no "the capture did not carry it" case any more: a
+				// zero FieldC is a REAL value on four maps and now only ever arrives as one.
+				var row = new Map
+				{
+					Id = id,
+					Name = string.Empty,
+					PlayfieldFlags = mc.Flags,
+					PlayfieldFieldA = mc.FieldA,
+					PlayfieldFieldC = mc.FieldC
+				};
 				db.Maps.Add(row);
 				inserted++;
 			}
@@ -73,10 +78,9 @@ namespace Faolan.Importer.Captures
 			return (inserted, reflagged);
 		}
 
-		// MapChange inner (after the body's u32 length prefix): [subop4][0][0][byte][posX,posY,posZ BE floats]
-		// [0x62][0xC79C][mapId4]...[flags4]. Offsets (inner frame): subop@0, mapId@30, flags@103 (the per-area rule
-		// word - beach/interior 0, mountable city 1). Keeps the LAST seen flags per map; it's stable across captures.
-		private static void TryReadMapChange(byte[] packetBytes, IDictionary<uint, MapChangeCodec.Parsed> into)
+		// The MapChange inner body, read WHOLE by PlayfieldFCodec (the map id and the per-map rule words live in the
+		// embedded PlayfieldProxy and the trailer). Keeps the LAST seen record per map; it's stable across captures.
+		private static void TryReadMapChange(byte[] packetBytes, IDictionary<uint, PlayfieldFIIR> into)
 		{
 			try
 			{
@@ -85,12 +89,8 @@ namespace Faolan.Importer.Captures
 					return;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
-				if (!MapChangeCodec.TryParse(inner, out var mc))
-					return;
-
-				// Prefer a packet that actually carried the trailer; don't let a later short packet blank a known value.
-				if (mc.Flags is not null || !into.ContainsKey(mc.MapId))
-					into[mc.MapId] = mc;
+				var mc = PlayfieldFCodec.Parse(inner);
+				into[mc.MapId] = mc;
 			}
 			catch
 			{

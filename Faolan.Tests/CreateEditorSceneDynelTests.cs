@@ -16,7 +16,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Proves the create-editor SCENE PROPS (the SimpleDynelFullUpdateIIR records the initial burst streams) are
-	// reconstructible from the committed faolan.db WorldObjects (map 4000) via WorldObjectBuilder - the same
+	// reconstructible from the committed faolan.db WorldObjects (map 4000) via WorldObjectCodec - the same
 	// DB-source path the world-entry login replay uses (issue #189 item 2). Each burst record is matched to its row
 	// by IDENTITY (display_name - NOT position: two props overlap at one spot) and rebuilt with the burst's own
 	// handle + the create session's playfield token; the rebuilt body must equal the captured record byte-for-byte.
@@ -43,10 +43,10 @@ namespace Faolan.Tests
 				// 3072626 and 347659 - which share an exact spot - both survive the dedup (#222).
 				Assert.True(rowsByIdentity.TryGetValue(identity, out var row), $"no DB row for handle 0x{handle:X8} (identity '{identity}')");
 
-				var built = WorldObjectBuilder.Build(row, handle, CreateSessionPlayfield);
-				// WorldObjectBuilder returns the full carrier payload [u32 len][u32 subOpcode][record]; the burst's
-				// Iir() helper writes those two words itself, so the comparable record is built[8..].
-				Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(built.AsSpan(8).ToArray()));
+				var built = WorldObjectCodec.Build(row, handle, CreateSessionPlayfield);
+				// The codec returns [u32 subOpcode][record] (its [u32 len] is the sender's, #530 rule 2); the burst's
+				// Iir() helper writes both of those words itself, so the comparable record is built[4..].
+				Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(built.AsSpan(4).ToArray()));
 				rebuilt++;
 			}
 
@@ -54,9 +54,9 @@ namespace Faolan.Tests
 		}
 
 		// End-to-end: running the actual initial burst WITH a DB (the committed faolan.db) emits exactly the golden
-		// bytes - i.e. the live scene-prop loop (EditorSceneDynelHandles -> WorldObjectBuilder build from the row keyed
+		// bytes - i.e. the live scene-prop loop (EditorSceneDynelHandles -> WorldObjectCodec build from the row keyed
 		// by captured handle) reproduces InitialBurst.bin. The dynels are SPAWNED FROM the DB, not verbatim, so this
-		// locks the wired DB path, not just WorldObjectBuilder in isolation.
+		// locks the wired DB path, not just WorldObjectCodec in isolation.
 		[Fact]
 		public async Task InitialBurst_WithDb_IsByteIdenticalToGolden()
 		{
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 		}
 
 		// The SimpleDynel record body in the burst: [u32 0x0000C878][u32 handle][u32 0] 2C 0A 0F 0D <posX> ... ;
-		// WorldObjectBuilder consumes/produces exactly this body (the bytes after the 0x2000 carrier prefix). Returns
+		// WorldObjectCodec consumes/produces exactly this body (the bytes after the 0x2000 carrier prefix). Returns
 		// (handle, body) for each of the burst's dynel records, lifted from the capture-locked InitialBurst.bin.
 		private static List<(uint Handle, byte[] Body)> ExtractBurstDynelRecords()
 		{
@@ -101,9 +101,12 @@ namespace Faolan.Tests
 
 		// The ProtoSimpleDynelIIR display_name (field 3, `1A <len> <utf8>`) - the "<localized id=...>" string that
 		// uniquely identifies the prop. Located via the codec (skips the header + transform), then read directly.
+		// The burst record starts at the typeTag - its own Iir() helper owns the [u32 len][u32 subOpcode] pair - so
+		// the sub-opcode is put back for the codec, which reads a whole record.
 		private static string ExtractDisplayName(byte[] body)
 		{
-			Assert.True(SimpleDynelMessageCodec.TryParse(body, out var message, out _, out _));
+			byte[] record = [0x66, 0xAE, 0xDD, 0x50, .. body]; // SimpleDynelFullUpdateIIR
+			Assert.True(WorldObjectColumns.TryReadIdentity(record, out var message));
 			return message.DisplayName;
 		}
 
@@ -134,7 +137,7 @@ namespace Faolan.Tests
 			using var ctx = new DatabaseContext(options);
 			var map = new Dictionary<string, WorldObject>();
 			foreach (var o in ctx.WorldObjects.Where(o => o.MapId == 4000 && o.DisplayKind != null).AsNoTracking())
-				map.TryAdd(WorldObjectDisplay.Build(o)!, o);
+				map.TryAdd(WorldObjectDisplay.ToWire(o)!, o);
 			return map;
 		}
 

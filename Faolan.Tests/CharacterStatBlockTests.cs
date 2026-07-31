@@ -20,7 +20,7 @@ namespace Faolan.Tests
 			// is [96b8dc59][0000c350][handle][00000000][count=1][statId 0x14][value 4]. Decodes the empty-handed-swing
 			// fix (#218); see WorldBroadcaster.BroadcastNpcCombatMode.
 			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, 4);
-			var body = StatUpdateCodec.BuildBody(0x00002C56u, stats);
+			var body = StatUpdateCodec.Build(0x00002C56u, stats);
 
 			Assert.Equal("96b8dc590000c35000002c5600000000010000001400000004", ToHex(body));
 		}
@@ -60,7 +60,7 @@ namespace Faolan.Tests
 		{
 			var body = new byte[17];
 			body.WriteU32Be(4, 0x0000C350u);
-			Assert.False(StatUpdateCodec.TryParseBody(body, out _, out _));
+			Assert.Throws<CodecParseException>(() => StatUpdateCodec.Parse(body));
 		}
 
 		[Fact]
@@ -78,7 +78,8 @@ namespace Faolan.Tests
 			// body[12..16] left zero (the constant padding word)
 			statBytes.CopyTo(body, 16);
 
-			Assert.True(StatUpdateCodec.TryParseBody(body, out var parsedHandle, out var parsedStats));
+			var parsed = StatUpdateCodec.Parse(body);
+			var (parsedHandle, parsedStats) = (parsed.EntityHandle, parsed.Stats);
 			Assert.Equal(handle, parsedHandle);
 			Assert.Equal(ToHex(statBytes), ToHex(parsedStats.ToArray()));
 		}

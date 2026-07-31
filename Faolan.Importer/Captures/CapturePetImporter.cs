@@ -65,7 +65,7 @@ namespace Faolan.Importer.Captures
 				// #307/#244: lift the whole spawn onto the TYPE from its capture so a summoned pet builds wholly from
 				// columns (no Data blob) - the stat core + no-morph recordCount, and, since a pet has no NpcSpawn
 				// placement, its worn equipment + appearance morphs on the type too (NpcEquipment/NpcMorph).
-				var body = WorldObjectBuilder.ExtractBody(e.Data);
+				var body = WorldObjectColumns.ExtractBody(e.Data);
 				if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 				{
 					type.StatCore ??= NpcStatCoreCodec.Lift(read.Message);

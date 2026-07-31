@@ -1,102 +1,82 @@
 using System;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// GameTimeIIR - the world clock that drives the day/night cycle; it resyncs the client's GameTime_t. The record is
-	// the 29-byte one CreateEditorRecordBuilder.BuildGameTimeIir builds (see there for the field split and how it was
-	// confirmed in-client), and this prepends the subop.
+	// GameTimeIIR (0x4F57DC08) - the world clock that drives the day/night cycle; it resyncs the client's GameTime_t.
+	// 33 bytes:
+	//   [u32 subop][u32 class][u32 handle][u8 isToBePassed][f32 dayTime][u32 unapplied][u32 gameDay][u32 unix][f32 rate]
+	// The class/handle carrier is 0 on every record we send (the clock is not addressed to an entity).
 	//
-	// Both live fields are GENERATED rather than replayed (#351), each resting on a different source that the other
-	// confirms - see docs/re/gametime-clock.md:
-	//   * `dayTime` is a float count of GAME SECONDS, 86400 to a game day, advancing at 5 per real second (the client's
-	//     own GameTime_t constants).
-	//   * `timestamp` - the resync anchor - is a pure function of wall-clock time, and its period is 86400/5 = 17280
-	//     real seconds, which the corpus gives independently of the client.
+	// The time MODEL - what dayTime and the resync anchor mean, and why both are generated rather than replayed - is
+	// GameClock next door.
 	public static class GameTimeCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameTimeIIR;
-
-		// dayTime's UNIT, from the client's own clock class GameTime_t (gametime.cpp). Its ctor FUN_004ed470 sets
-		// hoursPerDay=24 (+0x98), minutesPerHour=60 (+0x9C), secondsPerMinute=60 (+0xA0), secondsPerHour=3600 (+0xA4)
-		// and a wrap period of 86400.0 (+0x78), and its readers decompose the value as
-		//   seconds = t % 60,  minutes = (t / 60) % 60,  hours = t / 3600
-		// (FUN_004ee4f0 SetCurrentRealTime / FUN_004ee710, the IIR handler). So dayTime counts GAME SECONDS with 86400
-		// of them to a game day. Only minutes and seconds are taken modulo - hours is not - so the value is an absolute
-		// running count and the time of day is `dayTime % 86400`.
-		public const uint GameDaySeconds = 86400;
-
-		// How many game seconds pass per REAL second, from the same class: the per-frame tick FUN_004eddb0 advances the
-		// clock by `this[0x74] * dt * rate[0xBC] * wireRate[0xD4] * phaseRate`, and the ctor sets +0x74 = 5 (the rates
-		// all default to 1.0f, and the wire `rate` field feeds +0xD4 directly).
-		//
-		// Two side findings from that tick, not modelled here: +0xC0 / +0xC4 are SEPARATE day and night rate
-		// multipliers (so the two halves of the day can run at different speeds - both default to 1.0), selected by a
-		// dawn/dusk window built from +0xA8=19h, +0xAC=4h, +0xB0=7h, +0xB4=2h; and +0x80 / +0x88 hold 21600.0 (06:00)
-		// and 64800.0 (18:00), the day window itself.
-		public const uint GameSecondsPerRealSecond = 5;
-
-		// ...so one game day takes 86400 / 5 = 17280 real seconds = 4.8 real hours. That number is independently
-		// confirmed by the corpus, which is what makes this model trustworthy: it is the period of the resync
-		// timestamp's high word, derived from the 141 captured GameTimeIIR records two separate ways -
-		//   * high == low / P holds exactly for 140/141 samples at P = 17280, and for 0/141 at 3600 / 21600 / 43200 /
-		//     86400. The one miss is a field change, whose two halves straddle a period boundary (its low word is 155s
-		//     past one), so it is not a clock tick.
-		//   * solving for P directly as low/high over every sample lands in 17280.001 .. 17280.169.
-		// The client says 86400 game seconds at 5x; the wire says 17280 real seconds. They agree exactly.
-		public const uint GameDayRealSeconds = GameDaySeconds / GameSecondsPerRealSecond;
-
-		private const float ClockRate = 1.0f;
 
 		// The u32 that sits between dayTime and the anchor. The client's ReadSubClass loads it but the apply never
 		// forwards it to the clock; it holds 0..3 across the corpus (n = 11/37/16/77 for 0/1/2/3). We send the captured
 		// world-entry value. NB this is the byte the old decode mislabelled as a "flag" at the END of dayTime.
 		private const uint UnappliedWord = 1;
 
-		// The resync anchor, as its two u32 fields: [gameDay][unixSeconds]. Both are wall-clock derived, which is what
-		// makes this generatable rather than replayable:
-		//   * `unixSeconds` is plain unix epoch seconds - it matches the capturing frame's own time for 141/141 records
-		//     (0.2 .. 22.0s behind it, i.e. stamped at or just before the send). The client confirms the role: its
-		//     handler stores `field - __time64(NULL)`, the skew against its own clock.
-		//   * `gameDay` is that same value divided by GameDayRealSeconds - the game-day counter.
-		public static (uint GameDay, uint UnixSeconds) ResyncAnchor(DateTimeOffset now)
+		// CANONICAL - the only method here that writes bytes.
+		public static byte[] Build(GameTimeIIR value)
 		{
-			var unixSeconds = (uint)now.ToUnixTimeSeconds();
-			return (unixSeconds / GameDayRealSeconds, unixSeconds);
-		}
-
-		// Kept as a u64 view of the same two words, for the docs/tests that describe the anchor as one value.
-		public static ulong ResyncTimestamp(DateTimeOffset now)
-		{
-			var (gameDay, unixSeconds) = ResyncAnchor(now);
-			return ((ulong)gameDay << 32) | unixSeconds;
-		}
-
-		// The live time of day, in game seconds since game-midnight. Phase-locked to the wall clock the same way the
-		// resync anchor is, so it agrees with the game-day counter in that anchor: the day rolls over to 0 exactly when
-		// `unix / GameDayRealSeconds` ticks. `offsetGameSeconds` shifts the phase (the `.time` GM command).
-		//
-		// Retail's own dayTime is NOT phase-locked to unix time - our own corpus check rules that out - because retail's
-		// is per-playfield with its own epoch (it even runs backwards between captures). The phase is therefore ours to
-		// choose; this picks the one that is deterministic and survives a restart.
-		public static float TimeOfDay(DateTimeOffset now, long offsetGameSeconds = 0)
-		{
-			var gameSeconds = now.ToUnixTimeSeconds() * GameSecondsPerRealSecond + offsetGameSeconds;
-			return ((gameSeconds % GameDaySeconds) + GameDaySeconds) % GameDaySeconds;
+			ArgumentNullException.ThrowIfNull(value);
+			using var s = new FaolanStream();
+			Write(s, value);
+			return s.ToArray();
 		}
 
 		// dayTime is passed in rather than read from the clock so a golden test can rebuild a captured record exactly:
 		// the time of day is server state (like a position), while the record's LAYOUT is what the capture pins.
 		public static byte[] Build(float dayTimeSeconds, DateTimeOffset now)
 		{
-			var (gameDay, unixSeconds) = ResyncAnchor(now);
-			return new FaolanStream().WriteUInt32(Opcode).WriteArray(CreateEditorRecordBuilder.BuildGameTimeIir(dayTimeSeconds, UnappliedWord, gameDay, unixSeconds, true, ClockRate)).ToArray();
+			var (gameDay, unixSeconds) = GameClock.ResyncAnchor(now);
+			return Build(new GameTimeIIR(dayTimeSeconds, UnappliedWord, gameDay, unixSeconds));
 		}
 
 		public static byte[] Build(DateTimeOffset now, long offsetGameSeconds = 0)
 		{
-			return Build(TimeOfDay(now, offsetGameSeconds), now);
+			return Build(GameClock.TimeOfDay(now, offsetGameSeconds), now);
+		}
+
+		public static GameTimeIIR Parse(in ReadOnlySpan<byte> data)
+		{
+			var r = new SpanReader(data, nameof(GameTimeCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+			return value;
+		}
+
+		internal static GameTimeIIR Read(ref SpanReader r)
+		{
+			r.ExpectU32Be(Opcode, "GameTimeIIR subop");
+			var classWord = r.ReadU32Be();
+			var handle = r.ReadU32Be();
+			var isToBePassed = r.ReadU8() != 0;
+			var dayTime = r.ReadF32Be();
+			var unapplied = r.ReadU32Be();
+			var gameDay = r.ReadU32Be();
+			var unixSeconds = r.ReadU32Be();
+			return new GameTimeIIR(dayTime, unapplied, gameDay, unixSeconds, isToBePassed, r.ReadF32Be(), classWord, handle);
+		}
+
+		internal static void Write(FaolanStream s, GameTimeIIR v)
+		{
+			s.WriteUInt32(Opcode)
+				.WriteUInt32(v.ClassWord)
+				.WriteUInt32(v.Handle)
+				.WriteByte(v.IsToBePassed)
+				.WriteFloat(v.DayTimeSeconds)
+				.WriteUInt32(v.UnappliedWord)
+				.WriteUInt32(v.GameDay)
+				.WriteUInt32(v.UnixSeconds)
+				.WriteFloat(v.Rate);
 		}
 	}
+
+	// GameTimeIIR (0x4F57DC08).
+	public sealed record GameTimeIIR(float DayTimeSeconds, uint UnappliedWord, uint GameDay, uint UnixSeconds, bool IsToBePassed = true, float Rate = 1.0f, uint ClassWord = 0, uint Handle = 0);
 }

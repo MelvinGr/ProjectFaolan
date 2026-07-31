@@ -233,10 +233,20 @@ namespace Faolan.Importer.Extractors
 				return;
 
 			var payload = packet.BodyReader().ReadArrayUInt32Length();
-			if (!CoreClaimListCodec.TryParse(payload, out _, out var claims))
+			CoreClaimIIR parsed;
+			try
+			{
+				parsed = CoreClaimCodec.Parse(payload);
+			}
+			catch (CodecParseException)
+			{
+				return;
+			}
+
+			if (parsed is not CoreClaimListIIR list)
 				return;
 
-			foreach (var claim in claims)
+			foreach (var claim in list.Claims)
 			{
 				var key = claim.DecryptionKey;
 				if (claim.ItemTemplateId == 0 || key.Length < ClaimEntry.KeyLength)
@@ -264,11 +274,7 @@ namespace Faolan.Importer.Extractors
 				return;
 
 			var payload = packet.BodyReader().ReadArrayUInt32Length();
-			var s = new FaolanStream(payload);
-			if (s.ReadUInt32() != LootBagMessageCodec.Opcode)
-				return;
-
-			if (!LootBagMessageCodec.TryParse(payload.AsSpan(4), out var contents, out _) || contents?.Inventory?.Items == null)
+			if (!WorldObjectColumns.TryLocateContents(payload, out var contents, out _) || contents.Inventory?.Items == null)
 				return;
 
 			foreach (var listEntry in contents.Inventory.Items)

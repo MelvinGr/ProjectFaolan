@@ -1,19 +1,20 @@
 using System;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Xunit;
 
 namespace Faolan.Tests
 {
-	// The despawn packet (n3ToClientQuit 0x04B82B2D) and its playfield-token extraction
+	// The despawn packet (n3ToClientQuit 0x04B82B2D) and the playfield-token scan it is scoped by
 	// (Gitea #404, protocol_despawn_n3toclientquit). Body decoded from retail captures:
 	// [04B82B2D][0000C350][handle][0x01 marker][u32 playfield token].
-	public class WorldDespawnTests
+	public class N3ToClientQuitCodecTests
 	{
 		[Fact]
 		public void BuildBody_MatchesRetailLayout()
 		{
 			// The hoxxling gameplay capture: removing handle 0x00017E29 in playfield 0x01EA985C produced this body.
-			var body = WorldDespawn.BuildBody(0x00017E29, 0x01EA985C);
+			var body = N3ToClientQuitCodec.Build(0x00017E29, 0x01EA985C);
 
 			Assert.Equal(17, body.Length);
 			// [subop 04B82B2D][typeTag 0000C350][handle 00017E29][marker 01][playfield token 01EA985C].
@@ -34,14 +35,14 @@ namespace Faolan.Tests
 				0xBE, 0xEF
 			};
 
-			Assert.True(WorldDespawn.TryExtractPlayfieldToken(snapshot, out var token));
+			Assert.True(PlayfieldTokenScan.TryExtract(snapshot, out var token));
 			Assert.Equal(0x004FE428u, token);
 		}
 
 		[Fact]
 		public void TryExtractPlayfieldToken_ReturnsFalseWhenAbsent()
 		{
-			Assert.False(WorldDespawn.TryExtractPlayfieldToken([0x01, 0x02, 0x03, 0x04], out var token));
+			Assert.False(PlayfieldTokenScan.TryExtract([0x01, 0x02, 0x03, 0x04], out var token));
 			Assert.Equal(0u, token);
 		}
 
@@ -59,12 +60,12 @@ namespace Faolan.Tests
 				0x00, 0x00, 0x04, 0x0B // suffix
 			};
 
-			Assert.True(WorldDespawn.TryExtractPlayfieldToken(snapshot, out var token));
+			Assert.True(PlayfieldTokenScan.TryExtract(snapshot, out var token));
 			Assert.Equal(0x01EA985Cu, token);
 		}
 
 		[Fact]
-		public void TryParseBody_ParsesCapturedRecord()
+		public void Parse_ParsesCapturedRecord()
 		{
 			// The literal 17-byte body from the hoxxling gameplay capture (same bytes the build test asserts).
 			var captured = new byte[]
@@ -76,44 +77,46 @@ namespace Faolan.Tests
 				0x01, 0xEA, 0x98, 0x5C // playfield token
 			};
 
-			Assert.True(WorldDespawn.TryParseBody(captured, out var handle, out var token));
-			Assert.Equal(0x00017E29u, handle);
-			Assert.Equal(0x01EA985Cu, token);
+			var parsed = N3ToClientQuitCodec.Parse(captured);
+			Assert.Equal(0x00017E29u, parsed.Handle);
+			Assert.Equal(0x01EA985Cu, parsed.Token);
 		}
 
 		[Theory, InlineData(16), InlineData(18)]
 		// too short
 		// too long
-		public void TryParseBody_RejectsWrongLength(int length)
+		public void Parse_RejectsWrongLength(int length)
 		{
-			Assert.False(WorldDespawn.TryParseBody(new byte[length], out _, out _));
+			// Strict by rule (#530 rule 4): a short body underruns, a long one leaves bytes unread. Both throw.
+			var body = new byte[length];
+			Assert.Throws<CodecParseException>(() => N3ToClientQuitCodec.Parse(body));
 		}
 
 		[Fact]
-		public void TryParseBody_RejectsWrongMarker()
+		public void Parse_RejectsWrongMarker()
 		{
-			var body = WorldDespawn.BuildBody(0x00017E29, 0x01EA985C);
+			var body = N3ToClientQuitCodec.Build(0x00017E29, 0x01EA985C);
 			body[12] = 0x02; // marker is 0x01 in 3271/3271 records
-			Assert.False(WorldDespawn.TryParseBody(body, out _, out _));
+			Assert.Throws<CodecParseException>(() => N3ToClientQuitCodec.Parse(body));
 		}
 
 		[Fact]
-		public void TryParseBody_RejectsWrongSubOpcode()
+		public void Parse_RejectsWrongSubOpcode()
 		{
-			var body = WorldDespawn.BuildBody(0x00017E29, 0x01EA985C);
+			var body = N3ToClientQuitCodec.Build(0x00017E29, 0x01EA985C);
 			body[0] ^= 0xFF; // corrupt the sub-opcode
-			Assert.False(WorldDespawn.TryParseBody(body, out _, out _));
+			Assert.Throws<CodecParseException>(() => N3ToClientQuitCodec.Parse(body));
 		}
 
 		[Fact]
-		public void TryParseBody_RoundTripsBuildBody()
+		public void Parse_RoundTripsBuild()
 		{
 			// Build -> Parse must recover the exact (handle, token); the captured hoxxling record is the oracle.
-			var body = WorldDespawn.BuildBody(0x00017E29, 0x01EA985C);
+			var body = N3ToClientQuitCodec.Build(0x00017E29, 0x01EA985C);
 
-			Assert.True(WorldDespawn.TryParseBody(body, out var handle, out var token));
-			Assert.Equal(0x00017E29u, handle);
-			Assert.Equal(0x01EA985Cu, token);
+			var parsed = N3ToClientQuitCodec.Parse(body);
+			Assert.Equal(0x00017E29u, parsed.Handle);
+			Assert.Equal(0x01EA985Cu, parsed.Token);
 		}
 	}
 }

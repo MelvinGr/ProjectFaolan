@@ -150,7 +150,7 @@ namespace Faolan.GameServer.World
 			foreach (var obj in _sim.World.ZoneForEntity(player).WorldObjects)
 			{
 				if (obj.Row.EffectQuestId is { } eq && held.Contains(eq))
-					await WorldIir.Send(client, SimpleDynelMessageCodec.BuildVisualChange(obj.Handle, obj.Row.EffectDynelState));
+					await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(obj.Handle, obj.Row.EffectDynelState));
 			}
 		}
 
@@ -246,18 +246,18 @@ namespace Faolan.GameServer.World
 			{
 				// Despawn with the object's OWN class - a Character-classed quit silently misses a world object (#366).
 				var classWord = zone.TryGetWorldObject(handle, out var gone)
-					? WorldObjectBuilder.TypeTagForClass(gone.SubOpcode)
-					: WorldObjectBuilder.TypeTagForClass(0);
+					? WorldObjectColumns.TypeTagForClass(gone.SubOpcode)
+					: WorldObjectColumns.TypeTagForClass(0);
 				await SendWorldDespawn(client, zone.PlayfieldToken, handle, classWord);
 			}
 		}
 
 		// One static world object's FullUpdate, built from its columns and stamped with the live playfield token. The
-		// body carries its own [u32 len][u32 subOpcode][record] carrier prefix, so it rides DispatchPassBlob as-is.
+		// carrier's [u32 len] is the SENDER's (#530 rule 2), so it is written here rather than by the codec.
 		private static Rpc WorldObjectRpc(INetworkClient client, LiveWorldObject obj, uint playfieldToken)
 		{
 			return new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				WorldObjectBuilder.Build(obj.Row, obj.Handle, playfieldToken));
+				s => s.WriteArrayUInt32Length(WorldObjectCodec.Build(obj.Row, obj.Handle, playfieldToken)));
 		}
 
 		// Sends a QuestFullUpdate (one quest's full detail: description, summary, objective + map marker) built from
@@ -319,7 +319,7 @@ namespace Faolan.GameServer.World
 			// (the srcPos it dragged), echoed in the trailing u32 (decoded from loot-drag-1538). The client removes that
 			// slot and compacts; a partial take leaves the bag open with its remaining items - NO re-render (re-sending
 			// the full object stacked a second window). Loot-all passes removedPos 0 (matches the captured loot-all ACK).
-			await WorldIir.Send(client, WorldLoot.BuildLootRemoveItemsBody(bag.Handle, removedPos));
+			await WorldIir.Send(client, LootRemoveItemsCodec.Build(bag.Handle, removedPos));
 
 			if (bag.LootItems.Any(i => i != 0) || bag.CashTin > 0)
 				return; // items/coins remain (0 = a drag-looted slot) - keep the bag open; client drives close (0x2044)
@@ -328,10 +328,10 @@ namespace Faolan.GameServer.World
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchCloseLootBag,
 				b => b.WriteUInt32(EntityClass.LootBag).WriteUInt32(bag.Handle)));
-			await WorldIir.Send(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle));
-			await WorldIir.Send(client, WorldLoot.BuildLooterResetBody((uint)GameServer0X2000Opcodes.NewAllowedLooterIIR, bag.Handle));
-			await WorldIir.Send(client, WorldLoot.BuildFadeBody(EntityClass.LootBag, bag.Handle, WorldLoot.DefaultFadeSeconds));
-			await WorldIir.Send(client, WorldLoot.BuildBagConsumedVisualBody(bag.Handle));
+			await WorldIir.Send(client, NewLooterCodec.Build(GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle, 0));
+			await WorldIir.Send(client, NewLooterCodec.Build(GameServer0X2000Opcodes.NewAllowedLooterIIR, bag.Handle, 0));
+			await WorldIir.Send(client, N3ToClientFadeCodec.Build(EntityClass.LootBag, bag.Handle));
+			await WorldIir.Send(client, UpdateSimpleDynelCodec.Build(bag.Handle));
 
 			_sim.World.ZoneForEntity(bag).Remove(bag.Handle);
 			_logger.LogInformation("Loot: bag 0x{Handle:X8} fully looted; consumed + faded.", bag.Handle);
@@ -396,7 +396,7 @@ namespace Faolan.GameServer.World
 		// (consumed or expired). Loot bags carry the 0xC87A typetag.
 		public async Task BroadcastEntityFade(WorldEntity entity)
 		{
-			var body = WorldLoot.BuildFadeBody(EntityClass.LootBag, entity.Handle, WorldLoot.DefaultFadeSeconds);
+			var body = N3ToClientFadeCodec.Build(EntityClass.LootBag, entity.Handle);
 			foreach (var viewer in _sim.World.ZoneForEntity(entity).PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client == null)
@@ -439,7 +439,7 @@ namespace Faolan.GameServer.World
 			var stats = new CharacterStatBlock().Set(CharacterStatId.CombatMode, inCombat
 				? NpcCombatModeValue
 				: 0u);
-			var body = StatUpdateCodec.BuildBody(npc.Handle, stats);
+			var body = StatUpdateCodec.Build(npc.Handle, stats);
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
@@ -480,7 +480,7 @@ namespace Faolan.GameServer.World
 			// desyncs: the player takes hits from an NPC the client still shows mid-walk). The earlier path attempt reverted
 			// because its trailer anchored at the START (walk then back = net-zero); BuildWalkBody anchors it at the segment
 			// end (Position). Residual: consecutive segments still re-spline (a small snap) - the remaining #272 polish.
-			var body = MoveTaskCodec.BuildWalkBody(npc.Handle, npc.MoveFrom, npc.Position);
+			var body = MoveTaskCodec.Build(new MoveTaskIIR(npc.Handle, npc.MoveFrom, MoveTaskNodes.Walk(npc.MoveFrom, npc.Position)));
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
@@ -520,7 +520,7 @@ namespace Faolan.GameServer.World
 		public async Task BroadcastNpcStop(WorldEntity npc)
 		{
 			var facing = npc.MoveFrom.FaceTowards(npc.Position);
-			var record = StopCodec.Build(npc.Handle, npc.Position, facing.X, facing.Y, facing.Z, facing.W);
+			var record = StopCodec.Build(npc.Handle, npc.Position, facing);
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
@@ -626,8 +626,8 @@ namespace Faolan.GameServer.World
 		public async Task BroadcastKnockback(WorldEntity victim, Vector3 to)
 		{
 			var from = victim.Position;
-			var move = MoveTaskCodec.BuildForcedMoveBody(victim.Handle, from, to);
-			var pin = SetPosCodec.Build(victim.Handle, to, 0f, 0f, 0f, 0f, 0x01);
+			var move = MoveTaskCodec.Build(new MoveTaskIIR(victim.Handle, from, MoveTaskNodes.ForcedMove(to, from)));
+			var pin = SetPosCodec.Build(victim.Handle, to, default, 0x01);
 
 			victim.Position = to;
 
@@ -871,7 +871,7 @@ namespace Faolan.GameServer.World
 			// that have ENTERED the world (they received the world-object burst, so the handle is safe to quit for them).
 			// A world object is removed by its OWN class (SimpleDynel / LootBag / ZoneLabel / ...), not Character - a
 			// Character-classed despawn silently misses it (#366). Derive the class from its spawn IIR.
-			var classWord = WorldObjectBuilder.TypeTagForClass(obj.SubOpcode);
+			var classWord = WorldObjectColumns.TypeTagForClass(obj.SubOpcode);
 			foreach (var viewer in zone.PlayersInRange(obj.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client.Session.WorldEntered)
@@ -880,7 +880,7 @@ namespace Faolan.GameServer.World
 
 			zone.RemoveWorldObject(handle); // stop streaming it without waiting for a zone reload
 			var deleted = await _database.DeleteWorldObject(obj.Id);
-			_logger.LogInformation("Delete: removed world object {Name} 0x{Handle:X8} ({Rows} row(s), by {Player}).", WorldObjectDisplay.Build(obj) ?? obj.Name, handle, deleted, player.Name);
+			_logger.LogInformation("Delete: removed world object {Name} 0x{Handle:X8} ({Rows} row(s), by {Player}).", WorldObjectDisplay.ToWire(obj) ?? obj.Name, handle, deleted, player.Name);
 			return obj;
 		}
 
@@ -1021,12 +1021,12 @@ namespace Faolan.GameServer.World
 				// run-crawled). The cycle timer (path time + dwell) re-issues it so it keeps looping.
 				if (npc.PatrolNodes is { Count: > 0 } patrol)
 				{
-					var waypoints = MoveTaskCodec.PatrolWaypoints(patrol);
+					var waypoints = PatrolRoute.Waypoints(patrol);
 					if (waypoints.Count > 0)
 					{
 						entity.PatrolWaypoints = waypoints;
-						entity.PatrolBody = MoveTaskCodec.BuildPatrol(handle, entity.Position, patrol);
-						entity.PatrolCycleSeconds = MoveTaskCodec.TotalPathLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;
+						entity.PatrolBody = MoveTaskCodec.Build(new MoveTaskIIR(handle, entity.Position, MoveTaskNodes.Patrol(patrol)));
+						entity.PatrolCycleSeconds = PatrolRoute.TotalLength(entity.Position, entity.PatrolWaypoints) / PatrolWalkSpeed + PatrolDwellSeconds;
 						entity.ArmPatrolCycle();
 					}
 				}
@@ -1160,7 +1160,7 @@ namespace Faolan.GameServer.World
 			// NewCurrentLooter rides the WORLD conversation (GameAgent -> GameInterface), as in retail (mount/gameplay
 			// capture frame 1477).
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(WorldLoot.BuildNewCurrentLooterBody(bag.Handle, player.Handle))));
+				s => s.WriteArrayUInt32Length(NewLooterCodec.Build(GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle, player.Handle))));
 
 			// The actual window-open is DispatchOpenLootBag (0x2037) on the GameCharAgent -> GameCharInterface
 			// conversation (the same class-pair as the 0x201C spawn handshake / SpawnCheck), body [loot typetag][bag
@@ -1188,9 +1188,9 @@ namespace Faolan.GameServer.World
 
 			var obj = live.Row;
 
-			await WorldIir.Send(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x05));
-			await WorldIir.Send(client, WorldLoot.BuildOpenWindowBody(EntityClass.SimpleDynel, handle, "object_open"));
-			_logger.LogInformation("Object: {Player} opened '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name ?? WorldObjectDisplay.Build(obj) ?? "object", handle);
+			await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(handle, 0x05));
+			await WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(EntityClass.SimpleDynel, handle, "object_open"));
+			_logger.LogInformation("Object: {Player} opened '{Obj}' 0x{Handle:X8}.", player.Name, obj.Name ?? WorldObjectDisplay.ToWire(obj) ?? "object", handle);
 			return true;
 		}
 
@@ -1222,7 +1222,7 @@ namespace Faolan.GameServer.World
 				return;
 
 			var zone = _sim.World.ZoneForEntity(player);
-			var classWord = WorldObjectBuilder.TypeTagForClass(node.SubOpcode);
+			var classWord = WorldObjectColumns.TypeTagForClass(node.SubOpcode);
 			foreach (var viewer in zone.PlayersInRange(node.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client.Session.WorldEntered)
@@ -1286,7 +1286,7 @@ namespace Faolan.GameServer.World
 
 			var obj = live.Row;
 
-			var name = obj.Name ?? WorldObjectDisplay.Build(obj) ?? "?";
+			var name = obj.Name ?? WorldObjectDisplay.ToWire(obj) ?? "?";
 			var teleport = obj.DestinationMapId is { } destMap
 				? new ZoneLineDestination(destMap, obj.DestinationPosition, name)
 				: new ZoneLineDestination(0, null, name);
@@ -1946,7 +1946,7 @@ namespace Faolan.GameServer.World
 			await SendQuestMarker(client, npc.Handle, await ComputeGiverMarkerState(client, npc.Name, npc.MapId));
 		}
 
-		// Removes the subject from `recipient`'s view - the n3ToClientQuit despawn (WorldDespawn). Stamped with the
+		// Removes the subject from `recipient`'s view - the n3ToClientQuit despawn (N3ToClientQuitCodec). Stamped with the
 		// recipient's INSTANCE playfield token (#268; ZoneForEntity(recipient).PlayfieldToken at the call site): the
 		// burst's value for a replayed playfield (what the client learned at entry), else WorldState's minted fallback.
 		// The token-is-0 guard is just defensive (ZoneFor always mints one).
@@ -1960,7 +1960,7 @@ namespace Faolan.GameServer.World
 			}
 
 			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(WorldDespawn.BuildBody(subjectHandle, token, classWord))));
+				s => s.WriteArrayUInt32Length(N3ToClientQuitCodec.Build(subjectHandle, token, classWord))));
 		}
 
 		private async Task SendWorldSpawn(INetworkClient recipient, WorldEntity subject)
@@ -2167,7 +2167,7 @@ namespace Faolan.GameServer.World
 			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
 			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the
 			// live playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
-			var body = WorldObjectBuilder.BuildBody(template, handle, position, Quaternion.Identity, EntityClass.LootBag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken);
+			var body = WorldObjectCodec.Build(template, handle, position, Quaternion.Identity, EntityClass.LootBag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken);
 
 			body = WorldBroadcastBodies.WithLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l))]); // OUR items/cash, Pos 0..n-1
 
@@ -2198,7 +2198,7 @@ namespace Faolan.GameServer.World
 				// packet is a loot-PERMISSION grant, so it names the bag's OWNER (the killer / spawning player), not the
 				// recipient - a drop belongs to whoever earned it. Fall back to the viewer when there's no owner
 				// so the bag still renders.
-				await WorldIir.Send(viewer.Client, WorldLoot.BuildNewAllowedLooterBody(handle, allowedLooterHandle != 0
+				await WorldIir.Send(viewer.Client, NewLooterCodec.Build(GameServer0X2000Opcodes.NewAllowedLooterIIR, handle, allowedLooterHandle != 0
 					? allowedLooterHandle
 					: viewer.Handle));
 			}
@@ -2211,7 +2211,7 @@ namespace Faolan.GameServer.World
 		// Live-only: the static DB object re-streams on the next zone load (it respawns, retail-style).
 		public static Task HidePickupObject(INetworkClient client, uint handle)
 		{
-			return WorldIir.Send(client, SimpleDynelMessageCodec.BuildVisualChange(handle, 0x09));
+			return WorldIir.Send(client, SimpleDynelVisualChangeCodec.Build(handle, 0x09));
 		}
 
 		// Sends the QuestJournal list (one title line per quest). The shared area header (region/map names) is taken
@@ -2383,7 +2383,7 @@ namespace Faolan.GameServer.World
 		}
 
 		// The loot-bag definition (#249): the baked canonical "Bag of loot" (columns + embedded KdTreeTail), built FROM
-		// SCRATCH by WorldObjectBuilder.BuildBody - map-independent, needs NO captured loot-bag WorldObject in
+		// SCRATCH by WorldObjectCodec.Build - map-independent, needs NO captured loot-bag WorldObject in
 		// the world (deleting static world bags no longer breaks kill-loot). Null only if the geometry asset is missing.
 		private static WorldObject GetLootTemplate(LootContainerTemplateId variant = LootContainerTemplateId.Bag)
 		{
@@ -2403,7 +2403,7 @@ namespace Faolan.GameServer.World
 			};
 		}
 
-		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectBuilder) on
+		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectCodec) on
 		// the world conversation. Unlike SendWorldSpawn this does NOT re-patch the position - the body is already
 		// placed at the corpse's spot.
 		private static Task SendLootBagUpdate(INetworkClient recipient, byte[] body)

@@ -143,7 +143,7 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
    `WorldObjects` keyed by **display id** — the prop's LDB string reference, which is placement truth and unique
    across the map — then the burst loops `EditorSceneDynels`, which pairs each captured WIRE handle with the display
    id that finds its row, and builds each byte-exact via
-   `WorldObjectBuilder.TryBuild(row, handle, playfieldInstance, out body)` (the playfield-instance overload),
+   `WorldObjectCodec.Build(row, handle, playfieldInstance)` (the playfield-instance overload),
    re-addressing every prop to the captured handle + the editor playfield instance
    (`CreateEditorCharBuilder.EditorPlayfieldInstance`); a no-DB run simply omits them (no verbatim fallback).
    The lookup used to key on a `WorldObjects.CapturedHandle` column — a session-volatile value as a persistence key.

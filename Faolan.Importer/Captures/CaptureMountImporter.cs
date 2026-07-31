@@ -67,7 +67,7 @@ namespace Faolan.Importer.Captures
 				// Lift the whole spawn onto the TYPE (like pets): stat core + no-morph recordCount, and - since a mount
 				// has no NpcSpawn placement - its worn equipment + appearance morphs on the type (NpcEquipment/NpcMorph),
 				// so TryBuildFromType assembles the body wholly from columns (Data retired).
-				var body = WorldObjectBuilder.ExtractBody(e.Data);
+				var body = WorldObjectColumns.ExtractBody(e.Data);
 				if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
 				{
 					type.StatCore ??= NpcStatCoreCodec.Lift(read.Message);

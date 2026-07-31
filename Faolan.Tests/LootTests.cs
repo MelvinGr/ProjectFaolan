@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.GameServer.Combat;
@@ -16,7 +17,7 @@ namespace Faolan.Tests
 		public void BuildFadeBody_MatchesCapture()
 		{
 			// hoxxling-login-gameplay: fade bag 0x000021FE over 3.0s (0x40400000 big-endian float).
-			var body = WorldLoot.BuildFadeBody(EntityClass.LootBag, 0x000021FE, 3.0f);
+			var body = N3ToClientFadeCodec.Build(EntityClass.LootBag, 0x000021FE, 3.0f);
 			Assert.Equal("66180b200000c87a000021fe0040400000", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
@@ -24,7 +25,7 @@ namespace Faolan.Tests
 		public void BuildNewCurrentLooterBody_MatchesCapture()
 		{
 			// hoxxling-login-gameplay: bag 0x000021FE -> looter player 0x01316E71.
-			var body = WorldLoot.BuildNewCurrentLooterBody(0x000021FE, 0x01316E71);
+			var body = NewLooterCodec.Build(GameServer0X2000Opcodes.NewCurrentLooterIIR, 0x000021FE, 0x01316E71);
 			Assert.Equal("d06568c80000c87a000021fe000000c35001316e71", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
@@ -32,7 +33,7 @@ namespace Faolan.Tests
 		public void BuildOpenWindowBody_MatchesCapture()
 		{
 			// hoxxling-login-gameplay: SimpleDynelVisualChange "Open" on bag 0x000021FE opens the loot window.
-			var body = WorldLoot.BuildOpenWindowBody(EntityClass.LootBag, 0x000021FE);
+			var body = SimpleDynelVisualChangeCodec.Build(EntityClass.LootBag, 0x000021FE, "Open");
 			Assert.Equal("e7f4f8f80000c87a000021fe000000000000044f70656e", Convert.ToHexString(body).ToLowerInvariant());
 		}
 

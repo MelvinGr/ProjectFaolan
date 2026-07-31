@@ -45,12 +45,12 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildingAnOutOfRangeTypeThrows()
 		{
-			Assert.Throws<ArgumentOutOfRangeException>(() => GameActionElement.Build(0xD12D, 0, 0, []));
-			Assert.Throws<ArgumentOutOfRangeException>(() => GameActionElement.Build(GameActionTypeId.First - 1, 0, 0, []));
-			Assert.Throws<ArgumentOutOfRangeException>(() => GameActionElement.Build(GameActionTypeId.End, 0, 0, []));
+			Assert.Throws<ArgumentOutOfRangeException>(() => GameActionDataCodec.Build(0xD12D, 0, 0, []));
+			Assert.Throws<ArgumentOutOfRangeException>(() => GameActionDataCodec.Build(GameActionTypeId.First - 1, 0, 0, []));
+			Assert.Throws<ArgumentOutOfRangeException>(() => GameActionDataCodec.Build(GameActionTypeId.End, 0, 0, []));
 
 			// ...and a valid one still builds (the recast override's type).
-			Assert.NotEmpty(GameActionElement.Build(0xCF81, 0, 0, [1u, 2u]));
+			Assert.NotEmpty(GameActionDataCodec.Build(0xCF81, 0, 0, [1u, 2u]));
 		}
 	}
 }

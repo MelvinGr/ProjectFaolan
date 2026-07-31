@@ -26,16 +26,16 @@ namespace Faolan.Core.Network.Codecs.World
 				: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText);
 		}
 
-		// Injects THIS drop's live contents (cash + rolled items) into an already-from-scratch-built loot-bag body
-		// (WorldObjectBuilder + LootBagTemplate build the identity + kd-tree + a scaffold ProtoLootBagIIR): keeps the
-		// constructed envelope and swaps the trailing [u32 len][ProtoLootBagIIR] for the live contents, via the typed
-		// LootBagMessageCodec. Nothing captured is replayed; the two-step split is only because the envelope builder
+		// Injects THIS drop's live contents (cash + rolled items) into an already-from-scratch-built loot-bag record
+		// (WorldObjectCodec + LootContainerTemplate build the identity + kd-tree + a scaffold ProtoLootBagIIR): keeps
+		// the constructed envelope and swaps the trailing [u32 len][ProtoLootBagIIR] for the live contents, via the
+		// typed LootBagContentsCodec. Nothing captured is replayed; the two-step split is only because the envelope builder
 		// is the generic dynel/bag one, so the loot-specific cash+items are injected here at drop time. Per-item ids
 		// are synthetic (display only). Returns the body unchanged if the contents blob can't be located.
-		public static byte[] WithLootContents(byte[] body, uint handle, uint cash, IReadOnlyList<(uint Pos, Item Item)> entries)
+		public static byte[] WithLootContents(byte[] record, uint handle, uint cash, IReadOnlyList<(uint Pos, Item Item)> entries)
 		{
-			if (body.Length <= 8 || !LootBagMessageCodec.TryParse(body.AsSpan(8), out var contents, out var contentsStart))
-				return body;
+			if (!WorldObjectColumns.TryLocateContents(record, out var contents, out var contentsStart))
+				return record;
 
 			contents.Cash = cash;
 			contents.Inventory.Items.Clear();
@@ -51,13 +51,8 @@ namespace Faolan.Core.Network.Codecs.World
 				? Math.Max(10u, maxPos + 1)
 				: 10u;
 
-			var newContents = LootBagMessageCodec.BuildContents(contents);
-			var newRecordLen = contentsStart + newContents.Length;
-			var result = new byte[8 + newRecordLen];
-			body.AsSpan(0, 8 + contentsStart).CopyTo(result); // [u32 len][u32 subOpcode][identity + kd-tree]
-			newContents.CopyTo(result.AsSpan(8 + contentsStart)); // the new [u32 len][ProtoLootBagIIR] tail
-			result.WriteU32Be(0, (uint)(4 + newRecordLen)); // carrier len = subOpcode + record
-			return result;
+			var iir = WorldObjectCodec.Parse(record);
+			return WorldObjectCodec.Build(iir with { Tail = [.. iir.Tail.AsSpan(0, contentsStart), .. LootBagContentsCodec.Build(contents)] });
 		}
 	}
 }

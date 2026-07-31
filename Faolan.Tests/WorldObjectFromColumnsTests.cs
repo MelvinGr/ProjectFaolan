@@ -18,7 +18,7 @@ namespace Faolan.Tests
 	// CONTENTS, which is session state and deliberately not persisted (#410) - a chest rebuilds with the same clean
 	// empty scaffold a dropped bag gets, so the comparison covers everything the columns own and stops where the
 	// contents begin. The contents codec has its own gates (LootBagTemplateTests).
-	public class WorldObjectBuilderTests
+	public class WorldObjectFromColumnsTests
 	{
 		[Theory, InlineData("WorldObjDecor"), InlineData("WorldObjZone"), InlineData("WorldObjDestructible"), InlineData("WorldObjClimbing")]
 		public void TryBuild_FromLiftedRow_ReproducesCapturedBody(string golden)
@@ -27,8 +27,9 @@ namespace Faolan.Tests
 			var row = RowFromCapturedBody(capturedBody);
 			var handle = capturedBody.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 
-			var body = WorldObjectBuilder.Build(row, handle, ReadToken(capturedBody));
-			Assert.Equal(capturedBody, body);
+			// The carrier's [u32 len] is the SENDER's (#530 rule 2), so the codec is compared against the record.
+			var body = WorldObjectCodec.Build(row, handle, ReadToken(capturedBody));
+			Assert.Equal(capturedBody[4..], body);
 		}
 
 		// The container: byte-exact up to the loot contents, which are not DB state (see the class comment). The
@@ -41,15 +42,14 @@ namespace Faolan.Tests
 			var row = RowFromCapturedBody(capturedBody);
 			var handle = capturedBody.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 
-			var body = WorldObjectBuilder.Build(row, handle, ReadToken(capturedBody));
+			var body = WorldObjectCodec.Build(row, handle, ReadToken(capturedBody));
 
 			var contentsStart = body.Length - LootContainerTemplate.BuildEmptyContents().Length;
 			Assert.True(contentsStart > 0 && contentsStart < capturedBody.Length, $"contents boundary {contentsStart} is not inside the captured body ({capturedBody.Length})");
 
-			// From byte 4: the body-length word at [0] legitimately differs, since an empty contents scaffold is
-			// shorter than the captured chest's loot. Everything the columns own must still match to the byte.
-			Assert.Equal(capturedBody[4..contentsStart], body[4..contentsStart]);
-			Assert.Equal((uint)(body.Length - 4), body.ReadU32Be(0));
+			// Everything the columns own must match to the byte; only the contents scaffold differs, since an empty
+			// one is shorter than the captured chest's loot.
+			Assert.Equal(capturedBody[4..(4 + contentsStart)], body[..contentsStart]);
 		}
 
 		[Fact]
@@ -60,15 +60,15 @@ namespace Faolan.Tests
 			var capturedBody = Golden.Bytes("WorldObjDecor");
 			var row = RowFromCapturedBody(capturedBody);
 
-			var body = WorldObjectBuilder.Build(row, 0x000B5678u, ReadToken(capturedBody));
+			var body = WorldObjectCodec.Build(row, 0x000B5678u, ReadToken(capturedBody));
 
-			Assert.Equal(capturedBody.Length, body.Length);
-			Assert.Equal(0x000B5678u, body.ReadU32Be(SpawnPacketBuilder.HandleOffset));
+			Assert.Equal(capturedBody.Length - 4, body.Length);
+			Assert.Equal(0x000B5678u, body.ReadU32Be(SpawnPacketBuilder.HandleOffset - 4));
 			for (var i = 0; i < body.Length; i++)
 			{
-				var inHandleField = i is >= SpawnPacketBuilder.HandleOffset and < SpawnPacketBuilder.HandleOffset + 4;
+				var inHandleField = i is >= SpawnPacketBuilder.HandleOffset - 4 and < SpawnPacketBuilder.HandleOffset;
 				if (!inHandleField)
-					Assert.Equal(capturedBody[i], body[i]);
+					Assert.Equal(capturedBody[i + 4], body[i]);
 			}
 		}
 
@@ -94,7 +94,7 @@ namespace Faolan.Tests
 				RotationW = body.ReadF32Le(SpawnPacketBuilder.RotWOffset)
 			};
 			// Lift the identity + geometry columns from the captured body (as the importer does from the dump).
-			Assert.True(SimpleDynelMessageCodec.TryLiftColumns(row, body), $"lift failed for {row.SubOpcode:X8}");
+			Assert.True(WorldObjectColumns.TryLiftColumns(row, WorldObjectColumns.RecordOf(body)), $"lift failed for {row.SubOpcode:X8}");
 			return row;
 		}
 	}

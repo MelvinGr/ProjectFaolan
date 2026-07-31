@@ -32,8 +32,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void TargetPair_IsAnEntityClassAndHandle()
 		{
-			var none = FanaticCommandCodec.TryParse(Convert.FromHexString(CloakRecord))!.Value;
-			var self = FanaticCommandCodec.TryParse(Convert.FromHexString(CloakSelfTargetedRecord))!.Value;
+			var none = FanaticCommandCodec.Parse(Record(CloakRecord));
+			var self = FanaticCommandCodec.Parse(Record(CloakSelfTargetedRecord));
 
 			Assert.Equal("/cloak", none.Text);
 			Assert.Equal("/cloak", self.Text);
@@ -50,15 +50,14 @@ namespace Faolan.Tests
 		[InlineData(TeleportRecord, "/teleport gm island")]
 		public void Parses_TheRealRecordsOffTheWire(string hex, string expectedText)
 		{
-			var parsed = FanaticCommandCodec.TryParse(Convert.FromHexString(hex));
+			var parsed = FanaticCommandCodec.Parse(Record(hex));
 
-			Assert.NotNull(parsed);
-			Assert.Equal(expectedText, parsed!.Value.Text);
-			Assert.Equal(0x0802E5D4u, parsed.Value.Handle);
-			Assert.Equal(0, parsed.Value.Flag);   // the carrier flag byte
-			Assert.Equal(2u, parsed.Value.Word0); // constant across commands - NOT a command id
-			Assert.Equal(0u, parsed.Value.TargetA); // 0/0 = "no explicit target"; the client substitutes its own pair
-			Assert.Equal(0u, parsed.Value.TargetB);
+			Assert.Equal(expectedText, parsed.Text);
+			Assert.Equal(0x0802E5D4u, parsed.Handle);
+			Assert.Equal(0, parsed.Flag);   // the carrier flag byte
+			Assert.Equal(2u, parsed.Word0); // constant across commands - NOT a command id
+			Assert.Equal(0u, parsed.TargetA); // 0/0 = "no explicit target"; the client substitutes its own pair
+			Assert.Equal(0u, parsed.TargetB);
 		}
 
 		// The regression: the carrier's flag byte belongs BEFORE the record, and dropping it slides every field by one.
@@ -82,7 +81,7 @@ namespace Faolan.Tests
 			Assert.Equal(0u, U32(21));  // targetA
 			Assert.Equal(0u, U32(25));  // targetB
 			Assert.Equal(6u, U32(29));  // textLength == "/cloak".Length
-			Assert.Equal("/cloak", FanaticCommandCodec.TryParse(body)!.Value.Text);
+			Assert.Equal("/cloak", FanaticCommandCodec.Parse(body.AsSpan(4)).Text);
 		}
 
 		// The synthetic builder must reproduce the real records byte-for-byte, or it is not modelling the wire.
@@ -98,26 +97,30 @@ namespace Faolan.Tests
 		[Fact]
 		public void EmptyText_ParsesAsEmptyNotNull()
 		{
-			var parsed = FanaticCommandCodec.TryParse(Body(2, 0, 0, ""));
+			var parsed = FanaticCommandCodec.Parse(Body(2, 0, 0, "").AsSpan(4));
 
-			Assert.NotNull(parsed);
-			Assert.Equal("", parsed!.Value.Text);
+			Assert.Equal("", parsed.Text);
 		}
 
-		// This is an undecoded inbound path: a short or lying body must degrade, never throw into the inbound loop.
+		// This is an undecoded inbound path, so Parse is STRICT (#530 rule 4): a short or lying body is a decode
+		// FAILURE that names the offset, not a half-read record. The inbound handler catches it and tells the GM the
+		// body did not parse - which is the honest outcome when there is no capture to check a partial read against.
 		[Fact]
-		public void MalformedBodies_Degrade_RatherThanThrow()
+		public void MalformedBodies_Throw()
 		{
-			Assert.Null(FanaticCommandCodec.TryParse([1, 2, 3]));
-			Assert.Null(FanaticCommandCodec.TryParse(new byte[16])); // carrier only, no record
+			Assert.Throws<CodecParseException>(() => FanaticCommandCodec.Parse(new byte[] { 1, 2, 3 }));
+			Assert.Throws<CodecParseException>(() => FanaticCommandCodec.Parse(new byte[12])); // carrier only, no record
 
-			// A length field larger than the body: the text is dropped, the rest of the record still reads.
-			var lying = Body(9, 0, 0, "abc");
+			// A length field larger than the body used to yield "no text" and a plausible-looking record.
+			var lying = Body(9, 0, 0, "abc")[4..];
 			lying[^4] = 0x7F; // blow up the declared text length
-			var parsed = FanaticCommandCodec.TryParse(lying);
-			Assert.NotNull(parsed);
-			Assert.Equal(9u, parsed!.Value.Word0);
-			Assert.Equal("", parsed.Value.Text);
+			Assert.Throws<CodecParseException>(() => FanaticCommandCodec.Parse(lying));
+		}
+
+		// The captured record WITHOUT its leading u32 record length - what the codec parses (#530 rule 2).
+		private static byte[] Record(string hex)
+		{
+			return Convert.FromHexString(hex)[4..];
 		}
 
 		// Builds a c2s body the way the client does: carrier, flag byte, three u32s, then the u32-length-prefixed text.

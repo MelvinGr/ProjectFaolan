@@ -378,7 +378,7 @@ namespace Faolan.GameServer.World
 
 		// The FA015807 spawn BODY (the bytes after the RPC header) that renders this entity on a client. Constructed
 		// FROM SCRATCH - never a verbatim capture: NPCs via NpcSpawnBuilder.TryBuildLive from the typed NpcSpawn columns
-		// (the old captured NpcSpawn.Data blob is retired), pets via TryBuildFromType, loot via WorldObjectBuilder, and
+		// (the old captured NpcSpawn.Data blob is retired), pets via TryBuildFromType, loot via WorldObjectCodec, and
 		// players via PlayerSpawnBuilder.BuildFromScratch (stashed by CaptureOwnSpawnBody at entry). This is a RUNTIME,
 		// in-memory cache of that built body - never persisted, never touched by the importer - which the broadcaster
 		// re-frames per recipient (current position + live playfield token) in SendWorldSpawn, so it isn't rebuilt for

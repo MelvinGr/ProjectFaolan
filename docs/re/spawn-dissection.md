@@ -27,7 +27,7 @@
 > - **`96C46740` MoveTask** — grammar CRACKED; `dissect_movetask.py coverage` round-trips **4267/4267 (100%)**,
 >   82.8% fully field-grammared; `MoveTaskCodec.Build{Stationary,Patrol}` build byte-exact.
 > - **`66AEDD50`/`F096251E`/`33A56FB0` world objects** — message + tail DISSECTED; tail round-trips **1854/1854**;
->   `WorldObjectBuilder` rebuilds byte-exact.
+>   `WorldObjectCodec` rebuilds byte-exact.
 > - **`737A6DF9` inventory snapshot** — containers + tails parse→reserialize byte-identical (`InventorySnapshotTests`).
 > - **`642CD3D6` Interact** (inbound) — actionType/args/trailing slots+handle decoded (combat, equip, conversation).
 >
@@ -298,11 +298,11 @@ CONSTRUCTION PROGRESS (2026-06-10):
   cross-session and kept verbatim). `IDatabaseRepository.GetNpcSpawns(mapId)` added.
 
 - ✓ BURST-FREE CONSTRUCT VALIDATED IN-CLIENT (commit a7e6841, 2026-06-11). A from-scratch entity — built
-  FA015807 (`NpcSpawnBuilder`) + built stationary 96C46740 (`MoveTaskBuilder.BuildStationary`) on a fresh server
+  FA015807 (`NpcSpawnBuilder`) + built stationary 96C46740 (`MoveTaskNodes.Stationary`) on a fresh server
   handle (0x90001), framed onto a live burst header — is POLLED by the client (0x2020→SpawnCheck) and renders
   standing put beside the player. Isolated step-by-step via the `FAOLAN_BUILT_NPC_TEST=1` harness
   (`RetailLoginReplay.InjectBuiltTestNpc`): a clone of a real spawn renders (mechanism/handle/ordering OK), the
-  built spawn renders (builder OK), the built stationary MoveTask keeps it put (MoveTaskBuilder OK). So the
+  built spawn renders (builder OK), the built stationary MoveTask keeps it put (MoveTask builder OK). So the
   construct-from-scratch path WORKS against the real client. NOTE: the client only polls entities near the
   player's spawn (a far-off injection was ignored), and the SpawnCheck is reactive (answers any polled handle),
   so no manifest entry is needed for an injected spawn.
@@ -502,10 +502,10 @@ CONSTRUCTION DONE (2026-06-10, commits 7fce36c + 842f5fd) — same arc as NPC sp
 - `WorldObject` table (NOTE: the pre-existing `MapObject` is the unrelated archive table) + migration;
   `WorldObjectExtractor` lifts subOpcode/transform/id/name; importer populates faolan.db (644 objects: 548
   decor, 51 containers, 45 zones, all named). `IDatabaseRepository.GetWorldObjects(mapId)`.
-- `WorldObjectBuilder.TryBuild` (full body from columns — for the future burst-free build) + byte-exact tests
-  across all three classes (`WorldObjectBuilderTests`/`WorldObjectExtractorTests`).
+- `WorldObjectCodec.Build` (full body from columns — for the future burst-free build) + byte-exact tests
+  across all three classes (`WorldObjectFromColumnsTests`/`WorldObjectExtractorTests`).
 - Wired into `ReplayMapWorldBurst`: each burst object is matched to its row by position and built via
-  `WorldObjectBuilder.TryBuildOntoLivePlacement` - keeps the LIVE placement (handle/transform/playfield) and
+  `WorldObjectColumns.TryReplaceIdentity` - keeps the LIVE placement (handle/transform/playfield) and
   splices in only the DB object identity (message + tail), put on the wire when byte-identical. Beach: 4/12
   (the static zone + decor) now come from the table byte-identical, zero risk.
 - The 8 interactive chests differ in the tail's `stateHandle` + `interaction` protobuf (the
@@ -548,7 +548,7 @@ largest/most-variable family.
 
 MINIMAL STATIONARY FORM — BUILT (2026-06-10, commit 3b8dfa4). A non-patrolling NPC's MoveTask is a constant
 31-byte body (confirmed across 58 captured instances): `[bodyLen=27][96C46740][ack=0xC350][handle][00 00][vec3
-pos BIG-ENDIAN][06]` (the `06` terminator vs `04` = a movement segment follows). `MoveTaskBuilder.BuildStationary
+pos BIG-ENDIAN][06]` (the `06` terminator vs `04` = a movement segment follows). `MoveTaskNodes.Stationary
 (handle, position)` constructs it byte-exact (`MoveTaskBuilderTests`). This UNBLOCKS the burst-free NPC path:
 an NPC needs only its position (already in NpcSpawns) to register + render standing still, so the full
 multi-segment patrol grammar becomes an ENHANCEMENT, not a blocker. CONFIRMED IN-CLIENT 2026-06-11 (commit
@@ -557,7 +557,7 @@ put — see the Phase-4 "BURST-FREE CONSTRUCT VALIDATED IN-CLIENT" entry.
 
 CANONICAL PATROL FORM — BUILT 2026-06-11 (commit pending). The dominant single-segment waypoint patrol
 (`04 01 00 02 01 01 00 00 00 00 [count] [count x WP] 00 [speed f32] [12x00] [anchor=curPos] 00 01`) is
-constructed byte-exact by `MoveTaskBuilder.BuildPatrol(handle, currentPosition, waypoints, speed)` — proven
+constructed byte-exact by `MoveTaskNodes.Patrol(waypoints, speed, currentPosition)` — proven
 against the captured golden `Faolan.Tests/Golden/MoveTaskPatrol.bin` (handle 0x17E03, 2 waypoints) in
 `MoveTaskBuilderTests`. So a MOVING NPC's registration can now be constructed from {position, waypoint path,
 speed} — the data a `PatrolPath` schema would hold — complementing `BuildStationary` for non-movers. 165 of the

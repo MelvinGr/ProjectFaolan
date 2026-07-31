@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using System.Text;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -21,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	{
 		// The create-editor IIR types this builder is the CANONICAL emitter of (the ones without a dedicated codec).
 		// The other Build* methods below (GameTime, PlayfieldFiir, Regen, Feedback, ComboBook, ...) build bodies for
-		// types owned by their own codecs (GameTimeCodec, MapChangeCodec, ...), which declare those - so they are not
+		// types owned by their own codecs (GameTimeCodec, PlayfieldFCodec, ...), which declare those - so they are not
 		// listed here (declaring twice would double-attribute in the coverage matrix). #317 convention.
 		public static readonly GameServer0X2000Opcodes[] HandledTypes =
 		[
@@ -173,16 +174,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// the rate is the day-cycle speed (1.0 in every capture). Raw-body floats are big-endian.
 		public static byte[] BuildGameTimeIir(float dayTimeSeconds, uint word, uint gameDay, uint unixSeconds, bool isToBePassed = true, float rate = 1.0f)
 		{
-			return new FaolanStream()
-				.WriteUInt32(0u)
-				.WriteUInt32(0u)
-				.WriteByte(isToBePassed)
-				.WriteFloat(dayTimeSeconds)
-				.WriteUInt32(word)
-				.WriteUInt32(gameDay)
-				.WriteUInt32(unixSeconds)
-				.WriteFloat(rate)
-				.ToArray();
+			// One encoder per record (#530 rule 1): GameTimeCodec owns the layout, and the create burst wants it
+			// WITHOUT the leading IIR type word (the burst helper prepends that itself).
+			return GameTimeCodec.Build(new GameTimeIIR(dayTimeSeconds, word, gameDay, unixSeconds, isToBePassed, rate))[4..];
 		}
 
 		// PlayfieldFIIR (0x5D85BFC7, "MapChange"): announces the playfield the client is entering - its reference
@@ -216,37 +210,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public static byte[] BuildPlayfieldFiir(float posX, float posY, float posZ, uint mapId, uint charInstance, uint count, uint playfieldToken, float nearClip, float farClip, uint flags,
 			uint sceneWord = 0u, uint blobLastWord = 0u, uint fieldA = 0u, uint fieldC = 7u)
 		{
-			// The length-prefixed sub-blob at @59: the client reads it through FUN_00cbf5d0, so its contents are a
-			// nested stream and not four more top-level words. 24 bytes in all 151 captured records.
-			var sceneBlob = new FaolanStream()
-				.WriteUInt32(0x00000001u)
-				.WriteUInt32(playfieldToken) // the token again, inside the blob
-				.WriteUInt32(0x0000CB20u)
-				.WriteFloat(nearClip)
-				.WriteFloat(farClip)
-				.WriteUInt32(blobLastWord) // beach capture carries 0x3, retail Old Tarantia 0x0
-				.ToArray();
-
-			var s = new FaolanStream()
-				.WriteUInt32(0u)
-				.WriteUInt32(0u)
-				.WriteByte(0x00) // [0:9] the IIR base carrier: [u32 c350][u32 handle][u8 env]
-				.WriteFloat(posX)
-				.WriteFloat(posY)
-				.WriteFloat(posZ); // [9:21] reference position
-
-			// [21:55] the embedded PlayfieldProxy. Slot [2] is the per-map fieldA and slot [5] the small count -
-			// two slots the teleport and team-member embeddings both read as constants; see PlayfieldProxy.
-			new PlayfieldProxy(mapId, PlayfieldProxy.PlayfieldClass, charInstance, count, PlayfieldProxy.PinnedInstanceWord, playfieldToken, OwnerType: fieldA).Write(s);
-
-			return s
-				.WriteUInt32(sceneWord) // [55:59] -> obj+0x54
-				.WriteArrayUInt32Length(sceneBlob) // [59:87]
-				.WriteUInt32(0xFFFFFFFFu)
-				.WriteUInt32(0xFFFFFFFFu)
-				.WriteUInt32(fieldC) // per-MAP, 0 on 1010/2010/2040/5007 and 6 on 11040 (#451)
-				.WriteUInt32(flags)
-				.ToArray();
+			// One encoder per record (#530 rule 1): PlayfieldFCodec owns the layout, and the create burst wants it
+			// WITHOUT the leading IIR type word (the burst helper prepends that itself).
+			return PlayfieldFCodec.Build(new Vector3(posX, posY, posZ), mapId, charInstance, count, playfieldToken, nearClip, farClip, flags, sceneWord, blobLastWord, fieldA, fieldC)[4..];
 		}
 
 		// RegenIIR (0x28D0AC99): an entity regen record - three resource/regen values. 21 bytes:

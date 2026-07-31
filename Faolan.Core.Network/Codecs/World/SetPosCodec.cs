@@ -1,45 +1,58 @@
+using System;
 using System.Numerics;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.World
 {
 	// SetPosIIR_c (0x04B80B24) - the teleport/snap record: position(3) + rotation(4) floats + a trailing bool
 	// (FUN_00a33770; the client finite-checks the pos & rot).
+	//
+	// The u32 length prefix belongs to the SENDER (#530 rule 2) - WorldIir.Send writes it.
 	public static class SetPosCodec
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.SetPosIIR;
 
-		public static byte[] Build(uint handle, Vector3 position, float r0, float r1, float r2, float r3, byte flag = 0x00, byte env = 0x00)
+		// CANONICAL - the only method here that writes bytes.
+		public static byte[] Build(SetPosIIR value)
 		{
-			var c = new FaolanStream();
-			c
-				.WriteUInt32(Opcode)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(handle)
-				.WriteByte(env)
-				.WriteVector3(position)
-				.WriteFloat(r0)
-				.WriteFloat(r1)
-				.WriteFloat(r2)
-				.WriteFloat(r3)
-				.WriteByte(flag);
-			return CharDCMoveCodec.WithLength(c.ToArray());
+			ArgumentNullException.ThrowIfNull(value);
+			using var s = new FaolanStream();
+			Write(s, value);
+			return s.ToArray();
 		}
 
-		public static Parsed Parse(byte[] body)
+		public static byte[] Build(uint handle, Vector3 position, Quaternion rotation, byte flag = 0x00, byte env = 0x00)
 		{
-			var s = new FaolanStream(body);
-			s.ReadUInt32();
-			s.ReadUInt32();
-			s.ReadUInt32();
-			var handle = s.ReadUInt32();
-			var env = s.ReadByte();
-			var pos = s.ReadVector3();
-			var (r0, r1, r2, r3) = (s.ReadFloat(), s.ReadFloat(), s.ReadFloat(), s.ReadFloat());
-			return new Parsed(handle, env, pos, r0, r1, r2, r3, s.ReadByte());
+			return Build(new SetPosIIR(handle, env, position, rotation, flag));
 		}
 
-		public sealed record Parsed(uint Handle, byte Env, Vector3 Position, float R0, float R1, float R2, float R3, byte Flag);
+		public static SetPosIIR Parse(in ReadOnlySpan<byte> data)
+		{
+			var r = new SpanReader(data, nameof(SetPosCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+			return value;
+		}
+
+		internal static SetPosIIR Read(ref SpanReader r)
+		{
+			r.ExpectU32Be(Opcode, "SetPosIIR subop");
+			r.ExpectU32Be(EntityClass.Character, "entity class");
+			var handle = r.ReadU32Be();
+			var env = r.ReadU8();
+			var position = r.ReadVector3Be();
+			var rotation = r.ReadQuaternionBe();
+			return new SetPosIIR(handle, env, position, rotation, r.ReadU8());
+		}
+
+		internal static void Write(FaolanStream s, SetPosIIR v)
+		{
+			s.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(v.Handle).WriteByte(v.Env).WriteVector3(v.Position).WriteQuaternion(v.Rotation).WriteByte(v.Flag);
+		}
 	}
+
+	// SetPosIIR (0x04B80B24).
+	public sealed record SetPosIIR(uint Handle, byte Env, Vector3 Position, Quaternion Rotation, byte Flag);
 }

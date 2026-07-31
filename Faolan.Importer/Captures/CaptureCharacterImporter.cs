@@ -128,9 +128,16 @@ namespace Faolan.Importer.Captures
 					var subop = body.ReadU32Be(4);
 					if (subop == MapChangeSubOpcode)
 					{
-						// body is [u32 len][subop][PlayfieldFiir]; MapChangeCodec parses [subop][body], so skip the length.
-						if (MapChangeCodec.TryParse(body.AsSpan(4), out var mc))
-							currentMap = mc.MapId;
+						// body is [u32 len][subop][PlayfieldFiir]; PlayfieldFCodec parses [subop][body], so skip the length.
+						try
+						{
+							currentMap = PlayfieldFCodec.Parse(body.AsSpan(4)).MapId;
+						}
+						catch (CodecParseException)
+						{
+							// not a full PlayfieldFIIR body - leave the current map alone rather than guessing
+						}
+
 						continue;
 					}
 

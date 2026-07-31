@@ -23,7 +23,7 @@ namespace Faolan.Importer.Extractors
 	}
 
 	// Extracts NPC patrol routes from a capture's MoveTask packets (MoveTaskIIR 0x96C46740): tracks the current map
-	// (MapChange 5D85BFC7), parses every MoveTask via the fully-decoded recursive grammar (MoveTaskComposite,
+	// (MapChange 5D85BFC7), parses every MoveTask via the fully-decoded recursive grammar (MoveTaskCodec,
 	// round-trips all 6225 captured records), and columnarizes the task tree into a PatrolNode tree (#316) so the
 	// runtime CONSTRUCTS the patrol from DB columns rather than replaying a captured blob. Keyed by handle (the
 	// same-session mob identity); dedup by (map, position) joins a route to its NPC. Sibling of NpcSpawnExtractor.
@@ -61,11 +61,11 @@ namespace Faolan.Importer.Extractors
 				if (subop != MoveTaskSubOpcode || currentMap == 0)
 					continue;
 
-				MoveTaskComposite task;
+				MoveTaskIIR task;
 				// Parse expects the record starting at the subop; the packet Body includes the leading [u32 len], so skip it.
 				try
 				{
-					task = MoveTaskComposite.Parse(body[4..]);
+					task = MoveTaskCodec.Parse(body.AsSpan(4));
 				}
 				catch
 				{

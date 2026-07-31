@@ -157,7 +157,7 @@ namespace Faolan.GameServer
 				if (obj != null)
 				{
 					await _agentServerDispatcher.SendSystemMessage(characterId,
-						$"Deleted world object {WorldObjectDisplay.Build(obj) ?? obj.Name ?? "(unnamed)"} (0x{handle:X8}) - removed live + DB row (gone on relog too).");
+						$"Deleted world object {WorldObjectDisplay.ToWire(obj) ?? obj.Name ?? "(unnamed)"} (0x{handle:X8}) - removed live + DB row (gone on relog too).");
 					return;
 				}
 
@@ -455,14 +455,14 @@ namespace Faolan.GameServer
 
 				// Shift the phase so the CURRENT instant reads as the requested time of day.
 				var wanted = (long)(hours * 3600 + minutes * 60);
-				_gameTimeOffset = (_gameTimeOffset + wanted - (long)GameTimeCodec.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset) + GameTimeCodec.GameDaySeconds) % GameTimeCodec.GameDaySeconds;
+				_gameTimeOffset = (_gameTimeOffset + wanted - (long)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset) + GameClock.GameDaySeconds) % GameClock.GameDaySeconds;
 			}
 
 			await client.SendAsync(BuildGameTime(client));
 
-			var timeOfDay = (uint)GameTimeCodec.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset);
+			var timeOfDay = (uint)GameClock.TimeOfDay(DateTimeOffset.UtcNow, _gameTimeOffset);
 			await _agentServerDispatcher.SendSystemMessage(characterId,
-				$"World time {timeOfDay / 3600:00}:{timeOfDay % 3600 / 60:00} (game day = {GameTimeCodec.GameDayRealSeconds / 3600.0:0.#} real hours, offset {_gameTimeOffset}s)");
+				$"World time {timeOfDay / 3600:00}:{timeOfDay % 3600 / 60:00} (game day = {GameClock.GameDayRealSeconds / 3600.0:0.#} real hours, offset {_gameTimeOffset}s)");
 		}
 
 		// .kill [<handle> | self]  - kill the player's currently SELECTED target (last LookAt/SelectDeselect), or the
@@ -875,7 +875,7 @@ namespace Faolan.GameServer
 			if (_simulation.World.ZoneForEntity(player).TryGetWorldObject(handle, out var live))
 			{
 				var obj = live.Row;
-				var oname = WorldObjectDisplay.Build(obj) ?? obj.Name ?? "(unnamed object)";
+				var oname = WorldObjectDisplay.ToWire(obj) ?? obj.Name ?? "(unnamed object)";
 				var dest = obj.DestinationPosition is { } dp
 					? $" · teleports to map {obj.DestinationMapId} ({dp.X:F1}, {dp.Y:F1}, {dp.Z:F1})"
 					: "";

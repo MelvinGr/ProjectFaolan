@@ -11,9 +11,9 @@ namespace Faolan.Tests
 	// The whole-corpus gate on the world-object column lift: EVERY captured SimpleDynelFullUpdateIIR must lift into
 	// columns and rebuild its identity message + geometry record byte-exact.
 	//
-	// This exists because the lift is deliberately ALL-OR-NOTHING (SimpleDynelMessageCodec.TryLiftColumns): a record
+	// This exists because the lift is deliberately ALL-OR-NOTHING (WorldObjectColumns.TryLiftColumns): a record
 	// carrying a field no column covers is left UN-LIFTED rather than half-stored, which is the right call but is also
-	// SILENT - the importer ships the row, WorldObjectBuilder then refuses to build it, and the object simply never
+	// SILENT - the importer ships the row, WorldObjectCodec then refuses to build it, and the object simply never
 	// spawns. One row sat like that (the map 11040 "Siege Camp", the only captured object that sets proto field 4
 	// `show_popup_on_use`) and nothing failed. A per-row assertion in the importer would only cover rows the importer
 	// happens to select; asserting over the corpus covers the grammar itself.
@@ -28,7 +28,7 @@ namespace Faolan.Tests
 			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR))
 			{
 				var row = new WorldObject();
-				if (SimpleDynelMessageCodec.TryLiftColumns(row, body))
+				if (WorldObjectColumns.TryLiftColumns(row, WorldObjectColumns.RecordOf(body)))
 				{
 					lifted++;
 					continue;

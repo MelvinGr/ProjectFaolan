@@ -34,7 +34,7 @@ multi-charge claim (Double XP) instead gets a `0x05` ack echoing the row with Am
 
 ### The 0x0001 list entry (106 bytes)
 
-Built byte-exact by `CoreClaimListCodec` (proven by `CoreClaimListCodecTests.Build_MatchesCapturedList`
+Built byte-exact by `CoreClaimCodec` (proven by `CoreClaimCodecTests.Build_MatchesCapturedList`
 against frame 399):
 
 ```
@@ -83,7 +83,7 @@ not exist to harvest. Tracked as a follow-up.
 
 ### The 0x0009 "new claims" glow
 
-`CoreClaimListCodec.BuildNewClaimsGlow` (proven by `CoreClaimListCodecTests`) is the short 14-byte push that lights the claims
+`CoreClaimCodec.Build(new CoreClaimNewClaimsIIR(...))` (proven by `CoreClaimCodecTests`) is the short 14-byte push that lights the claims
 button. Retail sends it at world entry **only when the account has unseen claims** — present in the Faolanx
 login capture (new claims), absent in the NecroL80 capture (claims already viewed). The server gates it on a
 single per-account flag `Account.ClaimsAvailable` (`GameServerListener.SendNewClaimsGlowIfAny`) — set true

@@ -501,18 +501,26 @@ namespace Faolan.GameServer
 				// so report the parsed command rather than inventing a reply (#448/#449).
 				case GameServer0X2000Opcodes.FanaticCommandIir:
 				{
-					var fanatic = FanaticCommandCodec.TryParse(rawPayload);
-					// The raw body rides along: the c2s grammar has no capture behind it (the corpus holds no GM
-					// session), so the bytes are the only way to check a parse against reality.
-					Logger.LogInformation("GameServer FanaticCommandIIR: text='{Text}' word0={Word0} targets=({TargetA:X8},{TargetB:X8}) ({RawLength} bytes) raw={Raw}",
-						fanatic?.Text, fanatic?.Word0, fanatic?.TargetA, fanatic?.TargetB, rawPayload.Length, Convert.ToHexString(rawPayload));
-
-					if (fanatic is not { } f)
+					// The codec's Parse is strict (#530 rule 4); on an undecoded inbound path that means reporting the
+					// failure to the GM rather than acting on a half-read record. `rawPayload` is the framed record, so
+					// the body starts past its u32 length.
+					FanaticCommandIir f;
+					try
 					{
+						f = FanaticCommandCodec.Parse(rawPayload.AsSpan(4));
+					}
+					catch (CodecParseException e)
+					{
+						Logger.LogWarning(e, "GameServer FanaticCommandIIR did not parse ({RawLength} bytes) raw={Raw}", rawPayload.Length, Convert.ToHexString(rawPayload));
 						await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
 							$"GM command received but the FanaticCommandIIR body did not parse ({rawPayload.Length} bytes).");
 						break;
 					}
+
+					// The raw body rides along: the c2s grammar has no capture behind it (the corpus holds no GM
+					// session), so the bytes are the only way to check a parse against reality.
+					Logger.LogInformation("GameServer FanaticCommandIIR: text='{Text}' word0={Word0} targets=({TargetA:X8},{TargetB:X8}) ({RawLength} bytes) raw={Raw}",
+						f.Text, f.Word0, f.TargetA, f.TargetB, rawPayload.Length, Convert.ToHexString(rawPayload));
 
 					// The client's own GM commands run through the SAME table as our `.` ones: the command is entirely
 					// in the text (`word0` is a constant 2), and it arrives as "/verb args" - the exact shape

@@ -8,7 +8,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// #316 columnarization gate: every committed patrol body (Golden/PatrolBodies.bin - the 136 PatrolPath.Body blobs)
-	// must survive MoveTaskComposite -> PatrolNode tree -> MoveTaskComposite byte-for-byte. This proves the DB
+	// must survive MoveTaskIIR -> PatrolNode tree -> MoveTaskIIR byte-for-byte. This proves the DB
 	// columnarization (PatrolNode/PatrolNodeMapper) loses nothing, so the runtime can build patrols from columns
 	// instead of replaying the captured Body.
 	public class PatrolNodeRoundTripTests
@@ -18,21 +18,14 @@ namespace Faolan.Tests
 		{
 			_ = index;
 
-			// PatrolPath.Body is the record from the subop onward - the shape MoveTaskComposite.Parse accepts.
-			var original = MoveTaskComposite.Parse(body);
+			// PatrolPath.Body is the record from the subop onward - the shape MoveTaskCodec.Parse accepts.
+			var original = MoveTaskCodec.Parse(body);
 
 			var rootNode = PatrolNodeMapper.ToNode(original.Task);
 
-			var rebuilt = new MoveTaskComposite
-			{
-				Handle = original.Handle,
-				FromX = original.FromX,
-				FromY = original.FromY,
-				FromZ = original.FromZ,
-				Task = PatrolNodeMapper.ToTask(rootNode)
-			};
+			var rebuilt = original with { Task = PatrolNodeMapper.ToTask(rootNode) };
 
-			Assert.Equal(body, rebuilt.Encode());
+			Assert.Equal(body, MoveTaskCodec.Build(rebuilt));
 		}
 
 		public static IEnumerable<object[]> Bodies()

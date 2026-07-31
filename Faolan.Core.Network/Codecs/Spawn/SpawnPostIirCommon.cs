@@ -82,7 +82,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				if (flag == 1)
 				{
 					var reader = new FaolanStream(post[(i + 1)..frame]);
-					common.MoveTask = MoveTaskNode.Read(reader);
+					common.MoveTask = MoveTaskNodeCodec.Read(reader);
 					if (reader.Position != frame - i - 1)
 						throw new FormatException($"the move task left {frame - i - 1 - reader.Position} bytes before the buff list");
 				}
@@ -145,7 +145,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (HasMoveTaskSlot)
 			{
 				record.WriteByte(MoveTask != null ? (byte)1 : (byte)0);
-				MoveTask?.Write(record);
+				if (MoveTask != null)
+					MoveTaskNodeCodec.Write(record, MoveTask);
 			}
 
 			var slot = record.ToArray();

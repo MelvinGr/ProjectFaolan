@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -6,6 +7,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Extensions;
 using Faolan.Importer.Captures;
@@ -128,12 +130,13 @@ namespace Faolan.Tests
 			}
 		}
 
+		// A REAL PlayfieldFIIR, built by the codec - PlayfieldFCodec.Parse reads the record whole (#530 rule 3), so a
+		// 40-byte stub with the map id at an offset is no longer a MapChange.
 		private static byte[] MapChangePacket(uint mapId)
 		{
-			var body = new byte[40];
-			body.WriteU32Be(0, (uint)body.Length - 4);
-			body.WriteU32Be(4, 0x5D85BFC7);
-			body.WriteU32Be(34, mapId);
+			var record = PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0);
+			byte[] body = [0, 0, 0, 0, .. record];
+			body.WriteU32Be(0, (uint)record.Length);
 			return WrapBody(body);
 		}
 

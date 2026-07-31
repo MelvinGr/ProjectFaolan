@@ -8,10 +8,10 @@ using Faolan.Core.Protobuf;
 namespace Faolan.Core.Network.Codecs.World
 {
 	// The generic loot-container definition, built ENTIRELY FROM SCRATCH (#193): identity columns + the decoded
-	// kd-tree bounds (typed, BuildBounds) + a clean ProtoLootBagIIR scaffold (LootBagMessageCodec). No embedded asset
+	// kd-tree bounds (typed, BuildBounds) + a clean ProtoLootBagIIR scaffold (LootBagContentsCodec). No embedded asset
 	// and no baked capture state - the former LootBagKdTreeTail.bin carried the captured bag's stale OwnerId + a
 	// captured item; the live cash + items are injected by WithLootContents into a fully-constructed bag (owner/inventory-id
-	// baked); this constructs both halves so a spawned bag carries no session leftovers. WorldObjectBuilder.BuildBody
+	// baked); this constructs both halves so a spawned bag carries no session leftovers. WorldObjectCodec.Build
 	// assembles header/transform + identity-from-columns + this tail; WithLootContents then splices the live items + cash.
 	//
 	// A "chest" is NOT a distinct type: every container size ships as the SAME LootBagFullUpdateIIR (typetag 0xC87A,
@@ -20,7 +20,9 @@ namespace Faolan.Core.Network.Codecs.World
 	// drop is just this bag built from a bigger Variant. (agent memory loot_chest_is_lootbag_bigger_template)
 	public static class LootContainerTemplate
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR; // LootBagFullUpdateIIR
+		// The container CLASS this template builds for. Not an `Opcode` declaration - WorldObjectCodec owns
+		// LootBagFullUpdateIIR (one IIR, one codec); this is which class a template row is.
+		public const uint ContainerClass = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR;
 		private const uint DefaultMaxSize = 10;
 
 		// The loot inventory's container KIND (ID32 type) on the wire; the instance is left 0 here and the live items +
@@ -56,7 +58,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// empty node list, and its "scale" is the first of the two closing words.
 		public static byte[] BuildBounds(uint nodeTag)
 		{
-			return WorldObjectGeometryCodec.Build(WithBoundsColumns(new WorldObject(), nodeTag));
+			return WorldObjectGeometryColumns.ToWire(WithBoundsColumns(new WorldObject(), nodeTag));
 		}
 
 		// The unit-box geometry columns every container shares - the pick/collision volume, [-0.5,0.5]^3.
@@ -82,7 +84,15 @@ namespace Faolan.Core.Network.Codecs.World
 		// live cash + items per drop.
 		public static byte[] BuildEmptyContents()
 		{
-			return LootBagMessageCodec.BuildContents(BuildEmptyScaffold());
+			return LootBagContentsCodec.Build(NewContents(0, new ProtoInventoryGame
+			{
+				InventoryId = new ProtoID32
+				{
+					Type = LootContainerKind,
+					Instance = 0
+				},
+				MaxSize = DefaultMaxSize
+			}));
 		}
 
 		// A fresh WorldObject for a specific container VARIANT (bag / Large Chest / a future raid chest) - identity
@@ -95,7 +105,7 @@ namespace Faolan.Core.Network.Codecs.World
 			var row = new WorldObject
 			{
 				Name = variant.Name,
-				SubOpcode = Opcode,
+				SubOpcode = ContainerClass,
 				TemplateItemId = (uint)typeId,
 				CarsGroup = 1,
 				IsClosed = true,
@@ -111,19 +121,22 @@ namespace Faolan.Core.Network.Codecs.World
 			return row;
 		}
 
-		// A clean, empty ProtoLootBagIIR scaffold (no owner, no items) - WithLootContents fills in the live cash +
-		// items per drop. Built via the proven typed codec, not a captured blob.
-		private static ProtoLootBagIIR BuildEmptyScaffold()
+		// A ProtoLootBagIIR from the live drop: the cash on the corpse and its dropped items (already an assembled
+		// ProtoInventoryGame, built the same way the backpack snapshot is). Looter/owner default to "no owner"
+		// ({0,0}) - free-for-all loot, matching the captured bags. The empty-id messages ARE emitted (the captured
+		// bags carry them), so this round-trips to the captured shape when fed the captured cash/inventory.
+		public static ProtoLootBagIIR NewContents(uint cash, ProtoInventoryGame inventory)
 		{
-			return LootBagMessageCodec.BuildLootBag(0, new ProtoInventoryGame
+			return new ProtoLootBagIIR
 			{
-				InventoryId = new ProtoID32
-				{
-					Type = LootContainerKind,
-					Instance = 0
-				},
-				MaxSize = DefaultMaxSize
-			});
+				Cash = cash,
+				CurrentLooterId = new ProtoID32 { Type = 0, Instance = 0 },
+				OwnerId = new ProtoID32 { Type = 0, Instance = 0 },
+				DropperId = new ProtoID32 { Type = 0, Instance = 0 },
+				AllowedLooterId = new ProtoID32 { Type = 0, Instance = 0 },
+				HasMasterLooter = false,
+				Inventory = inventory
+			};
 		}
 	}
 }

@@ -286,7 +286,7 @@ namespace Faolan.Tests
 		}
 
 		// (2) The pre-#317 name must not reappear on a static const. (Instance members named SubOpcode - the
-		// WorldObject column, DynelFullUpdateCodec.Parsed.SubOpcode - are a different thing and are allowed.)
+		// WorldObject column, WorldObjectIIR.SubOpcode - are a different thing and are allowed.)
 		[Fact]
 		public void NoStaticConstantIsNamedSubOpcode()
 		{

@@ -59,13 +59,13 @@ namespace Faolan.Importer.Extractors
 		// The item template ids inside a loot-bag IIR record (mirrors ItemHashHarvester.ExtractFromLootBag, but yields
 		// only the template ids - the identity quad/hash is harvested separately by the items module). `body` is the
 		// packet body after the framing header: [u32 payloadLen][u32 subOpcode][record]; the ProtoLootBagIIR record the
-		// codec parses starts at offset 8 (after the length + sub-opcode words).
+		// codec parses starts at offset 4 (after the length word).
 		private static IEnumerable<uint> ReadLootTemplates(byte[] body)
 		{
 			if (body.Length < 8 || body.ReadU32Be(4) != LootBagSubOpcode)
 				yield break;
 
-			if (!LootBagMessageCodec.TryParse(body.AsSpan(8), out var contents, out _) || contents?.Inventory?.Items == null)
+			if (!WorldObjectColumns.TryLocateContents(body.AsSpan(4), out var contents, out _) || contents.Inventory?.Items == null)
 				yield break;
 
 			foreach (var listEntry in contents.Inventory.Items)

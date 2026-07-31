@@ -89,11 +89,11 @@ namespace Faolan.Tests
 			// The runtime state is a MOVE TASK - decoded in #477, and the reader now requires the slot to BE one
 			// rather than accepting any bytes of the right length. A mode-3 Jump node is the shortest real task.
 			var task = new FaolanStream().WriteByte(1); // the move-task presence byte
-			new MoveTaskNode
+			MoveTaskNodeCodec.Write(task, new MoveTaskNode
 			{
 				Mode = 3,
 				Flag = 1
-			}.Write(task);
+			});
 
 			var slot = task.ToArray();
 			var post = new FaolanStream()

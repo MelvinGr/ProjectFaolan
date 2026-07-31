@@ -9,11 +9,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Round-trip gate for the full recursive MoveTaskIIR codec (MoveTaskComposite): Parse -> Encode reproduces EVERY
+	// Round-trip gate for the full recursive MoveTaskIIR codec (MoveTaskCodec): Parse -> Build reproduces EVERY
 	// captured MoveTask record byte-exact, across all capture JSONs (#53 grammar, #190 construction). This is the
 	// production-language proof that any MoveTask form - incl. the recursive ListMoveTask (mode 4) that dominates the
 	// cutscene burst - can be constructed, not just replayed.
-	public class MoveTaskCompositeTests
+	public class MoveTaskCodecCorpusTests
 	{
 		private static readonly byte[] Sub = Convert.FromHexString("96c46740");
 
@@ -24,11 +24,11 @@ namespace Faolan.Tests
 		{
 			var listRec = AllMoveTaskRecords().First(r => r.Length > 27 && r[26] == 0x04);
 
-			var c = MoveTaskComposite.Parse(listRec);
+			var c = MoveTaskCodec.Parse(listRec);
 
 			Assert.Equal((byte)0x04, c.Task.Mode);
 			Assert.NotEmpty(c.Task.Children);
-			Assert.Equal(Convert.ToHexStringLower(listRec), Convert.ToHexStringLower(c.Encode()));
+			Assert.Equal(Convert.ToHexStringLower(listRec), Convert.ToHexStringLower(MoveTaskCodec.Build(c)));
 		}
 
 		[Fact]
@@ -40,7 +40,7 @@ namespace Faolan.Tests
 			var mismatches = 0;
 			foreach (var rec in records)
 			{
-				var rebuilt = MoveTaskComposite.Parse(rec).Encode();
+				var rebuilt = MoveTaskCodec.Build(MoveTaskCodec.Parse(rec));
 				if (!rec.AsSpan().SequenceEqual(rebuilt))
 					mismatches++;
 			}

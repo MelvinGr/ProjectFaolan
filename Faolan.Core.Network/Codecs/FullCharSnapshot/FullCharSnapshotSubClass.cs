@@ -228,7 +228,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// The tails are FULLY CONSTRUCTED for the live session - no post-hoc byte-patch: the quest portion is built
 			// with `instance`, the access-window + stat regions carry no per-session ids, and the playfield token is
 			// authored into the stat block above (from the live zone). (Both the old ReplaceRawUInt32 template-instance
-			// re-address and the WorldDespawn.TryReplacePlayfieldToken stamp are retired.)
+			// re-address and the N3ToClientQuitCodec's in-place token stamp are retired.)
 			return [.. quest, .. AccessWindowTable, .. statBytes];
 		}
 

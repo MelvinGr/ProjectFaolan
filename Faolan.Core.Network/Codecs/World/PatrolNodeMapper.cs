@@ -4,7 +4,7 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// Reversible mapping between the wire MoveTaskNode AST (MoveTaskComposite) and the columnarized PatrolNode tree
+	// Reversible mapping between the wire MoveTaskNode AST (MoveTaskCodec) and the columnarized PatrolNode tree
 	// (#316). ToNode decodes a captured task tree into DB rows; ToTask rebuilds the wire node from them. The pair
 	// round-trips byte-exact for every committed patrol (PatrolNodeRoundTripTests). Confirmed-float slots
 	// (duration/remaining/speed/anchor/waypoints) become float columns; the rest stay raw u32 bits (PathFloat10/20,

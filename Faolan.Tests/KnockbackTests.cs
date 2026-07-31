@@ -28,9 +28,9 @@ namespace Faolan.Tests
 				"43965a5b42be571c43a7b2c6" + // to
 				"00");
 
-			var built = MoveTaskCodec.BuildForcedMoveBody(0x0802E5D4,
-				new Vector3(298.826996f, 95.3995514f, 337.735413f),
-				new Vector3(300.705902f, 95.1701355f, 335.396667f));
+			var from = new Vector3(298.826996f, 95.3995514f, 337.735413f);
+			var to = new Vector3(300.705902f, 95.1701355f, 335.396667f);
+			var built = MoveTaskCodec.Build(new MoveTaskIIR(0x0802E5D4, from, MoveTaskNodes.ForcedMove(to, from)));
 
 			Assert.Equal(captured, built);
 		}
@@ -40,8 +40,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void ForcedMove_UsesModeFive()
 		{
-			var body = MoveTaskCodec.BuildForcedMoveBody(1, Vector3.Zero, Vector3.One);
-			Assert.Equal(MoveTaskCodec.ModeForcedMove, body[26]);
+			var body = MoveTaskCodec.Build(new MoveTaskIIR(1, Vector3.Zero, MoveTaskNodes.ForcedMove(Vector3.One, Vector3.Zero)));
+			Assert.Equal(MoveTaskNodes.ModeForcedMove, body[26]);
 			Assert.Equal(0x05, body[26]);
 			Assert.Equal(65, body.Length); // 69-byte frame once the length prefix is added
 		}
@@ -53,8 +53,8 @@ namespace Faolan.Tests
 		{
 			var from = new Vector3(10f, 20f, 30f);
 			var to = new Vector3(13f, 20f, 30f);
-			Assert.Equal(MoveTaskCodec.BuildForcedMoveBody(1, from, to), MoveTaskCodec.BuildForcedMoveBody(1, from, to, from));
-			Assert.NotEqual(MoveTaskCodec.BuildForcedMoveBody(1, from, to), MoveTaskCodec.BuildForcedMoveBody(1, from, to, Vector3.Zero));
+			Assert.Equal(MoveTaskCodec.Build(new MoveTaskIIR(1, from, MoveTaskNodes.ForcedMove(to, from))), MoveTaskCodec.Build(new MoveTaskIIR(1, from, MoveTaskNodes.ForcedMove(to, from))));
+			Assert.NotEqual(MoveTaskCodec.Build(new MoveTaskIIR(1, from, MoveTaskNodes.ForcedMove(to, from))), MoveTaskCodec.Build(new MoveTaskIIR(1, from, MoveTaskNodes.ForcedMove(to, Vector3.Zero))));
 		}
 
 		// The push is directly away from the source, and lands at the requested distance.

@@ -24,7 +24,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public static uint BlockType => ListFrame.ForCount(StatList1.Length);
 
 		// The stat slot whose VALUE is the playfield-instance token: in the snapshot the token is framed by the stat ids
-		// 0xBF..0x40B (see WorldDespawn). This is SESSION/MAP state, NOT a character stat - the snapshot is BUILT with the
+		// 0xBF..0x40B (see N3ToClientQuitCodec). This is SESSION/MAP state, NOT a character stat - the snapshot is BUILT with the
 		// live zone's minted token (FullCharSnapshotSubClass passes it in), never a captured one. Replaying a stale token
 		// HIDES the entire in-client abilities tab (bisected on NecroL80's level-80 sheet, 2026-07-04) and mis-scopes
 		// despawns. SkeletonValueOf (the beach 0x4FE428) is the fresh/fallback value when no live token is given.

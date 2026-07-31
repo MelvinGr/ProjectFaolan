@@ -1,9 +1,11 @@
-using System;
 using System.Collections.Generic;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	public sealed class MoveTaskNode : ICodec<MoveTaskNode>
+	// One node of the recursive MoveTask AST. A plain value (#530 rule 1: a value does not serialize itself) -
+	// MoveTaskNodeCodec below owns the reading and the writing.
+	public sealed class MoveTaskNode
 	{
 		public List<MoveTaskNode> Children { get; set; } = [];
 
@@ -53,56 +55,65 @@ namespace Faolan.Core.Network.Codecs.World
 		public ushort TerritoryPathIndex { get; set; }
 		public ushort RotateTail { get; set; }
 
-		private bool HasHeaderFloats => (HeaderFlags & 1) == 0;
+		internal bool HasHeaderFloats => (HeaderFlags & 1) == 0;
+	}
 
-		public static MoveTaskNode Read(FaolanStream r)
+	// The MoveTask node grammar (docs/re/movetask-grammar.md, #53), decoded 100% - every one of the 6225 captured
+	// records round-trips byte-exact (MoveTaskCodecCorpusTests). A class-(c) SUB-RECORD codec (#530 rule 5c): it is
+	// only ever composed - by MoveTaskCodec (the MoveTaskIIR packet) and by the spawn post-IIR's move-task slot - so
+	// it declares no opcode and exposes only the internal Read/Write pair.
+	//
+	// 4-byte fields are kept as raw u32 bits rather than floats so float values round-trip exactly.
+	public static class MoveTaskNodeCodec
+	{
+		internal static MoveTaskNode Read(ref SpanReader r)
 		{
 			var n = new MoveTaskNode
 			{
-				Mode = r.ReadByte()
+				Mode = r.ReadU8()
 			};
 			switch (n.Mode)
 			{
 				case 0:
 				{
-					n.ReadHeader(r);
+					ReadHeader(ref r, n);
 					break;
 				}
 
 				case 1:
 				{
-					n.ReadPath(r);
+					ReadPath(ref r, n);
 					break;
 				}
 
 				case 2:
 				{
-					ReadWords(r, n.Vec7);
-					n.RotateTail = r.ReadUInt16();
+					ReadWords(ref r, n.Vec7);
+					n.RotateTail = r.ReadU16Be();
 					break;
 				}
 
 				case 3:
 				{
-					n.Flag = r.ReadByte();
+					n.Flag = r.ReadU8();
 					break;
 				}
 
 				case 4:
 				{
-					n.ReadHeader(r);
-					n.ListMin = r.ReadByte();
-					var count = r.ReadByte();
+					ReadHeader(ref r, n);
+					n.ListMin = r.ReadU8();
+					var count = r.ReadU8();
 					for (var i = 0; i < count; i++)
-						n.Children.Add(Read(r));
+						n.Children.Add(Read(ref r));
 					break;
 				}
 
 				case 5:
 				{
-					n.ReadHeader(r);
-					ReadWords(r, n.Ballistic7);
-					n.Flag = r.ReadByte();
+					ReadHeader(ref r, n);
+					ReadWords(ref r, n.Ballistic7);
+					n.Flag = r.ReadU8();
 					break;
 				}
 
@@ -113,84 +124,96 @@ namespace Faolan.Core.Network.Codecs.World
 
 				case 7:
 				{
-					ReadWords(r, n.Formation6);
+					ReadWords(ref r, n.Formation6);
 					break;
 				}
 
 				case 8:
 				{
-					n.ApproachType = r.ReadUInt32();
-					n.ApproachTarget = r.ReadUInt32();
-					n.ApproachTail = r.ReadArray(10);
+					n.ApproachType = r.ReadU32Be();
+					n.ApproachTarget = r.ReadU32Be();
+					n.ApproachTail = r.ReadBytes(10).ToArray();
 					break;
 				}
 
 				case 10:
 				{
-					ReadWords(r, n.Vec7);
+					ReadWords(ref r, n.Vec7);
 					break;
 				}
 
 				case 11:
 				{
-					n.Flag = r.ReadByte();
+					n.Flag = r.ReadU8();
 					break;
 				}
 
 				default:
 				{
-					throw new InvalidOperationException($"MoveTask: unsupported mode {n.Mode}");
+					throw CodecParseException.Unexpected(nameof(MoveTaskNodeCodec), r.Position - 1, "a modelled MoveTask mode", n.Mode.ToString());
 				}
 			}
 
 			return n;
 		}
 
-		public void Write(FaolanStream s)
+		// The FaolanStream bridge the spawn post-IIR still reads through (SpawnPostIirCommon): it hands the rest of
+		// the stream to the span reader and rewinds by whatever the node did NOT consume, so there is exactly one
+		// copy of the grammar. Goes away when Spawn is converted (#530 wave 5).
+		internal static MoveTaskNode Read(FaolanStream s)
 		{
-			s.WriteByte(Mode);
-			switch (Mode)
+			var rest = s.ReadArray((uint)(s.Length - s.Position));
+			var r = new SpanReader(rest, nameof(MoveTaskNodeCodec));
+			var node = Read(ref r);
+			s.Position -= (uint)(rest.Length - r.Position);
+			return node;
+		}
+
+		internal static void Write(FaolanStream s, MoveTaskNode n)
+		{
+			s.WriteByte(n.Mode);
+			switch (n.Mode)
 			{
 				case 0:
 				{
-					WriteHeader(s);
+					WriteHeader(s, n);
 					break;
 				}
 
 				case 1:
 				{
-					WritePath(s);
+					WritePath(s, n);
 					break;
 				}
 
 				case 2:
 				{
-					WriteWords(s, Vec7);
-					s.WriteUInt16(RotateTail);
+					WriteWords(s, n.Vec7);
+					s.WriteUInt16(n.RotateTail);
 					break;
 				}
 
 				case 3:
 				{
-					s.WriteByte(Flag);
+					s.WriteByte(n.Flag);
 					break;
 				}
 
 				case 4:
 				{
-					WriteHeader(s);
-					s.WriteByte(ListMin);
-					s.WriteByte(Children.Count);
-					foreach (var child in Children)
-						child.Write(s);
+					WriteHeader(s, n);
+					s.WriteByte(n.ListMin);
+					s.WriteByte(n.Children.Count);
+					foreach (var child in n.Children)
+						Write(s, child);
 					break;
 				}
 
 				case 5:
 				{
-					WriteHeader(s);
-					WriteWords(s, Ballistic7);
-					s.WriteByte(Flag);
+					WriteHeader(s, n);
+					WriteWords(s, n.Ballistic7);
+					s.WriteByte(n.Flag);
 					break;
 				}
 
@@ -201,115 +224,106 @@ namespace Faolan.Core.Network.Codecs.World
 
 				case 7:
 				{
-					WriteWords(s, Formation6);
+					WriteWords(s, n.Formation6);
 					break;
 				}
 
 				case 8:
 				{
-					s.WriteUInt32(ApproachType).WriteUInt32(ApproachTarget).WriteArray(ApproachTail);
+					s.WriteUInt32(n.ApproachType).WriteUInt32(n.ApproachTarget).WriteArray(n.ApproachTail);
 					break;
 				}
 
 				case 10:
 				{
-					WriteWords(s, Vec7);
+					WriteWords(s, n.Vec7);
 					break;
 				}
 
 				case 11:
 				{
-					s.WriteByte(Flag);
+					s.WriteByte(n.Flag);
 					break;
 				}
 
 				default:
 				{
-					throw new InvalidOperationException($"MoveTask: unsupported mode {Mode}");
+					throw new CodecParseException($"{nameof(MoveTaskNodeCodec)}: unsupported MoveTask mode {n.Mode}");
 				}
 			}
 		}
 
-		private void ReadHeader(FaolanStream r)
+		private static void ReadHeader(ref SpanReader r, MoveTaskNode n)
 		{
-			HeaderFlags = r.ReadByte();
-			if (HasHeaderFloats)
+			n.HeaderFlags = r.ReadU8();
+			if (n.HasHeaderFloats)
 			{
-				HeaderDuration = r.ReadUInt32();
-				HeaderRemaining = r.ReadUInt32();
+				n.HeaderDuration = r.ReadU32Be();
+				n.HeaderRemaining = r.ReadU32Be();
 			}
 		}
 
-		private void ReadPath(FaolanStream r)
+		private static void ReadPath(ref SpanReader r, MoveTaskNode n)
 		{
-			ReadHeader(r);
-			PathFlags = r.ReadByte();
-			if ((PathFlags & 0x10) != 0)
-				PathFloat10 = r.ReadUInt32();
-			if ((PathFlags & 0x20) != 0)
-				PathFloat20 = r.ReadUInt32();
-			if ((PathFlags & 1) != 0)
+			ReadHeader(ref r, n);
+			n.PathFlags = r.ReadU8();
+			if ((n.PathFlags & 0x10) != 0)
+				n.PathFloat10 = r.ReadU32Be();
+			if ((n.PathFlags & 0x20) != 0)
+				n.PathFloat20 = r.ReadU32Be();
+			if ((n.PathFlags & 1) != 0)
 			{
-				TerritoryIndex = r.ReadUInt16();
-				TerritoryPathIndex = r.ReadUInt16();
+				n.TerritoryIndex = r.ReadU16Be();
+				n.TerritoryPathIndex = r.ReadU16Be();
 			}
 			else
 			{
-				var count = r.ReadUInt32();
+				var count = r.ReadU32Be();
 				if (count > 1000)
-					throw new InvalidOperationException($"PathMoveTask waypoint count {count}");
+					throw CodecParseException.Unexpected(nameof(MoveTaskNodeCodec), r.Position - 4, "a PathMoveTask waypoint count <= 1000", count.ToString());
 
-				Waypoints = new List<uint>((int)(count * 3));
+				n.Waypoints = new List<uint>((int)(count * 3));
 				for (var i = 0; i < count * 3; i++)
-					Waypoints.Add(r.ReadUInt32());
+					n.Waypoints.Add(r.ReadU32Be());
 			}
 
-			ReadTrailer(r); // a3e400 [u8][7 u32]
+			// a3e400 [u8][7 u32]
+			n.TrailerByte = r.ReadU8();
+			ReadWords(ref r, n.TrailerWords);
 		}
 
-		private void ReadTrailer(FaolanStream r)
+		private static void WriteHeader(FaolanStream s, MoveTaskNode n)
 		{
-			TrailerByte = r.ReadByte();
-			ReadWords(r, TrailerWords);
+			s.WriteByte(n.HeaderFlags);
+			if (n.HasHeaderFloats)
+				s.WriteUInt32(n.HeaderDuration).WriteUInt32(n.HeaderRemaining);
 		}
 
-		private void WriteHeader(FaolanStream s)
+		private static void WritePath(FaolanStream s, MoveTaskNode n)
 		{
-			s.WriteByte(HeaderFlags);
-			if (HasHeaderFloats)
-				s.WriteUInt32(HeaderDuration).WriteUInt32(HeaderRemaining);
-		}
-
-		private void WritePath(FaolanStream s)
-		{
-			WriteHeader(s);
-			s.WriteByte(PathFlags);
-			if ((PathFlags & 0x10) != 0)
-				s.WriteUInt32(PathFloat10!.Value);
-			if ((PathFlags & 0x20) != 0)
-				s.WriteUInt32(PathFloat20!.Value);
-			if ((PathFlags & 1) != 0)
-				s.WriteUInt16(TerritoryIndex).WriteUInt16(TerritoryPathIndex);
+			WriteHeader(s, n);
+			s.WriteByte(n.PathFlags);
+			if ((n.PathFlags & 0x10) != 0)
+				s.WriteUInt32(n.PathFloat10!.Value);
+			if ((n.PathFlags & 0x20) != 0)
+				s.WriteUInt32(n.PathFloat20!.Value);
+			if ((n.PathFlags & 1) != 0)
+				s.WriteUInt16(n.TerritoryIndex).WriteUInt16(n.TerritoryPathIndex);
 			else
 			{
-				s.WriteUInt32(Waypoints.Count / 3);
-				foreach (var w in Waypoints)
+				s.WriteUInt32(n.Waypoints.Count / 3);
+				foreach (var w in n.Waypoints)
 					s.WriteUInt32(w);
 			}
 
-			WriteTrailer(s);
+			s.WriteByte(n.TrailerByte);
+			WriteWords(s, n.TrailerWords);
 		}
 
-		private void WriteTrailer(FaolanStream s)
-		{
-			s.WriteByte(TrailerByte);
-			WriteWords(s, TrailerWords);
-		}
-
-		private static void ReadWords(FaolanStream r, uint[] words)
+		private static void ReadWords(ref SpanReader r, uint[] words)
 		{
 			for (var i = 0; i < words.Length; i++)
-				words[i] = r.ReadUInt32();
+				words[i] = r.ReadU32Be();
 		}
 
 		private static void WriteWords(FaolanStream s, uint[] words)

@@ -8,6 +8,7 @@ using Faolan.Core.Network.Protocol;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Importer.Captures
 {
@@ -39,10 +40,20 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				if (!CoreClaimListCodec.TryParse(payload, out _, out var claims))
+				CoreClaimIIR parsed;
+				try
+				{
+					parsed = CoreClaimCodec.Parse(payload);
+				}
+				catch (CodecParseException)
+				{
+					continue;
+				}
+
+				if (parsed is not CoreClaimListIIR list)
 					continue;
 
-				foreach (var claim in claims)
+				foreach (var claim in list.Claims)
 					byTemplate[claim.ItemTemplateId] = claim;
 			}
 

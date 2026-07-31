@@ -10,7 +10,7 @@ namespace Faolan.GameServer.World
 	// Frames the 0x96B8DC59 StatUpdateIIR for a single addressed recipient - the host-side counterpart of
 	// StatUpdateCodec (which owns the pure IIR body). Adds the RPC header on the world conversation (WorldSenderEndpoint)
 	// + length/hash. Used by everything that pushes a stat/vitals change to one client (combat, the regen tick, the
-	// world-entry replay, GM commands); broadcasters that fan a stat out to nearby viewers call StatUpdateCodec.BuildBody
+	// world-entry replay, GM commands); broadcasters that fan a stat out to nearby viewers call StatUpdateCodec.Build
 	// directly and frame it per recipient via WorldIir.Send. Kept here (not in the codec) because it depends on the
 	// host framing types (WorldSenderEndpoint + INetworkClient).
 	public static class VitalsPacket
@@ -20,7 +20,7 @@ namespace Faolan.GameServer.World
 		public static Rpc BuildStatUpdate(INetworkClient client, CharacterStatBlock stats, uint entityHandle)
 		{
 			return new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(StatUpdateCodec.BuildBody(entityHandle, stats)));
+				s => s.WriteArrayUInt32Length(StatUpdateCodec.Build(entityHandle, stats)));
 		}
 	}
 }

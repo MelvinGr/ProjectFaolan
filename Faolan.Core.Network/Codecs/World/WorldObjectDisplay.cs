@@ -14,11 +14,13 @@ namespace Faolan.Core.Network.Codecs.World
 	//
 	// Lives here rather than on the entity because the grammar (InnerElement) is in Faolan.Core.Network, which
 	// Faolan.Core.Database does not reference.
+	// NOT a codec (#530 rule 1): this is a row<->value mapping over InnerElementCodec's grammar, which is #533's
+	// subject. The codec is InnerElementCodec; what lives here is which COLUMNS hold that element.
 	public static class WorldObjectDisplay
 	{
 		// The wire value, rebuilt from the columns. Null when the object has no display element - which is also the
-		// "row is not lifted" signal WorldObjectBuilder refuses to build from.
-		public static string? Build(WorldObject row)
+		// "row is not lifted" signal WorldObjectCodec refuses to build from.
+		public static string? ToWire(WorldObject row)
 		{
 			ArgumentNullException.ThrowIfNull(row);
 			return row.DisplayKind is { } kind

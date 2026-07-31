@@ -24,21 +24,27 @@ namespace Faolan.Core.Network.Codecs.World
 	//
 	// LootBag (chests) is the exception and is NOT handled here: its trailer is the container's loot CONTENTS
 	// ([u32 len][ProtoLootBagIIR]), which is session state, not placement truth - the captured contents are
-	// deliberately not persisted and WorldObjectBuilder appends a clean empty scaffold instead (LootContainerTemplate,
+	// deliberately not persisted and WorldObjectCodec appends a clean empty scaffold instead (LootContainerTemplate,
 	// which already worked this way for spawned bags).
-	public static class WorldObjectGeometryCodec
+	// NOT a codec, deliberately: this is the WorldObject COLUMNS <-> that region mapping, and the region's length
+	// depends on the row's object class (the per-class trailer below), so it is not a standalone message with a
+	// self-describing body. Row<->value mapping is #533's subject; #530 rule 1 leaves it named for what it is.
+	// NOT a codec, deliberately (#530 rule 1): this is the WorldObject COLUMNS <-> that region mapping, and the
+	// region's length depends on the row's object CLASS (the per-class trailer below), so it is not a standalone
+	// message with a self-describing body. Row<->value mapping is #533's subject.
+	public static class WorldObjectGeometryColumns
 	{
 		// An object with no bounds writes an INVERTED box rather than zeros: min = +FLT_MAX, max = -FLT_MAX. Kept as
 		// the actual float values in the columns (no sentinel translation) so the record round-trips bit-for-bit.
-		public static byte[] Build(WorldObject row)
+		public static byte[] ToWire(WorldObject row)
 		{
 			var name = row.GeometryName ?? "";
 			var nodes = row.Words.Where(w => w.Kind == WorldObjectWordKind.GeometryNode).OrderBy(w => w.Ordinal).Select(w => w.Value).ToArray();
 			if (nodes.Length % 6 != 0)
 				throw new InvalidOperationException($"WorldObject {row.Id} has {nodes.Length} geometry-node word(s), which is not a whole number of 6-word nodes.");
 
-			var stream = new FaolanStream()
-				.WriteUInt32(row.GeometryAssetId)
+			using var stream = new FaolanStream();
+			stream.WriteUInt32(row.GeometryAssetId)
 				.WriteUInt32(row.GeometryAssetType)
 				.WriteUInt32((uint)name.Length)
 				.WriteArray(Encoding.Latin1.GetBytes(name))

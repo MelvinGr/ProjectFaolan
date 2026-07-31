@@ -221,7 +221,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		// A scope (whole test file, or one method body) is byte-exact for `codec` if it carries one of the explicit
 		// markers above, OR it loads a captured hex oracle (Convert.FromHexString) and compares it against a serialize
 		// output - either the round-trip `.ToArray()` (V1IirCodecTests: `Assert.Equal(body, codec.Parse(body).ToArray())`)
-		// or a direct call to THIS codec's Build* (ShopOpenBuilderTests/WorldDespawnTests: `Assert.Equal(captured,
+		// or a direct call to THIS codec's Build* (ShopOpenBuilderTests/N3ToClientQuitCodecTests: `Assert.Equal(captured,
 		// codec.BuildX(...))`). Requiring the codec's own Build keeps parse-only codecs (MoveInventoryItemCodec, which has
 		// no serialize path) from being falsely credited by an input-hex parser test. These idioms are real byte-exact
 		// goldens the explicit markers missed - why a batch of genuinely-tested IIR types read as V2.

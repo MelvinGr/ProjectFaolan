@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public const uint ChangeRecastTimeType = 0xCF81; // keyList: [0x4c3 spell, 0x2f9 recast]
 
 		// GameActionData version word (obj+0x14 area; validated == 4 by the deserializer, else "Invalid GameAction data version").
-		public const uint Version = GameActionElement.Version;
+		public const uint Version = GameActionDataCodec.Version;
 
 		// Wraps a ChangeRecastTime element as a full GameActionListIIR body (a 1-element 0x3F1 list) delivered to
 		// `frameHandle`. Reuses GameActionListCodec's list framing: it writes [subop][c350][frame][0][0x7E2][typeId]
@@ -43,7 +43,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// (asserted by the round-trip test).
 		public static byte[] BuildChangeRecastTimeBody(uint frameHandle, uint spellId, uint recastCentiseconds)
 		{
-			return GameActionElement.BuildBody(frameHandle, ChangeRecastTimeType, 0, 0, [spellId, recastCentiseconds]);
+			return GameActionListCodec.Build(frameHandle, new GameActionData(ChangeRecastTimeType, 0, 0, [spellId, recastCentiseconds]));
 		}
 
 		// Builds a single ChangeRecastTime GameActionData ELEMENT (the positional body FUN_00899a60 consumes): set
@@ -58,7 +58,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// keys 0x4d9/0x4da are not modelled here - the recast/stat-modifier setters are all-u32.)
 		public static byte[] BuildElement(uint typeId, uint field, uint subCount, IReadOnlyList<uint> keyValues)
 		{
-			return GameActionElement.Build(typeId, field, subCount, keyValues);
+			return GameActionDataCodec.Build(typeId, field, subCount, keyValues);
 		}
 	}
 }

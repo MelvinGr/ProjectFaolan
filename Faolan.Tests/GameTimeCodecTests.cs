@@ -31,9 +31,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void TheClockUnit_MatchesTheClientsOwnConstants()
 		{
-			Assert.Equal(86400u, GameTimeCodec.GameDaySeconds);
-			Assert.Equal(5u, GameTimeCodec.GameSecondsPerRealSecond);
-			Assert.Equal(17280u, GameTimeCodec.GameDayRealSeconds);
+			Assert.Equal(86400u, GameClock.GameDaySeconds);
+			Assert.Equal(5u, GameClock.GameSecondsPerRealSecond);
+			Assert.Equal(17280u, GameClock.GameDayRealSeconds);
 		}
 
 		// The time of day advances at 5x, wraps at 86400, and never leaves the day - a value outside it would put the
@@ -41,14 +41,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void TimeOfDay_Advances5xAndWrapsWithinTheDay()
 		{
-			var start = GameTimeCodec.TimeOfDay(CapturedInstant);
+			var start = GameClock.TimeOfDay(CapturedInstant);
 
-			Assert.Equal(start + 300f, GameTimeCodec.TimeOfDay(CapturedInstant.AddSeconds(60)));
+			Assert.Equal(start + 300f, GameClock.TimeOfDay(CapturedInstant.AddSeconds(60)));
 			// A full real day is exactly 5 game days, so it lands back on the same time of day.
-			Assert.Equal(start, GameTimeCodec.TimeOfDay(CapturedInstant.AddSeconds(GameTimeCodec.GameDayRealSeconds)));
+			Assert.Equal(start, GameClock.TimeOfDay(CapturedInstant.AddSeconds(GameClock.GameDayRealSeconds)));
 
 			for (var minutes = 0; minutes < 60 * 12; minutes += 7)
-				Assert.InRange(GameTimeCodec.TimeOfDay(CapturedInstant.AddMinutes(minutes)), 0f, GameTimeCodec.GameDaySeconds - 1f);
+				Assert.InRange(GameClock.TimeOfDay(CapturedInstant.AddMinutes(minutes)), 0f, GameClock.GameDaySeconds - 1f);
 		}
 
 		// The day rolls over at the same moment the resync anchor's game-day counter ticks. They are separate fields and
@@ -57,13 +57,13 @@ namespace Faolan.Tests
 		public void TimeOfDay_WrapsWhenTheAnchorsGameDayCounterTicks()
 		{
 			// Walk to a real second where the game day is about to roll over.
-			var atMidnight = DateTimeOffset.FromUnixTimeSeconds(1782048203 / GameTimeCodec.GameDayRealSeconds * GameTimeCodec.GameDayRealSeconds + GameTimeCodec.GameDayRealSeconds);
+			var atMidnight = DateTimeOffset.FromUnixTimeSeconds(1782048203 / GameClock.GameDayRealSeconds * GameClock.GameDayRealSeconds + GameClock.GameDayRealSeconds);
 
-			Assert.Equal(0f, GameTimeCodec.TimeOfDay(atMidnight));
-			Assert.Equal((float)(GameTimeCodec.GameDaySeconds - GameTimeCodec.GameSecondsPerRealSecond), GameTimeCodec.TimeOfDay(atMidnight.AddSeconds(-1)));
+			Assert.Equal(0f, GameClock.TimeOfDay(atMidnight));
+			Assert.Equal((float)(GameClock.GameDaySeconds - GameClock.GameSecondsPerRealSecond), GameClock.TimeOfDay(atMidnight.AddSeconds(-1)));
 
-			var before = GameTimeCodec.ResyncTimestamp(atMidnight.AddSeconds(-1)) >> 32;
-			Assert.Equal(before + 1, GameTimeCodec.ResyncTimestamp(atMidnight) >> 32);
+			var before = GameClock.ResyncTimestamp(atMidnight.AddSeconds(-1)) >> 32;
+			Assert.Equal(before + 1, GameClock.ResyncTimestamp(atMidnight) >> 32);
 		}
 
 		// dayTime is an IEEE FLOAT of game seconds, and it starts one byte later than the record's old reading claimed
@@ -81,8 +81,8 @@ namespace Faolan.Tests
 
 			var seconds = BitConverter.UInt32BitsToSingle(0x472BDD00);
 			Assert.Equal(43997f, seconds);                                       // 12:13, which is what the client renders
-			Assert.InRange(seconds, 0f, GameTimeCodec.GameDaySeconds);           // ...a real time of day
-			Assert.True(0x472BDD00u > GameTimeCodec.GameDaySeconds * 1000, "read as an INTEGER the same word is 1.19e9 - nowhere near a time of day, which is how the float reading was confirmed");
+			Assert.InRange(seconds, 0f, GameClock.GameDaySeconds);           // ...a real time of day
+			Assert.True(0x472BDD00u > GameClock.GameDaySeconds * 1000, "read as an INTEGER the same word is 1.19e9 - nowhere near a time of day, which is how the float reading was confirmed");
 		}
 
 		// The `.time` GM command shifts the phase by asking for a time of day; the offset must land on it exactly.
@@ -93,9 +93,9 @@ namespace Faolan.Tests
 		[InlineData(23 * 3600u + 59 * 60u)]
 		public void TimeOfDay_CanBePhaseShiftedOntoAnyRequestedTime(uint wanted)
 		{
-			var offset = ((long)wanted - (long)GameTimeCodec.TimeOfDay(CapturedInstant) + GameTimeCodec.GameDaySeconds) % GameTimeCodec.GameDaySeconds;
+			var offset = ((long)wanted - (long)GameClock.TimeOfDay(CapturedInstant) + GameClock.GameDaySeconds) % GameClock.GameDaySeconds;
 
-			Assert.Equal((float)wanted, GameTimeCodec.TimeOfDay(CapturedInstant, offset));
+			Assert.Equal((float)wanted, GameClock.TimeOfDay(CapturedInstant, offset));
 		}
 
 		// Both halves of the anchor are wall-clock derived, so the whole u64 has to fall out of the instant alone. The
@@ -103,19 +103,19 @@ namespace Faolan.Tests
 		[Fact]
 		public void ResyncTimestamp_ReproducesBothCapturedAnchors()
 		{
-			Assert.Equal(0x0001920C_6A024E93UL, GameTimeCodec.ResyncTimestamp(CapturedInstant));
+			Assert.Equal(0x0001920C_6A024E93UL, GameClock.ResyncTimestamp(CapturedInstant));
 			// ...and the create-editor capture's anchor, a different day, from the same one-line encoding.
-			Assert.Equal(0x00019272_6A1D3837UL, GameTimeCodec.ResyncTimestamp(DateTimeOffset.FromUnixTimeSeconds(0x6A1D3837)));
+			Assert.Equal(0x00019272_6A1D3837UL, GameClock.ResyncTimestamp(DateTimeOffset.FromUnixTimeSeconds(0x6A1D3837)));
 		}
 
 		// The clock must actually move now that it is generated - the bug this replaced was a frozen anchor.
 		[Fact]
 		public void ResyncTimestamp_AdvancesWithWallClock()
 		{
-			var day = GameTimeCodec.ResyncTimestamp(CapturedInstant) >> 32;
+			var day = GameClock.ResyncTimestamp(CapturedInstant) >> 32;
 
-			Assert.Equal(0x6A024E93UL + 60, GameTimeCodec.ResyncTimestamp(CapturedInstant.AddSeconds(60)) & 0xFFFFFFFF);
-			Assert.Equal(day + 1, GameTimeCodec.ResyncTimestamp(CapturedInstant.AddSeconds(GameTimeCodec.GameDayRealSeconds)) >> 32);
+			Assert.Equal(0x6A024E93UL + 60, GameClock.ResyncTimestamp(CapturedInstant.AddSeconds(60)) & 0xFFFFFFFF);
+			Assert.Equal(day + 1, GameClock.ResyncTimestamp(CapturedInstant.AddSeconds(GameClock.GameDayRealSeconds)) >> 32);
 		}
 	}
 }

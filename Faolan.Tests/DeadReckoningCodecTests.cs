@@ -6,8 +6,8 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for the dead-reckoning movement records (#190, docs/re/chardcmove-grammar.md):
-	// CharDCMoveIIR_t (0x4517AA81), StopIIR_c (0xD751EBB4), SetPosIIR_c (0x04B80B24). Oracles are captured bodies
-	// (full record incl. the 4-byte length prefix). Proves the codecs are a faithful inverse of the wire grammar
+	// CharDCMoveIIR_t (0x4517AA81), StopIIR_c (0xD751EBB4), SetPosIIR_c (0x04B80B24). Oracles are captured records;
+	// their leading 4-byte length belongs to the SENDER (#530 rule 2), so the codec is compared against Record(). Proves the codecs are a faithful inverse of the wire grammar
 	// (construct-don't-replay) across the flag-gated CharDCMove forms.
 	public class DeadReckoningCodecTests
 	{
@@ -26,7 +26,7 @@ namespace Faolan.Tests
 		public void CharDCMove_BuildStationaryFacing_RoundTripsThroughParse()
 		{
 			var pos = new Vector3(260f, 4.65f, 290f);
-			var body = CharDCMoveCodec.BuildStationaryFacing(0x01316E71, pos, Quaternion.Identity, 0.173f);
+			var body = CharDCMoveCodec.Build(0x01316E71, pos, Quaternion.Identity, 0.173f);
 
 			var r = CharDCMoveCodec.Parse(body);
 			Assert.Equal(0x01316E71u, r.Handle);
@@ -46,7 +46,7 @@ namespace Faolan.Tests
 		[Theory, InlineData(CharDcMoveCollapsed, true), InlineData(CharDcMoveFullVector, false)]
 		public void CharDCMove_RotationIsAUnitQuaternion(string hex, bool collapsed)
 		{
-			var r = CharDCMoveCodec.Parse(Convert.FromHexString(hex));
+			var r = CharDCMoveCodec.Parse(Record(hex));
 
 			Assert.Equal(collapsed, r.Bit4);
 			Assert.Equal(1f, r.Rotation.Length(), 4);
@@ -61,7 +61,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void CharDCMove_Parse_DecodesPositionAndFacing()
 		{
-			var r = CharDCMoveCodec.Parse(Convert.FromHexString(CharDcMoveCollapsed));
+			var r = CharDCMoveCodec.Parse(Record(CharDcMoveCollapsed));
 			Assert.Equal(0x01316E71u, r.Handle);
 			Assert.True(r.Bit4); // collapsed facing
 			Assert.Equal(260.0f, r.Position.X, 3);
@@ -71,24 +71,22 @@ namespace Faolan.Tests
 		[Theory, InlineData(CharDcMoveCollapsed), InlineData(CharDcMoveFullVector)]
 		public void CharDCMove_RoundTripsByteExact(string hex)
 		{
-			var captured = Convert.FromHexString(hex);
+			var captured = Record(hex);
 			var rebuilt = CharDCMoveCodec.Build(CharDCMoveCodec.Parse(captured));
-			Assert.Equal(hex, Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(hex[8..], Convert.ToHexStringLower(rebuilt));
 		}
 
 		[Fact]
 		public void SetPos_RoundTripsByteExact()
 		{
-			var captured = Convert.FromHexString(SetPosBody);
-			var p = SetPosCodec.Parse(captured);
-			var rebuilt = SetPosCodec.Build(p.Handle, p.Position, p.R0, p.R1, p.R2, p.R3, p.Flag, p.Env);
-			Assert.Equal(SetPosBody, Convert.ToHexStringLower(rebuilt));
+			var p = SetPosCodec.Parse(Record(SetPosBody));
+			Assert.Equal(SetPosBody[8..], Convert.ToHexStringLower(SetPosCodec.Build(p)));
 		}
 
 		[Fact]
 		public void Stop_Parse_DecodesPosition()
 		{
-			var p = StopCodec.Parse(Convert.FromHexString(StopBody));
+			var p = StopCodec.Parse(Record(StopBody));
 			Assert.Equal(0x01316E71u, p.Handle);
 			Assert.Equal(294.124f, p.Position.X, 2);
 			Assert.Equal(726.279f, p.Position.Z, 2);
@@ -97,10 +95,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void Stop_RoundTripsByteExact()
 		{
-			var captured = Convert.FromHexString(StopBody);
-			var p = StopCodec.Parse(captured);
-			var rebuilt = StopCodec.Build(p.Handle, p.Position, p.R0, p.R1, p.R2, p.R3, p.Env);
-			Assert.Equal(StopBody, Convert.ToHexStringLower(rebuilt));
+			var p = StopCodec.Parse(Record(StopBody));
+			Assert.Equal(StopBody[8..], Convert.ToHexStringLower(StopCodec.Build(p)));
+		}
+
+		// The captured record WITHOUT its leading u32 length - what the codec builds and parses (#530 rule 2).
+		private static byte[] Record(string hex)
+		{
+			return Convert.FromHexString(hex)[4..];
 		}
 	}
 }

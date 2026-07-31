@@ -93,7 +93,7 @@ namespace Faolan.Tests
 			Assert.NotEmpty(parameters);
 			Assert.NotEmpty(objects);
 
-			foreach (var raw in parameters.Select(ConversationScreenColumns.InnerRawOf).Concat(objects.Select(WorldObjectDisplay.Build)).Where(x => !string.IsNullOrEmpty(x)))
+			foreach (var raw in parameters.Select(ConversationScreenColumns.InnerRawOf).Concat(objects.Select(WorldObjectDisplay.ToWire)).Where(x => !string.IsNullOrEmpty(x)))
 			{
 				var element = InnerElementCodec.Parse(raw!); // throws when the element is outside the known grammar
 				Assert.Equal(raw, InnerElementCodec.Build(element));

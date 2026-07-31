@@ -90,7 +90,7 @@ validates the spline and reads nothing), so both PathMoveTask branches end with 
 - **Built byte-exact** (`MoveTaskCodec`, golden tests): mode 0 bare-position, mode 1 PathMoveTask
   (`BuildPathBody` — the multi-waypoint path; `BuildWalkBody` — the 2-point walk segment), mode 2 stationary
   (Rotate, the 61-B form), mode 8 approach-target. The full recursive form (incl. `ListMoveTask`) is covered by
-  `MoveTaskComposite` (parse + re-emit any record byte-exact — `MoveTaskCompositeTests`, all 9468 records).
+  `MoveTaskCodec` (parse + re-emit any record byte-exact — `MoveTaskCodecCorpusTests`, all 9468 records).
 - The grouped `PatrolPath` + `PatrolWaypoint` DB tables — ordered `Waypoints` by `Ordinal` — exist; the
   broadcaster emits mode-1 path moves via `BuildWalkBody` for chase steps and re-addresses the captured patrol
   body via `SendPatrol`.

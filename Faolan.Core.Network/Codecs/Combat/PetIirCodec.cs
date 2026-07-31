@@ -43,7 +43,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		}
 
 		// Read counterpart to the two builders: recovers the owner-binding from a captured record. Takes the IIR
-		// content ([u32 subop][...], i.e. the carrier body PAST its u32 length prefix), like MapChangeCodec.TryParse.
+		// content ([u32 subop][...], i.e. the carrier body PAST its u32 length prefix), like PlayfieldFCodec.Parse.
 		//
 		// This is what lets the importer answer "is this entity somebody's summon?" from the WIRE rather than from a
 		// roster of pet NAMES: a creature is a pet exactly when the server bound it to an owner, whatever it is called.

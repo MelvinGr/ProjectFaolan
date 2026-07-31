@@ -1,7 +1,9 @@
 using System;
+using System.Numerics;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Extensions;
 using Faolan.Importer.Extractors;
 using Xunit;
@@ -80,11 +82,13 @@ namespace Faolan.Tests
 
 		private static CapturedPacket MapChange(uint mapId)
 		{
-			// MapChangeCodec reads the map id at body offset 26 after the sub-opcode word.
-			var body = new byte[4 + 4 + 99 + 4];
-			body.WriteU32Be(0, (uint)body.Length);
-			body.WriteU32Be(4, (uint)GameServer0X2000Opcodes.PlayfieldFIIR);
-			body.WriteU32Be(8 + 26, mapId);
+			// A REAL PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte
+			// (#530 rule 3), so a synthetic body with the map id at the right offset and zeros everywhere else is
+			// not a MapChange any more - and a fixture shaped like the parser proves only that the file agrees
+			// with itself.
+			var record = PlayfieldFCodec.Build(Vector3.Zero, mapId, 0, 1, 0x01EA7B9C, 15f, 13.86f, 0);
+			byte[] body = [0, 0, 0, 0, .. record];
+			body.WriteU32Be(0, (uint)record.Length);
 			return Packet(true, (uint)GameServer0X2000Opcodes.PlayfieldFIIR, body);
 		}
 

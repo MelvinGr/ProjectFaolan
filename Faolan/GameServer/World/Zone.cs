@@ -34,9 +34,9 @@ namespace Faolan.GameServer.World
 		public int Count => _entities.Count;
 
 		// The per-playfield-instance token stamped into every despawn so the client scopes the removal to this playfield
-		// (see WorldDespawn). Minted by WorldState on zone creation as a fallback; for a REPLAYED playfield the burst's
+		// (see N3ToClientQuitCodec). Minted by WorldState on zone creation as a fallback; for a REPLAYED playfield the burst's
 		// own token (the value woven into the 0x737A6DF9 snapshot tail, the one the client actually learned) overrides
-		// it via WorldDespawn.TryExtractPlayfieldToken.
+		// it via PlayfieldTokenScan.TryExtract.
 		public uint PlayfieldToken { get; set; }
 
 		// The map's STATIC world objects (props, doors, climbing vines, destructibles), loaded once per zone by
