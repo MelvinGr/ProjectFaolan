@@ -229,10 +229,11 @@ Two things already run ahead of that move:
 codec is on the uniform surface, `Faolan/`'s own wire builders moved in (wave 7), `Faolan.Importer/` no longer
 names an IIR or hand-decodes a body a codec owns (wave 8), and `ICodec<T>` is deleted (wave 9) — do not
 reintroduce it. Outside `Codecs/`, a `GameServer0X2000Opcodes` member may only appear as a `case` label of the
-listener's routing switch. Two small allowlists remain, each naming the DECODE issue that removes it (#543 the
-snapshot stat region's flat view; #544/#545/#538 the three codecs the corpus round-trip cannot read yet) — they
-are not places to silence a gate. Remaining follow-ups: #540 (one importer full-update scan), #533 (row↔value
-mapping).
+listener's routing switch. ONE small allowlist remains, naming the DECODE issue that removes it (#543, the
+snapshot stat region's flat view) — it is not a place to silence a gate. The corpus round-trip's own allowlist is
+now **empty**: every codec with a standalone body Parses and re-Builds every captured body byte-exact, the last
+three coming off with #538, #544 and #545. Remaining follow-ups: #540 (one importer full-update scan), #533
+(row↔value mapping).
 
 - **One codec shape: two public method NAMES, nothing else.** A codec is a `static class` exposing exactly
   `byte[] Build(...)` and `T Parse(in ReadOnlySpan<byte> data)`, plus its `Opcode` / `HandledTypes`

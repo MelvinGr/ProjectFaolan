@@ -447,7 +447,8 @@ namespace Faolan.Tests
 			var parsedLog = QuestLogListCodec.Parse(logList);
 			Assert.Equal(0x0131720Bu, parsedLog.PlayerHandle);
 			Assert.Equal(0x34A7u, parsedLog.TrackedQuestId);
-			Assert.Equal([0x34A7u, 0x34FBu, 0x34A8u, 0x3077u], parsedLog.QuestIds);
+			Assert.Equal([0x34A7u, 0x34FBu, 0x34A8u, 0x3077u], parsedLog.Entries.Select(e => e.QuestId));
+			Assert.Equal(MainQuestUpdateOp.Add, parsedLog.Operation);
 
 			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00.
 			// Proven byte-identical to the SAME quest's block embedded in a real login snapshot (the conqueror's 13479

@@ -209,10 +209,10 @@ namespace Faolan.Importer.Captures
 						var log = QuestLogListCodec.Parse(inner);
 						if (!logListByChar.TryGetValue(log.PlayerHandle, out var set))
 							logListByChar[log.PlayerHandle] = set = [];
-						foreach (var id in log.QuestIds)
+						foreach (var entry in log.Entries)
 						{
-							if (id != 0)
-								set.Add(id);
+							if (entry.QuestId != 0)
+								set.Add(entry.QuestId);
 						}
 
 						return;

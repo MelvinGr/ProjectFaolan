@@ -64,11 +64,29 @@ Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1
 
 | sub | type | reader | structure |
 |---|---|---|---|
-| `0x504B7924` | `MainQuestUpdateIIR_c` | `918560` | `[u32×3][u32 n]( [u32][u32] )×n [string][u32×3][u16]` — **SHIPPED** as `QuestLogListIIR` (`BKDR-31("MainQuestUpdateIIR_c")==0x504B7924`): byte-exact wire in `QuestLogListCodec`, golden `QuestTests`; the real grammar (see the codec) differs from this decompile sketch |
+| `0x504B7924` | `MainQuestUpdateIIR_c` | `918560` | `[u32 op][u32 areaId][u32 trackedQuestId][u32 n]( [u32 ordinal][u32 questId] )×n [string][u32×3][u16]` — **SHIPPED** as `QuestLogListIIR` (`BKDR-31("MainQuestUpdateIIR_c")==0x504B7924`): byte-exact wire in `QuestLogListCodec`, golden `QuestTests`, and every captured body round-trips since #545. The reader validates **nothing**; the leading word is the `Activate()` (`FUN_00918cf0`) switch selector — see below |
 | `0x8BB2799C` | `QuestRewardNotifyIIR_c` | `91b2d0` | `[u32][u32 n1]( reward(0x40) + [u32] )×n1 [u32 n2]( reward + [u32] )×n2 [u32×4]` |
 | `0xE9EB9694` | `LootSpecialLootUpdateIIR_c` | `7a5540` | `[u32 n]( [u32][u32][u32] )×n` |
 | `0xE6C3CCEF` | `ScriptTextIIR_t` | `933390` | `[string][u8 ver][u32][u32]` (ver>1 short-circuits) |
 | `0x78BB8C2E` | `TeleportFailedIIR_c` | `5bf830` | `[u32 reason][string]` |
+
+### `MainQuestUpdateIIR_c::Activate()` — the leading word is an OPERATION [V1: tools/ghidra/StrXrefs.java]
+
+`FUN_00918cf0` switches on the first field the reader stores (`+0x2c`), and each arm logs its own name to the
+`GameCode/Quest` channel. The strings ARE the enum:
+
+| value | client log line | fields the arm uses |
+|---|---|---|
+| 0 | `Activate() was called with Invalid type!` | — |
+| 1 | `Activate() was called to add a new MainQuest.` | `areaId`, `trackedQuestId`, the entry pairs, and all three trailing words, forwarded into the character's quest holder (`FUN_00810840`, which stores two of them at holder `+0x48` / `+0x50`) |
+| 2 | `Activate() was called to remove a MainQuest.` | `FUN_00810950` |
+| 3 | `Activate() was called to update the StartTemplate of a MainQuest.` | `FUN_008109a0` |
+| 4 | `Activate() was called to update the timeout.` | the trailing **u16** only: `0` shows `"Entering mission area"`, non-zero `"Leaving mission area"` |
+
+The Add arm locates the tracked quest by scanning the entry-pair vector for one whose **second** u32 equals
+`trackedQuestId` — which is what proves the pair is `(ordinal, questId)` and not the reverse. Captures carry only
+Add (every populated list) and Remove (every empty one), and `Remove` is why a "leading constant 1" rejected 8 of
+the 46 captured lists until #545.
 
 ## Sub-reader-delegated (body in a shared helper, not expanded here)
 

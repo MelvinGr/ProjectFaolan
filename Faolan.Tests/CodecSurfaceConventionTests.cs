@@ -52,14 +52,17 @@ namespace Faolan.Tests
 		private static readonly string[] UncomposedSubRecords = ["StatListCodec"];
 
 		// Codecs the corpus round-trip cannot yet cover, each with the DECODE issue that removes it. #530 explicitly
-		// decodes nothing, and every one of these is a real gap the gate FOUND rather than a shape problem:
-		//   QuestLogListCodec (8/46 bodies)   - three asserted constants that are not constant: Gitea #545
+		// decodes nothing, and every one of these was a real gap the gate FOUND rather than a shape problem.
 		// ⚠️ Entries are per CODEC, not per body, so an entry hides the codec's PASSING bodies too. Delete one the
-		// moment its issue closes - the value of this gate is that the list is short and shrinking. Two have come off
-		// already: `FullPlayerCharacterCodec` with #538 (all 151 captured snapshot roots re-encode byte-exact) and
-		// `QuestJournalCodec` with #544 (all 38, once "RRL3" turned out to be a per-area ACGHash and the
-		// "tracked-quest pointer" turned out to be five separate fields).
-		private static readonly string[] UnreadableInTheCorpus = ["QuestLogListCodec"];
+		// moment its issue closes - the value of this gate is that the list is short and shrinking.
+		//
+		// EMPTY since #545, and that is the point: all three have come off. `FullPlayerCharacterCodec` with #538 (all
+		// 151 captured snapshot roots re-encode byte-exact), `QuestJournalCodec` with #544 (all 38, once "RRL3" turned
+		// out to be a per-area ACGHash and the "tracked-quest pointer" turned out to be five separate fields), and
+		// `QuestLogListCodec` with #545 (all 46, once the "leading constant" turned out to be the client's
+		// MainQuestUpdate OPERATION). Adding an entry back means shipping a codec that cannot read retail - do it only
+		// with a filed decode issue, never to silence a failure.
+		private static readonly string[] UnreadableInTheCorpus = [];
 
 		// The ROOT of Codecs/ itself - the codecs that sit in `Faolan.Core.Network.Codecs` with no domain folder.
 		// Spelled as a sentinel rather than "" so the two places that expand it read as deliberate.
