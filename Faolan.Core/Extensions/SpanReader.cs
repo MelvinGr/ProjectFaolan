@@ -231,6 +231,22 @@ namespace Faolan.Core.Extensions
 			return Encoding.Latin1.GetString(ReadBytesU8Length());
 		}
 
+		// A C-style NUL-terminated string. Rarer than the length-prefixed forms above and only used where the client
+		// itself terminates rather than counts - the PFAccessWindow_ catalog's short codes are the live case. Throws
+		// (rather than returning what it has) when the terminator is missing, since an unterminated string means the
+		// grammar is wrong, not that the string runs to the end.
+		public string ReadStringNullTerminated()
+		{
+			var start = _position;
+			while (_position < _data.Length)
+			{
+				if (_data[_position++] == 0)
+					return Encoding.Latin1.GetString(_data[start..(_position - 1)]);
+			}
+
+			throw CodecParseException.Unexpected(_codec, start, "a NUL-terminated string", "no terminator before the end of the body");
+		}
+
 		// A length-prefixed protobuf message - the read counterpart to FaolanStream.WriteProtobufByteLength. The
 		// prefix is a single BYTE, which is what the Conan carrier messages use around their protobuf payloads.
 		public T ReadProtobufByteLength<T>() where T : IExtensible

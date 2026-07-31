@@ -9,7 +9,7 @@ namespace Faolan.Tests
 	// Byte-exact golden for the ShortcutBarReply (0x2076) body decoded in #71: the action bar restored at login.
 	// Reproduces Strie's captured login reply from her stored shortcuts (slot/type/id), proving the builder matches
 	// retail - header = (N+1)*0x3F1, records = [slot][type][id][0][0][0].
-	public class ShortcutBarBuilderTests
+	public class ShortcutBarReplyCodecTests
 	{
 		// Strie_rogue-assassin_login.tshark.json, the 0x2076 DispatchShortcutBarReply body (14 shortcuts).
 		// header 0x00003b1f = (14+1)*0x3F1; then 14 records of [slot][type][id][0][0][0] (one per line, 48 hex each).
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildBody_EmptyBar_HasOnlyThe0x3F1Header()
 		{
-			var body = ShortcutBarBuilder.BuildBody([]);
+			var body = ShortcutBarReplyCodec.Build([]);
 			Assert.Equal("000003f1", Convert.ToHexString(body).ToLowerInvariant()); // (0+1)*0x3F1
 		}
 
@@ -36,13 +36,12 @@ namespace Faolan.Tests
 				S(112, 4, 769097), S(20000, 4, 3675584), S(20001, 4, 3316611), S(20002, 4, 3794819), S(20003, 4, 4931272)
 			};
 
-			var body = ShortcutBarBuilder.BuildBody(shortcuts);
+			var body = ShortcutBarReplyCodec.Build(shortcuts);
 
 			Assert.Equal(StrieBody, Convert.ToHexString(body).ToLowerInvariant());
 
-			// ICodec round-trip: Read recovers the per-slot records and rebuilds byte-for-byte.
-			var rt = ShortcutBarBuilder.ShortcutBar.Read(new FaolanStream(body));
-			Assert.Equal(body, rt.ToArray());
+			// Round-trip: Parse recovers the per-slot records and Build rebuilds them byte-for-byte.
+			Assert.Equal(body, ShortcutBarReplyCodec.Build(ShortcutBarReplyCodec.Parse(body)));
 		}
 
 		private static CharacterShortcut S(uint slot, uint type, uint id)

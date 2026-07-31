@@ -30,7 +30,7 @@ namespace Faolan.Tests
 		public void BeachPrefix_BuildsFromScratch_ByteIdentical()
 		{
 			var (prefix, root, _) = SplitBeach();
-			var built = FullCharSnapshotCodec.BuildPrefix(root.Length);
+			var built = SnapshotPackets.BuildPrefix(root.Length);
 			Assert.Equal(prefix, built);
 		}
 
@@ -47,18 +47,18 @@ namespace Faolan.Tests
 			Assert.Equal(0x28, root[0]); // root leads with field 5 (subscription_flags) on this beach capture
 		}
 
-		// (The byte-exact tails build is proven against this same template by BeachTailsFromScratchTests
+		// (The byte-exact tails build is proven against this same template by SnapshotTailsFromScratchTests
 		// [BuildFromScratch_ReproducesTheTemplate_ByteForByte / _AuthorsAssassinBlock], and the instance re-addressing by
 		// BuildFromScratch_ReAddressesInstance - so the template-path Build() tests were removed with the method.)
 
 		// The full beach snapshot body (constructed prefix + DB root + tails) re-splits cleanly with both intact - the
 		// prefix-length/framing invariant the world-entry snapshot relies on. Uses the captured golden tails (the
-		// from-scratch builder reproduces them byte-for-byte, proven by BeachTailsFromScratchTests).
+		// from-scratch builder reproduces them byte-for-byte, proven by SnapshotTailsFromScratchTests).
 		[Fact]
 		public void BeachSnapshot_PrefixPlusTails_ReassemblesConsistently()
 		{
 			var (_, root, tails) = SplitBeach();
-			var prefix = FullCharSnapshotCodec.BuildPrefix(root.Length);
+			var prefix = SnapshotPackets.BuildPrefix(root.Length);
 
 			using var content = new FaolanStream();
 			content.WriteUInt32(GameServer0X2000Opcodes.FullPlayerCharacterIIR);
@@ -72,9 +72,9 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			s.ReadUInt32();
-			var reparsed = FullCharSnapshotCodec.ParseInventoryPacketBody(s);
+			var reparsed = SnapshotPackets.Parse(s);
 			Assert.True(reparsed.Root.ToProtobuf().SequenceEqual(root));
-			Assert.True(reparsed.SubClass.ToArray().SequenceEqual(tails));
+			Assert.True(FullCharSnapshotSubClassCodec.Build(reparsed.SubClass).SequenceEqual(tails));
 		}
 
 		// VERIFIES that the committed beach tails template still matches what the capture yields - it does not rewrite
@@ -84,7 +84,7 @@ namespace Faolan.Tests
 		// ⚠️ It used to call File.WriteAllBytes(TemplatePath, ...) unconditionally, on every run, and that was the
 		// cause of the long-standing "suite flakes once in a while with no diagnosable failure". SIX other test classes
 		// READ this asset (SubClassStatBlockTests, QuestcRegionTests, AccessWindowCatalogTests, KnownSpellListTests,
-		// BeachSubClassFromScratchTests, BeachTailsFromScratchTests) and xUnit runs test CLASSES in parallel - so a
+		// SnapshotTailsFromScratchTests, SnapshotTailsFromScratchTests) and xUnit runs test CLASSES in parallel - so a
 		// reader landing mid-write saw a truncated file and blew up somewhere deep in a parser, e.g.
 		// "EndOfStreamException at QuestcRegion.Read". It presented as a DIFFERENT test each time, which is exactly why
 		// it never looked like one bug. Caught by re-running the suite in a loop and keeping the failing run's output
@@ -99,7 +99,7 @@ namespace Faolan.Tests
 			Assert.Equal(9282, tails.Length);
 
 			// Round-trips through the structured model.
-			Assert.True(FullCharSnapshotSubClass.Deserialize(tails).ToArray().SequenceEqual(tails));
+			Assert.True(FullCharSnapshotSubClassCodec.Build(FullCharSnapshotSubClassCodec.Parse(tails)).SequenceEqual(tails));
 
 			if (Environment.GetEnvironmentVariable("FAOLAN_UPDATE_ASSETS") == "1")
 			{
@@ -136,7 +136,7 @@ namespace Faolan.Tests
 				s.ReadUInt32();
 				s.ReadUInt32();
 				s.ReadUInt32();
-				return FullCharSnapshotCodec.ParseInventoryPacketBody(s).SubClass.UnknownBeforeAccessWindowTable ?? [];
+				return SnapshotPackets.Parse(s).SubClass.UnknownBeforeAccessWindowTable ?? [];
 			}
 		}
 
@@ -147,8 +147,8 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
-			return (parts.Prefix, parts.Root.ToProtobuf(), parts.SubClass.ToArray());
+			var parts = SnapshotPackets.Parse(stream);
+			return (SnapshotPackets.PrefixOf(parts), parts.Root.ToProtobuf(), FullCharSnapshotSubClassCodec.Build(parts.SubClass));
 		}
 	}
 }

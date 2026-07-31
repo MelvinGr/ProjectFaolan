@@ -46,21 +46,13 @@ namespace Faolan.Core.Network.Codecs.World
 			var entityHandle = r.ReadU32Be();
 			r.ExpectU32Be(0, "padding word");
 
-			// CharacterStatBlock still reads through the pre-#530 span API (it lands in wave 6); it reports what it
-			// consumed, so the reader is advanced by exactly that and EnsureAtEnd still governs the whole body.
-			var offset = r.Position;
-			var rest = r.PeekRemaining();
-			if (!CharacterStatBlock.TryParse(rest, out var stats, out var consumed))
-				throw CodecParseException.Unexpected(nameof(StatUpdateCodec), offset, "a CharacterStatBlock", $"{rest.Length} byte(s) that do not parse as one");
-
-			r.Skip(consumed);
-			return new StatUpdateIIR(entityHandle, stats);
+			return new StatUpdateIIR(entityHandle, CharacterStatBlockCodec.Read(ref r));
 		}
 
 		internal static void Write(FaolanStream s, StatUpdateIIR v)
 		{
 			s.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(v.EntityHandle).WriteUInt32(0x00000000);
-			v.Stats.WriteTo(s);
+			CharacterStatBlockCodec.Write(s, v.Stats);
 		}
 	}
 

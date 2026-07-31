@@ -4,7 +4,7 @@ Recovered from `AgeOfConan.exe` via the vtable-xref method (`tools/ghidra/DumpFu
 `DumpFullCharRecords.java`, slot 8 = `ReadSubClass`; see the agent memory `ghidra_vtable_xref_readers`).
 Goal (ACHIEVED for the tails, see Status): replace the captured `BeachTailsTemplate.bin` tails with a real,
 generated grammar so the `.bin` can be retired and the character's **class/progression** authored instead of
-inherited from Strie. `FullCharSnapshotSubClass.BuildFromScratch` reproduces the whole tails byte-for-byte from
+inherited from Strie. `SnapshotTails.FromScratch` reproduces the whole tails byte-for-byte from
 generated quest + a game-static access-window catalog + the code stat skeleton, and is now the LIVE production
 world-entry path (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`, the burst-less entry #210 — the
 only world-entry path); the captured `BeachTailsTemplate.bin` survives only as the golden test oracle. See the
@@ -12,8 +12,8 @@ memory `snapshot_tails_construction_scope`.
 
 ## Tails build from scratch (2026-06-17)
 
-**The WHOLE tails now build from scratch — no captured-tails template.** `FullCharSnapshotSubClass.BuildFromScratch`
-assembles the three regions and reproduces `BeachTailsTemplate.bin` byte-for-byte (`BeachTailsFromScratchTests`):
+**The WHOLE tails now build from scratch — no captured-tails template.** `SnapshotTails.FromScratch`
+assembles the three regions and reproduces `BeachTailsTemplate.bin` byte-for-byte (`SnapshotTailsFromScratchTests`):
 - **quest portion** `@0..1292` — DB-generated (`BuildQuestPortion`), wired into the production login
   snapshot (in-client verified 2026-06-16).
 - **access-window table** `@1292..7917` — carved out into the typed game-static catalog `AccessWindowCatalog`
@@ -21,10 +21,10 @@ assembles the three regions and reproduces `BeachTailsTemplate.bin` byte-for-byt
   playfield catalog, identical for every character — reference data, not generated; the former
   `AccessWindowTable.bin` blob is retired).
 - **stat block** `@7917..end` — the code skeleton `SubClassStatBlock.CreateFreshBlock` (313 fixed slots + ~14
-  character/map-derived, patched) serialized by `SubClassStatBlock.Serialize`.
+  character/map-derived, patched) serialized by `SubClassPostAccessBlockCodec.Build`.
 
 So the captured Strie tails are no longer needed to *author* a beach entry's tails. `BeachTailsTemplate.bin`
-now serves only as the golden test oracle. **`BuildFromScratch` is now wired into the burst-less world entry
+now serves only as the golden test oracle. **`SnapshotTails.FromScratch` is now wired into the burst-less world entry
 (#210) — the ONLY world-entry path (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`/
 `BuildBurstlessSnapshot`); the captured-burst tails are retired.** The production FullChar tails are fully
 generated.
@@ -41,7 +41,7 @@ Casilda 1 goal = `0x7E2`; the old `QuestObjectiveRegion.ChapterTag` const is now
 NAME word (beach `0x57365154` "W6QT", Casilda `0x52524C33" "RRL3") and the block trailers **CHAIN**: `linkWord` = the
 NEXT held quest's `AreaId`, the LAST block = the primary's `IndexTrailerWord`. **All record/objective/index scalars are
 PER-QUEST CONSTANTS** (byte-identical across a quest's active AND completed login captures — NOT progress-bearing; the
-beach record is the same fresh 601 B early or late). Builder: `FullCharSnapshotSubClass.BuildQuestPortion(quests, primary,
+beach record is the same fresh 601 B early or late). Builder: `SnapshotTails.QuestPortion(quests, primary,
 instance)` + a `BuildFromScratch(quests, primary, ...)` overload (beach-only delegates → byte-identical). New
 `QuestDefinition` cols: `Level`, `SnapshotUnknown28`, `IndexMagic` (+migrations; `SnapshotState` was collapsed into
 `Level` and the `SnapshotField*` scalars renamed `SnapshotUnknown*` on 2026-07-20). A held quest joins the snapshot
@@ -55,7 +55,7 @@ index), NOT a progress/obj-list issue — the obj-lists are empty and the record
 
 The measurement in #391 ("81 of 141 snapshots have no quest index we can identify") was the last big
 degenerate-corpus trap. The index was modelled from beach/2-quest goldens only, so two beach-only accidents
-were baked into the grammar. Both are now corrected and `FullCharSnapshotSubClass.Deserialize` identifies the
+were baked into the grammar. Both are now corrected and `FullCharSnapshotSubClassCodec.Parse` identifies the
 index in **all 141** snapshots (`UnknownBeforeAccessWindowTable` 105,744 B → **0**, guarded by
 `SnapshotOpaqueSurfaceTests`):
 
@@ -139,21 +139,21 @@ DONE 2026-06-16 (the single-quest beach region authors from server state):
 - **Production wiring (live, in-client verified 2026-06-16 — INTERIM, since SUPERSEDED by #210)** — the (now
   removed) `RetailLoginReplay` login-replay path generated the quest portion and spliced it over the captured
   tails' `@0..1292` unconditionally (graceful fallback to the captured region on failure); byte-identical for a
-  fresh beach char. At that point `BuildFromScratch` was TEST-ONLY and production still shipped the captured
+  fresh beach char. At that point `SnapshotTails.FromScratch` was TEST-ONLY and production still shipped the captured
   world-burst tails for everything OUTSIDE the quest portion. **That interim is retired: #210 landed, so
-  `FullCharSnapshotSubClass.BuildFromScratch` now builds the WHOLE tails and is the sole production path
+  `SnapshotTails.FromScratch` now builds the WHOLE tails and is the sole production path
   (`GameServerListener.WorldEntry.cs`); there is no captured-burst splice anymore.**
 - **Stat block decoded** — `CharacterStatBlockTests`: only 25 of 338 values vary across fresh chars (class/map/XP
   + one session slot); the other 313 are a fixed skeleton, relocated to `SubClassStatBlock`.
 
 DONE (2026-06-17): the **access-window table** (`[1292,7917)`, 86 `PFAccessWindow_` entries / 172 name strings)
 was carved into the typed game-static catalog `AccessWindowCatalog` (#258; `AccessWindowTable.bin` retired), and
-the **stat skeleton** + its patches are assembled by `FullCharSnapshotSubClass.BuildFromScratch` (serialized via
-`SubClassStatBlock.Serialize`). Together with the generated quest portion, `BuildFromScratch` reproduces
-`BeachTailsTemplate.bin` byte-for-byte (`BeachTailsFromScratchTests`).
+the **stat skeleton** + its patches are assembled by `SnapshotTails.FromScratch` (serialized via
+`SubClassPostAccessBlockCodec.Build`). Together with the generated quest portion, `SnapshotTails.FromScratch` reproduces
+`BeachTailsTemplate.bin` byte-for-byte (`SnapshotTailsFromScratchTests`).
 
 DONE (#210, since landed): both remaining integration steps below are complete —
-1. ✅ `BuildFromScratch` is wired into the burst-less world entry (#210); it is the ONLY world-entry path
+1. ✅ `SnapshotTails.FromScratch` is wired into the burst-less world entry (#210); it is the ONLY world-entry path
    (`GameServerListener.WorldEntry.cs` `SendBurstlessWorldEntry`), so the player's own FullChar tails are
    generated, not a captured burst's.
 2. **In-client chat-connect smoke test** — the standing acceptance gate for any byte-changing snapshot step.
@@ -339,9 +339,9 @@ In the captured beach tails (`BeachTailsTemplate.bin`) this list is **empty** at
 `0x03F1`), because the captured Strie was a fresh char with no spells — identified by the preceding landmark
 `00 00 00 00  00 00 02 90  00 00 00 00`. That empty list is why seeded spells USED to vanish on relog and type-4
 attacks didn't place on the bar. **FIXED (#74):** the codec `KnownSpellList` (`FullCharSnapshotSubClass`'s
-folder) models this list, and `BuildFromScratch` builds the character's own learned spells into it — the live
+folder) models this list, and `SnapshotTails.FromScratch` builds the character's own learned spells into it — the live
 world entry loads `CharacterSpells` → `knownSpellIds` and passes them through (`GameServerListener.WorldEntry.cs`
-loads them at world entry; `KnownSpellList.FromSpellIds` emits the type-2 records inside the stat block), so the
+loads them at world entry; `KnownSpellLists.FromSpellIds` emits the type-2 records inside the stat block), so the
 snapshot now lists the character's spells and they persist across relog + place on the bar.
 
 ## `Quest_c` per-record grammar (`FUN_0091df50`) — VALIDATED against `BeachTailsTemplate.bin`
@@ -450,7 +450,7 @@ access-window table our heuristic finds by the `PFAccessWindow_` ASCII is one of
 `StatList_t`s (region 9–10). Every region is a `0x3F1`/plain-count list — **fully tractable**, same shape as
 the spawn/loot/movetask readers already regenerated.
 
-**EMPIRICAL DECOMPOSITION (#258, 2026-06-21).** `FullCharSnapshotSubClass.Deserialize` on the beach template now leaves
+**EMPIRICAL DECOMPOSITION (#258, 2026-06-21).** `FullCharSnapshotSubClassCodec.Parse` on the beach template now leaves
 **ZERO opaque bytes** — `UnknownBefore = 0`, every byte falls into a typed region and `ToArray()` round-trips
 byte-exact: `Quests 609 + QuestObjectives 559 + QuestIndex 124 + AccessWindowEntries (86 entries, 6625 B) +
 PostAccessBlock (338 vals, 1365 B) = 9282`. So the beach tails are **fully decoded**; List B and the other
@@ -489,7 +489,7 @@ retail Necro captures):
   now authored: `SubClassPostAccessBlock.ApplyClassVitals` writes HP/mana/stamina (displayed + base/secondary
   slots, ×100, keeping the `+148` repeated copies in sync) from `CharacterMaxStats.SnapshotVitals()` (#4/#186).
 - The **class label is in the FRONT protobuf root** (`ProtoFullCharacterIIR`), not the tails; when a character's
-  REAL captured stat sheet is available `BuildFromScratch` ships that sheet (imported), otherwise the fresh
+  REAL captured stat sheet is available `SnapshotTails.FromScratch` ships that sheet (imported), otherwise the fresh
   skeleton with per-class vitals patched. The distinct class *identity* in the root is still the open part (#239).
 - (The earlier standalone tails-stat-block patch was reverted; the correct approach is the sheet-level authoring
   above. `CharacterStatBlockTests`'s WRONG label was `[78]=archetype` — every archetype has `[78]=3`; `[64]=mana` is

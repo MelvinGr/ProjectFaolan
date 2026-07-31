@@ -3,6 +3,7 @@ using System.IO;
 using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Protocol;
 using Faolan.GameServer;
 using Faolan.Tests.Support;
@@ -13,7 +14,7 @@ namespace Faolan.Tests
 	// Proves the from-scratch world-entry record framers (#210) reproduce their captured packets byte-for-byte when
 	// given the capture's own record body - i.e. the shared RpcHeader, the IIR record framing and (for the snapshot)
 	// the 5-byte blob prefix are all assembled from the live session with NO captured packet as a template. The body
-	// generation is proven separately (FullCharIirRoundTripTests / BeachTailsFromScratchTests / the SpawnPacketBuilder
+	// generation is proven separately (FullCharIirRoundTripTests / SnapshotTailsFromScratchTests / the SpawnPacketBuilder
 	// override engine, which the live login path already exercises in-client).
 	public class WorldEntryRecordFramerTests
 	{
@@ -32,10 +33,10 @@ namespace Faolan.Tests
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
+			var parts = SnapshotPackets.Parse(stream);
 
-			var built = FullCharSnapshotCodec.BuildPrefix(root.Length);
-			Assert.Equal(parts.Prefix, built);
+			var built = SnapshotPackets.BuildPrefix(root.ToProtobuf().Length);
+			Assert.Equal(SnapshotPackets.PrefixOf(parts), built);
 		}
 
 		[Fact]
@@ -88,15 +89,15 @@ namespace Faolan.Tests
 			return new RecordingNetworkClient(StriePlayerInstance);
 		}
 
-		private static (byte[] Root, byte[] SubClass) SplitBeachSnapshot()
+		private static (ProtoFullCharacterIIR Root, FullCharSnapshotSubClass SubClass) SplitBeachSnapshot()
 		{
 			var packet = Rpc.Parse(File.ReadAllBytes(SnapshotCap));
 			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
-			return (parts.Root.ToProtobuf(), parts.SubClass.ToArray());
+			var parts = SnapshotPackets.Parse(stream);
+			return (parts.Root, parts.SubClass);
 		}
 	}
 }

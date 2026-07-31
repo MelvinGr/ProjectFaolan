@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -57,8 +58,8 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				// DispatchShortcutBarReply (0x2076): the whole saved bar - the SAME body ShortcutBarBuilder builds, so
-				// parse it with ShortcutBar.Read instead of a hand-rolled 0x3F1 loop. Latest in the capture wins.
+				// DispatchShortcutBarReply (0x2076): the whole saved bar - the SAME body ShortcutBarReplyCodec builds,
+				// so parse it with that codec instead of a hand-rolled 0x3F1 loop. Latest in the capture wins.
 				var body = packet.BodyReader().ReadRemainingArray();
 				if (body.Length < 4)
 					continue;
@@ -73,7 +74,7 @@ namespace Faolan.Importer.Captures
 				if (4 + count * ShortcutEntrySize > body.Length)
 					continue;
 
-				var bar = ShortcutBarBuilder.ShortcutBar.Read(new FaolanStream(body)).Entries.ToDictionary(e => e.Slot, e => (e.Type, e.Id));
+				var bar = ShortcutBarReplyCodec.Parse(body.AsSpan(0, 4 + count * ShortcutEntrySize)).Entries.ToDictionary(e => e.Slot, e => (e.Type, e.Id));
 
 				shortcuts[character] = bar; // the full saved bar is authoritative (replaces any earlier one)
 			}

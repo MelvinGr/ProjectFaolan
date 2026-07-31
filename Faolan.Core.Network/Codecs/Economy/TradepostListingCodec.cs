@@ -59,7 +59,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 			return new ParsedResults(head, rows).ToArray();
 		}
 
-		// The listed item as the wire ProtoInventoryGameEntry (the same shape SnapshotItemBuilder emits, with the
+		// The listed item as the wire ProtoInventoryGameEntry (the same shape SnapshotItems emits, with the
 		// AH-specific stat set). The listed instance's TEA key is per-TEMPLATE and lives in Items, reached through the
 		// TemplateItem nav (FK on Template) - Include it before building. The Template/Level/ItemHash tail still comes
 		// off the listing row (ItemHash is the captured wire value, 0 for AH, not Items.Hash).

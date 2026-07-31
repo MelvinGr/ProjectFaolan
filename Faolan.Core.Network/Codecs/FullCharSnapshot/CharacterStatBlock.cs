@@ -1,19 +1,18 @@
-using System;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
 	/// <summary>
-	///     Builds the count-prefixed stat-record block shared by the <c>0x737A6DF9</c> snapshot and the
-	///     <c>0x96B8DC59</c> vitals/stat-update packet. Confirmed wire encoding (see docs/subsystems/player-stats.md and
-	///     docs/re/quests-and-combat.md): a single-byte record count, then N records of
-	///     <c>[uint32 statId BE][uint32 value BE]</c>.
-	///     Values are stored at wire scale: vitals (Health/Mana/Stamina) ×100, attributes ×10, everything else ×1
-	///     (see <see cref="CharacterStatIdExtensions.GetScale" />). Use <see cref="Set" /> with the player-facing
-	///     value (it applies the scale) or <see cref="SetRaw" /> with the already-scaled wire value.
+	///     The decoded stat-record block <see cref="CharacterStatBlockCodec" /> reads and writes: an ordered list of
+	///     <c>(statId, rawValue)</c> records at WIRE scale - vitals (Health/Mana/Stamina) ×100, attributes ×10,
+	///     everything else ×1 (see <see cref="CharacterStatIdExtensions.GetScale" />). Use <see cref="Set" /> with the
+	///     player-facing value (it applies the scale) or <see cref="SetRaw" /> with the already-scaled wire value.
 	/// </summary>
+	/// <remarks>
+	///     A plain value: it does not serialize itself (#530 rule 1). <see cref="CharacterStatBlockCodec.Build" /> is
+	///     how it becomes bytes.
+	/// </remarks>
 	public sealed class CharacterStatBlock
 	{
 		private readonly List<(CharacterStatId StatId, uint RawValue)> _records = [];
@@ -51,7 +50,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			}
 		}
 
-		/// <summary>The parsed/built records at wire scale, in order ([statId], [rawValue]).</summary>
+		/// <summary>The records at wire scale, in order ([statId], [rawValue]).</summary>
 		public IReadOnlyList<(CharacterStatId StatId, uint RawValue)> Records => _records;
 
 		public int Count => _records.Count;
@@ -67,53 +66,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		{
 			_records.Add((statId, rawValue));
 			return this;
-		}
-
-		public byte[] ToArray()
-		{
-			using var stream = new FaolanStream();
-			WriteTo(stream);
-			return stream.ToArray();
-		}
-
-		/// <summary>Writes <c>[count:1][N×(statId:u32, value:u32)]</c> (big-endian) into <paramref name="stream" />.</summary>
-		public FaolanStream WriteTo(FaolanStream stream)
-		{
-			stream.WriteByte(_records.Count);
-			foreach (var (statId, rawValue) in _records)
-				stream.WriteUInt32(statId).WriteUInt32(rawValue);
-
-			return stream;
-		}
-
-		/// <summary>
-		///     The inverse of <see cref="WriteTo" />: parses <c>[count:1][N×(statId:u32, value:u32)]</c> (big-endian)
-		///     from the front of <paramref name="data" />, returning the block and the number of bytes consumed. The
-		///     same codec covers both the <c>0x737A6DF9</c> snapshot and the <c>0x96B8DC59</c> vitals packet. Returns
-		///     false (and <paramref name="consumed" /> = 0) when the buffer is too short for the declared count.
-		/// </summary>
-		public static bool TryParse(ReadOnlySpan<byte> data, out CharacterStatBlock block, out int consumed)
-		{
-			block = new CharacterStatBlock();
-			consumed = 0;
-			if (data.Length < 1)
-				return false;
-
-			int count = data[0];
-			var needed = 1 + count * 8;
-			if (data.Length < needed)
-				return false;
-
-			for (var i = 0; i < count; i++)
-			{
-				var off = 1 + i * 8;
-				var statId = (CharacterStatId)data.ReadU32Be(off);
-				var rawValue = data.ReadU32Be(off + 4);
-				block._records.Add((statId, rawValue));
-			}
-
-			consumed = needed;
-			return true;
 		}
 	}
 }

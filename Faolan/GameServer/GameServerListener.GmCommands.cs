@@ -683,8 +683,8 @@ namespace Faolan.GameServer
 		{
 			var characterId = client.Session.Character.Id;
 			var rows = await Database.GetCharacterInventory(characterId);
-			var bankRows = rows.Where(r => r.Container == FullPlayerCharacterBuilder.BankKind).ToList();
-			var bank = FullPlayerCharacterBuilder.BuildContainer(FullPlayerCharacterBuilder.BankKind, 50, 30, characterId, bankRows);
+			var bankRows = rows.Where(r => r.Container == ContainerKind.Bank).ToList();
+			var bank = FullCharacterRoots.Container(ContainerKind.Bank, 50, 30, characterId, bankRows);
 
 			await _bank.SendBank(client, bank);
 			await TradepostResponses.SendOpenTradepost(client, accessPosition);

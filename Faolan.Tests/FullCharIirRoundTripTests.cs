@@ -25,7 +25,7 @@ namespace Faolan.Tests
 			_output = output;
 		}
 
-		// The AUTHORING oracle (#57): FullPlayerCharacterBuilder.BuildRoot, fed a captured root's own field values,
+		// The AUTHORING oracle (#57): FullCharacterRoots.ForCharacter, fed a captured root's own field values,
 		// must re-encode that root byte-identically - so the snapshot path can author the root from typed inputs
 		// (DB containers + account flags + tag/spell state) instead of carrying the captured protobuf root.
 		[Fact]
@@ -42,7 +42,7 @@ namespace Faolan.Tests
 					stream.ReadUInt32(); // subop
 					stream.ReadUInt32(); // c350
 					stream.ReadUInt32(); // instance
-					rootBytes = FullCharSnapshotCodec.ParseInventoryPacketBody(stream).Root.ToProtobuf();
+					rootBytes = SnapshotPackets.Parse(stream).Root.ToProtobuf();
 				}
 				catch
 				{
@@ -56,7 +56,7 @@ namespace Faolan.Tests
 				Assert.False(decoded.ShouldSerializeFreeFeatRespecs(), $"{source}: unexpected free_feat_respecs");
 				Assert.False(decoded.ShouldSerializeFeatResets(), $"{source}: unexpected feat_resets");
 
-				var rebuilt = FullPlayerCharacterBuilder.BuildRoot(decoded.CharacterTags, decoded.ShouldSerializeExpansionFlags()
+				var rebuilt = FullCharacterRoots.ForCharacter(decoded.CharacterTags, decoded.ShouldSerializeExpansionFlags()
 					? decoded.ExpansionFlags
 					: null, decoded.ShouldSerializeSubscriptionFlags()
 					? decoded.SubscriptionFlags
@@ -84,7 +84,7 @@ namespace Faolan.Tests
 			{
 				total++;
 
-				FullCharSnapshotCodec.InventoryPacketParts parts;
+				FullPlayerCharacterIIR parts;
 				byte[] rootBytes;
 				try
 				{
@@ -92,7 +92,7 @@ namespace Faolan.Tests
 					stream.ReadUInt32(); // subop
 					stream.ReadUInt32(); // c350
 					stream.ReadUInt32(); // instance
-					parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
+					parts = SnapshotPackets.Parse(stream);
 					rootBytes = parts.Root.ToProtobuf();
 				}
 				catch (Exception e)

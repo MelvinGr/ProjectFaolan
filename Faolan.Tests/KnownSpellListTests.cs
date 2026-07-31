@@ -35,7 +35,7 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null!, TemplateInstance, null, []);
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, null!, TemplateInstance, null, []));
 
 			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.True(template.SequenceEqual(built), "an empty known-list must equal BeachTailsTemplate.bin byte-for-byte");
@@ -50,8 +50,8 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			var empty = FullCharSnapshotSubClass.BuildFromScratch(def, null!, TemplateInstance, null, []);
-			var withSpells = FullCharSnapshotSubClass.BuildFromScratch(def, null!, TemplateInstance, null, FaolanxSpellIds);
+			var empty = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, null!, TemplateInstance, null, []));
+			var withSpells = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, null!, TemplateInstance, null, FaolanxSpellIds));
 
 			// Two 12-byte records spliced in.
 			Assert.Equal(empty.Length + 24, withSpells.Length);
@@ -77,25 +77,24 @@ namespace Faolan.Tests
 		[Fact]
 		public void EmptyList_IsJustTheFrameCountWord()
 		{
-			var empty = KnownSpellList.FromSpellIds([]).ToArray();
+			var empty = KnownSpellListCodec.Build(KnownSpellLists.FromSpellIds([]));
 			Assert.Equal(Convert.FromHexString("000003f1"), empty);
 		}
 
 		[Fact]
 		public void RoundTrip_CapturedList_IsLossless()
 		{
-			var parsed = KnownSpellList.Parse(FaolanxKnownListGolden, 0, out var consumed);
-			Assert.Equal(FaolanxKnownListGolden.Length, consumed);
+			var parsed = KnownSpellListCodec.Parse(FaolanxKnownListGolden);
 			Assert.Equal(2, parsed.Records.Count);
 			Assert.Equal(new KnownSpellRecord(0x42CA77, 2), parsed.Records[0]);
 			Assert.Equal(new KnownSpellRecord(0x125D9B, 2), parsed.Records[1]);
-			Assert.Equal(FaolanxKnownListGolden, parsed.ToArray());
+			Assert.Equal(FaolanxKnownListGolden, KnownSpellListCodec.Build(parsed));
 		}
 
 		[Fact]
 		public void ToArray_FreshNecro_MatchesTheCapturedFaolanxList()
 		{
-			var built = KnownSpellList.FromSpellIds(FaolanxSpellIds).ToArray();
+			var built = KnownSpellListCodec.Build(KnownSpellLists.FromSpellIds(FaolanxSpellIds));
 			Assert.Equal(FaolanxKnownListGolden, built);
 		}
 

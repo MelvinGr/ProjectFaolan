@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using System.Linq;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Xunit;
@@ -32,13 +33,18 @@ namespace Faolan.Tests
 					continue;
 
 				regions++;
-				if (!SnapshotTailRegion.TryParse(region, out var parsed))
+				SnapshotTailRegion parsed;
+				try
+				{
+					parsed = SnapshotTailRegionCodec.Parse(region);
+				}
+				catch (CodecParseException)
 				{
 					unparsed++;
 					continue;
 				}
 
-				Assert.Equal(region, parsed.ToArray());
+				Assert.Equal(region, SnapshotTailRegionCodec.Build(parsed));
 				shapes[string.Join(",", parsed.Lists.Select(l => $"f{l.Stride}x{l.Words.Count / (l.Stride / 4)}"))] =
 					shapes.GetValueOrDefault(string.Join(",", parsed.Lists.Select(l => $"f{l.Stride}x{l.Words.Count / (l.Stride / 4)}"))) + 1;
 			}
@@ -67,7 +73,8 @@ namespace Faolan.Tests
 
 			foreach (var (_, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
 			{
-				if (!SnapshotTailRegion.TryParse(sub.UnknownAfterAccessWindowTable ?? [], out var parsed))
+				var parsed = TryWalk(sub.UnknownAfterAccessWindowTable ?? []);
+				if (parsed == null)
 					continue;
 
 				var table = parsed.StatTable;
@@ -111,7 +118,8 @@ namespace Faolan.Tests
 
 			foreach (var (_, sub, _) in CompletedQuestJournalTests.SubClassesForProbe())
 			{
-				if (!SnapshotTailRegion.TryParse(sub.UnknownAfterAccessWindowTable ?? [], out var parsed))
+				var parsed = TryWalk(sub.UnknownAfterAccessWindowTable ?? []);
+				if (parsed == null)
 					continue;
 
 				foreach (var list in parsed.Lists.Where(l => l.Stride == 12))
@@ -119,14 +127,33 @@ namespace Faolan.Tests
 					for (var i = 0; i < list.Words.Count; i += 3)
 					{
 						records++;
-						Assert.Equal(KnownSpellList.Unbound, list.Words[i + 1]);
+						Assert.Equal(KnownSpellListCodec.Unbound, list.Words[i + 1]);
 						types.Add(list.Words[i + 2]);
 					}
 				}
 			}
 
 			Assert.True(records > 2000, $"only {records} spell records - the corpus slice is wrong");
-			Assert.Equal([KnownSpellList.SpellType, KnownSpellList.FeatType], types.Order().ToArray());
+			Assert.Equal([KnownSpellListCodec.SpellType, KnownSpellListCodec.FeatType], types.Order().ToArray());
 		}
+
+		// The tail region walks only when the frames land exactly on its end; a sub-class whose post-catalog
+		// remainder is not one is skipped by these censuses, so the throw is converted here rather than in the codec
+		// (rule 4: Parse is strict).
+		private static SnapshotTailRegion? TryWalk(byte[] region)
+		{
+			if (region.Length == 0)
+				return null;
+
+			try
+			{
+				return SnapshotTailRegionCodec.Parse(region);
+			}
+			catch (CodecParseException)
+			{
+				return null;
+			}
+		}
+
 	}
 }

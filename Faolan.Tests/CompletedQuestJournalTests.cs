@@ -31,7 +31,7 @@ namespace Faolan.Tests
 				examined++;
 
 				// The region sits between the active journal and the access-window table.
-				var start = subClass.KnownHeaderLength;
+				var start = SnapshotPackets.JournalLength(subClass);
 				var end = AccessWindowStart(tails, start);
 				if (end <= start || start + 4 > tails.Length)
 					continue;
@@ -201,14 +201,14 @@ namespace Faolan.Tests
 				if (declared + 4 > body.Length)
 					continue; // truncated capture - the TCP-reassembly gap on compressed downloads
 
-				FullCharSnapshotCodec.InventoryPacketParts parts;
+				FullPlayerCharacterIIR parts;
 				try
 				{
 					var stream = new FaolanStream(body[4..]);
 					stream.ReadUInt32();
 					stream.ReadUInt32();
 					stream.ReadUInt32();
-					parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
+					parts = SnapshotPackets.Parse(stream);
 				}
 				catch
 				{
@@ -217,7 +217,7 @@ namespace Faolan.Tests
 					continue;
 				}
 
-				yield return (source, parts.SubClass, parts.SubClass.ToArray());
+				yield return (source, parts.SubClass, FullCharSnapshotSubClassCodec.Build(parts.SubClass));
 			}
 		}
 	}

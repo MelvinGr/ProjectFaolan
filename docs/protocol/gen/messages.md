@@ -34,7 +34,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `EnergyIIR` | `0x40749B8A` | `EnergyCodec` | [V3: EnergyCodecTests.EnergyBody_MatchesExpectedLayout] |
 | V3 | `FeatIIR` | `0x28DA68A0` | `FeatCodec` | [V3: FeatCodecTests.Build_MatchesTheCapturedAck] |
 | V3 | `FormatFeedbackIIR` | `0x8D5A8B6B` | `FormatFeedbackCodec` | [V3: FormatFeedbackCodecTests.BuildAreaNameXml_MatchesCapturedBanner] |
-| V3 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `FullPlayerCharacterBuilder` | [V3: FullCharIirRoundTripTests.BuildRoot_FromCapturedFields_ReEncodesByteIdentically] |
+| V3 | `FullPlayerCharacterIIR` | `0x737A6DF9` | `FullPlayerCharacterCodec` | [V3: FullPlayerCharacterCodecTests.WriterOutput_SplitsBackIntoItsOwnInputs] |
 | V3 | `GameActionListIIR` | `0xF508F4C1` | `GameActionListCodec` | [V3: GameActionListCodecTests.Parse_ThenBuild_RoundTripsByteExact] |
 | V3 | `GameTimeIIR` | `0x4F57DC08` | `GameTimeCodec` | [V3: GameTimeCodecTests.Build_AtTheCapturedInstant_MatchesCapturedSnapshot] |
 | V3 | `GuildUpdateIIR` | `0x2550C99A` | `GuildUpdateCodec` | [V3: GuildPacketTests.GuildUpdate_Matches_ExpectedLayout] |

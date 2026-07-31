@@ -17,11 +17,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Proves the full chain capture -> CaptureItemImporter -> DB Item -> SnapshotItemBuilder -> on-wire bytes:
+	// Proves the full chain capture -> CaptureItemImporter -> DB Item -> SnapshotItems -> on-wire bytes:
 	// building the "Slave Manacles" entry from the imported Item (id 3361557) reproduces the captured snapshot
 	// entry byte for byte. The validated foundation for building inventories from the DB - and the answer to the
 	// add/remove stall (the item's identity is a real, captured one).
-	public class SnapshotItemBuilderTests
+	public class SnapshotItemsTests
 	{
 		private const uint Hash = 1129664565;
 		private const uint SlaveManaclesId = 3361557;
@@ -46,8 +46,8 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
-			var equipped = FullCharSnapshotCodec.GetContainer(parts.Root, ContainerKind.Equipped);
+			var parts = SnapshotPackets.Parse(body);
+			var equipped = SnapshotRoot.ContainerOf(parts.Root, ContainerKind.Equipped);
 			var captured = SnapshotEntryAccessors.EntryBySlot(equipped!, Slot);
 			Assert.NotNull(captured);
 			var expected = captured!.ToProtobuf();
@@ -67,14 +67,14 @@ namespace Faolan.Tests
 				Assert.NotNull(item);
 
 				// 3) Build the entry from the DB template + captured per-instance state, assert byte-identical.
-				var built = SnapshotItemBuilder.BuildListEntry(Slot, ItemId, RecordId, Count, item, Hash);
+				var built = SnapshotItems.ListEntry(Slot, ItemId, RecordId, Count, item, Hash);
 				var produced = built.ToProtobuf();
 
 				Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(produced));
 
 				// 4) And via the item's own hash (harvested into Items) - the fully DB-driven path.
 				Assert.Equal(Hash, item.Hash);
-				var auto = SnapshotItemBuilder.BuildListEntry(Slot, ItemId, RecordId, Count, item, item.Hash);
+				var auto = SnapshotItems.ListEntry(Slot, ItemId, RecordId, Count, item, item.Hash);
 				Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(auto.ToProtobuf()));
 			}
 			finally
@@ -114,29 +114,29 @@ namespace Faolan.Tests
 				body.ReadUInt32();
 				body.ReadUInt32();
 				body.ReadUInt32();
-				var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
+				var parts = SnapshotPackets.Parse(body);
 
-				var bag = FullCharSnapshotCodec.GetContainer(parts.Root, ContainerKind.Bag);
-				var before = FullCharSnapshotCodec.GetContainerEntries(bag!).ToList();
+				var bag = SnapshotRoot.ContainerOf(parts.Root, ContainerKind.Bag);
+				var before = SnapshotRoot.EntriesOf(bag!).ToList();
 				var original = before[0];
 				var slot = SnapshotEntryAccessors.EntrySlot(original);
 				var itemId = SnapshotEntryAccessors.EntryItemId(original) ?? 0;
 				var recordId = SnapshotEntryAccessors.EntryRecordId(original) ?? 0;
 				var count = SnapshotEntryAccessors.EntryCount(original) ?? 1;
 
-				var built = SnapshotItemBuilder.BuildListEntry(slot, itemId, recordId, count, item, hash);
+				var built = SnapshotItems.ListEntry(slot, itemId, recordId, count, item, hash);
 				bag!.Items[bag.Items.IndexOf(original)] = built;
 
 				// Re-serialize the whole root and re-parse, as the live path does.
 				using var reparsedStream = new MemoryStream(parts.Root.ToProtobuf(), false);
 				var reparsed = Serializer.Deserialize<ProtoFullCharacterIIR>(reparsedStream);
-				var bag2 = FullCharSnapshotCodec.GetContainer(reparsed, ContainerKind.Bag);
-				var after = FullCharSnapshotCodec.GetContainerEntries(bag2!).ToList();
+				var bag2 = SnapshotRoot.ContainerOf(reparsed, ContainerKind.Bag);
+				var after = SnapshotRoot.EntriesOf(bag2!).ToList();
 
 				Assert.Equal(before.Count, after.Count); // entry count unchanged (in-place replace)
 				var first = SnapshotEntryAccessors.EntryBySlot(bag2!, slot);
 				Assert.NotNull(first);
-				Assert.Equal(SlaveManaclesId, FullCharSnapshotCodec.GetEntryTemplateId(first!));
+				Assert.Equal(SlaveManaclesId, SnapshotRoot.TemplateIdOf(first!));
 				Assert.Equal(itemId, SnapshotEntryAccessors.EntryItemId(first!));
 				Assert.Equal(recordId, SnapshotEntryAccessors.EntryRecordId(first!));
 			}

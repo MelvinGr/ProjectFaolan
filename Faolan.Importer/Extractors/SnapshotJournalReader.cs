@@ -60,15 +60,10 @@ namespace Faolan.Importer.Extractors
 
 			try
 			{
-				var stream = new FaolanStream(body);
-				stream.ReadUInt32(); // body length
-				stream.ReadUInt32(); // sub-opcode
-				stream.ReadUInt32(); // type tag
-				var instance = stream.ReadUInt32(); // the snapshot is addressed to its own player
-
-				// The full split: the journal lives in the SUB-CLASS (tails), so the root-only reader will not do.
-				var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
-				characterId = instance;
+				// The full record: the journal lives in the SUB-CLASS (tails), so the root-only reader will not do.
+				// The body opens with the record's own carrier length, which belongs to the sender (#530 rule 2).
+				var parts = FullPlayerCharacterCodec.Parse(body.AsSpan(4));
+				characterId = parts.Instance; // the snapshot is addressed to its own player
 				records = parts.SubClass.Quests.Records;
 				// The quest index follows the journal; since #391 it parses for every held-quest snapshot, so surface
 				// it (QuestAreaExtractor reads the per-block area 4CCs from it - areas an ACTIVE quest reaches but no
@@ -98,13 +93,7 @@ namespace Faolan.Importer.Extractors
 
 			try
 			{
-				var stream = new FaolanStream(body);
-				stream.ReadUInt32(); // body length
-				stream.ReadUInt32(); // sub-opcode
-				stream.ReadUInt32(); // type tag
-				stream.ReadUInt32(); // instance
-
-				completed = FullCharSnapshotCodec.ParseInventoryPacketBody(stream).SubClass.CompletedQuests;
+				completed = FullPlayerCharacterCodec.Parse(body.AsSpan(4)).SubClass.CompletedQuests;
 				return completed is { Areas.Count: > 0 };
 			}
 			catch

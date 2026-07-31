@@ -23,7 +23,7 @@ namespace Faolan.Tests
 	//   3. No IIR opcode is written as a bare hex literal anywhere in Codecs/ - it always comes from the enum,
 	//      so `grep GameServer0X2000Opcodes.<Type>` finds every emitter.
 	//
-	// Codecs with NO opcode (sub-record helpers like CharacterStatBlock, StatList, SnapshotItemBuilder) are fine and
+	// Codecs with NO opcode (sub-record helpers like CharacterStatBlockCodec, StatListCodec, PfAccessWindowEntryCodec) are fine and
 	// are deliberately not required to declare one - reflection cannot tell "emits an IIR" from "is a sub-record".
 	public class CodecConventionTests
 	{

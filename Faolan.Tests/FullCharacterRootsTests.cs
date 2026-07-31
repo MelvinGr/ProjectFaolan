@@ -16,7 +16,7 @@ namespace Faolan.Tests
 	// 4 containers in kind order 101/104/112/113 with max_size 1028/24/48/48 and disabled_slots_count
 	// 0/0/12/0, owner = the client instance; entry ids follow the retail scheme (0x20D82B63 epoch high32)
 	// and are unique per item.
-	public class FullPlayerCharacterBuilderTests
+	public class FullCharacterRootsTests
 	{
 		private static readonly Item Manacles = new()
 		{
@@ -53,8 +53,8 @@ namespace Faolan.Tests
 				[0x12] = (Manacles, Manacles.Hash)
 			};
 
-			var first = FullPlayerCharacterBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
-			var second = FullPlayerCharacterBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
+			var first = FullCharacterRoots.Containers(0x02000005, equipped, (Signet, Signet.Hash));
+			var second = FullCharacterRoots.Containers(0x02000005, equipped, (Signet, Signet.Hash));
 
 			var ids = first.SelectMany(c => c.Items).Select(e => e.Item.ItemId).ToList();
 			var recordIds = first.SelectMany(c => c.Items).SelectMany(e => e.Item.StatLists.Where(s => s.Stat == 23)).Select(s => s.Value).ToList();
@@ -96,7 +96,7 @@ namespace Faolan.Tests
 				[(ulong)CharacterEquipmentSlot.ResourceBag] = (resourceBag, resourceBag.Hash) // slot 26
 			};
 
-			var containers = FullPlayerCharacterBuilder.BuildContainers(0x02000005, equipped, null);
+			var containers = FullCharacterRoots.Containers(0x02000005, equipped, null);
 
 			// backpack 24+216=240, resource 48+102=150; equipped/quest unchanged; disabled_slots unchanged.
 			Assert.Equal(new uint[] { 1028, 240, 150, 48 }, containers.Select(c => c.MaxSize));
@@ -115,7 +115,7 @@ namespace Faolan.Tests
 				[0x12] = (Manacles, Manacles.Hash)
 			};
 
-			var containers = FullPlayerCharacterBuilder.BuildContainers(0x02000005, equipped, (Signet, Signet.Hash));
+			var containers = FullCharacterRoots.Containers(0x02000005, equipped, (Signet, Signet.Hash));
 
 			Assert.Equal(new uint[] { 101, 104, 112, 113 }, containers.Select(c => c.InventoryId.Type));
 			Assert.All(containers, c => Assert.Equal(0x02000005u, c.InventoryId.Instance));
@@ -172,7 +172,7 @@ namespace Faolan.Tests
 				} // not buildable
 			};
 
-			var containers = FullPlayerCharacterBuilder.BuildContainers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Hash), rows);
+			var containers = FullCharacterRoots.Containers(0x02000005, new Dictionary<ulong, (Item, uint)>(), (Manacles, Manacles.Hash), rows);
 
 			var bag = containers[1].Items;
 			Assert.Equal(new uint[] { 1, 3 }, bag.Select(e => e.Pos)); // row at 1 wins over FirstPosBag; pos-ascending
@@ -196,16 +196,16 @@ namespace Faolan.Tests
 			body.ReadUInt32();
 			body.ReadUInt32();
 			body.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
+			var parts = SnapshotPackets.Parse(body);
 
-			var original = parts.SubClass.ToArray();
-			parts.SubClass.Level = parts.SubClass.Level; // same-value writes are a no-op
-			Assert.Equal(original, parts.SubClass.ToArray());
+			var original = FullCharSnapshotSubClassCodec.Build(parts.SubClass);
 
-			parts.SubClass.Level = 42;
-			var patched = FullCharSnapshotSubClass.Deserialize(parts.SubClass.ToArray());
-			Assert.Equal(42u, patched.Level);
-			Assert.Equal(original.Length, parts.SubClass.ToArray().Length); // fixed-width patch, no resize
+			// The lead quest's STATE word (@20) is a modelled field on the journal record, so writing it is an
+			// ordinary value edit rather than a byte patch - and it stays fixed-width.
+			parts.SubClass.Quests.Records[0].State = 42;
+			var patched = FullCharSnapshotSubClassCodec.Parse(FullCharSnapshotSubClassCodec.Build(parts.SubClass));
+			Assert.Equal(42u, patched.Quests.Records[0].State);
+			Assert.Equal(original.Length, FullCharSnapshotSubClassCodec.Build(parts.SubClass).Length);
 
 			// The live-vitals patch slots round-trip too. The bigboy capture is the tails model's reference
 			// fixture, so its stat table MUST be recognized - a silent skip here would mean the world-entry
@@ -214,7 +214,7 @@ namespace Faolan.Tests
 			{
 				var maxExp = parts.SubClass.PostAccessBlock!.MaxExp;
 				parts.SubClass.PostAccessBlock.CurrentHp = 1234;
-				var statPatched = FullCharSnapshotSubClass.Deserialize(parts.SubClass.ToArray());
+				var statPatched = FullCharSnapshotSubClassCodec.Parse(FullCharSnapshotSubClassCodec.Build(parts.SubClass));
 				Assert.Equal(1234u, statPatched.PostAccessBlock!.CurrentHp);
 				Assert.Equal(maxExp, statPatched.PostAccessBlock.MaxExp);
 			}

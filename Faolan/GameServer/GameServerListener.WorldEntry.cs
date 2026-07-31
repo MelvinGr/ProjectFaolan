@@ -376,7 +376,7 @@ namespace Faolan.GameServer
 		// Re-delivers, via the proven live DispatchAddItem (0x2020) path, the persisted BAG items the world-entry
 		// snapshot DROPPED because they carry no hash (Hash == 0 - e.g. an AH-bought item whose template
 		// we harvested from a listing, which has no hash). The snapshot only renders Hash != 0 rows
-		// (FullPlayerCharacterBuilder), and embedding a half-identified item in the chat-critical 0x737A6DF9 root is
+		// (FullCharacterRoots), and embedding a half-identified item in the chat-critical 0x737A6DF9 root is
 		// risky, so these ride the mid-session add-item mechanism (which renders by template / Hash 0) once at login.
 		// Items WITH an hash already rode the snapshot, so this only touches the dropped ones (no duplication).
 		private async Task RedeliverNonSnapshotBagItems(INetworkClient client)
@@ -385,13 +385,13 @@ namespace Faolan.GameServer
 
 			var rows = await Database.GetCharacterInventory(character.Id);
 			var pushed = 0;
-			foreach (var row in rows.Where(r => r is { Container: FullPlayerCharacterBuilder.BagKind, ItemId: not null, Item.Hash: 0 }))
+			foreach (var row in rows.Where(r => r is { Container: ContainerKind.Bag, ItemId: not null, Item.Hash: 0 }))
 			{
 				var slot = (ulong)row.Slot;
-				var entry = SnapshotItemBuilder.BuildInventoryEntry(FullPlayerCharacterBuilder.ItemId(character.Id, FullPlayerCharacterBuilder.BagKind, slot), row.Item!, 0,
+				var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(character.Id, ContainerKind.Bag, slot), row.Item!, 0,
 				[
-					new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, (uint)FullPlayerCharacterBuilder.RecordId(character.Id, FullPlayerCharacterBuilder.BagKind, slot)),
-					new SnapshotItemBuilder.ItemStat(26, row.Count)
+					new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(character.Id, ContainerKind.Bag, slot)),
+					new SnapshotItems.ItemStat(26, row.Count)
 				], row.Item!.Level);
 				await SendAddItem(client, ContainerKind.Bag, (uint)row.Slot, entry);
 				pushed++;
@@ -597,11 +597,11 @@ namespace Faolan.GameServer
 				? (equipment!.FirstPosBag, equipment!.FirstPosBag.Hash)
 				: null;
 
-			var typedRoot = FullPlayerCharacterBuilder.BuildRoot(characterTags, FullPlayerCharacterBuilder.FullExpansionFlags, FullPlayerCharacterBuilder.FullSubscriptionFlags, false, true,
-				FullPlayerCharacterBuilder.BuildContainers(instance, equipped, bagFirst, inventoryRows ?? []));
-			var tails = FullCharSnapshotSubClass.BuildFromScratch(snapshotQuests, primaryQuest!, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
+			var typedRoot = FullCharacterRoots.ForCharacter(characterTags, FullCharacterRoots.FullExpansionFlags, FullCharacterRoots.FullSubscriptionFlags, false, true,
+				FullCharacterRoots.Containers(instance, equipped, bagFirst, inventoryRows ?? []));
+			var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
 				indexAreas, areaCatalog);
-			var snapshot = BuildWorldEntrySnapshot(client, typedRoot.ToProtobuf(), tails);
+			var snapshot = BuildWorldEntrySnapshot(client, typedRoot, tails);
 
 			// TODO: Just send all? no need to batch them
 			var toSend = new List<Rpc>

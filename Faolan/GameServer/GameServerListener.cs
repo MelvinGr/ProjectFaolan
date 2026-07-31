@@ -550,7 +550,7 @@ namespace Faolan.GameServer
 			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
 			{
 				var def = await Database.GetQuestDefinition(cq.QuestId);
-				if (def != null && areaRows.TryGetValue(def.AreaId, out var area) && FullCharSnapshotSubClass.IsSnapshotEligible(def, area))
+				if (def != null && areaRows.TryGetValue(def.AreaId, out var area) && SnapshotTails.IsSnapshotEligible(def, area))
 					quests.Add(def);
 			}
 

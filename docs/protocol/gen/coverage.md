@@ -56,7 +56,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `EnergyIIR` | `EnergyCodec` |
 | V3 | `FeatIIR` | `FeatCodec` |
 | V3 | `FormatFeedbackIIR` | `FormatFeedbackCodec` |
-| V3 | `FullPlayerCharacterIIR` | `FullPlayerCharacterBuilder` |
+| V3 | `FullPlayerCharacterIIR` | `FullPlayerCharacterCodec` |
 | V3 | `GameActionListIIR` | `GameActionListCodec` |
 | V3 | `GameTimeIIR` | `GameTimeCodec` |
 | V3 | `GuildUpdateIIR` | `GuildUpdateCodec` |

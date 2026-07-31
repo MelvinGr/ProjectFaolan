@@ -34,7 +34,7 @@ namespace Faolan.GameServer
 	public partial class GameServerListener
 	{
 		// The backpack's slot count: base 24 + the equipped bag's Item.BagExtraSlots (equip slot 3 / Bag) - the same
-		// sizing the snapshot uses (FullPlayerCharacterBuilder), so a grown bag can actually be filled. #12.
+		// sizing the snapshot uses (FullCharacterRoots), so a grown bag can actually be filled. #12.
 		private const uint BaseBackpackSlots = 24;
 
 		Task<int?> IEconomyOutbound.GrantItemToBackpack(INetworkClient client, uint itemTemplateId, uint count, bool allowHashless, int? preferredSlot)
@@ -102,10 +102,10 @@ namespace Faolan.GameServer
 		// The same body either way; only the opcode says whose side of the table the item is on.
 		Task ITradeOutbound.SendTradeItem(uint recipientId, Item item, uint slot, uint count, bool mine)
 		{
-			var entry = SnapshotItemBuilder.BuildInventoryEntry(FullPlayerCharacterBuilder.ItemId(recipientId, FullPlayerCharacterBuilder.BagKind, slot), item, 0,
+			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(recipientId, ContainerKind.Bag, slot), item, 0,
 			[
-				new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, (uint)FullPlayerCharacterBuilder.RecordId(recipientId, FullPlayerCharacterBuilder.BagKind, slot)),
-				new SnapshotItemBuilder.ItemStat(26, count)
+				new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(recipientId, ContainerKind.Bag, slot)),
+				new SnapshotItems.ItemStat(26, count)
 			], item.Level);
 
 			return SendTradeRpc(recipientId, mine
@@ -154,10 +154,10 @@ namespace Faolan.GameServer
 			if (ClientForCharacter(characterId) is not { } client)
 				return Task.CompletedTask;
 
-			var entry = SnapshotItemBuilder.BuildInventoryEntry(FullPlayerCharacterBuilder.ItemId(characterId, FullPlayerCharacterBuilder.BagKind, slot), item, 0,
+			var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(characterId, ContainerKind.Bag, slot), item, 0,
 			[
-				new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, (uint)FullPlayerCharacterBuilder.RecordId(characterId, FullPlayerCharacterBuilder.BagKind, slot)),
-				new SnapshotItemBuilder.ItemStat(26, count)
+				new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, (uint)FullCharacterRoots.RecordId(characterId, ContainerKind.Bag, slot)),
+				new SnapshotItems.ItemStat(26, count)
 			], item.Level);
 
 			return SendAddItem(client, ContainerKind.Bag, slot, entry);
@@ -186,7 +186,7 @@ namespace Faolan.GameServer
 		{
 			var equipment = await Database.GetCharacterEquipment(characterId);
 			var rows = await Database.GetCharacterInventory(characterId);
-			var taken = rows.Where(r => r.Container == FullPlayerCharacterBuilder.BagKind).Select(r => r.Slot).ToHashSet();
+			var taken = rows.Where(r => r.Container == ContainerKind.Bag).Select(r => r.Slot).ToHashSet();
 			if (equipment?.FirstPosBag is { Hash: not 0 })
 				taken.Add(1);
 			var capacity = (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
@@ -218,8 +218,8 @@ namespace Faolan.GameServer
 
 		// Grants an item to the player's backpack: persists it to a free CharacterInventory bag cell (so it
 		// survives relog via the world-entry snapshot) AND pushes the live DispatchAddItem so it appears
-		// immediately. The entry is the proven snapshot entry (SnapshotItemBuilder.BuildListEntry().Item - the
-		// 3-stat form that renders in-client), and itemId/recordId use FullPlayerCharacterBuilder's deterministic
+		// immediately. The entry is the proven snapshot entry (SnapshotItems.ListEntry().Item - the
+		// 3-stat form that renders in-client), and itemId/recordId use FullCharacterRoots's deterministic
 		// formula so the live add and the next login's snapshot agree on the entry's identity. Returns the bag
 		// slot it landed in, or null when the item isn't snapshot-buildable or the bag is full.
 		// The live add is UNCONDITIONAL, loot included. This used to carry a `pushLiveAdd` flag that loot passed false,
@@ -249,8 +249,8 @@ namespace Faolan.GameServer
 				return null;
 
 			var kind = isQuestItem
-				? FullPlayerCharacterBuilder.QuestKind
-				: FullPlayerCharacterBuilder.BagKind;
+				? ContainerKind.Quest
+				: ContainerKind.Bag;
 			var capacity = isQuestItem
 				? 48 // quest tab holds 48 (NewContainer(QuestKind, 48))
 				: await BackpackCapacity(characterId); // backpack = 24 base + the equipped bag's extra slots
@@ -266,8 +266,8 @@ namespace Faolan.GameServer
 			var containerType = isQuestItem
 				? ContainerKind.Quest
 				: ContainerKind.Bag;
-			var entry = SnapshotItemBuilder.BuildListEntry((ulong)slot.Value, FullPlayerCharacterBuilder.ItemId(characterId, kind, (ulong)slot.Value),
-					FullPlayerCharacterBuilder.RecordId(characterId, kind, (ulong)slot.Value), count, item, item.Hash)
+			var entry = SnapshotItems.ListEntry((ulong)slot.Value, FullCharacterRoots.ItemId(characterId, kind, (ulong)slot.Value),
+					FullCharacterRoots.RecordId(characterId, kind, (ulong)slot.Value), count, item, item.Hash)
 				.Item;
 			await SendAddItem(client, containerType, (uint)slot.Value, entry);
 
@@ -310,7 +310,7 @@ namespace Faolan.GameServer
 				? (equipment.FirstPosBag, equipment.FirstPosBag.Hash)
 				: null;
 
-			var containers = FullPlayerCharacterBuilder.BuildContainers(characterId, equipped, bagFirst, await Database.GetCharacterInventory(characterId));
+			var containers = FullCharacterRoots.Containers(characterId, equipped, bagFirst, await Database.GetCharacterInventory(characterId));
 
 			// containers[0] = Equipped(101), [1] = Bag(104) - the two retail pushes. The Resource and Quest containers
 			// it also builds are NOT pushed: the capture carries exactly these two.
@@ -337,14 +337,14 @@ namespace Faolan.GameServer
 			var present = false;
 			foreach (var r in rows)
 			{
-				if (r.Container == FullPlayerCharacterBuilder.BagKind && r.Slot == slot)
+				if (r.Container == ContainerKind.Bag && r.Slot == slot)
 					present = true;
 			}
 
 			if (!present)
 				return false;
 
-			await Database.SetCharacterInventorySlot(characterId, FullPlayerCharacterBuilder.BagKind, slot, null);
+			await Database.SetCharacterInventorySlot(characterId, ContainerKind.Bag, slot, null);
 			await SendRemoveItem(client, ContainerKind.Bag, (uint)slot, amountToRemove);
 
 			// Retail follows a SERVER-initiated removal with both containers in full (#380). This path is exactly that
@@ -403,7 +403,7 @@ namespace Faolan.GameServer
 		// byte-exact to the capture by TradepostBankStatTests.
 		internal static byte[] BuildBankSlotStatBody(uint charInstance, uint slot, uint statId, uint value)
 		{
-			return new FaolanStream().WriteUInt32(FullPlayerCharacterBuilder.BankKind).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(statId).WriteUInt32(value).ToArray();
+			return new FaolanStream().WriteUInt32(ContainerKind.Bank).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(statId).WriteUInt32(value).ToArray();
 		}
 
 		// 0x4F57DC08 GameTime - the live world clock (#351). Both fields are generated: the resync anchor from the wall
@@ -508,15 +508,19 @@ namespace Faolan.GameServer
 			return BuildStatUpdate(client, block, client.Session.Character.Id);
 		}
 
-		// Assembles the complete world-entry snapshot packet for `client` from a pre-built root + tails. The record
-		// body ([IirType=0x737A6DF9][TypeTag][Handle=instance][prefix][root][tails]) is built by
-		// FullCharSnapshotWriter, which owns the prefix model next to the reader that parses it - it used to be
-		// stated here as well, and the two drifted (see that type's header). This adds only the client-dependent
-		// outer wrap: the RpcHeader + outer length/CRC. No captured packet is consulted.
-		internal static Rpc BuildWorldEntrySnapshot(INetworkClient client, byte[] rootBytes, byte[] tailsBytes)
+		// Assembles the complete world-entry snapshot packet for `client` from a pre-built root + tails. The
+		// RECORD ([IirType=0x737A6DF9][TypeTag][Handle=instance][blob frame][root][tails]) is built by
+		// FullPlayerCharacterCodec, which owns the blob frame next to the reader that parses it - it used to be
+		// stated here as well, and the two drifted (see that type's header). The carrier's u32 length is written
+		// HERE, because it belongs to the sender (#530 rule 2), together with the RpcHeader + outer length/CRC. No
+		// captured packet is consulted.
+		internal static Rpc BuildWorldEntrySnapshot(INetworkClient client, ProtoFullCharacterIIR root, FullCharSnapshotSubClass tails)
 		{
-			var body = FullCharSnapshotCodec.BuildBody(client.Session.Character.Id, rootBytes, tailsBytes);
-			return FrameWorldEntryRecord(client, body);
+			var record = FullPlayerCharacterCodec.Build(new FullPlayerCharacterIIR(client.Session.Character.Id, root, tails));
+
+			using var body = new FaolanStream();
+			body.WriteArrayUInt32Length(record);
+			return FrameWorldEntryRecord(client, body.ToArray());
 		}
 
 		// Assembles the complete world-entry player/NPC FA015807 spawn packet for `client` from a pre-built spawn

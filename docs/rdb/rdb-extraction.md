@@ -197,7 +197,7 @@ ProtoDecryptionKey { fixed32 key1; key2; key3; key4 }          // 4 LE u32 = the
 ProtoAcgItem { ProtoDecryptionKey key1,key2,key3; fixed32 template1,template2,template3; uint32 level; fixed32 hash }
 ProtoInventoryGameEntry { ... ProtoAcgItem item_data = 3; ... } // inventory entries embed the keys
 ```
-This maps onto our `SnapshotItemBuilder` tail: the three `{f1..f4 fixed32}` "identity payloads" (= `Data1..Data4`)
+This maps onto our `SnapshotItems` tail: the three `{f1..f4 fixed32}` "identity payloads" (= `Data1..Data4`)
 are `key1/key2/key3`; `tail.f4/f5` (= `Item.Id`) are `template1/template2`; `tail.f8` (we called "archetype") is
 `hash`.
 

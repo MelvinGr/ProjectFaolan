@@ -120,7 +120,7 @@ namespace Faolan.GameServer
 			// from their bank. Importer-seeded listings have no real seller character, so this is a no-op for them.
 			var seller = await Database.GetCharacterByName(listing.SellerName, character.RealmId);
 			if (seller != null && seller.Id != character.Id)
-				await Database.SetCharacterInventorySlot(seller.Id, FullPlayerCharacterBuilder.BankKind, (int)listing.BankSlot, null);
+				await Database.SetCharacterInventorySlot(seller.Id, ContainerKind.Bank, (int)listing.BankSlot, null);
 
 			// Push the mail (base, no attachment): it carries its own MailId, which the client then targets with the
 			// GetMail* ops to preview + take the item. Echo the inbound TradepostInterface instance.
@@ -359,7 +359,7 @@ namespace Faolan.GameServer
 			var price = body.ReadUInt64();
 
 			var rows = await Database.GetCharacterInventory(character.Id);
-			var row = rows.FirstOrDefault(r => r.Container == FullPlayerCharacterBuilder.BankKind && r.Slot == bankSlot);
+			var row = rows.FirstOrDefault(r => r.Container == ContainerKind.Bank && r.Slot == bankSlot);
 			if (row?.Item == null)
 			{
 				Logger.LogWarning("Tradepost SELL: {Char} has no bank item at slot {Slot}.", character.Name, bankSlot);
@@ -481,7 +481,7 @@ namespace Faolan.GameServer
 			// sender's bank with a "mail-pending" overlay (it does NOT leave on send) - it only leaves when the
 			// recipient TAKES it (GetMailItem), and the overlay clears if the sender cancels the mail.
 			var rows = await Database.GetCharacterInventory(character.Id);
-			var row = rows.FirstOrDefault(r => r.Container == FullPlayerCharacterBuilder.BankKind && r.Slot == bankSlot);
+			var row = rows.FirstOrDefault(r => r.Container == ContainerKind.Bank && r.Slot == bankSlot);
 			if (row?.Item != null)
 			{
 				mail.SenderBankSlot = (uint)bankSlot;
@@ -556,7 +556,7 @@ namespace Faolan.GameServer
 				// The listing importer harvests every listed item into Items (so the CharacterInventory.ItemId FK
 				// holds), letting the bought item persist. Hash-0 items the world-entry snapshot drops are
 				// re-rendered on relog by RedeliverNonSnapshotBagItems via the live add path.
-				await Database.SetCharacterInventorySlot(character.Id, FullPlayerCharacterBuilder.BagKind, slot.Value, attachment.Template, qty);
+				await Database.SetCharacterInventorySlot(character.Id, ContainerKind.Bag, slot.Value, attachment.Template, qty);
 			else
 				Logger.LogInformation("Tradepost mail: delivered template {Template} to {Char} LIVE-ONLY (no Items row; won't persist across relog).", attachment.Template, character.Name);
 
@@ -567,7 +567,7 @@ namespace Faolan.GameServer
 			{
 				var sender = await Database.GetCharacterByName(mail.SenderName, mail.RealmId);
 				if (sender != null)
-					await Database.SetCharacterInventorySlot(sender.Id, FullPlayerCharacterBuilder.BankKind, (int)mail.SenderBankSlot, null);
+					await Database.SetCharacterInventorySlot(sender.Id, ContainerKind.Bank, (int)mail.SenderBankSlot, null);
 			}
 
 			await Database.RemoveMailAttachment(mailId, attachment.ItemInstanceId);
@@ -585,21 +585,21 @@ namespace Faolan.GameServer
 			Logger.LogInformation("Tradepost mail: {Char} took item (template {Template}) from mail 0x{Mail:X16} into bag slot {Slot}.", character.Name, attachment.Template, mailId, slot);
 		}
 
-		// Builds the live DispatchAddItem entry for a mail attachment via the shared SnapshotItemBuilder (the single
+		// Builds the live DispatchAddItem entry for a mail attachment via the shared SnapshotItems (the single
 		// item-entry wire builder). The mail-specific glue is only the mapping: the itemId/recordId are derived from the
 		// target BAG slot, the stat triple is the fixed (0=flags, 23=recordId, 26=count), and the template identity +
 		// per-instance hash/level come off the attachment (its Item nav = the FK on Template, so Item.Id == Template;
 		// the caller loads it via Attachments.ThenInclude(a => a.Item) for the TEA key).
 		private static ProtoInventoryGameEntry BuildMailItemEntry(MailAttachment a, uint charId, int slot)
 		{
-			var itemId = FullPlayerCharacterBuilder.ItemId(charId, FullPlayerCharacterBuilder.BagKind, (ulong)slot);
-			var recordId = (uint)FullPlayerCharacterBuilder.RecordId(charId, FullPlayerCharacterBuilder.BagKind, (ulong)slot);
+			var itemId = FullCharacterRoots.ItemId(charId, ContainerKind.Bag, (ulong)slot);
+			var recordId = (uint)FullCharacterRoots.RecordId(charId, ContainerKind.Bag, (ulong)slot);
 			var qty = a.Quantity == 0
 				? 1u
 				: a.Quantity;
 
-			return SnapshotItemBuilder.BuildInventoryEntry(itemId, a.Item, a.ItemHash,
-				[new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(23, recordId), new SnapshotItemBuilder.ItemStat(26, qty)], a.ItemLevel);
+			return SnapshotItems.InventoryEntry(itemId, a.Item, a.ItemHash,
+				[new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(23, recordId), new SnapshotItems.ItemStat(26, qty)], a.ItemLevel);
 		}
 	}
 }

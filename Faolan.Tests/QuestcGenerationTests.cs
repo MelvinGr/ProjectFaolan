@@ -54,7 +54,7 @@ namespace Faolan.Tests
 
 			var portion = QuestPortionOracle.BuildSingle(def, BeachState, 0x02165EFF);
 
-			Assert.Equal(FullCharSnapshotSubClass.QuestPortionLength, portion.Length);
+			Assert.Equal(SnapshotTails.QuestPortionLength, portion.Length);
 			Assert.Equal((await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken))[..1292], portion);
 		}
 

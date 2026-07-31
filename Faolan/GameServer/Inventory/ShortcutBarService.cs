@@ -83,7 +83,7 @@ namespace Faolan.GameServer.Inventory
 		public async Task SendRestoredBar(INetworkClient client)
 		{
 			var shortcuts = await _database.GetCharacterShortcuts(client.Session.Character.Id);
-			await client.SendAsync(new Rpc(ReplySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchShortcutBarReply, ShortcutBarBuilder.BuildBody(shortcuts)));
+			await client.SendAsync(new Rpc(ReplySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchShortcutBarReply, ShortcutBarReplyCodec.Build(shortcuts)));
 			_logger.LogInformation("ShortcutBarReply: restored {Count} hotbar shortcut(s) (#71).", shortcuts.Length);
 		}
 	}

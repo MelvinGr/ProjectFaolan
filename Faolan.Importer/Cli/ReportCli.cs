@@ -2447,12 +2447,7 @@ namespace Faolan.Importer.Cli
 
 				try
 				{
-					var s = new FaolanStream(body);
-					s.ReadUInt32();
-					s.ReadUInt32();
-					s.ReadUInt32();
-					s.ReadUInt32();
-					var rootMsg = FullCharSnapshotCodec.ParseInventoryRoot(s);
+					var rootMsg = SnapshotRoot.Of(body.AsSpan(4)); // past the record's carrier length word
 					Console.WriteLine($"    inventory-root: OK ({rootMsg.Inventories.Count} containers)");
 				}
 				catch (Exception ex)

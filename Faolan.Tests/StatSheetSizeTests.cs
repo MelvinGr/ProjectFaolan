@@ -29,7 +29,7 @@ namespace Faolan.Tests
 			var def = await LoadDefinition();
 			Assert.NotNull(def);
 
-			var built = FullCharSnapshotSubClass.BuildFromScratch(def, new Character(), TemplateInstance, null, [], []);
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, new Character(), TemplateInstance, null, [], []));
 			Assert.NotEmpty(built);
 		}
 
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 			for (var i = 0; i < SubClassStatBlock.SheetSize - 1; i++)
 				partial.Add((CharacterStatId.Level, 1));
 
-			var ex = Assert.Throws<InvalidOperationException>(() => FullCharSnapshotSubClass.BuildFromScratch(def, new Character(), TemplateInstance, null, [], partial));
+			var ex = Assert.Throws<InvalidOperationException>(() => SnapshotTails.FromScratch(def, new Character(), TemplateInstance, null, [], partial));
 
 			Assert.Contains($"{SubClassStatBlock.SheetSize}", ex.Message);
 		}

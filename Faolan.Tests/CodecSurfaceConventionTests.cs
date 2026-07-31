@@ -34,7 +34,12 @@ namespace Faolan.Tests
 
 		// The folders converted to the uniform surface so far. ADD A FOLDER AS ITS WAVE LANDS - that is what makes the
 		// gates below binding on it, and leaving it out is how a converted folder silently stops being checked.
-		private static readonly string[] MigratedFolders = ["Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat", "Quest", "Spawn"];
+		private static readonly string[] MigratedFolders =
+			[RootFolder, "Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat", "Quest", "Spawn", "FullCharSnapshot"];
+
+		// The ROOT of Codecs/ itself - the codecs that sit in `Faolan.Core.Network.Codecs` with no domain folder.
+		// Spelled as a sentinel rather than "" so the two places that expand it read as deliberate.
+		private const string RootFolder = ".";
 
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 		private static readonly Regex ConstOffset = new(@"\bconst\s+int\s+\w*(Offset|Pos)\b");
@@ -50,7 +55,12 @@ namespace Faolan.Tests
 		// Anchored on Endpoints (Faolan.Core.Network/Constants) rather than on a codec: codec names are being
 		// rewritten by this very refactor, and ListFrame - the obvious anchor - lives in Faolan.Core now.
 		private static IEnumerable<Type> CodecTypes => typeof(Endpoints).Assembly.GetTypes()
-			.Where(t => t.Namespace != null && MigratedFolders.Any(f => t.Namespace == $"{CodecsNamespace}.{f}"));
+			.Where(t => t.Namespace != null && MigratedFolders.Any(f => t.Namespace == NamespaceOf(f)));
+
+		private static string NamespaceOf(string folder)
+		{
+			return folder == RootFolder ? CodecsNamespace : $"{CodecsNamespace}.{folder}";
+		}
 
 		// A codec MODULE: the static classes that carry Build/Parse. Value records are not modules.
 		private static IEnumerable<Type> CodecModules => CodecTypes
@@ -406,9 +416,15 @@ namespace Faolan.Tests
 			return end < 0 ? src[arrowEnd..] : src[arrowEnd..end];
 		}
 
+		// The root's files are its TOP LEVEL only - recursing would pull in every folder, migrated or not.
 		private static IEnumerable<string> CodecSourceFiles()
 		{
-			return SourceFiles(MigratedFolders.Select(f => TestPaths.Repo("Faolan.Core.Network", "Codecs", f)));
+			var root = TestPaths.Repo("Faolan.Core.Network", "Codecs");
+			var folders = SourceFiles(MigratedFolders.Where(f => f != RootFolder).Select(f => Path.Combine(root, f)));
+
+			return MigratedFolders.Contains(RootFolder)
+				? folders.Concat(Directory.EnumerateFiles(root, "*.cs", SearchOption.TopDirectoryOnly))
+				: folders;
 		}
 
 		private static IEnumerable<GameServer0X2000Opcodes> DeclaredOpcodes(Type t)

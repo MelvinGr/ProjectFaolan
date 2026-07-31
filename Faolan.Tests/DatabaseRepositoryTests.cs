@@ -36,8 +36,8 @@ namespace Faolan.Tests
 				const uint accountId = 1;
 				const uint realmId = 1;
 				const uint itemId = 354477; // an item with a real hash (renders in the container)
-				const ContainerKind bank = FullPlayerCharacterBuilder.BankKind; // 105
-				const ContainerKind bag = FullPlayerCharacterBuilder.BagKind; // 104
+				const ContainerKind bank = ContainerKind.Bank; // 105
+				const ContainerKind bag = ContainerKind.Bag; // 104
 
 				var (repo, factory) = NewRepo(dbPath);
 				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
@@ -85,7 +85,7 @@ namespace Faolan.Tests
 				// Reload across a fresh context: the bank row persists, and the on-demand bank container rebuilds it.
 				var bankRows = (await repo.GetCharacterInventory(character.Id)).Where(r => r.Container == bank).ToList();
 				Assert.Single(bankRows);
-				var container = FullPlayerCharacterBuilder.BuildContainer(bank, 50, 30, character.Id, bankRows);
+				var container = FullCharacterRoots.Container(bank, 50, 30, character.Id, bankRows);
 				Assert.Contains(container.Items, e => e.Pos == 3);
 
 				// Withdraw: bank slot 3 -> bag slot 0 (the move clears the bank cell, writes the bag cell).

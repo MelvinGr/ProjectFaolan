@@ -30,12 +30,12 @@ namespace Faolan.Tests
 
 			foreach (var newRoot in new[] { rootLen, rootLen - 370, 65, 0, rootLen + 2000 })
 			{
-				var p = FullCharSnapshotCodec.BuildPrefix(newRoot);
+				var p = SnapshotPackets.BuildPrefix(newRoot);
 				Assert.Equal((uint)newRoot, p.ReadU32Be(1));
 				Assert.Equal(prefix[0], p[0]); // flag
 			}
 
-			Assert.Equal(prefix, FullCharSnapshotCodec.BuildPrefix(rootLen));
+			Assert.Equal(prefix, SnapshotPackets.BuildPrefix(rootLen));
 		}
 
 		// The captured prefix's BE32 at offset 1 already equals rootLen (the client's blob length), and the byte
@@ -87,14 +87,14 @@ namespace Faolan.Tests
 
 			var typed = verbatimRoot.FromProtobuf<ProtoFullCharacterIIR>();
 			typed.Inventories.Clear();
-			foreach (var c in FullPlayerCharacterBuilder.BuildContainers(instance, equipped, bagFirst, rows))
+			foreach (var c in FullCharacterRoots.Containers(instance, equipped, bagFirst, rows))
 				typed.Inventories.Add(c);
 			var genRoot = typed.ToProtobuf();
 			Assert.NotEqual(verbatimRootLen, genRoot.Length); // a real resize, so the prefix MUST be corrected
 
 			// BuildSnapshotPrefix is the production path (the old SetSnapshotBlobLength patched a CAPTURED prefix and
 			// was retired when the prefix started being built from scratch).
-			var newPrefix = FullCharSnapshotCodec.BuildPrefix(genRoot.Length);
+			var newPrefix = SnapshotPackets.BuildPrefix(genRoot.Length);
 			Assert.Equal((uint)genRoot.Length, newPrefix.ReadU32Be(1));
 
 			// Reassemble [subop][c350][instance][newPrefix][genRoot][tails] and re-split.
@@ -110,8 +110,8 @@ namespace Faolan.Tests
 			s2.ReadUInt32();
 			s2.ReadUInt32();
 			s2.ReadUInt32();
-			var reparsed = FullCharSnapshotCodec.ParseInventoryPacketBody(s2);
-			Assert.True(reparsed.SubClass.ToArray().SequenceEqual(tails), "tails must survive intact after the regenerated root");
+			var reparsed = SnapshotPackets.Parse(s2);
+			Assert.True(FullCharSnapshotSubClassCodec.Build(reparsed.SubClass).SequenceEqual(tails), "tails must survive intact after the regenerated root");
 			Assert.True(reparsed.Root.ToProtobuf().SequenceEqual(genRoot), "the regenerated root must re-split byte-identically");
 			return;
 
@@ -139,8 +139,8 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			s.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(s);
-			return (parts.Prefix, parts.Root.ToProtobuf().Length, parts.SubClass.ToArray());
+			var parts = SnapshotPackets.Parse(s);
+			return (SnapshotPackets.PrefixOf(parts), parts.Root.ToProtobuf().Length, FullCharSnapshotSubClassCodec.Build(parts.SubClass));
 		}
 
 		// Variant of Split that also returns the instance id and the verbatim root bytes (for the reassembly test).
@@ -151,9 +151,9 @@ namespace Faolan.Tests
 			s.ReadUInt32();
 			s.ReadUInt32();
 			var instance = s.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(s);
+			var parts = SnapshotPackets.Parse(s);
 			var root = parts.Root.ToProtobuf();
-			return (parts.Prefix, root.Length, parts.SubClass.ToArray(), instance, root);
+			return (SnapshotPackets.PrefixOf(parts), root.Length, FullCharSnapshotSubClassCodec.Build(parts.SubClass), instance, root);
 		}
 	}
 }

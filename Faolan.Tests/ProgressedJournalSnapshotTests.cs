@@ -42,15 +42,14 @@ namespace Faolan.Tests
 
 			foreach (var (source, body) in SnapshotBodies())
 			{
-				var stream = new FaolanStream(body);
-				_ = stream.ReadUInt32();
-				_ = stream.ReadUInt32();
-				_ = stream.ReadUInt32();
+				var parts = FullPlayerCharacterCodec.Parse(body);
 
-				var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
-
-				// The tails as they arrived: everything after [subop][typeTag][instance][prefix][root].
-				Assert.True(parts.SubClass.OriginalData.SequenceEqual(parts.SubClass.ToArray()), $"{source}: tails must survive the typed model byte-identically");
+				// The tails as they arrived: everything after [subop][typeTag][instance][prefix][root]. Scoped to the
+				// SUB-CLASS deliberately: the whole-RECORD round-trip fails on 7 of 151 captures because their
+				// protobuf ROOT re-encodes exactly one byte shorter (#538) - a separate, real gap that a refactor
+				// wave must not widen this gate into. Widen to FullPlayerCharacterCodec.Build(parts) when #538 lands.
+				Assert.True(SnapshotPackets.SubClassBytes(body).SequenceEqual(FullCharSnapshotSubClassCodec.Build(parts.SubClass)),
+					$"{source}: tails must survive the typed model byte-identically");
 
 				checkedBodies++;
 				if (parts.SubClass.Quests.Records.Count > 1)
@@ -75,7 +74,7 @@ namespace Faolan.Tests
 					stream.ReadUInt32();
 					stream.ReadUInt32();
 					stream.ReadUInt32();
-					return (x.Source, Parts: FullCharSnapshotCodec.ParseInventoryPacketBody(stream));
+					return (x.Source, Parts: SnapshotPackets.Parse(stream));
 				})
 				.FirstOrDefault(x => x.Parts.SubClass.Quests.Records.Count > 1);
 

@@ -511,12 +511,9 @@ namespace Faolan.Importer.Captures
 			{
 				try
 				{
-					var stream = new FaolanStream(snapshotBody);
-					stream.ReadUInt32(); // body length
-					stream.ReadUInt32(); // subop
-					stream.ReadUInt32(); // ack
-					stream.ReadUInt32(); // instance
-					root = FullCharSnapshotCodec.ParseInventoryRoot(stream);
+					// The body opens with the record's own u32 carrier length, which belongs to the sender - the
+					// record itself starts behind it (#530 rule 2).
+					root = SnapshotRoot.Of(snapshotBody.AsSpan(4));
 					break;
 				}
 				catch
@@ -532,7 +529,7 @@ namespace Faolan.Importer.Captures
 			var total = 0;
 			foreach (var container in root.Inventories)
 			{
-				if ((ContainerKind)container.InventoryId.Type == FullPlayerCharacterBuilder.EquippedKind)
+				if ((ContainerKind)container.InventoryId.Type == ContainerKind.Equipped)
 					continue;
 
 				foreach (var entry in container.Items)
@@ -568,7 +565,7 @@ namespace Faolan.Importer.Captures
 			KnownSpellList? known = null;
 			foreach (var body in snapshotBodies.OrderByDescending(b => b.Length))
 			{
-				if (KnownSpellList.TryExtractFromSnapshot(body, out known))
+				if (KnownSpellListScan.TryExtractFromSnapshot(body, out known))
 					break;
 			}
 
@@ -576,7 +573,7 @@ namespace Faolan.Importer.Captures
 				return 0;
 
 			var existing = (await db.CharacterSpells.Where(s => s.CharacterId == characterId).Select(s => s.SpellId).ToListAsync()).ToHashSet();
-			var spellbookIds = known.Records.Where(r => r.Type == KnownSpellList.SpellType).Select(r => r.Id).Distinct().ToList();
+			var spellbookIds = known.Records.Where(r => r.Type == KnownSpellListCodec.SpellType).Select(r => r.Id).Distinct().ToList();
 
 			// CharacterSpell.SpellId FKs Spells. A spellbook id resolves in-client by RDB id regardless of our catalog,
 			// so an id with no Spell row is a gap in our (incomplete) catalog, not a fake spell (e.g. NecroL80's Corrupted

@@ -25,13 +25,13 @@ namespace Faolan.Tests
 		[Fact]
 		public void Catalog_SerializesByteExactToTheCapturedRegion()
 		{
-			var template = FullCharSnapshotSubClass.Deserialize(File.ReadAllBytes(TemplatePath));
+			var template = FullCharSnapshotSubClassCodec.Parse(File.ReadAllBytes(TemplatePath));
 
 			// The catalog is the same 86 entries the template parses into.
 			Assert.Equal(template.AccessWindowEntries.Count, AccessWindowCatalog.Entries.Count);
 
-			var fromTemplate = FullCharSnapshotSubClass.SerializeAccessWindowEntries(template.AccessWindowEntries);
-			var fromCatalog = FullCharSnapshotSubClass.SerializeAccessWindowEntries(AccessWindowCatalog.Entries);
+			var fromTemplate = PfAccessWindowEntryCodec.Build(template.AccessWindowEntries);
+			var fromCatalog = PfAccessWindowEntryCodec.Build(AccessWindowCatalog.Entries);
 
 			Assert.Equal(fromTemplate, fromCatalog);
 		}

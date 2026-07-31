@@ -210,14 +210,14 @@ namespace Faolan.Importer.Extractors
 
 			using var ms = new MemoryStream(blob, false);
 			var container = Serializer.Deserialize<ProtoInventoryGame>(ms);
-			if (FullCharSnapshotCodec.GetContainerKind(container) != (ulong)ContainerKind.Bank)
+			if (SnapshotRoot.KindOf(container) != (ulong)ContainerKind.Bank)
 				return;
 
-			foreach (var entry in FullCharSnapshotCodec.GetContainerEntries(container))
+			foreach (var entry in SnapshotRoot.EntriesOf(container))
 			{
-				var template = FullCharSnapshotCodec.GetEntryTemplateId(entry);
-				var quad = FullCharSnapshotCodec.GetEntryIdentityQuad(entry);
-				var hash = FullCharSnapshotCodec.GetEntryArchetype(entry);
+				var template = SnapshotRoot.TemplateIdOf(entry);
+				var quad = SnapshotRoot.IdentityQuadOf(entry);
+				var hash = SnapshotRoot.ArchetypeOf(entry);
 				if (template.HasValue && quad.HasValue)
 					into.TryAdd(template.Value, new CapturedItem(quad.Value.Data1, quad.Value.Data2, quad.Value.Data3, quad.Value.Data4, hash ?? 0));
 			}
@@ -317,14 +317,14 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var kind in Enum.GetValues<ContainerKind>())
 			{
-				var container = FullCharSnapshotCodec.GetContainer(root, kind);
+				var container = SnapshotRoot.ContainerOf(root, kind);
 				var itemType = ClassifyContainer(kind);
 
-				foreach (var entry in FullCharSnapshotCodec.GetContainerEntries(container!))
+				foreach (var entry in SnapshotRoot.EntriesOf(container!))
 				{
-					var template = FullCharSnapshotCodec.GetEntryTemplateId(entry);
-					var hash = FullCharSnapshotCodec.GetEntryArchetype(entry);
-					var quad = FullCharSnapshotCodec.GetEntryIdentityQuad(entry);
+					var template = SnapshotRoot.TemplateIdOf(entry);
+					var hash = SnapshotRoot.ArchetypeOf(entry);
+					var quad = SnapshotRoot.IdentityQuadOf(entry);
 
 					if (template.HasValue && hash.HasValue && quad.HasValue)
 					{
@@ -401,18 +401,14 @@ namespace Faolan.Importer.Extractors
 			if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 				return false;
 
-			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
-			var subOpcode = body.ReadUInt32();
-			if (subOpcode != InventorySubOpcode)
+			var record = packet.BodyReader().ReadArrayUInt32Length();
+			if (record.Length < 4 || record.ReadU32Be(0) != InventorySubOpcode)
 				return false;
 
-			body.ReadUInt32(); // c350
-			body.ReadUInt32(); // instance
-
-			// ParseInventoryRoot, NOT ParseInventoryPacketBody: we only want the containers, and the full split also
+			// SnapshotRoot, NOT FullPlayerCharacterCodec.Parse: we only want the containers, and the full record also
 			// deserializes the SUB-CLASS, whose Quest_c decode still fails on a level-80 journal ("marker 0x2 != 0x412").
 			// That threw away a perfectly good root and cost us every item only ever seen in an L80 bag (#383).
-			root = FullCharSnapshotCodec.ParseInventoryRoot(body);
+			root = SnapshotRoot.Of(record);
 			return true;
 		}
 

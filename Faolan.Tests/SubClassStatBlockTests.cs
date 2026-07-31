@@ -15,7 +15,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void CreateFreshBlock_MatchesTheTemplateStatBlock()
 		{
-			var parsed = FullCharSnapshotSubClass.Deserialize(File.ReadAllBytes(TemplatePath)).PostAccessBlock;
+			var parsed = FullCharSnapshotSubClassCodec.Parse(File.ReadAllBytes(TemplatePath)).PostAccessBlock;
 			Assert.NotNull(parsed);
 
 			var fresh = SubClassStatBlock.CreateFreshBlock();

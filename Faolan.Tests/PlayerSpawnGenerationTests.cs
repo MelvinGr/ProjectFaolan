@@ -141,7 +141,7 @@ namespace Faolan.Tests
 			Assert.Equal(0x1234u, head.Hash);
 			Assert.Equal(0x4C95E6E3u, head.Key1.Key1);
 			Assert.Equal(0x892A0B17u, head.Key1.Key4);
-			Assert.Same(head.Key1, head.Key2); // keys reuse the same quad (matches SnapshotItemBuilder)
+			Assert.Same(head.Key1, head.Key2); // keys reuse the same quad (matches SnapshotItems)
 		}
 
 		// A worn item with no hash cannot be described on the wire. It used to be skipped, which showed the piece to its

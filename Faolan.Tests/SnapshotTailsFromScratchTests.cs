@@ -20,7 +20,7 @@ namespace Faolan.Tests
 	// assembles the three regions (generated quest portion + the game-static access-window catalog asset + the code
 	// stat skeleton) and reproduces BeachTailsTemplate.bin BYTE-FOR-BYTE for the captured beach character + instance.
 	// Proving this means the .bin is no longer needed to author a beach world-entry snapshot's tails.
-	public class BeachTailsFromScratchTests
+	public class SnapshotTailsFromScratchTests
 	{
 		private const uint BeachStarterQuestId = 10238;
 		private const uint TemplateInstance = 0x02165EFF;
@@ -54,7 +54,7 @@ namespace Faolan.Tests
 				AccountId = 0x59EA506E,
 				MaxStats = CharacterMaxStats.CreateDefaults(ConanClass.Assassin, 1)
 			};
-			var built = FullCharSnapshotSubClass.BuildFromScratch(def, strie, TemplateInstance);
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, strie, TemplateInstance));
 
 			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.True(template.SequenceEqual(built), "authoring the per-class block for an Assassin L1 must still equal the captured Strie template byte-for-byte");
@@ -87,10 +87,8 @@ namespace Faolan.Tests
 				.Select(p => ((CharacterStatId)p.Id, p.Value))
 				.ToList();
 
-			var fromCapture = FullCharSnapshotSubClass.Deserialize(
-				FullCharSnapshotSubClass.BuildFromScratch(def, character, 0x0802ABCD, statSheet: captured));
-			var fromScratch = FullCharSnapshotSubClass.Deserialize(
-				FullCharSnapshotSubClass.BuildFromScratch(def, character, 0x0802ABCD));
+			var fromCapture = SnapshotTails.FromScratch(def, character, 0x0802ABCD, statSheet: captured);
+			var fromScratch = SnapshotTails.FromScratch(def, character, 0x0802ABCD);
 
 			Assert.Equal(4321u, fromCapture.PostAccessBlock!.CurrentHp);
 			Assert.Equal(fromScratch.PostAccessBlock!.CurrentHp, fromCapture.PostAccessBlock.CurrentHp);
@@ -125,8 +123,8 @@ namespace Faolan.Tests
 			};
 			const uint live = 0x0802ABCD;
 
-			var aliveSubClass = FullCharSnapshotSubClass.Deserialize(FullCharSnapshotSubClass.BuildFromScratch(def, alive, live));
-			var deadSubClass = FullCharSnapshotSubClass.Deserialize(FullCharSnapshotSubClass.BuildFromScratch(def, dead, live));
+			var aliveSubClass = SnapshotTails.FromScratch(def, alive, live);
+			var deadSubClass = SnapshotTails.FromScratch(def, dead, live);
 
 			Assert.Equal(4321u, aliveSubClass.PostAccessBlock!.CurrentHp); // alive: full current health
 			Assert.Equal(0u, deadSubClass.PostAccessBlock!.CurrentHp); // dead: current health = 0 (the gate)
@@ -152,7 +150,7 @@ namespace Faolan.Tests
 		{
 			var def = await LoadDefinition(BeachStarterQuestId);
 			const uint live = 0x0802ABCD;
-			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null!, live);
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, null!, live));
 
 			// the template instance must be gone, the live one present (raw big-endian)
 			var needleOld = new byte[] { 0x02, 0x16, 0x5E, 0xFF };
@@ -169,7 +167,7 @@ namespace Faolan.Tests
 
 			// character = null -> the stat skeleton stays at its (Strie) baseline, instance = the template's, so no
 			// re-addressing: the assembly must equal the captured tails exactly.
-			var built = FullCharSnapshotSubClass.BuildFromScratch(def, null!, TemplateInstance);
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, null!, TemplateInstance));
 
 			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.Equal(template.Length, built.Length);
@@ -202,14 +200,14 @@ namespace Faolan.Tests
 			};
 			const uint live = 0x0802ABCD;
 
-			var built = FullCharSnapshotSubClass.BuildFromScratch(def, character, live);
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, character, live));
 
 			// Re-parses without throwing, and is byte-lossless through the typed model.
-			var tails = FullCharSnapshotSubClass.Deserialize(built);
-			Assert.True(built.SequenceEqual(tails.ToArray()), "non-baseline from-scratch tails must round-trip losslessly");
+			var tails = FullCharSnapshotSubClassCodec.Parse(built);
+			Assert.True(built.SequenceEqual(FullCharSnapshotSubClassCodec.Build(tails)), "non-baseline from-scratch tails must round-trip losslessly");
 
 			// Region boundaries intact: the quest portion is the fixed beach length, the static access-window catalog parsed.
-			Assert.Equal(FullCharSnapshotSubClass.QuestPortionLength, tails.KnownHeaderLength + QuestRegionTrailerLength(tails));
+			Assert.Equal(SnapshotTails.QuestPortionLength, SnapshotPackets.JournalLength(tails) + QuestRegionTrailerLength(tails));
 			Assert.NotEmpty(tails.AccessWindowEntries);
 
 			// The live character's vitals/XP landed in the decoded stat slots (the part the production flip changes).
@@ -256,10 +254,10 @@ namespace Faolan.Tests
 			return (await repo.GetQuestDefinition(questId))!;
 		}
 
-		// The quest portion = the Quest_c journal (KnownHeaderLength) + the @609 objective region + the index region.
+		// The quest portion = the Quest_c journal (the journal region length) + the @609 objective region + the index region.
 		private static int QuestRegionTrailerLength(FullCharSnapshotSubClass tails)
 		{
-			// The @609 objective region is INSIDE the journal records now (KnownHeaderLength covers it, #384). What
+			// The @609 objective region is INSIDE the journal records now (the journal region length covers it, #384). What
 			// trails the active journal is the completed-journal frame (empty 0x3F1 for a beach char, #390/#391) then
 			// the quest index.
 			return (tails.CompletedQuests == null ? 0 : CompletedQuestJournalRegionCodec.Build(tails.CompletedQuests).Length)

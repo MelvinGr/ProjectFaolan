@@ -20,7 +20,7 @@ namespace Faolan.GameServer.Economy
 	//   2. BankIIR (0x0BA1C1CB) - the content, framed exactly like the FullChar 0x737A6DF9 snapshot:
 	//        [u32 subop=0BA1C1CB][u32 type=0000C350][u32 charInstance][u8 flag=01][u32 BE blobLen][ProtoInventoryGame]
 	//      (on the GameAgent->GameInterface world conversation). The container's items are standard
-	//      InventoryListEntry entries - the same codec SnapshotItemBuilder already produces for the backpack.
+	//      InventoryListEntry entries - the same codec SnapshotItems already produces for the backpack.
 	// Extracted from GameServerListener as a composed collaborator; the live item-grant outbound op (for a
 	// withdraw) is reached through the shared IEconomyOutbound port (the listener implements it).
 	public sealed class BankService
@@ -45,8 +45,8 @@ namespace Faolan.GameServer.Economy
 		{
 			var characterId = client.Session.Character.Id;
 			var rows = await _database.GetCharacterInventory(characterId);
-			var bankRows = rows.Where(r => r.Container == FullPlayerCharacterBuilder.BankKind).ToList();
-			var bank = FullPlayerCharacterBuilder.BuildContainer(FullPlayerCharacterBuilder.BankKind, BankMaxSize, BankDisabledSlots, characterId, bankRows);
+			var bankRows = rows.Where(r => r.Container == ContainerKind.Bank).ToList();
+			var bank = FullCharacterRoots.Container(ContainerKind.Bank, BankMaxSize, BankDisabledSlots, characterId, bankRows);
 			await SendBank(client, bank);
 		}
 
@@ -69,7 +69,7 @@ namespace Faolan.GameServer.Economy
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(record)));
 
-			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).", bank.Items.Count, client.Session.Character?.Name, FullPlayerCharacterBuilder.BankKind);
+			_logger.LogInformation("Bank: sent {Count} items to {Character} (BankIIR, container kind {Kind}).", bank.Items.Count, client.Session.Character?.Name, ContainerKind.Bank);
 		}
 
 		// Live-renders a MoveItemInInventory that touches the personal bank (kind 105). PersistInventoryMove has
@@ -86,18 +86,18 @@ namespace Faolan.GameServer.Economy
 
 			var sKind = (ContainerKind)move.SourceContainerId.Type;
 			var dKind = (ContainerKind)move.DestinationContainerId.Type;
-			if (sKind != FullPlayerCharacterBuilder.BankKind && dKind != FullPlayerCharacterBuilder.BankKind)
+			if (sKind != ContainerKind.Bank && dKind != ContainerKind.Bank)
 				return; // not a bank move - nothing to refresh
 
 			// Refresh the bank tab from the just-persisted rows (covers deposit, withdraw, and in-bank rearrange).
 			await ResendBank(client);
 
 			// Withdraw (bank -> bag): the item now lives in the bag; push the live add so it renders there too.
-			if (sKind == FullPlayerCharacterBuilder.BankKind && dKind == FullPlayerCharacterBuilder.BagKind)
+			if (sKind == ContainerKind.Bank && dKind == ContainerKind.Bag)
 			{
 				var dPos = move.DestinationItemPos;
 				var rows = await _database.GetCharacterInventory(character.Id);
-				var row = rows.FirstOrDefault(r => r.Container == FullPlayerCharacterBuilder.BagKind && r.Slot == dPos);
+				var row = rows.FirstOrDefault(r => r.Container == ContainerKind.Bag && r.Slot == dPos);
 				if (row?.ItemId == null)
 					return;
 
@@ -105,8 +105,8 @@ namespace Faolan.GameServer.Economy
 				if (item is not { Hash: not 0 })
 					return;
 
-				var entry = SnapshotItemBuilder.BuildListEntry((ulong)dPos, FullPlayerCharacterBuilder.ItemId(character.Id, FullPlayerCharacterBuilder.BagKind, (ulong)dPos),
-						FullPlayerCharacterBuilder.RecordId(character.Id, FullPlayerCharacterBuilder.BagKind, (ulong)dPos), row.Count, item, item.Hash)
+				var entry = SnapshotItems.ListEntry((ulong)dPos, FullCharacterRoots.ItemId(character.Id, ContainerKind.Bag, (ulong)dPos),
+						FullCharacterRoots.RecordId(character.Id, ContainerKind.Bag, (ulong)dPos), row.Count, item, item.Hash)
 					.Item;
 				await _outbound.SendAddItem(client, ContainerKind.Bag, (uint)dPos, entry);
 			}

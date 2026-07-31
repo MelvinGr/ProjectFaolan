@@ -71,7 +71,7 @@ namespace Faolan.Tests
 			{
 				var n = sub.UnknownBeforeAccessWindowTable.Length;
 				unknownBefore += n;
-				totalTails += sub.OriginalData.Length;
+				totalTails += FullCharSnapshotSubClassCodec.Build(sub).Length;
 				if (n > worst.Item2)
 					worst = (source, n);
 			}
@@ -95,7 +95,7 @@ namespace Faolan.Tests
 				stream.ReadUInt32();
 				stream.ReadUInt32();
 				stream.ReadUInt32();
-				yield return (source, FullCharSnapshotCodec.ParseInventoryPacketBody(stream).SubClass);
+				yield return (source, SnapshotPackets.Parse(stream).SubClass);
 			}
 		}
 	}

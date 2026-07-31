@@ -4,6 +4,7 @@ using System.Text;
 using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Tests.Support;
@@ -14,12 +15,12 @@ namespace Faolan.Tests
 	// The reader/writer pair for the 0x737A6DF9 body must agree on the prefix model. This is the test that makes
 	// that structural rather than hopeful.
 	//
-	// The model used to be stated TWICE - FullCharSnapshotCodec parsed the prefix, and the server host emitted it
+	// The model used to be stated TWICE - FullPlayerCharacterCodec parsed the prefix, and the server host emitted it
 	// from a separate builder in another project. They disagreed: the reader skipped a 3-byte "field5" that the
 	// writer appended verbatim. Both were self-consistent on the level-1 beach capture, so every existing golden
 	// passed while the reader failed on EVERY level-80 snapshot. Now one type owns the writing
-	// (FullCharSnapshotCodec) and these assert the round trip closes.
-	public class FullCharSnapshotCodecTests
+	// (FullPlayerCharacterCodec) and these assert the round trip closes.
+	public class FullPlayerCharacterCodecTests
 	{
 		private const uint Instance = 0x02165EFF;
 
@@ -31,8 +32,8 @@ namespace Faolan.Tests
 		// NecroL80's L80 root
 		public void PrefixWritten_IsThePrefixRead(int rootLength)
 		{
-			var prefix = FullCharSnapshotCodec.BuildPrefix(rootLength);
-			Assert.Equal(FullCharSnapshotCodec.PrefixLength, prefix.Length);
+			var prefix = SnapshotPackets.BuildPrefix(rootLength);
+			Assert.Equal(SnapshotPackets.PrefixLength, prefix.Length);
 
 			// Feed prefix + a root of that length and check the reader delimits it exactly where the writer said.
 			var body = new FaolanStream().WriteArray(prefix).WriteArray(new byte[rootLength]).WriteArray("TAILS"u8.ToArray()).ToArray();
@@ -50,28 +51,28 @@ namespace Faolan.Tests
 		{
 			var (root, subClass) = SplitBeach();
 
-			var body = FullCharSnapshotCodec.BuildBody(Instance, root, subClass);
+			var body = SnapshotPackets.BuildBody(Instance, root, subClass);
 
 			var stream = new FaolanStream(body);
 			stream.ReadUInt32(); // record length
-			Assert.Equal(FullPlayerCharacterBuilder.Opcode, stream.ReadUInt32());
+			Assert.Equal(FullPlayerCharacterCodec.Opcode, stream.ReadUInt32());
 			Assert.Equal(EntityClass.Character, stream.ReadUInt32());
 			Assert.Equal(Instance, stream.ReadUInt32());
 
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
-			Assert.True(parts.Root.ToProtobuf().SequenceEqual(root), "root must survive the writer/reader round trip");
-			Assert.True(parts.SubClass.ToArray().SequenceEqual(subClass), "sub-class must survive the writer/reader round trip");
+			var parts = SnapshotPackets.Parse(stream);
+			Assert.True(parts.Root.ToProtobuf().SequenceEqual(root.ToProtobuf()), "root must survive the writer/reader round trip");
+			Assert.True(FullCharSnapshotSubClassCodec.Build(parts.SubClass).SequenceEqual(FullCharSnapshotSubClassCodec.Build(subClass)), "sub-class must survive the writer/reader round trip");
 		}
 
-		private static (byte[] Root, byte[] SubClass) SplitBeach()
+		private static (ProtoFullCharacterIIR Root, FullCharSnapshotSubClass SubClass) SplitBeach()
 		{
 			var packet = Rpc.Parse(File.ReadAllBytes(TestPaths.Asset("strie-login-inventory.bin")));
 			var stream = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
 			stream.ReadUInt32();
 			stream.ReadUInt32();
 			stream.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(stream);
-			return (parts.Root.ToProtobuf(), parts.SubClass.ToArray());
+			var parts = SnapshotPackets.Parse(stream);
+			return (parts.Root, parts.SubClass);
 		}
 	}
 }

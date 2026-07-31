@@ -7,7 +7,7 @@ using Faolan.Core.Network.Codecs.Quest;
 namespace Faolan.Tests.Support
 {
 	// The single-quest quest portion, used as the byte-exact oracle for the multi-quest
-	// FullCharSnapshotSubClass.BuildQuestPortion: for one held quest the two are byte-identical (proven by
+	// SnapshotTails.QuestPortion: for one held quest the two are byte-identical (proven by
 	// BuildQuestPortionTests.BuildSingleQuestPortion_EqualsMultiQuestForm). Lives in the test project because the
 	// live snapshot path only ever uses the multi-quest form - this is a test-only convenience seam.
 	public static class QuestPortionOracle
@@ -32,8 +32,8 @@ namespace Faolan.Tests.Support
 				.. QuestcRegionCodec.Build(quests), .. CompletedQuestJournalRegionCodec.Build(CompletedQuestJournalRegions.ForAreas([])),
 				.. QuestIndexRegionCodec.Build(QuestIndexRegions.ForQuests([def], def))
 			];
-			if (portion.Length != FullCharSnapshotSubClass.QuestPortionLength)
-				throw new InvalidOperationException($"generated quest portion is {portion.Length} B, expected {FullCharSnapshotSubClass.QuestPortionLength}");
+			if (portion.Length != SnapshotTails.QuestPortionLength)
+				throw new InvalidOperationException($"generated quest portion is {portion.Length} B, expected {SnapshotTails.QuestPortionLength}");
 
 			return portion;
 		}

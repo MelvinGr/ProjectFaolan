@@ -1,34 +1,9 @@
-using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
-	// The snapshot tails BEHIND the access-window table - what `FullCharSnapshotSubClass` carries as
-	// `UnknownAfterAccessWindowTable` (Gitea #393). Recovered from the client's own reader
-	// (`CoreFullPlayerCharacterIIR::ReadSubClass` = FUN_00797440, then FullPlayerCharacterIIR's FUN_0148c210):
-	//
-	//   List D      FUN_0077d220 / FUN_0077db70   0x3F1-framed, VARIABLE-width records
-	//   List E      FUN_0077d5b0 / FUN_0077df00   0x3F1-framed, VARIABLE-width records
-	//   List F      FUN_004d5900                  0x3F1-framed, 2 x u32
-	//   StatList_t  FUN_0139d450 / FUN_0139d210   0x3F1-framed, [u32 statId][u32 value]   (read TWICE)
-	//   SpellBook_t FUN_0077af90                  0x3F1-framed, 3 x u32, CONDITIONAL
-	//   trailing    FUN_00797440's tail           [u32 n][ n x ([u8][u64][u64]) ]
-	//   trailing    FUN_0148c210                  [u32 m][ m x ([u32][u32]) ]
-	//
-	// ⚠️ Two long-standing errors in the write-up this corrects, both found by decompiling rather than by staring
-	// at bytes:
-	//   - `SpellBook_t` was documented as "records of 20 bytes (stride 0x14)". The 0x14 is the IN-MEMORY array
-	//     stride; the reader makes THREE 4-byte reads per record, so the WIRE record is 12 bytes - which makes it
-	//     the same list `KnownSpellList` models (#74), not a separate one.
-	//   - the final list was documented as `count x [u32,u32]`. There are TWO trailing lists, and the first one's
-	//     element is 17 bytes: `FUN_0048f720` reads 8 bytes, and the loop reads one raw byte ahead of the two.
-	//
-	// Both empty-everywhere lists (D and E) are still LISTS - `ForCount(0)` is 0x3F1, the trap this codebase keeps
-	// re-learning - so they are parsed as such rather than asserted to be a constant.
-	//
-	// All 151 captured subclasses walk to their exact last byte and re-encode byte-exact (SnapshotTailRegionTests).
+	// The decoded tail region SnapshotTailRegionCodec reads and writes - see that file for the grammar and its
+	// provenance. A plain value: it does not serialize itself (#530 rule 1).
 	public sealed class SnapshotTailRegion
 	{
 		// The framed lists, in wire order, each carrying its records as raw words. They are held generically because
@@ -74,107 +49,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			for (var i = 0; i < half; i++)
 				if (list.Words[i] != list.Words[half + i])
 					return false;
-
-			return true;
-		}
-
-		public static bool TryParse(byte[] region, [NotNullWhen(true)] out SnapshotTailRegion? parsed)
-		{
-			parsed = null;
-			if (region == null)
-				return false;
-
-			var result = new SnapshotTailRegion();
-			if (!Walk(region, 0, result, 0))
-				return false;
-
-			parsed = result;
-			return true;
-		}
-
-		public byte[] ToArray()
-		{
-			var stream = new FaolanStream();
-			foreach (var list in Lists)
-			{
-				stream.WriteUInt32(ListFrame.ForCount(list.Words.Count / (list.Stride / 4)));
-				foreach (var word in list.Words)
-					stream.WriteUInt32(word);
-			}
-
-			stream.WriteUInt32((uint)WideTail.Count);
-			foreach (var entry in WideTail)
-				stream.WriteByte(entry.Flag).WriteUInt64(entry.A).WriteUInt64(entry.B);
-
-			stream.WriteUInt32((uint)PairTail.Count);
-			foreach (var pair in PairTail)
-				stream.WriteUInt32(pair.Id).WriteUInt32(pair.Value);
-
-			return stream.ToArray();
-		}
-
-		// Consumes framed lists until the two trailing lists land EXACTLY on the region's end. The lists are tried in
-		// wire order and the walk backtracks, because a frame word alone does not say whether the list that follows
-		// is the 8-byte stat shape or the 12-byte spell shape - landing on the exact end is what decides it. Bounded
-		// at 8 lists: the reader has six, not dozens.
-		private static bool Walk(byte[] region, int i, SnapshotTailRegion result, int depth)
-		{
-			if (TryTrailingLists(region, i, result))
-				return true;
-			if (depth >= 8)
-				return false;
-
-			foreach (var stride in new[] { 8, 12 })
-			{
-				if (i + 4 > region.Length || !ListFrame.TryCountOf(region.ReadU32Be(i), out var count) || i + 4 + (long)count * stride > region.Length)
-					continue;
-
-				var list = new SnapshotTailList
-				{
-					Stride = stride,
-					Offset = i + 4
-				};
-				for (var w = 0; w < count * stride / 4; w++)
-					list.Words.Add(region.ReadU32Be(i + 4 + 4 * w));
-
-				result.Lists.Add(list);
-				if (Walk(region, i + 4 + count * stride, result, depth + 1))
-					return true;
-
-				result.Lists.RemoveAt(result.Lists.Count - 1);
-			}
-
-			return false;
-		}
-
-		private static bool TryTrailingLists(byte[] region, int i, SnapshotTailRegion result)
-		{
-			if (i + 4 > region.Length)
-				return false;
-
-			var wide = region.ReadU32Be(i);
-			if (wide > 0x1000)
-				return false;
-
-			var j = i + 4 + (int)wide * SnapshotTailWideEntry.ByteCount;
-			if (j + 4 > region.Length)
-				return false;
-
-			var pairs = region.ReadU32Be(j);
-			if (pairs > 0x1000 || j + 4 + (long)pairs * 8 != region.Length)
-				return false;
-
-			for (var n = 0; n < wide; n++)
-			{
-				var at = i + 4 + n * SnapshotTailWideEntry.ByteCount;
-				result.WideTail.Add(new SnapshotTailWideEntry(region[at], region.ReadU64Be(at + 1), region.ReadU64Be(at + 9)));
-			}
-
-			for (var n = 0; n < pairs; n++)
-			{
-				var at = j + 4 + n * 8;
-				result.PairTail.Add(new SnapshotTailPair(region.ReadU32Be(at), region.ReadU32Be(at + 4)));
-			}
 
 			return true;
 		}

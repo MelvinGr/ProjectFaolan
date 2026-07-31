@@ -16,8 +16,8 @@ Ground truth from `Captures/NecroL80_mage-necromancer_login_sell_items_to_trader
 - Each sale's `0x2034` sell request (`UP`, 20 B) = `[0xc75b shop-type][shopId 0x1e7e][container 0x68=backpack][0x8006f31 seller][u32 slot]`
   — the last u32 is the inventory slot (verified against frames 1282/1291/1301/1325/1339/1365/1369, body e.g. `0000c75b00001e7e0000006808006f3100000005`).
 - slot → (template, count) comes from the FullChar snapshot (`0x737A6DF9`, frame 66) via the C#
-  `FullCharSnapshotCodec` (`ParseInventoryPacketBody` → `GetContainer(root, ContainerKind.Bag)` →
-  `GetEntrySlot/GetEntryTemplateId/GetEntryCount`). NecroL80 isn't in the DB inventory, so it must be read
+  `FullPlayerCharacterCodec` (`Parse` → `SnapshotRoot.ContainerOf(root, ContainerKind.Bag)` →
+  `SnapshotRoot.TemplateIdOf` + the test-side entry accessors). NecroL80 isn't in the DB inventory, so it must be read
   from the capture.
 
 Combined oracle (`...sell_items_to_trader...`), **value-per-item = delta / count**:

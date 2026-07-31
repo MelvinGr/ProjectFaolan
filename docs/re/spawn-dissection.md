@@ -385,8 +385,8 @@ tail.f4 = tail.f5             = Item.Id           (template id)                 
 tail.f7                       = 1
 tail.f8                       = archetype          (the ONE field NOT in p_items)
 ```
-`SnapshotItemBuilder.BuildEntry(slot, itemId, recordId, count, Item, archetype)` constructs this; the test
-`SnapshotItemBuilderTests` imports `p_items` into a temp DB, builds the entry from row 3361557 + the captured
+`SnapshotItems.ListEntry(slot, itemId, recordId, count, Item, archetype)` constructs this; the test
+`SnapshotItemsTests` imports `p_items` into a temp DB, builds the entry from row 3361557 + the captured
 per-instance state, and asserts it equals the captured entry **byte-for-byte**. So: p_items SQL -> DB -> builder
 -> on-wire bytes is confirmed lossless. (The other 3 captured items aren't in the 219-row partial p_items, so
 only Slave Manacles could be cross-checked - but it's conclusive.)
@@ -402,7 +402,7 @@ buildable even without a `p_items` row:
   capture-only items (quad + archetype, no name/level). **Archetype now lives on `Item`** (new column; the old
   `ItemArchetypes`/`archetypes.tsv` are gone). An item is **buildable iff `Item.Archetype != 0`**.
 COVERAGE: **~384 items total, 177 buildable** (every item seen in a capture), up from 8. Verified end-to-end in
-`SnapshotItemBuilderTests`: building Slave Manacles from the DB Item alone reproduces the captured entry
+`SnapshotItemsTests`: building Slave Manacles from the DB Item alone reproduces the captured entry
 **byte-for-byte**. Wider coverage now just needs more captures (re-run the regenerator).
 
 STEP (b) CONFIRMED IN-CLIENT (2026-06-07). ✅ A beach character logs in and the DB-built **Royal Signet**
@@ -421,11 +421,11 @@ REPLACES the bag's first entry IN PLACE with a DB-built entry, keeping the origi
 entry count and the tails stay byte-stable - the lowest-risk way to prove the client accepts a DB-built item.
 - `RetailLoginReplay.ReplayStrieLoginWorldBurst` resolves a fully-buildable demo item (Royal Signet 3774542 -
   `TryResolveInjectableItem` via the new `IDatabaseRepository.GetItem`) and, if found, routes the inventory packet
-  through `BuildBeachInventoryPacket` -> `ReplaceFirstBagItemFromDb` (builds via `SnapshotItemBuilder`, swaps in
+  through `BuildBeachInventoryPacket` -> `ReplaceFirstBagItemFromDb` (builds via `SnapshotItems`, swaps in
   place, re-serializes with manual CRC). Falls back to the verbatim inventory if the item/archetype isn't
   available, so login stays reliable.
 - Count forced to 1 (Royal Signet is non-stackable) to avoid a confound.
-- Structurally verified by `SnapshotItemBuilderTests.ReplaceFirstBagItem_InPlace_KeepsCountAndSwapsTemplate`
+- Structurally verified by `SnapshotItemsTests.ReplaceFirstBagItem_InPlace_KeepsCountAndSwapsTemplate`
   (re-parse: entry count unchanged, first bag item now reports template 3774542, itemId/record preserved).
 
 STEP (b) — DRIVEN FROM CharacterEquipment (2026-06-07, pending in-client test). The hardcoded demo is replaced

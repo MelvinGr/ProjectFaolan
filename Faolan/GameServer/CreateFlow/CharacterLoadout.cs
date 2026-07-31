@@ -29,7 +29,7 @@ namespace Faolan.GameServer
 		private const uint ShortcutTypeAbility = 4;
 		private const uint ShortcutTypeSpell = 2;
 		private const uint SpecialBarBase = 0x4E20;
-		private const uint SecondBarBase = 100; // page 2 / "bar 1" (slot = bar position, page 2 = +100; see ShortcutBarBuilder)
+		private const uint SecondBarBase = 100; // page 2 / "bar 1" (slot = bar position, page 2 = +100; see ShortcutBarReplyCodec)
 
 		// The character's grantable abilities: its OWN persisted set (CharacterAbility, imported from the retail 0x2052
 		// grants) or, for a character that has none yet, the class-starting kit.

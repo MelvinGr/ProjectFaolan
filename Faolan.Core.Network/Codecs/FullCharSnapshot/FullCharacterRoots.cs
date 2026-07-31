@@ -6,7 +6,12 @@ using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
-	// Builds the FullChar (0x737A6DF9) snapshot's four inventory containers entirely from the character's DB
+	// VALUE FACTORIES for the FullChar (0x737A6DF9) snapshot's protobuf root and its inventory containers - what
+	// FullPlayerCharacterCodec.Build is handed, built entirely from the character's DB items (the generation
+	// counterpart of the older in-place entry swap). Not a codec: it produces typed protobuf messages, not bytes,
+	// which is why it is named for what it makes rather than carrying a `*Builder`/`*Codec` suffix (#530 rule 1).
+	//
+	// Layout facts from every captured
 	// items - the generation counterpart of the older in-place entry swap. Layout facts from every captured
 	// snapshot (docs/re/player-spawn-generation.md "FullChar"):
 	//   - the root carries exactly 4 ProtoInventoryGame containers, kind order Equipped=101, Bag=104,
@@ -17,14 +22,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	//     record ids (stat 23) another counter. Generated ids derive deterministically from instance+slot so
 	//     they are unique within the character and stable across logins (equip persistence keys on template
 	//     handle + slot, never on these instance ids).
-	public static class FullPlayerCharacterBuilder
+	public static class FullCharacterRoots
 	{
-		public const ContainerKind BagKind = ContainerKind.Bag;
-		public const ContainerKind BankKind = ContainerKind.Bank;
-		public const ContainerKind EquippedKind = ContainerKind.Equipped;
-		public const ContainerKind QuestKind = ContainerKind.Quest;
-		public const ContainerKind ResourceKind = ContainerKind.Resource;
-
 		// The server's account-entitlement policy: every account gets the full expansion + subscription set. These
 		// are the root's f4/f5 (account bitfields the client reads to gate expansion content, NOT per-character
 		// state); the captured TestAccount snapshots carry exactly these, so authoring them reproduces those roots
@@ -33,11 +32,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public const uint FullSubscriptionFlags = 0x00018181;
 
-		// The FullChar snapshot IIR (0x737A6DF9); the listener assembles [subop][typeTag][instance][prefix][root][tails].
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
-
 		// The first bag cell of a fresh character's snapshot is pos 1 (Strie's captured starter bag).
-		private const uint BagFirstPos = 1;
+		public const uint BagFirstPos = 1;
 
 		// Backpack sizing: the base backpack is 24 slots; the bag equipped in the bag slot (equip slot 3) adds its
 		// Item.BagExtraSlots (RDB field 104) on top - Burlap Sack +24 (=48), Bag of Holding +20 (=44), Veteran's Bag
@@ -55,23 +51,23 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		// Builds a SINGLE inventory container (ProtoInventoryGame) of the given kind from CharacterInventory rows -
 		// used for the on-demand BANK delivery (kind 105), which isn't one of the 4 login-snapshot containers.
-		// Same item codec as the snapshot (SnapshotItemBuilder.BuildListEntry). Includes hash-0 items too (they
+		// Same item codec as the snapshot (SnapshotItems.ListEntry). Includes hash-0 items too (they
 		// render by template / Hash 0, like the live add) so an AH-bought item deposited to the bank still shows on
 		// reopen - unlike the chat-critical world-entry snapshot, the BankIIR is its own channel, so a half-identified
 		// item here can't break world entry. Rows without a resolved Item (no DB identity at all) are still skipped.
-		public static ProtoInventoryGame BuildContainer(ContainerKind kind, uint capacity, uint disabledSlots, uint instance, IReadOnlyCollection<CharacterInventory> rows)
+		public static ProtoInventoryGame Container(ContainerKind kind, uint capacity, uint disabledSlots, uint instance, IReadOnlyCollection<CharacterInventory> rows)
 		{
 			var container = NewContainer(kind, capacity, disabledSlots, instance);
 			foreach (var row in (rows ?? []).Where(r => r.Item != null).OrderBy(r => r.Slot))
 			{
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item!, row.Item!.Hash));
+				container.Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, kind, slot), RecordId(instance, kind, slot), row.Count, row.Item!, row.Item!.Hash));
 			}
 
 			return container;
 		}
 
-		public static List<ProtoInventoryGame> BuildContainers(uint instance, IReadOnlyDictionary<ulong, (Item Item, uint Hash)> equipped, (Item Item, uint Hash)? bagFirst,
+		public static List<ProtoInventoryGame> Containers(uint instance, IReadOnlyDictionary<ulong, (Item Item, uint Hash)> equipped, (Item Item, uint Hash)? bagFirst,
 			IReadOnlyCollection<CharacterInventory>? inventoryRows = null)
 		{
 			// The backpack grows by the bag equipped in the bag slot (slot 3): base 24 + its BagExtraSlots.
@@ -87,14 +83,14 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			var containers = new List<ProtoInventoryGame>
 			{
-				NewContainer(EquippedKind, 1028, 0, instance),
-				NewContainer(BagKind, backpackSlots, 0, instance),
-				NewContainer(ResourceKind, resourceSlots, ResourceDisabledSlots, instance),
-				NewContainer(QuestKind, 48, 0, instance)
+				NewContainer(ContainerKind.Equipped, 1028, 0, instance),
+				NewContainer(ContainerKind.Bag, backpackSlots, 0, instance),
+				NewContainer(ContainerKind.Resource, resourceSlots, ResourceDisabledSlots, instance),
+				NewContainer(ContainerKind.Quest, 48, 0, instance)
 			};
 
 			foreach (var (slot, resolved) in equipped.OrderBy(kv => kv.Key))
-				containers[0].Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, EquippedKind, slot), RecordId(instance, EquippedKind, slot), 1, resolved.Item, resolved.Hash));
+				containers[0].Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, ContainerKind.Equipped, slot), RecordId(instance, ContainerKind.Equipped, slot), 1, resolved.Item, resolved.Hash));
 
 			// CharacterInventory rows fill their container by kind (bag rows from unequip persistence; resource/
 			// quest rows once something writes them). Buildable items only - a row without real identity is
@@ -107,8 +103,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 					continue;
 
 				var slot = (ulong)row.Slot;
-				container.Items.Add(SnapshotItemBuilder.BuildListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item!, row.Item!.Hash));
-				if ((ContainerKind)container.InventoryId.Type == BagKind)
+				container.Items.Add(SnapshotItems.ListEntry(slot, ItemId(instance, row.Container, slot), RecordId(instance, row.Container, slot), row.Count, row.Item!, row.Item!.Hash));
+				if ((ContainerKind)container.InventoryId.Type == ContainerKind.Bag)
 					bagSlotsTaken.Add(slot);
 			}
 
@@ -117,7 +113,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (bagFirst != null && !bagSlotsTaken.Contains(BagFirstPos))
 			{
 				containers[1]
-					.Items.Add(SnapshotItemBuilder.BuildListEntry(BagFirstPos, ItemId(instance, BagKind, BagFirstPos), RecordId(instance, BagKind, BagFirstPos), 1, bagFirst.Value.Item,
+					.Items.Add(SnapshotItems.ListEntry(BagFirstPos, ItemId(instance, ContainerKind.Bag, BagFirstPos), RecordId(instance, ContainerKind.Bag, BagFirstPos), 1, bagFirst.Value.Item,
 						bagFirst.Value.Hash));
 			}
 
@@ -139,7 +135,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// are nullable so an absent field stays absent (presence is per-account): a null arg emits nothing, a
 		// value emits the field (false/0 included). Reproduces any captured root byte-identically when fed that
 		// root's own field values (FullCharIirRoundTripTests) - the construction oracle.
-		public static ProtoFullCharacterIIR BuildRoot(IEnumerable<uint> characterTags, uint? expansionFlags, uint? subscriptionFlags, bool? hasNewClaimItems, bool? hasSpellbook,
+		public static ProtoFullCharacterIIR ForCharacter(IEnumerable<uint> characterTags, uint? expansionFlags, uint? subscriptionFlags, bool? hasNewClaimItems, bool? hasSpellbook,
 			IEnumerable<ProtoInventoryGame> containers)
 		{
 			var root = new ProtoFullCharacterIIR();

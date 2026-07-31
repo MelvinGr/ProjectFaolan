@@ -13,15 +13,15 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	//                           level, hash = hash }
 	// The per-instance state (itemId GUID, inventory record id, stack count, slot) is kept; the template identity -
 	// the Data1..4 quad (which is the item's ProtoDecryptionKey) plus the hash hash - comes from the DB Item.
-	// Proven byte-exact against the captured "Slave Manacles" entry (SnapshotItemBuilderTests); the typed schema is
+	// Proven byte-exact against the captured "Slave Manacles" entry (SnapshotItemsTests); the typed schema is
 	// proven to re-serialize the wire byte-for-byte (AocProtocolDecodeTests).
-	public static class SnapshotItemBuilder
+	public static class SnapshotItems
 	{
 		// Builds the bare per-item entry (ProtoInventoryGameEntry, i.e. InventoryListEntry.item without the Pos
 		// wrapper) from a DB template + per-instance state and an explicit stat list. This is the form
 		// GameCharInterface.DispatchAddItem (s2c 0x2020) carries as i_cEntry - the live, mid-session counterpart
 		// to the world-entry snapshot; there the slot rides separately as i_nItemPos, so no Pos wrapper.
-		public static ProtoInventoryGameEntry BuildInventoryEntry(ulong itemId, Item item, uint hash, IEnumerable<ItemStat> stats, ulong level = 1)
+		public static ProtoInventoryGameEntry InventoryEntry(ulong itemId, Item item, uint hash, IEnumerable<ItemStat> stats, ulong level = 1)
 		{
 			var key = item.Key;
 
@@ -52,20 +52,20 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return entry;
 		}
 
-		// The typed form, used directly by FullPlayerCharacterBuilder's generated containers. The world-entry snapshot
+		// The typed form, used directly by FullCharacterRoots' generated containers. The world-entry snapshot
 		// entry carries the fixed (flags, recordId, count) stat triple.
-		public static ProtoInventoryGame.InventoryListEntry BuildListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, ulong f7 = 1)
+		public static ProtoInventoryGame.InventoryListEntry ListEntry(ulong slot, ulong itemId, ulong recordId, ulong count, Item item, uint hash, ulong flags = 1, ulong f7 = 1)
 		{
 			return new ProtoInventoryGame.InventoryListEntry
 			{
 				Pos = (uint)slot,
-				Item = BuildInventoryEntry(itemId, item, hash, [new ItemStat(0, (uint)flags), new ItemStat(23, (uint)recordId), new ItemStat(26, (uint)count)], f7)
+				Item = InventoryEntry(itemId, item, hash, [new ItemStat(0, (uint)flags), new ItemStat(23, (uint)recordId), new ItemStat(26, (uint)count)], f7)
 			};
 		}
 
 		// One (stat id, value) record of a ProtoInventoryGameEntry.stat_list. The world-entry snapshot uses a
-		// fixed triple (BuildListEntry below); the incremental DispatchAddItem (0x2020) s2c carries a richer,
-		// per-instance set captured from retail, so BuildInventoryEntry takes the stat list as a parameter.
+		// fixed triple (ListEntry below); the incremental DispatchAddItem (0x2020) s2c carries a richer,
+		// per-instance set captured from retail, so InventoryEntry takes the stat list as a parameter.
 		public readonly record struct ItemStat(uint Stat, uint Value);
 	}
 }

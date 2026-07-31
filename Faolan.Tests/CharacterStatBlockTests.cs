@@ -35,7 +35,7 @@ namespace Faolan.Tests
 			Assert.Equal(3, block.Count);
 
 			// count(03) + HealthCurrent(001B)=189C + StaminaCurrent(01F8)=189C + ManaCurrent(01FA)=189C
-			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(block.ToArray()));
+			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(CharacterStatBlockCodec.Build(block)));
 		}
 
 		[Fact]
@@ -44,7 +44,7 @@ namespace Faolan.Tests
 			var block = new CharacterStatBlock().SetRaw(CharacterStatId.Level, 25);
 
 			// count(01) + Level(0036) = 25 (0x19), unscaled
-			Assert.Equal("010000003600000019", ToHex(block.ToArray()));
+			Assert.Equal("010000003600000019", ToHex(CharacterStatBlockCodec.Build(block)));
 		}
 
 		[Fact]
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 		{
 			// HealthCurrent (0x001B) is a ×100 vital: display 63 -> raw 6300 (0x189C).
 			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63);
-			Assert.Equal("010000001b0000189c", ToHex(block.ToArray()));
+			Assert.Equal("010000001b0000189c", ToHex(CharacterStatBlockCodec.Build(block)));
 		}
 
 		[Fact]
@@ -70,7 +70,7 @@ namespace Faolan.Tests
 			var stats = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).Set(CharacterStatId.StaminaCurrent, 63).Set(CharacterStatId.ManaCurrent, 63);
 			const uint handle = 0x0002324B;
 
-			var statBytes = stats.ToArray();
+			var statBytes = CharacterStatBlockCodec.Build(stats);
 			var body = new byte[16 + statBytes.Length];
 			body.WriteU32Be(0, 0x96B8DC59u); // StatUpdateIIR
 			body.WriteU32Be(4, 0x0000C350u); // VitalsMarker
@@ -81,45 +81,50 @@ namespace Faolan.Tests
 			var parsed = StatUpdateCodec.Parse(body);
 			var (parsedHandle, parsedStats) = (parsed.EntityHandle, parsed.Stats);
 			Assert.Equal(handle, parsedHandle);
-			Assert.Equal(ToHex(statBytes), ToHex(parsedStats.ToArray()));
+			Assert.Equal(ToHex(statBytes), ToHex(CharacterStatBlockCodec.Build(parsedStats)));
 		}
 
 		[Fact]
-		public void TryParse_ReadsCapturedVitalsBlock()
+		public void Parse_ReadsCapturedVitalsBlock()
 		{
 			// The exact captured block bytes from Build_VitalsBlock_MatchesCapturedBytes.
 			var bytes = FromHex("030000001b0000189c000001f80000189c000001fa0000189c");
 
-			Assert.True(CharacterStatBlock.TryParse(bytes, out var block, out var consumed));
-			Assert.Equal(bytes.Length, consumed);
+			var block = CharacterStatBlockCodec.Parse(bytes);
 			Assert.Equal(3, block.Count);
 			Assert.Equal((CharacterStatId.HealthCurrent, 6300u), block.Records[0]);
 			Assert.Equal((CharacterStatId.StaminaCurrent, 6300u), block.Records[1]);
 			Assert.Equal((CharacterStatId.ManaCurrent, 6300u), block.Records[2]);
 		}
 
+		// Rule 4: a short body is a decode FAILURE, not a `false` for the caller to drop on the floor.
 		[Fact]
-		public void TryParse_ReturnsFalseWhenTruncated()
+		public void Parse_ThrowsWhenTruncated()
 		{
 			// count says 2 records (needs 17 bytes) but only one is present.
 			var bytes = FromHex("020000001b0000189c");
-			Assert.False(CharacterStatBlock.TryParse(bytes, out _, out var consumed));
-			Assert.Equal(0, consumed);
+			Assert.Throws<CodecParseException>(() => CharacterStatBlockCodec.Parse(bytes));
+		}
+
+		// Rule 3: the codec accounts for the WHOLE body, so trailing bytes are a failure rather than a length to
+		// report back. A caller that composes it inside a bigger body uses the internal reader instead.
+		[Fact]
+		public void Parse_ThrowsOnTrailingBytes()
+		{
+			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).SetRaw(CharacterStatId.Level, 25);
+			var withTrailer = new byte[CharacterStatBlockCodec.Build(block).Length + 3];
+			CharacterStatBlockCodec.Build(block).CopyTo(withTrailer, 0);
+
+			Assert.Throws<CodecParseException>(() => CharacterStatBlockCodec.Parse(withTrailer));
 		}
 
 		[Fact]
-		public void TryParse_RoundTripsBuild_AndReportsConsumed()
+		public void Parse_RoundTripsBuild()
 		{
 			var block = new CharacterStatBlock().Set(CharacterStatId.HealthCurrent, 63).SetRaw(CharacterStatId.Level, 25);
-			var built = block.ToArray();
+			var built = CharacterStatBlockCodec.Build(block);
 
-			// Append trailing bytes: TryParse must consume only the block and report the right length.
-			var withTrailer = new byte[built.Length + 3];
-			built.CopyTo(withTrailer, 0);
-
-			Assert.True(CharacterStatBlock.TryParse(withTrailer, out var parsed, out var consumed));
-			Assert.Equal(built.Length, consumed);
-			Assert.Equal(ToHex(built), ToHex(parsed.ToArray()));
+			Assert.Equal(ToHex(built), ToHex(CharacterStatBlockCodec.Build(CharacterStatBlockCodec.Parse(built))));
 		}
 
 		private static byte[] FromHex(string hex)

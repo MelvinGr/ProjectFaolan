@@ -63,10 +63,10 @@ namespace Faolan.Tests
 				Assert.NotEqual(0u, item!.Hash);
 
 				// 1) The entry blob: same template the snapshot builds, but the live add's per-instance stat set.
-				var entry = SnapshotItemBuilder.BuildInventoryEntry(ItemId, item, item.Hash,
+				var entry = SnapshotItems.InventoryEntry(ItemId, item, item.Hash,
 				[
-					new SnapshotItemBuilder.ItemStat(0, 1), new SnapshotItemBuilder.ItemStat(8, 0xffffffff), new SnapshotItemBuilder.ItemStat(23, (uint)RecordId),
-					new SnapshotItemBuilder.ItemStat(46, 7)
+					new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(8, 0xffffffff), new SnapshotItems.ItemStat(23, (uint)RecordId),
+					new SnapshotItems.ItemStat(46, 7)
 				]);
 				var entryBytes = AddItemBody.SerializeInventoryEntry(entry);
 				Assert.Equal(CapturedEntry, Convert.ToHexStringLower(entryBytes));

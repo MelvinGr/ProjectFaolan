@@ -31,11 +31,11 @@ all **big-endian**:
   field 6 × N = the containers (Equipped 101 / Bag 104 / Resource 112 / Quest 113), then fields 7, 8.
 - Tails = the 9282-byte record/XML region starting `00 00 00 18` (subclass version 24). The live world-entry
   path builds them from scratch with this character's live level/vitals/XP via
-  `FullCharSnapshotSubClass.BuildFromScratch`, proven byte-exact against the captured `BeachTailsTemplate.bin`
+  `SnapshotTails.FromScratch`, proven byte-exact against the captured `BeachTailsTemplate.bin`
   oracle (golden tests `BeachSnapshotConstructionTests`).
 
-Containers are built wholesale from the DB (`FullPlayerCharacterBuilder.BuildContainers`:
-`CharacterEquipment` + `CharacterInventory` rows; entry = `SnapshotItemBuilder.BuildListEntry`, identity =
+Containers are built wholesale from the DB (`FullCharacterRoots.Containers`:
+`CharacterEquipment` + `CharacterInventory` rows; entry = `SnapshotItems.ListEntry`, identity =
 the `Item.Key` (Data1..4) quad + `Item.Hash`, buildable via the hash-gated snapshot iff `Hash != 0`).
 
 ## Delivery model (the hard-won facts)

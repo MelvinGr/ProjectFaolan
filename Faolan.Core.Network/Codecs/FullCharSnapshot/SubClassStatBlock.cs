@@ -108,7 +108,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			foreach (var record in records)
 			{
 				values.Add(record.Id);
-				values.Add(KnownSpellList.Unbound);
+				values.Add(KnownSpellListCodec.Unbound);
 				values.Add(record.Type);
 			}
 
@@ -188,20 +188,6 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		// (The known-spell list is no longer spliced in after the fact - CreateBlock builds it inline at the block tail,
 		// so the former FindKnownSpellCountIndex landmark search + InjectKnownSpells splice are gone.)
-
-		// Serializes a stat block to its wire bytes: [u32 Marker0][u32 Marker1][u32 BlockType][u32 x Values][Trailer]
-		// (mirrors FullCharSnapshotSubClass.WritePostAccessBlock). 12 + Values.Count*4 + Trailer bytes - 1365 for the fresh block.
-		public static byte[] Serialize(SubClassPostAccessBlock block)
-		{
-			var w = new FaolanStream();
-			w.WriteUInt32(block.Marker0);
-			w.WriteUInt32(block.Marker1);
-			w.WriteUInt32(block.BlockType);
-			foreach (var value in block.Values)
-				w.WriteUInt32(value);
-			w.WriteArray(block.Trailer);
-			return w.ToArray();
-		}
 
 		// The fresh-skeleton baseline value for a stat id (0 if absent). Used to reset the volatile slots above.
 		public static uint SkeletonValueOf(uint statId)

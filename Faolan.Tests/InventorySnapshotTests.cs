@@ -33,7 +33,7 @@ namespace Faolan.Tests
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
+			var parts = SnapshotPackets.Parse(body);
 
 			byte[] sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 			byte[] receiver = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xFF, 0xBD, 0xD9, 0x10];
@@ -43,9 +43,9 @@ namespace Faolan.Tests
 				s.WriteUInt32(subOpcode);
 				s.WriteUInt32(c350);
 				s.WriteUInt32(instance);
-				s.WriteArray(parts.Prefix);
+				s.WriteArray(SnapshotPackets.PrefixOf(parts));
 				s.WriteArray(parts.Root.ToProtobuf());
-				s.WriteArray(parts.SubClass.ToArray());
+				s.WriteArray(FullCharSnapshotSubClassCodec.Build(parts.SubClass));
 			})).Serialize();
 
 			var firstDiff = -1;
@@ -76,15 +76,15 @@ namespace Faolan.Tests
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
+			var parts = SnapshotPackets.Parse(body);
 
 			using var rebuilt = new FaolanStream();
 			rebuilt.WriteUInt32(subOpcode);
 			rebuilt.WriteUInt32(c350);
 			rebuilt.WriteUInt32(instance);
-			rebuilt.WriteArray(parts.Prefix);
+			rebuilt.WriteArray(SnapshotPackets.PrefixOf(parts));
 			rebuilt.WriteArray(parts.Root.ToProtobuf());
-			rebuilt.WriteArray(parts.SubClass.ToArray());
+			rebuilt.WriteArray(FullCharSnapshotSubClassCodec.Build(parts.SubClass));
 
 			body.Position = 0;
 			var original = body.ToArray();
@@ -128,7 +128,7 @@ namespace Faolan.Tests
 			var subOpcode = body.ReadUInt32();
 			var c350 = body.ReadUInt32();
 			var instance = body.ReadUInt32();
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
+			var parts = SnapshotPackets.Parse(body);
 
 			byte[] sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 			byte[] receiver = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, .. EncodeVarint(newInstance)];
@@ -138,9 +138,9 @@ namespace Faolan.Tests
 				s.WriteUInt32(subOpcode);
 				s.WriteUInt32(c350);
 				s.WriteUInt32(instance);
-				s.WriteArray(parts.Prefix);
+				s.WriteArray(SnapshotPackets.PrefixOf(parts));
 				s.WriteArray(parts.Root.ToProtobuf());
-				s.WriteArray(parts.SubClass.ToArray());
+				s.WriteArray(FullCharSnapshotSubClassCodec.Build(parts.SubClass));
 			})).Serialize();
 
 			var firstDiff = -1;
@@ -174,15 +174,15 @@ namespace Faolan.Tests
 			var instance = body.ReadUInt32();
 			var headerLen = body.Position; // bytes consumed before the inventory body proper
 
-			var parts = FullCharSnapshotCodec.ParseInventoryPacketBody(body);
+			var parts = SnapshotPackets.Parse(body);
 
 			using var rebuilt = new FaolanStream();
 			rebuilt.WriteUInt32(subOpcode);
 			rebuilt.WriteUInt32(c350);
 			rebuilt.WriteUInt32(instance);
-			rebuilt.WriteArray(parts.Prefix);
+			rebuilt.WriteArray(SnapshotPackets.PrefixOf(parts));
 			rebuilt.WriteArray(parts.Root.ToProtobuf());
-			rebuilt.WriteArray(parts.SubClass.ToArray());
+			rebuilt.WriteArray(FullCharSnapshotSubClassCodec.Build(parts.SubClass));
 
 			body.Position = 0;
 			var original = body.ToArray();
