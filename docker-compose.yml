@@ -1,7 +1,8 @@
 # Project Faolan — docker compose.
 #
 # Default: ONE all-in-one server (login tier + the first realm's world) — the simplest deploy. `docker compose up`
-# builds the image (Dockerfile) and runs it, persisting the game data via a bind mount.
+# builds the image (Faolan/Dockerfile) and runs it, persisting the game data via a bind mount. All three images
+# live beside their project and build from the repo ROOT as context, because every build graph spans siblings.
 #
 # CONFIG COMES FROM ENV VARS. The image carries NO faolan.json (it's optional; precedence is env > cmdline > json),
 # so every game process sets its config in `environment:` - shared here via the `x-faolan-config` anchor. Two caveats:
@@ -18,12 +19,17 @@ x-faolan-config: &faolan-config
   ServerIpAddress: "127.0.0.1"   # host IP / hostname for a real deploy (see note above)
   UniverseAgentPort: 7010
   PlayerAgentPort: 7011
-  Mcp__Port: 7099                # nested key -> env uses the __ separator (Mcp:Port)
+  Mcp__Port: 7099                # nested key -> env uses the __ separator (Mcp:Port). NOT published: the MCP
+                                 # endpoint binds 127.0.0.1, which in a container is its own loopback - reaching it
+                                 # from the host means `docker exec`, not a port mapping.
+  Log__File: "/app/data/faolan.log"  # onto the mounted volume; the default is beside the exe, i.e. lost on recreate
   WelcomeString: "Welcome to Project Faolan!"
 
 services:
   faolan:
-    build: .
+    build:
+      context: .
+      dockerfile: Faolan/Dockerfile
     image: projectfaolan
     # All-in-one: login tier + the first realm's world (the Dockerfile ENTRYPOINT, no --role override).
     environment: *faolan-config
@@ -46,7 +52,9 @@ services:
 # (id + IpAddress reachable by the client + its Port/AgentServerPort/CsPlayerAgentPort), then publish those ports.
 # ---------------------------------------------------------------------------------------------------------------
 #  login:
-#    build: .
+#    build:
+#      context: .
+#      dockerfile: Faolan/Dockerfile
 #    image: projectfaolan
 #    command: ["--role", "login"]        # UniverseAgent + PlayerAgent only; owns no world
 #    environment: *faolan-config
@@ -58,7 +66,9 @@ services:
 #    restart: unless-stopped
 #
 #  realm-2:
-#    build: .
+#    build:
+#      context: .
+#      dockerfile: Faolan/Dockerfile
 #    image: projectfaolan
 #    command: ["--role", "realm=2"]      # one realm's game host, bound to Realm row 2's ports
 #    environment: *faolan-config
@@ -71,7 +81,9 @@ services:
 #    restart: unless-stopped
 #
 #  realm-3:
-#    build: .
+#    build:
+#      context: .
+#      dockerfile: Faolan/Dockerfile
 #    image: projectfaolan
 #    command: ["--role", "realm=3"]      # a second realm (seed Realm row 3 with these ports first)
 #    environment: *faolan-config
@@ -109,7 +121,11 @@ services:
 
 # ---------------------------------------------------------------------------------------------------------------
 # WEB armory / 3D viewer / GM tools (commented; #275). Its own image (Faolan.Web/Dockerfile). Reads the roster from
-# the same DB, plus the client RDB dir (RdbDir - a DATA mount) for meshes/renders and CdnUrl (Faolan.Web.Content proxy).
+# the same DB, plus the client RDB dir (RdbDir - a DATA mount) for meshes/renders and CdnUrl (the `cdn` service below).
+#
+# ⚠️ The database mount is READ-WRITE, not `:ro`. Web is not a reader: the ASP.NET Identity store writes on every
+#    login and the GM/admin pages edit rows. Even a pure reader would need it - the file is journal_mode=WAL, and
+#    SQLite creates the -wal/-shm sidecars in that DIRECTORY before it can read a WAL database at all.
 # ---------------------------------------------------------------------------------------------------------------
 #  web:
 #    build:
@@ -120,12 +136,44 @@ services:
 #      Database__Provider: Sqlite
 #      Database__ConnectionString: "Data Source=/app/data/faolan.db"
 #      RdbDir: "/rdb"                                             # the client RDB, mounted below
-#      CdnUrl: "http://host.docker.internal:7081/gameupdate/upm/rdb"
+#      CdnUrl: "http://cdn:7081/gameupdate/upm/rdb"               # the `cdn` service by its compose DNS name
 #    ports:
 #      - "7080:8080"                                             # armory/viewer (Kestrel listens on 8080 in-container)
 #    volumes:
-#      - ./data:/app/data:ro                           # read-only roster
+#      - ./data:/app/data                                        # the same database the game server built (see below)
 #      - /path/to/client/RDB:/rdb:ro                             # the client RDB (3D models / renders)
+#    depends_on: [cdn]
+#    restart: unless-stopped
+
+# ---------------------------------------------------------------------------------------------------------------
+# CDN MIRROR (commented) - Faolan.Web.Content, a store-and-forward mirror of AoC's UPM content CDN. Two consumers:
+#   - the CLIENT/patcher, pointed here by `Faolan.ClientLauncher --mirror` (it rewrites LocalConfig.xml's three
+#     patch-addr keys), so a full ConanPatcher run archives the whole current revision into ./cdn-store;
+#   - Faolan.Web, for the on-demand RDB blobs its 3D viewer needs (`CdnUrl` above).
+# It is INDEPENDENT of the game server - no database, no RDB dir - so it can run alone.
+#
+# ⚠️ It fetches from the real Age of Conan CDN on a miss, so it needs outbound internet. On a hit it never leaves
+#    disk. The store is content-addressed (the last path segment IS the payload md5), so it is self-verifying and
+#    safe to share between runs - and worth persisting: a full patcher run is many GB.
+# ⚠️ `CdnMirror__Ip` MUST be 0.0.0.0 here (the image defaults it): the code's own default is 127.0.0.1, which
+#    inside a container is loopback the published port cannot reach.
+# ⚠️ The LocalConfig.xml the mirror serves back rewrites the patch addresses to `127.0.0.1:<port>`, which is right
+#    only for a client on the DOCKER HOST. A client on another machine needs that to be this host's address -
+#    tracked in Gitea #552.
+# ---------------------------------------------------------------------------------------------------------------
+#  cdn:
+#    build:
+#      context: .
+#      dockerfile: Faolan.Web.Content/Dockerfile
+#    image: projectfaolan-cdn
+#    environment:
+#      CdnMirror__Ip: "0.0.0.0"       # bind all interfaces IN the container (the code default, 127.0.0.1, is unreachable)
+#      CdnMirror__Port: 7081
+#      CdnMirror__Store: "/app/store"
+#    ports:
+#      - "7081:7081"                  # what --mirror and CdnUrl point at
+#    volumes:
+#      - ./cdn-store:/app/store       # the archived CDN blobs; a clean slate is just `rm -rf ./cdn-store`
 #    restart: unless-stopped
 
 # volumes:

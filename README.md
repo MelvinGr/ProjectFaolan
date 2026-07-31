@@ -366,6 +366,40 @@ dotnet run --project Faolan -- --role realm=3        # another realm, on that Re
 login tier and realm 2 together. At most one `realm` role per process (co-hosting realms would share chat/session
 state across them); run one process per realm for isolation.
 
+### Run it in Docker
+
+`docker compose up` builds the server image and starts an all-in-one deployment — no .NET SDK, no clone layout
+to get right:
+
+```sh
+docker compose up
+```
+
+Three images are defined, each with its `Dockerfile` **beside its project** but built with the repo **root** as
+context (every build graph spans sibling projects):
+
+| image | from | what it is |
+| --- | --- | --- |
+| `projectfaolan` | `Faolan/Dockerfile` | the game server — all-in-one by default, or `--role login` / `--role realm=<id>` |
+| `projectfaolan-web` | `Faolan.Web/Dockerfile` | the armory / 3D character viewer / GM tools |
+| `projectfaolan-cdn` | `Faolan.Web.Content/Dockerfile` | the store-and-forward mirror of the game's content CDN |
+
+```sh
+docker build -f Faolan/Dockerfile -t projectfaolan .
+```
+
+Only the server service is enabled in `docker-compose.yml`; the process-per-realm split, a Postgres backend, and
+the web + CDN services are commented examples in the same file, each with the caveats that bite in a container.
+Two are worth knowing up front:
+
+- **`ServerIpAddress` must be an address the client can reach** — the host's IP or a resolvable name, never
+  `127.0.0.1`. The login tier advertises it (and each `Realm` row's `IpAddress`) and the client connects there
+  from *outside* Docker. The same goes for any bind address: a service listening on `127.0.0.1` inside a
+  container is on its own loopback, and a published port reaches nothing.
+- **The image ships the seed, not a database.** `faolan.sql` is baked in and the server builds `faolan.db` from
+  it into the mounted volume on first start, so a container never mutates a file from the repo and a clean deploy
+  is an empty directory. Nothing is re-seeded on later boots.
+
 ## Configuration
 
 Every server-side executable — the server, the importer, `Faolan.Web`, the `Faolan.Web.Content` CDN mirror,

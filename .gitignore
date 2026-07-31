@@ -266,7 +266,8 @@ Faolan.ClientHook/*.lib
 # Test golden-mismatch diff artifacts (written by AssertBurstStable on failure)
 *.bin.actual
 
-# CI runner registration token (docker-compose.yml reads it from here) - never commit
+# compose picks .env up automatically for variable substitution, so it is where a local deploy's secrets land
+# (a CI runner registration token, a Postgres password) - never commit
 .env
 
 /faolan.db-shm

@@ -24,11 +24,11 @@
 
 LICENSE
 README.md
-Faolan.Files
 
-# Projects + assets not in the server's build graph (the Dockerfile copies only Faolan, Faolan.Core, Faolan.Mcp).
-# Keeps the build context small (Captures alone is hundreds of MB of pcaps/JSON). faolan.sql + its counter
-# sidecars at the repo root are NOT matched here - the image ships the SEED and builds its database from it.
+# Projects + assets in NO image's build graph. All three Dockerfiles (Faolan/, Faolan.Web/, Faolan.Web.Content/)
+# take the repo ROOT as their context, so one ignore file serves them all and it has to be the union of what none
+# of them needs. Keeps the context small (Captures alone is hundreds of MB of pcaps/JSON). faolan.sql + its counter
+# sidecars at the repo root are NOT matched here - the server image ships the SEED and builds its database from it.
 Faolan.Tests
 Faolan.Importer
 Faolan.ClientLauncher
@@ -36,7 +36,20 @@ Faolan.Wireshark
 Captures
 Archive
 docs
+tools
 **/*.pcapng
 **/*.tshark.json
 **/*.md
 logs.txt
+
+# Local runtime state, some of it created IN the repo root by compose's own bind mounts (./data, ./cdn-store) or by
+# a dev run (faolan.db + its WAL sidecars, the log). Never build input - and cdn-store is many GB after a full
+# patcher run, so shipping it as build context would dwarf the image.
+data
+cdn-store
+mirror-store
+faolan.db
+faolan.db-shm
+faolan.db-wal
+faolan.log
+**/.idea

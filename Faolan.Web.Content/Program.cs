@@ -166,7 +166,7 @@ namespace Faolan.Web.Content
 		{
 			var text = Encoding.UTF8.GetString(body);
 			foreach (var (tag, host) in Upstreams)
-				text = text.Replace($"{host}/upm", $"http://127.0.0.1:{port}/{tag}/upm"); // TODO: External IP
+				text = text.Replace($"{host}/upm", $"http://127.0.0.1:{port}/{tag}/upm"); // TODO: External IP (#552)
 			return Encoding.UTF8.GetBytes(text);
 		}
 	}

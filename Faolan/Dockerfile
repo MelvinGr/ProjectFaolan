@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1
-# Project Faolan server image. Build from the repo root:  docker build -t projectfaolan .
+# Project Faolan server image. The CONTEXT is the repo ROOT (the build graph spans eight sibling projects), so
+# build it the same way as the other two images - by file, from the root:
+#   docker build -f Faolan/Dockerfile -t projectfaolan .
 # The runtime needs the ASP.NET shared framework (the in-process MCP server references Microsoft.AspNetCore.App).
 
 # ---- build ----------------------------------------------------------------------------------------------------
@@ -44,10 +46,16 @@ COPY --from=build /app/publish ./
 # migrations + faolan.sql (DatabaseInitializer) into the mounted /app/data, so a container never mutates a file
 # from the repo and a clean deploy is just an empty directory. Global.SeedPath looks for faolan.sql beside the
 # exe, which is where this lands; the sidecar carries the auto-increment counter resync.
+# ⚠️ Not optional: with no seed beside the exe, a container on an empty volume FAILS at startup rather than coming
+# up with an empty world (DatabaseInitializer.EnsureGameDataAsync throws) - which is what makes leaving this out a
+# deploy-time break, not a smaller image.
 COPY faolan.sql faolan.seq.sqlite.sql faolan.seq.postgres.sql ./
 
-# Ports for the all-in-one default run
-#EXPOSE 7001 7010 7011 7012 7014
+# Ports for the all-in-one default run: the login tier is UniverseAgent 7010 (the only fixed client entry port) +
+# PlayerAgent 7011 (from the config); the realm-local services - GameServer 7014, AgentServer/chat 7012,
+# CsPlayerAgent 7001 - are the first Realm row's ports (#324, so change the Realm row to change them, not config).
+# (MCP binds 127.0.0.1 in-process, i.e. container loopback; there is nothing to publish.)
+EXPOSE 7001 7010 7011 7012 7014
 
 # Default = all-in-one (login + the first realm's world). For a process-per-realm deployment (#324), override the
 # command per container: `--role login` (router tier) or `--role realm=<id>` (one realm's game host, on that Realm

@@ -1,19 +1,36 @@
 name: build-docker
 
-# Build the server image on every push to the main branches (and version tags) and publish it to Gitea's
-# built-in container registry at git.groenendaal.io/melvingr/projectfaolan.
-#   - branch push  -> tag = branch name (development, main) + short commit SHA
-#   - tag vX.Y.Z   -> tag = X.Y.Z (+ latest)
-# Requires a registered act_runner on the Gitea host WITH Docker available (buildx). The GITHUB_TOKEN that
-# Gitea injects is used to authenticate to the registry (it has package write for the repo owner).
+# The push trigger is deliberately off: one image build per push is a lot of runner time for a repo that commits
+# every verified milestone, and enabling Actions replayed a backlog of old pushes on the first runner. Restore by
+# uncommenting - the job below does not care which event started it.
 on:
-  push:
-    branches: [development, main]
-    tags: ['v*']
+  workflow_dispatch:
+#  push:
+#    branches: [development, main]
+#    tags: ['v*']
 
 jobs:
   docker:
     runs-on: ubuntu-latest
+    name: ${{ matrix.image }}
+    # The three deployables, each with its Dockerfile beside its project and the repo ROOT as build context (every
+    # build graph spans sibling projects). They are independent images, so a failure in one still builds the others.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: projectfaolan          # the game server (all-in-one, or --role login / --role realm=<id>)
+            dockerfile: Faolan/Dockerfile
+          - image: projectfaolan-web      # the Blazor armory / 3D viewer / GM tools
+            dockerfile: Faolan.Web/Dockerfile
+          - image: projectfaolan-cdn      # the store-and-forward mirror of AoC's UPM content CDN
+            dockerfile: Faolan.Web.Content/Dockerfile
+    # Gitea mints the per-job GITHUB_TOKEN with the scopes declared here. Without `packages: write` it cannot talk
+    # to the container registry at all, and `docker login` fails with a bare `unauthorized` off the /v2/ ping -
+    # which reads as "wrong password" rather than "this token was never given package rights".
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,18 +38,30 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Fail with the actual reason. `docker login` reports every credential problem as a bare `unauthorized`
+      # off the /v2/ ping, so a missing secret and a wrong password are indistinguishable in the log.
+      - name: Check the registry credential is configured
+        run: |
+          if [ -z "${{ secrets.REGISTRY_TOKEN }}" ]; then
+            echo "::error::secrets.REGISTRY_TOKEN is not set. Create a PAT with the write:package scope"
+            echo "::error::(Settings -> Applications -> Generate New Token) and add it as the repo secret"
+            echo "::error::REGISTRY_TOKEN (Settings -> Actions -> Secrets). The auto-injected GITHUB_TOKEN"
+            echo "::error::is NOT accepted by this instance's container registry, even with packages: write."
+            exit 1
+          fi
+
       - name: Log in to the Gitea container registry
         uses: docker/login-action@v3
         with:
-          registry: git.groenendaal.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ vars.URL }}
+          username: ${{ vars.USERNAME }}
+          password: ${{ secrets.REGISTRY_TOKEN }}
 
       - name: Compute image tags and labels
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: git.groenendaal.io/melvingr/projectfaolan
+          images: ${{ vars.URL }}/${{ vars.USERNAME }}/${{ matrix.image }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -43,8 +72,11 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # SCOPE the cache per image. The gha backend keys on the scope name, so three matrix legs sharing the
+          # default scope would each overwrite the others' manifest and every run would start cold.
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

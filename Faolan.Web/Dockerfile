@@ -37,7 +37,8 @@ WORKDIR /app
 COPY --from=build /app/publish ./
 
 # Kestrel listens on 8080 in the container (the aspnet base image default). Config comes from env vars (faolan.json
-# is optional and not baked in): the game DB (DatabaseProvider / DatabaseConnectionString), RdbDir (point it at a
-# mounted client RDB dir) and CdnUrl (the Faolan.Web.Content CDN proxy). See docker-compose.yml.
+# is optional and not baked in): the game DB (Database__Provider / Database__ConnectionString - the `__` is how a
+# nested `Database:` key is spelled in the environment), RdbDir (point it at a mounted client RDB dir) and CdnUrl
+# (the Faolan.Web.Content CDN proxy). See docker-compose.yml.
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Faolan.Web.dll"]
