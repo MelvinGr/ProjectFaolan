@@ -43,6 +43,13 @@ namespace Faolan.Core.Network.Server.ChatServer
 				: 0;
 		}
 
+		public async Task RefreshPlayfieldChannel(uint characterId, uint mapId)
+		{
+			var provider = Provider;
+			if (provider != null)
+				await provider.RefreshPlayfieldChannel(characterId, mapId);
+		}
+
 		public async Task<bool> SendClaudeWhisper(uint targetCharacterId, ChatMarkup message)
 		{
 			var provider = Provider;

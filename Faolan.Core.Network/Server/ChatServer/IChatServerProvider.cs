@@ -30,6 +30,19 @@ namespace Faolan.Core.Network.Server.ChatServer
 		Task<int> SendClaudeChannelMessage(ChatMarkup message);
 
 		/// <summary>
+		///     Brings a character's <c>~Playfield</c> chat channel in line with the map they are now on: drops the old
+		///     channel (0x003D) and subscribes the new one (0x003C). IDEMPOTENT - a call naming the map the client is
+		///     already subscribed to does nothing, so the world tier can call it after any map change without tracking
+		///     what it sent last.
+		///     <para>
+		///         It matters because channel routing is the CLIENT's job: a ChannelChat is relayed to everyone and each
+		///         client shows only the channels it is subscribed to. Leaving the subscription stale does not just
+		///         linger - the player keeps hearing the playfield they left and never hears the one they are in (#562).
+		///     </para>
+		/// </summary>
+		Task RefreshPlayfieldChannel(uint characterId, uint mapId);
+
+		/// <summary>
 		///     Whispers (0x001E tell) a single character as the synthetic "Claude" sender. Returns false when the
 		///     character has no connected ChatServer client.
 		/// </summary>

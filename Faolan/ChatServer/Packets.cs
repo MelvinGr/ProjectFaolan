@@ -132,6 +132,37 @@ namespace Faolan.ChatServer
 			return client.SendAsync(new ChatServerMessage(ChannelSubscriptionCodec.Opcode, ChannelSubscriptionCodec.Build(type, id, name, flag)));
 		}
 
+		// The subscription's twin (0x003D): [type][id] - the channel this client is no longer on.
+		private static Task SendChannelUnsubscribe(INetworkClient client, byte type, uint id)
+		{
+			return client.SendAsync(new ChatServerMessage(ChannelUnsubscribeCodec.Opcode, ChannelUnsubscribeCodec.Build(type, id)));
+		}
+
+		// Moves the client's ~Playfield channel to the map they are now on. Retail does exactly this on a zone change:
+		// 0x003D on the old channel, then 0x003C on the new one.
+		//
+		// IDEMPOTENT by design, so the world tier can call it after ANY map change without remembering what it last
+		// sent - a map change funnels through one place (the MapChange packet) but a character's MapId is assigned from
+		// several, and a "refresh" that has to be paired with the right previous value would be wrong the first time
+		// somebody assigned it somewhere new. The session carries what was last subscribed, so a repeat is a no-op.
+		public async Task RefreshPlayfieldChannel(uint characterId, uint mapId)
+		{
+			var client = ClientForCharacter(characterId);
+			if (client?.Session == null || mapId == 0)
+				return;
+
+			var current = client.Session.PlayfieldChannelId;
+			if (current == mapId)
+				return;
+
+			if (current != 0)
+				await SendChannelUnsubscribe(client, PlayfieldChannelType, current);
+
+			await SendChannelSubscription(client, PlayfieldChannelType, mapId, PlayfieldChannelName, PlayfieldChannelFlag);
+			client.Session.PlayfieldChannelId = mapId;
+			Logger.LogInformation("ChatServer ~Playfield for {Character:X8}: {From} -> {To}", characterId, current, mapId);
+		}
+
 		private static Task SendSystemMessage(INetworkClient client, ChatMarkup message)
 		{
 			return client.SendAsync(new ChatServerMessage(ChatSystemMessageCodec.Opcode, ChatSystemMessageCodec.Build(message.Value)));

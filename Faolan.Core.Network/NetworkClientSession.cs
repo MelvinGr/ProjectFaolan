@@ -11,6 +11,12 @@ namespace Faolan.Core.Network
 		// The active dialogue's NPC type id, or null when no conversation is open.
 		uint? ConversationTypeId { get; set; }
 
+		// The map id of the ~Playfield chat channel this client is currently subscribed to, or 0 for none. Held per
+		// SESSION rather than read off Character.MapId, because those are two different facts: the character's map is
+		// where they ARE, this is what the chat tier last told them to listen to. Comparing the two is what makes
+		// RefreshPlayfieldChannel idempotent and tells it which channel to drop (#562).
+		uint PlayfieldChannelId { get; set; }
+
 		Account Account { get; set; }
 
 		Character Character { get; set; }
@@ -191,6 +197,7 @@ namespace Faolan.Core.Network
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
 		public uint? ConversationTypeId { get; set; }
+		public uint PlayfieldChannelId { get; set; }
 		public Account Account { get; set; } = null!;
 		public Character Character { get; set; } = null!;
 

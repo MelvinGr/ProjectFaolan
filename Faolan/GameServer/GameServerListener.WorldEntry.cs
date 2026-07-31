@@ -602,6 +602,13 @@ namespace Faolan.GameServer
 				BuildMapChange(client, map!, playfieldToken)
 			};
 
+			// The MapChange is the one place a player is told which playfield they are in, so it is also where their
+			// ~Playfield CHAT channel has to follow - the channel's id IS the map id, and chat routing is the client's
+			// job, so a stale subscription means hearing the playfield you left and not the one you are in (#562).
+			// The call is idempotent, so re-entering the same map costs nothing.
+			if (client.Session.Character is { } chatCharacter)
+				await _agentServerDispatcher.RefreshPlayfieldChannel(chatCharacter.Id, chatCharacter.MapId);
+
 			// World objects are INTEREST-STREAMED, not dumped (#424): entry sends the ones within range and movement
 			// streams the rest, which is what retail does - in Hoxxling_..._gameplay2 only 58 of 158 object handles
 			// arrive at entry, the last one 687s later. They keep their retail POSITION here (early in the stream, before

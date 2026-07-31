@@ -21,6 +21,12 @@ namespace Faolan.ChatServer
 {
 	public partial class ChatServerListener : ChatServerBase, IChatServerProvider
 	{
+		// The ~Playfield channel: type 0x90, and its ID IS the map id - which is what makes it follow the player and
+		// need re-subscribing on a zone change (#562). The flag is the per-channel word every non-~Trial channel uses.
+		private const byte PlayfieldChannelType = 0x90;
+		private const string PlayfieldChannelName = "~Playfield";
+		private const uint PlayfieldChannelFlag = 0x00008044;
+
 		private readonly ClaudeChannel _claudeChannel;
 		private readonly IChatServerDispatcher _dispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
@@ -93,7 +99,11 @@ namespace Faolan.ChatServer
 					await SendChannelSubscription(client, 0x11, 0x00002335, "~GlobalEnglish", 0x00008044);
 
 					if (client.Session.Character?.MapId > 0)
-						await SendChannelSubscription(client, 0x90, client.Session.Character.MapId, "~Playfield", 0x00008044);
+					{
+						await SendChannelSubscription(client, PlayfieldChannelType, client.Session.Character.MapId, PlayfieldChannelName, PlayfieldChannelFlag);
+						// Remember it, or the first RefreshPlayfieldChannel would not know which channel to drop.
+						client.Session.PlayfieldChannelId = client.Session.Character.MapId;
+					}
 
 					await SendChannelSubscription(client, 0x87, 0x001E8480, "~NewbieHelp", 0x00008044);
 
