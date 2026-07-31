@@ -281,6 +281,18 @@ namespace Faolan.Importer.Cli
 
 		// A wire string is [u16 BE length][latin-1 bytes]. Finding that FRAMING beats scraping printable bytes: the
 		// length's low byte is itself often printable and arrives glued to the front of the message.
+		//
+		// ⚠️ This is a GUESS over a body whose grammar we do not know - it is the last resort for messages with no
+		// case in DescribeCore - and a two-byte match is where the guessing goes wrong. An entity handle is the
+		// trap: `[0000c350][0002792a]` reads at offset 4 as length 0x0002 with payload `79 2a`, so 292 lines in one
+		// capture printed "y)" / "y+" / "y(" / "y*" - the low half of a Tortage handle, 0x79 being 'y' (#556).
+		//
+		// So a two-character run has to earn it: ALL of it must be letters or digits. That keeps the genuine short
+		// strings in the corpus ("jo" in channel chat, "en" the language code on LoginCharacter) and rejects the
+		// handle halves, which pair a letter with punctuation. It is not airtight - a handle CAN end in two letters -
+		// but the real fix for a message that matters is a case in DescribeCore, not a better guess here.
+		private const int UnambiguousLength = 3;
+
 		private static string PlainString(byte[] raw)
 		{
 			var best = "";
@@ -295,6 +307,12 @@ namespace Faolan.Importer.Cli
 				foreach (var b in candidate)
 				{
 					if (b is < 32 or > 126 && b != 9 && b != 10 && b != 13)
+					{
+						printable = false;
+						break;
+					}
+
+					if (n < UnambiguousLength && !char.IsAsciiLetterOrDigit((char)b))
 					{
 						printable = false;
 						break;

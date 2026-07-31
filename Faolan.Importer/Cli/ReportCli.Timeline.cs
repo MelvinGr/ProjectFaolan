@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Protobuf;
@@ -256,6 +257,14 @@ namespace Faolan.Importer.Cli
 				}
 				case "QuestJournalIIR":
 					return Journal(QuestJournalCodec.Parse(content), look);
+				case "KnubotAnswerIIR" or "KnubotAnswerListIIR" or "KnubotAppendTextIIR"
+					or "KnubotCloseChatWindowIIR" or "KnubotOpenChatWindowIIR":
+					return Dialogue(KnubotCodec.Parse(content), look, labels);
+				case "DispatchSetDialogueCamera":
+				{
+					var camera = SetDialogueCameraCodec.Parse(raw);
+					return $"{Ent(labels, camera.NpcHandle)} shot size {camera.Camera.ShotSize} type {camera.Camera.ShotType}";
+				}
 				case "QuestIIR":
 				{
 					var quest = QuestCodec.Parse(content);
@@ -332,6 +341,35 @@ namespace Faolan.Importer.Cli
 				}
 				default:
 					return look.Text(raw);
+			}
+		}
+
+		// One conversation message, through KnubotCodec - which NPC, and what was said or picked.
+		//
+		// ⚠️ These are the lines a reader of a quest capture actually wants, and they were the WORST served by the
+		// generic text scrape (#556): a Knubot body is [player][env][npc] followed by the payload, so the two bytes
+		// PlainString found were the low half of the NPC handle - every one of them printed as "y)" (0x27929 = Turach)
+		// rather than as dialogue. The answer list was worse still: it carries every option the player was offered and
+		// the scrape showed only the first, the same first-record-wins truncation the journal had (#557).
+		private static string Dialogue(KnubotIIR message, TimelineLookups look, Dictionary<uint, string> labels)
+		{
+			var who = Ent(labels, message.NpcHandle);
+			switch (message)
+			{
+				case KnubotAppendTextIIR text:
+					return $"{who}: {look.Text(text.Xml)}";
+				case KnubotAnswerListIIR answers:
+					return $"{who} offers {answers.Strings.Count}: "
+					       + string.Join(" | ", answers.Strings.Select(s => look.Text(s)));
+				case KnubotAnswerIIR answer:
+					return $"picks answer {answer.Index} to {who}";
+				case KnubotOpenChatWindowIIR:
+					return $"opens dialogue with {who}";
+				case KnubotCloseChatWindowIIR close:
+					return $"closes dialogue with {who}"
+					       + (close.Strings.Count > 0 ? ": " + string.Join(" | ", close.Strings.Select(s => look.Text(s))) : "");
+				default:
+					return who;
 			}
 		}
 
