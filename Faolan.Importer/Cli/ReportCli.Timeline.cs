@@ -132,11 +132,20 @@ namespace Faolan.Importer.Cli
 		// handle -> label. Entity handles are SESSION-VOLATILE, so they cannot be looked up; they are resolved through
 		// the capture itself, by matching a spawn body's POSITION against NpcSpawns/WorldObjects on this playfield.
 		//
-		// ⚠️ Three classes are excluded rather than matched, or they take the name of whatever they stood near:
-		// the player, summoned PETS (they follow the player - one matched a "Brutal Pirate" 22u away), and OTHER
+		// ⚠️ Five classes are excluded rather than matched, or they take the name of whatever they stood near:
+		// the player, summoned PETS (they follow the player - one matched a "Brutal Pirate" 22u away), OTHER
 		// PLAYERS (a character id is far above the entity-handle range; one standing inside 2u of a vendor came out
-		// labelled "Trader"). A non-exact match prints its distance, because an AMBUSH spawns where it was triggered
-		// rather than at its home point - the quarry Bat Demon appears 10u off its row, and that gap is evidence.
+		// labelled "Trader"), and LOOT BAGS + TOMBSTONES. The last two are dynamic in the same way: they spawn where
+		// something DIED or was dropped, so they can never have a WorldObjects row and the nearest static is simply
+		// whatever the fight happened to be near. 8 of the 9 in the necromancer play2 capture were wrong - a corpse
+		// bag labelled "Climbing Point (+19u)", a tombstone labelled "Genzio's House (+16u)" - and the only right one
+		// was the one with nothing inside 25u to steal a name from (#560). A bare handle is honest; a confident wrong
+		// name is not. (That also crossed entity CLASSES, LootBag 0xC87A taking a ClimbingDynel 0xC87D name; gating
+		// the match on class would need a class column on WorldObject, and with the dynamic types gone there is no
+		// observed case left that needs it.)
+		//
+		// A non-exact match prints its distance, because an AMBUSH spawns where it was triggered rather than at its
+		// home point - the quarry Bat Demon appears 10u off its row, and that gap is evidence.
 		private const uint CharacterIdFloor = 0x1000000;
 
 		private static Dictionary<uint, string> ResolveEntities(List<TimelineEvent> events, TimelineLookups look)
@@ -164,8 +173,8 @@ namespace Faolan.Importer.Cli
 			foreach (var e in events)
 			{
 				var isChar = e.Name is "SimpleCharFullUpdateIIR";
-				if (!isChar && e.Name is not ("SimpleDynelFullUpdateIIR" or "DoorFullUpdateIIR" or "LootBagFullUpdateIIR"
-					    or "TombStoneFullUpdateIIR" or "ClimbingDynelFullUpdateIIR"))
+				if (!isChar && e.Name is not ("SimpleDynelFullUpdateIIR" or "DoorFullUpdateIIR"
+					    or "ClimbingDynelFullUpdateIIR"))
 					continue;
 				if (e.Raw.Length < 16)
 					continue;
