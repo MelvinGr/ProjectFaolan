@@ -90,6 +90,9 @@ namespace Faolan.Importer.Extractors
 
 		// Dedup by (map, spawn point, identity); keep the first seen. Identity (the display_name) is part of the key
 		// because two distinct props can occupy the EXACT same coordinates (#222) - position alone would drop one.
+		// ⚠️ First-seen means ordinal CAPTURE FILENAME order, which is arbitrary for any field that changes during
+		// play: the same door is captured both closed and open, so which state ships is decided by file order rather
+		// than by the door (Gitea #554).
 		public static List<WorldObjectEntry> Merge(IEnumerable<WorldObjectEntry> all)
 		{
 			var seen = new Dictionary<(uint, float, float, float, string), WorldObjectEntry>();

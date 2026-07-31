@@ -87,8 +87,10 @@ namespace Faolan.Core.Database.Tables
 
 		// proto field 12. Nullable for the same reason as ShowPopupOnUse below: ABSENT and false are different bytes
 		// and the identity rebuild is byte-compared. Almost every captured door carries it explicitly, but the map
-		// 12040 "Wharf Door" omits it, and while the column was a plain bool that one row failed the all-or-nothing
-		// lift and would have shipped un-spawnable.
+		// 4020 "Wharf Door" omits it - it was standing OPEN when that packet was sent - and while the column was a
+		// plain bool that one record failed the all-or-nothing lift and would have shipped un-spawnable.
+		// ⚠️ It is the one identity field observed to CHANGE during play, so which state the importer stores is
+		// decided by capture filename order rather than by the door (Gitea #554).
 		public bool? IsClosed { get; set; }
 
 		// proto field 4 - "using this object opens a popup". Nullable because ABSENT and false are different bytes and
