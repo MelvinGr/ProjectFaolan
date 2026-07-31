@@ -139,8 +139,17 @@ namespace Faolan.Importer.Extractors
 			var screen = new List<byte[]>();
 			uint grant = 0; // a quest the server granted while collecting THIS screen's responses (0 = none)
 			var questsSeen = new HashSet<uint>(); // every quest whose full-update appeared earlier in THIS capture
-			uint currentQuest = 0; // the last quest whose full-update appeared (the active quest at any point in the capture)
-			uint instanceContext = 0; // currentQuest AT the active instance's greeting - the player's state when they talked
+			// The last quest whose full-update appeared - the active quest at any point in the capture.
+			//
+			// ⚠️ SEEDED from the capture's first quest JOURNAL, because a full-update only fires on a grant or a
+			// re-display: a capture that opens mid-chain has none for the quest the player is already on, so every
+			// greeting before the first grant used to read as context 0. That made 0 mean two different things -
+			// "no chain progress" and "we have not been told yet" - and the two collide (#526). The journal is the
+			// missing half: it is the whole J-panel, so its highlighted entry names the quest the player is on
+			// REGARDLESS of when the capture started. In the necromancer play2 capture the first journal arrives at
+			// 84.5s naming 12373, which is what the player was on for the two Turach greetings at 29.3s and 43.6s.
+			var currentQuest = InitialQuestContext(packets);
+			var instanceContext = currentQuest; // currentQuest AT the active instance's greeting - the player's state when they talked
 
 			foreach (var p in packets)
 			{
@@ -363,6 +372,43 @@ namespace Faolan.Importer.Extractors
 			}
 
 			return names;
+		}
+
+		// The quest the player was already on when the capture STARTED, from the first QuestJournalIIR in it.
+		//
+		// The journal is re-sent whole on every change and its trailing block names one quest again - in every capture
+		// the entry that was just accepted or advanced (QuestJournalCodec). At the FIRST journal of a capture that is
+		// the quest the player was carrying before we started watching, which is exactly the context a pre-grant
+		// greeting needs. 0 when the capture holds no journal, or none that parses - the honest answer there is still
+		// "we do not know", and the caller treats 0 as the unconditional fallback.
+		//
+		// A journal that fails to parse is skipped rather than fatal: this is a context HINT for grouping, and a
+		// capture whose journal we cannot read must still contribute its dialogue.
+		private static uint InitialQuestContext(IReadOnlyList<CapturedPacket> packets)
+		{
+			foreach (var p in packets)
+			{
+				if (p is not { IsDownload: true, IsIirCarrier: true, SubOpcode: QuestJournalCodec.Opcode })
+					continue;
+
+				try
+				{
+					var journal = QuestJournalCodec.Parse(p.Record);
+					if (journal.Current.QuestId != 0)
+						return journal.Current.QuestId;
+
+					// A one-quest journal carries (0, 0, [], 0) in the trailing block, so fall back to the single entry
+					// the area block does hold.
+					var only = journal.Area.Entries;
+					return only.Count > 0 ? only[^1].QuestId : 0;
+				}
+				catch (CodecParseException)
+				{
+					return 0;
+				}
+			}
+
+			return 0;
 		}
 
 		// Merges screens from many captures/instances, deduped by (NpcName, TypeId, AnswerPath) - the stable branch
