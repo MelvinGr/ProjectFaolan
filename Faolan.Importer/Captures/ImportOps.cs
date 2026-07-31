@@ -1044,13 +1044,16 @@ namespace Faolan.Importer.Captures
 					g.Extra5 = hg.Extra5;
 					g.Extra6 = hg.Extra6;
 
-					// The marker block describes the primary goal only (QuestDefinitionExtractor.UpsertGoal).
-					if (hg.Partial)
-						continue;
-
-					g.MapId = hg.MapId;
-					g.MarkerX = hg.MarkerX;
-					g.MarkerY = hg.MarkerY;
+					// EVERY goal carries its own map pin (#540). "The marker block describes the primary goal only" was
+					// an artefact of the old byte scan, which could see just the one block sitting before the first
+					// objective record - so every secondary goal was persisted with no pin at all. A goal the wire pins
+					// nowhere (quest 19314's twelve read 0/0/0) keeps whatever a snapshot already gave it.
+					if (hg.MapId is > 0 || hg.MarkerX is > 0 || hg.MarkerY is > 0)
+					{
+						g.MapId = hg.MapId;
+						g.MarkerX = hg.MarkerX;
+						g.MarkerY = hg.MarkerY;
+					}
 				}
 
 				updated++;

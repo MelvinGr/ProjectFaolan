@@ -2,7 +2,6 @@ using Faolan.Core.Crypt;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -36,16 +35,10 @@ namespace Faolan.Importer.Extractors
 
 				if (p.SubOpcode == QuestFullUpdateCodec.Opcode)
 				{
-					var body = p.Body;
-					if (body.Length >= 24)
-					{
-						// The codec's own decode rides ALONGSIDE the scan below rather than replacing it (#540 is still
-						// open): it is what the goals' reserved words are lifted from, and it is null only for a body the
-						// capture cut short.
-						MergeFullUpdate(body, p.TryParse(QuestFullUpdateCodec.Parse, out var full)
-							? full.Record
-							: null, byQuest);
-					}
+					// TryParse is false only for a body the capture cut short - there is no scan to fall back on any
+					// more, so such a packet contributes nothing rather than a half-read definition (#540).
+					if (p.TryParse(QuestFullUpdateCodec.Parse, out var full))
+						MergeFullUpdate(full.Record, byQuest);
 				}
 				else if (p.SubOpcode == QuestJournalCodec.Opcode)
 				{
@@ -100,82 +93,92 @@ namespace Faolan.Importer.Extractors
 
 
 
-		// ⚠️ STILL a parallel decoder of a body `QuestFullUpdateCodec` already parses - the one #530 §9 C case wave 8
-		// did not close. It scans the body for `<remoteformat>`/`<localized>` records and reads the level word and the
-		// marker block at offsets RELATIVE to where the primary objective record landed. The codec models the
-		// full-update as a `QuestcRecord`, which carries the title/summary/area/region strings but NOT the per-goal
-		// 50304 objective list, the level word or the marker block - naming those on the record is DECODE, which this
-		// refactor does not do. Tracked in Gitea #540.
-		private static void MergeFullUpdate(byte[] body, QuestcRecord? record, Dictionary<uint, QuestDefinition> byQuest)
+		// Reads the full-update ENTIRELY off `QuestFullUpdateCodec`'s `QuestcRecord` (#540). It used to scan the raw
+		// body for `<remoteformat>`/`<localized>` records and read the level word and the marker block at offsets
+		// RELATIVE to where the primary objective record landed, alongside the codec's own parse of the same bytes.
+		// Every value the scan derived was proven identical to the record's over all 74 captured full-updates before
+		// the scan went - EXCEPT the markers, which the scan got WRONG (see below).
+		//
+		// ⚠️ The level is the record's `state` slot: with the `[u32 len]` prefix `CapturedPacket.Body` keeps, the
+		// scan's `body[33..37]` is `state`, not `Field114` (which is 0 on every captured full-update).
+		private static void MergeFullUpdate(QuestcRecord record, Dictionary<uint, QuestDefinition> byQuest)
 		{
-			// content @16: [00000000][01][u32 questId]...
-			var questId = body.ReadU32Be(21);
-			var records = Records(body, 16).ToList();
-
 			// A full-update carries ONE 50304 objective record PER GOAL, in goal order - reading only the first is how
 			// two-goal quests came to look like one-goal quests (12369 dropped 7134, 10287 dropped 7363; the corpus
-			// also has a three-goal quest, 6499/6514/6515). The first is the PRIMARY goal, which owns the marker block.
-			var objectives = records.Where(r => r is { Tag: "remoteformat", Category: 50304 }).ToList();
-			var objective = objectives.FirstOrDefault();
-			var objectiveLocalized = records.FirstOrDefault(r => r.Tag == "localized");
-			var title = records.FirstOrDefault(r => r.Category == 50301);
-			var summary = records.FirstOrDefault(r => r.Category == 50302);
-			var areaTitle = records.FirstOrDefault(r => r.Category == 50300);
-			var region52000 = records.Where(r => r.Category == 52000).ToList();
+			// also has a three-goal quest, 6499/6514/6515, and a twelve-goal one, 19314).
+			var goals = record.Objectives?.Goals ?? [];
+			var title = TextRef(record.Title);
+			var areaTitle = TextRef(record.Area);
+			var objective = goals.Count > 0
+				? TextRef(goals[0].Objective)
+				: null;
+
 			if (title == null || areaTitle == null || objective == null)
 				return; // not a well-formed full-update
 
-			var def = GetOrAdd(byQuest, questId);
-			def.AreaId = areaTitle.Id;
+			var def = GetOrAdd(byQuest, record.QuestId);
+			def.AreaId = record.AreaId;
 			def.GoalId = objective.Id;
+			def.Level = record.State;
 
-			// The per-quest LEVEL word sits after the second questId: with the [u32 len] prefix InnerBody keeps, that is
-			// body[33..37] (subop 4, ack 4, player 4, [len 4] all counted). Harvested straight off the wire, see
-			// QuestDefinition.Level (the values track quest level, not the seeded Level).
-			if (body.Length >= 37)
-				def.Level = body.ReadU32Be(33);
-
-			// The two 52000 refs are region (smaller id, e.g. 4) then map (the map id). Map id also gates the marker.
-			var region = region52000.OrderBy(r => r.Id).FirstOrDefault();
-			var map = region52000.OrderByDescending(r => r.Id).FirstOrDefault();
+			var (region, map) = RegionAndMap(record);
 			if (map != null)
-			{
 				def.MapId = map.Id;
-				// Marker block sits right before the objective record: [mapId][markerX][markerY] then 10 zero bytes.
-				var mx = objective.Offset - 18;
-				if (mx >= 0 && body.ReadU32Be(objective.Offset - 22) == map.Id)
-				{
-					def.MarkerX = body.ReadU32Be(objective.Offset - 18);
-					def.MarkerY = body.ReadU32Be(objective.Offset - 14);
-				}
-			}
+
+			// The definition's marker is the PRIMARY goal's - the quest pin, not a per-goal one.
+			def.MarkerX = goals[0].MarkerX;
+			def.MarkerY = goals[0].MarkerY;
 
 			SetRef(def, QuestTextSlot.Title, title);
-			SetRef(def, QuestTextSlot.Summary, summary);
+			SetRef(def, QuestTextSlot.Summary, TextRef(record.Summary));
 			SetRef(def, QuestTextSlot.AreaTitle, areaTitle);
 			SetRef(def, QuestTextSlot.RegionName, region);
 			SetRef(def, QuestTextSlot.MapName, map);
 			SetRef(def, QuestTextSlot.Objective, objective);
-			SetRef(def, QuestTextSlot.ObjectiveLocalized, objectiveLocalized);
+			SetRef(def, QuestTextSlot.ObjectiveLocalized, goals.Select(g => TextRef(g.TextRecord)).FirstOrDefault(r => r is { Tag: "localized" }));
 
-			// Emit the quest's PRIMARY goal as a QuestGoalDefinition from the just-decoded objective + marker block -
-			// real per-quest map/marker/objective-ref, not a hardcoded seed. The importer's Seed* overlays later
-			// find-or-create by GoalId, so this completes with the server-side-only fields (TargetName/GoalType/
-			// QuestItemId) and any multi-goal @609 detail rather than being duplicated. This is the goal the wire
-			// carries; a quest's non-primary goals only appear in the @609 snapshot region (seeded where captured).
-			for (var i = 0; i < objectives.Count; i++)
-				UpsertGoal(def, objectives[i].Id, def.MapId, def.MarkerX, def.MarkerY, objectives[i], (uint)(i + 1), i > 0);
-
-			// The goal's reserved words - two (marker, random 4-character tag) pairs, see QuestObjectiveGoal.Reserved -
-			// come off the CODEC's decode of the same body, not the scan. They are the goal's own data and cannot be
-			// derived, so a quest the captures only ever full-updated (no snapshot journal, where ObjectiveGoalExtractor
-			// harvests them) would otherwise carry zeros - and the live sender used to fill the [5..6] pair with a clock
-			// reading instead, which retail never sends (#537).
-			foreach (var g in record?.Objectives?.Goals ?? [])
+			// Emit each goal as a QuestGoalDefinition from its own objective record - real per-goal map/marker/
+			// objective-ref, not a hardcoded seed. The importer's Seed* overlays later find-or-create by GoalId, so
+			// this completes with the server-side-only fields (TargetName/GoalType/QuestItemId) rather than
+			// duplicating them.
+			//
+			// ⚠️ EVERY goal carries its OWN map pin, which the byte scan could not see: it read one marker block, the
+			// one sitting before the first objective record, and gave it to the primary goal only. Quest 10238's two
+			// goals are pinned at (416,701) and (521,757), 12369's at (524,755) and (574,944), 14020's three all
+			// differently - so every secondary goal in the DB carried no pin at all. The scan also DISCARDED the
+			// primary's pin whenever the goal's map differed from the quest's, because it gated the block on the
+			// quest's 52000 map id: quest 10287's goal 400 is on map 4020 while the quest reads 4010, so its
+			// (933,715) was thrown away.
+			for (var i = 0; i < goals.Count; i++)
 			{
-				if (g.Reserved.Length == ReservedWords && def.Goals.FirstOrDefault(x => x.GoalId == g.GoalId) is { } row)
-					SetReserved(row, g.Reserved);
+				var goal = goals[i];
+				if (TextRef(goal.Objective) is not { } text)
+					continue;
+
+				// The goal's reserved words - up to three (marker, identity) reference slots, see
+				// QuestObjectiveGoal.Reserved and #546. They are the goal's own data and cannot be derived, so a quest
+				// the captures only ever full-updated (no snapshot journal, where ObjectiveGoalExtractor harvests them)
+				// would otherwise carry zeros - and the live sender used to fill the [5..6] slot with a clock reading
+				// instead, which retail never sends (#537).
+				var row = UpsertGoal(def, text.Id, goal.MapId, goal.MarkerX, goal.MarkerY, text, (uint)(i + 1), i > 0);
+				if (goal.Reserved.Length == ReservedWords)
+					SetReserved(row, goal.Reserved);
 			}
+		}
+
+		// A Quest_c record's two category-52000 refs are region (the smaller id, e.g. 4) and map (the map id). Told
+		// apart by id rather than by position, so the full-update and the snapshot journal agree. MapId matters beyond
+		// the text: it is an FK to Maps, and the quests module SKIPS any definition whose map is not in the catalog.
+		private static (TextRecord? Region, TextRecord? Map) RegionAndMap(QuestcRecord record)
+		{
+			var r1 = TextRef(record.Region1);
+			var r2 = TextRef(record.Region2);
+			if (r1 == null || r2 == null)
+				return (r1 ?? r2, null);
+
+			return r1.Id <= r2.Id
+				? (r1, r2)
+				: (r2, r1);
 		}
 
 		private const int ReservedWords = 7;
@@ -239,22 +242,7 @@ namespace Faolan.Importer.Extractors
 			def.SnapshotUnknownF8 = record.FieldF8;
 			def.SnapshotUnknown28 = record.Field28;
 
-			// The record's two category-52000 refs are region and map. They are told apart by id exactly as
-			// MergeFullUpdate does it - smaller = region, larger = the map id - rather than by their position in the
-			// record, so both sources agree. MapId matters beyond the text: it is an FK to Maps, and the quests module
-			// SKIPS any definition whose map is not in the catalog.
-			var r1 = TextRef(record.Region1);
-			var r2 = TextRef(record.Region2);
-			var region = r1 != null && r2 != null
-				? r1.Id <= r2.Id
-					? r1
-					: r2
-				: r1 ?? r2;
-			var map = r1 != null && r2 != null
-				? r1.Id > r2.Id
-					? r1
-					: r2
-				: null;
+			var (region, map) = RegionAndMap(record);
 
 			SetRef(def, QuestTextSlot.Title, title);
 			SetRef(def, QuestTextSlot.Summary, TextRef(record.Summary));
@@ -263,41 +251,6 @@ namespace Faolan.Importer.Extractors
 			SetRef(def, QuestTextSlot.MapName, map);
 			if (map != null && def.MapId == 0)
 				def.MapId = map.Id;
-		}
-
-		// A <remoteformat>/<localized> slot: 00 <u8 len> <ascii xml>. Returns null if no record starts at off.
-		private static TextRecord? ReadRecord(byte[] b, int off)
-		{
-			if (off + 2 > b.Length || b[off] != 0x00 || b[off + 2] != (byte)'<')
-				return null;
-
-			int len = b[off + 1];
-			if (off + 2 + len > b.Length || b[off + 2 + len - 1] != (byte)'>')
-				return null;
-
-			var xml = Encoding.ASCII.GetString(b, off + 2, len);
-			var tag = xml.Substring(1, xml.IndexOf(' ') - 1);
-			var id = AttrUInt(xml, "id");
-			var cat = AttrUInt(xml, "category");
-			var key = Attr(xml, "key");
-			var flags = Attr(xml, "flags");
-			return new TextRecord(off, 2 + len, tag, id, cat, key!, flags!);
-		}
-
-		private static IEnumerable<TextRecord> Records(byte[] b, int from)
-		{
-			for (var off = from; off + 2 <= b.Length;)
-			{
-				var rec = ReadRecord(b, off);
-				if (rec != null)
-				{
-					yield return rec;
-
-					off += rec.Length;
-				}
-				else
-					off++;
-			}
 		}
 
 		private static void SetRef(QuestDefinition def, QuestTextSlot slot, TextRecord? rec)
@@ -331,7 +284,7 @@ namespace Faolan.Importer.Extractors
 			var key = Attr(xml, "key");
 			return key == null
 				? null
-				: new TextRecord(0, xml.Length, xml.Contains("<localized", StringComparison.Ordinal)
+				: new TextRecord(xml.Contains("<localized", StringComparison.Ordinal)
 					? "localized"
 					: "remoteformat", AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags")!);
 		}
@@ -343,7 +296,7 @@ namespace Faolan.Importer.Extractors
 		// after the first: the packet's marker block describes the PRIMARY goal only, so a secondary goal is recovered
 		// with its identity and objective text but no verb, target or count (see QuestGoalDefinition.Partial). A goal
 		// the snapshot already supplied in full is never downgraded - Partial only ever goes false here.
-		private static void UpsertGoal(QuestDefinition def, uint goalId, uint mapId, uint markerX, uint markerY, TextRecord objective, uint sequence = 1, bool partial = false)
+		private static QuestGoalDefinition UpsertGoal(QuestDefinition def, uint goalId, uint mapId, uint markerX, uint markerY, TextRecord objective, uint sequence = 1, bool partial = false)
 		{
 			var goal = def.Goals.FirstOrDefault(g => g.GoalId == goalId);
 			if (goal == null)
@@ -365,16 +318,18 @@ namespace Faolan.Importer.Extractors
 			goal.ObjectiveCategory = objective.Category;
 			goal.ObjectiveKey = LdbKey.Decode(objective.Key) ?? new();
 
-			// The marker block belongs to the primary goal; attaching it to a secondary would place its map pin on the
-			// wrong objective.
-			if (partial)
-				return;
+			// Every goal has its own pin, so a secondary one is set too - see the ⚠️ in MergeFullUpdate. A goal the
+			// wire pins nowhere (quest 19314's twelve all read 0/0/0) keeps whatever a snapshot already gave it.
+			if (mapId != 0 || markerX != 0 || markerY != 0)
+			{
+				goal.MapId = mapId;
+				goal.MarkerX = markerX;
+				goal.MarkerY = markerY;
+			}
 
-			goal.MapId = mapId;
-			goal.MarkerX = markerX;
-			goal.MarkerY = markerY;
+			return goal;
 		}
 
-		private sealed record TextRecord(int Offset, int Length, string Tag, uint Id, uint Category, string Key, string Flags);
+		private sealed record TextRecord(string Tag, uint Id, uint Category, string Key, string Flags);
 	}
 }
