@@ -254,6 +254,8 @@ namespace Faolan.Importer.Cli
 					var goal = QuestGoalCodec.Parse(content);
 					return $"quest {goal.QuestId} goal {goal.GoalId} -> {goal.Update}";
 				}
+				case "QuestJournalIIR":
+					return Journal(QuestJournalCodec.Parse(content), look);
 				case "QuestIIR":
 				{
 					var quest = QuestCodec.Parse(content);
@@ -331,6 +333,37 @@ namespace Faolan.Importer.Cli
 				default:
 					return look.Text(raw);
 			}
+		}
+
+		// The whole J-panel journal, through QuestJournalCodec.
+		//
+		// ⚠️ This line used to fall through to the generic `look.Text(raw)`, which matches the FIRST <remoteformat> tag
+		// in a body and stops - so all four journals in the necromancer play2 capture printed the same thing, the
+		// container title "[Destiny 01] Shipwrecked", while 10 to 16 records per message were dropped in silence
+		// (#557). A journal carries three header strings plus TWO per quest (title cat 50301, sub-line cat 50303) plus
+		// two more for the highlighted entry, and it is re-sent whole on every change, so it grows as the chain
+		// advances: 11 records at frame 875, 17 by frame 6115.
+		//
+		// The sub-line is deliberately NOT printed. It is the multi-sentence objective blurb, and six of them would
+		// bury the line the reader came for; the title is what identifies a quest. `>` marks the entry the journal
+		// highlights - the quest just accepted or advanced.
+		private static string Journal(QuestJournalIIR journal, TimelineLookups look)
+		{
+			var areas = new List<QuestJournalArea>(1 + journal.MoreAreas.Count) { journal.Area };
+			areas.AddRange(journal.MoreAreas);
+
+			var parts = new List<string>();
+			foreach (var area in areas)
+			{
+				var where = string.Join(", ", new[] { look.Line(area.MapName), look.Line(area.RegionName) }
+					.Where(s => s.Length > 0).Distinct());
+				var entries = area.Entries.Select(e =>
+					(e.QuestId == journal.Current.QuestId ? ">" : "") + $"{e.QuestId} \"{look.Line(e.Title)}\"");
+				parts.Add($"\"{look.Line(area.AreaTitle)}\"" + (where.Length > 0 ? $" ({where})" : "")
+				          + $" {area.Entries.Count} quest(s): " + string.Join(", ", entries));
+			}
+
+			return string.Join(" | ", parts);
 		}
 
 		// The stat delta and its cause, through StatDamageCodec - now by NAME rather than by index into a bag of

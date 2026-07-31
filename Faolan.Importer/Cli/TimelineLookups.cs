@@ -226,27 +226,52 @@ namespace Faolan.Importer.Cli
 		// references it, so a capture is self-sufficient - including for screens our own tables have never captured.
 		public string Text(byte[] raw)
 		{
-			var ascii = Encoding.Latin1.GetString(raw);
-			var tag = RemoteFormatTag.Match(ascii);
-			if (tag.Success)
-			{
-				var attrs = Attribute.Matches(tag.Groups[1].Value)
-					.ToDictionary(m => m.Groups[1].Value, m => WebUtility.HtmlDecode(m.Groups[2].Value));
-				if (attrs.TryGetValue("token", out var token))
-					return $"token \"{token}\"" + (attrs.TryGetValue("category", out var tc) ? $" (cat {tc})" : "");
+			var tag = RemoteFormatTag.Match(Encoding.Latin1.GetString(raw));
+			if (!tag.Success)
+				return PlainString(raw);
 
-				if (attrs.TryGetValue("id", out var idText) && attrs.TryGetValue("category", out var catText)
-				    && uint.TryParse(idText, out var id) && uint.TryParse(catText, out var category))
-				{
-					if (attrs.TryGetValue("key", out var key) && _ciphertext.TryGetValue((category, id), out var blob)
-					    && LdbKey.Decode(key) is { } decoded && LdbKey.Decrypt(blob, decoded) is { } plain)
-						return $"\"{Flatten(plain)}\"";
+			var (text, literal) = Resolve(tag);
+			return text.Length == 0 ? PlainString(raw)
+				: literal ? $"\"{text}\""
+				: text;
+		}
 
-					return $"LDB[{category}][{id}]";
-				}
-			}
+		// The resolved text of ONE `<remoteformat>` string that is already a string rather than a packet body - a quest
+		// journal carries a dozen of them as wire strings inside the record, and each one references its own LDB line
+		// with its own key. Unquoted, so a caller can compose several into one line. A string with no tag comes back
+		// unchanged: journal fields are occasionally plain text rather than a reference.
+		public string Line(string remoteFormat)
+		{
+			if (string.IsNullOrEmpty(remoteFormat))
+				return "";
 
-			return PlainString(raw);
+			var tag = RemoteFormatTag.Match(remoteFormat);
+			if (!tag.Success)
+				return Flatten(remoteFormat);
+
+			var (text, _) = Resolve(tag);
+			return text.Length == 0 ? Flatten(remoteFormat) : text;
+		}
+
+		// The content a `<remoteformat>` tag points at. `Literal` distinguishes the real LDB line (decrypted, and worth
+		// quoting) from a stand-in for one we cannot produce - a `token "..."` reference, or `LDB[cat][id]` when the
+		// client pages hold no ciphertext for it or the wire carried no key.
+		private (string Text, bool Literal) Resolve(Match tag)
+		{
+			var attrs = Attribute.Matches(tag.Groups[1].Value)
+				.ToDictionary(m => m.Groups[1].Value, m => WebUtility.HtmlDecode(m.Groups[2].Value));
+			if (attrs.TryGetValue("token", out var token))
+				return ($"token \"{token}\"" + (attrs.TryGetValue("category", out var tc) ? $" (cat {tc})" : ""), false);
+
+			if (!attrs.TryGetValue("id", out var idText) || !attrs.TryGetValue("category", out var catText)
+			    || !uint.TryParse(idText, out var id) || !uint.TryParse(catText, out var category))
+				return ("", false);
+
+			if (attrs.TryGetValue("key", out var key) && _ciphertext.TryGetValue((category, id), out var blob)
+			    && LdbKey.Decode(key) is { } decoded && LdbKey.Decrypt(blob, decoded) is { } plain)
+				return (Flatten(plain), true);
+
+			return ($"LDB[{category}][{id}]", false);
 		}
 
 		private static string Flatten(string text)
