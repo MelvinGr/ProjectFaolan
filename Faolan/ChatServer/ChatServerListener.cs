@@ -102,8 +102,9 @@ namespace Faolan.ChatServer
 					if (Configuration.McpEnabled)
 						await SendChannelSubscription(client, ClaudeChannel.ChannelType, ClaudeChannel.ChannelId, ClaudeChannel.ChannelName, ClaudeChannel.ChannelFlag);
 
-					// An empty-bodied 0x0005 beat retail sends here; the method it names isn't recovered yet.
-					await client.SendAsync(new ChatServerMessage(0x0005));
+					// The empty-bodied answer to Hello. Named HelloAck in #532 - from position, since an empty body
+					// gives nothing else to go on, but the position is invariant across all 41 captures.
+					await client.SendAsync(new ChatServerMessage((ushort)ChatServerInterfaceOpcodes.HelloAck));
 
 					var character = client.Session.Character!;
 					await client.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(character.Id, character.Name?.Length > 0
