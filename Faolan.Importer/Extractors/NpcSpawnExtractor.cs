@@ -143,40 +143,8 @@ namespace Faolan.Importer.Extractors
 
 		// The entity name is a `0A <len> <utf8>` field whose offset varies; scan past the position block for the
 		// first plausible printable-ASCII run. Best-effort (display only - not the dedup key).
-		private static string ExtractName(byte[] body)
-		{
-			for (var i = 40; i + 2 < body.Length; i++)
-			{
-				if (body[i] != 0x0A)
-					continue;
-
-				int len = body[i + 1];
-				if (len < 2 || len > 40 || i + 2 + len > body.Length)
-					continue;
-
-				var slice = body.AsSpan(i + 2, len);
-				if (IsPrintableName(slice))
-					return Encoding.ASCII.GetString(slice);
-			}
-
-			return string.Empty;
-		}
 
 
-		private static bool IsPrintableName(ReadOnlySpan<byte> s)
-		{
-			var hasLetter = false;
-			foreach (var c in s)
-			{
-				if (c < 32 || c > 126)
-					return false;
-
-				if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
-					hasLetter = true;
-			}
-
-			return hasLetter;
-		}
 
 		// Decodes the CharacterIIR (ProtoCoreCharacterIIR) and lifts the NPC identity/appearance. Returns an empty
 		// entry (all defaults) if the body has no decodable IIR - the offset-based transform/name path still works.
@@ -260,7 +228,7 @@ namespace Faolan.Importer.Extractors
 			var identity = LiftIdentity(body);
 			var name = !string.IsNullOrEmpty(identity.Name)
 				? identity.Name
-				: ExtractName(body);
+				: SpawnNameScan.Plausible(body);
 
 			// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals. The clean shape
 			// decodes directly; a mid-session humanoid capture carries the SAME table behind a runtime record1, lifted

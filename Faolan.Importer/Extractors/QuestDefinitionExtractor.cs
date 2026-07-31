@@ -19,9 +19,6 @@ namespace Faolan.Importer.Extractors
 	// sub-line (category 50303) - so we merge them by quest id.
 	public static class QuestDefinitionExtractor
 	{
-		private const uint FullUpdateSubOpcode = (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR;
-		private const uint JournalSubOpcode = (uint)GameServer0X2000Opcodes.QuestJournalIIR;
-
 		public static List<QuestDefinition> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var byQuest = new Dictionary<uint, QuestDefinition>();
@@ -31,14 +28,17 @@ namespace Faolan.Importer.Extractors
 				if (!p.IsDownload)
 					continue;
 
-				var body = InnerBody(p.Bytes);
-				if (body == null || body.Length < 24)
-					continue;
-
-				if (p.SubOpcode == FullUpdateSubOpcode)
-					MergeFullUpdate(body, byQuest);
-				else if (p.SubOpcode == JournalSubOpcode)
-					MergeJournal(body, byQuest);
+				if (p.SubOpcode == QuestFullUpdateCodec.Opcode)
+				{
+					var body = p.Body;
+					if (body.Length >= 24)
+						MergeFullUpdate(body, byQuest);
+				}
+				else if (p.SubOpcode == QuestJournalCodec.Opcode)
+				{
+					if (p.TryParse(QuestJournalCodec.Parse, out var list))
+						MergeJournal(list, byQuest);
+				}
 				else if (SnapshotJournalReader.TryRead(p.Bytes, out _, out var journal))
 				{
 					foreach (var record in journal)
@@ -79,40 +79,14 @@ namespace Faolan.Importer.Extractors
 			return def;
 		}
 
-		private static int IndexOf(byte[] haystack, byte[] needle, int from)
-		{
-			for (var i = from; i <= haystack.Length - needle.Length; i++)
-			{
-				var ok = true;
-				for (var j = 0; j < needle.Length; j++)
-				{
-					if (haystack[i + j] != needle[j])
-					{
-						ok = false;
-						break;
-					}
-				}
 
-				if (ok)
-					return i;
-			}
 
-			return -1;
-		}
-
-		// Bytes = [..8..][u32 headerLen][header][body]; body = [u32 len][u32 subop][u32 ack][u32 player][record area...].
-		private static byte[]? InnerBody(byte[] bytes)
-		{
-			if (bytes == null || bytes.Length < 12)
-				return null;
-
-			var headerLen = (int)bytes.ReadU32Be(8);
-			var start = 12 + headerLen;
-			return start < bytes.Length
-				? bytes[start..]
-				: null;
-		}
-
+		// ⚠️ STILL a parallel decoder of a body `QuestFullUpdateCodec` already parses - the one #530 §9 C case wave 8
+		// did not close. It scans the body for `<remoteformat>`/`<localized>` records and reads the level word and the
+		// marker block at offsets RELATIVE to where the primary objective record landed. The codec models the
+		// full-update as a `QuestcRecord`, which carries the title/summary/area/region strings but NOT the per-goal
+		// 50304 objective list, the level word or the marker block - naming those on the record is DECODE, which this
+		// refactor does not do. Tracked in Gitea #540.
 		private static void MergeFullUpdate(byte[] body, Dictionary<uint, QuestDefinition> byQuest)
 		{
 			// content @16: [00000000][01][u32 questId]...
@@ -174,37 +148,13 @@ namespace Faolan.Importer.Extractors
 				UpsertGoal(def, objectives[i].Id, def.MapId, def.MarkerX, def.MarkerY, objectives[i], (uint)(i + 1), i > 0);
 		}
 
-		private static void MergeJournal(byte[] body, Dictionary<uint, QuestDefinition> byQuest)
+		// The journal LIST (0x79f8c7a1) carries the one slot a full-update does not: the panel's per-quest sub-line
+		// (category 50303). The RRL3 scan + per-entry offset walk this used to do is QuestJournalCodec's grammar.
+		private static void MergeJournal(QuestJournalIIR list, Dictionary<uint, QuestDefinition> byQuest)
 		{
-			// ...[RRL3][00000000][u32 count] then per entry [u32 idx][u32 questId][u32 chapter] <title> <subLine>.
-			var magic = Encoding.ASCII.GetBytes("RRL3");
-			var idx = IndexOf(body, magic, 16);
-			if (idx < 0)
-				return;
-
-			var off = idx + 4 + 4; // skip RRL3 + 00000000
-			if (off + 4 > body.Length)
-				return;
-
-			var count = body.ReadU32Be(off);
-			off += 4;
-
-			for (uint i = 0; i < count && off + 12 <= body.Length; i++)
+			foreach (var entry in list.Entries)
 			{
-				var questId = body.ReadU32Be(off + 4);
-				off += 12; // idx + questId + chapter
-				var title = ReadRecord(body, off);
-				if (title == null)
-					break;
-
-				off += title.Length;
-				var subLine = ReadRecord(body, off);
-				if (subLine == null)
-					break;
-
-				off += subLine.Length;
-
-				if (subLine.Category == 50303 && byQuest.TryGetValue(questId, out var def))
+				if (TextRef(entry.SubLine) is { Category: 50303 } subLine && byQuest.TryGetValue(entry.QuestId, out var def))
 					SetRef(def, QuestTextSlot.ListSubLine, subLine);
 			}
 		}

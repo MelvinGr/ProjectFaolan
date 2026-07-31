@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
@@ -24,6 +25,35 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// (0, seconds); that is what retail's own bytes are compared against by the goldens, so it is left alone here
 		// and tracked as a decode/behaviour gap rather than "fixed" inside a refactor.
 		public const ulong SnapshotQuestAcceptTime = 0x000111D354375554UL;
+
+		// The quest a full-update record is ABOUT, without decoding the record around it.
+		//
+		// A named read of the record's own key word - the `PlayfieldTokenScan` / `BehaviorTailScan` shape - for the
+		// capture sweep that only wants to know WHICH quest a grant signal names. `QuestFullUpdateCodec.Parse` is the
+		// right call when the caller wants the journal content; gating a grant signal on the whole Quest_c record
+		// decoding would drop the signal for any record shape the grammar cannot yet account for, which is a
+		// harvesting loss rather than a decode result.
+		//
+		// Reads sequentially and stops at the key word, so there are no offsets: the head is
+		// `[subop][class][handle][reserved][0x01]` and `QuestcRecord` opens with its listKey, which IS the quest id
+		// (QuestcRecordCodec asserts the two agree).
+		public static bool TryReadQuestId(ReadOnlySpan<byte> record, out uint questId)
+		{
+			questId = 0;
+			try
+			{
+				var r = new SpanReader(record, nameof(QuestFullUpdates));
+				r.ExpectU32Be(QuestFullUpdateCodec.Opcode, "QuestFullUpdateIIR subop");
+				r.Skip(sizeof(uint) + sizeof(uint) + sizeof(uint)); // entity class, player handle, reserved word
+				r.ExpectU8(0x01, "record marker");
+				questId = r.ReadU32Be();
+				return true;
+			}
+			catch (CodecParseException)
+			{
+				return false;
+			}
+		}
 
 		private const uint LiveField118 = 3;
 		private const uint LiveField28 = 0x50;

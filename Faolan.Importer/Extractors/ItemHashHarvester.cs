@@ -24,15 +24,12 @@ namespace Faolan.Importer.Extractors
 	// Data/archive/captured-items.tsv and imported into the `Items` table. See docs/re/spawn-dissection.md Phase 5.
 	public static class ItemHashHarvester
 	{
-		private const uint BankIirSubOpcode = (uint)GameServer0X2000Opcodes.BankIIR; // 0x0BA1C1CB - same framing
-
 		// The container an item was captured in IS its kind: ItemType's values are the same protocol container-kind
 		// numbers as ContainerKind (Bag=Normal 104 / Resource 112 / Quest 113), so those map straight. EXCEPT the
 		// equipped container (101): that is a LOCATION, not an item class - worn gear is ordinary Normal loot - so it
 		// folds into Normal, keeping the catalog to the three real item classes (the routing hint that keeps quest/
 		// resource items out of random loot).
 		private const uint EquippedContainerKind = 101;
-		private const uint InventorySubOpcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
 
 		// Parses one on-wire packet and merges every (templateId -> CapturedItem) it can recover - from an inventory
 		// snapshot's containers AND/OR a character spawn's worn equipment - into `into`. Conflicting identities for the
@@ -165,17 +162,21 @@ namespace Faolan.Importer.Extractors
 		private static void ExtractFromAddItem(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IDictionary<uint, ItemType>? types)
 		{
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != 0x2020)
+			if (packet.Opcode != AddItemCodec.Opcode)
 				return;
 
-			var body = packet.BodyReader();
-			var containerType = body.ReadUInt32();
-			body.ReadUInt32(); // charId
-			body.ReadUInt32(); // itemPos
-			var entryBytes = body.ReadArrayUInt32Length();
+			AddItem add;
+			try
+			{
+				add = AddItemCodec.Parse(packet.BodyReader().ReadRemainingArray());
+			}
+			catch (CodecParseException)
+			{
+				return; // another method sharing the 0x2020 index on a different interface
+			}
 
-			var entry = Serializer.Deserialize<ProtoInventoryGameEntry>(entryBytes.AsMemory());
-			var acg = entry?.ItemData;
+			var containerType = (uint)add.Container;
+			var acg = add.Entry?.ItemData;
 			if (acg?.Key1 == null || acg.Template1 == 0)
 				return;
 
@@ -199,17 +200,21 @@ namespace Faolan.Importer.Extractors
 			if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 				return;
 
-			var body = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());
-			if (body.ReadUInt32() != BankIirSubOpcode)
+			var record = packet.BodyReader().ReadArrayUInt32Length();
+			if (record.Length < 4 || record.ReadU32Be(0) != BankCodec.Opcode)
 				return;
 
-			body.ReadUInt32(); // c350
-			body.ReadUInt32(); // instance
-			body.ReadByte(); // env marker (0x01)
-			var blob = body.ReadArrayUInt32Length();
+			BankIIR bank;
+			try
+			{
+				bank = BankCodec.Parse(record);
+			}
+			catch (CodecParseException)
+			{
+				return;
+			}
 
-			using var ms = new MemoryStream(blob, false);
-			var container = Serializer.Deserialize<ProtoInventoryGame>(ms);
+			var container = bank.Container;
 			if (SnapshotRoot.KindOf(container) != (ulong)ContainerKind.Bank)
 				return;
 
@@ -402,7 +407,7 @@ namespace Faolan.Importer.Extractors
 				return false;
 
 			var record = packet.BodyReader().ReadArrayUInt32Length();
-			if (record.Length < 4 || record.ReadU32Be(0) != InventorySubOpcode)
+			if (record.Length < 4 || record.ReadU32Be(0) != FullPlayerCharacterCodec.Opcode)
 				return false;
 
 			// SnapshotRoot, NOT FullPlayerCharacterCodec.Parse: we only want the containers, and the full record also

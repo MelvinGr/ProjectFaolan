@@ -8,7 +8,10 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Importer.Captures;
 using Faolan.Core.Network.Constants;
 
@@ -48,25 +51,8 @@ namespace Faolan.Importer.Extractors
 	// `packets` must be one capture's GameServer packets in chronological order.
 	public static class ConversationExtractor
 	{
-		private const uint InteractSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
-		private const uint KnubotAnswerSubOpcode = (uint)GameServer0X2000Opcodes.KnubotAnswerIIR;
-		private const uint Opcode2015 = 0x2015; // GameCharInterfaceOpcodes.DispatchSetDialogueCamera
-
-		// A quest GRANT signal seen mid-conversation: the full journal record (0x63268258) the retail server sends when
-		// the player accepts a quest. (QuestIIR-add 0x97E02314 also adds the quest but the full-update is the
-		// unambiguous "here is the new quest" marker; the runtime guards against re-granting, so this is safe.)
-		private const uint QuestFullUpdateSubOpcode = (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR;
-
-		// The journal STATE flip retail sends as a quest starts and finishes: QuestIIR carries [state][questId], state 2
-		// = Active and 4 = Completed (QuestState). Tracked so a server-opened conversation can be gated on the quest it
-		// is about - see the lastQuest* locals.
-		private const uint QuestIirSubOpcode = (uint)GameServer0X2000Opcodes.QuestIIR;
-
-		private const uint CloseChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR;
-		private const uint OpenChatWindowSubOpcode = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR;
-		private const uint SpawnSubOpcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
-		private const uint TalkToNpcActionType = 0x16;
-		private const uint UseObjectActionType = 0x12; // ActionType.UseObject - 'use a world object' (the city door)
+		private const uint TalkToNpcActionType = (uint)ActionType.InteractWithCharacter; // 0x16
+		private const uint UseObjectActionType = (uint)ActionType.UseObject; // 0x12 - 'use a world object' (the city door)
 
 		// How far back a UseObject may sit and still be taken as the TRIGGER for a server-opened window. MEASURED over
 		// the whole corpus: both door conversations open 45 packets after their UseObject, and the nearest interaction
@@ -90,13 +76,9 @@ namespace Faolan.Importer.Extractors
 		private static readonly Regex NpcNameParameter =
 			new(@"<parameter\s+value=""[^""]*?id=&quot;(\d+)&quot;[^""]*?category=&quot;51000&quot;[^""]*""\s+name=""npcname""", RegexOptions.Compiled);
 
-		// The Knubot conversation-display response sub-opcodes (642CD3D6 echo excluded: it is a generic interact ack):
-		// OpenChatWindow (045B0B0F), AppendText (4A3D899A), AnswerList (F164A4A5), CloseChatWindow (C4AF39EB).
-		private static readonly HashSet<uint> ResponseSubOpcodes =
-		[
-			(uint)GameServer0X2000Opcodes.KnubotAppendTextIIR, (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR, (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR,
-			(uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR
-		];
+		// The Knubot conversation-display response sub-opcodes - the family KnubotCodec parses (642CD3D6 echo excluded:
+		// it is a generic interact ack, not a screen).
+		private static readonly HashSet<uint> ResponseSubOpcodes = [.. KnubotCodec.HandledTypes.Select(t => (uint)t)];
 
 		public static List<ConversationEntry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -168,40 +150,29 @@ namespace Faolan.Importer.Extractors
 			foreach (var p in packets)
 			{
 				index++;
-				if (p is { IsDownload: false, IsIirCarrier: true, SubOpcode: InteractSubOpcode })
+				if (p is { IsDownload: false, IsIirCarrier: true, SubOpcode: BehaviorControlCenterCodec.Opcode })
 				{
-					var body = p.Body;
-					if (body.Length < 26)
-						continue;
-
-					var action = body.ReadU32Be(18);
-					var bodyArgLen = (int)body.ReadU32Be(22);
-					if (26 + bodyArgLen > body.Length)
+					if (!p.TryParse(BehaviorControlCenterCodec.Parse, out var interact))
 						continue;
 
 					// A USE-OBJECT is remembered, not acted on: it is the trigger for a window the server opens a moment
 					// LATER (#523), so it only means anything once an unattributed OpenChatWindow shows up behind it.
-					if (action == UseObjectActionType)
+					if (interact.BehaviorId == UseObjectActionType)
 					{
-						// ⚠️ The object handle is in the TRAILER after the args ([from][target]), NOT in args.Target - which
-						// on a UseObject holds the PLAYER's own instance. A TalkToNpc is the other way round (its NPC handle
-						// IS args.Target.Instance and it carries only a short trailer), so the two cannot share a read.
-						// See GameServerListener.Inbound's from/target handling.
-						var trailer = 26 + bodyArgLen;
-						if (trailer + 8 <= body.Length)
+						// ⚠️ The object handle is in the behaviour TAIL, NOT in args.Target - see BehaviorTailScan.
+						if (BehaviorTailScan.InteractTargetHandle(interact.Tail) is var target and not 0)
 						{
-							lastUseObjectHandle = body.ReadU32Be(trailer + 4);
+							lastUseObjectHandle = target;
 							lastUseObjectAt = index;
 						}
 
 						continue;
 					}
 
-					if (action != TalkToNpcActionType)
+					if (interact.BehaviorId != TalkToNpcActionType)
 						continue;
 
-					var argLen = bodyArgLen;
-					var (parsedTypeId, _, field3, parsedNpc) = ParseArgs(body.AsSpan(26, argLen));
+					var (parsedTypeId, _, field3, parsedNpc) = ParseArgs(interact.Args);
 					if (field3 != 0)
 						continue; // a non-greeting TalkToNpc (retransmit / options re-request) - not an instance boundary
 
@@ -214,13 +185,13 @@ namespace Faolan.Importer.Extractors
 					serverCondition = (null, null);
 					typeId = parsedTypeId;
 					npc = parsedNpc;
-					instance = body.ReadU32Be(12);
+					instance = interact.Actor;
 					path = "";
 					screen = [];
 					grant = 0;
 					instanceContext = currentQuest; // the quest active WHEN the player opened this conversation (#264)
 				}
-				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: OpenChatWindowSubOpcode } && !active)
+				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: ConversationScreenDecoder.OpenChatWindow } && !active)
 				{
 					// #523: retail also opens a conversation ITSELF, with no player TalkToNpc in front of it - Casilda's
 					// city-door farewell is the worked example. Every one of those used to be dropped on the floor, taking
@@ -251,15 +222,14 @@ namespace Faolan.Importer.Extractors
 					grant = 0;
 					instanceContext = currentQuest;
 				}
-				else if (p is { IsDownload: false, IsIirCarrier: true, SubOpcode: KnubotAnswerSubOpcode } && active)
+				else if (p is { IsDownload: false, IsIirCarrier: true, SubOpcode: KnubotAnswerCodec.Opcode } && active)
 				{
 					// The player picked option `idx`: the current screen is complete (emit it), and the responses that
 					// follow belong to the child screen reached by that option.
-					var body = p.Body;
-					if (body.Length < 4)
+					if (!p.TryParse(KnubotAnswerCodec.Parse, out var pick))
 						continue;
 
-					var idx = body.ReadU32Be(body.Length - 4);
+					var idx = pick.Index;
 					Flush();
 					path = path.Length == 0
 						? idx.ToString()
@@ -267,34 +237,32 @@ namespace Faolan.Importer.Extractors
 					screen = [];
 					grant = 0;
 				}
-				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: QuestIirSubOpcode })
+				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: QuestCodec.Opcode })
 				{
-					// [ ... ][u32 state][u32 questId]; only the two states the journal actually flips through are taken.
-					var body = p.Body;
-					if (body.Length >= 33)
+					// Only the two states the journal actually flips through are taken.
+					if (p.TryParse(QuestCodec.Parse, out var flip) && flip.State is QuestCodec.StateActive or QuestCodec.StateCompleted)
 					{
-						var state = body.ReadU32Be(21);
-						if (state is 2 or 4)
-						{
-							lastQuestId = body.ReadU32Be(25);
-							lastQuestState = state == 2
-								? QuestState.Active
-								: QuestState.Completed;
-							lastQuestAt = index;
-						}
+						lastQuestId = flip.QuestId;
+						lastQuestState = flip.State == QuestCodec.StateActive
+							? QuestState.Active
+							: QuestState.Completed;
+						lastQuestAt = index;
 					}
 				}
-				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: QuestFullUpdateSubOpcode })
+				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: QuestFullUpdateCodec.Opcode })
 				{
-					// A quest full-update. body @16 = [00000000][01][u32 questId]. It's a GRANT (vs a login restore or a
-					// re-display) only if: a conversation is active, the player has navigated past the greeting (path !=
-					// ""), and this is the quest's FIRST appearance in the capture (a restore re-sends a quest first seen
-					// at login). That pins the accept to the dialogue node the player walked. Always remember the quest so
-					// later re-sends aren't mistaken for grants.
-					var body = p.Body;
-					if (body.Length >= 25)
+					// A quest full-update. It's a GRANT (vs a login restore or a re-display) only if: a conversation is
+					// active, the player has navigated past the greeting (path != ""), and this is the quest's FIRST
+					// appearance in the capture (a restore re-sends a quest first seen at login). That pins the accept to
+					// the dialogue node the player walked. Always remember the quest so later re-sends aren't mistaken
+					// for grants.
+					//
+					// Only the quest ID is wanted, and the record around it is the one region a level-80 journal can
+					// still fail to decode - so this reads the id off the record's own key word rather than gating the
+					// grant signal on the whole record parsing (the same reason ItemHashHarvester takes SnapshotRoot
+					// over the full snapshot codec, #383).
+					if (QuestFullUpdates.TryReadQuestId(p.Record, out var questId))
 					{
-						var questId = body.ReadU32Be(21);
 						currentQuest = questId; // track the active quest for the per-greeting QuestContextId (#264)
 
 						// A full-update is also how a quest BECOMES active (the grant), and the escort arrives that way -
@@ -309,7 +277,7 @@ namespace Faolan.Importer.Extractors
 							questsSeen.Add(questId);
 					}
 				}
-				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: CloseChatWindowSubOpcode } && active)
+				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: ConversationScreenDecoder.CloseChatWindow } && active)
 				{
 					// The window CLOSES: the instance is over. The close packet is part of the exchange, so it joins the
 					// screen before the flush.
@@ -325,7 +293,7 @@ namespace Faolan.Importer.Extractors
 					active = false;
 					screen = [];
 				}
-				else if (p.IsDownload && active && (p.Opcode == Opcode2015 || (p.IsIirCarrier && ResponseSubOpcodes.Contains(p.SubOpcode))))
+				else if (p.IsDownload && active && (p.Opcode == SetDialogueCameraCodec.Opcode || (p.IsIirCarrier && ResponseSubOpcodes.Contains(p.SubOpcode))))
 				{
 					screen.Add(p.Bytes);
 					if (serverInitiated && serverNpcTemplate == 0)
@@ -385,18 +353,13 @@ namespace Faolan.Importer.Extractors
 			var names = new HashSet<string>();
 			foreach (var p in packets)
 			{
-				if (p is not { IsDownload: false, IsIirCarrier: true, SubOpcode: InteractSubOpcode })
+				if (p is not { IsDownload: false, IsIirCarrier: true, SubOpcode: BehaviorControlCenterCodec.Opcode })
 					continue;
 
-				var body = p.Body;
-				if (body.Length < 26 || body.ReadU32Be(18) != TalkToNpcActionType)
+				if (!p.TryParse(BehaviorControlCenterCodec.Parse, out var interact) || interact.BehaviorId != TalkToNpcActionType)
 					continue;
 
-				var argLen = (int)body.ReadU32Be(22);
-				if (26 + argLen > body.Length)
-					continue;
-
-				var (_, _, field3, parsedNpc) = ParseArgs(body.AsSpan(26, argLen));
+				var (_, _, field3, parsedNpc) = ParseArgs(interact.Args);
 				if (field3 != 0)
 					continue;
 
@@ -464,17 +427,17 @@ namespace Faolan.Importer.Extractors
 			var map = new Dictionary<uint, string>();
 			foreach (var p in packets)
 			{
-				if (!p.IsDownload || !p.IsIirCarrier || p.SubOpcode != SpawnSubOpcode)
+				if (!p.IsDownload || !p.IsIirCarrier || p.SubOpcode != SimpleCharFullUpdateCodec.Opcode)
 					continue;
 
 				var body = p.Body;
-				if (body.Length < 16)
+				if (body.Length < SpawnPacketBuilder.HandleOffset + sizeof(uint))
 					continue;
 
-				var handle = body.ReadU32Be(12);
-				var name = ReadSpawnName(body);
-				if (name != null)
-					map[handle] = name;
+				// The name scan lives beside the spawn codec now (SpawnNameScan); the handle is at the codec's own
+				// header offset.
+				if (SpawnNameScan.Any(body) is { } name)
+					map[body.ReadU32Be(SpawnPacketBuilder.HandleOffset)] = name;
 			}
 
 			return map;
@@ -519,46 +482,6 @@ namespace Faolan.Importer.Extractors
 			return 0;
 		}
 
-		// The entity name is the first `0x0A <len 1..63> <printable-ascii>` run in the spawn body.
-		private static string? ReadSpawnName(ReadOnlySpan<byte> body)
-		{
-			for (var i = 16; i + 2 < body.Length; i++)
-			{
-				if (body[i] != 0x0A)
-					continue;
 
-				int len = body[i + 1];
-				if (len is < 1 or > 63 || i + 2 + len > body.Length)
-					continue;
-
-				var ok = true;
-				for (var j = 0; j < len; j++)
-				{
-					var c = body[i + 2 + j];
-					if (c is < 0x20 or > 0x7E)
-					{
-						ok = false;
-						break;
-					}
-				}
-
-				if (ok)
-					return Encoding.ASCII.GetString(body.Slice(i + 2, len));
-			}
-
-			return null;
-		}
-
-		private static int VarintLength(uint value)
-		{
-			var n = 1;
-			while (value >= 0x80)
-			{
-				value >>= 7;
-				n++;
-			}
-
-			return n;
-		}
 	}
 }
