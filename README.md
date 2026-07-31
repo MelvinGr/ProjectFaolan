@@ -299,7 +299,17 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 What the server should send back for each of the client's 133 GM commands is per-command work; most are not
   answered yet (#449)
 - 🟡 **Importer** — rebuilds the game database from captures + the client's asset files, plus read-only `--report`
-  diagnostics (NPC damage curve, item stat-region census, content coverage)
+  diagnostics (NPC damage curve, item stat-region census, behaviour-command census, content coverage)
+
+### Wire fidelity
+
+- ✅ **One codec per message** — every byte the server sends is built by a single codec with a uniform
+  `Build`/`Parse` surface; nothing outside `Codecs/` hand-rolls a packet. 16 convention gates enforce it with no
+  exclusions (#530)
+- ✅ **Every codec round-trips its captured bytes** — each one parses and rebuilds real corpus packets byte-exact,
+  with an empty allowlist: no message is excused from the gate (#538, #543, #544, #545)
+- ✅ **Behaviour commands fully decoded** — all 34 of the client's behaviour commands, under its own names, and
+  every per-command trailer: 100% of the 67,299 captured records, zero mismatches (#536, #549)
 
 ## Build
 

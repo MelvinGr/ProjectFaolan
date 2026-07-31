@@ -62,7 +62,12 @@ namespace Faolan.Tests
 
 			var path = Path.Combine(directory, $"seed-{hash}.db");
 			if (File.Exists(path))
+			{
+				// Mark it in use, so a concurrent run's prune (below) cannot take it out from under us.
+				File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+				PruneStaleFixtures(directory, path);
 				return path;
+			}
 
 			// DatabaseInitializer finds the seed through Global.SeedPath, which is CWD-relative - and the test host's
 			// CWD is the test bin directory, not the repo root. Point it at the real one.
@@ -100,7 +105,47 @@ namespace Faolan.Tests
 				}
 			}
 
+			PruneStaleFixtures(directory, path);
 			return path;
+		}
+
+		// Evicts fixtures nobody is using. The cache above had NONE, and /tmp is a RAMDISK on the dev machine: 625
+		// fixtures at 17 MB accumulated to 6.6 GB, filled it, and the whole suite then failed with ENOSPC - 104 tests
+		// at once, with nothing in the diff to explain it. Same failure the orphaned `-wal` files caused before
+		// `Delete` was written, and a cache that never evicts is that bug wearing a useful face.
+		//
+		// ⚠️ It leaked per BUILD, not per change. The key has to include the initializer assembly (see above), and this
+		// build is NOT byte-deterministic - two consecutive `dotnet build`s with no source change produce two different
+		// hashes - so EVERY build mints a fixture. The window therefore has to be short enough that a working day of
+		// building cannot fill the disk. An hour keeps the cache useful for the case it actually serves (repeated test
+		// runs against one build) while bounding the leak to one hour's worth.
+		//
+		// Never the fixture in hand, and never one touched inside the window: a run stamps the fixture it uses on a
+		// cache hit, so a fresh timestamp means "in use", not merely "recent".
+		private static void PruneStaleFixtures(string directory, string current)
+		{
+			var cutoff = DateTime.UtcNow - TimeSpan.FromHours(1);
+			foreach (var file in Directory.EnumerateFiles(directory, "seed-*.db"))
+			{
+				if (file == current || File.GetLastWriteTimeUtc(file) > cutoff)
+					continue;
+
+				// The sidecars too - a WAL-mode database is three files, which is the leak `Delete` exists to stop.
+				// Not routed through `Delete`: it clears the connection pool, and a fixture untouched for an hour is
+				// in no pool of this process anyway.
+				foreach (var part in new[] { file, $"{file}-wal", $"{file}-shm" })
+				{
+					try
+					{
+						if (File.Exists(part))
+							File.Delete(part);
+					}
+					catch (IOException)
+					{
+						// a fixture another run still has open is not worth failing the suite over
+					}
+				}
+			}
 		}
 
 		// A writable throwaway SQLite database at `path` (typically a temp file). Routed through the shared
