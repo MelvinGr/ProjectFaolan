@@ -76,10 +76,22 @@ public class DumpVtableReaders extends GhidraScript {
         PrintWriter out = new PrintWriter(OUT + "vtable_readers.txt");
         DecompInterface di = new DecompInterface(); di.setOptions(new DecompileOptions()); di.openProgram(currentProgram);
 
-        Address knownVt = vtableAddr(KNOWN_VTABLE);
-        out.println("KNOWN vtable " + KNOWN_VTABLE + " -> " + knownVt);
-        int slot = knownVt == null ? -1 : findSlot(knownVt, KNOWN_READER);
-        out.println("ReadSubClass slot index = " + slot + " (ptr 0x" + Long.toHexString(KNOWN_READER) + ")");
+        // SLOT=<n> reads a DIFFERENT vtable slot instead of deriving the IIR ReadSubClass one. The BCC commands
+        // (#536) put their wire reader at slot 32 (byte offset 0x80) of the Command class, not at the IIR's slot 8,
+        // and they are reached through InstantiateCommand's classmap rather than through an IIR vtable - so the
+        // anchor below cannot derive it.
+        String slotEnv = System.getenv("SLOT");
+        int slot;
+        if (slotEnv != null && !slotEnv.isBlank()) {
+            slot = Integer.parseInt(slotEnv.trim());
+            out.println("SLOT override = " + slot);
+        } else {
+            Address knownVt = vtableAddr(KNOWN_VTABLE);
+            out.println("KNOWN vtable " + KNOWN_VTABLE + " -> " + knownVt);
+            slot = knownVt == null ? -1 : findSlot(knownVt, KNOWN_READER);
+            out.println("ReadSubClass slot index = " + slot + " (ptr 0x" + Long.toHexString(KNOWN_READER) + ")");
+        }
+
         out.println();
         if (slot < 0) { out.println("could not locate slot; abort"); out.close(); return; }
 

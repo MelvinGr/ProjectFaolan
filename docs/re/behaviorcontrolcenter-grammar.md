@@ -56,11 +56,44 @@ Subtracting `49 x count` collapses every one of the 3 700 s2c attack tails onto 
 themselves differ by 41 (81 = 40+41, 82 = 41+41, 85 = 44+41), i.e. one optional 41-byte block on a 40/41/44
 head. `BehaviorAcks.HitResultBlock` builds the single-hit s2c form and is byte-exact against the capture.
 
+## Per-Command readers — the hop, and the ones that are done (#536)
+
+Each command's wire reader is **vtable slot 32** (byte offset `0x80`) of its Command class.
+`CLASSES=<Class> SLOT=32 tools/ghidra/DumpVtableReaders.java` resolves and decompiles it in one run.
+
+⚠️ Getting from the registration to the class is **two hops, not one**: the address the registration stores
+(`MOV [EAX],<addr>`) is a **factory FUNCTION**, not a vtable — it disassembles as a prologue. Decompiling the
+factory names the class through its RTTI (`*puVar1 = AttackCommandMelee_c::vftable`) *and* re-states the command
+id in its base-ctor call (`FUN_0114c4d0(0xf)`), which cross-checks the whole catalog: every id embedded in a
+factory matches the id its registration pushed.
+
+| id | command | class | reader | reads | tail |
+|---:|---|---|---|---|---:|
+| `0x05` | Emote | `SocialCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
+| `0x07` | BccAction | `BCCActionCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
+| `0x1F` | Limbo/Death | `LimboCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
+| `0x16` | UseCharacter | `UseCharacterCommand_c` | `FUN_0081fdb0` | 1 × u32 | 4 |
+| `0x12` | UseDynel | `UseDynelCommand` | `FUN_00832f80` | 3 × u32 | 12 |
+| `0x09` | Equip | `EquipItemCommand_c` | `FUN_00838820` | 2 × u32, an item-identity sub-read (`FUN_005d5150`), 3 × u32 | 88 |
+| `0x0F` | Combat:Melee | `AttackCommandMelee_c` | `FUN_01151170` | base + 7 × u32 + a counted record loop | varies |
+| `0x11` | Combat:Unarmed | `AttackCommandUnarmed_c` | `FUN_01151170` | *(same reader)* | varies |
+
+Two results fall straight out of that table and settle 83% of the traffic:
+
+* **The empty tail is STRUCTURAL, not incidental.** The three commands the census shows with no tail share ONE
+  reader, and it is a 3-byte `return;`. Those three are 55 699 of the 67 307 captured records.
+* **Melee and Unarmed share a reader**, which is why `BehaviorAcks` measured exactly those two padding an echoed
+  tail, and why the attack tail lengths form one family across `0x0F`/`0x10`/`0x11`.
+
+The attack reader is the residue: `FUN_0084d5f0` (its base) reads 6 × u32, then 7 × u32 inline, then a COUNT
+and a per-record loop. Sizing the record exactly needs the loop's conditional (`0x1b4`) resolved — it is skipped
+on one path — so the count→length arithmetic is not closed yet.
+
 ## Status
 
-Grammar SHAPE decoded (type switch + commandId + per-command reader), and the commandId → COMMAND map is now
-enumerated with the client's own names (above). A fully constructive codec still needs the per-Command readers
-(vtable slot 0x80 of each Command type) walked — the residue; the combat path is done. Open work tracked in
+Grammar SHAPE decoded (type switch + commandId + per-command reader); the commandId → COMMAND map is enumerated
+with the client's own names; and the per-Command readers are walked for every FIXED-tail command (above), which
+is 83% of the captured traffic. The residue is the attack family's counted record loop. Open work tracked in
 Gitea #536.
 
 ## Registration form (the create-burst / world-entry BccIIR) — #234
