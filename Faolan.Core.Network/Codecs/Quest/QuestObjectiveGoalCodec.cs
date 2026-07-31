@@ -172,9 +172,16 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// `Separator` 20 Deliver goals - i.e. exactly the ones that need a recipient.
 		//
 		// The lead word [0] is a small number - 0 on 155 goals, then 1/2/4/6 - and is not a count of the occupied
-		// slots (goal 3508 carries 4 with one pair; 11252 carries 0 with two). Still undecoded, as is a token ->
-		// object map: only the 23 tokens whose goal also states the NPC's LDB refId resolve, which is why the Deliver
-		// recipients are still read out of the objective TEXT.
+		// slots (goal 3508 carries 4 with one pair; 11252 carries 0 with two). Still undecoded.
+		//
+		// ⚠️ A token -> object map is NOT RECOVERABLE from the client (#547), so the Deliver recipients are read out
+		// of the objective TEXT and that is not a stopgap. The client never dereferences a token: `"ACGHash"` occurs
+		// exactly ONCE in AgeOfConan.exe - in FUN_005d7190's own log channel - and that function has three call sites
+		// (ACGPlayfieldGeneratorData_t's reader twice, QuestGoal_c's once), reads a u32, checks its four bytes are
+		// `[0-9A-Z_]`, stores it, and compares it against nothing. Neither consumer looks it up afterwards. Nor is it
+		// in the content we ship with: the decrypted item template for the one pair where we hold both halves (item
+		// 193400, token "XE7W") does not contain it, and a raw scan of all 28 GB of RDB for six known tokens in both
+		// byte orders returns hits at chance level. It is an authoring-pipeline identity that rides the wire.
 		//
 		// Carried per goal like QuestcRecord's undecoded scalars - a token is per-object, not derivable from the row.
 		public uint[] Reserved { get; init; } = new uint[7];

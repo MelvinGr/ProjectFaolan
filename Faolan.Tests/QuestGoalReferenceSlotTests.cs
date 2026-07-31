@@ -30,9 +30,11 @@ namespace Faolan.Tests
 	//     the 50200 goals and with the NPC on the 51000 goals.
 	//
 	// ⚠️ The slots FLOAT - goal 11252 uses [1] and [3] - so these gates are written over "whichever slots are
-	// occupied", never over a fixed position. Still open: the lead word [0], and a token -> object map (we can only
-	// resolve the 23 tokens whose goal also states the NPC's LDB refId, which is why the twelve Deliver recipients
-	// are still read out of the objective TEXT).
+	// occupied", never over a fixed position. Still open: the lead word [0].
+	//
+	// A token -> object map is CLOSED as not recoverable (#547): the client never dereferences a token, so the
+	// twelve Deliver recipients are read out of the objective TEXT by design rather than as a stopgap. See
+	// QuestObjectiveGoalCodec's Reserved comment for the evidence.
 	public class QuestGoalReferenceSlotTests
 	{
 		private const uint AcgHashMarker = 70099;
