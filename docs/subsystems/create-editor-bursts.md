@@ -52,7 +52,7 @@ pair yields garbage that looks like entity handles (`0x0009FF9x`) — that was t
 ## 3. Decoded grammars
 
 ### Fully decoded (constructive builders + golden tests landed)
-`Faolan.Core.Network/Codecs/Spawn/CreateEditorRecordBuilder.cs`, locked by `Faolan.Tests/CreateEditorRecordTests.cs`.
+The per-IIR codecs under `Faolan.Core.Network/Codecs/`, locked by `Faolan.Tests/CreateEditorRecordTests.cs`.
 
 - **StatIIR** (`0xF98E10B3`), 17 bytes — a single stat set on an entity:
   `[u32 type][u32 handle][u8 flag][u32 statId][u32 value]`.
@@ -82,7 +82,7 @@ create-specific to decode, only builder wiring to do:
   the avatar on the same pedestal; only `playfield_instance` (session) and the embedded looks differ.
 
 ### Fully decoded + constructive builders (added 2026-06-15)
-`CreateEditorRecordBuilder.BuildPlayfieldFiir` / `BuildGameTimeIir`, locked by `CreateEditorRecordTests`.
+`PlayfieldFCodec` / `GameTimeCodec`, locked by `CreateEditorRecordTests`.
 - **PlayfieldFIIR** (`0x5D85BFC7`, "MapChange"), 103 bytes. Framed the way the CLIENT reads it (#451) — its
   reader is `PlayfieldFIIR_c`'s `ReadSubClass` = `FUN_008f36e0`, which calls the base `FUN_013d0a20` and then
   reads the four trailing words:
@@ -156,17 +156,17 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
    importer's position-keyed `WorldObject` dedup dropped it. Fixed by keying world objects by (position,
    `display_name` identity) in the dedup + replay + coverage; `3072626` now has its own row.)
 - **`PlayfieldFIIR`/`GameTimeIIR`** — both are constructed in the burst
-   via `CreateEditorRecordBuilder.BuildPlayfieldFiir`/`BuildGameTimeIir`. MapChange is built from the editor
+   via `PlayfieldFCodec`/`GameTimeCodec`. MapChange is built from the editor
    map id + the session playfield token (carried twice); GameTime from the captured day-time/timestamp/rate.
    Wiring `InitialBurst.bin` surfaced an un-pinned u32 near PlayfieldFIIR `[58:62]` (0 in the test capture,
    `0x01000000` here) — added as a pass-through param. It is now framed as the client reads it, a plain `0`/`1`
    word at `[55:59]` (`sceneWord`, see the table above). Locked by `BurstGoldenTests`.
-- **Record coverage** — the only record left verbatim is the live `Character…` preview (`IirId`, intentionally
-   verbatim — see above). Across `WorldPrepBurst` +
+- **Record coverage** — the only record left verbatim is the live `Character…` preview
+   (`CreateEditorCharBuilder.LivePreview`, intentionally verbatim — see above). Across `WorldPrepBurst` +
    `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built
    + wired** (the two dissectors were retired with the burst - they read `Faolan.Tests/Golden/WorldPrepBurst.bin`,
    deleted in `0683e84d`; builders in
-   `CreateEditorRecordBuilder`, locked by `CreateEditorRecordTests` + the burst goldens):
+   the per-IIR codecs, locked by `CreateEditorRecordTests` + the burst goldens):
    - `CharacterActionIIR` (0x6B6FD368) — action/ability grant (26 records).
    - `ComboBookIIR` (0xA8BBEB7F) — combo-book grant (12 records).
    - `StatUpdateIIR` (0x96B8DC59) — `(statId,value)` batch.
@@ -180,17 +180,17 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
      `NullIdentity` sentinel (`B290805C 29E627CA`) — two *unset identity* slots, matching the doubling of every
      field before them, rather than the "creator/timestamp pair" this was read as while the value had a different
      name in each of the four codecs that write it. Decoded by
-     the retired `decode_create_iir_records.py` (see above), built by `CreateEditorRecordBuilder.BuildBehaviorControlCenterIirLong`.
+     the retired `decode_create_iir_records.py` (see above), built by `BehaviorAnimations.ItemRegistration`.
    - `RegenIIR` (0x28D0AC99, #223) — `[u32 type][u32 handle][u8 flag][u32 v1][u32 v2][u32 v3]` (21 bytes). The
      grammar was pinned by harvesting **590 records across all `*.tshark.json`** captures (it's ×1 in the create
      burst but recurs throughout login/gameplay) and confirmed in the client: `RegenIIR_c::ReadSubClass`
      (Ghidra `FUN_0079dea0`, vtable slot 8) reads exactly three big-endian u32 into +0x2c/+0x30/+0x34 — the three
      resource/regen pools; the lone `flag` byte is the base IIR's (0 in every capture). Decoded by
      the retired `decode_create_iir_records.py` + `tools/ghidra/DumpRegenReader.java`, built by
-     `CreateEditorRecordBuilder.BuildRegenIir`.
+     `RegenCodec`.
    - `StatIIR` (0xF98E10B3) / `EnergyIIR` (0x40749B8A) / `StatUpdateIIR` (0x96B8DC59) — had builders, and as of
      c2611b23 the last raw `IirId()` byte-literal records in `CreationScriptBurst` / `InitialBurst` /
-     `WorldPrepBurst` are now built via `CreateEditorRecordBuilder` too (the per-class StatIIR runs as loops). The
+     `WorldPrepBurst` are now built via their codecs too (the per-class StatIIR runs as loops). The
      unused `C350` var + per-file `IirId` helpers were dropped. (`PlayfieldFIIR`/`GameTimeIIR` already wired.)
      The verbatim carriers of this family that are **avatar-directed** (frame = the live `id`) were converted
      the same way (#304): 18× StatIIR in `Post205FBurst` (that burst has since been removed entirely as a dead,
@@ -201,7 +201,7 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
      StatIIR/… verbatim carrier remains in ANY burst" was WRONG — it was blind to the byte-per-line carriers.
      `RetailCreateWorldEntryBurst` (now a test-support replay under `Faolan.Tests/Support/`) still emits
      **decoded-record carriers with capture-specific NPC/dynel handles** — 7× StatUpdateIIR (frames
-     0x00017E2x/ED0, built via `CreateEditorRecordBuilder.BuildStatUpdateIir`) — plus the larger verbatim
+     0x00017E2x/ED0, built via `StatUpdateCodec`) — plus the larger verbatim
      FA015807-spawn / MoveTask blobs; those belong to the **#234 intro-cutscene reconstruction** (they must be
      re-addressed to live entities, not merely reframed), not this header-residue cleanup, so they are left
      as-is. (The lone `WorldEntryBurst` GameActionListIIR is now the constructed `id`-frame record counted

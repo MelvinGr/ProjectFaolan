@@ -43,6 +43,10 @@ namespace Faolan.Tests
 
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 		private static readonly Regex ConstOffset = new(@"\bconst\s+int\s+\w*(Offset|Pos)\b");
+
+		// One `case GameServer0X2000Opcodes.X:` of the listener's routing switch - §6's dispatch exemption, keyed on
+		// the label rather than on a file name (see IirOpcodesAreOnlyNamedInsideCodecs).
+		private static readonly Regex DispatchCaseLabel = new(@"^\s*case\s+GameServer0X2000Opcodes\.\w+\s*:");
 		private static readonly Regex LineComment = new(@"//.*$", RegexOptions.Multiline);
 		private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\]|\\\\.)*\"");
 
@@ -340,26 +344,23 @@ namespace Faolan.Tests
 
 		// ---- rule 7: encode/decode lives in Codecs/ --------------------------------------------------------
 
-		// ⚠️ `Faolan.Importer/` is CLEAN as of wave 8c - what still fails is `Faolan/`, and it is one shape problem,
-		// not a list of sites: `CreateFlowService`'s burst helper takes `(opcode, tail)` rather than a whole record, so
-		// every one of its 34 steps spells an IIR (`SendCreateEditor2000Record`, which takes a record, already exists
-		// beside it). Reshaping to that is what makes `CreateEditorRecordBuilder` - whose only job is slicing the
-		// sub-op back off for the helper - go away, and it takes `GameServerListener.WorldEntry`'s two prepends with
-		// it. Tracked in Gitea #542.
+		// LIVE since #542, which was the last blocker: `CreateFlowService`'s burst helper took `(opcode, tail)` rather
+		// than a whole record, so every one of its 34 steps spelled an IIR. It sends records now, and the helper whose
+		// only job was slicing the sub-op back off for it (`CreateEditorRecordBuilder`) is gone.
 		//
-		// The exemption below is also wrong and must be fixed when this goes live: §6 exempts the listener's opcode
-		// DISPATCH switch, but the filter keys on the FILE NAME containing "Dispatch" and the switch lives in
-		// `GameServerListener.Inbound.cs`, so its 22 names would be flagged as decode.
-		[Fact(Skip = "un-skip when #542 lands - Faolan.Importer/ is clean (wave 8c); CreateFlowService's 34 remain")]
+		// §6 exempts the listener's opcode DISPATCH switch. The exemption keys on the `case <opcode>:` LABEL, not on
+		// the file name: nothing in `Faolan/` is NAMED "Dispatch" - the switch lives in `GameServerListener.Inbound.cs`
+		// - so the old filename filter exempted nothing and would have counted its 22 routing labels as decode (#542).
+		// A `case` label routes a body to a codec without reading a byte of it, wherever it lives.
+		[Fact]
 		public void IirOpcodesAreOnlyNamedInsideCodecs()
 		{
 			string[] roots = [TestPaths.Repo("Faolan"), TestPaths.Repo("Faolan.Importer")];
 			var offenders = (from file in SourceFiles(roots)
-				where !Path.GetFileName(file).Contains("Dispatch", StringComparison.Ordinal) // the routing switch does not decode
 				let lines = File.ReadAllLines(file)
 				from i in Enumerable.Range(0, lines.Length)
 				let code = Strip(lines[i])
-				where code.Contains("GameServer0X2000Opcodes.", StringComparison.Ordinal)
+				where code.Contains("GameServer0X2000Opcodes.", StringComparison.Ordinal) && !DispatchCaseLabel.IsMatch(code)
 				select $"{Path.GetFileName(file)}:{i + 1}  {code.Trim()}").ToList();
 
 			Assert.True(offenders.Count == 0,

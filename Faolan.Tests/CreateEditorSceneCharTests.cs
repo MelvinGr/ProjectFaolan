@@ -33,35 +33,39 @@ namespace Faolan.Tests
 			var records = ExtractBurstCharRecords();
 			Assert.Equal(6, records.Count); // 5 fixed scene chars + the live "Character..." preview
 
-			foreach (var (name, body) in records)
+			foreach (var (name, record) in records)
 			{
-				var rebuilt = CreateEditorCharBuilder.Reconstruct(body, CreateEditorCharBuilder.EditorPlayfieldInstance);
-				_o.WriteLine($"{name}: {(Convert.ToHexString(body) == Convert.ToHexString(rebuilt!) ? "ok" : "DIFF")}");
-				Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(rebuilt!));
+				// Reconstruct takes the BODY and returns the whole RECORD (sub-opcode included), so the caller never
+				// names the IIR - #542.
+				var rebuilt = CreateEditorCharBuilder.Reconstruct(record[4..], CreateEditorCharBuilder.EditorPlayfieldInstance);
+				_o.WriteLine($"{name}: {(Convert.ToHexString(record) == Convert.ToHexString(rebuilt!) ? "ok" : "DIFF")}");
+				Assert.Equal(Convert.ToHexString(record), Convert.ToHexString(rebuilt!));
 			}
 		}
 
 		[Fact]
 		public void Reconstruct_ThreadsPlayfieldInstance()
 		{
-			var body = ExtractBurstCharRecords()[0].Body;
+			var record = ExtractBurstCharRecords()[0].Record;
 			const uint liveToken = 0x004FE1A8;
 
-			var rebuilt = CreateEditorCharBuilder.Reconstruct(body, liveToken);
+			var rebuilt = CreateEditorCharBuilder.Reconstruct(record[4..], liveToken);
 
-			// only the 4-byte playfield varint changes (transform `18 <varint>` at body offset 53 for a char)
-			Assert.Equal(body.Length, rebuilt!.Length);
-			const int varintOffset = 53;
-			for (var i = 0; i < body.Length; i++)
+			// only the 4-byte playfield varint changes (transform `18 <varint>` at body offset 53 for a char, i.e. 57
+			// into the record)
+			Assert.Equal(record.Length, rebuilt!.Length);
+			const int varintOffset = 4 + 53;
+			for (var i = 0; i < record.Length; i++)
 			{
 				if (i < varintOffset || i >= varintOffset + 4)
-					Assert.Equal(body[i], rebuilt[i]);
+					Assert.Equal(record[i], rebuilt[i]);
 			}
 		}
 
-		// SimpleChar records are framed by the Iir() helper as [u32 len][u32 0xFA015807][body]; the body is
-		// [u32 0x0000C350][u32 handle][u32 0] 2C ... . Returns (name, body) for each, from InitialBurst.bin.
-		private static List<(string Name, byte[] Body)> ExtractBurstCharRecords()
+		// SimpleChar records are framed by the burst sender as [u32 len][record]; the record is
+		// [u32 0xFA015807][u32 0x0000C350][u32 handle][u32 0] 2C ... . Returns (name, record) for each, from
+		// InitialBurst.bin.
+		private static List<(string Name, byte[] Record)> ExtractBurstCharRecords()
 		{
 			var burst = Golden.Bytes("InitialBurst");
 			var op = new byte[] { 0xFA, 0x01, 0x58, 0x07 };
@@ -76,10 +80,10 @@ namespace Faolan.Tests
 				if (burst.ReadU32Be(at + 4) != 0x0000C350u)
 					continue; // body must open with the character entity-class tag
 
-				var bodyLen = (int)burst.ReadU32Be(at - 4) - 4;
-				var body = burst.AsSpan(at + 4, bodyLen).ToArray();
-				SpawnBodyReader.TryReadCharacterMessage(body, out var read);
-				result.Add((read.Message?.Name ?? "?", body));
+				var recordLen = (int)burst.ReadU32Be(at - 4);
+				var record = burst.AsSpan(at, recordLen).ToArray();
+				SpawnBodyReader.TryReadCharacterMessage(record.AsSpan(4).ToArray(), out var read);
+				result.Add((read.Message?.Name ?? "?", record));
 			}
 
 			return result;

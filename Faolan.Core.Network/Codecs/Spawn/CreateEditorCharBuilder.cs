@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Spawn
 {
@@ -22,22 +23,27 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// The create-editor session's playfield instance (the MapChange token), shared by every editor record.
 		public const uint EditorPlayfieldInstance = 0x00502276;
 
-		// Reconstructs the SimpleChar record from its own Iir-carrier body (`record` = the bytes after the carrier's
+		// Reconstructs the SimpleChar record from its own Iir-carrier BODY (`body` = the bytes after the carrier's
 		// [u32 len][u32 iirType] prefix: [u32 0x0000C350][u32 handle][u32 0] 2C ...), threading `playfieldInstance`.
 		// Returns the input unchanged if it can't be framed/decoded (safety fallback - the verbatim bytes ship).
-		public static byte[]? Reconstruct(byte[]? record, uint playfieldInstance)
+		//
+		// ⚠️ It takes a BODY and returns a whole RECORD - `[u32 SimpleCharFullUpdateIIR][body]`, the shape the burst
+		// sender frames directly (#542). The asymmetry is deliberate: the captured pedestal bodies predate the codec
+		// and are stored without their type word, but a caller must not have to name the IIR to send one back.
+		public static byte[]? Reconstruct(byte[]? body, uint playfieldInstance)
 		{
+			var record = body;
 			if (record == null || record.Length < SpawnPacketBuilder.RotWOffset - 8 + 4)
-				return record;
+				return record == null ? null : WithSubOpcode(record);
 
 			// Frame as the [u32 len][u32 FA015807][record] template SpawnPacketBuilder consumes/produces.
 			var template = new byte[8 + record.Length];
 			template.WriteU32Be(0, (uint)(4 + record.Length));
-			template.WriteU32Be(4, 0xFA015807u);
+			template.WriteU32Be(4, SimpleCharFullUpdateCodec.Opcode);
 			record.CopyTo(template, 8);
 
 			if (!SpawnBodyReader.TryReadCharacterMessage(record, out var read))
-				return record;
+				return WithSubOpcode(record);
 
 			var handle = record.ReadU32Be(4);
 			var full = SpawnPacketBuilder.BuildSpawn(template, handle, PositionOf(template), RotationOf(template), read.Message);
@@ -47,7 +53,24 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (SpawnTransformPatch.TryRewritePlayfield(patched, playfieldInstance))
 				patched.CopyTo(full, 4);
 
-			return full[8..];
+			return full[4..];
+		}
+
+		// The LIVE avatar preview the editor scene puts on its pedestal: a captured SimpleChar record whose only
+		// session-varying field is the HANDLE, so it is spliced rather than reconstructed (the pedestals go through
+		// `Reconstruct`; this one carries the client instance, which no capture can supply). `tail` is everything
+		// after the handle, verbatim.
+		public static byte[] LivePreview(uint handle, byte[] tail)
+		{
+			using var s = new FaolanStream();
+			return s.WriteUInt32(SimpleCharFullUpdateCodec.Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(handle).WriteArray(tail).ToArray();
+		}
+
+		// `[u32 SimpleCharFullUpdateIIR][body]` - the record a caller can send without naming the IIR itself.
+		private static byte[] WithSubOpcode(byte[] body)
+		{
+			using var s = new FaolanStream();
+			return s.WriteUInt32(SimpleCharFullUpdateCodec.Opcode).WriteArray(body).ToArray();
 		}
 
 		private static Vector3 PositionOf(byte[] template)

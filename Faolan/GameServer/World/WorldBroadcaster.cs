@@ -2418,12 +2418,12 @@ namespace Faolan.GameServer.World
 		}
 
 		// #363 pushes a SetNameIIR (0xADCE0CDA) to `recipient` overriding entity `handle`'s floating nameplate with
-		// `name` - the in-world grammar recovered in CreateEditorRecordBuilder.BuildWorldSetNameIir (nameType 3 applies
-		// the name AND refreshes the already-built OverheadText). Used by the spawn path and the .togglenpcgroup toggle.
+		// `name` - the in-world form `SetNames.Nameplate` names (nameType 3 applies the name AND refreshes the
+		// already-built OverheadText). Used by the spawn path and the .togglenpcgroup toggle.
 		private static Task SendSetName(INetworkClient recipient, uint handle, string name)
 		{
 			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(x => x.WriteUInt32(GameServer0X2000Opcodes.SetNameIIR).WriteArray(CreateEditorRecordBuilder.BuildWorldSetNameIir(handle, name)))));
+				s => s.WriteArrayUInt32Length(SetNameCodec.Build(SetNames.Nameplate(handle, name)))));
 		}
 
 		// Frames a raw 0x2000 IIR body on the world conversation to one recipient (the generic single-recipient send the

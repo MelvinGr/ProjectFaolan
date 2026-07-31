@@ -34,7 +34,7 @@ playfield** when `InitPath` ran — not a data/animation bug.
 ## Our flow already satisfies this
 
 - `SendRetailCreateEditorInitialBurst` (`CreateFlowService.cs`) sends MapChange → **4000**
-  (`0x0FA0`) on the editor connection — CONSTRUCTED via `CreateEditorRecordBuilder.BuildPlayfieldFiir` from
+  (`0x0FA0`) on the editor connection — CONSTRUCTED via `PlayfieldFCodec` from
   `StartingData.EditorMapId` (= 4000), not a verbatim blob — and `SendRetailCreateEditorCreationScriptBurst`
   sends the `NEW_character_creation Slave Galley` playorskip on that same connection. So the editor IS on
   playfield 4000 with the drowning cutscene armed.

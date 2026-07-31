@@ -8,6 +8,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
@@ -377,10 +378,10 @@ namespace Faolan.GameServer.CreateFlow
 		{
 			var id = client.Session.Account.ClientInstance;
 
-			// EnergyIIR (0x40749B8A) seed on the avatar - constructed via CreateEditorRecordBuilder (byte-exact-locked
-			// by CreateEditorRecordTests), was a verbatim blob. flag=1, value=0x36B0.
-			await SendIir(client, Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameServer0X2000Opcodes.EnergyIIR,
-				CreateEditorRecordBuilder.BuildEnergyIir(EntityClass.Character, id, 0x01, 0x36B0));
+			// EnergyIIR (0x40749B8A) seed on the avatar - constructed via EnergyCodec (byte-exact-locked by
+			// CreateEditorRecordTests), was a verbatim blob. env=1, value=0x36B0.
+			await SendIirRecord(client, Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id),
+				EnergyCodec.Build(new EnergyIIR(id, 0x01, 0x36B0)));
 			await SendScry(client, ScryScriptCodec.Build(id, 48126));
 			await SendScry(client,
 				ScryScriptCodec.Build(id,
@@ -693,14 +694,15 @@ namespace Faolan.GameServer.CreateFlow
 		{
 			var instance = client.Session.Account.ClientInstance;
 
-			await SendIir(client, MorphAckSender, Receiver(client), GameServer0X2000Opcodes.SetNameIIR, CreateEditorRecordBuilder.BuildSetNameIir(instance, name));
+			await SendIirRecord(client, MorphAckSender, Receiver(client), SetNameCodec.Build(SetNames.Accepted(instance, name)));
 
 			await SendA36DCallback(client, "NicknameOk", name);
-			await SendCreateEditor2000(client, (uint)GameServer0X2000Opcodes.GameActionListIIR,
+			// The fixed post-name GameActionList for dynel 0xCFEF; the header is GameActionListCodec's and only the
+			// (still-opaque, #190) action tail rides verbatim.
+			await SendCreateEditor2000Record(client, GameActionListCodec.Build(new GameActionListIIR(instance, 0x0000CFEF, 0,
 			[
-				0x00, 0x00, 0x00, 0x07, 0xE2, 0x00, 0x00, 0xCF, 0xEF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x46, 0x37, 0x00, 0x00, 0x00, 0x00, 0x00
-			], instance);
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x46, 0x37, 0x00, 0x00, 0x00, 0x00, 0x00
+			])));
 			await SendA36DCallback(client, "CharCreationFinished", "");
 
 			// Step 3 (REMOVED): the world-prep grant burst (SendWorldPrepBurst) used to fire here - the guardian
@@ -798,9 +800,8 @@ namespace Faolan.GameServer.CreateFlow
 			// MapChange: CONSTRUCTED from the editor map's reference point + the session playfield token (#189
 			// item 3). mapId + playfieldToken are the meaningful values; the reference position, clip planes and
 			// trailing flags are this map's constants (not yet semantically pinned - carried as builder args).
-			await Iir(GameServer0X2000Opcodes.PlayfieldFIIR,
-				CreateEditorRecordBuilder.BuildPlayfieldFiir(StartingData.EditorSpawnPosition.X, StartingData.EditorSpawnPosition.Y, StartingData.EditorSpawnPosition.Z, StartingData.EditorMapId, 0, 1,
-					CreateEditorCharBuilder.EditorPlayfieldInstance, 15.0f, BitConverter.UInt32BitsToSingle(0x415DA9E7u), 0x00000080, 1u));
+			await Record(PlayfieldFCodec.Build(StartingData.EditorSpawnPosition, StartingData.EditorMapId, 0, 1, CreateEditorCharBuilder.EditorPlayfieldInstance, 15.0f,
+				BitConverter.UInt32BitsToSingle(0x415DA9E7u), 0x00000080, 1u));
 
 			// The 18 galley scene props: SPAWNED FROM their map-4000 WorldObjects rows (built byte-exact by
 			// WorldObjectCodec, re-addressed to the captured handle + editor playfield), in retail send order.
@@ -817,8 +818,7 @@ namespace Faolan.GameServer.CreateFlow
 					continue;
 				}
 
-				var dynel = WorldObjectCodec.Build(dynelRow, handle, CreateEditorCharBuilder.EditorPlayfieldInstance);
-				await Iir(GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, dynel[4..]);
+				await Record(WorldObjectCodec.Build(dynelRow, handle, CreateEditorCharBuilder.EditorPlayfieldInstance));
 			}
 
 			// The editor scene pedestals: each SimpleChar is RECONSTRUCTED from its own bytes via IirChar (#189) -
@@ -939,7 +939,7 @@ namespace Faolan.GameServer.CreateFlow
 				0x03, 0x24, 0x3F, 0x44, 0xC5, 0x34, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x43, 0x3D, 0xFD, 0x80, 0xD4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1,
 				0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1);
 
-			await IirId(GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, [0x00, 0x00, 0xC3, 0x50], 0x00, 0x00, 0x00, 0x00, 0x2C, 0x0A, 0x0F, 0x0D, 0x00, 0x00, 0x82, 0x43, 0x15, 0x00, 0x00, 0x00, 0x00,
+			await Record(CreateEditorCharBuilder.LivePreview(id, [0x00, 0x00, 0x00, 0x00, 0x2C, 0x0A, 0x0F, 0x0D, 0x00, 0x00, 0x82, 0x43, 0x15, 0x00, 0x00, 0x00, 0x00,
 				0x1D, 0x00, 0x00, 0x91, 0x43, 0x12, 0x14, 0x0D, 0x00, 0x00, 0x00, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00, 0x1D, 0x00, 0x00, 0x00, 0x00, 0x25, 0x00, 0x00, 0x80, 0x3F, 0x18, 0xF6, 0xC4,
 				0xC0, 0x02, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -953,7 +953,8 @@ namespace Faolan.GameServer.CreateFlow
 				0x3E, 0x40, 0x88, 0x27, 0x48, 0x64, 0x50, 0x00, 0x58, 0x00, 0x60, 0x00, 0x70, 0x64, 0x78, 0x00, 0x80, 0x01, 0x01, 0x88, 0x01, 0x00, 0x90, 0x01, 0x01, 0x98, 0x01, 0x01, 0xA0, 0x01,
 				0x64, 0xA8, 0x01, 0xC8, 0x61, 0xB0, 0x01, 0x08, 0xE8, 0x01, 0x00, 0x90, 0x02, 0x01, 0xA0, 0x02, 0x05, 0x32, 0x08, 0x58, 0x0A, 0x68, 0x81, 0x06, 0x80, 0x01, 0x00, 0x3A, 0x0D, 0x08,
 				0xF8, 0xDC, 0x04, 0x15, 0x00, 0x00, 0x00, 0x00, 0x18, 0x01, 0x50, 0x00, 0xA0, 0x01, 0x00, 0xA8, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x02,
-				0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1);
+				0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1
+			]));
 
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob,
 				b => b
@@ -975,33 +976,27 @@ namespace Faolan.GameServer.CreateFlow
 			// The editor's captured time of day (0x4743EB00 = 50155s = 13:55) with a generated resync anchor. The backdrop
 			// has no day/night to track, so this stays the captured value rather than the live clock.
 			var (editorGameDay, editorUnixSeconds) = GameClock.ResyncAnchor(now ?? DateTimeOffset.UtcNow);
-			await Iir(GameServer0X2000Opcodes.GameTimeIIR, CreateEditorRecordBuilder.BuildGameTimeIir(BitConverter.UInt32BitsToSingle(0x4743EB00), 1u, editorGameDay, editorUnixSeconds));
+			await Record(GameTimeCodec.Build(new GameTimeIIR(BitConverter.UInt32BitsToSingle(0x4743EB00), 1u, editorGameDay, editorUnixSeconds)));
 
-			// #189: constructed via BuildStatIir (was verbatim). flag=0 for 0x0F4266, then a flag=1 / value=0 run 0x0F4285..0x0F428C.
-			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(EntityClass.Character, id, 0x00, 0x0F4266, 0x00));
+			// #189: constructed via StatCodec (was verbatim). env=0 for 0x0F4266, then an env=1 / value=0 run 0x0F4285..0x0F428C.
+			await Record(StatCodec.Build(new StatIIR(id, 0x00, 0x0F4266, 0x00)));
 
 			for (uint statId = 0x0F4285; statId <= 0x0F428C; statId++)
-				await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(EntityClass.Character, id, 0x01, statId, 0x00));
+				await Record(StatCodec.Build(new StatIIR(id, 0x01, statId, 0x00)));
 
 			return;
 
-			Task Iir(GameServer0X2000Opcodes iir, params byte[] body)
+			Task Record(byte[] record)
 			{
-				return SendIir(client, sender, receiver, iir, body);
+				return SendIirRecord(client, sender, receiver, record);
 			}
 
 			// Emits a SimpleChar scene-pedestal record, RECONSTRUCTED from its own bytes (transform + identity
 			// rebuilt, pre-IIR scaffold carried, session playfield threaded - CreateEditorCharBuilder). The live
-			// "Character..." preview stays on IirId (it carries the live client instance as its handle).
+			// "Character..." preview stays on LivePreview (it carries the live client instance as its handle).
 			Task IirChar(params byte[] verbatim)
 			{
-				return Iir(GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, CreateEditorCharBuilder.Reconstruct(verbatim, CreateEditorCharBuilder.EditorPlayfieldInstance)!);
-			}
-
-			Task IirId(GameServer0X2000Opcodes iir, byte[] prefix, params byte[] suffix)
-			{
-				return client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob,
-					s => s.WriteArrayUInt32Length(x => x.WriteUInt32(iir).WriteArray(prefix).WriteUInt32(id).WriteArray(suffix))));
+				return Record(CreateEditorCharBuilder.Reconstruct(verbatim, CreateEditorCharBuilder.EditorPlayfieldInstance)!);
 			}
 		}
 
@@ -1041,69 +1036,77 @@ namespace Faolan.GameServer.CreateFlow
 			var sender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
 			var receiver = Endpoints.Endpoint(Endpoints.GameInterfaceType, id);
 
-			const uint W = EntityClass.Character; // EntityClass.Character (0xC350)
-
 			// Initial vitals + behavior/action setup for the editor entities (handles 0x0009FF92..96).
-			await Iir(GameServer0X2000Opcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF92u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));
-			await Iir(GameServer0X2000Opcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF93u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF94u, 5, 85843, 1, 24, 0));
-			await Iir(GameServer0X2000Opcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF94u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF95u, 7, 41413, 1, 24, 0));
-			await Iir(GameServer0X2000Opcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF95u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF96u, 7, 41413, 1, 24, 0));
-			await Iir(GameServer0X2000Opcodes.StatUpdateIIR, CreateEditorRecordBuilder.BuildStatUpdateIir(0x0009FF96u, [(0x1Bu, 0x189Cu), (0x1F8u, 0x189Cu), (0x1FAu, 0x189Cu)]));
+			await Record(StatUpdateCodec.Build(0x0009FF92u, EditorVitals()));
+			await Record(StatUpdateCodec.Build(0x0009FF93u, EditorVitals()));
+			await Record(BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(0x0009FF94u, 5, 85843, 1, 24, 0)));
+			await Record(StatUpdateCodec.Build(0x0009FF94u, EditorVitals()));
+			await Record(BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(0x0009FF95u, 7, 41413, 1, 24, 0)));
+			await Record(StatUpdateCodec.Build(0x0009FF95u, EditorVitals()));
+			await Record(BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(0x0009FF96u, 7, 41413, 1, 24, 0)));
+			await Record(StatUpdateCodec.Build(0x0009FF96u, EditorVitals()));
 
-			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(W, id, 0x00, 0x0360, 0x02));
+			await Record(StatCodec.Build(new StatIIR(id, 0x00, 0x0360, 0x02)));
 
-			// MagicBuff carries the instance twice (caster + target).
-			await client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000Opcodes.MagicBuffIIR)
-					.WriteArray(0x00, 0x00, 0xC3, 0x50)
-					.WriteUInt32(id)
-					.WriteArray(0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00, 0x00, 0xC3, 0x50)
-					.WriteUInt32(id)
-					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00,
-						0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x3D, 0x5F, 0xC9, 0x66))));
+			// MagicBuff carries the instance twice (applyTo + applyFrom); the 54-byte APPLY payload rides verbatim.
+			await Record(MagicBuffCodec.Build(new MagicBuffIIR(id, 0x00, 0x00000B90, 0x00, id,
+			[
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x90, 0x00, 0x00,
+				0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x3D, 0x5F, 0xC9, 0x66
+			])));
 
-			await Iir(GameServer0X2000Opcodes.EnergyIIR, CreateEditorRecordBuilder.BuildEnergyIir(W, id, 0x01, 0x00));
+			await Record(EnergyCodec.Build(new EnergyIIR(id, 0x01, 0x00)));
 
-			// Stat run (flag=1, value=0): entity stat ids 0x0566..0x0573, then 0x0575 and 0x0580.
+			// Stat run (env=1, value=0): entity stat ids 0x0566..0x0573, then 0x0575 and 0x0580.
 			foreach (var statId in (uint[])[0x0566, 0x0567, 0x0568, 0x0569, 0x056A, 0x056B, 0x056C, 0x056D, 0x056E, 0x056F, 0x0570, 0x0571, 0x0572, 0x0573, 0x0575, 0x0580])
-				await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(W, id, 0x01, statId, 0x00));
+				await Record(StatCodec.Build(new StatIIR(id, 0x01, statId, 0x00)));
 
-			await Iir(GameServer0X2000Opcodes.StatIIR, CreateEditorRecordBuilder.BuildStatIir(W, id, 0x00, 0x0F428F, 0x00));
+			await Record(StatCodec.Build(new StatIIR(id, 0x00, 0x0F428F, 0x00)));
 
-			await Iir(GameServer0X2000Opcodes.StatUpdateIIR,
-				CreateEditorRecordBuilder.BuildStatUpdateIir(id, [(0x1Bu, 0x1F40u), (0xBAu, 0x00u), (0x1FFu, 0x00u), (0x200u, 0x301u), (0x201u, 0x00u), (0x25Fu, 0x59EA5C54u)]));
+			await Record(StatUpdateCodec.Build(id, EditorAvatarStats()));
 
 			// ScryScriptIIR: the create-world "PlayOrSkip(72) Slave Galley" remoteformat + its RDB resource manifest, 			// then the "PlayOrSkip" ScriptMessage (decoded by tools/capture/decode_scryscript.py).
-			await IirRecord(ScryScriptCodec.Build(id, CreateWorldScriptToken, 7, resources: CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303));
-			await IirRecord(ScryScriptCodec.Build(id, "PlayOrSkip"));
+			await Record(ScryScriptCodec.Build(id, CreateWorldScriptToken, 7, resources: CreateWorldResourceManifest, f6Field1: 6177372, f6Field2: 9422303));
+			await Record(ScryScriptCodec.Build(id, "PlayOrSkip"));
 
 			// SetMorphValue setup (hair meshes, then a texscript) on the editor entities.
-			await Iir(GameServer0X2000Opcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF94u, "hairmesh_207920", 1.0f, 0x00, 0x00000001u));
-			await Iir(GameServer0X2000Opcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF95u, "hairmesh_203666", 1.0f, 0x00, 0x00000001u));
-			await Iir(GameServer0X2000Opcodes.BehaviorControlCenterIIR, CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(0x0009FF94u, 5, 85843, 2, 24, 0));
-			await Iir(GameServer0X2000Opcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(id, "texscript_183875", 1.0f, 0x01, 0x00000001u));
-			await Iir(GameServer0X2000Opcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF95u, "texscript_183875", 1.0f, 0x01, 0x00000002u));
-			await Iir(GameServer0X2000Opcodes.SetMorphValueIIR, CreateEditorRecordBuilder.BuildSetMorphValueIir(0x0009FF94u, "texscript_183875", 1.0f, 0x01, 0x00000002u));
+			await Record(SetMorphValueCodec.Build(new SetMorphValueIIR(0x0009FF94u, "*hairmesh_207920", 1.0f, 0x00, 0x00000001u)));
+			await Record(SetMorphValueCodec.Build(new SetMorphValueIIR(0x0009FF95u, "*hairmesh_203666", 1.0f, 0x00, 0x00000001u)));
+			await Record(BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(0x0009FF94u, 5, 85843, 2, 24, 0)));
+			await Record(SetMorphValueCodec.Build(new SetMorphValueIIR(id, "*texscript_183875", 1.0f, 0x01, 0x00000001u)));
+			await Record(SetMorphValueCodec.Build(new SetMorphValueIIR(0x0009FF95u, "*texscript_183875", 1.0f, 0x01, 0x00000002u)));
+			await Record(SetMorphValueCodec.Build(new SetMorphValueIIR(0x0009FF94u, "*texscript_183875", 1.0f, 0x01, 0x00000002u)));
 
 			return;
 
-			// One IIR packet: 0x2000 envelope -> [u32 length][u32 IIR-id][body]. The length is recomputed, so editing
-			// a body never desyncs it.
-			Task Iir(GameServer0X2000Opcodes iir, params byte[] body)
+			// One IIR packet: 0x2000 envelope -> [u32 length][record]. The length is recomputed, so editing a record
+			// never desyncs it.
+			Task Record(byte[] record)
 			{
-				return SendIir(client, sender, receiver, iir, body);
+				return SendIirRecord(client, sender, receiver, record);
 			}
+		}
 
-			// Sends a fully-built IIR record (one that already begins with its sub-opcode, e.g. ScryScript.BuildStep);
-			// the length prefix is recomputed by WriteArrayUInt32Length.
-			Task IirRecord(byte[] record)
-			{
-				return client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
-			}
+		// The three vitals every create-editor entity is seeded with, and the avatar's own six-stat push. Raw WIRE
+		// values straight from the capture (hence SetRaw, which applies no display scale); the ids past PlayerId are
+		// unnamed in CharacterStatId. Fresh blocks per call - CharacterStatBlock is mutable.
+		private static CharacterStatBlock EditorVitals()
+		{
+			return new CharacterStatBlock()
+				.SetRaw(CharacterStatId.HealthCurrent, 0x189C)
+				.SetRaw(CharacterStatId.StaminaCurrent, 0x189C)
+				.SetRaw(CharacterStatId.ManaCurrent, 0x189C);
+		}
+
+		private static CharacterStatBlock EditorAvatarStats()
+		{
+			return new CharacterStatBlock()
+				.SetRaw(CharacterStatId.HealthCurrent, 0x1F40)
+				.SetRaw(CharacterStatId.Mount, 0x00)
+				.SetRaw((CharacterStatId)0x1FF, 0x00)
+				.SetRaw((CharacterStatId)0x200, 0x0301)
+				.SetRaw((CharacterStatId)0x201, 0x00)
+				.SetRaw(CharacterStatId.PlayerId, 0x59EA5C54);
 		}
 
 		internal static Task SendRetailCreateEditorPostReadyAck(INetworkClient client, uint requestId)
@@ -1134,8 +1137,7 @@ namespace Faolan.GameServer.CreateFlow
 					0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD, 0x00, 0x00, 0x07, 0xE2, 0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD, 0x00, 0x00,
 					0xC7, 0x9E, 0x00, 0x00, 0x0F, 0xAA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00
 				]));
-			await SendIir(client, Endpoints.Endpoint(Endpoints.GameAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameServer0X2000Opcodes.CharInPlayIIR,
-				CreateEditorRecordBuilder.BuildCharInPlayIir(id));
+			await SendIirRecord(client, Endpoints.Endpoint(Endpoints.GameAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), CharInPlayCodec.Build(new CharInPlayIIR(id)));
 
 			// The racial CHARACTER-TEMPLATE choice list the creation editor reads (Male/Female/StygianSlaver ->
 			// template ids 50000:65525x), delivered on two GameActionListIIR (0xF508F4C1) records for dynel 0xD00C.
@@ -1242,42 +1244,17 @@ namespace Faolan.GameServer.CreateFlow
 		// HandleCommandPacket already reads typed. It used to be written as raw tag bytes.
 		private static Task SendA36DCallback(INetworkClient client, string token, string value)
 		{
-			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob, b => b.WriteArrayUInt32Length(s =>
-			{
-				s.WriteUInt32(GameServer0X2000Opcodes.ScryScriptIIR);
-				s.WriteUInt32(EntityClass.Character);
-				s.WriteUInt32(client.Session.Account.ClientInstance);
-				s.WriteByte(0x00);
-				s.WriteProtobufUInt32Length(new ProtoScryScriptIIR
-				{
-					Version = 5,
-					type = ProtoScryScriptIIR.Type.ScriptMessage,
-					IntParameter = 0, // sint32 - zigzag(0) is 0, so this is the same `18 00` as before
-					StringParameterOne = token,
-					StringParameterTwo = value,
-					IdParameter = new ProtoID32
-					{
-						Type = 0,
-						Instance = 0
-					}
-				});
-			})));
+			return SendCreateEditor2000Record(client,
+				ScryScriptCodec.Build(client.Session.Account.ClientInstance, token, (uint)ProtoScryScriptIIR.Type.ScriptMessage, resources: value));
 		}
 
-		// Builds a creator-connection 0x2000 packet: subOpcode + ack(0xC350) + clientInstance + fixed tail.
-		private static Task SendCreateEditor2000(INetworkClient client, uint subOpcode, byte[] tail, uint instance)
-		{
-			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob, b => b.WriteArrayUInt32Length(s =>
-			{
-				s.WriteUInt32(subOpcode);
-				s.WriteUInt32(EntityClass.Character);
-				s.WriteUInt32(instance);
-				s.WriteArray(tail);
-			})));
-		}
-
-		// Sends a fully-built create-editor IIR record (one that already begins with its sub-opcode, e.g.
-		// ScryScript.BuildStartScriptGroup) on the same conversation framing as SendCreateEditor2000.
+		// Sends a fully-built create-editor IIR RECORD - one that already begins with its sub-opcode, i.e. whatever
+		// `XCodec.Build(...)` returned - on the creator connection.
+		//
+		// ⚠️ There is deliberately no `(subOpcode, tail)` twin any more (#542). That shape made every burst step name
+		// an IIR in the SERVICE, which is #530 rule 7's definition of a file that encodes, and it forced a helper
+		// (`CreateEditorRecordBuilder`) whose whole job was slicing the sub-opcode back off a record so this could
+		// re-prepend it.
 		private static Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
 		{
 			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
@@ -1292,16 +1269,16 @@ namespace Faolan.GameServer.CreateFlow
 				s => s.WriteArrayUInt32Length(GameActionListCodec.Build(new GameActionListIIR(id, dynel, 0u, actionTail)))));
 		}
 
-		// The create-flow send idiom: one 0x2000 record ([u32 len][u32 iir opcode][body]) delivered via DispatchPassBlob.
-		// Every editor/world-prep burst funnels its records through here instead of re-spelling the PacketStream chain.
-		private static Task SendIir(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, GameServer0X2000Opcodes iir, params byte[] body)
+		// The create-flow send idiom: one 0x2000 record ([u32 len][record]) delivered via DispatchPassBlob, where the
+		// record is a codec's `Build` output and therefore already carries its own sub-opcode. Every editor/world-prep
+		// burst funnels its records through here instead of re-spelling the PacketStream chain.
+		private static Task SendIirRecord(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, byte[] record)
 		{
-			return client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(x => x.WriteUInt32(iir).WriteArray(body))));
+			return client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 		}
 
-		// Sends the 0xBADF5A4B ack for one SetMorphValue. The wire layout (after the 0x2000 wrapper) is:
-		//   subOpcode(0xBADF5A4B) ack(0xC350) clientInstance uint16(0) [byteLen morphValue] float byte(0) counter
-		// The float is a server-side default that is not present in the client's message: textures
+		// Sends the SetMorphValueIIR ack for one SetMorphValue (SetMorphValueCodec owns the layout).
+		// The weight is a server-side default that is not present in the client's message: textures
 		// (values starting with '*') use 1.0, body morphs use -0.03 (the only two values seen in retail).
 		private static Task SendMorphValueAck(INetworkClient client, string morphValue)
 		{
@@ -1309,24 +1286,11 @@ namespace Faolan.GameServer.CreateFlow
 			var counter = client.Session.MorphAckCounter == 0
 				? client.Session.MorphAckCounter = 2
 				: ++client.Session.MorphAckCounter;
-			// IEEE-754 bits written big-endian (the editor reads these floats big-endian here, unlike
-			// FaolanStream.WriteFloat which is little-endian). 1.0f=0x3F800000 for textures (values starting
-			// with '*'), -0.03f=0xBCF5C28F for body morphs - the only two values retail uses.
-			var floatBits = morphValue.StartsWith("*", StringComparison.Ordinal)
-				? 0x3F800000u
-				: 0xBCF5C28Fu;
+			var weight = morphValue.StartsWith("*", StringComparison.Ordinal)
+				? 1.0f
+				: -0.03f;
 
-			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob, b => b.WriteArrayUInt32Length(s =>
-			{
-				s.WriteUInt32(GameServer0X2000Opcodes.SetMorphValueIIR);
-				s.WriteUInt32(EntityClass.Character);
-				s.WriteUInt32(instance);
-				s.WriteUInt16(0);
-				s.WriteStringByteLength(morphValue);
-				s.WriteUInt32(floatBits);
-				s.WriteByte(0);
-				s.WriteUInt32(counter);
-			})));
+			return SendCreateEditor2000Record(client, SetMorphValueCodec.Build(new SetMorphValueIIR(instance, morphValue, weight, 0, counter)));
 		}
 
 		// Reject a chosen name so the client re-prompts instead of dead-ending (no loading screen). Retail answers a
@@ -1348,7 +1312,7 @@ namespace Faolan.GameServer.CreateFlow
 			var instance = client.Session.Account.ClientInstance;
 			var character = client.Session.Character;
 
-			await SendCreateEditor2000(client, (uint)GameServer0X2000Opcodes.StatIIR, [0x01, 0x00, 0x00, 0x05, 0x78, 0x00, 0x00, 0x00, 0x00], instance);
+			await SendCreateEditor2000Record(client, StatCodec.Build(new StatIIR(instance, 0x01, 0x0578, 0x00)));
 			await SendCreateEditor2000Record(client, ScryScriptCodec.Build(instance, 35820)); // StartScriptGroupOnClient (#223)
 
 			// The editor's class-base push: stat 0x0001 / 0x01F9 / 0x01FB for the class the player just chose. Retail

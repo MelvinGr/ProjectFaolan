@@ -1,3 +1,5 @@
+using System;
+using System.Text;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
@@ -103,6 +105,47 @@ namespace Faolan.Core.Network.Codecs.Combat
 			}
 
 			return new BehaviorControlCenterIIR(handle, form, slot, message.ToProtobuf(), tail);
+		}
+
+		// The LONG (116-byte) registration: the same head as `Registration` plus an 88-byte behaviour-state tail that
+		// binds the behaviour to an EQUIPPED ITEM (the three records in the WorldPrep stream each pair with one of that
+		// burst's DispatchAddItem equipment pieces - the item's handle, its 4-char entity tag and its transform all
+		// match):
+		//   [u32 index][u32 someId][u32 itemHandle][u32 itemHandle][u32 0][u32 1][char[4] tag]
+		//   [byte[16] transform][byte[16] transform][8-byte ownerStamp][8-byte ownerStamp][12 zero bytes]
+		// The item handle + 4-char tag are repeated; the 16-byte transform is the item's pose packed as four
+		// big-endian u32 (the same x/y/z + rotation values the paired DispatchAddItem carries as fixed32 protobuf
+		// fields), also repeated; `ownerStamp` (0xB290805C 0x29E627CA) is the fixed creator/timestamp pair that
+		// recurs across the whole WorldPrep burst (semantics unpinned). The trailing 3 u32 are 0 in the WorldPrep
+		// equipment records but carry a small state pair (e.g. 0,1,1) in the create-world cutscene's mount/companion
+		// long form. Decoded from WorldPrepBurst.bin by tools/capture/decode_create_iir_records.py.
+		public static BehaviorControlCenterIIR ItemRegistration(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint index, uint someId, uint itemHandle, string tag,
+			byte[] transform, uint trailingA = 0, uint trailingB = 0, uint trailingC = 0)
+		{
+			var tagBytes = Encoding.Latin1.GetBytes(tag);
+			if (tagBytes.Length != 4)
+				throw new ArgumentException("behavior entity tag must be 4 ASCII chars", nameof(tag));
+			if (transform.Length != 16)
+				throw new ArgumentException("behavior transform must be 16 bytes", nameof(transform));
+
+			using var itemTail = new FaolanStream();
+			itemTail
+				.WriteUInt32(index)
+				.WriteUInt32(someId)
+				.WriteUInt32(itemHandle)
+				.WriteUInt32(itemHandle)
+				.WriteUInt32(0u)
+				.WriteUInt32(1u)
+				.WriteArray(tagBytes)
+				.WriteArray(transform)
+				.WriteArray(transform)
+				.WriteArray(NullIdentity.Bytes)
+				.WriteArray(NullIdentity.Bytes)
+				.WriteUInt32(trailingA)
+				.WriteUInt32(trailingB)
+				.WriteUInt32(trailingC);
+
+			return Registration(handle, slot, behaviorId, phase, field5, field6) with { Tail = itemTail.ToArray() };
 		}
 
 		// The object-action STATE record (behaviorId 0x12) that HOLDS the player in the seated pose. The sit ANIMATION

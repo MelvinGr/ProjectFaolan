@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**80** IIR carrier types · **60 V3** (60 with an auto-cited golden). The
+**80** IIR carrier types · **61 V3** (61 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -65,6 +65,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `QuestLogListIIR` | `0x504B7924` | `QuestLogListCodec` | [V3: QuestTests.QuestDefinitionExtractor_RoundTripsCasilda] |
 | V3 | `RemoveFromGroupIIR` | `0xE4FF0C85` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
 | V3 | `ScryScriptIIR` | `0xA36D3B74` | `ScryScriptCodec` | [V3: ScryScriptCodecTests.BuildStartScriptGroup_MatchesTheHandWrittenBytes] |
+| V3 | `SetNameIIR` | `0xADCE0CDA` | `SetNameCodec` | [V3: WorldSetNameIirTests.BuildWorldSetNameIir_MatchesRecoveredGrammar] |
 | V3 | `SetPosIIR` | `0x04B80B24` | `SetPosCodec` | [V3: DeadReckoningCodecTests.SetPos_RoundTripsByteExact] |
 | V3 | `SimpleCharFullUpdateIIR` | `0xFA015807` | `SimpleCharFullUpdateCodec` | [V3: SimpleCharFullUpdateCodecTests.Build_AfterCharacterIirSwap_StaysParseable] |
 | V3 | `SimpleCharKilledByUpdateIIR` | `0xB066AFC2` | `SimpleCharKilledByUpdateCodec` | [V3: DeathSequenceTests.BuildKilledBy_ReproducesCapturedRecord_ByteExact] |
@@ -92,7 +93,6 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `MoveInventoryItemCodec` |  |
 | V2 | `RegenIIR` | `0x28D0AC99` | `RegenCodec` |  |
 | V2 | `SetMorphValueIIR` | `0xBADF5A4B` | `SetMorphValueCodec` |  |
-| V2 | `SetNameIIR` | `0xADCE0CDA` | `SetNameCodec` |  |
 | V2 | `SetShadowCoverageIIR` | `0xD6C1F0CC` | `SetShadowCoverageCodec` |  |
 | V2 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` |  |
 | V2 | `StatIIR` | `0xF98E10B3` | `StatCodec` |  |

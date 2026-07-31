@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
@@ -30,17 +31,17 @@ namespace Faolan.Tests
 			"9c5001ea7b9c0000000000000000180000000101ea7b9c0000cb2041700000415dc69500000000ffffffffffffffff00" +
 			"00000700000080";
 
-		private static byte[] BuildCapturedBody()
+		private static byte[] BuildCapturedRecord()
 		{
-			return CreateEditorRecordBuilder.BuildPlayfieldFiir(260f, 0f, 290f, 0x00000FA0, 0x00000000, 1, 0x01EA7B9C, 15f, 13.860981941223145f, 0x00000080);
+			return PlayfieldFCodec.Build(new Vector3(260f, 0f, 290f), 0x00000FA0, 0x00000000, 1, 0x01EA7B9C, 15f, 13.860981941223145f, 0x00000080);
 		}
 
 		[Fact]
 		public void BuildIir_ReproducesTheCapturedRecord()
 		{
-			var built = BuildCapturedBody();
+			var built = BuildCapturedRecord();
 
-			Assert.Equal(CapturedIirContent[8..], Convert.ToHexString(built).ToLowerInvariant());
+			Assert.Equal(CapturedIirContent, Convert.ToHexString(built).ToLowerInvariant());
 		}
 
 		// Parse reads the record SEQUENTIALLY to its last byte (#530 rule 3), so a builder/parser drift cannot hide.

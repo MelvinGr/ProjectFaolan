@@ -17,8 +17,7 @@ in `faolan.db`), so this affects all real creatures.
 
 `SetNameIIR_t` (0xADCE0CDA) is a per-entity name commit the client honours. The **in-world** path
 (`n3InfoItemRemote::Construct` → `SetNameIIR_t::ReadSubClass`) is a DISTINCT grammar from the create-editor
-`SetNameIIR` (`CreateEditorRecordBuilder.BuildSetNameIir`, a different reader). Builder:
-`CreateEditorRecordBuilder.BuildWorldSetNameIir`.
+`SetNameIIR` (`SetNames.Accepted`, a different reader). Builder: `SetNameCodec.Build(SetNames.Nameplate(...))`.
 
 ### Wire record (after the `[u32 len][u32 opcode]` IIR carrier)
 

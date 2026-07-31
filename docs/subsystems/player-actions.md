@@ -13,7 +13,7 @@ book start a weave on a necromancer.
 for the server to assert the behaviour before the stance visibly takes. That is the single most useful fact on
 this page: implementing a stance means emitting the player's BCC, not just recording state.
 
-The BCC body is the ordinary behaviour record (`CreateEditorRecordBuilder.BuildBehaviorControlCenterIir`):
+The BCC body is the ordinary behaviour record (`BehaviorAnimations.Registration`):
 
 ```
 [u32 type=Character][u32 handle][u16 form][u32 slot][u32 protobufLen][protobuf][trailer]
@@ -101,6 +101,6 @@ one to send it, so a value other than 100 is expected somewhere the corpus simpl
 - `GameServerListener.Inbound.cs` — the `PerformSpecialAction` handler and its routing.
 - `StartingData.SpellweaveToggleAction` — the per-class spellweave selector.
 - `SpellweaveService` — the trance state machine ([docs/subsystems/combos.md](combos.md)).
-- `CreateEditorRecordBuilder.BuildBehaviorControlCenterIir` — the BCC record every action is answered with.
+- `BehaviorAnimations.Registration` — the BCC record every action is answered with.
 
 Open work tracked in Gitea #505.

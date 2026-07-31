@@ -101,11 +101,11 @@ namespace Faolan.GameServer
 
 			// The CharInPlayIIR echo (retail fr324: [u32 len][864cfef8][C350][instance][00]).
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50).WriteUInt32(instance).WriteArray(0x00)));
+				b => b.WriteArrayUInt32Length(CharInPlayCodec.Build(new CharInPlayIIR(instance)))));
 
 			// RegenIIR (retail fr325 carries 0 / 0x8F2 / 0 - the middle pool is the only seeded one).
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(x => x.WriteUInt32(GameServer0X2000Opcodes.RegenIIR).WriteArray(CreateEditorRecordBuilder.BuildRegenIir(instance, 0, 0x8F2, 0)))));
+				s => s.WriteArrayUInt32Length(RegenCodec.Build(new RegenIIR(instance, 0x00, 0, 0x8F2, 0)))));
 
 			// SyncCanSprint (0x200C, one byte).
 			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),
@@ -121,13 +121,7 @@ namespace Faolan.GameServer
 		private async Task SendWorldReadyBurst(INetworkClient client)
 		{
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000Opcodes.StatIIR)
-					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(client.Session.Character.Id)
-					.WriteByte(0x01)
-					.WriteUInt32(0x00000013)
-					.WriteUInt32(0x00000000))));
+				b => b.WriteArrayUInt32Length(StatCodec.Build(new StatIIR(client.Session.Character.Id, 0x01, 0x00000013, 0x00000000)))));
 			Logger.LogInformation("Sent deferred StatIIR prompt.");
 
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker,
@@ -181,7 +175,7 @@ namespace Faolan.GameServer
 
 			// record 0: 0x00002000, 17-byte body
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, Endpoints.Endpoint(Endpoints.GameInterfaceType, instance), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArray(0x00, 0x00, 0x00, 0x0D, 0x86, 0x4C, 0xFE, 0xF8, 0x00, 0x00, 0xC3, 0x50).WriteUInt32(instance).WriteArray(0x00)));
+				b => b.WriteArrayUInt32Length(CharInPlayCodec.Build(new CharInPlayIIR(instance)))));
 
 			// record 1: 0x0000200C, 1-byte body
 			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),

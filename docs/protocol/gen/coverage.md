@@ -8,8 +8,8 @@
 ## Headline
 
 - **826** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **80** IIR carrier types: **60 V3** (byte-exact builder), **20 V2** (built, no golden), **0 V1** (no builder found).
-- **68** codec classes, **49** with a byte-exact test.
+- **80** IIR carrier types: **61 V3** (byte-exact builder), **19 V2** (built, no golden), **0 V1** (no builder found).
+- **68** codec classes, **50** with a byte-exact test.
 - **8** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -87,6 +87,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `QuestLogListIIR` | `QuestLogListCodec` |
 | V3 | `RemoveFromGroupIIR` | `GroupMembershipCodec` |
 | V3 | `ScryScriptIIR` | `ScryScriptCodec` |
+| V3 | `SetNameIIR` | `SetNameCodec` |
 | V3 | `SetPosIIR` | `SetPosCodec` |
 | V3 | `SimpleCharFullUpdateIIR` | `SimpleCharFullUpdateCodec` |
 | V3 | `SimpleCharKilledByUpdateIIR` | `SimpleCharKilledByUpdateCodec` |
@@ -114,7 +115,6 @@ the margins, but never invents a golden that isn't there.
 | V2 | `MoveInventoryItemIIR` | `MoveInventoryItemCodec` |
 | V2 | `RegenIIR` | `RegenCodec` |
 | V2 | `SetMorphValueIIR` | `SetMorphValueCodec` |
-| V2 | `SetNameIIR` | `SetNameCodec` |
 | V2 | `SetShadowCoverageIIR` | `SetShadowCoverageCodec` |
 | V2 | `SpellBookIIR` | `SpellBookCodec` |
 | V2 | `StatIIR` | `StatCodec` |
