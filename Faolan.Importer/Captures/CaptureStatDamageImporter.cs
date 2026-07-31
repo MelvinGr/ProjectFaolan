@@ -31,7 +31,7 @@ namespace Faolan.Importer.Captures
 	// GAPS across captures is safe and is what gives most spells their sample count: a gap is a duration.
 	public static class CaptureStatDamageImporter
 	{
-		private const uint StatDamageSubOpcode = (uint)GameServer0X2000Opcodes.StatDamageIIR;
+		private const uint StatDamageSubOpcode = StatDamageCodec.Opcode;
 
 		private const long TicksPerSecond = 10_000_000;
 

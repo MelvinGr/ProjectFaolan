@@ -12,6 +12,8 @@ using Faolan.Core.Network.Protocol;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using Faolan.Core.Network.Codecs.Dialogue;
+
 namespace Faolan.Importer.Captures
 {
 	// Harvests the player's starting abilities from the retail 0x2052 ability-grant packets (the real wire format,
@@ -28,8 +30,8 @@ namespace Faolan.Importer.Captures
 	// but the CHECK still forbids writing one, so it is equally dead.)
 	public static class CaptureAbilityImporter
 	{
-		private const uint ChangeClassSubOpcode = (uint)GameServer0X2000Opcodes.ScryScriptIIR; // client->server character-editor script callback
-		private const uint ComboBookSubOpcode = (uint)GameServer0X2000Opcodes.ComboBookIIR;
+		private const uint ChangeClassSubOpcode = ScryScriptCodec.Opcode; // client->server character-editor script callback
+		private const uint ComboBookSubOpcode = ComboBookCodec.Opcode;
 		private const ushort AddSpecialAbilityOpcode = (ushort)GameCharInterfaceOpcodes.DispatchAddSpecialAbility;
 
 		// The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive

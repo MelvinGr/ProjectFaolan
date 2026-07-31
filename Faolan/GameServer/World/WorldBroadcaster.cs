@@ -324,8 +324,8 @@ namespace Faolan.GameServer.World
 			// consumed visual. (LootRemoveItems with remaining=0 was already sent above.)
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchCloseLootBag,
 				b => b.WriteUInt32(EntityClass.LootBag).WriteUInt32(bag.Handle)));
-			await WorldIir.Send(client, NewLooterCodec.Build(GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle, 0));
-			await WorldIir.Send(client, NewLooterCodec.Build(GameServer0X2000Opcodes.NewAllowedLooterIIR, bag.Handle, 0));
+			await WorldIir.Send(client, NewLooterCodec.Build(NewLooters.Current(bag.Handle, 0)));
+			await WorldIir.Send(client, NewLooterCodec.Build(NewLooters.Allowed(bag.Handle, 0)));
 			await WorldIir.Send(client, N3ToClientFadeCodec.Build(EntityClass.LootBag, bag.Handle));
 			await WorldIir.Send(client, UpdateSimpleDynelCodec.Build(bag.Handle));
 
@@ -1157,7 +1157,7 @@ namespace Faolan.GameServer.World
 			// NewCurrentLooter rides the WORLD conversation (GameAgent -> GameInterface), as in retail (mount/gameplay
 			// capture frame 1477).
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(NewLooterCodec.Build(GameServer0X2000Opcodes.NewCurrentLooterIIR, bag.Handle, player.Handle))));
+				s => s.WriteArrayUInt32Length(NewLooterCodec.Build(NewLooters.Current(bag.Handle, player.Handle)))));
 
 			// The actual window-open is DispatchOpenLootBag (0x2037) on the GameCharAgent -> GameCharInterface
 			// conversation (the same class-pair as the 0x201C spawn handshake / SpawnCheck), body [loot typetag][bag
@@ -2196,9 +2196,9 @@ namespace Faolan.GameServer.World
 				// packet is a loot-PERMISSION grant, so it names the bag's OWNER (the killer / spawning player), not the
 				// recipient - a drop belongs to whoever earned it. Fall back to the viewer when there's no owner
 				// so the bag still renders.
-				await WorldIir.Send(viewer.Client, NewLooterCodec.Build(GameServer0X2000Opcodes.NewAllowedLooterIIR, handle, allowedLooterHandle != 0
+				await WorldIir.Send(viewer.Client, NewLooterCodec.Build(NewLooters.Allowed(handle, allowedLooterHandle != 0
 					? allowedLooterHandle
-					: viewer.Handle));
+					: viewer.Handle)));
 			}
 
 			return bag;

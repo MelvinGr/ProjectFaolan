@@ -1474,7 +1474,7 @@ namespace Faolan.Importer.Captures
 			var summoned = new HashSet<uint>();
 			foreach (var p in packets)
 			{
-				if (p is not { IsIirCarrier: true, SubOpcode: (uint)GameServer0X2000Opcodes.PetIIR })
+				if (p is not { IsIirCarrier: true, SubOpcode: PetCodec.Opcode })
 					continue;
 
 				// Body slices the packet on every access, so take it once. The sweep runs over a mixed stream, so a

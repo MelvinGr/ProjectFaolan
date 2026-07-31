@@ -14,6 +14,10 @@ namespace Faolan.Core.Network.Codecs.World
 	// dynel but is never baked into the WorldObjects table.
 	public static class WorldObjectClasses
 	{
+		// The plain decor/prop dynel - the class a caller names when it means "an ordinary world object" rather than
+		// the whole family (the corpus extract's world-object slice, the burst's column lift).
+		public const uint SimpleDynel = (uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR;
+
 		public static readonly IReadOnlySet<uint> Placed = new HashSet<uint>
 		{
 			(uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR,

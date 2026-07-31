@@ -833,7 +833,7 @@ namespace Faolan.Importer.Cli
 				// `lvl gap` column below.
 				foreach (var p in c.Packets)
 				{
-					if (p is not { IsIirCarrier: true, SubOpcode: (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR })
+					if (p is not { IsIirCarrier: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
 						continue;
 
 					var sb = p.Body;
@@ -858,7 +858,7 @@ namespace Faolan.Importer.Cli
 					if (!p.IsIirCarrier || p.Body is not { Length: >= 8 })
 						continue;
 
-					if (p.Body.ReadU32Be(4) == (uint)GameServer0X2000Opcodes.StatUpdateIIR && p.Body.Length >= 29)
+					if (p.Body.ReadU32Be(4) == StatUpdateCodec.Opcode && p.Body.Length >= 29)
 					{
 						var handle = p.Body.ReadU32Be(12);
 						var count = p.Body[20];
@@ -883,7 +883,7 @@ namespace Faolan.Importer.Cli
 					// ⚠️ SPELL damage is NOT a DamageResult - it rides StatDamageIIR (see StatDamageCodec / #349),
 					// so a census of DamageResult alone reports "no magical schools" and means only "I looked in the
 					// melee packet". A caster NPC's hit is a negative HealthCurrent delta with the caster's handle.
-					if (p.Body.ReadU32Be(4) == (uint)GameServer0X2000Opcodes.StatDamageIIR)
+					if (p.Body.ReadU32Be(4) == StatDamageCodec.Opcode)
 					{
 						StatDamageIIR cast;
 						try
@@ -931,7 +931,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					if (p.Body.ReadU32Be(4) != (uint)GameServer0X2000Opcodes.DamageResultIIR)
+					if (p.Body.ReadU32Be(4) != DamageResultCodec.Opcode)
 						continue;
 
 					DamageResultIIR hit;
@@ -1398,7 +1398,7 @@ namespace Faolan.Importer.Cli
 			foreach (var c in captures)
 				foreach (var p in c.Packets)
 				{
-					if (p.Opcode != 0x2000u || p.SubOpcode != (uint)GameServer0X2000Opcodes.PlayfieldFIIR || p.Bytes.Length < 16)
+					if (p.Opcode != 0x2000u || p.SubOpcode != PlayfieldFCodec.Opcode || p.Bytes.Length < 16)
 						continue;
 
 					var body = p.Bytes[(12 + (int)p.Bytes.ReadU32Be(8))..];
@@ -2421,7 +2421,7 @@ namespace Faolan.Importer.Cli
 			foreach (var c in captures)
 				foreach (var p in c.Packets)
 				{
-					if (!p.IsDownload || p.SubOpcode != (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR)
+					if (!p.IsDownload || p.SubOpcode != FullPlayerCharacterCodec.Opcode)
 						continue;
 
 					var body = p.Bytes.Length >= 16
@@ -2442,7 +2442,7 @@ namespace Faolan.Importer.Cli
 
 				var instance = body.ReadU32Be(12);
 				Console.WriteLine(
-					$"{cap[..Math.Min(46, cap.Length)],-46} size={body.Length,8} instance=0x{instance:X8} 0x{(uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR:X8}@[{string.Join(",", positions)}]");
+					$"{cap[..Math.Min(46, cap.Length)],-46} size={body.Length,8} instance=0x{instance:X8} 0x{FullPlayerCharacterCodec.Opcode:X8}@[{string.Join(",", positions)}]");
 				Console.WriteLine($"    first48: {Convert.ToHexString(body.AsSpan(0, Math.Min(48, body.Length)))}");
 
 				try

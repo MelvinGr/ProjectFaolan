@@ -9,6 +9,16 @@ using System.Text;
 using System.Text.Json;
 using Faolan.Core.Enums;
 
+using Faolan.Core.Network.Codecs.Economy;
+
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+
+using Faolan.Core.Network.Codecs.Quest;
+
+using Faolan.Core.Network.Codecs.Spawn;
+
+using Faolan.Core.Network.Codecs.World;
+
 namespace Faolan.Importer.Captures
 {
 	// Writes the CORPUS EXTRACT: the handful of packet bodies the test suite actually reads, pulled out of the 349 MB
@@ -35,12 +45,12 @@ namespace Faolan.Importer.Captures
 		// regenerating - the extract deliberately freezes the set rather than guessing.
 		public static readonly (uint Iir, string Name)[] WantedIirs =
 		[
-			((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, "snapshot tails, protobuf root, death vitals, quest regions"),
-			((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, "spawn - the protobuf round-trip corpus"), ((uint)GameServer0X2000Opcodes.MoveTaskIIR, "MoveTask"),
-			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, "QuestFullUpdate"), ((uint)GameServer0X2000Opcodes.QuestJournalIIR, "QuestJournal"),
-			((uint)GameServer0X2000Opcodes.QuestLogListIIR, "QuestLogList"), ((uint)GameServer0X2000Opcodes.PlayfieldFIIR, "map change - NpcSpawnExtractor needs it to key spawns to a map"),
-			((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, "the one captured recipe catalog"),
-			((uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, "world objects - the identity+geometry column lift, byte-compared")
+			(FullPlayerCharacterCodec.Opcode, "snapshot tails, protobuf root, death vitals, quest regions"),
+			(SimpleCharFullUpdateCodec.Opcode, "spawn - the protobuf round-trip corpus"), (MoveTaskCodec.Opcode, "MoveTask"),
+			(QuestFullUpdateCodec.Opcode, "QuestFullUpdate"), (QuestJournalCodec.Opcode, "QuestJournal"),
+			(QuestLogListCodec.Opcode, "QuestLogList"), (PlayfieldFCodec.Opcode, "map change - NpcSpawnExtractor needs it to key spawns to a map"),
+			(TradeskillReplyCodec.Opcode, "the one captured recipe catalog"),
+			(WorldObjectClasses.SimpleDynel, "world objects - the identity+geometry column lift, byte-compared")
 		];
 
 		// Reads the tshark JSON DIRECTLY rather than going through TsharkCaptureReader, because the tests consume the

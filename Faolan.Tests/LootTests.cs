@@ -25,7 +25,7 @@ namespace Faolan.Tests
 		public void BuildNewCurrentLooterBody_MatchesCapture()
 		{
 			// hoxxling-login-gameplay: bag 0x000021FE -> looter player 0x01316E71.
-			var body = NewLooterCodec.Build(GameServer0X2000Opcodes.NewCurrentLooterIIR, 0x000021FE, 0x01316E71);
+			var body = NewLooterCodec.Build(NewLooters.Current(0x000021FE, 0x01316E71));
 			Assert.Equal("d06568c80000c87a000021fe000000c35001316e71", Convert.ToHexString(body).ToLowerInvariant());
 		}
 

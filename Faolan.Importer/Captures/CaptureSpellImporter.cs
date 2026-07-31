@@ -29,8 +29,8 @@ namespace Faolan.Importer.Captures
 		// How many packets after a cast may still carry its effect buff (#434). The answer lands within a handful of
 		// packets (Frozen Hatred: cast fr5393 -> ApplySpell fr5400); the window only has to outlast the acks between.
 		private const int CastEffectWindow = 40;
-		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
-		private const uint BehaviorSubOpcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
+		private const uint ApplySpellSubOpcode = MagicBuffCodec.Opcode;
+		private const uint BehaviorSubOpcode = BehaviorControlCenterCodec.Opcode;
 		private const uint CastSpellActionType = 4; // ActionType.CastSpell
 		private const uint MaxLevel = 80;
 

@@ -26,7 +26,7 @@ namespace Faolan.Importer.Captures
 			var records = new List<RecipeRecord>();
 			foreach (var p in packets)
 			{
-				if (!p.IsDownload || p.SubOpcode != (uint)GameServer0X2000Opcodes.TradeskillReplyIIR)
+				if (!p.IsDownload || p.SubOpcode != TradeskillReplyCodec.Opcode)
 					continue;
 
 				// Locate the sub-opcode inside the raw packet; the record runs from there to the packet end, which is

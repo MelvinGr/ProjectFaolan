@@ -10,6 +10,8 @@ using Faolan.Importer.Extractors;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 
+using Faolan.Core.Network.Codecs.Economy;
+
 namespace Faolan.Importer.Modules
 {
 	// The remaining capture-sourced modules. Each wraps an existing CaptureX importer / extractor + the shared
@@ -998,7 +1000,7 @@ namespace Faolan.Importer.Modules
 		public ImportSource Source => ImportSource.Captures;
 		public bool InDefaultSet => false;
 
-		public string Description => "Crafting recipes book (TradeskillReplyIIR (uint)GameServer0X2000Opcodes.TradeskillReplyIIR, opt-in).";
+		public string Description => "Crafting recipes book (TradeskillReplyIIR TradeskillReplyCodec.Opcode, opt-in).";
 		public string Name => "recipes";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)

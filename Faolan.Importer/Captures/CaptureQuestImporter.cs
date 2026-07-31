@@ -12,6 +12,8 @@ using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+
 namespace Faolan.Importer.Captures
 {
 	// Seeds each captured character's quest journal (CharacterQuest rows) from three s2c sources on the 0x2000 carrier,
@@ -36,7 +38,7 @@ namespace Faolan.Importer.Captures
 	// Idempotent: updates an existing row, else inserts. Only characters already in the DB are touched.
 	public static class CaptureQuestImporter
 	{
-		private const uint SnapshotSubOpcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
+		private const uint SnapshotSubOpcode = FullPlayerCharacterCodec.Opcode;
 
 		public static async Task<(int Characters, int Quests)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{

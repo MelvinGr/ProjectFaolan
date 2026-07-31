@@ -340,7 +340,17 @@ namespace Faolan.Tests
 
 		// ---- rule 7: encode/decode lives in Codecs/ --------------------------------------------------------
 
-		[Fact(Skip = "un-skip in wave 8 - ConversationExtractor and QuestDefinitionExtractor fail today (see #530 §9 C)")]
+		// ⚠️ `Faolan.Importer/` is CLEAN as of wave 8c - what still fails is `Faolan/`, and it is one shape problem,
+		// not a list of sites: `CreateFlowService`'s burst helper takes `(opcode, tail)` rather than a whole record, so
+		// every one of its 34 steps spells an IIR (`SendCreateEditor2000Record`, which takes a record, already exists
+		// beside it). Reshaping to that is what makes `CreateEditorRecordBuilder` - whose only job is slicing the
+		// sub-op back off for the helper - go away, and it takes `GameServerListener.WorldEntry`'s two prepends with
+		// it. Tracked in Gitea #542.
+		//
+		// The exemption below is also wrong and must be fixed when this goes live: §6 exempts the listener's opcode
+		// DISPATCH switch, but the filter keys on the FILE NAME containing "Dispatch" and the switch lives in
+		// `GameServerListener.Inbound.cs`, so its 22 names would be flagged as decode.
+		[Fact(Skip = "un-skip when #542 lands - Faolan.Importer/ is clean (wave 8c); CreateFlowService's 34 remain")]
 		public void IirOpcodesAreOnlyNamedInsideCodecs()
 		{
 			string[] roots = [TestPaths.Repo("Faolan"), TestPaths.Repo("Faolan.Importer")];

@@ -36,13 +36,13 @@ namespace Faolan.Tests
 		[Fact]
 		public void NewAllowedLooterReset_MatchesCapture()
 		{
-			Assert.Equal("1e2e01390000c87a000021fe000000000000000000", Convert.ToHexStringLower(NewLooterCodec.Build(GameServer0X2000Opcodes.NewAllowedLooterIIR, Bag, 0)));
+			Assert.Equal("1e2e01390000c87a000021fe000000000000000000", Convert.ToHexStringLower(NewLooterCodec.Build(NewLooters.Allowed(Bag, 0))));
 		}
 
 		[Fact]
 		public void NewCurrentLooterReset_MatchesCapture()
 		{
-			Assert.Equal("d06568c80000c87a000021fe000000000000000000", Convert.ToHexStringLower(NewLooterCodec.Build(GameServer0X2000Opcodes.NewCurrentLooterIIR, Bag, 0)));
+			Assert.Equal("d06568c80000c87a000021fe000000000000000000", Convert.ToHexStringLower(NewLooterCodec.Build(NewLooters.Current(Bag, 0))));
 		}
 	}
 }

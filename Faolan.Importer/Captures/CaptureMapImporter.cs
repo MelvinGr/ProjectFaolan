@@ -23,7 +23,7 @@ namespace Faolan.Importer.Captures
 	// Takes raw on-wire packet bytes (no pcap dependency).
 	public static class CaptureMapImporter
 	{
-		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
+		private const uint MapChangeSubOpcode = PlayfieldFCodec.Opcode;
 
 		public static async Task<(int Inserted, int Reflagged)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{

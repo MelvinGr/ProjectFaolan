@@ -13,6 +13,8 @@ using Microsoft.Extensions.Logging;
 
 using Faolan.Core.Network.Constants;
 
+using Faolan.Core.Network.Codecs.Economy;
+
 namespace Faolan.Importer.Captures
 {
 	// Seeds each captured character's personal BANK (CharacterInventory rows in container kind 105) from the on-demand
@@ -24,7 +26,7 @@ namespace Faolan.Importer.Captures
 	public static class CaptureBankImporter
 	{
 		private const int BlobOffset = 17; // subop(4) + 0xC350(4) + charInstance(4) + flag(1) + blobLen(4)
-		private const uint BankIirSubOpcode = (uint)GameServer0X2000Opcodes.BankIIR;
+		private const uint BankIirSubOpcode = BankCodec.Opcode;
 
 		public static async Task<(int Characters, int Items)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{

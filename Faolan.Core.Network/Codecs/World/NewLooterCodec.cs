@@ -30,14 +30,6 @@ namespace Faolan.Core.Network.Codecs.World
 			return s.ToArray();
 		}
 
-		// Assigns `playerHandle` as the bag's looter, or clears it when the handle is 0.
-		public static byte[] Build(GameServer0X2000Opcodes subOpcode, uint bagHandle, uint playerHandle)
-		{
-			return Build(new NewLooterIIR(subOpcode, bagHandle, 0x00, playerHandle == 0
-				? 0
-				: EntityClass.Character, playerHandle));
-		}
-
 		public static NewLooterIIR Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(NewLooterCodec));
@@ -67,4 +59,30 @@ namespace Faolan.Core.Network.Codecs.World
 	// NewCurrentLooterIIR / NewAllowedLooterIIR. LooterClass + LooterHandle are one entity reference; (0, 0) = no
 	// looter.
 	public sealed record NewLooterIIR(GameServer0X2000Opcodes SubOpcode, uint BagHandle, byte Flag, uint LooterClass, uint LooterHandle);
+
+	// VALUE factories for the two looter verbs. They live here, not as Build overloads, so a caller states WHICH
+	// looter it is setting by name instead of handing the codec an IIR opcode - #530 rule 7 keeps the IIR names
+	// inside Codecs/, and `NewLooterCodec.Build(GameServer0X2000Opcodes.NewAllowedLooterIIR, ...)` was the last
+	// place in the server layer that spelled one.
+	public static class NewLooters
+	{
+		// The bag's CURRENT looter - who is holding it open. `playerHandle` 0 clears it.
+		public static NewLooterIIR Current(uint bagHandle, uint playerHandle)
+		{
+			return For(GameServer0X2000Opcodes.NewCurrentLooterIIR, bagHandle, playerHandle);
+		}
+
+		// Who is ALLOWED to loot the bag - and, mid-session, what makes the client instantiate it at all (#263).
+		public static NewLooterIIR Allowed(uint bagHandle, uint playerHandle)
+		{
+			return For(GameServer0X2000Opcodes.NewAllowedLooterIIR, bagHandle, playerHandle);
+		}
+
+		private static NewLooterIIR For(GameServer0X2000Opcodes subOpcode, uint bagHandle, uint playerHandle)
+		{
+			return new NewLooterIIR(subOpcode, bagHandle, 0x00, playerHandle == 0
+				? 0
+				: EntityClass.Character, playerHandle);
+		}
+	}
 }

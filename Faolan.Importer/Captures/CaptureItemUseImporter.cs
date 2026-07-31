@@ -20,8 +20,8 @@ namespace Faolan.Importer.Captures
 	// Moonspill->Mana Potion Effect, etc. See docs/subsystems/item-claims.md (item-use) / GameServerListener.UseInventoryItem.
 	public static class CaptureItemUseImporter
 	{
-		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
-		private const uint TemplateActionSubOpcode = (uint)GameServer0X2000Opcodes.TemplateActionIIR;
+		private const uint ApplySpellSubOpcode = MagicBuffCodec.Opcode;
+		private const uint TemplateActionSubOpcode = TemplateActionCodec.Opcode;
 
 		// (template -> on-use spell BASE) for one capture, in frame order (state resets per capture so a use in one
 		// capture can't pair with a template in the next).

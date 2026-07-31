@@ -226,8 +226,10 @@ Two things already run ahead of that move:
 
 ⚠️ **These rules describe the TARGET shape and are binding on new/edited codecs from now on.** The existing 152
 are being converted folder by folder — migration tracked in Gitea #530, which also carries the per-codec rename
-table. **Every `Codecs/` folder is converted and `Faolan/`'s own wire builders have moved in (wave 7); what remains
-is `Faolan.Importer/`'s hand-decoding (#530 wave 8) and wave 9's cleanup.**
+table. **Every `Codecs/` folder is converted, `Faolan/`'s own wire builders have moved in (wave 7), and
+`Faolan.Importer/` no longer names an IIR or hand-decodes a body a codec owns (wave 8). What remains is the
+create-editor burst's `(opcode, tail)` helper (#542, the last blocker for rule 7's gate), one full-update scan
+(#540), and wave 9's cleanup.**
 `ICodec<T>` has NO implementations left (the interface file goes in wave 9); do not add any.
 
 - **One codec shape: two public method NAMES, nothing else.** A codec is a `static class` exposing exactly

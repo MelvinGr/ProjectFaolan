@@ -30,8 +30,8 @@ namespace Faolan.Importer.Captures
 		// two drift.
 		internal const string ImportAccountName = "faolan";
 		private const uint CharacterListOpcode = 0x20EF; // PlayerAgent SendCharacterList
-		private const uint InventorySnapshotSubOpcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
-		private const uint MapChangeSubOpcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
+		private const uint InventorySnapshotSubOpcode = FullPlayerCharacterCodec.Opcode;
+		private const uint MapChangeSubOpcode = PlayfieldFCodec.Opcode;
 
 
 		// The account imported characters are attached to. 0 = find-or-create ImportAccountName, which is the normal
@@ -77,7 +77,7 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				if (subop != (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR || body.Length <= 136)
+				if (subop != SimpleCharFullUpdateCodec.Opcode || body.Length <= 136)
 					continue;
 
 				// Editor-preview spawns (empty sublist) carry no real class byte - the same frame ImportAsync rejects.
@@ -150,7 +150,7 @@ namespace Faolan.Importer.Captures
 						continue;
 					}
 
-					if (subop != (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR)
+					if (subop != SimpleCharFullUpdateCodec.Opcode)
 						continue;
 
 					// Only PLAYER spawns parse with the scaffold codec (NPC FA015807 bodies have a different

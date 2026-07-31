@@ -128,7 +128,7 @@ namespace Faolan.GameServer
 					.WriteByte(0x01)
 					.WriteUInt32(0x00000013)
 					.WriteUInt32(0x00000000))));
-			Logger.LogInformation("Sent deferred (uint)GameServer0X2000Opcodes.StatIIR prompt.");
+			Logger.LogInformation("Sent deferred StatIIR prompt.");
 
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetQuestMarker,
 				b => b.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteByte(0)));
