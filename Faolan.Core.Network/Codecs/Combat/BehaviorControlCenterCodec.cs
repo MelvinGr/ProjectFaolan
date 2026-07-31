@@ -7,8 +7,8 @@ namespace Faolan.Core.Network.Codecs.Combat
 {
 	// BehaviorControlCenterIIR (0x642CD3D6) - the generic BEHAVIOUR channel. It is the single busiest s2c IIR in the
 	// corpus (49158 records carry seq 0x0004 alone) and it carries everything an entity *does*: combat swings, casts,
-	// the idle pulse, animations aimed at world objects, the equip/interact acks, the death pose transition and the
-	// revive.
+	// the generic action pulse, animations aimed at world objects, the equip/interact acks, the death transition and
+	// the revive.
 	//
 	// ONE grammar, always:
 	//   [u32 subop][u32 class=0xC350][u32 actor][u16 seq][u32 behaviorId][u32 argsLen][args protobuf][tail]
@@ -26,13 +26,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//   * the tail genuinely is not one grammar, and the CLIENT says so: `ReadSubClass` (FUN_005e24e0) reads the
 	//     phase byte, then this `behaviorId`, then hands off to `InstantiateCommand` (FUN_007dcd60) which looks the
 	//     id up in a classmap and constructs a per-COMMAND object that reads the rest itself. So the tail belongs to
-	//     the command, not to this record - see BehaviorId, which is that classmap with the client's own names, and
-	//     Gitea #536 for the per-command readers that remain.
+	//     the command, not to this record - see BehaviorId, which is that classmap with the client's own names.
 	//
-	// ⚠️ Most behaviours have a FIXED tail length, which is the useful half of the census over all 67307 captured
-	// records: BccAction (0x07, 35852 of them), Emote (0x05) and Limbo/Death (0x1F) carry NONE at all - 83% of the
-	// traffic - while Transition is always 20, UseCharacter 4, UseDynel 12 and Equip 88. Only Combat:Melee /
-	// :Ranged / :Unarmed (the shared hit-result family), Magic:Attack, PlayAnimation and ObjectInteraction vary.
+	// ⚠️ Every per-command reader the corpus exercises IS decoded now (#536) - see
+	// docs/re/behaviorcontrolcenter-grammar.md for the table, which accounts for 67289 of the 67299 captured records
+	// with zero mismatches. Eight commands share one no-op reader and so carry NO tail at all (83% of the traffic);
+	// the rest are fixed-width but for Search, Magic:Attack, PlayAnimation, ObjectInteraction and the three attack
+	// commands. The tail stays `byte[]` here regardless: nothing on the server needs it taken apart yet, and this
+	// codec's job is the record, not the command.
+	//
 	// The semantic forms live beside the codec as VALUE factories (`BehaviorAnimations`, `BehaviorAcks`,
 	// `DeathSequence`), not as Build overloads - see CLAUDE.md's codec conventions.
 	//

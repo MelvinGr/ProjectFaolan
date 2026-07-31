@@ -71,14 +71,41 @@ factory matches the id its registration pushed.
 |---:|---|---|---|---|---:|
 | `0x05` | Emote | `SocialCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
 | `0x07` | BccAction | `BCCActionCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
+| `0x0B` | Dance | `DanceCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
+| `0x0C` | DisarmTrap | `DisarmTrapCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
+| `0x15` | Combat:Evasive Maneuver | `MovementRollCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
 | `0x1F` | Limbo/Death | `LimboCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
+| `0x2E` | SwapAlternateEquipment | `SwapAlternateEquipmentCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
+| `0x2F` | Combat:Reactive | `ReactiveCommand_c` | `FUN_007dd5b0` | *nothing* | 0 |
+| `0x08` | Combat:Shield Taunt | `ShieldTauntCommand_c` | `FUN_0114ace0` | 1 × u32 | 4 |
 | `0x16` | UseCharacter | `UseCharacterCommand_c` | `FUN_0081fdb0` | 1 × u32 | 4 |
+| `0x25` | Revive | `ReviveCommand_c` | `FUN_00834420` | 2 × u32 | 8 |
+| `0x0D` | SearchTrap | `SearchTrapCommand_c` | `FUN_00831710` | 3 × u32 | 12 |
+| `0x0E` | UseItem | `UseItemCommand_c` | `FUN_008328b0` | 3 × u32 | 12 |
 | `0x12` | UseDynel | `UseDynelCommand` | `FUN_00832f80` | 3 × u32 | 12 |
-| `0x09` | Equip | `EquipItemCommand_c` | `FUN_00838820` | 2 × u32, an item-identity sub-read (`FUN_005d5150`), 3 × u32 | 88 |
-| `0x0F` | Combat:Melee | `AttackCommandMelee_c` | `FUN_01151170` | base + 7 × u32 + a counted record loop | varies |
+| `0x0A` | Mount | `MountCommand_c` | `FUN_0082f9f0` | 3 × u32 + u8 | 13 |
+| `0x01` | Transition | `TransitionCommand_c` | `FUN_0082cb50` | 5 × u32 | 20 |
+| `0x24` | Climbing | `ClimbingCommand_c` | `FUN_00835b70` | 5 × u32 | 20 |
+| `0x09` | Equip | `EquipItemCommand_c` | `FUN_00838820` | 2 × u32, item-identity sub-read, 3 × u32 | 88 |
+| `0x1E` | Sneak/Hide | `HideCommand_c` | `FUN_00833860` | 1 **or** 2 × u32, chosen by a virtual | 4 or 8 |
+| `0x20` | Search | `SearchCommand_c` | `FUN_00833c50` | `[u8][u32 n][n × 8]` | 5 + 8n |
+| `0x04` | Magic:Attack | `MagicCommand_c` | `FUN_01141060` | `[u64][u8 f][3 × u32 if f≠1][3 × u32][u8]` | 22 or 34 |
+| `0x1D` | PlayAnimation | `PlayAnimationCommand_c` | `FUN_0082b700` | `[u8][u8][u32][string]` | 8 + len |
+| `0x2A` | ObjectInteraction | `ObjectInteractionCommand_c` | `FUN_00836b70` | `[u32][str][3 × u32][str][u32]` | 24 + both |
+| `0x0F` | Combat:Melee | `AttackCommandMelee_c` | `FUN_01151170` | the hit-result block, below | varies |
 | `0x11` | Combat:Unarmed | `AttackCommandUnarmed_c` | `FUN_01151170` | *(same reader)* | varies |
+| `0x10` | Combat:Ranged | `AttackCommandRanged_c` | `FUN_01146af0` | the same + one trailing `0x00` | varies |
 
-Two results fall straight out of that table and settle 83% of the traffic:
+Run over the corpus, these account for **67 289 of the 67 299** captured BCC records (99.99%) with **zero
+mismatches**. The ten that remain are command ids `0x32` (×6), `0x35`, `0x39`, `0x3A` and `0x47` — none of which
+either registration function registers, so a THIRD registration site exists.
+
+⚠️ `PlayAnimation`'s string is the animation name (`sad`, `approve`, `social_conversation_gesticulate`) and
+`ObjectInteraction`'s two are the action name plus its remoteformat (`lootbag_open`,
+`<remoteformat token="startobjectaction(18)|onuse(2)|Treasure…`) — which is why those two were the
+variable-length outliers in the census.
+
+Two results fall straight out of that table:
 
 * **The empty tail is STRUCTURAL, not incidental.** The three commands the census shows with no tail share ONE
   reader, and it is a 3-byte `return;`. Those three are 55 699 of the 67 307 captured records.
@@ -116,9 +143,9 @@ zero results.
 
 Grammar SHAPE decoded (type switch + commandId + per-command reader); the commandId → COMMAND map is enumerated
 with the client's own names; the per-Command readers are walked for every fixed-tail command (83% of the
-captured traffic); and the attack family's counted tail accounts for 100% of its captured bodies. The residue is
-what the middle words MEAN (one is a float, two carry ids) and the per-command readers for the remaining
-variable-tail commands (Magic:Attack, PlayAnimation, ObjectInteraction). Open work tracked in Gitea #536.
+captured traffic); and every per-command reader the corpus exercises is walked — 99.99% of captured records, zero
+mismatches. What is left is not structure but MEANING: the eight middle words of the attack block (one is a
+charge float, two carry ids), and the five unregistered command ids behind the last ten records.
 
 ## Registration form (the create-burst / world-entry BccIIR) — #234
 
