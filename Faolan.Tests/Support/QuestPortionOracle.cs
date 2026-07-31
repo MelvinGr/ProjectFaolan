@@ -16,8 +16,8 @@ namespace Faolan.Tests.Support
 		{
 			ArgumentNullException.ThrowIfNull(def);
 
-			var record = QuestcRecord.BuildSingle(def, state, def.SnapshotUnknown118, def.SnapshotUnknownEc, def.SnapshotUnknownF0, def.SnapshotUnknownF8);
-			record.Objectives = QuestObjectiveRegion.Build(def, instance);
+			var record = QuestcRecords.ForQuest(def, state);
+			record.Objectives = QuestObjectiveRegions.ForQuest(def, instance);
 			var quests = new QuestcRegion
 			{
 				Records =
@@ -25,10 +25,13 @@ namespace Faolan.Tests.Support
 					record
 				}
 			};
-			var index = QuestIndexRegion.Build([def], def);
 
 			// The empty completed-journal frame (0x3F1) always sits between the active journal and the index (#391).
-			byte[] portion = [.. quests.ToArray(), .. CompletedQuestJournalRegion.Build([]).ToArray(), .. index.ToArray()];
+			byte[] portion =
+			[
+				.. QuestcRegionCodec.Build(quests), .. CompletedQuestJournalRegionCodec.Build(CompletedQuestJournalRegions.ForAreas([])),
+				.. QuestIndexRegionCodec.Build(QuestIndexRegions.ForQuests([def], def))
+			];
 			if (portion.Length != FullCharSnapshotSubClass.QuestPortionLength)
 				throw new InvalidOperationException($"generated quest portion is {portion.Length} B, expected {FullCharSnapshotSubClass.QuestPortionLength}");
 

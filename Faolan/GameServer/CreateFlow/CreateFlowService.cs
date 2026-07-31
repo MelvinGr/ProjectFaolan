@@ -434,9 +434,9 @@ namespace Faolan.GameServer.CreateFlow
 			// beach entry; we persist it now so the journal is data-driven from CharacterQuests (delivered live on the
 			// create-world entry, then riding the snapshot on later logins) instead of baked into the snapshot. It is
 			// NOT re-seeded on world entry, so a completed/removed quest never reappears.
-			await _database.SetCharacterQuest(character.Id, WorldQuest.BeachStarterQuestId, QuestState.Active);
+			await _database.SetCharacterQuest(character.Id, QuestContent.BeachStarterQuestId, QuestState.Active);
 			_logger.LogInformation("Character-editor: committed character name '{Name}' for character {CharacterId:X8}; granted starter quest {QuestId}.", name, character.Id,
-				WorldQuest.BeachStarterQuestId);
+				QuestContent.BeachStarterQuestId);
 			return NameCommitResult.Committed;
 		}
 

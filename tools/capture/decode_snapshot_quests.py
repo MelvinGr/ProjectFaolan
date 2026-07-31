@@ -8,7 +8,7 @@ template carrying only the beach starter quest 10238 (Strie's); to show accepted
 this region from the character's quests. This script characterises the grammar so the generator is grounded.
 
 Finding (decode): each quest is one block, structurally the SAME as the QuestFullUpdate (0x63268258) body's
-content section (Faolan.Core.Network/Codecs/Quest/WorldQuest.cs BuildQuestFullUpdate):
+content section (Faolan.Core.Network/Codecs/Quest/QuestFullUpdateCodec.cs):
 
     [0x00000BD3 ChapterTag]?          # grouping word - precedes the FIRST quest of a chapter run
     u32 questId

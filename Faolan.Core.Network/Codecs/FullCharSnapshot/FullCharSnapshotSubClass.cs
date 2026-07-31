@@ -105,13 +105,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		public void Write(FaolanStream writer)
 		{
-			writer.WriteArray(Quests.ToArray());
+			QuestcRegionCodec.Write(writer, Quests);
 
 			if (CompletedQuests != null)
-				writer.WriteArray(CompletedQuests.ToArray());
+				CompletedQuestJournalRegionCodec.Write(writer, CompletedQuests);
 
 			if (QuestIndex != null)
-				writer.WriteArray(QuestIndex.ToArray());
+				QuestIndexRegionCodec.Write(writer, QuestIndex);
 
 			writer.WriteArray(UnknownBeforeAccessWindowTable);
 
@@ -134,12 +134,12 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public static byte[] BuildEmptyQuestPortion()
 		{
 			using var w = new FaolanStream();
-			w.WriteUInt32(QuestcRegion.Version); // 0x18
-			w.WriteUInt32(QuestcRegion.Frame); // 0x3F1 - empty Quest_c list ((0+1)*0x3F1)
+			w.WriteUInt32(QuestcRegionCodec.Version); // 0x18
+			w.WriteUInt32(ListFrame.Empty); // empty Quest_c list ((0+1)*0x3F1)
 			w.WriteUInt32(ListFrame.Empty); // 0x3F1 - empty completed-journal frame (0 areas); NOT an "index tag" (#391)
-			w.WriteUInt32(QuestcRegion.Frame); // 0x3F1 - empty index marker ((0+1)*0x3F1)
+			w.WriteUInt32(ListFrame.Empty); // empty index marker ((0+1)*0x3F1)
 			w.WriteUInt32(0); // index count = 0
-			w.WriteUInt32(QuestIndexRegion.IndexTerminalWord);
+			w.WriteUInt32(QuestIndexRegionCodec.IndexTerminalWord);
 			return w.ToArray();
 		}
 
@@ -261,32 +261,32 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			var ordered = quests.OrderByDescending(q => q.QuestId == primary.QuestId).ThenBy(q => q.QuestId).ToList();
 
 			using var w = new FaolanStream();
-			w.WriteUInt32(QuestcRegion.Version);
-			w.WriteUInt32((ordered.Count + 1) * QuestcRegion.Frame);
+			w.WriteUInt32(QuestcRegionCodec.Version);
+			w.WriteUInt32(ListFrame.ForCount(ordered.Count));
 			foreach (var q in ordered)
 			{
 				// The objective region is part of the RECORD (interleaved per quest), so it rides on the record and
 				// QuestcRecord.Write emits it - keeping the writer symmetric with QuestcRegion.Read (#384).
 				var record = Record(q);
-				record.Objectives = QuestObjectiveRegion.Build(q, instance);
-				record.Write(w);
+				record.Objectives = QuestObjectiveRegions.ForQuest(q, instance);
+				QuestcRecordCodec.Write(w, record);
 			}
 
 			// The COMPLETED-quest journal sits between the active journal and the index (#390) and is ALWAYS present -
 			// as its own frame word even when empty (ListFrame.ForCount(0) == 0x3F1). That empty frame is exactly the
 			// 0x3F1 the index USED to swallow as a phantom "IndexTag" (#391); emitting it here (and dropping the tag
 			// from QuestIndexRegion) keeps the beach/2-quest goldens byte-identical while making the model correct.
-			w.WriteArray(CompletedQuestJournalRegion.Build(completed ?? []).ToArray());
+			CompletedQuestJournalRegionCodec.Write(w, CompletedQuestJournalRegions.ForAreas(completed ?? []));
 
 			// The quest index: all held questIds + one chained area-catalog block per quest, owned by the primary
 			// (its trailer carries the terminal IndexTrailerWord). Modeled by the typed QuestIndexRegion codec.
-			w.WriteArray(QuestIndexRegion.Build(ordered, primary, areas, areaCatalog).ToArray());
+			QuestIndexRegionCodec.Write(w, QuestIndexRegions.ForQuests(ordered, primary, areas, areaCatalog));
 
 			return w.ToArray();
 
 			static QuestcRecord Record(QuestDefinition q)
 			{
-				return QuestcRecord.BuildSingle(q, q.Level, q.SnapshotUnknown118, q.SnapshotUnknownEc, q.SnapshotUnknownF0, q.SnapshotUnknownF8, q.SnapshotUnknown28);
+				return QuestcRecords.ForQuest(q, q.Level);
 			}
 		}
 
@@ -296,7 +296,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			// The tails open with the Quest_c journal region (version + 0x3F1-framed Quest_c list); parse it as a
 			// typed region and take the boundary where it ends as the start of the remaining opaque blob.
-			var quests = QuestcRegion.Parse(data, out var knownHeaderLength);
+			var questReader = new SpanReader(data, nameof(QuestcRegionCodec));
+			var quests = QuestcRegionCodec.Read(ref questReader);
+			var knownHeaderLength = questReader.Position;
 
 			// The @609 per-goal objective region is NOT a separate top-level region: it is interleaved per quest and
 			// QuestcRegion already consumed each record's own (QuestcRecord.Objectives, #384). Parsing it again here
@@ -676,8 +678,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// failure means our model is wrong - not that the region is absent. Swallowing it drops the bytes into
 			// the opaque blob, which is exactly how the completed-quest journal stayed unmodelled while every snapshot
 			// still round-tripped (#390).
-			var region = CompletedQuestJournalRegion.Parse(data, offset, endOffset, out var after);
-			afterRegion = after;
+			// Slicing at `endOffset` makes the safety bound the reader's own: running past it underruns and throws,
+			// naming the offset, instead of silently reading into the next region.
+			var r = new SpanReader(data.AsSpan(offset, endOffset - offset), nameof(CompletedQuestJournalRegionCodec));
+			var region = CompletedQuestJournalRegionCodec.Read(ref r);
+			afterRegion = offset + r.Position;
 			return region;
 		}
 
@@ -696,8 +701,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				return null;
 
 			// The marker says an index starts here, so failing to parse it is a MODEL error, not an absent region.
-			var region = QuestIndexRegion.Parse(data, offset, endOffset);
-			afterIndex = endOffset; // the region consumes to the boundary (its trailer is the remainder)
+			var r = new SpanReader(data.AsSpan(offset, endOffset - offset), nameof(QuestIndexRegionCodec));
+			var region = QuestIndexRegionCodec.Read(ref r);
+			r.EnsureAtEnd(); // the region consumes to the boundary (its trailer is the remainder)
+			afterIndex = endOffset;
 			return region;
 		}
 

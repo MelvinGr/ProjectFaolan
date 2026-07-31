@@ -39,14 +39,16 @@ namespace Faolan.Tests
 				// Only snapshots that actually carry it: the word at the boundary is the region frame, and the region
 				// opens with an areaId rather than the 0x3F1 index tag.
 				var lead = tails.ReadU32Be(start);
-				if (lead == QuestIndexRegion.IndexTag || lead == 0 || lead % ListFrame.Unit != 0)
+				if (lead == ListFrame.Empty || lead == 0 || lead % ListFrame.Unit != 0)
 					continue;
 
 				CompletedQuestJournalRegion region;
 				int after;
 				try
 				{
-					region = CompletedQuestJournalRegion.Parse(tails, start, end, out after);
+					var r = new SpanReader(tails.AsSpan(start, end - start), nameof(CompletedQuestJournalRegionCodec));
+					region = CompletedQuestJournalRegionCodec.Read(ref r);
+					after = start + r.Position;
 				}
 				catch (Exception ex)
 				{
@@ -63,7 +65,7 @@ namespace Faolan.Tests
 				// The region ends where its own frame count runs out - well before the access-window table, with other
 				// regions in between - so the round-trip is measured against exactly what Parse consumed.
 				Assert.InRange(after, start + 4, end);
-				Assert.Equal(tails[start..after], region.ToArray());
+				Assert.Equal(tails[start..after], CompletedQuestJournalRegionCodec.Build(region));
 			}
 
 			o.WriteLine($"snapshots examined={examined} withRegion={withRegion} areas={areas} completedQuests={quests}");

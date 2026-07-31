@@ -1,3 +1,5 @@
+using Faolan.Core.Extensions;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -25,13 +27,21 @@ namespace Faolan.Tests
 			// (goalId/n/k/subId/map/marker) - synthesizing the constants - plus their objective/trailing text records
 			// (the DB-sourced data, taken here from the parsed region), and prove the assembled region reproduces the
 			// template's @609 bytes exactly. Confirms a compact per-goal definition regenerates the full record.
-			var parsed = QuestObjectiveRegion.Parse(File.ReadAllBytes(TemplatePath), RegionStart);
+			var parsed = QuestObjectiveRegionCodec.Parse(Region);
 			const uint instance = 0x02165EFF; // the template's baked-in instance (re-addressed live)
 
-			// goalIdEcho is explicit now: it is EITHER the goal id or 0 depending on the goal (1567 of 2850 captured
+			// GoalIdRepeat is explicit: it is EITHER the goal id or 0 depending on the goal (1567 of 2850 captured
 			// goals carry 0), so it cannot default to the id.
-			var g1 = QuestObjectiveGoal.BuildSingle(instance, 10238, 1448, 1, 9, 180, 4010, 416, 701, parsed.Goals[0].Objective, parsed.Goals[0].TextRecord, goalIdEcho: 1448);
-			var g2 = QuestObjectiveGoal.BuildSingle(instance, 10238, 3490, 2, 12, 0, 4010, 521, 757, parsed.Goals[1].Objective, parsed.Goals[1].TextRecord, 70099, 0x36314C56, goalIdEcho: 3490);
+			var g1 = new QuestObjectiveGoal
+			{
+				Instance = instance, QuestId = 10238, GoalId = 1448, N = 1, K = 9, SubId = 180, MapId = 4010, MarkerX = 416, MarkerY = 701, RequiredCount = 1, GoalIdRepeat = 1448,
+				Objective = parsed.Goals[0].Objective, TextRecord = parsed.Goals[0].TextRecord
+			};
+			var g2 = new QuestObjectiveGoal
+			{
+				Instance = instance, QuestId = 10238, GoalId = 3490, N = 2, K = 12, SubId = 0, MapId = 4010, MarkerX = 521, MarkerY = 757, RequiredCount = 1, GoalIdRepeat = 3490,
+				Reserved = [0, 0, 0, 0, 0, 70099, 0x36314C56], Objective = parsed.Goals[1].Objective, TextRecord = parsed.Goals[1].TextRecord
+			};
 
 			var region = new QuestObjectiveRegion
 			{
@@ -42,7 +52,7 @@ namespace Faolan.Tests
 				}
 			};
 
-			Assert.Equal(Region, region.ToArray());
+			Assert.Equal(Region, QuestObjectiveRegionCodec.Build(region));
 		}
 
 		// Corpus invariants for the two byte-shaped goal words, recovered from QuestGoal_c::WriteToStream plus the
@@ -57,13 +67,13 @@ namespace Faolan.Tests
 			Assert.All(goals, g => Assert.InRange(g.Unknown1, 0u, 255u));
 
 			// Unknown2: a flag, never an arbitrary number - 0 or the byte 0x01 followed by three zero bytes.
-			Assert.All(goals, g => Assert.True(g.Unknown2 is 0 or QuestObjectiveGoal.FlagSet, $"Unknown2 should be a flag but goal {g.GoalId} carries 0x{g.Unknown2:X8}"));
+			Assert.All(goals, g => Assert.True(g.Unknown2 is 0 or QuestObjectiveGoalCodec.FlagSet, $"Unknown2 should be a flag but goal {g.GoalId} carries 0x{g.Unknown2:X8}"));
 		}
 
 		[Fact]
 		public void Parse_DecodesTheTwoBeachGoals()
 		{
-			var region = QuestObjectiveRegion.Parse(File.ReadAllBytes(TemplatePath), RegionStart);
+			var region = QuestObjectiveRegionCodec.Parse(Region);
 
 			Assert.Equal(2, region.Goals.Count);
 
@@ -89,10 +99,11 @@ namespace Faolan.Tests
 		{
 			var template = File.ReadAllBytes(TemplatePath);
 
-			var region = QuestObjectiveRegion.Parse(template, RegionStart, out var consumed);
+			var region = QuestObjectiveRegionCodec.Parse(Region);
+			var consumed = Region.Length;
 
 			Assert.Equal(IndexTag - RegionStart, consumed); // consumed exactly to the index boundary
-			Assert.Equal(Region, region.ToArray());
+			Assert.Equal(Region, QuestObjectiveRegionCodec.Build(region));
 		}
 
 		[Fact]
@@ -103,7 +114,10 @@ namespace Faolan.Tests
 			// required amount (#47). Prove a count > 1 survives BuildSingle -> Write -> Read.
 			var obj = "<remoteformat id=\"6491\" category=\"50304\" key=\"x\" >";
 			var txt = "<remoteformat id=\"1\" category=\"51200\" key=\"y\" >";
-			var goal = QuestObjectiveGoal.BuildSingle(0x1234, 14012, 6491, 1, 12, 0, 4010, 0, 0, obj, txt, requiredCount: 3);
+			var goal = new QuestObjectiveGoal
+			{
+				Instance = 0x1234, QuestId = 14012, GoalId = 6491, N = 1, K = 12, MapId = 4010, RequiredCount = 3, Objective = obj, TextRecord = txt
+			};
 			Assert.Equal(3u, goal.RequiredCount);
 
 			var region = new QuestObjectiveRegion
@@ -113,7 +127,7 @@ namespace Faolan.Tests
 					goal
 				}
 			};
-			var reparsed = QuestObjectiveRegion.Parse(region.ToArray(), 0);
+			var reparsed = QuestObjectiveRegionCodec.Parse(QuestObjectiveRegionCodec.Build(region));
 			Assert.Equal(3u, reparsed.Goals[0].RequiredCount);
 		}
 

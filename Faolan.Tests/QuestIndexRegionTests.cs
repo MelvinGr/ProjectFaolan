@@ -1,3 +1,5 @@
+using Faolan.Core.Extensions;
+using System;
 using System.IO;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Quest;
@@ -18,9 +20,11 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_DecodesTheIndexAndGoalTable()
 		{
-			var region = QuestIndexRegion.Parse(File.ReadAllBytes(TemplatePath), RegionStart, RegionEnd);
+			var template = File.ReadAllBytes(TemplatePath);
+			var region = QuestIndexRegionCodec.Parse(template.AsSpan(RegionStart, RegionEnd - RegionStart));
 
-			Assert.Equal(0x7E2u, region.Marker);
+			// The region opens on the id-list FRAME - a one-element list, not the 0x7E2 "constant" it reads as.
+			Assert.Equal(ListFrame.ForCount(1), template.ReadU32Be(RegionStart));
 			Assert.Equal(new[] { 10238u }, region.QuestIds);
 			Assert.Equal(241u, region.LeadAreaId); // the beach area id (== 0xF1, the old "sentinel")
 			Assert.Single(region.Blocks);
@@ -33,9 +37,9 @@ namespace Faolan.Tests
 		{
 			var template = File.ReadAllBytes(TemplatePath);
 
-			var region = QuestIndexRegion.Parse(template, RegionStart, RegionEnd);
+			var region = QuestIndexRegionCodec.Parse(template.AsSpan(RegionStart, RegionEnd - RegionStart));
 
-			Assert.Equal(template[RegionStart..RegionEnd], region.ToArray());
+			Assert.Equal(template[RegionStart..RegionEnd], QuestIndexRegionCodec.Build(region));
 		}
 	}
 }

@@ -35,7 +35,7 @@ so the login journal shows the real quests, not the captured beach char's phanto
 (decoded byte-exact from the Strie/Stihetfv 2-quest `[beach+13479]` login snapshot, 2247 B):
 `[QuestcRegion version 0x18][count=(N+1)*0x3F1]`, then **PER QUEST**: its `Quest_c` record IMMEDIATELY followed by its
 OWN `@609` objective region — whose lead word is `(goals+1)*0x3F1` (NOT a constant `0xBD3`; beach 2 goals = `0xBD3`,
-Casilda 1 goal = `0x7E2`; the old `QuestObjectiveRegion.ChapterTag` const is now `Frame`, computed). Then the quest
+Casilda 1 goal = `0x7E2`; the old `QuestObjectiveRegion.ChapterTag` const is now the region's `ListFrame` count, computed). Then the quest
 **index** = shared header `[0x3F1][marker=(N+1)*0x3F1][all questIds][count][sentinel 0xF1]` + **one block per quest**
 `[magic][tf1..3][goalCount][(step,1..n) pairs][trailer questId,1,0,0,linkWord]`, where `magic` is the quest's goal-table
 NAME word (beach `0x57365154` "W6QT", Casilda `0x52524C33" "RRL3") and the block trailers **CHAIN**: `linkWord` = the
@@ -82,7 +82,7 @@ count>0  -> [u32 leadAreaId]                                  # the first block'
 ```
 - `trailerQuestId` is the **area's ANCHOR quest** (catalog sequence 1), NOT the held quest — they coincide only
   when the held quest is the area's first. Beach: held 12371 (seq 5) but the block trailer is 10238 (seq 1).
-  (`QuestIndexRegion.Build` had this wrong; fixed — it exposed a real generation bug the beach goldens hid.)
+  (`QuestIndexRegions.ForQuests` had this wrong; fixed — it exposed a real generation bug the beach goldens hid.)
 - `chainWord` = the NEXT block's `leadAreaId`, or the terminal `0x156E7` for the last block (a linked list of
   area ids). `leadAreaId` + the block chainWords form that chain.
 
@@ -125,10 +125,10 @@ already round-trip, so it is labelling, not decoding.
 
 DONE 2026-06-16 (the single-quest beach region authors from server state):
 - **Quest_c (`@0..609`)** — `QuestcRegion`/`QuestcRecord` codec (byte-exact round-trip), wired into
-  `FullCharSnapshotSubClass`, and `QuestcRecord.BuildSingle` GENERATES it from `faolan.db` (`QuestcGenerationTests`).
+  `FullCharSnapshotSubClass`, and `QuestcRecords.ForQuest` GENERATES it from `faolan.db` (`QuestcGenerationTests`).
 - **`@609` objective region** — DECODED as a per-GOAL block (NOT a `BuildQuestFullUpdate` block — that was
   DISPROVEN: 559 B vs 869 B). Codec `QuestObjectiveRegion`/`QuestObjectiveGoal` (round-trip), wired into
-  `FullCharSnapshotSubClass`, and `QuestObjectiveGoal.BuildSingle` GENERATES it from the per-goal DB model.
+  `FullCharSnapshotSubClass`, and `QuestObjectiveRegions.ForQuest` GENERATES it from the per-goal DB model.
 - **Quest INDEX (`@1168`)** — codec `QuestIndexRegion` (the `0x3F1` index + the `0x57365154` "W6QT" goal-id
   table), wired into `FullCharSnapshotSubClass`, with a `Build` generator.
 - **Per-goal `QuestDefinition` model** — `QuestGoalDefinition` table + the snapshot-generation columns
@@ -163,13 +163,13 @@ DONE (#210, since landed): both remaining integration steps below are complete �
 Decoded the 2-quest snapshot (`xxx-login`: 10238 + 13479) vs the 1-quest (`Strie`: 10238), authoring the
 player's accepted quests on login from `CharacterQuests` (replacing the snapshot's single beach quest). Findings:
 - **Index marker is DERIVED from the count**: `marker = 0x3F1 * (questCount + 1)` (1 quest → `0x7E2`, 2 quests →
-  `0xBD3`). It is NOT a per-quest constant; baked into `QuestIndexRegion.Build` (the `IndexMarker` DB column is now
+  `0xBD3`). It is NOT a per-quest constant; baked into `QuestIndexRegions.ForQuests` (the `IndexMarker` DB column is now
   unused). Index = `[0x3F1][marker][questId × N][N][0xF1]` + the W6QT goal-id table with ALL quests' goal steps.
 - Quest journal = N concatenated `Quest_c` records (one per quest); the index lists all N ids.
 
 Multi-quest decode notes:
 1. **The 2-quest `Quest_c` List A + `@609` objective region.** Pinpointed 2026-06-16: running the production
-   `FullCharSnapshotSubClass`/`QuestcRegion.Parse` on the `xxx-login` 2-quest tails THROWS `Quest_c record: listKey 3027 !=
+   `FullCharSnapshotSubClass`/`QuestcRegionCodec.Parse` on the `xxx-login` 2-quest tails THROWS `Quest_c record: listKey 3027 !=
    questId 9` (3027 = `0xBD3` = the objective region's chapterTag). So after the two `Quest_c` records the parser runs
    into the `@609` objective region and reads its `0xBD3`/`[1][9]` as a third record's listKey - i.e. `QuestcRegion`'s
    List A model (validated only on the 1-quest beach, whose record's 4 objective sub-lists are EMPTY and consume
@@ -185,7 +185,7 @@ Multi-quest decode notes:
    @1624 13479 block            (879 B, QuestFullUpdate-content shape - objectives INLINE, NO 0xBD3)
    @2503 index (0x3F1 tag, marker 0xBD3, ids [27FE,34A7] count 2, W6QT table @2527)
    ```
-   So `QuestcRegion.Parse` (loops `records=2`, reading `QuestcRecord` back-to-back) reads record 1 (10238, to
+   So `QuestcRegionCodec.Parse` (loops `records=2`, reading `QuestcRecord` back-to-back) reads record 1 (10238, to
    @1065) then tries record 2 AT @1065 - the 10238 OBJECTIVE region (0xBD3), whose `[1][9]` reads as ver=1/questId=9
    -> the `listKey 3027(0xBD3) != questId 9` throw. KEY: the objective region is INTERLEAVED between the two
    Quest_c records, and the two quests are structurally DIFFERENT (10238 = split record + separate 0xBD3 objregion
@@ -231,7 +231,7 @@ count (no `0x3F1`): the quest list and the outer trailing pair-list.
 
 `CoreFullPlayerCharacterIIR::ReadSubClass` (`FUN_00797440`):
 
-1. `u32 version` — must == `0x18` (else `"...Wrong IIR_t version"`). This is `QuestcRegion.Version`.
+1. `u32 version` — must == `0x18` (else `"...Wrong IIR_t version"`). This is `QuestcRegionCodec.Version`.
 2. **List A — the quest journal** — `FUN_0091f5c0`: `0x3F1`-framed; `N-1` records of **`Quest_c`** (0x120-byte
    objects; the constructor `FUN_0091cf10` sets `Quest_c::vftable`), read by `FUN_0091df50` — see the per-record
    grammar below. **This is where the journal `<remoteformat>` XML lives** (the 5 header strings); it is the
@@ -361,7 +361,7 @@ u32   level          # @0x10  (=1; the quest's LEVEL, not a state - same field a
                      #         QuestDefinition.SnapshotState, which is therefore also the level.)
 u32   reserved == 0  # @0x114
 u32   N              # @0x118 (4 — journal goal/line count)
-u32   marker == 0x412# @0x14  (constant; also emitted by WorldQuest.BuildQuestFullUpdate)
+u32   marker == 0x412# @0x14  (carried per quest; QuestFullUpdateCodec emits the same record)
 string × 5           # [u16 len][bytes] <remoteformat> tokens:
                      #   50301 title, 50302 summary, 50300 area(id=241), 52000 region(id=4), 52000 region(id=4010)
 u32   @0xec   (=1)
@@ -408,13 +408,13 @@ STRUCTURE is per-goal and the starter carries **two** goals each with its own wo
 `QuestDefinition` today (one `GoalId`, one marker). Open work is tracked in Gitea #186.
 
 **CORRECTION (2026-06-16):** the earlier claim that `@609` is "a QuestFullUpdate block authored by
-`WorldQuest.BuildQuestFullUpdate`" is **WRONG** for the beach starter. Empirically (`Snapshot609AnalysisTests`):
+`QuestFullUpdateCodec`" is **WRONG** for the beach starter. Empirically (`Snapshot609AnalysisTests`):
 `BuildQuestFullUpdate`'s content for 10238 is **869 B** and starts `[questId][1][questId][3][0][3][0x412]`,
 whereas the template's `@609` region is **559 B** starting `[0x0BD3][1][9][instance][questId][goalId]`. They
 differ at byte 2 — different grammars. (The now-removed `BuildSnapshotQuestBlock`/`SnapshotQuestInjector`
 `FAOLAN_SNAPSHOT_QUESTS` experiment was validated against a *different* capture's 13479 block, not this region,
 so it did **not** reproduce the beach `@609`.) The beach region IS now authored — by the dedicated codec
-`QuestObjectiveRegion.Build` (byte-exact, `QuestObjectiveRegionTests`), NOT by `BuildQuestFullUpdate`.
+`QuestObjectiveRegions.ForQuest` (byte-exact, `QuestObjectiveRegionTests`), NOT by the live full-update.
 
 **Reader (Ghidra) still partial.** Ruled out by byte layout: `QuestFullUpdateIIR::ReadSubClass` (= a `Quest_c`,
 no `ver==1·questId·…·0x412` header here), List B (`FUN_00922c90`, mis-frames on the 2nd ReadString),
@@ -430,7 +430,7 @@ it consumes exactly to the objective-block boundary `@609`; `listKey == questId`
 the former opaque `Header0`/`Unknown*`/`RemoteFormat*` fields. The live snapshot is byte-identical (all 400
 tests pass, incl. `BeachSnapshotConstructionTests`).
 
-**Generation (DONE, byte-exact).** `QuestcRecord.BuildSingle(QuestDefinition, state, n, fieldEc, fieldF0,
+**Generation (DONE, byte-exact).** `QuestcRecords.ForQuest(QuestDefinition, state)` (was `BuildSingle(.., n, fieldEc, fieldF0,
 fieldF8)` assembles a record from a DB `QuestDefinition` (its 5 header text refs + `AreaId`) plus the few
 per-quest scalars not yet harvested into the definition (`N`, the `@0xf0`/`@0xf8` words). `QuestcGenerationTests`
 proves building the beach starter (10238) from `faolan.db` reproduces the template's `@0–609` byte-exact - the
@@ -565,7 +565,7 @@ codebase surfaces as `statlist.cpp (134) (nSize%1009)==0 && nSize>0` — the sta
 strict length check downstream, not the thing that is wrong.
 
 The per-quest reader `FUN_00922210` reads five u32s into the quest object, then a **count followed by
-u32 pairs** — the (questId, sequence) pairs our `QuestIndexRegion.Block.AreaQuestIds` models.
+u32 pairs** — the (questId, sequence) pairs our `QuestIndexRegion.Block.AreaQuestIds` models (see `QuestIndexRegionCodec`).
 
 ### The area 4CC is SERVER-authored
 

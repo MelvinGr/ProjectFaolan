@@ -8,7 +8,7 @@ Treat the field counts as decompile-accurate and the framing as the standard
 
 > **Note (SHIPPED since batch 4):** two rows below have since surfaced in captures and are now
 > implemented byte-exact — `NewLevelIIR_t` (`NewLevelCodec`, golden `NewLevelCodecTests`) and
-> `MainQuestUpdateIIR_c`/`QuestLogListIIR` (`WorldQuest.BuildQuestLogList`, golden `QuestTests`). Their
+> `MainQuestUpdateIIR_c`/`QuestLogListIIR` (`QuestLogListCodec`, golden `QuestTests`). Their
 > rows carry an inline SHIPPED annotation; the rest remain binary-only.
 
 Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1 byte / 2 u16 /
@@ -64,7 +64,7 @@ Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1
 
 | sub | type | reader | structure |
 |---|---|---|---|
-| `0x504B7924` | `MainQuestUpdateIIR_c` | `918560` | `[u32×3][u32 n]( [u32][u32] )×n [string][u32×3][u16]` — **SHIPPED** as `QuestLogListIIR` (`BKDR-31("MainQuestUpdateIIR_c")==0x504B7924`): byte-exact wire in `WorldQuest.BuildQuestLogList`, golden `QuestTests`; the real grammar (see the codec) differs from this decompile sketch |
+| `0x504B7924` | `MainQuestUpdateIIR_c` | `918560` | `[u32×3][u32 n]( [u32][u32] )×n [string][u32×3][u16]` — **SHIPPED** as `QuestLogListIIR` (`BKDR-31("MainQuestUpdateIIR_c")==0x504B7924`): byte-exact wire in `QuestLogListCodec`, golden `QuestTests`; the real grammar (see the codec) differs from this decompile sketch |
 | `0x8BB2799C` | `QuestRewardNotifyIIR_c` | `91b2d0` | `[u32][u32 n1]( reward(0x40) + [u32] )×n1 [u32 n2]( reward + [u32] )×n2 [u32×4]` |
 | `0xE9EB9694` | `LootSpecialLootUpdateIIR_c` | `7a5540` | `[u32 n]( [u32][u32][u32] )×n` |
 | `0xE6C3CCEF` | `ScriptTextIIR_t` | `933390` | `[string][u8 ver][u32][u32]` (ver>1 short-circuits) |

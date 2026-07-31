@@ -182,7 +182,7 @@ Quest state is driven by four IIR records (decoded from `hoxxling-login-gameplay
   (categories 50300–50302); the client renders the title/description/journal text from its RDB **by id**, so the
   server only sends ids + state, never the text.
 
-**Built:** `WorldQuest` (byte-exact `QuestIIR`/`QuestGoal` builders) + a `CharacterQuest` table (per-character
+**Built:** `QuestCodec` / `QuestGoalCodec` (byte-exact `QuestIIR`/`QuestGoalIIR` codecs) + a `CharacterQuest` table (per-character
 quest id + state + goal progress; schema since squashed into the `InitialCreate` migration) + repo upsert/remove +
 restore-on-login. ⚠️ That live restore path (`RestorePlayerQuests`) was DELETED on 2026-07-20: retail sends no
 quest packet at all before the first in-session accept, and both journal tabs ride the login snapshot instead

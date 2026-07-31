@@ -1,6 +1,6 @@
 # Quest_c region (0x737A6DF9 FullChar snapshot) — deep decode (2026-07-05)
 
-The Quest_c region is the quest JOURNAL at the front of the snapshot tails. `QuestcRegion.cs` models it and
+The Quest_c region is the quest JOURNAL at the front of the snapshot tails. `QuestcRegionCodec` models it and
 round-trips the **beach create template** byte-exact, but the beach template is the *simplest* possible journal
 (fresh char: full quests, empty objective lists, no progress). This doc records the FULL structure recovered
 from the client reader (Ghidra) + validated against NecroL80's lvl80 login (27 quests, real progress), so the
@@ -39,7 +39,7 @@ progress-sublist                       # <-- the piece the beach template never 
 ```
 
 `ObjRec` = **16 u32** on the wire (reader scrambles them into an 18-word struct: 2 words, then `Read4×U32`,
-2 words, `Read4×U32`, 2 words). Reading them as 16 raw u32 in wire order (what `QuestcRegion.cs` does) IS
+2 words, `Read4×U32`, 2 words). Reading them as 16 raw u32 in wire order (what `QuestcRecordCodec` does) IS
 byte-exact.
 
 ## ~~progress-sublist (per record, after obj4) — the real blocker~~ — RESOLVED 2026-07-20 (#384)
@@ -104,7 +104,7 @@ Both items below shipped; nothing here is blocked any more.
 
 - The mislabeled fields were renamed (`Zero→Field114`, `N→Field118`, `Marker→N`, `QuestId2→Field2c`) and the
   two beach-only asserts (`!=0x412`, `questId2!=questId`) dropped. Read/write order is unchanged, so every
-  beach golden stayed byte-exact. `QuestcRegion.Marker` is now `QuestcRegion.BeachN` — the value the beach
+  beach golden stayed byte-exact. `QuestcRegion.Marker` is now `QuestcRecord.Unknown14` — the value the beach
   template happens to carry in the goal-count slot, never something to assert against.
 - The per-record objective region is modelled as `QuestcRecord.Objectives` and read/written with the record,
   so `QuestcRegion` round-trips a progressed journal. `FullCharSnapshotSubClass` lost its now-redundant

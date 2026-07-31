@@ -1,3 +1,5 @@
+using Faolan.Core.Extensions;
+using System;
 using System.IO;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Quest;
@@ -26,7 +28,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void QuestcRegion_Parses_BeachStarter_Fields()
 		{
-			var region = QuestcRegion.Parse(File.ReadAllBytes(TemplatePath));
+			var region = QuestcRegionCodec.Parse(File.ReadAllBytes(TemplatePath).AsSpan(0, RegionEnd));
 
 			var q = Assert.Single(region.Records);
 			_o.WriteLine($"questId={q.QuestId} state={q.State} unknown14={q.Unknown14} areaId={q.AreaId}");
@@ -38,7 +40,7 @@ namespace Faolan.Tests
 			// rejected every level-80 snapshot, #384) and NOT a goal count either: this quest has TWO goals while the
 			// word is 0x412, and NecroL80 rec0 holds 2. Reading it as a count crashed the client - see the rename
 			// migration QuestSnapshotUnknown14.
-			Assert.Equal(QuestcRegion.BeachN, q.Unknown14);
+			Assert.Equal(QuestFullUpdates.LiveUnknown14, q.Unknown14);
 			Assert.Equal(2, q.Objectives!.Goals.Count);
 			// The record owns its objective region.
 			Assert.NotNull(q.Objectives);
@@ -59,8 +61,8 @@ namespace Faolan.Tests
 		{
 			var template = File.ReadAllBytes(TemplatePath);
 
-			var region = QuestcRegion.Parse(template);
-			var built = region.ToArray();
+			var region = QuestcRegionCodec.Parse(template.AsSpan(0, RegionEnd));
+			var built = QuestcRegionCodec.Build(region);
 
 			// The codec consumes + reproduces exactly the version + List A + records prefix of the tails.
 			Assert.Equal(RegionEnd, built.Length);

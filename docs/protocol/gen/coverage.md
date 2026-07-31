@@ -9,7 +9,7 @@
 
 - **826** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
 - **80** IIR carrier types: **65 V3** (byte-exact builder), **15 V2** (built, no golden), **0 V1** (no builder found).
-- **62** codec classes, **47** with a byte-exact test.
+- **66** codec classes, **51** with a byte-exact test.
 - **8** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -82,11 +82,11 @@ the margins, but never invents a golden that isn't there.
 | V3 | `NewLevelIIR` | `NewLevelCodec` |
 | V3 | `PetIIR` | `PetCodec` |
 | V3 | `PlayfieldFIIR` | `PlayfieldFCodec` |
-| V3 | `QuestFullUpdateIIR` | `WorldQuest` |
-| V3 | `QuestGoalIIR` | `WorldQuest` |
-| V3 | `QuestIIR` | `WorldQuest` |
-| V3 | `QuestJournalIIR` | `WorldQuest` |
-| V3 | `QuestLogListIIR` | `WorldQuest` |
+| V3 | `QuestFullUpdateIIR` | `QuestFullUpdateCodec` |
+| V3 | `QuestGoalIIR` | `QuestGoalCodec` |
+| V3 | `QuestIIR` | `QuestCodec` |
+| V3 | `QuestJournalIIR` | `QuestJournalCodec` |
+| V3 | `QuestLogListIIR` | `QuestLogListCodec` |
 | V3 | `RemoveFromGroupIIR` | `GroupMembershipCodec` |
 | V3 | `ScryScriptIIR` | `ScryScriptCodec` |
 | V3 | `SetMorphValueIIR` | `CreateEditorRecordBuilder` |

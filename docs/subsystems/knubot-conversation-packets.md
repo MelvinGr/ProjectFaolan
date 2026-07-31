@@ -6,7 +6,7 @@ CONSTRUCTED** via `KnubotCodec` (`Faolan.Core.Network/Codecs/Dialogue/KnubotCode
 spoken line), `KnubotOpenChatWindow`, `KnubotAnswerList` (the option buttons) and `KnubotCloseChatWindow` —
 entirely from the packet's typed columns, re-addressed to the live player + clicked NPC and framed on the
 conversation endpoint (`GameAgent:<stored SenderInstance>`) like `SendConversationClose`. The quest-grant packets
-in the flow are built by the `WorldQuest` builders. `ServeScreen` **replays nothing** — there is no raw-`Data`
+in the flow are built by the `Codecs/Quest` codecs. `ServeScreen` **replays nothing** — there is no raw-`Data`
 fallback (see below). Proven byte-identical to the codec construct (`ConversationConstructTests`/`KnubotCodecTests`).
 
 **Stored structured (2026-06-30; screens columnized + `Data` retired 2026-07-12).** Every packet of a node is
@@ -116,6 +116,6 @@ They carry no `remoteformat` text, but they ARE structured (#188): `Conversation
 stores the GameCharAgent sender instance + the param bytes in the `SenderInstance`/`CameraParams`
 columns, and the runtime BUILDS the packet from those columns via
 `SetDialogueCameraCodec` (framed by `ConversationService.BuildDialogueCameraPacket`) re-addressed to the live player + NPC handles (byte-exact in
-`ConversationConstructTests`). The interleaved quest-grant packets are built by the `WorldQuest` builders.
+`ConversationConstructTests`). The interleaved quest-grant packets are built by the `Codecs/Quest` codecs.
 
 Open work is tracked in Gitea #188.

@@ -108,7 +108,7 @@ namespace Faolan.Importer.Captures
 				{
 					foreach (var (id, wire) in states)
 					{
-						merged[id] = wire == WorldQuest.StateCompleted
+						merged[id] = wire == QuestCodec.StateCompleted
 							? QuestState.Completed
 							: QuestState.Active;
 					}
@@ -194,36 +194,51 @@ namespace Faolan.Importer.Captures
 					return;
 				}
 
-				if (WorldQuest.TryParseQuestLogList(inner, out var logHandle, out _, out var logIds))
+				// DISPATCH on the record's own sub-opcode rather than trying each codec until one returns true: the
+				// codecs' Parse is strict and THROWS (#530 rule 4), and "try until one succeeds" would abort the whole
+				// packet the moment the first candidate rejected it.
+				if (inner.Length < 4)
+					return;
+
+				switch (inner.ReadU32Be(0))
 				{
-					if (!logListByChar.TryGetValue(logHandle, out var set))
-						logListByChar[logHandle] = set = [];
-					foreach (var id in logIds)
+					case QuestLogListCodec.Opcode:
 					{
-						if (id != 0)
-							set.Add(id);
+						var log = QuestLogListCodec.Parse(inner);
+						if (!logListByChar.TryGetValue(log.PlayerHandle, out var set))
+							logListByChar[log.PlayerHandle] = set = [];
+						foreach (var id in log.QuestIds)
+						{
+							if (id != 0)
+								set.Add(id);
+						}
+
+						return;
 					}
 
-					return;
-				}
+					case QuestCodec.Opcode:
+					{
+						var quest = QuestCodec.Parse(inner);
+						if (quest.QuestId == 0)
+							return;
 
-				if (WorldQuest.TryParseQuestIir(inner, out var handle, out var questId, out var state))
-				{
-					if (questId == 0)
+						(stateByChar.TryGetValue(quest.PlayerHandle, out var m)
+							? m
+							: stateByChar[quest.PlayerHandle] = [])[quest.QuestId] = quest.State;
 						return;
+					}
 
-					(stateByChar.TryGetValue(handle, out var m)
-						? m
-						: stateByChar[handle] = [])[questId] = state;
-				}
-				else if (WorldQuest.TryParseQuestGoal(inner, out handle, out questId, out _, out var update))
-				{
-					if (questId == 0)
+					case QuestGoalCodec.Opcode:
+					{
+						var goal = QuestGoalCodec.Parse(inner);
+						if (goal.QuestId == 0)
+							return;
+
+						(goalUpdateByChar.TryGetValue(goal.PlayerHandle, out var m)
+							? m
+							: goalUpdateByChar[goal.PlayerHandle] = [])[goal.QuestId] = goal.Update;
 						return;
-
-					(goalUpdateByChar.TryGetValue(handle, out var m)
-						? m
-						: goalUpdateByChar[handle] = [])[questId] = update;
+					}
 				}
 			}
 			catch

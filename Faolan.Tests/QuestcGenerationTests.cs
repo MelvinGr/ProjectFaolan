@@ -38,7 +38,7 @@ namespace Faolan.Tests
 			Assert.Equal(2, def.Goals.Count); // the two seeded beach goals (1448 + 3490)
 
 			const uint templateInstance = 0x02165EFF;
-			var built = QuestObjectiveRegion.Build(def, templateInstance).ToArray();
+			var built = QuestObjectiveRegionCodec.Build(QuestObjectiveRegions.ForQuest(def, templateInstance));
 
 			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.Equal(template[RegionEnd..1168], built);
@@ -65,7 +65,7 @@ namespace Faolan.Tests
 			Assert.NotNull(def);
 
 			// All scalars sourced from the DB (SnapshotUnknown118/FieldEc/FieldF0/FieldF8) - no literals but the per-char state.
-			var record = QuestcRecord.BuildSingle(def, BeachState, def.SnapshotUnknown118, def.SnapshotUnknownEc, def.SnapshotUnknownF0, def.SnapshotUnknownF8);
+			var record = QuestcRecords.ForQuest(def, BeachState);
 			var region = new QuestcRegion
 			{
 				Records =
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 					record
 				}
 			};
-			var built = region.ToArray();
+			var built = QuestcRegionCodec.Build(region);
 
 			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.Equal(RegionEnd, built.Length);
@@ -94,15 +94,19 @@ namespace Faolan.Tests
 			{
 				Records =
 				{
-					QuestcRecord.BuildSingle(def, BeachState, def.SnapshotUnknown118, def.SnapshotUnknownEc, def.SnapshotUnknownF0, def.SnapshotUnknownF8)
+					QuestcRecords.ForQuest(def, BeachState)
 				}
 			};
-			var objectives = QuestObjectiveRegion.Build(def, instance);
-			var index = QuestIndexRegion.Build([def], def);
+			var objectives = QuestObjectiveRegions.ForQuest(def, instance);
+			var index = QuestIndexRegions.ForQuests([def], def);
 
 			// The empty completed-journal frame (0x3F1) always sits between the objective region and the index (#391);
 			// it is the word the index USED to swallow as a phantom "IndexTag".
-			byte[] built = [.. quests.ToArray(), .. objectives.ToArray(), .. CompletedQuestJournalRegion.Build([]).ToArray(), .. index.ToArray()];
+			byte[] built =
+			[
+				.. QuestcRegionCodec.Build(quests), .. QuestObjectiveRegionCodec.Build(objectives), .. CompletedQuestJournalRegionCodec.Build(CompletedQuestJournalRegions.ForAreas([])),
+				.. QuestIndexRegionCodec.Build(index)
+			];
 
 			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.Equal(template[..1292], built);

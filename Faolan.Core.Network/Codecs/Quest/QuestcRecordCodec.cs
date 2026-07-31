@@ -1,0 +1,210 @@
+using System;
+using System.Collections.Generic;
+using Faolan.Core.Extensions;
+
+namespace Faolan.Core.Network.Codecs.Quest
+{
+	// One Quest_c journal RECORD - the client's per-quest journal entry, read by FUN_0091df50. Composed by
+	// QuestcRegionCodec (the snapshot's journal list) and by QuestFullUpdateCodec, which carries exactly ONE of these
+	// as its whole payload (#530 wave 5 - the live full-update used to hand-roll the same 12 scalars + 5 strings + 4
+	// object lists + objective region under a different set of names).
+	//
+	// Wire:
+	//   [u32 listKey(=questId)][u32 ver(=1)][u32 questId][u32 state][u32 field114][u32 field118][u32 n]
+	//   [string title][string summary][string area][string region1][string region2]
+	//   [u32 fieldEc][u32 areaId][u32 field2c][u32 field11c][u64 accept][u32 field28]
+	//   [objlist1][objlist2][u32 fieldF0][u64 fieldF8][objlist3][objlist4]
+	//   [objective region]
+	// where each objlist = [u32 count] then count × ObjRec (16 raw u32s, unvalidated - empty for the beach starter).
+	//
+	// The objective region is part of the RECORD (interleaved per quest, #384), not a separate top-level region: the
+	// reader used to skip it and desynced on the SECOND record of any multi-quest journal with "marker 0x2 != 0x412".
+	public static class QuestcRecordCodec
+	{
+		public const uint RecordVersion = 1;
+		private const int ObjRecWords = 16;
+
+		// CANONICAL - the only method here that writes bytes.
+		public static byte[] Build(QuestcRecord value)
+		{
+			using var s = new FaolanStream();
+			Write(s, value);
+			return s.ToArray();
+		}
+
+		public static QuestcRecord Parse(in ReadOnlySpan<byte> data)
+		{
+			var r = new SpanReader(data, nameof(QuestcRecordCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+			return value;
+		}
+
+		internal static QuestcRecord Read(ref SpanReader r)
+		{
+			var at = r.Position;
+			var listKey = r.ReadU32Be();
+			r.ExpectU32Be(RecordVersion, "Quest_c record version");
+
+			var questId = r.ReadU32Be();
+			if (listKey != questId)
+				throw CodecParseException.Unexpected(nameof(QuestcRecordCodec), at, $"listKey == questId ({questId})", listKey.ToString());
+
+			var state = r.ReadU32Be();
+			var field114 = r.ReadU32Be();
+			var field118 = r.ReadU32Be();
+			var n = r.ReadU32Be();
+
+			var title = r.ReadStringU16Length();
+			var summary = r.ReadStringU16Length();
+			var area = r.ReadStringU16Length();
+			var region1 = r.ReadStringU16Length();
+			var region2 = r.ReadStringU16Length();
+
+			var fieldEc = r.ReadU32Be();
+			var areaId = r.ReadU32Be();
+			var field2c = r.ReadU32Be();
+			var field11c = r.ReadU32Be();
+			var accept = r.ReadU64Be();
+			var field28 = r.ReadU32Be();
+
+			var obj1 = ReadObjList(ref r);
+			var obj2 = ReadObjList(ref r);
+			var fieldF0 = r.ReadU32Be();
+			var fieldF8 = r.ReadU64Be();
+			var obj3 = ReadObjList(ref r);
+			var obj4 = ReadObjList(ref r);
+
+			return new QuestcRecord
+			{
+				QuestId = questId,
+				State = state,
+				Field114 = field114,
+				Field118 = field118,
+				Unknown14 = n,
+				Title = title,
+				Summary = summary,
+				Area = area,
+				Region1 = region1,
+				Region2 = region2,
+				FieldEc = fieldEc,
+				AreaId = areaId,
+				Field2c = field2c,
+				Field11c = field11c,
+				Accept = accept,
+				Field28 = field28,
+				FieldF0 = fieldF0,
+				FieldF8 = fieldF8,
+				Obj1 = obj1,
+				Obj2 = obj2,
+				Obj3 = obj3,
+				Obj4 = obj4,
+				Objectives = QuestObjectiveRegionCodec.Read(ref r)
+			};
+		}
+
+		internal static void Write(FaolanStream s, QuestcRecord v)
+		{
+			ArgumentNullException.ThrowIfNull(v);
+			s.WriteUInt32(v.QuestId); // listKey
+			s.WriteUInt32(RecordVersion);
+			s.WriteUInt32(v.QuestId);
+			s.WriteUInt32(v.State);
+			s.WriteUInt32(v.Field114);
+			s.WriteUInt32(v.Field118);
+			s.WriteUInt32(v.Unknown14);
+
+			s.WriteString(v.Title);
+			s.WriteString(v.Summary);
+			s.WriteString(v.Area);
+			s.WriteString(v.Region1);
+			s.WriteString(v.Region2);
+
+			s.WriteUInt32(v.FieldEc);
+			s.WriteUInt32(v.AreaId);
+			s.WriteUInt32(v.Field2c);
+			s.WriteUInt32(v.Field11c);
+			s.WriteUInt64(v.Accept);
+			s.WriteUInt32(v.Field28);
+
+			WriteObjList(s, v.Obj1);
+			WriteObjList(s, v.Obj2);
+			s.WriteUInt32(v.FieldF0);
+			s.WriteUInt64(v.FieldF8);
+			WriteObjList(s, v.Obj3);
+			WriteObjList(s, v.Obj4);
+
+			// NULL means "this record's objective region is composed by the caller", which is how the beach goldens
+			// slice the journal at @609 and compare the objective region separately. A record READ off the wire always
+			// carries one, so the asymmetry only reaches hand-built values.
+			if (v.Objectives != null)
+				QuestObjectiveRegionCodec.Write(s, v.Objectives);
+		}
+
+		private static List<uint[]> ReadObjList(ref SpanReader r)
+		{
+			var count = r.ReadU32Be();
+			var list = new List<uint[]>((int)count);
+			for (var i = 0; i < count; i++)
+			{
+				var rec = new uint[ObjRecWords];
+				for (var j = 0; j < ObjRecWords; j++)
+					rec[j] = r.ReadU32Be();
+				list.Add(rec);
+			}
+
+			return list;
+		}
+
+		private static void WriteObjList(FaolanStream s, List<uint[]> list)
+		{
+			s.WriteUInt32(list.Count);
+			foreach (var rec in list)
+			foreach (var word in rec)
+				s.WriteUInt32(word);
+		}
+	}
+
+	// One quest's journal record. See QuestcRecords for the DB-row factory.
+	public sealed record QuestcRecord
+	{
+		public uint AreaId { get; init; } // @+0xcc (matches the Area string's id)
+		public uint QuestId { get; init; }
+
+		// The four objective lists. Each entry is one ObjRec carried as 16 raw u32s (unvalidated; empty for
+		// the beach starter, so this is exercised only by round-trip of progressed captures).
+		public List<uint[]> Obj1 { get; init; } = [];
+		public List<uint[]> Obj2 { get; init; } = [];
+		public List<uint[]> Obj3 { get; init; } = [];
+		public List<uint[]> Obj4 { get; init; } = [];
+
+		// The quest's @609 OBJECTIVE region, which on the wire follows this record's obj4 - the journal record and its
+		// objective region are INTERLEAVED per quest, not two separate top-level regions (#384). Null only for a record
+		// built without one (see the Write comment). See tools/capture/decode_questc_progress.py, which validates the
+		// interleaved grammar across all 141 captured snapshots.
+		public QuestObjectiveRegion? Objectives { get; set; }
+		public string Area { get; init; } = ""; // <remoteformat category=50300>
+		public string Region1 { get; init; } = ""; // <remoteformat category=52000>
+		public string Region2 { get; init; } = ""; // <remoteformat category=52000>
+		public string Summary { get; init; } = ""; // <remoteformat category=50302>
+		public string Title { get; init; } = ""; // <remoteformat category=50301>
+		public uint Field114 { get; init; } // @+0x114 (=0 on the beach template)
+		public uint Field118 { get; init; } // @+0x118
+		public uint Field11c { get; init; } // @+0x11c (=0)
+		public uint Field28 { get; init; } // @+0x28 (=0 on the beach template; 0x50 in the live full-update)
+		public uint Field2c { get; init; } // @+0x2c - equals questId on the beach template, but NOT in general
+		public uint FieldEc { get; init; } // @+0xec (=1 in template)
+		public uint FieldF0 { get; init; } // @+0xf0 (=0x96 in the template, 0x64 in the live full-update)
+
+		public uint State { get; set; } // settable: world entry historically patches the lead quest's @20 word
+
+		// @+0x14. NOT a goal count, despite carrying that name until 2026-07-20: the beach template holds 0x412
+		// (1042) for a TWO-goal quest, and NecroL80's first record holds 2. Emitting it as a goal count - telling the
+		// client "N objectives follow" and then writing none - desynced the client's cursor and crashed it in
+		// StatList_t. Its meaning is still open; treat it as opaque and carry it through from the capture rather than
+		// deriving it. NOT a ListFrame word either (1042 is not a multiple of 1009).
+		public uint Unknown14 { get; init; }
+		public ulong Accept { get; init; } // @+0x20 u64 (likely acceptTime; =0)
+		public ulong FieldF8 { get; init; } // @+0xf8 u64 (=15 in the template, 0 in the live full-update)
+	}
+}

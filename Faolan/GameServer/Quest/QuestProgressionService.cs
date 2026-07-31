@@ -454,7 +454,7 @@ namespace Faolan.GameServer.Quest
 		{
 			await _database.SetCharacterQuest(character.Id, quest.QuestId, QuestState.Active, required, quest.GoalRequired, quest.GoalTargetName);
 			await _outbound.SendQuestGoal(client, quest.QuestId, def.GoalId, QuestGoalUpdate.Satisfied);
-			await _outbound.SendQuestIir(client, quest.QuestId, WorldQuest.StateActive);
+			await _outbound.SendQuestIir(client, quest.QuestId, QuestCodec.StateActive);
 			await _agents.SendSystemMessage(character.Id, $"Objective complete ({required}/{required}). Return to the quest giver.");
 		}
 
@@ -471,15 +471,15 @@ namespace Faolan.GameServer.Quest
 		private async Task SendGoalUpdate(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update)
 		{
 			await _outbound.SendQuestGoal(client, questId, goalId, update);
-			await _outbound.SendQuestIir(client, questId, WorldQuest.StateActive);
+			await _outbound.SendQuestIir(client, questId, QuestCodec.StateActive);
 		}
 
 		// The shared head of every completion: QuestGoal (the goal is met) then QuestIIR active(2) -> completed(4).
 		private async Task SendStageCompletion(INetworkClient client, uint questId, uint goalId)
 		{
 			await _outbound.SendQuestGoal(client, questId, goalId, QuestGoalUpdate.Satisfied);
-			await _outbound.SendQuestIir(client, questId, WorldQuest.StateActive);
-			await _outbound.SendQuestIir(client, questId, WorldQuest.StateCompleted);
+			await _outbound.SendQuestIir(client, questId, QuestCodec.StateActive);
+			await _outbound.SendQuestIir(client, questId, QuestCodec.StateCompleted);
 		}
 
 		private static uint GoalRequired(CharacterQuest quest, QuestDefinition def, QuestGoalDefinition goal)

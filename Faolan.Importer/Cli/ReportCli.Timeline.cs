@@ -255,10 +255,17 @@ namespace Faolan.Importer.Cli
 					return $"login snapshot, {raw.Length} B";
 				case "DispatchUpdateBindLocation" when raw.Length >= 4:
 					return $"bind playfield {raw.ReadU32Be(0)}";
-				case "QuestGoalIIR" when WorldQuest.TryParseQuestGoal(content, out _, out var qg, out var goal, out var update):
-					return $"quest {qg} goal {goal} -> {update}";
-				case "QuestIIR" when WorldQuest.TryParseQuestIir(content, out _, out var qi, out var state):
-					return $"quest {qi} state {state}" + state switch { 2 => " (active)", 4 => " (completed)", _ => "" };
+				case "QuestGoalIIR":
+				{
+					var goal = QuestGoalCodec.Parse(content);
+					return $"quest {goal.QuestId} goal {goal.GoalId} -> {goal.Update}";
+				}
+				case "QuestIIR":
+				{
+					var quest = QuestCodec.Parse(content);
+					return $"quest {quest.QuestId} state {quest.State}"
+					       + quest.State switch { QuestCodec.StateActive => " (active)", QuestCodec.StateCompleted => " (completed)", _ => "" };
+				}
 				case "DispatchAddSpecialAbility":
 				{
 					var ability = AddSpecialAbilityCodec.Parse(content);

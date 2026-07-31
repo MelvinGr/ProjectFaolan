@@ -1,31 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.Core.Network.Codecs.World
 {
-	// Pure wire-body transforms extracted from WorldBroadcaster (they take captured/DB inputs, no world state): the
-	// patrol re-address, a QuestTextRef -> on-wire record, and the loot-bag contents splice. The broadcaster keeps
-	// the interest/send orchestration; these are the byte construction it forwards.
+	// Pure wire-body transforms extracted from WorldBroadcaster (they take captured/DB inputs, no world state). The
+	// broadcaster keeps the interest/send orchestration; these are the byte construction it forwards.
+	// (The QuestTextRef -> on-wire record mapping moved to QuestTextTokens.Record, which is where the other three
+	// copies of it lived - #530 wave 5.)
 	public static class WorldBroadcastBodies
 	{
-		// A QuestTextRef -> on-wire text record (remoteformat/localized). Missing slots fall back to an empty
-		// remoteformat so the framing stays valid (the client just renders nothing for that slot).
-		public static byte[] Record(QuestDefinition def, QuestTextSlot slot)
-		{
-			var r = def.TextRefs.FirstOrDefault(t => t.Slot == slot);
-			if (r == null)
-				return WorldQuest.RemoteFormat(0, 0, "");
-
-			return r.IsLocalized
-				? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText)
-				: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText);
-		}
-
 		// Injects THIS drop's live contents (cash + rolled items) into an already-from-scratch-built loot-bag record
 		// (WorldObjectCodec + LootContainerTemplate build the identity + kd-tree + a scaffold ProtoLootBagIIR): keeps
 		// the constructed envelope and swaps the trailing [u32 len][ProtoLootBagIIR] for the live contents, via the

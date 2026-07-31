@@ -34,7 +34,7 @@ namespace Faolan.Tests
 
 		// The folders converted to the uniform surface so far. ADD A FOLDER AS ITS WAVE LANDS - that is what makes the
 		// gates below binding on it, and leaving it out is how a converted folder silently stops being checked.
-		private static readonly string[] MigratedFolders = ["Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat"];
+		private static readonly string[] MigratedFolders = ["Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat", "Quest"];
 
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 		private static readonly Regex ConstOffset = new(@"\bconst\s+int\s+\w*(Offset|Pos)\b");

@@ -268,12 +268,8 @@ namespace Faolan.GameServer.World
 			// only when this quest had no full-update in the captures (Level == 0).
 			var levelValue = level ?? (def.Level != 0
 				? def.Level
-				: WorldQuest.DefaultQuestLevel);
-			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }
-				.Select(s => WorldBroadcastBodies.Record(def, s))
-				.ToArray();
-			var body = WorldQuest.BuildQuestFullUpdate(client.Session.Character.Id, def.QuestId, levelValue, def.AreaId, refs, def.GoalId, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), def.MapId,
-				def.MarkerX, def.MarkerY, WorldBroadcastBodies.Record(def, QuestTextSlot.Objective), WorldBroadcastBodies.Record(def, QuestTextSlot.ObjectiveLocalized));
+				: QuestFullUpdateCodec.DefaultQuestLevel);
+			var body = QuestFullUpdateCodec.Build(QuestFullUpdates.ForQuest(client.Session.Character.Id, def, levelValue, (uint)DateTimeOffset.UtcNow.ToUnixTimeSeconds()));
 
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));
@@ -283,14 +279,14 @@ namespace Faolan.GameServer.World
 		public Task SendQuestGoal(INetworkClient client, uint questId, uint goalId, QuestGoalUpdate update)
 		{
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(WorldQuest.BuildQuestGoal(client.Session.Character.Id, questId, goalId, update))));
+				s => s.WriteArrayUInt32Length(QuestGoalCodec.Build(client.Session.Character.Id, questId, goalId, update))));
 		}
 
 		// Sends a QuestIIR (add/update a quest in the player's journal) to the player.
 		public Task SendQuestIir(INetworkClient client, uint questId, uint state)
 		{
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(WorldQuest.BuildQuestIir(client.Session.Character.Id, questId, state))));
+				s => s.WriteArrayUInt32Length(QuestCodec.Build(client.Session.Character.Id, questId, state))));
 		}
 
 		// Make the named NPC in `mapId`'s zone follow (or stop following) the given player handle - the quest-driven
@@ -2226,17 +2222,7 @@ namespace Faolan.GameServer.World
 		// collapsed group in the Completed tab.
 		public static Task SendQuestJournal(INetworkClient client, IReadOnlyList<QuestDefinition> definitions)
 		{
-			var first = definitions[0];
-			var areaHeader = new[]
-			{
-				WorldBroadcastBodies.Record(first, QuestTextSlot.AreaTitle), WorldBroadcastBodies.Record(first, QuestTextSlot.MapName), WorldBroadcastBodies.Record(first, QuestTextSlot.RegionName)
-			};
-			var entries = definitions
-				.Select(d => new WorldQuest.JournalEntry(d.QuestId, WorldBroadcastBodies.Record(d, QuestTextSlot.Title), WorldBroadcastBodies.Record(d, QuestTextSlot.ListSubLine)))
-				.ToList();
-			var trailing = WorldQuest.BuildTrackedQuestPointer();
-
-			var body = WorldQuest.BuildQuestJournal(client.Session.Character.Id, first.AreaId, areaHeader, entries, trailing);
+			var body = QuestJournalCodec.Build(QuestJournals.ForQuests(client.Session.Character.Id, definitions));
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));
 		}
@@ -2246,8 +2232,7 @@ namespace Faolan.GameServer.World
 		// player's active quests with the tracked one FIRST. The area-title slot comes from the tracked quest's def.
 		public static Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
 		{
-			var body = WorldQuest.BuildQuestLogList(client.Session.Character.Id, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds,
-				WorldBroadcastBodies.Record(trackedDef, QuestTextSlot.AreaTitle));
+			var body = QuestLogListCodec.Build(client.Session.Character.Id, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds, QuestTextTokens.Record(trackedDef, QuestTextSlot.AreaTitle));
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));
 		}

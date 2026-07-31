@@ -1,11 +1,11 @@
 # Tortage intro quest ids (per-class check)
 
 Decoded from the capture set (`Captures/*.tshark.json`) by reading a u32 BE at offset **+17** from each
-`QuestIIR` (0x97E02314) / `QuestFullUpdate` (0x63268258) sub-opcode. Builders: `WorldQuest.BuildQuestIir` /
-`BuildQuestFullUpdate`. Note the two shapes differ: `BuildQuestFullUpdate` puts `questId` at +17
-(`WorldQuest.QuestFullUpdateContentOffset = 17`), so the +17 read yields the real quest id there;
-`BuildQuestIir` puts `questId` at **+21** and holds `state` at +17, so the uniform +17 read on a `QuestIIR`
-catches the `state` value (2/4), not the id (this is what surfaces the "2, 4" noted below).
+`QuestIIR` (0x97E02314) / `QuestFullUpdate` (0x63268258) sub-opcode. Codecs: `QuestCodec` /
+`QuestFullUpdateCodec`. Note the two shapes differ: `QuestFullUpdateIIR` opens its payload (a `QuestcRecord`)
+right after the 17-byte header, and that record starts with `questId`, so the +17 read yields the real quest
+id there; `QuestIIR` puts `questId` at **+21** and holds `state` at +17, so the uniform +17 read on a
+`QuestIIR` catches the `state` value (2/4), not the id (this is what surfaces the "2, 4" noted below).
 
 ## Conclusion: the beach Casilda chain is SHARED, not per-class
 
@@ -33,7 +33,7 @@ data-driven (`QuestProgressionService`, name-keyed goals), which is correct.
 
 ## Other shared early-beach quest ids (appear in every beach capture)
 
-- **10238** — `WorldQuest.BeachStarterQuestId` (the wash-ashore starter, seeded on first beach entry).
+- **10238** — `QuestContent.BeachStarterQuestId` (the wash-ashore starter, seeded on first beach entry).
 - **5744, 5745, 5867** — shared early quests present in every beach login (purpose not yet pinned; same ids
   for guardian/necro/herald/assassin/conqueror, so also not per-class).
 - **2, 4** — not quest ids (framing/state values the decoder's +17 read catches; ignore).

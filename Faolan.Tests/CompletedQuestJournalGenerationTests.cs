@@ -55,8 +55,8 @@ namespace Faolan.Tests
 
 				// Goals carry the live player's instance; take it from the capture so only CONTENT is compared.
 				var instance = captured.Goals[0].Instance;
-				var built = QuestObjectiveRegion.Build(def, instance).ToArray();
-				var want = captured.ToArray();
+				var built = QuestObjectiveRegionCodec.Build(QuestObjectiveRegions.ForQuest(def, instance));
+				var want = QuestObjectiveRegionCodec.Build(captured);
 				compared++;
 				if (built.SequenceEqual(want))
 				{
@@ -68,7 +68,7 @@ namespace Faolan.Tests
 				failByQuest[rec.QuestId] = failByQuest.GetValueOrDefault(rec.QuestId) + 1;
 
 				// Aggregate WHICH field differs, so the tail can be worked in priority order.
-				var rebuiltGoals = QuestObjectiveRegion.Parse(built, 0).Goals;
+				var rebuiltGoals = QuestObjectiveRegionCodec.Parse(built).Goals;
 				if (rebuiltGoals.Count != captured.Goals.Count)
 					Bump(fieldDiffs, "GOAL COUNT");
 				else
@@ -118,8 +118,8 @@ namespace Faolan.Tests
 					shown++;
 					first = "see log";
 					o.WriteLine($"  MISMATCH {source[..Math.Min(30, source.Length)]} quest {rec.QuestId}: built {built.Length} B vs captured {want.Length} B; " +
-					            $"goals db={def.Goals.Count} cap={captured.Goals.Count}; builtGoalIds=[{string.Join(",", QuestObjectiveRegion.Parse(built, 0).Goals.Select(x => x.GoalId))}] capGoalIds=[{string.Join(",", captured.Goals.Select(x => x.GoalId))}]");
-					var rebuilt = QuestObjectiveRegion.Parse(built, 0);
+					            $"goals db={def.Goals.Count} cap={captured.Goals.Count}; builtGoalIds=[{string.Join(",", QuestObjectiveRegionCodec.Parse(built).Goals.Select(x => x.GoalId))}] capGoalIds=[{string.Join(",", captured.Goals.Select(x => x.GoalId))}]");
+					var rebuilt = QuestObjectiveRegionCodec.Parse(built);
 					for (var gi = 0; gi < captured.Goals.Count; gi++)
 					{
 						var cg = captured.Goals[gi];
@@ -327,8 +327,8 @@ namespace Faolan.Tests
 					continue;
 				}
 
-				var built = QuestIndexRegion.Build([.. ordered!], ordered[0]!, areaRows, catalogs).ToArray();
-				var want = captured.ToArray();
+				var built = QuestIndexRegionCodec.Build(QuestIndexRegions.ForQuests([.. ordered!], ordered[0]!, areaRows, catalogs));
+				var want = QuestIndexRegionCodec.Build(captured);
 				compared++;
 				if (built.SequenceEqual(want))
 				{
@@ -338,7 +338,7 @@ namespace Faolan.Tests
 
 				if (first.Length == 0)
 				{
-					var b = QuestIndexRegion.Parse(built, 0, built.Length);
+					var b = QuestIndexRegionCodec.Parse(built);
 					first = $"{source}: {built.Length} B built vs {want.Length} B captured; " + $"block0 tf1={b.Blocks[0].TableField1}/{captured.Blocks[0].TableField1} " +
 					        $"tf2={b.Blocks[0].TableField2}/{captured.Blocks[0].TableField2} " + $"chain=0x{b.Blocks[0].ChainWord:X}/0x{captured.Blocks[0].ChainWord:X} " +
 					        $"areaQuests={b.Blocks[0].AreaQuestIds.Count}/{captured.Blocks[0].AreaQuestIds.Count}";
@@ -420,8 +420,8 @@ namespace Faolan.Tests
 					continue;
 				}
 
-				var built = CompletedQuestJournalRegion.Build(groups).ToArray();
-				var expected = region.ToArray();
+				var built = CompletedQuestJournalRegionCodec.Build(CompletedQuestJournalRegions.ForAreas(groups));
+				var expected = CompletedQuestJournalRegionCodec.Build(region);
 				if (built.SequenceEqual(expected))
 				{
 					rebuilt++;
@@ -437,11 +437,11 @@ namespace Faolan.Tests
 				// per-quest sequence word).
 				for (var a = 0; a < region.Areas.Count; a++)
 				{
-					var cap = new CompletedQuestJournalRegion
+					var cap = CompletedQuestJournalRegionCodec.Build(new CompletedQuestJournalRegion
 					{
 						Areas = [region.Areas[a]]
-					}.ToArray();
-					var got = CompletedQuestJournalRegion.Build([groups[a]]).ToArray();
+					});
+					var got = CompletedQuestJournalRegionCodec.Build(CompletedQuestJournalRegions.ForAreas([groups[a]]));
 					if (cap.SequenceEqual(got))
 						continue;
 

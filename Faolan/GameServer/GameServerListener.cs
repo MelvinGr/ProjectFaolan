@@ -60,8 +60,8 @@ namespace Faolan.GameServer
 		// (verified across the Strie / hoxxling / randochar captures - it is the canonical beach starting quest, not
 		// a per-character artifact). Since the snapshot is replayed and the client renders that quest, persist it so
 		// the DB matches what the journal shows (otherwise CharacterQuests is empty while the journal shows a quest -
-		// see snapshot_embeds_strie_quest). See CommitCharacterName / WorldQuest.BeachStarterQuestId.
-		private const uint BeachStarterQuestId = WorldQuest.BeachStarterQuestId;
+		// see snapshot_embeds_strie_quest). See CommitCharacterName / QuestContent.BeachStarterQuestId.
+		private const uint BeachStarterQuestId = QuestContent.BeachStarterQuestId;
 
 		// The per-application effect nonce a synthesized self-buff carries (the value the old verbatim Scythe-Shield
 		// blob used; the client does not validate it - #304).

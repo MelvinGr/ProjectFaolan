@@ -37,10 +37,12 @@ namespace Faolan.Tests
 			// The previously-assumed authoring path produces a 869 B block that starts [questId][1][questId][3]...,
 			// whereas the template region is 559 B starting [0x0BD3][1][9][instance]... - a different grammar.
 			var def = await LoadDefinition(10238);
-			var refs = new[] { QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName }.Select(s => Record(def, s)).ToArray();
-			var full = WorldQuest.BuildQuestFullUpdate(0x02165EFF, def.QuestId, WorldQuest.DefaultQuestLevel, def.AreaId, refs, def.GoalId, WorldQuest.SnapshotQuestAcceptTime, def.MapId, def.MarkerX,
-				def.MarkerY, Record(def, QuestTextSlot.Objective), Record(def, QuestTextSlot.ObjectiveLocalized));
-			var block = full[WorldQuest.QuestFullUpdateContentOffset..^1];
+			var iir = QuestFullUpdates.ForQuest(0x02165EFF, def, QuestFullUpdateCodec.DefaultQuestLevel, QuestFullUpdates.SnapshotQuestAcceptTime);
+			var full = QuestFullUpdateCodec.Build(iir);
+
+			// The full-update's payload IS the quest's journal record (#530 wave 5), so the "content block" the older
+			// slice `full[17..^1]` cut out is just that record's own bytes.
+			var block = QuestcRecordCodec.Build(iir.Record);
 
 			var region = Template[RegionStart..IndexTag];
 			Assert.NotEqual(region.Length, block.Length); // 559 vs 869
@@ -78,18 +80,6 @@ namespace Faolan.Tests
 			var repo = new DatabaseRepository(new Factory(options));
 			return (await repo.GetQuestDefinition(questId))!;
 		}
-
-		private static byte[] Record(QuestDefinition def, QuestTextSlot slot)
-		{
-			var r = def.TextRefs.FirstOrDefault(t => t.Slot == slot);
-			if (r == null)
-				return WorldQuest.RemoteFormat(0, 0, "");
-
-			return r.IsLocalized
-				? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText)
-				: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText);
-		}
-
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
 		{

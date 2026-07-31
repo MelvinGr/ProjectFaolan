@@ -430,8 +430,8 @@ namespace Faolan.GameServer.Dialogue
 				return;
 
 			await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
-			await _broadcaster.SendQuestIir(client, held.QuestId, WorldQuest.StateActive);
-			await _broadcaster.SendQuestIir(client, held.QuestId, WorldQuest.StateCompleted);
+			await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateActive);
+			await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateCompleted);
 			_logger.LogInformation("Quest {Quest} turned in to {NpcTemplate} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcName, character.Name, held.GoalProgress,
 				held.GoalRequired);
 		}

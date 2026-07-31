@@ -1,3 +1,5 @@
+using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Core.Extensions;
 using System;
 using System.IO;
 using System.Linq;
@@ -260,7 +262,8 @@ namespace Faolan.Tests
 			// The @609 objective region is INSIDE the journal records now (KnownHeaderLength covers it, #384). What
 			// trails the active journal is the completed-journal frame (empty 0x3F1 for a beach char, #390/#391) then
 			// the quest index.
-			return (tails.CompletedQuests?.ToArray().Length ?? 0) + (tails.QuestIndex?.ByteLength ?? 0);
+			return (tails.CompletedQuests == null ? 0 : CompletedQuestJournalRegionCodec.Build(tails.CompletedQuests).Length)
+			       + (tails.QuestIndex == null ? 0 : QuestIndexRegionCodec.Build(tails.QuestIndex).Length);
 		}
 
 		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>

@@ -68,17 +68,38 @@ namespace Faolan.Tests
 		public void BuildQuestFullUpdate_MatchesCasildaCapture()
 		{
 			// The fresh Casilda offer (player 0x0131720B), from Assets/casilda-quest-offer.bin.
-			var textRefs = new[]
+			// Spelled out field by field rather than via QuestFullUpdates.ForQuest, so the golden pins the LAYOUT (a
+			// QuestcRecord carrying one QuestObjectiveGoal) and not just the factory agreeing with itself.
+			var goal = new QuestObjectiveGoal
 			{
-				WorldQuest.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"), WorldQuest.RemoteFormat(13479, 50302, "iHLlH81PhqeCC&#36;cD0VwJ"),
-				WorldQuest.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"), WorldQuest.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr"),
-				WorldQuest.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/")
+				K = 0x0C, Instance = 0x0131720B, QuestId = 0x34A7, GoalId = 0x1670, N = 1, GoalIdRepeat = 0x1670, RequiredCount = 1,
+				// The "acceptTime" u64 is really the goal's (70099, 4CC-tag) reserved pair - see QuestFullUpdates.
+				Reserved = [0, 0, 0, 0, 0, 0x000111D3, 0x54375554],
+				MapId = 4010, MarkerX = 0x147, MarkerY = 0x2A6,
+				Objective = QuestTextTokens.RemoteFormat(5744, 50304, "M8Zw&quot;&quot;xo*V@DWHQ&amp;oPn1"),
+				TextRecord = QuestTextTokens.Localized(11561, 51000, "m", "I!,pP8[uf?E5+a&#36;1uQ6O")
 			};
-			var objectiveText = WorldQuest.RemoteFormat(5744, 50304, "M8Zw&quot;&quot;xo*V@DWHQ&amp;oPn1");
-			var objectiveLocalized = WorldQuest.Localized(11561, 51000, "m", "I!,pP8[uf?E5+a&#36;1uQ6O");
 
-			var body = WorldQuest.BuildQuestFullUpdate(0x0131720B, 0x34A7, 3, 1054, textRefs, 0x1670, 0x000111D354375554UL, 4010, 0x147, 0x2A6, objectiveText, objectiveLocalized);
+			var record = new QuestcRecord
+			{
+				QuestId = 0x34A7, State = 3, Field118 = 3, Unknown14 = QuestFullUpdates.LiveUnknown14,
+				Title = QuestTextTokens.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"),
+				Summary = QuestTextTokens.RemoteFormat(13479, 50302, "iHLlH81PhqeCC&#36;cD0VwJ"),
+				Area = QuestTextTokens.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"),
+				Region1 = QuestTextTokens.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr"),
+				Region2 = QuestTextTokens.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/"),
+				FieldEc = 1, AreaId = 1054, Field2c = 0x34A7, Field28 = 0x50, FieldF0 = 0x64,
+				Objectives = new QuestObjectiveRegion
+				{
+					Goals = [goal]
+				}
+			};
+
+			var body = QuestFullUpdateCodec.Build(new QuestFullUpdateIIR(0x0131720B, record));
 			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestFullUpdateIIR), Convert.ToHexString(body).ToLowerInvariant());
+
+			// ...and the strict Parse reads every byte of that captured body back (rule 3's EnsureAtEnd).
+			Assert.Equal(body, QuestFullUpdateCodec.Build(QuestFullUpdateCodec.Parse(body)));
 		}
 
 		// All three update spellings, byte-exact against retail. The Satisfied case is the original Casilda fixture; the
@@ -96,14 +117,14 @@ namespace Faolan.Tests
 			"0774c8c10000c35001317cf8010000305300000da7000000030000000200000000")]
 		public void BuildQuestGoal_MatchesCapture(QuestGoalUpdate update, uint player, uint quest, uint goal, string expected)
 		{
-			var body = WorldQuest.BuildQuestGoal(player, quest, goal, update);
+			var body = QuestGoalCodec.Build(player, quest, goal, update);
 			Assert.Equal(expected, Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]
 		public void BuildQuestIir_MatchesCapture()
 		{
-			var body = WorldQuest.BuildQuestIir(0x01316E71, 0x34A7, WorldQuest.StateActive);
+			var body = QuestCodec.Build(0x01316E71, 0x34A7, QuestCodec.StateActive);
 			Assert.Equal("97e023140000c35001316e71000000000100000002000034a700000000", Convert.ToHexString(body).ToLowerInvariant());
 		}
 
@@ -114,19 +135,19 @@ namespace Faolan.Tests
 		public void BuildQuestJournal_MatchesCasildaCapture()
 		{
 			// A single-quest journal for 13479, from Assets/casilda-quest-packets.bin.
-			var areaHeader = new[]
-			{
-				WorldQuest.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"), WorldQuest.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/"),
-				WorldQuest.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr")
-			};
-			var entries = new[]
-			{
-				new WorldQuest.JournalEntry(0x34A7, WorldQuest.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"), WorldQuest.RemoteFormat(13479, 50303, "i&#36;g&#92;DTrqI&#92;nBI0lUo6&amp;7"))
-			};
-			var trailing = WorldQuest.BuildTrackedQuestPointer();
+			var journal = new QuestJournalIIR(0x01316D8A, 1054,
+				QuestTextTokens.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"),
+				QuestTextTokens.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/"),
+				QuestTextTokens.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr"),
+				[
+					new QuestJournalEntry(0x34A7, QuestTextTokens.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"),
+						QuestTextTokens.RemoteFormat(13479, 50303, "i&#36;g&#92;DTrqI&#92;nBI0lUo6&amp;7"))
+				],
+				new TrackedQuestPointer());
 
-			var body = WorldQuest.BuildQuestJournal(0x01316D8A, 1054, areaHeader, entries, trailing);
+			var body = QuestJournalCodec.Build(journal);
 			Assert.Equal(CaptureBody(JournalFixture, GameServer0X2000Opcodes.QuestJournalIIR), Convert.ToHexString(body).ToLowerInvariant());
+			Assert.Equal(body, QuestJournalCodec.Build(QuestJournalCodec.Parse(body)));
 		}
 
 		// The RICH creation step (mode 7) - "NEW_character_creation Slave Galley": an f4 <remoteformat> token, an f5
@@ -397,29 +418,25 @@ namespace Faolan.Tests
 			Assert.Equal(0x2A6u, def.MarkerY);
 
 			// Journal list (no timestamp) - byte-exact against frame 9947.
-			var areaHeader = new[] { Rec(QuestTextSlot.AreaTitle), Rec(QuestTextSlot.MapName), Rec(QuestTextSlot.RegionName) };
-			var entries = new[] { new WorldQuest.JournalEntry(0x34A7, Rec(QuestTextSlot.Title), Rec(QuestTextSlot.ListSubLine)) };
-			var trailing = WorldQuest.BuildTrackedQuestPointer();
-			var journal = WorldQuest.BuildQuestJournal(0x01316D8A, def.AreaId, areaHeader, entries, trailing);
+			var journal = QuestJournalCodec.Build(QuestJournals.ForQuests(0x01316D8A, [def]));
 			Assert.Equal(CaptureBody(JournalFixture, GameServer0X2000Opcodes.QuestJournalIIR), Convert.ToHexString(journal).ToLowerInvariant());
 
-			// Full update - byte-exact against frame 687 when fed the captured accept timestamp.
-			var textRefs = new[] { Rec(QuestTextSlot.Title), Rec(QuestTextSlot.Summary), Rec(QuestTextSlot.AreaTitle), Rec(QuestTextSlot.RegionName), Rec(QuestTextSlot.MapName) };
-			var full = WorldQuest.BuildQuestFullUpdate(0x0131720B, def.QuestId, 3, def.AreaId, textRefs, def.GoalId, WorldQuest.SnapshotQuestAcceptTime, def.MapId, def.MarkerX, def.MarkerY,
-				Rec(QuestTextSlot.Objective), Rec(QuestTextSlot.ObjectiveLocalized));
+			// Full update - byte-exact against frame 687 when fed the captured reserved pair.
+			var iir = QuestFullUpdates.ForQuest(0x0131720B, def, 3, QuestFullUpdates.SnapshotQuestAcceptTime);
+			var full = QuestFullUpdateCodec.Build(iir);
 			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestFullUpdateIIR), Convert.ToHexString(full).ToLowerInvariant());
 
 			// Quest-log LIST (the packet that POPULATES the J-panel) - byte-exact against frame 687. The captured
-			// captured character had four active quests (tracked 13479 first); the area-title slot is the 13479 def's AreaTitle.
-			var logList = WorldQuest.BuildQuestLogList(0x0131720B, def.AreaId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], Rec(QuestTextSlot.AreaTitle));
+			// character had four active quests (tracked 13479 first); the area-title slot is the 13479 def's AreaTitle.
+			var logList = QuestLogListCodec.Build(0x0131720B, def.AreaId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], QuestTextTokens.Record(def, QuestTextSlot.AreaTitle));
 			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestLogListIIR), Convert.ToHexString(logList).ToLowerInvariant());
 
-			// Inverse: TryParseQuestLogList recovers the handle, tracked id, and the exact quest-id list (the
-			// CaptureQuestImporter path that harvests each character's held-quest set from the J-panel log).
-			Assert.True(WorldQuest.TryParseQuestLogList(logList, out var logHandle, out var trackedId, out var logIds));
-			Assert.Equal(0x0131720Bu, logHandle);
-			Assert.Equal(0x34A7u, trackedId);
-			Assert.Equal([0x34A7u, 0x34FBu, 0x34A8u, 0x3077u], logIds);
+			// Inverse: Parse recovers the handle, tracked id, and the exact quest-id list (the CaptureQuestImporter
+			// path that harvests each character's held-quest set from the J-panel log).
+			var parsedLog = QuestLogListCodec.Parse(logList);
+			Assert.Equal(0x0131720Bu, parsedLog.PlayerHandle);
+			Assert.Equal(0x34A7u, parsedLog.TrackedQuestId);
+			Assert.Equal([0x34A7u, 0x34FBu, 0x34A8u, 0x3077u], parsedLog.QuestIds);
 
 			// SNAPSHOT-TAILS per-quest block = the QuestFullUpdate content (questId onward) minus the trailing 0x00.
 			// Proven byte-identical to the SAME quest's block embedded in a real login snapshot (the conqueror's 13479
@@ -427,7 +444,9 @@ namespace Faolan.Tests
 			// and @585 (0 vs 7), and the player INSTANCE @606-609 - i.e. a freshly-accepted quest generates the exact
 			// retail block (decode_snapshot_quests.py). Validates BuildQuestFullUpdate's content shape (the basis the
 			// from-DB quest-region generation builds on).
-			var block = full[WorldQuest.QuestFullUpdateContentOffset..^1];
+			// (#530 wave 5: the block IS the full-update's QuestcRecord - the live message and the snapshot journal
+			// carry the same record, which is why this comparison works at all.)
+			var block = QuestcRecordCodec.Build(iir.Record);
 			Assert.Equal(879, block.Length);
 			var tailsBlock = SnapshotQuestBlock(0x34A7); // the 13479 block from the conqueror's login snapshot (879 B)
 			for (var i = 0; i < 879; i++)
@@ -438,61 +457,46 @@ namespace Faolan.Tests
 				Assert.True(block[i] == tailsBlock[i], $"snapshot block byte @{i}: built=0x{block[i]:x2} capture=0x{tailsBlock[i]:x2}");
 			}
 
-			return;
-
-			byte[] Rec(QuestTextSlot slot)
-			{
-				var r = def.TextRefs.Single(t => t.Slot == slot);
-				return r.IsLocalized
-					? WorldQuest.Localized((int)r.RefId, (int)r.Category, r.Flags ?? "", r.KeyText)
-					: WorldQuest.RemoteFormat((int)r.RefId, (int)r.Category, r.KeyText);
-			}
 		}
 
 		[Theory]
 		[InlineData(QuestGoalUpdate.Satisfied)]
 		[InlineData(QuestGoalUpdate.Progress)]
 		[InlineData(QuestGoalUpdate.Advanced)]
-		public void TryParseQuestGoal_RoundTripsBuild(QuestGoalUpdate update)
+		public void QuestGoalCodec_ParseRoundTripsBuild(QuestGoalUpdate update)
 		{
-			var body = WorldQuest.BuildQuestGoal(0x01316E71, 0x34A7, 0x1670, update);
+			var body = QuestGoalCodec.Build(0x01316E71, 0x34A7, 0x1670, update);
 
-			Assert.True(WorldQuest.TryParseQuestGoal(body, out var player, out var quest, out var goal, out var parsed));
-			Assert.Equal(0x01316E71u, player);
-			Assert.Equal(0x34A7u, quest);
-			Assert.Equal(0x1670u, goal);
-			Assert.Equal(update, parsed);
+			Assert.Equal(new QuestGoalIIR(0x01316E71, 0x34A7, 0x1670, update), QuestGoalCodec.Parse(body));
 
-			Assert.False(WorldQuest.TryParseQuestGoal(new byte[32], out _, out _, out _, out _)); // wrong length
+			// Strict Parse (#530 rule 4): a short body and a wrong marker THROW rather than returning false.
+			Assert.Throws<CodecParseException>(() => QuestGoalCodec.Parse(new byte[32]));
 			var corrupt = (byte[])body.Clone();
 			corrupt[12] = 0x00; // marker must be 0x01
-			Assert.False(WorldQuest.TryParseQuestGoal(corrupt, out _, out _, out _, out _));
+			Assert.Throws<CodecParseException>(() => QuestGoalCodec.Parse(corrupt));
 		}
 
 		// A word-triple retail never sends must NOT parse. The old reader accepted anything in the first word (it only
 		// required the last two to be zero), so (9,0,0) read as "count 9" - and conversely it REJECTED the real
 		// Progress/Advanced packets. Both halves of that are what this pins.
 		[Fact]
-		public void TryParseQuestGoal_RejectsAnUnknownUpdateTriple()
+		public void QuestGoalCodec_RejectsAnUnknownUpdateTriple()
 		{
-			var body = WorldQuest.BuildQuestGoal(0x01316E71, 0x34A7, 0x1670, QuestGoalUpdate.Satisfied);
+			var body = QuestGoalCodec.Build(0x01316E71, 0x34A7, 0x1670, QuestGoalUpdate.Satisfied);
 			body[^9] = 0x09; // first update word 1 -> 9, a combination that appears nowhere in the corpus
-			Assert.False(WorldQuest.TryParseQuestGoal(body, out _, out _, out _, out _));
+			Assert.Throws<CodecParseException>(() => QuestGoalCodec.Parse(body));
 		}
 
 		[Fact]
-		public void TryParseQuestIir_RoundTripsBuild()
+		public void QuestCodec_ParseRoundTripsBuild()
 		{
-			var body = WorldQuest.BuildQuestIir(0x01316E71, 0x34A7, WorldQuest.StateActive);
+			var body = QuestCodec.Build(0x01316E71, 0x34A7, QuestCodec.StateActive);
 
-			Assert.True(WorldQuest.TryParseQuestIir(body, out var player, out var quest, out var state));
-			Assert.Equal(0x01316E71u, player);
-			Assert.Equal(0x34A7u, quest);
-			Assert.Equal(WorldQuest.StateActive, state);
+			Assert.Equal(new QuestIIR(0x01316E71, 0x34A7, QuestCodec.StateActive), QuestCodec.Parse(body));
 
 			var corrupt = (byte[])body.Clone();
 			corrupt[0] ^= 0xFF; // sub-opcode
-			Assert.False(WorldQuest.TryParseQuestIir(corrupt, out _, out _, out _));
+			Assert.Throws<CodecParseException>(() => QuestCodec.Parse(corrupt));
 		}
 
 		// The extractor's inputs, as CapturedPacket. The RPC opcode is the same IIR mux for every one of them; the
