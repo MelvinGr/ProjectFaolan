@@ -71,7 +71,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `SimpleCharFullUpdateIIR` | `0xFA015807` | `SimpleCharFullUpdateCodec` | [V3: SimpleCharFullUpdateCodecTests.Build_AfterCharacterIirSwap_StaysParseable] |
 | V3 | `SimpleCharKilledByUpdateIIR` | `0xB066AFC2` | `SimpleCharKilledByUpdateCodec` | [V3: DeathSequenceTests.BuildKilledBy_ReproducesCapturedRecord_ByteExact] |
 | V3 | `SimpleDynelFullUpdateIIR` | `0x66AEDD50` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
-| V3 | `SimpleDynelVisualChangeIIR` | `0xE7F4F8F8` | `SimpleDynelVisualChangeCodec` | [V3: LootTests.BuildOpenWindowBody_MatchesCapture] |
+| V3 | `SimpleDynelVisualChangeIIR` | `0xE7F4F8F8` | `SimpleDynelVisualChangeCodec` | [V3: SimpleDynelVisualChangeCodecTests.CapturedBody_ParsesToItsKind_AndReEncodesByteExact] |
 | V3 | `StatDamageIIR` | `0xE9F24184` | `StatDamageCodec` | [V3: CombatDamageCodecTests.EnvironmentalDamage_IsByteIdentical] |
 | V3 | `StatUpdateIIR` | `0x96B8DC59` | `StatUpdateCodec` | [V3: CharacterStatBlockTests.BuildStatBlockBody_NpcCombatMode_MatchesCapturedFrame] |
 | V3 | `StopIIR` | `0xD751EBB4` | `StopCodec` | [V3: DeadReckoningCodecTests.Stop_RoundTripsByteExact] |
