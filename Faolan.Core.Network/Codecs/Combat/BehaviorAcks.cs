@@ -97,7 +97,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		{
 			var request = ParseRequest(rawPayload);
 
-			return new BehaviorControlCenterIIR(instance, (ushort)(request.Seq + 1), NormalAttackBehaviorId, InsertBehaviorPhaseField(request.Args, phase),
+			return new BehaviorControlCenterIIR(instance, (ushort)(request.Seq + 1), (uint)BehaviorId.CombatMelee, InsertBehaviorPhaseField(request.Args, phase),
 				HitResultBlock(victimHandle, damage));
 		}
 
@@ -171,7 +171,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		// The behaviour id an attack ack carries, whatever the request said. The client calls it Combat:Melee; this
 		// codebase called it "NormalAttack", which is our invention (#536).
-		internal const uint NormalAttackBehaviorId = (uint)BehaviorId.CombatMelee;
 
 		// The equip/unequip (Interact 0x09) ack: the echo-ack with the tail's zero padding replaced by an identity
 		// block - the first 28 tail bytes echoed, then the moved item's Data1..4 key quad twice + the null filler

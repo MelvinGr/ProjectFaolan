@@ -1,4 +1,5 @@
 using System.Numerics;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Protobuf;
@@ -33,10 +34,6 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		// The self-applied "you are dead" effect's spell id.
 		public const uint DeathEffectSpellId = 0x0009F000;
-
-		// The BCC slot (behaviorId) of the death transition and of the revive.
-		private const uint DeathSlot = 0x0000001F;
-		private const uint ReviveSlot = 0x00000025;
 
 		// The BCC seq (form) both carry.
 		private const ushort DeathSeq = 0x0004;
@@ -74,7 +71,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				ActivationTime = 240
 			}.ToProtobuf();
 
-			return new BehaviorControlCenterIIR(handle, DeathSeq, DeathSlot, args, []);
+			return new BehaviorControlCenterIIR(handle, DeathSeq, (uint)BehaviorId.LimboDeath, args, []);
 		}
 
 		// ⚠️ DECODED BUT DELIBERATELY NOT SENT. Retail's AssassinL23 (map 2010) death carries this self-applied
@@ -111,7 +108,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		{
 			using var tail = new FaolanStream();
 			tail.WriteUInt32(ReviveTailPrefix).WriteUInt32(respawnPointId);
-			return new BehaviorControlCenterIIR(handle, DeathSeq, ReviveSlot, ReviveArgs, tail.ToArray());
+			return new BehaviorControlCenterIIR(handle, DeathSeq, (uint)BehaviorId.Revive, ReviveArgs, tail.ToArray());
 		}
 
 		private static readonly byte[] EffectData =

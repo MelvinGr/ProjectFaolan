@@ -14,9 +14,8 @@ aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, p
   [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md). The ones this page is about:
   **0x0F Combat:Melee** (armed swing), **0x11 Combat:Unarmed** (empty main hand; behavior TypeIds 1089xx),
   0x09 Equip (see `docs/subsystems/inventory.md`), 0x2E SwapAlternateEquipment, 0x16 UseCharacter (talk),
-  0x12 UseDynel. ⚠️ "NormalAttack" and "UnarmedAttack" were OUR names for the first two, corrected in #536.
-  The duplicate `ActionType` enum that carried those names is gone — `BehaviorId` is the one catalog — though
-  `CombatService`'s `NormalAttackBehaviorId` constant and `SendNormalAttackResponse` keep the old spelling.
+  0x12 UseDynel. ⚠️ "NormalAttack" and "UnarmedAttack" were OUR names for the first two, corrected in #536;
+  `CombatService`'s `SendNormalAttackResponse` still keeps the old spelling.
 - args protobuf `{TypeId, Mode, Category, Field6, ...}` - **Mode is a monotonic per-session action
   counter** across ALL BCC interactions.
 - Attack tails end with the **direction-ability id** (769094/769095/769099 = Normal Attack Left/Right/

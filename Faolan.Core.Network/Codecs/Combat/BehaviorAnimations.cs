@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
@@ -19,12 +20,10 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class BehaviorAnimations
 	{
 		// World-object action animations - the actor plays a NAMED animation aimed at a target object, with a feedback
-		// remoteformat (decode_sit.py, path-of-azura sit-bench capture). behaviorId 0x2A, seq begin; the anim string +
-		// blend constants below are byte-exact vs F2795 (sit) / F2840 (standup). animActionId sits beside the spellweave
-		// actions in the same table (42052/42053). Sitting on a bench is startobjectaction(33)|turnon_execute(4).
-		public const uint ObjectActionBehaviorId = 0x2A;
-
-		public const uint ObjectStateBehaviorId = 0x12;
+		// remoteformat (decode_sit.py, path-of-azura sit-bench capture). BehaviorId.ObjectInteraction, seq begin; the
+		// anim string + blend constants below are byte-exact vs F2795 (sit) / F2840 (standup). animActionId sits beside
+		// the spellweave actions in the same table (42052/42053). Sitting on a bench is
+		// startobjectaction(33)|turnon_execute(4).
 
 		public const ushort SeqBegin = 0x0004;
 		public const ushort SeqComplete = 0x000A;
@@ -35,12 +34,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// NPC animation acks are server-initiated, so the echoed sequence is the constant 0x0004 (not a client seq).
 		private const ushort NpcAttackAckSeq = 0x0004;
 
-		// The NormalAttack behaviorId carried by an attack BehaviorControlCenterIIR (BehaviorAcks owns the constant -
-		// the player-side ack writes the same one).
-		private const uint NormalAttackBehaviorId = BehaviorAcks.NormalAttackBehaviorId;
-
 		private const uint IdleBehaviorAction = 41413; // the capture's `08 c5 c3 02` varint
-		private const uint IdleBehaviorId = 7;
 
 		private const float SitBlend = 2.6153848f; // 0x40276277 - the sit animation's blend/duration (raw-body BE float)
 		private const string SitAnimName = "chair_sit_calm";
@@ -166,7 +160,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 			using var tail = new FaolanStream();
 			tail.WriteUInt32(EntityClass.SimpleDynel).WriteUInt32(benchHandle).WriteUInt32(BenchSitAction);
-			return new BehaviorControlCenterIIR(actor, seq, ObjectStateBehaviorId, args, tail.ToArray());
+			return new BehaviorControlCenterIIR(actor, seq, (uint)BehaviorId.UseDynel, args, tail.ToArray());
 		}
 
 		// The continuous short-form "AI / idle behavior pulse" retail streams ~10/s for every rendered entity (#225).
@@ -184,7 +178,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				ExecutionStatus = 0
 			}.ToProtobuf();
 
-			return new BehaviorControlCenterIIR(actor, NpcAttackAckSeq, IdleBehaviorId, args, []);
+			return new BehaviorControlCenterIIR(actor, NpcAttackAckSeq, (uint)BehaviorId.BccAction, args, []);
 		}
 
 		// The NPC counter-attack ANIMATION ack: the "second BccAck with actor = target handle" (docs/subsystems/combat.md, was
@@ -216,7 +210,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 			// The result block is BehaviorAcks' - the player's targeted-hit ack sends the same 81 bytes with the roles
 			// swapped, and it was written out in both files until #530 wave 7.
-			return new BehaviorControlCenterIIR(npcHandle, NpcAttackAckSeq, NormalAttackBehaviorId, args, BehaviorAcks.HitResultBlock(playerHandle, damage, resultType, resultK1, resultK2));
+			return new BehaviorControlCenterIIR(npcHandle, NpcAttackAckSeq, (uint)BehaviorId.CombatMelee, args, BehaviorAcks.HitResultBlock(playerHandle, damage, resultType, resultK1, resultK2));
 		}
 
 		// Sit the actor on a world object (a bench): plays "chair_sit_calm" aimed at the object. `remoteformat` is the
@@ -324,7 +318,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteString(remoteformat)
 				.WriteUInt32(trailer);
 
-			return new BehaviorControlCenterIIR(actor, SeqBegin, ObjectActionBehaviorId, message.ToProtobuf(), tail.ToArray());
+			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.ObjectInteraction, message.ToProtobuf(), tail.ToArray());
 		}
 
 		// Field 10 - who/what the animation is aimed at. A ProtoID32 { type, instance }; the old model called it a

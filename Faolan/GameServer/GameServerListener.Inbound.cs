@@ -2280,7 +2280,7 @@ namespace Faolan.GameServer
 						// sit, s2c only, and never echoes one back. The guard is scoped to being seated because retail's
 						// client does send 0x2A otherwise (17 across the captures) and those ARE answered, so a blanket
 						// skip would soft-lock other object actions - the very thing the ack below exists to prevent.
-						if ((uint)actionType == BehaviorAnimations.ObjectActionBehaviorId && client.Session.SeatedOnHandle is not null)
+						if (actionType == BehaviorId.ObjectInteraction && client.Session.SeatedOnHandle is not null)
 						{
 							Logger.LogInformation("Sit: absorbed the client's re-sent sit behavior (not echoed - it would replay the sit).");
 
