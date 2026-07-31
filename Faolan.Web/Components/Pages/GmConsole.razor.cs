@@ -3,8 +3,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Web.Services;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Faolan.Web.Components.Pages
 {

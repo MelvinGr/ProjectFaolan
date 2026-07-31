@@ -155,7 +155,7 @@ namespace Faolan.Core.Rdb.Assets
 			var inv = 1f / det;
 			var tvec = origin - v0;
 			var u = Vector3.Dot(tvec, pvec) * inv;
-			if (u < 0f || u > 1f)
+			if (u is < 0f or > 1f)
 				return false;
 
 			var qvec = Vector3.Cross(tvec, edge1);

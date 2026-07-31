@@ -3,9 +3,9 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Progression;
 using Faolan.GameServer.World;
-using Faolan.Core.Network.Codecs.Combat;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer

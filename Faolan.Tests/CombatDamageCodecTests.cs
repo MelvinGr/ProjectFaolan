@@ -1,7 +1,5 @@
 using System;
-using Faolan.Core;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Progression;
 using Xunit;

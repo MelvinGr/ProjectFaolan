@@ -1,10 +1,8 @@
 using System;
-using System.Linq;
 using Faolan.Core.Database.Interfaces;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Codecs.World

@@ -1,8 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;

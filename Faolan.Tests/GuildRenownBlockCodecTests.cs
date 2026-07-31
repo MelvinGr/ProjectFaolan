@@ -1,5 +1,3 @@
-using Faolan.Core;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Tests.Support;
 using Xunit;

@@ -2,12 +2,10 @@ using System;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Protobuf;
+using Faolan.GameServer.Economy;
 using Faolan.Tests.Support;
 using Xunit;
-
-using Faolan.GameServer.Economy;
 
 namespace Faolan.Tests
 {

@@ -4,8 +4,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
-using Faolan.Core.Database.Interfaces;
-using Faolan.Core.Database.Tables;
 
 namespace Faolan.GameServer.World
 {

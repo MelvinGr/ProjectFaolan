@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
 	// One `PFAccessWindow_` playfield record out of the FullChar snapshot tails (see AccessWindowCatalog).

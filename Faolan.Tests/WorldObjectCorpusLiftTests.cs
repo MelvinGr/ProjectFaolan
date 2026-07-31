@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Tests.Support;
 using Xunit;
 

@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Numerics;
 using Faolan.Core.Extensions;
-using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;

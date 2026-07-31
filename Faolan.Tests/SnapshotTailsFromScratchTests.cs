@@ -1,5 +1,3 @@
-using Faolan.Core.Network.Codecs.Quest;
-using Faolan.Core.Extensions;
 using System;
 using System.IO;
 using System.Linq;
@@ -9,6 +7,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Progression;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;

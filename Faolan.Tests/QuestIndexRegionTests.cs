@@ -1,7 +1,6 @@
-using Faolan.Core.Extensions;
 using System;
 using System.IO;
-using Faolan.Core.Network.Codecs;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;
 using Xunit;

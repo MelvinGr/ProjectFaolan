@@ -1,6 +1,6 @@
+using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Importer.Extractors;
-using System.Linq;
 using Xunit;
 
 namespace Faolan.Tests

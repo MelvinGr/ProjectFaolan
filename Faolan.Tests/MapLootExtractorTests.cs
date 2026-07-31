@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Importer.Extractors;
 using Xunit;
 

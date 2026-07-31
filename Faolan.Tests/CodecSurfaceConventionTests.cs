@@ -1,14 +1,13 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Collections.Concurrent;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text.RegularExpressions;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Xunit;

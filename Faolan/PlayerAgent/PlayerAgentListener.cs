@@ -1,11 +1,9 @@
 using System;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.PlayerAgent;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Protocol;

@@ -233,7 +233,7 @@ namespace Faolan.Importer.Captures
 		// integer"). Same trap for floats, which come back as `double`.
 		private static string Literal(object? value, Type clrType)
 		{
-			if (value is null || value is DBNull)
+			if (value is null or DBNull)
 				return "NULL";
 
 			var type = Nullable.GetUnderlyingType(clrType) ?? clrType;

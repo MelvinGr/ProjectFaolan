@@ -1,7 +1,6 @@
 using System;
 using Faolan.Core;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.World;
 using Xunit;
 

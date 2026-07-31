@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.Economy

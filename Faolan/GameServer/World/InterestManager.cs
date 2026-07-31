@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Faolan.Core.Database.Tables;
 using System.Linq;
 using System.Numerics;
 

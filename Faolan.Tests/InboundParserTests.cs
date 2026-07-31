@@ -1,5 +1,5 @@
-using Faolan.Core.Extensions;
 using Faolan.Core;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Protobuf;

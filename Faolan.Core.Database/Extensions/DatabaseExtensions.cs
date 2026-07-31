@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;

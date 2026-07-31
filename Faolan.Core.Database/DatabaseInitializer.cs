@@ -3,10 +3,10 @@ using System.Data;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
-using Faolan.Core.Crypt;
 
 namespace Faolan.Core.Database
 {

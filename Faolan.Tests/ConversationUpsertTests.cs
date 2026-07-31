@@ -6,7 +6,6 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
-using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

@@ -62,7 +62,7 @@ namespace Faolan.Core
 		public static readonly string BuildString;
 		public static readonly string StartupBanner;
 
-		public const bool EnableTutorialOverlay = false;
+		public static readonly bool EnableTutorialOverlay = false;
 
 		static Global()
 		{

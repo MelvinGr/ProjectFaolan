@@ -1,7 +1,7 @@
 using System;
+using System.Numerics;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using System.Numerics;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {

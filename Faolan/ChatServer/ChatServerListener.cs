@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core;
@@ -15,7 +16,6 @@ using Faolan.Core.Network.Server.GameServer;
 using Faolan.GameServer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using System.Linq;
 
 namespace Faolan.ChatServer
 {

@@ -1,7 +1,7 @@
 using System.Linq;
 using Faolan.Core.Database;
-using Microsoft.EntityFrameworkCore;
 using Faolan.Tests.Support;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Faolan.Tests

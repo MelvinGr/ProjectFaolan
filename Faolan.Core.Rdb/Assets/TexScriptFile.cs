@@ -51,7 +51,7 @@ namespace Faolan.Core.Rdb.Assets
 				var name = (string?)o.Attribute("name");
 				if (name == "tinting")
 					op = new Operation(Kind.Tint, ByteAttr(o, "red"), ByteAttr(o, "green"), ByteAttr(o, "blue"), 0);
-				else if ((name == "projecttexture" || name == "projectselfilluminationmap") && (uint?)o.Attribute("textureid") is { } tid)
+				else if (name is "projecttexture" or "projectselfilluminationmap" && (uint?)o.Attribute("textureid") is { } tid)
 				{
 					op = new Operation(Kind.Project, 0, 0, 0, tid, FloatAttr(o, "ucoord", 0.5f), FloatAttr(o, "vcoord", 0.5f), FloatAttr(o, "scale", 100f), FloatAttr(o, "rotation", 0f),
 						FloatAttr(o, "blendweight", 1f));

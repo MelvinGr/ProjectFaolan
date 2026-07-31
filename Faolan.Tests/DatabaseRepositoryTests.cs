@@ -12,7 +12,6 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

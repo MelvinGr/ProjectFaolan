@@ -1,5 +1,4 @@
 using System;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs;
 using Xunit;

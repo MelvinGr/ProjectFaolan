@@ -4,11 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {

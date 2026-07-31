@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -536,7 +535,7 @@ namespace Faolan.GameServer
 		// This is what actually MOVES the yellow bar (the e9f24184 "Spellweaving Cost" gauge is separate accounting).
 		// Retail streams it while weaving to drain the energy bar (decode_spellweave, sender GameCharAgentProject/0x54
 		// -> GameCharInterfaceProject/instance; energy full = 8910 for the necro).
-		private Task SendSprintBar(INetworkClient client, uint energy)
+		private static Task SendSprintBar(INetworkClient client, uint energy)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType),
 				GameCharInterfaceProjectOpcodes.DispatchUpdateSprintBar, b => b.WriteUInt32(energy).WriteByte(0x01)));

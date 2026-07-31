@@ -10,8 +10,6 @@ using Faolan.Importer.Extractors;
 using Faolan.Importer.Rdb;
 using Microsoft.EntityFrameworkCore;
 
-using Faolan.Core.Network.Codecs.Economy;
-
 namespace Faolan.Importer.Modules
 {
 	// The remaining capture-sourced modules. Each wraps an existing CaptureX importer / extractor + the shared

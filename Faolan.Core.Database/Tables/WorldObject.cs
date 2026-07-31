@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using Faolan.Core.Protobuf;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Numerics;
 using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Database.Tables
 {

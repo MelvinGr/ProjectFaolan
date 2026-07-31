@@ -7,7 +7,6 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
-using Faolan.Core.Network.Interfaces;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Packets.ChatServer;
 using Faolan.Core.Network.Protocol;

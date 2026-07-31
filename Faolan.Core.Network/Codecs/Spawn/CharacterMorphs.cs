@@ -1,6 +1,6 @@
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using Faolan.Core.Database.Tables;
 
 namespace Faolan.Core.Network.Codecs.Spawn

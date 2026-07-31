@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;

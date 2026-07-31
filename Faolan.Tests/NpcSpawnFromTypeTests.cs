@@ -2,8 +2,8 @@ using System.Linq;
 using System.Numerics;
 using Faolan.Core.Database;
 using Faolan.Core.Network.Codecs.Spawn;
-using Microsoft.EntityFrameworkCore;
 using Faolan.Tests.Support;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Faolan.Tests

@@ -3,11 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Faolan.Core.Constants;
-using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -58,7 +55,7 @@ namespace Faolan.Importer.Extractors
 				if (!p.TryParse(MoveTaskCodec.Parse, out var task))
 					continue;
 
-				if (task.Handle == 0 || task.Handle >= EntityHandles.CharacterInstanceBase)
+				if (task.Handle is 0 or >= EntityHandles.CharacterInstanceBase)
 					continue; // a player's MoveTask, not an NPC patrol
 
 				var waypoints = new List<Vector3>();

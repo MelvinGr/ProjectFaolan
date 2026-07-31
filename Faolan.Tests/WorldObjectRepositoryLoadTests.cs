@@ -2,9 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
-using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

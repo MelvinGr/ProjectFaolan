@@ -6,13 +6,12 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 
 namespace Faolan.Importer.Captures
 {

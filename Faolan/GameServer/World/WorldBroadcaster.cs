@@ -11,7 +11,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
-using Faolan.Core.Progression;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
@@ -20,6 +19,7 @@ using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Progression;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.Quest;
 using Microsoft.Extensions.Logging;
@@ -1278,11 +1278,11 @@ namespace Faolan.GameServer.World
 		// WITHOUT a captured destination yields Teleport.DestMapId == 0 so the caller can surface a message. (Whether
 		// it's a same-playfield Teleport or a cross-playfield ProxyTeleport, the handoff path is the same - DoTeleport
 		// change-maps only when the destination map differs.)
-		public async Task<UsedObjectInteraction> ResolveUseObject(INetworkClient client, uint handle)
+		public Task<UsedObjectInteraction> ResolveUseObject(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var live))
-				return new UsedObjectInteraction(InteractAction.None, default);
+				return Task.FromResult(new UsedObjectInteraction(InteractAction.None, default));
 
 			var obj = live.Row;
 
@@ -1290,7 +1290,7 @@ namespace Faolan.GameServer.World
 			var teleport = obj.DestinationMapId is { } destMap
 				? new ZoneLineDestination(destMap, obj.DestinationPosition, name)
 				: new ZoneLineDestination(0, null, name);
-			return new UsedObjectInteraction(obj.InteractAction, teleport, obj.Id);
+			return Task.FromResult(new UsedObjectInteraction(obj.InteractAction, teleport, obj.Id));
 		}
 
 		// #398: the per-NPC follow-ups for the entry-burst NPCs (BuildEntryNpcBurst) - the quest markers and the

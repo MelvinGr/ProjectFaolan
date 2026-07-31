@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Economy;
@@ -10,7 +8,6 @@ using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
-using ProtoBuf;
 
 namespace Faolan.Importer.Extractors
 {

@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Rdb;
 using Faolan.Importer.Cli;
-using Faolan.Core.Database.Tables;
 using Faolan.Importer.Rdb;
 
 namespace Faolan.Importer.Modules

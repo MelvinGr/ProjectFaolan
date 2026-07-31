@@ -8,8 +8,8 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Extensions;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Faolan.Importer.Captures
 {

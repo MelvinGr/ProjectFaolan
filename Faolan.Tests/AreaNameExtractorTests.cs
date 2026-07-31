@@ -1,11 +1,8 @@
-using System;
-using System.Numerics;
 using System.Linq;
-using System.Text;
-using Faolan.Core.Enums;
+using System.Numerics;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Extensions;
 using Faolan.Importer.Extractors;
 using Xunit;
 

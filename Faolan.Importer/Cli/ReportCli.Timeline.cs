@@ -1,22 +1,16 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Faolan.Core.Crypt;
-using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
-using Faolan.Importer.Extractors;
-using Microsoft.EntityFrameworkCore;
 using ProtoBuf;
 
 namespace Faolan.Importer.Cli

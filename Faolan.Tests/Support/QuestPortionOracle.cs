@@ -1,6 +1,5 @@
 using System;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 

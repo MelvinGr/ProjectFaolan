@@ -7,8 +7,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
-using Faolan.Core.Enums;
-
 using Faolan.Core.Network.Codecs.Economy;
 
 using Faolan.Core.Network.Codecs.FullCharSnapshot;

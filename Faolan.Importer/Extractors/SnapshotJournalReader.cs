@@ -1,11 +1,8 @@
-using System;
 using System.Collections.Generic;
-using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
-using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {

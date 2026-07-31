@@ -4,15 +4,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Constants;
-using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.GameServer;
+using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.CSPlayerAgent

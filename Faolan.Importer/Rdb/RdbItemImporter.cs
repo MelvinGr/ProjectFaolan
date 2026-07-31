@@ -321,7 +321,7 @@ namespace Faolan.Importer.Rdb
 		{
 			foreach (var c in s)
 			{
-				if (c < 32 || c > 126)
+				if (c is < 32 or > 126)
 					return false;
 			}
 

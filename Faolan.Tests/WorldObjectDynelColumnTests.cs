@@ -1,11 +1,10 @@
-using Faolan.Core.Crypt;
-using Faolan.Core.Protobuf;
 using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
-using Microsoft.Data.Sqlite;
+using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Faolan.Tests

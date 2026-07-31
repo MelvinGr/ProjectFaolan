@@ -1,9 +1,9 @@
-using Faolan.Core.Crypt;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;

@@ -1,8 +1,8 @@
-using Faolan.Core.Crypt;
-using Faolan.Core.Extensions;
 using System;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
 
 namespace Faolan.Core.Network.Codecs.World

@@ -1,18 +1,17 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
+using Faolan.Core;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Team;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
-using Faolan.Core.Network;
-using Faolan.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 

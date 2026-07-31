@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
-using Faolan.Core.Protobuf;
+using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
-using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Protobuf;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables

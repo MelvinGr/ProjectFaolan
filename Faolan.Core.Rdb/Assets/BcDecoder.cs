@@ -9,7 +9,7 @@ namespace Faolan.Core.Rdb.Assets
 		// Decode the top-level mip of a BCn payload (block data only, no DDS/FCTX header) to RGBA32 (row-major, top-down).
 		public static byte[] Decode(ReadOnlySpan<byte> blocks, int width, int height, string fourCc)
 		{
-			var bc3 = fourCc == "DXT3" || fourCc == "DXT5";
+			var bc3 = fourCc is "DXT3" or "DXT5";
 			var blockBytes = bc3
 				? 16
 				: 8;

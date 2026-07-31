@@ -9,15 +9,16 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
-using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
@@ -25,7 +26,6 @@ using Faolan.GameServer.Dialogue;
 using Faolan.GameServer.Session;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
-using Faolan.Core.Network.Server.ChatServer;
 
 namespace Faolan.GameServer
 {
@@ -247,7 +247,7 @@ namespace Faolan.GameServer
 							Logger.LogInformation("Create-world CharInPlayIIR: sending the create ready burst, then starting the intro cutscene.");
 							client.Session.HasPendingPost205FFollowUp = false;
 							await SendCreateWorldReadyBurst(client);
-							await _createFlow.SendCreateIntroCutscene(client);
+							await CreateFlowService.SendCreateIntroCutscene(client);
 							break;
 						}
 

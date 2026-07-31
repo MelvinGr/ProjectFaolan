@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using Faolan.ClientLauncher;
-using Faolan.Core.Crypt;
-using System.Text;
 using System.Globalization;
 using System.Numerics;
+using System.Text;
+using Faolan.ClientLauncher;
+using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Microsoft.Extensions.Configuration;

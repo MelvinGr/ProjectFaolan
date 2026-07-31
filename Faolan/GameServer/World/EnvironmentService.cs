@@ -9,7 +9,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Progression;
-using Faolan.GameServer.Combat;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World

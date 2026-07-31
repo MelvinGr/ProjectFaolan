@@ -241,16 +241,15 @@ namespace Faolan.GameServer.Combat
 			// (2.0 - level / apprenticeLevel) × total. An un-mentored character's apprentice level IS its level, so the
 			// term is 1.0 - we send ApprenticeLevel = level for exactly this reason (leaving it unset made the client
 			// compute 2 - 80/1 = -78).
-			var adjusted = total;
 			var target = level * targetPerLevel;
 
 			// The client's closed form, taken when its ARMOR_MITIGATION table has no matching row - which on this build
 			// is ALWAYS: the table loads but the vector the lookup walks is empty, so it logs
 			// "No mitigation entry found" and falls through. Hence this IS the client's effective behaviour, not a
 			// degraded path. If a build ever ships rows, they interpolate a (Min,Max) pair instead (docs/subsystems/combat.md).
-			var fraction = adjusted >= target
-				? adjusted / (target + adjusted)
-				: adjusted / target * 0.5;
+			var fraction = total >= target
+				? total / (target + total)
+				: total / target * 0.5;
 
 			return Math.Clamp(fraction, 0, MaxMitigationFraction);
 		}

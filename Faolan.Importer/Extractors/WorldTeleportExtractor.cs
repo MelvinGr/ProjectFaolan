@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using System.Linq;
-using System.Numerics;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Protobuf;
-using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {

@@ -5,7 +5,6 @@ using System.Text.RegularExpressions;
 using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Tests.Support;

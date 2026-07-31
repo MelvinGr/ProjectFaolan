@@ -1,6 +1,5 @@
 using System;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs;
 using Xunit;
 
 namespace Faolan.Tests

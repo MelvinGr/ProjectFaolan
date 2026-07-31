@@ -5,8 +5,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Xunit;

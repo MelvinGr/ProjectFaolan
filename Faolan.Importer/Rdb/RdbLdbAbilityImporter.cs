@@ -56,7 +56,7 @@ namespace Faolan.Importer.Rdb
 				}
 
 				var cat = LdbStringIndex.CategoryOf(body);
-				if (cat == LdbStringIndex.ItemNameCategory || cat == ItemNameCategory2)
+				if (cat is LdbStringIndex.ItemNameCategory or ItemNameCategory2)
 				{
 					foreach (var entry in LdbStringIndex.Parse(body))
 						itemNamed.Add(entry.Id); // ANY language: this is an exclusion set, so the id is all that matters

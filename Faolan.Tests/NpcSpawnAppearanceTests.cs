@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Tests.Support;

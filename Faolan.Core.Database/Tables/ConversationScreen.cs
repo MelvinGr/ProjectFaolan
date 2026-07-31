@@ -1,7 +1,6 @@
 using System.Collections.Generic;
-using Faolan.Core.Protobuf;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Protobuf;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables

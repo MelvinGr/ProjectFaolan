@@ -9,7 +9,6 @@ using System.Threading;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Rdb;
 using Faolan.Core.Rdb.Assets;
 using Microsoft.EntityFrameworkCore;
@@ -816,7 +815,7 @@ namespace Faolan.Web.Services
 		// when the item has no key / no local template entry.
 		private static byte[]? DecryptTemplate(RdbReader rdb, Item? item)
 		{
-			if (item == null || item is { Key.Key1: 0, Key.Key2: 0, Key.Key3: 0, Key.Key4: 0 })
+			if (item is null or { Key.Key1: 0, Key.Key2: 0, Key.Key3: 0, Key.Key4: 0 })
 				return null;
 
 			var key = new[] { item.Key.Key1, item.Key.Key2, item.Key.Key3, item.Key.Key4 };

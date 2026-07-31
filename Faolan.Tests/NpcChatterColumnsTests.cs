@@ -1,9 +1,9 @@
-using Faolan.Core.Crypt;
-using Faolan.Core.Extensions;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
 using Microsoft.EntityFrameworkCore;
 using Xunit;

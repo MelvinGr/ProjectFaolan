@@ -1,10 +1,8 @@
 using System;
-using System.Security.Claims;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Faolan.Web.Components.Pages
 {

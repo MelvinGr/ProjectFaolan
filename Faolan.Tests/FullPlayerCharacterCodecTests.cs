@@ -4,9 +4,9 @@ using System.Text;
 using Faolan.Core;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
-using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;
 

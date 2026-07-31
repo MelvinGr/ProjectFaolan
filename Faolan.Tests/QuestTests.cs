@@ -463,7 +463,7 @@ namespace Faolan.Tests
 			var tailsBlock = SnapshotQuestBlock(0x34A7); // the 13479 block from the conqueror's login snapshot (879 B)
 			for (var i = 0; i < 879; i++)
 			{
-				if (i is 577 or 585 || i is >= 606 and <= 609)
+				if (i is 577 or 585 or >= 606 and <= 609)
 					continue; // progress (577/585) + player instance (606-609): expected per-character differences
 
 				Assert.True(block[i] == tailsBlock[i], $"snapshot block byte @{i}: built=0x{block[i]:x2} capture=0x{tailsBlock[i]:x2}");

@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using Faolan.Core;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;

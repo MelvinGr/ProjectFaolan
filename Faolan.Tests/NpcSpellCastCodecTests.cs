@@ -1,8 +1,6 @@
 using System;
 using System.Linq;
-using Faolan.Core;
 using Faolan.Core.Extensions;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;

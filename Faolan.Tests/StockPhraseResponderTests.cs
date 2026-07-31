@@ -5,8 +5,8 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Text;
-using Microsoft.EntityFrameworkCore;
 using Faolan.Tests.Support;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Faolan.Tests

@@ -57,7 +57,7 @@ namespace Faolan.Tests
 			const int varintOffset = 4 + 53;
 			for (var i = 0; i < record.Length; i++)
 			{
-				if (i < varintOffset || i >= varintOffset + 4)
+				if (i is < varintOffset or >= varintOffset + 4)
 					Assert.Equal(record[i], rebuilt[i]);
 			}
 		}

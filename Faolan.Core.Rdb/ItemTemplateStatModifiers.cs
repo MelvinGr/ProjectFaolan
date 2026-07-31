@@ -59,7 +59,7 @@ namespace Faolan.Core.Rdb
 					continue;
 
 				var statId = W(body, off + 24);
-				if (statId == 0 || statId >= MaxStatId)
+				if (statId is 0 or >= MaxStatId)
 					continue;
 
 				mods.Add(new Modifier(off >= 8 ? W(body, off - 8) : 0, statId, W(body, off + 28)));

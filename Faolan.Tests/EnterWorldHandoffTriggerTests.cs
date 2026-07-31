@@ -1,7 +1,6 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Faolan.Core.Network;
 using Faolan.GameServer.CreateFlow;
 using Faolan.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;

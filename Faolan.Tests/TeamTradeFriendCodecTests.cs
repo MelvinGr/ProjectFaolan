@@ -1,11 +1,10 @@
 using System;
-using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
-using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Protobuf;
 using Xunit;
 
 namespace Faolan.Tests

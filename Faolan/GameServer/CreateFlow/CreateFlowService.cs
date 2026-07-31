@@ -10,9 +10,9 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -374,7 +374,7 @@ namespace Faolan.GameServer.CreateFlow
 		// instead put the cutscene FIRST, so the client's CharInPlayIIR - and therefore ReadyForPlayScreen - landed in
 		// the middle of the intro. That is the same failure the 0x2020-poll flush caused, just moved later: the intro
 		// began correctly and then the world snapped back to the un-ready state.
-		internal async Task SendCreateIntroCutscene(INetworkClient client)
+		internal static async Task SendCreateIntroCutscene(INetworkClient client)
 		{
 			var id = client.Session.Account.ClientInstance;
 

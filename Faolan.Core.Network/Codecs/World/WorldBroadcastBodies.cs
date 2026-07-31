@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 
 namespace Faolan.Core.Network.Codecs.World

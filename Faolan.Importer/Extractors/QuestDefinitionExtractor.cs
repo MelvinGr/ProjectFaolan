@@ -1,11 +1,9 @@
-using Faolan.Core.Crypt;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
-using Faolan.Core.Enums;
-using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Quest;
 
 namespace Faolan.Importer.Extractors

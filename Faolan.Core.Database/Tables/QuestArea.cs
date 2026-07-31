@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using Faolan.Core.Protobuf;
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Database.Tables
 {

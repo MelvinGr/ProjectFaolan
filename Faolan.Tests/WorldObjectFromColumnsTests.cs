@@ -1,4 +1,3 @@
-using System;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;

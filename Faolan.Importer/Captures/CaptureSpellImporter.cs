@@ -571,7 +571,7 @@ namespace Faolan.Importer.Captures
 
 				instance = body.ReadU32Be(i + 8);
 				var level = body.ReadU32Be(i + 13);
-				if (level == 0 || level > MaxLevel)
+				if (level is 0 or > MaxLevel)
 					return false;
 
 				newLevel = (byte)level;

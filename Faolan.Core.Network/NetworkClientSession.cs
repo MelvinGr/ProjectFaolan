@@ -1,6 +1,6 @@
 using System.Collections.Generic;
-using System.Threading;
 using System.Numerics;
+using System.Threading;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 

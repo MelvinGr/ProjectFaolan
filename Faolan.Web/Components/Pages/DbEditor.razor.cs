@@ -6,8 +6,6 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Web.Services;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Web.Components.Pages

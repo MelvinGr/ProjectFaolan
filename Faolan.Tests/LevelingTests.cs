@@ -1,5 +1,4 @@
 using Faolan.Core.Progression;
-using Faolan.GameServer.Combat;
 using Xunit;
 
 namespace Faolan.Tests

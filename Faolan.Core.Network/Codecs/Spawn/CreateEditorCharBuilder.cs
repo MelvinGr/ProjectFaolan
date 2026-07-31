@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
@@ -32,20 +31,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// and are stored without their type word, but a caller must not have to name the IIR to send one back.
 		public static byte[]? Reconstruct(byte[]? body, uint playfieldInstance)
 		{
-			var record = body;
-			if (record == null || record.Length < SpawnPacketBuilder.RotWOffset - 8 + 4)
-				return record == null ? null : WithSubOpcode(record);
+			if (body == null || body.Length < SpawnPacketBuilder.RotWOffset - 8 + 4)
+				return body == null ? null : WithSubOpcode(body);
 
 			// Frame as the [u32 len][u32 FA015807][record] template SpawnPacketBuilder consumes/produces.
-			var template = new byte[8 + record.Length];
-			template.WriteU32Be(0, (uint)(4 + record.Length));
+			var template = new byte[8 + body.Length];
+			template.WriteU32Be(0, (uint)(4 + body.Length));
 			template.WriteU32Be(4, SimpleCharFullUpdateCodec.Opcode);
-			record.CopyTo(template, 8);
+			body.CopyTo(template, 8);
 
-			if (!SpawnBodyReader.TryReadCharacterMessage(record, out var read))
-				return WithSubOpcode(record);
+			if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read))
+				return WithSubOpcode(body);
 
-			var handle = record.ReadU32Be(4);
+			var handle = body.ReadU32Be(4);
 			var full = SpawnPacketBuilder.BuildSpawn(template, handle, PositionOf(template), RotationOf(template), read.Message);
 			// The token patch works on the RECORD (past the carrier's u32 length), so slice it out, patch it and copy
 			// it back. Best-effort: the captured token stays if the transform cannot be located.

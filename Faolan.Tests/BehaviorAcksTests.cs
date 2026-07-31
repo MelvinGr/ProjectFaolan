@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
-using Faolan.Core.Extensions;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Protobuf;
 using Xunit;

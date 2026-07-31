@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Importer.Modules;
-using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

@@ -1,6 +1,4 @@
 using System;
-using Faolan.Core;
-using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.Combat;
 using Xunit;
 

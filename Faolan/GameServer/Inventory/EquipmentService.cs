@@ -2,10 +2,8 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
-using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Protobuf;
 using Microsoft.Extensions.Logging;
 
