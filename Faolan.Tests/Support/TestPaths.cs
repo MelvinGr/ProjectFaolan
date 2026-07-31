@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 
@@ -10,25 +9,24 @@ namespace Faolan.Tests.Support
 	// hardcode an absolute path in a test; go through here (or Golden).
 	public static class TestPaths
 	{
-		// Captures/ - the packet-trace corpus. The *.tshark.json files are read at TEST time (the whole-corpus
-		// round-trip gates), so they are fixtures, not regenerable build artifacts.
-		[Obsolete]
-		public static string CapturesDir => Path.Combine(RepoRoot(), "Captures");
-
 		// The real-data game database for tests. BUILT from the migrations + faolan.sql rather than read from the
 		// committed faolan.db (#412) - see TestDb.GameDatabase, which is the single place that strategy lives.
 		public static string FaolanDb => TestDb.GameDatabase;
 
-		// Faolan.Tests/Assets - capture blobs + render templates used as test INPUTS (Golden/ holds the expected
-		// OUTPUTS). The four strie-login-*/bigboy captures live here because only the test suite reads them.
+		// The named capture blobs + render templates used as test INPUTS. They live in the fixture archive's `assets/`
+		// keys (Faolan.Tests/Assets/fixtures.bin, the one file that holds every byte the suite reads) - `Golden` reads
+		// the expected OUTPUTS out of the same archive.
+		//
+		// Asset() hands back a PATH because ~29 call sites pass one to something that opens it; the bytes are
+		// materialized into the gitignored obj/ cache on first use. Prefer AssetBytes() in new code.
 		public static string Asset(string fileName)
 		{
-			return Path.Combine(TestProjectDir(), "Assets", fileName);
+			return FixtureArchive.NamedPath($"assets/{fileName}");
 		}
 
 		public static byte[] AssetBytes(string fileName)
 		{
-			return File.ReadAllBytes(Asset(fileName));
+			return FixtureArchive.Named($"assets/{fileName}");
 		}
 
 		// Any repo-relative path, e.g. Repo("docs", "protocol", "gen", "opcodes.md").
@@ -44,12 +42,6 @@ namespace Faolan.Tests.Support
 		{
 			return Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!)!;
 			// -> repo root
-		}
-
-		private static string TestProjectDir([CallerFilePath] string thisFile = "")
-		{
-			return Path.GetDirectoryName(Path.GetDirectoryName(thisFile)!)!;
-			// Support/ -> Faolan.Tests/
 		}
 	}
 }

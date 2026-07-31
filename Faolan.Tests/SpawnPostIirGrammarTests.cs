@@ -46,7 +46,7 @@ namespace Faolan.Tests
 			Assert.Equal(21, shapes["len=40 firstRecordLen=4 word2=2"]);
 			Assert.Equal(40, 12 + 4 + 24); // the empty-tail identity, spelled out for the two minimal forms
 			Assert.Equal(41, 12 + 5 + 24);
-			Assert.Equal(757 + 2492 + 23, shapes.Where(s => s.Key.StartsWith("len=41 ")).Sum(s => s.Value));
+			Assert.Equal(1609 + 3513 + 30, shapes.Where(s => s.Key.StartsWith("len=41 ")).Sum(s => s.Value));
 		}
 
 		// word2 is NOT a record count, which is what it was called until this landed: it takes three different values

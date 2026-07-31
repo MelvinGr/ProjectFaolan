@@ -55,7 +55,7 @@ namespace Faolan.Tests
 				shapes[shape] = shapes.GetValueOrDefault(shape) + 1;
 			}
 
-			Assert.Equal(151, blocks);
+			Assert.Equal(184, blocks);
 			Assert.Equal(0, unparsed);
 
 			// Both stat lists are FIXED-SIZE across the corpus - 17 displayed stats and the sheet's 74 pairs twice.
@@ -64,7 +64,7 @@ namespace Faolan.Tests
 		}
 
 		// The spellbook list is OPTIONAL, not merely sometimes empty - the distinction the flat view could not make.
-		// 21 of the 151 blocks end at StatList#2 and go straight to two zero-count tails; the other 130 carry the
+		// 21 of the 184 blocks end at StatList#2 and go straight to two zero-count tails; the other 163 carry the
 		// list, empty (its bare 0x3F1 frame, 9 captures) or not. Absent and empty are different bytes, so they are
 		// different in the model.
 		//
@@ -96,7 +96,7 @@ namespace Faolan.Tests
 
 			var without = blocks.Where(b => b.Block.KnownSpells == null).ToList();
 			Assert.Equal(21, without.Count);
-			Assert.Equal(130, blocks.Count - without.Count);
+			Assert.Equal(163, blocks.Count - without.Count);
 
 			// Every spellbook-less block is its capture's FIRST snapshot, and closes with both tails empty.
 			Assert.All(without, b => Assert.Equal(firstOfCapture[b.Capture], b.Packet));
@@ -142,8 +142,8 @@ namespace Faolan.Tests
 				}
 			}
 
-			Assert.Equal(151, blocks);
-			Assert.Equal(151 * (17 + 148), ids);
+			Assert.Equal(184, blocks);
+			Assert.Equal(184 * (17 + 148), ids);
 
 			// NOT ONE unknown id across the corpus - the catalog already covers everything these lists name.
 			Assert.Empty(unknown);

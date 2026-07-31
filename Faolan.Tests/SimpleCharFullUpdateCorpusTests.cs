@@ -60,8 +60,8 @@ namespace Faolan.Tests
 			Assert.True(mismatches.Count == 0, $"{mismatches.Count} captured spawns did not re-encode byte-exact:\n  " + string.Join("\n  ", mismatches.Take(10)));
 
 			// Pinned to the FULL corpus. The family is told apart by the first record's MOVE-TASK SLOT: an NPC has
-			// one, a player's first record IS the buff list's framing word (length 4). The 259 player streams are the
-			// 232 the old player-only codec read plus the 27 whose entry slot is EMPTY - there the player's
+			// one, a player's first record IS the buff list's framing word (length 4). The 317 player streams are the
+			// 286 the old player-only codec read plus the 31 whose entry slot is EMPTY - there the player's
 			// [count][entryTableX][marker] and the NPC's [count][two words] are the same twelve bytes, so the two
 			// readings do not disagree about anything and either reproduces the stream.
 			//
@@ -69,9 +69,9 @@ namespace Faolan.Tests
 			// record resolves the last six, including the one whose ASCII is scrambled in 4-byte groups - a
 			// mis-reassembled TCP segment, which reads fine because the corruption is inside a string rather than in
 			// the framing.
-			Assert.Equal(11632, census.Values.Sum());
-			Assert.Equal(259, census["player"]);
-			Assert.Equal(11373, census["npc"]);
+			Assert.Equal(17717, census.Values.Sum());
+			Assert.Equal(317, census["player"]);
+			Assert.Equal(17400, census["npc"]);
 		}
 
 		// The first record's move-task slot (#477) - the last region of the spawn stream that was carried as bytes.
@@ -102,18 +102,18 @@ namespace Faolan.Tests
 			}
 
 			// Pinned to the FULL corpus. Every NPC stream has the slot; every player stream lacks it.
-			Assert.Equal(259, noSlot);
-			Assert.Equal(9694, emptySlot);
-			Assert.Equal(1679, withTask);
+			Assert.Equal(317, noSlot);
+			Assert.Equal(14153, emptySlot);
+			Assert.Equal(3247, withTask);
 
 			// The five modes are MoveTaskCodec's own: 4 = ListMoveTask (a waypoint path), 7 and 8 = the approach
 			// forms, 1 = PathMoveTask, 2 = the stationary from/to/facing record.
 			Assert.Equal(new Dictionary<byte, int>
 			{
-				[0x04] = 1636,
-				[0x07] = 22,
-				[0x08] = 18,
-				[0x01] = 2,
+				[0x04] = 3170,
+				[0x07] = 32,
+				[0x08] = 33,
+				[0x01] = 11,
 				[0x02] = 1
 			}, modes);
 		}
@@ -145,16 +145,16 @@ namespace Faolan.Tests
 				}
 			}
 
-			// 1033 records over ALL 11,632 captured streams - player and NPC alike. The old census read 670, because
+			// 1471 records over ALL 17,717 captured streams - player and NPC alike. The old census read 670, because
 			// it only counted the streams the NPC-shaped decoder accepted; the player-only ones carry buffs too and
 			// were simply never walked by that gate.
-			Assert.Equal(1033, records);
+			Assert.Equal(1471, records);
 
-			// ⚠️ TargetClass is EntityClass.Character on 1032 of them and ZERO on exactly one. The field was written up
+			// ⚠️ TargetClass is EntityClass.Character on 1469 of them and ZERO on exactly two. The field was written up
 			// as "EntityClass.Character on all 941" from the narrower census - a claim the wider one breaks. It is
 			// CARRIED, not asserted, so that record round-trips (the whole-record gate above reproduces it); asserting
 			// the class here would have rejected a real captured stream.
-			Assert.Equal(new Dictionary<uint, int> { [EntityClass.Character] = 1032, [0] = 1 }, classes);
+			Assert.Equal(new Dictionary<uint, int> { [EntityClass.Character] = 1469, [0] = 2 }, classes);
 
 			// The nine that appear on NPC spawns, all rows in Spells: Runed Flesh (Rank 5 / Rank 1), Ether Channel,
 			// Undead Minion: Mutilator, Deathless Acolyte: Arcanist, Hearty Meal, Shrink, Stagger, Frozen Hatred. Two
@@ -164,12 +164,12 @@ namespace Faolan.Tests
 			Assert.All(onNpcs, id => Assert.Contains(id, spellIds));
 			Assert.DoesNotContain(0u, spellIds);
 
-			// ⚠️ 0..82, and 82 is ABOVE the level cap. So the field is level-LIKE - #438 identified it as the caster's
+			// ⚠️ 0..83, and 83 is ABOVE the level cap. So the field is level-LIKE - #438 identified it as the caster's
 			// level by a separate route - but this corpus does not prove it IS the level, and asserting 1..80 here
 			// would have written a wrong bound into a gate. (The narrower NPC-only census read 5..82; the player
 			// streams it skipped carry a 0, which is another reason the field is carried rather than bounded.)
 			Assert.Equal(0u, casterLevels.Min());
-			Assert.Equal(82u, casterLevels.Max());
+			Assert.Equal(83u, casterLevels.Max());
 		}
 	}
 }

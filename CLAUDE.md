@@ -336,35 +336,39 @@ The 349 MB of retail traces, the Ghidra project and the baked terrain live in a 
 (and can go public). Clone it near this repo (it holds `Captures/`, `Ghidra/`, `Terrain/`) and pass its
 `Captures/` dir to importer commands as `--captures <data-repo>/Captures` (and `--RdbDir` likewise).
 
-**The test suite does NOT need it.** Every test runs from a plain clone, off committed fixtures in
-`Faolan.Tests/Assets`. There are two kinds, and the difference decides which one a new gate belongs in:
+**The test suite does NOT need it.** Every test runs from a plain clone, off ONE committed file —
+`Faolan.Tests/Assets/fixtures.bin` (15 MB, `FixtureArchive`), which holds every byte of capture-derived data the
+suite reads. It has two halves, and the difference decides which one a new gate belongs in:
 
-- **Named fixtures** (`recipe-book-reply.bin`, `mount-spawns.bin`, `casilda-quest-*.bin`,
-  `snapshot-login-*.bin`, …) - a specific packet or one capture's worth, read via `CapturedFixture` (whole
-  Conan packets concatenated; a packet self-frames, so no container format) or `TestPaths.AssetBytes`. This is
-  what a gate that only ever wanted ONE packet should use.
-- **`corpus-extract.bin`** (14 MB) - the whole-corpus slice, read via `CorpusExtract`. Reserved for gates whose
-  assertion IS breadth: the snapshot round-trips (#384/#390/#391), the protobuf re-encode oracle (#385), the
-  world-object column lift. These would go vacuous on a fixture, which is exactly why they read the corpus.
-  Regenerate it with the data repo present:
+- **Named fixtures** (`assets/recipe-book-reply.bin`, `assets/mount-spawns.bin`, `assets/casilda-quest-*.bin`,
+  `golden/SpawnNpcCasilda.bin`, …) - a specific packet or one capture's worth, read via `CapturedFixture` (whole
+  Conan packets concatenated; a packet self-frames, so no container format), `TestPaths.AssetBytes`/`TestPaths.Asset`
+  for inputs, or `Golden.Bytes` for expected outputs. This is what a gate that only ever wanted ONE packet should
+  use. They are **hand-carved and cannot be re-derived from the captures**, so a regeneration carries them over
+  untouched; add or replace one with `--report fixture-set --report-arg <key>=<file>`.
+- **The corpus slice** (45k packet bodies), read via `CorpusExtract`. Reserved for gates whose assertion IS
+  breadth: the snapshot round-trips (#384/#390/#391), the protobuf re-encode oracle (#385), the world-object
+  column lift. These would go vacuous on a fixture, which is exactly why they read the corpus. Rebuild it with
+  the data repo present (the named half is preserved):
 
 ```zsh
-dotnet run --project Faolan.Importer -- --report corpus-extract --captures <data-repo>/Captures
+dotnet run --project Faolan.Importer -- --report fixtures --captures <data-repo>/Captures
 ```
 
 `--captures` is how every importer command takes it (`--RdbDir` likewise). The importer's DB comes from faolan.json
 (the `Database` section: `Database:Provider` + `Database:ConnectionString`), the same as the server; override the connection with `--Database:ConnectionString "<conn string>"`
 
-⚠️ The extract is DERIVED. A regeneration against a partial corpus would quietly WEAKEN every whole-corpus
-gate while they all still pass - the exact failure mode those gates exist to catch. Its manifest pins the
-per-IIR counts and `CorpusExtract` throws on a short extract rather than letting coverage narrow.
+⚠️ The corpus half is DERIVED. A regeneration against a partial corpus would quietly WEAKEN every whole-corpus
+gate while they all still pass - the exact failure mode those gates exist to catch. `CorpusExtract.ExpectedCounts`
+is a RATCHET: a regeneration may only ADD packets, and a short archive throws rather than letting coverage narrow.
 
-The extract carries **no capture file-name index**. It used to, so `ProtocolCitationTests` and
+The archive carries **no capture file-name index**. It used to, so `ProtocolCitationTests` and
 `DocReferenceTests` could resolve `[V2:]` citations and `Captures/…` paths without the data - which meant every
 checkout shipped a listing of the private corpus. `V2Citations_AreWellFormed` now checks the citation's FORM
-instead, and `Captures/…` paths in docs are not linted at all. Don't reintroduce the list.
+instead, and `Captures/…` paths in docs are not linted at all. Don't reintroduce the list. (Each corpus entry does
+still name the capture it came from, for failure provenance.)
 
-You only need the real corpus to regenerate the extract, or to run `Faolan.Importer` / its `--report` tools.
+You only need the real corpus to rebuild the archive, or to run `Faolan.Importer` / its `--report` tools.
 `Terrain/` needs no symlink - it is the `TerrainDir` key in `faolan.json`; if it is missing the server logs
 that ground-snap and line-of-sight are DISABLED and carries on, so check that line rather than assuming.
 

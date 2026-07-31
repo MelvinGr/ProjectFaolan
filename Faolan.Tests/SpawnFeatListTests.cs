@@ -11,11 +11,11 @@ namespace Faolan.Tests
 	//
 	// PlayerSpawnScaffoldRowsTests pins the ids + train order for three NAMED goldens. This asks the other question -
 	// does the extractor hold across EVERY captured spawn - which is why it reads the corpus extract and would go
-	// vacuous on a fixture. It is what retires the hand-run Python sweep: the same 11632 spawns, re-checked on every
+	// vacuous on a fixture. It is what retires the hand-run Python sweep: the same 17,717 spawns, re-checked on every
 	// test run instead of when someone remembers to point a script at the private corpus.
 	//
 	// The byte-exact REGENERATION half of this file moved to SimpleCharFullUpdateCorpusTests when the player and NPC
-	// codecs merged (#530 wave 5b): that gate covers all 11,632 captured spawns rather than the 259 player ones, so
+	// codecs merged (#530 wave 5b): that gate covers all 17,717 captured spawns rather than the 317 player ones, so
 	// keeping a narrower copy here would only be a second chance to disagree.
 	public class SpawnFeatListTests
 	{
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 			// the list, lands here rather than passing with fewer spawns.
 			// INDEPENDENT corroboration, and why this gate is not self-referential: the pre-IIR frame's LENGTH is not
 			// something ExtractPreFrameFeats looks at, yet frame length minus 4 per feat collapses onto a handful of
-			// fixed bases - 239 for the standard frame (all 232 of them), 228 for the create-editor variant, and three
+			// fixed bases - 239 for the standard frame (all 286 of them), 228 for the create-editor variant, and three
 			// larger bases for the six MULTI-SPEC frames, whose extra width is their specs' NAMES (see
 			// PlayerSpawnPreFrameTests): 250 = 228 + 2 unnamed specs, 264 = 250 + len("PvE - Lance") + len("PvP"),
 			// 336 = 228 + 4 named specs. A feat count read one too high or low would break this arithmetic immediately.
@@ -78,18 +78,19 @@ namespace Faolan.Tests
 			// (These bases were 350/370/464/772 while the extractor read a fixed offset: on a multi-spec frame that
 			// offset lands inside a spec NAME, so it found no valid count word and reported ZERO feats - base ==
 			// length. The frames were pinned, but pinned to a mis-read.)
-			Assert.Equal(new Dictionary<int, int> { [228 - 5] = 21, [239 - 5] = 232, [250 - 5] = 3, [264 - 5] = 2, [336 - 5] = 1 }, bases);
+			Assert.Equal(new Dictionary<int, int> { [228 - 5] = 21, [239 - 5] = 286, [250 - 5] = 7, [264 - 5] = 2, [336 - 5] = 1 }, bases);
 
-			Assert.Equal(11632, withFeats + empty + notPlayerScaffold);
-			// 112 / 147, from 109 / 150: the three multi-spec frames whose fixed-offset read landed inside a spec name
+			Assert.Equal(17717, withFeats + empty + notPlayerScaffold);
+			// 168 / 149, from 112 / 147 on the narrower corpus: the multi-spec frames whose fixed-offset read landed inside a spec name
 			// reported an EMPTY feat list and were counted as unfeated characters. They are level-80 characters.
-			Assert.Equal(112, withFeats);
-			Assert.Equal(147, empty);
+			Assert.Equal(168, withFeats);
+			Assert.Equal(149, empty);
 
-			// 296 distinct feat ids: 86 while six fields of this grammar were read as constants, 204 once the spawn
-			// parsed, and 296 once the pre-IIR frame's SUBLIST was read as a list of named specs instead of a single
-			// feat list at a fixed offset - the six multi-spec frames alone carry 92 ids nothing had ever read.
-			Assert.Equal(296, distinct.Count);
+			// 329 distinct feat ids. The count is a history of what the grammar could SEE: 86 while six fields of it
+			// were read as constants, 204 once the spawn parsed, 296 once the pre-IIR frame's SUBLIST was read as a
+			// list of named specs instead of a single feat list at a fixed offset (the multi-spec frames alone carried
+			// 92 ids nothing had ever read), and 329 on the wider 2026-07-31 corpus.
+			Assert.Equal(329, distinct.Count);
 		}
 
 	}

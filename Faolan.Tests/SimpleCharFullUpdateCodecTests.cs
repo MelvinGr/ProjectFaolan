@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Constants;
+using Faolan.Tests.Support;
 using Xunit;
 
 namespace Faolan.Tests
@@ -138,12 +139,7 @@ namespace Faolan.Tests
 		// The captured body minus the leading u32 carrier length - i.e. the record the codec owns.
 		private static byte[] Record(string name)
 		{
-			return File.ReadAllBytes(Path.Combine(GoldenDir(), name + ".bin"))[4..];
-		}
-
-		private static string GoldenDir([CallerFilePath] string thisFile = "")
-		{
-			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
+			return Golden.Bytes(name)[4..];
 		}
 	}
 }

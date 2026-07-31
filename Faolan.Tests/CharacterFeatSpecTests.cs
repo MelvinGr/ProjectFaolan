@@ -72,9 +72,9 @@ namespace Faolan.Tests
 				names.AddRange(character.FeatSpecs.Where(s => s.Name.Length > 0).Select(s => s.Name));
 			}
 
-			Assert.Equal(259, checkedSpawns);
+			Assert.Equal(317, checkedSpawns);
 			Assert.Equal(21, editorFrames);
-			Assert.Equal(6, multiSpec);
+			Assert.Equal(10, multiSpec);
 
 			// The named specs reach the rows, not just the codec - the half that used to be dropped entirely.
 			// Ordinal, not the culture's collation: "PvP" sorts before "PvP - ..." only under an ordinal comparison,

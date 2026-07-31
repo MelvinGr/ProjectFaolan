@@ -37,22 +37,20 @@ namespace Faolan.Tests
 			await run(client);
 			var bytes = client.Sent.SelectMany(p => p).ToArray();
 
-			var path = Path.Combine(GoldenDir(), name + ".bin");
-			if (!File.Exists(path))
+			// The golden comes out of the fixture archive, which does NOT write itself: a missing entry throws with the
+			// `--report fixture-set` line rather than blessing whatever the code just produced. Auto-creating it (what
+			// this did while the goldens were loose files) makes the gate assert that the code equals itself.
+			var golden = Golden.Bytes(name);
+			if (!Enumerable.SequenceEqual(golden, bytes))
 			{
-				Directory.CreateDirectory(GoldenDir());
-				await File.WriteAllBytesAsync(path, bytes);
+				// Dump the mismatch somewhere diffable - obj/ is gitignored, so a failed run cannot leave a stray blob
+				// in the tree that looks like a fixture.
+				var actual = Path.Combine(TestPaths.Repo("Faolan.Tests", "obj", "fixtures"), $"{name}.actual.bin");
+				Directory.CreateDirectory(Path.GetDirectoryName(actual)!);
+				await File.WriteAllBytesAsync(actual, bytes);
 			}
 
-			var golden = await File.ReadAllBytesAsync(path);
-			if (!Enumerable.SequenceEqual(golden, bytes))
-				await File.WriteAllBytesAsync(path + ".actual", bytes);
 			Assert.Equal(golden, bytes);
-		}
-
-		private static string GoldenDir([CallerFilePath] string thisFile = "")
-		{
-			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
 		}
 	}
 }

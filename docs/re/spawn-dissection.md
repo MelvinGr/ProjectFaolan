@@ -558,7 +558,7 @@ put — see the Phase-4 "BURST-FREE CONSTRUCT VALIDATED IN-CLIENT" entry.
 CANONICAL PATROL FORM — BUILT 2026-06-11 (commit pending). The dominant single-segment waypoint patrol
 (`04 01 00 02 01 01 00 00 00 00 [count] [count x WP] 00 [speed f32] [12x00] [anchor=curPos] 00 01`) is
 constructed byte-exact by `MoveTaskNodes.Patrol(waypoints, speed, currentPosition)` — proven
-against the captured golden `Faolan.Tests/Golden/MoveTaskPatrol.bin` (handle 0x17E03, 2 waypoints) in
+against the captured golden `golden/MoveTaskPatrol.bin` (in `Faolan.Tests/Assets/fixtures.bin`) (handle 0x17E03, 2 waypoints) in
 `MoveTaskBuilderTests`. So a MOVING NPC's registration can now be constructed from {position, waypoint path,
 speed} — the data a `PatrolPath` schema would hold — complementing `BuildStationary` for non-movers. 165 of the
 captured beach/world patrols match this canonical header byte-for-byte.

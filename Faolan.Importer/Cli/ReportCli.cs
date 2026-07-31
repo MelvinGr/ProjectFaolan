@@ -37,7 +37,7 @@ namespace Faolan.Importer.Cli
 		private static (FaolanDbProvider Provider, string Connection)? _db;
 
 		// DB config (provider + connection) for the DB-backed reports. Resolved LAZILY on the first OpenDb so the
-		// capture/RDB-only reports (corpus-extract, coverage-of-captures, ...) need no DB config at all. Same source
+		// capture/RDB-only reports (fixtures, coverage-of-captures, ...) need no DB config at all. Same source
 		// and precedence as the import path (env > cmdline(--Database:ConnectionString) > faolan.json) - see CliConfig.
 		private static ImporterOptions _options = null!;
 
@@ -97,6 +97,21 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// Adds or replaces ONE named fixture in the archive. Reads no captures, so it sits above the corpus check:
+			// the hand-carved fixtures cannot be re-derived from the corpus, which is exactly why this exists.
+			if (report == "fixture-set")
+			{
+				var split = (arg ?? "").IndexOf('=');
+				if (split <= 0)
+				{
+					await Console.Error.WriteLineAsync("usage: --report fixture-set --report-arg <key>=<file>   e.g. golden/InitialBurst.bin=/tmp/burst.bin");
+					return 1;
+				}
+
+				FixtureArchiveWriter.SetNamed(Path.Combine("Faolan.Tests", "Assets", "fixtures.bin"), arg![..split], arg[(split + 1)..]);
+				return 0;
+			}
+
 			// Every report below reads the corpus. It is NOT in this repo (private ProjectFaolan-Data), so say where
 			// to point rather than letting Directory.EnumerateFiles throw a bare path error.
 			if (!Directory.Exists(capturesDir))
@@ -109,13 +124,13 @@ namespace Faolan.Importer.Cli
 
 			switch (report)
 			{
-				case "corpus-extract":
+				case "fixtures":
 				{
-					// The test suite's slice of the corpus, so a plain clone can run the whole-corpus gates without
-					// the 349 MB capture repo. See CorpusExtractWriter.
+					// The single file holding every byte the test suite reads: the corpus slice (rebuilt here) plus the
+					// hand-carved named fixtures (carried over from the existing archive). See FixtureArchiveWriter.
 					// Default paths here are CWD-relative: the importer runs from the repo root (see CLAUDE.md).
-					var target = arg ?? Path.Combine("Faolan.Tests", "Assets", "corpus-extract.bin");
-					CorpusExtractWriter.Write(capturesDir, target);
+					var target = arg ?? Path.Combine("Faolan.Tests", "Assets", "fixtures.bin");
+					FixtureArchiveWriter.Write(capturesDir, target);
 					return 0;
 				}
 

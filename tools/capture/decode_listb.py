@@ -22,7 +22,10 @@ Run:  python3 tools/capture/decode_listb.py [tails.bin] [start_offset]
 """
 import struct, sys, re
 
-TEMPLATE = "Faolan.Tests/Assets/BeachTailsTemplate.bin"
+from fixtures import named
+
+# The beach tails template lives in the fixture archive (Faolan.Tests/Assets/fixtures.bin), not as a loose file.
+TEMPLATE = "assets/BeachTailsTemplate.bin"
 FRAME = 0x3F1
 
 
@@ -91,7 +94,8 @@ def read_record(r, idx):
 
 
 def decode(path, start):
-    b = open(path, "rb").read()
+    # A path argument reads that file; the default is the archived template, by key.
+    b = open(path, "rb").read() if path != TEMPLATE else named(TEMPLATE)
     print(f"\n=== {path}  ({len(b)} bytes)  List B probe @ {start} ===")
     r = R(b, start)
     c = r.u32()

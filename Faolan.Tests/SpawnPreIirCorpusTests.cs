@@ -50,15 +50,15 @@ namespace Faolan.Tests
 			Assert.True(mismatches.Count == 0, $"{mismatches.Count} captured pre-IIR frames did not rebuild byte-exact:\n  " + string.Join("\n  ", mismatches.Take(10)));
 
 			// Pinned to the FULL corpus. The 25 captured frame LENGTHS are one shape parameterised by the sublist:
-			// 228 is the create-editor frame (empty sublist), 232 frames carry the single unnamed spec every normal
-			// login has, and the 6 that carry MORE are the whole reason this reads the corpus - they are what proved
+			// 228 is the create-editor frame (empty sublist), 286 frames carry the single unnamed spec every normal
+			// login has, and the 10 that carry MORE are the whole reason this reads the corpus - they are what proved
 			// the entry has a name and the sublist a count. A regeneration against a partial corpus, or a grammar that
 			// quietly stopped finding the sublist, lands here rather than passing with fewer frames.
 			Assert.Equal(new Dictionary<string, int>
 			{
 				["sublist=0 named=0"] = 21,
-				["sublist=1 named=0"] = 232,
-				["sublist=2 named=0"] = 3,
+				["sublist=1 named=0"] = 286,
+				["sublist=2 named=0"] = 7,
 				["sublist=2 named=2"] = 2,
 				["sublist=4 named=4"] = 1
 			}, shapes);
@@ -122,13 +122,13 @@ namespace Faolan.Tests
 
 			// Both hold on EVERY captured frame, create-editor previews included - the category is the same modal
 			// value the NPC sweep found, from an entirely separate direction.
-			Assert.Equal(new Dictionary<uint, int> { [SpawnPreIir.DefaultCategory] = 259 }, categories);
-			Assert.Equal(new Dictionary<uint, int> { [SpawnPreIir.ConstantWordValue] = 259 }, constants);
+			Assert.Equal(new Dictionary<uint, int> { [SpawnPreIir.DefaultCategory] = 317 }, categories);
+			Assert.Equal(new Dictionary<uint, int> { [SpawnPreIir.ConstantWordValue] = 317 }, constants);
 
 			// The CoreCharacter's IirHeader is one of two values and is NOT per-character (the same character carries
 			// both across sessions), so the generated frame reproduces the modal one rather than deriving it.
 			Assert.Equal([SimpleCharFullUpdateIIR.DefaultCoreCharIirHeader, 0x820Au], iirHeaders.Keys.Order().ToArray());
-			Assert.Equal(259, iirHeaders.Values.Sum());
+			Assert.Equal(317, iirHeaders.Values.Sum());
 		}
 
 		// The generated fresh frame is the captured shape, not a lookalike: it walks under the same grammar and its

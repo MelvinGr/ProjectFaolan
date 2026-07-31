@@ -49,14 +49,16 @@ namespace Faolan.Tests
 			// is. (What the player model used to call "the frame" was this scaffold plus the embedded CoreCharacter's
 			// 5-byte head, which is the message's, not the scaffold's.)
 			Assert.Equal(0, undecodable);
-			Assert.Equal(11632, decoded);
+			Assert.Equal(17717, decoded);
 
-			// ⚠️ THE SIX. All are one NPC - Viriden - and they carry the same key-0/flag-0/unnamed/no-ids entry a
-			// fresh player carries. Before this they were the only captured spawns the NPC codec could not read at
-			// all. The 232 four-entry-or-fewer player frames are the feat specs (#474).
-			Assert.Equal(11394, sublistSizes[0]);
-			Assert.Equal(226 + 6, sublistSizes[1]);
-			Assert.Equal(5, sublistSizes[2]);
+			// ⚠️ THE SIX. Six of the single-entry frames are one NPC - Viriden - carrying the same key-0/flag-0/
+			// unnamed/no-ids entry a fresh player carries; before this they were the only captured spawns the NPC
+			// codec could not read at all. (That split was 226 + 6 when it was counted by hand on the 2026-07-27
+			// corpus; it is the TOTAL that is pinned here, since nothing in this walk knows an entity's name.) The
+			// four-entry-or-fewer player frames are the feat specs (#474).
+			Assert.Equal(17421, sublistSizes[0]);
+			Assert.Equal(286, sublistSizes[1]);
+			Assert.Equal(9, sublistSizes[2]);
 			Assert.Equal(1, sublistSizes[4]);
 		}
 

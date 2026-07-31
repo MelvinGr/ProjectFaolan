@@ -309,9 +309,10 @@ namespace Faolan.Tests
 			return SimpleCharFullUpdateCodec.Build(s);
 		}
 
+		// Support.Golden, spelled out: this class has its own Golden(name) helper, so the bare name binds to the method.
 		private static byte[] Golden(string name)
 		{
-			return File.ReadAllBytes(Path.Combine(GoldenDir(), name + ".bin"));
+			return Support.Golden.Bytes(name);
 		}
 
 		// A captured body minus the leading u32 carrier length, which belongs to the sender (#530 rule 2).
@@ -331,11 +332,6 @@ namespace Faolan.Tests
 			using var stream = new FaolanStream();
 			SpawnPreIirCodec.Write(stream, frame);
 			return stream.ToArray();
-		}
-
-		private static string GoldenDir([CallerFilePath] string thisFile = "")
-		{
-			return Path.Combine(Path.GetDirectoryName(thisFile)!, "Golden");
 		}
 
 		// Capture -> character -> capture, through the SHIPPED MorphTarget catalog in both directions: extraction turns

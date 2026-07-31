@@ -164,7 +164,7 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
 - **Record coverage** — the only record left verbatim is the live `Character…` preview
    (`CreateEditorCharBuilder.LivePreview`, intentionally verbatim — see above). Across `WorldPrepBurst` +
    `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built
-   + wired** (the two dissectors were retired with the burst - they read `Faolan.Tests/Golden/WorldPrepBurst.bin`,
+   + wired** (the two dissectors were retired with the burst - they read the retired `WorldPrepBurst` golden,
    deleted in `0683e84d`; builders in
    the per-IIR codecs, locked by `CreateEditorRecordTests` + the burst goldens):
    - `CharacterActionIIR` (0x6B6FD368) — action/ability grant (26 records).

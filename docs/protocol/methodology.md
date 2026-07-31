@@ -106,7 +106,7 @@ Both live in `Faolan.Tests`:
 
    V2 is the weaker check of the three, on purpose: the corpus lives in the private data repo, so the suite has
    nothing to resolve a capture name *against*. It used to resolve them against a name index carried in
-   `corpus-extract.bin`, which meant shipping a listing of the private corpus in every clone. Whether a named
+   the committed fixture archive, which meant shipping a listing of the private corpus in every clone. Whether a named
    capture exists is checked by whoever holds it; the linter catches the shape that actually rotted — a payload
    that is not a capture file name at all.
 

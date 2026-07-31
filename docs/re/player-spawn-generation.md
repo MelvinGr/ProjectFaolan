@@ -11,7 +11,7 @@ Goal (chosen 2026-06-10, finished the same day over two sessions): generate the 
 > **STATUS: COMPLETE.** The spawn's `ProtoCoreCharacterIIR` (identity/stats/equipment) AND its scaffold frame
 > are generated from the character's DB rows. `spawn-player-template.bin` and its successor, the
 > `PlayerSpawnTemplate` C# constant, are both gone; Strie's captured bytes survive only as a test oracle
-> (`Faolan.Tests/Golden/SpawnStrieTemplate.bin`).
+> (the `golden/SpawnStrieTemplate.bin` entry of `Faolan.Tests/Assets/fixtures.bin`).
 > Verified: the wire grammar parses + regenerates **all captured player-own spawns byte-exact (37/37, incl. captures added after the codec was written)**
 > (`tools/capture/parse_spawn_scaffold.py`); the rows→bytes oracle is locked by
 > `SimpleCharFullUpdateCodecTests`/`PlayerSpawnScaffoldRowsTests`; a local smoke-test script, 16/16 with the
