@@ -78,7 +78,7 @@ namespace Faolan.Tests
 
 				var bodyLen = (int)burst.ReadU32Be(at - 4) - 4;
 				var body = burst.AsSpan(at + 4, bodyLen).ToArray();
-				PlayerSpawnReader.TryReadCharacterMessage(body, out var read);
+				SpawnBodyReader.TryReadCharacterMessage(body, out var read);
 				result.Add((read.Message?.Name ?? "?", body));
 			}
 

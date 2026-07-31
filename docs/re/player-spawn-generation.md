@@ -2,7 +2,7 @@
 
 > **STATUS: COMPLETE — kept as the byte-level derivation reference, not open work.** The verified per-message
 > index is [`../protocol/gen/messages.md`](../protocol/gen/messages.md) (`SimpleCharFullUpdateIIR`); the executable
-> spec is the codec (`PlayerSpawnScaffoldCodec`), golden-tested.
+> spec is the codec (`SimpleCharFullUpdateCodec`), golden-tested.
 
 Goal (chosen 2026-06-10, finished the same day over two sessions): generate the player's own
 `SimpleCharFullUpdate` (0xFA015807) spawn entirely from DB character data — name, race, sex, level, vitals,
@@ -14,7 +14,7 @@ Goal (chosen 2026-06-10, finished the same day over two sessions): generate the 
 > (`Faolan.Tests/Golden/SpawnStrieTemplate.bin`).
 > Verified: the wire grammar parses + regenerates **all captured player-own spawns byte-exact (37/37, incl. captures added after the codec was written)**
 > (`tools/capture/parse_spawn_scaffold.py`); the rows→bytes oracle is locked by
-> `PlayerSpawnScaffoldCodecTests`/`PlayerSpawnScaffoldRowsTests`; a local smoke-test script, 16/16 with the
+> `SimpleCharFullUpdateCodecTests`/`PlayerSpawnScaffoldRowsTests`; a local smoke-test script, 16/16 with the
 > generated scaffold confirmed on the wire (session-pcap parse); 142 unit tests.
 
 ## Architecture (what ships)
@@ -25,11 +25,11 @@ just logs a warning and skips the spawn):
 
 1. **Transform** — `SpawnPacketBuilder.BuildSpawnBody` constructs the header + position (DB) + rotation
    (kept from the capture: rebuilding rotation from unreliable DB data once hung the client).
-2. **CharacterIIR** — `PlayerSpawnReader` locates the embedded `ProtoCoreCharacterIIR` (any spawn, any
+2. **CharacterIIR** — `SpawnBodyReader` locates the embedded `ProtoCoreCharacterIIR` (any spawn, any
    layout); name/sex/race/level/vitals are overridden from `Character`/`CharacterMaxStats`, the worn
    equipment from `CharacterEquipment` via `PlayerSpawnEquipment` (`InventoryEntry { pos, ProtoAcgItem }`,
    items built like `SnapshotItemBuilder`); `SpawnPacketBuilder.SetCharacterMessage` splices it back.
-3. **Scaffold frame** — `PlayerSpawnScaffoldCodec` (byte-exact parse/generate of the full body) +
+3. **Scaffold frame** — `SimpleCharFullUpdateCodec` (byte-exact parse/generate of the full body) +
    `PlayerSpawnScaffoldRows` regenerate everything around the CharacterIIR from the character:
    - the uniform entry table is **DERIVED, not stored** (`PlayerSpawnScaffoldRows.BuildAppearanceEntries`):
      weighted entries from `CharacterBodyResource` through the `MorphTarget` registry, morph entries from
@@ -84,13 +84,13 @@ sole path); changes are gated on the smoke test.
 ## Wire grammar (validated: regenerates all 37 captured player spawns byte-exact)
 
 Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `all` / `one` / `dumpb` / `pre` /
-`prediff` commands). C# port: `PlayerSpawnScaffoldCodec`.
+`prediff` commands). C# port: `SimpleCharFullUpdateCodec`.
 
 - `[u32 bodyLen=len-4][u32 FA015807][u32 ack=C350][u32 handle][u32 fieldA]`
 - transform group `0x2C`: `0A <len> vec3, 12 <len> quat, (25 <fixed32 scale>,) 18 <varint playfield>`
 - **pre-IIR frame** (between the transform and the CharacterIIR length prefix) — **decoded**
-  (`PlayerSpawnPreFrame` / `PlayerSpawnPreFrameCodec`). It is not a constant skeleton with value islands: it is
-  the SAME `SimpleCharFullUpdateIIR_t::ReadSubClass` scaffold the NPC spawn uses (`NpcSpawnPreIir`, grammar in
+  (`SpawnPreIir` / `SpawnPreIirCodec`). It is not a constant skeleton with value islands: it is
+  the SAME `SimpleCharFullUpdateIIR_t::ReadSubClass` scaffold the NPC spawn uses (`SpawnPreIir`, grammar in
   `docs/re/fa015807-spawn-reader.md`), plus the head of the embedded CoreCharacter:
 
   ```
@@ -107,7 +107,7 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
   `[u32 index][u8 index][u16 len + Latin1 name][count-framed list of u32 feat ids]`. Every normal login carries
   exactly ONE entry with an empty name — which is why the frame's bytes 119..121 read as three reserved zeros
   and the whole entry read as a lead-in to a bare feat list — and the create-editor preview carries none, which
-  is why its frame is exactly `NpcSpawnPreIir.FixedLength` + 5 = 228 bytes. Six captured frames carry two or
+  is why its frame is exactly `SpawnPreIir.FixedLength` + 5 = 228 bytes. Six captured frames carry two or
   four NAMED specs (`PvE - Lance` 23 feats, `PvP` 27, `PvP - Decap/Protection` 28, `PvP - Decap/Armor` 28,
   `Hybrid` 27, `Berserker: No Decap` 26).
 
@@ -119,7 +119,7 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
 
   Named fields inside the 53 words: **4** = the vanity shown-slots mask (#336 found it independently at frame
   offset 18, which is exactly word 4 — corroboration that this grid is the client's), **17** = the same
-  category enum `NpcSpawnPreIir` calls the category, carrying its modal `0x6f` on all 259 captured frames,
+  category enum `SpawnPreIir` calls the category, carrying its modal `0x6f` on all 259 captured frames,
   **19** = a constant `0x41700000` (float 15.0) on all 259, **21** = a per-session value (6..44, plus round
   outliers 1005/1586/9000/11185/14000) that nothing predicts. The 6 u8 fields carry the archetype
   (Soldier 1 / Priest 2 / Rogue 3 / Mage 4) and the class byte at flags 1 and 2 — the frame's only genuinely
@@ -130,8 +130,8 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
   length-consistent u32 at all. The legacy splice path
   (the obsolete `SpawnPacketBuilder.SetCharacterMessage`, using `NameOuterLengthOffset` = 133) still
   adjusts it on resize — the client demonstrably tolerates that — but the generation path builds the
-  whole frame from `Character.Class` (`PlayerSpawnScaffoldRows.FreshPreFrame` → `PlayerSpawnScaffold.Frame`,
-  which is a typed `PlayerSpawnPreFrame` — the scaffold holds no frame bytes).
+  whole frame from `Character.Class` (`PlayerSpawnScaffoldRows.FreshPreFrame` → `SimpleCharFullUpdateIIR.Frame`,
+  which is a typed `SpawnPreIir` — the scaffold holds no frame bytes).
 - `[u32 innerLen]` + the **ProtoCoreCharacterIIR**.
 - **post-IIR stream** (contiguous to EOF; nothing follows it):
   - header: a **plain-counted list** `[u32 n][n x u32]` then the constant `[u32 4]`. Read as the constant pair
@@ -141,7 +141,7 @@ Workbench: `tools/capture/parse_spawn_scaffold.py` (`template` / `players` / `al
     `[EntityClass.Character][handle]` reference to whoever the buff is on — decoded in #475). An empty list
     frames as a bare `0x3F1`, which is `ForCount(0)`, not a constant.
   - `[u32 count][u32 X]` + (`[f32 1.0]` iff count>0) — the entry-table count and the per-char scalar X
-    (Strie 0xB7, NecroL80 0x2B6, editor preview 0x3F1) = `PlayerSpawnScaffold.EntryTableX`.
+    (Strie 0xB7, NecroL80 0x2B6, editor preview 0x3F1) = `SimpleCharFullUpdateIIR.EntryTableX`.
   - **count entries, UNIFORM 14 bytes**: `[u32 idx][u32 flag][u16 tag][u32 value]` = the appearance entry table.
     `flag` was read as a constant 0; 2 captured spawns carry a 1 on their LAST entry, and there `value` is a
     plain integer (300, 400) rather than float bits — so it discriminates how `value` is read.
@@ -184,7 +184,7 @@ This independently confirms three of the six corrections above: the head list re
 its trailing byte, and the closing pair list really is count-framed where the two before it are plain-counted.
 
 ⚠️ It also shows our field BOUNDARIES are not the client's. `FUN_0079cfd0` reads its 5-byte elements as
-`[u32 id][u8 rank]` behind a LEADING frame word, where `PlayerSpawnScaffoldCodec` carves `[u8 rank][u32 id]` groups
+`[u32 id][u8 rank]` behind a LEADING frame word, where `SimpleCharFullUpdateCodec` carves `[u8 rank][u32 id]` groups
 and treats the frame word as a trailing terminator. Both reproduce the same bytes — the codec round-trips all 259
 captured bodies byte-exact — so this is a naming/semantics discrepancy, not a parsing bug, but the client is the
 authority and the two should be reconciled. Open on #466.

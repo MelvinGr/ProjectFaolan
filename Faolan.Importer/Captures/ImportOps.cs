@@ -1200,9 +1200,9 @@ namespace Faolan.Importer.Captures
 			// Per-placement stat pools (#244): lift the remaining level-scaled/per-placement values from this spawn's
 			// capture (via the same codec the type core uses), overriding the type StatCore when the body is built.
 			var placeBody = WorldObjectColumns.ExtractBody(e.Data);
-			if (placeBody != null && PlayerSpawnReader.TryReadCharacterMessage(placeBody, out var placeRead))
+			if (placeBody != null && SpawnBodyReader.TryReadCharacterMessage(placeBody, out var placeRead))
 			{
-				var core = NpcStatCoreCodec.Lift(placeRead.Message);
+				var core = NpcStatCoreColumns.Lift(placeRead.Message);
 				row.Life = core.Life ?? 0;
 				row.Mana = core.Mana ?? 0;
 				row.MaxMana = core.MaxMana ?? 0;
@@ -1824,7 +1824,7 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				var b = WorldObjectColumns.ExtractBody(e.Data);
-				if (b != null && NpcSpawnScaffold.TryReadNoMorphWord2(b, out var rc))
+				if (b != null && NpcSpawnAppearance.TryReadNoMorphWord2(b, out var rc))
 					minimalRcByTemplate[e.TemplateId] = rc;
 			}
 
@@ -1855,10 +1855,10 @@ namespace Faolan.Importer.Captures
 				if (npc.StatCore == null || npc.StatCore.IirHeader == null)
 				{
 					var body = WorldObjectColumns.ExtractBody(e.Data);
-					if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+					if (body != null && SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 					{
-						npc.StatCore ??= NpcStatCoreCodec.Lift(read.Message);
-						npc.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
+						npc.StatCore ??= NpcStatCoreColumns.Lift(read.Message);
+						npc.StatCore.IirHeader ??= NpcStatCoreColumns.ReadIirHeaderWord(body);
 					}
 				}
 

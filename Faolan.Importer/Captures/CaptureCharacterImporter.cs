@@ -81,7 +81,7 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				// Editor-preview spawns (empty sublist) carry no real class byte - the same frame ImportAsync rejects.
-				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || scaffold.Frame.Sublist.Count == 0)
+				if (!SpawnBodyReader.TryParse(body, out var scaffold) || !SpawnBodyReader.IsPlayer(scaffold) || scaffold.PreIir.Sublist.Count == 0)
 					continue;
 
 				classByHandle[scaffold.Handle] = body[136];
@@ -160,9 +160,9 @@ namespace Faolan.Importer.Captures
 					// instances, never importable. Real spawns also include OTHER PLAYERS visible in gameplay
 					// captures; those are filtered out after pooling (only the capturing account's own played
 					// character is imported - see the own-character prune below).
-					if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || scaffold.Frame.Sublist.Count == 0)
+					if (!SpawnBodyReader.TryParse(body, out var scaffold) || !SpawnBodyReader.IsPlayer(scaffold) || scaffold.PreIir.Sublist.Count == 0)
 						continue;
-					if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read) || string.IsNullOrEmpty(read.Message.Name) || IsCreatorTempName(read.Message.Name))
+					if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read) || string.IsNullOrEmpty(read.Message.Name) || IsCreatorTempName(read.Message.Name))
 						continue;
 
 					spawns.Add((read.Message.Name, body, currentMap, scaffold.Handle));
@@ -209,8 +209,8 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _);
-				PlayerSpawnReader.TryReadCharacterMessage(body, out var read);
+				SpawnBodyReader.TryParse(body, out var scaffold);
+				SpawnBodyReader.TryReadCharacterMessage(body, out var read);
 
 				// The class lives in the pre-IIR frame's u16 value island at body offset 135: its LOW byte is
 				// the class id (verified 10/10 against the captured character lists, all pre-frame variants;
@@ -247,7 +247,7 @@ namespace Faolan.Importer.Captures
 			return (best.Count, added, skipped);
 		}
 
-		private static async Task AddCharacter(DatabaseContext db, uint accountId, uint realmId, string name, uint mapId, uint classId, PlayerSpawnScaffold scaffold, ProtoCoreCharacterIIR message,
+		private static async Task AddCharacter(DatabaseContext db, uint accountId, uint realmId, string name, uint mapId, uint classId, SimpleCharFullUpdateIIR scaffold, ProtoCoreCharacterIIR message,
 			List<byte[]>? snapshots, CharListEntry? listEntry)
 		{
 			var stats = message.Stats ?? new ProtoCoreCharacterIIR.CharacterStats();

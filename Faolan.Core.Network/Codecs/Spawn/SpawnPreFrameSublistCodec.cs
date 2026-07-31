@@ -12,50 +12,32 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// cases: it is EMPTY on every NPC and holds exactly one unnamed entry on a normal login, so the framing word
 	// looked like a terminator. On a player it is the character's saved FEAT SPECS - named, with a trained-feat list
 	// each - which is what put a name to the whole structure.
-	public static class SpawnPreFrameSublist
+	//
+	// A SUB-RECORD codec (#530 §2 rule 5c): composed inside SpawnPreIirCodec, never sent alone, so it declares no
+	// opcode and exposes only the internal composition pair.
+	internal static class SpawnPreFrameSublistCodec
 	{
-		// Reads the list at `o`, advancing it. Returns false when the list runs past the frame - the caller's own
-		// consume-to-the-exact-end check is what decides whether this was a sublist at all.
-		public static bool TryRead(byte[] frame, ref int o, List<SpawnPreFrameSublistEntry> into)
+		internal static void Read(ref SpanReader r, List<SpawnPreFrameSublistEntry> into)
 		{
-			if (o + 4 > frame.Length || !ListFrame.TryCountOf(frame.ReadU32Be(o), out var count))
-				return false;
-
-			o += 4;
+			var count = r.ReadListCount();
 			for (var e = 0; e < count; e++)
 			{
-				if (o + 4 + 1 + 2 > frame.Length)
-					return false;
-
 				var entry = new SpawnPreFrameSublistEntry
 				{
-					Key = frame.ReadU32Be(o),
-					Flag = frame[o + 4]
+					Key = r.ReadU32Be(),
+					Flag = r.ReadU8(),
+					Name = Encoding.Latin1.GetString(r.ReadBytesU16Length())
 				};
-				var nameLength = frame.ReadU16Be(o + 5);
-				o += 4 + 1 + 2;
-				if (o + nameLength + 4 > frame.Length)
-					return false;
 
-				entry.Name = Encoding.Latin1.GetString(frame, o, nameLength);
-				o += nameLength;
-				if (!ListFrame.TryCountOf(frame.ReadU32Be(o), out var ids))
-					return false;
-
-				o += 4;
-				if (o + 4 * (long)ids > frame.Length)
-					return false;
-
-				for (var k = 0; k < ids; k++, o += 4)
-					entry.FeatIds.Add(frame.ReadU32Be(o));
+				var ids = r.ReadListCount();
+				for (var k = 0; k < ids; k++)
+					entry.FeatIds.Add(r.ReadU32Be());
 
 				into.Add(entry);
 			}
-
-			return true;
 		}
 
-		public static void Write(FaolanStream stream, IReadOnlyList<SpawnPreFrameSublistEntry> entries)
+		internal static void Write(FaolanStream stream, IReadOnlyList<SpawnPreFrameSublistEntry> entries)
 		{
 			stream.WriteUInt32(ListFrame.ForCount(entries.Count));
 			foreach (var entry in entries)
@@ -68,7 +50,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The list's own width on the wire: its framing word plus each entry's
 		// [u32 key][u8 flag][u16 len + name][count word][4 x id].
-		public static int ByteCount(IReadOnlyList<SpawnPreFrameSublistEntry> entries)
+		internal static int ByteCount(IReadOnlyList<SpawnPreFrameSublistEntry> entries)
 		{
 			var bytes = 4;
 			foreach (var entry in entries)

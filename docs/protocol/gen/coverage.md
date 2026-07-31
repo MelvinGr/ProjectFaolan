@@ -8,8 +8,8 @@
 ## Headline
 
 - **826** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **80** IIR carrier types: **65 V3** (byte-exact builder), **15 V2** (built, no golden), **0 V1** (no builder found).
-- **66** codec classes, **51** with a byte-exact test.
+- **80** IIR carrier types: **61 V3** (byte-exact builder), **19 V2** (built, no golden), **0 V1** (no builder found).
+- **69** codec classes, **50** with a byte-exact test.
 - **8** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -44,8 +44,6 @@ the margins, but never invents a golden that isn't there.
 | V3 | `BankIIR` | `BankIirCodec` |
 | V3 | `BehaviorControlCenterIIR` | `BehaviorControlCenterCodec` |
 | V3 | `CharDCMoveIIR` | `CharDCMoveCodec` |
-| V3 | `CharInPlayIIR` | `CreateEditorRecordBuilder` |
-| V3 | `CharacterActionIIR` | `CreateEditorRecordBuilder` |
 | V3 | `ChatTextIIR` | `ChatTextCodec` |
 | V3 | `ClimbingDynelFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `CombatReactiveIIR` | `CombatReactiveCodec` |
@@ -89,10 +87,8 @@ the margins, but never invents a golden that isn't there.
 | V3 | `QuestLogListIIR` | `QuestLogListCodec` |
 | V3 | `RemoveFromGroupIIR` | `GroupMembershipCodec` |
 | V3 | `ScryScriptIIR` | `ScryScriptCodec` |
-| V3 | `SetMorphValueIIR` | `CreateEditorRecordBuilder` |
-| V3 | `SetNameIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetPosIIR` | `SetPosCodec` |
-| V3 | `SimpleCharFullUpdateIIR` | `PlayerSpawnScaffoldCodec` |
+| V3 | `SimpleCharFullUpdateIIR` | `SimpleCharFullUpdateCodec` |
 | V3 | `SimpleCharKilledByUpdateIIR` | `SimpleCharKilledByUpdateCodec` |
 | V3 | `SimpleDynelFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `SimpleDynelVisualChangeIIR` | `SimpleDynelVisualChangeCodec` |
@@ -107,6 +103,8 @@ the margins, but never invents a golden that isn't there.
 | V3 | `UpdateSimpleDynelIIR` | `UpdateSimpleDynelCodec` |
 | V2 | `AreaFormulaIIR` | `AreaFormulaCodec` |
 | V2 | `ChainKillIIR` | `ChainKillCodec` |
+| V2 | `CharInPlayIIR` | `CharInPlayCodec` |
+| V2 | `CharacterActionIIR` | `CharacterActionCodec` |
 | V2 | `CrimeIIR` | `CrimeCodec` |
 | V2 | `DeleteItemIIR` | `DeleteItemCodec` |
 | V2 | `FanaticCommandIir` | `FanaticCommandCodec` |
@@ -116,6 +114,8 @@ the margins, but never invents a golden that isn't there.
 | V2 | `LockedToChangedIIR` | `LockedToChangedCodec` |
 | V2 | `MoveInventoryItemIIR` | `MoveInventoryItemCodec` |
 | V2 | `RegenIIR` | `RegenCodec` |
+| V2 | `SetMorphValueIIR` | `SetMorphValueCodec` |
+| V2 | `SetNameIIR` | `SetNameCodec` |
 | V2 | `SetShadowCoverageIIR` | `SetShadowCoverageCodec` |
 | V2 | `SpellBookIIR` | `SpellBookCodec` |
 | V2 | `StatIIR` | `StatCodec` |

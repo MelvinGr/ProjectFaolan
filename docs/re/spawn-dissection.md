@@ -35,7 +35,7 @@
 
 > **2026-06-10: the PLAYER-SPAWN half of this plan is COMPLETE and documented in
 > `docs/re/player-spawn-generation.md`** — the player's FA015807 is fully generated from DB rows
-> (identity/stats/equipment via `ProtoCoreCharacterIIR`, the scaffold frame via `PlayerSpawnScaffoldCodec` +
+> (identity/stats/equipment via `ProtoCoreCharacterIIR`, the scaffold frame via `SimpleCharFullUpdateCodec` +
 > the appearance model + CharacterSkill/CharacterScaffoldPair rows);
 > `spawn-player-template.bin` and the `PlayerSpawnTemplate` constant are both gone. The morph-encoding
 > blocker recorded below is SUPERSEDED: the editor sliders are the float-valued scaffold entries. The
@@ -199,7 +199,7 @@ as the player spawn** — only the field VALUES differ; the byte layout is ident
           recordCount]; word0=0 on ALL 42 NPCs (player has 2 there), recordCount=1 on 41/42. Minimal
           freshly-spawned form is a CONSTANT 41B block (23/42 NPCs, single distinct value); larger blocks
           concatenate runtime-state records (movement waypoint vec3 BE float triples + buff/timer pairs) past
-          the first. -> NpcSpawnScaffold.BuildMinimalPostIir() (C#, tested byte-exact vs the Crocodile golden).
+          the first. -> SpawnPostIirs.BuildMinimalPostIir() (C#, tested byte-exact vs the Crocodile golden).
 ```
 The whole identity/appearance/stats/equipment of an NPC lives in the CharacterIIR, which decodes cleanly with
 the existing `ProtoCoreCharacterIIR` type (the same one the player spawn already round-trips byte-exact). Key
@@ -209,7 +209,7 @@ Pillager=8756/14040 (two variants), Kalanthes=2704 (= the archive `npcs` MODEL i
 per-spawn size jitter (e.g. crocodiles 129–136). So an NPC spawn is reconstructable from a per-template row
 (name, the CharacterStats/NpcStats/Bcc field set, equipment list) + per-instance (handle, position, rotation,
 monster_scale). POST-IIR scaffold REGENERATABLE 2026-06-12: the freshly-spawned form is a constant 41B block
-(`NpcSpawnScaffold.BuildMinimalPostIir`), and `WithMinimalPostIir(body)` strips a body's post-IIR to it (the
+(`SpawnPostIirs.BuildMinimalPostIir`), and `WithMinimalPostIir(body)` strips a body's post-IIR to it (the
 candidate fix for the cross-session render rejection — wired behind `FAOLAN_MINIMAL_SCAFFOLD=1`, run alongside
 `FAOLAN_BUILT_NPC_TEST=1` to test in-client). STILL RAW: the 227B pre-IIR block — it has NO constant form (only
 35/227 bytes stable even across the 10 freshly-spawned NPCs; the rest are per-instance handle/spatial values),
@@ -219,7 +219,7 @@ analysis over the 42 beach NPCs: only ~8% of bytes are constant, ~152/227 are ze
 positions per NPC), and it carries the **`03 f1` (0x3F1) marker @112-113** — the SAME scaffold-entry family as
 the dissected POST-IIR scaffold. So it is NOT encrypted/opaque; it is another sparse 0x3F1-keyed scaffold
 region (extended transform/bounds + state entries) that yields to the same pair-list decode as
-`PlayerSpawnScaffoldCodec` — a dedicated effort, not a blocker (NpcSpawnBuilder ships it raw from `Data` today).
+`SimpleCharFullUpdateCodec` — a dedicated effort, not a blocker (NpcSpawnBuilder ships it raw from `Data` today).
 
 PRE-IIR LAYOUT DECODED FROM THE CLIENT (Ghidra, 2026-06-14, Gitea #185). `SimpleCharFullUpdateIIR_t::ReadSubClass`
 = `FUN_01121c00` (anchor "...Received a bad stream..."), reproduce with `tools/ghidra/DumpSpawnIir.java` +
@@ -272,7 +272,7 @@ drop, and is exactly what `FAOLAN_NPC_BURST_XFORM` (splice the burst transform i
 
 CONSTRUCTION PROGRESS (2026-06-10):
 - ✓ The machinery generalizes (commit 3897e05, `NpcSpawnConstructionTests`): `BuildSpawnBody` reconstructs an
-  NPC body (animal + humanoid) byte-exact from its typed pos/rot, and `PlayerSpawnReader` decodes the NPC
+  NPC body (animal + humanoid) byte-exact from its typed pos/rot, and `SpawnBodyReader` decodes the NPC
   CharacterIIR with a byte-identical re-encode (the splice oracle). Golden fixtures `SpawnNpcCrocodile`/
   `SpawnNpcCasilda`.
 - ✓ Identity lifted into `NpcSpawn` columns (commit 9734fc7): the importer (`NpcSpawnExtractor`) decodes the
@@ -283,7 +283,7 @@ CONSTRUCTION PROGRESS (2026-06-10):
   DB — the known non-idempotent `CaptureCharacterImporter`, UNIQUE CharacterBodies.CharacterId.)
 
 - ✓ Full construction primitives (commit 84b14dd): `SetCharacterMessage` generalized to locate the IIR via
-  `PlayerSpawnReader` (works for NPC + player; adjusts body-length @0 + IIR-length @iirOff-4; the @133 island is
+  `SpawnBodyReader` (works for NPC + player; adjusts body-length @0 + IIR-length @iirOff-4; the @133 island is
   player-only), and `SpawnPacketBuilder.BuildSpawn(template, handle, pos, rot, iir)` composes transform + IIR.
   Rebuilding Casilda/Crocodile from their own transform + decoded IIR is byte-identical.
 - ✓ DB-row → wire-body bridge (commit d10faa6): `NpcSpawnBuilder.TryBuild(NpcSpawn row, handle)` drives the

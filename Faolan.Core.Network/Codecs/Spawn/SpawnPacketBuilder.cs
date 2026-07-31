@@ -17,7 +17,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	{
 		// Offsets within the FA015807 body, valid for the Strie-shaped beach layout (the burst's player spawn and
 		// the SpawnStrieTemplate test golden; other characters' spawns shift with name/equipment length - use
-		// PlayerSpawnReader / PlayerSpawnScaffoldCodec for those).
+		// SpawnBodyReader / PlayerSpawnScaffoldCodec for those).
 		public const int HandleOffset = 12; // uint32 big-endian
 		public const int NameInnerLengthOffset = 304; // 4-byte BE length prefix of the ProtoCoreCharacterIIR (@304 = 469)
 
@@ -64,7 +64,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			var ack = template.ReadU32Be(8);
 			var fieldA = template.ReadU32Be(16);
 
-			return new FaolanStream()
+			using var s = new FaolanStream();
+			return s
 				.WriteUInt32(bodyLength)
 				.WriteUInt32(subOpcode)
 				.WriteUInt32(ack)
@@ -85,7 +86,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Replaces the ENTIRE ProtoCoreCharacterIIR component (name / stats / player_stats / bcc / ... /
 		// inventory_entry) with a re-encoded one. Works for ANY FA015807 body (player OR NPC - they share the
 		// grammar, see docs/re/spawn-dissection.md Phase 4): the CharacterIIR is located by its name signature
-		// via PlayerSpawnReader (not the fixed Strie offset), and on resize the body length @0 and the IIR's own
+		// via SpawnBodyReader (not the fixed Strie offset), and on resize the body length @0 and the IIR's own
 		// length prefix @(iirOff-4) are delta-adjusted. The Strie-shaped player layout additionally carries the
 		// @133 value island, adjusted only there (NPCs have no such outer length). This is how identity + equipment
 		// are rebuilt: the caller decodes the captured base's IIR, overrides fields from the DB, and re-encodes
@@ -94,7 +95,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// the body unchanged if no CharacterIIR is found.
 		public static byte[] SetCharacterMessage(byte[] body, ProtoCoreCharacterIIR character)
 		{
-			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+			if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 				return body;
 
 			var iirOffset = read.Offset;

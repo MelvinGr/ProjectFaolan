@@ -36,12 +36,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			template.WriteU32Be(4, 0xFA015807u);
 			record.CopyTo(template, 8);
 
-			if (!PlayerSpawnReader.TryReadCharacterMessage(record, out var read))
+			if (!SpawnBodyReader.TryReadCharacterMessage(record, out var read))
 				return record;
 
 			var handle = record.ReadU32Be(4);
 			var full = SpawnPacketBuilder.BuildSpawn(template, handle, PositionOf(template), RotationOf(template), read.Message);
-			SpawnPlayfieldRewriter.TryRewrite(full, playfieldInstance); // best-effort: keeps the captured token if it can't
+			// The token patch works on the RECORD (past the carrier's u32 length), so slice it out, patch it and copy
+			// it back. Best-effort: the captured token stays if the transform cannot be located.
+			var patched = full[4..];
+			if (SpawnTransformPatch.TryRewritePlayfield(patched, playfieldInstance))
+				patched.CopyTo(full, 4);
+
 			return full[8..];
 		}
 

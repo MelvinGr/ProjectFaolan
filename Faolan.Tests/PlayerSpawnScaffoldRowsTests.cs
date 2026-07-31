@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Faolan.Core.Database.Tables;
+using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
@@ -58,20 +59,20 @@ namespace Faolan.Tests
 		public void EditedAppearance_RoundTripsExceptItsRetailSlots(string name, ConanClass @class)
 		{
 			var body = Golden(name);
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(ConstructedForm(body, @class), out var captured, out _));
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(RoundTripThroughRows(body, @class), out var rebuilt, out _));
+			var captured = SimpleCharFullUpdateCodec.Parse(ConstructedForm(body, @class));
+			var rebuilt = SimpleCharFullUpdateCodec.Parse(RoundTripThroughRows(body, @class));
 
 			// Every entry's payload survives - same records, same float bits, closer included.
-			Assert.Equal(captured.Entries.OrderBy(e => e.Tag).Select(e => (e.Tag, e.Value)), rebuilt.Entries.OrderBy(e => e.Tag).Select(e => (e.Tag, e.Value)));
+			Assert.Equal(PlayerSlot(captured).Entries.OrderBy(e => e.Tag).Select(e => (e.Tag, e.Value)), PlayerSlot(rebuilt).Entries.OrderBy(e => e.Tag).Select(e => (e.Tag, e.Value)));
 
 			// ...and the slot numbering is what does not, which is the whole of the divergence.
-			Assert.NotEqual(captured.Entries.Select(e => e.Index), rebuilt.Entries.Select(e => e.Index));
-			Assert.Equal(Enumerable.Range(1, rebuilt.Entries.Count).Select(i => (uint)i), rebuilt.Entries.Select(e => e.Index));
+			Assert.NotEqual(PlayerSlot(captured).Entries.Select(e => e.Index), PlayerSlot(rebuilt).Entries.Select(e => e.Index));
+			Assert.Equal(Enumerable.Range(1, PlayerSlot(rebuilt).Entries.Count).Select(i => (uint)i), PlayerSlot(rebuilt).Entries.Select(e => e.Index));
 
 			// Everything else in the record is byte-identical: swap the entry tables and the bytes match exactly.
-			captured.Entries.Clear();
-			captured.Entries.AddRange(rebuilt.Entries);
-			Assert.Equal(Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(captured)), Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(rebuilt)));
+			PlayerSlot(captured).Entries.Clear();
+			PlayerSlot(captured).Entries.AddRange(PlayerSlot(rebuilt).Entries);
+			Assert.Equal(Convert.ToHexString(SimpleCharFullUpdateCodec.Build(captured)), Convert.ToHexString(SimpleCharFullUpdateCodec.Build(rebuilt)));
 		}
 
 		// The unlocked FEAT list (spawn pre-IIR) extracts to CharacterFeat rows in wire/train order - a DIFFERENT
@@ -86,7 +87,7 @@ namespace Faolan.Tests
 				80004, 82704, 410604, 80200, 80104, 81603, 84004, 84104, 410204, 81804, 82801, 410104, 81702, 80401, 82904, 83401, 85700, 410901, 80800, 80902, 82202, 83000, 85400, 81001, 82500
 			];
 
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnNecroKingsCastle"), out var scaffold, out _));
+			var scaffold = SimpleCharFullUpdateCodec.Parse(Record(Golden("SpawnNecroKingsCastle")));
 			var character = new Character
 			{
 				Id = 0x0200000A,
@@ -111,7 +112,9 @@ namespace Faolan.Tests
 			Assert.True(PlayerSpawnScaffoldRows.TrySeedFreshRows(character));
 			Assert.Empty(character.Feats);
 
-			Assert.Equal(239, PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Necromancer).ByteCount);
+			// 234, not the 239 the old player-only model reported: the 5 it counted in are the embedded
+			// CoreCharacter's version byte + IirHeader, which belong to the message.
+			Assert.Equal(239 - 5, PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Necromancer).ByteCount);
 			Assert.Empty(PlayerSpawnScaffoldRows.ExtractPreFrameFeats(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Necromancer)));
 		}
 
@@ -149,15 +152,15 @@ namespace Faolan.Tests
 			Assert.Equal(expectedTag, closer.Tag);
 		}
 
-		// FreshPreFrame(feats) and ExtractPreFrameFeats are exact inverses, and the frame grows by 4 bytes per feat
-		// (126-byte head incl. the marker + 4*count + 113-byte tail).
+		// FreshPreFrame(feats) and ExtractPreFrameFeats are exact inverses, and the scaffold grows by 4 bytes per
+		// feat (126-byte head incl. the marker + 4*count + 108-byte tail).
 		[Fact]
 		public void FreshPreFrame_And_ExtractPreFrameFeats_RoundTrip()
 		{
 			uint[] feats = [110004, 110100, 111304, 111402, 110300, 112700]; // hakotep (hox) unlocked set
 			var frame = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.HeraldOfXotli, 0, feats);
 
-			Assert.Equal(126 + 4 * feats.Length + 113, frame.ByteCount);
+			Assert.Equal(126 + 4 * feats.Length + 108, frame.ByteCount);
 			Assert.Equal(feats, PlayerSpawnScaffoldRows.ExtractPreFrameFeats(frame).ToArray());
 		}
 
@@ -174,7 +177,7 @@ namespace Faolan.Tests
 			// Byte offset 18, spelled out rather than taken from the codec: this is the assertion that pins scaffold
 			// word 4 to the place #336 found the mask by a different route, so reading the index back off
 			// PlayerSpawnPreFrame would make it self-referential.
-			Assert.Equal(expectedHex, Convert.ToHexString(PlayerSpawnPreFrameCodec.Build(frame).AsSpan(18, 4).ToArray()).ToLowerInvariant());
+			Assert.Equal(expectedHex, Convert.ToHexString(PreIirBytes(frame).AsSpan(18, 4).ToArray()).ToLowerInvariant());
 		}
 
 		// #239: the AoC client derives the displayed profession from the character's feat tree, whose first
@@ -212,7 +215,7 @@ namespace Faolan.Tests
 		public void FreshRows_OverDikketestBody_AreByteIdenticalToTheCapture()
 		{
 			var body = Golden("SpawnDikketestLogin");
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _));
+			var scaffold = SimpleCharFullUpdateCodec.Parse(Record(body));
 
 			var character = new Character
 			{
@@ -248,7 +251,7 @@ namespace Faolan.Tests
 			Assert.False(PlayerSpawnScaffoldRows.TrySeedFreshRows(character)); // idempotent
 			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, scaffold, MorphRegistry.ByName));
 
-			Assert.Equal(Convert.ToHexString(body), Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(scaffold)));
+			Assert.Equal(Convert.ToHexString(Record(body)), Convert.ToHexString(SimpleCharFullUpdateCodec.Build(scaffold)));
 		}
 
 		// A character that never touched a slider (no CharacterBody) gets no morph entries at all: 6 weighted
@@ -282,7 +285,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void TryApplyFrom_WithoutRows_ReturnsFalse()
 		{
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(Golden("SpawnDikketestLogin"), out var scaffold, out _));
+			var scaffold = SimpleCharFullUpdateCodec.Parse(Record(Golden("SpawnDikketestLogin")));
 
 			Assert.False(PlayerSpawnScaffoldRows.TryApplyFrom(new Character
 			{
@@ -296,19 +299,38 @@ namespace Faolan.Tests
 		// regenerated as FreshPreFrame(class), EntryTableX 0xB7, and transient buff/session records dropped.
 		private static byte[] ConstructedForm(byte[] body, ConanClass @class)
 		{
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var s, out _));
+			var s = SimpleCharFullUpdateCodec.Parse(Record(body));
 			// The frame is reconstructed, but the unlocked FEAT list it carries IS character data and survives the row
 			// round-trip - so the constructed form keeps the captured feats (spliced into the canonical frame).
-			var feats = PlayerSpawnScaffoldRows.ExtractPreFrameFeats(s.Frame);
-			s.Frame = PlayerSpawnScaffoldRows.FreshPreFrame(@class, 0, feats);
-			s.EntryTableX = 0xB7;
-			s.BuffRecords.Clear();
-			return PlayerSpawnScaffoldCodec.Generate(s);
+			var feats = PlayerSpawnScaffoldRows.ExtractPreFrameFeats(s.PreIir);
+			s.PreIir = PlayerSpawnScaffoldRows.FreshPreFrame(@class, 0, feats);
+			PlayerSlot(s).EntryTableX = PlayerSpawnScaffoldRows.FreshEntryTableX;
+			s.Post.BuffRecords.Clear();
+			return SimpleCharFullUpdateCodec.Build(s);
 		}
 
 		private static byte[] Golden(string name)
 		{
 			return File.ReadAllBytes(Path.Combine(GoldenDir(), name + ".bin"));
+		}
+
+		// A captured body minus the leading u32 carrier length, which belongs to the sender (#530 rule 2).
+		private static byte[] Record(byte[] body)
+		{
+			return body[4..];
+		}
+
+		private static PlayerEntrySlot PlayerSlot(SimpleCharFullUpdateIIR spawn)
+		{
+			return Assert.IsType<PlayerEntrySlot>(spawn.Post.Slot);
+		}
+
+		// The pre-IIR scaffold composes into a spawn record rather than standing alone (#530 rule 5c).
+		private static byte[] PreIirBytes(SpawnPreIir frame)
+		{
+			using var stream = new FaolanStream();
+			SpawnPreIirCodec.Write(stream, frame);
+			return stream.ToArray();
 		}
 
 		private static string GoldenDir([CallerFilePath] string thisFile = "")
@@ -321,7 +343,7 @@ namespace Faolan.Tests
 		// resolves them back. Nothing about the entry table is carried across as data.
 		private static byte[] RoundTripThroughRows(byte[] body, ConanClass @class)
 		{
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out var error), $"parse failed: {error}");
+			var scaffold = SimpleCharFullUpdateCodec.Parse(Record(body));
 
 			var character = new Character
 			{
@@ -330,9 +352,9 @@ namespace Faolan.Tests
 			};
 			PlayerSpawnScaffoldRows.ExtractTo(character, scaffold, MorphRegistry.RefsByTag);
 
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out _)); // fresh instance, then the character overwrites
+			var rebuilt = SimpleCharFullUpdateCodec.Parse(Record(body)); // fresh instance, then the character overwrites
 			Assert.True(PlayerSpawnScaffoldRows.TryApplyFrom(character, rebuilt, MorphRegistry.ByName));
-			return PlayerSpawnScaffoldCodec.Generate(rebuilt);
+			return SimpleCharFullUpdateCodec.Build(rebuilt);
 		}
 	}
 }

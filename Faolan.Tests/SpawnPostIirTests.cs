@@ -1,0 +1,106 @@
+using System.Numerics;
+using Faolan.Core;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.World;
+using Faolan.Tests.Support;
+using Xunit;
+
+namespace Faolan.Tests
+{
+	// Locks the canonical minimal NPC post-IIR stream (the freshly-spawned, no-runtime-state form) against real
+	// capture bodies, and pins the decoded header grammar. The SpawnNpcCrocodile golden is one of the 23 beach NPCs
+	// that carry exactly this minimal form.
+	public class SpawnPostIirTests
+	{
+		[Fact]
+		public void MinimalNpc_HasTheDecodedHeaderGrammar()
+		{
+			var post = Rebuild(SpawnPostIirs.Npc());
+
+			Assert.Equal(0u, post.ReadU32Be(0)); // the head-word LIST'S count, 0 - not the constant it read as
+			Assert.Equal(5u, post.ReadU32Be(4)); // the first record: the empty move-task slot + the buff list's frame
+			Assert.Equal(SpawnPostIirs.MinimalWord2, post.ReadU32Be(8));
+			Assert.Equal(ListFrame.Empty, post.ReadU32Be(post.Length - 4)); // the closing pair list, empty
+		}
+
+		[Fact]
+		public void MinimalNpc_ReproducesTheCapturedMinimalScaffold()
+		{
+			var captured = CapturedPostIir("SpawnNpcCrocodile");
+
+			Assert.Equal(SpawnPostIirs.MinimalNpcLength, captured.Length);
+			Assert.Equal(captured, Rebuild(SpawnPostIirs.Npc()));
+		}
+
+		[Fact]
+		public void MinimalNpc_ReproducesThePantherScaffold()
+		{
+			Assert.Equal(CapturedPostIir("SpawnNpcMinimalPanther"), Rebuild(SpawnPostIirs.Npc()));
+		}
+
+		// No head words. That leading u32 is the head-word LIST'S COUNT, not a constant - it is 0 on 11,627 captured
+		// streams and 1 on the 5 that carry a word, and it was written up as "constant 0 (the player spawn has 2)",
+		// which is wrong on both halves (#475).
+		[Theory, InlineData("SpawnNpcCrocodile"), InlineData("SpawnNpcCasilda")]
+		public void DecodeEncode_IsByteIdentical(string golden)
+		{
+			Assert.True(SpawnBodyReader.TryParse(Golden.Bytes(golden), out var spawn));
+
+			Assert.Empty(spawn.Post.HeadWords);
+			Assert.Equal(CapturedPostIir(golden), Rebuild(spawn.Post));
+		}
+
+		// #243: TryReadNoMorphWord2 reads the fresh word2 off a no-morph body (minimal OR runtime-bearing) and
+		// declines an appearance-bearing body (which builds from morph rows). The animal minimal golden is word2==1;
+		// Casilda (a morph table) is declined.
+		[Fact]
+		public void TryReadNoMorphWord2_ReadsMinimal_DeclinesAppearance()
+		{
+			Assert.True(NpcSpawnAppearance.TryReadNoMorphWord2(Golden.Bytes("SpawnNpcCrocodile"), out var word2));
+			Assert.Equal(SpawnPostIirs.MinimalWord2, word2);
+
+			Assert.False(NpcSpawnAppearance.TryReadNoMorphWord2(Golden.Bytes("SpawnNpcCasilda"), out _));
+		}
+
+		// A RUNTIME-BEARING no-morph stream (a first record carrying the entity's current MOVE TASK, no morph table)
+		// still yields its header word2 - the key to building the runtime tail from columns.
+		//
+		// ⚠️ The runtime record used to be 40 RANDOM BYTES behind a `firstRecordLen` that said so. That parsed only
+		// because the old reader took word2 off a fixed offset without walking the stream; it is a fixture shaped
+		// like its parser, which proves only that the file agrees with itself (the wave-3 lesson). The slot is a
+		// MoveTaskNode (#477), so this builds one.
+		[Fact]
+		public void TryReadNoMorphWord2_ReadsRuntimeBearingForm()
+		{
+			var animal = Golden.Bytes("SpawnNpcCrocodile");
+			Assert.True(SpawnBodyReader.TryParse(animal, out var spawn));
+
+			var post = SpawnPostIirs.Npc(SpawnPostIirs.MinimalHumanoidWord2);
+			post.MoveTask = MoveTaskNodes.Walk(new Vector3(1, 2, 3), new Vector3(4, 5, 6));
+			spawn.Post = post;
+
+			var body = new byte[4 + SimpleCharFullUpdateCodec.Build(spawn).Length];
+			SimpleCharFullUpdateCodec.Build(spawn).CopyTo(body, 4);
+			body.WriteU32Be(0, (uint)(body.Length - 4));
+
+			Assert.True(NpcSpawnAppearance.TryReadNoMorphWord2(body, out var word2));
+			Assert.Equal(SpawnPostIirs.MinimalHumanoidWord2, word2);
+		}
+
+		// The captured post-IIR stream, sliced off behind the embedded CharacterIIR.
+		private static byte[] CapturedPostIir(string golden)
+		{
+			var body = Golden.Bytes(golden);
+			Assert.True(SpawnBodyReader.TryReadCharacterMessage(body, out var read));
+			return body[(read.Offset + read.Length)..];
+		}
+
+		private static byte[] Rebuild(SpawnPostIir post)
+		{
+			using var s = new FaolanStream();
+			SpawnPostIirCodec.Write(s, post);
+			return s.ToArray();
+		}
+	}
+}

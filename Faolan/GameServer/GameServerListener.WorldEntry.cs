@@ -816,9 +816,9 @@ namespace Faolan.GameServer
 		private static Rpc BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, uint playfield, IReadOnlyDictionary<string, MorphTarget> morphRegistry)
 		{
 			var character = client.Session.Character;
-			// The CharacterIIR is built from code (PlayerCharacterIir, formerly PlayerCharacterIirTemplate.bin, #258):
+			// The CharacterIIR is built from code (PlayerCharacterIirs, formerly PlayerCharacterIirTemplate.bin, #258):
 			// the fixed render template with this character's name/identity/looks/worn gear applied.
-			var message = PlayerCharacterIir.Build(character, equipment);
+			var message = PlayerCharacterIirs.ForCharacter(character, equipment);
 
 			// A near-zero stored quaternion (the degenerate W=0 default) can't be realised by the avatar; fall back to
 			// identity rather than risk it (the live splice path guards the same way).

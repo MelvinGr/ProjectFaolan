@@ -101,7 +101,7 @@ namespace Faolan.Core.Network.Codecs.World
 			// The 0x2C transform component: a ProtoGameCodeDynelIIR { position=1, rotation=2, playfield_instance=3 }.
 			// All 15787 captured FA015807/66AEDD50 groups carry exactly those three fields in that order, and every
 			// captured playfield token falls in [2^21, 2^28) - where the MINIMAL varint protobuf-net writes is
-			// already 4 bytes, so SpawnPlayfieldRewriter's splice-free in-place re-address still holds.
+			// already 4 bytes, so SpawnTransformPatch's splice-free in-place re-address still holds.
 			var transform = new ProtoGameCodeDynelIIR
 			{
 				Position = position,

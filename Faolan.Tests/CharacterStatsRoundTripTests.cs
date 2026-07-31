@@ -17,7 +17,7 @@ namespace Faolan.Tests
 		public void TemplateCharacterMessage_ReEncodesByteIdentical()
 		{
 			var template = Golden.Bytes("SpawnStrieTemplate");
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(template, out var read));
+			Assert.True(SpawnBodyReader.TryReadCharacterMessage(template, out var read));
 
 			// Re-encoding the typed ProtoCoreCharacterIIR (which contains CharacterStats) reproduces the captured
 			// message slice byte-for-byte - the build-side oracle, located structurally (no fixed Strie offset).
@@ -37,12 +37,12 @@ namespace Faolan.Tests
 			Assert.Equal(9000u, stats.Life);
 		}
 
-		// Locates the ProtoCoreCharacterIIR structurally (PlayerSpawnReader, not a fixed byte offset) and returns its
+		// Locates the ProtoCoreCharacterIIR structurally (SpawnBodyReader, not a fixed byte offset) and returns its
 		// typed CharacterStats sub-message.
 		private static ProtoCoreCharacterIIR.CharacterStats TemplateCharacterStats()
 		{
 			var template = Golden.Bytes("SpawnStrieTemplate");
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(template, out var read));
+			Assert.True(SpawnBodyReader.TryReadCharacterMessage(template, out var read));
 			Assert.NotNull(read.Message.Stats);
 			return read.Message.Stats;
 		}

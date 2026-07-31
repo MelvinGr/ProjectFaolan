@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**80** IIR carrier types · **65 V3** (65 with an auto-cited golden). The
+**80** IIR carrier types · **61 V3** (61 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -22,8 +22,6 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `BankIIR` | `0x0BA1C1CB` | `BankIirCodec` | [V3: BankStorageTests.BuildBankIirRecord_Matches_CapturedBank] |
 | V3 | `BehaviorControlCenterIIR` | `0x642CD3D6` | `BehaviorControlCenterCodec` | [V3: BehaviorAcksTests.UnequipOutOfSlot_AckMatchesCapture] |
 | V3 | `CharDCMoveIIR` | `0x4517AA81` | `CharDCMoveCodec` | [V3: CrossPlayerMoveRelayTests.BroadcastPlayerMove_ForwardsTheJumpVerbatim_ToAViewerWhoKnowsTheMover] |
-| V3 | `CharInPlayIIR` | `0x864CFEF8` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
-| V3 | `CharacterActionIIR` | `0x6B6FD368` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `ChatTextIIR` | `0xE0B51102` | `ChatTextCodec` | [V3: ChatTextCodecTests.Build_FromParsedFields_MatchesCapture] |
 | V3 | `ClimbingDynelFullUpdateIIR` | `0x1FD6412B` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `CombatReactiveIIR` | `0x54C02089` | `CombatReactiveCodec` | [V3: SpellweaveCodecTests.BuildReactiveList_ConsumedElementZeroed_MatchesCapture] |
@@ -67,10 +65,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `QuestLogListIIR` | `0x504B7924` | `QuestLogListCodec` | [V3: QuestTests.QuestDefinitionExtractor_RoundTripsCasilda] |
 | V3 | `RemoveFromGroupIIR` | `0xE4FF0C85` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
 | V3 | `ScryScriptIIR` | `0xA36D3B74` | `ScryScriptCodec` | [V3: ScryScriptCodecTests.BuildStartScriptGroup_MatchesTheHandWrittenBytes] |
-| V3 | `SetMorphValueIIR` | `0xBADF5A4B` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
-| V3 | `SetNameIIR` | `0xADCE0CDA` | `CreateEditorRecordBuilder` | [V3: CreateEditorRecordTests.BehaviorControlCenterIirLong_MatchesCapturedBytes] |
 | V3 | `SetPosIIR` | `0x04B80B24` | `SetPosCodec` | [V3: DeadReckoningCodecTests.SetPos_RoundTripsByteExact] |
-| V3 | `SimpleCharFullUpdateIIR` | `0xFA015807` | `PlayerSpawnScaffoldCodec` | [V3: PlayerSpawnScaffoldCodecTests.Generate_AfterCharacterIirSwap_StaysParseable] |
+| V3 | `SimpleCharFullUpdateIIR` | `0xFA015807` | `SimpleCharFullUpdateCodec` | [V3: SimpleCharFullUpdateCodecTests.Build_AfterCharacterIirSwap_StaysParseable] |
 | V3 | `SimpleCharKilledByUpdateIIR` | `0xB066AFC2` | `SimpleCharKilledByUpdateCodec` | [V3: DeathSequenceTests.BuildKilledBy_ReproducesCapturedRecord_ByteExact] |
 | V3 | `SimpleDynelFullUpdateIIR` | `0x66AEDD50` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `SimpleDynelVisualChangeIIR` | `0xE7F4F8F8` | `SimpleDynelVisualChangeCodec` | [V3: LootTests.BuildOpenWindowBody_MatchesCapture] |
@@ -85,6 +81,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `UpdateSimpleDynelCodec` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V2 | `AreaFormulaIIR` | `0xCE30BE4E` | `AreaFormulaCodec` |  |
 | V2 | `ChainKillIIR` | `0x0EED7068` | `ChainKillCodec` |  |
+| V2 | `CharInPlayIIR` | `0x864CFEF8` | `CharInPlayCodec` |  |
+| V2 | `CharacterActionIIR` | `0x6B6FD368` | `CharacterActionCodec` |  |
 | V2 | `CrimeIIR` | `0xC7954504` | `CrimeCodec` |  |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `DeleteItemCodec` |  |
 | V2 | `FanaticCommandIir` | `0xEE4AA85C` | `FanaticCommandCodec` |  |
@@ -94,6 +92,8 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChangedCodec` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `MoveInventoryItemCodec` |  |
 | V2 | `RegenIIR` | `0x28D0AC99` | `RegenCodec` |  |
+| V2 | `SetMorphValueIIR` | `0xBADF5A4B` | `SetMorphValueCodec` |  |
+| V2 | `SetNameIIR` | `0xADCE0CDA` | `SetNameCodec` |  |
 | V2 | `SetShadowCoverageIIR` | `0xD6C1F0CC` | `SetShadowCoverageCodec` |  |
 | V2 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` |  |
 | V2 | `StatIIR` | `0xF98E10B3` | `StatCodec` |  |

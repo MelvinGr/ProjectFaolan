@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Faolan.Core;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
@@ -15,7 +16,8 @@ namespace Faolan.Tests
 	// not merely lose the list: the subtraction landed mid-field and the whole scaffold was undecodable.
 	//
 	// The player side has modelled this list as typed entries since #466 (the character's saved feat specs). Both
-	// families run the same client reader, so it is now one shared type - SpawnPreFrameSublist.
+	// families run the same client reader, so it is now one shared type - and since #530 wave 5b one shared scaffold
+	// (SpawnPreIir) read by one codec.
 	public class SpawnPreIirSublistTests
 	{
 		[Fact]
@@ -27,26 +29,26 @@ namespace Faolan.Tests
 
 			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
 			{
-				if (!PlayerSpawnReader.TryReadCharacterMessage(body, out _))
-					continue;
-
-				if (!NpcSpawnPreIirCodec.TryDecode(body, out var scaffold, out var offset))
+				if (!SpawnBodyReader.TryParse(body, out var spawn))
 				{
 					undecodable++;
 					continue;
 				}
 
+				var scaffold = spawn.PreIir;
 				decoded++;
 				sublistSizes[scaffold.Sublist.Count] = sublistSizes.GetValueOrDefault(scaffold.Sublist.Count) + 1;
 
-				// The width is DERIVED from the scaffold's own grammar, and the re-encode has to match the captured
-				// bytes over exactly that span - which is also what proves the walk found the right start.
-				Assert.Equal(body[offset..(offset + scaffold.ByteCount)], NpcSpawnPreIirCodec.Encode(scaffold));
+				// The width is DERIVED from the scaffold's own grammar, and the re-encode has to be exactly that wide.
+				// That the bytes themselves match the capture is SimpleCharFullUpdateCorpusTests' whole-record gate,
+				// which reproduces every one of these spawns - the scaffold no longer has an offset of its own to be
+				// right or wrong about, because the body is read sequentially.
+				Assert.Equal(scaffold.ByteCount, Rebuild(scaffold).Length);
 			}
 
 			// Every captured scaffold, player and NPC alike - the codec is family-neutral because the client reader
-			// is. (A player's frame is this scaffold plus the embedded CoreCharacter's 5-byte head, which is why
-			// PlayerSpawnPreFrame wraps it rather than redefining it.)
+			// is. (What the player model used to call "the frame" was this scaffold plus the embedded CoreCharacter's
+			// 5-byte head, which is the message's, not the scaffold's.)
 			Assert.Equal(0, undecodable);
 			Assert.Equal(11632, decoded);
 
@@ -59,22 +61,30 @@ namespace Faolan.Tests
 			Assert.Equal(1, sublistSizes[4]);
 		}
 
+		// The scaffold composes into a spawn record rather than standing alone (#530 rule 5c).
+		private static byte[] Rebuild(SpawnPreIir frame)
+		{
+			using var s = new FaolanStream();
+			SpawnPreIirCodec.Write(s, frame);
+			return s.ToArray();
+		}
+
 		// The from-scratch fresh scaffold emits an EMPTY sublist, which frames as ForCount(0) - the same four bytes
 		// that used to be hardcoded. Pinned so the typed list cannot start emitting a different fresh form.
 		[Fact]
 		public void TheFreshScaffold_EmitsAnEmptySublist()
 		{
-			var fresh = NpcSpawnPreIir.BuildMinimal();
+			var fresh = SpawnPreIirs.Minimal();
 
 			Assert.Empty(fresh.Sublist);
-			Assert.Equal(NpcSpawnPreIir.FixedLength, fresh.ByteCount);
-			Assert.Equal(NpcSpawnPreIir.FixedLength, NpcSpawnPreIirCodec.Encode(fresh).Length);
+			Assert.Equal(SpawnPreIir.FixedLength, fresh.ByteCount);
+			Assert.Equal(SpawnPreIir.FixedLength, Rebuild(fresh).Length);
 			// And an entry costs exactly its own width - [u32 key][u8 flag][u16 len][count word] + name + ids - which
 			// is what makes the fixed-width subtraction this codec used to do wrong rather than merely lossy.
-			var withEntry = NpcSpawnPreIir.BuildMinimal();
+			var withEntry = SpawnPreIirs.Minimal();
 			withEntry.Sublist.Add(new SpawnPreFrameSublistEntry());
-			Assert.Equal(NpcSpawnPreIir.FixedLength + 11, NpcSpawnPreIirCodec.Encode(withEntry).Length);
-			Assert.Equal(NpcSpawnPreIirCodec.Encode(withEntry).Length, withEntry.ByteCount);
+			Assert.Equal(SpawnPreIir.FixedLength + 11, Rebuild(withEntry).Length);
+			Assert.Equal(Rebuild(withEntry).Length, withEntry.ByteCount);
 		}
 	}
 }

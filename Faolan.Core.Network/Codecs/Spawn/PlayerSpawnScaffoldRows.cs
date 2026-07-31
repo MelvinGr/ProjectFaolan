@@ -23,10 +23,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// CharacterBody, the closer from the class.
 	public static class PlayerSpawnScaffoldRows
 	{
-		// The pre-IIR frame's grammar lives in PlayerSpawnPreFrame / PlayerSpawnPreFrameCodec - it is the client's
+		// The pre-IIR frame's grammar lives in SpawnPreIir / SpawnPreIirCodec - it is the client's
 		// SimpleCharFullUpdateIIR scaffold, not a blob with islands, and the character's UNLOCKED FEAT list is the
 		// nested count-framed list inside its sublist (see docs/subsystems/feats.md +
 		// tools/capture/decode_unlocked_feats.py). Nothing here addresses the frame by offset any more.
+
+		// The per-character u32 that follows the entry count. Constant on every generated spawn; captured characters
+		// carry their own (Strie 0xB7, NecroL80 0x2B6, the create editor 0x3F1) and it is reproduced, not derived.
+		public const uint FreshEntryTableX = 0xB7;
 
 		private static readonly Dictionary<ConanClass, uint[]> FreshSkillIdsByClass = new Dictionary<ConanClass, uint[]>
 		{
@@ -200,7 +204,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		//
 		// The frame arrives typed now, so there is nothing to parse here and nothing to fail. It used to take the
 		// frame's BYTES and re-walk them - the same walk PlayerSpawnScaffoldCodec had already done to produce them.
-		public static List<uint> ExtractPreFrameFeats(PlayerSpawnPreFrame frame)
+		public static List<uint> ExtractPreFrameFeats(SpawnPreIir frame)
 		{
 			return frame.Sublist.SelectMany(spec => spec.FeatIds).ToList();
 		}
@@ -212,11 +216,12 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// BuildWeightedEntries generates through: tag 133 comes back as "*beardmesh_210844", 226 as
 		// "*texscript_202392". It is REQUIRED rather than optional because the entry table is the only place a
 		// captured character's looks exist - extracting without it would silently import a faceless character.
-		public static (int Morphs, int Resources) ExtractTo(Character character, PlayerSpawnScaffold scaffold, IReadOnlyDictionary<ushort, string> refsByTag)
+		public static (int Morphs, int Resources) ExtractTo(Character character, SimpleCharFullUpdateIIR scaffold, IReadOnlyDictionary<ushort, string> refsByTag)
 		{
 			ArgumentNullException.ThrowIfNull(refsByTag);
 
-			character.Skills = scaffold
+			var slot = PlayerSlotOf(scaffold);
+			character.Skills = slot
 				.IdList.Select(s => new CharacterSkill
 				{
 					CharacterId = character.Id,
@@ -225,14 +230,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				})
 				.ToList();
 
-			character.ScaffoldPairs = scaffold.EndPairs.Select(p => Pair(character.Id, 0, p)).Concat(scaffold.EndPairs2.Select(p => Pair(character.Id, 1, p))).ToList();
+			character.ScaffoldPairs = scaffold.Post.EndPairs.Select(p => Pair(character.Id, 0, p)).Concat(scaffold.Post.EndPairs2.Select(p => Pair(character.Id, 1, p))).ToList();
 
 			// The unlocked FEAT list lives in the pre-IIR frame (not the post-IIR IdList, which is skills). It IS
 			// character data, so extract it to CharacterFeat rows (in wire/train order); the rest of the frame +
 			// EntryTableX are constants reconstructed from Character.Class by TryApplyFrom (see FreshPreFrame).
 			// Specs are preserved rather than flattened (#474): a character with four saved specs round-trips as
 			// four CharacterFeatSpec rows, and the same feat id may legitimately appear in several of them.
-			character.FeatSpecs = scaffold.Frame.Sublist
+			character.FeatSpecs = scaffold.PreIir.Sublist
 				.Select((spec, index) => new CharacterFeatSpec
 				{
 					CharacterId = character.Id,
@@ -240,7 +245,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 					Name = spec.Name
 				})
 				.ToList();
-			character.Feats = scaffold.Frame.Sublist
+			character.Feats = scaffold.PreIir.Sublist
 				.SelectMany((spec, index) => spec.FeatIds.Select((id, sequence) => new CharacterFeat
 				{
 					CharacterId = character.Id,
@@ -263,18 +268,19 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// A morph slider is never mistaken for a resource: the two share a tag SPACE (the registry carries entries
 		// literally named "arm"/"chest"/"bosom" at ids 256..258, which are also the type-1 slider tags), so the
 		// discriminator is CharacterMorphs.IsMorphTag - the whole (type, id) pair - and it is checked FIRST.
-		private static (int Morphs, int Resources) ExtractAppearance(Character character, PlayerSpawnScaffold scaffold, IReadOnlyDictionary<ushort, string> refsByTag)
+		private static (int Morphs, int Resources) ExtractAppearance(Character character, SimpleCharFullUpdateIIR scaffold, IReadOnlyDictionary<ushort, string> refsByTag)
 		{
 			character.Body ??= new CharacterBody
 			{
 				CharacterId = character.Id
 			};
 
-			var morphs = CharacterMorphs.ApplyEntries(character.Body, scaffold.Entries.Select(e => (e.Tag, e.Value)));
+			var entries = PlayerSlotOf(scaffold).Entries;
+			var morphs = CharacterMorphs.ApplyEntries(character.Body, entries.Select(e => (e.Tag, e.Value)));
 
 			// Everything but the closer, which is the LAST record and carries a count marker, not appearance.
 			character.BodyResources.Clear();
-			foreach (var entry in scaffold.Entries.Take(Math.Max(0, scaffold.Entries.Count - 1)))
+			foreach (var entry in entries.Take(Math.Max(0, entries.Count - 1)))
 			{
 				if (CharacterMorphs.IsMorphTag(entry.Tag) || !refsByTag.TryGetValue(entry.Tag, out var resourceRef))
 					continue;
@@ -322,7 +328,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		}
 
 		// The single-spec overload - the shape every fresh character and every shipped character has.
-		public static PlayerSpawnPreFrame FreshPreFrame(ConanClass @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
+		public static SpawnPreIir FreshPreFrame(ConanClass @class, uint vanityShownMask = 0, IReadOnlyList<uint>? feats = null)
 		{
 			var entry = new SpawnPreFrameSublistEntry();
 			if (feats != null)
@@ -331,15 +337,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return FreshPreFrame(@class, vanityShownMask, [entry]);
 		}
 
-		public static PlayerSpawnPreFrame FreshPreFrame(ConanClass @class, uint vanityShownMask, IReadOnlyList<SpawnPreFrameSublistEntry> specs)
+		public static SpawnPreIir FreshPreFrame(ConanClass @class, uint vanityShownMask, IReadOnlyList<SpawnPreFrameSublistEntry> specs)
 		{
-			var frame = new PlayerSpawnPreFrame();
-			frame.Flags[PlayerSpawnPreFrame.ArchetypeFlagIndex] = FrameArchetype(@class);
-			frame.Flags[PlayerSpawnPreFrame.ClassFlagIndex] = (byte)@class;
-			frame.Words[PlayerSpawnPreFrame.VanityShownMaskWordIndex] = vanityShownMask; // #336
-			frame.Words[PlayerSpawnPreFrame.CategoryWordIndex] = NpcSpawnPreIir.DefaultCategory;
-			frame.Words[PlayerSpawnPreFrame.ConstantWordIndex] = PlayerSpawnPreFrame.ConstantWordValue;
-			frame.Words[PlayerSpawnPreFrame.SessionWordIndex] = PlayerSpawnPreFrame.FreshSessionWordValue;
+			var frame = new SpawnPreIir();
+			frame.Flags[SpawnPreIir.ArchetypeFlagIndex] = FrameArchetype(@class);
+			frame.Flags[SpawnPreIir.ClassFlagIndex] = (byte)@class;
+			frame.Words[SpawnPreIir.VanityShownMaskWordIndex] = vanityShownMask; // #336
+			frame.Words[SpawnPreIir.CategoryWordIndex] = SpawnPreIir.DefaultCategory;
+			frame.Words[SpawnPreIir.ConstantWordIndex] = SpawnPreIir.ConstantWordValue;
+			frame.Words[SpawnPreIir.SessionWordIndex] = SpawnPreIir.FreshSessionWordValue;
 
 			// One sublist entry per saved feat spec, each carrying its name and its own trained-feat list in train
 			// order. A fresh character has one unnamed spec with no feats, which frames as the bare 0x3F1 word -
@@ -370,9 +376,9 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The vanity shown-mask carried by a captured spawn's frame. The write side is FreshPreFrame; this is the
 		// read side, so the importer recovers a captured character's setting instead of defaulting it to 0.
-		public static uint ReadVanityShownMask(PlayerSpawnScaffold scaffold)
+		public static uint ReadVanityShownMask(SimpleCharFullUpdateIIR scaffold)
 		{
-			return scaffold.Frame.Words[PlayerSpawnPreFrame.VanityShownMaskWordIndex];
+			return scaffold.PreIir.Words[SpawnPreIir.VanityShownMaskWordIndex];
 		}
 
 		// Fills the scaffold's per-character parts from the character (generation: model -> wire). Returns false when
@@ -387,7 +393,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// weighted entries. A ref it does not know THROWS rather than being dropped or swapped for a default face
 		// (BuildWeightedEntries) - the create flow says the same thing once, at creation, where it is still
 		// actionable (CreateFlowService.ReportUnresolvableAppearance).
-		public static bool TryApplyFrom(Character character, PlayerSpawnScaffold scaffold, IReadOnlyDictionary<string, MorphTarget> registry)
+		public static bool TryApplyFrom(Character character, SimpleCharFullUpdateIIR scaffold, IReadOnlyDictionary<string, MorphTarget> registry)
 		{
 			if (character?.Skills is not { Count: > 0 })
 				return false;
@@ -397,36 +403,37 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// hidden-slots mask (#336) from the character's equipment (the FA015807 self-spawn carries it so a hidden
 			// piece survives relog), and the unlocked FEAT list spliced in from CharacterFeat rows (train order).
 			// EntryTableX is the constant 0xB7. Transient session islands are correctly absent.
-			scaffold.Frame = FreshPreFrame(character.Class, character.Equipment?.VanityShownMask ?? 0, SpecsOf(character));
-			scaffold.EntryTableX = 0xB7;
-			scaffold.BuffRecords.Clear();
+			scaffold.PreIir = FreshPreFrame(character.Class, character.Equipment?.VanityShownMask ?? 0, SpecsOf(character));
+			var slot = PlayerSlotOf(scaffold);
+			slot.EntryTableX = FreshEntryTableX;
+			scaffold.Post.BuffRecords.Clear();
 
-			scaffold.Entries.Clear();
-			scaffold.Entries.AddRange(BuildAppearanceEntries(character, BuildWeightedEntries(character.BodyResources, registry)));
+			slot.Entries.Clear();
+			slot.Entries.AddRange(BuildAppearanceEntries(character, BuildWeightedEntries(character.BodyResources, registry)));
 
-			scaffold.IdList.Clear();
+			slot.IdList.Clear();
 			if (character.Skills != null)
-				scaffold.IdList.AddRange(character.Skills.OrderBy(s => s.SkillId).Select(s => new ScaffoldIdEntry(s.Rank, s.SkillId)));
+				slot.IdList.AddRange(character.Skills.OrderBy(s => s.SkillId).Select(s => new ScaffoldIdEntry(s.Rank, s.SkillId)));
 
 			// The closer (last entry-table record) carries the COUNT MARKER the client uses to read the feat list:
 			// TAG = (IdList.Count + 2) * 0x3F1 (see FreshCloser). It was stored at the FRESH skill count, so once the
 			// class feat scaffold is granted on level-up (#298) the skill count grows and the stored tag goes stale ->
 			// the client miscounts the feat list and CoreCharacterFullUpdateIIR asserts (a_cBlob.HasFailed). Recompute
 			// it from the ACTUAL IdList here so the wire is always self-consistent (value/archetype is left intact).
-			if (scaffold.Entries.Count > 0)
+			if (slot.Entries.Count > 0)
 			{
-				scaffold.Entries[^1] = scaffold.Entries[^1] with
+				slot.Entries[^1] = slot.Entries[^1] with
 				{
-					Tag = (ushort)ListFrame.ForCount(scaffold.IdList.Count + 1) // frames ONE MORE than the id list holds; truncated to u16
+					Tag = (ushort)ListFrame.ForCount(slot.IdList.Count + 1) // frames ONE MORE than the id list holds; truncated to u16
 				};
 			}
 
-			scaffold.EndPairs.Clear();
-			scaffold.EndPairs2.Clear();
+			scaffold.Post.EndPairs.Clear();
+			scaffold.Post.EndPairs2.Clear();
 			if (character.ScaffoldPairs != null)
 			{
-				scaffold.EndPairs.AddRange(character.ScaffoldPairs.Where(p => p.ListIndex == 0).OrderBy(p => p.PairId).Select(p => new ScaffoldPair(p.PairId, p.Value)));
-				scaffold.EndPairs2.AddRange(character.ScaffoldPairs.Where(p => p.ListIndex == 1).OrderBy(p => p.PairId).Select(p => new ScaffoldPair(p.PairId, p.Value)));
+				scaffold.Post.EndPairs.AddRange(character.ScaffoldPairs.Where(p => p.ListIndex == 0).OrderBy(p => p.PairId).Select(p => new ScaffoldPair(p.PairId, p.Value)));
+				scaffold.Post.EndPairs2.AddRange(character.ScaffoldPairs.Where(p => p.ListIndex == 1).OrderBy(p => p.PairId).Select(p => new ScaffoldPair(p.PairId, p.Value)));
 			}
 
 			return true;
@@ -472,6 +479,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 			var tag = (ushort)ListFrame.ForCount(FreshSkillIdsFor(@class).Length + 1); // as above: one more than the ids
 			return (tag, value);
+		}
+
+		// The spawn's entry slot as the PLAYER's. Everything in this file describes a character, so a body whose slot
+		// is the NPC morph table is not a player spawn at all - and saying so is what the caller wants to be told,
+		// the same way the old player codec asserted the header's two family words.
+		private static PlayerEntrySlot PlayerSlotOf(SimpleCharFullUpdateIIR scaffold)
+		{
+			return scaffold.Post.Slot as PlayerEntrySlot
+			       ?? throw new InvalidOperationException($"the spawn's entry slot is {scaffold.Post.Slot.GetType().Name}, not a player's entry table");
 		}
 
 		private static CharacterScaffoldPair Pair(uint characterId, byte listIndex, ScaffoldPair p)

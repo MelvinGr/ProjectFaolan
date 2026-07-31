@@ -91,7 +91,7 @@ namespace Faolan.Tests
 
 			foreach (var (source, body) in CapturedBodies(0xFA015807u))
 			{
-				if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 					continue;
 
 				var original = body.AsSpan(read.Offset, read.Length).ToArray();

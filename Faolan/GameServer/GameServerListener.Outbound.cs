@@ -519,14 +519,14 @@ namespace Faolan.GameServer
 			return FrameWorldEntryRecord(client, body);
 		}
 
-		// Assembles the complete world-entry player/NPC FA015807 spawn packet for `client` from a pre-built spawn body.
-		// `spawnBody` is the `packet[bodyStart..]` form ([u32 bodyLen][IirType=0xFA015807][TypeTag][Handle][FieldA]
-		// [transform + CharacterIIR + scaffold]) that the SpawnPacketBuilder override engine produces; this wraps it in
-		// the shared world-entry header so the spawn no longer needs the captured packet's header (the burst-less path).
-		internal static Rpc BuildWorldEntrySpawn(INetworkClient client, byte[] spawnBody)
+		// Assembles the complete world-entry player/NPC FA015807 spawn packet for `client` from a pre-built spawn
+		// RECORD ([IirType=0xFA015807][TypeTag][Handle][FieldA][transform + pre-IIR + CharacterIIR + post-IIR]) - the
+		// form SimpleCharFullUpdateCodec builds. The carrier's u32 length is written HERE, because it belongs to the
+		// sender (#530 rule 2), which is what lets a from-scratch record reach the wire without a captured header.
+		internal static Rpc BuildWorldEntrySpawn(INetworkClient client, byte[] spawnRecord)
 		{
-			ArgumentNullException.ThrowIfNull(spawnBody);
-			return FrameWorldEntryRecord(client, spawnBody);
+			ArgumentNullException.ThrowIfNull(spawnRecord);
+			return new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(spawnRecord));
 		}
 
 		// Prepends the shared world-entry RpcHeader + outer length/CRC (the WriteHeader/WriteLengthHash path) to a

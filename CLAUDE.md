@@ -255,7 +255,10 @@ table. `ICodec<T>` is being retired; do not add implementations of it.
 - **Read sequentially through `SpanReader` (`Faolan.Core/Extensions`); no const offsets; `Parse` ends with
   `EnsureAtEnd()`.** A `private const int FooOffset = 17` means the bytes before 17 were never decoded, so the
   codec cannot tell a correct body from one that merely has the right word at 17. `SpanReader` also owns the
-  bounds checks — a codec never writes `if (body.Length < 26) return false;`.
+  bounds checks — a codec never writes `if (body.Length < 26) return false;`. The rule is about READING, so the
+  gate scopes to files that declare a `Parse`: a build/patch-only neighbour (`SpawnTransformPatch` stamping the
+  live position/token into an already-built record, `SpawnPacketBuilder` splicing a captured template) legitimately
+  addresses a fixed-width head by offset, and those offsets go away with the thing they patch.
 - **`Build` returns the body WITHOUT the length prefix.** The u32 length belongs to the framing sender.
 - **Dispose the stream:** `using var s = new FaolanStream(); … return s.ToArray();` — never
   `return new FaolanStream().Write(…).ToArray();` (`FaolanStream : MemoryStream` is `IDisposable`).

@@ -53,7 +53,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// position (the client positions off the RespawnMe spawnPointId / its RDB / the following n3Teleport). The
 		// PlayfieldProxy is pinned to the CURRENT playfield: map + the player's own handle in slot3 + the ready flag +
 		// the LIVE playfield token in slot7. CRITICAL: playfieldToken MUST be the token the client currently holds
-		// (Zone.PlayfieldToken, captured from the burst-less world-entry snapshot - the same one SpawnPlayfieldRewriter
+		// (Zone.PlayfieldToken, captured from the burst-less world-entry snapshot - the same one SpawnTransformPatch
 		// stamps into rendered spawns), NOT the MapWorldBurst token (ResolveMapPlayfieldToken): a mismatch makes the
 		// client treat it as a real changemap and show a LOADING SCREEN. Decoded byte-for-byte from the beach resurrect
 		// (Stihetfv #1387, map 0xFAA): trailing IIR bool = 1.

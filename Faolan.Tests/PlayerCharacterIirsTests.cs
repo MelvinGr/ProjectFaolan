@@ -7,11 +7,11 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// #258 follow-up: the base player-spawn ProtoCoreCharacterIIR is now built from code (PlayerCharacterIir) instead
-	// of the captured PlayerCharacterIirTemplate.bin blob. These prove the bare template (PlayerCharacterIir.Build with
+	// #258 follow-up: the base player-spawn ProtoCoreCharacterIIR is now built from code (PlayerCharacterIirs) instead
+	// of the captured PlayerCharacterIirTemplate.bin blob. These prove the bare template (PlayerCharacterIirs.ForCharacter with
 	// no character) reproduces the .bin exactly except for the worn-gear entries - which Build always replaces with the
 	// character's own gear, so they are intentionally not reproduced. The .bin survives only as this golden oracle.
-	public class PlayerCharacterIirTests
+	public class PlayerCharacterIirsTests
 	{
 		private static readonly string TemplatePath = TestPaths.Asset("PlayerCharacterIirTemplate.bin");
 
@@ -25,7 +25,7 @@ namespace Faolan.Tests
 			stripped.InventoryEntries.Clear();
 			var strippedBytes = stripped.ToProtobuf();
 
-			var built = PlayerCharacterIir.Build(null!, null!).ToProtobuf();
+			var built = PlayerCharacterIirs.ForCharacter(null!, null!).ToProtobuf();
 
 			Assert.Equal(strippedBytes, built);
 		}
@@ -38,7 +38,7 @@ namespace Faolan.Tests
 			var template = File.ReadAllBytes(TemplatePath);
 			var msg = template.FromProtobuf<ProtoCoreCharacterIIR>();
 			Assert.Equal(4, msg.InventoryEntries.Count);
-			Assert.Empty(PlayerCharacterIir.Build(null!, null!).InventoryEntries);
+			Assert.Empty(PlayerCharacterIirs.ForCharacter(null!, null!).InventoryEntries);
 		}
 	}
 }

@@ -12,8 +12,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// reflection): it runs in the per-spawn build path, and a hand-written map is compile-checked - a proto field
 	// that gains no column is a build error, not a silently dropped field. Presence is preserved exactly: a field is
 	// copied only when ShouldSerialize is true (Lift) / the column is non-null (build), so an unset field stays off
-	// the wire, which is what keeps the rebuilt core byte-identical to the capture (verified in NpcStatCoreCodecTests).
-	public static class NpcStatCoreCodec
+	// the wire, which is what keeps the rebuilt core byte-identical to the capture (verified in NpcStatCoreColumnsTests).
+	public static class NpcStatCoreColumns
 	{
 		// Captured message -> typed columns (importer side). A column stays null unless the proto field was set.
 		public static NpcStatCore Lift(ProtoCoreCharacterIIR m)
@@ -164,19 +164,27 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return core;
 		}
 
-		// Reads the CoreCharacter-IIR header word X from a captured FA015807 body (#244): the message is preceded by
-		// [u8 0x41 version][u32 X][u32 msgLen]; X is a type-stable field-presence/shape mask lifted so the header can
-		// be rebuilt from the DB. Returns null if the body has no CharacterIIR or the version byte isn't 0x41.
+		// Reads the CoreCharacter-IIR header word X out of a captured FA015807 body (#244): the embedded message is
+		// preceded by [u8 0x41 version][u32 X][u32 msgLen], and X is a type-stable field-presence/shape mask lifted
+		// so the header can be rebuilt from the DB. Returns null when the body is not a decodable spawn.
+		//
+		// `body` is the raw wire body INCLUDING its leading u32 carrier length, which the codec does not own (#530
+		// rule 2) - so the length is stripped here, at the boundary between a captured body and the record. The walk
+		// used to SCAN for the character message and index back 9 bytes; the codec reads the body sequentially, so
+		// the word is simply a field on the value now.
 		public static uint? ReadIirHeaderWord(byte[] body)
 		{
-			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+			if (body == null || body.Length < 4)
 				return null;
 
-			var hdr = read.Offset - 9;
-			if (hdr < 0 || body[hdr] != 0x41)
+			try
+			{
+				return SimpleCharFullUpdateCodec.Parse(body.AsSpan(4)).CoreCharIirHeader;
+			}
+			catch (CodecParseException)
+			{
 				return null;
-
-			return body.ReadU32Be(hdr + 1);
+			}
 		}
 
 		// Typed columns -> CharacterBcc (build side).

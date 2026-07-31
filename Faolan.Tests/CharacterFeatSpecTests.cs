@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
+using Faolan.Core;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
@@ -27,10 +29,10 @@ namespace Faolan.Tests
 
 			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
 			{
-				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) )
+				if (!SpawnBodyReader.TryParse(body, out var scaffold) || !SpawnBodyReader.IsPlayer(scaffold))
 					continue;
 
-				var frame = scaffold.Frame;
+				var frame = scaffold.PreIir;
 
 				// Extraction: the captured spawn -> CharacterFeatSpec + CharacterFeat rows.
 				var character = new Character
@@ -148,8 +150,8 @@ namespace Faolan.Tests
 			Assert.Equal([200000u, 200100u], specs[0].FeatIds);
 			// Compared as WIRE BYTES: the frame is a typed object now, so equality here has to be the thing that
 			// matters - that both construction paths put the same bytes on the wire.
-			Assert.Equal(PlayerSpawnPreFrameCodec.Build(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Guardian, 0, [200000u, 200100u])),
-				PlayerSpawnPreFrameCodec.Build(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Guardian, 0, specs)));
+			Assert.Equal(PreIirBytes(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Guardian, 0, [200000u, 200100u])),
+				PreIirBytes(PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Guardian, 0, specs)));
 		}
 
 		// A multi-spec frame built from rows is a valid scaffold, and it is 11 bytes + the name per extra spec longer
@@ -163,8 +165,20 @@ namespace Faolan.Tests
 			// A sublist entry is 11 bytes of frame (key 4 + flag 1 + name length 2 + the feat list's count word 4)
 			// plus its name plus 4 per feat.
 			Assert.Equal(single.ByteCount + 11 + "PvP".Length + 4 * 2, two.ByteCount);
-			Assert.True(PlayerSpawnPreFrameCodec.TryParse(PlayerSpawnPreFrameCodec.Build(two), out var parsed));
+
+			var reader = new SpanReader(PreIirBytes(two));
+			var parsed = SpawnPreIirCodec.Read(ref reader);
+			reader.EnsureAtEnd();
 			Assert.Equal(["", "PvP"], parsed.Sublist.Select(s => s.Name).ToArray());
+		}
+
+		// The scaffold composes into a spawn record rather than standing alone (#530 rule 5c), so its bytes are
+		// reached through the composition pair rather than a Build of its own.
+		private static byte[] PreIirBytes(SpawnPreIir frame)
+		{
+			using var s = new FaolanStream();
+			SpawnPreIirCodec.Write(s, frame);
+			return s.ToArray();
 		}
 
 		private static IReadOnlyList<SpawnPreFrameSublistEntry> SpecEntries((string Name, uint[] Ids)[] specs)
@@ -184,11 +198,12 @@ namespace Faolan.Tests
 				.ToList();
 		}
 
-		private static PlayerSpawnScaffold SpawnWithSpecs((string Name, uint[] Ids)[] specs)
+		private static SimpleCharFullUpdateIIR SpawnWithSpecs((string Name, uint[] Ids)[] specs)
 		{
-			return new PlayerSpawnScaffold
+			return new SimpleCharFullUpdateIIR
 			{
-				Frame = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Barbarian, 0, SpecEntries(specs))
+				PreIir = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Barbarian, 0, SpecEntries(specs)),
+				Post = SpawnPostIirs.Player()
 			};
 		}
 	}

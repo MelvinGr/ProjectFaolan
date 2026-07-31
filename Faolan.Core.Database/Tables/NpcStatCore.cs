@@ -10,7 +10,7 @@ namespace Faolan.Core.Database.Tables
 	// spawn body can be CONSTRUCTED from the DB instead of spliced from a capture. A 1:1 side table keyed to its `NpcTemplate`
 	// type (like Character <-> CharacterMaxStats). Property names mirror the protobuf field names in
 	// ProtoCoreCharacterIIR's Stats (CharacterStats) / npc_stats (NpcStats) / Bcc (CharacterBcc) sub-messages exactly,
-	// so NpcStatCoreCodec maps them by name with no per-field code. Nullable throughout: null = the proto field was NOT
+	// so NpcStatCoreColumns maps them by name with no per-field code. Nullable throughout: null = the proto field was NOT
 	// set (ShouldSerialize false), so it is omitted on the wire - this is what preserves byte-exactness.
 	//
 	// This holds the TYPE core (constant across every spawn of a type). Fields that vary per placement (level-scaled
@@ -122,7 +122,7 @@ namespace Faolan.Core.Database.Tables
 		//
 		// ⚠️ NULL would silently drop the rank, so every NPC renders unranked - which is why NpcStatCoreRankTests
 		// gates the column as fully populated rather than trusting that it happens to be. Nothing here needed
-		// building: the live spawn path already emits it (NpcSpawnBuilder -> NpcStatCoreCodec.ToNpcStats), so the
+		// building: the live spawn path already emits it (NpcSpawnBuilder -> NpcStatCoreColumns.ToNpcStats), so the
 		// skull was always reaching the client; the field was simply undocumented, which is why #508 read as missing
 		// plumbing. Types 1 vs 2 are not fully separated - [V0: what npc_type 1 and 2 mean].
 		public uint? NpcType { get; set; }

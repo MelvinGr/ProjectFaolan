@@ -13,33 +13,12 @@ namespace Faolan.Tests
 	// does the extractor hold across EVERY captured spawn - which is why it reads the corpus extract and would go
 	// vacuous on a fixture. It is what retires the hand-run Python sweep: the same 11632 spawns, re-checked on every
 	// test run instead of when someone remembers to point a script at the private corpus.
+	//
+	// The byte-exact REGENERATION half of this file moved to SimpleCharFullUpdateCorpusTests when the player and NPC
+	// codecs merged (#530 wave 5b): that gate covers all 11,632 captured spawns rather than the 259 player ones, so
+	// keeping a narrower copy here would only be a second chance to disagree.
 	public class SpawnFeatListTests
 	{
-		// The gate that makes the parser's relaxations honest. Every field this codec stopped ASSERTING (the ID-list
-		// terminator rank, the entry flag, the buff record's +32 word) it now CARRIES, and every list it stopped
-		// reading as a closing constant (the ID-list tail, the third pair list, the head list) it now round-trips. If
-		// any of that were dropped instead, Generate would emit different bytes and this fails on the spot.
-		[Fact]
-		public void EveryParsedSpawn_RegeneratesByteExact()
-		{
-			var mismatches = new List<string>();
-			var parsed = 0;
-
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
-			{
-				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _))
-					continue;
-
-				parsed++;
-				var regenerated = PlayerSpawnScaffoldCodec.Generate(scaffold);
-				if (!regenerated.SequenceEqual(body))
-					mismatches.Add($"{source}: {body.Length} bytes in, {regenerated.Length} out");
-			}
-
-			Assert.True(mismatches.Count == 0, $"{mismatches.Count} of {parsed} captured player spawns did not regenerate byte-exact:\n  " + string.Join("\n  ", mismatches.Take(10)));
-			Assert.Equal(259, parsed);
-		}
-
 		[Fact]
 		public void EveryCapturedSpawn_ExtractsItsFeatList_OrNoneAtAll()
 		{
@@ -53,13 +32,13 @@ namespace Faolan.Tests
 
 			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
 			{
-				if (!PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _))
+				if (!SpawnBodyReader.TryParse(body, out var scaffold) || !SpawnBodyReader.IsPlayer(scaffold))
 				{
 					notPlayerScaffold++; // an NPC/entity spawn - not the player scaffold shape, so it carries no feat frame
 					continue;
 				}
 
-				var feats = PlayerSpawnScaffoldRows.ExtractPreFrameFeats(scaffold.Frame);
+				var feats = PlayerSpawnScaffoldRows.ExtractPreFrameFeats(scaffold.PreIir);
 				if (feats.Count == 0)
 					empty++;
 				else
@@ -69,7 +48,7 @@ namespace Faolan.Tests
 				// something ExtractPreFrameFeats looks at, yet it agrees with the count the extractor read, every time.
 				// The feat list is the frame's only variable-width part, so a standard frame is 239 bytes + 4 per feat.
 				// (228 is the create-editor variant, which has no feat region at all - excluded, not silently passed.)
-				var basis = scaffold.Frame.ByteCount - (4 * feats.Count);
+				var basis = scaffold.PreIir.ByteCount - 4 * feats.Count;
 				bases[basis] = bases.GetValueOrDefault(basis) + 1;
 
 				foreach (var id in feats)
@@ -94,10 +73,12 @@ namespace Faolan.Tests
 			// larger bases for the six MULTI-SPEC frames, whose extra width is their specs' NAMES (see
 			// PlayerSpawnPreFrameTests): 250 = 228 + 2 unnamed specs, 264 = 250 + len("PvE - Lance") + len("PvP"),
 			// 336 = 228 + 4 named specs. A feat count read one too high or low would break this arithmetic immediately.
+			// (The -5 on each is the embedded CoreCharacter's version byte + IirHeader: the old player-only model cut
+			// the frame at the IIR's length prefix and so counted 5 of the MESSAGE's bytes into the scaffold.)
 			// (These bases were 350/370/464/772 while the extractor read a fixed offset: on a multi-spec frame that
 			// offset lands inside a spec NAME, so it found no valid count word and reported ZERO feats - base ==
 			// length. The frames were pinned, but pinned to a mis-read.)
-			Assert.Equal(new Dictionary<int, int> { [228] = 21, [239] = 232, [250] = 3, [264] = 2, [336] = 1 }, bases);
+			Assert.Equal(new Dictionary<int, int> { [228 - 5] = 21, [239 - 5] = 232, [250 - 5] = 3, [264 - 5] = 2, [336 - 5] = 1 }, bases);
 
 			Assert.Equal(11632, withFeats + empty + notPlayerScaffold);
 			// 112 / 147, from 109 / 150: the three multi-spec frames whose fixed-offset read landed inside a spec name
@@ -111,10 +92,5 @@ namespace Faolan.Tests
 			Assert.Equal(296, distinct.Count);
 		}
 
-		// The create-editor pre-IIR variant: a different shape with no feat region.
-		private const int CreateEditorFrameLength = 228;
-
-		// A standard pre-IIR frame carrying an EMPTY feat list; each feat adds 4 bytes.
-		private const int EmptyFrameLength = 239;
 	}
 }

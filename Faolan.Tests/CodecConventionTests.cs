@@ -154,9 +154,12 @@ namespace Faolan.Tests
 				         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}") &&
 				                     !f.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}")))
 			{
-				// EntityClass.cs IS the registry, and NpcSpawnScaffold's blobs are verbatim capture-derived bytes.
+				// EntityClass.cs IS the registry. (NpcSpawnScaffold.cs used to be exempted here as "verbatim
+				// capture-derived bytes"; its baked array became a typed stream build long before #530 wave 5b
+				// deleted the file, so the entry had been stale for a while - a reason to check an exemption is still
+				// true, not to carry it forward.)
 				var name = Path.GetFileName(file);
-				if (name is "EntityClass.cs" or "NpcSpawnScaffold.cs")
+				if (name is "EntityClass.cs")
 					continue;
 
 				var lines = File.ReadAllLines(file);
@@ -180,8 +183,9 @@ namespace Faolan.Tests
 		// Three subsystems shipped it as a "constant" before anyone noticed (resurrection spots #372, the AH search
 		// head, and SendMail #378 - still open). One name, one place, one test.
 		//
-		// Allowed: ListFrame.cs itself, and VERBATIM capture-derived byte templates (NpcSpawnScaffold's blobs), which
-		// the project rule says not to refactor without proving the replacement byte-for-byte.
+		// Allowed: ListFrame.cs itself. (NpcSpawnScaffold.cs used to be exempted as a "verbatim capture-derived byte
+		// template"; its baked array had already become a typed stream build, and #530 wave 5b deleted the file - the
+		// exemption was stale before it was removed, which is the reason to re-check one rather than carry it.)
 		[Fact]
 		public void CountFramedListWordComesFromListFrame_NotAHandRolled0x3F1()
 		{
@@ -203,7 +207,7 @@ namespace Faolan.Tests
 					continue;
 
 				var name = Path.GetFileName(file);
-				if (name is "ListFrame.cs" or "NpcSpawnScaffold.cs" || ListWordLiteralAllowlist.ContainsKey(name))
+				if (name is "ListFrame.cs" || ListWordLiteralAllowlist.ContainsKey(name))
 					continue;
 
 				var lines = File.ReadAllLines(file);

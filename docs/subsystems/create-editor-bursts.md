@@ -135,7 +135,7 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
    from the `NpcSpawns` rows is blocked on that lift, #185/#54 — the captured rows are from a different session,
    so their pre-IIR blocks don't match). Self-reconstruction is byte-exact (`CreateEditorSceneCharTests`); the
    full burst still equals `InitialBurst.bin` (`BurstGoldenTests`). The live `Character…` preview stays on
-   `IirId` (it carries the live client instance as its handle; also already covered by `PlayerSpawnScaffoldCodec`
+   `IirId` (it carries the live client instance as its handle; also already covered by `SimpleCharFullUpdateCodec`
    / `SpawnEditorPreview.bin`) — the seam for the eventual live chosen-looks preview.
 - **Editor-scene `SimpleDynel` props** — the 18 props are `WorldObjects` rows on map
    4000 in `faolan.db` (same localized ids + keys). `SendRetailCreateEditorInitialBurst` now takes the

@@ -5,7 +5,7 @@
 > `0x01EA985C`), NOT this session's live token (`0x004FE428`). The client looks a spawn's playfield up in its
 > loaded-playfield map and silently drops a miss before it ever polls (`0x2020`) the handle. The login burst rendered
 > only because it was replayed from the same session whose token IS the live one. Fix: `SendWorldSpawn`
-> now re-stamps the token to the live `Zone.PlayfieldToken` via `SpawnPlayfieldRewriter` (loot bags are built from
+> now re-stamps the token to the live `Zone.PlayfieldToken` via `SpawnTransformPatch` (loot bags are built from
 > scratch with the live `Zone.PlayfieldToken` stamped in directly by `WorldObjectCodec.Build`, no rewriter
 > pass; commit `0827af5`). **Verified in-client:** spawning a Crocodile mid-session drew the first mid-session
 > `0x2020` poll + `0x2008` SpawnCheck in the project's history and rendered. This fixes mid-session NPC spawns,
@@ -214,7 +214,7 @@ remote can't resolve. The fix is therefore a **slice of the missing simulation/c
 The login burst renders because its spawns' playfield-instance matches the playfield the client registered at
 MapChange/world-entry; a mid-session push is dropped if its playfield-instance doesn't match the client's CURRENTLY
 loaded playfield's `+0x94`. The doc-verified "loot bag carried 0x01EA985C" is necessary but only sufficient *iff*
-`pf->GetInstance() == 0x01EA985C` for the live session — i.e. the token we splice via `SpawnPlayfieldRewriter`
+`pf->GetInstance() == 0x01EA985C` for the live session — i.e. the token we splice via `SpawnTransformPatch`
 must equal the registered playfield instance, not a captured/stale one.
 
 **Where `+0x94` comes from (client):** the `n3Playfield` ctor (`FUN_0059a1a0`, writes `[ESI+0x94]` at `0059a242`)

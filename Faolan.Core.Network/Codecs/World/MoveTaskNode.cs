@@ -157,18 +157,6 @@ namespace Faolan.Core.Network.Codecs.World
 			return n;
 		}
 
-		// The FaolanStream bridge the spawn post-IIR still reads through (SpawnPostIirCommon): it hands the rest of
-		// the stream to the span reader and rewinds by whatever the node did NOT consume, so there is exactly one
-		// copy of the grammar. Goes away when Spawn is converted (#530 wave 5).
-		internal static MoveTaskNode Read(FaolanStream s)
-		{
-			var rest = s.ReadArray((uint)(s.Length - s.Position));
-			var r = new SpanReader(rest, nameof(MoveTaskNodeCodec));
-			var node = Read(ref r);
-			s.Position -= (uint)(rest.Length - r.Position);
-			return node;
-		}
-
 		internal static void Write(FaolanStream s, MoveTaskNode n)
 		{
 			s.WriteByte(n.Mode);

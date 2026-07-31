@@ -19,7 +19,7 @@ there is no verbatim-burst fallback anymore — #185).
 
 Decompiled from `AgeOfConan.exe` (Ghidra) — reproduce with `tools/ghidra/DumpSpawnIir.java` +
 `DumpFns.java` (both committed). Grammar **validated against 4558 captured FA015807 records** (zero
-framing failures) by `PlayerSpawnReader`.
+framing failures) by `SpawnBodyReader`.
 
 ## Reader primitives (`DumpFns.java`)
 
@@ -61,7 +61,7 @@ the embedded CoreCharacter.
 
 ## Validation
 
-`python3 `PlayerSpawnReader`` walks the fixed scaffold for every captured FA015807 record and
+`python3 `SpawnBodyReader`` walks the fixed scaffold for every captured FA015807 record and
 checks three predictions: leading version `0x05`, the sub-list's first word is a multiple of `0x3F1`, and the
 embedded CoreCharacter version `0x41` lands at the exact predicted offset. Across all login + create captures:
 
@@ -88,7 +88,7 @@ So the block is genuinely **fixed-width: 222 bytes** (version+1 → CoreChar), w
 lands on `0x41` at +223 across all 4094 records. The ASCII that shows up in the capture
 (`fifomessagefromserver`, `<font color=…>` markup, event names) is **the value of u32 slots**, not a special
 read: the C++ struct has fixed-width inline **char buffer(s)** over the region `0x184–0x264` that the IIR
-reads 4 bytes at a time. `NpcSpawnScaffoldTests` carries the exact wire-order→struct-offset map and
+reads 4 bytes at a time. `SpawnPostIirTests` carries the exact wire-order→struct-offset map and
 classifies each word over a beach burst: the great majority are `ascii/charbuf` (text in some NPCs, zero in
 others — 36/36 blocks distinct because the per-NPC text differs), with only a few genuine scalars
 (`w21`@0x1fc, the const-zero `w22`@0x200 / `w45`@0x224, the numeric `w50`@0x23c).
@@ -130,21 +130,21 @@ minimal form "drops hair". **The cross-capture sweep (`NpcSpawnAppearanceTests`,
   correction below.
 
 So the "missing hair" regression was the **#23 playfield token** (a stale token made the client drop the spawn),
-now fixed by `SpawnPlayfieldRewriter` — not the post-IIR content. The minimal post-IIR is correct for animals
+now fixed by `SpawnTransformPatch` — not the post-IIR content. The minimal post-IIR is correct for animals
 **and** humanoids. (`[[npc_spawn_minimal_postiir_breaks_humanoids]]` is corrected accordingly.)
 
 ## Resolution — from-scratch minimal scaffold, DEFAULT (2026-06-17, #185 done)
 The wire grammar was already pinned; the sweep settled the **construction** question (there is nothing to source).
 Implemented:
-1. **pre-IIR** — `NpcSpawnPreIir.BuildMinimal(category = 0x6f)`: version `0x05`, all 6 flags 0, all 53 words 0
+1. **pre-IIR** — `SpawnPreIir.BuildMinimal(category = 0x6f)`: version `0x05`, all 6 flags 0, all 53 words 0
    except `word17` = the modal category enum. Byte-exact to a real captured minimal NPC.
-2. **post-IIR** — the existing `NpcSpawnScaffold.BuildMinimalPostIir()` (recordCount==1) is a captured-valid form.
-3. **lift** — `NpcSpawnScaffold.WithMinimalScaffolds(body)` rewrites a captured/cross-session body to the fresh
+2. **post-IIR** — the existing `SpawnPostIirs.BuildMinimalPostIir()` (recordCount==1) is a captured-valid form.
+3. **lift** — `SpawnPostIirs.WithMinimalScaffolds(body)` rewrites a captured/cross-session body to the fresh
    form (transform + IIR identity kept, both scaffolds reset), applied in `NpcSpawnBuilder.TryBuild` on every
    `freshSpawn` build. **This is now unconditional/default** (the `FAOLAN_MINIMAL_SCAFFOLD` opt-in is gone); the
    byte-exact reproduction goldens are unaffected because they build with `freshSpawn=false`.
 4. **golden** — `SpawnNpcMinimalPanther.bin` (Kier-Dheed's Panther, fully minimal in both halves) proves
-   `BuildMinimal` (pre) + `BuildMinimalPostIir` (post) + `WithMinimalScaffolds` byte-exact (`NpcSpawnPreIirTests`,
+   `BuildMinimal` (pre) + `BuildMinimalPostIir` (post) + `WithMinimalScaffolds` byte-exact (`SpawnPreIirTests`,
    526 tests green).
 
 **In-client flip DONE (2026-06-17, #185 verified):** logged onto the beach with the minimal scaffolds active —
@@ -154,13 +154,13 @@ confirmation), zero stream errors. So the minimal scaffold was made the **defaul
 removed — construct-don't-replay is now the only NPC spawn path. The per-spawn sub-list (`@1122b10`) is
 `count==0` on 11,394 of the 11,400 captured NPC spawns — but **not everywhere**, as this said: six carry one
 entry (all of one NPC, Viriden), and it is the same entry shape a player's frame carries, so its grammar is not
-unobserved at all — the player side decoded it in #466. Shared as `SpawnPreFrameSublist` since #475. The same reader primitives + `0x3F1` framing drove the dynel/loot readers
+unobserved at all — the player side decoded it in #466. Shared as `SpawnPreFrameSublistCodec` since #475. The same reader primitives + `0x3F1` framing drove the dynel/loot readers
 (#187, done) — see `tools/ghidra/DumpIirReaders.java`.
 
 ## The NPC post-IIR and the PLAYER post-IIR are the SAME grammar (2026-07-28, #475)
 
-They were modelled as two unrelated formats. `PlayerSpawnScaffoldCodec` writes `[u32 4][u32 2]` as bare
-constants; `NpcSpawnPostIir` reads the same two words as `[firstRecordLen][recordCount]` and keeps everything
+They were modelled as two unrelated formats. `SimpleCharFullUpdateCodec` writes `[u32 4][u32 2]` as bare
+constants; `SpawnPostIir` reads the same two words as `[firstRecordLen][recordCount]` and keeps everything
 after them as an opaque `byte[]`. One shared reader walks both:
 
 ```
@@ -183,7 +183,7 @@ about. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameGra
   or 3 buffs, because the buff records are that list's *elements*, not further records.
 - ⚠️ **`word2` does not count records.** Streams of identical length carry 1, 2 and 3 in it, so it cannot be
   counting anything that occupies bytes. It is a type-stable enum of unknown meaning, named for its position -
-  `NpcSpawnPostIir.Word2` and the persisted column `NpcStatCore.MinimalPostIirWord2`, both of which used to say
+  `SpawnPostIir.Word2` and the persisted column `NpcStatCore.MinimalPostIirWord2`, both of which used to say
   "record count".
 - `12 + firstRecordLen + 24` is the length only when all three pair lists are empty, i.e. the minimal forms. It
   is not a general identity — streams with populated pair lists are longer and still walk exactly.
@@ -195,18 +195,18 @@ re-derives"*. It is the player's own stream, and **every one of the 11,632 captu
 exact last byte** by one of the two codecs:
 
 ```
-[SpawnPostIirCommon prologue]       header + first record + the ACTIVE BUFFS
+[SpawnPostIir prologue]       header + first record + the ACTIVE BUFFS
   [u32 headCount][headCount x u32]
   [u32 firstRecordLen][u32 word2]
   [firstRecordLen-4 prefix][u32 buff list frame]      <- the record ENDS in the buff count
   [k x 60-byte ScaffoldBuff]
 [the ENTRY SLOT]                    NPC: [u32 count][morph entries][u32][u32]
                                     PLAYER: [u32 count][u32 entryTableX][f32 1.0][14-byte entries][ID list]
-[SpawnPostIirCommon tail]           [u32 c1][c1 x 8] [u32 c2][c2 x 8] [u32 ListFrame][n x 8]
+[SpawnPostIir tail]           [u32 c1][c1 x 8] [u32 c2][c2 x 8] [u32 ListFrame][n x 8]
 ```
 
-Everything but the entry slot is shared — `SpawnPostIirCommon`, held by both `PlayerSpawnScaffold` and
-`NpcSpawnPostIir`, which stay separate codecs because each asserts what its own family guarantees.
+Everything but the entry slot is shared — `SpawnPostIir`, held by both `SimpleCharFullUpdateIIR` and
+`SpawnPostIir`, which stay separate codecs because each asserts what its own family guarantees.
 
 | | streams |
 |---|---|
@@ -215,13 +215,13 @@ Everything but the entry slot is shared — `SpawnPostIirCommon`, held by both `
 | read identically by both | **27** |
 | unread | **0** |
 
-[V3: NpcPostIirBodyTests.EveryCapturedPostIirStream_IsReadByOneOfTheTwoCodecs]
+[V3: SimpleCharFullUpdateCorpusTests.EveryCapturedSpawn_ParsesToTheExactByte_AndReEncodes]
 
 The 27 that both read are player streams whose entry slot is EMPTY, where the player's
 `[count][entryTableX][marker]` and the NPC's `[count][two words]` are the same twelve bytes — the two codecs
 read the same stream and put the same bytes back, so it is not an ambiguity. Every NPC-shaped stream also
 **re-encodes byte-exact**, which is the acceptance bar for a decoded region.
-[V3: NpcPostIirBodyTests.EveryNpcShapedStream_ReEncodesByteExact]
+[V3: SimpleCharFullUpdateCorpusTests.EveryCapturedSpawn_ParsesToTheExactByte_AndReEncodes]
 
 ⚠️ **THE BUFF COUNT IS READ, NOT SEARCHED.** The last four bytes of the first record are the buff list's
 framing word on all 11,632 streams, without exception. This is invisible from the player side, where the first
@@ -271,7 +271,7 @@ byte-exact. The modes are `MoveTaskCodec`'s own:
 | `0x01` | PathMoveTask | 2 |
 | `0x02` | stationary from/to/facing | 1 |
 
-[V3: NpcPostIirBodyTests.EveryFirstRecordSlot_IsAMoveTask]
+[V3: SimpleCharFullUpdateCorpusTests.EveryFirstRecordSlot_IsAMoveTask]
 
 That the payloads are vec3 positions and unit quaternions is what identified it — and then the sibling codec
 parsed all 1,679 without a line of new grammar. Third time in this packet: the pre-IIR frame was the NPC
@@ -291,20 +291,20 @@ that is **+258 morph rows across 7 spawns** — all Red Hand City Guards in Tort
 storing no appearance at all. [V3: NpcSpawnAppearanceTests.DecodeAppearanceLenient_WithAnActiveBuff_StillRecoversTheTable]
 
 ## Typed scaffold codec — landed (2026-06-16, byte-exact)
-`NpcSpawnPreIir` + `NpcSpawnPreIirCodec` (`Faolan.Core.Network/Codecs/Spawn/NpcSpawnPreIir.cs`) decode the
+`SpawnPreIir` + `SpawnPreIirCodec` (`Faolan.Core.Network/Codecs/Spawn/SpawnPreIir.cs`) decode the
 scaffold into a typed, mutable struct (`Version`, 6 `Flags`, 53 `Words`, the typed `Sublist`) and re-encode it
 **byte-exact**. The scaffold's start is WALKED to through the body's own header; it used to be computed as
 "the fixed 223 bytes before the embedded CoreCharacter", which assumes the sublist — the one variable-width
 field — is empty, and so rejected outright the six captured spawns where it is not
-(`SpawnPreIirSublistTests`). The post-IIR is likewise typed end to end (`NpcSpawnPostIir` +
-`SpawnPostIirCommon`), not a header over raw records. Round-trip gates:
-`NpcSpawnPreIirTests` (8 tests, both goldens). This makes the from-DB path own the grammar in code instead of
+(`SpawnPreIirSublistTests`). The post-IIR is likewise typed end to end (`SpawnPostIir` +
+`SpawnPostIir`), not a header over raw records. Round-trip gates:
+`SpawnPreIirTests` (8 tests, both goldens). This makes the from-DB path own the grammar in code instead of
 slicing the captured `Data` blob — the foundation for sourcing the scaffold from DB / zeroing the buffer.
 
 ## Two findings that revise the plan above (2026-06-16)
 1. **The "synthesized block is rejected" gate is STALE.** That belief came from the mid-session-spawn failure,
    which #23 cracked (2026-06-16) as the **playfield token**, not block synthesis — synthesized spawns now
-   render once `SpawnPlayfieldRewriter` re-stamps the live token (`[[protocol_midsession_spawn_blocked]]`). So
+   render once `SpawnTransformPatch` re-stamps the live token (`[[protocol_midsession_spawn_blocked]]`). So
    the in-client flip for a constructed scaffold is no longer presumed-blocked; it is **testable**, and the
    `npc_spawn_minimal_postiir_breaks_humanoids` result (which predates the token fix) is worth re-running.
 2. **The two rendering beach NPCs carry an EMPTY script buffer.** Decoding the `SpawnNpcCrocodile` and

@@ -43,7 +43,7 @@ both build this way. **The playfield token, however, must NOT be baked at build/
 value written at construction is only a placeholder. The token the client accepts is the LIVE playfield
 token the entering player loaded, which does not exist until that player enters the world; a spawn
 carrying any other token is silently dropped by the client (it never even polls), so `SendWorldSpawn`
-**re-stamps the token per-send** via `SpawnPlayfieldRewriter` from the recipient's live zone token. A
+**re-stamps the token per-send** via `SpawnTransformPatch` from the recipient's live zone token. A
 2026-07-08 regression baked the zone's default load-time token and dropped that re-stamp, which stalled
 every world entry (see the memory `spawn_playfield_token_per_send`).
 
@@ -83,7 +83,7 @@ Decoding all 1043 captured stat cores confirmed the lift can be byte-exact:
 Goal: retire `Npc.Data` / `NpcSpawn.Data` and the `SpawnPacketBuilder` splice; construct every NPC spawn
 from typed columns.
 
-- [x] `NpcStatCoreCodec` (explicit if-mapping, no reflection): Lift(msg) -> NpcStatCore and
+- [x] `NpcStatCoreColumns` (explicit if-mapping, no reflection): Lift(msg) -> NpcStatCore and
       ToStats/ToNpcStats/ToBcc back. Verified byte-exact across all 3097 captured sub-messages.
 - [x] `NpcStatCore` 1:1 side table (`NpcStatCores`, keyed by NpcId) + migration - the type-level core.
 - [x] Importer lifts the stat core: `UpsertNpcTypes` from a representative spawn, `CapturePetImporter` from
@@ -94,14 +94,14 @@ from typed columns.
       but deviate per creature, so stored (derivable later if a curve is decoded).
 - [x] `NpcSpawnBuilder.ApplyStatCore` composes the CharacterIIR stat core from `row.Npc.StatCore` (type) +
       `row` (placement overrides), with runtime anim/state canonical. Verified byte-exact for the type +
-      placement fields across all 980 populated spawns (`NpcStatCoreCodecTests`). `Data` still supplies the
+      placement fields across all 980 populated spawns (`NpcStatCoreColumnsTests`). `Data` still supplies the
       frame + name + equipment structure.
 - [x] `NpcSpawnBuilder.BuildBody` assembles the WHOLE body with no template: header constants;
       transform `2C 0A <vec3> 12 <quat> 18 <token varint>` (token written in-place as a placeholder - the
       live token is re-stamped per-send, see above);
-      pre-IIR = `NpcSpawnPreIir.BuildMinimal`; CoreChar header `[41][X][msgLen]` with X = the lifted
+      pre-IIR = `SpawnPreIir.BuildMinimal`; CoreChar header `[41][X][msgLen]` with X = the lifted
       `NpcStatCore.IirHeader` (RE: type-stable, `ReadIirHeaderWord`); ANIMAL post-IIR = `BuildMinimalPostIir`,
-      clean-HUMANOID post-IIR = `NpcSpawnAppearanceCodec.BuildPostIir(morphs)`.
+      clean-HUMANOID post-IIR = `NpcSpawnAppearance.BuildPostIir(morphs)`.
 - [x] `NpcSpawnBuilder.BuildMessageFromColumns` builds the whole `ProtoCoreCharacterIIR` from the DB (Name +
       `ApplyStatCore` + equipment rows). Whole-DB gate (`NpcSpawnFromScratchTests`): **824/988 build byte-exact
       from columns**, 9 canonically cleaner (drop a captured runtime target), 155 the humanoid runtime-post-IIR
@@ -109,7 +109,7 @@ from typed columns.
 - [x] WIRE it into the live path: `TryBuildLive` builds the body via `BuildMessageFromColumns` +
       `BuildBody(zoneToken)` for every expressible case, falling back to the `Data` splice only for the
       residual runtime-post-IIR tail. NB `SendWorldSpawn` STILL re-stamps the playfield token per-send
-      (`SpawnPlayfieldRewriter`) - the token baked at build is only a placeholder; the live token isn't known
+      (`SpawnTransformPatch`) - the token baked at build is only a placeholder; the live token isn't known
       until the player enters (a 2026-07-08 regression baked the load-time token + dropped the re-stamp,
       stalling world entry).
 - [x] #243: **the live path now builds 964/988 shipped spawns from scratch (was 786); only 24 keep `Data`.**
@@ -123,7 +123,7 @@ from typed columns.
         with correct head/hair.
       - **runtime-bearing-with-morphs**: a large first record (movement/bounds float triples) with the **morph
         table embedded after it** at `12 + firstRecordLen` (`[count][morphId f32 0 0 strLen str]…` + the shared
-        0x3F1 terminator). `NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient` skips the runtime record and lifts
+        0x3F1 terminator). `NpcSpawnAppearance.TryDecodeAppearanceLenient` skips the runtime record and lifts
         the trailing table → morph rows → `BuildPostIir(morphs)`. (In practice these types also have clean
         captures, so the importer's morph backfill-by-name already covered most; the lenient decode makes the
         buried-table instances self-sufficient.)

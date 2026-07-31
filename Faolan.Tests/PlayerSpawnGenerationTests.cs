@@ -44,7 +44,7 @@ namespace Faolan.Tests
 				}
 			};
 
-			var message = PlayerCharacterIir.Build(character, new CharacterEquipment());
+			var message = PlayerCharacterIirs.ForCharacter(character, new CharacterEquipment());
 
 			Assert.Equal(expectedHealth, message.Stats.Health);
 			Assert.Equal(196u * 100, message.Stats.Life); // life (max) is full regardless of dead state
@@ -79,7 +79,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void PlayerCharacterMessage_LooksFields_AreHalfTheEditorValues()
 		{
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(Golden.Bytes("SpawnDikketestLogin"), out var read));
+			Assert.True(SpawnBodyReader.TryReadCharacterMessage(Golden.Bytes("SpawnDikketestLogin"), out var read));
 
 			Assert.Equal(2285694u / 2, read.Message.Stats.HeadMesh);
 			Assert.Equal(10u / 2, read.Message.Stats.VoiceSet);
@@ -291,7 +291,7 @@ namespace Faolan.Tests
 			var body = Golden.Bytes("SpawnStrieTemplate");
 			var innerLen = (int)body.ReadU32Be(SpawnPacketBuilder.NameInnerLengthOffset);
 
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var result));
+			Assert.True(SpawnBodyReader.TryReadCharacterMessage(body, out var result));
 			Assert.Equal(SpawnPacketBuilder.NameTagOffset, result.Offset);
 			Assert.Equal(innerLen, result.Length);
 			Assert.Equal("Strie", result.Message.Name);

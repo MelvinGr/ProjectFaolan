@@ -1047,7 +1047,7 @@ namespace Faolan.GameServer.World
 				// Keep the NPC's FA015807 spawn body (addressed to the chosen handle) so interest/respawn can re-render
 				// it for nearby players (#244): built WHOLE from typed columns (the captured Data blob was retired) with
 				// this zone's load-time playfield token baked in. SendWorldSpawn re-stamps the entering player's LIVE
-				// token per-send (SpawnPlayfieldRewriter), since that token isn't known until the player enters.
+				// token per-send (SpawnTransformPatch), since that token isn't known until the player enters.
 				// #363 dev label: the client ignores the spawn-body free `Name` for an NPC's floating nameplate (it uses
 				// the template_id LDB name), so we DON'T bake the label into the spawn body - we push the AREA LABEL via a
 				// SetNameIIR after the spawn (SendWorldSpawn), gated on the .togglenpcgroup toggle. The client hard-caps a
@@ -1966,7 +1966,7 @@ namespace Faolan.GameServer.World
 			// A PLAYER's record is REBUILT from live state, not spliced out of a cached one (#429). The cached body is
 			// the FA015807 from that player's own world ENTRY, so a viewer arriving later was handed a description of
 			// them as they were at LOGIN - the mount was simply the first thing anyone noticed missing; equipment,
-			// level and vanity have the same hole. Nothing here is replayed: PlayerCharacterIir builds the message
+			// level and vanity have the same hole. Nothing here is replayed: PlayerCharacterIirs builds the message
 			// from code (#258) and PlayerSpawnBuilder builds the record from scratch, so calling them per send costs
 			// one equipment load and always describes the player as they are NOW.
 			if (subject.IsPlayer)
@@ -1980,7 +1980,8 @@ namespace Faolan.GameServer.World
 					return;
 				}
 
-				await recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, live));
+				await recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+					s => s.WriteArrayUInt32Length(live)));
 			}
 			else
 			{
@@ -2024,7 +2025,7 @@ namespace Faolan.GameServer.World
 			var handle = NextRuntimeHandle();
 			// Bake THIS zone's live token (4-byte) so the body is wire-correct and SendWorldSpawn can re-stamp it per
 			// recipient. Passing 0 shipped a 1-byte token that the client read as a version-byte desync (crash on 4010's
-			// ambient pools) and that SpawnPlayfieldRewriter could not fix (it only overwrites a 4-byte token in place).
+			// ambient pools) and that SpawnTransformPatch could not fix (it only overwrites a 4-byte token in place).
 			var body = NpcSpawnBuilder.BuildFromType(pool.Type, handle, pos, Quaternion.Identity, zone.PlayfieldToken);
 
 			var entity = WorldEntity.ForNpc(handle, zone.MapId, pos, Quaternion.Identity, pool.Type.Name, EntityVitals.FromMax(pool.MaxHealth, 0, pool.MaxHealth), pool.Type.TemplateId);
@@ -2162,7 +2163,7 @@ namespace Faolan.GameServer.World
 
 			// Identity (unit) rotation in the wire transform: a bag has no facing, and a non-unit quaternion scales the
 			// model. Built FROM SCRATCH (#249): header/transform + identity-from-columns + KdTreeTail, stamped with the
-			// live playfield token directly - no captured Data, no SpawnPlayfieldRewriter pass.
+			// live playfield token directly - no captured Data, no SpawnTransformPatch pass.
 			var body = WorldObjectCodec.Build(template, handle, position, Quaternion.Identity, EntityClass.LootBag, _sim.World.ZoneFor(mapId, instanceId).PlayfieldToken);
 
 			body = WorldBroadcastBodies.WithLootContents(body, handle, cashTin, [.. loot.Select((l, i) => ((uint)i, l))]); // OUR items/cash, Pos 0..n-1
@@ -2309,19 +2310,14 @@ namespace Faolan.GameServer.World
 			// (WithSessionNavigations). It did not, once: the session copy came back with Body + MaxStats only, so the
 			// build failed - and that failure landed on the ENTERING player, hanging them on the loading screen over a
 			// row missing from somebody ELSE's session object.
-			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIir.Build(character, equipment), character,
+			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIirs.ForCharacter(character, equipment), character,
 				await _database.GetMorphTargetRegistry());
 		}
 
 		private static Rpc BuildWorldSpawnRecord(INetworkClient recipient, WorldEntity subject, uint playfieldToken)
 		{
 			var body = (byte[])subject.SpawnBody.Clone();
-			if (body.Length >= SpawnPacketBuilder.PosZOffset + 4)
-			{
-				body.WriteF32Le(SpawnPacketBuilder.PosXOffset, subject.Position.X);
-				body.WriteF32Le(SpawnPacketBuilder.PosYOffset, subject.Position.Y);
-				body.WriteF32Le(SpawnPacketBuilder.PosZOffset, subject.Position.Z);
-			}
+			SpawnTransformPatch.WritePosition(body, subject.Position);
 
 			// Re-stamp the playfield-instance token to the LIVE value at send time. The token baked into SpawnBody at
 			// map-load (NpcSpawnBuilder.TryBuildLive) is the zone's DEFAULT token - but the client only registers, and
@@ -2329,13 +2325,15 @@ namespace Faolan.GameServer.World
 			// isn't known until the player actually enters (docs/subsystems/mid-session-spawn-blocker.md part 3). Baking the
 			// load-time token shipped every NPC with a stale playfield, so the client silently dropped them all and
 			// never polled -> world entry never completed. Rewrite here, once the entering player's live token exists.
-			SpawnPlayfieldRewriter.TryRewrite(body, playfieldToken);
+			SpawnTransformPatch.TryRewritePlayfield(body, playfieldToken);
 
-			return new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, body);
+			// The u32 carrier length belongs to the SENDER (#530 rule 2) - SpawnBody is the bare record.
+			return new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+				s => s.WriteArrayUInt32Length(body));
 		}
 
 		// The nameplate label for an area: "<group> | <tier> x<count>" (e.g. "Ape2 | id-prop x8"). ASCII-only on
-		// purpose (#363): the client's nameplate font doesn't render the "·"/"×" glyphs, and our own PlayerSpawnReader
+		// purpose (#363): the client's nameplate font doesn't render the "·"/"×" glyphs, and our own SpawnBodyReader
 		// rejects a non-ASCII overhead name - both broke the dev label silently, so keep it 7-bit.
 		private static string FormatAreaLabel(NpcSpawnArea a)
 		{

@@ -439,10 +439,10 @@ namespace Faolan.Importer.Captures
 				// enum too (Kalanthes reads 24, Pillager 20), so a looser filter would hand a player's grants to
 				// whichever NPC streamed first.
 				var body = PacketBody(p.Bytes);
-				if (body.Length < 138 || !PlayerSpawnScaffoldCodec.TryParse(body, out var scaffold, out _) || scaffold.Frame.Sublist.Count == 0)
+				if (body.Length < 138 || !SpawnBodyReader.TryParse(body, out var scaffold) || !SpawnBodyReader.IsPlayer(scaffold) || scaffold.PreIir.Sublist.Count == 0)
 					continue;
 
-				if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read) || string.IsNullOrEmpty(read.Message.Name))
+				if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read) || string.IsNullOrEmpty(read.Message.Name))
 					continue;
 
 				classByHandle[scaffold.Handle] = body[136];

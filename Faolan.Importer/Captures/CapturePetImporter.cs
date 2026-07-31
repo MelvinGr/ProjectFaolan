@@ -66,11 +66,11 @@ namespace Faolan.Importer.Captures
 				// columns (no Data blob) - the stat core + no-morph recordCount, and, since a pet has no NpcSpawn
 				// placement, its worn equipment + appearance morphs on the type too (NpcEquipment/NpcMorph).
 				var body = WorldObjectColumns.ExtractBody(e.Data);
-				if (body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				if (body != null && SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 				{
-					type.StatCore ??= NpcStatCoreCodec.Lift(read.Message);
-					type.StatCore.IirHeader ??= NpcStatCoreCodec.ReadIirHeaderWord(body);
-					if (type.StatCore.MinimalPostIirWord2 == null && NpcSpawnScaffold.TryReadNoMorphWord2(body, out var rc))
+					type.StatCore ??= NpcStatCoreColumns.Lift(read.Message);
+					type.StatCore.IirHeader ??= NpcStatCoreColumns.ReadIirHeaderWord(body);
+					if (type.StatCore.MinimalPostIirWord2 == null && NpcSpawnAppearance.TryReadNoMorphWord2(body, out var rc))
 						type.StatCore.MinimalPostIirWord2 = rc;
 
 					type.Equipment.Clear();
@@ -86,9 +86,9 @@ namespace Faolan.Importer.Captures
 					}
 
 					type.Morphs.Clear();
-					var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var dm)
+					var morphs = NpcSpawnAppearance.TryLift(body, out var dm)
 						? dm
-						: NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out var lm)
+						: NpcSpawnAppearance.TryLiftLenient(body, out var lm)
 							? lm
 							: [];
 					for (var i = 0; i < morphs.Count; i++)

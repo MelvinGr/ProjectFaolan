@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Proves the player-spawn construction machinery (SpawnPacketBuilder + PlayerSpawnReader) generalizes to NPC
+	// Proves the player-spawn construction machinery (SpawnPacketBuilder + SpawnBodyReader) generalizes to NPC
 	// FA015807 bodies - the dissection finding that an NPC spawn is the byte-identical grammar as the player
 	// spawn (docs/re/spawn-dissection.md Phase 4). These are the acceptance gates for building NPC spawns from
 	// structured data: the transform is reconstructed from typed pos/rot, and the CharacterIIR (the NPC's
@@ -53,7 +53,7 @@ namespace Faolan.Tests
 		public void BuildSpawn_FromOwnTransformAndIir_IsByteIdentical(string golden)
 		{
 			var template = Golden.Bytes(golden);
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(template, out var read));
+			Assert.True(SpawnBodyReader.TryReadCharacterMessage(template, out var read));
 
 			var handle = template.ReadU32Be(SpawnPacketBuilder.HandleOffset);
 			var position = new Vector3(template.ReadF32Le(SpawnPacketBuilder.PosXOffset), template.ReadF32Le(SpawnPacketBuilder.PosYOffset), template.ReadF32Le(SpawnPacketBuilder.PosZOffset));
@@ -73,7 +73,7 @@ namespace Faolan.Tests
 		{
 			var body = Golden.Bytes(golden);
 
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var result));
+			Assert.True(SpawnBodyReader.TryReadCharacterMessage(body, out var result));
 			Assert.Equal(name, result.Message.Name);
 			Assert.Equal(templateId, result.Message.npc_stats.TemplateId); // NpcStats f4 (fixed32) = identity
 			Assert.Equal(hasEquipment, result.Message.InventoryEntries.Count > 0);
@@ -89,7 +89,7 @@ namespace Faolan.Tests
 		public void SetCharacterMessage_NpcRename_AdjustsBodyAndIirLengths()
 		{
 			var body = Golden.Bytes("SpawnNpcCrocodile");
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(body, out var read));
+			Assert.True(SpawnBodyReader.TryReadCharacterMessage(body, out var read));
 			var iirLenOffset = read.Offset - 4;
 			var oldBodyLen = body.ReadU32Be(0);
 			var oldIirLen = body.ReadU32Be(iirLenOffset);
@@ -103,7 +103,7 @@ namespace Faolan.Tests
 			Assert.Equal((uint)(oldIirLen + delta), rebuilt.ReadU32Be(iirLenOffset));
 
 			// Re-reading the rebuilt body yields the new name (the splice is structurally valid).
-			Assert.True(PlayerSpawnReader.TryReadCharacterMessage(rebuilt, out var reread));
+			Assert.True(SpawnBodyReader.TryReadCharacterMessage(rebuilt, out var reread));
 			Assert.Equal("Ancient Crocodile", reread.Message.Name);
 		}
 

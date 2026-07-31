@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// byte-blob - #258) whose identity/looks/vitals/worn-gear are overridden per character. Pass character == null to
 	// get the bare template (the golden oracle; PlayerCharacterIirTests proves it is byte-exact to the .bin minus the
 	// worn-gear entries, which are always character-supplied).
-	public static class PlayerCharacterIir
+	public static class PlayerCharacterIirs
 	{
 		// CharacterStats.bcc_state value for a dead character (alive==1). The behavior-controller Dead state enum.
 		private const uint DeadBccState = 29;
@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The player-spawn message for `character` (worn `equipment` applied). character == null returns the bare
 		// render template (fixed constants + Strie's identity/looks fallbacks, no worn gear).
-		public static ProtoCoreCharacterIIR Build(Character character, CharacterEquipment equipment)
+		public static ProtoCoreCharacterIIR ForCharacter(Character character, CharacterEquipment equipment)
 		{
 			var message = new ProtoCoreCharacterIIR
 			{

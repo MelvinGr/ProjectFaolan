@@ -11,7 +11,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// CharacterEquipment. Each worn item becomes a ProtoCoreCharacterIIR.InventoryEntry { pos = the equip slot id,
 	// item = ProtoAcgItem(visual) } - the same Item -> ProtoAcgItem encoding the inventory snapshot uses
 	// (SnapshotItemBuilder): keys = the item's Data1..4 quad, templates = Item.Id, hash = hash. Replaces the
-	// captured player's equipment in the spawn (see SpawnPacketBuilder.SetCharacterMessage / PlayerSpawnReader).
+	// captured player's equipment in the spawn (see SpawnPacketBuilder.SetCharacterMessage / SpawnBodyReader).
 	public static class PlayerSpawnEquipment
 	{
 		public static ProtoCoreCharacterIIR.InventoryEntry BuildEntry(CharacterEquipmentSlot pos, Item item)

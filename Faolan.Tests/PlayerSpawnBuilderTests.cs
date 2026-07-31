@@ -11,7 +11,7 @@ using Xunit;
 namespace Faolan.Tests
 {
 	// Locks the from-scratch player-spawn BODY builder (#210, the player analog of #185): assembled entirely from a
-	// typed PlayerSpawnScaffold (session/transform fields + the DB scaffold rows + the CharacterIIR), with NO captured
+	// typed SimpleCharFullUpdateIIR (session/transform fields + the DB scaffold rows + the CharacterIIR), with NO captured
 	// template. Proven by decomposing SpawnStrieTemplate.bin into its parts (transform, CharacterIIR, scaffold rows)
 	// and rebuilding it byte-for-byte - so the fresh-char constants (FieldA=0, no Scale, the transform encoding) and
 	// the rows->wire assembly reproduce the capture.
@@ -20,8 +20,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildFromScratch_NoScaffoldRows_Throws()
 		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var scaffold, out _));
+			var scaffold = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnStrieTemplate").AsSpan(4));
 
 			// A character with no scaffold rows cannot be described, and there is no longer a captured-splice path to
 			// fall back to: the rows are seeded at character creation, so their absence is corruption and it throws.
@@ -37,8 +36,8 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildFromScratch_ReproducesStrieTemplate()
 		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var scaffold, out var error), error);
+			var template = Golden.Bytes("SpawnStrieTemplate").AsSpan(4).ToArray();
+			var scaffold = SimpleCharFullUpdateCodec.Parse(template);
 
 			// Decompose the captured scaffold into the from-scratch builder's inputs.
 			var position = scaffold.Position;
@@ -62,21 +61,20 @@ namespace Faolan.Tests
 			var built = PlayerSpawnBuilder.BuildFromScratch(scaffold.Handle, scaffold.Playfield, position, rotation, scaffold.Character, scaffoldCharacter, MorphRegistry.ByName);
 
 			Assert.NotNull(built);
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var expected, out _));
-			expected.Frame = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Assassin);
-			expected.EntryTableX = 0xB7;
-			expected.BuffRecords.Clear();
-			Assert.Equal(Convert.ToHexString(PlayerSpawnScaffoldCodec.Generate(expected)), Convert.ToHexString(built));
+			var expected = SimpleCharFullUpdateCodec.Parse(template);
+			expected.PreIir = PlayerSpawnScaffoldRows.FreshPreFrame(ConanClass.Assassin);
+			SimpleCharFullUpdateCodecTests.PlayerSlot(expected).EntryTableX = PlayerSpawnScaffoldRows.FreshEntryTableX;
+			expected.Post.BuffRecords.Clear();
+			Assert.Equal(Convert.ToHexString(SimpleCharFullUpdateCodec.Build(expected)), Convert.ToHexString(built));
 		}
 
-		// The burst-less composition (#210): the from-code CharacterIIR built for a NEW character (PlayerCharacterIir.
+		// The burst-less composition (#210): the from-code CharacterIIR built for a NEW character (PlayerCharacterIirs.
 		// Build) + assembled into a player body (PlayerSpawnBuilder) must produce a body that re-parses with that
 		// character's name - i.e. the build -> re-encode -> scaffold-assemble chain fits together.
 		[Fact]
 		public void BuildFromScratch_WithOverriddenIdentity_ParsesBackWithNewName()
 		{
-			var template = Golden.Bytes("SpawnStrieTemplate");
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(template, out var scaffold, out _));
+			var scaffold = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnStrieTemplate").AsSpan(4));
 
 			var character = new Character
 			{
@@ -91,7 +89,7 @@ namespace Faolan.Tests
 					Stamina = 200
 				}
 			};
-			var message = PlayerCharacterIir.Build(character, new CharacterEquipment());
+			var message = PlayerCharacterIirs.ForCharacter(character, new CharacterEquipment());
 
 			var scaffoldCharacter = new Character
 			{
@@ -102,7 +100,7 @@ namespace Faolan.Tests
 			var body = PlayerSpawnBuilder.BuildFromScratch(0x0A1B2C3D, scaffold.Playfield, new Vector3(1, 2, 3), Quaternion.Identity, message, scaffoldCharacter, MorphRegistry.ByName);
 
 			Assert.NotNull(body);
-			Assert.True(PlayerSpawnScaffoldCodec.TryParse(body, out var rebuilt, out var err), err);
+			var rebuilt = SimpleCharFullUpdateCodec.Parse(body);
 			Assert.Equal("Newcomer", rebuilt.Character.Name);
 			Assert.Equal(0x0A1B2C3Du, rebuilt.Handle);
 		}

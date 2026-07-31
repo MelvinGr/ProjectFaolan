@@ -29,14 +29,14 @@ namespace Faolan.Tests
 		{
 			var shapes = new Dictionary<string, int>();
 
-			foreach (var post in Streams())
+			foreach (var (body, post) in Streams())
 			{
-				if (!NpcSpawnPostIir.TryDecodePost(post, out var decoded) || decoded.Morphs.Count > 0)
+				if (!SpawnBodyReader.TryParse(body, out var spawn) || MorphsOf(spawn).Count > 0)
 					continue;
-				if (decoded.Common.BuffRecords.Count > 0 || decoded.Common.EndPairs.Count > 0 || decoded.Common.EndPairs2.Count > 0 || decoded.Common.EndPairs3.Count > 0)
+				if (spawn.Post.BuffRecords.Count > 0 || spawn.Post.EndPairs.Count > 0 || spawn.Post.EndPairs2.Count > 0 || spawn.Post.EndPairs3.Count > 0)
 					continue;
 
-				var shape = $"len={post.Length} firstRecordLen={decoded.FirstRecordLen} word2={decoded.Word2}";
+				var shape = $"len={post.Length} firstRecordLen={spawn.Post.FirstRecordLen} word2={spawn.Post.Word2}";
 				shapes[shape] = shapes.GetValueOrDefault(shape) + 1;
 			}
 
@@ -57,25 +57,33 @@ namespace Faolan.Tests
 		{
 			var byLength = new Dictionary<int, HashSet<uint>>();
 
-			foreach (var post in Streams())
+			foreach (var (body, post) in Streams())
 			{
-				if (!NpcSpawnPostIir.TryDecodePost(post, out var decoded) || decoded.Morphs.Count > 0)
+				if (!SpawnBodyReader.TryParse(body, out var spawn) || MorphsOf(spawn).Count > 0)
 					continue;
 
 				byLength.TryAdd(post.Length, []);
-				byLength[post.Length].Add(decoded.Word2);
+				byLength[post.Length].Add(spawn.Post.Word2);
 			}
 
 			Assert.Equal([1u, 2u, 3u], byLength[41].Order().ToArray());
 			Assert.Equal([2u], byLength[40].ToArray());
 		}
 
-		// Every captured FA015807's post-IIR stream, sliced off behind the embedded CharacterIIR.
-		private static IEnumerable<byte[]> Streams()
+		private static List<NpcAppearanceMorph> MorphsOf(SimpleCharFullUpdateIIR spawn)
+		{
+			return spawn.Post.Slot is NpcEntrySlot npc
+				? npc.Morphs
+				: [];
+		}
+
+		// Every captured FA015807's post-IIR stream, sliced off behind the embedded CharacterIIR, paired with the
+		// body it came from (the codec reads the whole record, so the family is decided there rather than here).
+		private static IEnumerable<(byte[] Body, byte[] Post)> Streams()
 		{
 			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
-				if (PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
-					yield return body[(read.Offset + read.Length)..];
+				if (SpawnBodyReader.TryReadCharacterMessage(body, out var read))
+					yield return (body, body[(read.Offset + read.Length)..]);
 		}
 	}
 }

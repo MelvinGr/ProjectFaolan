@@ -108,7 +108,7 @@ AoC has two separate systems, and the codebase's naming predates the distinction
 | | what it is | where it lives on the wire | in our code |
 |---|---|---|---|
 | **Feats** (talent tree) | points spent to unlock/rank tree feats | full set in the **`FA015807` player-spawn pre-IIR** feat list; train/unlock via `FeatIIR 0x28DA68A0` | **nothing yet** |
-| **Skills / abilities** (spawn scaffold) | the flat id list a char carries; gates spell usability | the **`FA015807` player-spawn post-IIR** id-list | `CharacterSkill(SkillId, Rank)`, built by `PlayerSpawnScaffoldCodec` |
+| **Skills / abilities** (spawn scaffold) | the flat id list a char carries; gates spell usability | the **`FA015807` player-spawn post-IIR** id-list | `CharacterSkill(SkillId, Rank)`, built by `SimpleCharFullUpdateCodec` |
 
 **Proof they're distinct** (same packet, two different regions + id-spaces): unlocking the Hellfire feat
 (`Captures/faolan-account-login-hakotep-hox-lvl24-unlock-feat-hellfire.tshark.json`) left the **post-IIR skill

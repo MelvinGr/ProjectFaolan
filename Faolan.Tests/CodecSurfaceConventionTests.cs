@@ -34,7 +34,7 @@ namespace Faolan.Tests
 
 		// The folders converted to the uniform surface so far. ADD A FOLDER AS ITS WAVE LANDS - that is what makes the
 		// gates below binding on it, and leaving it out is how a converted folder silently stops being checked.
-		private static readonly string[] MigratedFolders = ["Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat", "Quest"];
+		private static readonly string[] MigratedFolders = ["Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat", "Quest", "Spawn"];
 
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 		private static readonly Regex ConstOffset = new(@"\bconst\s+int\s+\w*(Offset|Pos)\b");
@@ -185,12 +185,19 @@ namespace Faolan.Tests
 
 		// ---- rule 3: sequential reading -------------------------------------------------------------------
 
-		// ⚠️ Scoped to MigratedFolders like the rest. SpawnPacketBuilder's 12 patch offsets are the last holdouts and
-		// need the captured template retired first (#530 §7), so Spawn only joins once that is done.
+		// ⚠️ Scoped to PARSE paths, which is what rule 3 is actually about (#530 §7): a const offset means the fields
+		// between 0 and it were never DECODED, so the codec cannot tell a correct body from one that merely happens to
+		// have the right byte there. A file with no `Parse` reads nothing - its offsets are PATCH offsets into a
+		// record whose head is fixed-width (SpawnTransformPatch stamps the live position/token at send time) or into a
+		// captured template (SpawnPacketBuilder's splice engine), and both disappear with the thing they patch rather
+		// than with a rewrite of the reader. Scoping is the agreed answer here, not an allowlist: an allowlist would
+		// exempt a FILE, and the moment one of these grew a Parse it would keep its exemption.
 		[Fact]
 		public void NoConstOffsetsInCodecs()
 		{
 			var offenders = (from file in CodecSourceFiles()
+				let source = File.ReadAllText(file)
+				where source.Contains("Parse(in ReadOnlySpan<byte>", StringComparison.Ordinal)
 				let lines = File.ReadAllLines(file)
 				from i in Enumerable.Range(0, lines.Length)
 				let code = Strip(lines[i])

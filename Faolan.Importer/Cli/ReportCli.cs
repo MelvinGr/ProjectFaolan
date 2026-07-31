@@ -627,7 +627,7 @@ namespace Faolan.Importer.Cli
 					var body = e.Data is { Length: >= 12 }
 						? e.Data[(12 + (int)e.Data.ReadU32Be(8))..]
 						: null;
-					var anim = body != null && PlayerSpawnReader.TryReadCharacterMessage(body, out var read)
+					var anim = body != null && SpawnBodyReader.TryReadCharacterMessage(body, out var read)
 						? read.Message?.Bcc?.AnimIdleId.ToString() ?? "(no bcc)"
 						: "(unreadable)";
 					Console.WriteLine($"{c.Name[..Math.Min(40, c.Name.Length)]} | handle 0x{e.Handle:X} | AnimIdleId={anim} | pos=({e.X:0.#},{e.Z:0.#})");
@@ -816,7 +816,7 @@ namespace Faolan.Importer.Cli
 					var spawnBody = e.Data is { Length: >= 12 }
 						? e.Data[(12 + (int)e.Data.ReadU32Be(8))..]
 						: null;
-					if (spawnBody != null && PlayerSpawnReader.TryReadCharacterMessage(spawnBody, out var read) && read.Message.Stats is { } st)
+					if (spawnBody != null && SpawnBodyReader.TryReadCharacterMessage(spawnBody, out var read) && read.Message.Stats is { } st)
 					{
 						levels[e.Handle] = st.Level;
 						if (!string.IsNullOrEmpty(e.Name))
@@ -842,7 +842,7 @@ namespace Faolan.Importer.Cli
 
 					// `Body` is already past the packet prologue+header, so it IS the IIR body the reader wants -
 					// unlike NpcSpawnEntry.Data above, which is the whole packet and has to be sliced.
-					if (PlayerSpawnReader.TryReadCharacterMessage(sb, out var pread) && pread.Message.Stats is { } pst && pst.Level > playerLevel)
+					if (SpawnBodyReader.TryReadCharacterMessage(sb, out var pread) && pread.Message.Stats is { } pst && pst.Level > playerLevel)
 						playerLevel = pst.Level;
 				}
 
@@ -1097,7 +1097,7 @@ namespace Faolan.Importer.Cli
 				var body = e.Data is { Length: >= 12 }
 					? e.Data[(12 + (int)e.Data.ReadU32Be(8))..]
 					: null;
-				if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+				if (body == null || !SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 					continue;
 
 				spawns++;
@@ -1127,7 +1127,7 @@ namespace Faolan.Importer.Cli
 					var body = e.Data is { Length: >= 12 }
 						? e.Data[(12 + (int)e.Data.ReadU32Be(8))..]
 						: null;
-					if (body == null || !PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+					if (body == null || !SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 					{
 						Console.WriteLine($"{c.Name[..Math.Min(44, c.Name.Length)]} | handle 0x{e.Handle:X} | (unreadable)");
 						continue;
@@ -2768,7 +2768,7 @@ namespace Faolan.Importer.Cli
 					// record it as a failure instead of aborting the sweep.
 				}
 
-				var rewriteOk = baseOk && SpawnPlayfieldRewriter.TryRewrite(baseBody!, 0x01EA985Cu);
+				var rewriteOk = baseOk && SpawnTransformPatch.TryRewritePlayfield(baseBody!, 0x01EA985Cu);
 				Console.WriteLine($"map {row.MapId} {row.Name} baseBuild={baseOk} rewrite={rewriteOk} asset={row.GeometryAssetId}/{row.GeometryAssetType} words={row.Words.Count}");
 				if (baseOk)
 					Console.WriteLine("  BUILT: " + Convert.ToHexString(baseBody!).ToLowerInvariant());

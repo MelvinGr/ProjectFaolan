@@ -47,7 +47,7 @@ namespace Faolan.Importer.Extractors
 
 	// Extracts NPC entity spawns (FA015807) per map from a capture: tracks the current map (MapChange 5D85BFC7),
 	// then for each spawn reads the handle (body@12), transform (position @24/29/34 + rotation @41.., LE) and the
-	// identity/appearance lifted from the CharacterIIR (ProtoCoreCharacterIIR via PlayerSpawnReader - the same
+	// identity/appearance lifted from the CharacterIIR (ProtoCoreCharacterIIR via SpawnBodyReader - the same
 	// decode the player spawn uses). The player's own spawn is skipped - its handle is the session client instance
 	// (>= 0x02000000), whereas NPC handles are small. Dedup key is (map, position); the handle/name vary.
 	public static class NpcSpawnExtractor
@@ -191,7 +191,7 @@ namespace Faolan.Importer.Extractors
 		private static NpcSpawnEntry LiftIdentity(byte[] body)
 		{
 			var empty = new NpcSpawnEntry(0, string.Empty, 0, 0, 0, 0, null!);
-			if (!PlayerSpawnReader.TryReadCharacterMessage(body, out var read))
+			if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 				return empty;
 
 			var msg = read.Message;
@@ -257,7 +257,7 @@ namespace Faolan.Importer.Extractors
 			// Another visible PLAYER's spawn (not the own player - a different account in view): it carries
 			// player_stats + no npc_stats, so it isn't an NPC. These were previously imported as phantom NpcSpawn
 			// rows with TemplateId 0 / no type (found via the CoreChar-header X RE, #244) - drop them here.
-			if (PlayerSpawnReader.TryReadCharacterMessage(body, out var pr) && pr.Message.player_stats != null)
+			if (SpawnBodyReader.TryReadCharacterMessage(body, out var pr) && pr.Message.player_stats != null)
 				return false;
 
 			var identity = LiftIdentity(body);
@@ -268,9 +268,9 @@ namespace Faolan.Importer.Extractors
 			// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals. The clean shape
 			// decodes directly; a mid-session humanoid capture carries the SAME table behind a runtime record1, lifted
 			// by the lenient decode (#243) so those spawns get morph rows too (and build from scratch, not Data).
-			var morphs = NpcSpawnAppearanceCodec.TryDecodeAppearance(body, out var decoded)
+			var morphs = NpcSpawnAppearance.TryLift(body, out var decoded)
 				? decoded
-				: NpcSpawnAppearanceCodec.TryDecodeAppearanceLenient(body, out var lenient)
+				: NpcSpawnAppearance.TryLiftLenient(body, out var lenient)
 					? lenient
 					: [];
 

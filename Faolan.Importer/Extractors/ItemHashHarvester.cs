@@ -363,7 +363,7 @@ namespace Faolan.Importer.Extractors
 		// Recovers (template -> CapturedItem) from a character SPAWN's worn equipment. The spawn body holds a
 		// ProtoCoreCharacterIIR whose InventoryEntries are the worn items, each a ProtoAcgItem carrying the same
 		// identity the inventory snapshot does (Key1.Key1..4 = the Data quad, Template1 = the template id, Hash =
-		// the hash). PlayerSpawnReader scans the body for the character message, so this works on any packet
+		// the hash). SpawnBodyReader scans the body for the character message, so this works on any packet
 		// that contains a spawn (FA015807) - we just try it on every packet's Conan body.
 		private static void ExtractFromSpawnEquipment(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
@@ -375,7 +375,7 @@ namespace Faolan.Importer.Extractors
 			if (bodyStart >= packetBytes.Length)
 				return;
 
-			if (!PlayerSpawnReader.TryReadCharacterMessage(packetBytes[bodyStart..], out var read))
+			if (!SpawnBodyReader.TryReadCharacterMessage(packetBytes[bodyStart..], out var read))
 				return;
 
 			foreach (var entry in read.Message.InventoryEntries)

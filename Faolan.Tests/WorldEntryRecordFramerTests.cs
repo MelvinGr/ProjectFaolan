@@ -58,9 +58,11 @@ namespace Faolan.Tests
 		{
 			var captured = File.ReadAllBytes(PlayerSpawnCap);
 			var bodyStart = 12 + (int)captured.ReadU32Be(8);
-			var spawnBody = captured[bodyStart..];
+			// The RECORD, without the carrier's u32 length - that belongs to the sender, which is what this frames
+			// (#530 rule 2).
+			var spawnRecord = captured[(bodyStart + 4)..];
 
-			var built = GameServerListener.BuildWorldEntrySpawn(BeachClient(), spawnBody).Serialize();
+			var built = GameServerListener.BuildWorldEntrySpawn(BeachClient(), spawnRecord).Serialize();
 
 			Assert.Equal(captured.Length, built.Length);
 			Assert.True(captured.SequenceEqual(built), "from-scratch player-spawn packet must be byte-identical to the capture");
