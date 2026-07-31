@@ -23,9 +23,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//   * the args round-trip through protobuf-net only because nothing re-encodes them - `BehaviorAcks` echoes the
 	//     CLIENT's own bytes back with one field spliced in, and a re-encode of a field we do not model would change
 	//     them;
-	//   * the tail genuinely is not one grammar - it is an echoed client tail, or an equip identity block, or the
-	//     132-byte hit-result block, or empty - and inventing a union for it would be decoding, which this refactor
-	//     does not do.
+	//   * the tail genuinely is not one grammar, and the CLIENT says so: `ReadSubClass` (FUN_005e24e0) reads the
+	//     phase byte, then this `behaviorId`, then hands off to `InstantiateCommand` (FUN_007dcd60) which looks the
+	//     id up in a classmap and constructs a per-COMMAND object that reads the rest itself. So the tail belongs to
+	//     the command, not to this record - see BehaviorId, which is that classmap with the client's own names, and
+	//     Gitea #536 for the per-command readers that remain.
+	//
+	// ⚠️ Most behaviours have a FIXED tail length, which is the useful half of the census over all 67307 captured
+	// records: BccAction (0x07, 35852 of them), Emote (0x05) and Limbo/Death (0x1F) carry NONE at all - 83% of the
+	// traffic - while Transition is always 20, UseCharacter 4, UseDynel 12 and Equip 88. Only Combat:Melee /
+	// :Ranged / :Unarmed (the shared hit-result family), Magic:Attack, PlayAnimation and ObjectInteraction vary.
 	// The semantic forms live beside the codec as VALUE factories (`BehaviorAnimations`, `BehaviorAcks`,
 	// `DeathSequence`), not as Build overloads - see CLAUDE.md's codec conventions.
 	//
@@ -76,7 +83,15 @@ namespace Faolan.Core.Network.Codecs.Combat
 	}
 
 	// BehaviorControlCenterIIR (0x642CD3D6). `Seq` distinguishes the phases of one behaviour - 0x0004 begin,
-	// 0x000A complete, 0x0007 abort, 0x000F commit - and `BehaviorId` selects the behaviour itself (0x0F NormalAttack,
-	// 0x07 the idle pulse, 0x12 an object-hold state, 0x2A an object action, ...).
+	// 0x000A complete, 0x0007 abort, 0x000F commit - and `BehaviorId` selects the COMMAND itself.
+	//
+	// ⚠️ `Seq`'s high byte is always zero because the client reads its low byte ALONE: `ReadSubClass` takes one u8
+	// (the byte before it belongs to the base record) and switches on it, and every value the corpus shows - 2, 3,
+	// 4, 7, 0xA, 0xF - is in the branch that then reads a command id. Kept as a u16 because that is the field's
+	// width on our side of every emitter; nothing depends on the split.
+	//
+	// `BehaviorId` values are the client's own catalog - see BehaviorId (0x0F Combat:Melee, 0x07 BccAction, 0x12
+	// UseDynel, 0x2A ObjectInteraction, ...). Those four were previously guessed here as "NormalAttack", "the idle
+	// pulse", "an object-hold state" and "an object action"; only the last was close.
 	public sealed record BehaviorControlCenterIIR(uint Actor, ushort Seq, uint BehaviorId, byte[] Args, byte[] Tail);
 }

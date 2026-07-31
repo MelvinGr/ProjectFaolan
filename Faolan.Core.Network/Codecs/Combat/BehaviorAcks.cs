@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
@@ -20,12 +21,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 	{
 		// The behaviours whose ECHOED tail takes 12 zero bytes of padding. This is NOT universal, which is what the code
 		// used to assume: measured across every login capture, pairing each c2s request with its s2c ack and diffing the
-		// tail lengths, only the two attack behaviours pad an echoed tail -
-		//   0x0F NormalAttack: +12 in 85 acks   .   0x11 UnarmedAttack: +12 in 3
-		// while every other behaviour echoes the tail UNCHANGED: +0 across 25 acks for 0x01, 87 for 0x04, 174 for 0x16
-		// (talk), 66 for 0x12 (the bench-sit hold state), 15 for 0x2A (the sit animation), 13 for 0x09/0x0A, and so on.
+		// tail lengths, only the two hand-weapon attack commands pad an echoed tail -
+		//   Combat:Melee (0x0F): +12 in 85 acks   .   Combat:Unarmed (0x11): +12 in 3
+		// while every other behaviour echoes the tail UNCHANGED: +0 across 25 acks for Transition (0x01), 87 for
+		// Magic:Attack (0x04), 174 for UseCharacter (0x16, talk), 66 for UseDynel (0x12, the bench-sit), 15 for
+		// ObjectInteraction (0x2A, the sit animation), 13 for Equip/Mount (0x09/0x0A), and so on.
 		// (0x0F also shows much larger deltas - 53, 94, ... - but those are the separate result-block ack variant for a
 		// targeted hit, not this echo path.)
+		//
+		// ⚠️ That the two padding behaviours are exactly the two hand-weapon attacks is not a coincidence, and it is
+		// visible now that the ids have the client's names (#536): Combat:Melee, :Ranged and :Unarmed share one tail
+		// family. This list stays at the measured two rather than gaining :Ranged on the strength of that - the
+		// corpus has no padded 0x10 echo to justify it.
 		//
 		// Padding unconditionally made every non-attack ack 8-12 bytes too long, and the client REJECTS the record
 		// outright: it parses to the end of what it expects, then reads the leftovers as a fresh IIR and finds a type
@@ -36,7 +43,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// A REPLACED tail (tailOverride) is a different shape and always pads: the equip/unequip acks build a bespoke
 		// identity-block tail whose captured form ends in those 12 zero bytes (BehaviorAckTests, behaviour 0x09). So the
 		// pad follows the tail's PROVENANCE - echoed or replaced - not the behaviour id alone.
-		private static readonly uint[] PaddedTailBehaviors = [0x0F, 0x11];
+		private static readonly uint[] PaddedTailBehaviors = [(uint)BehaviorId.CombatMelee, (uint)BehaviorId.CombatUnarmed];
 
 		// The shortest request this can read: the header through the args length, with empty args.
 		private const int MinimumRequestLength = 26;
@@ -126,8 +133,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return s.ToArray();
 		}
 
-		// The NormalAttack behaviorId an attack ack carries, whatever the request said.
-		internal const uint NormalAttackBehaviorId = 0x0000000F;
+		// The behaviour id an attack ack carries, whatever the request said. The client calls it Combat:Melee; this
+		// codebase called it "NormalAttack", which is our invention (#536).
+		internal const uint NormalAttackBehaviorId = (uint)BehaviorId.CombatMelee;
 
 		// The equip/unequip (Interact 0x09) ack: the echo-ack with the tail's zero padding replaced by an identity
 		// block - the first 28 tail bytes echoed, then the moved item's Data1..4 key quad twice + the null filler

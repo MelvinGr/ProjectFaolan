@@ -20,10 +20,48 @@ So a BccIIR = `[u8 type][u32 commandId?][command-specific data]`, where the comm
 looked-up Command object's reader (another vtable hop). The combat-relevant forms (the attack/interact ack)
 are already built byte-exact by `CombatService`/`BehaviorControlCenterCodec` (`BehaviorAcksTests`).
 
+## The Command catalog — `InstantiateCommand::classmap` (#536)
+
+`FUN_007dcd60` is `InstantiateCommand` (named by its own error string, *"InstantiateCommand::classmap is NOT
+initialized!"*, log channel `Control`). The `commandId` above is a key into that map, and **two registration
+functions populate it, pushing each command's NAME STRING next to its id** — so the whole catalog is readable
+off the binary rather than inferred from behaviour:
+
+* `FUN_007375b0` — 22 commands, the interaction/animation set.
+* `FUN_01134510` — 12 commands, the combat/movement set.
+
+All 34 are enumerated in `BehaviorId`. The names corroborate the corpus independently: `UseDynel` (0x12) carries
+a 12-byte tail (a class+handle reference), `UseCharacter` (0x16) four (a handle), `PlayAnimation` (0x1D) a
+*variable* 10–39 (an animation name), and `Emote` (0x05), `BccAction` (0x07) and `Limbo/Death` (0x1F) none at
+all — those three alone are 55 699 of the 67 307 captured records.
+
+⚠️ Two names this codebase had invented are corrected by it: `0x0F` is **Combat:Melee**, not "NormalAttack", and
+`0x07` is **BccAction**, not "the idle pulse". `0x12` is **UseDynel**, not "an object-hold state".
+
+## Tail census (all 67 307 captured records)
+
+Most commands have a FIXED tail length: `Transition` (0x01) 20, `UseCharacter` 4, `UseDynel` 12, `Equip` (0x09)
+88, and the three above 0. What varies is `Magic:Attack` (0x04), `PlayAnimation`, `ObjectInteraction` (0x2A) and
+the three attack commands.
+
+The three attack commands — `Combat:Melee` (0x0F), `Combat:Ranged` (0x10), `Combat:Unarmed` (0x11) — share one
+tail family whose first word is a COUNT, and the stride differs by direction:
+
+```
+c2s request : base 28|32  + 8  x count      (counts 0..2 observed)
+s2c ack     : base 40|41|44|81|82|85 + 49 x count
+```
+
+Subtracting `49 x count` collapses every one of the 3 700 s2c attack tails onto those six bases, and the bases
+themselves differ by 41 (81 = 40+41, 82 = 41+41, 85 = 44+41), i.e. one optional 41-byte block on a 40/41/44
+head. `BehaviorAcks.HitResultBlock` builds the single-hit s2c form and is byte-exact against the capture.
+
 ## Status
 
-Grammar SHAPE decoded (type switch + commandId + per-command reader). A fully constructive codec needs the
-per-Command readers (vtable slot 0x80 of each Command type) enumerated - the residue; the combat path is done.
+Grammar SHAPE decoded (type switch + commandId + per-command reader), and the commandId → COMMAND map is now
+enumerated with the client's own names (above). A fully constructive codec still needs the per-Command readers
+(vtable slot 0x80 of each Command type) walked — the residue; the combat path is done. Open work tracked in
+Gitea #536.
 
 ## Registration form (the create-burst / world-entry BccIIR) — #234
 
