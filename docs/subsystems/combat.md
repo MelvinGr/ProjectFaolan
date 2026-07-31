@@ -407,7 +407,7 @@ A killing blow makes the server apply a **fatality burst** to the KILLER — two
 off them. Long treated as un-pinnable ("no capture shows a fatality"), which was true only of the **melee**
 finishers: the corpus carries the server side of a **caster's** fatality in seven captures.
 
-Worked example, `xxx_mage-necromancer_login_play_beach-to-enter-tortage_city` fr1267 — one frame, right after the
+Worked example, `xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city` fr1267 — one frame, right after the
 killing cast completes (`BccIIR seq=0x000A action=4`):
 
 ```

@@ -27,7 +27,7 @@ namespace Faolan.Tests
 		[InlineData(ConanClass.HeraldOfXotli, 3, 14600, 30000, 14100)]
 		[InlineData(ConanClass.HeraldOfXotli, 4, 17900, 33000, 15400)]
 		[InlineData(ConanClass.HeraldOfXotli, 5, 21200, 36000, 16700)]
-		// Blablatest_mage-necromancer-create_casilda_quest_first + xxx_mage-necromancer_login_play_beach-to-enter-tortage_city
+		// Blablatest_mage-necromancer-create_casilda_quest_first + xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city
 		[InlineData(ConanClass.Necromancer, 2, 10900, 27000, 0)]
 		[InlineData(ConanClass.Necromancer, 3, 13800, 30000, 0)]
 		[InlineData(ConanClass.Necromancer, 4, 16700, 33000, 0)]

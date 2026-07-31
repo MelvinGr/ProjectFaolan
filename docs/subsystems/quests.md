@@ -198,7 +198,7 @@ removal, and destroying a player's item on an unproven inference is the worse er
 
 ### The escort ends at the city DOOR, and the farewell follows the completion
 
-Decoded from `xxx_mage-necromancer_login_play_beach-to-enter-tortage_city` (and identical in the `mage-demo`
+Decoded from `xxx_mage-necromancer_login_play1_beach-to-enter-tortage_city` (and identical in the `mage-demo`
 twin). The Tortage escort (12407, goal 3544, Casilda) does **not** end on a conversation or a zone change — it
 ends when the player **opens the city door**:
 
