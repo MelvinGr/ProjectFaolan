@@ -135,16 +135,56 @@ namespace Faolan.Importer.Cli
 			};
 		}
 
-		// The message's name. An IIR names itself through IirTypes; an RPC method is named by its
-		// interface, which the TIER plus the DIRECTION pick - *AgentOpcodes are c2s, *InterfaceOpcodes are s2c.
+		// Which interface each RECEIVER endpoint class is. The receiver is the object being addressed - the server's
+		// *Agent on a c2s call, the client's *Interface on an s2c dispatch - so it names the interface in BOTH
+		// directions. Verified over the whole corpus: all 404k Conan packets are a clean A<->B swap of one of these
+		// pairs, and the receiver's enum contains the opcode in every case bar three mis-framed packets in one lossy
+		// capture (their "bodies" are the first bytes of an RpcHeader).
+		private static readonly Dictionary<uint, Type> InterfaceByReceiver = new()
+		{
+			[Endpoints.UniverseAgentType] = typeof(UniverseAgentOpcodes),
+			[Endpoints.UniverseInterfaceType] = typeof(UniverseInterfaceOpcodes),
+			[Endpoints.PlayerAgentType] = typeof(PlayerAgentOpcodes),
+			[Endpoints.PlayerInterfaceType] = typeof(PlayerInterfaceOpcodes),
+			[Endpoints.CSPlayerAgentType] = typeof(CSPlayerAgentOpcodes),
+			[Endpoints.CSPlayerInterfaceType] = typeof(CSPlayerInterfaceOpcodes),
+			[Endpoints.GameAgentType] = typeof(GameAgentOpcodes),
+			[Endpoints.GameInterfaceType] = typeof(GameInterfaceOpcodes),
+			[Endpoints.GameCharAgentType] = typeof(GameCharAgentOpcodes),
+			[Endpoints.GameCharInterfaceType] = typeof(GameCharInterfaceOpcodes),
+			[Endpoints.GameCharAgentProjectType] = typeof(GameCharAgentProjectOpcodes),
+			[Endpoints.GameCharInterfaceProjectType] = typeof(GameCharInterfaceProjectOpcodes),
+			[Endpoints.TradepostAgentType] = typeof(TradepostAgentOpcodes),
+			[Endpoints.TradepostInterfaceType] = typeof(TradepostInterfaceOpcodes)
+		};
+
+		// The message's name. An IIR names itself through IirTypes; an RPC method is named by its INTERFACE, and the
+		// receiver endpoint class is the only thing that says which interface a packet is on.
+		//
+		// ⚠️ Opcodes are PER INTERFACE - every interface numbers its first method 0x2000 - so picking the interface
+		// from the tier plus the direction, as this did, is picking it by guess. The world connection alone carries
+		// four interfaces (GameAgent/GameInterface, GameChar*, GameChar*Project) and trying them in a fixed order let
+		// the first enum answer for all of them: 1,642 packets in one capture came out as PassBlob / DispatchPassBlob /
+		// RemoveGuildFeat / DispatchGameStats / DispatchReportDimesionID when they were really the aggro poll, the
+		// sprint input and the quest-marker reply. Every one of those is in TimelineNoise, so the wrong name also
+		// defeated the noise filter and printed 40% of the timeline as heartbeat traffic (#558).
+		//
+		// A KNOWN receiver is authoritative: if its interface does not define the opcode, the answer is that we cannot
+		// name it, NOT the name a different interface happens to have at that number. Falling through would rebuild
+		// the bug.
 		public string NameOf(CapturedPacket packet, uint iir, string tier)
 		{
 			if (iir != 0)
 				return IirNames.TryGetValue(iir, out var n) ? n : $"0x{iir:x8}";
 
-			var c2s = packet.Direction == "c2s";
 			var opcode = (ushort)packet.Opcode;
-			foreach (var type in InterfacesFor(tier, c2s))
+			if (InterfaceByReceiver.TryGetValue(packet.ReceiverClass, out var iface))
+				return Enum.GetName(iface, opcode) ?? $"0x{packet.Opcode:x4}";
+
+			// ChatServer frames carry NO RpcHeader, so they have no endpoint to key off and the tier is all there is
+			// (TsharkCaptureReader leaves SenderClass/ReceiverClass zero for them). Its two enums do not collide with
+			// each other, so direction alone separates them.
+			foreach (var type in InterfacesFor(tier, packet.Direction == "c2s"))
 			{
 				var name = Enum.GetName(type, opcode);
 				if (name != null)
@@ -154,6 +194,8 @@ namespace Faolan.Importer.Cli
 			return $"0x{packet.Opcode:x4}";
 		}
 
+		// The endpoint-less fallback. Only the chat tier reaches it in the corpus; the other tiers are listed so a
+		// packet whose dump row is missing its endpoint columns still gets a best effort rather than a bare hex id.
 		private static IEnumerable<Type> InterfacesFor(string tier, bool c2s)
 		{
 			switch (tier)
@@ -171,8 +213,6 @@ namespace Faolan.Importer.Cli
 					yield return c2s ? typeof(ChatServerOpcodes) : typeof(ChatServerInterfaceOpcodes);
 					break;
 				default:
-					// The world tier carries the create-editor's GameChar* interfaces on the same connection as the
-					// GameAgent/GameInterface pair, so both are tried.
 					yield return c2s ? typeof(GameAgentOpcodes) : typeof(GameInterfaceOpcodes);
 					yield return c2s ? typeof(GameCharAgentOpcodes) : typeof(GameCharInterfaceOpcodes);
 					yield return c2s ? typeof(TradepostAgentOpcodes) : typeof(TradepostInterfaceOpcodes);

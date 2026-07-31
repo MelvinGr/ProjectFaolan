@@ -40,6 +40,12 @@ namespace Faolan.Core.Network.Constants
 		// go through EndpointBytes like every other endpoint.
 		public const uint PlayerAgentType = 0x82F20484;
 
+		// The two s2c login-tier classes. Both were already recovered in docs/re/aoc-opcode-ids.md; only the constants
+		// were missing here, because nothing SENT on them - our login tier replies on the connection it was called on.
+		// `--report timeline` needs them to map a receiver class to its interface (#558).
+		public const uint PlayerInterfaceType = 0x7D155738; // = hash("PlayerInterface")
+		public const uint UniverseInterfaceType = 0x0C384054; // = hash("UniverseInterface")
+
 		// Tradepost (auction house + mail) rides the GameServer RPC layer. TradepostAgent is the SERVER object the
 		// client calls (client->server); TradepostInterface is the CLIENT object the server dispatches to (s2c).
 		public const uint TradepostAgentType = 0x3D744981; // = hash("TradepostAgent")     (client -> server endpoint)
