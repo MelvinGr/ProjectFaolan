@@ -620,7 +620,7 @@ namespace Faolan.GameServer
 			// The wire side: the "Criminal" debuff plus the murder-point stat, the two things the capture shows moving.
 			var spell = await Database.GetSpell(CriminalStatus.CriminalSpellId);
 			await SendMagicBuffIir(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8,
-				MagicBuffDataCodec.Build(CriminalStatus.CriminalSpellId, (uint)(seconds * 100), DefaultSelfBuffEffectNonce, CasterLevel(client)));
+				MagicBuffDatas.Apply(CriminalStatus.CriminalSpellId, (uint)(seconds * 100), DefaultSelfBuffEffectNonce, CasterLevel(client)));
 			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, character.MurderPoints), character.Id);
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id,

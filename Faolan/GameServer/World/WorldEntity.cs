@@ -698,7 +698,7 @@ namespace Faolan.GameServer.World
 
 	// A spell a caster NPC casts at its target (#232): the full wire spell id + the captured ApplySpell effect
 	// payload (interim verbatim). Sourced from the NpcSpell table by NPC name.
-	public readonly record struct NpcSpellCast(uint SpellId, byte[] Payload);
+	public readonly record struct NpcSpellCast(uint SpellId, MagicBuffData Payload);
 
 	// A pending ReachArea quest goal (#262), solved when the player enters it on map `MapId`. Two shapes, and
 	// `Region` decides which:

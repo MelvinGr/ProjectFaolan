@@ -224,13 +224,15 @@ Two things already run ahead of that move:
 
 **Codec conventions** (`Faolan.Core.Network/Codecs/`, enforced by `Faolan.Tests/CodecConventionTests.cs`):
 
-⚠️ **These rules describe the TARGET shape and are binding on new/edited codecs from now on.** The existing 152
-are being converted folder by folder — migration tracked in Gitea #530, which also carries the per-codec rename
-table. **Every `Codecs/` folder is converted, `Faolan/`'s own wire builders have moved in (wave 7), and
-`Faolan.Importer/` no longer names an IIR or hand-decodes a body a codec owns (wave 8). **Rule 7's gate is
-LIVE**: outside `Codecs/`, a `GameServer0X2000Opcodes` member may only appear as a `case` label of the
-listener's routing switch (#542). What remains is one full-update scan (#540) and wave 9's cleanup.**
-`ICodec<T>` has NO implementations left (the interface file goes in wave 9); do not add any.
+⚠️ **These rules are BINDING — the sweep is done (Gitea #530, waves 0–9) and all 16 gates in
+`Faolan.Tests/CodecSurfaceConventionTests.cs` are live over every folder under `Codecs/`, with zero skips.** Every
+codec is on the uniform surface, `Faolan/`'s own wire builders moved in (wave 7), `Faolan.Importer/` no longer
+names an IIR or hand-decodes a body a codec owns (wave 8), and `ICodec<T>` is deleted (wave 9) — do not
+reintroduce it. Outside `Codecs/`, a `GameServer0X2000Opcodes` member may only appear as a `case` label of the
+listener's routing switch. Two small allowlists remain, each naming the DECODE issue that removes it (#543 the
+snapshot stat region's flat view; #544/#545/#538 the three codecs the corpus round-trip cannot read yet) — they
+are not places to silence a gate. Remaining follow-ups: #540 (one importer full-update scan), #533 (row↔value
+mapping).
 
 - **One codec shape: two public method NAMES, nothing else.** A codec is a `static class` exposing exactly
   `byte[] Build(...)` and `T Parse(in ReadOnlySpan<byte> data)`, plus its `Opcode` / `HandledTypes`

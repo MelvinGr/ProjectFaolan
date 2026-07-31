@@ -33,14 +33,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void PayloadExtractors_RecoverNonce_FromBuffPayload()
 		{
-			var payload = MagicBuffDataCodec.Build(0x37F298, 640000, 0x195DA1FE, 80);
-			Assert.Equal(54, payload.Length);
+			var payload = MagicBuffDatas.Apply(0x37F298, 640000, 0x195DA1FE, 80);
+			Assert.Equal(54, MagicBuffDataCodec.Build(payload).Length);
 			Assert.Equal(0x195DA1FEu, ActiveBuff.NonceFromPayload(payload));
 			Assert.Equal(6400000u, ActiveBuff.DurationMsFromPayload(payload)); // 640000 cs -> ms
 
-			// The empty removal twin carries no duration/nonce - the extractors must not read off the end.
-			Assert.Equal(0u, ActiveBuff.NonceFromPayload([]));
-			Assert.Equal(0u, ActiveBuff.DurationMsFromPayload([]));
+			// The removal twin carries NO data region at all - the extractors take the absence, not an empty array.
+			Assert.Equal(0u, ActiveBuff.NonceFromPayload(null));
+			Assert.Equal(0u, ActiveBuff.DurationMsFromPayload(null));
 		}
 	}
 }

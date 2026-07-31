@@ -41,27 +41,22 @@ namespace Faolan.GameServer.World
 		// field is in CENTISECONDS (hundredths of a second - the same ×10ms unit as the RDB cast-time field), so this
 		// scales by 10 and callers stay in ms. Calibrated in-client: Rend 700 -> 7s, Butcher 400 -> 4s,
 		// Poacher-Marksman 600 -> 6s, Exhausted 10000 -> 100s. (#274)
-		public static uint DurationMsFromPayload(byte[] payload)
+		//
+		// ⚠️ It takes the decoded VALUE, not bytes. The buff pipeline used to carry the payload as pre-built bytes and
+		// re-Parse them here, which made `MagicBuffDataCodec` a codec the SERVICE composed rather than its parent
+		// (#539); `MagicBuffCodec.Build(..., MagicBuffData)` composes it now, so nothing but the codec ever holds the
+		// encoded form. `null` = the removal twin, which carries no data region at all.
+		public static uint DurationMsFromPayload(MagicBuffData? payload)
 		{
-			return Payload(payload)?.Duration * 10 ?? 0;
+			return payload?.Duration * 10 ?? 0;
 		}
 
 		// The per-application effect nonce an ApplySpell payload carries. It is the LOW half of the record's u64
 		// expiry-stamp slot, which is where our sender puts it - the `effectNonce` spelling is a misnomer the codec
 		// documents and this file keeps because it is also a persisted column name. (#274)
-		public static uint NonceFromPayload(byte[] payload)
+		public static uint NonceFromPayload(MagicBuffData? payload)
 		{
-			return (uint)(Payload(payload)?.ExpiryStamp ?? 0);
-		}
-
-		// The APPLY payload decoded, or null when there is none to decode: the removal twin carries an EMPTY payload,
-		// and the only form in traffic is the 54-byte apply (MagicBuffDataCodec). Reading it through the codec is what
-		// removed the two fixed offsets (+8 and end-4) this file used to index by.
-		private static MagicBuffData? Payload(byte[] payload)
-		{
-			return payload is { Length: MagicBuffDataCodec.Length }
-				? MagicBuffDataCodec.Parse(payload)
-				: null;
+			return (uint)(payload?.ExpiryStamp ?? 0);
 		}
 	}
 }

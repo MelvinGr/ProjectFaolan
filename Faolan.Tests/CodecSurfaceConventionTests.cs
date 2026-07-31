@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Collections.Concurrent;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Text.RegularExpressions;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
@@ -16,14 +19,13 @@ namespace Faolan.Tests
 	// this file pins the SHAPE: every codec is `byte[] Build(...)` + `T Parse(in ReadOnlySpan<byte>)` and nothing
 	// else public, reading sequentially through SpanReader to the end of the body.
 	//
-	// ⚠️ Most tests here are still SKIPPED, deliberately, and each Skip names the wave that un-skips it. The conversion
-	// runs folder by folder; a gate that went live in wave 0 would be red for the whole sweep and would just get muted.
-	// The bodies are written so that un-skipping is a one-line change and so the rule has an executable definition
-	// rather than only prose. Removing a Skip is part of landing that wave - not a separate cleanup.
+	// ALL SIXTEEN GATES ARE LIVE as of wave 9, over EVERY folder under `Codecs/`. They were added skipped in wave 0
+	// and un-skipped a wave at a time, each asserting only over the folders converted so far - a gate that had gone
+	// live in wave 0 would have been red for the whole sweep and would just have got muted. `MigratedFolders` is read
+	// off disk now, so a NEW folder is covered the moment it exists.
 	//
-	// The LIVE gates assert over `MigratedFolders` only, which is what lets them go live a wave at a time: the gate
-	// tightens as the sweep advances instead of waiting for the end, when nothing would be left to catch. Wave 9 drops
-	// the filter.
+	// Two allowlists remain (`UncomposedSubRecords`, `UnreadableInTheCorpus`); every entry names the DECODE issue that
+	// removes it, and #530 decoded nothing. They are not places to silence a gate.
 	//
 	// Wave order (see #530): 1 Inventory/Feats/Team/Guild · 2 Text/Dialogue/Economy · 3 World · 4 Combat ·
 	// 5 Spawn/Quest · 6 FullCharSnapshot (+#447) · 7 Faolan/ moves in · 8 Faolan.Importer/ stops hand-decoding ·
@@ -32,14 +34,38 @@ namespace Faolan.Tests
 	{
 		private const string CodecsNamespace = "Faolan.Core.Network.Codecs";
 
-		// The folders converted to the uniform surface so far. ADD A FOLDER AS ITS WAVE LANDS - that is what makes the
-		// gates below binding on it, and leaving it out is how a converted folder silently stops being checked.
+		// EVERY folder under Codecs/, enumerated from disk. This was a hand-maintained list of the folders converted so
+		// far, which is what let the gates go live a wave at a time; wave 9 drops the filter, so a NEW folder is
+		// covered the moment it exists rather than when someone remembers to add it here.
 		private static readonly string[] MigratedFolders =
-			[RootFolder, "Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat", "Quest", "Spawn", "FullCharSnapshot", "PlayerAgent", "Economy"];
+		[
+			RootFolder,
+			.. Directory.EnumerateDirectories(TestPaths.Repo("Faolan.Core.Network", "Codecs")).Select(d => Path.GetFileName(d)!).Order(StringComparer.Ordinal)
+		];
+
+		// A genuine sub-record whose PARENT does not compose it yet - not a place to silence the gate, and each entry
+		// names the issue that removes it. `StatListCodec` is the typed reading of the snapshot's stat region, but
+		// `SubClassPostAccessBlockCodec` carries that region as a flat `uint[]` and `SubClassStatBlock` lays the two
+		// lists out as words, so there are two spellings of one layout in the folder. Replacing the flat view is
+		// snapshot decode work, not a surface change: Gitea #543. (`KnownSpellListCodec` is in the same position and
+		// only passes incidentally, because two neighbours reference its constants.)
+		private static readonly string[] UncomposedSubRecords = ["StatListCodec"];
+
+		// Codecs the corpus round-trip cannot yet cover, each with the DECODE issue that removes it. #530 explicitly
+		// decodes nothing, and every one of these is a real gap the gate FOUND rather than a shape problem:
+		//   QuestJournalCodec (31/38 bodies)  - "RRL3" is not a magic and the tracked-quest pointer's list is not
+		//                                       empty: Gitea #544
+		//   QuestLogListCodec (8/46 bodies)   - three asserted constants that are not constant: Gitea #545
+		//   FullPlayerCharacterCodec (7/151)  - the protobuf ROOT re-encodes one byte shorter: Gitea #538
+		// ⚠️ Entries are per CODEC, not per body, so an entry hides the codec's PASSING bodies too. Delete one the
+		// moment its issue closes - the value of this gate is that the list is short and shrinking.
+		private static readonly string[] UnreadableInTheCorpus = ["QuestJournalCodec", "QuestLogListCodec", "FullPlayerCharacterCodec"];
 
 		// The ROOT of Codecs/ itself - the codecs that sit in `Faolan.Core.Network.Codecs` with no domain folder.
 		// Spelled as a sentinel rather than "" so the two places that expand it read as deliberate.
 		private const string RootFolder = ".";
+
+		private static readonly ConcurrentDictionary<MethodInfo, Func<byte[], object?>> Parsers = new();
 
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 		private static readonly Regex ConstOffset = new(@"\bconst\s+int\s+\w*(Offset|Pos)\b");
@@ -297,17 +323,17 @@ namespace Faolan.Tests
 		// listener has no business knowing the mail template exists). `NpcChatterCodec` cleared with the ChatServer
 		// bodies: the world model caches the bark VALUE and `CharacterChatCodec` renders it.
 		//
-		// ONE is left, and it is a buff-PIPELINE change rather than a codec one: `MagicBuffDataCodec` is composed by
-		// `Faolan/` because `NpcSpellCast` stores its payload as BYTES on the world model, so the broadcaster builds
-		// the 54 bytes at spawn time. Giving that record a typed `MagicBuffData` is the same fix the chatter barks just
-		// got, and it reaches `ActiveBuff` / `WorldSimulation` / `MountCatalog` / the `NpcSpell` columns. Wave 4 also
-		// keeps `MagicBuffIIR.Data` opaque deliberately, so the parent needs a typed Build OVERLOAD rather than a
-		// retyped value.
+		// The last one, `MagicBuffDataCodec`, cleared in wave 9 and it was a buff-PIPELINE change rather than a codec
+		// one: `NpcSpellCast` stored its payload as BYTES on the world model, so the broadcaster built the 54 bytes at
+		// spawn time and `ActiveBuff` re-Parsed them to read a duration back out. The record carries the VALUE now and
+		// `MagicBuffCodec.Build(applyTo, applyFrom, wireSpellId, MagicBuffData?)` composes it - a typed Build OVERLOAD
+		// rather than a retyped value, because wave 4 keeps `MagicBuffIIR.Data` opaque on purpose (the END twin carries
+		// no data at all, which is what the overload's `null` says).
 		//
 		// Two blind spots WERE fixed while proving the list: the field scan missed `HandledOpcodes` (so the two Team
 		// codecs that do declare their identity were flagged), and "standalone" ignored §6's own definition, which is
 		// "nothing else composes it" - that alone cleared `RemoteFormatScreenCodec`.
-		[Fact(Skip = "un-skip when #539's last offender lands - MagicBuffDataCodec needs NpcSpellCast to carry the VALUE instead of pre-built bytes")]
+		[Fact]
 		public void RpcMessageCodecsDeclareTheirMethodOpcode()
 		{
 			// A codec with a standalone body but no IIR opcode is an RPC-message codec: it must declare its method
@@ -326,16 +352,18 @@ namespace Faolan.Tests
 
 		// Keeps the (a)/(b)/(c) taxonomy from rotting: a codec that declares no opcode must be COMPOSED by another
 		// codec. A "sub-record" nobody composes is really a standalone message with its identity recorded nowhere.
-		[Fact(Skip = "un-skip in wave 9")]
+		[Fact]
 		public void EveryCodecIsClassified()
 		{
 			var sources = CodecSourceFiles().ToDictionary(f => f, File.ReadAllText);
 			var offenders = new List<string>();
 
-			foreach (var t in CodecModules.Where(t => !DeclaredOpcodes(t).Any() && Fields(t).All(f => !f.Name.EndsWith("Opcode", StringComparison.Ordinal))))
+			// Via DeclaresAnOpcode, so `HandledOpcodes` (the RPC twin of `HandledTypes`) counts - the plural was the
+			// blind spot wave 7 fixed in RpcMessageCodecsDeclareTheirMethodOpcode and this gate had its own copy of.
+			foreach (var t in CodecModules.Where(t => !DeclaredOpcodes(t).Any() && Fields(t).All(f => !DeclaresAnOpcode(f))))
 			{
 				var composed = sources.Any(kv => !kv.Key.EndsWith($"{t.Name}.cs", StringComparison.Ordinal) && kv.Value.Contains($"{t.Name}.", StringComparison.Ordinal));
-				if (!composed)
+				if (!composed && !UncomposedSubRecords.Contains(t.Name))
 					offenders.Add($"{t.Name} declares no opcode but nothing composes it - it is a standalone message with no declared identity");
 			}
 
@@ -373,38 +401,59 @@ namespace Faolan.Tests
 		// reproduce the input EXACTLY, and Parse(Build(v)) must equal v. Subsumes rule 3 - a codec that skips a
 		// region cannot reproduce it on the way out, so a partial decode fails here even if EnsureAtEnd() passed.
 		// Sub-record codecs are covered transitively through the parent that composes them.
-		[Fact(Skip = "un-skip per wave; live from wave 9")]
+		//
+		// ⚠️ It parses the RECORD, `entry.Body[4..]`, not `entry.Full`. `Body` is `[u32 carrier length][record]` and
+		// rule 2 took that length off every `Build`, so handing the gate the framed form would fail every codec for
+		// the framing rather than for its grammar. (The draft written in wave 0 invoked `Parse` on `entry.Full`, i.e.
+		// the whole packet - it predates rule 2 landing.)
+		//
+		// Codecs with their own dedicated corpus gate (`SimpleCharFullUpdateCorpusTests`, `MoveTaskCodecCorpusTests`,
+		// `SpawnPreIirCorpusTests`) are NOT excluded: those assert over ALL captured bodies and report a census, this
+		// samples 50 per type and asserts nothing else. Overlap is cheap; a codec silently losing its only coverage is
+		// not.
+		[Fact]
 		public void BuildParseRoundTripsOverTheCorpus()
 		{
 			var failures = new List<string>();
+			var covered = 0;
 			foreach (var t in CodecModules)
 			{
 				var parse = Methods(t).SingleOrDefault(m => m.Name == "Parse");
 				var build = Methods(t).FirstOrDefault(m => m.Name == "Build" && m.GetParameters() is [{ } p] && p.ParameterType == parse?.ReturnType);
-				if (parse == null || build == null)
+				if (parse == null || build == null || UnreadableInTheCorpus.Contains(t.Name))
 					continue;
 
 				foreach (var op in DeclaredOpcodes(t))
 				foreach (var entry in CorpusExtract.PacketsOfType((uint)op).Take(50))
 				{
+					var record = entry.Body[4..]; // the u32 carrier length is the sender's (#530 rule 2)
 					object? value;
 					try
 					{
-						value = parse.Invoke(null, [entry.Full]);
+						value = ParserFor(parse)(record);
 					}
-					catch (TargetInvocationException e)
+					// The emitted call is a DIRECT call, so the codec's own exception arrives unwrapped - there is no
+					// TargetInvocationException to unpack, unlike a MethodInfo.Invoke.
+					catch (CodecParseException e)
 					{
-						failures.Add($"{t.Name} failed to parse a captured {op} from {entry.Source}: {e.InnerException?.Message}");
+						failures.Add($"{t.Name} failed to parse a captured {op} from {entry.Source}: {e.Message}");
 						continue;
 					}
 
+					covered++;
 					var rebuilt = (byte[])build.Invoke(null, [value])!;
-					if (!rebuilt.AsSpan().SequenceEqual(entry.Full))
-						failures.Add($"{t.Name} did not reproduce a captured {op} from {entry.Source} ({entry.Full.Length} -> {rebuilt.Length} bytes)");
+					if (!rebuilt.AsSpan().SequenceEqual(record))
+						failures.Add($"{t.Name} did not reproduce a captured {op} from {entry.Source} ({record.Length} -> {rebuilt.Length} bytes)");
 				}
 			}
 
-			Assert.True(failures.Count == 0, "Parse -> Build must reproduce the captured bytes exactly:\n  " + string.Join("\n  ", failures.Take(25)));
+			Assert.True(failures.Count == 0,
+				$"Parse -> Build must reproduce the captured bytes exactly ({failures.Count} failures; " +
+				string.Join(", ", failures.GroupBy(f => f.Split(' ')[0]).Select(g => $"{g.Key} x{g.Count()}")) + "):\n  " + string.Join("\n  ", failures.Take(25)));
+
+			// A gate that reflects its way to zero work passes silently, which is the one failure mode it cannot
+			// report itself. The extract carries 9 IIR types; this is the floor, not a count to keep in step.
+			Assert.True(covered > 200, $"the corpus round-trip only exercised {covered} bodies - it is reflecting its way to nothing");
 		}
 
 		// LIVE from wave 7b: Economy held the last two implementations (`TradepostListingCodec.ParsedResults` and
@@ -500,6 +549,35 @@ namespace Faolan.Tests
 			return CodecSourceFiles()
 				.Where(f => !f.EndsWith($"{t.Name}.cs", StringComparison.Ordinal))
 				.Any(f => File.ReadAllText(f).Contains($"{t.Name}.", StringComparison.Ordinal));
+		}
+
+		// `Parse(in ReadOnlySpan<byte>)` cannot be reached through `MethodInfo.Invoke`: a `ReadOnlySpan<byte>` is a ref
+		// struct, so it cannot be boxed into the `object[]` an Invoke takes, and the parameter is additionally by-ref
+		// ("Object of type 'System.Byte[]' cannot be converted to type 'System.ReadOnlySpan`1[System.Byte]&'"). Nor can
+		// an expression tree build one - they support neither ref-struct locals nor by-ref parameters.
+		//
+		// So the call is emitted: wrap the array, take its address, call, box a value type. This is the whole reason
+		// the strongest gate in the set could not simply be un-skipped, and it is confined to this one helper - if
+		// `Parse`'s signature ever changes, this fails loudly at emit time rather than silently covering nothing.
+		private static Func<byte[], object?> ParserFor(MethodInfo parse)
+		{
+			return Parsers.GetOrAdd(parse, static m =>
+			{
+				var dm = new DynamicMethod($"parse_{m.DeclaringType!.Name}", typeof(object), [typeof(byte[])], typeof(CodecSurfaceConventionTests).Module, true);
+				var il = dm.GetILGenerator();
+				il.DeclareLocal(typeof(ReadOnlySpan<byte>));
+				il.Emit(OpCodes.Ldarg_0);
+				il.Emit(OpCodes.Call, typeof(ReadOnlySpan<byte>).GetMethod("op_Implicit", [typeof(byte[])])!);
+				il.Emit(OpCodes.Stloc_0);
+				il.Emit(OpCodes.Ldloca_S, (byte)0);
+				il.Emit(OpCodes.Call, m);
+				if (m.ReturnType.IsValueType)
+					il.Emit(OpCodes.Box, m.ReturnType);
+
+				il.Emit(OpCodes.Ret);
+
+				return dm.CreateDelegate<Func<byte[], object?>>();
+			});
 		}
 
 		private static IEnumerable<MethodInfo> Methods(Type t)

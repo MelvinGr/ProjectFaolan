@@ -51,6 +51,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return Build(new MagicBuffIIR(applyTo, 0x00, MagicBuffIds.BaseOf(wireSpellId), MagicBuffIds.FormOf(wireSpellId), applyFrom, data ?? []));
 		}
 
+		// The TYPED apply: the parent composes its own data region rather than being handed 54 pre-built bytes.
+		// `null` is the END twin, which carries no data at all - that is the whole reason `MagicBuffIIR.Data` stays
+		// opaque, so the choice lives here in the overload rather than in the value (#530 rule 5b / #539).
+		public static byte[] Build(uint applyTo, uint applyFrom, uint wireSpellId, MagicBuffData? data)
+		{
+			return Build(applyTo, applyFrom, wireSpellId, data == null
+				? null
+				: MagicBuffDataCodec.Build(data));
+		}
+
 		public static MagicBuffIIR Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(MagicBuffCodec));

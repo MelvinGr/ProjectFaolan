@@ -1,3 +1,4 @@
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
 using Xunit;
 
@@ -23,14 +24,14 @@ namespace Faolan.Tests
 		{
 			// The verbatim 54-byte ride-buff payload from the mount capture (frame 520): duration@8 = 8_640_000 cs
 			// (24 h), spell base 0x31EB15 @22, magnitude 80, effect nonce 0x1560F9BB @50. Now CONSTRUCTED via
-			// SelfBuffCodec.BuildBuffDataLong instead of a verbatim blob.
+			// MagicBuffDatas.Apply instead of a verbatim blob.
 			byte[] captured =
 			[
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x83, 0xD6, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x31, 0xEB, 0x15, 0x00, 0x00, 0x00, 0x50,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x15, 0x60, 0xF9, 0xBB
 			];
 
-			Assert.Equal(captured, MountCatalog.RideBuffPayload(80)); // the mount capture is a level-80 character (#438)
+			Assert.Equal(captured, MagicBuffDataCodec.Build(MountCatalog.RideBuffPayload(80))); // the mount capture is a level-80 character (#438)
 		}
 
 		[Fact]

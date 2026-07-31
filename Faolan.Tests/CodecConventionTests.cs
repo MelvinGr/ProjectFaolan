@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Constants;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -64,29 +65,18 @@ namespace Faolan.Tests
 		private static readonly Regex EndpointClassLiteral = new(
 			@"\b0x(0C384054|1D359116|28377648|3D744981|5B9756FC|604DDBA0|6C67C147|6DD55614|7D155738|82F20484|8B87F791|A9ECB95D|B171CE13|BBD560C8|F2C2D5B5)\b", RegexOptions.IgnoreCase);
 
-		private static IEnumerable<Type> CodecTypes => typeof(ICodec<>).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith(CodecsNamespace, StringComparison.Ordinal));
+		// Anchored on Endpoints (Faolan.Core.Network/Constants): the old anchor was `ICodec<>`, deleted in #530 wave 9.
+		private static IEnumerable<Type> CodecTypes => typeof(Endpoints).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith(CodecsNamespace, StringComparison.Ordinal));
 
-		// (6) The two codec SHAPES keep distinct names. A `*Codec`/`*Builder` is a static MODULE of stateless ops; a
-		// wire VALUE is a record/class named after the value it holds, implementing ICodec<T> (see ICodec.cs). So a
-		// type that implements ICodec<T> is a value and must not wear the module suffix.
+		// (6) WAS `TypesImplementingICodec_AreNotNamedCodec`: a `*Codec`/`*Builder` is a static MODULE of stateless
+		// ops, while a self-serializing `ICodec<T>` was a wire VALUE, so a type could not be both. Thirteen were -
+		// AreaFormulaCodec, ChainKillCodec, CrimeCodec, RegenCodec, ... - one batch of V1 IIR decoders that all copied
+		// the same wrong shape, which is how `ChainKillCodec.Parse(body)` came to return a `ChainKillCodec`: a "codec"
+		// that is a value.
 		//
-		// Thirteen did - AreaFormulaCodec, ChainKillCodec, CrimeCodec, RegenCodec, ... - one batch of V1 IIR decoders
-		// that all copied the same wrong shape, which is how `ChainKillCodec.Parse(body)` came to return a
-		// `ChainKillCodec`: a "codec" that is a value. The sibling types got it right by nesting the value inside the
-		// module (a nested `Message` record), so both spellings of one idea were in the same folder. #530's uniform
-		// surface removed both: a value is a plain record beside its module, and neither is called a codec.
-		[Fact]
-		public void TypesImplementingICodec_AreNotNamedCodec()
-		{
-			var bad = CodecTypes
-				.Where(t => t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICodec<>)))
-				.Where(t => t.Name.EndsWith("Codec", StringComparison.Ordinal) || t.Name.EndsWith("Builder", StringComparison.Ordinal))
-				.Select(t => t.FullName!)
-				.ToList();
-
-			Assert.True(bad.Count == 0,
-				"a type implementing ICodec<T> is a wire VALUE - name it after the value, not `*Codec`/`*Builder` (those suffixes mean a static codec module):\n  " + string.Join("\n  ", bad));
-		}
+		// The rule is GONE rather than moved, because #530 removed the shape it policed: `ICodec<T>` is deleted (wave
+		// 9), a value is a plain record beside its module, and neither is called a codec.
+		// `CodecSurfaceConventionTests.NoIcodecImplementations` is what keeps the interface from coming back.
 
 		// (7) The RPC ENDPOINT class ids come from Endpoints, never a hand-rolled hash. Same rule as EntityClass
 		// below, for the other id namespace: these are BKDR-31 hashes of the client's class names
