@@ -434,9 +434,12 @@ namespace Faolan.Importer.Extractors
 				if (body.Length < SpawnPacketBuilder.HandleOffset + sizeof(uint))
 					continue;
 
-				// The name scan lives beside the spawn codec now (SpawnNameScan); the handle is at the codec's own
-				// header offset.
-				if (SpawnNameScan.Any(body) is { } name)
+				// The name comes off the CoreCharacter message (#541); the handle is at the codec's own header
+				// offset. This used to use a lenient byte scan that started at offset 16 and accepted a
+				// SINGLE-character run with no letter in it - which on one captured spawn named a Crocodile "\",
+				// because a stray 0x0A ahead of the message won. The reader finds the same name on every other one
+				// of the 11632 captured spawns, and names nothing extra.
+				if (SpawnBodyReader.TryReadCharacterMessage(body, out var read) && read.Message.Name is { Length: > 0 } name)
 					map[body.ReadU32Be(SpawnPacketBuilder.HandleOffset)] = name;
 			}
 

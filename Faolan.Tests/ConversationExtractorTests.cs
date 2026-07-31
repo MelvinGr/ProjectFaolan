@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Extensions;
+using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
 using Xunit;
 
@@ -193,17 +194,24 @@ namespace Faolan.Tests
 			return new CapturedPacket(0, true, opcode, subOpcode, Frame(new byte[8]));
 		}
 
+		// ⚠️ The name rides a REAL length-prefixed CoreCharacter message, serialized by the generated type (#541).
+		// This used to lay down a bare `0x0A <len> <name>`, which is not a spawn - it only ever satisfied the lenient
+		// byte scan the extractor has stopped using. `SpawnBodyReader.TryReadCharacterMessage` verifies the u32
+		// length ahead of field 1 and re-decodes the message, so the fixture has to carry one.
 		private static CapturedPacket Spawn(uint handle, string name)
 		{
-			var nb = Encoding.ASCII.GetBytes(name);
-			var body = new byte[20 + 2 + nb.Length];
+			var message = new ProtoCoreCharacterIIR
+			{
+				Name = name
+			}.ToProtobuf();
+
+			var body = new byte[20 + 4 + message.Length];
 			body.WriteU32Be(0, (uint)body.Length);
 			body.WriteU32Be(4, 0xFA015807);
 			body.WriteU32Be(8, 0x0000C350);
 			body.WriteU32Be(12, handle);
-			body[20] = 0x0A;
-			body[21] = (byte)nb.Length;
-			nb.CopyTo(body, 22);
+			body.WriteU32Be(20, (uint)message.Length); // the message's own length prefix
+			message.CopyTo(body, 24);
 			return new CapturedPacket(0, true, 0x2000, 0xFA015807, Frame(body));
 		}
 

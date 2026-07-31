@@ -225,10 +225,12 @@ namespace Faolan.Importer.Extractors
 			if (SpawnBodyReader.TryReadCharacterMessage(body, out var pr) && pr.Message.player_stats != null)
 				return false;
 
+			// The name comes off the CoreCharacter message and nowhere else (#541). This used to fall back to a
+			// lenient byte scan for the name field; measured over the whole corpus, that fallback NEVER fires - of
+			// 11632 captured char spawns the scan and the message reader name the same 11631, and the one they
+			// disagree on is the scan getting it wrong (a 1-character "\" where the message says "Crocodile").
 			var identity = LiftIdentity(body);
-			var name = !string.IsNullOrEmpty(identity.Name)
-				? identity.Name
-				: SpawnNameScan.Plausible(body);
+			var name = identity.Name;
 
 			// Humanoid appearance/morph table (#185) - decoded from the post-IIR; empty for animals. The clean shape
 			// decodes directly; a mid-session humanoid capture carries the SAME table behind a runtime record1, lifted
