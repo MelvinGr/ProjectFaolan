@@ -20,27 +20,22 @@ namespace Faolan.Tests
 		private const uint CharId = 0x01316d8a;
 
 		[Fact]
-		public void RemoveItemBody_EncodesFields()
+		public void RemoveItem_RoundTripsItsFields()
 		{
-			var s = new FaolanStream();
-			RemoveItemBody.WriteRemoveItemBody(s, ContainerKind.Bag, CharId, 5, 2);
-			var body = s.ToArray();
+			var value = new RemoveItem(ContainerKind.Bag, CharId, 5, 2);
+			var body = RemoveItemCodec.Build(value);
 
 			Assert.Equal(16, body.Length);
-			var r = new FaolanStream(body);
-			Assert.Equal((uint)ContainerKind.Bag, r.ReadUInt32());
-			Assert.Equal(CharId, r.ReadUInt32());
-			Assert.Equal(5u, r.ReadUInt32());
-			Assert.Equal(2u, r.ReadUInt32());
+			Assert.Equal(value, RemoveItemCodec.Parse(body));
 		}
 
 		[Fact]
-		public void RemoveItemBody_MatchesCapture()
+		public void RemoveItem_MatchesCapture()
 		{
-			var s = new FaolanStream();
-			RemoveItemBody.WriteRemoveItemBody(s, EquippedContainer, CharId, 0, 0);
+			var body = RemoveItemCodec.Build(new RemoveItem(EquippedContainer, CharId, 0, 0));
 
-			Assert.Equal(CapturedBody, Convert.ToHexStringLower(s.ToArray()));
+			Assert.Equal(CapturedBody, Convert.ToHexStringLower(body));
+			Assert.Equal(CapturedBody, Convert.ToHexStringLower(RemoveItemCodec.Build(RemoveItemCodec.Parse(Convert.FromHexString(CapturedBody)))));
 		}
 	}
 }

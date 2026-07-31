@@ -1,5 +1,4 @@
 using System;
-using Faolan.Core;
 using Faolan.Core.Network.Codecs.Economy;
 using Xunit;
 
@@ -10,22 +9,19 @@ namespace Faolan.Tests
 	public class UpdateCashTests
 	{
 		[Fact]
-		public void UpdateCashBody_Matches_CapturedFirstCoinLoot()
+		public void UpdateCash_Matches_CapturedFirstCoinLoot()
 		{
-			var s = new FaolanStream();
-			UpdateCashBody.WriteUpdateCashBody(s, 2, UpdateCashReason.Gain);
+			var body = UpdateCashCodec.Build(new UpdateCash(2, UpdateCashReason.Gain));
 
-			Assert.Equal("000000000000000200000003", Convert.ToHexStringLower(s.ToArray()));
+			Assert.Equal("000000000000000200000003", Convert.ToHexStringLower(body));
+			Assert.Equal(new UpdateCash(2, UpdateCashReason.Gain), UpdateCashCodec.Parse(body));
 		}
 
 		[Fact]
-		public void UpdateCashBody_Spend_UsesReasonZero()
+		public void UpdateCash_Spend_UsesReasonZero()
 		{
 			// The DemoL80 capture shows a DECREASED balance with reason 0 (a purchase): 0x2638 after 0x26E8.
-			var s = new FaolanStream();
-			UpdateCashBody.WriteUpdateCashBody(s, 0x2638, UpdateCashReason.Spend);
-
-			Assert.Equal("000000000000263800000000", Convert.ToHexStringLower(s.ToArray()));
+			Assert.Equal("000000000000263800000000", Convert.ToHexStringLower(UpdateCashCodec.Build(new UpdateCash(0x2638, UpdateCashReason.Spend))));
 		}
 	}
 }

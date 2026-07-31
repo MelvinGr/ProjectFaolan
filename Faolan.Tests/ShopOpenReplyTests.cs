@@ -1,6 +1,5 @@
 using System;
 using Faolan.Core.Network.Codecs.Combat;
-using Faolan.Core.Network.Codecs.Economy;
 using Xunit;
 
 namespace Faolan.Tests
@@ -10,7 +9,7 @@ namespace Faolan.Tests
 	// (frame 1188, player 0x08006F31 -> vendor 0x000439AD) is answered by the 0x0D155695 trade-select echo
 	// (frame 1189) and the BARE BCC echo-ack (frame 1193 first record - the standard behavior echo without
 	// the combat ack's 12-zero pad), then DispatchShopData (already covered by ShopTests).
-	public class ShopOpenBuilderTests
+	public class ShopOpenReplyTests
 	{
 		[Fact]
 		public void BareBehaviorEchoAck_IsByteIdenticalToFrame1193()
@@ -26,14 +25,17 @@ namespace Faolan.Tests
 			Assert.Equal(captured, built);
 		}
 
+		// The trade-select echo is a plain LookAtIIR select - it had its own emitter (`ShopOpenBuilder`) under the same
+		// opcode until #530 wave 7 merged it into LookAtCodec, one IIR one codec.
 		[Fact]
-		public void BuildTradeSelectEcho_IsByteIdenticalToFrame1189()
+		public void TradeSelectEcho_IsByteIdenticalToFrame1189()
 		{
 			var captured = Convert.FromHexString("0d1556950000c35008006f31000000c350000439ad0000000000000002");
 
-			var built = ShopOpenBuilder.BuildTradeSelectEcho(0x08006F31, 0x000439AD);
+			var built = LookAtCodec.Build(LookAts.Select(0x08006F31, 0x000439AD));
 
 			Assert.Equal(captured, built);
+			Assert.Equal(captured, LookAtCodec.Build(LookAtCodec.Parse(captured)));
 		}
 	}
 }

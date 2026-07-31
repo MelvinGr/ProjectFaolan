@@ -8,8 +8,8 @@
 ## Headline
 
 - **826** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **80** IIR carrier types: **61 V3** (byte-exact builder), **19 V2** (built, no golden), **0 V1** (no builder found).
-- **69** codec classes, **50** with a byte-exact test.
+- **80** IIR carrier types: **60 V3** (byte-exact builder), **20 V2** (built, no golden), **0 V1** (no builder found).
+- **68** codec classes, **49** with a byte-exact test.
 - **8** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -41,7 +41,7 @@ the margins, but never invents a golden that isn't there.
 | Level | IIR type | Built by |
 |-------|----------|----------|
 | V3 | `AddToGroupIIR` | `GroupMembershipCodec` |
-| V3 | `BankIIR` | `BankIirCodec` |
+| V3 | `BankIIR` | `BankCodec` |
 | V3 | `BehaviorControlCenterIIR` | `BehaviorControlCenterCodec` |
 | V3 | `CharDCMoveIIR` | `CharDCMoveCodec` |
 | V3 | `ChatTextIIR` | `ChatTextCodec` |
@@ -67,7 +67,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `KnubotCloseChatWindowIIR` | `KnubotCodec` |
 | V3 | `KnubotOpenChatWindowIIR` | `KnubotCodec` |
 | V3 | `KnubotStartTradeIIR` | `KnubotStartTradeCodec` |
-| V3 | `LookAtIIR` | `LookAtCodec`, `ShopOpenBuilder` |
+| V3 | `LookAtIIR` | `LookAtCodec` |
 | V3 | `LootBagFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `LootRemoveItemsIIR` | `LootRemoveItemsCodec` |
 | V3 | `MagicBuffIIR` | `MagicBuffCodec` |
@@ -97,8 +97,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `StopIIR` | `StopCodec` |
 | V3 | `ThreatLevelIIR` | `ThreatLevelCodec` |
 | V3 | `TombStoneFullUpdateIIR` | `WorldObjectCodec` |
-| V3 | `TradeskillReplyIIR` | `TradeskillRecipeCodec` |
-| V3 | `TradeskillRequestIIR` | `TradeskillRecipeCodec` |
+| V3 | `TradeskillReplyIIR` | `TradeskillReplyCodec` |
 | V3 | `UpdateInventoryIIR` | `UpdateInventoryCodec` |
 | V3 | `UpdateSimpleDynelIIR` | `UpdateSimpleDynelCodec` |
 | V2 | `AreaFormulaIIR` | `AreaFormulaCodec` |
@@ -120,3 +119,4 @@ the margins, but never invents a golden that isn't there.
 | V2 | `SpellBookIIR` | `SpellBookCodec` |
 | V2 | `StatIIR` | `StatCodec` |
 | V2 | `TemplateActionIIR` | `TemplateActionCodec` |
+| V2 | `TradeskillRequestIIR` | `GameServerListener.Inbound` *(inline)* |

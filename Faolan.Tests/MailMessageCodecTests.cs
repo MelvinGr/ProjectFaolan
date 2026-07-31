@@ -49,9 +49,7 @@ namespace Faolan.Tests
 		{
 			var mail = MailMessageCodec.Parse(Convert.FromHexString(AttachmentBody));
 
-			var body = MailMessageCodec.Build(mail, true);
-
-			Assert.Equal(AttachmentBody, Convert.ToHexStringLower(body));
+			Assert.Equal(AttachmentBody, Convert.ToHexStringLower(MailMessageCodec.Build(mail)));
 		}
 
 		[Fact]
@@ -59,21 +57,21 @@ namespace Faolan.Tests
 		{
 			var mail = MailMessageCodec.Parse(Convert.FromHexString(BaseBody));
 
-			var body = MailMessageCodec.Build(mail, true);
-
-			Assert.Equal(BaseBody, Convert.ToHexStringLower(body));
+			Assert.Equal(BaseBody, Convert.ToHexStringLower(MailMessageCodec.Build(mail)));
 		}
 
 		[Fact]
 		public void Build_WithoutAttachments_DropsTheItem()
 		{
 			// The base mail (poll / GetAllMails) is the attachment mail with the items withheld - i.e. the 754 B
-			// mail rebuilt with includeAttachments=false reproduces the 629 B body (same mailId/recipient/footer).
+			// mail rebuilt with no attachments reproduces the 629 B body (same mailId/recipient/footer). The withholding
+			// is now the ROW mapper's `includeAttachments`, so this goes through it, which also proves the row
+			// round-trip: decoded -> rows -> value -> the SAME bytes.
 			var mail = MailMessageCodec.Parse(Convert.FromHexString(AttachmentBody));
+			var row = MailColumns.ToRow(mail);
 
-			var body = MailMessageCodec.Build(mail, false);
-
-			Assert.Equal(BaseBody, Convert.ToHexStringLower(body));
+			Assert.Equal(BaseBody, Convert.ToHexStringLower(MailMessageCodec.Build(row, false)));
+			Assert.Equal(AttachmentBody, Convert.ToHexStringLower(MailMessageCodec.Build(row, true)));
 		}
 
 		[Fact]
@@ -90,7 +88,7 @@ namespace Faolan.Tests
 
 			var attachment = Assert.Single(mail.Attachments);
 			Assert.Equal(0x20d82b62d02b198bul, attachment.ItemInstanceId);
-			Assert.Equal(5u, attachment.Quantity);
+			Assert.Equal(5u, MailColumns.ToRow(attachment).Quantity);
 		}
 	}
 }

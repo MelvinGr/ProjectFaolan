@@ -53,7 +53,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// same everything else; the mode is this word. That is one observation, but it is the cleanest kind: a controlled
 	// A/B on one map, minutes apart, with the player narrating which was which.
 	public sealed record PlayfieldProxy(uint MapId, uint ClassWord = PlayfieldProxy.PlayfieldClass, uint OwnerId = 0, uint Slot5 = 0, uint InstanceWord = 0, uint InstanceToken = 0,
-		bool Trailing = false, uint OwnerType = 0) : ICodec<PlayfieldProxy>
+		bool Trailing = false, uint OwnerType = 0)
 	{
 		// [0] for every proxy except the revive body's - and, per the note above, the NORMAL difficulty mode.
 		public const uint PlayfieldClass = 0x0000C79C;
@@ -76,8 +76,9 @@ namespace Faolan.Core.Network.Codecs.World
 
 		public const byte Version = 0x62; // 'b'
 
-		// The SpanReader twin of Read(FaolanStream), for codecs already converted to the uniform surface (#530). The
-		// stream form goes away when this file's own wave lands; until then both read the same ten slots.
+		// A SUB-RECORD's composition pair: this value is only ever read/written inside a larger body (PlayfieldFIIR,
+		// the teleport records, a team-member record), so both halves are `internal` (#530 rule 1). The value stopped
+		// implementing `ICodec<PlayfieldProxy>` in wave 7 - a wire value does not serialize itself.
 		internal static PlayfieldProxy Read(ref SpanReader r)
 		{
 			r.ReadU8(); // version 'b'
@@ -93,20 +94,6 @@ namespace Faolan.Core.Network.Codecs.World
 			return new PlayfieldProxy(mapId, classWord, ownerId, slot5, instanceWord, token, r.ReadU8() != 0, ownerType);
 		}
 
-		public static PlayfieldProxy Read(FaolanStream s)
-		{
-			s.ReadByte(); // version 'b'
-			var classWord = s.ReadUInt32();
-			var mapId = s.ReadUInt32();
-			var ownerType = s.ReadUInt32(); // [2] - the owner's ID32 type, see the slot notes
-			var ownerId = s.ReadUInt32(); // [3] - the owner's ID32 instance
-			s.ReadUInt32(); // [4] - 0 in every capture
-			var slot5 = s.ReadUInt32();
-			var instanceWord = s.ReadUInt32();
-			var token = s.ReadUInt32();
-			return new PlayfieldProxy(mapId, classWord, ownerId, slot5, instanceWord, token, s.ReadByte() != 0, ownerType);
-		}
-
 		/// <summary>Whether this playfield is a private copy at all - i.e. whether anyone owns it.</summary>
 		public bool IsInstanced => OwnerType != 0;
 
@@ -116,7 +103,7 @@ namespace Faolan.Core.Network.Codecs.World
 		/// <summary>Whether this is an EPIC-difficulty copy of the playfield rather than a normal one.</summary>
 		public bool IsEpic => ClassWord == EpicPlayfieldClass;
 
-		public void Write(FaolanStream s)
+		internal void Write(FaolanStream s)
 		{
 			s.WriteByte(Version)
 				.WriteUInt32(ClassWord) // [0]

@@ -14,6 +14,8 @@ using Faolan.Core.Protobuf;
 using Faolan.Core;
 using Microsoft.Extensions.Logging;
 
+using Faolan.GameServer.Economy;
+
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener
@@ -43,7 +45,7 @@ namespace Faolan.GameServer
 				RecipientName = buyer,
 				SenderClass = MailConstants.EndpointClass,
 				SenderName = "",
-				BodyXml = TradepostMailBody.BuildItemBought(buyer, listing.SaleId, "", listing.SellerName, listing.Price.ToString()),
+				BodyXml = TradepostMailBodyCodec.Build(new TradepostMailBody(buyer, listing.SaleId, "", listing.SellerName ?? "", listing.Price.ToString())),
 				FooterWord = MailConstants.FooterUnread,
 				Money = 0,
 				Timestamp1 = now,
@@ -274,7 +276,7 @@ namespace Faolan.GameServer
 
 				case TradepostAgentOpcodes.ItemSearch:
 				{
-					var query = TradepostResponses.ParseSearch(body);
+					var query = TradepostItemSearchCodec.Parse(body.ReadRemainingArray());
 					var listings = await Database.GetTradepostListings(query.ItemId, client.Session.Character.RealmId); // #324: realm-local market
 					Logger.LogInformation("Tradepost: {Char} searched lang={Lang} itemId=0x{Item:X} page={Page} -> {Count} listing(s).", client.Session.Character!.Name, query.Lang, query.ItemId,
 						query.Page, listings.Length);

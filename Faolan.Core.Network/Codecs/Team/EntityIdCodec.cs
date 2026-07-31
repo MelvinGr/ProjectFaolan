@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Team
 {
@@ -44,4 +45,15 @@ namespace Faolan.Core.Network.Codecs.Team
 	}
 
 	public sealed record EntityId(uint Class, uint Id);
+
+	// The forms our senders build, as VALUE factories. `Character` is by far the common one - the player-trade
+	// endpoints (DispatchRequestTrade / DispatchStartTrade / DispatchPartnerAcceptedTrade) name one character and
+	// nothing else, which is what folded `PlayerTradeCodec.BuildCharacterRef` into this codec in #530 wave 7.
+	public static class EntityIds
+	{
+		public static EntityId Character(uint characterId)
+		{
+			return new EntityId(EntityClass.Character, characterId);
+		}
+	}
 }

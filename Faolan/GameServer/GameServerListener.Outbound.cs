@@ -86,17 +86,17 @@ namespace Faolan.GameServer
 		// only through this port, addressed by character id because a trade always spans two connections. ---------------
 		Task ITradeOutbound.SendTradeRequest(uint targetId, uint requesterId)
 		{
-			return SendTradeRpc(targetId, GameCharInterfaceOpcodes.DispatchRequestTrade, PlayerTradeCodec.BuildCharacterRef(requesterId));
+			return SendTradeRpc(targetId, GameCharInterfaceOpcodes.DispatchRequestTrade, EntityIdCodec.Build(EntityIds.Character(requesterId)));
 		}
 
 		Task ITradeOutbound.SendTradeStarted(uint recipientId, uint partnerId)
 		{
-			return SendTradeRpc(recipientId, GameCharInterfaceOpcodes.DispatchStartTrade, PlayerTradeCodec.BuildCharacterRef(partnerId));
+			return SendTradeRpc(recipientId, GameCharInterfaceOpcodes.DispatchStartTrade, EntityIdCodec.Build(EntityIds.Character(partnerId)));
 		}
 
 		Task ITradeOutbound.SendPartnerCash(uint recipientId, ulong tin)
 		{
-			return SendTradeRpc(recipientId, GameCharInterfaceOpcodes.DispatchPartnerUpdatedCash, PlayerTradeCodec.BuildCash(tin));
+			return SendTradeRpc(recipientId, GameCharInterfaceOpcodes.DispatchPartnerUpdatedCash, TradeCashCodec.Build(new TradeCash(tin)));
 		}
 
 		// The same body either way; only the opcode says whose side of the table the item is on.
@@ -110,7 +110,7 @@ namespace Faolan.GameServer
 
 			return SendTradeRpc(recipientId, mine
 				? GameCharInterfaceOpcodes.DispatchTradeAddedItem
-				: GameCharInterfaceOpcodes.DispatchTradePartnerAddedItem, PlayerTradeCodec.BuildAddedItem(AddItemBody.SerializeInventoryEntry(entry), count));
+				: GameCharInterfaceOpcodes.DispatchTradePartnerAddedItem, TradeAddedItemCodec.Build(new TradeAddedItem(entry, count)));
 		}
 
 		Task ITradeOutbound.SendAcceptAck(uint recipientId)
@@ -122,7 +122,7 @@ namespace Faolan.GameServer
 
 		Task ITradeOutbound.SendPartnerAccepted(uint recipientId, uint partnerId)
 		{
-			return SendTradeRpc(recipientId, GameCharInterfaceOpcodes.DispatchPartnerAcceptedTrade, PlayerTradeCodec.BuildCharacterRef(partnerId));
+			return SendTradeRpc(recipientId, GameCharInterfaceOpcodes.DispatchPartnerAcceptedTrade, EntityIdCodec.Build(EntityIds.Character(partnerId)));
 		}
 
 		// The empty 0x206D then the toast - retail sends both, in that order, to each party.
@@ -363,10 +363,10 @@ namespace Faolan.GameServer
 		{
 			var handle = client.Session.Character.Id;
 			var rows = await Database.GetRecipes();
-			var records = rows.Select(TradeskillRecipeCodec.ToRecord).ToList();
+			var records = rows.Select(RecipeRecords.FromRow).ToList();
 
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(TradeskillRecipeCodec.BuildReplyIir(handle, records))));
+				b => b.WriteArrayUInt32Length(TradeskillReplyCodec.Build(handle, records))));
 
 			Logger.LogInformation("Sent crafting recipe book: {Count} recipe(s) to client {Handle} (TradeskillReplyIIR).", records.Count, handle);
 		}
@@ -394,16 +394,9 @@ namespace Faolan.GameServer
 		private async Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
 		{
 			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchUpdateCash,
-				b => UpdateCashBody.WriteUpdateCashBody(b, balanceTin, reason)));
+				UpdateCashCodec.Build(new UpdateCash(balanceTin, reason))));
 
 			Logger.LogInformation("UpdateCash: {Balance} tin ({Reason}) -> {Character}.", balanceTin, reason, client.Session.Character?.Name);
-		}
-
-		// The 0x201c bank-slot stat-update body: [kind=105][charInstance][slot][statId][value] (all u32 BE). Locked
-		// byte-exact to the capture by TradepostBankStatTests.
-		internal static byte[] BuildBankSlotStatBody(uint charInstance, uint slot, uint statId, uint value)
-		{
-			return new FaolanStream().WriteUInt32(ContainerKind.Bank).WriteUInt32(charInstance).WriteUInt32(slot).WriteUInt32(statId).WriteUInt32(value).ToArray();
 		}
 
 		// 0x4F57DC08 GameTime - the live world clock (#351). Both fields are generated: the resync anchor from the wall
@@ -549,7 +542,7 @@ namespace Faolan.GameServer
 			var charId = client.Session.Character.Id;
 
 			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchAddItem,
-				b => AddItemBody.WriteAddItemBody(b, containerType, charId, itemPos, AddItemBody.SerializeInventoryEntry(entry), feedback)));
+				AddItemCodec.Build(new AddItem(containerType, charId, itemPos, entry, feedback))));
 		}
 
 		// DispatchDisplayItemLootChatMessage (0x2012) - the "you receive N x <item>" chat line. Body is
@@ -583,7 +576,7 @@ namespace Faolan.GameServer
 		private static Task SendBankSlotStat(INetworkClient client, uint slot, uint statId, uint value)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetItemStat,
-				BuildBankSlotStatBody(client.Session.Character.Id, slot, statId, value)));
+				SetItemStatCodec.Build(SetItemStats.BankSlot(client.Session.Character.Id, slot, statId, value))));
 		}
 
 		// Pushes a FormatFeedback message (raw remoteformat XML) to the client's on-screen feedback. typeFlags =
@@ -601,7 +594,7 @@ namespace Faolan.GameServer
 			var charId = client.Session.Character.Id;
 
 			await client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchRemoveItem,
-				b => RemoveItemBody.WriteRemoveItemBody(b, containerType, charId, itemPos, amountToRemove)));
+				RemoveItemCodec.Build(new RemoveItem(containerType, charId, itemPos, amountToRemove))));
 		}
 
 		// #372: the "resurrection point discovered" FIFO banner. Retail sends it in the SAME frame as the

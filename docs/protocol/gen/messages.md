@@ -12,14 +12,14 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**80** IIR carrier types · **61 V3** (61 with an auto-cited golden). The
+**80** IIR carrier types · **60 V3** (60 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
 | Level | IIR type | Opcode | Codec | Golden (proof of layout) |
 |-------|----------|--------|-------|--------------------------|
 | V3 | `AddToGroupIIR` | `0x0DF44B73` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
-| V3 | `BankIIR` | `0x0BA1C1CB` | `BankIirCodec` | [V3: BankStorageTests.BuildBankIirRecord_Matches_CapturedBank] |
+| V3 | `BankIIR` | `0x0BA1C1CB` | `BankCodec` | [V3: BankStorageTests.BankCodec_Matches_CapturedBank] |
 | V3 | `BehaviorControlCenterIIR` | `0x642CD3D6` | `BehaviorControlCenterCodec` | [V3: BehaviorAcksTests.UnequipOutOfSlot_AckMatchesCapture] |
 | V3 | `CharDCMoveIIR` | `0x4517AA81` | `CharDCMoveCodec` | [V3: CrossPlayerMoveRelayTests.BroadcastPlayerMove_ForwardsTheJumpVerbatim_ToAViewerWhoKnowsTheMover] |
 | V3 | `ChatTextIIR` | `0xE0B51102` | `ChatTextCodec` | [V3: ChatTextCodecTests.Build_FromParsedFields_MatchesCapture] |
@@ -45,7 +45,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `KnubotCloseChatWindowIIR` | `0xC4AF39EB` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
 | V3 | `KnubotOpenChatWindowIIR` | `0x045B0B0F` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
 | V3 | `KnubotStartTradeIIR` | `0x4B2A47BF` | `KnubotStartTradeCodec` | [V3: V1IirCodecTests.KnubotStartTrade_FramesAndCarriesTheDialoguePayloadVerbatim] |
-| V3 | `LookAtIIR` | `0x0D155695` | `LookAtCodec`, `ShopOpenBuilder` | [V3: MagicBuffLookAtCodecTests.LookAt_ParsesSelectAndDeselect] |
+| V3 | `LookAtIIR` | `0x0D155695` | `LookAtCodec` | [V3: MagicBuffLookAtCodecTests.LookAt_ParsesSelectAndDeselect] |
 | V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `LootRemoveItemsIIR` | `0x70010162` | `LootRemoveItemsCodec` | [V3: WorldLootTakeTests.LootRemoveItems_MatchesCapture] |
 | V3 | `MagicBuffIIR` | `0x6B87E316` | `MagicBuffCodec` | [V3: MagicBuffLookAtCodecTests.MagicBuff_LongFormSpellIdIsEchoed] |
@@ -75,8 +75,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `StopIIR` | `0xD751EBB4` | `StopCodec` | [V3: DeadReckoningCodecTests.Stop_RoundTripsByteExact] |
 | V3 | `ThreatLevelIIR` | `0x1745EF6C` | `ThreatLevelCodec` | [V3: CombatRecordCodecTests.ThreatLevel_BuildsByteExact] |
 | V3 | `TombStoneFullUpdateIIR` | `0x0D80E7C9` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
-| V3 | `TradeskillReplyIIR` | `0x9062D559` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
-| V3 | `TradeskillRequestIIR` | `0x06B9CD94` | `TradeskillRecipeCodec` | [V3: TradeskillRecipeCodecTests.BuildReplyBody_EmptyCatalog_IsAValidEmptyList] |
+| V3 | `TradeskillReplyIIR` | `0x9062D559` | `TradeskillReplyCodec` | [V3: TradeskillReplyCodecTests.Build_EmptyCatalog_IsAValidEmptyList] |
 | V3 | `UpdateInventoryIIR` | `0xA74D2814` | `UpdateInventoryCodec` | [V3: V1IirCodecTests.UpdateInventory_RoundTripsCapturedBody_AndCarriesTheItemProtobuf] |
 | V3 | `UpdateSimpleDynelIIR` | `0x30536411` | `UpdateSimpleDynelCodec` | [V3: WorldLootTakeTests.BagConsumedVisual_MatchesCapture] |
 | V2 | `AreaFormulaIIR` | `0xCE30BE4E` | `AreaFormulaCodec` |  |
@@ -98,6 +97,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `SpellBookIIR` | `0x6BA10936` | `SpellBookCodec` |  |
 | V2 | `StatIIR` | `0xF98E10B3` | `StatCodec` |  |
 | V2 | `TemplateActionIIR` | `0x6C300937` | `TemplateActionCodec` |  |
+| V2 | `TradeskillRequestIIR` | `0x06B9CD94` | `GameServerListener.Inbound` *(inline)* |  |
 
 **V2** rows are built but have no byte-exact golden yet; **V1** rows are genuinely undecoded (see
 [`gaps.md`](../gaps.md)). A V3 row with an empty golden column is byte-exact via a codec whose test the

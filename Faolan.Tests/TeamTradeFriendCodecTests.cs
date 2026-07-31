@@ -1,6 +1,8 @@
 using System;
 using Faolan.Core;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
+using Faolan.Core.Protobuf;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Codecs.Text;
@@ -144,19 +146,20 @@ namespace Faolan.Tests
 			Assert.Equal("e4ff0c850000c350013184ae000000dea90051dd9a", Convert.ToHexString(GroupMembershipCodec.Build(new RemoveFromGroupIIR(0x013184AE, 0x0051DD9A))).ToLowerInvariant());
 		}
 
-		// f1260 DispatchRequestTrade, f1268 DispatchStartTrade, f1481 DispatchPartnerAcceptedTrade - one shape.
+		// f1260 DispatchRequestTrade, f1268 DispatchStartTrade, f1481 DispatchPartnerAcceptedTrade - one shape, and it
+		// is the bare ID32 several other methods already share, so #530 wave 7 folded it into EntityIdCodec.
 		[Fact]
 		public void Trade_CharacterRefMessages_AreByteExact()
 		{
-			Assert.Equal("0000c350013184ae", Convert.ToHexString(PlayerTradeCodec.BuildCharacterRef(0x013184AE)).ToLowerInvariant());
-			Assert.Equal("0000c35001317cf8", Convert.ToHexString(PlayerTradeCodec.BuildCharacterRef(0x01317CF8)).ToLowerInvariant());
+			Assert.Equal("0000c350013184ae", Convert.ToHexString(EntityIdCodec.Build(EntityIds.Character(0x013184AE))).ToLowerInvariant());
+			Assert.Equal("0000c35001317cf8", Convert.ToHexString(EntityIdCodec.Build(EntityIds.Character(0x01317CF8))).ToLowerInvariant());
 		}
 
 		// f1293 DispatchPartnerUpdatedCash - the 5 tin the capture puts on the table.
 		[Fact]
 		public void Trade_Cash_IsByteExact()
 		{
-			Assert.Equal("0000000000000005", Convert.ToHexString(PlayerTradeCodec.BuildCash(5)).ToLowerInvariant());
+			Assert.Equal("0000000000000005", Convert.ToHexString(TradeCashCodec.Build(new TradeCash(5))).ToLowerInvariant());
 		}
 
 		// f1408 AddTradeItem - bag slot 5 of the backpack (container 104), into trade-window slot 1. The last field is
@@ -165,13 +168,14 @@ namespace Faolan.Tests
 		[Fact]
 		public void Trade_ParsesAddItem()
 		{
-			using var s = new FaolanStream(Convert.FromHexString("0000006801317cf80000000500000001"));
-			var request = PlayerTradeCodec.ParseAddItem(s);
+			var captured = Convert.FromHexString("0000006801317cf80000000500000001");
+			var request = AddTradeItemCodec.Parse(captured);
 
 			Assert.Equal(104u, request.Container);
 			Assert.Equal(0x01317CF8u, request.Owner);
 			Assert.Equal(5u, request.ItemPos);
 			Assert.Equal(1u, request.DestPos);
+			Assert.Equal(captured, AddTradeItemCodec.Build(request));
 		}
 
 		// f1411 DispatchTradePartnerAddedItem - the length-prefixed item snapshot plus the stack count.
@@ -181,7 +185,9 @@ namespace Faolan.Tests
 			const string snapshot = "0888d7e395b3ec8aec2012040800100112060817108bf1301204081a10011a530a140d93991f2715011fcc4e1dd20089d625a4013d0d12140d93991f2715011fcc4e1dd20089d6" +
 									"25a4013d0d1a140d93991f2715011fcc4e1dd20089d625a4013d0d25e9550d002de9550d003801455a313848";
 
-			Assert.Equal("00000073" + snapshot + "00000001", Convert.ToHexString(PlayerTradeCodec.BuildAddedItem(Convert.FromHexString(snapshot), 1)).ToLowerInvariant());
+			var entry = Convert.FromHexString(snapshot).FromProtobuf<ProtoInventoryGameEntry>();
+
+			Assert.Equal("00000073" + snapshot + "00000001", Convert.ToHexString(TradeAddedItemCodec.Build(new TradeAddedItem(entry, 1))).ToLowerInvariant());
 		}
 
 		// The friend-list entries retail restores at login, from `login-with-friends` f150 - SIX friends of six different

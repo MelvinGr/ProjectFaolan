@@ -62,10 +62,10 @@ namespace Faolan.GameServer.Economy
 			{
 				var slotRecordId = recordId++;
 				await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchSetItemStat,
-					b => BankIirCodec.WriteBankSlotRegistration(b, charInstance, entry.Pos, slotRecordId)));
+					SetItemStatCodec.Build(SetItemStats.SlotRegistration(charInstance, entry.Pos, slotRecordId))));
 			}
 
-			var record = BankIirCodec.BuildBankIirRecord(charInstance, bank);
+			var record = BankCodec.Build(new BankIIR(charInstance, bank));
 			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(record)));
 

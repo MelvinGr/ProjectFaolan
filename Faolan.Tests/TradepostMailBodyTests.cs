@@ -32,8 +32,9 @@ namespace Faolan.Tests
 			var capturedXml = MailMessageCodec.Parse(Convert.FromHexString(CapturedMail)).BodyXml;
 
 			// Recipient = the captured character, because the captured XML this is compared against contains it (#417).
-			var built = TradepostMailBody.BuildItemBought("AssassinL23" /* the capture's buyer - must match the golden XML */, 7310868733973495813ul, // the mail XML's param-1 item id (decimal, distinct from the saleId)
-				TradepostMailBody.CapturedItemNameEscaped, "Ponakin", "25");
+			var built = TradepostMailBodyCodec.Build(new TradepostMailBody("AssassinL23" /* the capture's buyer - must match the golden XML */,
+				7310868733973495813ul, // the mail XML's param-1 item id (decimal, distinct from the saleId)
+				TradepostMailBodyCodec.CapturedItemNameEscaped, "Ponakin", "25"));
 
 			Assert.Equal(capturedXml, built);
 		}
@@ -41,7 +42,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildItemNameEscaped_IsXmlEscaped()
 		{
-			var escaped = TradepostMailBody.BuildItemNameEscaped(163118);
+			var escaped = TradepostMailBodies.ItemName(163118);
 
 			Assert.DoesNotContain("<", escaped);
 			Assert.DoesNotContain(">", escaped);

@@ -97,7 +97,9 @@ leave, which makes a cheap end-to-end check.
 
 ## Player trade
 
-All on the game server, `PlayerTradeCodec`:
+All on the game server. One message, one codec (#530 wave 7): the three ProtoID32-bodied messages are
+`EntityIdCodec`, the cash pair `TradeCashCodec`, the added-item pair `TradeAddedItemCodec`, and the client's add
+`AddTradeItemCodec`.
 
 ```
 s2c 0x2068 DispatchRequestTrade          [ProtoID32 requester]     "X wants to trade"
@@ -105,7 +107,7 @@ c2s 0x2065 StartTrade                    [ProtoID32 partner]       the target op
 s2c 0x2069 DispatchStartTrade            [ProtoID32 partner]       to BOTH - each carrying the OTHER party
 c2s 0x2067 SetTradeCash                  [u64 tin]
 s2c 0x206E DispatchPartnerUpdatedCash    [u64 tin]                 to the partner
-c2s 0x2068 AddTradeItem                  [u32 container][u32 owner][u32 slot][u32 count]
+c2s 0x2068 AddTradeItem                  [u32 container][u32 owner][u32 itemPos][u32 destPos]
 s2c 0x2070 DispatchTradeAddedItem        [u32 len][item snapshot][u32 count]   to the adder
 s2c 0x206F DispatchTradePartnerAddedItem  (same body)                          to the partner
 c2s 0x206B AcceptTrade                   (empty)

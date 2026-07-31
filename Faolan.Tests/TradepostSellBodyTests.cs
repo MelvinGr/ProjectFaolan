@@ -1,6 +1,6 @@
 using System;
 using Faolan.Core;
-using Faolan.GameServer;
+using Faolan.Core.Network.Codecs.Economy;
 using Xunit;
 
 namespace Faolan.Tests
@@ -15,9 +15,20 @@ namespace Faolan.Tests
 		[Fact]
 		public void BankSlotStatBody_MatchesCapturedOverlayUpdate()
 		{
-			var body = GameServerListener.BuildBankSlotStatBody(0x0802e5d4, 6, 258, 1_000_000);
+			var body = SetItemStatCodec.Build(SetItemStats.BankSlot(0x0802e5d4, 6, 258, 1_000_000));
 
 			Assert.Equal("000000690802e5d40000000600000102000f4240", Convert.ToHexStringLower(body));
+		}
+
+		// The per-slot REGISTRATION the bank sends before its content is the SAME message with stat 0x17 and the
+		// record id packed into the value - it had its own writer until #530 wave 7 (see SetItemStatCodec).
+		[Fact]
+		public void BankSlotRegistration_IsTheSameMessageWithStat0x17()
+		{
+			var registration = SetItemStats.SlotRegistration(0x0802e5d4, 3, 0x0A18);
+
+			Assert.Equal("000000690802e5d40000000300000017000f0a18", Convert.ToHexStringLower(SetItemStatCodec.Build(registration)));
+			Assert.Equal(registration, SetItemStatCodec.Parse(SetItemStatCodec.Build(registration)));
 		}
 
 		// CancelMail (0x2009), capture F403: a u64 mail id.

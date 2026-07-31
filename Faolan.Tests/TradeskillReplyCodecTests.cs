@@ -15,16 +15,17 @@ namespace Faolan.Tests
 	// Recipes window. Grammar decoded from AgeOfConan.exe (docs/subsystems/tradeskill-recipes.md) and gated byte-exact
 	// against the one captured reply (603 recipes, Assets/recipe-book-reply.bin): parsing it into Recipe records and
 	// rebuilding it via the codec must reproduce the wire body exactly.
-	public class TradeskillRecipeCodecTests
+	public class TradeskillReplyCodecTests
 	{
 		private static readonly byte[] ReplySubOpBe = [0x90, 0x62, 0xD5, 0x59];
 
 		[Fact]
-		public void BuildReplyBody_EmptyCatalog_IsAValidEmptyList()
+		public void Build_EmptyCatalog_IsAValidEmptyList()
 		{
-			// The correct reply for a character with no learned recipes: env=0, version=1, type=3, count=0x3F1.
-			var body = TradeskillRecipeCodec.BuildReplyBody([]);
-			Assert.Equal("00" + "00000001" + "03" + "000003f1", Convert.ToHexStringLower(body));
+			// The correct reply for a character with no learned recipes: env=0, version=1, type=3, count=0x3F1 - after
+			// the [subop][0xC350][handle] carrier prefix the codec now owns (#530 wave 7).
+			var body = TradeskillReplyCodec.Build(0x0802E5D4, []);
+			Assert.Equal("9062d5590000c3500802e5d4" + "00" + "00000001" + "03" + "000003f1", Convert.ToHexStringLower(body));
 		}
 
 		[Fact]
@@ -35,22 +36,22 @@ namespace Faolan.Tests
 			// the live server does) and rebuild. Proves the column schema loses nothing through the DB representation.
 			var reply = Reply();
 			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
-			var capturedBody = reply.Bytes.AsSpan(sub + 12).ToArray();
-			var records = TradeskillRecipeCodec.ParseReplyBody(capturedBody);
+			var capturedRecord = reply.Bytes.AsSpan(sub).ToArray();
+			var parsed = TradeskillReplyCodec.Parse(capturedRecord);
 
-			var rows = records.Select(ToRowLikeImporter).ToList();
-			var roundTripped = rows.Select(TradeskillRecipeCodec.ToRecord).ToList();
-			var rebuilt = TradeskillRecipeCodec.BuildReplyBody(roundTripped);
+			var rows = parsed.Recipes.Select(ToRowLikeImporter).ToList();
+			var roundTripped = rows.Select(RecipeRecords.FromRow).ToList();
+			var rebuilt = TradeskillReplyCodec.Build(parsed.Handle, roundTripped);
 
-			Assert.Equal(Convert.ToHexStringLower(capturedBody), Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(Convert.ToHexStringLower(capturedRecord), Convert.ToHexStringLower(rebuilt));
 		}
 
 		[Fact]
-		public void ParseReplyBody_DecodesRecipeFieldsAndElements()
+		public void Parse_DecodesRecipeFieldsAndElements()
 		{
 			var reply = Reply();
 			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
-			var records = TradeskillRecipeCodec.ParseReplyBody(reply.Bytes.AsSpan(sub + 12).ToArray());
+			var records = TradeskillReplyCodec.Parse(reply.Bytes.AsSpan(sub)).Recipes.ToList();
 
 			// Recipe 9 (the first record) = 3 ingredients + 1 result (validated against the capture bytes).
 			var recipe9 = records.First(r => r.Id == 9);
@@ -76,14 +77,13 @@ namespace Faolan.Tests
 
 			var sub = IndexOf(reply.Bytes, ReplySubOpBe);
 			Assert.True(sub >= 0);
-			var capturedBody = reply.Bytes.AsSpan(sub + 12).ToArray(); // past [subop][0xC350][handle]
+			var capturedRecord = reply.Bytes.AsSpan(sub).ToArray(); // the WHOLE record, carrier prefix included
 
-			var records = TradeskillRecipeCodec.ParseReplyBody(capturedBody);
-			Assert.Equal(603, records.Count);
-			Assert.Equal(9u, records[0].Id); // first recipe id in the capture
+			var parsed = TradeskillReplyCodec.Parse(capturedRecord);
+			Assert.Equal(603, parsed.Recipes.Count);
+			Assert.Equal(9u, parsed.Recipes.First().Id); // first recipe id in the capture
 
-			var rebuilt = TradeskillRecipeCodec.BuildReplyBody(records);
-			Assert.Equal(Convert.ToHexStringLower(capturedBody), Convert.ToHexStringLower(rebuilt));
+			Assert.Equal(Convert.ToHexStringLower(capturedRecord), Convert.ToHexStringLower(TradeskillReplyCodec.Build(parsed)));
 		}
 
 		private static int IndexOf(byte[] haystack, byte[] needle)
@@ -118,7 +118,7 @@ namespace Faolan.Tests
 
 		// Mirrors CaptureRecipeImporter.BuildRow + item harvest, in-memory: a Recipe row whose RecipeItems each carry
 		// the referenced Item template (with the element's TEA key + hash), so ToRecord can read them back.
-		private static Recipe ToRowLikeImporter(TradeskillRecipeCodec.RecipeRecord r)
+		private static Recipe ToRowLikeImporter(RecipeRecord r)
 		{
 			var row = new Recipe
 			{
@@ -137,7 +137,7 @@ namespace Faolan.Tests
 			Add(row, r.Results, RecipeItemRole.Result);
 			return row;
 
-			static void Add(Recipe row, IReadOnlyList<TradeskillRecipeCodec.RecipeElement> els, RecipeItemRole role)
+			static void Add(Recipe row, IReadOnlyList<RecipeElement> els, RecipeItemRole role)
 			{
 				for (var i = 0; i < els.Count; i++)
 				{

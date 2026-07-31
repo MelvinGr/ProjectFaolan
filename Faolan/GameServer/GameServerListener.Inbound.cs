@@ -855,14 +855,14 @@ namespace Faolan.GameServer
 
 				case GameCharAgentOpcodes.SetTradeCash: // 0x2067
 				{
-					await _trade.SetCash(client.Session.Character.Id, body.ReadUInt64());
+					await _trade.SetCash(client.Session.Character.Id, TradeCashCodec.Parse(body.ReadRemainingArray()).Tin);
 					break;
 				}
 
 				// 0x2068 - the SAME method index as the s2c DispatchRequestTrade, on the other interface.
 				case GameCharAgentOpcodes.AddTradeItem:
 				{
-					var request = PlayerTradeCodec.ParseAddItem(body);
+					var request = AddTradeItemCodec.Parse(body.ReadRemainingArray());
 					await _trade.AddItem(client.Session.Character.Id, request.ItemPos, request.DestPos);
 					break;
 				}

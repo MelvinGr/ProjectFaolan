@@ -23,6 +23,8 @@ using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
+using Faolan.GameServer.Economy;
+
 namespace Faolan.GameServer
 {
 	public partial class GameServerListener

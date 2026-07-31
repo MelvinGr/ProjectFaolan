@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 
 namespace Faolan.Core.Network.Codecs.Economy
@@ -21,7 +22,10 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// remoteformat carries a per-item RDB string id + key we cannot synthesize for an arbitrary item (the same
 	// client-RDB-by-id limit as conversation/quest text), so live buys pass a minimal name fragment; the captured
 	// fragment round-trips byte-exact for the golden test.
-	public static class TradepostMailBody
+	// A rule-1a STRING codec (#530): `string Build(T)` over a plain value, with the substitutable fields as its
+	// components. BUILD-ONLY - nothing reads this XML back, and the golden that pins it is the captured mail's own
+	// body (TradepostMailBodyTests lifts it with MailMessageCodec.Parse).
+	public static class TradepostMailBodyCodec
 	{
 		// The captured item-name remoteformat (item 163118), already XML-escaped for embedding in a parameter value
 		// (note the double-escaped &amp;amp; in its key). The golden-test oracle and a sane default identity.
@@ -38,29 +42,20 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// two trailing spaces before '>' are reproduced from the capture (the client emits them verbatim).
 		private const string OuterOpen = "<remoteformat token=\"TradePostGUI_MailItemBought\" category=\"629\" key=\"#x[c`Nt]6eQ!6I]Tj]Lw\" knubot=\"0\"  >";
 
-		// Builds the full mail XML. `itemNameEscaped` is the item-name remoteformat already escaped for a parameter
-		// value (use BuildItemNameEscaped for the live best-effort form, or CapturedItemNameEscaped for the oracle).
-		// `priceDisplay` is the bare number that precedes the currency token (e.g. "25").
-		public static string BuildItemBought(string buyer, ulong itemInstanceId, string itemNameEscaped, string seller, string priceDisplay)
+		// CANONICAL - the only method here that composes text.
+		public static string Build(TradepostMailBody value)
 		{
+			ArgumentNullException.ThrowIfNull(value);
 			var sb = new StringBuilder();
 			sb.Append(OuterOpen);
-			Parameter(sb, "7", buyer ?? "");
-			Parameter(sb, "1", itemInstanceId.ToString());
-			Parameter(sb, "7", itemNameEscaped ?? "");
-			Parameter(sb, "7", seller ?? "");
-			Parameter(sb, "7", (priceDisplay ?? "0") + CurrencySuffix);
+			Parameter(sb, "7", value.Buyer);
+			Parameter(sb, "1", value.ItemInstanceId.ToString());
+			Parameter(sb, "7", value.ItemNameEscaped);
+			Parameter(sb, "7", value.Seller);
+			Parameter(sb, "7", value.PriceDisplay + CurrencySuffix);
 			sb.Append(OuterClose);
-			return sb.ToString();
-		}
 
-		// A minimal item-name remoteformat for a live buy when only the item's RDB name string id is known (we lack
-		// the per-item category/key the retail client emits). Renders the localized name by id; degrades to the id
-		// itself if the client has no string for it. Escaped for embedding in a parameter value.
-		public static string BuildItemNameEscaped(uint nameStringId)
-		{
-			var inner = $"<remoteformat id=\"{nameStringId}\" knubot=\"0\"></remoteformat>";
-			return XmlEscape(inner);
+			return sb.ToString();
 		}
 
 		private static void Parameter(StringBuilder sb, string type, string value)
@@ -69,9 +64,27 @@ namespace Faolan.Core.Network.Codecs.Economy
 		}
 
 		// XML attribute/text escaping matching the client's parameter-value encoding (& < > " ').
-		private static string XmlEscape(string s)
+		internal static string XmlEscape(string s)
 		{
 			return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;");
+		}
+	}
+
+	// The "you bought an item" mail's five substitutable fields. `ItemNameEscaped` is the item-name remoteformat
+	// ALREADY escaped for a parameter value (TradepostMailBodies.ItemName for the live best-effort form, or the
+	// codec's CapturedItemNameEscaped for the oracle); `PriceDisplay` is the bare number that precedes the currency
+	// token (e.g. "25").
+	public sealed record TradepostMailBody(string Buyer, ulong ItemInstanceId, string ItemNameEscaped, string Seller, string PriceDisplay);
+
+	// The item-name fragment forms, as VALUE factories.
+	public static class TradepostMailBodies
+	{
+		// A minimal item-name remoteformat for a live buy when only the item's RDB name string id is known (we lack
+		// the per-item category/key the retail client emits). Renders the localized name by id; degrades to the id
+		// itself if the client has no string for it. Escaped for embedding in a parameter value.
+		public static string ItemName(uint nameStringId)
+		{
+			return TradepostMailBodyCodec.XmlEscape($"<remoteformat id=\"{nameStringId}\" knubot=\"0\"></remoteformat>");
 		}
 	}
 }

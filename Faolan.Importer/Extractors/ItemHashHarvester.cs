@@ -297,14 +297,14 @@ namespace Faolan.Importer.Extractors
 			if (packet.Opcode != 0x2002)
 				return;
 
-			var mail = MailMessageCodec.Parse(packet.Body.ToArray());
+			var mail = MailMessageCodec.Parse(packet.Body.Span);
 			foreach (var a in mail.Attachments)
 			{
-				// Parse attaches a transient Item carrying the decoded per-template key (MailAttachment no longer
-				// stores it inline - it lives in Items via the Template FK).
-				var key = a.Item?.Key;
-				if (a.Template != 0 && key != null && (key.Key1 | key.Key2 | key.Key3 | key.Key4) != 0)
-					into.TryAdd(a.Template, new CapturedItem(key.Key1, key.Key2, key.Key3, key.Key4, a.ItemHash));
+				// The attachment's identity is on its wire entry - the per-template key, the template id and the hash.
+				var item = a.Entry.ItemData;
+				var key = item?.Key1;
+				if (item is { Template1: not 0 } && key != null && (key.Key1 | key.Key2 | key.Key3 | key.Key4) != 0)
+					into.TryAdd(item.Template1, new CapturedItem(key.Key1, key.Key2, key.Key3, key.Key4, item.Hash));
 			}
 		}
 
@@ -353,7 +353,7 @@ namespace Faolan.Importer.Extractors
 				return;
 
 			var body = packetBytes[bodyStart..];
-			if (!ShopContentCodec.LooksLikeShopData(body))
+			if (!ShopDataScan.LooksLikeShopData(body))
 				return;
 
 			foreach (var e in ShopContentCodec.Parse(body).Entries)

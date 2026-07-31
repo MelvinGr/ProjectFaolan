@@ -254,6 +254,14 @@ namespace Faolan.Core.Extensions
 			return ReadBytesU8Length().FromProtobuf<T>();
 		}
 
+		// A protobuf message behind a u32 BE length prefix - the read counterpart to
+		// FaolanStream.WriteArrayUInt32Length(msg.ToProtobuf()). The two prefix widths are both real on the wire: the
+		// 0x2000 IIR carriers use u8 (above) while the RPC method bodies that embed an inventory entry use u32.
+		public T ReadProtobufU32Length<T>() where T : IExtensible
+		{
+			return ReadBytesU32Length().FromProtobuf<T>();
+		}
+
 		// A base-128 varint (protobuf LEB128) - the read counterpart to FaolanStream.WriteVarint.
 		public ulong ReadVarint()
 		{

@@ -21,31 +21,29 @@ namespace Faolan.Importer.Captures
 	{
 		private static readonly byte[] ReplySubOpBe = [0x90, 0x62, 0xD5, 0x59]; // TradeskillReplyIIR_c
 
-		public static List<TradeskillRecipeCodec.RecipeRecord> Extract(IReadOnlyList<CapturedPacket> packets)
+		public static List<RecipeRecord> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
-			var records = new List<TradeskillRecipeCodec.RecipeRecord>();
+			var records = new List<RecipeRecord>();
 			foreach (var p in packets)
 			{
 				if (!p.IsDownload || p.SubOpcode != (uint)GameServer0X2000Opcodes.TradeskillReplyIIR)
 					continue;
 
-				// Locate the sub-opcode inside the raw packet, then step past [subop][0xC350][handle] to the reply body.
+				// Locate the sub-opcode inside the raw packet; the record runs from there to the packet end, which is
+				// what the codec's strict Parse asserts (#530 wave 7 - the reader used to be told where the BODY
+				// started and stopped after `count` records, so trailing bytes went unnoticed).
 				var sub = IndexOf(p.Bytes, ReplySubOpBe);
 				if (sub < 0)
 					continue;
 
-				var bodyStart = sub + 12;
-				if (bodyStart >= p.Bytes.Length)
-					continue;
-
-				records.AddRange(TradeskillRecipeCodec.ParseReplyBody(p.Bytes.AsSpan(bodyStart)));
+				records.AddRange(TradeskillReplyCodec.Parse(p.Bytes.AsSpan(sub)).Recipes);
 			}
 
 			// De-dupe by recipe id (keep first) in case a capture carries the list more than once.
 			return records.GroupBy(r => r.Id).Select(g => g.First()).ToList();
 		}
 
-		public static async Task<(int Seen, int Added, int Updated, int HarvestedItems)> ImportAsync(IDatabaseContext db, IReadOnlyCollection<TradeskillRecipeCodec.RecipeRecord> records)
+		public static async Task<(int Seen, int Added, int Updated, int HarvestedItems)> ImportAsync(IDatabaseContext db, IReadOnlyCollection<RecipeRecord> records)
 		{
 			// Seed a bare Items TEMPLATE for every item a recipe references so the RecipeItem.ItemId -> Items FK
 			// (Restrict) resolves. Must run BEFORE the recipe rows are saved (same ordering as the shop/AH harvesters).
@@ -82,7 +80,7 @@ namespace Faolan.Importer.Captures
 			return (records.Count, added, updated, harvestedItems);
 		}
 
-		private static void AddItems(Recipe recipe, IReadOnlyList<TradeskillRecipeCodec.RecipeElement> elements, RecipeItemRole role)
+		private static void AddItems(Recipe recipe, IReadOnlyList<RecipeElement> elements, RecipeItemRole role)
 		{
 			for (var i = 0; i < elements.Count; i++)
 			{
@@ -101,7 +99,7 @@ namespace Faolan.Importer.Captures
 		// Map a decoded wire record to its fully-columnized Recipe row: the per-recipe header/mid/tail fields, the
 		// opaque ref-id list (1-2 entries), and the ingredient/result elements as RecipeItem child rows (item id +
 		// flag + trailing; the item's TEA key + hash live once on the referenced Items row).
-		private static Recipe BuildRow(TradeskillRecipeCodec.RecipeRecord r)
+		private static Recipe BuildRow(RecipeRecord r)
 		{
 			if (r.RefIds.Count is < 1 or > 2)
 				throw new InvalidOperationException($"Recipe {r.Id:x}: ref-id list has {r.RefIds.Count} entries (expected 1 or 2)");
@@ -133,7 +131,7 @@ namespace Faolan.Importer.Captures
 		// keeps its (richer) row but has its Hash BACKFILLED from the recipe when it was 0 - the recipe carries the
 		// real per-template hash that AH-listing-harvested items lack (Hash=0). Verified: no recipe/item hash ever
 		// DIFFERS non-zero, so the backfill only ever fills a 0, never overwrites a real hash.
-		private static async Task<int> HarvestItems(IDatabaseContext db, IEnumerable<TradeskillRecipeCodec.RecipeRecord> records)
+		private static async Task<int> HarvestItems(IDatabaseContext db, IEnumerable<RecipeRecord> records)
 		{
 			var harvested = 0;
 			var seen = new HashSet<uint>();

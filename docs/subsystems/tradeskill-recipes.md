@@ -40,16 +40,17 @@ listC = 0x3F1-list of 17-u32 elements # results (FUN_005d4e50)
 [u8]                                 # trailing flag (@0x5c, read by FUN_00cba1b0(...,1) in the loop)
 ```
 Validated byte-exact: the 603 records consume the payload with **0 leftover bytes**
-(`TradeskillRecipeCodecTests`). Each 16-byte block inside the ingredient/result elements is an item's TEA
+(`TradeskillReplyCodecTests`). Each 16-byte block inside the ingredient/result elements is an item's TEA
 `DecryptionKey` — the keys `RequestRecipeInfo` (0x2090) later references to fetch a recipe's item details.
 
 ## Implementation
 
-- **`TradeskillRecipeCodec`** (`Faolan.Core.Network`): `ParseReplyBody` (→ typed `RecipeRecord[]`),
-  `BuildReplyBody` (env/version/type/count + records), and `ToRecord` (a stored `Recipe` row → wire record).
-  Fully decoded — no verbatim blob. `ParseReplyBody` → `BuildReplyBody` round-trips the capture byte-for-byte,
-  and so does the DB path (`Recipe` row → `ToRecord` → `BuildReplyBody`); both are golden-gated in
-  `TradeskillRecipeCodecTests`. Parse validates every folded constant (header word 0 == list-key, mid header,
+- **`TradeskillReplyCodec`** (`Faolan.Core.Network`): `Parse` (→ a `TradeskillReplyIIR` carrying typed
+  `RecipeRecord`s) and `Build` (the whole record: carrier prefix + env/version/type/count + records), with
+  `RecipeRecords.FromRow` mapping a stored `Recipe` row to a wire record.
+  Fully decoded — no verbatim blob. `Parse` → `Build` round-trips the capture byte-for-byte,
+  and so does the DB path (`Recipe` row → `RecipeRecords.FromRow` → `Build`); both are golden-gated in
+  `TradeskillReplyCodecTests`. Parse validates every folded constant (header word 0 == list-key, mid header,
   element id-dup / key-dup / `[13..16]` const) so a capture that breaks the layout throws rather than mis-building.
 - **`Recipe` table** — **fully columnized** (#193): `Id` (= recipeId = header word 0), `Header1`, `RdbType`
   (`0xf4241`/`0xf4242`), `MidFlag` (0/1), `Tail`, `TrailingFlag` (0/1), and the opaque ref-id list as `RefId0`

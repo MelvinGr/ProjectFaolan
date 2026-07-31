@@ -214,7 +214,7 @@ namespace Faolan.GameServer.Economy
 			}
 
 			var instance = client.Session.Character.Id;
-			await SendWorldPacket(client, ShopOpenBuilder.BuildTradeSelectEcho(instance, npcHandle));
+			await SendWorldPacket(client, LookAtCodec.Build(LookAts.Select(instance, npcHandle)));
 			await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.EchoAck(rawPayload, instance, mode)));
 			await SendShopData(client, shop, npcHandle);
 

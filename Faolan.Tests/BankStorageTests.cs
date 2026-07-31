@@ -9,7 +9,7 @@ namespace Faolan.Tests
 {
 	// Golden-byte test for the BankIIR (0x0BA1C1CB) framing that delivers the personal bank container (kind 105),
 	// decoded from NecroL80_mage-necromancer_login_Has-inventory-at-trader-bank (memory protocol_bank_storage).
-	// Proves BuildBankIirRecord reproduces the captured on-wire bank record byte-for-byte given the captured
+	// Proves BankCodec reproduces the captured on-wire bank record byte-for-byte given the captured
 	// ProtoInventoryGame blob: [subop 0BA1C1CB][type C350][charInstance][flag 01][u32 BE blobLen][blob], with the
 	// 0x2000 packet length prefix (WriteArrayUInt32Length).
 	public class BankStorageTests
@@ -43,7 +43,7 @@ namespace Faolan.Tests
 		private const uint CharInstance = 0x0802E5D4;
 
 		[Fact]
-		public void BuildBankIirRecord_Matches_CapturedBank()
+		public void BankCodec_Matches_CapturedBank()
 		{
 			var captured = Convert.FromHexString(CapturedBankBody);
 
@@ -51,13 +51,16 @@ namespace Faolan.Tests
 			// The blob (the ProtoInventoryGame) starts after recLen(4)+subop(4)+type(4)+instance(4)+flag(1)+blobLen(4)=21.
 			var blob = captured[21..];
 
-			var record = BankIirCodec.BuildBankIirRecord(CharInstance, blob.FromProtobuf<ProtoInventoryGame>());
+			var record = BankCodec.Build(new BankIIR(CharInstance, blob.FromProtobuf<ProtoInventoryGame>()));
 
 			// Re-add the 0x2000 packet length prefix the send path writes (WriteArrayUInt32Length).
 			var s = new FaolanStream();
 			s.WriteArrayUInt32Length(record);
 
 			Assert.Equal(Convert.ToHexStringLower(captured), Convert.ToHexStringLower(s.ToArray()));
+
+			// Rule 1: the record Parse returns is the record Build takes, so the captured bytes rebuild themselves.
+			Assert.Equal(Convert.ToHexStringLower(record), Convert.ToHexStringLower(BankCodec.Build(BankCodec.Parse(record))));
 		}
 	}
 }

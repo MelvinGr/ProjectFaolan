@@ -35,7 +35,7 @@ namespace Faolan.Tests
 		// The folders converted to the uniform surface so far. ADD A FOLDER AS ITS WAVE LANDS - that is what makes the
 		// gates below binding on it, and leaving it out is how a converted folder silently stops being checked.
 		private static readonly string[] MigratedFolders =
-			[RootFolder, "Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat", "Quest", "Spawn", "FullCharSnapshot", "PlayerAgent"];
+			[RootFolder, "Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat", "Quest", "Spawn", "FullCharSnapshot", "PlayerAgent", "Economy"];
 
 		// The ROOT of Codecs/ itself - the codecs that sit in `Faolan.Core.Network.Codecs` with no domain folder.
 		// Spelled as a sentinel rather than "" so the two places that expand it read as deliberate.
@@ -391,7 +391,10 @@ namespace Faolan.Tests
 			Assert.True(failures.Count == 0, "Parse -> Build must reproduce the captured bytes exactly:\n  " + string.Join("\n  ", failures.Take(25)));
 		}
 
-		[Fact(Skip = "un-skip in wave 9, when ICodec.cs is deleted")]
+		// LIVE from wave 7b: Economy held the last two implementations (`TradepostListingCodec.ParsedResults` and
+		// `ShopContentCodec.ShopContent`) and `PlayfieldProxy` the third, deferred by wave 3 because Economy consumed
+		// its stream `Read`. The interface FILE goes in wave 9; nothing implements it from here.
+		[Fact]
 		public void NoIcodecImplementations()
 		{
 			var offenders = CodecTypes

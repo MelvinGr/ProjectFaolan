@@ -7,6 +7,8 @@ using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
 using Xunit;
 
+using Faolan.GameServer.Economy;
+
 namespace Faolan.Tests
 {
 	// Locks the tradepost server->client replies to the retail wire format, driving the LIVE send path

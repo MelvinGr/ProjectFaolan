@@ -1,5 +1,6 @@
 using System;
 using Faolan.Core;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs;
 using Faolan.Core.Network.Codecs.World;
 using Xunit;
@@ -15,7 +16,11 @@ namespace Faolan.Tests
 	{
 		private static PlayfieldProxy Parse(string hex)
 		{
-			return PlayfieldProxy.Read(new FaolanStream(Convert.FromHexString(hex)));
+			// A sub-record, so its reader is internal (InternalsVisibleTo Faolan.Tests) and takes a SpanReader - the
+			// proxy is the whole slice here, which is what makes the bound the reader's own.
+			var r = new SpanReader(Convert.FromHexString(hex), nameof(PlayfieldProxy));
+
+			return PlayfieldProxy.Read(ref r);
 		}
 
 		// The group-instance entry: IntendedTeleport at 20:22:12 into the Amphitheatre of Karutonia (map 1092 =

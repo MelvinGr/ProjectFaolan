@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
-using ProtoBuf;
 
 namespace Faolan.Core.Network.Codecs.Economy
 {
@@ -18,8 +18,11 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// the saleId, stats {0:flags, 26:qty, 258:price, 265:timestamp}, item_data = the listed instance's ProtoAcgItem
 	// (its own Data1..4 quad + template). So one entry codec serves the snapshot, the shop window, the live add,
 	// and the AH grid (and, later, the mail attachment).
+	// The value used to be a self-serializing `ICodec<ParsedResults>` (#530 wave 7 retired the interface here).
 	public static class TradepostListingCodec
 	{
+		public const ushort Opcode = (ushort)TradepostInterfaceOpcodes.DispatchTradepostSearchResults;
+
 		// The flag word (stat 0) every captured listing carries; the default for a freshly-created listing.
 		public const uint DefaultEntryFlags = 0x421;
 
@@ -47,23 +50,98 @@ namespace Faolan.Core.Network.Codecs.Economy
 		// handle, so these are pure session-volatile display ids. Left null for the byte-exact golden replay tests.
 		public static byte[] Build(uint head, IEnumerable<TradepostListing> listings, Func<int, (uint Handle, uint ItemHandle)>? mintHandles = null)
 		{
+			return Build(TradepostListings.FromRows(head, listings, mintHandles));
+		}
+
+		// CANONICAL - the only method here that writes bytes.
+		public static byte[] Build(ParsedResults value)
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			using var s = new FaolanStream();
+			Write(s, value);
+
+			return s.ToArray();
+		}
+
+		public static ParsedResults Parse(in ReadOnlySpan<byte> data)
+		{
+			var r = new SpanReader(data, nameof(TradepostListingCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+
+			return value;
+		}
+
+		internal static ParsedResults Read(ref SpanReader r)
+		{
+			var head = r.ReadU32Be();
+
+			var rows = new List<ParsedRow>();
+			while (r.Remaining >= sizeof(uint))
+			{
+				var saleId = r.ReadU64Be();
+				var handle = r.ReadU32Be();
+				var seller = r.ReadStringU16Length();
+				var price = r.ReadU64Be();
+				var qty = r.ReadU32Be();
+				var itemId = r.ReadU32Be();
+				var instanceField = r.ReadU64Be();
+				var itemHandle = r.ReadU32Be();
+				rows.Add(new ParsedRow(saleId, handle, seller, price, qty, itemId, instanceField, itemHandle, r.ReadProtobufU32Length<ProtoInventoryGameEntry>()));
+			}
+
+			return new ParsedResults(head, rows);
+		}
+
+		internal static void Write(FaolanStream s, ParsedResults v)
+		{
+			s.WriteUInt32(v.Head);
+			foreach (var row in v.Rows)
+			{
+				s
+					.WriteUInt64(row.SaleId)
+					.WriteUInt32(row.Handle)
+					.WriteString(row.Seller ?? "")
+					.WriteUInt64(row.Price)
+					.WriteUInt32(row.Quantity)
+					.WriteUInt32(row.ItemId)
+					.WriteUInt64(row.InstanceField)
+					.WriteUInt32(row.ItemHandle)
+					.WriteArrayUInt32Length(row.Entry.ToProtobuf());
+			}
+		}
+	}
+
+	// One row of the AH grid.
+	public sealed record ParsedRow(ulong SaleId, uint Handle, string Seller, ulong Price, uint Quantity, uint ItemId, ulong InstanceField, uint ItemHandle, ProtoInventoryGameEntry Entry);
+
+	// The decoded AH search grid: the 0x3F1 list `Head` plus its rows.
+	public sealed record ParsedResults(uint Head, IReadOnlyList<ParsedRow> Rows);
+
+	// The grid forms, as VALUE factories - row -> value mapping (#533).
+	public static class TradepostListings
+	{
+		public static ParsedResults FromRows(uint head, IEnumerable<TradepostListing> listings, Func<int, (uint Handle, uint ItemHandle)>? mintHandles = null)
+		{
+			ArgumentNullException.ThrowIfNull(listings);
+
 			var rows = new List<ParsedRow>();
 			var index = 0;
 			foreach (var listing in listings)
 			{
 				var (handle, itemHandle) = mintHandles?.Invoke(index) ?? (listing.Handle, listing.ItemHandle);
-				rows.Add(new ParsedRow(listing.SaleId, handle, listing.SellerName ?? "", listing.Price, listing.Quantity, listing.ItemId, listing.InstanceField, itemHandle, BuildEntry(listing)));
+				rows.Add(new ParsedRow(listing.SaleId, handle, listing.SellerName ?? "", listing.Price, listing.Quantity, listing.ItemId, listing.InstanceField, itemHandle, Entry(listing)));
 				index++;
 			}
 
-			return new ParsedResults(head, rows).ToArray();
+			return new ParsedResults(head, rows);
 		}
 
 		// The listed item as the wire ProtoInventoryGameEntry (the same shape SnapshotItems emits, with the
 		// AH-specific stat set). The listed instance's TEA key is per-TEMPLATE and lives in Items, reached through the
 		// TemplateItem nav (FK on Template) - Include it before building. The Template/Level/ItemHash tail still comes
 		// off the listing row (ItemHash is the captured wire value, 0 for AH, not Items.Hash).
-		public static ProtoInventoryGameEntry BuildEntry(TradepostListing listing)
+		public static ProtoInventoryGameEntry Entry(TradepostListing listing)
 		{
 			var key = (listing.TemplateItem ?? throw new InvalidOperationException(
 				$"TradepostListing {listing.SaleId} (template {listing.Template}): the TemplateItem navigation is not loaded - Include it before building the row.")).Key;
@@ -84,89 +162,26 @@ namespace Faolan.Core.Network.Codecs.Economy
 			};
 			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
-				Stat = StatFlags,
+				Stat = TradepostListingCodec.StatFlags,
 				Value = listing.EntryFlags
 			});
 			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
-				Stat = StatQuantity,
+				Stat = TradepostListingCodec.StatQuantity,
 				Value = listing.Quantity
 			});
 			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
-				Stat = StatPrice,
+				Stat = TradepostListingCodec.StatPrice,
 				Value = (uint)listing.Price
 			});
 			entry.StatLists.Add(new ProtoInventoryGameEntry.StatValue
 			{
-				Stat = StatTimestamp,
+				Stat = TradepostListingCodec.StatTimestamp,
 				Value = listing.Timestamp
 			});
 			return entry;
 		}
 
-		// Decodes a captured/served body back into structured rows (the entry boundary falls out of the u32 length
-		// prefix, so no prefix-sniffing is needed - unlike the Python dissector).
-		public static ParsedResults Parse(byte[] body)
-		{
-			return ParsedResults.Read(new FaolanStream(body));
-		}
-
-		public sealed record ParsedRow(ulong SaleId, uint Handle, string Seller, ulong Price, uint Quantity, uint ItemId, ulong InstanceField, uint ItemHandle, ProtoInventoryGameEntry Entry);
-
-		// The decoded AH search grid as a self-serializing codec (ICodec): Write frames [head][row*] (each row's
-		// trailing ProtoInventoryGameEntry serialized length-prefixed); Read recovers the rows.
-		public sealed record ParsedResults(uint Head, IReadOnlyList<ParsedRow> Rows) : ICodec<ParsedResults>
-		{
-			public static ParsedResults Read(FaolanStream s)
-			{
-				var head = s.ReadUInt32();
-
-				var rows = new List<ParsedRow>();
-				while (s.Position + 4 <= s.Length)
-				{
-					var saleId = s.ReadUInt64();
-					var handle = s.ReadUInt32();
-					var seller = s.ReadString();
-					var price = s.ReadUInt64();
-					var qty = s.ReadUInt32();
-					var itemId = s.ReadUInt32();
-					var instanceField = s.ReadUInt64();
-					var itemHandle = s.ReadUInt32();
-					var entryBytes = s.ReadArrayUInt32Length();
-
-					using var ms = new MemoryStream(entryBytes);
-					var entry = Serializer.Deserialize<ProtoInventoryGameEntry>(ms);
-					rows.Add(new ParsedRow(saleId, handle, seller, price, qty, itemId, instanceField, itemHandle, entry));
-				}
-
-				return new ParsedResults(head, rows);
-			}
-
-			public void Write(FaolanStream s)
-			{
-				s.WriteUInt32(Head);
-				foreach (var row in Rows)
-				{
-					byte[] entryBytes;
-					using (var ms = new MemoryStream())
-					{
-						Serializer.Serialize(ms, row.Entry);
-						entryBytes = ms.ToArray();
-					}
-
-					s
-						.WriteUInt64(row.SaleId)
-						.WriteUInt32(row.Handle)
-						.WriteString(row.Seller ?? "")
-						.WriteUInt64(row.Price)
-						.WriteUInt32(row.Quantity)
-						.WriteUInt32(row.ItemId)
-						.WriteUInt64(row.InstanceField)
-						.WriteUInt32(row.ItemHandle)
-						.WriteArrayUInt32Length(entryBytes);
-				}
-			}
-		}
 	}
 }

@@ -54,7 +54,7 @@ the `Item.Key` (Data1..4) quad + `Item.Hash`, buildable via the hash-gated snaps
    live-add IS a per-item packet — `DispatchAddItem` (s2c 0x2020), decoded + byte-exact + in-client verified
    (`GrantItemToBackpack`; `DispatchAddItemTests`). `.additem` / `add_item` now both persist the row AND push the
    live add (no relog needed). **Live item-REMOVE — `DispatchRemoveItem` (s2c 0x201F)** is now built too (2026-06-14):
-   byte-exact builder (`WriteRemoveItemBody`/`SendRemoveItem`, body `[container ID32][u32 pos][u32 amount]`,
+   byte-exact builder (`RemoveItemCodec`/`SendRemoveItem`, body `[container ID32][u32 pos][u32 amount]`,
    `DispatchRemoveItemTests`), `RemoveItemFromBackpack` clears the persisted cell AND pushes the live remove, wired to
    the `.removeitem <slot>` GM command (inverse of `.additem`).
 4. **Bag-poison items**: an item only ever captured WORN (never inside an inventory container) can render

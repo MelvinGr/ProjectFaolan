@@ -10,6 +10,9 @@ using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+// The codec's per-WARE record and this file's per-SHOP one are both called ShopEntry; alias the wire one.
+using WireShopEntry = Faolan.Core.Network.Codecs.Economy.ShopEntry;
+
 namespace Faolan.Importer.Captures
 {
 	// Imports NPC vendor shops from captured DispatchShopData (0x2033) packets into Shop/ShopItem rows
@@ -39,10 +42,10 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				var body = p.Bytes[bodyStart..];
-				if (!ShopContentCodec.LooksLikeShopData(body))
+				if (!ShopDataScan.LooksLikeShopData(body))
 					continue;
 
-				ShopContentCodec.ShopContent content;
+				ShopContent content;
 				try
 				{
 					content = ShopContentCodec.Parse(body);
@@ -115,6 +118,6 @@ namespace Faolan.Importer.Captures
 			return entries.GroupBy(e => e.TemplateId).Select(g => g.Last()).ToList();
 		}
 
-		public sealed record ShopEntry(uint TemplateId, string VendorName, uint MaxSize, IReadOnlyList<ShopContentCodec.ShopEntry> Items);
+		public sealed record ShopEntry(uint TemplateId, string VendorName, uint MaxSize, IReadOnlyList<WireShopEntry> Items);
 	}
 }

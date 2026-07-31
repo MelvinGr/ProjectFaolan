@@ -45,7 +45,7 @@ namespace Faolan.Importer.Captures
 
 				var body = p.Bytes[bodyStart..];
 
-				TradepostListingCodec.ParsedResults results;
+				ParsedResults results;
 				try
 				{
 					results = TradepostListingCodec.Parse(body);
@@ -160,9 +160,9 @@ namespace Faolan.Importer.Captures
 			return listings.GroupBy(l => l.SaleId).Select(g => g.Last()).ToList();
 		}
 
-		// Maps one parsed search-results row to a TradepostListing. Inverse of TradepostListingCodec.BuildEntry, so a
+		// Maps one parsed search-results row to a TradepostListing. Inverse of TradepostListings.Entry, so a
 		// row re-imported and rebuilt reproduces the captured bytes (proven by CaptureListingImporterTests).
-		public static TradepostListing ToListing(TradepostListingCodec.ParsedRow row)
+		public static TradepostListing ToListing(ParsedRow row)
 		{
 			var item = row.Entry.ItemData ?? new ProtoAcgItem();
 			var key = item.Key1 ?? new ProtoDecryptionKey();

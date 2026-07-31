@@ -5,6 +5,7 @@ using Faolan.Core;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Importer.Captures;
@@ -43,7 +44,7 @@ namespace Faolan.Tests
 		private static readonly string InventoryCapture = TestPaths.Asset("strie-login-inventory.bin");
 
 		[Fact]
-		public async Task AddItemBody_FromImportedItem_MatchesCapturedSlaveManacles()
+		public async Task AddItem_FromImportedItem_MatchesCapturedSlaveManacles()
 		{
 			if (!File.Exists(InventoryCapture))
 				return;
@@ -68,13 +69,14 @@ namespace Faolan.Tests
 					new SnapshotItems.ItemStat(0, 1), new SnapshotItems.ItemStat(8, 0xffffffff), new SnapshotItems.ItemStat(23, (uint)RecordId),
 					new SnapshotItems.ItemStat(46, 7)
 				]);
-				var entryBytes = AddItemBody.SerializeInventoryEntry(entry);
-				Assert.Equal(CapturedEntry, Convert.ToHexStringLower(entryBytes));
+				Assert.Equal(CapturedEntry, Convert.ToHexStringLower(entry.ToProtobuf()));
 
 				// 2) The full method body framing around that entry.
-				var s = new FaolanStream();
-				AddItemBody.WriteAddItemBody(s, ContainerKind.Bag, CharId, ItemPos, entryBytes);
-				Assert.Equal(CapturedBody, Convert.ToHexStringLower(s.ToArray()));
+				var body = AddItemCodec.Build(new AddItem(ContainerKind.Bag, CharId, ItemPos, entry));
+				Assert.Equal(CapturedBody, Convert.ToHexStringLower(body));
+
+				// Rule 1: the captured body rebuilds itself through Parse.
+				Assert.Equal(CapturedBody, Convert.ToHexStringLower(AddItemCodec.Build(AddItemCodec.Parse(Convert.FromHexString(CapturedBody)))));
 			}
 			finally
 			{
