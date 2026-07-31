@@ -107,7 +107,7 @@ that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then
 ## Implementation (spellweaving, Necromancer)
 
 The Necromancer weave is built end-to-end and byte-exact (golden tests `SpellweaveCodecTests` +
-`BehaviorAnimationCodecTests`). Code map:
+`BehaviorAnimationsTests`). Code map:
 
 - `SpellweaveService` (`Faolan/GameServer/Combat/SpellweaveService.cs`) — the weave FSM + the trance-meter /
   energy loop. Session state on `NetworkClientSession`: `IsSpellweaving`, `WeaveComponents`, `SpellweaveBuffStack`,
@@ -116,9 +116,9 @@ The Necromancer weave is built end-to-end and byte-exact (golden tests `Spellwea
   `SendWorldIir`, `SendBuffRemoval` (rank-1 end-twins, relayed to viewers so the pose ends on their screens too),
   `SendSprintBar` (`0x200E`), `EnsureEnergyLoop`, and `isMounted` — the trance roots the caster and plays a kneeling
   pose, so opening one from the saddle is refused with an on-screen line rather than pinning a rider mid-gallop.
-- `SpellweaveCodec` (`Faolan.Core.Network/Codecs/Combat/SpellweaveCodec.cs`) — reactive-list, stat-gauge,
+- `CombatReactiveCodec` (`Faolan.Core.Network/Codecs/Combat/CombatReactiveCodec.cs`) — reactive-list, stat-gauge,
   buff-data and fire-stage builders.
-- `BehaviorAnimationCodec` (`Faolan.Core.Network/Codecs/Combat/BehaviorAnimationCodec.cs`) — the trance /
+- `BehaviorAnimations` (`Faolan.Core.Network/Codecs/Combat/BehaviorAnimations.cs`) — the trance /
   component / EXIT BCC animations (BCC `0x642CD3D6` is the generic behaviour channel, shared with combat).
 - `SpellweaveCatalog` (`Faolan.Core.Network/Constants/SpellweaveCatalog.cs`) — the per-class `SpellweaveProfile`
   (Necromancer only) + `EnergyMaxForClass`.

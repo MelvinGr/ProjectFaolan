@@ -35,10 +35,9 @@ namespace Faolan.Tests
 		{
 			var spawn = new Vector3(Bits(0x43a74000), Bits(0x43146666), Bits(0x44254ccd));
 
-			var s = new FaolanStream();
-			ResurrectionSpotsBody.WriteCreateFlowValidResurrectionSpots(s, spawn);
+			var body = ValidResurrectionSpotsCodec.Build(ValidResurrectionSpotLists.CreateFlow(spawn));
 
-			Assert.Equal(CapturedCreateFlow, Convert.ToHexStringLower(s.ToArray()));
+			Assert.Equal(CapturedCreateFlow, Convert.ToHexStringLower(body));
 		}
 
 		// The count prefix is (count+1) * 0x3F1 - the same list framing the guild lists use. 0x7E2 was only ever
@@ -50,10 +49,7 @@ namespace Faolan.Tests
 			for (var i = 0; i < spotCount; i++)
 				spots[i] = Spot((uint)(784236 + i), 4010, 0x43a8278d, 0x4314f78d, 0x44253df4, 10);
 
-			var s = new FaolanStream();
-			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(s, Vector3.Zero, spots);
-
-			var bytes = s.ToArray();
+			var bytes = ValidResurrectionSpotsCodec.Build(ValidResurrectionSpotLists.Known(Vector3.Zero, spots));
 			Assert.Equal(expectedPrefix, Convert.ToHexStringLower(bytes)[24..32]); // after the 12-byte reference position
 			Assert.Equal(16 + 41 * spotCount, bytes.Length); // 41-byte records, no separate end-of-body byte
 		}
@@ -65,10 +61,9 @@ namespace Faolan.Tests
 		{
 			var spot = Spot(0x000f5c46, 2010, 0x44812c7b, 0x431a6ac1, 0x4473f5c3, restorationLevel);
 
-			var s = new FaolanStream();
-			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(s, Vector3.Zero, [spot]);
+			var body = ValidResurrectionSpotsCodec.Build(ValidResurrectionSpotLists.Known(Vector3.Zero, [spot]));
 
-			var hex = Convert.ToHexStringLower(s.ToArray());
+			var hex = Convert.ToHexStringLower(body);
 			Assert.Equal(expectedTail, hex[^10..^2]); // the u32 ahead of the record's 0x00 terminator
 		}
 
@@ -78,10 +73,9 @@ namespace Faolan.Tests
 			var deathPosition = new Vector3(Bits(0x446b8aa0), Bits(0x43260594), Bits(0x44877ccd));
 			var spot = Spot(0x000f5c46, 2010, 0x44812c7b, 0x431a6ac1, 0x4473f5c3, 10);
 
-			var s = new FaolanStream();
-			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(s, deathPosition, [spot]);
+			var body = ValidResurrectionSpotsCodec.Build(ValidResurrectionSpotLists.Known(deathPosition, [spot]));
 
-			Assert.Equal(CapturedOneSpot, Convert.ToHexStringLower(s.ToArray()));
+			Assert.Equal(CapturedOneSpot, Convert.ToHexStringLower(body));
 		}
 
 		// The captured order is 784237 then 784236, and 784237 is the nearer of the two (13.7 vs 141.9 units from the
@@ -94,10 +88,9 @@ namespace Faolan.Tests
 			var far = Spot(784236, 4010, 0x43a8278d, 0x4314f78d, 0x44253df4, 10);
 			var near = Spot(784237, 4010, 0x43d9f979, 0x431feccd, 0x443b38f6, 10);
 
-			var s = new FaolanStream();
-			ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(s, playerPosition, [far, near]);
+			var body = ValidResurrectionSpotsCodec.Build(ValidResurrectionSpotLists.Known(playerPosition, [far, near]));
 
-			Assert.Equal(CapturedTwoSpots, Convert.ToHexStringLower(s.ToArray()));
+			Assert.Equal(CapturedTwoSpots, Convert.ToHexStringLower(body));
 		}
 
 		private static float Bits(uint u)

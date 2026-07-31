@@ -68,7 +68,7 @@ the count-framing word.
 
 - `0xC79C` / `0xC79E` / `0xC7A0` — the resurrection-spot and playfield-proxy type words. These are per-**packet**
   rather than per-entity: spawn point 790836 appears under both `0xC79C` and `0xC7A0` in different frames, so the
-  word cannot be a property of the thing it addresses (`ResurrectionSpotsBody`). Undecoded; kept local to their
+  word cannot be a property of the thing it addresses (`ValidResurrectionSpotsCodec`). Undecoded; kept local to their
   codecs.
 - `0x9C50` = 40016 — shows up inside the PlayfieldFIIR body and the teleport destination proxy. Below the 50000
   base entirely; semantics TBD.

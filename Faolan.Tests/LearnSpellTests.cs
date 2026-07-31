@@ -14,7 +14,7 @@ namespace Faolan.Tests
 		// hoxxling guild-gameplay frame 3336
 		public void BuildLearnSpellBody_IsTheBareSpellId(uint spellId, string expectedHex)
 		{
-			var body = AbilityGrantBody.BuildLearnSpellBody(spellId);
+			var body = LearnSpellCodec.Build(spellId);
 
 			Assert.Equal(expectedHex, Convert.ToHexStringLower(body));
 			Assert.Equal(4, body.Length);

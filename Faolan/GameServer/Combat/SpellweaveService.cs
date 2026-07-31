@@ -84,8 +84,8 @@ namespace Faolan.GameServer.Combat
 			// The component-add gesture animation (BCC begin + complete), carrying the added element.
 			if (hasElement)
 			{
-				await WorldIir.Send(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile!.WeaveElements[componentIndex], false));
-				await WorldIir.Send(client, BehaviorAnimationCodec.SpellweaveComponentAdd(caster, profile.WeaveElements[componentIndex], true));
+				await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.SpellweaveComponentAdd(caster, profile!.WeaveElements[componentIndex], false)));
+				await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.SpellweaveComponentAdd(caster, profile.WeaveElements[componentIndex], true)));
 			}
 
 			// Immediate component effect: apply the element's own spell as a self-buff (the full id is the base << 8).
@@ -111,7 +111,7 @@ namespace Faolan.GameServer.Combat
 						await _out.ApplyBuff(client, caster, caster, (profile.StackingBuffBase + (uint)session.SpellweaveBuffStack) << 8);
 					}
 
-					await WorldIir.Send(client, SpellweaveCodec.BuildReactiveList(caster, profile.WeaveElements));
+					await WorldIir.Send(client, CombatReactiveCodec.Build(caster, profile.WeaveElements));
 				}, _logger);
 			}
 
@@ -156,11 +156,11 @@ namespace Faolan.GameServer.Combat
 			if (profile != null)
 			{
 				foreach (var stage in profile.FireStages)
-					await WorldIir.Send(client, SpellweaveCodec.BuildFireStage(caster, stage));
+					await WorldIir.Send(client, StatCodec.Build(caster, stage));
 			}
 
 			// The trance-EXIT animation: take the character out of the weave pose (without it it stays stuck kneeling).
-			await WorldIir.Send(client, BehaviorAnimationCodec.SpellweaveTranceExit(caster));
+			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.SpellweaveTranceExit(caster)));
 
 			// Close the trance: remove the trance buffs (their rank-1 end-twins) so the client clears the icons + exits
 			// the trance pose (capture: the cancel press removes 37F298 + the current 37E5A8 stack). Without this the
@@ -209,7 +209,7 @@ namespace Faolan.GameServer.Combat
 						drain = Math.Min(drain, session.Energy);
 						session.Energy -= drain;
 						await _out.SendSprintBar(client, session.Energy);
-						await WorldIir.Send(client, SpellweaveCodec.BuildStatGauge(caster, session.Energy, -(int)drain, SpellweaveCodec.StaminaGauge, SpellweaveCodec.StaminaScale));
+						await WorldIir.Send(client, StatDamageCodec.Build(StatDamages.SpellweaveGauge(caster, session.Energy, -(int)drain, StatDamages.SpellweaveStaminaGauge, StatDamages.SpellweaveStaminaScale)));
 					}
 					else
 					{
@@ -223,7 +223,7 @@ namespace Faolan.GameServer.Combat
 						// Phase 2: energy empty -> the health DoT (the damage the player takes for over-weaving).
 						var dmg = (uint)Math.Min(DotDrainPerTick, (int)health);
 						health -= dmg;
-						await WorldIir.Send(client, SpellweaveCodec.BuildStatGauge(caster, health, -(int)dmg, SpellweaveCodec.DotGauge, SpellweaveCodec.DotScale));
+						await WorldIir.Send(client, StatDamageCodec.Build(StatDamages.SpellweaveGauge(caster, health, -(int)dmg, StatDamages.SpellweaveDotGauge, StatDamages.SpellweaveDotScale)));
 					}
 
 					tick++;
@@ -280,11 +280,11 @@ namespace Faolan.GameServer.Combat
 
 			// The trance-pose animation (BCC): make the character play the spellweaving stance (without it the buffs
 			// render but the body stays idle).
-			await WorldIir.Send(client, BehaviorAnimationCodec.SpellweaveTrance(caster));
+			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.SpellweaveTrance(caster)));
 
 			// The reactive element list: tells the client which weave elements it can add (the componentIndex on each
 			// add indexes into this list). This is what unblocks the adds.
-			await WorldIir.Send(client, SpellweaveCodec.BuildReactiveList(caster, profile.WeaveElements));
+			await WorldIir.Send(client, CombatReactiveCodec.Build(caster, profile.WeaveElements));
 
 			// The trance METER: stream the draining energy bar (then the health DoT) while the trance is open.
 			_ = RunTranceMeter(client, caster); // fire-and-forget; it logs its own exceptions and stops itself

@@ -1,0 +1,65 @@
+using System;
+using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
+
+namespace Faolan.Core.Network.Codecs.Combat
+{
+	// HateListUpdateIIR (0x8A01E5A1) - a hate/aggro entry: a flag byte then three u32s (FUN_007a93a0); in the capture
+	// the trio is [0xC350 marker][target handle][count]. The carrier handle is the hater (the NPC); `Target` is who it
+	// hates.
+	//
+	// The u32 carrier length belongs to the SENDER (#530 rule 2).
+	public static class HateListUpdateCodec
+	{
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.HateListUpdateIIR;
+
+		// CANONICAL - the only method here that writes bytes.
+		public static byte[] Build(HateListUpdateIIR value)
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			using var s = new FaolanStream();
+			Write(s, value);
+			return s.ToArray();
+		}
+
+		public static byte[] Build(uint handle, uint target, uint count = 1, byte flag = 0x00, byte env = 0x00)
+		{
+			return Build(new HateListUpdateIIR(handle, env, flag, EntityClass.Character, target, count));
+		}
+
+		public static HateListUpdateIIR Parse(in ReadOnlySpan<byte> data)
+		{
+			var r = new SpanReader(data, nameof(HateListUpdateCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+			return value;
+		}
+
+		internal static HateListUpdateIIR Read(ref SpanReader r)
+		{
+			r.ExpectU32Be(Opcode, "HateListUpdateIIR subop");
+			r.ExpectU32Be(EntityClass.Character, "entity class");
+			var handle = r.ReadU32Be();
+			var env = r.ReadU8();
+			var flag = r.ReadU8();
+			return new HateListUpdateIIR(handle, env, flag, r.ReadU32Be(), r.ReadU32Be(), r.ReadU32Be());
+		}
+
+		internal static void Write(FaolanStream s, HateListUpdateIIR v)
+		{
+			s
+				.WriteUInt32(Opcode)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(v.Handle)
+				.WriteByte(v.Env)
+				.WriteByte(v.Flag)
+				.WriteUInt32(v.Marker)
+				.WriteUInt32(v.Target)
+				.WriteUInt32(v.Count);
+		}
+	}
+
+	// HateListUpdateIIR (0x8A01E5A1).
+	public sealed record HateListUpdateIIR(uint Handle, byte Env, byte Flag, uint Marker, uint Target, uint Count);
+}

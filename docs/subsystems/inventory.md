@@ -67,7 +67,7 @@ the `Item.Key` (Data1..4) quad + `Item.Hash`, buildable via the hash-gated snaps
 ## Equip/unequip moves (Interact 0x09) - decoded from capture
 
 Capture: `Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed` (2026-06-12). Golden tests:
-`BehaviorAckTests`.
+`BehaviorAcksTests`.
 
 - Request args protobuf: `{TypeId, Mode, Category:10, Field6:0}`. **Mode is the client's monotonic
   per-session action counter** (shared across all BCC interactions), NOT a direction. **TypeId selects the

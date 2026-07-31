@@ -76,7 +76,7 @@ client-side proximity check, so the access position must be within 15 units of t
 
 ⚠️ **`head` was documented here as "the query's category root; echoed, NOT a quantity". That was wrong.** It is the
 protocol's shared `0x3F1` list framing — `(rowCount+1) * 0x3F1` — the same word `GuildSearchResultCodec`,
-`TradeskillRecipeCodec`, the quest progress-sublist (`docs/re/questc-region-decode.md`) and `ResurrectionSpotsBody`
+`TradeskillRecipeCodec`, the quest progress-sublist (`docs/re/questc-region-decode.md`) and `ValidResurrectionSpotsCodec`
 carry. Two coincidences hid it: the search REQUEST also carries `0x7E2`, which made it look echoed, and a 1-row
 result is `2 * 0x3F1 = 0x7E2` exactly, which made it look constant. Measured across the captures' 15 search
 results: an EMPTY grid is a 4-byte body whose head is `0x3F1` (= 0 rows) with no rows at all, and head tracks the

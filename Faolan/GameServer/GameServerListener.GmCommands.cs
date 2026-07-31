@@ -333,7 +333,7 @@ namespace Faolan.GameServer
 			if (command == PetCommand.Dismiss)
 			{
 				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-					b => b.WriteArrayUInt32Length(PetIirCodec.BuildRemove(owner, petHandle))));
+					b => b.WriteArrayUInt32Length(PetCodec.Build(PetBindings.Remove(owner, petHandle)))));
 
 				var removed = await _broadcaster.DespawnEntityForPlayer(client, petHandle);
 				Logger.LogInformation(removed != null
@@ -618,7 +618,7 @@ namespace Faolan.GameServer
 			// The wire side: the "Criminal" debuff plus the murder-point stat, the two things the capture shows moving.
 			var spell = await Database.GetSpell(CriminalStatus.CriminalSpellId);
 			await SendMagicBuffIir(client, character.Id, character.Id, CriminalStatus.CriminalSpellId << 8,
-				SelfBuffCodec.BuildBuffDataLong(CriminalStatus.CriminalSpellId, (uint)(seconds * 100), DefaultSelfBuffEffectNonce, CasterLevel(client)));
+				MagicBuffDataCodec.Build(CriminalStatus.CriminalSpellId, (uint)(seconds * 100), DefaultSelfBuffEffectNonce, CasterLevel(client)));
 			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.MurderPoints, character.MurderPoints), character.Id);
 
 			await _agentServerDispatcher.SendSystemMessage(character.Id,

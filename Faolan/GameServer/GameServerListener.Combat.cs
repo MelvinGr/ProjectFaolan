@@ -26,19 +26,19 @@ namespace Faolan.GameServer
 		Task IWorldOutbound.SendDeathBcc(INetworkClient client, uint dyingHandle)
 		{
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(WorldDeath.BuildDeathBcc(dyingHandle))));
+				b => b.WriteArrayUInt32Length(BehaviorControlCenterCodec.Build(DeathSequence.Bcc(dyingHandle)))));
 		}
 
 		Task IWorldOutbound.SendDeathPose(INetworkClient client, uint dyingHandle, Vector3 deathPosition)
 		{
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(WorldDeath.BuildDeathPose(dyingHandle, deathPosition))));
+				b => b.WriteArrayUInt32Length(MoveTaskCodec.Build(DeathSequence.Pose(dyingHandle, deathPosition)))));
 		}
 
 		Task IWorldOutbound.SendDeathTrigger(INetworkClient client, uint dyingHandle, uint killerEndpoint)
 		{
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(WorldDeath.BuildKilledBy(dyingHandle, killerEndpoint))));
+				b => b.WriteArrayUInt32Length(SimpleCharKilledByUpdateCodec.Build(dyingHandle, killerEndpoint))));
 		}
 
 		Task IWorldOutbound.SendNpcAttackAnimation(INetworkClient client, uint npcHandle, uint damage, uint swingCounter)
@@ -60,7 +60,7 @@ namespace Faolan.GameServer
 		{
 			// Same GameAgent 0x59 sender / receiver framing as the death sequence (retail beach #1382 uses it).
 			return client.SendAsync(new Rpc(PlayerDeathSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				b => b.WriteArrayUInt32Length(WorldDeath.BuildRevive(handle, respawnPointId))));
+				b => b.WriteArrayUInt32Length(BehaviorControlCenterCodec.Build(DeathSequence.Revive(handle, respawnPointId)))));
 		}
 
 		Task IWorldOutbound.SendReviveDestination(INetworkClient client, uint handle, uint mapId, Vector3 position, float facingX, float facingZ)
@@ -89,7 +89,7 @@ namespace Faolan.GameServer
 		Task IEnvironmentOutbound.SendEnvironmentalDamage(INetworkClient client, uint targetHandle, uint amount, uint statId, uint school)
 		{
 			return client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(CombatEffectBuilder.BuildEnvironmentalDamage(targetHandle, amount, statId, school))));
+				s => s.WriteArrayUInt32Length(StatDamageCodec.Build(StatDamages.Environmental(targetHandle, amount, statId, school)))));
 		}
 
 		Task IEnvironmentOutbound.PushVitals(INetworkClient client, EntityVitals vitals)

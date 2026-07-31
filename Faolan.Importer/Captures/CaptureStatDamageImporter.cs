@@ -124,9 +124,9 @@ namespace Faolan.Importer.Captures
 
 				seen++;
 
-				// The StatDamageIIR content is exactly what CombatEffectBuilder.StatDamage models (delta@37 / statId@41
-				// / spellBaseId@61) - parse it typed (StatDamage) instead of re-reading those three offsets by hand.
-				var dmg = StatDamage.Read(new FaolanStream(inner));
+				// The StatDamageIIR content is exactly what StatDamageCodec models (delta@37 / statId@41 /
+				// spellBaseId@61) - parse it typed instead of re-reading those three offsets by hand.
+				var dmg = StatDamageCodec.Parse(inner);
 				if (dmg.SpellBaseId == 0 || dmg.Delta == 0)
 					return;
 
@@ -135,7 +135,7 @@ namespace Faolan.Importer.Captures
 				types.TryAdd(dmg.SpellBaseId, []);
 				types[dmg.SpellBaseId][(uint)dmg.School] = types[dmg.SpellBaseId].GetValueOrDefault((uint)dmg.School) + 1;
 
-				var key = (dmg.SpellBaseId, dmg.Target, dmg.Caster);
+				var key = (dmg.SpellBaseId, dmg.Handle, dmg.Caster);
 				trains.TryAdd(key, []);
 				trains[key].Add(packet.Ticks);
 			}

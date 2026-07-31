@@ -11,9 +11,11 @@ namespace Faolan.Core.Network.Codecs
 	//
 	// NAMING follows that split, and CodecConventionTests.TypesImplementingICodec_AreNotNamedCodec enforces it: the
 	// `*Codec`/`*Builder` suffix belongs to the static MODULE, so a type implementing this interface is named after
-	// the VALUE it holds (ChainKill, Regen, NpcSpellEffect). A value may also live nested inside its
-	// module when the module has other ops to offer - CombatShieldCodec.Message, StatDamageCodec.Message. What it
-	// must not be is `ChainKillCodec.Parse(body)` returning a `ChainKillCodec`: a codec that is a value.
+	// the VALUE it holds. What it must not be is `ChainKillCodec.Parse(body)` returning a `ChainKillCodec`: a codec
+	// that is a value.
+	//
+	// ⚠️ RETIRED, and deleted in #530 wave 9. The uniform surface leaves no room for a third public shape: a value is
+	// a plain record and its module owns Build/Parse. No folder converted so far still implements it.
 	public interface ICodec<out T>
 	{
 		void Write(FaolanStream s);

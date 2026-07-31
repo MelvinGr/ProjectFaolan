@@ -19,7 +19,7 @@ namespace Faolan.Importer.Extractors
 	public static class NpcSpellExtractor
 	{
 		// Body offsets (inside the 0x2000 IIR carrier): [u32 len][u32 subop][u32 c350][u32 applyTo][u16 0]
-		// [u32 spellId][u32 c350][u32 applyFrom][payload...]. The header fields are read by NpcSpellCastBuilder;
+		// [u32 spellId][u32 c350][u32 applyFrom][payload...]. The header fields are read by MagicBuffCodec;
 		// PayloadOffset (30) is the fixed header length used as the minimum-body guard.
 		private const int PayloadOffset = 30;
 		private const uint ApplySpellSubOpcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
@@ -46,24 +46,24 @@ namespace Faolan.Importer.Extractors
 				if (body.ReadU32Be(4) != ApplySpellSubOpcode)
 					continue;
 
-				// The ApplySpell content is [subop][c350][applyTo][u16 0][spellId][c350][applyFrom][payload] - the same
-				// shape NpcSpellCastBuilder builds, so parse it with that codec (applyTo@12 / spellId@18 / applyFrom@26
-				// as before). Bound the stream to the declared IIR length so Payload matches the old len-bounded slice.
+				// The ApplySpell content is [subop][c350][applyTo][env][spellBaseId][form][c350][applyFrom][data] -
+				// MagicBuffCodec's record, so parse it with that codec instead of re-reading applyTo@12 / spellId@18 /
+				// applyFrom@26. Bound the span to the declared IIR length so Data matches the old len-bounded slice.
 				var len = (int)body.ReadU32Be(0);
 				var end = Math.Min(body.Length, 4 + len);
 				if (end < PayloadOffset) // a length shorter than the fixed header: the old code yielded an empty payload -> skip
 					continue;
 
-				var cast = NpcSpellCastBuilder.NpcSpellCast.Read(new FaolanStream(body[4..end]));
+				var cast = MagicBuffCodec.Parse(body.AsSpan(4, end - 4));
 
 				if (cast.ApplyFrom == cast.ApplyTo) // a self-buff, not an offensive cast
 					continue;
 				if (!nameByHandle.TryGetValue(cast.ApplyFrom, out var name)) // not a known NPC caster (e.g. the player's own cast)
 					continue;
-				if (cast.Payload.Length == 0) // the rank-1 EMPTY twin is the buff-end/terminator, not a standalone cast (#232)
+				if (cast.Data.Length == 0) // the rank-1 EMPTY twin is the buff-end/terminator, not a standalone cast (#232)
 					continue;
 
-				entries.Add(new NpcSpellEntry(name, cast.SpellId, cast.Payload));
+				entries.Add(new NpcSpellEntry(name, MagicBuffIds.WireIdOf(cast.SpellBaseId, cast.Form), cast.Data));
 			}
 
 			return entries;

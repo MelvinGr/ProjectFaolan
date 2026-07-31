@@ -7,7 +7,7 @@ Treat the field counts as decompile-accurate and the framing as the standard
 `[len][sub][0xC350][handle][u8 env][reader]` (unverified env size for these specific types).
 
 > **Note (SHIPPED since batch 4):** two rows below have since surfaced in captures and are now
-> implemented byte-exact — `NewLevelIIR_t` (`NewLevelIirCodec`, golden `NewLevelIirCodecTests`) and
+> implemented byte-exact — `NewLevelIIR_t` (`NewLevelCodec`, golden `NewLevelCodecTests`) and
 > `MainQuestUpdateIIR_c`/`QuestLogListIIR` (`WorldQuest.BuildQuestLogList`, golden `QuestTests`). Their
 > rows carry an inline SHIPPED annotation; the rest remain binary-only.
 
@@ -19,7 +19,7 @@ Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1
 
 | sub | type | reader | body |
 |---|---|---|---|
-| `0x6D314743` | `NewLevelIIR_t` | `79bb60` | `[u32×7]` — new level + stat/derived deltas. **SHIPPED:** now byte-exact vs the combat-levelup capture — `NewLevelIirCodec` / `NewLevelIirCodecTests` |
+| `0x6D314743` | `NewLevelIIR_t` | `79bb60` | `[u32×7]` — new level + stat/derived deltas. **SHIPPED:** now byte-exact vs the combat-levelup capture — `NewLevelCodec` / `NewLevelCodecTests` |
 | `0x45675F8F` | `GroundEffectIIR_t` | `7afb20` | `[u32×4]` |
 | `0x9CC129C5` | `QuestCooldownIIR` | `91cc00` | `[u32×3]` (quest id + cooldown window) |
 | `0x80138D7B` | `QuestRewardSelectionIIR_c` | `91c990` | `[u32×2]` |

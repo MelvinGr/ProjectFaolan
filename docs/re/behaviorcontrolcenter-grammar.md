@@ -18,7 +18,7 @@ switch (behaviorType):
 
 So a BccIIR = `[u8 type][u32 commandId?][command-specific data]`, where the command data is read by the
 looked-up Command object's reader (another vtable hop). The combat-relevant forms (the attack/interact ack)
-are already built byte-exact by `CombatService`/`CombatPacketCodec` (`BehaviorAckTests`).
+are already built byte-exact by `CombatService`/`BehaviorControlCenterCodec` (`BehaviorAcksTests`).
 
 ## Status
 

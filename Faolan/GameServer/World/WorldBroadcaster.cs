@@ -415,15 +415,15 @@ namespace Faolan.GameServer.World
 			if (target == null)
 				return;
 
-			var hate = HateListCodec.Build(npc.Handle, target.Handle);
-			var threat = ThreatLevel.Build(npc.Handle, 1, 1);
+			var hate = HateListUpdateCodec.Build(npc.Handle, target.Handle);
+			var threat = ThreatLevelCodec.Build(npc.Handle, 1, 1);
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
 				{
-					await WorldIir.SendFramed(viewer.Client, hate);
-					await WorldIir.SendFramed(viewer.Client, threat);
+					await WorldIir.Send(viewer.Client, hate);
+					await WorldIir.Send(viewer.Client, threat);
 				}
 			}
 		}
@@ -456,7 +456,7 @@ namespace Faolan.GameServer.World
 			// codec output is the bare IIR record (no length prefix), so it rides WorldIir.Send - the same framing as the
 			// MoveTask above - which adds the carrier's [u32 length]. Gated on CONFIRMED (not Known) so a still-loading
 			// viewer - which has the handle in Known but not Confirmed - is never sent a pulse for an unbuilt dynel.
-			var record = BehaviorHeartbeatCodec.Build(npc.Handle, ++npc.HeartbeatTick);
+			var record = BehaviorControlCenterCodec.Build(BehaviorAnimations.Heartbeat(npc.Handle, ++npc.HeartbeatTick));
 
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
@@ -525,7 +525,7 @@ namespace Faolan.GameServer.World
 			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
 			{
 				if (viewer.Client != null && viewer.Known.Contains(npc.Handle))
-					await WorldIir.SendFramed(viewer.Client, record);
+					await WorldIir.Send(viewer.Client, record);
 			}
 		}
 
@@ -1071,7 +1071,7 @@ namespace Faolan.GameServer.World
 				if (npc.NpcTemplate.Spells is { Count: > 0 } typeSpells)
 				{
 					foreach (var s in typeSpells)
-						entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8).ToArray()));
+						entity.Spells.Add(new NpcSpellCast(s.SpellId, MagicBuffDataCodec.Build(NpcSpellEffectColumns.ToBuffData(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8))));
 				}
 
 				// Ambient chatter lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent).
@@ -1394,7 +1394,7 @@ namespace Faolan.GameServer.World
 			if (entity.Name is { Length: > 0 } spellName)
 			{
 				foreach (var s in await _database.GetNpcSpellsByName(spellName))
-					entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8).ToArray()));
+					entity.Spells.Add(new NpcSpellCast(s.SpellId, MagicBuffDataCodec.Build(NpcSpellEffectColumns.ToBuffData(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8))));
 			}
 
 			_sim.World.ZoneForEntity(player).Add(entity);
@@ -1444,7 +1444,7 @@ namespace Faolan.GameServer.World
 			entity.NoRespawn = true;
 
 			foreach (var s in npcType.Spells)
-				entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8).ToArray()));
+				entity.Spells.Add(new NpcSpellCast(s.SpellId, MagicBuffDataCodec.Build(NpcSpellEffectColumns.ToBuffData(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8))));
 
 			_sim.World.ZoneForEntity(player).Add(entity);
 			foreach (var viewer in _sim.World.ZoneForEntity(player).PlayersInRange(player.Position, WorldSimulation.PlayerInterestRange))
@@ -1502,7 +1502,7 @@ namespace Faolan.GameServer.World
 			if (player == null)
 				return;
 
-			var body = BehaviorAnimationCodec.PlayerStandUp(player.Handle, handle, BehaviorAnimationCodec.StandRemoteformat());
+			var body = BehaviorControlCenterCodec.Build(BehaviorAnimations.PlayerStandUp(player.Handle, handle, BehaviorAnimations.StandRemoteformat()));
 			await WorldIir.Send(client, body);
 			await BroadcastBehaviorToViewers(client, body);
 			_logger.LogInformation("Sit: {Player} stood up from 0x{Handle:X8}.", player.Name, handle);
@@ -1645,7 +1645,7 @@ namespace Faolan.GameServer.World
 				// Phase 2 - the client's confirming re-send. Commit the pose with the hold-assert, exactly once.
 				if (!client.Session.SeatedHoldConfirmed)
 				{
-					var assert = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqObjectHold, handle);
+					var assert = BehaviorControlCenterCodec.Build(BehaviorAnimations.BenchSitState(player.Handle, BehaviorAnimations.SeqObjectHold, handle));
 					await WorldIir.Send(client, assert);
 					await BroadcastBehaviorToViewers(client, assert);
 					client.Session.SeatedHoldConfirmed = true;
@@ -1658,8 +1658,8 @@ namespace Faolan.GameServer.World
 			// Phase 1 - the initial UseObject. Retail brackets the sit ANIMATION with the object-action hold STATE
 			// (behaviorId 0x12): the hold-echo BEFORE the animation, then the animation itself. The hold-assert is NOT
 			// sent yet - it answers the client's phase-2 re-send above.
-			var sit = BehaviorAnimationCodec.PlayerSitOnObject(player.Handle, handle, BehaviorAnimationCodec.SitRemoteformat(BenchObjectClass));
-			var holdEcho = BehaviorAnimationCodec.BenchSitState(player.Handle, BehaviorAnimationCodec.SeqBegin, handle);
+			var sit = BehaviorControlCenterCodec.Build(BehaviorAnimations.PlayerSitOnObject(player.Handle, handle, BehaviorAnimations.SitRemoteformat(BenchObjectClass)));
+			var holdEcho = BehaviorControlCenterCodec.Build(BehaviorAnimations.BenchSitState(player.Handle, BehaviorAnimations.SeqBegin, handle));
 
 			foreach (var body in new[] { holdEcho, sit })
 			{
@@ -2044,7 +2044,7 @@ namespace Faolan.GameServer.World
 			entity.PatrolWaypoints = pool.Points; // roam the group's area via the #266 wander (no new movement code)
 			entity.ArmPatrolCycle(); // stagger the first wander so they don't all step at once
 			foreach (var s in pool.Type.Spells)
-				entity.Spells.Add(new NpcSpellCast(s.SpellId, new NpcSpellEffect(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8).ToArray()));
+				entity.Spells.Add(new NpcSpellCast(s.SpellId, MagicBuffDataCodec.Build(NpcSpellEffectColumns.ToBuffData(s.SpellId, s.Duration, s.DescriptorSlot3, s.CastingLevel, s.FlagA, s.DescriptorSlot0, s.DescriptorSlot8))));
 
 			zone.Add(entity);
 			return entity;
@@ -2092,7 +2092,7 @@ namespace Faolan.GameServer.World
 			entity.NoRespawn = true; // her corpse fades; the LURE comes back instead (EncounterReset)
 			entity.EncounterLureTemplateId = lure.NpcTemplateId;
 			foreach (var sp in boss.Spells)
-				entity.Spells.Add(new NpcSpellCast(sp.SpellId, new NpcSpellEffect(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8).ToArray()));
+				entity.Spells.Add(new NpcSpellCast(sp.SpellId, MagicBuffDataCodec.Build(NpcSpellEffectColumns.ToBuffData(sp.SpellId, sp.Duration, sp.DescriptorSlot3, sp.CastingLevel, sp.FlagA, sp.DescriptorSlot0, sp.DescriptorSlot8))));
 
 			// Added to the zone only: the interest manager streams a new entity to nearby players on its next pass,
 			// which is how the ambient pools spawn members mid-session too. No explicit broadcast to get wrong.
@@ -2414,8 +2414,7 @@ namespace Faolan.GameServer.World
 		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
 		// patrol client-side - the server sends the route once per spawn/respawn, not a per-tick step). The anchor /
 		// current position is the NPC's live spawn position (the render-gate requires the MoveTask position to match
-		// the spawn it was just sent); the waypoints are the absolute captured world coords. BuildPatrol emits a
-		// self-contained record (it prepends its own [u32 len]), so it rides WorldIir.SendFramed, not WorldIir.Send.
+		// the spawn it was just sent); the waypoints are the absolute captured world coords.
 		private static Task SendPatrol(INetworkClient recipient, WorldEntity npc)
 		{
 			if (!npc.Patrols)

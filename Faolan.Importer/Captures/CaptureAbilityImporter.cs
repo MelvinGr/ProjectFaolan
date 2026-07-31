@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 namespace Faolan.Importer.Captures
 {
 	// Harvests the player's starting abilities from the retail 0x2052 ability-grant packets (the real wire format,
-	// NOT the C++ 0x4d scheme; see Faolan.Core.Network/Codecs/Combat/AbilityGrantBody.cs). The grant body carries
+	// NOT the C++ 0x4d scheme; see Faolan.Core.Network/Codecs/Combat/AddSpecialAbilityCodec.cs). The grant body carries
 	// the ability's Slot (template word) + Data0..4 identity quad; names are client-side (resolved by id).
 	//
 	// CLASS-AWARE: each create-flow capture is attributed to its character's class via the ChangeClass editor command
@@ -531,9 +531,10 @@ namespace Faolan.Importer.Captures
 
 				var body = packet.BodyReader().ReadRemainingArray();
 
-				// The 0x2052 grant is exactly what AbilityGrantBody builds/parses (slot, id, data0, key1..4) - use its
+				// The 0x2052 grant is exactly what AddSpecialAbilityCodec builds/parses (slot, id, data0, key1..4) - use its
 				// parser (which validates the full 81-byte shape) instead of re-reading the words by hand.
-				if (!AbilityGrantBody.TryParseAddSpecialAbilityBody(body, out var ability, out _) || ability.Id == 0)
+				var ability = AddSpecialAbilityCodec.Parse(body);
+				if (ability.Id == 0)
 					return;
 
 				grants[ability.Id] = (ability.Slot, ability.Data0, ability.Key.Key1, ability.Key.Key2, ability.Key.Key3, ability.Key.Key4);
@@ -622,15 +623,25 @@ namespace Faolan.Importer.Captures
 					if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob || body.Length < 22 || body.ReadU32Be(4) != ComboBookSubOpcode)
 						return;
 
-					id = ComboBookIirCodec.Message.Read(new FaolanStream(body)).ComboId;
+					id = ComboBookCodec.Parse(body.AsSpan(4)).ComboId;
 				}
 				else
 				{
-					// The same 0x2052 grant AbilityGrantBody parses; take its validated id.
-					if (packet.Opcode != AddSpecialAbilityOpcode || !AbilityGrantBody.TryParseAddSpecialAbilityBody(body, out var ability, out _))
+					// The same 0x2052 grant AddSpecialAbilityCodec parses; take its validated id.
+					if (packet.Opcode != AddSpecialAbilityOpcode)
 						return;
 
-					id = ability.Id;
+					uint id2;
+					try
+					{
+						id2 = AddSpecialAbilityCodec.Parse(body).Id;
+					}
+					catch (CodecParseException)
+					{
+						return; // not a well-formed grant
+					}
+
+					id = id2;
 				}
 
 				if (id == 0)

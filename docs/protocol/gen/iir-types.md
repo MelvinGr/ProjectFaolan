@@ -62,7 +62,7 @@ external doc; the enum + the hash function are the whole source.
 | `0x6BA10936` | `SpellBookIIR_t` ✓ | `SpellBookIIR` | SpellBookIIR_t  (x1) |
 | `0x6BD56736` | `DestructibleFullUpdateIIR_c` ✓ | `DestructibleFullUpdateIIR` | DestructibleFullUpdateIIR_c  (x189) |
 | `0x6C300937` | `TemplateActionIIR_t` ✓ | `TemplateActionIIR` | TemplateActionIIR_t  (x7) |
-| `0x6D314743` | `NewLevelIIR_t` ✓ | `NewLevelIIR` | NewLevelIIR_t - level-up notification (built by NewLevelIirCodec) |
+| `0x6D314743` | `NewLevelIIR_t` ✓ | `NewLevelIIR` | NewLevelIIR_t - level-up notification (built by NewLevelCodec) |
 | `0x70010162` | `LootRemoveItemsIIR_c` ✓ | `LootRemoveItemsIIR` | LootRemoveItemsIIR_c  (x42) |
 | `0x72491DE9` | `DeleteItemIIR_t` ✓ | `DeleteItemIIR` | DeleteItemIIR_t - "DropItem"; body = ProtoDeleteItemIIR (NOT the sibling move message - they alias on the wire; see DeleteItemCodec) |
 | `0x737A6DF9` | `FullPlayerCharacterIIR` ✓ | `FullPlayerCharacterIIR` | FullPlayerCharacterIIR  (x33) - the whole player character (inc. inventory); see carve-out below |

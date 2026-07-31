@@ -37,18 +37,19 @@ namespace Faolan.Importer.Captures
 
 				if (sub == ApplySpellSubOpcode)
 				{
-					// [c350][applyTo][u16 0][spellId][c350][applyFrom][payload]. This is the ApplySpell content that
-					// NpcSpellCastBuilder models, minus its leading subop (TryReadIirBody split it off) - re-prepend the
-					// subop so the codec parses it, instead of re-deriving applyTo@8/spellId@14/applyFrom@22 by hand. Only
+					// [c350][applyTo][env][spellBaseId][form][c350][applyFrom][data]. This is the MagicBuffIIR content,
+					// minus its leading subop (TryReadIirBody split it off) - re-prepend the subop so the codec parses
+					// it, instead of re-deriving applyTo@8/spellId@14/applyFrom@22 by hand. Only
 					// a SELF-buff full apply (applyTo == applyFrom, and a payload present - not the ~short rank-1 removal
 					// twin) is a consumable effect.
 					if (body.Length < 22)
 						continue;
 
-					var content = new FaolanStream().WriteUInt32(sub).WriteArray(body).ToArray();
-					var cast = NpcSpellCastBuilder.NpcSpellCast.Read(new FaolanStream(content));
+					using var content = new FaolanStream();
+					content.WriteUInt32(sub).WriteArray(body);
+					var cast = MagicBuffCodec.Parse(content.ToArray());
 					if (cast.ApplyTo == cast.ApplyFrom && body.Length > 30)
-						pendingSpellBase = cast.SpellId >> 8;
+						pendingSpellBase = cast.SpellBaseId;
 				}
 				else if (sub == TemplateActionSubOpcode && pendingSpellBase is { } spellBase)
 				{

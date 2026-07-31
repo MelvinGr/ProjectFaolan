@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Xunit;
 
@@ -19,10 +20,12 @@ namespace Faolan.Tests
 		[Fact]
 		public void MagicBuff_ParsesShortForm()
 		{
-			Assert.True(MagicBuffCodec.TryParse(Convert.FromHexString(ShortBuff), out var caster, out var spell, out var target));
-			Assert.Equal(0x01317CF8u, caster);
-			Assert.Equal(5070797u, spell); // Fatality
-			Assert.Equal(0x01317CF8u, target);
+			var buff = MagicBuffCodec.Parse(Convert.FromHexString(ShortBuff));
+			Assert.Equal(0x01317CF8u, buff.ApplyTo);
+			Assert.Equal(0x01317CF8u, buff.ApplyFrom);
+			Assert.Equal(5070797u, buff.SpellBaseId); // Fatality
+			Assert.Equal(MagicBuffIds.FormEnd, buff.Form); // the low byte of the wire id, the client's form selector
+			Assert.Empty(buff.Data);
 		}
 
 		// The long form's second copy of the id is the independent check on the offset: read it wrong and the two
@@ -31,36 +34,40 @@ namespace Faolan.Tests
 		public void MagicBuff_LongFormSpellIdIsEchoed()
 		{
 			var body = Convert.FromHexString(LongBuff);
-			Assert.True(MagicBuffCodec.TryParse(body, out _, out var spell, out _));
-			Assert.Equal(1151266u, spell);
+			var buff = MagicBuffCodec.Parse(body);
+			Assert.Equal(1151266u, buff.SpellBaseId);
 			Assert.Contains("00119122", LongBuff[26..], StringComparison.Ordinal);
+			// The whole record is modelled, so the 54-byte data region round-trips too.
+			Assert.Equal(MagicBuffDataCodec.Length, buff.Data.Length);
+			Assert.Equal(body, MagicBuffCodec.Build(buff));
 		}
 
 		[Fact]
 		public void MagicBuff_RoundTripsBuild()
 		{
-			var body = MagicBuffCodec.Build(0x01317CF8, 5070797, 0x01317CF8);
+			var body = MagicBuffCodec.Build(0x01317CF8, 0x01317CF8, MagicBuffIds.WireIdOf(5070797, MagicBuffIds.FormEnd));
 			Assert.Equal(ShortBuff, Convert.ToHexString(body).ToLowerInvariant());
 		}
 
 		[Fact]
 		public void MagicBuff_RejectsAnotherIir()
 		{
-			Assert.False(MagicBuffCodec.TryParse(Convert.FromHexString("0d1556950000c35001317cf8000000c3500002792900000000"), out _, out _, out _));
+			var notAMagicBuff = Convert.FromHexString("0d1556950000c35001317cf8000000c3500002792900000000");
+			Assert.Throws<CodecParseException>(() => MagicBuffCodec.Parse(notAMagicBuff));
 		}
 
 		// Selecting Turach, then clearing the selection. A zero target is a DESELECT, not an absent field.
 		[Fact]
 		public void LookAt_ParsesSelectAndDeselect()
 		{
-			Assert.True(LookAtCodec.TryParse(
-				Convert.FromHexString("0d1556950000c35001317cf8000000c350000279290000000000000002"), out var subject, out var target));
-			Assert.Equal(0x01317CF8u, subject);
-			Assert.Equal(0x00027929u, target); // Turach
+			var select = LookAtCodec.Parse(Convert.FromHexString("0d1556950000c35001317cf8000000c350000279290000000000000002"));
+			Assert.Equal(0x01317CF8u, select.Subject);
+			Assert.Equal(0x00027929u, select.Target); // Turach
 
-			// A cleared selection: the target endpoint is zeroed rather than the field being absent.
-			Assert.True(LookAtCodec.TryParse(LookAtCodec.Build(0x01317CF8, 0), out _, out var cleared));
-			Assert.Equal(0u, cleared);
+			// A cleared selection: BOTH target words are zeroed rather than the field being absent.
+			var cleared = LookAtCodec.Parse(LookAtCodec.Build(0x01317CF8, 0));
+			Assert.Equal(0u, cleared.Target);
+			Assert.Equal(0u, cleared.TargetClass);
 		}
 
 		[Fact]

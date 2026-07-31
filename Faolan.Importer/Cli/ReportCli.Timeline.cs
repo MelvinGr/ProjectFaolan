@@ -237,10 +237,9 @@ namespace Faolan.Importer.Cli
 
 		private static string DescribeCore(TimelineEvent e, TimelineLookups look, Dictionary<uint, string> labels)
 		{
-			// ⚠️ The two codec families disagree on framing and both are right for their own Build. WorldQuest,
-			// MagicBuffCodec and LookAtCodec start at the SUB-OPCODE (Content); StatDamage/HateList/ChainKill/
-			// CombatShield Write through WriteArrayUInt32Length and so Read the u32 LENGTH first (Raw). Passing the
-			// wrong one does not fail cleanly - it reads four bytes short and runs off the end of the buffer.
+			// Every IIR codec now takes the CONTENT (from the sub-opcode on) - #530 rule 2 moved the carrier's u32
+			// length out of the codecs and onto the sender, which retired the split where half of them read the length
+			// first. `raw` is still the framed bytes, for the branches that have no codec yet.
 			var raw = e.Raw;
 			var content = e.Content;
 			switch (e.Name)
@@ -260,38 +259,56 @@ namespace Faolan.Importer.Cli
 					return $"quest {qg} goal {goal} -> {update}";
 				case "QuestIIR" when WorldQuest.TryParseQuestIir(content, out _, out var qi, out var state):
 					return $"quest {qi} state {state}" + state switch { 2 => " (active)", 4 => " (completed)", _ => "" };
-				case "DispatchAddSpecialAbility" when AbilityGrantBody.TryParseAddSpecialAbilityBody(content, out var ability, out _):
+				case "DispatchAddSpecialAbility":
+				{
+					var ability = AddSpecialAbilityCodec.Parse(content);
 					return $"ability {ability.Id} slot {ability.Slot}"
 					       + (look.Abilities.TryGetValue(ability.Id, out var an) ? $" = {an}" : "");
+				}
 				case "PerformSpecialAction" when raw.Length >= 4:
 				{
 					var slot = raw.ReadU32Be(0);
 					return $"use ability slot {slot}" + (look.AbilityBySlot.TryGetValue(slot, out var n) ? $" = {n}" : "");
 				}
-				case "MagicBuffIIR" when MagicBuffCodec.TryParse(content, out var caster, out var spell, out var target):
+				case "MagicBuffIIR":
 				{
-					var name = look.Spells.TryGetValue(spell, out var sn) ? sn : $"spell {spell}";
-					var at = target != 0 && target != caster ? $" -> {Ent(labels, target)}" : "";
-					return $"{Ent(labels, caster)} buff {name}{at}";
+					// applyFrom is the CASTER and applyTo is who the buff lands on - the carrier handle is the TARGET.
+					// This line had them the other way round until #530 wave 4 merged the three MagicBuffIIR emitters
+					// and settled which endpoint is which (the NPC-cast golden pins it: applyFrom = the caster's spawn).
+					var buff = MagicBuffCodec.Parse(content);
+					var wireId = MagicBuffIds.WireIdOf(buff.SpellBaseId, buff.Form);
+					var name = look.Spells.TryGetValue(buff.SpellBaseId, out var sn) ? sn : $"spell {buff.SpellBaseId}";
+					var at = buff.ApplyTo != 0 && buff.ApplyTo != buff.ApplyFrom ? $" -> {Ent(labels, buff.ApplyTo)}" : "";
+					var end = buff.Form == MagicBuffIds.FormEnd ? " (end)" : "";
+					return $"{Ent(labels, buff.ApplyFrom)} buff {name}{at}{end} [0x{wireId:x}]";
 				}
-				case "LookAtIIR" when LookAtCodec.TryParse(content, out var subject, out var target):
-					return $"{Ent(labels, subject)} " + (target != 0 ? $"selects {Ent(labels, target)}" : "deselects");
+				case "LookAtIIR":
+				{
+					var look2 = LookAtCodec.Parse(content);
+					return $"{Ent(labels, look2.Subject)} " + (look2.Target != 0 ? $"selects {Ent(labels, look2.Target)}" : "deselects");
+				}
 				case "StatDamageIIR":
-					return StatDelta(raw, look, labels);
-				case "DamageResultIIR" when raw.Length >= 33:
-					return $"{Ent(labels, raw.ReadU32Be(12))} <- {Ent(labels, raw.ReadU32Be(21))}, "
-					       + $"{raw.ReadU32Be(25)} ({raw.ReadU32Be(25) / 100.0:F2} shown), school {raw.ReadU32Be(29)}";
+					return StatDelta(content, look, labels);
+				case "DamageResultIIR":
+				{
+					var hit = DamageResultCodec.Parse(content);
+					return $"{Ent(labels, hit.Target)} <- {Ent(labels, hit.Attacker)}, "
+					       + $"{hit.Damage} ({hit.Damage / 100.0:F2} shown), school {(uint)hit.School}";
+				}
 				case "ChainKillIIR":
-					return $"chain {ChainKill.Parse(raw).Count}";
+					return $"chain {ChainKillCodec.Parse(content).Count}";
 				case "HateListUpdateIIR":
 				{
-					var hate = HateListCodec.Parse(raw);
+					var hate = HateListUpdateCodec.Parse(content);
 					return $"{Ent(labels, hate.Handle)} -> {Ent(labels, hate.Target)}";
 				}
 				case "CombatShieldIIR":
-					return $"shield {CombatShieldCodec.Parse(raw).Value}";
-				case "PetIIR" when raw.Length >= 29:
-					return $"{Ent(labels, raw.ReadU32Be(25))} " + (raw[20] == 0x01 ? "dismissed" : "summoned");
+					return $"shield {CombatShieldCodec.Parse(content).Value}";
+				case "PetIIR":
+				{
+					var pet = PetCodec.Parse(content);
+					return $"{Ent(labels, pet.Pet)} " + (pet.Mode == PetCodec.ModeRemove ? "dismissed" : "summoned");
+				}
 				case "N3ToClientFadeIIR" when raw.Length >= 16:
 					return $"despawn {Ent(labels, raw.ReadU32Be(12))}";
 				case "N3ToClientQuitIIR" when raw.Length >= 16:
@@ -315,22 +332,17 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		// The stat delta and its cause, through StatDamageCodec. Its Words begin right after the env byte at 16 -
-		// FOUR bytes earlier than the raw-offset reading of the same record, so every index here is one higher than a
-		// hand count off the hex: [4] stat id, [6] SIGNED delta, [9] the source handle, [12] the spell responsible.
-		// Like combat damage the delta is display-scaled x100, which makes a damage-over-time tick read -7.07.
-		private static string StatDelta(byte[] raw, TimelineLookups look, Dictionary<uint, string> labels)
+		// The stat delta and its cause, through StatDamageCodec - now by NAME rather than by index into a bag of
+		// seventeen words (#530 wave 4). Like combat damage the delta is display-scaled x100, which makes a
+		// damage-over-time tick read -7.07.
+		private static string StatDelta(byte[] content, TimelineLookups look, Dictionary<uint, string> labels)
 		{
-			var msg = StatDamageCodec.Parse(raw);
-			if (msg.Words.Length < 13)
-				return "";
-
-			var delta = unchecked((int)msg.Words[6]) / 100.0;
-			var stat = look.Stats.TryGetValue(msg.Words[4], out var sn) ? sn : $"stat {msg.Words[4]}";
-			var cause = msg.Words[12] == 0
+			var msg = StatDamageCodec.Parse(content);
+			var stat = look.Stats.TryGetValue(msg.StatId, out var sn) ? sn : $"stat {msg.StatId}";
+			var cause = msg.SpellBaseId == 0
 				? ""
-				: look.Spells.TryGetValue(msg.Words[12], out var cn) ? $" via {cn}" : $" via spell {msg.Words[12]}";
-			return $"{Ent(labels, msg.Handle)} {stat} {delta:+0.00;-0.00} from {Ent(labels, msg.Words[9])}{cause}";
+				: look.Spells.TryGetValue(msg.SpellBaseId, out var cn) ? $" via {cn}" : $" via spell {msg.SpellBaseId}";
+			return $"{Ent(labels, msg.Handle)} {stat} {msg.Delta / 100.0:+0.00;-0.00} from {Ent(labels, msg.Caster)}{cause}";
 		}
 
 		// The granted item, through the GENERATED protobuf rather than a hand walk: item_data.template1 is the

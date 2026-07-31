@@ -30,7 +30,7 @@ MagicBuffIIR_c::Activate, UpdateBuff with parameters:
 
 `CasterID` is `+0x3C`, not `+0x38`: the buff-add call takes `in_ECX + 0x3c` **by pointer**, i.e. the two-word
 `ID32` the wire carries as `[u32 0xC350][u32 applyFrom]`. That leaves `+0x38` — the payload's `@42` word — as
-`CastingLevel`, which is what `SelfBuffCodec` already sends the caster's level in.
+`CastingLevel`, which is what `MagicBuffDataCodec` already sends the caster's level in.
 
 ## Reading order, and where the record really starts
 The client's IIR base read consumes `[u32 0xC350][u32 handle][u8 env]` — **nine** bytes, the same carrier
@@ -79,8 +79,8 @@ is that neither `@26` nor `@42` is a rendered magnitude or a stack count — the
 ## The EMPIRICAL map, and how it lines up
 Before the client's reader was walked, the payload was recovered by diffing same-spell instances (per-cast
 fields) against different spells (spell params), and modelled as `NpcSpell` columns in #304
-(`Faolan.Core.Network/Codecs/Combat/NpcSpellEffect.cs`, byte-exact over all 21 distinct captured payloads —
-`Faolan.Tests/NpcSpellEffectCodecTests.cs`, which is where the proof lives now that the Python dissector that
+(`Faolan.Core.Network/Codecs/Combat/MagicBuffDataCodec.cs`, byte-exact over all 21 distinct captured payloads —
+`Faolan.Tests/NpcSpellEffectColumnsTests.cs`, which is where the proof lives now that the Python dissector that
 did the original diff has been retired). Every one of its offsets is the **low byte** of a u32 in the table
 above, so the two readings agree everywhere; the column names are what changes:
 
@@ -114,9 +114,9 @@ its terminator. This was read as a `(base<<8)|rank` convention with "rank 0" and
 form byte (see above), and the ids pair up as one spell's start and stop rather than two ranks of it.
 
 ## What this gives #232
-- The cast packet is fully understood and `NpcSpellCastBuilder` reproduces it byte-exact.
+- The cast packet is fully understood and `MagicBuffCodec` reproduces it byte-exact.
 - The 54-byte payload is decoded into `NpcSpell` columns (`Duration`, `Magnitude`, `Rank`, `FlagA/B/C`) and the
-  sim **builds** the wire payload from them via `NpcSpellEffect` (#304) — there is no stored blob any more. The
+  sim **builds** the wire payload from them via `MagicBuffDataCodec` (#304) — there is no stored blob any more. The
   value at `@10` that the early decode read as a u32 "magnitude" is actually the **Duration** (centiseconds; the
   `@10` u16 read big-endian off a zeroed high half, e.g. Poacher 400 = 4s), which is why the raw 400–4000 range
   is durations, not HP. The value at `@50` is not stored — it is the low half of the client's expiry stamp.

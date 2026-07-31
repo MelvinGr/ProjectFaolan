@@ -97,9 +97,9 @@ namespace Faolan.GameServer
 			var owner = client.Session.Character.Id;
 			entity.OwnerHandle = owner;
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, b =>
-				b.WriteArrayUInt32Length(PetIirCodec.BuildAssign(owner, entity.Handle, combat
-					? PetIirCodec.CombatKind
-					: PetIirCodec.SocialKind))));
+				b.WriteArrayUInt32Length(PetCodec.Build(PetBindings.Assign(owner, entity.Handle, combat
+					? PetCodec.CombatKind
+					: PetCodec.SocialKind)))));
 
 			_broadcaster.SetNpcFollow(client, entity.Handle, true);
 			return entity;
@@ -169,12 +169,12 @@ namespace Faolan.GameServer
 			{
 				var effectWireId = effect.Id << 8;
 				Logger.LogInformation("Cast {Cast} ('{Name}') carries no effect of its own; applying its effect spell {Effect} ('{EffectName}').", spell.Id, spell.Name, effect.Id, effect.Name);
-				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, SelfBuffCodec.BuildBuffDataLong(effect.Id, effect.DurationMs / 10, DefaultSelfBuffEffectNonce, CasterLevel(client)));
+				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, MagicBuffDataCodec.Build(effect.Id, effect.DurationMs / 10, DefaultSelfBuffEffectNonce, CasterLevel(client)));
 				return;
 			}
 
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce, CasterLevel(client)));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDataCodec.Build(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce, CasterLevel(client)));
 		}
 
 		// Applies a spellweave buff (trance buff on activate, or a component's own spell on add) with the CORRECT
@@ -188,7 +188,7 @@ namespace Faolan.GameServer
 			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			var nonce = 0x18000000u | ((uint)Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce, CasterLevel(client)));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDataCodec.Build(spellBase, durationCs, nonce, CasterLevel(client)));
 		}
 
 		// Shield of the Risen also drops the instant the player commits an AGGRESSIVE action - an offensive cast, a
@@ -250,7 +250,7 @@ namespace Faolan.GameServer
 				}
 
 				var spellBase = buff.BuffId >> 8;
-				await SendMagicBuffIir(client, self, self, buff.BuffId, SelfBuffCodec.BuildBuffDataLong(spellBase, remainingCs, buff.Nonce, CasterLevel(client)));
+				await SendMagicBuffIir(client, self, self, buff.BuffId, MagicBuffDataCodec.Build(spellBase, remainingCs, buff.Nonce, CasterLevel(client)));
 				restored++;
 			}
 
@@ -307,7 +307,7 @@ namespace Faolan.GameServer
 		private async Task SendBuffRemoval(INetworkClient client, uint applyTo, uint applyFrom, uint appliedSpellId)
 		{
 			var endId = (appliedSpellId & 0xFFFFFF00u) | 0x01u; // form 1 = the "end" twin of the applied buff id
-			var body = NpcSpellCastBuilder.Build(applyTo, applyFrom, endId, []);
+			var body = MagicBuffCodec.Build(applyTo, applyFrom, endId, []);
 
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, b => b.WriteArrayUInt32Length(body)));
 
@@ -329,7 +329,7 @@ namespace Faolan.GameServer
 		private Task SendLearnSpell(INetworkClient client, uint spellId)
 		{
 			return client.SendAsync(new Rpc(LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchLearnSpell,
-				AbilityGrantBody.BuildLearnSpellBody(spellId)));
+				LearnSpellCodec.Build(spellId)));
 		}
 
 		// Sends the MagicBuffIIR (ApplySpell 0x6B87E316) carrier with an already-CONSTRUCTED payload and, for a SELF
@@ -360,7 +360,7 @@ namespace Faolan.GameServer
 
 			// The ApplySpell carrier body - the SAME layout for player and NPC casts, byte-exact via NpcSpellCastBuilder
 			// (NpcSpellCastBuilderTests). Built once so the identical bytes go to the caster AND to nearby viewers below.
-			var body = NpcSpellCastBuilder.Build(applyTo, applyFrom, spellId, payload);
+			var body = MagicBuffCodec.Build(applyTo, applyFrom, spellId, payload);
 
 			await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(body)));
 
@@ -496,7 +496,7 @@ namespace Faolan.GameServer
 			var spell = await Database.GetSpell(spellBase);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
 			var nonce = 0x14000000u | (spellBase & 0x00FFFFFF);
-			await SendMagicBuffIir(client, self, self, spellBase << 8, SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce, CasterLevel(client)));
+			await SendMagicBuffIir(client, self, self, spellBase << 8, MagicBuffDataCodec.Build(spellBase, durationCs, nonce, CasterLevel(client)));
 		}
 
 		// Shield of the Risen (#221): retail applies TWO persistent self-buffs on every world entry - both on a fresh
@@ -565,7 +565,7 @@ namespace Faolan.GameServer
 		internal static Task SendAddSpecialAbility(INetworkClient client, Ability ability, bool announce = true, ProtoEndpoint? sender = null)
 		{
 			return client.SendAsync(new Rpc(sender ?? LoginWorld201CSenderEndpoint, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchAddSpecialAbility,
-				AbilityGrantBody.BuildAddSpecialAbilityBody(ability, announce)));
+				AddSpecialAbilityCodec.Build(ability, announce)));
 		}
 
 		// Emits the level-up attribute feedback: one AttributeChanged/Increased on-screen line per primary attribute

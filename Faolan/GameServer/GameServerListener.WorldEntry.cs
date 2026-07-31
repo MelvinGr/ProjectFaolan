@@ -311,7 +311,7 @@ namespace Faolan.GameServer
 
 			foreach (var comboId in comboIds)
 			{
-				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, ComboBookIirCodec.Build(instance, comboId)));
+				await WorldIir.Send(client, ComboBookCodec.Build(instance, comboId));
 			}
 
 			if (comboIds.Count > 0)
@@ -714,13 +714,13 @@ namespace Faolan.GameServer
 					: thisXp; // only the final level carries partial XP
 				ReadOnlySpan<uint> deltas = [currentXp, thisXp, nextXp, 1u, 8u, 0u];
 
-				await WorldIir.SendFramed(client, NewLevelIirCodec.Build(instance, lvl, deltas));
+				await WorldIir.Send(client, NewLevelCodec.Build(instance, lvl, deltas));
 
 				// The combos this class unlocks AT this level, from the class<->combo ACCESS map (ClassCombo) - retail
 				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the old
 				// class-independent level-keyed catalog (casters have no rows); empty until populated from dumps.
 				foreach (var combo in await Database.GetClassCombosUnlockedBetween(@class, lvl - 1, lvl))
-					await WorldIir.SendFramed(client, ComboBookIirCodec.Build(instance, combo.Id));
+					await WorldIir.Send(client, ComboBookCodec.Build(instance, combo.Id));
 			}
 		}
 
@@ -734,26 +734,26 @@ namespace Faolan.GameServer
 				? Endpoints.EndpointFromBytes(0x0D, 0x91, 0xF7, 0x87, 0x8B, 0x10, 0xC2, 0xDD, 0xD8, 0x10)
 				: client.Endpoint(Endpoints.GameCharInterfaceType);
 
-			using var bodyStream = new FaolanStream();
+			ValidResurrectionSpots body;
 			if (client.Session.IsUnnamedCreatePhase)
 			{
 				// New-character create flow: the create-capture's ValidResurrectionSpots body - a sibling of the login
-				// WriteValidResurrectionSpotsBody with the create variant's own constants (see ResurrectionSpotsBody).
-				ResurrectionSpotsBody.WriteCreateFlowValidResurrectionSpots(bodyStream, client.Session.Character.Position);
+				// one with the create variant's own constants (see ValidResurrectionSpotLists).
+				body = ValidResurrectionSpotLists.CreateFlow(client.Session.Character.Position);
 			}
 			else
 			{
 				// Existing-character login: this 0x2024 is byte-structurally GameCharInterface.DispatchValidResurrectionSpots
 				// (the death/release screen) - at login the client consumes it silently to set the resurrection anchor. Build
-				// the body via the shared WriteValidResurrectionSpotsBody from the character's actual resurrection point (the
+				// the body via the shared ValidResurrectionSpotLists.Known from the character's actual resurrection point (the
 				// same closest-known/AlwaysKnown resolution SendDeathScreen does), so the anchor is per-character/per-map and
 				// advertises our REAL RespawnPoint.Id (the id RespawnMe echoes back) instead of the Strie capture's hardcoded
 				// beach point. Falls back to the universal Tortage Beach default when the map defines no point.
 				var spot = await ResolveLoginResurrectionSpot(client.Session.Character);
-				ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(bodyStream, client.Session.Character.Position, [spot]);
+				body = ValidResurrectionSpotLists.Known(client.Session.Character.Position, [spot]);
 			}
 
-			await client.SendAsync(new Rpc(sender, receiver, GameCharInterfaceOpcodes.DispatchValidResurrectionSpots, bodyStream.ToArray()));
+			await client.SendAsync(new Rpc(sender, receiver, GameCharInterfaceOpcodes.DispatchValidResurrectionSpots, ValidResurrectionSpotsCodec.Build(body)));
 		}
 
 		// Answers a client 0x2020 spawn poll with a 0x2008 SpawnCheck on the 201C conversation: body is

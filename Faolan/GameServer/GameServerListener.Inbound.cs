@@ -490,9 +490,9 @@ namespace Faolan.GameServer
 				// Nothing consumes the value yet; stealth detection is where it will.
 				case GameServer0X2000Opcodes.SetShadowCoverageIIR:
 				{
-					var shadow = SetShadowCoverage.Parse(rawPayload);
+					var shadow = SetShadowCoverageCodec.Parse(rawPayload);
 					Logger.LogDebug("GameServer shadow coverage {Percent}% for handle {Handle}.", shadow.Percent, shadow.Handle);
-					await WorldIir.SendFramed(client, SetShadowCoverage.Build(shadow.Handle, shadow.Percent));
+					await WorldIir.Send(client, SetShadowCoverageCodec.Build(shadow.Handle, shadow.Percent));
 					break;
 				}
 
@@ -1633,9 +1633,9 @@ namespace Faolan.GameServer
 				await CombatService.SendBehaviorEchoAck(client, rawPayload, args.CommandqueueClientId);
 				var activeSet = await _broadcaster.TogglePlayerWeaponSet(client);
 
-				var swapRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Account!.ClientInstance, rawPayload, args.CommandqueueClientId);
+				var swapRelay = BehaviorAcks.Relay(client.Session.Account!.ClientInstance, rawPayload, args.CommandqueueClientId);
 				if (swapRelay != null)
-					await _broadcaster.BroadcastBehaviorToViewers(client, swapRelay);
+					await _broadcaster.BroadcastBehaviorToViewers(client, BehaviorControlCenterCodec.Build(swapRelay));
 
 				Logger.LogInformation("SwitchWeaponsButton -> weapon set {Set}. {Args}", activeSet, args);
 			}
@@ -1797,7 +1797,7 @@ namespace Faolan.GameServer
 						// A GROUND-TARGETED AoE (e.g. Deathly Blizzard) is aimed at a reticle POSITION carried in the
 						// trailer instead of a locked entity: it has NO SpellTarget and the trailer's kind byte is 0.
 						// CastGroundTarget reads the reticle; SpellTarget == null confirms there's no locked entity. (#236)
-						var isGroundCast = CastGroundTarget.TryParse(actionTrailer, out var groundTarget) && args.Target == null;
+						var isGroundCast = CastGroundTargetScan.TryReadPosition(actionTrailer, out var groundTarget) && args.Target == null;
 
 						// This cast's invalidation token: a later cancel (or a new cast) bumps ActiveCastToken so the
 						// deferred Resolve below aborts if the cast was interrupted before its cast time elapsed.
@@ -2260,7 +2260,7 @@ namespace Faolan.GameServer
 						// Because we inferred standup from movement instead, these requests fell into this
 						// un-decoded fallback and got a bare echo - so the client asked to get up, was never
 						// answered, and stayed stuck in the pose until it timed out and stood up on its own.
-						// The seq mapping (3->4, 2->0x0F) lives in BehaviorAckBody.AckSeq.
+						// The seq mapping (3->4, 2->0x0F) lives in BehaviorAcks.AckSeq.
 						if ((uint)actionType == 1 && client.Session.SeatedOnHandle is not null)
 						{
 							var requestSeq = rawPayload.Length >= 18
@@ -2285,7 +2285,7 @@ namespace Faolan.GameServer
 						// sit, s2c only, and never echoes one back. The guard is scoped to being seated because retail's
 						// client does send 0x2A otherwise (17 across the captures) and those ARE answered, so a blanket
 						// skip would soft-lock other object actions - the very thing the ack below exists to prevent.
-						if ((uint)actionType == BehaviorAnimationCodec.ObjectActionBehaviorId && client.Session.SeatedOnHandle is not null)
+						if ((uint)actionType == BehaviorAnimations.ObjectActionBehaviorId && client.Session.SeatedOnHandle is not null)
 						{
 							Logger.LogInformation("Sit: absorbed the client's re-sent sit behavior (not echoed - it would replay the sit).");
 
@@ -2316,9 +2316,9 @@ namespace Faolan.GameServer
 				// instead, and without it in this list the actor animated on their own screen only.
 				if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell or ActionType.MoveEquippedToFromInventory or ActionType.PlayAnimation)
 				{
-					var behaviorRelay = BehaviorAckBody.BuildBehaviorRelayBody(client.Session.Character.Id, rawPayload, args.CommandqueueClientId);
+					var behaviorRelay = BehaviorAcks.Relay(client.Session.Character.Id, rawPayload, args.CommandqueueClientId);
 					if (behaviorRelay != null)
-						await _broadcaster.BroadcastBehaviorToViewers(client, behaviorRelay);
+						await _broadcaster.BroadcastBehaviorToViewers(client, BehaviorControlCenterCodec.Build(behaviorRelay));
 				}
 			}
 		}

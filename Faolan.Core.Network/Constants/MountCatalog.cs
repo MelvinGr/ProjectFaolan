@@ -70,7 +70,7 @@ namespace Faolan.Core.Network.Constants
 		// old hardcoded 80 came from (#438).
 		public static byte[] RideBuffPayload(uint riderLevel)
 		{
-			return SelfBuffCodec.BuildBuffDataLong(RideSpell >> 8, RideBuffDurationCentiseconds, RideBuffEffectNonce, riderLevel);
+			return MagicBuffDataCodec.Build(RideSpell >> 8, RideBuffDurationCentiseconds, RideBuffEffectNonce, riderLevel);
 		}
 
 		private static Dictionary<uint, MountDef> BuildById()

@@ -558,7 +558,7 @@ namespace Faolan.Importer.Captures
 		}
 
 		// NewLevelIIR_t on the world conversation: [u32 len][u32 6D314743][u32 0000C350][u32 instance][u8 flag]
-		// [u32 newLevel][u32 x6] - see NewLevelIirCodec.
+		// [u32 newLevel][u32 x6] - see NewLevelCodec.
 		private static bool TryReadNewLevel(byte[] packetBytes, out uint instance, out byte newLevel)
 		{
 			instance = 0;
@@ -566,7 +566,7 @@ namespace Faolan.Importer.Captures
 			var body = PacketBody(packetBytes);
 			for (var i = 0; i + 25 <= body.Length; i++)
 			{
-				if (body.ReadU32Be(i) != NewLevelIirCodec.Opcode)
+				if (body.ReadU32Be(i) != NewLevelCodec.Opcode)
 					continue;
 
 				instance = body.ReadU32Be(i + 8);

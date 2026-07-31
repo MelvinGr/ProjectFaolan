@@ -8,8 +8,8 @@
 ## Headline
 
 - **826** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **80** IIR carrier types: **76 V3** (byte-exact builder), **4 V2** (built, no golden), **0 V1** (no builder found).
-- **64** codec classes, **60** with a byte-exact test.
+- **80** IIR carrier types: **65 V3** (byte-exact builder), **15 V2** (built, no golden), **0 V1** (no builder found).
+- **62** codec classes, **47** with a byte-exact test.
 - **8** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -41,82 +41,82 @@ the margins, but never invents a golden that isn't there.
 | Level | IIR type | Built by |
 |-------|----------|----------|
 | V3 | `AddToGroupIIR` | `GroupMembershipCodec` |
-| V3 | `AreaFormulaIIR` | `AreaFormula` |
 | V3 | `BankIIR` | `BankIirCodec` |
-| V3 | `BehaviorControlCenterIIR` | `BehaviorAckBody`, `BehaviorAnimationCodec`, `BehaviorHeartbeatCodec`, `CombatPacketCodec`, `WorldDeath` |
-| V3 | `ChainKillIIR` | `ChainKill` |
+| V3 | `BehaviorControlCenterIIR` | `BehaviorControlCenterCodec` |
 | V3 | `CharDCMoveIIR` | `CharDCMoveCodec` |
 | V3 | `CharInPlayIIR` | `CreateEditorRecordBuilder` |
 | V3 | `CharacterActionIIR` | `CreateEditorRecordBuilder` |
 | V3 | `ChatTextIIR` | `ChatTextCodec` |
 | V3 | `ClimbingDynelFullUpdateIIR` | `WorldObjectCodec` |
-| V3 | `CombatReactiveIIR` | `SpellweaveCodec` |
+| V3 | `CombatReactiveIIR` | `CombatReactiveCodec` |
 | V3 | `CombatShieldIIR` | `CombatShieldCodec` |
-| V3 | `ComboBookIIR` | `ComboBookIirCodec` |
+| V3 | `ComboBookIIR` | `ComboBookCodec` |
 | V3 | `CoreClaimIIR` | `CoreClaimCodec` |
-| V3 | `CrimeIIR` | `Crime` |
-| V3 | `DamageResultIIR` | `CombatEffectBuilder`, `CombatPacketCodec` |
+| V3 | `DamageResultIIR` | `DamageResultCodec` |
 | V3 | `DestructibleFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `DoorFullUpdateIIR` | `WorldObjectCodec` |
-| V3 | `EnergyIIR` | `CombatPacketCodec` |
+| V3 | `EnergyIIR` | `EnergyCodec` |
 | V3 | `FeatIIR` | `FeatCodec` |
-| V3 | `FeedbackIIR` | `FeedbackIir` |
 | V3 | `FormatFeedbackIIR` | `FormatFeedbackCodec` |
 | V3 | `FullPlayerCharacterIIR` | `FullPlayerCharacterBuilder` |
 | V3 | `GameActionListIIR` | `GameActionListCodec` |
 | V3 | `GameTimeIIR` | `GameTimeCodec` |
 | V3 | `GuildUpdateIIR` | `GuildUpdateCodec` |
-| V3 | `HateListUpdateIIR` | `HateListCodec` |
+| V3 | `HateListUpdateIIR` | `HateListUpdateCodec` |
 | V3 | `IntendedTeleportIIR` | `TeleportCodec` |
 | V3 | `KnubotAnswerListIIR` | `KnubotCodec` |
 | V3 | `KnubotAppendTextIIR` | `KnubotCodec` |
 | V3 | `KnubotCloseChatWindowIIR` | `KnubotCodec` |
-| V3 | `KnubotFinishTradeIIR` | `KnubotFinishTrade` |
 | V3 | `KnubotOpenChatWindowIIR` | `KnubotCodec` |
-| V3 | `KnubotStartTradeIIR` | `KnubotStartTrade` |
-| V3 | `LockedToChangedIIR` | `LockedToChanged` |
-| V3 | `LookAtIIR` | `LookAtCodec`, `ShopOpenBuilder`, `WorldDeath` |
+| V3 | `KnubotStartTradeIIR` | `KnubotStartTradeCodec` |
+| V3 | `LookAtIIR` | `LookAtCodec`, `ShopOpenBuilder` |
 | V3 | `LootBagFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `LootRemoveItemsIIR` | `LootRemoveItemsCodec` |
-| V3 | `MagicBuffIIR` | `MagicBuffCodec`, `NpcSpellCastBuilder`, `WorldDeath` |
-| V3 | `MoveTaskIIR` | `MoveTaskCodec`, `WorldDeath` |
+| V3 | `MagicBuffIIR` | `MagicBuffCodec` |
+| V3 | `MoveTaskIIR` | `MoveTaskCodec` |
 | V3 | `N3TeleportIIR` | `TeleportCodec` |
 | V3 | `N3ToClientFadeIIR` | `N3ToClientFadeCodec` |
 | V3 | `N3ToClientQuitIIR` | `N3ToClientQuitCodec` |
 | V3 | `NewAllowedLooterIIR` | `NewLooterCodec` |
 | V3 | `NewCurrentLooterIIR` | `NewLooterCodec` |
-| V3 | `NewLevelIIR` | `NewLevelIirCodec` |
-| V3 | `PetIIR` | `PetIirCodec` |
+| V3 | `NewLevelIIR` | `NewLevelCodec` |
+| V3 | `PetIIR` | `PetCodec` |
 | V3 | `PlayfieldFIIR` | `PlayfieldFCodec` |
 | V3 | `QuestFullUpdateIIR` | `WorldQuest` |
 | V3 | `QuestGoalIIR` | `WorldQuest` |
 | V3 | `QuestIIR` | `WorldQuest` |
 | V3 | `QuestJournalIIR` | `WorldQuest` |
 | V3 | `QuestLogListIIR` | `WorldQuest` |
-| V3 | `RegenIIR` | `Regen` |
 | V3 | `RemoveFromGroupIIR` | `GroupMembershipCodec` |
 | V3 | `ScryScriptIIR` | `ScryScriptCodec` |
 | V3 | `SetMorphValueIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetNameIIR` | `CreateEditorRecordBuilder` |
 | V3 | `SetPosIIR` | `SetPosCodec` |
-| V3 | `SetShadowCoverageIIR` | `SetShadowCoverage` |
 | V3 | `SimpleCharFullUpdateIIR` | `PlayerSpawnScaffoldCodec` |
-| V3 | `SimpleCharKilledByUpdateIIR` | `WorldDeath` |
+| V3 | `SimpleCharKilledByUpdateIIR` | `SimpleCharKilledByUpdateCodec` |
 | V3 | `SimpleDynelFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `SimpleDynelVisualChangeIIR` | `SimpleDynelVisualChangeCodec` |
-| V3 | `SpellBookIIR` | `SpellBook` |
-| V3 | `StatDamageIIR` | `CombatEffectBuilder`, `SpellweaveCodec`, `StatDamageCodec` |
-| V3 | `StatIIR` | `SpellweaveCodec` |
+| V3 | `StatDamageIIR` | `StatDamageCodec` |
 | V3 | `StatUpdateIIR` | `StatUpdateCodec` |
 | V3 | `StopIIR` | `StopCodec` |
-| V3 | `TemplateActionIIR` | `TemplateAction` |
-| V3 | `ThreatLevelIIR` | `ThreatLevel` |
+| V3 | `ThreatLevelIIR` | `ThreatLevelCodec` |
 | V3 | `TombStoneFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `TradeskillReplyIIR` | `TradeskillRecipeCodec` |
 | V3 | `TradeskillRequestIIR` | `TradeskillRecipeCodec` |
-| V3 | `UpdateInventoryIIR` | `UpdateInventory` |
+| V3 | `UpdateInventoryIIR` | `UpdateInventoryCodec` |
 | V3 | `UpdateSimpleDynelIIR` | `UpdateSimpleDynelCodec` |
+| V2 | `AreaFormulaIIR` | `AreaFormulaCodec` |
+| V2 | `ChainKillIIR` | `ChainKillCodec` |
+| V2 | `CrimeIIR` | `CrimeCodec` |
 | V2 | `DeleteItemIIR` | `DeleteItemCodec` |
 | V2 | `FanaticCommandIir` | `FanaticCommandCodec` |
+| V2 | `FeedbackIIR` | `FeedbackCodec` |
 | V2 | `KnubotAnswerIIR` | `KnubotAnswerCodec` |
+| V2 | `KnubotFinishTradeIIR` | `KnubotFinishTradeCodec` |
+| V2 | `LockedToChangedIIR` | `LockedToChangedCodec` |
 | V2 | `MoveInventoryItemIIR` | `MoveInventoryItemCodec` |
+| V2 | `RegenIIR` | `RegenCodec` |
+| V2 | `SetShadowCoverageIIR` | `SetShadowCoverageCodec` |
+| V2 | `SpellBookIIR` | `SpellBookCodec` |
+| V2 | `StatIIR` | `StatCodec` |
+| V2 | `TemplateActionIIR` | `TemplateActionCodec` |

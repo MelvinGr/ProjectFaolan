@@ -850,7 +850,7 @@ namespace Faolan.Importer.Cli
 				// health drop that follows it - the only way to settle whether the damage number shares the vitals'
 				// x100 wire scale or is the raw displayed figure.
 				var health = new Dictionary<uint, uint>();
-				var pendingHits = new Dictionary<uint, DamageResult>(); // per TARGET: other packets interleave
+				var pendingHits = new Dictionary<uint, DamageResultIIR>(); // per TARGET: other packets interleave
 				var dealtTo = new Dictionary<uint, uint>();             // total damage each NPC took, for the scale check
 
 				foreach (var p in c.Packets)
@@ -880,15 +880,15 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					// ⚠️ SPELL damage is NOT a DamageResult - it rides StatDamageIIR (see CombatEffectBuilder / #349),
+					// ⚠️ SPELL damage is NOT a DamageResult - it rides StatDamageIIR (see StatDamageCodec / #349),
 					// so a census of DamageResult alone reports "no magical schools" and means only "I looked in the
 					// melee packet". A caster NPC's hit is a negative HealthCurrent delta with the caster's handle.
 					if (p.Body.ReadU32Be(4) == (uint)GameServer0X2000Opcodes.StatDamageIIR)
 					{
-						StatDamage cast;
+						StatDamageIIR cast;
 						try
 						{
-							cast = StatDamage.Read(new FaolanStream(p.Body[4..]));
+							cast = StatDamageCodec.Parse(p.Body.AsSpan(4));
 						}
 						catch
 						{
@@ -914,7 +914,7 @@ namespace Faolan.Importer.Cli
 						// one end files the PET's own nukes as NPC casts, and a mob's DoT on the pet as damage to the player.
 						var magnitude = (uint)(-cast.Delta);
 						var casterIsNpc = levels.TryGetValue(cast.Caster, out var casterLevel);
-						var spellTargetIsNpc = levels.TryGetValue(cast.Target, out var spellTargetLevel);
+						var spellTargetIsNpc = levels.TryGetValue(cast.Handle, out var spellTargetLevel);
 
 						if (casterIsNpc && !spellTargetIsNpc)
 						{
@@ -934,10 +934,10 @@ namespace Faolan.Importer.Cli
 					if (p.Body.ReadU32Be(4) != (uint)GameServer0X2000Opcodes.DamageResultIIR)
 						continue;
 
-					DamageResult hit;
+					DamageResultIIR hit;
 					try
 					{
-						hit = DamageResult.Read(new FaolanStream(p.Body[4..]));
+						hit = DamageResultCodec.Parse(p.Body.AsSpan(4));
 					}
 					catch
 					{

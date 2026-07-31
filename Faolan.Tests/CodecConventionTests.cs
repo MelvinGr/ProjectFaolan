@@ -73,8 +73,8 @@ namespace Faolan.Tests
 		// Thirteen did - AreaFormulaCodec, ChainKillCodec, CrimeCodec, RegenCodec, ... - one batch of V1 IIR decoders
 		// that all copied the same wrong shape, which is how `ChainKillCodec.Parse(body)` came to return a
 		// `ChainKillCodec`: a "codec" that is a value. The sibling types got it right by nesting the value inside the
-		// module (CombatShieldCodec.Message, StatDamageCodec.Message, HateListCodec.Message), so both spellings of one
-		// idea were in the same folder.
+		// module (a nested `Message` record), so both spellings of one idea were in the same folder. #530's uniform
+		// surface removed both: a value is a plain record beside its module, and neither is called a codec.
 		[Fact]
 		public void TypesImplementingICodec_AreNotNamedCodec()
 		{

@@ -33,7 +33,7 @@ namespace Faolan.Tests
 		[InlineData(FrozenHatredProc, 600u, 0x1436F170u, FrozenHatredProcPayload)] // 6s
 		public void FatalityBuffPayload_MatchesCapture(uint spellBase, uint durationCs, uint nonce, string expected)
 		{
-			var payload = SelfBuffCodec.BuildBuffDataLong(spellBase, durationCs, nonce, 1);
+			var payload = MagicBuffDataCodec.Build(spellBase, durationCs, nonce, 1);
 
 			Assert.Equal(expected, Convert.ToHexStringLower(payload));
 		}

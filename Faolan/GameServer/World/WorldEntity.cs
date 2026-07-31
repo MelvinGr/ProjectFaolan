@@ -82,9 +82,9 @@ namespace Faolan.GameServer.World
 		public uint? CurrentHazardId { get; set; }
 
 		// The creature's death-animation behaviorId (the death BccIIR field-1, #362), from its NpcTemplate. Defaults to
-		// the humanoid biped death (WorldDeath.HumanoidDeathBehaviorId); overridden per-type where harvested (demon /
+		// the humanoid biped death (DeathSequence.HumanoidDeathBehaviorId); overridden per-type where harvested (demon /
 		// quadruped). Read by CombatService.OnNpcKilled when it sends the death BccIIR.
-		public uint DeathBehaviorId { get; set; } = WorldDeath.HumanoidDeathBehaviorId;
+		public uint DeathBehaviorId { get; set; } = DeathSequence.HumanoidDeathBehaviorId;
 
 		// For an NPC: a quest that, once the VIEWER has COMPLETED it, HIDES this NPC (they don't spawn / are despawned).
 		// The complement of GateQuestIds ("show while active") - e.g. Casilda vanishes from the beach once her escort

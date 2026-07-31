@@ -6,7 +6,8 @@ namespace Faolan.Tests
 {
 	// Byte-exact construct + round-trip for the server->client combat-state records (#216/#218,
 	// docs/re/iir-readers-combat-world.md): CombatShield, ThreatLevel, HateListUpdate, StatDamage. Oracles are captured
-	// bodies (full record incl. the 4-byte length prefix).
+	// bodies. Their leading four bytes are the carrier's u32 LENGTH, which #530 rule 2 moved off the codecs and onto
+	// the sender - `Record()` drops it, and the wire is unchanged.
 	public class CombatRecordCodecTests
 	{
 		private const string CombatShieldBody = "00000011cffd05190000c35000017f80000000006f";
@@ -21,40 +22,45 @@ namespace Faolan.Tests
 		[Fact]
 		public void CombatShield_BuildsByteExact()
 		{
-			var p = CombatShieldCodec.Parse(Convert.FromHexString(CombatShieldBody));
+			var p = CombatShieldCodec.Parse(Record(CombatShieldBody));
 			Assert.Equal(0x00017F80u, p.Handle);
 			Assert.Equal(0x6Fu, p.Value);
-			Assert.Equal(CombatShieldBody, Convert.ToHexStringLower(CombatShieldCodec.Build(p.Handle, p.Value, p.Env)));
+			Assert.Equal(CombatShieldBody[8..], Convert.ToHexStringLower(CombatShieldCodec.Build(p.Handle, p.Value, p.Env)));
 		}
 
 		[Fact]
 		public void HateList_BuildsByteExact()
 		{
-			var p = HateListCodec.Parse(Convert.FromHexString(HateListBody));
+			var p = HateListUpdateCodec.Parse(Record(HateListBody));
 			Assert.Equal(0x01316E71u, p.Handle); // the hater
 			Assert.Equal(0x00017F80u, p.Target); // who it hates
 			Assert.Equal(1u, p.Count);
-			Assert.Equal(HateListBody, Convert.ToHexStringLower(HateListCodec.Build(p.Handle, p.Target, p.Count, p.Flag, p.Env)));
+			Assert.Equal(HateListBody[8..], Convert.ToHexStringLower(HateListUpdateCodec.Build(p.Handle, p.Target, p.Count, p.Flag, p.Env)));
 		}
 
 		[Fact]
 		public void StatDamage_RoundTripsByteExact()
 		{
-			var captured = Convert.FromHexString(StatDamageBody);
+			var captured = Record(StatDamageBody);
 			var p = StatDamageCodec.Parse(captured);
 			Assert.Equal(0x00017F80u, p.Handle); // the target
-			Assert.Equal(StatDamageCodec.WordCount, p.Words.Length);
-			Assert.Contains(0x01316E71u, p.Words); // the attacker handle rides as a word
-			Assert.Equal(StatDamageBody, Convert.ToHexStringLower(StatDamageCodec.Build(p.Handle, p.Words, p.Env)));
+			Assert.Equal(0x01316E71u, p.Caster); // the attacker - a NAMED field since #530 wave 4, not word [9] of a bag
+			Assert.Equal(StatDamageBody[8..], Convert.ToHexStringLower(StatDamageCodec.Build(p)));
 		}
 
 		[Fact]
 		public void ThreatLevel_BuildsByteExact()
 		{
-			var p = ThreatLevel.Parse(Convert.FromHexString(ThreatLevelBody));
+			var p = ThreatLevelCodec.Parse(Record(ThreatLevelBody));
 			Assert.Equal(0x01316E71u, p.Handle);
 			Assert.Equal(1, p.Flag);
-			Assert.Equal(ThreatLevelBody, Convert.ToHexStringLower(ThreatLevel.Build(p.Handle, p.Threat, p.Flag, p.Env)));
+			Assert.Equal(ThreatLevelBody[8..], Convert.ToHexStringLower(ThreatLevelCodec.Build(p.Handle, p.Threat, p.Flag, p.Env)));
+		}
+
+		// The captured payload WITHOUT its leading u32 length - the sender's, since #530 rule 2.
+		private static byte[] Record(string hex)
+		{
+			return Convert.FromHexString(hex)[4..];
 		}
 	}
 }

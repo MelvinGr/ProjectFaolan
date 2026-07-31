@@ -321,7 +321,7 @@ namespace Faolan.GameServer
 				var payload = ms.ToArray();
 
 				await client.SendAsync(new Rpc(WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-					s => new UpdateInventory(characterId, 0x00, payload).Write(s)));
+					s => s.WriteArrayUInt32Length(UpdateInventoryCodec.Build(new UpdateInventoryIIR(characterId, 0x00, payload)))));
 			}
 
 			Logger.LogDebug("Pushed UpdateInventoryIIR for {Character}: Equipped + Bag (#380).", client.Session.Character.Name);
@@ -620,7 +620,7 @@ namespace Faolan.GameServer
 		private static Task SendValidResurrectionSpots(INetworkClient client, Vector3 deathPosition, IReadOnlyList<RespawnPoint> spots)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), client.Endpoint(Endpoints.GameCharInterfaceType),
-				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots, b => ResurrectionSpotsBody.WriteValidResurrectionSpotsBody(b, deathPosition, spots)));
+				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots, ValidResurrectionSpotsCodec.Build(ValidResurrectionSpotLists.Known(deathPosition, spots))));
 		}
 
 		// A vitals push emits the whole EntityVitals.ToVitalsBlock (current AND max) - there is deliberately no

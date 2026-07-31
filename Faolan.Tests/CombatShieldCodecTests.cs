@@ -13,7 +13,8 @@ namespace Faolan.Tests
 	// lesson being that a golden is only a golden if the bytes came from a capture.
 	public class CombatShieldCodecTests
 	{
-		// A real captured record: [u32 len=17][subop][C350][handle][u8 env=0][u32 value=111].
+		// A real captured record: [u32 len=17][subop][C350][handle][u8 env=0][u32 value=111]. The leading length is the
+		// carrier's and belongs to the sender (#530 rule 2), so the codec sees it from the subop on.
 		private const string Captured = "00000011cffd05190000c35000002c56000000006f";
 
 		// The decimal-packing semantics came from client RE. The captures corroborate it: every distinct value seen
@@ -27,7 +28,7 @@ namespace Faolan.Tests
 			Assert.All(captured, v =>
 			{
 				var (left, mid, right) = (v / 100, v / 10 % 10, v % 10);
-				Assert.Equal(v, CombatShieldCodec.Pack(left, mid, right));
+				Assert.Equal(v, CombatShieldDistribution.Pack(left, mid, right));
 				Assert.Equal(3u, left + mid + right);
 			});
 		}
@@ -35,19 +36,19 @@ namespace Faolan.Tests
 		[Fact]
 		public void Pack_MatchesTheDecimalDigitModel()
 		{
-			Assert.Equal(210u, CombatShieldCodec.Pack(2, 1, 0));
-			Assert.Equal(CombatShieldCodec.DefaultDistribution, CombatShieldCodec.Pack(1, 1, 1));
+			Assert.Equal(210u, CombatShieldDistribution.Pack(2, 1, 0));
+			Assert.Equal(CombatShieldCodec.DefaultDistribution, CombatShieldDistribution.Pack(1, 1, 1));
 		}
 
 		[Fact]
 		public void RoundTrips_ACapturedRecord_ByteExact()
 		{
-			var parsed = CombatShieldCodec.Parse(Convert.FromHexString(Captured));
+			var parsed = CombatShieldCodec.Parse(Convert.FromHexString(Captured)[4..]);
 
 			Assert.Equal(0x2C56u, parsed.Handle);
 			Assert.Equal(0x00, parsed.Env);
 			Assert.Equal(CombatShieldCodec.DefaultDistribution, parsed.Value);
-			Assert.Equal(Captured, Convert.ToHexStringLower(CombatShieldCodec.Build(parsed.Handle, parsed.Value, parsed.Env)));
+			Assert.Equal(Captured[8..], Convert.ToHexStringLower(CombatShieldCodec.Build(parsed.Handle, parsed.Value, parsed.Env)));
 		}
 	}
 }

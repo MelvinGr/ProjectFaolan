@@ -11,6 +11,7 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Progression;
@@ -246,11 +247,11 @@ namespace Faolan.GameServer.Combat
 			var hasEnemyTarget = targetHandle != 0 && targetHandle != instance;
 			if (!hasEnemyTarget)
 			{
-				await SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, phase));
+				await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.EchoAck(rawPayload, instance, phase)));
 				return;
 			}
 
-			var echoedArgs = BehaviorAckBody.InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
+			var echoedArgs = BehaviorAcks.InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
 			var level = client.Session.Character.Level;
 			// #395: melee damage is driven by the equipped main-hand weapon (min/max from the RDB template), not a flat
 			// level value, so a better weapon hits harder. Unarmed / no imported weapon damage falls back to the level curve.
@@ -315,7 +316,7 @@ namespace Faolan.GameServer.Combat
 
 			// 3) EnergyIIR - the player's stamina after the swing.
 			var player = GetOrAddPlayerVitals(client);
-			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
+			await SendWorldPacket(client, EnergyCodec.Build(instance, player.Stamina));
 		}
 
 		// The unarmed swing (Interact action 0x11, empty main hand; behavior TypeIds 1089xx, ability id in the
@@ -328,7 +329,7 @@ namespace Faolan.GameServer.Combat
 				return;
 
 			var instance = client.Session.Character.Id;
-			await SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, mode));
+			await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.EchoAck(rawPayload, instance, mode)));
 
 			var hasEnemyTarget = targetHandle != 0 && targetHandle != instance;
 			if (!hasEnemyTarget)
@@ -512,9 +513,9 @@ namespace Faolan.GameServer.Combat
 				// lingering corpse plays its death anim.
 				// The dying mob drops its target first (retail sends this LookAtIIR on 95% of captured kills, Stickienecro
 				// idx 545, between the killing damage and the pose); then the pose freezes the corpse.
-				await SendWorldPacket(killer, WorldDeath.BuildDeathDeselect(targetHandle));
-				await SendWorldPacket(killer, WorldDeath.BuildDeathPose(targetHandle, npcEntity.Position));
-				await SendWorldPacket(killer, WorldDeath.BuildDeathBcc(targetHandle, npcEntity.DeathBehaviorId, WorldDeath.NpcDeathVariant));
+				await SendWorldPacket(killer, LookAtCodec.Build(LookAts.DropTarget(targetHandle)));
+				await SendWorldPacket(killer, MoveTaskCodec.Build(DeathSequence.Pose(targetHandle, npcEntity.Position)));
+				await SendWorldPacket(killer, BehaviorControlCenterCodec.Build(DeathSequence.Bcc(targetHandle, npcEntity.DeathBehaviorId, DeathSequence.NpcDeathVariant)));
 
 				await AwardKillXp(killer, npcEntity.Level);
 
@@ -552,14 +553,14 @@ namespace Faolan.GameServer.Combat
 					? thisXp + character.Experience
 					: thisXp;
 				ReadOnlySpan<uint> deltas = [currentXp, thisXp, nextXp, 1u, 8u, 0u];
-				await SendWorldFeedback(killer, NewLevelIirCodec.Build(instance, lvl, deltas));
+				await SendWorldPacket(killer, NewLevelCodec.Build(instance, lvl, deltas));
 
 				// The combos this class unlocks AT this level, from the class<->combo ACCESS map (ClassCombo) - retail
 				// sends them right after the NewLevelIIR (combat-levelup capture ordering). ClassCombo replaces the old
 				// class-independent level-keyed catalog (casters have no rows); it ships empty until populated from dumps,
 				// so this is a no-op today.
 				foreach (var combo in await _database.GetClassCombosUnlockedBetween(character.Class, lvl - 1, lvl))
-					await SendWorldFeedback(killer, ComboBookIirCodec.Build(instance, combo.Id));
+					await SendWorldPacket(killer, ComboBookCodec.Build(instance, combo.Id));
 			}
 
 			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, character.Level, levelsGained))
@@ -642,7 +643,7 @@ namespace Faolan.GameServer.Combat
 			await ApplyMeleeCleave(client, instance, targetHandle, damage);
 
 			var player = GetOrAddPlayerVitals(client);
-			await SendWorldPacket(client, CombatPacketCodec.BuildEnergyBody(instance, player.Stamina));
+			await SendWorldPacket(client, EnergyCodec.Build(instance, player.Stamina));
 		}
 
 		// The generic "every behavior gets an echo-ack" reply (docs/subsystems/combat.md rule 1) for an Interact request with no
@@ -658,7 +659,7 @@ namespace Faolan.GameServer.Combat
 			var phase = mode != 0
 				? mode
 				: (uint)(++client.Session.NormalAttackAckPhase);
-			return SendWorldPacket(client, BehaviorAckBody.BuildBehaviorEchoAckBody(rawPayload, instance, phase));
+			return SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.EchoAck(rawPayload, instance, phase)));
 		}
 
 		// Sends the cast-interrupt abort BccAck (#347): the state=0x0007 reply to the client's cast-cancel that drops
@@ -667,7 +668,7 @@ namespace Faolan.GameServer.Combat
 		public static Task SendCastInterruptAbort(INetworkClient client, byte[] beginArgs, byte[] cancelPayload, uint phase)
 		{
 			var instance = client.Session.Character.Id;
-			return SendWorldPacket(client, BehaviorAckBody.BuildCastInterruptAbort(beginArgs, cancelPayload, instance, phase));
+			return SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.CastInterruptAbort(beginArgs, cancelPayload, instance, phase)));
 		}
 
 		// The floating combat-damage number over the player when an NPC hits them (DamageResultIIR 0xFEC4158A,
@@ -679,7 +680,7 @@ namespace Faolan.GameServer.Combat
 		// per-NPC/per-weapon schools; player-melee callers pass Crushing.
 		public static Task SendDamageNumber(INetworkClient client, uint targetHandle, uint attackerHandle, uint damage, DamageSchool school = DamageSchool.Piercing)
 		{
-			return SendWorldPacket(client, CombatEffectBuilder.BuildDamageResult(targetHandle, attackerHandle, damage, school));
+			return SendWorldPacket(client, DamageResultCodec.Build(targetHandle, attackerHandle, damage, school));
 		}
 
 		// Acks an equip/unequip move (Interact 0x09) and appends the 0x201C bookkeeping entry retail sends with it:
@@ -690,7 +691,7 @@ namespace Faolan.GameServer.Combat
 			if (rawPayload.Length < 26)
 				return;
 
-			await SendWorldPacket(client, BehaviorAckBody.BuildEquipMoveAckBody(rawPayload, client.Session.Character.Id, mode, movedItem));
+			await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.EquipMoveAck(rawPayload, client.Session.Character.Id, mode, movedItem)));
 		}
 
 		// Sends the NPC counter-attack ANIMATION ack to the player it hit: a BehaviorControlCenterIIR with actor = the
@@ -705,7 +706,7 @@ namespace Faolan.GameServer.Combat
 			// ability id. The capture's beach mobs use ~0xBEEC (48876) across several NPCs (per-NPC jitter of a few);
 			// 0xBEEC is the representative value. (The earlier 769094 was the Normal Attack ABILITY id - wrong field,
 			// which played the player's hit-react + audio but left the NPC body un-animated.)
-			var body = CombatPacketCodec.BuildNpcAttackAnimationAckBody(npcHandle, playerHandle, damage, 0xBEEC, swingCounter);
+			var body = BehaviorControlCenterCodec.Build(BehaviorAnimations.NpcAttackAck(npcHandle, playerHandle, damage, 0xBEEC, swingCounter));
 			return SendWorldPacket(client, body);
 		}
 
@@ -716,25 +717,23 @@ namespace Faolan.GameServer.Combat
 		public static Task SendNpcSpellCast(INetworkClient client, uint npcHandle, NpcSpellCast spell)
 		{
 			var playerHandle = client.Session.Character.Id;
-			var body = NpcSpellCastBuilder.Build(playerHandle, npcHandle, spell.SpellId, spell.Payload);
+			var body = MagicBuffCodec.Build(playerHandle, npcHandle, spell.SpellId, spell.Payload);
 			return SendWorldPacket(client, body);
 		}
 
 		// Retail's per-tick vitals regen (RegenIIR 0x28D0AC99, decoded): a compact [+hp][+mana][+stamina] delta the
 		// client ADDS to the current bars, ×100 wire scale. Lets the bars regen smoothly without pushing a full
-		// 0x96B8DC59 block every tick. Regen.Build already frames it as the [u32 len][iir] carrier body, so it
-		// rides the DispatchPassBlob directly (WriteArray, not WriteArrayUInt32Length).
+		// 0x96B8DC59 block every tick.
 		public static Task SendRegen(INetworkClient client, uint handle, int healthDelta, int manaDelta, int staminaDelta)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				Regen.Build(handle, healthDelta, manaDelta, staminaDelta)));
+			return SendWorldPacket(client, RegenCodec.Build(handle, healthDelta, manaDelta, staminaDelta));
 		}
 
 		// A DoT tick's StatDamageIIR (the health effect of an active bleed/HoT). idx 1 is the typical effect slot in
 		// the capture; statValue = the resulting HealthCurrent so the client's bar/number matches the vitals move. #274
 		public static Task SendStatDamage(INetworkClient client, uint targetHandle, uint statValue, int delta, uint type, uint casterHandle, uint spellBaseId)
 		{
-			return SendWorldPacket(client, CombatEffectBuilder.BuildStatDamage(targetHandle, statValue, delta, type, casterHandle, 1, spellBaseId));
+			return SendWorldPacket(client, StatDamageCodec.Build(StatDamages.Combat(targetHandle, statValue, delta, (DamageSchool)type, casterHandle, 1, spellBaseId)));
 		}
 
 		// Pushes a 0x96B8DC59 stat block to the client (shared wire builder on World.VitalsPacket).

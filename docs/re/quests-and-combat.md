@@ -57,8 +57,8 @@ scale — send a known raw value, read the rendered number. It is also how the t
 `.setstat 1 <v>` moves the health bar's max, `.setstat 27 <v>` moves nothing the bar draws.) Round-trip tests
 (`CharacterStatBlockTests`, `CharacterMaxStatsTests`, `DatabaseRepositoryTests.CreateCharacter_SeedsDefaultMaxStats`)
 cover bytes, defaults, and cascade. `ApplySpell` (0x6B87E316) was already implemented (caster + `0000` + spellId +
-`0000C350` + target + data); its builders now live in `Faolan.Core.Network/Codecs/Combat/` (`SelfBuffCodec`,
-`NpcSpellCastBuilder`, `WorldDeath`).
+`0000C350` + target + data); its builders now live in `Faolan.Core.Network/Codecs/Combat/` (`MagicBuffDataCodec`,
+`MagicBuffCodec`, `DeathSequence`).
 
 **Combat loop implemented** (2026-06-08): `Faolan/GameServer/Combat/` — `EntityVitals` (live current+max HP/
 Mana/Stamina, clamped deltas), `CombatState` (in-memory per-handle vitals store; world-authoritative, never

@@ -15,9 +15,9 @@ namespace Faolan.GameServer.World
 	// verbatim one puts the IIR TYPE where the client reads a length: AddToGroupIIR went out unframed, the client read
 	// 0x0DF44B73 as a 234 MB payload, and BOTH members of the team lost every connection the instant the roster landed.
 	//
-	// So the two shapes keep existing - some codecs frame their own payload (ComboBookIirCodec, NewLevelIirCodec,
-	// GroupMembershipCodec, WorldObjectCodec), most emit a bare record - but they are one definition each with a name
-	// that says which is which, and a call site now reads unambiguously.
+	// #530 rule 2 settled which shape is right: the u32 length belongs to the SENDER, so a codec emits a bare record
+	// and there is exactly ONE way to put it on the wire. The `SendFramed` twin - for codecs that prepended their own
+	// length - lost its last caller when Combat converted in wave 4 and is gone.
 	public static class WorldIir
 	{
 		// The usual case: `record` is [u32 iirType][record] and the carrier's [u32 len] is written here.
@@ -25,13 +25,6 @@ namespace Faolan.GameServer.World
 		{
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(record)));
-		}
-
-		// For a codec that already emits the WHOLE carrier payload - [u32 len][u32 iirType][record] - so its output is
-		// directly comparable to a captured packet. Framing it again would nest one payload inside another.
-		public static Task SendFramed(INetworkClient client, params byte[] framedPayload)
-		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, framedPayload));
 		}
 	}
 }

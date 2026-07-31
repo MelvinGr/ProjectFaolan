@@ -76,7 +76,7 @@ human-readable `remoteformat`/`localized` XML + object/NPC name strings (with th
   picks → `RespawnMe` (c2s `0x2024`) = `[u32 spawnPointId]` (the chosen spot echoed back). NOTE: the same `0x2024` is
   sent at LOGIN (the misnamed `SendReadyForPlayScreen`) to set the spawn anchor - it only renders the release UI when
   the client is in the dead state (which needs a real combat killing-blow, not a raw health=0 push). Builder
-  (`Faolan.Core.Network/Codecs/Combat/ResurrectionSpotsBody.cs`) + golden test
+  (`Faolan.Core.Network/Codecs/Combat/ValidResurrectionSpotsCodec.cs`) + golden test
   (`Faolan.Tests/DispatchValidResurrectionSpotsTests.cs`) shipped; see Gitea #214/#215.
 
 ### Blablabla — create, combat, levelup, questcomplete

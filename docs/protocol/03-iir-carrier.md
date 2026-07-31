@@ -57,8 +57,8 @@ round-trips each byte-exact. [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTri
 The direction of travel is to build each record from typed DB columns, not replay a captured blob. Two records
 that already build wholly from typed inputs and are pinned byte-exact:
 
-- the death sequence's kill record [V3: WorldDeathTests.BuildKilledBy_ReproducesCapturedRecord_ByteExact]
-- the death-pose MoveTask [V3: WorldDeathTests.BuildDeathPose_ReproducesCapturedRecord_ByteExact]
+- the death sequence's kill record [V3: DeathSequenceTests.BuildKilledBy_ReproducesCapturedRecord_ByteExact]
+- the death-pose MoveTask [V3: DeathSequenceTests.BuildDeathPose_ReproducesCapturedRecord_ByteExact]
 
 Records still replayed verbatim are tracked in [`gaps.md`](gaps.md) and [`gen/coverage.md`](gen/coverage.md) (the
 V1 rows).

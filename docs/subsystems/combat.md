@@ -1,7 +1,7 @@
 # Combat: the BehaviorControlCenter ack protocol (armed + unarmed)
 
 Status 2026-06-12: armed and unarmed swings work in-client; equip-state decides which protocol the client
-speaks. Commits `226b16f`, `a115c40`. Golden tests: `BehaviorAckTests` (byte-exact against
+speaks. Commits `226b16f`, `a115c40`. Golden tests: `BehaviorAcksTests` (byte-exact against
 `Captures/Stihetfv_soldier-conqueror_login_combat_armed-and-unarmed.pcapng`). Wider combat-loop status (NPC
 aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, plus `docs/re/quests-and-combat.md`.
 
@@ -22,7 +22,7 @@ aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, p
 1. **Every behavior request gets an echo-ack**: the request echoed with `seq+1` and **field3 spliced into
    the args, value = the request's own Mode** (NOT a server counter - the earlier "monotonic phase counter"
    read was Mode itself incrementing), tail echoed + 12 zero bytes appended
-   (`BehaviorAckBody.BuildBehaviorEchoAckBody`).
+   (`BehaviorAcks.EchoAck`).
 2. **Air swings (no target) get exactly that and nothing else** - armed and unarmed alike.
 3. **Targeted ARMED hits** additionally get the result-block ack variant (the 81-byte block with the
    damage slot and the `0x06 000000CB` constant - `SendNormalAttackResponse`), then `DamageResultIIR
@@ -40,7 +40,7 @@ A killed NPC no longer instant-pops. The killing blow pushes the `health=0` vita
 `CombatService.OnNpcKilled` `MarkDead`s the world entity (+ XP + kill quests) and plays the death anim via the
 retail NPC-death pair — a **death-pose `MoveTaskIIR`** (0x96C46740, movement-type 0x06, freezes the corpse in
 place) + a **death-behavior `BehaviorControlCenterIIR`** (0x642CD3D6, behaviorId 41877) on the dying handle
-(`WorldDeath.BuildDeathPose`/`BuildDeathBcc`, #204/#349, see below). The
+(`DeathSequence.Pose`/`DeathSequence.Bcc`, #204/#349, see below). The
 world tick (`WorldState.Tick`) drives two independent timers off the death:
 1. **corpse linger** (`WorldEntity.CorpseLingerSeconds`, ~3s): the corpse stays the dying creature so the
    client plays its death animation. When it elapses the tick emits `NpcCorpseLootable` ->
@@ -70,17 +70,17 @@ never showed). **NPC death and player death use DIFFERENT triggers** — decoded
 - **NPC death** (#204/#349) = a **death-pose `MoveTaskIIR`** (0x96C46740, movement-type 0x06 — freezes the
   corpse where it fell) followed by a **death-behavior `BehaviorControlCenterIIR`** (0x642CD3D6) on the dying
   handle. In `NecroL80_..._casting-combat` **every** NPC kill carries exactly this pair and **NO
-  `SimpleCharKilledBy`** (validated by `WorldDeathTests`). The death is identified by the
+  `SimpleCharKilledBy`** (validated by `DeathSequenceTests`). The death is identified by the
   BccIIR **envelope** — form **0x0004**, slot **0x0000001F**, a 13-byte protobuf `08 <behaviorId> 18 <variant>
   28 08 30 00 60 <f12>`; the **behaviorId is creature-specific** (that creature's own death animation — 41877
   for the common humanoid mobs, 17036 for the F023 creature) and the field-3 `<variant>` byte varies per kill
-  (a hit-direction/ragdoll selector). Built by `WorldDeath.BuildDeathPose` + `BuildDeathBcc(handle,
+  (a hit-direction/ragdoll selector). Built by `DeathSequence.Pose` + `DeathSequence.Bcc(handle,
   NpcDeathVariant)` (byte-exact goldens), sent by `CombatService.OnNpcKilled` after the killing-blow vitals. We
   send the common humanoid death (behaviorId 41877, `NpcDeathVariant` = 0x05); per-creature death behaviorIds
   need per-NPC behavior data we don't yet carry.
 - **Player death** (#214) uses `SimpleCharKilledByUpdateIIR_t` (**0xB066AFC2**) — the "you were killed by X"
   record that drives the local release/resurrect UI, ABSENT from NPC kills. Record:
-  `[subop][0000C350][dyingHandle][00][01][0000C350][killerEndpoint]`, built by `WorldDeath.BuildKilledBy`
+  `[subop][0000C350][dyingHandle][00][01][0000C350][killerEndpoint]`, built by `SimpleCharKilledByUpdateCodec`
   (byte-exact golden). `WorldSimulation.SendDeathScreen` sends it (along with the death-pose + death-Bcc) for the
   player BEFORE `DispatchValidResurrectionSpots`.
 
@@ -95,7 +95,7 @@ commit 763aeb0). Trail: agent memory `protocol_death_resurrect`.
 creature, then a separate loot bag spawns, #246.)
 
 **Resurrection spots (`DispatchValidResurrectionSpots`, s2c 0x2024) — body fully decoded, #372.** The body is a
-reference position + a **list** of the points a player may revive at, built by `ResurrectionSpotsBody`:
+reference position + a **list** of the points a player may revive at, built by `ValidResurrectionSpotsCodec`:
 
 ```
 [refPos X,Y,Z][u32 (count+1) * 0x3F1]  then count × 41-byte records:
@@ -183,9 +183,9 @@ clean NPC-vs-player tell). `seq` is the constant `0x0004` (server-initiated, not
 Sending it plays the NPC's swing + the player's hit-react; the authoritative HP move still rides the
 world-tick `StatUpdate` (the ack's damage is just the floating number, so the two don't double-apply).
 
-Decode: `CombatEffectBuilderTests` (98/98 frames of the strickenbla capture). Builder
-`CombatPacketCodec.BuildNpcAttackAnimationAckBody`, byte-exact against frame 6472 in
-`CombatPacketCodecTests`. Wired into `WorldSimulation.ApplyNpcAttack` via `IWorldOutbound.SendNpcAttackAnimation`.
+Decode: `CombatDamageCodecTests` (98/98 frames of the strickenbla capture). Builder
+`BehaviorAnimations.NpcAttackAck`, byte-exact against frame 6472 in
+`EnergyCodecTests`. Wired into `WorldSimulation.ApplyNpcAttack` via `IWorldOutbound.SendNpcAttackAnimation`.
 The animation/result params (`typeId`/`swingCounter`/`f5`/`f11`/`f12`/`resultType`/`resultK*`) are not
 semantically decoded - capture-typical defaults for the live send.
 
@@ -201,7 +201,7 @@ the target out in the field also sends it home. WORKS in-client (it moves + leas
 
 On arrival home the NPC now also emits a **StopIIR** (`StopCodec` → `BroadcastNpcStop`, the `NpcStopped`
 tick effect) to formally close the move stream (#190), and on engage the broadcaster pushes the NPC's
-**aggro** — a `HateListUpdate` + `ThreatLevel` (`HateListCodec`/`ThreatLevel` → `BroadcastNpcAggro`,
+**aggro** — a `HateListUpdate` + `ThreatLevel` (`HateListUpdateCodec`/`ThreatLevel` → `BroadcastNpcAggro`,
 #216) — alongside the combat-mode weapon-draw. Both are gated by `NpcAutoAttackEnabled`.
 
 **Walk gait + slight snap.** The 61-byte form has no speed field, so the client uses a default
@@ -254,7 +254,7 @@ how much is provisional (`Combat.AttributeGrowth`, flat +1/primary) — no per-c
 Two distinct mid-session grant packets, both on the GameCharInterface conversation (same class pair), each
 byte-exact:
 - **`0x2052 DispatchAddSpecialAbility`** — grants a catalog **ability** (the melee/utility kit). Body = the 81-byte
-  ability struct. `SendAddSpecialAbility`/`AbilityGrantBody.BuildAddSpecialAbilityBody`, used by login
+  ability struct. `SendAddSpecialAbility`/`AddSpecialAbilityCodec`, used by login
   `GrantCharacterAbilities` (post-0x2024, from `FlushPendingPost205FFollowUp`).
 
   **The `Abilities` catalog has two tiers (#303), and only one of them can be granted.** An ability is an RDB
@@ -271,7 +271,7 @@ byte-exact:
   key-less row rather than putting a null key on the wire. Recovering the rest needs a capture that grants them —
   the same key blocker as the item catalog (Gitea #415). Pinned by `AbilityCatalogTests`.
 - **`0x200A DispatchLearnSpell`** — grants a real **spell**. Body = a bare big-endian `u32` spell id (`i_nSpellID`),
-  invariant across all 68 captured packets. `SendLearnSpell`/`AbilityGrantBody.BuildLearnSpellBody` (decode
+  invariant across all 68 captured packets. `SendLearnSpell`/`LearnSpellCodec` (decode
   `CaptureSpellImporterTests`, golden `LearnSpellTests`).
 
 (The GM test commands `.grantability`/`.abilitylist`/`.learnspell` were removed in the "remove 25 GM test commands"
@@ -298,10 +298,10 @@ builds it (via `SendMagicBuffIir`, which registers `applyTo == applyFrom` casts 
 the client-initiated `CancelBuff` `0x201E` and the expiry tick can track them). The **wire spell id is `(baseId << 8) | rank`** — apply uses rank `00`,
 remove uses rank `01`; the payload embeds the same `baseId` at offset **[22..26]**.
 
-**The data tail has exactly ONE form: 54 bytes** (`SelfBuffCodec.BuildBuffDataLong`). Across all 103
+**The data tail has exactly ONE form: 54 bytes** (`MagicBuffDataCodec`). Across all 103
 `Captures/*.tshark.json` the only s2c `MagicBuffIIR` tails are **54** bytes (×1412) and **0** (×578 — the rank-1
 end twin). A 50-byte tail occurs **zero** times. `[V2: Captures/*.tshark.json — every s2c body whose u32 length is
-followed by 6b87e316; scan reproduced by Faolan.Tests/SelfBuffCodecTests]` The client's
+followed by 6b87e316; scan reproduced by Faolan.Tests/MagicBuffDataCodecTests]` The client's
 `MagicBuffIIR_c::ReadSubClass` reads 4 bytes past the end of a 50-byte tail and **rejects the whole record** —
 silently, apart from the client log (`ReadSubClass for IIR 1804067606 (MagicBuffIIR_c) failed! datasize left in
 stream=4, raw=76`) — so the buff simply never renders.
@@ -330,7 +330,7 @@ FullPlayerCharacterIIR  ->  GameTimeIIR  ->  ride buff 0x31EB1500  ->  Shield of
 
 That entry-restore ride buff is byte-identical to a player-initiated mount cast **except for the per-application
 effect id and the trailing nonce** — 6 bytes of 84, both of which vary per application by definition
-(`NpcSpellCastBuilderTests.MountRideBuff_EntryRestoreMatchesAFreshCast_ExceptThePerApplicationIds`). So there is no
+(`NpcSpellCastCodecTests.MountRideBuff_EntryRestoreMatchesAFreshCast_ExceptThePerApplicationIds`). So there is no
 "already active" or silent variant of the record, and the FullChar snapshot carries no active-buff region for one to
 live in. Reconstructing the mount silently inside the snapshot would be an invention rather than a mirror of retail.
 What retail differs on is **position**: it sends the restore inside the entry stream, immediately after the snapshot
@@ -344,7 +344,7 @@ autosave) snapshots each self-buff to the `CharacterBuff` table — `BuffId`, th
 `RestoreMount` and `SendShieldOfTheRisen` (#423). All three used to run from the post-`0x205F` flush, after the client
 had left the loading screen, which reads as a NEW application and fires the client's apply feedback on every login and
 every playfield change — #342 confirmed that for the mount, whose feedback was audible. Restore rebuilds the
-`ApplySpell` payload from those columns via `SelfBuffCodec` (not a
+`ApplySpell` payload from those columns via `MagicBuffDataCodec` (not a
 stored blob) with the duration recomputed to the time left, so the client counts down the **remaining** seconds and
 the tick expires it on schedule. Only self-buffs persist (NPC-cast debuffs carry a volatile caster handle + a DoT
 and are dropped); buffs owned by a dedicated re-applier — the login shield and the mount ride buff — are excluded
@@ -359,7 +359,7 @@ control, so the protection banner would paint over a cinematic and the shield wo
 fight they have not had yet. Every later login, including the first ordinary one after creation, applies it. The real
 ids are bases **`4061768` (1h)** + **`3666828` (10h)**, both named "Shield of the Risen" in `Spells` with real
 durations (`NecroL80_..._conans-castle-exit` rec#165/#736) — the old `0x000B9000` claim was WRONG (that id is the
-"Exhausted" debuff). It uses `SelfBuffCodec.BuildBuffDataLong` — the 54-byte tail that is the only form retail
+"Exhausted" debuff). It uses `MagicBuffDataCodec` — the 54-byte tail that is the only form retail
 sends (#274) — and retail shows exactly **one at a time**, picked by playfield type: the 1h on an instanced
 playfield, the 10h in the shared open world (we select by `Map.InstanceMode`, tracked in
 `Session.ActiveShieldSpellBase`). The client renders it TOP-of-screen (protection banner) and auto-generates the
@@ -413,7 +413,7 @@ ApplySpell 3666099 "Frozen Hatred"   self, 6s   - only when that buff is up
 ```
 
 36 bursts across the corpus carry both `Fatality` ids; 21 also carry the Frozen Hatred proc. Every payload is the
-ordinary 54-byte self-buff form (`SelfBuffCodec.BuildBuffDataLong`) with magnitude **1** — a fatality needs no new
+ordinary 54-byte self-buff form (`MagicBuffDataCodec`) with magnitude **1** — a fatality needs no new
 wire shape, which is why `FatalityService` is three ApplySpell sends and not a bespoke record
 (`FatalityBurstTests` locks all three against the captured bytes).
 
@@ -508,11 +508,11 @@ begin×2 / cancel×1; every cast in the ice-strike/casilda/casting captures is b
   (`GameServerListener.Inbound.cs` `CharDCMoveIIR`, position delta > `CastMoveCancelEpsilonSq` so turning-in-place
   to aim doesn't self-cancel). Either way the deferred resolve sees a mismatched token and aborts (no complete-ack,
   no damage). The **client cast bar** is stopped by answering the cancel with retail's **state `0x0007` abort BCC**
-  (`BehaviorAckBody.BuildCastInterruptAbort` / `CombatService.SendCastInterruptAbort`) — the begin's args (held as
+  (`BehaviorAcks.CastInterruptAbort` / `CombatService.SendCastInterruptAbort`) — the begin's args (held as
   `Session.PendingCastArgs`) re-emitted at state `0x0007` with the cancel packet's tail; this drops the bar, cancels
   the animation and pops the client's "Interrupted" floating text (client-generated — no separate feedback packet).
   Byte-exact against `NecroL80_..._cast-interupt` (begin idx988 + cancel idx1006 → abort idx1013), golden-tested in
-  `BehaviorAckTests`. Echoing the cancel back (the old behaviour) left the bar running.
+  `BehaviorAcksTests`. Echoing the cancel back (the old behaviour) left the bar running.
 - **Ground-targeted AoE:** a spell aimed at a reticle POSITION (no locked entity) carries the target Vector3 in
   the trailer (`[u8 kind=0][f32 X/Y/Z BE]…`) and has **no** `SpellTarget`; `CastGroundTarget.TryParse` reads it
   (an entity cast sends `kind=1` and a garbage position). `CombatService.ResolveGroundAoe` then damages every

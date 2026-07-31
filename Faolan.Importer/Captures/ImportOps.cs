@@ -8,6 +8,7 @@ using Faolan.Core.Crypt;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
@@ -1394,19 +1395,19 @@ namespace Faolan.Importer.Captures
 			});
 		}
 
-		// Decodes the captured 54-byte ApplySpell effect payload into the NpcSpell columns (NpcSpellEffectCodec, #304).
+		// Decodes the captured 54-byte MagicBuffIIR data region into the NpcSpell columns (#304).
 		private static void ApplyEffect(NpcSpell s, byte[] payload)
 		{
-			if (payload is not { Length: NpcSpellEffect.Length })
+			if (payload is not { Length: MagicBuffDataCodec.Length })
 				return;
 
-			var fx = NpcSpellEffect.Parse(payload);
-			s.Duration = fx.Duration;
-			s.DescriptorSlot3 = fx.DescriptorSlot3;
-			s.CastingLevel = fx.CastingLevel;
-			s.FlagA = fx.FlagA;
-			s.DescriptorSlot0 = fx.DescriptorSlot0;
-			s.DescriptorSlot8 = fx.DescriptorSlot8;
+			var fx = MagicBuffDataCodec.Parse(payload);
+			s.Duration = NpcSpellEffectColumns.Duration(fx);
+			s.DescriptorSlot3 = NpcSpellEffectColumns.DescriptorSlot3(fx);
+			s.CastingLevel = NpcSpellEffectColumns.CastingLevel(fx);
+			s.FlagA = NpcSpellEffectColumns.FlagA(fx);
+			s.DescriptorSlot0 = NpcSpellEffectColumns.DescriptorSlot0(fx);
+			s.DescriptorSlot8 = NpcSpellEffectColumns.DescriptorSlot8(fx);
 		}
 
 		// Upsert (never wipe): refresh from a clean slate so stale handle-keyed (un-named) nodes don't linger. One
@@ -1477,10 +1478,17 @@ namespace Faolan.Importer.Captures
 				if (p is not { IsIirCarrier: true, SubOpcode: (uint)GameServer0X2000Opcodes.PetIIR })
 					continue;
 
-				// Body slices the packet on every access, so take it once.
+				// Body slices the packet on every access, so take it once. The sweep runs over a mixed stream, so a
+				// record whose grammar does not hold (a mode the client's own reader rejects) is skipped, not fatal.
 				var body = p.Body;
-				if (body.Length > 4 && PetIirCodec.TryParse(body.AsSpan(4), out var pet))
-					summoned.Add(pet.Pet);
+				try
+				{
+					summoned.Add(PetCodec.Parse(body.AsSpan(4)).Pet);
+				}
+				catch (CodecParseException)
+				{
+					// not a well-formed owner binding
+				}
 			}
 
 			return summoned;

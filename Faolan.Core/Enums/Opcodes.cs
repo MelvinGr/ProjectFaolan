@@ -668,7 +668,7 @@ namespace Faolan.Core.Enums
 		MoveTaskIIR = 0x96C46740, // MoveTaskIIR_c  (x5564) - movement task (the float-heavy state block)
 		NewAllowedLooterIIR = 0x1E2E0139, // NewAllowedLooterIIR_c  (x59)
 		NewCurrentLooterIIR = 0xD06568C8, // NewCurrentLooterIIR_c  (x60)
-		NewLevelIIR = 0x6D314743, // NewLevelIIR_t - level-up notification (built by NewLevelIirCodec)
+		NewLevelIIR = 0x6D314743, // NewLevelIIR_t - level-up notification (built by NewLevelCodec)
 		PetIIR = 0x1F4CB0F7, // PetIIR_c  (x6)
 		PlayfieldFIIR = 0x5D85BFC7, // PlayfieldFIIR_t  (x33) - "MapChange"
 		QuestFullUpdateIIR = 0x63268258, // QuestFullUpdateIIR  (x28)

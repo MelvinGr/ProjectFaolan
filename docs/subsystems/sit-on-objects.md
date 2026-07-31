@@ -30,11 +30,11 @@ deadlocks anything that waits on movement.
 
 `0x0003 -> 0x0004` and **`0x0002 -> 0x000F`** - four matched pairs above, and consistent corpus-wide (a `0x0002`
 request is answered with `0x000F` in 70 of 118 cases). `0x0002` is the client confirming; `0x000F` commits.
-Implemented in `BehaviorAckBody.AckSeq`.
+Implemented in `BehaviorAcks`.
 
 ## Our implementation
 
-- `BehaviorAnimationCodec.PlayerSitOnObject` / `PlayerStandUp` - the two `0x2A` animation records (byte-exact vs
+- `BehaviorAnimations.PlayerSitOnObject` / `PlayerStandUp` - the two `0x2A` animation records (byte-exact vs
   F2795 / F2840). `BenchSitState` builds the `0x12` hold records.
 - `WorldBroadcaster.TrySitOnObject` runs the sit's two phases; `SeatedHoldConfirmed` is the latch that answers the
   client's confirm exactly once.

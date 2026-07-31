@@ -12,7 +12,7 @@ client-named trigger is `playerenter` — the crossing, not "being inside".
 ## The wire form: `StatDamageIIR`, environmental variant
 
 Retail sends environmental damage as a `StatDamageIIR` (`0xE9F24184`) with a **different grammar** from the
-combat one, which is why `CombatEffectBuilder.EnvironmentalDamage` is its own codec:
+combat one, which is why `StatDamages.Environmental` is its own codec:
 
 ```
 [subop][class][target][env=0][u32 amount][0][0][0][u32 statId][u32 0][i32 -amount][u32 school][0 ×9]
@@ -30,7 +30,7 @@ That the first word is a magnitude and not a resulting value is proven by consec
 (nothing heals 2050 health in 7 s, and the second record's own delta implies a start the first contradicts).
 
 ⚠️ **No `DamageResultIIR` accompanies it** — a fall renders no floating combat number. Do not pair this with
-`SendDamageNumber` the way the melee path does. [V3: CombatEffectBuilderTests.EnvironmentalDamage_IsByteIdentical]
+`SendDamageNumber` the way the melee path does. [V3: CombatDamageCodecTests.EnvironmentalDamage_IsByteIdentical]
 
 ## Fall damage
 

@@ -29,6 +29,7 @@
     <s:Boolean x:Key="/Default/CodeStyle/CodeFormatting/JavaScriptCodeFormatting/PLACE_ELSE_ON_NEW_LINE/@EntryValue">True</s:Boolean>
     <s:Boolean x:Key="/Default/CodeStyle/CodeFormatting/JavaScriptCodeFormatting/PLACE_FINALLY_ON_NEW_LINE/@EntryValue">True</s:Boolean>
     <s:Boolean x:Key="/Default/CodeStyle/CodeFormatting/JavaScriptCodeFormatting/PLACE_WHILE_ON_NEW_LINE/@EntryValue">True</s:Boolean>
+	<s:String x:Key="/Default/CodeStyle/Naming/CSharpNaming/Abbreviations/=IIR/@EntryIndexedValue">IIR</s:String>
     <s:Boolean x:Key="/Default/CodeStyle/Naming/CSharpNaming/ApplyAutoDetectedRules/@EntryValue">False</s:Boolean>
     <s:Boolean x:Key="/Default/Dpa/IsEnabledInDebug/@EntryValue">True</s:Boolean>
     <s:Boolean x:Key="/Default/Environment/ExcludedFiles/FilesAndFoldersThirdParty/=2D18123E_002D0E59_002D7C3D_002DDDA5_002D6E0F262FC524_002Fd_003AThirdParty/@EntryIndexedValue">True</s:Boolean>
