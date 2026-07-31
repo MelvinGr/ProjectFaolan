@@ -48,7 +48,7 @@ namespace Faolan.Importer.Captures
 			(FullPlayerCharacterCodec.Opcode, "snapshot tails, protobuf root, death vitals, quest regions"),
 			(SimpleCharFullUpdateCodec.Opcode, "spawn - the protobuf round-trip corpus"), (MoveTaskCodec.Opcode, "MoveTask"),
 			(QuestFullUpdateCodec.Opcode, "QuestFullUpdate"), (QuestJournalCodec.Opcode, "QuestJournal"),
-			(QuestLogListCodec.Opcode, "QuestLogList"), (PlayfieldFCodec.Opcode, "map change - NpcSpawnExtractor needs it to key spawns to a map"),
+			(MainQuestUpdateCodec.Opcode, "QuestLogList"), (PlayfieldFCodec.Opcode, "map change - NpcSpawnExtractor needs it to key spawns to a map"),
 			(TradeskillReplyCodec.Opcode, "the one captured recipe catalog"),
 			(WorldObjectClasses.SimpleDynel, "world objects - the identity+geometry column lift, byte-compared")
 		];

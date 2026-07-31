@@ -202,7 +202,7 @@ ends when the player **opens the city door**:
 | 11363 | s2c | `BehaviorControlCenterIIR` | server acks the action |
 | **11365** | s2c | `QuestGoalIIR` quest `0x3077`=12407, goal `0x0DD8`=3544, 1/1 | **the escort goal completes** |
 | 11365 | s2c | `QuestIIR` state `2` then `4` | Active → Completed |
-| 11366 | s2c | `QuestLogListIIR` | journal refresh |
+| 11366 | s2c | `MainQuestUpdateIIR` | journal refresh |
 | 11370 | s2c | `SetPosIIR` | Casilda is repositioned |
 | **11395** | s2c | `KnubotOpenChatWindowIIR` + `DispatchSetDialogueCamera` + `KnubotAppendTextIIR` + `KnubotAnswerListIIR` | **the farewell conversation opens** |
 | 11401/11413/11418 | c2s | `KnubotAnswerIIR` | the player's three picks |

@@ -204,9 +204,9 @@ namespace Faolan.Importer.Captures
 
 				switch (inner.ReadU32Be(0))
 				{
-					case QuestLogListCodec.Opcode:
+					case MainQuestUpdateCodec.Opcode:
 					{
-						var log = QuestLogListCodec.Parse(inner);
+						var log = MainQuestUpdateCodec.Parse(inner);
 						if (!logListByChar.TryGetValue(log.PlayerHandle, out var set))
 							logListByChar[log.PlayerHandle] = set = [];
 						foreach (var entry in log.Entries)

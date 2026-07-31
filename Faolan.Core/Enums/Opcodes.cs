@@ -649,7 +649,7 @@ namespace Faolan.Core.Enums
 		// channel. Body decoded from the client's reader (FUN_00663860): [u32 command][u32 targetA][u32 targetB][string].
 		// Seen on the wire from our own client, never in the corpus (the retail traces are ordinary play, not GM
 		// sessions), so the server's REPLY is still undecoded - #448/#449.
-		FanaticCommandIir = 0xEE4AA85C,
+		FanaticCommandIIR = 0xEE4AA85C,
 
 		IntendedTeleportIIR = 0x10D27BC0, // IntendedTeleportIIR_c  (x15)
 		KnubotAnswerIIR = 0x4D7D9123, // KnubotAnswerIIR_c  (x194) - NPC dialogue ("Knubot" = the NPC dialogue system)
@@ -675,7 +675,10 @@ namespace Faolan.Core.Enums
 		QuestGoalIIR = 0x0774C8C1, // QuestGoalIIR_c  (x27)
 		QuestIIR = 0x97E02314, // QuestIIR_c  (x34) - "DeleteQuest"
 		QuestJournalIIR = 0x79F8C7A1, // QuestJournalIIR_c  (x17)
-		QuestLogListIIR = 0x504B7924, // the active-quest LIST that populates the J-panel (WorldQuest.BuildQuestLogList)
+		// MainQuestUpdateIIR_c - the active-quest LIST that populates the J-panel. Named QuestLogListIIR here until
+		// #545, which is a name we INVENTED (BKDR-31("QuestLogListIIR") == 0xB80D3852, not this id); the client's own
+		// class name hashes exactly, and its Activate() switch is what the leading word selects.
+		MainQuestUpdateIIR = 0x504B7924, // MainQuestUpdateIIR_c - the active-quest LIST that populates the J-panel
 		RegenIIR = 0x28D0AC99, // RegenIIR_c  (x554)
 		RemoveFromGroupIIR = 0xE4FF0C85, // RemoveFromGroupIIR_c  (x8) - a member left/was kicked; the AddToGroupIIR complement
 		ScryScriptIIR = 0xA36D3B74, // ScryScriptIIR_c  (x390) - cutscene/scry scripts + char-editor callbacks (IntroDone, TheNameIs, ...)

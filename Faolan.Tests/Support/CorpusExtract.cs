@@ -39,7 +39,7 @@ namespace Faolan.Tests.Support
 		private static readonly (uint Iir, int Count)[] ExpectedCounts =
 		[
 			((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, 151), ((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, 11632), ((uint)GameServer0X2000Opcodes.MoveTaskIIR, 12660),
-			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, 74), ((uint)GameServer0X2000Opcodes.QuestJournalIIR, 38), ((uint)GameServer0X2000Opcodes.QuestLogListIIR, 46),
+			((uint)GameServer0X2000Opcodes.QuestFullUpdateIIR, 74), ((uint)GameServer0X2000Opcodes.QuestJournalIIR, 38), ((uint)GameServer0X2000Opcodes.MainQuestUpdateIIR, 46),
 			((uint)GameServer0X2000Opcodes.PlayfieldFIIR, 151), ((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, 1),
 			((uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, 5405)
 		];

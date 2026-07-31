@@ -15,8 +15,7 @@ recomputing the hash over candidates derived from our member name (± `_c`/`_t`,
 so a filled cell is a self-contained proof: `BKDR-31(name) == id`. This holds without parsing any
 external doc; the enum + the hash function are the whole source.
 
-- **78** ids: client type name recovered + BKDR-31-verified.
-- **2** ids: 32-bit hash (V1-recovered from the client) whose exact source string our name doesn't reproduce.
+- **80** ids: client type name recovered + BKDR-31-verified.
 
 | Type id | Recovered client name | Our enum name | Note |
 |---------|-----------------------|---------------|------|
@@ -48,7 +47,7 @@ external doc; the enum + the hash function are the whole source.
 | `0x4B2A47BF` | `KnubotStartTradeIIR_c` ✓ | `KnubotStartTradeIIR` | KnubotStartTradeIIR_c  (x2) |
 | `0x4D7D9123` | `KnubotAnswerIIR_c` ✓ | `KnubotAnswerIIR` | KnubotAnswerIIR_c  (x194) - NPC dialogue ("Knubot" = the NPC dialogue system) |
 | `0x4F57DC08` | `GameTimeIIR_t` ✓ | `GameTimeIIR` | GameTimeIIR_t  (x33) - the world day/night clock; resyncs the client's GameTime_t |
-| `0x504B7924` | — *(source string not reproduced)* | `QuestLogListIIR` | the active-quest LIST that populates the J-panel (WorldQuest.BuildQuestLogList) |
+| `0x504B7924` | `MainQuestUpdateIIR_c` ✓ | `MainQuestUpdateIIR` | MainQuestUpdateIIR_c - the active-quest LIST that populates the J-panel |
 | `0x54C02089` | `CombatReactiveIIR_c` ✓ | `CombatReactiveIIR` | CombatReactiveIIR_c  (x17) |
 | `0x5A32F0D7` | `n3TeleportIIR_t` ✓ | `N3TeleportIIR` | n3TeleportIIR_t  (x27) - teleport |
 | `0x5D85BFC7` | `PlayfieldFIIR_t` ✓ | `PlayfieldFIIR` | PlayfieldFIIR_t  (x33) - "MapChange" |
@@ -93,7 +92,7 @@ external doc; the enum + the hash function are the whole source.
 | `0xE4FF0C85` | `RemoveFromGroupIIR_c` ✓ | `RemoveFromGroupIIR` | RemoveFromGroupIIR_c  (x8) - a member left/was kicked; the AddToGroupIIR complement |
 | `0xE7F4F8F8` | `SimpleDynelVisualChangeIIR_c` ✓ | `SimpleDynelVisualChangeIIR` | SimpleDynelVisualChangeIIR_c  (x548) |
 | `0xE9F24184` | `StatDamageIIR_t` ✓ | `StatDamageIIR` | StatDamageIIR_t  (x450) |
-| `0xEE4AA85C` | — *(source string not reproduced)* | `FanaticCommandIir` |  |
+| `0xEE4AA85C` | `FanaticCommandIIR_t` ✓ | `FanaticCommandIIR` |  |
 | `0xF096251E` | `LootBagFullUpdateIIR_c` ✓ | `LootBagFullUpdateIIR` | LootBagFullUpdateIIR_c  (x102) - loot bag (NOT the player bag) |
 | `0xF164A4A5` | `KnubotAnswerListIIR_c` ✓ | `KnubotAnswerListIIR` | KnubotAnswerListIIR_c  (x177) |
 | `0xF508F4C1` | `GameActionListIIR_t` ✓ | `GameActionListIIR` | GameActionListIIR_t  (x366) |

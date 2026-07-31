@@ -71,6 +71,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `LootBagFullUpdateIIR` | `WorldObjectCodec` |
 | V3 | `LootRemoveItemsIIR` | `LootRemoveItemsCodec` |
 | V3 | `MagicBuffIIR` | `MagicBuffCodec` |
+| V3 | `MainQuestUpdateIIR` | `MainQuestUpdateCodec` |
 | V3 | `MoveTaskIIR` | `MoveTaskCodec` |
 | V3 | `N3TeleportIIR` | `TeleportCodec` |
 | V3 | `N3ToClientFadeIIR` | `N3ToClientFadeCodec` |
@@ -84,7 +85,6 @@ the margins, but never invents a golden that isn't there.
 | V3 | `QuestGoalIIR` | `QuestGoalCodec` |
 | V3 | `QuestIIR` | `QuestCodec` |
 | V3 | `QuestJournalIIR` | `QuestJournalCodec` |
-| V3 | `QuestLogListIIR` | `QuestLogListCodec` |
 | V3 | `RemoveFromGroupIIR` | `GroupMembershipCodec` |
 | V3 | `ScryScriptIIR` | `ScryScriptCodec` |
 | V3 | `SetNameIIR` | `SetNameCodec` |
@@ -107,7 +107,7 @@ the margins, but never invents a golden that isn't there.
 | V2 | `CharacterActionIIR` | `CharacterActionCodec` |
 | V2 | `CrimeIIR` | `CrimeCodec` |
 | V2 | `DeleteItemIIR` | `DeleteItemCodec` |
-| V2 | `FanaticCommandIir` | `FanaticCommandCodec` |
+| V2 | `FanaticCommandIIR` | `FanaticCommandCodec` |
 | V2 | `FeedbackIIR` | `FeedbackCodec` |
 | V2 | `KnubotAnswerIIR` | `KnubotAnswerCodec` |
 | V2 | `KnubotFinishTradeIIR` | `KnubotFinishTradeCodec` |

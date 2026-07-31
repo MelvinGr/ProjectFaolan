@@ -56,7 +56,7 @@ on instance entry. The wire says otherwise — it is the **group finder refusing
 20:21:31  c2s RequestNeededRole          → DispatchGroupFinderReceivedNeededRole
 20:21:34  c2s QueueGroupFinder           00000fc4 …
 20:21:34  s2c DispatchGroupFinderSignupFailed   <remoteformat id="218378963" category="10035" …>
-          ── player deletes a quest (c2s QuestIIR "DeleteQuest", then a QuestLogListIIR refresh) ──
+          ── player deletes a quest (c2s QuestIIR "DeleteQuest", then a MainQuestUpdateIIR refresh) ──
 20:22:05  c2s QueueGroupFinder           00000fc4 …            (the identical activity)
 20:22:08  s2c DispatchGroupFinderSignupSuccess
 20:22:09  s2c DispatchYouJoinedTeam / ~Team channel subscription

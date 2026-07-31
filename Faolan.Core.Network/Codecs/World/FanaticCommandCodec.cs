@@ -63,9 +63,9 @@ namespace Faolan.Core.Network.Codecs.World
 	// no capture behind it.
 	public static class FanaticCommandCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.FanaticCommandIir;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.FanaticCommandIIR;
 
-		public static FanaticCommandIir Parse(in ReadOnlySpan<byte> data)
+		public static FanaticCommandIIR Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(FanaticCommandCodec));
 			var value = Read(ref r);
@@ -73,7 +73,7 @@ namespace Faolan.Core.Network.Codecs.World
 			return value;
 		}
 
-		internal static FanaticCommandIir Read(ref SpanReader r)
+		internal static FanaticCommandIIR Read(ref SpanReader r)
 		{
 			r.ExpectU32Be(Opcode, "FanaticCommandIIR subop");
 			r.ExpectU32Be(EntityClass.Character, "entity class");
@@ -82,10 +82,10 @@ namespace Faolan.Core.Network.Codecs.World
 			var word0 = r.ReadU32Be();
 			var targetA = r.ReadU32Be();
 			var targetB = r.ReadU32Be();
-			return new FanaticCommandIir(handle, flag, word0, targetA, targetB, r.ReadStringU32Length());
+			return new FanaticCommandIIR(handle, flag, word0, targetA, targetB, r.ReadStringU32Length());
 		}
 	}
 
 	// FanaticCommandIIR_t (0xEE4AA85C).
-	public sealed record FanaticCommandIir(uint Handle, byte Flag, uint Word0, uint TargetA, uint TargetB, string Text);
+	public sealed record FanaticCommandIIR(uint Handle, byte Flag, uint Word0, uint TargetA, uint TargetB, string Text);
 }

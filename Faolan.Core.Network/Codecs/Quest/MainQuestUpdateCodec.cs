@@ -7,7 +7,7 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Quest
 {
-	// QuestLogListIIR (0x504B7924) - the active-quest LIST that POPULATES the J-panel. WITHOUT it the client never
+	// MainQuestUpdateIIR (0x504B7924) - the active-quest LIST that POPULATES the J-panel. WITHOUT it the client never
 	// shows an accepted quest in the log even though it received the per-quest QuestFullUpdate detail (the detail
 	// alone is not enough - decoded from randochar frame 687 / strickenbla frame 3086). Retail sends it at every
 	// grant, listing ALL the player's active quests (tracked quest first), plus the current area's journal-title slot.
@@ -35,12 +35,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//   * the "trailer constant 1" is `unknown0`, which is 0 on every Remove and 4 in one capture (path-of-azura).
 	//
 	// The u32 length prefix belongs to the SENDER (#530 rule 2).
-	public static class QuestLogListCodec
+	public static class MainQuestUpdateCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.QuestLogListIIR;
+		public const uint Opcode = (uint)GameServer0X2000Opcodes.MainQuestUpdateIIR;
 
 		// CANONICAL - the only method here that writes bytes.
-		public static byte[] Build(QuestLogListIIR value)
+		public static byte[] Build(MainQuestUpdateIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
 			using var s = new FaolanStream();
@@ -52,24 +52,24 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public static byte[] Build(uint playerHandle, uint areaId, uint trackedQuestId, IReadOnlyList<uint> questIds, string areaTitle)
 		{
 			ArgumentNullException.ThrowIfNull(questIds);
-			var entries = questIds.Select((id, i) => new QuestLogEntry((uint)(i + 1), id)).ToList();
-			return Build(new QuestLogListIIR(playerHandle, MainQuestUpdateOp.Add, areaId, trackedQuestId, entries, areaTitle)
+			var entries = questIds.Select((id, i) => new MainQuestUpdateEntry((uint)(i + 1), id)).ToList();
+			return Build(new MainQuestUpdateIIR(playerHandle, MainQuestUpdateOp.Add, areaId, trackedQuestId, entries, areaTitle)
 			{
 				Unknown0 = 1
 			});
 		}
 
-		public static QuestLogListIIR Parse(in ReadOnlySpan<byte> data)
+		public static MainQuestUpdateIIR Parse(in ReadOnlySpan<byte> data)
 		{
-			var r = new SpanReader(data, nameof(QuestLogListCodec));
+			var r = new SpanReader(data, nameof(MainQuestUpdateCodec));
 			var value = Read(ref r);
 			r.EnsureAtEnd();
 			return value;
 		}
 
-		internal static QuestLogListIIR Read(ref SpanReader r)
+		internal static MainQuestUpdateIIR Read(ref SpanReader r)
 		{
-			r.ExpectU32Be(Opcode, "QuestLogListIIR subop");
+			r.ExpectU32Be(Opcode, "MainQuestUpdateIIR subop");
 			r.ExpectU32Be(EntityClass.Character, "entity class");
 			var handle = r.ReadU32Be();
 			r.ExpectU8(0x01, "record marker");
@@ -81,16 +81,16 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var trackedQuestId = r.ReadU32Be();
 
 			var count = r.ReadU32Be();
-			var entries = new List<QuestLogEntry>((int)count);
+			var entries = new List<MainQuestUpdateEntry>((int)count);
 			for (var i = 0; i < count; i++)
 			{
 				var ordinal = r.ReadU32Be();
-				entries.Add(new QuestLogEntry(ordinal, r.ReadU32Be()));
+				entries.Add(new MainQuestUpdateEntry(ordinal, r.ReadU32Be()));
 			}
 
 			var areaTitle = r.ReadStringU16Length();
 
-			return new QuestLogListIIR(handle, operation, areaId, trackedQuestId, entries, areaTitle)
+			return new MainQuestUpdateIIR(handle, operation, areaId, trackedQuestId, entries, areaTitle)
 			{
 				Unknown0 = r.ReadU32Be(),
 				Unknown1 = r.ReadU32Be(),
@@ -99,7 +99,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			};
 		}
 
-		internal static void Write(FaolanStream s, QuestLogListIIR v)
+		internal static void Write(FaolanStream s, MainQuestUpdateIIR v)
 		{
 			ArgumentNullException.ThrowIfNull(v);
 			s.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(v.PlayerHandle).WriteByte((byte)0x01)
@@ -127,15 +127,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 	// One line of the J-panel list. `Ordinal` is the client's group/sort key - see the codec note; it repeats across
 	// entries, so it is carried rather than derived from the position.
-	public sealed record QuestLogEntry(uint Ordinal, uint QuestId);
+	public sealed record MainQuestUpdateEntry(uint Ordinal, uint QuestId);
 
-	// QuestLogListIIR (0x504B7924).
-	public sealed record QuestLogListIIR(
+	// MainQuestUpdateIIR (0x504B7924).
+	public sealed record MainQuestUpdateIIR(
 		uint PlayerHandle,
 		MainQuestUpdateOp Operation,
 		uint AreaId,
 		uint TrackedQuestId,
-		IReadOnlyList<QuestLogEntry> Entries,
+		IReadOnlyList<MainQuestUpdateEntry> Entries,
 		string AreaTitle)
 	{
 		// The three trailing words. `Activate()`'s Add case forwards all three into the character's quest holder

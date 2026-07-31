@@ -49,6 +49,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `LootBagFullUpdateIIR` | `0xF096251E` | `WorldObjectCodec` | [V3: WorldObjectCodecTests.DynelFullUpdate_RoundTripsByteExact] |
 | V3 | `LootRemoveItemsIIR` | `0x70010162` | `LootRemoveItemsCodec` | [V3: WorldLootTakeTests.LootRemoveItems_MatchesCapture] |
 | V3 | `MagicBuffIIR` | `0x6B87E316` | `MagicBuffCodec` | [V3: MagicBuffLookAtCodecTests.MagicBuff_LongFormSpellIdIsEchoed] |
+| V3 | `MainQuestUpdateIIR` | `0x504B7924` | `MainQuestUpdateCodec` | [V3: QuestTests.QuestDefinitionExtractor_RoundTripsCasilda] |
 | V3 | `MoveTaskIIR` | `0x96C46740` | `MoveTaskCodec` | [V3: MoveTaskCodecTests.ApproachTargetBody_MatchesCapture] |
 | V3 | `N3TeleportIIR` | `0x5A32F0D7` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
 | V3 | `N3ToClientFadeIIR` | `0x66180B20` | `N3ToClientFadeCodec` | [V3: LootTests.BuildFadeBody_MatchesCapture] |
@@ -62,7 +63,6 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `QuestGoalIIR` | `0x0774C8C1` | `QuestGoalCodec` | [V3: QuestTests.BuildQuestGoal_MatchesCapture] |
 | V3 | `QuestIIR` | `0x97E02314` | `QuestCodec` | [V3: QuestTests.BuildQuestIir_MatchesCapture] |
 | V3 | `QuestJournalIIR` | `0x79F8C7A1` | `QuestJournalCodec` | [V3: QuestTests.BuildQuestJournal_MatchesCasildaCapture] |
-| V3 | `QuestLogListIIR` | `0x504B7924` | `QuestLogListCodec` | [V3: QuestTests.QuestDefinitionExtractor_RoundTripsCasilda] |
 | V3 | `RemoveFromGroupIIR` | `0xE4FF0C85` | `GroupMembershipCodec` | [V3: TeamTradeFriendCodecTests.AddToGroupIir_IsByteExact] |
 | V3 | `ScryScriptIIR` | `0xA36D3B74` | `ScryScriptCodec` | [V3: ScryScriptCodecTests.BuildStartScriptGroup_MatchesTheHandWrittenBytes] |
 | V3 | `SetNameIIR` | `0xADCE0CDA` | `SetNameCodec` | [V3: WorldSetNameIirTests.BuildWorldSetNameIir_MatchesRecoveredGrammar] |
@@ -85,7 +85,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `CharacterActionIIR` | `0x6B6FD368` | `CharacterActionCodec` |  |
 | V2 | `CrimeIIR` | `0xC7954504` | `CrimeCodec` |  |
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `DeleteItemCodec` |  |
-| V2 | `FanaticCommandIir` | `0xEE4AA85C` | `FanaticCommandCodec` |  |
+| V2 | `FanaticCommandIIR` | `0xEE4AA85C` | `FanaticCommandCodec` |  |
 | V2 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackCodec` |  |
 | V2 | `KnubotAnswerIIR` | `0x4D7D9123` | `KnubotAnswerCodec` |  |
 | V2 | `KnubotFinishTradeIIR` | `0x7446F3FA` | `KnubotFinishTradeCodec` |  |

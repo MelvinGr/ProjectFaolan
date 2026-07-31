@@ -8,7 +8,7 @@ Treat the field counts as decompile-accurate and the framing as the standard
 
 > **Note (SHIPPED since batch 4):** two rows below have since surfaced in captures and are now
 > implemented byte-exact — `NewLevelIIR_t` (`NewLevelCodec`, golden `NewLevelCodecTests`) and
-> `MainQuestUpdateIIR_c`/`QuestLogListIIR` (`QuestLogListCodec`, golden `QuestTests`). Their
+> `MainQuestUpdateIIR_c` (`MainQuestUpdateCodec`, golden `QuestTests`). Their
 > rows carry an inline SHIPPED annotation; the rest remain binary-only.
 
 Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1 byte / 2 u16 /
@@ -64,7 +64,7 @@ Primitives: `FUN_0048f900` = `ReadU32` (BE); `FUN_00cba1b0(&x,N)` = `ReadN` (N=1
 
 | sub | type | reader | structure |
 |---|---|---|---|
-| `0x504B7924` | `MainQuestUpdateIIR_c` | `918560` | `[u32 op][u32 areaId][u32 trackedQuestId][u32 n]( [u32 ordinal][u32 questId] )×n [string][u32×3][u16]` — **SHIPPED** as `QuestLogListIIR` (`BKDR-31("MainQuestUpdateIIR_c")==0x504B7924`): byte-exact wire in `QuestLogListCodec`, golden `QuestTests`, and every captured body round-trips since #545. The reader validates **nothing**; the leading word is the `Activate()` (`FUN_00918cf0`) switch selector — see below |
+| `0x504B7924` | `MainQuestUpdateIIR_c` | `918560` | `[u32 op][u32 areaId][u32 trackedQuestId][u32 n]( [u32 ordinal][u32 questId] )×n [string][u32×3][u16]` — **SHIPPED** as `MainQuestUpdateIIR` (`BKDR-31("MainQuestUpdateIIR_c")==0x504B7924`): byte-exact wire in `MainQuestUpdateCodec`, golden `QuestTests`, and every captured body round-trips since #545. The reader validates **nothing**; the leading word is the `Activate()` (`FUN_00918cf0`) switch selector — see below |
 | `0x8BB2799C` | `QuestRewardNotifyIIR_c` | `91b2d0` | `[u32][u32 n1]( reward(0x40) + [u32] )×n1 [u32 n2]( reward + [u32] )×n2 [u32×4]` |
 | `0xE9EB9694` | `LootSpecialLootUpdateIIR_c` | `7a5540` | `[u32 n]( [u32][u32][u32] )×n` |
 | `0xE6C3CCEF` | `ScriptTextIIR_t` | `933390` | `[string][u8 ver][u32][u32]` (ver>1 short-circuits) |
@@ -172,7 +172,7 @@ generated protobuf serialize/parse virtual, not the IIR stream reader.) Covered 
 Readers recovered (this doc). These are **mostly not implemented or byte-validated** — the retail
 captures never exercise them, so they're low priority for the emulator until a feature needs one
 (groups, feats/skills, master-looter, PvP threat meter, quest rewards). (Exceptions: `NewLevelIIR_t`
-and `MainQuestUpdateIIR_c`/`QuestLogListIIR` have since surfaced in captures and shipped byte-exact —
+and `MainQuestUpdateIIR_c` has since surfaced in captures and shipped byte-exact —
 see their SHIPPED-annotated rows.) When a feature needs one of the rest, the grammar above is the
 starting point; capture or in-client validation is still required before shipping a builder.
 

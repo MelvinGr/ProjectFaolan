@@ -24,8 +24,8 @@ namespace Faolan.Tests
 	// live in wave 0 would have been red for the whole sweep and would just have got muted. `MigratedFolders` is read
 	// off disk now, so a NEW folder is covered the moment it exists.
 	//
-	// Two allowlists remain (`UncomposedSubRecords`, `UnreadableInTheCorpus`); every entry names the DECODE issue that
-	// removes it, and #530 decoded nothing. They are not places to silence a gate.
+	// ONE allowlist still has entries (`UncomposedSubRecords`); `UnreadableInTheCorpus` emptied with #545. Every entry
+	// names the DECODE issue that removes it, and #530 decoded nothing. They are not places to silence a gate.
 	//
 	// Wave order (see #530): 1 Inventory/Feats/Team/Guild · 2 Text/Dialogue/Economy · 3 World · 4 Combat ·
 	// 5 Spawn/Quest · 6 FullCharSnapshot (+#447) · 7 Faolan/ moves in · 8 Faolan.Importer/ stops hand-decoding ·
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 		// EMPTY since #545, and that is the point: all three have come off. `FullPlayerCharacterCodec` with #538 (all
 		// 151 captured snapshot roots re-encode byte-exact), `QuestJournalCodec` with #544 (all 38, once "RRL3" turned
 		// out to be a per-area ACGHash and the "tracked-quest pointer" turned out to be five separate fields), and
-		// `QuestLogListCodec` with #545 (all 46, once the "leading constant" turned out to be the client's
+		// `MainQuestUpdateCodec` with #545 (all 46, once the "leading constant" turned out to be the client's
 		// MainQuestUpdate OPERATION). Adding an entry back means shipping a codec that cannot read retail - do it only
 		// with a filed decode issue, never to silence a failure.
 		private static readonly string[] UnreadableInTheCorpus = [];

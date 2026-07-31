@@ -412,7 +412,7 @@ namespace Faolan.GameServer
 
 					Logger.LogInformation("QuestIIR (DeleteQuest) from character {CharacterId}: dropped quest {QuestId} (state {State}).", clientInst.ToHex(), questId, state);
 
-					// ⚠️ Retail sends a THIRD packet in the same frame: a QuestLogListIIR (0x504B7924) refreshing the
+					// ⚠️ Retail sends a THIRD packet in the same frame: a MainQuestUpdateIIR (0x504B7924) refreshing the
 					// J-panel. We do NOT, because its body is a SHORTER variant than BuildQuestLogList writes and the
 					// two captured instances are not enough to pin it. Both are 41 bytes:
 					//   [u32 c350][u32 handle][01][u32 2][u32 areaId][24 zero bytes]
@@ -498,12 +498,12 @@ namespace Faolan.GameServer
 				// A GM command in the client sends FanaticCommandIIR ("Fanatic" is its own name for the GM subsystem).
 				// We can read what it asked for, but what to send BACK is not decoded - no corpus capture contains one -
 				// so report the parsed command rather than inventing a reply (#448/#449).
-				case GameServer0X2000Opcodes.FanaticCommandIir:
+				case GameServer0X2000Opcodes.FanaticCommandIIR:
 				{
 					// The codec's Parse is strict (#530 rule 4); on an undecoded inbound path that means reporting the
 					// failure to the GM rather than acting on a half-read record. `rawPayload` is the framed record, so
 					// the body starts past its u32 length.
-					FanaticCommandIir f;
+					FanaticCommandIIR f;
 					try
 					{
 						f = FanaticCommandCodec.Parse(rawPayload.AsSpan(4));

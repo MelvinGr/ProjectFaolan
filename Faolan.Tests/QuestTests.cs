@@ -439,12 +439,12 @@ namespace Faolan.Tests
 
 			// Quest-log LIST (the packet that POPULATES the J-panel) - byte-exact against frame 687. The captured
 			// character had four active quests (tracked 13479 first); the area-title slot is the 13479 def's AreaTitle.
-			var logList = QuestLogListCodec.Build(0x0131720B, def.AreaId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], QuestTextTokens.Record(def, QuestTextSlot.AreaTitle));
-			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestLogListIIR), Convert.ToHexString(logList).ToLowerInvariant());
+			var logList = MainQuestUpdateCodec.Build(0x0131720B, def.AreaId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], QuestTextTokens.Record(def, QuestTextSlot.AreaTitle));
+			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.MainQuestUpdateIIR), Convert.ToHexString(logList).ToLowerInvariant());
 
 			// Inverse: Parse recovers the handle, tracked id, and the exact quest-id list (the CaptureQuestImporter
 			// path that harvests each character's held-quest set from the J-panel log).
-			var parsedLog = QuestLogListCodec.Parse(logList);
+			var parsedLog = MainQuestUpdateCodec.Parse(logList);
 			Assert.Equal(0x0131720Bu, parsedLog.PlayerHandle);
 			Assert.Equal(0x34A7u, parsedLog.TrackedQuestId);
 			Assert.Equal([0x34A7u, 0x34FBu, 0x34A8u, 0x3077u], parsedLog.Entries.Select(e => e.QuestId));
