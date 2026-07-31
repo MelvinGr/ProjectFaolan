@@ -13,8 +13,14 @@ namespace Faolan.Importer.Extractors
 	//
 	// For a STATE-MANAGED NPC (any NpcName that appears in Rules) the classification is AUTHORITATIVE: only the
 	// captures listed here contribute that NPC's dialogue. An unlisted capture's nodes for the NPC are DROPPED, so a
-	// mixed-state capture (e.g. a mid-game char re-walking and picking up follow-up quests) or a loopback of our own
-	// server can't pollute the per-state tree. The whole tree (every AnswerPath), not just the greeting, is gated.
+	// mixed-state capture - a mid-game char re-walking a tree and picking up follow-up quests, which is exactly the
+	// Strie/strickenbla case noted below - can't pollute the per-state tree. The whole tree (every AnswerPath), not
+	// just the greeting, is gated.
+	//
+	// ⚠️ This used to also claim it guarded against "a loopback of our own server". It does not, because that cannot
+	// happen: we NEVER store loopback dumps. All 120 captures are a LAN client (192.168.x) talking to retail
+	// (37.18.192.43 / 37.18.193.22) and not one contains a 127.x address. Self-capture is prevented by not keeping
+	// such a dump, not by this table - so do not keep the table on that basis (#526).
 	//
 	// Keyed by the capture's BASE filename (no .tshark.json) + NPC name. Unmanaged NPCs (not listed) stay
 	// unconditional regardless of capture.
