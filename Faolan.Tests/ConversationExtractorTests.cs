@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Extractors;
 using Xunit;
@@ -144,13 +145,16 @@ namespace Faolan.Tests
 			Assert.True(byPath.ContainsKey("0>0") && byPath.ContainsKey("0>1"));
 		}
 
-		// A client KnubotAnswer (0x4D7D9123) whose body ends with the picked option index (u32 BE) - the branch key.
+		// A client KnubotAnswer (0x4D7D9123) carrying the picked option index - the branch key. Built THROUGH the
+		// codec (#534): the pick is a full Knubot record (KnubotBase header then the index), and the extractor reads
+		// it as one. This used to be 12 hand-laid bytes whose only real content was a trailing u32, which the old
+		// opaque-prefix codec accepted by construction.
 		private static CapturedPacket Answer(uint index)
 		{
-			var body = new byte[12];
-			body.WriteU32Be(0, (uint)body.Length);
-			body.WriteU32Be(4, 0x4D7D9123);
-			body.WriteU32Be(8, index);
+			var record = KnubotCodec.Build(new KnubotAnswerIIR(0x02000005, 0x9D42, 0, index));
+			var body = new byte[4 + record.Length];
+			body.WriteU32Be(0, (uint)record.Length);
+			record.CopyTo(body, 4);
 			return new CapturedPacket(0, false, 0x2000, 0x4D7D9123, Frame(body));
 		}
 

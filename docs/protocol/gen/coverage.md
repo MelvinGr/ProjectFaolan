@@ -8,8 +8,8 @@
 ## Headline
 
 - **826** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
-- **80** IIR carrier types: **61 V3** (byte-exact builder), **19 V2** (built, no golden), **0 V1** (no builder found).
-- **68** codec classes, **50** with a byte-exact test.
+- **80** IIR carrier types: **62 V3** (byte-exact builder), **18 V2** (built, no golden), **0 V1** (no builder found).
+- **67** codec classes, **50** with a byte-exact test.
 - **8** Python dissectors (`tools/capture/decode_*.py`).
 
 ### The distinction this table exists to make
@@ -62,6 +62,7 @@ the margins, but never invents a golden that isn't there.
 | V3 | `GuildUpdateIIR` | `GuildUpdateCodec` |
 | V3 | `HateListUpdateIIR` | `HateListUpdateCodec` |
 | V3 | `IntendedTeleportIIR` | `TeleportCodec` |
+| V3 | `KnubotAnswerIIR` | `KnubotCodec` |
 | V3 | `KnubotAnswerListIIR` | `KnubotCodec` |
 | V3 | `KnubotAppendTextIIR` | `KnubotCodec` |
 | V3 | `KnubotCloseChatWindowIIR` | `KnubotCodec` |
@@ -109,7 +110,6 @@ the margins, but never invents a golden that isn't there.
 | V2 | `DeleteItemIIR` | `DeleteItemCodec` |
 | V2 | `FanaticCommandIIR` | `FanaticCommandCodec` |
 | V2 | `FeedbackIIR` | `FeedbackCodec` |
-| V2 | `KnubotAnswerIIR` | `KnubotAnswerCodec` |
 | V2 | `KnubotFinishTradeIIR` | `KnubotFinishTradeCodec` |
 | V2 | `LockedToChangedIIR` | `LockedToChangedCodec` |
 | V2 | `MoveInventoryItemIIR` | `MoveInventoryItemCodec` |

@@ -12,7 +12,7 @@
    header comment is the byte grammar, and its `Build`/`Parse`/`Read`/`Write` is the executable spec.
    3. The **golden** column names the test that proves those bytes match a real capture.
 
-**80** IIR carrier types · **61 V3** (61 with an auto-cited golden). The
+**80** IIR carrier types · **62 V3** (62 with an auto-cited golden). The
 carrier framing that wraps every one of these is in [`03-iir-carrier.md`](../03-iir-carrier.md); the
 encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md).
 
@@ -40,6 +40,7 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V3 | `GuildUpdateIIR` | `0x2550C99A` | `GuildUpdateCodec` | [V3: GuildPacketTests.GuildUpdate_Matches_ExpectedLayout] |
 | V3 | `HateListUpdateIIR` | `0x8A01E5A1` | `HateListUpdateCodec` | [V3: CombatRecordCodecTests.HateList_BuildsByteExact] |
 | V3 | `IntendedTeleportIIR` | `0x10D27BC0` | `TeleportCodec` | [V3: TeleportHandoffTests.BuildTeleportBeginBody_MatchesCapture] |
+| V3 | `KnubotAnswerIIR` | `0x4D7D9123` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
 | V3 | `KnubotAnswerListIIR` | `0xF164A4A5` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
 | V3 | `KnubotAppendTextIIR` | `0x4A3D899A` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
 | V3 | `KnubotCloseChatWindowIIR` | `0xC4AF39EB` | `KnubotCodec` | [V3: KnubotCodecTests.AnswerList_BuildsByteExact] |
@@ -87,7 +88,6 @@ encoding rules for the fields inside are in [`04-encoding.md`](../04-encoding.md
 | V2 | `DeleteItemIIR` | `0x72491DE9` | `DeleteItemCodec` |  |
 | V2 | `FanaticCommandIIR` | `0xEE4AA85C` | `FanaticCommandCodec` |  |
 | V2 | `FeedbackIIR` | `0xBA1FD222` | `FeedbackCodec` |  |
-| V2 | `KnubotAnswerIIR` | `0x4D7D9123` | `KnubotAnswerCodec` |  |
 | V2 | `KnubotFinishTradeIIR` | `0x7446F3FA` | `KnubotFinishTradeCodec` |  |
 | V2 | `LockedToChangedIIR` | `0x6B0AEC58` | `LockedToChangedCodec` |  |
 | V2 | `MoveInventoryItemIIR` | `0x2A8A1B49` | `MoveInventoryItemCodec` |  |

@@ -75,6 +75,23 @@ namespace Faolan.Tests
 			Assert.Equal(RecordHex(OpenChatWindowBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
 		}
 
+		// The c2s answer pick, from the corpus (#534). This is the shape ALL 586 captured picks have: 31 bytes, the
+		// KnubotBase header with `env` 0 and version 1, then the option index - the same header the four s2c records
+		// carry, which is why the pick moved into this family codec. It used to be `[opaque prefix][u32 index]`.
+		[Fact]
+		public void Answer_BuildsByteExact()
+		{
+			const string answerBody = "0000001b4d7d91230000c35001316e710000010000c35000017ed000000000";
+
+			var p = (KnubotAnswerIIR)KnubotCodec.Parse(Record(answerBody));
+
+			Assert.Equal(0x01316E71u, p.PlayerInstance);
+			Assert.Equal(0x00017ED0u, p.NpcHandle);
+			Assert.Equal(0x00, p.Env);
+			Assert.Equal(0u, p.Index);
+			Assert.Equal(RecordHex(answerBody), Convert.ToHexStringLower(KnubotCodec.Build(p)));
+		}
+
 		// The captured payload minus the carrier's [u32 len], which is the sender's (#530 rule 2).
 		internal static byte[] Record(string capturedHex)
 		{

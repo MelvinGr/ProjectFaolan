@@ -222,13 +222,13 @@ namespace Faolan.Importer.Extractors
 					grant = 0;
 					instanceContext = currentQuest;
 				}
-				else if (p is { IsDownload: false, IsIirCarrier: true, SubOpcode: KnubotAnswerCodec.Opcode } && active)
+				// The player picked option `idx`: the current screen is complete (emit it), and the responses that
+				// follow belong to the child screen reached by that option. Selected by the RECORD's type rather
+				// than by a sub-opcode - the family codec is what knows which sub-opcodes it owns (#534), and rule 7
+				// keeps an IIR opcode from being named outside Codecs/.
+				else if (p is { IsDownload: false, IsIirCarrier: true } && active
+					&& p.TryParse(KnubotCodec.Parse, out var record) && record is KnubotAnswerIIR pick)
 				{
-					// The player picked option `idx`: the current screen is complete (emit it), and the responses that
-					// follow belong to the child screen reached by that option.
-					if (!p.TryParse(KnubotAnswerCodec.Parse, out var pick))
-						continue;
-
 					var idx = pick.Index;
 					Flush();
 					path = path.Length == 0

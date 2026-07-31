@@ -107,21 +107,30 @@ namespace Faolan.Tests
 			Assert.Equal(9, parsed.DestinationItemPos);
 		}
 
+		// The answer pick is an ordinary Knubot record: KnubotBase header then the chosen option index (#534). This
+		// used to assert only "the index is the LAST u32" against a hand-made 12-byte body - which the old codec
+		// satisfied by construction, since it read everything before the last word as an opaque prefix. Round-trip
+		// through the family codec instead, so the header is asserted too.
 		[Fact]
-		public void KnubotAnswerIndex_IsLastU32BigEndian()
+		public void KnubotAnswer_RoundTripsThroughTheFamilyCodec()
 		{
-			// The chosen dialogue option is the last u32 (big-endian) of the answer body.
-			var body = new FaolanStream().WriteUInt32(0x0000C350u).WriteUInt32(0x11u).WriteUInt32(3u).ToArray();
-			Assert.Equal(3u, KnubotAnswerCodec.Parse(body).Index);
+			var bytes = KnubotCodec.Build(new KnubotAnswerIIR(0x0802E5D4, 0x0004DEE9, 0, 3));
+
+			Assert.Equal(27, bytes.Length); // [sub][class][player][env][ver][class][npc][index] - the captured 31 minus its length word
+			var parsed = Assert.IsType<KnubotAnswerIIR>(KnubotCodec.Parse(bytes));
+			Assert.Equal(3u, parsed.Index);
+			Assert.Equal(0x0802E5D4u, parsed.PlayerInstance);
+			Assert.Equal(0x0004DEE9u, parsed.NpcHandle);
+			Assert.Equal(bytes, KnubotCodec.Build(parsed));
 		}
 
-		// Strict parse (#530 rule 4): a body too short to carry an index is a decode FAILURE, not a silent 0 that
+		// Strict parse (#530 rule 4): a body too short to carry the record is a decode FAILURE, not a silent 0 that
 		// would route the player to option zero.
 		[Fact]
-		public void KnubotAnswerIndex_TooShort_Throws()
+		public void KnubotAnswer_TooShort_Throws()
 		{
-			Assert.Throws<CodecParseException>(() => KnubotAnswerCodec.Parse([0x01, 0x02]));
-			Assert.Throws<CodecParseException>(() => KnubotAnswerCodec.Parse([]));
+			Assert.Throws<CodecParseException>(() => KnubotCodec.Parse([0x01, 0x02]));
+			Assert.Throws<CodecParseException>(() => KnubotCodec.Parse([]));
 		}
 	}
 }

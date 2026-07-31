@@ -277,10 +277,11 @@ namespace Faolan.GameServer
 
 				case GameServer0X2000Opcodes.KnubotAnswerIIR:
 				{
-					// The player picked a dialogue option. The chosen option INDEX is the last u32 of the body; it
-					// selects the branch, so route to the child screen at the extended answer-path (AdvanceConversation).
-					// No active conversation -> no-op.
-					await _conversation.AdvanceConversation(client, KnubotAnswerCodec.Parse(rawPayload).Index);
+					// The player picked a dialogue option. The pick is an ordinary Knubot record - KnubotBase header
+					// then the chosen option INDEX (#534) - and the index selects the branch, so route to the child
+					// screen at the extended answer-path (AdvanceConversation). No active conversation -> no-op.
+					if (KnubotCodec.Parse(rawPayload.AsSpan(sizeof(uint))) is KnubotAnswerIIR pick)
+						await _conversation.AdvanceConversation(client, pick.Index);
 
 					break;
 				}

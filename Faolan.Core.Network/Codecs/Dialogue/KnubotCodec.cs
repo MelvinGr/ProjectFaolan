@@ -6,9 +6,9 @@ using Faolan.Core.Network.Constants;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
-	// The server->client Knubot conversation records (#188, docs/re/iir-readers-conversation-misc.md). A FAMILY
-	// codec (#530 rule 5): the four IIRs share one header grammar and are discriminated by the type word at offset
-	// 0, so `Parse` returns the base `KnubotIIR` and `Build` dispatches on the concrete record.
+	// The Knubot conversation records (#188, docs/re/iir-readers-conversation-misc.md). A FAMILY codec (#530 rule
+	// 5): the five IIRs share one header grammar and are discriminated by the type word at offset 0, so `Parse`
+	// returns the base `KnubotIIR` and `Build` dispatches on the concrete record.
 	//
 	// The Knubot carrier nests BOTH conversation endpoints: the player is the IIR carrier handle (`instance`), and
 	// the KnubotBaseIIR_c header (FUN_009a7e00) carries the version + the NPC endpoint:
@@ -18,15 +18,20 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// Big-endian; golden-tested byte-exact in KnubotCodecTests. The carrier's [u32 len] belongs to the SENDER
 	// (#530 rule 2) - ConversationService frames it.
 	//
-	// The c2s answer pick (KnubotAnswerIIR) is NOT part of this family: it carries no KnubotBase header and its
-	// grammar is only partly decoded, so it has its own codec next door.
+	// ⚠️ The c2s answer pick belongs here TOO (#534). It had its own codec, on the stated grounds that it "carries
+	// no KnubotBase header" and that everything ahead of its answer index was an undecoded opaque `Prefix`. It is
+	// the SAME header: swept over the corpus, all 586 captured KnubotAnswer bodies are 31 bytes and every one reads
+	// `[u32 0xC350][u32 player][u8 0x00][u16 1][u32 0xC350][u32 npc][u32 index]` - the prefix was a KnubotBase
+	// header with `env` 0 all along, and the "observed shape [u32 0xC350][u32 instance]" in the old comment was the
+	// first two words of it. The other two c2s Knubot messages (FinishTrade 6/6, CloseChatWindow 3/3) open with the
+	// identical header, so the envelope is the family's, not one message's.
 	public static class KnubotCodec
 	{
 		// The IIR types this codec constructs and parses (read by the coverage matrix).
 		public static readonly GameServer0X2000Opcodes[] HandledTypes =
 		[
-			GameServer0X2000Opcodes.KnubotAnswerListIIR, GameServer0X2000Opcodes.KnubotAppendTextIIR, GameServer0X2000Opcodes.KnubotCloseChatWindowIIR,
-			GameServer0X2000Opcodes.KnubotOpenChatWindowIIR
+			GameServer0X2000Opcodes.KnubotAnswerIIR, GameServer0X2000Opcodes.KnubotAnswerListIIR, GameServer0X2000Opcodes.KnubotAppendTextIIR,
+			GameServer0X2000Opcodes.KnubotCloseChatWindowIIR, GameServer0X2000Opcodes.KnubotOpenChatWindowIIR
 		];
 
 		private const ushort Version = 1;
@@ -72,6 +77,8 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 					return new KnubotAnswerListIIR(player, npc, env, ReadStrings(ref r));
 				case GameServer0X2000Opcodes.KnubotCloseChatWindowIIR:
 					return new KnubotCloseChatWindowIIR(player, npc, env, ReadStrings(ref r));
+				case GameServer0X2000Opcodes.KnubotAnswerIIR:
+					return new KnubotAnswerIIR(player, npc, env, r.ReadU32Be());
 				default:
 					throw CodecParseException.Unexpected(nameof(KnubotCodec), 0, "a Knubot IIR sub-opcode", $"0x{(uint)sub:X8}");
 			}
@@ -95,6 +102,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 					break;
 				case KnubotCloseChatWindowIIR close:
 					WriteStrings(Header(s, GameServer0X2000Opcodes.KnubotCloseChatWindowIIR, close), close.Strings);
+
+					break;
+				case KnubotAnswerIIR answer:
+					Header(s, GameServer0X2000Opcodes.KnubotAnswerIIR, answer).WriteUInt32(answer.Index);
 
 					break;
 				default:
@@ -149,4 +160,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 
 	// KnubotOpenChatWindowIIR_c (0x045B0B0F) - opens the dialogue window. A single trailing byte.
 	public sealed record KnubotOpenChatWindowIIR(uint PlayerInstance, uint NpcHandle, byte Env, byte Value) : KnubotIIR(PlayerInstance, NpcHandle, Env);
+
+	// KnubotAnswerIIR_c (0x4D7D9123) - the CLIENT's answer pick: the chosen option's index, which selects the
+	// branch (ConversationService.AdvanceConversation routes it). The only c2s record in the family, and the only
+	// one whose whole body past the header is a single field. `Env` is 0 on all 586 captured picks and `Index`
+	// runs 0..6.
+	public sealed record KnubotAnswerIIR(uint PlayerInstance, uint NpcHandle, byte Env, uint Index) : KnubotIIR(PlayerInstance, NpcHandle, Env);
 }
