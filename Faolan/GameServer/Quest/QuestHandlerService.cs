@@ -7,7 +7,7 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
-using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -87,13 +87,12 @@ namespace Faolan.GameServer.Quest
 		//    record retail sends at the rescue (capture idx 2106) so she stops struggling and walks when following.
 		public Task SendCasildaPose(INetworkClient client, uint casildaHandle, bool captive)
 		{
-			// BuildBehaviorControlCenterIir returns the record BODY ([type][handle][form][slot][protobuf]) WITHOUT the
-			// 0x642CD3D6 sub-opcode (the create-burst Iir helper prepends it), so prepend it here - WorldIir.Send only adds
-			// the carrier + length, not the sub-op, and the client drops a BCC record that doesn't start with it.
-			var record = captive
-				? CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 5, 159428, 1, 24, 0)
-				: CreateEditorRecordBuilder.BuildBehaviorControlCenterIir(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0);
-			var body = new FaolanStream().WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR).WriteArray(record).ToArray();
+			// The whole record comes off BehaviorControlCenterCodec, sub-opcode included. It used to be built through the
+			// create-burst helper, which slices the sub-op off for its own sender - so this path had to write the
+			// 0x642CD3D6 word back on by hand, and a BCC record that does not start with it is dropped by the client.
+			var body = BehaviorControlCenterCodec.Build(captive
+				? BehaviorAnimations.Registration(casildaHandle, 5, 159428, 1, 24, 0)
+				: BehaviorAnimations.Registration(casildaHandle, 9, 42010, 7, 24, 0, boundA: 0x12, boundB: 0));
 			_logger.LogInformation("#267: sent Casilda {Pose} pose (handle 0x{Handle:X8}) to {Player}.", captive
 				? "CAPTIVE"
 				: "freed", casildaHandle, client.Session.Character.Name);
@@ -123,36 +122,14 @@ namespace Faolan.GameServer.Quest
 			return MoveTaskCodec.Build(new MoveTaskIIR(handle, KalanthesIntroPos, MoveTaskNodes.Rotate(KalanthesIntroPos, KalanthesIntroFacing)));
 		}
 
-		// The WALK: ListMoveTask[ PathMoveTask(from -> target) + WaitMoveTask ], the exact captured composite shape,
-		// built from the typed model so it round-trips byte-exact while the positions stay explicit data.
+		// The WALK: ListMoveTask[ PathMoveTask(from -> target) + WaitMoveTask ] - which is exactly the canonical
+		// single-segment PATROL shape, so it is `MoveTaskNodes.Patrol` with the cutscene's two waypoints rather than a
+		// second hand-built copy of that tree (#530 wave 7 - the node fields it used to spell out here, down to the
+		// trailer's anchor triple, were the factory's). The captured path LENGTH is passed rather than recomputed: it
+		// differs from a recomputed float by ~1 ULP. Positions stay HERE because they are quest content.
 		public static byte[] BuildKalanthesWalkMove(uint handle)
 		{
-			var path = new MoveTaskNode
-			{
-				Mode = 1,
-				HeaderFlags = 1,
-				PathFlags = 0,
-				Waypoints = [B(KalanthesIntroPos.X), B(KalanthesIntroPos.Y), B(KalanthesIntroPos.Z), B(KalanthesWalkTarget.X), B(KalanthesWalkTarget.Y), B(KalanthesWalkTarget.Z)],
-				TrailerByte = 0,
-				TrailerWords = [B(KalanthesWalkPathLength), 0, 0, 0, B(KalanthesIntroPos.X), B(KalanthesIntroPos.Y), B(KalanthesIntroPos.Z)]
-			};
-			var wait = new MoveTaskNode
-			{
-				Mode = 0,
-				HeaderFlags = 1
-			};
-			return MoveTaskCodec.Build(new MoveTaskIIR(handle, KalanthesIntroPos, new MoveTaskNode
-			{
-				Mode = 4,
-				HeaderFlags = 1,
-				ListMin = 0,
-				Children = [path, wait]
-			}));
-
-			static uint B(float f)
-			{
-				return BitConverter.SingleToUInt32Bits(f);
-			}
+			return MoveTaskCodec.Build(new MoveTaskIIR(handle, KalanthesIntroPos, MoveTaskNodes.Patrol([KalanthesIntroPos, KalanthesWalkTarget], KalanthesWalkPathLength, KalanthesIntroPos)));
 		}
 
 		// Sends a constructed Kalanthes MoveTask on the world conversation (WorldSenderEndpoint + IirCarrier - the same framing

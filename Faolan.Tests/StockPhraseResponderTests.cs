@@ -3,8 +3,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Repositories;
+using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Text;
-using Faolan.GameServer.Dialogue;
 using Microsoft.EntityFrameworkCore;
 using Faolan.Tests.Support;
 using Xunit;
@@ -24,9 +24,11 @@ namespace Faolan.Tests
 		{
 			// captured c2s 0x205E: npcId {0xC350,0x2C1C} + "{stock_48}" + threadCtx 0x000077AA
 			var req = Convert.FromHexString("0000c35000002c1c000a7b73746f636b5f34387d000077aa");
-			Assert.True(StockConversationService.TryParsePlayStockphraseRequest(req, out var key, out var tc));
-			Assert.Equal("{stock_48}", key);
-			Assert.Equal(0x000077aau, tc);
+			var parsed = PlayStockphraseAsSubtitleCodec.Parse(req);
+
+			Assert.Equal("{stock_48}", parsed.StockKey);
+			Assert.Equal(0x000077aau, parsed.ThreadContext);
+			Assert.Equal(req, PlayStockphraseAsSubtitleCodec.Build(parsed));
 		}
 
 		// (stockKey, capturedThreadCtx, capturedFullResponseBody) triples from the guardian create capture.
@@ -49,7 +51,7 @@ namespace Faolan.Tests
 			Assert.True(phrases.TryGetValue(stockKey, out var phrase), $"no StockPhrases row for {stockKey}");
 			// #410: the payload is REBUILT from the row's columns (the raw blob column is gone), so this gate now
 			// also proves the columnization is lossless - the bytes must still equal the captured reply exactly.
-			var body = StockConversationService.BuildReceivedStockPhraseBody(threadCtx, RemoteFormatScreenCodec.Build(phrase));
+			var body = ReceivedStockPhraseTextCodec.Build(new ReceivedStockPhraseText(threadCtx, RemoteFormatScreenCodec.Build(RemoteFormatScreens.ForStockPhrase(phrase))));
 			Assert.Equal(expectedHex, Convert.ToHexStringLower(body));
 		}
 

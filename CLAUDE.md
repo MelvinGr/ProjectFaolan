@@ -226,8 +226,8 @@ Two things already run ahead of that move:
 
 ⚠️ **These rules describe the TARGET shape and are binding on new/edited codecs from now on.** The existing 152
 are being converted folder by folder — migration tracked in Gitea #530, which also carries the per-codec rename
-table. **Every `Codecs/` folder is now converted; what remains is the wire code that lives OUTSIDE `Codecs/`**
-(`Faolan/` and `Faolan.Importer/`, #530 waves 7–8) plus `Economy`, which rides along with the first of those.
+table. **Every `Codecs/` folder is converted, and `Faolan/`'s own wire builders have moved in (wave 7a); what
+remains is `Economy` (wave 7b) and `Faolan.Importer/`'s hand-decoding (#530 wave 8).**
 `ICodec<T>` is being retired; do not add implementations of it.
 
 - **One codec shape: two public method NAMES, nothing else.** A codec is a `static class` exposing exactly

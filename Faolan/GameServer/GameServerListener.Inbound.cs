@@ -15,6 +15,7 @@ using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Inventory;
 using Faolan.Core.Network.Codecs.Team;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
@@ -59,14 +60,12 @@ namespace Faolan.GameServer
 			{
 				case GameServer0X2000Opcodes.CombatReactiveIIR:
 				{
-					// Spellweave ADD-COMPONENT (docs/subsystems/combos.md). Each add is two packets: a 0x03-tagged carrier that
-					// carries the componentIndex, and a 0x02-tagged ack twin (no index). rawPayload =
-					// [u32 len][u32 sub][u32 senderType][u32 handle][u32 0][u8 tag][u32 componentIndex?].
-					if (rawPayload.Length >= 25 && rawPayload[20] == 0x03)
-					{
-						var componentIndex = rawPayload.ReadU32Be(21);
+					// Spellweave ADD-COMPONENT (docs/subsystems/combos.md). Each add is two packets: a 0x03-tagged carrier
+					// carrying the componentIndex in the element list, and a 0x02-tagged ack twin whose list is empty.
+					// CombatReactiveCodec reads both - the c2s add and the s2c element list are one grammar.
+					var reactive = CombatReactiveCodec.Parse(rawPayload.AsSpan(sizeof(uint)));
+					if (reactive is { Tag: CombatReactiveCodec.AddComponentTag, ElementBaseIds: [var componentIndex, ..] })
 						await _spellweave.AddComponentAsync(client, componentIndex);
-					}
 
 					break;
 				}
@@ -325,17 +324,17 @@ namespace Faolan.GameServer
 					//   [u16 0xC350 targetTag][u32 targetHandle] [trailing counters]
 					// On deselect the target tag+handle are zeroed. Decoded from
 					// Hoxxling_mage-heraldofxotli_login_gameplay (frames 259 select / 362 deselect).
-					var data = body.ReadRemainingArray();
+					// LookAtCodec reads the whole 29-byte record, so the deselect (both target words zeroed) and a live
+					// select come off the same reader instead of a `>= 17` guard plus a fixed offset 13.
+					var lookAt = LookAtCodec.Parse(rawPayload.AsSpan(sizeof(uint)));
 
-					uint targetHandle = 0;
-					if (data.Length >= 17)
-						targetHandle = data.ReadU32Be(13);
+					var targetHandle = lookAt.Target;
 					client.Session.SelectedTargetHandle = targetHandle;
 					// #217: a (re-)select is genuine intent to interact - lift the post-close greeting suppression so a
 					// deliberate re-talk opens (the reflexive post-close greeting carries no SelectDeselect).
 					client.Session.ConversationEndedNpcHandle = null;
 
-					Logger.LogInformation("SelectDeselect: target 0x{Target:X8} ({Data})", targetHandle, data.ToHex());
+					Logger.LogInformation("SelectDeselect: subject 0x{Subject:X8} -> target 0x{Target:X8} (trailers {A}/{B})", lookAt.Subject, targetHandle, lookAt.TrailerA, lookAt.TrailerB);
 
 					break;
 				}
@@ -993,7 +992,7 @@ namespace Faolan.GameServer
 
 					if (await Database.GetCharacter(subjectId) is { Name: { } name })
 						await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchCharacterNameReply,
-							(byte[])[0x01], new FaolanStream().WriteUInt32(EntityClass.Character).WriteUInt32(subjectId).WriteString(name).ToArray()));
+							(byte[])[0x01], CharacterNameReplyCodec.Build(new CharacterNameReply(subjectId, name))));
 					else
 						Logger.LogWarning("RequestCharName for unknown character {CharacterId:X8}; no reply.", subjectId);
 
@@ -1833,9 +1832,8 @@ namespace Faolan.GameServer
 						{
 							// Hold the begin's args (only) so the cast-cancel handler can build the state=0x0007 abort that
 							// stops the client's cast bar (#347). The rest of the abort comes from the cancel packet.
-							// Cleared on resolve/cancel.
-							var castArgsLen = (int)rawPayload.ReadU32Be(22); // TODO: just read the packet with FaolanStream instead of rawPayload
-							client.Session.PendingCastArgs = rawPayload[26..(26 + castArgsLen)];
+							// Cleared on resolve/cancel. The args come off the codec, not off offsets 22/26 (#530 wave 7).
+							client.Session.PendingCastArgs = BehaviorControlCenterCodec.Parse(rawPayload.AsSpan(sizeof(uint))).Args;
 							client.Session.PendingCastMode = args.CommandqueueClientId;
 
 							// A channeled ground AoE (Deathly Blizzard) ticks damage DURING the channel, not one hit at
@@ -2192,10 +2190,9 @@ namespace Faolan.GameServer
 								Logger.LogInformation($"{direction}: ({from} -> {targetSlot}) {args}");
 
 								// The trailing struct (after from/target) carries the item's template handle as a
-								// big-endian uint32; persist the equip into CharacterEquipment.
-								var equipHandle = actionTrailer.Length >= 4
-									? actionTrailer.ReadU32Be(0)
-									: 0;
+								// big-endian uint32; persist the equip into CharacterEquipment. Read by name out of the
+								// behaviour tail, which the codec carries opaquely (#536).
+								var equipHandle = BehaviorTailScan.MovedItemHandle(actionTrailer);
 								var movedItem = equipHandle != 0
 									? await Database.GetItem(equipHandle)
 									: null;

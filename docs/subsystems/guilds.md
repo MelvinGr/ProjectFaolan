@@ -93,8 +93,8 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
   builder wrote a bare `0` where that count-word belongs (misread as a "self contribution" counter); `0` isn't a 0x3F1
   multiple, so the client aborted `GuildUpdate`, never registered the guild, and re-polled every 30s — THIS was the
   "not in guild after relog" bug. Verified in-client: with the count-word correct the CsPlayerAgent connection stays
-  persistent (1 connect, matching retail) instead of the 30s reconnect loop. Shared multiplier: `GuildListMultiplier`
-  / `ListFrame.Unit` (= the renown block's `0x3F1` list framing).
+  persistent (1 connect, matching retail) instead of the 30s reconnect loop. The whole body is `GuildFullUpdateCodec`
+  (#530 wave 7); its list count is `ListFrame.ForCount` (= the renown block's `0x3F1` list framing).
 - **Rankings (0x2038):** the global guild-renown leaderboard (the "Guild Renown Rankings" window, tabs
   Total/Valor/Glory/Artistry) is now CONSTRUCTED from the realm's guilds via `GuildRankingsCodec`
   (`Faolan.Core.Network/Codecs/Guild/GuildRankingsCodec.cs`, byte-exact against the capture —

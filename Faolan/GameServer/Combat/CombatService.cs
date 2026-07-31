@@ -220,17 +220,6 @@ namespace Faolan.GameServer.Combat
 				return;
 
 			var instance = client.Session.Character.Id;
-			var seq = (ushort)((rawPayload[16] << 8) | rawPayload[17]);
-			// argsLen is the u32 at offset 22 (the request args length). The old code read it as a u16 at 22 (= the
-			// high half = 0), so the ack echoed EMPTY args and the client's behaviour FSM desynced after one swing.
-			var argsLen = (int)rawPayload.ReadU32Be(22);
-			if (26 + argsLen > rawPayload.Length)
-				return;
-
-			var reqTail = rawPayload[(26 + argsLen)..];
-			var abilityId = reqTail.Length >= 4
-				? (uint)((reqTail[^4] << 24) | (reqTail[^3] << 16) | (reqTail[^2] << 8) | reqTail[^1])
-				: 0u;
 
 			// Retail's ack echoes the request args with a field3 "phase" inserted. The 2026-06-12 armed+unarmed
 			// capture proves the phase value IS the request's own Mode (field 2) - the earlier "monotonic server
@@ -251,7 +240,6 @@ namespace Faolan.GameServer.Combat
 				return;
 			}
 
-			var echoedArgs = BehaviorAcks.InsertBehaviorPhaseField(rawPayload[26..(26 + argsLen)], phase);
 			var level = client.Session.Character.Level;
 			// #395: melee damage is driven by the equipped main-hand weapon (min/max from the RDB template), not a flat
 			// level value, so a better weapon hits harder. Unarmed / no imported weapon damage falls back to the level curve.
@@ -269,40 +257,11 @@ namespace Faolan.GameServer.Combat
 			if (crit)
 				damage = (uint)CombatResolver.ApplyCritDamage((int)damage, attackerEntity?.CriticalDamageRating ?? 0);
 			const DamageSchool school = DamageSchool.Crushing; // the player's physical-melee damage school (capture-derived)
-			var next = (ushort)(seq + 1);
 
-			// 1) BehaviorControlCenterIIR ack - releases the swing.
-			await client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, b =>
-				b.WriteArrayUInt32Length(s => s
-					.WriteUInt32(GameServer0X2000Opcodes.BehaviorControlCenterIIR)
-					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(instance)
-					.WriteUInt16(next)
-					.WriteUInt32(0x0000000Fu)
-					.WriteArrayUInt32Length(echoedArgs)
-					.WriteUInt32(0)
-					.WriteUInt32(0)
-					.WriteUInt32(1) // result block: count
-					.WriteUInt32(0)
-					.WriteUInt32(0)
-					.WriteUInt32(0)
-					.WriteUInt32(0)
-					.WriteUInt32(0)
-					.WriteUInt32(0) // entry (6 u32)
-					.WriteUInt32(1)
-					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(targetHandle)
-					.WriteUInt32(0) // result: count, c350, VICTIM=target, 0 - the entity that plays the hit-react/blood.
-					// Was `instance` (the player), which played the blood/impact on SELF when hitting an NPC (#228);
-					// the proven NPC->player ack (BuildNpcAttackAnimationAckBody) names the victim handle in this slot.
-					.WriteByte(0x06)
-					.WriteUInt32(0x000000CBu) // result constant (was 0xCD; the capture's BccAck result block uses 0xCB)
-					.WriteUInt32(0)
-					.WriteUInt32(1)
-					.WriteUInt32(damage)
-					.WriteUInt32(2)
-					.WriteUInt32(0)
-					.WriteUInt32(0))));
+			// 1) BehaviorControlCenterIIR ack - releases the swing. The record (header, echoed args, 132-byte result
+			// block naming the VICTIM) is BehaviorAcks.HitResultAck's; this path used to write all of it inline, which
+			// made it the sixth hand-rolled copy of a message that has one codec (#530 wave 7).
+			await SendWorldPacket(client, BehaviorControlCenterCodec.Build(BehaviorAcks.HitResultAck(rawPayload, instance, phase, targetHandle, damage)));
 
 			// 2) DamageResultIIR - the hit / floating number (crits are just a bigger number, same school).
 			await SendDamageNumber(client, targetHandle, instance, damage, school);
@@ -335,10 +294,9 @@ namespace Faolan.GameServer.Combat
 			if (!hasEnemyTarget)
 				return;
 
-			var reqTail = rawPayload[(26 + (int)rawPayload.ReadU32Be(22))..];
-			var abilityId = reqTail.Length >= 4
-				? reqTail.ReadU32Be(reqTail.Length - 4)
-				: 0u;
+			// The unarmed swing's ability id is the LAST word of the request's behaviour TAIL - an opaque region at the
+			// codec (#536), read by name through BehaviorTailScan rather than at `26 + <u32 at 22>` here.
+			var abilityId = BehaviorTailScan.AbilityId(BehaviorControlCenterCodec.Parse(rawPayload.AsSpan(sizeof(uint))).Tail);
 			var damage = (uint)CombatResolver.ResolveSpellDamage(abilityId, client.Session.Character.Level);
 			await SendSwingDamage(client, instance, targetHandle, damage);
 		}

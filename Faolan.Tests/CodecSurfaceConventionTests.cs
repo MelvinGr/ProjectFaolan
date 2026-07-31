@@ -35,7 +35,7 @@ namespace Faolan.Tests
 		// The folders converted to the uniform surface so far. ADD A FOLDER AS ITS WAVE LANDS - that is what makes the
 		// gates below binding on it, and leaving it out is how a converted folder silently stops being checked.
 		private static readonly string[] MigratedFolders =
-			[RootFolder, "Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat", "Quest", "Spawn", "FullCharSnapshot"];
+			[RootFolder, "Inventory", "Feats", "Team", "Guild", "Text", "Dialogue", "World", "Combat", "Quest", "Spawn", "FullCharSnapshot", "PlayerAgent"];
 
 		// The ROOT of Codecs/ itself - the codecs that sit in `Faolan.Core.Network.Codecs` with no domain folder.
 		// Spelled as a sentinel rather than "" so the two places that expand it read as deliberate.
@@ -286,14 +286,26 @@ namespace Faolan.Tests
 			Assert.True(offenders.Count == 0, "the wire value is named for the client IIR:\n  " + string.Join("\n  ", offenders));
 		}
 
-		[Fact(Skip = "un-skip in wave 7 - GuildRenownBlockCodec is a SUB-record whose parent body is still hand-built in GuildService, so it reads as standalone until that moves into Codecs/")]
+		// Wave 7 moved GuildService's five bodies into Codecs/, which was the reason recorded here for deferring this
+		// gate - GuildRenownBlockCodec now passes. It did NOT pass, and what is left is not a gate bug: five codecs
+		// produce a PAYLOAD that a parent codec should compose but the SERVICE composes instead -
+		// `AreaNameBannerCodec` / `RespawnPointDiscoveredCodec` / `AttributeChangedCodec` (the service pipes their XML
+		// into `FormatFeedbackCodec.Build`), `NpcChatterCodec` (the broadcaster caches its lines on the entity) and
+		// `MagicBuffDataCodec` (whose parent deliberately carries `Data` as opaque bytes, #530 wave 4). Each is a real
+		// "the parent should take the value" change in a different codec's design, tracked in Gitea #539 - not
+		// something wave 7's scope (moving `Faolan/`'s OWN wire code in) reaches.
+		//
+		// Two blind spots WERE fixed while proving that: the field scan missed `HandledOpcodes` (so the two Team
+		// codecs that do declare their identity were flagged), and "standalone" ignored §6's own definition, which is
+		// "nothing else composes it" - that alone cleared `RemoteFormatScreenCodec`.
+		[Fact(Skip = "un-skip in wave 9 - five payload codecs still get composed by the SERVICE rather than by their parent codec (Gitea #539)")]
 		public void RpcMessageCodecsDeclareTheirMethodOpcode()
 		{
 			// A codec with a standalone body but no IIR opcode is an RPC-message codec: it must declare its method
 			// off its own interface enum, so the identity is recorded somewhere rather than nowhere.
 			var offenders = CodecModules
 				.Where(t => !DeclaredOpcodes(t).Any())
-				.Where(t => Fields(t).All(f => !f.Name.EndsWith("Opcode", StringComparison.Ordinal)))
+				.Where(t => Fields(t).All(f => !DeclaresAnOpcode(f)))
 				.Where(IsStandaloneMessage)
 				.Select(t => t.Name)
 				.ToList();
@@ -444,12 +456,31 @@ namespace Faolan.Tests
 			return t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly);
 		}
 
-		// A codec whose Build produces a whole message rather than a fragment: it is called from the server layer
-		// (a listener/service sends it) rather than only from another codec.
+		// A field that records the codec's message identity. `Opcode` is the single-method form and `HandledOpcodes`
+		// the RPC twin of `HandledTypes` (one layout, the verb in the opcode) - the suffix check used to test only for
+		// "Opcode", so a codec declaring the PLURAL was read as declaring nothing at all.
+		private static bool DeclaresAnOpcode(FieldInfo f)
+		{
+			return f.Name.EndsWith("Opcode", StringComparison.Ordinal) || f.Name.EndsWith("Opcodes", StringComparison.Ordinal);
+		}
+
+		// A codec whose Build produces a whole message rather than a fragment: the server layer sends it AND no other
+		// codec composes it. The second half is §6's own definition of a sub-record ("a codec that declares no opcode
+		// must be composed by another codec in the tree") and it is what `EveryCodecIsClassified` asks; without it a
+		// sub-record whose parent lives in `Codecs/` still read as standalone the moment a service touched it too.
 		private static bool IsStandaloneMessage(Type t)
 		{
 			var server = SourceFiles([TestPaths.Repo("Faolan")]).Any(f => File.ReadAllText(f).Contains($"{t.Name}.Build", StringComparison.Ordinal));
-			return server;
+
+			return server && !IsComposedByAnotherCodec(t);
+		}
+
+		// True when some OTHER codec source file mentions this codec - i.e. composes it into a larger body.
+		private static bool IsComposedByAnotherCodec(Type t)
+		{
+			return CodecSourceFiles()
+				.Where(f => !f.EndsWith($"{t.Name}.cs", StringComparison.Ordinal))
+				.Any(f => File.ReadAllText(f).Contains($"{t.Name}.", StringComparison.Ordinal));
 		}
 
 		private static IEnumerable<MethodInfo> Methods(Type t)

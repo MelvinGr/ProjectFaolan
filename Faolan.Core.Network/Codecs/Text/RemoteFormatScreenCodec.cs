@@ -43,17 +43,6 @@ namespace Faolan.Core.Network.Codecs.Text
 			return sb.ToString();
 		}
 
-		// The cutscene stock-phrase payload (#410): every captured phrase is a PARAMETER-LESS root, so a StockPhrase
-		// row's four attribute columns rebuild the exact bytes the 0x205D reply carries - the blob column they
-		// replaced is gone. Latin-1 because that is the wire's string encoding, and here the text IS the whole wire
-		// payload, which is what rule 1a allows a byte[] overload for.
-		public static byte[] Build(StockPhrase row)
-		{
-			ArgumentNullException.ThrowIfNull(row);
-
-			return Encoding.Latin1.GetBytes(Build(new RemoteFormatScreen($"{row.RemoteFormatId}", $"{row.Category}", LdbKey.ToWire(row.FormatKey), $"{row.Knubot}", null, [])));
-		}
-
 		public static RemoteFormatScreen Parse(string text)
 		{
 			var root = RootRx.Match(text);
@@ -71,6 +60,22 @@ namespace Faolan.Core.Network.Codecs.Text
 	}
 
 	public sealed record RemoteFormatParameter(string Name, string InnerRaw);
+
+	// The screen forms our own senders build, as VALUE factories - row -> value mapping, not encoding (#533).
+	public static class RemoteFormatScreens
+	{
+		// The cutscene stock-phrase payload (#410): every captured phrase is a PARAMETER-LESS root, so a StockPhrase
+		// row's four attribute columns rebuild the exact text the 0x205D reply carries - the blob column they replaced
+		// is gone. It used to be a `byte[] Build(StockPhrase)` overload on the codec, which rule 1a allows only while
+		// the text IS the whole wire payload; since #530 wave 7 it is composed INTO ReceivedStockPhraseTextCodec, so
+		// the string is what the caller wants and the Latin1 encoding belongs to that codec's `WriteString`.
+		public static RemoteFormatScreen ForStockPhrase(StockPhrase row)
+		{
+			ArgumentNullException.ThrowIfNull(row);
+
+			return new RemoteFormatScreen($"{row.RemoteFormatId}", $"{row.Category}", LdbKey.ToWire(row.FormatKey), $"{row.Knubot}", null, []);
+		}
+	}
 
 	public sealed record RemoteFormatScreen(string Id, string Category, string Key, string Knubot, string? Antitag, IReadOnlyList<RemoteFormatParameter> Parameters);
 }

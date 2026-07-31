@@ -5,7 +5,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Guild;
-using Faolan.CSPlayerAgent;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -51,10 +50,9 @@ namespace Faolan.Tests
 				Class = (ConanClass)0x2C
 			};
 
-			var s = new FaolanStream();
-			GuildService.WriteGuildCreatedBody(s, guild, creator, 0x06, 0x2B20);
+			var body = GuildCreatedCodec.Build(new GuildCreated(GuildMemberRecords.FromCharacter(creator, true, 0x2B20, 0), GuildHeaders.ForGuildCreate(guild, 0x06)));
 
-			Assert.Equal(Convert.ToHexStringLower(Golden.Bytes("GuildCreated")), Convert.ToHexStringLower(s.ToArray()));
+			Assert.Equal(Convert.ToHexStringLower(Golden.Bytes("GuildCreated")), Convert.ToHexStringLower(body));
 		}
 
 		[Fact]
@@ -66,10 +64,9 @@ namespace Faolan.Tests
 				Name = "Sepulchra Invictus"
 			};
 
-			var s = new FaolanStream();
-			GuildService.WriteGuildInviteBody(s, guild, 0x01316E71, "Kyloth");
+			var body = GuildInviteCodec.Build(new GuildInvite(guild.Id, guild.Name, 0x01316E71, "Kyloth"));
 
-			Assert.Equal(CapturedInviteBody, Convert.ToHexStringLower(s.ToArray()));
+			Assert.Equal(CapturedInviteBody, Convert.ToHexStringLower(body));
 		}
 
 		[Fact]
@@ -84,10 +81,11 @@ namespace Faolan.Tests
 				Class = ConanClass.HeraldOfXotli
 			};
 
-			var s = new FaolanStream();
-			GuildService.WriteGuildMemberRecord(s, hoxxling, true, 0xFAA, 0);
+			var record = GuildMemberRecords.FromCharacter(hoxxling, true, 0xFAA, 0);
 
-			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(s.ToArray()));
+			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(GuildMemberRecordCodec.Build(record)));
+			// Rule 1: the record Parse returns is the record Build takes, so the captured bytes rebuild themselves.
+			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(GuildMemberRecordCodec.Build(GuildMemberRecordCodec.Parse(Convert.FromHexString(CapturedMemberRecord)))));
 		}
 
 		// #463: DispatchGuildName (0x2041) - the reply to ClientRequestGuildName. Capture-verified as a PAIR in
@@ -96,10 +94,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void GuildNameBody_Matches_CapturedBytes()
 		{
-			var s = new FaolanStream();
-			GuildService.WriteGuildNameBody(s, 0x00075E9A, "the chickas");
+			var body = GuildNameCodec.Build(new GuildName(0x00075E9A, "the chickas"));
 
-			Assert.Equal("00075e9a000b" + Convert.ToHexStringLower(Encoding.Latin1.GetBytes("the chickas")), Convert.ToHexStringLower(s.ToArray()));
+			Assert.Equal("00075e9a000b" + Convert.ToHexStringLower(Encoding.Latin1.GetBytes("the chickas")), Convert.ToHexStringLower(body));
+			Assert.Equal(new GuildName(0x00075E9A, "the chickas"), GuildNameCodec.Parse(body));
 		}
 
 		[Fact]

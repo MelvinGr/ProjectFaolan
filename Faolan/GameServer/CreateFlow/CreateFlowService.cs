@@ -11,6 +11,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Codecs.Spawn;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -1360,20 +1361,16 @@ namespace Faolan.GameServer.CreateFlow
 			// have. Exactly the "wrong-looking constant that is really a captured value for ONE case" this codebase
 			// warns about; the class curve is the same source the snapshot's own max slots already use.
 			var (health, mana, stamina) = CharacterMaxStats.ClassBaseHundredths(character.Class, character.Level);
-			await SendCreateEditor2000(client, (uint)GameServer0X2000Opcodes.StatUpdateIIR, BuildClassBaseStatUpdate(health, mana, stamina), instance);
-		}
+			// Stat ids in retail's order (health, stamina, mana - see the captured f2613 body); the record itself is
+			// StatUpdateCodec's, so this path no longer hand-writes the `[u32 0][u8 count][id][value]*` tail
+			// (#530 wave 7). Sent whole, because the record's `[subop][class][handle]` head IS what the tail form's
+			// helper was re-writing by hand.
+			var classBase = new CharacterStatBlock()
+				.SetRaw(CharacterStatId.HealthMax, health)
+				.SetRaw(CharacterStatId.StaminaMax, stamina)
+				.SetRaw(CharacterStatId.ManaMax, mana);
 
-		// The post-morph class-base StatUpdate body: [u32 0][u8 count][statId u32][value u32] x3, ids in retail's order
-		// (health, stamina, mana - see the captured f2613 body).
-		internal static byte[] BuildClassBaseStatUpdate(uint health, uint mana, uint stamina)
-		{
-			var stream = new FaolanStream();
-			stream.WriteUInt32(0);
-			stream.WriteByte(3);
-			stream.WriteUInt32((uint)CharacterStatId.HealthMax).WriteUInt32(health);
-			stream.WriteUInt32((uint)CharacterStatId.StaminaMax).WriteUInt32(stamina);
-			stream.WriteUInt32((uint)CharacterStatId.ManaMax).WriteUInt32(mana);
-			return stream.ToArray();
+			await SendCreateEditor2000Record(client, StatUpdateCodec.Build(new StatUpdateIIR(instance, classBase)));
 		}
 
 		// A ScryScriptIIR step on the GameAgent->GameInterface conversation (the framing the verbatim burst uses).

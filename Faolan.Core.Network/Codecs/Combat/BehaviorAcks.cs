@@ -73,6 +73,62 @@ namespace Faolan.Core.Network.Codecs.Combat
 			return new BehaviorControlCenterIIR(instance, AckSeq(request.Seq), request.BehaviorId, InsertBehaviorPhaseField(request.Args, phase), tail);
 		}
 
+		// The TARGETED-HIT ack (#19/#228): the echo-ack's header and args, with the echoed tail REPLACED by the
+		// 132-byte result block naming the victim and the damage. It is what makes the client play the hit-react on the
+		// entity the block names, which is why an air swing must get `EchoAck` instead - naming the player there made
+		// them visibly bleed when swinging at nothing.
+		//
+		// ⚠️ Two deliberate differences from `EchoAck`, both preserving the bytes the server has always sent:
+		//   * the seq is `requestSeq + 1`, not `AckSeq(requestSeq)`. Every captured normal-attack request carries
+		//     0x0003, so the two agree in traffic; changing it here would be a wire change, not a refactor.
+		//   * the behaviourId is the NormalAttack constant rather than the request's own.
+		// The result block is the SAME 132 bytes `BehaviorAnimations.NpcAttackAck` sends the other way round - it was
+		// written out twice, once here and once there, which is the duplicate-layout pattern #530 keeps finding.
+		public static BehaviorControlCenterIIR HitResultAck(byte[] rawPayload, uint instance, uint phase, uint victimHandle, uint damage)
+		{
+			var request = ParseRequest(rawPayload);
+
+			return new BehaviorControlCenterIIR(instance, (ushort)(request.Seq + 1), NormalAttackBehaviorId, InsertBehaviorPhaseField(request.Args, phase),
+				HitResultBlock(victimHandle, damage));
+		}
+
+		// The single-entry result block that closes a targeted-hit ack:
+		//   [0][0][count=1] [6 x u32 entry = 0] [1][class][victim][0] [u8 0x06][resultType][0][k1][damage][k2][0][0]
+		// `victim` is the entity that plays the hit-react/blood - it was once the ATTACKER's own handle on the player
+		// path, which is #228 ("attack hits myself"). The result codes are capture-derived and not semantically
+		// decoded; 0xCB is the value the captured BccAck result block carries (it was once written as 0xCD).
+		internal static byte[] HitResultBlock(uint victimHandle, uint damage, byte resultType = 0xCB, uint resultK1 = 1, uint resultK2 = 2)
+		{
+			using var s = new FaolanStream();
+			s
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(1) // [0][0][count=1]
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0)
+				.WriteUInt32(0) // 6 x u32 entry (zero in the single-hit case)
+				.WriteUInt32(1)
+				.WriteUInt32(EntityClass.Character)
+				.WriteUInt32(victimHandle)
+				.WriteUInt32(0)
+				.WriteByte(0x06)
+				.WriteUInt32(resultType)
+				.WriteUInt32(0)
+				.WriteUInt32(resultK1)
+				.WriteUInt32(damage)
+				.WriteUInt32(resultK2)
+				.WriteUInt32(0)
+				.WriteUInt32(0);
+
+			return s.ToArray();
+		}
+
+		// The NormalAttack behaviorId an attack ack carries, whatever the request said.
+		internal const uint NormalAttackBehaviorId = 0x0000000F;
+
 		// The equip/unequip (Interact 0x09) ack: the echo-ack with the tail's zero padding replaced by an identity
 		// block - the first 28 tail bytes echoed, then the moved item's Data1..4 key quad twice + the null filler
 		// twice (equip), or the null filler six times (unequip). Byte-exact against the capture (BehaviorAckTests).

@@ -1,5 +1,7 @@
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Codecs.FullCharSnapshot;
+using Faolan.Core.Network.Codecs.World;
 using Faolan.GameServer.CreateFlow;
 using Xunit;
 
@@ -15,6 +17,8 @@ namespace Faolan.Tests
 		// Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json frame 2613, the
 		// StatUpdateIIR body after its 16-byte [len][iir][0xC350][handle] prefix:
 		//   [u32 0][u8 3] then (1, 12000) (505, 17250) (507, 0)
+		// The record's own [subop][class][handle] head is StatUpdateCodec's (#530 wave 7), so the assertion compares
+		// the built record from that head onwards - the 12 bytes it skips are the ones the codec now owns.
 		private static readonly byte[] RetailGuardianF2613 =
 		[
 			0x00, 0x00, 0x00, 0x00, 0x03,
@@ -23,12 +27,20 @@ namespace Faolan.Tests
 			0x00, 0x00, 0x01, 0xFB, 0x00, 0x00, 0x00, 0x00
 		];
 
+		// The create-editor instance the capture used - only the head, which the slice below drops, depends on it.
+		private const uint CapturedHandle = 0x021662C8;
+
 		[Fact]
 		public void GuardianLevel1_ReproducesTheCapturedEditorPush_ByteExact()
 		{
 			var (health, mana, stamina) = CharacterMaxStats.ClassBaseHundredths(ConanClass.Guardian, 1);
 
-			Assert.Equal(RetailGuardianF2613, CreateFlowService.BuildClassBaseStatUpdate(health, mana, stamina));
+			var classBase = new CharacterStatBlock()
+				.SetRaw(CharacterStatId.HealthMax, health)
+				.SetRaw(CharacterStatId.StaminaMax, stamina)
+				.SetRaw(CharacterStatId.ManaMax, mana);
+
+			Assert.Equal(RetailGuardianF2613, StatUpdateCodec.Build(new StatUpdateIIR(CapturedHandle, classBase))[12..]);
 		}
 
 		[Fact]

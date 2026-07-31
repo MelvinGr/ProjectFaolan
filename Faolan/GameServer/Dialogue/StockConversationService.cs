@@ -7,6 +7,8 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -34,11 +36,19 @@ namespace Faolan.GameServer.Dialogue
 
 		internal async Task HandlePlayStockphraseAsSubtitle(INetworkClient client, byte[] requestBody)
 		{
-			if (!TryParsePlayStockphraseRequest(requestBody, out var stockKey, out var threadContext))
+			PlayStockphraseAsSubtitle request;
+			try
 			{
-				_logger.LogWarning("PlayStockphraseAsSubtitle: could not parse request body ({Len} bytes)", requestBody.Length);
+				request = PlayStockphraseAsSubtitleCodec.Parse(requestBody);
+			}
+			catch (CodecParseException e)
+			{
+				// Say WHY rather than "could not parse": the codec names the offset and what it expected there.
+				_logger.LogWarning(e, "PlayStockphraseAsSubtitle: could not parse request body ({Len} bytes)", requestBody.Length);
 				return;
 			}
+
+			var (stockKey, threadContext) = (request.StockKey, request.ThreadContext);
 
 			var phrases = _phrases ??= await _database.GetStockPhrases();
 			if (!phrases.TryGetValue(stockKey, out var phrase))
@@ -51,39 +61,10 @@ namespace Faolan.GameServer.Dialogue
 
 			var id = client.Session.Character.Id;
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id),
-				GameCharInterfaceOpcodes.DispatchReceivedStockPhraseText, BuildReceivedStockPhraseBody(threadContext, RemoteFormatScreenCodec.Build(phrase))));
+				GameCharInterfaceOpcodes.DispatchReceivedStockPhraseText, ReceivedStockPhraseTextCodec.Build(new ReceivedStockPhraseText(threadContext, RemoteFormatScreenCodec.Build(RemoteFormatScreens.ForStockPhrase(phrase))))));
 
 			_logger.LogInformation("PlayStockphraseAsSubtitle: answered {Key} (tc=0x{Tc:X8}) for client {Id} (#234 cutscene speech)", stockKey, threadContext, id);
 		}
 
-		// Build the s2c ReceivedStockPhraseText (0x205D) body: [u32 threadCtx][u16 textLen][text].
-		internal static byte[] BuildReceivedStockPhraseBody(uint threadContext, byte[] textBytes)
-		{
-			var body = new byte[4 + 2 + textBytes.Length];
-			body.WriteU32Be(0, threadContext);
-			body.WriteU16Be(4, (ushort)textBytes.Length);
-			textBytes.CopyTo(body.AsSpan(6));
-			return body;
-		}
-
-		// Parse a c2s PlayStockphraseAsSubtitle (0x205E) request:
-		//   [ProtoID npcId (u32 type, u32 instance)][String: u16 len + bytes "{stock_N}"][u32 threadCtx]
-		// Returns false if the body is malformed.
-		internal static bool TryParsePlayStockphraseRequest(ReadOnlySpan<byte> body, out string stockKey, out uint threadContext)
-		{
-			stockKey = null!;
-			threadContext = 0;
-			if (body.Length < 8 + 2 + 4)
-				return false;
-
-			int strLen = body.ReadU16Be(8);
-			var tcOffset = 10 + strLen;
-			if (tcOffset + 4 > body.Length)
-				return false;
-
-			stockKey = Encoding.Latin1.GetString(body.Slice(10, strLen));
-			threadContext = body.ReadU32Be(tcOffset);
-			return true;
-		}
 	}
 }

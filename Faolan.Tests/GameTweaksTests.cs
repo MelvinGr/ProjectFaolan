@@ -1,4 +1,5 @@
 using Faolan.Core;
+using Faolan.Core.Network.Codecs.PlayerAgent;
 using Xunit;
 
 namespace Faolan.Tests
@@ -8,16 +9,6 @@ namespace Faolan.Tests
 	// the 19 tweaks instead of 19) - the bug fixed in 40d4bc0. The golden below is retail pkt#3's 630-byte body.
 	public class GameTweaksTests
 	{
-		// The 19 tweaks PlayerAgentListener sends (Ox20EC handler), in wire order. Kept here so the test locks the
-		// retail golden + wire format independently; if the listener's inline list changes, this golden must too.
-		private static readonly (string Name, double Value)[] Tweaks =
-		[
-			("AAPointsPerLevel", 1.0), ("AlternateAdvancement_GenericTokensAwarded", 1.0), ("AlternateAdvancement_SpecificTokensAwarded", 3.0), ("Anniversary2020", 0.0),
-			("Anniversary2020_CanGetArmor", 0.0), ("Anniversary_5_SpawnBosses", 0.0), ("CurrentSeason", 3.0), ("DoubleRaidFinderTokens", 0.0), ("EventAnniversary_2014", 0.0),
-			("EventDoubleXP", 0.0), ("EventHalloween", 1.0), ("ExpandInventories_MaxBankSlots", 300.0), ("IsPvPServer", 0.0), ("PvEXPFromPvPMultiplier", 0.1), ("RaidFinderEventChest", 0.0),
-			("WorldBoss_SpawnDay_Boss_11", 0.0), ("WorldBoss_SpawnDay_Boss_4", 0.0), ("WorldBoss_SpawnWeek_Boss_11", 0.0), ("WorldBoss_SpawnWeek_Boss_3", 3.0)
-		];
-
 		private static readonly byte[] RetailGameTweaksBody =
 		[
 			0x00, 0x00, 0x4E, 0xD4, 0x00, 0x10, 0x41, 0x41, 0x50, 0x6F, 0x69, 0x6E, 0x74, 0x73, 0x50, 0x65, 0x72, 0x4C, 0x65, 0x76, 0x65, 0x6C, 0x3F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -46,16 +37,22 @@ namespace Faolan.Tests
 		[Fact]
 		public void GameTweaksBody_MatchesRetailBytes()
 		{
-			// Build the body with the same FaolanStream primitives the listener uses (Ox20EC handler):
-			//   [u32 header][ per tweak: WriteString(name) -> u16 len + ASCII, WriteDouble(value) ] *
-			Assert.Equal(19, Tweaks.Length); // retail logs "ApplyDynamicGameTweaks: Applying 19 gametweaks"
+			var tweaks = GameTweakSets.Defaults();
 
-			var stream = new FaolanStream();
-			stream.WriteUInt32(0x00004ED4u);
-			foreach (var (name, value) in Tweaks)
-				stream.WriteString(name).WriteDouble(value);
+			Assert.Equal(19, tweaks.Tweaks.Count); // retail logs "ApplyDynamicGameTweaks: Applying 19 gametweaks"
+			Assert.Equal(RetailGameTweaksBody, GameTweaksCodec.Build(tweaks));
+		}
 
-			Assert.Equal(RetailGameTweaksBody, stream.ToArray());
+		// The collection carries no count, so the reader stops at end-of-stream - which is exactly the condition that
+		// makes a stray byte fatal in-client. Parsing retail's own body back proves the reader lands on it.
+		[Fact]
+		public void GameTweaksBody_RoundTripsRetailBytes()
+		{
+			var parsed = GameTweaksCodec.Parse(RetailGameTweaksBody);
+
+			Assert.Equal(GameTweaksCodec.RetailTableId, parsed.TableId);
+			Assert.Equal(GameTweakSets.Defaults().Tweaks, parsed.Tweaks);
+			Assert.Equal(RetailGameTweaksBody, GameTweaksCodec.Build(parsed));
 		}
 
 		[Fact]

@@ -272,8 +272,7 @@ namespace Faolan.CSPlayerAgent
 			team.UseNeedGreed = useNeedGreed;
 			team.LootThreshold = lootThreshold;
 
-			var body = new FaolanStream().WriteUInt32(lootMode).WriteByte(useNeedGreed).WriteUInt32(lootThreshold).ToArray();
-			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchTeamLootOptionChanged, body);
+			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchTeamLootOptionChanged, TeamLootOptionCodec.Build(new TeamLootOption(lootMode, useNeedGreed, lootThreshold)));
 
 			_logger.LogInformation("Team 0x{Team:X8}: loot mode {Mode}, need/greed {NeedGreed}, threshold {Threshold}.", team.Id, lootMode, useNeedGreed, lootThreshold);
 			return true;

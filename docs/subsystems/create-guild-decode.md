@@ -21,7 +21,7 @@ Retail's immediate create response is **`DispatchGuildCreated` = 0x2044** (opcod
 `Opcodes.cs`), not the `GuildFullUpdate` (0x203F) the blind impl sends. 338-byte body, fully mapped:
 
 ```
-[creator member record]        # EXACTLY WriteGuildMemberRecord format, 81 bytes:
+[creator member record]        # EXACTLY `GuildMemberRecordCodec` format, 81 bytes:
   03 03 · [charId u32] · [name s16] · [rank u8=4 leader] · [online u8=1] · [playfield u32] ·
   [level u8] · [class u32] · [u32 0] · [lastSeen u32] · [48 zero bytes]
 [guild header]                 # identical to the 0x203F body head EXCEPT the post-cash byte:
@@ -47,7 +47,7 @@ there — the byte-exact goal is the header/member-record (deterministic); the t
 
 - **Implemented (#306, `45905d5d`):** `HandleCreateGuild` now emits `DispatchGuildCreated` (0x2044) — the
   retail no-relog create response — instead of only the `0x203F` full update. Built byte-exact against this
-  capture (`GuildPacketTests.GuildCreatedBody_Matches_CapturedBytes`, 338 bytes) by `WriteGuildCreatedBody`:
+  capture (`GuildPacketTests.GuildCreatedBody_Matches_CapturedBytes`, 338 bytes) by `GuildCreatedCodec`:
   member record + header are CONSTRUCTED; the 225-byte tail is emitted verbatim as a valid create-time block
   (this capture is itself a fresh guild, so its feat numbers are create-time defaults — only the 40-byte
   trailer holds cosmetic capture timestamps). The login `0x203F` push still runs, so relog remains a fallback.
@@ -57,7 +57,7 @@ there — the byte-exact goal is the header/member-record (deterministic); the t
 - **Tail decoded + constructed:** the 225-byte tail is the SAME `CoreGuild_c::Read` renown block as the 0x203F
   (FUN_00565900, case 1→3), written in its create-time form: `Flag=0` (the full update uses 1) and an EMPTY StatIds
   list (so 225 = 277 − 52), zeroed renown, the feat defaults `List2 = 0x410/0x816/0xBEA`, and create-time constants
-  in `Counters64C[0..2]`/`Counters64D`. `WriteGuildCreatedBody` now emits `GuildRenownBlockCodec.Build(GuildRenownBlock.ForGuildCreate())`
+  in `Counters64C[0..2]`/`Counters64D`. `GuildHeaders.ForGuildCreate` now carries `GuildRenownBlock.ForGuildCreate()`
   (byte-exact — `GuildRenownBlockCodecTests.ForGuildCreate_EncodesToTheCapturedCreateTail`), replacing the verbatim blob.
 - **Remaining follow-up:** fan out the `0x003c` guild + officer chat-CHANNEL subs (step 3 below) so the guild chat
   tabs appear. Does not block the window opening.

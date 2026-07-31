@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public static byte[] BuildBehaviorControlCenterIir(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint type = EntityClass.Character, uint? field2 = null,
 			uint? field4 = null, uint? field11 = null, uint? field12 = null, uint? boundA = null, uint? boundB = null, ushort form = 0x0004)
 		{
-			return Record(BehaviorControlCenterCodec.Build(Bcc(handle, slot, behaviorId, phase, field5, field6, field2, field4, field11, field12, boundA, boundB, form)));
+			return Record(BehaviorControlCenterCodec.Build(BehaviorAnimations.Registration(handle, slot, behaviorId, phase, field5, field6, field2, field4, field11, field12, boundA, boundB, form)));
 		}
 
 		// The LONG (116-byte) form: the same head plus an 88-byte behaviour-state tail that binds the behaviour to an
@@ -74,7 +74,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.WriteUInt32(trailingB)
 				.WriteUInt32(trailingC);
 
-			var head = Bcc(handle, slot, behaviorId, phase, field5, field6, null, null, null, null, null, null, 0x0004);
+			var head = BehaviorAnimations.Registration(handle, slot, behaviorId, phase, field5, field6);
 			return Record(BehaviorControlCenterCodec.Build(head with { Tail = itemTail.ToArray() }));
 		}
 
@@ -159,37 +159,6 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public static byte[] BuildWorldSetNameIir(uint handle, string name, uint type = EntityClass.Character)
 		{
 			return Record(SetNameCodec.Build(SetNames.Nameplate(handle, name)));
-		}
-
-		private static BehaviorControlCenterIIR Bcc(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint? field2, uint? field4, uint? field11, uint? field12,
-			uint? boundA, uint? boundB, ushort form)
-		{
-			var message = new CommandMessage
-			{
-				BccActionId = behaviorId,
-				CommandqueueServerId = phase,
-				Flags = field5,
-				ExecutionStatus = field6
-			};
-			if (field2 is { } f2)
-				message.CommandqueueClientId = f2;
-			if (field4 is { } f4)
-				message.AnimRandom = f4;
-			if (field11 is { } f11)
-				message.RechargeTime = f11;
-			if (field12 is { } f12)
-				message.ActivationTime = f12;
-
-			// The optional 20-byte "bound" tail (`[u32 boundA][u32 boundB][12 x 00]`), decoded from the create-world
-			// cutscene burst (tools/capture/decode_behaviorcc.py, #234).
-			byte[] tail = [];
-			if (boundA is { } a)
-			{
-				using var bound = new FaolanStream();
-				tail = bound.WriteUInt32(a).WriteUInt32(boundB ?? 0u).WriteArray(new byte[12]).ToArray();
-			}
-
-			return new BehaviorControlCenterIIR(handle, form, slot, message.ToProtobuf(), tail);
 		}
 
 		// The burst helper writes the sub-opcode itself, so it wants the record WITHOUT it.

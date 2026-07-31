@@ -6,6 +6,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs;
+using Faolan.Core.Network.Codecs.PlayerAgent;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Configuration;
@@ -163,41 +164,11 @@ namespace Faolan.PlayerAgent
 					await SendChatServer(client, packet.Sender);
 					await SendGameServer(client, packet.Sender);
 
-					// OverrideGameTweaks (PlayerInterface 0x1A07): the 19 dynamic game tweaks the client applies on
-					// login. Body is built inline from the named-tweak list below; the wire format is locked byte-for-byte by GameTweaksTests.cs.
-					using var gameTweaks = new FaolanStream();
-
-					// The PlayerInterface OverrideGameTweaks (0x1A07) payload: the server's "dynamic game tweaks" the client
-					// applies on login (ApplyDynamicGameTweaks: "Applying N gametweaks"). Reverse-engineered from the retail
-					// capture (logs-test/retail pkt#3) — see docs/protocol/02-rpc.md.
-					//
-					// Wire format of the `overrides` collection (raw stream, NOT protobuf):
-					//   [u32 header][ per tweak: [u16 nameLen][name ASCII][f64 value] ] *   — all multi-byte fields big-endian.
-					//
-					// The tweak NAMES are plaintext on the wire (length-prefixed), not name-hashes — they map 1:1 onto the
-					// client's RDBGameTweaks DataTable keys. Every value here is serialized as an 8-byte double regardless of the
-					// tweak's logical type (bool/int/float). This list is byte-for-byte identical to what retail sends; a single
-					// stray byte makes the client log "stream bad after 'overrides'" and drop the whole PlayerInterface route
-					// (the old bug — it applied 0 of 19 tweaks).
-
-					(string Name, double Value)[] Defaults =
-					[
-						("AAPointsPerLevel", 1.0), ("AlternateAdvancement_GenericTokensAwarded", 1.0), ("AlternateAdvancement_SpecificTokensAwarded", 3.0), ("Anniversary2020", 0.0),
-						("Anniversary2020_CanGetArmor", 0.0), ("Anniversary_5_SpawnBosses", 0.0), ("CurrentSeason", 3.0), ("DoubleRaidFinderTokens", 0.0), ("EventAnniversary_2014", 0.0),
-						("EventDoubleXP", 0.0), ("EventHalloween", 1.0), ("ExpandInventories_MaxBankSlots", 300.0), ("IsPvPServer", 0.0), ("PvEXPFromPvPMultiplier", 0.1),
-						("RaidFinderEventChest", 0.0), ("WorldBoss_SpawnDay_Boss_11", 0.0), ("WorldBoss_SpawnDay_Boss_4", 0.0), ("WorldBoss_SpawnWeek_Boss_11", 0.0),
-						("WorldBoss_SpawnWeek_Boss_3", 3.0)
-					];
-
-					// Opaque 4-byte prefix replayed verbatim from the retail capture (a tweak-table id/version; not the
-					// entry count, which the client infers by reading to end-of-stream).
-					gameTweaks.WriteUInt32(0x00004ED4);
-
-					foreach (var (name, value) in Defaults)
-						gameTweaks.WriteString(name).WriteDouble(value);
-
+					// OverrideGameTweaks (PlayerInterface 0x1A07): the 19 dynamic game tweaks the client applies on login.
+					// The named-tweak set and its wire format are GameTweaksCodec's (#530 wave 7); the 13-byte session
+					// header-extra this method rides with stays here, because it is framing.
 					await client.SendAsync(new Rpc(ServiceConnectionSender, packet.Sender, PlayerInterfaceOpcodes.OverrideGameTweaks,
-						(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07], gameTweaks.ToArray()));
+						(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07], GameTweaksCodec.Build(GameTweakSets.Defaults())));
 
 					break;
 				}

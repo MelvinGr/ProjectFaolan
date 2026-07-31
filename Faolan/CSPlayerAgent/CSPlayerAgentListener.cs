@@ -216,11 +216,9 @@ namespace Faolan.CSPlayerAgent
 				// DispatchTeamLootOptionChanged; NEEDS in-client verification.
 				case CSPlayerAgentOpcodes.TeamSetLootOption:
 				{
-					var lootMode = body.ReadUInt32();
-					var useNeedGreed = body.ReadByte() != 0;
-					var lootThreshold = body.ReadUInt32();
+					var loot = TeamLootOptionCodec.Parse(body.ReadRemainingArray());
 
-					if (!await _teams.SetLootOption(client.Session.Character.Id, lootMode, useNeedGreed, lootThreshold))
+					if (!await _teams.SetLootOption(client.Session.Character.Id, loot.Mode, loot.UseNeedGreed, loot.Threshold))
 						Logger.LogDebug("TeamSetLootOption from {Character:X8} with no team; ignored.", client.Session.Character.Id);
 
 					break;

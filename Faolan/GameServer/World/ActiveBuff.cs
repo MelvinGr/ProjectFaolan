@@ -1,5 +1,5 @@
 using System;
-using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.Combat;
 
 namespace Faolan.GameServer.World
 {
@@ -37,25 +37,31 @@ namespace Faolan.GameServer.World
 			return DurationSeconds is { } d && (now - AppliedAt).TotalSeconds >= d;
 		}
 
-		// The buff duration encoded in an ApplySpell (0x6B87E316) effect payload: a u32 big-endian at offset +8, in
-		// CENTISECONDS (hundredths of a second - the same ×10ms unit as the RDB cast-time field). Calibrated in-client:
-		// Rend 700 -> 7s, Butcher 400 -> 4s, Poacher-Marksman 600 -> 6s, Exhausted 10000 -> 100s. Returned here in
-		// MILLISECONDS (×10) so callers stay in ms. Returns 0 when the payload is too short / carries no duration. (#274)
+		// The buff duration carried by an ApplySpell (0x6B87E316) effect payload, in MILLISECONDS. The payload's own
+		// field is in CENTISECONDS (hundredths of a second - the same ×10ms unit as the RDB cast-time field), so this
+		// scales by 10 and callers stay in ms. Calibrated in-client: Rend 700 -> 7s, Butcher 400 -> 4s,
+		// Poacher-Marksman 600 -> 6s, Exhausted 10000 -> 100s. (#274)
 		public static uint DurationMsFromPayload(byte[] payload)
 		{
-			return payload is { Length: >= 12 }
-				? payload.ReadU32Be(8) * 10
-				: 0;
+			return Payload(payload)?.Duration * 10 ?? 0;
 		}
 
-		// The per-application effect nonce carried at the END of an ApplySpell payload (the last big-endian u32 -
-		// offset 50 in the 54-byte buff-data form). Returns 0 for a payload too short to carry one (e.g. the empty
-		// removal twin). (#274)
+		// The per-application effect nonce an ApplySpell payload carries. It is the LOW half of the record's u64
+		// expiry-stamp slot, which is where our sender puts it - the `effectNonce` spelling is a misnomer the codec
+		// documents and this file keeps because it is also a persisted column name. (#274)
 		public static uint NonceFromPayload(byte[] payload)
 		{
-			return payload is { Length: >= 4 }
-				? payload.ReadU32Be(payload.Length - 4)
-				: 0;
+			return (uint)(Payload(payload)?.ExpiryStamp ?? 0);
+		}
+
+		// The APPLY payload decoded, or null when there is none to decode: the removal twin carries an EMPTY payload,
+		// and the only form in traffic is the 54-byte apply (MagicBuffDataCodec). Reading it through the codec is what
+		// removed the two fixed offsets (+8 and end-4) this file used to index by.
+		private static MagicBuffData? Payload(byte[] payload)
+		{
+			return payload is { Length: MagicBuffDataCodec.Length }
+				? MagicBuffDataCodec.Parse(payload)
+				: null;
 		}
 	}
 }

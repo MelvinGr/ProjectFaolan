@@ -27,19 +27,6 @@ namespace Faolan.CSPlayerAgent
 	// in-world guild-tag push rides the existing IGameServerDispatcher.
 	public sealed class GuildService
 	{
-		// The AoC count-framed-list multiplier (ListFrame.Unit): every such list on the wire starts with a u32 word ==
-		// (count+1)*0x3F1 (the client's readers divide by it - 77 such readers in the exe). Shared by the renown
-		// block's stat-lists (GuildRenownBlockCodec), the 0x203F member list, and the 0x2038 rankings lists.
-		internal const uint GuildListMultiplier = ListFrame.Unit;
-
-		// CoreGuild_c::Read (the client deserializer, FUN_00565900) asserts streaming version == 3; the byte after
-		// guildId is the GOVERNMENT FORM, whose value selects the body layout. Form 1 (which falls through into the
-		// form-3 field block in the reader) is the layout GuildRenownBlockCodec encodes, so both are fixed here. The old
-		// code wrote guild.GovernmentForm into the version slot - harmless only because it defaulted to 3, but a
-		// non-3 value would have tripped the client's "streaming version mismatch" assert (#219, docs/subsystems/guilds.md).
-		private const byte CoreGuildStreamVersion = 0x03; // first body byte - CoreGuild_c streaming version (must be 3)
-		private const byte GuildGovernmentForm = 0x01; // byte after guildId - the form selecting the case 1->3 layout
-
 		// Retail addresses every CsPlayerAgent server->client packet FROM the guild-server object endpoint
 		// {class = the class the client targeted, instance = a fixed server-object handle}. The client targets the
 		// class with NO instance (its Authenticate/requests carry instance 0), and the captures show a nonzero server
@@ -174,16 +161,8 @@ namespace Faolan.CSPlayerAgent
 				return;
 			}
 
-			using var reply = new FaolanStream();
-			WriteGuildNameBody(reply, guildId, guild.Name);
-			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildName, reply.ToArray()));
-		}
-
-		// The DispatchGuildName (0x2041) body: [u32 guildId][name s16]. Byte-exact against the capture
-		// (GuildPacketTests).
-		internal static void WriteGuildNameBody(FaolanStream s, uint guildId, string name)
-		{
-			s.WriteUInt32(guildId).WriteString(name);
+			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildName,
+				GuildNameCodec.Build(new GuildName(guildId, guild.Name))));
 		}
 
 		// 0x2021 CreateGuild. Body decoded from DemoL80_..._create-guild.pcapng (docs/subsystems/create-guild-decode.md):
@@ -366,69 +345,36 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x203F full guild update - the packet that makes the client consider itself a guild member (guild
 		// window, guild chat tab, MOTD popup). Retail pushes it right after the Authenticate ack on login and
-		// again on join/member-list requests. DispatchGuildUpdate reads THREE arguments in order (FUN_013428d0),
-		// each with its own "stream bad after '<arg>'" abort:
-		//   i_pcGuild    = [version u8=3][guildId u32][govForm u8=1][cash u64][b u8=03][u32 0][b u8=00]
-		//                  [name s16][description s16][motd s16][277-byte renown block]
-		//   i_pcMember   = [self member record]                       (the authenticated member)
-		//   i_cMemberList= [u32 (otherCount+1)*0x3F1][other member records]   (0x3F1-count-framed list)
-		// The renown block is built per-guild from Guild.Renown (GuildRenownBlock.ForRenown), now that the 277-byte
-		// block is a typed codec (#219) - our created guilds no longer carry the captured guild's feat/city numbers.
+		// again on join/member-list requests. The three arguments and their framing live in GuildFullUpdateCodec
+		// (#530 wave 7); the renown block is built per-guild from Guild.Renown (#219), so our created guilds no
+		// longer carry the captured guild's feat/city numbers.
 		private async Task SendGuildFullUpdate(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character self)
 		{
-			using var body = new FaolanStream();
-			body
-				.WriteByte(CoreGuildStreamVersion)
-				.WriteUInt32(guild.Id)
-				.WriteByte(GuildGovernmentForm)
-				.WriteUInt64(guild.Cash)
-				.WriteByte(0x03)
-				.WriteUInt32(0)
-				.WriteByte(0x00)
-				.WriteString(guild.Name)
-				.WriteString(guild.Description ?? "")
-				.WriteString(guild.MessageOfTheDay ?? "")
-				.WriteArray(GuildRenownBlockCodec.Build(GuildRenownBlock.ForRenown(guild.Renown)));
+			// The roster must include EVERY member, the viewing player included - see the codec's header for why an
+			// empty member map crashes the guild-management panel.
+			var roster = guild.Members.Where(m => m.Name != null).Select(MemberRecord).ToList();
+			var body = GuildFullUpdateCodec.Build(new GuildFullUpdate(GuildHeaders.ForFullUpdate(guild), MemberRecord(self), roster));
 
-			WriteGuildMemberRecord(body, self); // i_pcMember: the authenticated member
-
-			// i_cMemberList: the FULL roster as a 0x3F1-framed list ([u32 (count+1)*0x3F1][records]). CoreGuild's list
-			// reader (FUN_0134ed30) asserts the count-word is a multiple of 0x3F1; the old WriteUInt32(0) here (misread
-			// as a "self contribution" counter) fails that check, so the client aborts DispatchGuildUpdate ("stream bad
-			// after i_cMemberList") and the character shows as guildless. Retail's word for a 173-member roster was
-			// 0x2ADCE = (173+1)*0x3F1.
-			//
-			// The list must include EVERY member, the viewing player included - it fills the client's member std::map
-			// (CoreGuild+0x1e4 node ptr / +0x1e8 _Mysize count). i_pcMember above is a separate self-pointer, NOT a map
-			// entry, so excluding self here left the map empty. The guild-management panel then averages renown over the
-			// members (FUN_0176d4a0: sum(member renown) / map._Mysize), and a 0 count is an Integer-Divide-By-Zero crash
-			// (__aulldiv) the instant the panel opens. Sending the full roster keeps the count >= 1.
-			var roster = guild.Members.Where(m => m.Name != null).ToList();
-			body.WriteUInt32((roster.Count + 1) * GuildListMultiplier);
-			foreach (var member in roster)
-				WriteGuildMemberRecord(body, member);
-
-			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildUpdate, body.ToArray()));
+			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildUpdate, body));
 		}
 
-		// 0x202F member joined: [member ID32][member record]. Retail fans this out to every online guild member
-		// (including the joiner, right after its 0x203F).
+		// 0x202F member joined. Retail fans this out to every online guild member (including the joiner, right after
+		// its 0x203F).
 		private Task SendGuildMemberJoined(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Character member)
 		{
-			using var body = new FaolanStream();
-			body.WriteUInt32(EntityClass.Character).WriteUInt32(member.Id);
-			WriteGuildMemberRecord(body, member);
-			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMemberJoined, body.ToArray()));
+			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMemberJoined, GuildMemberJoinedCodec.Build(MemberRecord(member))));
 		}
 
-		private void WriteGuildMemberRecord(FaolanStream s, Character member)
+		// A stored member as a roster record, with the live-session fields (online / playfield / last-seen) resolved
+		// here - the only place that knows who is connected.
+		private GuildMemberRecord MemberRecord(Character member)
 		{
 			var online = IsCharacterOnline(member.Id);
 			var lastSeen = online || member.LastConnection == null
 				? 0u
 				: (uint)member.LastConnection.Value.ToUnixTimeSeconds();
 
-			WriteGuildMemberRecord(s, member, online, online
+			return GuildMemberRecords.FromCharacter(member, online, online
 				? member.MapId
 				: 0, lastSeen);
 		}
@@ -444,71 +390,21 @@ namespace Faolan.CSPlayerAgent
 			};
 		}
 
-		// 0x2044 DispatchGuildCreated - retail's IMMEDIATE create response, which opens the guild window WITH NO
-		// RELOG (vs the 0x203F GuildUpdate, which only takes effect on the next login). Body decoded byte-exact
-		// (docs/subsystems/create-guild-decode.md, GuildPacketTests): [creator member record][guild header][225-byte
-		// renown block]. The header is the 0x203F head EXCEPT the post-cash byte carries the request's guild FORM
-		// (0x203F hardcodes 0x03). The 225-byte tail is the SAME CoreGuild_c::Read renown block as the 0x203F, written
-		// in its create-time form (GuildRenownBlock.ForGuildCreate) - no longer a verbatim blob. The creator is online
-		// (they just made it); `playfield` is their current map/playfield token.
-		internal static void WriteGuildCreatedBody(FaolanStream s, Guild guild, Character creator, byte form, uint playfield) // TODO: Just inline, (remove the test?)
-		{
-			WriteGuildMemberRecord(s, creator, true, playfield, 0);
-			s
-				.WriteByte(CoreGuildStreamVersion)
-				.WriteUInt32(guild.Id)
-				.WriteByte(GuildGovernmentForm)
-				.WriteUInt64(guild.Cash)
-				.WriteByte(form)
-				.WriteUInt32(0)
-				.WriteByte(0x00)
-				.WriteString(guild.Name)
-				.WriteString(guild.Description ?? "")
-				.WriteString(guild.MessageOfTheDay ?? "")
-				.WriteArray(GuildRenownBlockCodec.Build(GuildRenownBlock.ForGuildCreate()));
-		}
-
-		// 0x202A guild invite: [guild ID32][guildName s16][invitee ID32][inviterName s16]. Shows the client's
-		// accept/decline dialog. Byte-exact against the captured Kyloth->Hoxxling invite (GuildPacketTests).
-		internal static void WriteGuildInviteBody(FaolanStream s, Guild guild, uint inviteeId, string inviterName) // TODO: Just inline, (remove the test?)
-		{
-			s.WriteUInt32(EntityClass.Guild).WriteUInt32(guild.Id).WriteString(guild.Name).WriteUInt32(EntityClass.Character).WriteUInt32(inviteeId).WriteString(inviterName);
-		}
-
-		// One member record of the roster/joined/update packets (75 bytes + name):
-		//   [03 03][charId u32][name s16][rank u8][online u8][playfield u32][level u8][class u32]
-		//   [unknown u32][lastSeenUnix u32][48 bytes sparse renown/pvp counters]
-		// Playfield is 0 and lastSeen is the last-connection time when offline; both flip when online.
-		// Byte-exact against the capture's Hoxxling 0x202F record (GuildPacketTests).
-		internal static void WriteGuildMemberRecord(FaolanStream s, Character member, bool online, uint playfield, uint lastSeen) // TODO: Just inline, (remove the test?)
-		{
-			s
-				.WriteByte(0x03)
-				.WriteByte(0x03)
-				.WriteUInt32(member.Id)
-				.WriteString(member.Name!)
-				.WriteByte(member.GuildRank!)
-				.WriteByte(online)
-				.WriteUInt32(playfield)
-				.WriteByte(member.Level)
-				.WriteUInt32(member.Class)
-				.WriteUInt32(0)
-				.WriteUInt32(lastSeen)
-				.WriteArray(new byte[48]);
-		}
-
+		// 0x2044 DispatchGuildCreated - retail's IMMEDIATE create response, which opens the guild window WITH NO RELOG
+		// (vs the 0x203F GuildUpdate, which only takes effect on the next login). Grammar in GuildCreatedCodec. The
+		// creator is online (they just made it) and their playfield is their current map token.
 		private static async Task SendGuildCreated(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, Character creator, byte form)
 		{
-			using var body = new FaolanStream();
-			WriteGuildCreatedBody(body, guild, creator, form, creator.MapId);
-			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildCreated, body.ToArray()));
+			var body = GuildCreatedCodec.Build(new GuildCreated(GuildMemberRecords.FromCharacter(creator, true, creator.MapId, 0), GuildHeaders.ForGuildCreate(guild, form)));
+
+			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildCreated, body));
 		}
 
 		private static Task SendGuildInvite(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, uint inviteeId, string inviterName)
 		{
-			using var body = new FaolanStream();
-			WriteGuildInviteBody(body, guild, inviteeId, inviterName);
-			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildInvite, body.ToArray()));
+			var body = GuildInviteCodec.Build(new GuildInvite(guild.Id, guild.Name, inviteeId, inviterName));
+
+			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildInvite, body));
 		}
 
 		// 0x2057 DispatchGuildMessageOfTheDayChanged(i_cMessageOfTheDay): retail's TARGETED MOTD-change push - updates

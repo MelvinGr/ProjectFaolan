@@ -21,8 +21,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.CombatReactiveIIR;
 
-		// The "list active" flag every captured record carries.
+		// The "list active" flag every captured s2c record carries.
 		public const byte ActiveTag = 0x01;
+
+		// The c2s tag on a component ADD - the packet that carries the picked element's index in the list slot. Its
+		// 0x02-tagged twin is the ack and carries an EMPTY list, which is the whole difference between the two.
+		public const byte AddComponentTag = 0x03;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(CombatReactiveIIR value)

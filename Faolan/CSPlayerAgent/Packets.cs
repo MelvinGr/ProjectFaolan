@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Codecs.Team;
@@ -134,7 +135,7 @@ namespace Faolan.CSPlayerAgent
 		{
 			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchMassivePvpInfoRequestReturn, (byte[])[0x01], b => b
 				.WriteUInt32(0) // last-update timestamp (cosmetic; 0 = never updated)
-				.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed guild list ((0+1)*0x3F1)
+				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed guild list ((0+1)*0x3F1)
 				.WriteUInt32(1))); // trailing guildCount+1 (= 1 for the empty board) - the field the client read past
 		}
 
@@ -144,7 +145,7 @@ namespace Faolan.CSPlayerAgent
 		private static Task SendPvpMatchMakingInfo(INetworkClient client, Rpc packet)
 		{
 			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn, (byte[])[0x01], b => b
-				.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
+				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed record list
 				.WriteUInt32(0))); // trailer
 		}
 
@@ -154,7 +155,7 @@ namespace Faolan.CSPlayerAgent
 		private static Task SendTeamSearchResult(INetworkClient client, Rpc packet)
 		{
 			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchTeamSearchResult, b => b
-				.WriteUInt32(GuildService.GuildListMultiplier) // empty 0x3F1-framed record list
+				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed record list
 				.WriteByte(0x00))); // list trailer
 		}
 	}

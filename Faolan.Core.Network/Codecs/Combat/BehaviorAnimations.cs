@@ -34,8 +34,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// NPC animation acks are server-initiated, so the echoed sequence is the constant 0x0004 (not a client seq).
 		private const ushort NpcAttackAckSeq = 0x0004;
 
-		// The NormalAttack behaviorId carried by an attack BehaviorControlCenterIIR.
-		private const uint NormalAttackBehaviorId = 0x0000000F;
+		// The NormalAttack behaviorId carried by an attack BehaviorControlCenterIIR (BehaviorAcks owns the constant -
+		// the player-side ack writes the same one).
+		private const uint NormalAttackBehaviorId = BehaviorAcks.NormalAttackBehaviorId;
 
 		private const uint IdleBehaviorAction = 41413; // the capture's `08 c5 c3 02` varint
 		private const uint IdleBehaviorId = 7;
@@ -61,6 +62,48 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// behaviorId 1, args {f1=TranceAction, f3=4, f5=8, f6=0, f11=1199}, tail [0x27][1][0][0][0]. Without it the
 		// trance buffs render but the character stays idle. Action params are capture-derived (necro).
 		private const uint SpellweaveTranceAction = 42041;
+
+		// The generic REGISTRATION form (#189/#234/#267): the header plus a `CommandMessage` naming the behaviour
+		// slot, its id and its phase, with an optional 20-byte "bound" tail. It is what the create-editor burst
+		// streams for every entity it brings into play, and what a scripted NPC pose (Casilda's captive/freed) rides.
+		//
+		// protobuf-net omits an unset optional and emits fields in ascending number order, so the optional
+		// f2/f4/f11/f12 land exactly where the hand-written writer used to put them. `form` is the wire SEQ: 0x0004
+		// for the common registration; the rarer 0x0007 subtype adds protobuf field 4 (a varint, between phase and
+		// field5). The bound tail (`[u32 boundA][u32 boundB][12 x 00]`) is decoded in
+		// tools/capture/decode_behaviorcc.py.
+		//
+		// Lived as `CreateEditorRecordBuilder.Bcc` until #530 wave 7, which is why the Casilda pose in `Faolan/` had to
+		// re-prepend the sub-opcode by hand: the only way to reach it was through a helper that had already sliced it
+		// off for the burst.
+		public static BehaviorControlCenterIIR Registration(uint handle, uint slot, uint behaviorId, uint phase, uint field5, uint field6, uint? field2 = null, uint? field4 = null,
+			uint? field11 = null, uint? field12 = null, uint? boundA = null, uint? boundB = null, ushort form = SeqBegin)
+		{
+			var message = new CommandMessage
+			{
+				BccActionId = behaviorId,
+				CommandqueueServerId = phase,
+				Flags = field5,
+				ExecutionStatus = field6
+			};
+			if (field2 is { } f2)
+				message.CommandqueueClientId = f2;
+			if (field4 is { } f4)
+				message.AnimRandom = f4;
+			if (field11 is { } f11)
+				message.RechargeTime = f11;
+			if (field12 is { } f12)
+				message.ActivationTime = f12;
+
+			byte[] tail = [];
+			if (boundA is { } a)
+			{
+				using var bound = new FaolanStream();
+				tail = bound.WriteUInt32(a).WriteUInt32(boundB ?? 0u).WriteArray(new byte[12]).ToArray();
+			}
+
+			return new BehaviorControlCenterIIR(handle, form, slot, message.ToProtobuf(), tail);
+		}
 
 		// The object-action STATE record (behaviorId 0x12) that HOLDS the player in the seated pose. The sit ANIMATION
 		// (PlayerSitOnObject) alone plays the sit-down transition then reverts to idle; retail brackets it with this
@@ -129,32 +172,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 				ActivationTime = f12
 			}.ToProtobuf();
 
-			// The result block (the single-entry 132-byte-frame layout).
-			using var tail = new FaolanStream();
-			tail
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(1) // [0][0][count=1]
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0)
-				.WriteUInt32(0) // 6xu32 entry (zero in the single-hit case)
-				.WriteUInt32(1)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(playerHandle)
-				.WriteUInt32(0)
-				.WriteByte(0x06)
-				.WriteUInt32(resultType)
-				.WriteUInt32(0)
-				.WriteUInt32(resultK1)
-				.WriteUInt32(damage)
-				.WriteUInt32(resultK2)
-				.WriteUInt32(0)
-				.WriteUInt32(0);
-
-			return new BehaviorControlCenterIIR(npcHandle, NpcAttackAckSeq, NormalAttackBehaviorId, args, tail.ToArray());
+			// The result block is BehaviorAcks' - the player's targeted-hit ack sends the same 132 bytes with the roles
+			// swapped, and it was written out in both files until #530 wave 7.
+			return new BehaviorControlCenterIIR(npcHandle, NpcAttackAckSeq, NormalAttackBehaviorId, args, BehaviorAcks.HitResultBlock(playerHandle, damage, resultType, resultK1, resultK2));
 		}
 
 		// Sit the actor on a world object (a bench): plays "chair_sit_calm" aimed at the object. `remoteformat` is the
