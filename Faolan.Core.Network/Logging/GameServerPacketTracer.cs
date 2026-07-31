@@ -28,7 +28,7 @@ namespace Faolan.Core.Network.Logging
 				return;
 			}
 
-			Logger.LogPacketWithSubOpcode(direction, ChannelName, opcodeName, PacketLogFormatter.OpcodeName(typeof(GameServer0X2000Opcodes), iir), payloadLength, rpc.Body.Length, rpc.FrameLength,
+			Logger.LogPacketWithSubOpcode(direction, ChannelName, opcodeName, PacketLogFormatter.OpcodeName(typeof(IirTypes), iir), payloadLength, rpc.Body.Length, rpc.FrameLength,
 				("headerData", rpc.HeaderData), ("body", rpc.Body));
 		}
 

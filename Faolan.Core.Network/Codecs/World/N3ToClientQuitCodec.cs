@@ -20,7 +20,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// (Was WorldDespawn - #530 rule 5a names a codec for the IIR it emits.)
 	public static class N3ToClientQuitCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.N3ToClientQuitIIR;
+		public const uint Opcode = (uint)IirTypes.N3ToClientQuitIIR;
 
 		private const byte RecordMarker = 0x01; // constant in 3271/3271 records (record-count / type marker)
 

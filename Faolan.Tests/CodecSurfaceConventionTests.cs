@@ -74,9 +74,9 @@ namespace Faolan.Tests
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 		private static readonly Regex ConstOffset = new(@"\bconst\s+int\s+\w*(Offset|Pos)\b");
 
-		// One `case GameServer0X2000Opcodes.X:` of the listener's routing switch - §6's dispatch exemption, keyed on
+		// One `case IirTypes.X:` of the listener's routing switch - §6's dispatch exemption, keyed on
 		// the label rather than on a file name (see IirOpcodesAreOnlyNamedInsideCodecs).
-		private static readonly Regex DispatchCaseLabel = new(@"^\s*case\s+GameServer0X2000Opcodes\.\w+\s*:");
+		private static readonly Regex DispatchCaseLabel = new(@"^\s*case\s+IirTypes\.\w+\s*:");
 		private static readonly Regex LineComment = new(@"//.*$", RegexOptions.Multiline);
 		private static readonly Regex StringLiteral = new("\"(?:[^\"\\\\]|\\\\.)*\"");
 
@@ -293,7 +293,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void EachIirHasExactlyOneCodec()
 		{
-			var byOpcode = new Dictionary<GameServer0X2000Opcodes, List<string>>();
+			var byOpcode = new Dictionary<IirTypes, List<string>>();
 			foreach (var t in CodecTypes)
 			foreach (var op in DeclaredOpcodes(t))
 				(byOpcode.TryGetValue(op, out var l) ? l : byOpcode[op] = []).Add(t.Name);
@@ -392,7 +392,7 @@ namespace Faolan.Tests
 				let lines = File.ReadAllLines(file)
 				from i in Enumerable.Range(0, lines.Length)
 				let code = Strip(lines[i])
-				where code.Contains("GameServer0X2000Opcodes.", StringComparison.Ordinal) && !DispatchCaseLabel.IsMatch(code)
+				where code.Contains("IirTypes.", StringComparison.Ordinal) && !DispatchCaseLabel.IsMatch(code)
 				select $"{Path.GetFileName(file)}:{i + 1}  {code.Trim()}").ToList();
 
 			Assert.True(offenders.Count == 0,
@@ -511,14 +511,14 @@ namespace Faolan.Tests
 				: folders;
 		}
 
-		private static IEnumerable<GameServer0X2000Opcodes> DeclaredOpcodes(Type t)
+		private static IEnumerable<IirTypes> DeclaredOpcodes(Type t)
 		{
 			foreach (var f in Fields(t))
 			{
 				if (f.IsLiteral && f.FieldType == typeof(uint) && f.Name == "Opcode")
-					yield return (GameServer0X2000Opcodes)(uint)f.GetRawConstantValue()!;
-				else if (f.Name == "HandledTypes" && f.FieldType == typeof(GameServer0X2000Opcodes[]))
-					foreach (var v in (GameServer0X2000Opcodes[])f.GetValue(null)!)
+					yield return (IirTypes)(uint)f.GetRawConstantValue()!;
+				else if (f.Name == "HandledTypes" && f.FieldType == typeof(IirTypes[]))
+					foreach (var v in (IirTypes[])f.GetValue(null)!)
 						yield return v;
 			}
 		}
@@ -589,7 +589,7 @@ namespace Faolan.Tests
 			return t.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly);
 		}
 
-		private static IEnumerable<(Type Type, GameServer0X2000Opcodes Iir)> SingleIirCodecs()
+		private static IEnumerable<(Type Type, IirTypes Iir)> SingleIirCodecs()
 		{
 			foreach (var t in CodecTypes)
 			{

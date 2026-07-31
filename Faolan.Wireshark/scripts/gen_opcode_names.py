@@ -43,7 +43,7 @@ ENUM_TO_CLASS = {
 # GameAgent/GameInterface 0x2000 PassBlob packets, and the ChatServer chat opcodes
 # (chat packets have no RpcHeader, so they can't ride the class-keyed tables).
 STANDALONE_ENUMS = {
-    "GameServer0X2000Opcodes": "faolan_iir_names",
+    "IirTypes": "faolan_iir_names",
     "ChatServerOpcodes": "faolan_chat_c2s_names",
     "ChatServerInterfaceOpcodes": "faolan_chat_s2c_names",
 }

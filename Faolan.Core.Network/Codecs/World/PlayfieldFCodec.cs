@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// within a single map - so both are still passed through. [V0 on their meaning; V1 on the framing.]
 	public static class PlayfieldFCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.PlayfieldFIIR;
+		public const uint Opcode = (uint)IirTypes.PlayfieldFIIR;
 
 		// The scene blob's leading word and its third word, constant in all 151 captured bodies.
 		private const uint SceneBlobHead = 0x00000001;

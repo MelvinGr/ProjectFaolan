@@ -31,7 +31,7 @@ Wireshark without the JSON dump + Python dissector pipeline.
 - **IIR type resolution**: GameAgent/GameInterface `0x2000` (PassBlob) bodies are the IIR
   carrier `[u32 len][u32 IIR type id][record]`; the id (BKDR-31 hash of the client IIR
   class name) is dissected as `faolan.pkt.iir` and resolved against the catalog in
-  `Opcodes.cs` (`GameServer0X2000Opcodes`), so COL_INFO reads e.g.
+  `Opcodes.cs` (`IirTypes`), so COL_INFO reads e.g.
   `GameInterface DispatchPassBlob:MoveTaskIIR`.
 - **Direction**: `faolan.pkt.direction` = `c2s`/`s2c` from the receiver class suffix
   (*Agent classes receive c2s calls, *Interface classes s2c dispatches); chat packets use

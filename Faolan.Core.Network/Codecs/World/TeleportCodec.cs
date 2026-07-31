@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.World
 	public static class TeleportCodec
 	{
 		// The IIR types this codec constructs or parses.
-		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.IntendedTeleportIIR, GameServer0X2000Opcodes.N3TeleportIIR];
+		public static readonly IirTypes[] HandledTypes = [IirTypes.IntendedTeleportIIR, IirTypes.N3TeleportIIR];
 
 		private const uint PositionBlobTag = 0x00018704; // first word of the length-prefixed spawn-position blob
 
@@ -104,13 +104,13 @@ namespace Faolan.Core.Network.Codecs.World
 			var clientInstance = r.ReadU32Be();
 			var env = r.ReadU8();
 
-			if (subop == (uint)GameServer0X2000Opcodes.IntendedTeleportIIR)
+			if (subop == (uint)IirTypes.IntendedTeleportIIR)
 			{
 				var proxy = PlayfieldProxy.Read(ref r);
 				return new IntendedTeleportIIR(clientInstance, env, proxy, r.ReadU8());
 			}
 
-			if (subop != (uint)GameServer0X2000Opcodes.N3TeleportIIR)
+			if (subop != (uint)IirTypes.N3TeleportIIR)
 				throw CodecParseException.Unexpected(nameof(TeleportCodec), subopOffset, "IntendedTeleportIIR or n3TeleportIIR", $"0x{subop:X8}");
 
 			// The two n3Teleport forms are told apart by their LEADING BLOCK: the cross-map announce opens with six
@@ -155,7 +155,7 @@ namespace Faolan.Core.Network.Codecs.World
 			{
 				case IntendedTeleportIIR begin:
 				{
-					s.WriteUInt32(GameServer0X2000Opcodes.IntendedTeleportIIR).WriteUInt32(EntityClass.Character).WriteUInt32(begin.ClientInstance).WriteByte(begin.Env);
+					s.WriteUInt32(IirTypes.IntendedTeleportIIR).WriteUInt32(EntityClass.Character).WriteUInt32(begin.ClientInstance).WriteByte(begin.Env);
 					begin.Proxy.Write(s);
 					s.WriteByte(begin.Trailing); // IntendedTeleportIIR trailing bool (-> obj+0x40)
 					break;
@@ -166,7 +166,7 @@ namespace Faolan.Core.Network.Codecs.World
 					using var blob = new FaolanStream();
 					blob.WriteUInt32(PositionBlobTag).WriteVector3(dest.Position).WriteUInt32(dest.DestDescriptor);
 
-					s.WriteUInt32(GameServer0X2000Opcodes.N3TeleportIIR)
+					s.WriteUInt32(IirTypes.N3TeleportIIR)
 						.WriteUInt32(EntityClass.Character)
 						.WriteUInt32(dest.ClientInstance)
 						.WriteByte(dest.Env)
@@ -181,7 +181,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 				case N3TeleportIIR sameMap:
 				{
-					s.WriteUInt32(GameServer0X2000Opcodes.N3TeleportIIR)
+					s.WriteUInt32(IirTypes.N3TeleportIIR)
 						.WriteUInt32(EntityClass.Character)
 						.WriteUInt32(sameMap.ClientInstance)
 						.WriteByte(sameMap.Env)

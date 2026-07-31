@@ -56,7 +56,7 @@ namespace Faolan.Tests
 				var capture = new[]
 				{
 					new CapturedPacket(0, true, 0x2000, 0x5D85BFC7, MapChangePacket(4000)), new CapturedPacket(1, true, 0x2000, 0xFA015807, WrapBody(Golden.Bytes("SpawnDikketestLogin"))),
-					new CapturedPacket(2, true, 0x2000, (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR, SnapshotPacket(dikketestHandle))
+					new CapturedPacket(2, true, 0x2000, (uint)IirTypes.FullPlayerCharacterIIR, SnapshotPacket(dikketestHandle))
 				};
 
 				CaptureCharacterImporter.AccountId = 7;
@@ -147,7 +147,7 @@ namespace Faolan.Tests
 		{
 			var body = new byte[40];
 			body.WriteU32Be(0, (uint)body.Length - 4);
-			body.WriteU32Be(4, (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR);
+			body.WriteU32Be(4, (uint)IirTypes.FullPlayerCharacterIIR);
 			body.WriteU32Be(12, instance);
 			return WrapBody(body);
 		}

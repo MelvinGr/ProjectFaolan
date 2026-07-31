@@ -27,7 +27,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// ever called from tests - but it is why one codec per IIR is a rule.
 	public static class DamageResultCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.DamageResultIIR;
+		public const uint Opcode = (uint)IirTypes.DamageResultIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(DamageResultIIR value)

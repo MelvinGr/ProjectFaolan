@@ -19,7 +19,7 @@ namespace Faolan.Core.Network.Codecs.Inventory
 	// see that codec for why the two alias on the wire and how the client settled it.
 	public static class MoveInventoryItemCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.MoveInventoryItemIIR;
+		public const uint Opcode = (uint)IirTypes.MoveInventoryItemIIR;
 
 		public static MoveInventoryItemIIR Parse(in ReadOnlySpan<byte> data)
 		{

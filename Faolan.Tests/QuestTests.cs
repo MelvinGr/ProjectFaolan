@@ -97,7 +97,7 @@ namespace Faolan.Tests
 			};
 
 			var body = QuestFullUpdateCodec.Build(new QuestFullUpdateIIR(0x0131720B, record));
-			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestFullUpdateIIR), Convert.ToHexString(body).ToLowerInvariant());
+			Assert.Equal(CaptureBody(OfferFixture, IirTypes.QuestFullUpdateIIR), Convert.ToHexString(body).ToLowerInvariant());
 
 			// ...and the strict Parse reads every byte of that captured body back (rule 3's EnsureAtEnd).
 			Assert.Equal(body, QuestFullUpdateCodec.Build(QuestFullUpdateCodec.Parse(body)));
@@ -153,7 +153,7 @@ namespace Faolan.Tests
 				QuestJournalCurrent.None);
 
 			var body = QuestJournalCodec.Build(journal);
-			Assert.Equal(CaptureBody(JournalFixture, GameServer0X2000Opcodes.QuestJournalIIR), Convert.ToHexString(body).ToLowerInvariant());
+			Assert.Equal(CaptureBody(JournalFixture, IirTypes.QuestJournalIIR), Convert.ToHexString(body).ToLowerInvariant());
 			Assert.Equal(body, QuestJournalCodec.Build(QuestJournalCodec.Parse(body)));
 		}
 
@@ -426,7 +426,7 @@ namespace Faolan.Tests
 
 			// Journal list (no timestamp) - byte-exact against frame 9947.
 			var journal = QuestJournalCodec.Build(QuestJournals.ForQuests(0x01316D8A, [def]));
-			Assert.Equal(CaptureBody(JournalFixture, GameServer0X2000Opcodes.QuestJournalIIR), Convert.ToHexString(journal).ToLowerInvariant());
+			Assert.Equal(CaptureBody(JournalFixture, IirTypes.QuestJournalIIR), Convert.ToHexString(journal).ToLowerInvariant());
 
 			// Full update - byte-exact against frame 687. The goal's reserved (70099, "T7UT") pair is not passed in: the
 			// extractor lifts it off the same body through the codec, so it rides the harvested definition (#537).
@@ -435,12 +435,12 @@ namespace Faolan.Tests
 			Assert.Equal(0x54375554u, primary.Extra6); // "T7UT"
 			var iir = QuestFullUpdates.ForQuest(0x0131720B, def, 3);
 			var full = QuestFullUpdateCodec.Build(iir);
-			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.QuestFullUpdateIIR), Convert.ToHexString(full).ToLowerInvariant());
+			Assert.Equal(CaptureBody(OfferFixture, IirTypes.QuestFullUpdateIIR), Convert.ToHexString(full).ToLowerInvariant());
 
 			// Quest-log LIST (the packet that POPULATES the J-panel) - byte-exact against frame 687. The captured
 			// character had four active quests (tracked 13479 first); the area-title slot is the 13479 def's AreaTitle.
 			var logList = MainQuestUpdateCodec.Build(0x0131720B, def.AreaId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], QuestTextTokens.Record(def, QuestTextSlot.AreaTitle));
-			Assert.Equal(CaptureBody(OfferFixture, GameServer0X2000Opcodes.MainQuestUpdateIIR), Convert.ToHexString(logList).ToLowerInvariant());
+			Assert.Equal(CaptureBody(OfferFixture, IirTypes.MainQuestUpdateIIR), Convert.ToHexString(logList).ToLowerInvariant());
 
 			// Inverse: Parse recovers the handle, tracked id, and the exact quest-id list (the CaptureQuestImporter
 			// path that harvests each character's held-quest set from the J-panel log).
@@ -522,7 +522,7 @@ namespace Faolan.Tests
 		// assert builders byte-for-byte. `asset` picks WHICH capture: the fresh Casilda offer and the single-quest
 		// journal come from two different characters, and both carry a QuestFullUpdate for quest 13479 - the offer's
 		// is the one these gates are pinned on.
-		private static string CaptureBody(string asset, GameServer0X2000Opcodes iir)
+		private static string CaptureBody(string asset, IirTypes iir)
 		{
 			foreach (var p in CapturedFixture.Packets(asset))
 			{

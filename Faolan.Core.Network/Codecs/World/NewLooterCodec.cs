@@ -19,7 +19,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// playfield (re)load.
 	public static class NewLooterCodec
 	{
-		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.NewCurrentLooterIIR, GameServer0X2000Opcodes.NewAllowedLooterIIR];
+		public static readonly IirTypes[] HandledTypes = [IirTypes.NewCurrentLooterIIR, IirTypes.NewAllowedLooterIIR];
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(NewLooterIIR value)
@@ -41,7 +41,7 @@ namespace Faolan.Core.Network.Codecs.World
 		internal static NewLooterIIR Read(ref SpanReader r)
 		{
 			var offset = r.Position;
-			var subop = (GameServer0X2000Opcodes)r.ReadU32Be();
+			var subop = (IirTypes)r.ReadU32Be();
 			if (Array.IndexOf(HandledTypes, subop) < 0)
 				throw CodecParseException.Unexpected(nameof(NewLooterCodec), offset, "NewCurrentLooterIIR or NewAllowedLooterIIR", $"0x{(uint)subop:X8}");
 
@@ -58,27 +58,27 @@ namespace Faolan.Core.Network.Codecs.World
 
 	// NewCurrentLooterIIR / NewAllowedLooterIIR. LooterClass + LooterHandle are one entity reference; (0, 0) = no
 	// looter.
-	public sealed record NewLooterIIR(GameServer0X2000Opcodes SubOpcode, uint BagHandle, byte Flag, uint LooterClass, uint LooterHandle);
+	public sealed record NewLooterIIR(IirTypes SubOpcode, uint BagHandle, byte Flag, uint LooterClass, uint LooterHandle);
 
 	// VALUE factories for the two looter verbs. They live here, not as Build overloads, so a caller states WHICH
 	// looter it is setting by name instead of handing the codec an IIR opcode - #530 rule 7 keeps the IIR names
-	// inside Codecs/, and `NewLooterCodec.Build(GameServer0X2000Opcodes.NewAllowedLooterIIR, ...)` was the last
+	// inside Codecs/, and `NewLooterCodec.Build(IirTypes.NewAllowedLooterIIR, ...)` was the last
 	// place in the server layer that spelled one.
 	public static class NewLooters
 	{
 		// The bag's CURRENT looter - who is holding it open. `playerHandle` 0 clears it.
 		public static NewLooterIIR Current(uint bagHandle, uint playerHandle)
 		{
-			return For(GameServer0X2000Opcodes.NewCurrentLooterIIR, bagHandle, playerHandle);
+			return For(IirTypes.NewCurrentLooterIIR, bagHandle, playerHandle);
 		}
 
 		// Who is ALLOWED to loot the bag - and, mid-session, what makes the client instantiate it at all (#263).
 		public static NewLooterIIR Allowed(uint bagHandle, uint playerHandle)
 		{
-			return For(GameServer0X2000Opcodes.NewAllowedLooterIIR, bagHandle, playerHandle);
+			return For(IirTypes.NewAllowedLooterIIR, bagHandle, playerHandle);
 		}
 
-		private static NewLooterIIR For(GameServer0X2000Opcodes subOpcode, uint bagHandle, uint playerHandle)
+		private static NewLooterIIR For(IirTypes subOpcode, uint bagHandle, uint playerHandle)
 		{
 			return new NewLooterIIR(subOpcode, bagHandle, 0x00, playerHandle == 0
 				? 0

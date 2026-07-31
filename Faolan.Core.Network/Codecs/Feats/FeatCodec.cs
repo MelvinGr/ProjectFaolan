@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Feats
 	// composite base*100+rank). Decoded from the hakotep feat captures; see docs/subsystems/feats.md + #251.
 	public static class FeatCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.FeatIIR;
+		public const uint Opcode = (uint)IirTypes.FeatIIR;
 
 		public const byte StateAck = 0x05;
 		public const byte StateTrainRequest = 0x04;

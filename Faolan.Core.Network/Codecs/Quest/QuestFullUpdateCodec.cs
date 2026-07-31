@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// The u32 length prefix belongs to the SENDER (#530 rule 2).
 	public static class QuestFullUpdateCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.QuestFullUpdateIIR;
+		public const uint Opcode = (uint)IirTypes.QuestFullUpdateIIR;
 
 		// The per-quest LEVEL fallback. The level is a quest PROPERTY, CONSTANT per quest across its whole lifecycle
 		// (every captured 13479 full-update uses 3, on grant and on every re-display: frames 687/8876/9947/10129). It

@@ -36,7 +36,7 @@ namespace Faolan.Tests
 			var record = DecodeIir(GameServerListener.BuildGameTime(BeachClient(), BitConverter.UInt32BitsToSingle(0x472BDD00), DateTimeOffset.FromUnixTimeSeconds(0x6A024E93)).Serialize());
 
 			Assert.Equal(0x2000u, record.Opcode);
-			Assert.Equal((uint)GameServer0X2000Opcodes.GameTimeIIR, record.IirType);
+			Assert.Equal((uint)IirTypes.GameTimeIIR, record.IirType);
 			Assert.Equal(0u, record.Handle);
 			// NB "FieldA" is this decoder's generic name for the 4 bytes at that offset, and under the corrected clock
 			// split (#351) they are not one field: 0x01 is the isToBePassed bool and 0x472BDD are the top 3 bytes of the
@@ -52,7 +52,7 @@ namespace Faolan.Tests
 			var record = DecodeIir(GameServerListener.BuildMapChange(BeachClient(), null!, WorldState.DefaultPlayfieldToken).Serialize());
 
 			Assert.Equal(0x2000u, record.Opcode);
-			Assert.Equal((uint)GameServer0X2000Opcodes.PlayfieldFIIR, record.IirType);
+			Assert.Equal((uint)IirTypes.PlayfieldFIIR, record.IirType);
 			Assert.Equal(0u, record.Handle);
 			Assert.Equal(0x0043A140u, record.FieldA);
 			Assert.Equal(CapturedMapChangeBody, record.Body);

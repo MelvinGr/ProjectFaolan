@@ -1,6 +1,6 @@
 # IIR carrier type sub-opcodes (generated)
 
-> **GENERATED — do not edit.** Source: the compiled `GameServer0X2000Opcodes` enum in
+> **GENERATED — do not edit.** Source: the compiled `IirTypes` enum in
 > `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 

@@ -31,7 +31,7 @@ namespace Faolan.Tests
 				total++;
 				var row = new WorldObject
 				{
-					SubOpcode = (uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR,
+					SubOpcode = (uint)IirTypes.SimpleDynelFullUpdateIIR,
 					Name = r.GetString(0),
 					DisplayKind = (InnerElementKind)r.GetInt64(1),
 					CarsGroup = (uint)r.GetInt64(2),

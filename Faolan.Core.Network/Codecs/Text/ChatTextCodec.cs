@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.Text
 		// the values in our sole capture (type 0, flags 0x40000001).
 		public const byte DefaultChatTextType = 0x00;
 		public const uint DefaultTypeFlags = 0x40000001;
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.ChatTextIIR; // 0xE0B51102
+		public const uint Opcode = (uint)IirTypes.ChatTextIIR; // 0xE0B51102
 		private const byte LeadFlag = 0x00;
 
 		public static byte[] Build(ChatTextIIR value)

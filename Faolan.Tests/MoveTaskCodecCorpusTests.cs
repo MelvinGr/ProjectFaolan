@@ -55,7 +55,7 @@ namespace Faolan.Tests
 			// From the committed corpus extract, so this runs without the capture repo. Verified equivalent: all
 			// 10241 MoveTask records in the corpus are TOP-LEVEL packets - none is nested inside another packet's
 			// body - so filtering by IIR loses nothing versus scanning every body.
-			foreach (var (_, raw) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.MoveTaskIIR))
+			foreach (var (_, raw) in CorpusExtract.OfType((uint)IirTypes.MoveTaskIIR))
 			{
 				var o = 0;
 				while (true)

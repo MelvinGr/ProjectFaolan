@@ -16,13 +16,13 @@ namespace Faolan.Core.Network.Codecs.World
 	{
 		// The plain decor/prop dynel - the class a caller names when it means "an ordinary world object" rather than
 		// the whole family (the corpus extract's world-object slice, the burst's column lift).
-		public const uint SimpleDynel = (uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR;
+		public const uint SimpleDynel = (uint)IirTypes.SimpleDynelFullUpdateIIR;
 
 		public static readonly IReadOnlySet<uint> Placed = new HashSet<uint>
 		{
-			(uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR,
-			(uint)GameServer0X2000Opcodes.DoorFullUpdateIIR, (uint)GameServer0X2000Opcodes.DestructibleFullUpdateIIR,
-			(uint)GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR
+			(uint)IirTypes.SimpleDynelFullUpdateIIR, (uint)IirTypes.LootBagFullUpdateIIR,
+			(uint)IirTypes.DoorFullUpdateIIR, (uint)IirTypes.DestructibleFullUpdateIIR,
+			(uint)IirTypes.ClimbingDynelFullUpdateIIR
 		};
 
 		// The classes that can back a zone-line DOOR: the dedicated door class, plus SimpleDynel - which also backs
@@ -30,7 +30,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// follows its use, so the broader class costs nothing (decor never teleports anyone).
 		public static readonly IReadOnlySet<uint> Doors = new HashSet<uint>
 		{
-			(uint)GameServer0X2000Opcodes.DoorFullUpdateIIR, (uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR
+			(uint)IirTypes.DoorFullUpdateIIR, (uint)IirTypes.SimpleDynelFullUpdateIIR
 		};
 	}
 }

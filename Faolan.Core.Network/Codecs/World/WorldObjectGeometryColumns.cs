@@ -154,11 +154,11 @@ namespace Faolan.Core.Network.Codecs.World
 		// LootBag appends its loot contents instead, which is why it is 0 here and short-parses by design.
 		private static int TrailerWordCount(uint subOpcode)
 		{
-			return (GameServer0X2000Opcodes)subOpcode switch
+			return (IirTypes)subOpcode switch
 			{
-				GameServer0X2000Opcodes.DestructibleFullUpdateIIR => 5,
-				GameServer0X2000Opcodes.DoorFullUpdateIIR => 1,
-				GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR => 1,
+				IirTypes.DestructibleFullUpdateIIR => 5,
+				IirTypes.DoorFullUpdateIIR => 1,
+				IirTypes.ClimbingDynelFullUpdateIIR => 1,
 				_ => 0 // SimpleDynelFullUpdateIIR has none; LootBagFullUpdateIIR carries contents, not words
 			};
 		}

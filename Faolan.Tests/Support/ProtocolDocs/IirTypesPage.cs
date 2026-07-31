@@ -7,7 +7,7 @@ using Faolan.Core.Enums;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
-	// Generates docs/protocol/gen/iir-types.md from the compiled GameServer0X2000Opcodes enum. Each entry's VALUE is
+	// Generates docs/protocol/gen/iir-types.md from the compiled IirTypes enum. Each entry's VALUE is
 	// a 32-bit BKDR-31 hash of the client's IIR type name; the client names carry _c/_t suffixes (and lowercase n3)
 	// that our curated member names drop. So for each entry we RECOVER the client type string by recomputing BKDR-31
 	// over a small set of candidates derived from the member name, and keep only the one that hashes to the value -
@@ -19,12 +19,12 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 		public static string Render()
 		{
-			var members = typeof(GameServer0X2000Opcodes)
+			var members = typeof(IirTypes)
 				.GetFields(BindingFlags.Public | BindingFlags.Static)
 				.Select(f => (f.Name, Value: Convert.ToUInt32(f.GetRawConstantValue())))
 				.OrderBy(x => x.Value)
 				.ToList();
-			var notes = OpcodesSource.Notes("GameServer0X2000Opcodes");
+			var notes = OpcodesSource.Notes("IirTypes");
 
 			int verified = 0, commandOps = 0, unrecovered = 0;
 			var rows = new List<(uint Value, string Member, string Recovered, string Kind)>();
@@ -52,7 +52,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			var sb = new StringBuilder();
 			sb.AppendLine("# IIR carrier type sub-opcodes (generated)");
 			sb.AppendLine();
-			sb.AppendLine("> **GENERATED — do not edit.** Source: the compiled `GameServer0X2000Opcodes` enum in");
+			sb.AppendLine("> **GENERATED — do not edit.** Source: the compiled `IirTypes` enum in");
 			sb.AppendLine("> `Faolan.Core/Enums/Opcodes.cs`, read by reflection.");
 			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.");
 			sb.AppendLine();

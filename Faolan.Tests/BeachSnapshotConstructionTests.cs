@@ -61,7 +61,7 @@ namespace Faolan.Tests
 			var prefix = SnapshotPackets.BuildPrefix(root.Length);
 
 			using var content = new FaolanStream();
-			content.WriteUInt32(GameServer0X2000Opcodes.FullPlayerCharacterIIR);
+			content.WriteUInt32(IirTypes.FullPlayerCharacterIIR);
 			content.WriteUInt32(0x0000C350);
 			content.WriteUInt32(0x02165EFF);
 			content.WriteArray(prefix);

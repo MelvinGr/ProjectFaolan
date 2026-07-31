@@ -51,14 +51,14 @@ namespace Faolan.Tests
 			var tracer = Tracer(capture);
 
 			var rpc = new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), Endpoints.Endpoint(Endpoints.GameAgentType, 0x0012D687), GameAgentOpcodes.PassBlob,
-				body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
+				body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)IirTypes.MoveTaskIIR).WriteUInt32(0x11223344)));
 
 			tracer.Received(Rpc.Parse(rpc.Serialize()));
 			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
 
 			Assert.All(capture.Messages, line =>
 			{
-				Assert.Contains($"subOpcode={nameof(GameServer0X2000Opcodes.MoveTaskIIR)}", line);
+				Assert.Contains($"subOpcode={nameof(IirTypes.MoveTaskIIR)}", line);
 				Assert.Contains("PassBlob (0x2000)", line);
 			});
 		}
@@ -72,7 +72,7 @@ namespace Faolan.Tests
 			var tracer = new ConanPacketTracer(capture, "UniverseAgent", typeof(UniverseInterfaceOpcodes));
 
 			var rpc = new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
-				body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.MoveTaskIIR).WriteUInt32(0x11223344)));
+				body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)IirTypes.MoveTaskIIR).WriteUInt32(0x11223344)));
 
 			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
 
@@ -138,7 +138,7 @@ namespace Faolan.Tests
 			yield return
 			[
 				new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
-					body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)GameServer0X2000Opcodes.StatUpdateIIR).WriteUInt32(0x0000C350).WriteUInt32(0x0012D687)))
+					body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)IirTypes.StatUpdateIIR).WriteUInt32(0x0000C350).WriteUInt32(0x0012D687)))
 			];
 
 			// A non-PassBlob carrier with a plain byte body (no sub-opcode branch).

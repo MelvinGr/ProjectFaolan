@@ -18,7 +18,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class PetCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.PetIIR;
+		public const uint Opcode = (uint)IirTypes.PetIIR;
 
 		public const uint ModeAssign = 0;
 		public const uint ModeRemove = 1;

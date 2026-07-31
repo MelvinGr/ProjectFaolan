@@ -26,7 +26,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// that the bytes on the wire stay identical to retail's.
 	public static class ScryScriptCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.ScryScriptIIR;
+		public const uint Opcode = (uint)IirTypes.ScryScriptIIR;
 		private const byte FramingFlag = 0x00;
 
 		public static byte[] Build(ScryScriptIIR value)

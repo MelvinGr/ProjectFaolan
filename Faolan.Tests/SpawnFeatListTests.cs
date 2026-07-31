@@ -30,7 +30,7 @@ namespace Faolan.Tests
 			var distinct = new HashSet<uint>();
 			var bases = new Dictionary<int, int>();
 
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
+			foreach (var (source, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
 			{
 				if (!SpawnBodyReader.TryParse(body, out var scaffold) || !SpawnBodyReader.IsPlayer(scaffold))
 				{

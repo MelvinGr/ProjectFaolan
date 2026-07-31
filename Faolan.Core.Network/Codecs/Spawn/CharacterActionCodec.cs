@@ -16,7 +16,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class CharacterActionCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.CharacterActionIIR;
+		public const uint Opcode = (uint)IirTypes.CharacterActionIIR;
 
 		// The record's one non-zero literal: a kind byte ahead of the 16 zero bytes. Constant across every captured
 		// record, so it is asserted rather than carried.

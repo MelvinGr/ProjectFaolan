@@ -11,7 +11,7 @@ namespace Faolan.Core.Network.Codecs.World
 	{
 		public const float DefaultFadeSeconds = 3.0f;
 
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.N3ToClientFadeIIR;
+		public const uint Opcode = (uint)IirTypes.N3ToClientFadeIIR;
 
 		private const byte RecordMarker = 0x00;
 

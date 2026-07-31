@@ -112,7 +112,7 @@ namespace Faolan.Tests
 		private static CapturedPacket Reply()
 		{
 			var packet = CapturedFixture.Packets("recipe-book-reply.bin").Single();
-			Assert.Equal((uint)GameServer0X2000Opcodes.TradeskillReplyIIR, packet.Iir);
+			Assert.Equal((uint)IirTypes.TradeskillReplyIIR, packet.Iir);
 			return new CapturedPacket(0, true, (uint)GameInterfaceOpcodes.DispatchPassBlob, packet.Iir, packet.Full);
 		}
 

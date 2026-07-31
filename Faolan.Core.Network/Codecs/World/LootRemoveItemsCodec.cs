@@ -26,7 +26,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// slots in one message. Gitea #453. [V0]
 	public static class LootRemoveItemsCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.LootRemoveItemsIIR;
+		public const uint Opcode = (uint)IirTypes.LootRemoveItemsIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(LootRemoveItemsIIR value)

@@ -94,7 +94,7 @@ namespace Faolan.Tests
 		{
 			// Reads the committed CORPUS EXTRACT rather than the capture repo, so the suite runs from a plain clone.
 			// Bodies are byte-identical to the corpus' BodyHex and keep their "<file>#<index>" provenance.
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
+			foreach (var (source, body) in CorpusExtract.OfType((uint)IirTypes.FullPlayerCharacterIIR))
 			{
 				// BodyHex is the body WITH its leading u32 length; callers want everything after it.
 				var declared = body.ReadU32Be(0);

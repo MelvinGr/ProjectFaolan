@@ -20,7 +20,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The u32 carrier length belongs to the SENDER (#530 rule 2) - it was 0x12 (18) on every captured record.
 	public static class ComboBookCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.ComboBookIIR;
+		public const uint Opcode = (uint)IirTypes.ComboBookIIR;
 		private const ushort AddFlag = 0x0001;
 
 		// CANONICAL - the only method here that writes bytes.

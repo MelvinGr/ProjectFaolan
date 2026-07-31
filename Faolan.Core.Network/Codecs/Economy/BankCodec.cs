@@ -18,7 +18,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class BankCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.BankIIR;
+		public const uint Opcode = (uint)IirTypes.BankIIR;
 
 		// The lead flag every captured record carries.
 		public const byte LeadFlag = 0x01;

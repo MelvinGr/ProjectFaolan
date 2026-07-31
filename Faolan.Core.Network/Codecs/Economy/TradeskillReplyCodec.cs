@@ -41,7 +41,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 		public const byte RoleIngredient = 0;
 		public const byte RoleResult = 1;
 
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.TradeskillReplyIIR;
+		public const uint Opcode = (uint)IirTypes.TradeskillReplyIIR;
 		public const uint Version = 1;
 		private const uint HeaderTypeA = 0xF4241; // rdbType value A (1000001)
 		private const uint HeaderTypeB = 0xF4242; // rdbType value B (1000002)

@@ -34,7 +34,7 @@ namespace Faolan.Tests
 			var mismatches = new List<string>();
 			var census = new Dictionary<string, int>();
 
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
+			foreach (var (source, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
 			{
 				var record = body[4..]; // the u32 carrier length is the sender's (#530 rule 2)
 				SimpleCharFullUpdateIIR spawn;
@@ -85,7 +85,7 @@ namespace Faolan.Tests
 			var emptySlot = 0;
 			var noSlot = 0;
 
-			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
+			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
 			{
 				if (!SpawnBodyReader.TryParse(body, out var spawn))
 					continue;
@@ -129,7 +129,7 @@ namespace Faolan.Tests
 			var records = 0;
 			var classes = new Dictionary<uint, int>();
 
-			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
+			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
 			{
 				if (!SpawnBodyReader.TryParse(body, out var spawn))
 					continue;

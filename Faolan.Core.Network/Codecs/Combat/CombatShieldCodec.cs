@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The retail default the client's own overflow clamp resets stat 0xA5 to: one shield per arc. The most
 		// common captured value (17 of 86).
 		public const uint DefaultDistribution = 111;
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.CombatShieldIIR;
+		public const uint Opcode = (uint)IirTypes.CombatShieldIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(CombatShieldIIR value)

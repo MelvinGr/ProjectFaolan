@@ -28,10 +28,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	public static class KnubotCodec
 	{
 		// The IIR types this codec constructs and parses (read by the coverage matrix).
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		public static readonly IirTypes[] HandledTypes =
 		[
-			GameServer0X2000Opcodes.KnubotAnswerIIR, GameServer0X2000Opcodes.KnubotAnswerListIIR, GameServer0X2000Opcodes.KnubotAppendTextIIR,
-			GameServer0X2000Opcodes.KnubotCloseChatWindowIIR, GameServer0X2000Opcodes.KnubotOpenChatWindowIIR
+			IirTypes.KnubotAnswerIIR, IirTypes.KnubotAnswerListIIR, IirTypes.KnubotAppendTextIIR,
+			IirTypes.KnubotCloseChatWindowIIR, IirTypes.KnubotOpenChatWindowIIR
 		];
 
 		private const ushort Version = 1;
@@ -56,7 +56,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 
 		internal static KnubotIIR Read(ref SpanReader r)
 		{
-			var sub = (GameServer0X2000Opcodes)r.ReadU32Be();
+			var sub = (IirTypes)r.ReadU32Be();
 			r.ExpectU32Be(EntityClass.Character, "the carrier entity class");
 			var player = r.ReadU32Be();
 			var env = r.ReadU8();
@@ -66,18 +66,18 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 
 			switch (sub)
 			{
-				case GameServer0X2000Opcodes.KnubotOpenChatWindowIIR:
+				case IirTypes.KnubotOpenChatWindowIIR:
 					return new KnubotOpenChatWindowIIR(player, npc, env, r.ReadU8());
-				case GameServer0X2000Opcodes.KnubotAppendTextIIR:
+				case IirTypes.KnubotAppendTextIIR:
 					var field = r.ReadU32Be();
 					var xml = r.ReadBytesU16Length().ToArray();
 
 					return new KnubotAppendTextIIR(player, npc, env, field, xml, r.ReadU8());
-				case GameServer0X2000Opcodes.KnubotAnswerListIIR:
+				case IirTypes.KnubotAnswerListIIR:
 					return new KnubotAnswerListIIR(player, npc, env, ReadStrings(ref r));
-				case GameServer0X2000Opcodes.KnubotCloseChatWindowIIR:
+				case IirTypes.KnubotCloseChatWindowIIR:
 					return new KnubotCloseChatWindowIIR(player, npc, env, ReadStrings(ref r));
-				case GameServer0X2000Opcodes.KnubotAnswerIIR:
+				case IirTypes.KnubotAnswerIIR:
 					return new KnubotAnswerIIR(player, npc, env, r.ReadU32Be());
 				default:
 					throw CodecParseException.Unexpected(nameof(KnubotCodec), 0, "a Knubot IIR sub-opcode", $"0x{(uint)sub:X8}");
@@ -89,23 +89,23 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			switch (v)
 			{
 				case KnubotOpenChatWindowIIR open:
-					Header(s, GameServer0X2000Opcodes.KnubotOpenChatWindowIIR, open).WriteByte(open.Value);
+					Header(s, IirTypes.KnubotOpenChatWindowIIR, open).WriteByte(open.Value);
 
 					break;
 				case KnubotAppendTextIIR text:
-					Header(s, GameServer0X2000Opcodes.KnubotAppendTextIIR, text).WriteUInt32(text.Field).WriteUInt16(text.Xml.Length).WriteArray(text.Xml).WriteByte(text.Trailing);
+					Header(s, IirTypes.KnubotAppendTextIIR, text).WriteUInt32(text.Field).WriteUInt16(text.Xml.Length).WriteArray(text.Xml).WriteByte(text.Trailing);
 
 					break;
 				case KnubotAnswerListIIR answers:
-					WriteStrings(Header(s, GameServer0X2000Opcodes.KnubotAnswerListIIR, answers), answers.Strings);
+					WriteStrings(Header(s, IirTypes.KnubotAnswerListIIR, answers), answers.Strings);
 
 					break;
 				case KnubotCloseChatWindowIIR close:
-					WriteStrings(Header(s, GameServer0X2000Opcodes.KnubotCloseChatWindowIIR, close), close.Strings);
+					WriteStrings(Header(s, IirTypes.KnubotCloseChatWindowIIR, close), close.Strings);
 
 					break;
 				case KnubotAnswerIIR answer:
-					Header(s, GameServer0X2000Opcodes.KnubotAnswerIIR, answer).WriteUInt32(answer.Index);
+					Header(s, IirTypes.KnubotAnswerIIR, answer).WriteUInt32(answer.Index);
 
 					break;
 				default:
@@ -113,7 +113,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			}
 		}
 
-		private static FaolanStream Header(FaolanStream s, GameServer0X2000Opcodes sub, KnubotIIR v)
+		private static FaolanStream Header(FaolanStream s, IirTypes sub, KnubotIIR v)
 		{
 			return s.WriteUInt32(sub)
 				.WriteUInt32(EntityClass.Character)

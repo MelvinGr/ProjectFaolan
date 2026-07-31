@@ -52,7 +52,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("# Coverage matrix (generated)");
 			sb.AppendLine();
 			sb.AppendLine("> **GENERATED — do not edit.** Derived from the codecs themselves: a codec covers an IIR type when it");
-			sb.AppendLine("> **declares** it (`HandledTypes`, or a `const uint *Opcode` = `(uint)GameServer0X2000Opcodes.<Type>`);");
+			sb.AppendLine("> **declares** it (`HandledTypes`, or a `const uint *Opcode` = `(uint)IirTypes.<Type>`);");
 			sb.AppendLine("> a codec has a byte-exact test when a `Faolan.Tests` file references the codec class AND asserts on bytes.");
 			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.");
 			sb.AppendLine();
@@ -78,7 +78,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine();
 			sb.AppendLine("V1 now means what it says. A codec cannot emit an IIR without declaring it: `CodecConventionTests`");
 			sb.AppendLine("forbids a bare opcode hex literal anywhere in `Codecs/`, so every emitter names its");
-			sb.AppendLine("`GameServer0X2000Opcodes.<Type>` member and is attributed here. (Before #317 the scan fell back on a");
+			sb.AppendLine("`IirTypes.<Type>` member and is attributed here. (Before #317 the scan fell back on a");
 			sb.AppendLine("`<Name>Iir` identifier regex, and ~9 built types showed a false V1.)");
 			sb.AppendLine();
 			sb.AppendLine("**Limitation (honest):** RPC method opcodes are dispatched inline in the listeners with no explicit");

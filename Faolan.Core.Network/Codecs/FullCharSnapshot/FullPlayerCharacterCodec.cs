@@ -32,7 +32,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// captures are the degenerate case.
 	public static class FullPlayerCharacterCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR;
+		public const uint Opcode = (uint)IirTypes.FullPlayerCharacterIIR;
 
 		// [u8 flag][u32 BE rootLength]. The flag is 0 on every captured snapshot; asserted rather than skipped, so
 		// a body that carries something else there fails loudly instead of shifting the root by a byte.

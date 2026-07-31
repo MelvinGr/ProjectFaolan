@@ -28,7 +28,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// c2s selections matching the conversations and fights that follow them]
 	public static class LookAtCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.LookAtIIR;
+		public const uint Opcode = (uint)IirTypes.LookAtIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(LookAtIIR value)

@@ -27,7 +27,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class NewLevelCodec
 	{
 		public const int DeltaCount = 6;
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.NewLevelIIR;
+		public const uint Opcode = (uint)IirTypes.NewLevelIIR;
 		private const byte LeadFlag = 0x00;
 
 		// CANONICAL - the only method here that writes bytes.

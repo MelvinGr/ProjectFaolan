@@ -46,7 +46,7 @@ namespace Faolan.Tests
 			var withCharacterTags = 0;
 			var singleTag = 0;
 
-			foreach (var (source, body) in CapturedBodies((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
+			foreach (var (source, body) in CapturedBodies((uint)IirTypes.FullPlayerCharacterIIR))
 			{
 				var stream = new FaolanStream(body);
 				stream.ReadUInt32(); // subOpcode

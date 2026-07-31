@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// every spell id resolving to a Spells row]
 	public static class MagicBuffCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.MagicBuffIIR;
+		public const uint Opcode = (uint)IirTypes.MagicBuffIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(MagicBuffIIR value)

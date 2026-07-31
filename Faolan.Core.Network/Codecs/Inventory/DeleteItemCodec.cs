@@ -34,7 +34,7 @@ namespace Faolan.Core.Network.Codecs.Inventory
 	// tools/ghidra/DumpDeleteItemIir.java + DumpDeleteItemFns.java -> tools/ghidra/output/delete_item_fns.txt.
 	public static class DeleteItemCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.DeleteItemIIR;
+		public const uint Opcode = (uint)IirTypes.DeleteItemIIR;
 
 		public static DeleteItemIIR Parse(in ReadOnlySpan<byte> data)
 		{

@@ -3,7 +3,7 @@ namespace Faolan.Core.Enums
 	// The u16 method index a CoreClaimIIR carries after the endpoint - the Claims/Redeem window's little
 	// request/response protocol, decoded from the NecroL80 login_redeem-claim capture
 	// (docs/subsystems/item-claims.md). These are method indices WITHIN the InventoryClaims IIR, not entries in
-	// GameServer0X2000Opcodes, which is why they are their own enum rather than members of an opcode catalog.
+	// IirTypes, which is why they are their own enum rather than members of an opcode catalog.
 	//
 	// Both directions are here deliberately: the pair is what makes the exchange readable (Request -> List,
 	// Redeem -> RedeemAck), and splitting c2s from s2c would hide that.

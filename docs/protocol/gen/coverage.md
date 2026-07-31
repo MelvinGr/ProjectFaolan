@@ -1,7 +1,7 @@
 # Coverage matrix (generated)
 
 > **GENERATED — do not edit.** Derived from the codecs themselves: a codec covers an IIR type when it
-> **declares** it (`HandledTypes`, or a `const uint *Opcode` = `(uint)GameServer0X2000Opcodes.<Type>`);
+> **declares** it (`HandledTypes`, or a `const uint *Opcode` = `(uint)IirTypes.<Type>`);
 > a codec has a byte-exact test when a `Faolan.Tests` file references the codec class AND asserts on bytes.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
@@ -27,7 +27,7 @@ outstanding, and check the direction before treating one as a gap.
 
 V1 now means what it says. A codec cannot emit an IIR without declaring it: `CodecConventionTests`
 forbids a bare opcode hex literal anywhere in `Codecs/`, so every emitter names its
-`GameServer0X2000Opcodes.<Type>` member and is attributed here. (Before #317 the scan fell back on a
+`IirTypes.<Type>` member and is attributed here. (Before #317 the scan fell back on a
 `<Name>Iir` identifier regex, and ~9 built types showed a false V1.)
 
 **Limitation (honest):** RPC method opcodes are dispatched inline in the listeners with no explicit

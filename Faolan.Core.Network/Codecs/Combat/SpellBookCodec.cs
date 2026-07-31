@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class SpellBookCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.SpellBookIIR;
+		public const uint Opcode = (uint)IirTypes.SpellBookIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(SpellBookIIR value)

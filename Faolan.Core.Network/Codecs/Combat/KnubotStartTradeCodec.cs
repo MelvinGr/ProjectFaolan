@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class KnubotStartTradeCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.KnubotStartTradeIIR;
+		public const uint Opcode = (uint)IirTypes.KnubotStartTradeIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(KnubotStartTradeIIR value)

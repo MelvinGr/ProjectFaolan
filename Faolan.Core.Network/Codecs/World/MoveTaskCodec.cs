@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// signature is exactly the ambiguity rule 1 removes.
 	public static class MoveTaskCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.MoveTaskIIR;
+		public const uint Opcode = (uint)IirTypes.MoveTaskIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(MoveTaskIIR value)

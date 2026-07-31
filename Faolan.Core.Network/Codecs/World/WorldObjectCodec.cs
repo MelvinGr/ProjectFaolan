@@ -25,10 +25,10 @@ namespace Faolan.Core.Network.Codecs.World
 	// DynelFullUpdateCodecTests).
 	public static class WorldObjectCodec
 	{
-		public static readonly GameServer0X2000Opcodes[] HandledTypes =
+		public static readonly IirTypes[] HandledTypes =
 		[
-			GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR, GameServer0X2000Opcodes.LootBagFullUpdateIIR, GameServer0X2000Opcodes.DoorFullUpdateIIR,
-			GameServer0X2000Opcodes.DestructibleFullUpdateIIR, GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR, GameServer0X2000Opcodes.TombStoneFullUpdateIIR
+			IirTypes.SimpleDynelFullUpdateIIR, IirTypes.LootBagFullUpdateIIR, IirTypes.DoorFullUpdateIIR,
+			IirTypes.DestructibleFullUpdateIIR, IirTypes.ClimbingDynelFullUpdateIIR, IirTypes.TombStoneFullUpdateIIR
 		];
 
 		// CANONICAL - the only method here that writes bytes.
@@ -68,7 +68,7 @@ namespace Faolan.Core.Network.Codecs.World
 		internal static WorldObjectIIR Read(ref SpanReader r)
 		{
 			var offset = r.Position;
-			var subOpcode = (GameServer0X2000Opcodes)r.ReadU32Be();
+			var subOpcode = (IirTypes)r.ReadU32Be();
 			if (Array.IndexOf(HandledTypes, subOpcode) < 0)
 				throw CodecParseException.Unexpected(nameof(WorldObjectCodec), offset, "a dynel-family full-update type (see HandledTypes)", $"0x{(uint)subOpcode:X8}");
 
@@ -113,7 +113,7 @@ namespace Faolan.Core.Network.Codecs.World
 			// A container's trailer is its loot CONTENTS, and the captured contents are not persisted (session state,
 			// #410) - every chest spawns with the same clean empty scaffold a dropped bag gets, and WithLootContents
 			// splices the live cash + items per drop.
-			var contents = row.SubOpcode == (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR
+			var contents = row.SubOpcode == (uint)IirTypes.LootBagFullUpdateIIR
 				? LootContainerTemplate.BuildEmptyContents()
 				: [];
 

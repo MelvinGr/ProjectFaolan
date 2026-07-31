@@ -503,7 +503,7 @@ retail Necro captures):
 
 ## Inventory/bag carve-out (moved from Opcodes.cs 2026-07-06)
 
-RE notes on the FullPlayerCharacterIIR (0x737A6DF9) inventory/bag serialization, formerly a comment block in the `GameServer0X2000RespondsOpcodes` enum:
+RE notes on the FullPlayerCharacterIIR (0x737A6DF9) inventory/bag serialization, formerly a comment block in the `IirTypes` enum (then named `GameServer0X2000RespondsOpcodes`):
 
 ```
 FullPlayerCharacterIIR (0x737A6DF9) carve-out - the player inventory/bag serialization:

@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	public static class TemplateActionCodec
 	{
 		public const int TemplateBytes = 68;
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.TemplateActionIIR;
+		public const uint Opcode = (uint)IirTypes.TemplateActionIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(TemplateActionIIR value)

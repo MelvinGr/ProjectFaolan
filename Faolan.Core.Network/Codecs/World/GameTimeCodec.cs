@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// GameClock next door.
 	public static class GameTimeCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameTimeIIR;
+		public const uint Opcode = (uint)IirTypes.GameTimeIIR;
 
 		// The u32 that sits between dayTime and the anchor. The client's ReadSubClass loads it but the apply never
 		// forwards it to the clock; it holds 0..3 across the corpus (n = 11/37/16/77 for 0/1/2/3). We send the captured

@@ -28,7 +28,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// The u32 carrier length belongs to the SENDER (#530 rule 2) - this builds the record only.
 	public static class SimpleCharFullUpdateCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR;
+		public const uint Opcode = (uint)IirTypes.SimpleCharFullUpdateIIR;
 
 		// The embedded CoreCharacterFullUpdateIIR's version byte, 'A'. The client rejects any other value.
 		public const byte CoreCharacterVersion = 0x41;

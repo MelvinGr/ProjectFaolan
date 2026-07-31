@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// that needs a different combination can send it without inventing a meaning for it.
 	public static class UpdateSimpleDynelCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.UpdateSimpleDynelIIR;
+		public const uint Opcode = (uint)IirTypes.UpdateSimpleDynelIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(UpdateSimpleDynelIIR value)

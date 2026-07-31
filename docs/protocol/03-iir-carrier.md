@@ -36,11 +36,11 @@ generated catalog recomputes the hash from the recovered name and shows the matc
 Every codec that emits an IIR **declares** the type(s) it emits, so the sub-opcode is never a bare literal:
 
 ```csharp
-public const uint Opcode = (uint)GameServer0X2000Opcodes.ChatTextIIR;          // single type
-public static readonly GameServer0X2000Opcodes[] HandledTypes = [ … ];         // more than one
+public const uint Opcode = (uint)IirTypes.ChatTextIIR;          // single type
+public static readonly IirTypes[] HandledTypes = [ … ];         // more than one
 ```
 
-A test forbids a bare IIR hex literal anywhere in `Codecs/`, which is what lets `grep GameServer0X2000Opcodes.<Type>`
+A test forbids a bare IIR hex literal anywhere in `Codecs/`, which is what lets `grep IirTypes.<Type>`
 find every emitter. [V3: CodecConventionTests.NoCodecSourceContainsAMagicIirOpcodeLiteral]
 
 That declaration is also what [`gen/coverage.md`](gen/coverage.md) reads to attribute each type to its builder, so

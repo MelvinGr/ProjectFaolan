@@ -194,7 +194,7 @@ namespace Faolan.Tests
 		private static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass, byte[] Tails)> SubClasses()
 		{
 			// Reads the committed CORPUS EXTRACT rather than the capture repo, so the suite runs from a plain clone.
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
+			foreach (var (source, body) in CorpusExtract.OfType((uint)IirTypes.FullPlayerCharacterIIR))
 			{
 				var declared = body.ReadU32Be(0);
 				if (declared + 4 > body.Length)

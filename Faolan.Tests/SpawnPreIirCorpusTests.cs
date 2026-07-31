@@ -26,7 +26,7 @@ namespace Faolan.Tests
 			var mismatches = new List<string>();
 			var shapes = new Dictionary<string, int>();
 
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
+			foreach (var (source, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
 			{
 				if (!SpawnBodyReader.TryParse(body, out var spawn) || !SpawnBodyReader.IsPlayer(spawn))
 					continue;
@@ -72,7 +72,7 @@ namespace Faolan.Tests
 		{
 			var specs = new List<string>();
 
-			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
+			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
 			{
 				if (!SpawnBodyReader.TryParse(body, out var spawn) || !SpawnBodyReader.IsPlayer(spawn))
 					continue;
@@ -106,7 +106,7 @@ namespace Faolan.Tests
 			var constants = new Dictionary<uint, int>();
 			var iirHeaders = new Dictionary<uint, int>();
 
-			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
+			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
 			{
 				if (!SpawnBodyReader.TryParse(body, out var spawn) || !SpawnBodyReader.IsPlayer(spawn))
 					continue;

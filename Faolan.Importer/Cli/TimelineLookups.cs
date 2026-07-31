@@ -74,7 +74,7 @@ namespace Faolan.Importer.Cli
 
 		private Dictionary<(uint Category, uint Id), byte[]> _ciphertext = [];
 
-		public Dictionary<uint, string> IirNames { get; } = Enum.GetValues<GameServer0X2000Opcodes>()
+		public Dictionary<uint, string> IirNames { get; } = Enum.GetValues<IirTypes>()
 			.GroupBy(v => (uint)v).ToDictionary(g => g.Key, g => g.First().ToString());
 
 		public Dictionary<uint, string> Maps { get; private set; } = [];
@@ -135,7 +135,7 @@ namespace Faolan.Importer.Cli
 			};
 		}
 
-		// The message's name. An IIR names itself through GameServer0X2000Opcodes; an RPC method is named by its
+		// The message's name. An IIR names itself through IirTypes; an RPC method is named by its
 		// interface, which the TIER plus the DIRECTION pick - *AgentOpcodes are c2s, *InterfaceOpcodes are s2c.
 		public string NameOf(CapturedPacket packet, uint iir, string tier)
 		{

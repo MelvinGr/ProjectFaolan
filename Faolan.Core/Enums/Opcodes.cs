@@ -613,7 +613,7 @@ namespace Faolan.Core.Enums
 	// the occurrence count across all captures. This is the full catalog of every IIR id observed on the wire
 	// (server->client AND client->server - the id is the message type, direction-independent), even ones the
 	// server doesn't emit yet. The few descriptive aliases the server code uses are at the bottom.
-	public enum GameServer0X2000Opcodes : uint
+	public enum IirTypes : uint
 	{
 		AddToGroupIIR = 0x0DF44B73, // AddToGroupIIR_c  (x16) - a member joined a team; pushed to every member's WORLD connection
 		AreaFormulaIIR = 0xCE30BE4E, // AreaFormulaIIR_t  (x42)

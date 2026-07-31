@@ -450,7 +450,7 @@ namespace Faolan.GameServer
 			// The ONE reader over the body for this packet's whole dispatch chain: BodyReader() hands out a fresh cursor
 			// per call, so every layer (dispatcher -> handler -> service) shares this instance and reads from its
 			// position rather than re-reading from 0. Threaded down as a `FaolanStream body` parameter. Handlers that
-			// read a sub-header first (Handle0X2000) leave the cursor advanced for their own sub-handlers.
+			// read a sub-header first (HandleIirCarrier) leave the cursor advanced for their own sub-handlers.
 			var body = packet.BodyReader();
 
 			return packet.Receiver.Type switch

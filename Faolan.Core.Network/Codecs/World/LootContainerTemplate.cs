@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.World
 	{
 		// The container CLASS this template builds for. Not an `Opcode` declaration - WorldObjectCodec owns
 		// LootBagFullUpdateIIR (one IIR, one codec); this is which class a template row is.
-		public const uint ContainerClass = (uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR;
+		public const uint ContainerClass = (uint)IirTypes.LootBagFullUpdateIIR;
 		private const uint DefaultMaxSize = 10;
 
 		// The loot inventory's container KIND (ID32 type) on the wire; the instance is left 0 here and the live items +

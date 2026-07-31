@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class LockedToChangedCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.LockedToChangedIIR;
+		public const uint Opcode = (uint)IirTypes.LockedToChangedIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(LockedToChangedIIR value)

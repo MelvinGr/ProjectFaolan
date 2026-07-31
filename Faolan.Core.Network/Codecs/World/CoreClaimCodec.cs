@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// availability/flags block. All preserved verbatim (byte-exact test).
 	public static class CoreClaimCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.CoreClaimIIR;
+		public const uint Opcode = (uint)IirTypes.CoreClaimIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(CoreClaimIIR value)

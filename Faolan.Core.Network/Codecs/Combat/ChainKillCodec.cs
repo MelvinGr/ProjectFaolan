@@ -11,7 +11,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class ChainKillCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.ChainKillIIR;
+		public const uint Opcode = (uint)IirTypes.ChainKillIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(ChainKillIIR value)

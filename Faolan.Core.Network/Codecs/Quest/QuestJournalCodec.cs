@@ -28,7 +28,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// The u32 length prefix belongs to the SENDER (#530 rule 2).
 	public static class QuestJournalCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.QuestJournalIIR;
+		public const uint Opcode = (uint)IirTypes.QuestJournalIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(QuestJournalIIR value)

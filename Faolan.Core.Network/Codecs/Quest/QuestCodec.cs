@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// The u32 length prefix belongs to the SENDER (#530 rule 2).
 	public static class QuestCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.QuestIIR;
+		public const uint Opcode = (uint)IirTypes.QuestIIR;
 
 		// Quest state codes, from the capture.
 		public const uint StateActive = 2;

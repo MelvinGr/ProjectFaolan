@@ -46,7 +46,7 @@ namespace Faolan.Core.Network.Codecs.World
 		// carries exactly one `ActionTail` blob; a multi-action body would need the tail split per element first.
 		public const int ActionCount = 1;
 
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.GameActionListIIR;
+		public const uint Opcode = (uint)IirTypes.GameActionListIIR;
 
 		private const uint ConstFour = 4;
 		private const ulong ConstOne = 1;

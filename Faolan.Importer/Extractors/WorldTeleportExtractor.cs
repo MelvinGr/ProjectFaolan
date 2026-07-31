@@ -96,7 +96,7 @@ namespace Faolan.Importer.Extractors
 				for (var j = i + 1; j < packets.Count && j <= i + LookaheadPackets; j++)
 				{
 					var q = packets[j];
-					if (!q.IsIirCarrier || !q.IsDownload || !TeleportCodec.HandledTypes.Contains((GameServer0X2000Opcodes)q.SubOpcode))
+					if (!q.IsIirCarrier || !q.IsDownload || !TeleportCodec.HandledTypes.Contains((IirTypes)q.SubOpcode))
 						continue;
 
 					if (!q.TryParse(TeleportCodec.Parse, out var teleport))

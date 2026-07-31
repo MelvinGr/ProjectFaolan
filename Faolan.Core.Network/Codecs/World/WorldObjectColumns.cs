@@ -215,11 +215,11 @@ namespace Faolan.Core.Network.Codecs.World
 		{
 			return subOpcode switch
 			{
-				(uint)GameServer0X2000Opcodes.ClimbingDynelFullUpdateIIR => EntityClass.ClimbingDynel,
-				(uint)GameServer0X2000Opcodes.DoorFullUpdateIIR => EntityClass.ZoneLabel,
-				(uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR => EntityClass.SimpleDynel,
-				(uint)GameServer0X2000Opcodes.DestructibleFullUpdateIIR => EntityClass.Destructible,
-				(uint)GameServer0X2000Opcodes.LootBagFullUpdateIIR => EntityClass.LootBag,
+				(uint)IirTypes.ClimbingDynelFullUpdateIIR => EntityClass.ClimbingDynel,
+				(uint)IirTypes.DoorFullUpdateIIR => EntityClass.ZoneLabel,
+				(uint)IirTypes.SimpleDynelFullUpdateIIR => EntityClass.SimpleDynel,
+				(uint)IirTypes.DestructibleFullUpdateIIR => EntityClass.Destructible,
+				(uint)IirTypes.LootBagFullUpdateIIR => EntityClass.LootBag,
 				_ => EntityClass.SimpleDynel
 			};
 		}

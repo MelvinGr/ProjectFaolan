@@ -4,7 +4,7 @@
 > `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
-16 enums, 826 entries. The 32-bit `GameServer0X2000` IIR sub-opcodes are catalogued separately in [`iir-types.md`](iir-types.md).
+16 enums, 826 entries. The 32-bit IIR sub-opcodes carried inside a `0x2000` PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
 
 ## What is (and is not) verified here [V1]
 
@@ -857,7 +857,7 @@ RPC class **GameInterface** (id `0x6C67C147`) · S2C (server→client dispatch)
 | `0x200E` | `Reserved0x200E` |  |
 | `0x200F` | `DispatchDisplayPlayfieldAccessPopup` |  |
 
-## GameServer0X2000Opcodes
+## IirTypes
 
 The 0x2000-carrier IIR type sub-opcodes (32-bit BKDR-31 hashes of the client IIR type names).
 Catalogued in [`iir-types.md`](iir-types.md).

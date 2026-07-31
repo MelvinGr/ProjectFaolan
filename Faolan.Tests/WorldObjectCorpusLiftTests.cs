@@ -25,7 +25,7 @@ namespace Faolan.Tests
 			var unlifted = new List<string>();
 			var lifted = 0;
 
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR))
+			foreach (var (source, body) in CorpusExtract.OfType((uint)IirTypes.SimpleDynelFullUpdateIIR))
 			{
 				var row = new WorldObject();
 				if (WorldObjectColumns.TryLiftColumns(row, WorldObjectColumns.RecordOf(body)))

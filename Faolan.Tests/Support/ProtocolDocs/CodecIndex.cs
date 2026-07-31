@@ -52,24 +52,24 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			var repo = TestPaths.Repo();
 			var idx = new CodecIndex();
 
-			var enumFields = typeof(GameServer0X2000Opcodes).GetFields(BindingFlags.Public | BindingFlags.Static);
+			var enumFields = typeof(IirTypes).GetFields(BindingFlags.Public | BindingFlags.Static);
 			var allIirNames = enumFields.Select(f => f.Name).Where(n => n.EndsWith("IIR", StringComparison.Ordinal)).ToList();
 			foreach (var f in enumFields)
 				idx.NameByValue[Convert.ToUInt32(f.GetRawConstantValue())] = f.Name;
 
 			// Codec -> the IIR types it DECLARES. HandledTypes wins (the whole set); else every `const uint *Opcode`.
-			// Anchor the scan on a Faolan.Core.Network type (Rpc), NOT GameServer0X2000Opcodes: the opcode enums moved to
-			// Faolan.Core, so typeof(GameServer0X2000Opcodes).Assembly is now Faolan.Core.dll - the codecs live in
+			// Anchor the scan on a Faolan.Core.Network type (Rpc), NOT IirTypes: the opcode enums moved to
+			// Faolan.Core, so typeof(IirTypes).Assembly is now Faolan.Core.dll - the codecs live in
 			// Faolan.Core.Network.dll, and scanning the wrong assembly found zero codecs (every IIR fell back to "inline").
 			foreach (var t in typeof(Rpc).Assembly.GetTypes().Where(t => t.Namespace != null && t.Namespace.StartsWith("Faolan.Core.Network.Codecs", StringComparison.Ordinal)))
 			{
 				var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly);
 				var iirs = new HashSet<string>(StringComparer.Ordinal);
 
-				var handled = fields.FirstOrDefault(f => f.Name == "HandledTypes" && f.FieldType == typeof(GameServer0X2000Opcodes[]));
+				var handled = fields.FirstOrDefault(f => f.Name == "HandledTypes" && f.FieldType == typeof(IirTypes[]));
 				if (handled != null)
 				{
-					foreach (var v in (GameServer0X2000Opcodes[])handled.GetValue(null)!)
+					foreach (var v in (IirTypes[])handled.GetValue(null)!)
 						iirs.Add(v.ToString());
 				}
 				else
@@ -109,7 +109,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 					if (idx.BuiltSomewhere.Contains(iir))
 						continue;
 
-					if (text.Contains($"GameServer0X2000Opcodes.{iir}", StringComparison.Ordinal))
+					if (text.Contains($"IirTypes.{iir}", StringComparison.Ordinal))
 					{
 						idx.BuiltSomewhere.Add(iir);
 						idx.BuiltIn[iir] = Path.GetFileNameWithoutExtension(file);
@@ -154,7 +154,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 			idx.RpcOpcodeTotal = typeof(GameCharAgentOpcodes)
 				.Assembly.GetTypes()
-				.Where(t => t is { IsEnum: true, Namespace: "Faolan.Core.Enums" } && t.Name.EndsWith("Opcodes", StringComparison.Ordinal) && t.Name != "GameServer0X2000Opcodes")
+				.Where(t => t is { IsEnum: true, Namespace: "Faolan.Core.Enums" } && t.Name.EndsWith("Opcodes", StringComparison.Ordinal)) // the RPC method catalogs; IirTypes is counted above
 				.Sum(t => t.GetFields(BindingFlags.Public | BindingFlags.Static).Length);
 			idx.Dissectors = SourceFiles(Path.Combine(repo, "tools", "capture"), "decode_*.py", SearchOption.TopDirectoryOnly).Count;
 

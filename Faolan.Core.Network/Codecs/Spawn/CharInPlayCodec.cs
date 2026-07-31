@@ -16,7 +16,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class CharInPlayCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.CharInPlayIIR;
+		public const uint Opcode = (uint)IirTypes.CharInPlayIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(CharInPlayIIR value)

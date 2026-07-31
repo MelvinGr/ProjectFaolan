@@ -102,7 +102,7 @@ namespace Faolan.GameServer.Economy
 		}
 
 		// Dispatch an inbound CoreClaimIIR. Body (after the 0x2000 sub-header) = [receiverClass][receiverInstance][u16 sub][args].
-		// The shared reader arrives positioned PAST the [pbLength][pbOpcode] sub-header (Handle0X2000 consumed it), so the
+		// The shared reader arrives positioned PAST the [iirLength][iirType] sub-header (HandleIirCarrier consumed it), so the
 		// first field here is the receiver class (0xC350), matching the docs layout - no re-read from position 0.
 		public async Task HandleCoreClaim(INetworkClient client, FaolanStream body)
 		{

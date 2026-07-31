@@ -84,7 +84,7 @@ namespace Faolan.Tests
 
 		private static IEnumerable<(string Source, FullCharSnapshotSubClass SubClass)> SubClasses()
 		{
-			foreach (var (source, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.FullPlayerCharacterIIR))
+			foreach (var (source, body) in CorpusExtract.OfType((uint)IirTypes.FullPlayerCharacterIIR))
 			{
 				var declared = body.ReadU32Be(0);
 				if (declared + 4 > body.Length)

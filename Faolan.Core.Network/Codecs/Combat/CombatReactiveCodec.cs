@@ -19,7 +19,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// (caster 0x0802E5D4); docs/subsystems/combos.md.
 	public static class CombatReactiveCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.CombatReactiveIIR;
+		public const uint Opcode = (uint)IirTypes.CombatReactiveIIR;
 
 		// The "list active" flag every captured s2c record carries.
 		public const byte ActiveTag = 0x01;

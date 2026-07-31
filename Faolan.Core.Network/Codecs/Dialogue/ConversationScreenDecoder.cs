@@ -24,10 +24,10 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// cinematic conversation camera. No remoteformat text, so nothing to structure.
 	public static class ConversationScreenDecoder
 	{
-		public const uint AnswerList = (uint)GameServer0X2000Opcodes.KnubotAnswerListIIR; // 0xF164A4A5
-		public const uint AppendText = (uint)GameServer0X2000Opcodes.KnubotAppendTextIIR; // 0x4A3D899A
-		public const uint CloseChatWindow = (uint)GameServer0X2000Opcodes.KnubotCloseChatWindowIIR; // 0xC4AF39EB
-		public const uint OpenChatWindow = (uint)GameServer0X2000Opcodes.KnubotOpenChatWindowIIR; // 0x045B0B0F
+		public const uint AnswerList = (uint)IirTypes.KnubotAnswerListIIR; // 0xF164A4A5
+		public const uint AppendText = (uint)IirTypes.KnubotAppendTextIIR; // 0x4A3D899A
+		public const uint CloseChatWindow = (uint)IirTypes.KnubotCloseChatWindowIIR; // 0xC4AF39EB
+		public const uint OpenChatWindow = (uint)IirTypes.KnubotOpenChatWindowIIR; // 0x045B0B0F
 		public const uint SetDialogueCamera = SetDialogueCameraCodec.Opcode; // a 16-bit RPC opcode, not an IIR sub
 
 		public static Columns? Decode(byte[] data)

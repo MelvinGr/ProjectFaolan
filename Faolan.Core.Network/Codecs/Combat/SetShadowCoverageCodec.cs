@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class SetShadowCoverageCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.SetShadowCoverageIIR;
+		public const uint Opcode = (uint)IirTypes.SetShadowCoverageIIR;
 
 		/// <summary>The env byte the CLIENT sends with; the server's echo carries 0.</summary>
 		public const byte ClientEnv = 0x01;

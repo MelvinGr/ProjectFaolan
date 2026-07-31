@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// byte-exact by the round-trip in CharacterStatBlockTests.
 	public static class StatUpdateCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.StatUpdateIIR;
+		public const uint Opcode = (uint)IirTypes.StatUpdateIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(StatUpdateIIR value)

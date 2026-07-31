@@ -58,7 +58,7 @@ Validated byte-exact: the 603 records consume the payload with **0 leftover byte
 - **Importer** `--only recipes` (`RecipesModule` / `CaptureRecipeImporter`) — scans captures for the reply
   sub-opcode, parses records into `Recipe` rows (columns) + `RecipeItem` children, upserts them. Seeded 603
   from the NecroL80 capture.
-- **Handler** `Handle0X2000` → `SendCraftingRecipeBook`: on `TradeskillRequestIIR`, loads `Database.GetRecipes()`
+- **Handler** `HandleIirCarrier` → `SendCraftingRecipeBook`: on `TradeskillRequestIIR`, loads `Database.GetRecipes()`
   (ordered by id = capture order, `Items` + their `Items` rows included), maps each via `ToRecord`, and sends the
   reply on the world framing.
 

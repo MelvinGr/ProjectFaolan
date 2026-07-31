@@ -26,8 +26,8 @@ namespace Faolan.Tests
 			// tracks the current map and drops every spawn it sees before one.
 			var packets = CapturedFixture.Packets("mount-spawns.bin").Select(p => new CapturedPacket(0, true, (uint)GameInterfaceOpcodes.DispatchPassBlob, p.Iir, p.Full)).ToList();
 
-			Assert.Equal((uint)GameServer0X2000Opcodes.PlayfieldFIIR, packets[0].SubOpcode);
-			Assert.All(packets.Skip(1), p => Assert.Equal((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR, p.SubOpcode));
+			Assert.Equal((uint)IirTypes.PlayfieldFIIR, packets[0].SubOpcode);
+			Assert.All(packets.Skip(1), p => Assert.Equal((uint)IirTypes.SimpleCharFullUpdateIIR, p.SubOpcode));
 
 			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-mount-{Guid.NewGuid():N}.db");
 			try

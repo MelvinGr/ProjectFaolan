@@ -37,7 +37,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// The u32 length prefix belongs to the SENDER (#530 rule 2).
 	public static class MainQuestUpdateCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.MainQuestUpdateIIR;
+		public const uint Opcode = (uint)IirTypes.MainQuestUpdateIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(MainQuestUpdateIIR value)

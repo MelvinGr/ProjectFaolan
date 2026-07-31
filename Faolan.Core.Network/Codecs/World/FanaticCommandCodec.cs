@@ -63,7 +63,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// no capture behind it.
 	public static class FanaticCommandCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.FanaticCommandIIR;
+		public const uint Opcode = (uint)IirTypes.FanaticCommandIIR;
 
 		public static FanaticCommandIIR Parse(in ReadOnlySpan<byte> data)
 		{

@@ -81,7 +81,7 @@ namespace Faolan.Tests
 		// body it came from (the codec reads the whole record, so the family is decided there rather than here).
 		private static IEnumerable<(byte[] Body, byte[] Post)> Streams()
 		{
-			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
+			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
 				if (SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 					yield return (body, body[(read.Offset + read.Length)..]);
 		}

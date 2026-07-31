@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Codecs.World
 	//   [subop][0x0000C350][handle][u8 env][u8 flag1][pos 3f][rotation 2 or 4f][u8 flag2][ move block ]
 	public static class CharDCMoveCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.CharDCMoveIIR;
+		public const uint Opcode = (uint)IirTypes.CharDCMoveIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(CharDCMoveIIR value)

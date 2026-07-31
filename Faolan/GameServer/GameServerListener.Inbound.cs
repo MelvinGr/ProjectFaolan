@@ -31,18 +31,18 @@ namespace Faolan.GameServer
 {
 	public partial class GameServerListener
 	{
-		private async Task Handle0X2000(INetworkClient client, Rpc packet, FaolanStream body)
+		private async Task HandleIirCarrier(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			// Snapshot the entire 0x2000 sub-payload before consuming it, so every
 			// case below can dump the raw bytes for offline reverse-engineering.
-			// This is the data starting at the 4-byte pbLength header. ToArray() returns the whole body window
+			// This is the data starting at the 4-byte iirLength header. ToArray() returns the whole body window
 			// regardless of the cursor, so it is safe to take after the shared reader arrives positioned at 0.
 			var rawPayload = body.ToArray();
 
-			var pbLength = body.ReadUInt32();
-			var pbOpcode = body.ReadUInt32<GameServer0X2000Opcodes>();
+			var iirLength = body.ReadUInt32();
+			var iirType = body.ReadUInt32<IirTypes>();
 
-			// The shared `body` is now positioned PAST the [pbLength][pbOpcode] prefix. The sub-handlers that continue
+			// The shared `body` is now positioned PAST the [iirLength][iirType] prefix. The sub-handlers that continue
 			// reading (ScryScriptIIR -> HandleCommandPacket, the create-editor instance echo, and CoreClaim) read from
 			// this position directly - the streaming cursor that the old ConanPacket.Body shared and that the removed
 			// `subPacket` slice used to reconstruct (#407).
@@ -50,15 +50,15 @@ namespace Faolan.GameServer
 			// During the create-editor handshake the client echoes its own instance id as the 0x2000 subopcode.
 			// Retail used a fixed id (0x021662C8, or Strie's 0x02165EFF); we hand out the character's real id, so
 			// the subopcode is dynamic - match it against the session instance and route it to the echo handler.
-			if (client.Session.IsUnnamedCreatePhase && client.Session.Account?.ClientInstance == (uint)pbOpcode)
+			if (client.Session.IsUnnamedCreatePhase && client.Session.Account?.ClientInstance == (uint)iirType)
 			{
 				await HandleCreateEditorInstanceEcho(client, body);
 				return;
 			}
 
-			switch (pbOpcode)
+			switch (iirType)
 			{
-				case GameServer0X2000Opcodes.CombatReactiveIIR:
+				case IirTypes.CombatReactiveIIR:
 				{
 					// Spellweave ADD-COMPONENT (docs/subsystems/combos.md). Each add is two packets: a 0x03-tagged carrier
 					// carrying the componentIndex in the element list, and a 0x02-tagged ack twin whose list is empty.
@@ -70,25 +70,25 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.StatIIR:
+				case IirTypes.StatIIR:
 				{
 					// Create-editor (unnamed) avatar stat stream: retail sends no response, we just observe it.
 					if (client.Session.IsUnnamedCreatePhase)
 					{
-						Logger.LogInformation("Observed retail create-editor (uint)GameServer0X2000Opcodes.StatIIR while pendingPost205F={PendingPost205F}.",
+						Logger.LogInformation("Observed retail create-editor (uint)IirTypes.StatIIR while pendingPost205F={PendingPost205F}.",
 							client.Session.HasPendingPost205FFollowUp);
 					}
 
 					break;
 				}
 
-				case GameServer0X2000Opcodes.ScryScriptIIR:
+				case IirTypes.ScryScriptIIR:
 				{
 					await _createFlow.HandleCommandPacket(client, packet, body);
 					break;
 				}
 
-				case GameServer0X2000Opcodes.CharDCMoveIIR:
+				case IirTypes.CharDCMoveIIR:
 				{
 					body.ReadUInt32(); // 0xC350 IIR marker
 					body.ReadUInt32(); // the mover's handle - we key off the session, not the client's claim
@@ -192,7 +192,7 @@ namespace Faolan.GameServer
 					// (#272). While spellweaving the position is PINNED (trance root #141) - the client does NOT self-root
 					// (verified: without this overwrite you can walk during a weave), so overwrite the echoed position
 					// floats with the accepted (pinned) position; otherwise the client's own move rides back unchanged.
-					var echoBody = rawPayload[4..]; // drop the u32 pbLength: [opcode][c350][inst][env][flag1][pos][...]
+					var echoBody = rawPayload[4..]; // drop the u32 iirLength: [opcode][c350][inst][env][flag1][pos][...]
 
 					// The movingType u16 is [u8 env][u8 flag1] (docs/re/chardcmove-grammar.md): the client streams
 					// its move with env=0x01 (the "I am the controlling client" flag) and retail's echo AND relay
@@ -219,7 +219,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.CharInPlayIIR: //peer0_160
+				case IirTypes.CharInPlayIIR: //peer0_160
 				{
 					// CharInPlayIIR ("ReadyForPlayScreen") means something different per connection ROLE, so it routes on
 					// EntryMode - the role decided once at Authenticate2 - and handles every mode explicitly (#432).
@@ -275,7 +275,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.KnubotAnswerIIR:
+				case IirTypes.KnubotAnswerIIR:
 				{
 					// The player picked a dialogue option. The pick is an ordinary Knubot record - KnubotBase header
 					// then the chosen option INDEX (#534) - and the index selects the branch, so route to the child
@@ -286,7 +286,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.KnubotCloseChatWindowIIR:
+				case IirTypes.KnubotCloseChatWindowIIR:
 				{
 					// The player closed the NPC chat window (ESC/X). The client signals this with its OWN
 					// KnubotCloseChatWindow (the client double-sends it); retail just accepts it. We must tear down the
@@ -297,13 +297,13 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.BehaviorControlCenterIIR:
+				case IirTypes.BehaviorControlCenterIIR:
 				{
 					await HandleBehaviorControlCenter(client, packet, body, rawPayload);
 					break;
 				}
 
-				case GameServer0X2000Opcodes.CharacterActionIIR: // Also received when Activating feat point ??
+				case IirTypes.CharacterActionIIR: // Also received when Activating feat point ??
 				{
 					// Standard IIR carrier head: [u32 entity class][u32 handle]. Corpus (21 c2s CharacterActionIIRs,
 					// every one on quit) continues [u32 0][u8 0x21][24 zero bytes] - the same [u32 0][u8 code] slot
@@ -318,7 +318,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.LookAtIIR:
+				case IirTypes.LookAtIIR:
 				{
 					// LookAtIIR (0x0D155695): the client selects/deselects an entity. Body (after the 0x2000 framing):
 					//   [u32 0x0000C350 type][u32 selectorInstance=self] [u8 00 00 00 pad]
@@ -340,7 +340,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.DeleteItemIIR:
+				case IirTypes.DeleteItemIIR:
 				{
 					// ProtoDeleteItemIIR, NOT the sibling move message: { container_id, item_pos, template_id }. The
 					// two alias on the wire for fields 1-3, so this parsed as a move for a long time and quietly read
@@ -361,7 +361,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.MoveInventoryItemIIR:
+				case IirTypes.MoveInventoryItemIIR:
 				{
 					// The recovered client schema names this message ProtoMoveInventoryItemIIR:
 					//   { source_container_id, source_item_pos, destination_container_id, destination_item_pos }
@@ -385,7 +385,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.QuestIIR:
+				case IirTypes.QuestIIR:
 				{
 					// The client's OWN copy of the record the server sends as QuestIIR (QuestCodec.Build) - same
 					// grammar, other direction: [u32 entity class][u32 handle][u32 0][u8 0x01][u32 state][u32 questId][u32 0].
@@ -425,7 +425,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.CoreClaimIIR:
+				case IirTypes.CoreClaimIIR:
 				{
 					// The Claims/Redeem window: sub 0x0007 requests the list, sub 0x0003 redeems a claim. See
 					// GameServerListener.Claims.cs / docs/subsystems/item-claims.md.
@@ -434,7 +434,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.FeatIIR:
+				case IirTypes.FeatIIR:
 				{
 					// Feat TRAIN: state 0x04 [feat ids] -> add to CharacterFeat -> s2c FeatIIR state 0x05 ack. See
 					// GameServerListener.Feats.cs / docs/subsystems/feats.md.
@@ -443,7 +443,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.TradeskillRequestIIR:
+				case IirTypes.TradeskillRequestIIR:
 				{
 					// The client opened the Crafting -> Recipes book and is asking for its recipe list. Answer with
 					// the TradeskillReplyIIR (0x9062D559) catalog from the DB so the book populates. See
@@ -454,7 +454,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case GameServer0X2000Opcodes.UpdateInventoryIIR:
+				case IirTypes.UpdateInventoryIIR:
 				{
 					// c2s UpdateInventoryIIR is a PROBE, not a request that wants an answer: as an entity streams in
 					// the client fires a pair asking for that entity's Equipped(101) then Bag(104) container -
@@ -468,7 +468,7 @@ namespace Faolan.GameServer
 					// below; answering would diverge from capture. The s2c push itself is unimplemented (see
 					// UpdateInventory, currently emitted nowhere).
 
-					Logger.LogDebug("GameServer 0x2000 inventory probe"); //" {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), probe.Length);
+					Logger.LogDebug("GameServer 0x2000 inventory probe"); //" {SubOpcodeHex} ({RawLength} bytes).", iirType.ToHex(), probe.Length);
 
 					break;
 				}
@@ -476,10 +476,10 @@ namespace Faolan.GameServer
 				// After we relocate the player on resurrect (IntendedTeleport + n3Teleport, #214), the client echoes the
 				// teleport records back. Benign acks with no reply owed - handled here purely so they do not reach the
 				// default branch's "Unknown 0x2000 Opcode" system message.
-				case GameServer0X2000Opcodes.N3TeleportIIR:
-				case GameServer0X2000Opcodes.IntendedTeleportIIR:
+				case IirTypes.N3TeleportIIR:
+				case IirTypes.IntendedTeleportIIR:
 				{
-					Logger.LogDebug("GameServer 0x2000 client teleport-ack {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
+					Logger.LogDebug("GameServer 0x2000 client teleport-ack {SubOpcodeHex} ({RawLength} bytes).", iirType.ToHex(), rawPayload.Length);
 					break;
 				}
 
@@ -488,7 +488,7 @@ namespace Faolan.GameServer
 				// `ShadowCoverage = <n>`. Retail echoes the record straight back with the env byte cleared, which is
 				// what both captured exchanges show (client env 0x01 -> server env 0x00), so that is what we do.
 				// Nothing consumes the value yet; stealth detection is where it will.
-				case GameServer0X2000Opcodes.SetShadowCoverageIIR:
+				case IirTypes.SetShadowCoverageIIR:
 				{
 					var shadow = SetShadowCoverageCodec.Parse(rawPayload);
 					Logger.LogDebug("GameServer shadow coverage {Percent}% for handle {Handle}.", shadow.Percent, shadow.Handle);
@@ -499,7 +499,7 @@ namespace Faolan.GameServer
 				// A GM command in the client sends FanaticCommandIIR ("Fanatic" is its own name for the GM subsystem).
 				// We can read what it asked for, but what to send BACK is not decoded - no corpus capture contains one -
 				// so report the parsed command rather than inventing a reply (#448/#449).
-				case GameServer0X2000Opcodes.FanaticCommandIIR:
+				case IirTypes.FanaticCommandIIR:
 				{
 					// The codec's Parse is strict (#530 rule 4); on an undecoded inbound path that means reporting the
 					// failure to the GM rather than acting on a half-read record. `rawPayload` is the framed record, so
@@ -551,15 +551,15 @@ namespace Faolan.GameServer
 					// sub-opcode is its OWN instance id (the client-instance ack/keepalive stream). Since the create flow
 					// started using the real character id that value is DYNAMIC, not a constant, so it can only be
 					// matched here. Treat it as a benign ping: log quietly, don't spam system messages.
-					if ((uint)pbOpcode == client.Session.Character.Id)
+					if ((uint)iirType == client.Session.Character.Id)
 					{
-						Logger.LogDebug("GameServer 0x2000 client-instance ping {SubOpcodeHex} ({RawLength} bytes).", pbOpcode.ToHex(), rawPayload.Length);
+						Logger.LogDebug("GameServer 0x2000 client-instance ping {SubOpcodeHex} ({RawLength} bytes).", iirType.ToHex(), rawPayload.Length);
 						break;
 					}
 
-					Logger.LogDebug("Unhandled GameServer 0x2000 subopcode {SubOpcodeHex} raw payload: {RawPayload}", pbOpcode.ToHex(), rawPayload.ToHex());
+					Logger.LogDebug("Unhandled GameServer 0x2000 subopcode {SubOpcodeHex} raw payload: {RawPayload}", iirType.ToHex(), rawPayload.ToHex());
 
-					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"Unknown 0x2000 Opcode: {pbOpcode.ToHex()} ({rawPayload.Length} bytes)");
+					await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, $"Unknown 0x2000 Opcode: {iirType.ToHex()} ({rawPayload.Length} bytes)");
 
 					break;
 				}
@@ -785,7 +785,7 @@ namespace Faolan.GameServer
 
 				case GameAgentOpcodes.PassBlob:
 				{
-					await Handle0X2000(client, packet, body);
+					await HandleIirCarrier(client, packet, body);
 
 					break;
 				}
@@ -1585,11 +1585,11 @@ namespace Faolan.GameServer
 
 		// The BehaviorControlCenter (0x642CD3D6) inbound: by a wide margin the biggest thing the client sends on the
 		// world carrier - every action that goes through the command queue (attack swings, interacts, sit, mount,
-		// loot, emotes) arrives as one of its actionTypes. It was 669 lines INSIDE the Handle0X2000 switch, 60% of
+		// loot, emotes) arrives as one of its actionTypes. It was 669 lines INSIDE the HandleIirCarrier switch, 60% of
 		// that method's 1140; splitting it out leaves the switch readable as the routing table it is.
 		//
 		// Pure move, no behaviour change: the four early `return`s inside were already equivalent to the case's
-		// `break` because nothing follows the switch in Handle0X2000.
+		// `break` because nothing follows the switch in HandleIirCarrier.
 		private async Task HandleBehaviorControlCenter(INetworkClient client, Rpc packet, FaolanStream body, byte[] rawPayload)
 		{
 			// Important capture observation:
@@ -1613,7 +1613,7 @@ namespace Faolan.GameServer
 			if (body.Length - body.Position < sizeof(uint))
 			{
 				Logger.LogDebug("Interact: terminal behaviorType 0x{BehaviorType:X4}, no commandId - ignoring.", behaviorType);
-				return; // was a `break` out of the Handle0X2000 switch - same exit, now from this method
+				return; // was a `break` out of the HandleIirCarrier switch - same exit, now from this method
 			}
 
 			var actionType = body.ReadUInt32<BehaviorId>();

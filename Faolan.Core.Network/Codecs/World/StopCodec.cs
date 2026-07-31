@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// The u32 length prefix belongs to the SENDER (#530 rule 2) - WorldIir.Send writes it.
 	public static class StopCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.StopIIR;
+		public const uint Opcode = (uint)IirTypes.StopIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(StopIIR value)

@@ -46,7 +46,7 @@ namespace Faolan.Core.Network.Codecs.World
 	// WorldLoot.BuildOpenWindowBody), which is exactly the duplicate the one-IIR-one-codec rule exists to surface.
 	public static class SimpleDynelVisualChangeCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.SimpleDynelVisualChangeIIR;
+		public const uint Opcode = (uint)IirTypes.SimpleDynelVisualChangeIIR;
 
 		// The kind that carries a state NAME rather than words - what a window open sends.
 		public const uint NamedKind = 0;

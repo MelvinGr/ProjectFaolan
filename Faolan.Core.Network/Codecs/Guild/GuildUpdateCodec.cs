@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// (WriteHeader with the world endpoints) and the live send.
 	public static class GuildUpdateCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.GuildUpdateIIR;
+		public const uint Opcode = (uint)IirTypes.GuildUpdateIIR;
 
 		public static byte[] Build(GuildUpdateIIR value)
 		{

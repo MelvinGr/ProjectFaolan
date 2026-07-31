@@ -40,7 +40,7 @@ namespace Faolan.Tests
 
 			var row = new WorldObject
 			{
-				SubOpcode = (uint)GameServer0X2000Opcodes.SimpleDynelFullUpdateIIR
+				SubOpcode = (uint)IirTypes.SimpleDynelFullUpdateIIR
 			};
 			WorldObjectColumns.ApplyColumns(row, msg); // importer side
 			Assert.Equal("Acheronian Ruins", row.Name);

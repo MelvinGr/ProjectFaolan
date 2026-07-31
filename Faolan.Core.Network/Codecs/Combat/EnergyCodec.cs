@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// protocol_stats_and_combat).
 	public static class EnergyCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.EnergyIIR;
+		public const uint Opcode = (uint)IirTypes.EnergyIIR;
 
 		// The env byte every captured EnergyIIR carries.
 		public const byte StaminaEnv = 0x01;

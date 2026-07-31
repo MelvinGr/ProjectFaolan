@@ -27,7 +27,7 @@ namespace Faolan.Tests
 			var checkedSpawns = 0;
 			var names = new List<string>();
 
-			foreach (var (_, body) in CorpusExtract.OfType((uint)GameServer0X2000Opcodes.SimpleCharFullUpdateIIR))
+			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
 			{
 				if (!SpawnBodyReader.TryParse(body, out var scaffold) || !SpawnBodyReader.IsPlayer(scaffold))
 					continue;

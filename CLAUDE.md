@@ -228,7 +228,7 @@ Two things already run ahead of that move:
 `Faolan.Tests/CodecSurfaceConventionTests.cs` are live over every folder under `Codecs/`, with zero skips.** Every
 codec is on the uniform surface, `Faolan/`'s own wire builders moved in (wave 7), `Faolan.Importer/` no longer
 names an IIR or hand-decodes a body a codec owns (wave 8), and `ICodec<T>` is deleted (wave 9) — do not
-reintroduce it. Outside `Codecs/`, a `GameServer0X2000Opcodes` member may only appear as a `case` label of the
+reintroduce it. Outside `Codecs/`, an `IirTypes` member may only appear as a `case` label of the
 listener's routing switch. **Every allowlist is now EMPTY** — `UncomposedSubRecords` came off with #543 and
 `UnreadableInTheCorpus` with #545, so every codec with a standalone body Parses and re-Builds every captured body
 byte-exact, with nothing excused. An allowlist is not a place to silence a gate: re-adding an entry means naming
@@ -269,9 +269,9 @@ the DECODE issue that removes it again. One follow-up remains: #533 (row↔value
 - **Dispose the stream:** `using var s = new FaolanStream(); … return s.ToArray();` — never
   `return new FaolanStream().Write(…).ToArray();` (`FaolanStream : MemoryStream` is `IDisposable`).
 - **Every codec with a standalone body declares its opcode**, in one uniform place: `public const uint Opcode =
-  (uint)GameServer0X2000Opcodes.<Type>;` (single type) or `public static readonly GameServer0X2000Opcodes[]
+  (uint)IirTypes.<Type>;` (single type) or `public static readonly IirTypes[]
   HandledTypes` (a genuine family). An IIR opcode must **never** appear as a bare hex literal in `Codecs/` —
-  the test fails on it. This is what makes `grep GameServer0X2000Opcodes.<Type>` find every emitter, and it
+  the test fails on it. This is what makes `grep IirTypes.<Type>` find every emitter, and it
   is what `docs/protocol/gen/coverage.md` reads to attribute each type to its builder.
   **One IIR, one codec** — two codecs declaring the same opcode are the same codec and must be merged.
   **RPC-message codecs** (whole method bodies: `GuildSearchResultCodec`, `MailMessageCodec`, …) do the same against

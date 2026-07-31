@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// tools/capture/decode_spellweave.py from NecroL80_..._consuming-potions-food-spellweaving.
 	public static class StatCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.StatIIR;
+		public const uint Opcode = (uint)IirTypes.StatIIR;
 
 		// The env byte every captured fire stage carries.
 		public const byte FireStageEnv = 0x01;

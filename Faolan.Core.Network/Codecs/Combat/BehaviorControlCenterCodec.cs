@@ -41,7 +41,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class BehaviorControlCenterCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
+		public const uint Opcode = (uint)IirTypes.BehaviorControlCenterIIR;
 
 		// The one phase whose record carries an EXTRA u32 in front of the behaviorId - see BehaviorControlCenterIIR.
 		private const byte DelayPhase = 0x0E;

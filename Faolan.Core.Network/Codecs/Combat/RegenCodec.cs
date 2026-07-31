@@ -19,7 +19,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class RegenCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.RegenIIR;
+		public const uint Opcode = (uint)IirTypes.RegenIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(RegenIIR value)

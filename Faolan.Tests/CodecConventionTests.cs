@@ -16,11 +16,11 @@ namespace Faolan.Tests
 	// expressed here instead, and this test is what makes it stick:
 	//
 	//   1. A codec declares the IIR type(s) it emits in ONE uniform place:
-	//        - `public const uint Opcode = (uint)GameServer0X2000Opcodes.X`   (exactly one type), or
-	//        - `public static readonly GameServer0X2000Opcodes[] HandledTypes` (more than one).
+	//        - `public const uint Opcode = (uint)IirTypes.X`   (exactly one type), or
+	//        - `public static readonly IirTypes[] HandledTypes` (more than one).
 	//   2. The old inconsistent name (`SubOpcode` on a static const) never comes back.
 	//   3. No IIR opcode is written as a bare hex literal anywhere in Codecs/ - it always comes from the enum,
-	//      so `grep GameServer0X2000Opcodes.<Type>` finds every emitter.
+	//      so `grep IirTypes.<Type>` finds every emitter.
 	//
 	// Codecs with NO opcode (sub-record helpers like CharacterStatBlockCodec, StatListCodec, PfAccessWindowEntryCodec) are fine and
 	// are deliberately not required to declare one - reflection cannot tell "emits an IIR" from "is a sub-record".
@@ -225,9 +225,9 @@ namespace Faolan.Tests
 					continue;
 
 				declaring.Add(t.Name);
-				Assert.True(f.FieldType == typeof(GameServer0X2000Opcodes[]), $"{t.Name}.HandledTypes must be GameServer0X2000Opcodes[], was {f.FieldType.Name}");
+				Assert.True(f.FieldType == typeof(IirTypes[]), $"{t.Name}.HandledTypes must be IirTypes[], was {f.FieldType.Name}");
 
-				var values = (GameServer0X2000Opcodes[])f.GetValue(null)!;
+				var values = (IirTypes[])f.GetValue(null)!;
 				Assert.True(values.Length > 1, $"{t.Name}.HandledTypes has {values.Length} entries - use `const uint Opcode` for a single type");
 				Assert.True(values.Distinct().Count() == values.Length, $"{t.Name}.HandledTypes contains duplicates");
 				Assert.All(values, v => Assert.True(Enum.IsDefined(v), $"{t.Name}.HandledTypes has an undefined member"));
@@ -238,7 +238,7 @@ namespace Faolan.Tests
 		}
 
 		// (3) The one that actually matters: an IIR opcode never appears as a bare hex literal in codec CODE. If it
-		// did, `grep GameServer0X2000Opcodes.<Type>` would miss that emitter and the coverage matrix could not
+		// did, `grep IirTypes.<Type>` would miss that emitter and the coverage matrix could not
 		// attribute it. Comments may still spell the hex for readability - they are stripped before scanning.
 		[Fact]
 		public void NoCodecSourceContainsAMagicIirOpcodeLiteral()
@@ -246,10 +246,10 @@ namespace Faolan.Tests
 			// Scans the CODEC layer AND its consumers. It used to cover Codecs/ only, and the gap showed: the
 			// snapshot opcode 0x737A6DF9 has had an enum member (FullPlayerCharacterIIR) all along, and Codecs/ was
 			// clean, but 12 bare literals had accumulated in the server, the importer and the tests - exactly the
-			// emitters `grep GameServer0X2000Opcodes.<Type>` needs to find. Mirrors the ListFrame rule below, which
+			// emitters `grep IirTypes.<Type>` needs to find. Mirrors the ListFrame rule below, which
 			// already spanned both trees.
 			string[] roots = [TestPaths.Repo("Faolan.Core.Network", "Codecs"), TestPaths.Repo("Faolan"), TestPaths.Repo("Faolan.Importer")];
-			var defined = Enum.GetValues<GameServer0X2000Opcodes>().ToHashSet();
+			var defined = Enum.GetValues<IirTypes>().ToHashSet();
 			var offenders = new List<string>();
 
 			foreach (var file in roots
@@ -262,19 +262,19 @@ namespace Faolan.Tests
 				for (var i = 0; i < lines.Length; i++)
 				{
 					var code = LineComment.Replace(BlockComment.Replace(lines[i], ""), "");
-					if (code.Contains("GameServer0X2000Opcodes", StringComparison.Ordinal))
+					if (code.Contains("IirTypes", StringComparison.Ordinal))
 						continue; // the value comes from the enum on this line - that IS the convention
 
 					foreach (Match m in HexLiteral.Matches(code))
 					{
 						var value = Convert.ToUInt32(m.Value, 16);
-						if (defined.Contains((GameServer0X2000Opcodes)value))
-							offenders.Add($"{Path.GetFileName(file)}:{i + 1}  {m.Value} == GameServer0X2000Opcodes.{(GameServer0X2000Opcodes)value}");
+						if (defined.Contains((IirTypes)value))
+							offenders.Add($"{Path.GetFileName(file)}:{i + 1}  {m.Value} == IirTypes.{(IirTypes)value}");
 					}
 				}
 			}
 
-			Assert.True(offenders.Count == 0, "IIR opcodes must come from GameServer0X2000Opcodes, not a hex literal:\n  " + string.Join("\n  ", offenders));
+			Assert.True(offenders.Count == 0, "IIR opcodes must come from IirTypes, not a hex literal:\n  " + string.Join("\n  ", offenders));
 		}
 
 		// (2) The pre-#317 name must not reappear on a static const. (Instance members named SubOpcode - the
@@ -287,7 +287,7 @@ namespace Faolan.Tests
 			Assert.True(bad.Count == 0, "Static opcode constants are named `Opcode`, not `SubOpcode`:\n  " + string.Join("\n  ", bad));
 		}
 
-		// (1) Every const named *Opcode carries a real GameServer0X2000Opcodes value - never a hand-typed hash.
+		// (1) Every const named *Opcode carries a real IirTypes value - never a hand-typed hash.
 		[Fact]
 		public void OpcodeConstants_AreDefinedEnumMembers()
 		{
@@ -298,11 +298,11 @@ namespace Faolan.Tests
 			{
 				checkedCount++;
 				var value = (uint)f.GetRawConstantValue()!;
-				if (!Enum.IsDefined((GameServer0X2000Opcodes)value))
-					bad.Add($"{t.Name}.{f.Name} = 0x{value:X8} is not a defined GameServer0X2000Opcodes member");
+				if (!Enum.IsDefined((IirTypes)value))
+					bad.Add($"{t.Name}.{f.Name} = 0x{value:X8} is not a defined IirTypes member");
 			}
 
-			Assert.True(bad.Count == 0, "Opcode constants must be (uint)GameServer0X2000Opcodes.<Type>:\n  " + string.Join("\n  ", bad));
+			Assert.True(bad.Count == 0, "Opcode constants must be (uint)IirTypes.<Type>:\n  " + string.Join("\n  ", bad));
 			Assert.True(checkedCount >= 15, $"only {checkedCount} Opcode constants found - the reflection filter is probably broken");
 		}
 

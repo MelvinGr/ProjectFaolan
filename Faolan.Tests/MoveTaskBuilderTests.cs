@@ -42,7 +42,7 @@ namespace Faolan.Tests
 			var waypoints = new[] { new Vector3(100f, 10f, 200f), new Vector3(110f, 11f, 210f), new Vector3(120f, 12f, 220f) };
 			var built = MoveTaskCodec.Build(new MoveTaskIIR(0x000900A1u, new Vector3(100f, 10f, 200f), MoveTaskNodes.Patrol(waypoints, 4.5f, new Vector3(100f, 10f, 200f))));
 
-			Assert.Equal((uint)GameServer0X2000Opcodes.MoveTaskIIR, built.ReadU32Be(0));
+			Assert.Equal((uint)IirTypes.MoveTaskIIR, built.ReadU32Be(0));
 			Assert.Equal(0x000900A1u, built.ReadU32Be(8));
 			Assert.Equal((byte)0x04, built[26]); // patrol task type
 			Assert.Equal((byte)waypoints.Length, built[36]);
@@ -69,7 +69,7 @@ namespace Faolan.Tests
 			var built = MoveTaskCodec.Build(new MoveTaskIIR(0x000818D9u, new Vector3(461.22f, 162.71f, 664.95f), MoveTaskNodes.Stationary()));
 
 			Assert.Equal(27, built.Length);
-			Assert.Equal((uint)GameServer0X2000Opcodes.MoveTaskIIR, built.ReadU32Be(0));
+			Assert.Equal((uint)IirTypes.MoveTaskIIR, built.ReadU32Be(0));
 			Assert.Equal(0x000818D9u, built.ReadU32Be(8));
 			Assert.Equal(461.22f, built.ReadF32Be(14));
 			Assert.Equal((byte)0x06, built[26]);

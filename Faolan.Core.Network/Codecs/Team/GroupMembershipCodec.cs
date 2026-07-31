@@ -27,12 +27,12 @@ namespace Faolan.Core.Network.Codecs.Team
 	// killing BOTH clients in the team the instant the roster went out.
 	public static class GroupMembershipCodec
 	{
-		public static readonly GameServer0X2000Opcodes[] HandledTypes = [GameServer0X2000Opcodes.AddToGroupIIR, GameServer0X2000Opcodes.RemoveFromGroupIIR];
+		public static readonly IirTypes[] HandledTypes = [IirTypes.AddToGroupIIR, IirTypes.RemoveFromGroupIIR];
 
 		public static byte[] Build(GroupMembershipIIR value)
 		{
 			using var s = new FaolanStream();
-			s.WriteUInt32((uint)(value is AddToGroupIIR ? GameServer0X2000Opcodes.AddToGroupIIR : GameServer0X2000Opcodes.RemoveFromGroupIIR))
+			s.WriteUInt32((uint)(value is AddToGroupIIR ? IirTypes.AddToGroupIIR : IirTypes.RemoveFromGroupIIR))
 				.WriteUInt32(EntityClass.Character).WriteUInt32(value.MemberId).WriteByte(0).WriteUInt32(EntityClass.Team).WriteUInt32(value.TeamId);
 
 			if (value is AddToGroupIIR add)
@@ -44,7 +44,7 @@ namespace Faolan.Core.Network.Codecs.Team
 		public static GroupMembershipIIR Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(GroupMembershipCodec));
-			var type = (GameServer0X2000Opcodes)r.ReadU32Be();
+			var type = (IirTypes)r.ReadU32Be();
 			r.ExpectU32Be(EntityClass.Character, "the member's entity class");
 			var memberId = r.ReadU32Be();
 			r.ReadU8(); // constant 0
@@ -54,12 +54,12 @@ namespace Faolan.Core.Network.Codecs.Team
 			GroupMembershipIIR value;
 			switch (type)
 			{
-				case GameServer0X2000Opcodes.AddToGroupIIR:
+				case IirTypes.AddToGroupIIR:
 					r.ExpectU32Be(EntityClass.Character, "the leader's entity class");
 					value = new AddToGroupIIR(memberId, teamId, r.ReadU32Be());
 					break;
 
-				case GameServer0X2000Opcodes.RemoveFromGroupIIR:
+				case IirTypes.RemoveFromGroupIIR:
 					value = new RemoveFromGroupIIR(memberId, teamId);
 					break;
 

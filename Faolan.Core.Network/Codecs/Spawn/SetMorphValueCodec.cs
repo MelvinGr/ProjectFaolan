@@ -23,7 +23,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class SetMorphValueCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.SetMorphValueIIR;
+		public const uint Opcode = (uint)IirTypes.SetMorphValueIIR;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(SetMorphValueIIR value)

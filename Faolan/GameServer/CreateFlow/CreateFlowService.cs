@@ -1027,7 +1027,7 @@ namespace Faolan.GameServer.CreateFlow
 		// All packets ride one conversation (sender hash("GameAgent") sub-0x59 -> receiver hash("GameInterface") +
 		// instance varint) and reuse the editor temp instance; a byte-for-byte replay reproduces retail exactly
 		// (locked by BurstGoldenTests). The 32-bit values are the client's IIR message-type hashes (see
-		// GameServer0X2000Opcodes / docs/re/aoc-opcode-ids.md); bodies are kept verbatim - they are opaque
+		// IirTypes / docs/re/aoc-opcode-ids.md); bodies are kept verbatim - they are opaque
 		// editor-state (entity handles 0x0009FFxx, morph mesh names, stat blobs) the client choreography expects.
 
 		internal static async Task SendRetailCreateEditorCreationScriptBurst(INetworkClient client)

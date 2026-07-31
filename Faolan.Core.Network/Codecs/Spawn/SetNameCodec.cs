@@ -27,7 +27,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class SetNameCodec
 	{
-		public const uint Opcode = (uint)GameServer0X2000Opcodes.SetNameIIR;
+		public const uint Opcode = (uint)IirTypes.SetNameIIR;
 
 		// The client reads nameLen as a u32 and HARD-CAPS it at 0x20 (so 1..31 characters); a longer name makes it
 		// read length 0, skip the name and reject the blob.
