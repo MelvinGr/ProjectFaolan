@@ -32,7 +32,7 @@ namespace Faolan.GameServer
 
 		// Builds the system mail for a completed AH purchase: recipient = the buyer, sender empty (system), the bought
 		// item escrowed as an attachment, body = the TradePostGUI_MailItemBought remoteformat. The item-name fragment
-		// is left empty (the per-item RDB name key is unsynthesizable - see TradepostMailBody); the item still
+		// is left empty (the per-item RDB name key is unsynthesizable - see MailColumns.ItemBoughtBody); the item still
 		// delivers, only its name in the mail text degrades.
 		private async Task<Mail> BuildPurchaseMail(string buyer, TradepostListing listing)
 		{
@@ -45,7 +45,7 @@ namespace Faolan.GameServer
 				RecipientName = buyer,
 				SenderClass = MailConstants.EndpointClass,
 				SenderName = "",
-				BodyXml = TradepostMailBodyCodec.Build(new TradepostMailBody(buyer, listing.SaleId, "", listing.SellerName ?? "", listing.Price.ToString())),
+				BodyXml = MailColumns.ItemBoughtBody(buyer, listing.SaleId, listing.SellerName ?? "", listing.Price.ToString()),
 				FooterWord = MailConstants.FooterUnread,
 				Money = 0,
 				Timestamp1 = now,

@@ -844,7 +844,7 @@ namespace Faolan.GameServer.World
 									foreach (var near in World.ZoneForEntity(lure).PlayersInRange(lure.Position, SayRangeUnits, lure.Handle))
 										heard.Add(near.Handle);
 									if (heard.Count > 0)
-										await _agents.CharacterSay(lure.Handle, barkLines[Random.Shared.Next(barkLines.Length)], heard);
+										await _agents.NpcBark(lure.Handle, barkLines[Random.Shared.Next(barkLines.Length)], heard);
 									break;
 								}
 
@@ -871,7 +871,7 @@ namespace Faolan.GameServer.World
 									foreach (var near in World.ZoneForEntity(npc).PlayersInRange(npc.Position, SayRangeUnits, npc.Handle))
 										recipients.Add(near.Handle);
 									if (recipients.Count > 0)
-										await _agents.CharacterSay(npc.Handle, lines[Random.Shared.Next(lines.Length)], recipients);
+										await _agents.NpcBark(npc.Handle, lines[Random.Shared.Next(lines.Length)], recipients);
 									break;
 								}
 							}

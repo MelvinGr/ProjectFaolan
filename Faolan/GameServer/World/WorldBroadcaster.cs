@@ -1071,9 +1071,10 @@ namespace Faolan.GameServer.World
 				}
 
 				// Ambient chatter lines for this NPC type (per-NPC; empty for NPCs without a captured group -> silent).
-				// CONSTRUCTED from the columnized token/category/key rather than replayed from a stored blob.
+				// The entity caches the bark VALUES; the chat tier renders them (#539), so the world model never holds
+				// pre-built wire text - the same reason wave 6 took OriginalData off the snapshot sub-class.
 				if (npc.NpcTemplate.Chatter is { Count: > 0 } chatter)
-					entity.ChatterLines = chatter.Select(c => NpcChatterCodec.Build(c)).ToArray();
+					entity.ChatterLines = chatter.Select(c => NpcChatterColumns.ToBark(c)).ToArray();
 
 				// #363: a captured spawn LINKED to an ambient area is a member of that area's POOL (the softer alternative
 				// to graduating/deleting it). It renders with its captured appearance but the POOL owns its respawn (fades
@@ -1104,13 +1105,13 @@ namespace Faolan.GameServer.World
 		// Brick), as opposed to a door/container. Only reports the object KIND; the pickup's EFFECT (grant item +
 		// advance the CollectItem goal) is quest-driven, so the caller no-ops it when no collect quest is active - which
 		// is what gates the brick nodes to Shipwrecked-V holders.
-		public async Task<bool> IsQuestPickup(INetworkClient client, uint handle)
+		public Task<bool> IsQuestPickup(INetworkClient client, uint handle)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null)
-				return false;
+				return Task.FromResult(false);
 
-			return _sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var obj) && obj.Row.QuestItemEffect is > 0;
+			return Task.FromResult(_sim.World.ZoneForEntity(player).TryGetWorldObject(handle, out var obj) && obj.Row.QuestItemEffect is > 0);
 		}
 
 		// #363 pool maintenance (called on a slow cadence from the sim tick): keep each loaded zone's ambient pools at

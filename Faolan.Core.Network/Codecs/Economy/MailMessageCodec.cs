@@ -131,6 +131,15 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// shape while the DB splits it across the attachment row and the per-TEMPLATE `Items` row that holds the TEA key.
 	public static class MailColumns
 	{
+		// The AH-buy system mail's BODY. The listener should not know that a TradePostGUI_MailItemBought template
+		// exists - it asks for "the item-bought body" and the mail layer composes it (#539). `itemNameEscaped` is left
+		// empty for a live buy: the per-item RDB name key is unsynthesizable (see TradepostMailBodyCodec), so the item
+		// still delivers and only its NAME in the mail text degrades.
+		public static string ItemBoughtBody(string buyer, ulong saleId, string seller, string priceDisplay, string itemNameEscaped = "")
+		{
+			return TradepostMailBodyCodec.Build(new TradepostMailBody(buyer, saleId, itemNameEscaped, seller, priceDisplay));
+		}
+
 		public static MailMessage ToMessage(Mail mail, bool includeAttachments)
 		{
 			ArgumentNullException.ThrowIfNull(mail);

@@ -20,21 +20,21 @@ The ChatServer wire format is `[u16 opcode][u16 bodyLen][body]` (`ChatServerMess
 
 - **`0x0000` Hello** (in): `[u32 unk0][u32 clientInstance][u32 accountId]`. On receipt the server sends the channel
   subscription list, a `0x00050000` ready, `0x0014` char-info, and the welcome `SystemMessage`s.
-- **`0x003C` ChannelSubscription** (out): `[byte type][u32 channelId][u16-str name][u32 flag][u16 0000]`. The list:
+- **`0x003C` ChannelSubscription** (out, `ChannelSubscriptionCodec`): `[byte type][u32 channelId][u16-str name][u32 flag][u16 0000]`. The list:
   ~Trial(04/0x232A/flag 0x8244), ~Global(04/0x2328), ~LFG(04/0x2329), ~GlobalEnglish(11/0x2335),
   ~Playfield(90/**id = the character's map id**), ~NewbieHelp(87/0x1E8480); flag 0x8044 except ~Trial. Retail also
   adds ~Guild(03/<guildId>) once the guild is known — we don't track guilds, so we don't send it.
-- **`0x0041` ChannelChat**. **in** (client posts): `[byte type][u32 channelId][u16-str message][u16 0000]` — no
+- **`0x0041` ChannelChat** (out, `ChannelChatCodec`). **in** (client posts): `[byte type][u32 channelId][u16-str message][u16 0000]` — no
   sender. **out** (relay): `[byte type][u32 channelId][u32 senderId][u16-str message][u16 0000]` — sender inserted,
   preceded by a `0x0014` sender-info. Implemented: inbound `0x0041` → `BroadcastChannelChat` relays `0x0014`+`0x0041`
   to **every** connected client, **preserving the channel type+id**. Per-channel routing is the **client's own
   subscription filter** — a relayed message only shows in a channel the client subscribed to, so global channels
   reach everyone while ~Playfield (id = map) is naturally same-map; no server-side membership table needed.
-- **`0x0014`** (out): `[u32 senderId][u32 0][u16-str name]` — sender identity, sent before a `0x0041`.
-- **`0x0022` CharacterChat** (out): the **local "say"** relay. `[u32 charId][u16-str message][u16 0001][byte 0]`
+- **`0x0014`** (out, `ChatSenderInfoCodec`): `[u32 senderId][u32 0][u16-str name]` — sender identity, sent before a `0x0041`.
+- **`0x0022` CharacterChat** (out, `CharacterChatCodec`): the **local "say"** relay. `[u32 charId][u16-str message][u16 0001][byte 0]`
   (byte-exact vs the captures: "hell", "hello beach", "say", …). The longer remoteformat-XML `0x0022`s are NPC/scry
   "say". See the say flow below.
-- **`0x0023` SystemMessage** (out): `[u16 0000][u16-str message][u16 0000]` (message may be `<remoteformat>` XML).
+- **`0x0023` SystemMessage** (out, `ChatSystemMessageCodec`): `[u16 0000][u16-str message][u16 0000]` (message may be `<remoteformat>` XML).
 - **`0x0064` ChatReady** (in): a small chat-init handshake (body `00 01 02`); echoed back verbatim.
 
 ## Claude channel (MCP bridge) — added 2026-06-12
@@ -74,7 +74,7 @@ Capture `Hoxxling_mage-heraldofxotli_login_move-from-night-to-day_send-and-recei
 op **0x001E both directions**, same body shape: `[u32 peerCharId][string][00 01 00]` (peer = the TARGET in the
 client's request, the SENDER on delivery). Delivery is preceded by a `0x0014` sender info, like channel chat;
 retail echoes nothing back to the sender (the client renders its own outgoing tell locally). Golden tests:
-`WhisperTests` (byte-exact both captured packets). Implemented in `ChatServerListener` (`BuildWhisper`);
+`WhisperTests` (byte-exact both captured packets). Implemented in `WhisperCodec` (one codec, both directions);
 offline target -> system message (uncaptured fallback). A tell to Claude's synthetic identity
 (`/tell Claude`, id learned from the channel's 0x0014) lands in the MCP bridge log as a private message.
 LIMIT: the client whispers by character ID it already knows (from a 0x0014 it has seen); whispering a name the

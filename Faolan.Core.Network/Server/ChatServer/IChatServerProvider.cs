@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Codecs.Text;
 
 namespace Faolan.Core.Network.Server.ChatServer
 {
@@ -9,6 +10,11 @@ namespace Faolan.Core.Network.Server.ChatServer
 		// scopes it to those characters (proximity say - the GameServer computes who is in range, since it holds the
 		// live positions); null = every connected client (server-wide).
 		Task CharacterSay(uint characterId, ChatMarkup message, IReadOnlyCollection<uint>? recipientCharacterIds = null);
+
+		// An NPC's ambient/encounter BARK, as the typed content rather than pre-rendered wire text. The world model
+		// caches the bark VALUE and this tier renders it, so the remoteformat layer stays inside `Codecs/` - the
+		// broadcaster used to build the string at spawn time and store it on the entity (#539).
+		Task NpcBark(uint npcHandle, NpcChatterBark bark, IReadOnlyCollection<uint>? recipientCharacterIds = null);
 
 		/// <summary>
 		///     The COMPLETE live <see cref="INetworkClientSession" /> of every connected client - full session state.

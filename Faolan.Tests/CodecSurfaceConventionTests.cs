@@ -287,19 +287,23 @@ namespace Faolan.Tests
 		}
 
 		// #539: a codec that produces a PAYLOAD its parent should compose reads as standalone whenever the SERVICE does
-		// the composing instead. Five failed when this was first un-skipped; the three FEEDBACK payloads are fixed -
-		// `FormatFeedbackCodec.Build(instance, FeedbackPayload)` now takes the value and the payload owns its own
-		// typeFlags/footer. What is left is three DIFFERENT deferral shapes, none of them a gate bug:
-		//   * `NpcChatterCodec` - its parent is the chat server's CharacterChat body, which is still hand-built in
-		//     `Faolan/ChatServer/Packets.cs` (a §9 B group the issue never enumerated, like the character list).
-		//   * `TradepostMailBodyCodec` - its text is stored on `Mail.BodyXml` and encoded a request LATER, so the
-		//     composition is deferred through the DATABASE, not skipped.
-		//   * `MagicBuffDataCodec` - its parent deliberately carries `Data` as opaque bytes (#530 wave 4).
+		// the composing instead. Five failed when this was first un-skipped; four are fixed - the three FEEDBACK
+		// payloads (`FormatFeedbackCodec.Build(instance, FeedbackPayload)` takes the value and the payload owns its own
+		// typeFlags/footer) and `TradepostMailBodyCodec` (the AH-buy body is `MailColumns.ItemBoughtBody`, because the
+		// listener has no business knowing the mail template exists). `NpcChatterCodec` cleared with the ChatServer
+		// bodies: the world model caches the bark VALUE and `CharacterChatCodec` renders it.
+		//
+		// ONE is left, and it is a buff-PIPELINE change rather than a codec one: `MagicBuffDataCodec` is composed by
+		// `Faolan/` because `NpcSpellCast` stores its payload as BYTES on the world model, so the broadcaster builds
+		// the 54 bytes at spawn time. Giving that record a typed `MagicBuffData` is the same fix the chatter barks just
+		// got, and it reaches `ActiveBuff` / `WorldSimulation` / `MountCatalog` / the `NpcSpell` columns. Wave 4 also
+		// keeps `MagicBuffIIR.Data` opaque deliberately, so the parent needs a typed Build OVERLOAD rather than a
+		// retyped value.
 		//
 		// Two blind spots WERE fixed while proving the list: the field scan missed `HandledOpcodes` (so the two Team
 		// codecs that do declare their identity were flagged), and "standalone" ignored §6's own definition, which is
 		// "nothing else composes it" - that alone cleared `RemoteFormatScreenCodec`.
-		[Fact(Skip = "un-skip in wave 9 - 3 of #539's 5 payload codecs are fixed; NpcChatter needs the ChatServer bodies to become codecs, TradepostMailBody composes through the DB, MagicBuffData through an opaque parent field")]
+		[Fact(Skip = "un-skip when #539's last offender lands - MagicBuffDataCodec needs NpcSpellCast to carry the VALUE instead of pre-built bytes")]
 		public void RpcMessageCodecsDeclareTheirMethodOpcode()
 		{
 			// A codec with a standalone body but no IIR opcode is an RPC-message codec: it must declare its method

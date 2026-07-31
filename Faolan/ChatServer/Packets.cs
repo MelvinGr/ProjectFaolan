@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Packets.ChatServer;
 using Faolan.Core.Network.Server.ChatServer;
 using Microsoft.Extensions.Logging;
@@ -23,11 +24,21 @@ namespace Faolan.ChatServer
 				if (recipientCharacterIds != null && !recipientCharacterIds.Contains(recipientId))
 					continue;
 
-				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.CharacterChat, s => s
-					.WriteUInt32(characterId)
-					.WriteString(message.Value)
-					.WriteUInt16(0x0001) // type?
-					.WriteByte(0)));
+				await client.SendAsync(new ChatServerMessage(CharacterChatCodec.Opcode, CharacterChatCodec.Build(characterId, message.Value)));
+			}
+		}
+
+		// An NPC bark: the same CharacterChat (0x0022) delivery as a say, with CharacterChatCodec composing the bark's
+		// remoteformat (#539) instead of the world layer pre-rendering it.
+		public async Task NpcBark(uint npcHandle, NpcChatterBark bark, IReadOnlyCollection<uint>? recipientCharacterIds = null)
+		{
+			foreach (var client in NetworkClients)
+			{
+				var recipientId = client.Session.Character?.Id ?? 0;
+				if (recipientCharacterIds != null && !recipientCharacterIds.Contains(recipientId))
+					continue;
+
+				await client.SendAsync(new ChatServerMessage(CharacterChatCodec.Opcode, CharacterChatCodec.Build(npcHandle, bark)));
 			}
 		}
 
@@ -39,11 +50,10 @@ namespace Faolan.ChatServer
 			var delivered = 0;
 			foreach (var client in NetworkClients)
 			{
-				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo,
-					s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName)));
+				await client.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(ClaudeChannel.SenderId, ClaudeChannel.SenderName)));
 
-				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChannelChat,
-					s => s.WriteByte(ClaudeChannel.ChannelType).WriteUInt32(ClaudeChannel.ChannelId).WriteUInt32(ClaudeChannel.SenderId).WriteString(message.Value).WriteUInt16(0x0000)));
+				await client.SendAsync(new ChatServerMessage(ChannelChatCodec.Opcode,
+					ChannelChatCodec.Build(ClaudeChannel.ChannelType, ClaudeChannel.ChannelId, ClaudeChannel.SenderId, message.Value)));
 
 				delivered++;
 			}
@@ -62,8 +72,7 @@ namespace Faolan.ChatServer
 			if (target == null)
 				return false;
 
-			await target.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo,
-				s => s.WriteUInt32(ClaudeChannel.SenderId).WriteUInt32(0x00000000).WriteString(ClaudeChannel.SenderName)));
+			await target.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(ClaudeChannel.SenderId, ClaudeChannel.SenderName)));
 
 			await target.SendAsync(BuildWhisper(ClaudeChannel.SenderId, message.Value));
 
@@ -102,10 +111,9 @@ namespace Faolan.ChatServer
 
 			foreach (var client in NetworkClients)
 			{
-				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteUInt32(senderId).WriteUInt32(0x00000000).WriteString(senderName)));
+				await client.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(senderId, senderName)));
 
-				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChannelChat,
-					s => s.WriteByte(channelType).WriteUInt32(channelId).WriteUInt32(senderId).WriteString(message).WriteUInt16(0x0000)));
+				await client.SendAsync(new ChatServerMessage(ChannelChatCodec.Opcode, ChannelChatCodec.Build(channelType, channelId, senderId, message)));
 			}
 		}
 
@@ -114,7 +122,7 @@ namespace Faolan.ChatServer
 		// the whisper capture (WhisperTests). The receiving client resolves the name from the preceding 0x0014.
 		internal static ChatServerMessage BuildWhisper(uint peerCharacterId, string message)
 		{
-			return new ChatServerMessage(ChatServerInterfaceOpcodes.Whisper, s => s.WriteUInt32(peerCharacterId).WriteString(message).WriteByte(0x00).WriteByte(0x01).WriteByte(0x00));
+			return new ChatServerMessage(WhisperCodec.Opcode, WhisperCodec.Build(peerCharacterId, message));
 		}
 
 		// A chat-channel subscription (0x003C): [type][id][name][flag][0x0000]. Sent on ChatServer connect for each
@@ -122,13 +130,12 @@ namespace Faolan.ChatServer
 		// verified from the raw login pcap.
 		private static Task SendChannelSubscription(INetworkClient client, byte type, uint id, string name, uint flag)
 		{
-			return client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChannelSubscription,
-				s => s.WriteByte(type).WriteUInt32(id).WriteString(name).WriteUInt32(flag).WriteUInt16(0x0000)));
+			return client.SendAsync(new ChatServerMessage(ChannelSubscriptionCodec.Opcode, ChannelSubscriptionCodec.Build(type, id, name, flag)));
 		}
 
 		private static Task SendSystemMessage(INetworkClient client, ChatMarkup message)
 		{
-			return client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.SystemMessage, s => s.WriteUInt16(0x0000).WriteString(message.Value).WriteUInt16(0x0000)));
+			return client.SendAsync(new ChatServerMessage(ChatSystemMessageCodec.Opcode, ChatSystemMessageCodec.Build(message.Value)));
 		}
 	}
 }

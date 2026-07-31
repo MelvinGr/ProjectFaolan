@@ -106,12 +106,9 @@ namespace Faolan.ChatServer
 					await client.SendAsync(new ChatServerMessage(0x0005));
 
 					var character = client.Session.Character!;
-					await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s
-						.WriteUInt32(character.Id)
-						.WriteUInt32(0x00000000)
-						.WriteString(character.Name?.Length > 0
-							? character.Name
-							: $"Character{character.Id}")));
+					await client.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(character.Id, character.Name?.Length > 0
+						? character.Name
+						: $"Character{character.Id}")));
 
 					await SendSystemMessage(client, Configuration.WelcomeString); //.Replace("$BUILDSTRING", Global.BuildString));
 					await SendSystemMessage(client, ChatMarkup.Lines([.. Global.BuildString.Split('\n').Select(ChatMarkup (l) => l)]));
@@ -207,7 +204,7 @@ namespace Faolan.ChatServer
 						break;
 					}
 
-					await target.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteArray(ChatSenderInfoCodec.Build(senderId, senderName))));
+					await target.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(senderId, senderName)));
 
 					await target.SendAsync(BuildWhisper(senderId, message));
 
@@ -244,7 +241,7 @@ namespace Faolan.ChatServer
 				{
 					var friendId = FriendRefCodec.Parse(body.ReadRemainingArray()).CharacterId;
 					var removed = await Database.RemoveFriend(client.Session.Character.Id, friendId);
-					await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendRemoved, s => s.WriteArray(FriendRefCodec.Build(friendId))));
+					await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendRemoved, FriendRefCodec.Build(friendId)));
 					Logger.LogInformation("Friends: {Character} removed {Friend:X8}{Missing}.", client.Session.Character.Name, friendId, removed
 						? ""
 						: " (was not on the list)");
@@ -302,9 +299,9 @@ namespace Faolan.ChatServer
 		{
 			var name = friend.Name ?? "";
 			if (presence)
-				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendPresence, s => s.WriteArray(FriendPresenceCodec.Build(name))));
+				await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendPresence, FriendPresenceCodec.Build(name)));
 
-			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.ChatSenderInfo, s => s.WriteArray(ChatSenderInfoCodec.Build(friend.Id, name))));
+			await client.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(friend.Id, name)));
 
 			// The stamp is a UNION on the online flag: an OFFLINE friend gets a real unix LAST-SEEN (the captured offline
 			// friend's value is 2h06 before the capture was taken, which is what identified it), an online one gets the
@@ -316,8 +313,7 @@ namespace Faolan.ChatServer
 				? FriendStateCodec.OnlineStamp
 				: (uint)friend.LastConnection!.Value.ToUnixTimeSeconds();
 
-			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendAdded,
-				s => s.WriteArray(FriendStateCodec.Build(friend.Id, online, (byte)friend.Level, friend.Class, stamp))));
+			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendAdded, FriendStateCodec.Build(friend.Id, online, (byte)friend.Level, friend.Class, stamp)));
 		}
 
 		// A logout is a presence change for everyone who has this character on their friend list. The chat connection is

@@ -6,6 +6,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Core.Network.Codecs.Text;
 using Faolan.GameServer.Combat;
 
 namespace Faolan.GameServer.World
@@ -411,7 +412,7 @@ namespace Faolan.GameServer.World
 
 		// Ambient bark lines (verbatim <remoteformat> XML) this NPC type periodically local-says, from NpcChatter at
 		// zone load. Null/empty = this NPC has no captured chatter group and stays silent.
-		public string[] ChatterLines { get; set; } = null!;
+		public NpcChatterBark[] ChatterLines { get; set; } = null!;
 
 		// For a LOOT BAG: the player handle allowed to loot it (the killer, or the spawning player). Sent as the
 		// NewAllowedLooterIIR's looter at spawn (#263) - retail's loot-permission grant, so a drop belongs to whoever

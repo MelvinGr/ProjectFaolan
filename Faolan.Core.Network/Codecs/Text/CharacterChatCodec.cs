@@ -1,0 +1,70 @@
+using System;
+using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
+
+namespace Faolan.Core.Network.Codecs.Text
+{
+	// s2c CharacterChat (0x0022) - proximity "say", spoken by one entity and delivered to the clients in range:
+	//   [u32 characterId][u16 len][text][u16 type][u8 0]
+	// The speaker is an id only; the client resolves the NAME from a ChatSenderInfo (0x0014) it has already been sent.
+	// `Type` is 0x0001 on every say we send and is carried rather than fixed.
+	//
+	// The GameServer holds the positions, so it passes the in-range recipient ids down and this tier only frames +
+	// delivers. Moved in from `Faolan/ChatServer/Packets.cs` in #530 (the §9 B group the issue's inventory missed).
+	public static class CharacterChatCodec
+	{
+		public const ushort Opcode = (ushort)ChatServerInterfaceOpcodes.CharacterChat;
+
+		// The type word every captured say carries.
+		public const ushort SayType = 0x0001;
+
+		// CANONICAL - the only method here that writes bytes.
+		public static byte[] Build(CharacterChat value)
+		{
+			ArgumentNullException.ThrowIfNull(value);
+			using var s = new FaolanStream();
+			Write(s, value);
+
+			return s.ToArray();
+		}
+
+		public static byte[] Build(uint characterId, string text)
+		{
+			return Build(new CharacterChat(characterId, text));
+		}
+
+		// An NPC's ambient BARK. The parent composes the child: `NpcChatterCodec` renders the remoteformat and this
+		// frames it, so a caller holding the bark never spells the text layer (#539).
+		public static byte[] Build(uint npcHandle, NpcChatterBark bark)
+		{
+			return Build(new CharacterChat(npcHandle, NpcChatterCodec.Build(bark)));
+		}
+
+		public static CharacterChat Parse(in ReadOnlySpan<byte> data)
+		{
+			var r = new SpanReader(data, nameof(CharacterChatCodec));
+			var value = Read(ref r);
+			r.EnsureAtEnd();
+
+			return value;
+		}
+
+		internal static CharacterChat Read(ref SpanReader r)
+		{
+			var characterId = r.ReadU32Be();
+			var text = r.ReadStringU16Length();
+			var type = r.ReadU16Be();
+			r.ExpectU8(0, "the trailing byte");
+
+			return new CharacterChat(characterId, text, type);
+		}
+
+		internal static void Write(FaolanStream s, CharacterChat v)
+		{
+			s.WriteUInt32(v.CharacterId).WriteString(v.Text).WriteUInt16(v.Type).WriteByte(0);
+		}
+	}
+
+	// s2c CharacterChat (0x0022).
+	public sealed record CharacterChat(uint CharacterId, string Text, ushort Type = CharacterChatCodec.SayType);
+}

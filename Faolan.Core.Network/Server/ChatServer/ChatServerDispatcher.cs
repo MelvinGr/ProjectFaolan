@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Faolan.Core.Network.Codecs.Text;
 
 namespace Faolan.Core.Network.Server.ChatServer
 {
@@ -20,6 +21,13 @@ namespace Faolan.Core.Network.Server.ChatServer
 			var provider = Provider;
 			if (provider != null)
 				await provider.CharacterSay(characterId, message, recipientCharacterIds);
+		}
+
+		public async Task NpcBark(uint npcHandle, NpcChatterBark bark, IReadOnlyCollection<uint>? recipientCharacterIds = null)
+		{
+			var provider = Provider;
+			if (provider != null)
+				await provider.NpcBark(npcHandle, bark, recipientCharacterIds);
 		}
 
 		public IEnumerable<INetworkClientSession> GetWorldSessions()
