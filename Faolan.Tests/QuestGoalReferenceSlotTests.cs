@@ -30,7 +30,7 @@ namespace Faolan.Tests
 	//     the 50200 goals and with the NPC on the 51000 goals.
 	//
 	// ⚠️ The slots FLOAT - goal 11252 uses [1] and [3] - so these gates are written over "whichever slots are
-	// occupied", never over a fixed position. Still open: the lead word [0].
+	// occupied", never over a fixed position. The lead word [0] is still undecoded - Gitea #550.
 	//
 	// A token -> object map is CLOSED as not recoverable (#547): the client never dereferences a token, so the
 	// twelve Deliver recipients are read out of the objective TEXT by design rather than as a stopgap. See

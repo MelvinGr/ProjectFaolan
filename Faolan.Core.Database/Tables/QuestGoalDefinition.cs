@@ -139,9 +139,10 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? TrailingToken { get; set; }
 
-		// The goal record's 7 "reserved" words, verbatim - a lead word then three optional (marker, random-4CC-token)
-		// slots at [1..2]/[3..4]/[5..6]. Stored rather than derived because the tokens are random per entry; what they
-		// MEAN is Gitea #546, and QuestObjectiveGoal.Reserved carries the measured shape.
+		// The goal record's 7 "reserved" words, verbatim - a lead word then three optional (marker, ACGHash-token)
+		// slots at [1..2]/[3..4]/[5..6], which refer to the goal's own target and NPC (#546; QuestObjectiveGoal.Reserved
+		// carries the measured shape). Stored rather than derived because the token resolves to nothing we hold - the
+		// client never dereferences it either (#547). The lead word [0] is undecoded - Gitea #550.
 		//
 		// Harvested from BOTH wire sources - the snapshot journal (ObjectiveGoalExtractor) and the live QuestFullUpdate
 		// (QuestDefinitionExtractor, #537) - which agree on every goal seen by both.

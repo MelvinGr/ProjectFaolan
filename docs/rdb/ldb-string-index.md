@@ -227,11 +227,14 @@ four are gated over every shipped goal by `QuestGoalReferenceSlotTests`:
 - the only **item** goals that carry `[5..6]` are all twelve `Separator` 20 **Deliver** goals — exactly the goals
   that need a recipient.
 
-⚠️ **This does not yet replace the objective text as the importer's source for a Deliver recipient.** The
-reference is by ACGHash token, and the only token → object map we can build is the 23 pairs from goals that
-*also* state the NPC's LDB refId; none of the twelve Deliver recipients is in it. A global token → object table
-would make the recipient structural — the lead is the client's own ACG content data (`AcgItemData_t`), not the
-LDB. Still undecoded: the lead word `[0]` (0 on 155 goals, then 1/2/4/6 — **not** a count of occupied slots).
+⚠️ **This does not replace the objective text as the importer's source for a Deliver recipient, and it never
+will.** The reference is by ACGHash token, and a global token → object map is CLOSED as not recoverable (#547):
+the client never dereferences a token, it is absent from the item template, and it is not plaintext in the RDB.
+The only map that exists is the 23 pairs from goals that *also* state the NPC's LDB refId, and none of the twelve
+Deliver recipients is in it. So reading those recipients out of the objective text is by design, not a stopgap.
+
+The lead word `[0]` is undecoded (0 on 155 goals, then 1/2/4/6 — **not** a count of occupied slots); open work
+tracked in Gitea #550.
 
 ### The 74 item goals (`50200`) are inert fetch objectives — and the reference does not type them
 
