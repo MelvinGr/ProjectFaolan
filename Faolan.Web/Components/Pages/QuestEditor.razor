@@ -35,6 +35,10 @@
 							               ? "sel"
 							               : "")" @onclick="() => Select(q)">
 							<span class="qid">@q.QuestId</span>
+							@if (q.Verified)
+							{
+								<span class="vflag" title="Hand-verified - the importer leaves this quest alone">✓</span>
+							}
 							@if (q.NextQuestId is { } nx)
 							{
 								<span class="arrow">→ @nx</span>
@@ -58,6 +62,16 @@
 						<label>Level<input @bind="_quest.Level"/></label>
 						<label>Area id<input @bind="_quest.AreaId"/></label>
 					</div>
+					<label class="qe-verified">
+						<input type="checkbox" @bind="_quest.Verified"/>
+						<span>Verified — the importer must not overwrite this quest</span>
+					</label>
+					@if (_quest.Verified)
+					{
+						<p class="chainhint">Re-importing the captures will leave this quest exactly as it is, in
+							both upsert and overwrite. Clear the tick (or run the importer with <code>--force</code>)
+							to let a harvest replace it again.</p>
+					}
 					@if (Next(_quest) is { } nextDef)
 					{
 						<p class="chainhint">Chains to <b>@nextDef.QuestId</b> — @nextDef.Goals.Count goal(s).</p>

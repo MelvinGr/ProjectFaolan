@@ -1194,6 +1194,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("TypeId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("Verified")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Id");
 
                     b.HasIndex("GrantQuestId");
@@ -2823,6 +2826,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<ulong>("SnapshotUnknownF8")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Verified")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("QuestId");

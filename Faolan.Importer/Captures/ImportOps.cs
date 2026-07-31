@@ -437,8 +437,15 @@ namespace Faolan.Importer.Captures
 		// (most response packets), so a truncated dump can never displace a screen already captured in full. Two
 		// fields are merged rather than overwritten - GrantQuestId and NpcTemplateId are sparsely observed (only the
 		// capture that walked the accept branch sees the grant), so a dump that did not see one must not clear it.
-		public static async Task<ConversationImportResult> ImportConversations(DatabaseContext db, List<ConversationEntry> conversations, bool overwrite)
+		// A row marked Verified is hand-reviewed and survives BOTH paths untouched unless `force`. That is what makes
+		// "import the bulk, correct the tail by hand" a workflow rather than a treadmill: without it the next import
+		// silently undoes every correction.
+		public static async Task<ConversationImportResult> ImportConversations(DatabaseContext db, List<ConversationEntry> conversations, bool overwrite, bool force = false)
 		{
+			var verified = force
+				? []
+				: (await db.ConversationNodes.Where(n => n.Verified).Select(n => n.Id).ToListAsync()).ToHashSet();
+
 			if (overwrite)
 			{
 				// The drop MUST land before the inserts are staged. The node ids are derived from the node's identity,
@@ -446,7 +453,9 @@ namespace Faolan.Importer.Captures
 				// into one SaveChanges races them on the same primary key ("UNIQUE constraint failed:
 				// ConversationScreens..."). ExecuteDelete runs the DELETE immediately (inside the importer's
 				// transaction) and cascades to packets/screens/parameters in the database.
-				await db.ConversationNodes.ExecuteDeleteAsync();
+				// A verified row is exempt from the rebuild: overwrite means "make the table what the captures say",
+				// and a hand-reviewed row is a deliberate statement that the captures are wrong there.
+				await db.ConversationNodes.Where(n => force || !n.Verified).ExecuteDeleteAsync();
 
 				// ...but it goes straight to the database and does NOT tell the change tracker, so anything this
 				// context already holds would collide on the identity map when the same (derived) ids are re-added.
@@ -514,9 +523,18 @@ namespace Faolan.Importer.Captures
 			var insert = new List<ConversationNode>();
 			var replace = new List<uint>();
 			var kept = 0;
+			var untouched = 0;
 
 			foreach (var node in desired)
 			{
+				// Hand-reviewed rows are left exactly as they are - not replaced, and not even taught the sparse
+				// fields below, because "verified" means the stored row is the answer.
+				if (verified.Contains(node.Id))
+				{
+					untouched++;
+					continue;
+				}
+
 				if (!stored.TryGetValue(node.Id, out var existing))
 				{
 					insert.Add(node);
@@ -560,12 +578,15 @@ namespace Faolan.Importer.Captures
 			db.ConversationNodes.AddRange(insert);
 			await db.SaveChangesAsync();
 
-			return new ConversationImportResult(insert.Count - replace.Count, replace.Count, kept);
+			return new ConversationImportResult(insert.Count - replace.Count, replace.Count, kept, untouched);
 		}
 
-		// What an incremental conversation import did: rows newly added, rows replaced by a richer capture, and rows
-		// left alone because what is stored is already at least as complete.
-		public sealed record ConversationImportResult(int Inserted, int Replaced, int Kept);
+		// What an incremental conversation import did: rows newly added, rows replaced by a richer capture, rows left
+		// alone because what is stored is already at least as complete, and rows skipped as hand-verified.
+		//
+		// Protected is reported rather than silent on purpose: a skipped row is exactly the thing you would otherwise
+		// spend an afternoon on, wondering why a re-import "did nothing".
+		public sealed record ConversationImportResult(int Inserted, int Replaced, int Kept, int Protected = 0);
 
 		// Rebuild the per-map loot pool (#273) from the captured bag contents. Clean rebuild (the pool is fully derived
 		// from the captures, so a re-run should not accumulate stale rows), keyed for dedup by (MapId, ItemTemplateId).
@@ -944,7 +965,7 @@ namespace Faolan.Importer.Captures
 			return added;
 		}
 
-		public static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions)
+		public static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions, bool force = false)
 		{
 			// QuestDefinition.MapId is a required FK to Maps, but a harvested quest can point its map marker at a
 			// playfield the Maps catalog doesn't have - the catalog is built from captured MapChange packets, so a map
@@ -971,6 +992,7 @@ namespace Faolan.Importer.Captures
 			}
 
 			var skipped = 0;
+			var protectedRows = 0;
 
 			var added = 0;
 			var updated = 0;
@@ -988,6 +1010,13 @@ namespace Faolan.Importer.Captures
 				{
 					db.QuestDefinitions.Add(def);
 					added++;
+					continue;
+				}
+
+				// Hand-reviewed: leave every field as stored. See QuestDefinition.Verified.
+				if (existing.Verified && !force)
+				{
+					protectedRows++;
 					continue;
 				}
 
@@ -1079,7 +1108,8 @@ namespace Faolan.Importer.Captures
 				throw;
 			}
 
-			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated, {skipped} skipped (map not in catalog).");
+			Console.WriteLine($"Quest definitions (journal content): {definitions.Count} harvested, {added} new, {updated} updated, {skipped} skipped (map not in catalog)"
+			                  + (protectedRows > 0 ? $", {protectedRows} left as hand-verified." : "."));
 		}
 
 		// Static world objects (decor/containers/zones), deduped by (map, position). Transient loot bags skipped.

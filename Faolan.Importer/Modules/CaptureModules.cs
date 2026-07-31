@@ -294,11 +294,12 @@ namespace Faolan.Importer.Modules
 
 			var conversations = ConversationExtractor.Merge(split);
 			var overwrite = ctx.ModeFor(Name) == WriteMode.Overwrite;
-			var result = await ImportOps.ImportConversations(ctx.Db, conversations, overwrite);
+			var result = await ImportOps.ImportConversations(ctx.Db, conversations, overwrite, ctx.Force);
+			var held = result.Protected > 0 ? $", {result.Protected} left as hand-verified" : "";
 
 			return new ImportResult(overwrite
-				? $"{conversations.Count} conversation nodes (rebuilt)."
-				: $"{conversations.Count} screens in the dump: {result.Inserted} new, {result.Replaced} replaced by a richer capture, {result.Kept} already as complete.");
+				? $"{conversations.Count} conversation nodes (rebuilt){held}."
+				: $"{conversations.Count} screens in the dump: {result.Inserted} new, {result.Replaced} replaced by a richer capture, {result.Kept} already as complete{held}.");
 		}
 	}
 
@@ -916,7 +917,7 @@ namespace Faolan.Importer.Modules
 			var areas = QuestAreaExtractor.Extract(packets);
 			var areaCount = await ImportOps.ImportQuestAreas(ctx.Db, areas, defs.Select(d => d.AreaId).Where(id => id != 0).Distinct().ToList());
 
-			await ImportOps.ImportQuestDefinitions(ctx.Db, defs);
+			await ImportOps.ImportQuestDefinitions(ctx.Db, defs, ctx.Force);
 
 			// The completed journal carries a title + sub-line for every quest the character ever finished - far more
 			// quests than any capture session touches. Additive: never disturbs the richer full-update definitions.

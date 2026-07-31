@@ -41,6 +41,10 @@ namespace Faolan.Core.Database.Tables
 		[Key]
 		public uint QuestId { get; set; }
 
+		// Hand-reviewed: the importer must not overwrite this row's fields. Set from the editor, NEVER by an import.
+		// See ConversationNode.Verified - same contract, same `--force` escape.
+		public bool Verified { get; set; }
+
 		// The per-GOAL objective detail (the @609 region of the FullChar snapshot tails) - one row per goal of the
 		// quest. A quest can have several goals each with its own world marker + objective text (the beach starter has
 		// two: 1448 + 3490). Distinct from TextRefs (the journal header); these drive QuestObjectiveRegion generation

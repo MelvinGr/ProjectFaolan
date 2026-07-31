@@ -101,6 +101,23 @@
 	margin-left: auto;
 }
 
+/* Hand-verified: the importer leaves the row alone. Marked in the LIST as well as the detail pane so a protected
+   quest is visible without selecting it - the whole point is knowing which rows a re-import will skip. */
+.rowlist .vflag {
+	color: var(--ok, #3fa66a);
+	font-size: .78rem;
+	font-weight: 700;
+}
+
+.qe-verified {
+	align-items: center;
+	display: flex;
+	gap: .4rem;
+	margin-top: .6rem;
+}
+
+.qe-verified span { font-size: .82rem; }
+
 .qe-fields {
 	display: grid;
 	gap: .5rem 1rem;

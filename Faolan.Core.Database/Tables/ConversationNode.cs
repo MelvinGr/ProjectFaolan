@@ -74,6 +74,19 @@ namespace Faolan.Core.Database.Tables
 		// by its trigger, a talk node is not. See ComputeId.
 		public bool ServerInitiated { get; set; }
 
+		// Hand-reviewed: the importer must not touch this row. Set from the editor, NEVER by an import.
+		//
+		// The importer harvests the bulk from captures and gets most of it right; the tail is corrected by hand, and
+		// without this flag the next `--only conversations` would undo that work - upsert replaces a row whenever a
+		// capture has more packets, and overwrite drops the table outright. `--force` overrides it, for the case where
+		// the correction itself has gone stale.
+		//
+		// ⚠️ NOT part of ComputeId, deliberately: the id is the node's IDENTITY (who says it, on which branch, under
+		// which gate) and marking a row reviewed does not change any of that. Folding it in would give a verified row
+		// a different key from the one the harvest computes, so the importer would stop seeing it as the same node and
+		// insert a duplicate beside it - the exact opposite of protecting it.
+		public bool Verified { get; set; }
+
 		// For a ServerInitiated node: the WORLD OBJECT whose use opened this conversation (#523). Null on a talk node,
 		// and null on a server-opened one whose trigger is not an interaction - five of the seven in the corpus are
 		// preceded by movement alone, so they are proximity-triggered and need a different target.
