@@ -4,7 +4,7 @@ using Faolan.Core.Network.Codecs.Combat;
 namespace Faolan.Core.Network.Constants
 {
 	// The summonable-mount catalog (#27). The player triggers a mount with a BehaviorControlCenter SummonMount
-	// action (ActionType 0xA) whose `from` is the mount id; the server answers by casting the summon spell and
+	// action (BehaviorId 0xA, Mount) whose `from` is the mount id; the server answers by casting the summon spell and
 	// spawning the mount creature at the player. Capture-grounded from the NecroL80 mount/dismount captures:
 	//   - SummonMount `from` 0x3E34F1 = "Fading Black Horse", 0x3E34F2 = "Swift Fading Black Horse"
 	//     (Handle0x2000 SummonMount comments + the 0x2076 action-bar entries).

@@ -3,7 +3,7 @@ using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.Combat
 {
-	// Reads the ground-target position out of a CastSpell BehaviorControlCenterIIR's TAIL (ActionType 4).
+	// Reads the ground-target position out of a CastSpell BehaviorControlCenterIIR's TAIL (BehaviorId 4, Magic:Attack).
 	//
 	// Not a codec: it reads a field out of ANOTHER message's opaque region, so there is no message here to Build and no
 	// body to consume to the end - the same shape `PlayfieldTokenScan` has in World/. It is deliberately tolerant

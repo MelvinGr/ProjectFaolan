@@ -199,7 +199,7 @@ namespace Faolan.GameServer.Combat
 				() => SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId));
 		}
 
-		// The melee swing / auto-attack (Interact ActionType 0x0F). Retail's response sequence, reproduced from the
+		// The melee swing / auto-attack (Combat:Melee, BehaviorId 0x0F). Retail's response sequence, reproduced from the
 		// strickenbla combat capture, is: a BehaviorControlCenterIIR (0x642CD3D6) acking the behavior (this is what
 		// the client blocks on - without it the swing stalls), then a DamageResultIIR (0xFEC4158A) hit, then an
 		// EnergyIIR (0x40749B8A) stamina update. The ack header echoes the request (instance, behaviorId, args) with

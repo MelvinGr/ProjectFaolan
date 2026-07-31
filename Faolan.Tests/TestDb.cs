@@ -115,8 +115,8 @@ namespace Faolan.Tests
 		// `Delete` was written, and a cache that never evicts is that bug wearing a useful face.
 		//
 		// ⚠️ It leaked per BUILD, not per change. The key has to include the initializer assembly (see above), and this
-		// build is NOT byte-deterministic - two consecutive `dotnet build`s with no source change produce two different
-		// hashes - so EVERY build mints a fixture. The window therefore has to be short enough that a working day of
+		// build is NOT byte-deterministic (Gitea #551) - two consecutive `dotnet build`s with no source change produce
+		// two different hashes - so EVERY build mints a fixture. The window has to be short enough that a working day of
 		// building cannot fill the disk. An hour keeps the cache useful for the case it actually serves (repeated test
 		// runs against one build) while bounding the leak to one hour's worth.
 		//

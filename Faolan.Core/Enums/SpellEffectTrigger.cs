@@ -5,7 +5,7 @@ namespace Faolan.Core.Enums
 	// of the key rather than a flag on the effect.
 	public enum SpellEffectTrigger : byte
 	{
-		// The spell is cast (BehaviorControlCenter ActionType.CastSpell), and the cast resolves after its cast time.
+		// The spell is cast (BehaviorControlCenter BehaviorId.MagicAttack), and the cast resolves after its cast time.
 		// The effect replaces the generic "apply the buff to the target" resolution.
 		OnCast = 0,
 

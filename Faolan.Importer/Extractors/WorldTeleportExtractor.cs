@@ -32,7 +32,6 @@ namespace Faolan.Importer.Extractors
 		// same-map (same-playfield) relocation streams the new locale's entities BETWEEN the IntendedTeleport and the
 		// N3Teleport, so the arrival record can be ~90 packets out (Hoxxling inn: UseObject #10369 -> N3Teleport #10459).
 		private const int LookaheadPackets = 150;
-		private const uint UseObjectActionType = (uint)ActionType.UseObject; // 0x12
 
 		// The world-object classes that can be teleporter doors: DoorFullUpdateIIR (0x33A56FB0, the Tarantia/castle
 		// zone-lines) AND SimpleDynelFullUpdateIIR (0x66AEDD50, which also backs same-playfield doors like the Thirsty
@@ -79,7 +78,7 @@ namespace Faolan.Importer.Extractors
 				// Client used an object: is the target one of the current map's zone-lines, and does a teleport follow?
 				if (p.IsDownload || p.SubOpcode != BehaviorControlCenterCodec.Opcode)
 					continue;
-				if (!p.TryParse(BehaviorControlCenterCodec.Parse, out var interact) || interact.BehaviorId != UseObjectActionType)
+				if (!p.TryParse(BehaviorControlCenterCodec.Parse, out var interact) || interact.BehaviorId != (uint)BehaviorId.UseDynel)
 					continue;
 
 				// Only a handle that is actually a tracked door produces a link - the used object is named in the

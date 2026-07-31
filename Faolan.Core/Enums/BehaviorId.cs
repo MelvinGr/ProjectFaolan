@@ -38,25 +38,53 @@ namespace Faolan.Core.Enums
 	{
 		Transition = 0x01,
 		Movement = 0x02,
+
+		/// <summary>Casting a spell. The tail carries the ground-target reticle for an AoE (<c>CastGroundTargetScan</c>).</summary>
 		MagicAttack = 0x04, // "Magic:Attack"
 		Emote = 0x05,
 
-		/// <summary>The generic action channel, and the busiest record in the corpus (35852 of 67307, no tail).</summary>
+		/// <summary>
+		///     The generic action channel, and the busiest record in the corpus (35852 of 67307, no tail).
+		///     <para>
+		///         ⚠️ This codebase called it <c>PlayAnimation</c>, which is a DIFFERENT command (<see cref="PlayAnimation" />,
+		///         0x1D). One thing genuinely rides this channel: the MOUNTED jump (#428). A standing jump moves the
+		///         character nowhere, so there is no CharDCMove for the viewer relay to carry and the client asks for the
+		///         animation here instead - the animation itself named by the args' <c>bcc_action_id</c> (live 2026-07-25:
+		///         f1 249528 mounted, 249527 off a bridge, 249555 elsewhere, all one id cluster). A plain unmounted jump
+		///         does NOT use it: that is pure CharDCMove with MoveFlag.Airborne.
+		///     </para>
+		/// </summary>
 		BccAction = 0x07,
 		CombatShieldTaunt = 0x08, // "Combat:Shield Taunt"
+
+		/// <summary>Moving an item between an equipment slot and the inventory.</summary>
 		Equip = 0x09,
+
+		/// <summary>Summoning a mount; the args' <c>from</c> is the mount id (<c>MountCatalog</c>).</summary>
 		Mount = 0x0A,
 		Dance = 0x0B,
 		DisarmTrap = 0x0C,
 		SearchTrap = 0x0D,
+
+		/// <summary>Using an inventory item - what a right-click on it sends.</summary>
 		UseItem = 0x0E,
 
 		/// <summary>The ordinary weapon swing - what this codebase used to call "NormalAttack".</summary>
 		CombatMelee = 0x0F, // "Combat:Melee"
 		CombatRanged = 0x10, // "Combat:Ranged"
+
+		/// <summary>The empty-main-hand swing - what this codebase used to call "UnarmedAttack".</summary>
 		CombatUnarmed = 0x11, // "Combat:Unarmed"
+
+		/// <summary>Acting on a world OBJECT - <c>startobjectaction(18)</c>, e.g. opening a loot bag, chest or door.</summary>
 		UseDynel = 0x12,
 		CombatEvasiveManeuver = 0x15, // "Combat:Evasive Maneuver"
+
+		/// <summary>
+		///     Interacting with a CHARACTER, and the target decides what it means: an NPC opens its conversation (or its
+		///     shop window), a PLAYER is a trade request (#101 - capture login_2-clients_group-trade-friend f1251 -> f1260,
+		///     where the same id at another player produces DispatchRequestTrade).
+		/// </summary>
 		UseCharacter = 0x16,
 		TargetAnimation = 0x18,
 		CombatSiege = 0x1B, // "Combat:Siege"
@@ -74,6 +102,8 @@ namespace Faolan.Core.Enums
 		TransitionLeaveKnockout = 0x29, // "Transition:Leave Knockout"
 		ObjectInteraction = 0x2A,
 		PickPocket = 0x2B,
+
+		/// <summary>The weapon-set switch button (melee set ↔ ranged set).</summary>
 		SwapAlternateEquipmentCommand = 0x2E, // registered as "SwapAlternateEquipmentCommand_c"
 		CombatReactive = 0x2F // "Combat:Reactive"
 	}

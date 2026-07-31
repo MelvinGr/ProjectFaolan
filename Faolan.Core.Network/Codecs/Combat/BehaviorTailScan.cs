@@ -33,7 +33,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 				: 0;
 		}
 
-		// The entity a UseObject (ActionType 0x12) acted on: the SECOND word of the tail's leading `[from][target]`
+		// The entity a UseDynel (BehaviorId 0x12) acted on: the SECOND word of the tail's leading `[from][target]`
 		// pair, `from` being the object's typetag. 0 when the tail is too short.
 		//
 		// ⚠️ NOT `args.Target` - on a UseObject that holds the PLAYER's own instance, and the object is only in the

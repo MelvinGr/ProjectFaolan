@@ -218,7 +218,7 @@ ends when the player **opens the city door**:
 ⚠️ **Order matters: the quest completes BEFORE the conversation, not because of it.** The door is the trigger; the
 farewell is a separate, server-initiated beat that follows.
 
-**That is how the escort is wired.** `GameServerListener.Inbound`'s `ActionType.UseObject` case asks which NPCs
+**That is how the escort is wired.** `GameServerListener.Inbound`'s `BehaviorId.UseDynel` case asks which NPCs
 this object opens a server-initiated conversation for, completes their `Escort` goals, and then opens the farewell
 (`ConversationService.TryOpenTriggeredConversation`) — in the capture's order.
 
@@ -252,7 +252,7 @@ NPC     We'll meet again.
 `{gameactiononnpc SendScryEvent EventString RunToTortage}` is what sends her off. `{resolvegoal <TOKEN>}` is the
 same inline directive that resolves her earlier stage (`BJGY` for 13480) — see Gitea #356.
 
-**The trigger is `ActionType.UseObject` (0x12) on the city door**, and it reproduces across both beach-to-city
+**The trigger is `BehaviorId.UseDynel` (0x12) on the city door**, and it reproduces across both beach-to-city
 captures — necro `fr11357 → fr11395`, demo `fr10180 → fr10213`, same action, same 60-byte body, ~35 frames ahead
 of the window opening. The door is a `WorldObject`, so the trigger is stable rather than session-volatile:
 

@@ -78,7 +78,7 @@ namespace Faolan.Core.Database.Tables
 		// and null on a server-opened one whose trigger is not an interaction - five of the seven in the corpus are
 		// preceded by movement alone, so they are proximity-triggered and need a different target.
 		//
-		// Casilda's city-door farewell is the worked example: ActionType.UseObject (0x12) on WorldObjects.Id 1044692756
+		// Casilda's city-door farewell is the worked example: BehaviorId.UseDynel (0x12) on WorldObjects.Id 1044692756
 		// (map 4010, `object_closed`, DestinationMapId 4020 - the zone line into Tortage), reproduced in both
 		// beach-to-city captures. SetNull rather than Cascade: losing the object should degrade the conversation to
 		// "trigger unknown", not delete the dialogue.

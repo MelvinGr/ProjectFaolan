@@ -64,7 +64,7 @@ resolves the blend + a backlash roll on deactivate.
 
 **Melee** (dumps: `Hakotep_hox_login_gameplay0`, `Hoxxling_mage-heraldofxotli_combos` [HoX], plus
 `AssassinL23_rogue-assassin_login_combos` [Assassin, incl. a few DELIBERATELY FAILED combos]):
-- A combo is a **sequence of `NormalAttack` (BehaviorControlCenter, ActionType 0xF)** c2s actions. **No separate
+- A combo is a **sequence of `Combat:Melee` (BehaviorControlCenter, `BehaviorId` 0xF)** c2s actions. **No separate
   activation packet** precedes the swings (checked the 3s before a combo's first swing: only heartbeat + move) —
   the swings ARE the input, not an "activate combo X then confirm" flow.
 - Swing payload (after the offset-i+18 LENGTH; NB the earlier "direction 0x12/0x15" read was that length field):
@@ -102,7 +102,7 @@ that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then
 - **Fire / cancel**: on the 2nd toggle, the s2c `f98e10b3` burst (the weave firing) + trance-buff end-twins + a
   trance-EXIT BCC. Per add: the component's own spell as an immediate self-buff + add-gesture BCC; the Spellweaving(1)
   buff re-applies at an incremented id each picker reappear (stacks ~x2).
-- `0x2085` (~2s heartbeat) and food/potion `RightClickItem` (BCC ActionType 0x0e) are NOT part of the weave.
+- `0x2085` (~2s heartbeat) and food/potion `UseItem` (BCC `BehaviorId` 0x0e) are NOT part of the weave.
 
 ## Implementation (spellweaving, Necromancer)
 

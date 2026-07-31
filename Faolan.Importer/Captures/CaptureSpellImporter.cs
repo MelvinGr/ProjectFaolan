@@ -31,7 +31,6 @@ namespace Faolan.Importer.Captures
 		private const int CastEffectWindow = 40;
 		private const uint ApplySpellSubOpcode = MagicBuffCodec.Opcode;
 		private const uint BehaviorSubOpcode = BehaviorControlCenterCodec.Opcode;
-		private const uint CastSpellActionType = 4; // ActionType.CastSpell
 		private const uint MaxLevel = 80;
 
 		// MoveItemToBar / AddShortcut. The client's first one ends the create starting-kit phase (its bar drags
@@ -612,7 +611,7 @@ namespace Faolan.Importer.Captures
 				if (inner.Length < 22 || inner.ReadU32Be(0) != BehaviorSubOpcode)
 					return false;
 
-				if (inner.ReadU32Be(14) != CastSpellActionType)
+				if (inner.ReadU32Be(14) != (uint)BehaviorId.MagicAttack)
 					return false;
 
 				var argsLen = (int)inner.ReadU32Be(18);

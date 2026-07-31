@@ -48,8 +48,6 @@ namespace Faolan.Importer.Extractors
 	// `packets` must be one capture's GameServer packets in chronological order.
 	public static class ConversationExtractor
 	{
-		private const uint TalkToNpcActionType = (uint)ActionType.InteractWithCharacter; // 0x16
-		private const uint UseObjectActionType = (uint)ActionType.UseObject; // 0x12 - 'use a world object' (the city door)
 
 		// How far back a UseObject may sit and still be taken as the TRIGGER for a server-opened window. MEASURED over
 		// the whole corpus: both door conversations open 45 packets after their UseObject, and the nearest interaction
@@ -154,7 +152,7 @@ namespace Faolan.Importer.Extractors
 
 					// A USE-OBJECT is remembered, not acted on: it is the trigger for a window the server opens a moment
 					// LATER (#523), so it only means anything once an unattributed OpenChatWindow shows up behind it.
-					if (interact.BehaviorId == UseObjectActionType)
+					if (interact.BehaviorId == (uint)BehaviorId.UseDynel)
 					{
 						// ⚠️ The object handle is in the behaviour TAIL, NOT in args.Target - see BehaviorTailScan.
 						if (BehaviorTailScan.InteractTargetHandle(interact.Tail) is var target and not 0)
@@ -166,7 +164,7 @@ namespace Faolan.Importer.Extractors
 						continue;
 					}
 
-					if (interact.BehaviorId != TalkToNpcActionType)
+					if (interact.BehaviorId != (uint)BehaviorId.UseCharacter)
 						continue;
 
 					var (parsedTypeId, _, field3, parsedNpc) = ParseArgs(interact.Args);
@@ -341,7 +339,7 @@ namespace Faolan.Importer.Extractors
 		{
 			var namesByHandle = BuildSpawnNameMap(packets);
 
-			// Only handles that spawned as an NPC count. ActionType 0x16 is the generic "interact with a character", so
+			// Only handles that spawned as an NPC count. UseCharacter (0x16) is the generic "interact with a character", so
 			// aiming it at a PLAYER is a TRADE REQUEST (#101) rather than a greeting - and since the spawn name map
 			// covers players too, the two-client capture had both players counted as dialogue NPCs with missing
 			// dialogue, quietly deflating the coverage figure this feeds (34/37 -> 34/39) and putting player names in
@@ -353,7 +351,7 @@ namespace Faolan.Importer.Extractors
 				if (p is not { IsDownload: false, IsIirCarrier: true, SubOpcode: BehaviorControlCenterCodec.Opcode })
 					continue;
 
-				if (!p.TryParse(BehaviorControlCenterCodec.Parse, out var interact) || interact.BehaviorId != TalkToNpcActionType)
+				if (!p.TryParse(BehaviorControlCenterCodec.Parse, out var interact) || interact.BehaviorId != (uint)BehaviorId.UseCharacter)
 					continue;
 
 				var (_, _, field3, parsedNpc) = ParseArgs(interact.Args);

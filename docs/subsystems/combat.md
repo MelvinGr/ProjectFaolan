@@ -9,9 +9,14 @@ aggro/death/XP/loot) is tracked as Gitea issues under the `area:combat` label, p
 
 `[bodyLen u32][subop][0000C350][instance][seq u16 = 0003][behaviorId u32][argsLen u32][args][tail]`
 
-- `behaviorId` = the `ActionType`: **0x0F NormalAttack** (armed swing), **0x11 UnarmedAttack** (empty main
-  hand; behavior TypeIds 1089xx), 0x09 equip move (see `docs/subsystems/inventory.md`), 0x2E weapon switch, 0x16 talk,
-  0x12 use object, etc.
+- `behaviorId` names a COMMAND in the client's own classmap — `BehaviorId` carries all 34 under the client's
+  names, and the full grammar (including the one phase that carries an extra word here) is
+  [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md). The ones this page is about:
+  **0x0F Combat:Melee** (armed swing), **0x11 Combat:Unarmed** (empty main hand; behavior TypeIds 1089xx),
+  0x09 Equip (see `docs/subsystems/inventory.md`), 0x2E SwapAlternateEquipment, 0x16 UseCharacter (talk),
+  0x12 UseDynel. ⚠️ "NormalAttack" and "UnarmedAttack" were OUR names for the first two, corrected in #536.
+  The duplicate `ActionType` enum that carried those names is gone — `BehaviorId` is the one catalog — though
+  `CombatService`'s `NormalAttackBehaviorId` constant and `SendNormalAttackResponse` keep the old spelling.
 - args protobuf `{TypeId, Mode, Category, Field6, ...}` - **Mode is a monotonic per-session action
   counter** across ALL BCC interactions.
 - Attack tails end with the **direction-ability id** (769094/769095/769099 = Normal Attack Left/Right/
@@ -386,7 +391,8 @@ body** the actor's own client receives, only the frame receiver differs. Two rel
 `Known` set (so a still-loading viewer is never sent an action for a handle it hasn't built — the `#245`
 invariant):
 - **The cast/attack GESTURE** — the `BehaviorControlCenter` animation (`#48`, `BroadcastBehaviorToViewers`),
-  fired for `NormalAttack` / `UnarmedAttack` / `CastSpell` in `GameServerListener.Inbound.cs`.
+  fired for `BehaviorId.CombatMelee` / `CombatUnarmed` / `MagicAttack` (and the mounted jump's `BccAction`) in
+  `GameServerListener.Inbound.cs`.
 - **The spell EFFECT** — the `ApplySpell` (`0x6B87E316`) itself (`BroadcastSpellToViewers`, from
   `SendMagicBuffIir`), so the buff/effect that lands renders on nearby clients, not just the gesture.
 - **The buff's END** — the rank-1 end twin (`SendBuffRemoval`) relays the same way. A buff other clients were told
@@ -494,7 +500,7 @@ so a character rolls the best tier its level qualifies for — `FatalityService.
    (The client's rig also carries a bone named `rig_bone_decapitationhelp`.)
 
 ## Spell cast FSM (#236)
-A player spell cast is a `BehaviorControlCenter` (`0x642CD3D6`) `CastSpell` action (`ActionType 4`), handled in
+A player spell cast is a `BehaviorControlCenter` (`0x642CD3D6`) `Magic:Attack` action (`BehaviorId` 4), handled in
 `GameServerListener.Inbound.cs`. The real spell id rides the action **trailer** (`[u32 from][u32 spellId]`), not
 the protobuf `SpellTarget.SpellId` (that field is the constant `0xC350` type-word). The BCC **state word** (the
 `u16` before `actionType`) is `3` = begin, `2` = **cancel** — capture-derived (`actions-described-in-chat`:

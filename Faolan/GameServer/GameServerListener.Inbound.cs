@@ -846,7 +846,7 @@ namespace Faolan.GameServer
 
 			switch (opcode)
 			{
-				// --- player trade (#101). The request itself arrives as a BCC (ActionType 0x16 at a PLAYER), handled above;
+				// --- player trade (#101). The request itself arrives as a BCC (UseCharacter 0x16 at a PLAYER), handled above;
 				// everything from the window opening onward is these five methods. ------------------------------------
 				case GameCharAgentOpcodes.StartTrade: // 0x2065 - the TARGET opens the window, creating the session
 				{
@@ -1616,10 +1616,10 @@ namespace Faolan.GameServer
 				return; // was a `break` out of the Handle0X2000 switch - same exit, now from this method
 			}
 
-			var actionType = body.ReadUInt32<ActionType>();
+			var actionType = body.ReadUInt32<BehaviorId>();
 			var args = body.ReadProtobufUInt32Length<CommandMessage>();
 
-			if (actionType == ActionType.SwitchWeaponsButton)
+			if (actionType == BehaviorId.SwapAlternateEquipmentCommand)
 			{
 				// #400: SwitchWeaponsButton is the weapon-SET switch (toggles the two swappable loadouts), NOT a draw/sheathe -
 				// capture-confirmed: a character wearing both sets pressed it 3x and the newly-active weapon main slot alternated
@@ -1651,7 +1651,7 @@ namespace Faolan.GameServer
 
 				switch (actionType)
 				{
-					case ActionType.SummonMount:
+					case BehaviorId.Mount:
 					{
 						// SummonMount TOGGLES (pressing the same button while mounted dismounts) and the two directions time
 						// DIFFERENTLY:
@@ -1737,7 +1737,7 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					case ActionType.RightClickItem:
+					case BehaviorId.UseItem:
 					{
 						Logger.LogInformation("RightClickItem: container={Container} slot={Slot} {Args}", (ContainerKind)from, target, args);
 
@@ -1752,7 +1752,7 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					case ActionType.CastSpell:
+					case BehaviorId.MagicAttack:
 					{
 						// The BCC behaviorType tells begin from cancel: 3 = begin, 2 = CANCEL. The client sends
 						// the cancel when the cast is interrupted (moving mid-cast - "move cancels the cast", #346/#347),
@@ -1923,7 +1923,7 @@ namespace Faolan.GameServer
 						}
 					}
 
-					case ActionType.NormalAttack:
+					case BehaviorId.CombatMelee:
 					{
 						// The melee swing / auto-attack: ack the behavior + resolve the hit (see
 						// SendNormalAttackResponse). The target is in the request args (SpellTarget.TargetHandle).
@@ -1933,7 +1933,7 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					case ActionType.UnarmedAttack:
+					case BehaviorId.CombatUnarmed:
 					{
 						// Unarmed swing (empty main hand; behavior TypeIds 1089xx, ability id in the tail).
 						// Retail's reply is the plain behavior echo-ack - no result block (combat capture
@@ -1945,14 +1945,14 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					case ActionType.Emote:
+					case BehaviorId.Emote:
 					{
 						Logger.LogInformation($"Emote: {args}");
 
 						break;
 					}
 
-					case ActionType.UseObject:
+					case BehaviorId.UseDynel:
 					{
 						// Using a world object - `target` is the object handle (its typetag, 0xC87A for loot bags,
 						// rides in `from`). Dispatch on what the object DOES (its InteractAction, data-driven from
@@ -2084,7 +2084,7 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					case ActionType.InteractWithCharacter:
+					case BehaviorId.UseCharacter:
 					{
 						// The clicked NPC's entity handle rides in the interact args (field 10 / field 2);
 						// (TypeId, Mode, Field3) select the conversation node the client is requesting.
@@ -2171,7 +2171,7 @@ namespace Faolan.GameServer
 						break;
 					}
 
-					case ActionType.MoveEquippedToFromInventory:
+					case BehaviorId.Equip:
 					{
 						// bag slot starts top left, continue counting on next page
 
@@ -2309,7 +2309,7 @@ namespace Faolan.GameServer
 				// PlayAnimation (#428): the mounted jump. A standing jump moves the character nowhere, so there is
 				// no CharDCMove for the relay to carry - the client asks for the animation over this channel
 				// instead, and without it in this list the actor animated on their own screen only.
-				if (actionType is ActionType.NormalAttack or ActionType.UnarmedAttack or ActionType.CastSpell or ActionType.MoveEquippedToFromInventory or ActionType.PlayAnimation)
+				if (actionType is BehaviorId.CombatMelee or BehaviorId.CombatUnarmed or BehaviorId.MagicAttack or BehaviorId.Equip or BehaviorId.BccAction)
 				{
 					var behaviorRelay = BehaviorAcks.Relay(client.Session.Character.Id, rawPayload, args.CommandqueueClientId);
 					if (behaviorRelay != null)

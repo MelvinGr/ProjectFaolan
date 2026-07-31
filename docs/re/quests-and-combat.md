@@ -63,13 +63,13 @@ cover bytes, defaults, and cascade. `ApplySpell` (0x6B87E316) was already implem
 **Combat loop implemented** (2026-06-08): `Faolan/GameServer/Combat/` — `EntityVitals` (live current+max HP/
 Mana/Stamina, clamped deltas), `CombatState` (in-memory per-handle vitals store; world-authoritative, never
 persisted), `CombatResolver` (provisional level-scaled damage; spell power/mitigation TBD). The client's
-`CastSpell` interact (`ActionType 0x4`) now broadcasts the `0x6B87E316` ApplySpell and, for a cast at another
+`Magic:Attack` interact (`BehaviorId` 0x4) now broadcasts the `0x6B87E316` ApplySpell and, for a cast at another
 entity, calls `ResolveOffensiveCast` → applies damage to the target's vitals → pushes a `0x96B8DC59` update so
 its health bar moves. Death is detected (HP→0); the despawn + XP packet is not decoded. GM test commands
 `.hurt [n]` / `.heal [n]` / `.spelltest <id>` have since been removed (the `.kill` command now drives the death
 path). Tests: `CombatTests`.
 
-**Melee auto-attack — a BehaviorControlCenter FSM** (2026-06-11). NormalAttack = `0x642CD3D6` Interact actionType
+**Melee auto-attack — a BehaviorControlCenter FSM** (2026-06-11). `Combat:Melee` = `0x642CD3D6` behaviorId
 **0xf**, not a one-shot: the client sends one swing per press (args field2 = swing counter; the attack direction
 ability 769094/95/99 cycles in the request tail; the target is `args.SpellTarget.field2`). The server's BccAck
 (`0x642CD3D6` download) echoes the request args **with field3 (a monotonic "phase" counter) inserted after
@@ -157,7 +157,7 @@ inventory-delivery mechanism — see memory `protocol_containeradditem`).
 - NecroL80 accept_quest tree: nodes 30031/30033/30039/… ; strickenbla beach tree: 12493→12490→…→12494.
 
 ### Accept / interact
-- `0x642CD3D6` Interact carries the talk-to-NPC / accept actions (ActionType `0x16` = TalkToNpc). The discrete
+- `0x642CD3D6` Interact carries the talk-to-NPC / accept actions (`BehaviorId` `0x16` = UseCharacter). The discrete
   "accept" vs "decline" action isn't yet isolated to its own field.
 
 ### Rewards / turn-in
