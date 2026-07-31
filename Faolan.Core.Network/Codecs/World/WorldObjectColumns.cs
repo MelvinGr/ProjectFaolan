@@ -25,7 +25,9 @@ namespace Faolan.Core.Network.Codecs.World
 			row.Name = message.Name;
 			WorldObjectDisplay.TryApply(row, message.DisplayName);
 			row.CarsGroup = message.CarsGroup;
-			row.IsClosed = message.IsClosed;
+			row.IsClosed = message.ShouldSerializeIsClosed()
+				? message.IsClosed
+				: null;
 			row.ShowPopupOnUse = message.ShouldSerializeShowPopupOnUse()
 				? message.ShowPopupOnUse
 				: null;
@@ -85,7 +87,7 @@ namespace Faolan.Core.Network.Codecs.World
 		}
 
 		// Builds the typed identity message from a WorldObject row's columns (the DB-source path). Kdtree is always 0
-		// on world dynels; the two nullable columns are emitted only when present, reproducing the captured field-set.
+		// on world dynels; the nullable columns are emitted only when present, reproducing the captured field-set.
 		// Stays here, not on WorldObject: the entity is a plain Core.Database row, and wire/protobuf construction is
 		// the codec's job - putting it on the row would couple the DB layer to the protobuf message type.
 		public static ProtoSimpleDynelIIR ToMessage(WorldObject row)
@@ -95,9 +97,10 @@ namespace Faolan.Core.Network.Codecs.World
 				Kdtree = row.Kdtree,
 				Name = row.Name,
 				DisplayName = WorldObjectDisplay.ToWire(row),
-				CarsGroup = row.CarsGroup,
-				IsClosed = row.IsClosed
+				CarsGroup = row.CarsGroup
 			};
+			if (row.IsClosed.HasValue)
+				message.IsClosed = row.IsClosed.Value;
 			if (row.ShowPopupOnUse.HasValue)
 				message.ShowPopupOnUse = row.ShowPopupOnUse.Value;
 			if (row.QuestItemEffect.HasValue)

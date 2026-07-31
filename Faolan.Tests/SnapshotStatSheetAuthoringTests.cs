@@ -52,6 +52,10 @@ namespace Faolan.Tests
 			[CharacterStatId.Skulk] = "skills not derived",
 			[CharacterStatId.RunSpeed] = "movement stats not derived",
 
+			// Religion: 0 on 183 of the 184 captured snapshots and 1 on exactly one, so it VARIES - but there is no
+			// deity column to author it from, and which integer is which god is unverified (#553).
+			[CharacterStatId.ChosenGod] = "religion not modelled (#553)",
+
 			// Named-unknown slots that vary: undecoded, so there is nothing to derive them FROM yet (#464).
 			[CharacterStatId.Unknown15] = "undecoded slot (#464)",
 			[CharacterStatId.Unknown46] = "undecoded slot (#464)",

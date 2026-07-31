@@ -85,7 +85,11 @@ namespace Faolan.Core.Database.Tables
 			? null
 			: new Vector3(DestinationX!.Value, DestinationY!.Value, DestinationZ!.Value); // Just throw if any are null, the DB should never have a partial position.
 
-		public bool IsClosed { get; set; } // proto field 12
+		// proto field 12. Nullable for the same reason as ShowPopupOnUse below: ABSENT and false are different bytes
+		// and the identity rebuild is byte-compared. Almost every captured door carries it explicitly, but the map
+		// 12040 "Wharf Door" omits it, and while the column was a plain bool that one row failed the all-or-nothing
+		// lift and would have shipped un-spawnable.
+		public bool? IsClosed { get; set; }
 
 		// proto field 4 - "using this object opens a popup". Nullable because ABSENT and false are different bytes and
 		// the identity rebuild is byte-compared: exactly one captured object sets it (the map 11040 "Siege Camp"), and

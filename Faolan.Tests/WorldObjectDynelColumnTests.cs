@@ -35,7 +35,7 @@ namespace Faolan.Tests
 					Name = r.GetString(0),
 					DisplayKind = (InnerElementKind)r.GetInt64(1),
 					CarsGroup = (uint)r.GetInt64(2),
-					IsClosed = r.GetBoolean(3),
+					IsClosed = r.IsDBNull(3) ? null : r.GetBoolean(3),
 					QuestItemEffect = r.IsDBNull(4)
 						? null
 						: (uint)r.GetInt64(4),

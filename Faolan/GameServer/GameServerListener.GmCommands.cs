@@ -879,7 +879,7 @@ namespace Faolan.GameServer
 					: "";
 				await _agentServerDispatcher.SendSystemMessage(characterId,
 					ChatMarkup.Lines(ChatMarkup.Raw($"{ChatMarkup.Bold(oname)}  (handle 0x{handle:X8}, world-object)"),
-						$"objectId {obj.ObjectId} · item template {obj.TemplateItemId?.ToString() ?? "none"} · subop 0x{obj.SubOpcode:X8} · {(obj.IsClosed ? "closed" : "open")}",
+						$"objectId {obj.ObjectId} · item template {obj.TemplateItemId?.ToString() ?? "none"} · subop 0x{obj.SubOpcode:X8} · {(obj.IsClosed == true ? "closed" : "open")}",
 						$"interact {obj.InteractAction} · carsGroup {obj.CarsGroup}{dest}", $"pos ({obj.Position.X:F1}, {obj.Position.Y:F1}, {obj.Position.Z:F1}) · map {obj.MapId}"));
 				return;
 			}
