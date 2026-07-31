@@ -157,12 +157,26 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// - goal 11252 - uses [1]+[3]). So the pairs FLOAT; an earlier note here pinned them to [1..2] and [5..6],
 		// which is where they happen to sit in most captures.
 		//
-		// ⚠️ The marker is not one constant either: it is 70099 on 118 slots and 50003 on 3 (goals 11252, 12555,
-		// 12766). The lead word [0] is a small number - 0 on 155 goals, then 1/2/4/6 - and is not a count of the
-		// occupied slots (goal 3508 carries 4 with one pair; 11252 carries 0 with two).
+		// ⚠️ The marker is not one constant either, and it is a TYPE TAG on the identity beside it (#546):
+		//   * 70099 (118 slots) is the client's "unset id" SENTINEL - `FUN_006dd970`, the `GameCode/Criteria`
+		//     evaluator, guards every id compare with `!= 0x111d3` and logs "user criteria failed" on a match. So the
+		//     pair says "not an LDB reference", and the identity is the object's 4-character ACGHash name.
+		//   * 50003 (3 slots: goals 11252, 12555, 12766) is a real LDB category (`nc_trade.tradename`, per the
+		//     client's own descriptor table) and the identity is an LDB refId.
 		//
-		// Carried per goal like QuestcRecord's undecoded scalars; the tags being random is why they must be stored
-		// rather than derived (see the WTHD note in questc-region-decode). What the pairs MEAN is Gitea #546.
+		// The slots REFER to the goal's own two objects: [1..2] is its TARGET - the same object `TrailingCategory` /
+		// `TrailingRefId` names - and [5..6] is its NPC. That is not visible in one row, so it is gated by
+		// `QuestGoalReferenceSlotTests` over every shipped goal: all three 50003 slots hold the goal's own
+		// `TrailingRefId` verbatim (the Rosetta stone), the token is a bijection with the referenced item / NPC rather
+		// than a per-entry random, every NPC goal carries [5..6], and the only ITEM goals that do are the twelve
+		// `Separator` 20 Deliver goals - i.e. exactly the ones that need a recipient.
+		//
+		// The lead word [0] is a small number - 0 on 155 goals, then 1/2/4/6 - and is not a count of the occupied
+		// slots (goal 3508 carries 4 with one pair; 11252 carries 0 with two). Still undecoded, as is a token ->
+		// object map: only the 23 tokens whose goal also states the NPC's LDB refId resolve, which is why the Deliver
+		// recipients are still read out of the objective TEXT.
+		//
+		// Carried per goal like QuestcRecord's undecoded scalars - a token is per-object, not derivable from the row.
 		public uint[] Reserved { get; init; } = new uint[7];
 	}
 }

@@ -182,6 +182,9 @@ The descriptor table also finishes off the quest-goal reference model. A `QuestG
 | `ObjectiveRefId` + `ObjectiveCategory` | **50304** `quest_goal_templates.goal_name` on all 168 goals; `ObjectiveRefId == GoalId` | the goal's own **display text** ("Kill slavemaster Saddur") | **yes — encrypted, and we hold the keys** (see below) |
 | `TrailingRefId` + `TrailingCategory` | 50200 `item.name`, 51000 `npc_template.name`, 51100 `categorytree.description`, 51200 `bounded_areas` | the goal's **target** | **yes — plaintext** |
 
+There is a **third** reference on the goal, and it is not an LDB one — see
+[the reserved reference slots](#the-goals-reserved-slots-are-a-third-typed-reference) below.
+
 `TrailingCategory` is therefore a **type tag on the target reference**, and it resolves completely: all **107**
 goals with a non-zero `TrailingRefId` resolve in their declared category, giving `Stolen Goods`, `Mangy Yeti
 Pelt`, `Gormley's Buried Treasure`, `Quarry Stonebrick`, `Taskmaster Olaf`, `Vanir Master Polluter`,
@@ -200,6 +203,35 @@ all seven languages silently yields French.)
 **Settled: only 1448 is a reach goal**, and the objective text is what settles it — the column that used to be
 blocked on #520. That is also why the kind value `9` is `RegionScoped` and not `ReachRegion`: two of its three
 goals are not reaches.
+
+### The goal's reserved slots are a third, typed reference
+
+`QuestGoalDefinition.Extra0..Extra6` — the seven "reserved" words — are a lead word plus **three optional
+`(marker, identity)` reference slots** at `[1..2]` / `[3..4]` / `[5..6]`. The slots float (goal 11252 uses `[1]`
+and `[3]`), and the marker types the identity:
+
+| marker | what it is | identity beside it |
+|---|---|---|
+| `70099` | the client's **"unset id" sentinel** — `FUN_006dd970`, the `GameCode/Criteria` evaluator, guards every id compare with `!= 0x111d3` and logs `user criteria failed` on a match | the object's **4-character ACGHash name** (`XE7W`, `8MYE`, `61LV`, …) |
+| `50003` | a real LDB category — `nc_trade.tradename`, from the descriptor table above | an ordinary **LDB refId** |
+
+**What they refer to** is the goal's own two objects: `[1..2]` is its **target** (the same object
+`TrailingCategory`/`TrailingRefId` names) and `[5..6]` is its **NPC**. Four independent facts pin that, and all
+four are gated over every shipped goal by `QuestGoalReferenceSlotTests`:
+
+- the three `50003` slots hold the goal's **own `TrailingRefId` verbatim** — the Rosetta stone, since it is the
+  one case where the slot is spelled in a vocabulary we already read;
+- the token is a **bijection** with the referenced object — 70 tokens ↔ 70 items, 23 ↔ 23 NPCs — so it identifies
+  the object rather than the entry (which is what the earlier "random per-entry key" reading had it as);
+- **every** `51000` NPC goal carries `[5..6]`;
+- the only **item** goals that carry `[5..6]` are all twelve `Separator` 20 **Deliver** goals — exactly the goals
+  that need a recipient.
+
+⚠️ **This does not yet replace the objective text as the importer's source for a Deliver recipient.** The
+reference is by ACGHash token, and the only token → object map we can build is the 23 pairs from goals that
+*also* state the NPC's LDB refId; none of the twelve Deliver recipients is in it. A global token → object table
+would make the recipient structural — the lead is the client's own ACG content data (`AcgItemData_t`), not the
+LDB. Still undecoded: the lead word `[0]` (0 on 155 goals, then 1/2/4/6 — **not** a count of occupied slots).
 
 ### The 74 item goals (`50200`) are inert fetch objectives — and the reference does not type them
 
