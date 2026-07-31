@@ -16,6 +16,15 @@ namespace Faolan.Core.Enums
 	///         display name - <c>SwapAlternateEquipmentCommand_c</c> - and is kept verbatim.
 	///     </para>
 	///     <para>
+	///         ⚠️ These 34 are ALL of them (#549). Decompiling every caller of the Command base ctor
+	///         (<c>FUN_007dc7a0</c>) enumerates every Command class the binary can construct, and none passes an id
+	///         above <c>0x2F</c>; the one class that is built but never registered is <c>LockPickingCommand_c</c>
+	///         (<c>0x2D</c>), which the wire therefore cannot reach, so it is deliberately absent here. An id outside
+	///         this enum arriving off the wire means the record was SPLIT wrong, not that the catalog is short - that
+	///         is exactly what the ten phase-0x0E records turned out to be (see <c>BehaviorControlCenterIIR</c>, whose
+	///         delay word was being read as a command id).
+	///     </para>
+	///     <para>
 	///         The names corroborate the corpus independently, which is what makes them trustworthy: over 67307
 	///         captured records <see cref="UseDynel" /> carries a 12-byte tail (a class+handle reference),
 	///         <see cref="UseCharacter" /> 4 (a handle), <see cref="PlayAnimation" /> a VARIABLE 10-39 (an animation

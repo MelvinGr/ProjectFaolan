@@ -11,7 +11,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// the revive.
 	//
 	// ONE grammar, always:
-	//   [u32 subop][u32 class=0xC350][u32 actor][u16 seq][u32 behaviorId][u32 argsLen][args protobuf][tail]
+	//   [u32 subop][u32 class=0xC350][u32 actor][u16 seq][u32 delay if seq==0x0E][u32 behaviorId][u32 argsLen][args protobuf][tail]
 	//
 	// That is what collapsed FIVE emitters into this one codec (#530 wave 4). They had each named the same six fields
 	// differently and two of them did not realise they were writing this record at all: the death BCC called `seq` a
@@ -43,10 +43,19 @@ namespace Faolan.Core.Network.Codecs.Combat
 	{
 		public const uint Opcode = (uint)GameServer0X2000Opcodes.BehaviorControlCenterIIR;
 
+		// The one phase whose record carries an EXTRA u32 in front of the behaviorId - see BehaviorControlCenterIIR.
+		private const byte DelayPhase = 0x0E;
+
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(BehaviorControlCenterIIR value)
 		{
 			ArgumentNullException.ThrowIfNull(value);
+
+			// The phase byte alone decides whether the delay word is on the wire, so a value that disagrees with it
+			// would build a body the client reads one field out of step - refuse rather than silently drop/insert.
+			if ((value.DelayCentiseconds != null) != IsDelayPhase(value.Seq))
+				throw new ArgumentException($"DelayCentiseconds is carried by phase 0x{DelayPhase:X2} and only by it (seq 0x{value.Seq:X4}, delay {value.DelayCentiseconds?.ToString() ?? "none"})", nameof(value));
+
 			using var s = new FaolanStream();
 			Write(s, value);
 			return s.ToArray();
@@ -66,9 +75,10 @@ namespace Faolan.Core.Network.Codecs.Combat
 			r.ExpectU32Be(EntityClass.Character, "entity class");
 			var actor = r.ReadU32Be();
 			var seq = r.ReadU16Be();
+			var delay = IsDelayPhase(seq) ? r.ReadU32Be() : (uint?)null;
 			var behaviorId = r.ReadU32Be();
 			var args = r.ReadBytesU32Length().ToArray();
-			return new BehaviorControlCenterIIR(actor, seq, behaviorId, args, r.ReadRemaining().ToArray());
+			return new BehaviorControlCenterIIR(actor, seq, behaviorId, args, r.ReadRemaining().ToArray(), delay);
 		}
 
 		internal static void Write(FaolanStream s, BehaviorControlCenterIIR v)
@@ -77,10 +87,22 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteUInt32(Opcode)
 				.WriteUInt32(EntityClass.Character)
 				.WriteUInt32(v.Actor)
-				.WriteUInt16(v.Seq)
+				.WriteUInt16(v.Seq);
+
+			if (v.DelayCentiseconds is { } delay)
+				s.WriteUInt32(delay);
+
+			s
 				.WriteUInt32(v.BehaviorId)
 				.WriteArrayUInt32Length(v.Args)
 				.WriteArray(v.Tail);
+		}
+
+		// The client switches on the LOW byte of `seq` alone (BccIIR::ReadSubClass, FUN_005e24e0), so the high byte -
+		// which belongs to the base record - must not take part in the discrimination.
+		private static bool IsDelayPhase(ushort seq)
+		{
+			return (byte)seq == DelayPhase;
 		}
 	}
 
@@ -88,12 +110,23 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// 0x000A complete, 0x0007 abort, 0x000F commit - and `BehaviorId` selects the COMMAND itself.
 	//
 	// ⚠️ `Seq`'s high byte is always zero because the client reads its low byte ALONE: `ReadSubClass` takes one u8
-	// (the byte before it belongs to the base record) and switches on it, and every value the corpus shows - 2, 3,
-	// 4, 7, 0xA, 0xF - is in the branch that then reads a command id. Kept as a u16 because that is the field's
-	// width on our side of every emitter; nothing depends on the split.
+	// (the byte before it belongs to the base record) and switches on it. Kept as a u16 because that is the field's
+	// width on our side of every emitter; nothing depends on the split. The corpus shows 2, 3, 4, 5, 7, 0xA, 0xE, 0xF
+	// and 0x10 - all but 0xE go straight to a command id, and 0xE reads the delay word first.
 	//
 	// `BehaviorId` values are the client's own catalog - see BehaviorId (0x0F Combat:Melee, 0x07 BccAction, 0x12
 	// UseDynel, 0x2A ObjectInteraction, ...). Those four were previously guessed here as "NormalAttack", "the idle
 	// pulse", "an object-hold state" and "an object action"; only the last was close.
-	public sealed record BehaviorControlCenterIIR(uint Actor, ushort Seq, uint BehaviorId, byte[] Args, byte[] Tail);
+	//
+	// ⚠️ `DelayCentiseconds` is present for phase 0x0E and ONLY for it, and the phase byte is what says so - the field
+	// is not optional data, it is a different record shape. `ReadSubClass`'s `case 0xe` reads a u32 BEFORE the
+	// behaviorId (`this+0x24`), and the record's `SetTime` consumer scales it by 0.01 and ADDS it to two of the
+	// running Command's six timeline doubles (indices 3 and 4, vtable slot 0x8c) when index 3 is non-zero - i.e. it
+	// defers a command already in flight by hundredths of a second. The ten captured records are 0.50-0.71 s, on
+	// Magic:Attack casts and on a treasure chest's ObjectInteraction (#549).
+	//
+	// Missing that extra word is what made those ten look like commands 0x32/0x35/0x39/0x3A/0x47, none of which the
+	// client's classmap registers - the shape of the "third registration site" #549 was opened to find. There is no
+	// third site: every one of the ten is a Magic:Attack (0x04) or ObjectInteraction (0x2A) read one field out of step.
+	public sealed record BehaviorControlCenterIIR(uint Actor, ushort Seq, uint BehaviorId, byte[] Args, byte[] Tail, uint? DelayCentiseconds = null);
 }

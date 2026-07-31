@@ -137,6 +137,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "bcc-census":
+				{
+					BccCensus(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "equip":
 				{
 					Equip(NamedCapture.LoadAll(capturesDir), arg ?? "Casilda");

@@ -12,13 +12,17 @@ switch (behaviorType):
                                reader (vtable slot 0x80) reads its behavior-specific data
   6,8,9,0xD,0x11             : (terminal - no extra read)
   0xB,0xC                    : [u32] (+0x28)
-  0xE                        : [u32 a (+0x24)] ; if a != 0 -> [u32 commandId] -> Command reader
+  0xE                        : [u32 delay (+0x24)] ; if delay != 0 -> [u32 commandId] -> Command reader
   default                    : (nothing)
 ```
 
-So a BccIIR = `[u8 type][u32 commandId?][command-specific data]`, where the command data is read by the
-looked-up Command object's reader (another vtable hop). The combat-relevant forms (the attack/interact ack)
+So a BccIIR = `[u8 type][u32 delay?][u32 commandId?][command-specific data]`, where the command data is read by
+the looked-up Command object's reader (another vtable hop). The combat-relevant forms (the attack/interact ack)
 are already built byte-exact by `CombatService`/`BehaviorControlCenterCodec` (`BehaviorAcksTests`).
+
+⚠️ **Type `0x0E` is the one branch that puts an extra word in front of the commandId** — see "The delay phase"
+below. Every other type the corpus carries (2, 3, 4, 5, 7, 0xA, 0xF, 0x10) goes straight to the commandId, which
+is why reading them all one way looked right for so long.
 
 ## The Command catalog — `InstantiateCommand::classmap` (#536)
 
@@ -30,7 +34,15 @@ off the binary rather than inferred from behaviour:
 * `FUN_007375b0` — 22 commands, the interaction/animation set.
 * `FUN_01134510` — 12 commands, the combat/movement set.
 
-All 34 are enumerated in `BehaviorId`. The names corroborate the corpus independently: `UseDynel` (0x12) carries
+**There is no third one.** Both sites inline the same four-call registration sequence
+(`FUN_0040ec10(name, len)` → id → `FUN_007de4c0()` slot → factory pointer → `FUN_00708ec0(&id)`), and every
+reference to either map helper is inside one of them — bar `FUN_007dcd10`, the out-of-line form of the same
+sequence, which **nothing calls**. Cross-checked from the other end: `FUN_007dc7a0` is `CommandBase(id)`, and
+decompiling all 69 of its callers enumerates every Command class the binary can construct. The highest id any of
+them passes is `0x2F`, and exactly one class is built but never registered — `LockPickingCommand_c` (`0x2D`,
+`FUN_0080b430` / `FUN_00849a60`), which the wire therefore cannot reach.
+
+All 34 registered commands are enumerated in `BehaviorId`. The names corroborate the corpus independently: `UseDynel` (0x12) carries
 a 12-byte tail (a class+handle reference), `UseCharacter` (0x16) four (a handle), `PlayAnimation` (0x1D) a
 *variable* 10–39 (an animation name), and `Emote` (0x05), `BccAction` (0x07) and `Limbo/Death` (0x1F) none at
 all — those three alone are 55 699 of the 67 307 captured records.
@@ -96,9 +108,9 @@ factory matches the id its registration pushed.
 | `0x11` | Combat:Unarmed | `AttackCommandUnarmed_c` | `FUN_01151170` | *(same reader)* | varies |
 | `0x10` | Combat:Ranged | `AttackCommandRanged_c` | `FUN_01146af0` | the same + one trailing `0x00` | varies |
 
-Run over the corpus, these account for **67 289 of the 67 299** captured BCC records (99.99%) with **zero
-mismatches**. The ten that remain are command ids `0x32` (×6), `0x35`, `0x39`, `0x3A` and `0x47` — none of which
-either registration function registers, so a THIRD registration site exists.
+Run over the corpus, these account for **all 67 299** captured BCC records with **zero mismatches** — the last
+ten came in with the delay phase below (#549). Re-derive the numbers with
+`dotnet run --project Faolan.Importer -- --report bcc-census`, which is this census.
 
 ⚠️ `PlayAnimation`'s string is the animation name (`sad`, `approve`, `social_conversation_gesticulate`) and
 `ObjectInteraction`'s two are the action name plus its remoteformat (`lootbag_open`,
@@ -139,13 +151,46 @@ resolved: the arithmetic closes without it.
 The AIR SWING is a real captured shape, not just our workaround for #228: 130 tails carry zero targets *and*
 zero results.
 
+### The delay phase — behaviorType `0x0E` (#549)
+
+`case 0xe` reads a u32 into `this+0x24` *before* the commandId, and the IIR's apply pass (`FUN_005e1c70`) spends
+it like this:
+
+```c
+case 0xe:
+  pct = (float)*(int *)(this + 0x24) * 0.01;
+  if (*(double *)(command + 0x70) != 0.0) { /* FUN_00730930 */
+      command->SetTime(3, command->time[3] + pct);   // vtable slot 0x8c; case 3 falls into case 2
+      command->SetTime(4, command->time[4] + pct);
+  }
+```
+
+`SetTime` (`FUN_007ddc60`) is an indexed setter over the Command's **six timeline doubles** at `+0x58`, `+0x60`,
+`+0x68`, `+0x70`, `+0x78`, `+0x80`. So the word is a **hundredths-of-a-second delay applied to a command already
+in flight** — it shifts indices 2, 3 and 4 later, and it is skipped outright when index 3 is zero.
+
+Ten records carry it, all s2c, all on a command the client is mid-way through: seven `Magic:Attack` casts and
+three treasure-chest `ObjectInteraction`s, at 50, 53, 57, 58 and 71 (0.50–0.71 s).
+`--report bcc-census --report-arg 0E` prints all ten in full; `BehaviorDelayPhaseTests` locks two of them.
+
+⚠️ **This is what the "five unregistered command ids" were.** Read without the extra word, the delay lands where
+the commandId belongs, so the ten records showed up as commands `0x32`, `0x35`, `0x39`, `0x3A` and `0x47` —
+values nothing in the client registers, which is the "third registration site" #549 was opened to find. There is
+no third site. Re-split, all ten are `Magic:Attack` (a 22-byte `f == 1` tail) or `ObjectInteraction` (185 bytes),
+both lengths the corpus already showed on the ordinary phases — the arithmetic closing on grammars decoded
+*before* this was found is what makes the split right rather than merely plausible.
+
 ## Status
 
-Grammar SHAPE decoded (type switch + commandId + per-command reader); the commandId → COMMAND map is enumerated
-with the client's own names; the per-Command readers are walked for every fixed-tail command (83% of the
-captured traffic); and every per-command reader the corpus exercises is walked — 99.99% of captured records, zero
-mismatches. What is left is not structure but MEANING: the eight middle words of the attack block (one is a
-charge float, two carry ids), and the five unregistered command ids behind the last ten records.
+Grammar SHAPE decoded (type switch + optional delay + commandId + per-command reader); the commandId → COMMAND
+map is enumerated with the client's own names and shown to be complete; and every per-command reader the corpus
+exercises is walked — **100% of captured records, zero mismatches**. What is left is not structure but MEANING:
+the eight middle words of the attack block (one is a charge float, two carry ids).
+
+Three of the client's branches have no captured example, so nothing here is claimed about them beyond what
+`ReadSubClass` shows: types 6, 8, 9, 0xD and 0x11 read nothing after the type byte, and 0xB/0xC read one u32 into
+`+0x28` and no commandId. `BehaviorControlCenterCodec` does not special-case them — it would throw rather than
+misread, because both shapes run out of bytes where it expects the args length.
 
 ## Registration form (the create-burst / world-entry BccIIR) — #234
 
