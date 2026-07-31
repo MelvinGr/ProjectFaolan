@@ -68,8 +68,13 @@ namespace Faolan.Core.Database.Tables
 
 		// Quest index region: the W6QT goal-id table's marker + three lead words + trailer word, and the goal-step ids
 		// (CSV, the client's 1..n goal index). Beach 10238: marker 0x7E2, fields 1/7/0, trailer 0x156E7, 8 steps.
-		// IndexMagic = the per-quest goal-table NAME word (beach = 0x57365154 "W6QT"; Casilda 13479 = 0x52524C33
-		// "RRL3"); in a multi-quest index each held quest contributes its own block keyed by this (#255).
+		//
+		// IndexMagic is the AREA's `ACGHash` token, not a per-quest magic: the client reads it through `FUN_005d7190`,
+		// which only checks the four bytes are `[0-9A-Z_]` (see docs/re/questc-region-decode.md). Area 241 = "W6QT",
+		// 1054 = "RRL3", 1772 = "B0DN", 1834 = "3734" - stable across every character and capture. The QuestJournal
+		// carries the same value in its area header, which is where the importer harvests it from (#544); in a
+		// multi-quest index each held quest contributes its own block keyed by this (#255). Stored per quest because
+		// that is the grain both regions consume it at.
 		public uint IndexMagic { get; set; }
 		public uint IndexMarker { get; set; }
 		public uint IndexTableField1 { get; set; }

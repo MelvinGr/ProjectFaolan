@@ -14,6 +14,55 @@ generator can eventually emit arbitrary journals.
   (`[u16 len][utf8]`), `FUN_0048f720`=ReadU64, `FUN_00cc0540`=Read4×U32. Post-obj4 calls are `FUN_009202d0`
   (std::sort introsort) + vector-push, NOT stream reads.
 
+## `ACGHash` — the 4-character token, and why it is never a magic
+
+`FUN_005d7190` is the client's **ACGHash** stream reader, and it is what every "4-character magic" in the quest
+packets actually goes through. It reads one `u32`, checks each of the four bytes against `[0-9A-Z_]`, and on a
+mismatch logs `Read invalid hash "<...>" from stream` under the `ACGHash` debug channel. It compares against
+**nothing** — there is no expected value, because the value is an identity token, not a marker.
+
+That names three things this repo had decoded separately as random tokens:
+
+- the `QuestJournalIIR` word read as a `"RRL3"` **record-list magic** — really the AREA's token (#544);
+- `QuestObjectiveGoal.Reserved`'s tokens, incl. the `WTHD` block below (#546);
+- the quest index's per-block `magic` (`QuestDefinition.IndexMagic`), which is the same area token again — a
+  quest's index block and its journal block carry one value, keyed by `AreaId`.
+
+⚠️ So: **a four-byte field of printable uppercase-alphanumerics in a quest packet is an ACGHash.** Asserting the
+one value the first decoded capture carried is the same mistake as asserting a `0x3F1` list frame, and it failed
+the same way — 31 of 38 captured journals rejected.
+
+Observed area tokens: 241 → `W6QT`, 1054 → `RRL3`, 1772 → `B0DN`, 1834 → `3734`.
+
+## `QuestJournalIIR` (0x5A2FE45E) — reader `FUN_0091a4e0` (vtable slot 8 of `QuestJournalIIR_c`)
+
+```
+[u32 subop][u32 class][u32 playerHandle][u8 0x01]
+<area block>                                FUN_00922c90
+[u32 currentFlag]                           0 / 1
+[ListFrame'd list of <area block>]          FUN_00798c70 — frame-ONLY, empty in all 38 captures
+[u32 currentQuestId]                        0 = none
+[ListFrame'd list of strings]               FUN_004d55b0 — the named quest's title + sub-line
+[u32 currentOrdinal]                        0 = none
+```
+
+with the area block (`FUN_00922c90`)
+
+```
+[u32 areaId][string areaTitle][string mapName][string regionName]
+[u32 acgHash][u32 unknown=0][u32 count]
+count x [u32 ordinal][u32 questId][ListFrame'd list of 2 strings: title, sub-line]
+```
+
+Two notes the corpus alone could not settle. **The trailing five fields are not a "tracked-quest pointer".** They
+had been read as `[u32 trackedQuestId][list A][list B]` with each list `[frame][count]`, which only fits a
+one-quest journal: in every larger one, list A's "count" slot holds a quest id and list B's frame holds `0xBD3`.
+The reader shows five independent fields instead, and both captured shapes then fall out exactly — `(0, empty, 0,
+empty, 0)` for a single-quest journal and `(1, empty, questId, 2 strings, entryCount)` naming the LAST entry for
+every larger one. **And a string list here is frame-ONLY** — one `(count+1) * 0x3F1` word and then the strings,
+with no separate count word, unlike the record lists which carry both. That is why the per-entry `0xBD3` read as a
+"ChapterTag": it is `ForCount(2)`, framing the entry's title + sub-line.
+
 ## Record grammar (validated byte-exact on NecroL80 rec0, snapshot offset 11024)
 
 ```

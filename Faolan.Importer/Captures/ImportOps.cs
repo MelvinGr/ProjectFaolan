@@ -998,6 +998,11 @@ namespace Faolan.Importer.Captures
 				existing.MapId = def.MapId;
 				existing.MarkerX = def.MarkerX;
 				existing.MarkerY = def.MarkerY;
+
+				// The area's ACGHash, off the captured journal (#544). Only overwrite when the harvest HAS one: the
+				// quest index seeds it by hand for two quests, and an area no journal was captured for must not lose it.
+				if (def.IndexMagic != 0)
+					existing.IndexMagic = def.IndexMagic;
 				db.QuestTextRefs.RemoveRange(existing.TextRefs);
 				existing.TextRefs = def.TextRefs;
 

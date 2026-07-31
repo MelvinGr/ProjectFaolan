@@ -12,20 +12,27 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// definition.
 		//
 		// ⚠️ That means every entry is filed under ONE area, which is only correct for a single-area call - it is what
-		// rendered ~28 quests from 20 areas as one collapsed group in the Completed tab.
-		public static QuestJournalIIR ForQuests(uint playerHandle, IReadOnlyList<QuestDefinition> definitions, TrackedQuestPointer? tracked = null)
+		// rendered ~28 quests from 20 areas as one collapsed group in the Completed tab. The wire can say it properly:
+		// QuestJournalIIR.MoreAreas is a list of FURTHER area blocks (empty in every capture we have, but it is the
+		// client's own structure, not an invention - see the codec).
+		public static QuestJournalIIR ForQuests(uint playerHandle, IReadOnlyList<QuestDefinition> definitions, QuestJournalCurrent? current = null)
 		{
 			ArgumentNullException.ThrowIfNull(definitions);
 			var first = definitions[0];
 
-			return new QuestJournalIIR(
-				playerHandle,
+			var area = new QuestJournalArea(
 				first.AreaId,
 				QuestTextTokens.Record(first, QuestTextSlot.AreaTitle),
 				QuestTextTokens.Record(first, QuestTextSlot.MapName),
 				QuestTextTokens.Record(first, QuestTextSlot.RegionName),
-				[.. definitions.Select(d => new QuestJournalEntry(d.QuestId, QuestTextTokens.Record(d, QuestTextSlot.Title), QuestTextTokens.Record(d, QuestTextSlot.ListSubLine)))],
-				tracked ?? new TrackedQuestPointer());
+				[.. definitions.Select(d => new QuestJournalEntry(d.QuestId, QuestTextTokens.Record(d, QuestTextSlot.Title), QuestTextTokens.Record(d, QuestTextSlot.ListSubLine)))])
+			{
+				// The area's ACGHash token, harvested per quest into QuestDefinition.IndexMagic. It is a property of the
+				// AREA, so the first definition's is the block's; 0 for an area no capture has shown a journal for.
+				AcgHash = first.IndexMagic
+			};
+
+			return new QuestJournalIIR(playerHandle, area, [], current ?? QuestJournalCurrent.None);
 		}
 	}
 }

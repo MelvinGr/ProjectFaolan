@@ -23,6 +23,12 @@ namespace Faolan.Importer.Extractors
 		{
 			var byQuest = new Dictionary<uint, QuestDefinition>();
 
+			// The journal's ACGHash, keyed by the AREA it belongs to (#544). Collected across the whole sweep and
+			// applied at the end rather than as each journal arrives, for two reasons: it is a property of the area, so
+			// it belongs to every quest filed under it and not just the ones whose journal LINE was captured; and a
+			// journal seen before that quest's full-update would otherwise find no definition to write to.
+			var hashByArea = new Dictionary<uint, uint>();
+
 			foreach (var p in packets)
 			{
 				if (!p.IsDownload)
@@ -44,13 +50,19 @@ namespace Faolan.Importer.Extractors
 				else if (p.SubOpcode == QuestJournalCodec.Opcode)
 				{
 					if (p.TryParse(QuestJournalCodec.Parse, out var list))
-						MergeJournal(list, byQuest);
+						MergeJournal(list, byQuest, hashByArea);
 				}
 				else if (SnapshotJournalReader.TryRead(p.Bytes, out _, out var journal))
 				{
 					foreach (var record in journal)
 						MergeSnapshotRecord(record, byQuest);
 				}
+			}
+
+			foreach (var def in byQuest.Values)
+			{
+				if (hashByArea.TryGetValue(def.AreaId, out var hash))
+					def.IndexMagic = hash;
 			}
 
 			// Only keep quests whose full-update was seen (it carries the bulk of the slots + the marker).
@@ -181,12 +193,21 @@ namespace Faolan.Importer.Extractors
 
 		// The journal LIST (0x79f8c7a1) carries the one slot a full-update does not: the panel's per-quest sub-line
 		// (category 50303). The RRL3 scan + per-entry offset walk this used to do is QuestJournalCodec's grammar.
-		private static void MergeJournal(QuestJournalIIR list, Dictionary<uint, QuestDefinition> byQuest)
+		//
+		// It also carries the area's ACGHash, which the journal builder needs back (#544). That one is recorded per
+		// AREA into `hashByArea` and applied to every definition at the end of the sweep - see Extract.
+		private static void MergeJournal(QuestJournalIIR list, Dictionary<uint, QuestDefinition> byQuest, Dictionary<uint, uint> hashByArea)
 		{
-			foreach (var entry in list.Entries)
+			foreach (var area in new[] { list.Area }.Concat(list.MoreAreas))
 			{
-				if (TextRef(entry.SubLine) is { Category: 50303 } subLine && byQuest.TryGetValue(entry.QuestId, out var def))
-					SetRef(def, QuestTextSlot.ListSubLine, subLine);
+				if (area.AcgHash != 0)
+					hashByArea[area.AreaId] = area.AcgHash;
+
+				foreach (var entry in area.Entries)
+				{
+					if (TextRef(entry.SubLine) is { Category: 50303 } subLine && byQuest.TryGetValue(entry.QuestId, out var def))
+						SetRef(def, QuestTextSlot.ListSubLine, subLine);
+				}
 			}
 		}
 

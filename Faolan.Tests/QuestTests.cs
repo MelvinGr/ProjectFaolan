@@ -135,16 +135,22 @@ namespace Faolan.Tests
 		[Fact]
 		public void BuildQuestJournal_MatchesCasildaCapture()
 		{
-			// A single-quest journal for 13479, from Assets/casilda-quest-packets.bin.
-			var journal = new QuestJournalIIR(0x01316D8A, 1054,
-				QuestTextTokens.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"),
-				QuestTextTokens.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/"),
-				QuestTextTokens.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr"),
-				[
-					new QuestJournalEntry(0x34A7, QuestTextTokens.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"),
-						QuestTextTokens.RemoteFormat(13479, 50303, "i&#36;g&#92;DTrqI&#92;nBI0lUo6&amp;7"))
-				],
-				new TrackedQuestPointer());
+			// A single-quest journal for 13479, from Assets/casilda-quest-packets.bin. Area 1054's ACGHash is "RRL3"
+			// (0x52524C33) - a per-AREA token, not a record-list magic (#544).
+			var journal = new QuestJournalIIR(0x01316D8A,
+				new QuestJournalArea(1054,
+					QuestTextTokens.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"),
+					QuestTextTokens.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/"),
+					QuestTextTokens.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr"),
+					[
+						new QuestJournalEntry(0x34A7, QuestTextTokens.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"),
+							QuestTextTokens.RemoteFormat(13479, 50303, "i&#36;g&#92;DTrqI&#92;nBI0lUo6&amp;7"))
+					])
+				{
+					AcgHash = 0x52524C33
+				},
+				[],
+				QuestJournalCurrent.None);
 
 			var body = QuestJournalCodec.Build(journal);
 			Assert.Equal(CaptureBody(JournalFixture, GameServer0X2000Opcodes.QuestJournalIIR), Convert.ToHexString(body).ToLowerInvariant());

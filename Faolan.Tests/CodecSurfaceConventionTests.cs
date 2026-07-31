@@ -53,13 +53,13 @@ namespace Faolan.Tests
 
 		// Codecs the corpus round-trip cannot yet cover, each with the DECODE issue that removes it. #530 explicitly
 		// decodes nothing, and every one of these is a real gap the gate FOUND rather than a shape problem:
-		//   QuestJournalCodec (31/38 bodies)  - "RRL3" is not a magic and the tracked-quest pointer's list is not
-		//                                       empty: Gitea #544
 		//   QuestLogListCodec (8/46 bodies)   - three asserted constants that are not constant: Gitea #545
 		// ⚠️ Entries are per CODEC, not per body, so an entry hides the codec's PASSING bodies too. Delete one the
-		// moment its issue closes - the value of this gate is that the list is short and shrinking. `FullPlayerCharacterCodec`
-		// was the third and came off when #538 landed: all 151 captured snapshot roots re-encode byte-exact now.
-		private static readonly string[] UnreadableInTheCorpus = ["QuestJournalCodec", "QuestLogListCodec"];
+		// moment its issue closes - the value of this gate is that the list is short and shrinking. Two have come off
+		// already: `FullPlayerCharacterCodec` with #538 (all 151 captured snapshot roots re-encode byte-exact) and
+		// `QuestJournalCodec` with #544 (all 38, once "RRL3" turned out to be a per-area ACGHash and the
+		// "tracked-quest pointer" turned out to be five separate fields).
+		private static readonly string[] UnreadableInTheCorpus = ["QuestLogListCodec"];
 
 		// The ROOT of Codecs/ itself - the codecs that sit in `Faolan.Core.Network.Codecs` with no domain folder.
 		// Spelled as a sentinel rather than "" so the two places that expand it read as deliberate.
