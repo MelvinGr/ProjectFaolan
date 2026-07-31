@@ -4,7 +4,7 @@
 > `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
-16 enums, 826 entries. The 32-bit IIR sub-opcodes carried inside a `0x2000` PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
+16 enums, 828 entries. The 32-bit IIR sub-opcodes carried inside a `0x2000` PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
 
 ## What is (and is not) verified here [V1]
 
@@ -385,6 +385,7 @@ ChatServer chat — **no RpcHeader** (raw opcode) · S2C
 
 | Opcode | Name | Note |
 |--------|------|------|
+| `0x0005` | `HelloAck` |  |
 | `0x0014` | `ChatSenderInfo` | sender id + name; also sent before a ChannelChat so the client can show the speaker |
 | `0x001E` | `Whisper` | incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info |
 | `0x0022` | `CharacterChat` |  |
@@ -393,6 +394,7 @@ ChatServer chat — **no RpcHeader** (raw opcode) · S2C
 | `0x0028` | `FriendAdded` | [u32 characterId][u8 online][u8 5][u32 stamp][u8 class] - the added friend's state |
 | `0x0029` | `FriendRemoved` | [u32 characterId] - the removal echoed back |
 | `0x003C` | `ChannelSubscription` |  |
+| `0x003D` | `ChannelUnsubscribe` |  |
 | `0x0041` | `ChannelChat` | a channel message relayed to a client: [byte type][u32 channelId][u32 senderId][string][0000] |
 | `0x0064` | `ChatReadyAck` | echo of the client's chat-init handshake |
 

@@ -14,6 +14,13 @@ namespace Faolan.Core.Enums
 
 	public enum ChatServerInterfaceOpcodes : ushort
 	{
+		// The server's answer to the client's Hello (0x0000), carrying NO body. Named from POSITION, which is all an
+		// empty message can be named from - but the position is invariant across the corpus (#532): it is the 4th chat
+		// packet of every one of the 41 captures, always `Hello -> the opening ChannelSubscription burst -> THIS ->
+		// the session's own ChatSenderInfo -> the welcome_message SystemMessage`. Two-client captures carry it twice,
+		// once per client, so it is per-session rather than per-event. Not verified against the client; a future RE
+		// pass over the chat dispatcher should confirm the name rather than assume it.
+		HelloAck = 0x0005,
 		CharacterChat = 0x0022,
 		SystemMessage = 0x0023,
 		Whisper = 0x001E, // incoming tell: [u32 senderCharId][string][00 01 00], preceded by 0x0014 sender info
@@ -23,6 +30,14 @@ namespace Faolan.Core.Enums
 		FriendAdded = 0x0028, // [u32 characterId][u8 online][u8 5][u32 stamp][u8 class] - the added friend's state
 		FriendRemoved = 0x0029, // [u32 characterId] - the removal echoed back
 		ChannelSubscription = 0x003C,
+
+		// The subscription's twin: the channel you are no longer on. Body is [u8 type][u32 channelId] - byte-identical
+		// to the (type, id) pair 0x003C opens with, minus the name string and trailing flags, which is what identifies
+		// it (#532). The ids match channels subscribed earlier in the same capture: a `~Team` subscription
+		// (82 000f08db) is followed by 0x003D on 82 000f08db, and in the two-client group capture the "leave goup now"
+		// message on channel 82 0051dd9a is followed by 0x003D on that same channel. `~Playfield` likewise flips as the
+		// player changes playfield - the old channel is dropped, then the new one subscribed.
+		ChannelUnsubscribe = 0x003D,
 		ChatReadyAck = 0x0064 // echo of the client's chat-init handshake
 	}
 
