@@ -74,6 +74,11 @@ namespace Faolan.Importer.Cli
 
 		private Dictionary<(uint Category, uint Id), byte[]> _ciphertext = [];
 
+		// The plaintext half of the LDB. Deliberately a SECOND map rather than merged into _ciphertext: one holds
+		// ciphertext that still needs the key the wire carried, the other holds finished strings. Merging them would
+		// let a decrypt failure read as a lookup miss and print LDB[cat][id] either way, hiding which one broke.
+		private Dictionary<(uint Category, uint Id), string> _plaintext = [];
+
 		public Dictionary<uint, string> IirNames { get; } = Enum.GetValues<IirTypes>()
 			.GroupBy(v => (uint)v).ToDictionary(g => g.Key, g => g.First().ToString());
 
@@ -123,6 +128,7 @@ namespace Faolan.Importer.Cli
 				.ToDictionary(g => g.Key, g => g.Select(o => new Placed(o.PositionX, o.PositionY, o.PositionZ, o.Name)).ToList());
 
 			look._ciphertext = ReportCli.EncryptedLdbBlobsFor(rdbDir);
+			look._plaintext = ReportCli.PlaintextLdbStringsFor(rdbDir);
 			return look;
 		}
 
@@ -270,6 +276,12 @@ namespace Faolan.Importer.Cli
 			if (attrs.TryGetValue("key", out var key) && _ciphertext.TryGetValue((category, id), out var blob)
 			    && LdbKey.Decode(key) is { } decoded && LdbKey.Decrypt(blob, decoded) is { } plain)
 				return (Flatten(plain), true);
+
+			// A reference into one of the PLAINTEXT categories carries no key and needs none - the string ships
+			// readable. Half the category table is this side (52000 regions, 51200 bounded_areas, 51000 npc_template,
+			// 50200 item, ...), so consulting only the ciphertext map made all of it unresolvable (#561).
+			if (_plaintext.TryGetValue((category, id), out var text))
+				return (Flatten(text), true);
 
 			return ($"LDB[{category}][{id}]", false);
 		}

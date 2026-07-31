@@ -316,6 +316,49 @@ namespace Faolan.Importer.Cli
 		// the page's statement rather than something inferred from how the bytes look.
 		internal static Dictionary<(uint Category, uint Id), byte[]> EncryptedLdbBlobsFor(string rdbDir) => EncryptedLdbBlobs(rdbDir);
 
+		// (category, id) -> the FINISHED string, over the English pages of the PLAINTEXT categories - the other half of
+		// the LDB, and the half nothing here used to read.
+		//
+		// Roughly half of the 47 categories ship unencrypted (docs/rdb/ldb-string-index.md names them all): 52000
+		// regions, 51200 bounded_areas, 51000 npc_template, 50200/50201 item, 55000 simpledynels, ... A remoteformat
+		// pointing at one of those carries no key and needs none, so resolving it through the ciphertext map can only
+		// fail - which is why the quest journal's area header printed LDB[52000][4010] instead of its region name
+		// (#561).
+		//
+		// Kept as its OWN walk rather than folded into EncryptedLdbBlobs, which would hand every existing caller a
+		// second dictionary it does not want: the plaintext side includes the item-name category, ~100k strings, and
+		// --report ldb-quest-text has no use for them. The cost is one extra pass for the one report that wants both.
+		internal static Dictionary<(uint Category, uint Id), string> PlaintextLdbStringsFor(string rdbDir)
+		{
+			using var rdb = new RdbReader(rdbDir);
+			var language = LdbLanguageIndex.LanguageByPage(rdb);
+			var strings = new Dictionary<(uint, uint), string>();
+
+			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(x => x.IsLocal))
+			{
+				if (!language.TryGetValue(e.Id, out var lang) || lang != LdbLanguageIndex.English)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue; // not a readable record (CDN-only / not zlib)
+				}
+
+				if (LdbStringIndex.CategoryOf(body) == 0 || LdbStringIndex.FlagsOf(body) == 1)
+					continue; // not a TDC2 page, or an ENCRYPTED one (EncryptedLdbBlobs owns those)
+
+				foreach (var entry in LdbStringIndex.Parse(body))
+					strings[(entry.Category, entry.Id)] = entry.Value;
+			}
+
+			return strings;
+		}
+
 		private static Dictionary<(uint Category, uint Id), byte[]> EncryptedLdbBlobs(string rdbDir)
 		{
 			using var rdb = new RdbReader(rdbDir);
