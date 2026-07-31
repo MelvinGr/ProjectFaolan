@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Tests.Support;
@@ -49,11 +50,13 @@ namespace Faolan.Tests
 		}
 
 		[Fact]
-		public void PostAccessBlock_PatchedDead_ZeroesCurrentHpSlotsButKeepsMax()
+		public void PostAccessBlock_PatchedDead_ZeroesEveryCurrentHpOccurrenceButKeepsMax()
 		{
 			// The builder-side of the fix: applying class vitals (full HP) then marking dead (CurrentHp = 0) must
-			// zero the current-health slots [23]/[54]/[202] while leaving the base/max slots [21]/[56]/[204] full -
-			// exactly the shape the retail dead snapshot carries.
+			// zero EVERY HealthCurrent occurrence while leaving every HealthMax one full - exactly the shape the
+			// retail dead snapshot carries. Asserted BY STAT ID: this used to name slots [23]/[54]/[202] and
+			// [21]/[56]/[204], which is the positional addressing #393 removed - the ids are on the wire, and a
+			// stat appears in the displayed list AND in both halves of the sheet.
 			const uint hp = 196, hpBase = 196;
 			var block = SubClassStatBlock.CreateFreshBlock();
 			block.ApplyClassVitals(hp, hpBase, 0, 0, 217, 197);
@@ -62,12 +65,11 @@ namespace Faolan.Tests
 
 			block.CurrentHp = 0; // the dead patch
 
-			Assert.Equal(0u, block.Values[23]); // CurrentHpExtra
-			Assert.Equal(0u, block.Values[54]); // CurrentHp (repeated-block slot)
-			Assert.Equal(0u, block.Values[54 + 148]); // [202] copy
-			Assert.Equal(hpBase * 100, block.Values[21]); // base/max-side stays full
-			Assert.Equal(hpBase * 100, block.Values[56]); // [56] (+[204])
-			Assert.Equal(hpBase * 100, block.Values[56 + 148]); // [204] copy
+			var occurrences = block.Displayed.Pairs.Concat(block.Sheet.Pairs).ToList();
+			Assert.Equal(3, occurrences.Count(p => p.Id == HealthCurrentStatId)); // displayed + both sheet copies
+			Assert.All(occurrences.Where(p => p.Id == HealthCurrentStatId), p => Assert.Equal(0u, p.Value));
+			Assert.Equal(3, occurrences.Count(p => p.Id == HealthMaxStatId));
+			Assert.All(occurrences.Where(p => p.Id == HealthMaxStatId), p => Assert.Equal(hpBase * 100, p.Value));
 		}
 
 		private static int IndexOf(byte[]? haystack, ReadOnlySpan<byte> needle)

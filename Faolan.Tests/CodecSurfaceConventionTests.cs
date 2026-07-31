@@ -24,8 +24,8 @@ namespace Faolan.Tests
 	// live in wave 0 would have been red for the whole sweep and would just have got muted. `MigratedFolders` is read
 	// off disk now, so a NEW folder is covered the moment it exists.
 	//
-	// ONE allowlist still has entries (`UncomposedSubRecords`); `UnreadableInTheCorpus` emptied with #545. Every entry
-	// names the DECODE issue that removes it, and #530 decoded nothing. They are not places to silence a gate.
+	// BOTH allowlists are now EMPTY - `UnreadableInTheCorpus` with #545, `UncomposedSubRecords` with #543. Every entry
+	// named the DECODE issue that removed it, and #530 decoded nothing. They are not places to silence a gate.
 	//
 	// Wave order (see #530): 1 Inventory/Feats/Team/Guild · 2 Text/Dialogue/Economy · 3 World · 4 Combat ·
 	// 5 Spawn/Quest · 6 FullCharSnapshot (+#447) · 7 Faolan/ moves in · 8 Faolan.Importer/ stops hand-decoding ·
@@ -44,12 +44,14 @@ namespace Faolan.Tests
 		];
 
 		// A genuine sub-record whose PARENT does not compose it yet - not a place to silence the gate, and each entry
-		// names the issue that removes it. `StatListCodec` is the typed reading of the snapshot's stat region, but
-		// `SubClassPostAccessBlockCodec` carries that region as a flat `uint[]` and `SubClassStatBlock` lays the two
-		// lists out as words, so there are two spellings of one layout in the folder. Replacing the flat view is
-		// snapshot decode work, not a surface change: Gitea #543. (`KnownSpellListCodec` is in the same position and
-		// only passes incidentally, because two neighbours reference its constants.)
-		private static readonly string[] UncomposedSubRecords = ["StatListCodec"];
+		// would name the issue that removes it.
+		//
+		// EMPTY since #543, which was the last one: `StatListCodec` was the typed reading of the snapshot's stat
+		// region while `SubClassPostAccessBlockCodec` carried that same region as a flat `uint[]` and
+		// `SubClassStatBlock` laid the two lists out as words - two spellings of one layout in one folder. The block
+		// is typed now and composes both `StatListCodec` and `KnownSpellListCodec` (which was in the same position
+		// and only passed incidentally, because two neighbours referenced its constants).
+		private static readonly string[] UncomposedSubRecords = [];
 
 		// Codecs the corpus round-trip cannot yet cover, each with the DECODE issue that removes it. #530 explicitly
 		// decodes nothing, and every one of these was a real gap the gate FOUND rather than a shape problem.

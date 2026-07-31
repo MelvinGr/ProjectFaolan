@@ -13,10 +13,10 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// type 2 = spell, type 5 = feat/ability. A fresh character's list is just its learned spells (type 2) - the 3
 	// Normal Attacks do NOT appear here (Faolanx's list has no type-5 records), so this carries spells only.
 	//
-	// ⚠️ Like StatListCodec, nothing composes this yet: SubClassStatBlock lays the known list out inline as words at
-	// the block tail, because it sits INSIDE the flat u32 view SubClassPostAccessBlock carries. The value is still
-	// what production builds (KnownSpellLists.FromSpellIds), and this codec is the reading of the same bytes -
-	// KnownSpellListScan is what the importer lifts a captured one with.
+	// Composed by SubClassPostAccessBlockCodec (#543), which carries it as the block's optional spellbook list - it
+	// used to be laid out inline as words at the block tail, because it sat INSIDE the flat u32 view the block was.
+	// The value is what production builds (KnownSpellLists.FromSpellIds); KnownSpellListScan is what the importer
+	// lifts a captured one with.
 	public static class KnownSpellListCodec
 	{
 		// The "no bound bar slot" word every record carries in its second position.

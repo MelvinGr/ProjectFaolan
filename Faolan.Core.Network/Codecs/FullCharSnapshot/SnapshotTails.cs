@@ -78,10 +78,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 			// The stat sheet has ONE author (#447): SnapshotStatSheet picks the baseline from provenance and then
 			// applies the SAME override table either way, so a modelled stat reaches the wire for an imported
-			// character and a freshly-created one alike. The overrides land on the SHEET rather than on the built
-			// block, because SubClassPostAccessBlock.SetStat scans ALL Values - which now include the inline
-			// known-spell records - so a spell id colliding with an override stat id would corrupt a record and the
-			// client would drop the connection. (The id-addressed vitals ops below stay inside the stat tables.)
+			// character and a freshly-created one alike. The overrides land on the SHEET because that is where a
+			// sheet is authored - the block is what the sheet is BUILT into. (They could equally ride the block's
+			// id-addressed setters now, as the vitals below do; when the block was a flat uint[] they could not,
+			// because SetStat scanned the inline known-spell records too and a spell id equal to an override stat id
+			// corrupted a record.)
 			var sheet = SnapshotStatSheet.For(character, playfieldToken, statSheet);
 			var block = SubClassStatBlock.CreateBlock(sheet, knownList);
 

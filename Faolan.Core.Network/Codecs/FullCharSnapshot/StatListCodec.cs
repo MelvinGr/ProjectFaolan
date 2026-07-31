@@ -12,11 +12,9 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// (what the old "repeated run" was). This is the real grammar behind the former opaque 338-value skeleton - so
 	// the sheet is authored as (statId, value) pairs from the character, not carried verbatim.
 	//
-	// ⚠️ Nothing composes this codec yet. `SubClassPostAccessBlockCodec` carries the block as a FLAT u32 view (the
-	// region's own grammar is walked by SnapshotTailRegionCodec, which reports where the stride-8 tables sit), and
-	// SubClassStatBlock lays the two lists out as words rather than through this writer. So this is the typed
-	// reading of those same bytes, proven against them by StatListCodecTests, and it is what a future pass that replaces
-	// the flat view will build on.
+	// Composed by SubClassPostAccessBlockCodec, which reads the block as these two lists (#543). It used to carry the
+	// block as a FLAT u32 view with a second codec walking the same bytes to say where the stride-8 tables sat, while
+	// SubClassStatBlock laid the lists out as words - three spellings of one layout.
 	public static class StatListCodec
 	{
 		// CANONICAL - the only method here that writes bytes.

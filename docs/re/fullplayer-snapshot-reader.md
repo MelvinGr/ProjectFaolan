@@ -299,14 +299,19 @@ out of decompiling rather than measuring:
   element), and `FullPlayerCharacterIIR::ReadSubClass` then reads its own `[u32 m][ m × ([u32][u32]) ]`. The
   second one's ids are RDB template ids (`0xF426A` = 1000042, the feat id-map), so it reads as a counter table.
 
-With those corrected, every one of the 151 captured subclasses walks to its exact last byte and re-encodes
-byte-exact through `SnapshotTailRegion`. Every capture opens identically — `D×0, E×0, F×17, StatList×148` — and
-what varies is the second stat list and the spell list, i.e. the per-character part.
-[V3: SnapshotTailRegionTests.EveryCapturedTailRegion_WalksAndReEncodesByteExact]
+With those corrected, every one of the 151 captured subclasses parses to its exact last byte and re-encodes
+byte-exact through `SubClassPostAccessBlock`. Every capture opens identically — `D×0, E×0, StatList#1×17,
+StatList#2×148` — and what varies is the spell list, i.e. the per-character part.
+[V3: SubClassPostAccessBlockTests.EveryCapturedPostAccessBlock_ParsesAndReEncodesByteExact]
+
+The spell list is **optional**, not merely sometimes empty: 21 of the 151 end at `StatList#2` and go straight to
+the two zero-count tails, and each of those is its capture's FIRST snapshot — the one the create editor is sent.
+The other 130 carry the list, empty (its bare `0x3F1` frame) or not; absent and empty are different bytes.
+[V3: SubClassPostAccessBlockTests.TheSpellBookList_IsAbsentOnlyInTheSessionsFirstSnapshot]
 
 Lists D and E carry VARIABLE-width records (both call ReadString) and are empty in all 151, so which leading
-empty frame is which is not observable on the wire; `SnapshotTailRegion` holds the lists generically rather than
-labelling them beyond what the captures can prove.
+empty frame is which is not observable on the wire, and neither is the record shape behind them; the model reads
+them as the empty lists they are rather than labelling them beyond what the captures can prove.
 
 ### The stat table LABELS ITSELF (2026-07-28, #393)
 
@@ -318,10 +323,11 @@ read exactly as a character sheet: `HealthCurrent=8000`, `HealthMax=8000`, `Inte
 The table is also **two identical copies** of the same 74-pair run — same ids *and* same values in both halves, on
 every capture. That doubling is what `SubClassPostAccessBlock.HasRepeatedStatTable` detects, and why patching a
 vital has to write both halves.
-[V3: SnapshotTailRegionTests.TheStatTable_IsSelfLabellingAndDoubled]
+[V3: SubClassPostAccessBlockTests.TheStatTable_IsSelfLabellingAndDoubled]
 
-⚠️ `SubClassPostAccessBlock` still indexes this table POSITIONALLY through `CharacterValueIndex`, whose names are
-early-dev guesses (word 80 is MaxExp, not XP). The ids are on the wire; that indirection is now avoidable.
+`SubClassPostAccessBlock` addresses the table BY ID (`GetStat`/`SetStat` across both lists). It used to index it
+positionally through a `CharacterValueIndex` enum of early-dev guesses (word 80 is MaxExp, not XP) over a flat
+`uint[]` view of the whole region — replaced with the two typed `StatList`s in #543.
 
 ## The per-character KNOWN-SPELL/FEAT list (decoded 2026-06-20, #74) — relog persistence + bar placement
 

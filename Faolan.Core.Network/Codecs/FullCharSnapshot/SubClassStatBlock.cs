@@ -16,9 +16,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 	// this baseline (the genuinely-fixed fresh-char stats) + the already-computed patches.
 	public static class SubClassStatBlock
 	{
-		public const uint Marker = ListFrame.Unit; // an EMPTY count-framed list, twice
-
-		// StatList#1's count word - and the field the parser scans for. It is NOT a type tag: it is
+		// StatList#1's count word - and the landmark ExtractFromSnapshot scans for. It is NOT a type tag: it is
 		// `(displayedStats + 1) * 0x3F1` (0x46F2 for 17), the ordinary ListFrame count. Written as the arithmetic so
 		// resizing StatList1 moves the scan target with it instead of silently looking for the old list's length.
 		public static uint BlockType => ListFrame.ForCount(StatList1.Length);
@@ -72,67 +70,37 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			(CharacterStatId.Unknown62, 0x0), (CharacterStatId.Deaths, 0x0), (CharacterStatId.Unknown63, 0x0), (CharacterStatId.Kills, 0x0)
 		];
 
-		// The fixed words AFTER the known-spell list at the block tail (the known-list - its count word then the 12-byte
-		// records - is built inline by CreateBlock, so it is no longer spliced in after the fact).
-		private static readonly uint[] TrailerRest = [0x1, 0x1000000, 0x0, 0x0, 0x0, 0x0];
+		// The block's WIDE tail: one entry, all-zero but for its flag byte. The captured beach block's trailing bytes
+		// used to be carried here as six opaque words plus a spare byte - which is what a 17-byte record looks like
+		// through a u32 view. The PAIR tail is empty for a fresh character.
+		private static readonly SnapshotTailWideEntry FreshWideTail = new(0x01, 0, 0);
 
 		// Builds a stat block from a full stat sheet: `sheet` is StatList#1 (its first StatList1.Length pairs - the
 		// displayed stats) followed by StatList#2 (the remaining pairs, ONE copy). StatList#2 is emitted TWICE on the
-		// wire (base + current), so the block is [17 displayed pairs][StatList#2 count][74 sheet pairs x2][known-spell
-		// list][trailer]. The KNOWN-SPELL LIST is built inline here - its count word ((records+1)*0x3F1) then each 12-
-		// byte [id][0xFFFFFFFF][type] record; a null/empty list is just the count 0x3F1 (byte-identical to the fresh
-		// skeleton). Everything is CONSTRUCTED directly, so nothing scans the whole list (SetStat would otherwise also
-		// overwrite the trailer's 0x1 word and the known-list ids - the reason this used to be a fragile post-hoc splice).
+		// wire (base + current), so the block is [17 displayed pairs][74 sheet pairs x2][known-spell list][tails].
+		// A null known-list becomes an EMPTY one rather than an absent one: a login snapshot always carries the list
+		// (its 0x3F1 frame), and the empty form is byte-identical to the captured beach skeleton.
 		public static SubClassPostAccessBlock CreateBlock(IReadOnlyList<(uint Id, uint Value)> sheet, KnownSpellList? known = null)
 		{
 			var displayedCount = StatList1.Length;
-			var sheetCount = sheet.Count - displayedCount;
 
-			var values = new List<uint>(338);
+			var displayed = new StatList();
 			for (var i = 0; i < displayedCount; i++)
-			{
-				values.Add(sheet[i].Id);
-				values.Add(sheet[i].Value);
-			}
+				displayed.Pairs.Add(sheet[i]);
 
-			values.Add(ListFrame.ForCount(sheetCount * 2)); // StatList#2 count - it carries BOTH copies (0x24B45 for 74 pairs)
+			// BOTH copies, because both are on the wire and a stat is only consistent when both carry the same value.
+			var full = new StatList();
 			for (var copy = 0; copy < 2; copy++)
 			for (var i = displayedCount; i < sheet.Count; i++)
-			{
-				values.Add(sheet[i].Id);
-				values.Add(sheet[i].Value);
-			}
-
-			var records = known?.Records ?? [];
-			values.Add(ListFrame.ForCount(records.Count)); // known-spell list count (0x3F1 when empty)
-			foreach (var record in records)
-			{
-				values.Add(record.Id);
-				values.Add(KnownSpellListCodec.Unbound);
-				values.Add(record.Type);
-			}
-
-			values.AddRange(TrailerRest);
+				full.Pairs.Add(sheet[i]);
 
 			return new SubClassPostAccessBlock
 			{
-				Marker0 = Marker, // the two preceding empty framed lists (List E / F)
-				Marker1 = Marker,
-				BlockType = ListFrame.ForCount(displayedCount), // StatList#1 count word = 0x46F2 for its 17 pairs
-				Values = values,
-				// Where the [statId][value] tables sit, stated by the code that just laid them out: the displayed
-				// list at the front, then StatList#2's doubled run behind its count word. A lookup by id scans these
-				// PAIR-ALIGNED and nothing else - scanning the flat array matches ordinary data (HealthMax's id is 1).
-				StatTables =
-				[
-					(0, displayedCount * 2),
-					(displayedCount * 2 + 1, sheetCount * 4)
-				],
-				Trailer = [0x00],
-				// True so HasKnownRepeatedStatTable is, and the caller's vitals patches (which write the +148 copy too)
-				// fire. A FRESH sheet is built with the doubled region by construction, so this is a statement of fact
-				// about what was just assembled, not a detection.
-				HasRepeatedStatTable = true
+				Displayed = displayed,
+				Sheet = full,
+				KnownSpells = known ?? new KnownSpellList(),
+				WideTail = [FreshWideTail],
+				PairTail = []
 			};
 		}
 
@@ -154,19 +122,19 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				if (body.ReadU32Be(i) != BlockType)
 					continue; // not a StatList#1 count word (0x46F2)
 
-				if (!TryReadStatList(body, i, out var displayed, out var afterDisplayed) || displayed.Count != StatList1.Length)
+				if (!TryReadStatList(body, i, out var displayed, out var afterDisplayed) || displayed.Pairs.Count != StatList1.Length)
 					continue;
 
 				// Reject a spurious 0x46F2 that is really a stat VALUE: the displayed stat ids are all small.
-				if (displayed.Exists(p => p.Id >= 0x700))
+				if (displayed.Pairs.Exists(p => p.Id >= 0x700))
 					continue;
 
-				if (!TryReadStatList(body, afterDisplayed, out var sheet, out _) || sheet.Count < StatList2Half.Length * 2)
+				if (!TryReadStatList(body, afterDisplayed, out var sheet, out _) || sheet.Pairs.Count < StatList2Half.Length * 2)
 					continue;
 
 				var pairs = new List<(uint, uint)>(StatList1.Length + StatList2Half.Length);
-				pairs.AddRange(displayed);
-				pairs.AddRange(sheet.GetRange(0, StatList2Half.Length)); // first copy = the 74 unique sheet stats
+				pairs.AddRange(displayed.Pairs);
+				pairs.AddRange(sheet.Pairs.GetRange(0, StatList2Half.Length)); // first copy = the 74 unique sheet stats
 				return pairs;
 			}
 
@@ -207,25 +175,24 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			return 0;
 		}
 
-		private static bool TryReadStatList(ReadOnlySpan<byte> body, int off, [NotNullWhen(true)] out List<(uint Id, uint Value)>? list, out int end)
+		// Reads one StatList_t at `off` THROUGH ITS CODEC - the scan only decides WHERE a list starts, never how one is
+		// laid out. The codec is strict, so a frame word that is not really a list throws and the scan moves on.
+		private static bool TryReadStatList(ReadOnlySpan<byte> body, int off, [NotNullWhen(true)] out StatList? list, out int end)
 		{
 			list = null;
 			end = off;
-			if (!ListFrame.TryCountOf(body.ReadU32Be(off), out var n))
-				return false;
 
-			if (off + 4 + n * 8 > body.Length)
-				return false;
-
-			list = new List<(uint, uint)>(n);
-			var p = off + 4;
-			for (var i = 0; i < n; i++)
+			var r = new SpanReader(body[off..], nameof(SubClassStatBlock));
+			try
 			{
-				list.Add((body.ReadU32Be(p), body.ReadU32Be(p + 4)));
-				p += 8;
+				list = StatListCodec.Read(ref r);
+			}
+			catch (CodecParseException)
+			{
+				return false;
 			}
 
-			end = p;
+			end = off + r.Position;
 			return true;
 		}
 	}

@@ -20,12 +20,15 @@ namespace Faolan.Tests
 
 			var fresh = SubClassStatBlock.CreateFreshBlock();
 
-			Assert.Equal(parsed.Marker0, fresh.Marker0);
-			Assert.Equal(parsed.Marker1, fresh.Marker1);
-			Assert.Equal(parsed.BlockType, fresh.BlockType);
-			Assert.True(parsed.Values.SequenceEqual(fresh.Values), "skeleton values must equal the template stat block");
-			Assert.True(parsed.Trailer.SequenceEqual(fresh.Trailer), "trailer must match");
-			Assert.True(fresh.HasRepeatedStatTable); // so the caller's vitals patches fire (they write the +148 copy too)
+			// Field by field, so a mismatch says WHICH part of the block drifted, then byte-exact so nothing the
+			// model does not compare can drift silently.
+			Assert.True(parsed.Displayed.Pairs.SequenceEqual(fresh.Displayed.Pairs), "StatList#1 must equal the template's displayed stats");
+			Assert.True(parsed.Sheet.Pairs.SequenceEqual(fresh.Sheet.Pairs), "StatList#2 must equal the template's sheet");
+			Assert.Equal(parsed.KnownSpells?.Records, fresh.KnownSpells?.Records);
+			Assert.Equal(parsed.WideTail, fresh.WideTail);
+			Assert.Equal(parsed.PairTail, fresh.PairTail);
+			Assert.Equal(SubClassPostAccessBlockCodec.Build(parsed), SubClassPostAccessBlockCodec.Build(fresh));
+			Assert.True(fresh.HasRepeatedStatTable); // so the caller's vitals patches fire (they write both copies)
 		}
 	}
 }

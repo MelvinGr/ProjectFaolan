@@ -92,7 +92,7 @@ namespace Faolan.Tests
 
 			Assert.Equal(4321u, fromCapture.PostAccessBlock!.CurrentHp);
 			Assert.Equal(fromScratch.PostAccessBlock!.CurrentHp, fromCapture.PostAccessBlock.CurrentHp);
-			Assert.Equal(fromScratch.PostAccessBlock.Values[21], fromCapture.PostAccessBlock.Values[21]);
+			Assert.Equal(fromScratch.PostAccessBlock.GetStat(CharacterStatId.HealthMax), fromCapture.PostAccessBlock.GetStat(CharacterStatId.HealthMax));
 		}
 
 		// #214 step 2: a DEAD character's from-scratch tails carry current-health = 0 (the release-window gate)
@@ -129,9 +129,9 @@ namespace Faolan.Tests
 			Assert.Equal(4321u, aliveSubClass.PostAccessBlock!.CurrentHp); // alive: full current health
 			Assert.Equal(0u, deadSubClass.PostAccessBlock!.CurrentHp); // dead: current health = 0 (the gate)
 
-			// Max/base HP side is untouched by death - the slot [21] base stays full in both.
-			Assert.Equal(aliveSubClass.PostAccessBlock.Values[21], deadSubClass.PostAccessBlock.Values[21]);
-			Assert.True(deadSubClass.PostAccessBlock.Values[21] > 0u, "dead snapshot keeps the max-health side populated");
+			// Max HP is untouched by death - HealthMax stays full in both.
+			Assert.Equal(aliveSubClass.PostAccessBlock.GetStat(CharacterStatId.HealthMax), deadSubClass.PostAccessBlock.GetStat(CharacterStatId.HealthMax));
+			Assert.True(deadSubClass.PostAccessBlock.GetStat(CharacterStatId.HealthMax) > 0u, "dead snapshot keeps the max-health side populated");
 			return;
 
 			CharacterMaxStats Stats()
@@ -223,17 +223,13 @@ namespace Faolan.Tests
 			Assert.Equal(0u, StatValue(tails.PostAccessBlock, CharacterStatId.ExpCurrentLevelBase));
 		}
 
-		// A stat's value out of the built block: the sheet is [statId, value] pairs, so the value is the word after the
-		// id. Reads the FIRST occurrence - the overrides write every one, so any of them will do.
+		// A stat's value out of the built block, BY ID. Asserts the stat is actually there rather than letting
+		// GetStat's "absent reads as 0" make an expected-zero assertion pass vacuously.
 		private static uint StatValue(SubClassPostAccessBlock block, CharacterStatId stat)
 		{
-			for (var i = 0; i + 1 < block.Values.Count; i++)
-			{
-				if (block.Values[i] == (uint)stat)
-					return block.Values[i + 1];
-			}
-
-			return uint.MaxValue;
+			var value = block.Displayed.Get((uint)stat) ?? block.Sheet.Get((uint)stat);
+			Assert.True(value.HasValue, $"{stat} is present in the built block");
+			return value!.Value;
 		}
 
 		private static bool Contains(byte[] hay, byte[] needle)

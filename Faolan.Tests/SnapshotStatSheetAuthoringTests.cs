@@ -225,13 +225,10 @@ namespace Faolan.Tests
 				if (block == null)
 					continue;
 
-				foreach (var (start, words) in block.StatTables)
+				foreach (var (id, value) in block.Displayed.Pairs.Concat(block.Sheet.Pairs))
 				{
-					for (var i = start; i + 1 < start + words && i + 1 < block.Values.Count; i += 2)
-					{
-						byStat.TryAdd(block.Values[i], []);
-						byStat[block.Values[i]].Add(block.Values[i + 1]);
-					}
+					byStat.TryAdd(id, []);
+					byStat[id].Add(value);
 				}
 			}
 

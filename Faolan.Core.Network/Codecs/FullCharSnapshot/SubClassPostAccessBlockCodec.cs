@@ -1,25 +1,46 @@
 using System;
-using System.Collections.Generic;
 using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
-	// The snapshot's POST-ACCESS-WINDOW block - everything after the PFAccessWindow_ catalog:
+	// The snapshot's POST-ACCESS-WINDOW block - everything after the PFAccessWindow_ catalog, 1.3-2.7 KB per
+	// subclass and the largest region of the login snapshot that was ever carried opaque (#393). Recovered from the
+	// client's own reader (`CoreFullPlayerCharacterIIR::ReadSubClass` = FUN_00797440, then FullPlayerCharacterIIR's
+	// FUN_0148c210) rather than guessed:
 	//
-	//   [u32 List D frame][u32 List E frame][u32 StatList#1 frame][ u32 values... ][ 0-3 trailer bytes ]
+	//   List D      FUN_0077d220 / FUN_0077db70   0x3F1-framed, VARIABLE-width records   EMPTY in all 151 captures
+	//   List E      FUN_0077d5b0 / FUN_0077df00   0x3F1-framed, VARIABLE-width records   EMPTY in all 151 captures
+	//   StatList#1  FUN_004d5900                  0x3F1-framed, [u32 statId][u32 value]  the 17 DISPLAYED stats
+	//   StatList#2  FUN_0139d450 / FUN_0139d210   0x3F1-framed, [u32 statId][u32 value]  74 sheet pairs, TWICE
+	//   SpellBook_t FUN_0077af90                  0x3F1-framed, 3 x u32, CONDITIONAL     the known-spell list (#74)
+	//   wide tail   FUN_00797440's tail           [u32 n][ n x ([u8][u64][u64]) ]
+	//   pair tail   FUN_0148c210                  [u32 m][ m x ([u32][u32]) ]
 	//
-	// The three leading words are the region's own framing (two EMPTY lists then StatList#1's count, 0x46F2 for the
-	// 17 displayed stats - not a type tag, see SubClassStatBlock.BlockType), and `Values` is the flat u32 view over
-	// the rest. The region's real grammar - which of those words are stride-8 [statId][value] tables - comes from
-	// SnapshotTailRegionCodec, which walks the same bytes; this codec asks it where the tables sit so that
-	// SubClassPostAccessBlock can address a stat BY ID rather than by counting slots (#393).
+	// ⚠️ Two long-standing errors in the write-up this corrects, both found by decompiling rather than by staring at
+	// bytes:
+	//   - `SpellBook_t` was documented as "records of 20 bytes (stride 0x14)". The 0x14 is the IN-MEMORY array
+	//     stride; the reader makes THREE 4-byte reads per record, so the WIRE record is 12 bytes - which makes it the
+	//     same list KnownSpellListCodec models (#74), not a separate one.
+	//   - the final list was documented as `count x [u32,u32]`. There are TWO trailing lists, and the first one's
+	//     element is 17 bytes: `FUN_0048f720` reads 8 bytes, and the loop reads one raw byte ahead of the two.
 	//
-	// The trailer is what is left when the payload is not a whole number of words. It is 0-3 bytes by construction,
-	// and it is carried rather than interpreted.
+	// Lists D and E are still LISTS - `ForCount(0)` is 0x3F1, the trap this codebase keeps re-learning - so they are
+	// read as such rather than asserted to be a constant; they are what says a post-access block starts here. Their
+	// record shape is unobservable from the corpus (every capture has them empty), so nothing beyond the frame is
+	// modelled and nothing needs to be: an empty list writes back as its frame word.
+	//
+	// The SPELLBOOK list is genuinely optional, not merely empty: 130 login snapshots carry one (0 to 127 records)
+	// and the 21 create-editor snapshots end at StatList#2, going straight to the two zero-count tails. An absent
+	// list and an empty one differ on the wire (nothing vs 0x3F1), so the model distinguishes them.
+	//
+	// All 151 captured blocks parse to their exact last byte and re-encode byte-exact
+	// (SubClassPostAccessBlockTests). This replaced a flat `uint[]` view plus a separate backtracking walker over the
+	// same bytes (`SnapshotTailRegionCodec`) - two spellings of one layout, which is what #543 was.
 	public static class SubClassPostAccessBlockCodec
 	{
-		// The three framing words ahead of the flat value view.
-		private const int HeaderWords = 3;
+		// Refuses a wildly out-of-range trailing count before it is used as a length: these two lists are
+		// per-character counter tables, so a four-digit count means we are not at the trailing pair after all.
+		private const uint MaxTrailingCount = 0x1000;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(SubClassPostAccessBlock value)
@@ -32,7 +53,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public static SubClassPostAccessBlock Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(SubClassPostAccessBlockCodec));
-			var value = Read(ref r, data);
+			var value = Read(ref r);
 			r.EnsureAtEnd();
 			return value;
 		}
@@ -40,100 +61,74 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		internal static void Write(FaolanStream s, SubClassPostAccessBlock v)
 		{
 			ArgumentNullException.ThrowIfNull(v);
-			s.WriteUInt32(v.Marker0);
-			s.WriteUInt32(v.Marker1);
-			s.WriteUInt32(v.BlockType);
-			foreach (var value in v.Values)
-				s.WriteUInt32(value);
 
-			s.WriteArray(v.Trailer);
+			s.WriteUInt32(ListFrame.Empty); // List D
+			s.WriteUInt32(ListFrame.Empty); // List E
+			StatListCodec.Write(s, v.Displayed);
+			StatListCodec.Write(s, v.Sheet);
+
+			if (v.KnownSpells != null)
+				KnownSpellListCodec.Write(s, v.KnownSpells);
+
+			s.WriteUInt32((uint)v.WideTail.Count);
+			foreach (var entry in v.WideTail)
+				s.WriteByte(entry.Flag).WriteUInt64(entry.A).WriteUInt64(entry.B);
+
+			s.WriteUInt32((uint)v.PairTail.Count);
+			foreach (var pair in v.PairTail)
+				s.WriteUInt32(pair.Id).WriteUInt32(pair.Value);
 		}
 
-		// `region` is the WHOLE block, which the stat-table walk needs: SnapshotTailRegionCodec reads the same bytes
-		// from the first framing word, so its list offsets are block-relative and map straight onto `Values`.
-		private static SubClassPostAccessBlock Read(ref SpanReader r, in ReadOnlySpan<byte> region)
+		internal static SubClassPostAccessBlock Read(ref SpanReader r)
 		{
-			// The two leading EMPTY framed lists (List D / List E) are what says a post-access block starts here.
-			var marker0 = r.ExpectU32Be(ListFrame.Empty, "post-access List D frame");
-			var marker1 = r.ExpectU32Be(ListFrame.Empty, "post-access List E frame");
-			var blockType = r.ReadU32Be();
+			// The two leading EMPTY framed lists are what says a post-access block starts here.
+			r.ExpectU32Be(ListFrame.Empty, "post-access List D frame");
+			r.ExpectU32Be(ListFrame.Empty, "post-access List E frame");
 
-			var valueCount = r.Remaining / 4;
-			var values = new List<uint>(valueCount);
-			for (var i = 0; i < valueCount; i++)
-				values.Add(r.ReadU32Be());
+			var displayed = StatListCodec.Read(ref r);
+			var sheet = StatListCodec.Read(ref r);
 
-			var trailer = r.ReadRemaining().ToArray();
-
-			return new SubClassPostAccessBlock
+			var block = new SubClassPostAccessBlock
 			{
-				Marker0 = marker0,
-				Marker1 = marker1,
-				BlockType = blockType,
-				Values = values,
-				StatTables = StatTablesOf(region, values.Count),
-				HasRepeatedStatTable = HasAdjacentRepeatedRun(values),
-				Trailer = trailer
+				Displayed = displayed,
+				Sheet = sheet,
+				KnownSpells = HasSpellBook(r) ? KnownSpellListCodec.Read(ref r) : null
 			};
+
+			ReadTails(ref r, block);
+			return block;
 		}
 
-		// True when the values carry an adjacent repeated run of at least 8 words - the signature of the post-access
-		// stat table's doubled region (base + current copy of the same 74 pairs).
-		private static bool HasAdjacentRepeatedRun(List<uint> values)
+		// Whether a spellbook list follows. The discriminator is the frame word itself: a 0x3F1-framed count cannot
+		// be mistaken for the wide tail's count, because the smallest one (0x3F1 = 1009) would claim 1009 x 17 bytes
+		// - far past the largest captured block - while the tails' own counts are single digits. The `fits` test
+		// says exactly that rather than trusting the arithmetic to stay true.
+		private static bool HasSpellBook(SpanReader r)
 		{
-			for (var startIndex = 0; startIndex < values.Count; startIndex++)
-			{
-				for (var length = (values.Count - startIndex) / 2; length >= 8; length--)
-				{
-					if (RangesEqual(values, startIndex, startIndex + length, length))
-						return true;
-				}
-			}
+			if (r.Remaining < 4 || !ListFrame.TryCountOf(r.PeekU32Be(), out var records))
+				return false;
 
-			return false;
+			return 4 + (long)records * KnownSpellListCodec.RecordSize + 8 <= r.Remaining;
 		}
 
-		private static bool RangesEqual(List<uint> values, int leftStart, int rightStart, int length)
+		// The two plainly-counted lists that close the region. Their counts are read as counts, not peeked at: by
+		// here the framed lists are all consumed, so anything that does not land exactly on the region's end is a
+		// block we have mis-modelled and Parse's EnsureAtEnd says so.
+		private static void ReadTails(ref SpanReader r, SubClassPostAccessBlock block)
 		{
-			for (var i = 0; i < length; i++)
-			{
-				if (values[leftStart + i] != values[rightStart + i])
-					return false;
-			}
+			var wide = r.ReadU32Be();
+			if (wide > MaxTrailingCount)
+				throw CodecParseException.Unexpected(nameof(SubClassPostAccessBlockCodec), r.Position - 4, $"a wide-tail count <= {MaxTrailingCount}", wide.ToString());
 
-			return true;
-		}
+			for (var i = 0; i < wide; i++)
+				block.WideTail.Add(new SnapshotTailWideEntry(r.ReadU8(), r.ReadU64Be(), r.ReadU64Be()));
 
-		// Where the [statId][value] tables sit inside the flat `Values` view, as (start, wordCount) pairs. Derived
-		// from the region walk rather than from fixed indexes - scanning the flat array instead is not a smaller
-		// version of this, it is wrong: HealthMax's id is 1, and the word 1 appears all over the array as ordinary
-		// data. A region that does not walk yields no tables, and a lookup by id then finds nothing rather than
-		// finding the wrong thing.
-		private static List<(int Start, int Words)> StatTablesOf(in ReadOnlySpan<byte> region, int valueCount)
-		{
-			var tables = new List<(int Start, int Words)>();
+			var pairs = r.ReadU32Be();
+			if (pairs > MaxTrailingCount)
+				throw CodecParseException.Unexpected(nameof(SubClassPostAccessBlockCodec), r.Position - 4, $"a pair-tail count <= {MaxTrailingCount}", pairs.ToString());
 
-			SnapshotTailRegion walked;
-			try
-			{
-				walked = SnapshotTailRegionCodec.Parse(region);
-			}
-			catch (CodecParseException)
-			{
-				return tables; // the region does not walk - see SnapshotTailRegionCodec's header for why that happens
-			}
-
-			foreach (var list in walked.Lists)
-			{
-				if (list.Stride != 8 || list.Words.Count == 0)
-					continue;
-
-				var start = (list.Offset - HeaderWords * 4) / 4;
-				if (start >= 0 && start + list.Words.Count <= valueCount)
-					tables.Add((start, list.Words.Count));
-			}
-
-			return tables;
+			for (var i = 0; i < pairs; i++)
+				block.PairTail.Add(new SnapshotTailPair(r.ReadU32Be(), r.ReadU32Be()));
 		}
 	}
 }
