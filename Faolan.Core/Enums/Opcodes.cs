@@ -756,7 +756,7 @@ namespace Faolan.Core.Enums
 		//   MasterLooterOpenIIR          0x26D0EDD5  [auth: MasterLooterOpenIIR_c]
 		//   MoveToPosIIR                 [alias] movement; we emit MoveTaskIIR 0x96C46740
 		//   PVPDropItemIIR               0x7057225B  [auth: PVPDropItemIIR_t]
-		//   PatrolIIR                    [alias] NPC roam; drives MoveTaskIIR 0x96C46740 movement (no distinct wire record)
+		//   PatrolIIR                    0x34DA37AA  [auth: PatrolIIR_c]  (a REAL class, not an alias - see below)
 		//   PlayfieldAnarchyFIIR         [alias] playfield/map change; we emit PlayfieldFIIR 0x5D85BFC7
 		//   QuestCooldownIIR             0x9CC129C5  [auth: QuestCooldownIIR]
 		//   QuestRewardNotifyIIR         0x8BB2799C  [auth: QuestRewardNotifyIIR_c]
@@ -772,6 +772,18 @@ namespace Faolan.Core.Enums
 		//   ToolMessageIIR               0x444A6CD8  [auth: ToolMessageIIR_t]
 		//   ToolMessageInternalIIR       0x3188C31B  [auth: ToolMessageInternalIIR_t]
 		//   UpdateClientVisualIIR        0x356184B3  [auth: UpdateClientVisualIIR_t]
+		//
+		// ⚠️ PatrolIIR's id is COMPUTED, not observed - the one entry here that is. `PatrolIIR_c` is attested by exactly
+		// one string in the whole image, the assert `PatrolIIR_c::PollStatus[%d:%u], invalid id!` at 01fdf970 (used by
+		// FUN_00919cc0), and unlike all 141 IIR classes below it has NO RTTI type descriptor - so it is compiled in but
+		// never instantiated polymorphically. 0x34DA37AA is what BKDR-31 of the `_c` name gives, which is the rule every
+		// other id follows, but nothing here confirms the client ever puts it on the wire: 0 of 120 captures carry it
+		// (control: MainQuestUpdateIIR appears in 31). It was previously listed as "[alias] ... (no distinct wire
+		// record)" with no id at all, which stated the inference as fact in the other direction.
+		//
+		// Do not try to confirm an id by scanning the image for it as a constant: these ids are NEVER immediates. The
+		// client registers each class by NAME and hashes it at runtime, so even 0x504B7924 - live, captured and
+		// implemented - appears in no instruction. Absence of the constant is not evidence about a type.
 		//
 		// BASE / PROTO / ABSTRACT (19) - mostly C++ base classes + Proto* wrappers, likely not concrete wire subops:
 		//   CoreCharacterFullUpdateIIR   bare 0x828E35F0  _c 0x17D885D4  [unverified]
@@ -801,6 +813,32 @@ namespace Faolan.Core.Enums
 		//   PlayfieldDebugManagerIIR     0xEE7F5776  [auth: PlayfieldDebugManagerIIR_c]
 		//   RequestDebugInfoIIR          0x09F159E4  [auth: RequestDebugInfoIIR_c]
 		//   ServerPosDebugInfoIIR        0xAFE243E6  [auth: ServerPosDebugInfoIIR_c]
+		//
+		// RTTI SWEEP (2026-08-01) - every `.?AV*IIR*@@` type descriptor in the image, hashed. It recovered 141 IIR
+		// classes and is the reason to trust the ids above: 80 of the 80 IirTypes members below hash EXACTLY to one of
+		// those class names, so neither the names nor the hash rule are guesswork. The 13 ids the sweep found that this
+		// file did not mention at all, grouped by what they are:
+		//
+		//   nested PROTOBUF sub-messages (a field of another IIR's payload, never a wire sub-opcode of their own):
+		//     ProtoCoreCharacterIIR_CharacterBcc        0xF3CFB5C8
+		//     ProtoCoreCharacterIIR_CharacterStats      0x3FB0B4A5
+		//     ProtoCoreCharacterIIR_InventoryEntry      0x27A68225
+		//     ProtoCoreCharacterIIR_InventoryEntry_GemSlot 0x3AD379B3
+		//     ProtoCoreCharacterIIR_NpcStats            0xDD7C872D
+		//     ProtoCoreCharacterIIR_PlayerStats         0x3BB3CAEF
+		//     ProtoGameCodeDynelIIR_RunningEffects      0x06B5B509
+		//     ProtoLootBagIIR_SpecialLootOwnerEntry     0xF810A79B
+		//     ProtoScryScriptIIR_Variable               0x05E16A33
+		//   CLIENT-SIDE view classes (UI, not wire):
+		//     IIRDebugView                              0x52076086
+		//     IIRStatListViewItem                       0x9D5F1DDC
+		//   genuine IIR classes we have never seen on the wire:
+		//     n3PlayfieldFullUpdateIIR_t                0x5D7884EE
+		//     n3ToServerUnBlockIIR_t                    0x87A3B396
+		//
+		// ⚠️ The client spells the n3* classes with a LOWERCASE n3 - `n3TeleportIIR_t`, `n3ToClientFadeIIR_t`,
+		// `n3ToClientQuitIIR_t`. The members below are `N3…` for C# convention; the ids are hashes of the CLIENT
+		// spelling, so do not "fix" a member name into the hash input.
 		// ---------------------------------------------------------------------------------------------------------
 	}
 
