@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
@@ -327,6 +329,91 @@ namespace Faolan.Tests
 			var known = Enum.GetValues<QuestGoalKind>().Select(k => (uint)k).ToHashSet();
 			var stray = await db.QuestGoalDefinitions.Where(g => g.Separator != null).Select(g => g.Separator!.Value).Distinct().ToListAsync(ct);
 			Assert.All(stray, s => Assert.Contains(s, known));
+		}
+
+		// The quest INDEX's per-line catalog may never contain a quest the captures never showed.
+		//
+		// This is the regression the client's quest catalog (RDB 1000104) introduced and the goldens did NOT catch.
+		// The index block lists its line's quest ids plus a (sequence, remaining) pair built from the line's COUNT, so
+		// the 3011 catalog-only quests silently changed that region for the 56 snapshot-eligible quests that share a
+		// line with one. The only index golden covers quest 10238, whose line 241 happened to be complete already -
+		// 8 members before and after - so the suite stayed green while a live login would have shipped a region no
+		// capture backs.
+		//
+		// It goes through the REPOSITORY on purpose. The filter that fixes this lives in GetQuestDefinitionsByLine,
+		// so a test that re-implements the query would pass no matter what the repository does - which is exactly how
+		// this got through the first time.
+		[Fact]
+		public async Task QuestIndexCatalog_HoldsOnlyQuestsTheCapturesShowed()
+		{
+			var options = TestDb.ReadOnly(TestDb.GameDatabase);
+			var repo = new DatabaseRepository(new SeedContextFactory(options));
+			await using var db = new DatabaseContext(options);
+			var ct = TestContext.Current.CancellationToken;
+
+			// The lines that can actually reach a login snapshot - the ones whose index region is built and sent.
+			var lines = await db
+				.QuestDefinitions.Where(q => q.HasSnapshotRecord)
+				.Select(q => q.QuestLineId)
+				.Distinct()
+				.ToListAsync(ct);
+
+			Assert.NotEmpty(lines);
+
+			var withRefs = (await db.QuestTextRefs.Select(r => r.QuestId).Distinct().ToListAsync(ct)).ToHashSet();
+
+			var leaked = new List<string>();
+			foreach (var line in lines)
+			foreach (var q in await repo.GetQuestDefinitionsByLine(line))
+				if (!withRefs.Contains(q.QuestId))
+					leaked.Add($"quest {q.QuestId} (line {line}, '{q.Name}')");
+
+			Assert.True(leaked.Count == 0,
+				$"{leaked.Count} catalog-only quest(s) reached a snapshot-eligible line's index catalog. They carry no journal " +
+				"text, so no capture ever listed them - shipping them changes the index block's id list AND its `remaining` " +
+				"count:\n  " + string.Join("\n  ", leaked.Take(20)));
+		}
+
+		// The two quests that carry a CAPTURED line catalog (IndexQuestLineQuestIds) are a byte-level oracle for the
+		// list the index builder derives from the DB: the CSV is what the wire actually sent.
+		//
+		// ⚠️ Necessary but NOT sufficient, and worth knowing why: both of them sit in lines the catalog did not grow
+		// (241 and 1054), so this passes even with the bug above. It locks the derivation for the two lines we can
+		// prove; QuestIndexCatalog_HoldsOnlyQuestsTheCapturesShowed is what covers the other 80.
+		[Fact]
+		public async Task DerivedLineCatalog_MatchesTheCapturedCsv()
+		{
+			var options = TestDb.ReadOnly(TestDb.GameDatabase);
+			var repo = new DatabaseRepository(new SeedContextFactory(options));
+			await using var db = new DatabaseContext(options);
+			var ct = TestContext.Current.CancellationToken;
+
+			var withCsv = await db
+				.QuestDefinitions.Where(q => q.IndexQuestLineQuestIds != null)
+				.Select(q => new { q.QuestId, q.QuestLineId, q.IndexQuestLineQuestIds })
+				.ToListAsync(ct);
+
+			Assert.NotEmpty(withCsv);
+
+			foreach (var q in withCsv)
+			{
+				var derived = (await repo.GetQuestDefinitionsByLine(q.QuestLineId)).Select(d => d.QuestId).ToList();
+				var captured = q.IndexQuestLineQuestIds!.Split(',').Select(uint.Parse).ToList();
+				Assert.Equal(captured, derived);
+			}
+		}
+
+		private sealed class SeedContextFactory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
+		{
+			public DatabaseContext CreateDbContext()
+			{
+				return new DatabaseContext(options);
+			}
+
+			public Task<DatabaseContext> CreateDbContextAsync(CancellationToken ct = default)
+			{
+				return Task.FromResult(new DatabaseContext(options));
+			}
 		}
 
 		// Every server-opened conversation is REACHABLE: it has a trigger the runtime can fire, and an NPC to speak it.

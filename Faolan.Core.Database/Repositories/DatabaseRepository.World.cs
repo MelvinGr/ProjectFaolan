@@ -114,11 +114,26 @@ namespace Faolan.Core.Database.Repositories
 		}
 
 		// Every step of a quest line, ordered by its position within that line (JournalSequence) - the quest index's
-		// per-line id list.
+		// per-line id list, which QuestIndexRegions.ForQuests turns into a block's `AreaQuestIds` and its
+		// (sequence, remaining) pair.
+		//
+		// ⚠️ Restricted to steps that have journal TEXT REFS, and that filter is load-bearing on the login path. The
+		// client's quest catalog (RDB 1000104) contributed 3011 quests no capture ever showed, and 56 of the 82
+		// snapshot-eligible quests share a line with one; without this filter their index block would list ids the
+		// captures never carried and a `remaining` count to match, which is a region we cannot prove against any
+		// capture going out on a live login. Having text refs is the right test rather than a provenance flag: this
+		// list IS what the journal renders, and a quest with no journal text cannot be rendered in it. It splits the
+		// two sources exactly - all 2037 captured quests have refs, all 3011 catalog-only ones have none.
+		//
+		// ⚠️ Do NOT filter on JournalSequence != 0 instead. 0 is a legitimate captured value (74 captured quests carry
+		// it; 182 lines list every quest with 0), so that would drop real steps.
 		public async Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.QuestDefinitions.Where(q => q.QuestLineId == questLineId).OrderBy(q => q.JournalSequence).ToArrayAsync();
+			return await ctx
+				.QuestDefinitions.Where(q => q.QuestLineId == questLineId && q.TextRefs.Any())
+				.OrderBy(q => q.JournalSequence)
+				.ToArrayAsync();
 		}
 
 		public async Task<RespawnPoint?> GetRespawnPoint(uint id)
