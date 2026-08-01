@@ -42,7 +42,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 			return new QuestObjectiveGoal
 			{
 				Lead = QuestObjectiveGoalCodec.GoalLead,
-				K = g.Separator,
+				// A goal with no captured kind cannot be built into a region the client will accept - but that is
+				// gated upstream by ObjectiveRegionVerified, which only ever flips on for goals harvested from the
+				// wire. Falling back to 0 here keeps the builder total; it never reaches a live client.
+				K = g.Separator ?? 0,
 				Instance = instance,
 				QuestId = def.QuestId,
 				GoalId = g.GoalId,

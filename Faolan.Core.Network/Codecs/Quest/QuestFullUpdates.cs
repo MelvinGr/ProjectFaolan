@@ -83,7 +83,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 					? [row.Extra0, row.Extra1, row.Extra2, row.Extra3, row.Extra4, row.Extra5, row.Extra6]
 					: new uint[7],
 				SubId = 0,
-				MapId = def.MapId,
+				// 0 is the wire's "no marker" - the same convention QuestObjectiveRegions uses for a goal with a
+				// null map. A quest with no map is a catalog quest that no capture ever placed.
+				MapId = def.MapId ?? 0,
 				MarkerX = def.MarkerX,
 				MarkerY = def.MarkerY,
 				Objective = QuestTextTokens.Record(def, QuestTextSlot.Objective),

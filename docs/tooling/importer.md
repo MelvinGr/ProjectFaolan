@@ -84,6 +84,8 @@ Capture-sourced (default group, run in dependency order):
 Opt-in capture-sourced (run only when named via `--only`): `mounts`, `pets`, `recipes`.
 
 RDB-sourced (require `--rdb`, **not** in the default group — opt-in via `--only`):
+`rdb-quest-catalog` (the client's quest catalog, RDB 1000104 — quest lines/quests/goals + their plaintext
+names; see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)),
 `rdb-inventory` (read-only type-count report), `rdb-morphs`, `rdb-appearance`, `rdb-spells`, `rdb-abilities`,
 `rdb-combos`, `rdb-maps`, `rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt),
 `rdb-hazards` (lava volumes), `rdb-regions` (the bounded-area trigger volumes a subsystem consumes — depends on

@@ -264,6 +264,35 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
+	// The client's OWN quest catalog (RDB 1000104, #568) - 2181 quest lines / 5042 quests / 7301 goals with the
+	// designers' names in plaintext. Everything else in the quest tables came from captures, so it covered only what a
+	// captured character held; this covers the game. It ADDS and NAMES and never overwrites captured wire data.
+	public sealed class RdbQuestCatalogModule : IImportModule
+	{
+		// Lines must exist before the quests that FK them, and quests before their goals - the importer orders those
+		// three passes itself. It depends on no other module: the catalog is self-contained client data.
+		public IReadOnlyList<string> DependsOn => [];
+
+		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
+		{
+			WriteMode.Insert,
+			WriteMode.Upsert
+		};
+
+		public ImportSource Source => ImportSource.Rdb;
+
+		public string Description => "Quest lines/quests/goals + their names from the client's quest catalog (RDB 1000104).";
+		public string Name => "rdb-quest-catalog";
+
+		public async Task<ImportResult> RunAsync(ImportContext ctx)
+		{
+			var r = await RdbQuestCatalogImporter.ImportAsync(ctx.Db, ctx.RdbDir!);
+			return new ImportResult(
+				$"lines +{r.LinesAdded} ({r.LinesNamed} named, {r.PlaceholderLines} placeholder); quests +{r.QuestsAdded} ({r.QuestsNamed} named); " +
+				$"goals +{r.GoalsAdded} ({r.GoalsNamed} named); {r.Rewards} item rewards; {r.GoalsOrphaned} goals with no quest.");
+		}
+	}
+
 	// Resurrection points; on-demand records fetched from the CDN. Under --dry-run the CDN blob archive
 	// (--store) is suppressed (an out-of-DB write the transaction rollback can't undo).
 	public sealed class RdbRespawnsModule : IImportModule

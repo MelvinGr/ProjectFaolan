@@ -27,11 +27,16 @@ namespace Faolan.Core.Database.Tables
 		// The primary objective's goal id (e.g. 0x1670 = 5744), echoed in QuestGoal and the full-update.
 		public uint GoalId { get; set; }
 
-		// The objective's world-marker (map id + x/y) shown on the map; 0 when the quest has no map marker.
-		public uint MapId { get; set; }
+		// The objective's world-marker (map id + x/y) shown on the map. NULL when the quest has no map marker - which
+		// is every quest that comes from the client's catalog rather than a capture, since the catalog carries no map.
+		//
+		// ⚠️ Was a NOT NULL FK with "0 = none" in the comment and no row ever holding 0, because the importer SKIPPED
+		// any quest whose map it could not resolve ("map N not in the Maps catalog") - a silent drop that read as
+		// "the wire didn't carry it". Nullable is both the honest model and what lets a mapless quest exist at all.
+		public uint? MapId { get; set; }
 
 		[ForeignKey(nameof(MapId))]
-		public virtual Map Map { get; set; } = null!;
+		public virtual Map? Map { get; set; }
 
 		// The next stage in a multi-stage quest CHAIN (Gitea #261): completing this quest's goal SUPERSEDES it with
 		// NextQuestId (QuestProgressionService sends QuestGoal + QuestIIR 2->4 + QuestFullUpdate(next) and sets the next
@@ -42,6 +47,13 @@ namespace Faolan.Core.Database.Tables
 		// The RDB quest id (e.g. 13479) - the primary key (natural key; see the class note).
 		[Key]
 		public uint QuestId { get; set; }
+
+		// The designers' name for this STEP, in plaintext, from the client's quest catalog (RDB 1000104,
+		// `Quest.name`; see docs/rdb/quest-catalog-1000104.md) - "The Slaver", "The Scavenger's Key". Distinct from
+		// the journal TITLE the client renders, which is a text ref resolved against an LDB page and needs a captured
+		// decryption key; this one is free and covers all 5042 catalog quests. Null for a quest the catalog omits.
+		[MaxLength(256)]
+		public string? Name { get; set; }
 
 		// Hand-reviewed: the importer must not overwrite this row's fields. Set from the editor, NEVER by an import.
 		// See ConversationNode.Verified - same contract, same `--force` escape.

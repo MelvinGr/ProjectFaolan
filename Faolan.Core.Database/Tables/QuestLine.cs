@@ -60,5 +60,34 @@ namespace Faolan.Core.Database.Tables
 		// The word after Magic. 0 in every captured line group; kept rather than asserted, because "constant across
 		// the corpus" has repeatedly turned out to mean "the corpus only covers one case" in this protocol.
 		public uint TableField1 { get; set; }
+
+		// --- from the client's quest catalog, RDB 1000104 (`MainQuest`); see docs/rdb/quest-catalog-1000104.md ---
+
+		// The designers' name for the line, in PLAINTEXT - `[Eiglophian_Mountains] Feast of Coltranach`. Unlike the
+		// three text refs above it needs no LDB page and no captured decryption key, which is why it is a column and
+		// not another (Category, RefId, Key) triple. The bracketed prefix is a dev tag (zone, content pack, series), not
+		// structure - do not parse it.
+		[MaxLength(256)]
+		public string? Name { get; set; }
+
+		// The line's first and last STEP. The catalog gives the endpoints but NOT the order of the steps between them
+		// (`Quest.tier` and `Quest.start_new_tier` are empty in the shipped data), so this does not replace the
+		// hand-authored chain in ImportOps.Chain - it bounds it.
+		public uint FirstQuestId { get; set; }
+		public uint LastQuestId { get; set; }
+
+		// The line that must be completed before this one opens - `MainQuest.prev_template_id`, populated on 394 of
+		// the catalog's 2181 lines.
+		//
+		// ⚠️ Deliberately NOT a foreign key, and not a nav. It is a single-parent PREREQUISITE pointer, not the
+		// reverse of an ordering: `next_template_id` is populated on just 3 rows and only 2 of the 394 links are
+		// reciprocal. Two of its targets (798, 806) are not lines in the table at all, so an FK would reject the
+		// catalog's own data.
+		public uint? PrevQuestLineId { get; set; }
+
+		public uint Tier { get; set; }
+
+		// The line's ITEM rewards - `MainQuest.reward` (1098 lines) and `optional_reward` (619).
+		public virtual ICollection<QuestLineReward> Rewards { get; set; } = [];
 	}
 }

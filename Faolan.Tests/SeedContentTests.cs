@@ -321,9 +321,11 @@ namespace Faolan.Tests
 
 			Assert.True(untagged.Count == 0, "goals with no kind tag - the full-update's `K` word is not being harvested:\n  " + string.Join("\n  ", untagged));
 
-			// ...and the tag is only ever a kind the corpus actually shows, so a stray value is caught too.
+			// ...and the tag is only ever a kind the corpus actually shows, so a stray value is caught too. NULL is
+			// excluded rather than asserted against: it means "never seen on the wire", which is every goal that comes
+			// from the client's quest catalog rather than a capture (see QuestGoalDefinition.Separator).
 			var known = Enum.GetValues<QuestGoalKind>().Select(k => (uint)k).ToHashSet();
-			var stray = await db.QuestGoalDefinitions.Select(g => g.Separator).Distinct().ToListAsync(ct);
+			var stray = await db.QuestGoalDefinitions.Where(g => g.Separator != null).Select(g => g.Separator!.Value).Distinct().ToListAsync(ct);
 			Assert.All(stray, s => Assert.Contains(s, known));
 		}
 

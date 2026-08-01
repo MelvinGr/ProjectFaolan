@@ -967,14 +967,17 @@ namespace Faolan.Importer.Captures
 
 		public static async Task ImportQuestDefinitions(DatabaseContext db, List<QuestDefinition> definitions, bool force = false)
 		{
-			// QuestDefinition.MapId is a required FK to Maps, but a harvested quest can point its map marker at a
-			// playfield the Maps catalog doesn't have - the catalog is built from captured MapChange packets, so a map
-			// nobody visited in a capture is simply absent (e.g. 1000004, referenced by four Quest_c journal records).
-			// These used to be SKIPPED, which threw away real journal content to satisfy an FK. A placeholder Map row
-			// carries the id and nothing else; the maps module fills in the name if that playfield is ever captured.
+			// QuestDefinition.MapId is an FK to Maps, but a harvested quest can point its map marker at a playfield the
+			// Maps catalog doesn't have - the catalog is built from captured MapChange packets, so a map nobody visited
+			// in a capture is simply absent (e.g. 1000004, referenced by four Quest_c journal records). These used to be
+			// SKIPPED, which threw away real journal content to satisfy an FK. A placeholder Map row carries the id and
+			// nothing else; the maps module fills in the name if that playfield is ever captured.
+			//
+			// A NULL MapId needs none of this: it means the quest has no map marker at all, which is every quest that
+			// comes from the client's catalog rather than a capture.
 			var knownMaps = (await db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
 			var placeholderMaps = 0;
-			foreach (var mapId in definitions.Select(d => d.MapId).Distinct().Where(id => id != 0 && !knownMaps.Contains(id)))
+			foreach (var mapId in definitions.Select(d => d.MapId).OfType<uint>().Distinct().Where(id => !knownMaps.Contains(id)))
 			{
 				db.Maps.Add(new Map
 				{
@@ -998,9 +1001,12 @@ namespace Faolan.Importer.Captures
 			var updated = 0;
 			foreach (var def in definitions)
 			{
-				if (!knownMaps.Contains(def.MapId))
+				// Unreachable in practice now that every referenced map gets a placeholder above and a mapless quest is
+				// NULL rather than 0 - kept as a guard so a future caller that hands us an unplaceholdered map fails
+				// loudly on one row instead of aborting the whole import on the FK.
+				if (def.MapId is { } defMapId && !knownMaps.Contains(defMapId))
 				{
-					Console.WriteLine($"Quest {def.QuestId}: skipped - map {def.MapId} not in the Maps catalog (id 0 = the record carried no map ref).");
+					Console.WriteLine($"Quest {def.QuestId}: skipped - map {defMapId} not in the Maps catalog.");
 					skipped++;
 					continue;
 				}

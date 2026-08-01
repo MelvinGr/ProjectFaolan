@@ -97,6 +97,44 @@ words — see [questc-region-decode.md](../re/questc-region-decode.md).
 low-level cash/xp ratios (715/60, 1000/157, 455/36 → 0.08–0.16) match the wire's (150/15, 370/44, 550/66 →
 0.10–0.12).]
 
+## Importing it
+
+```zsh
+dotnet run --project Faolan.Importer -- --only rdb-quest-catalog --RdbDir <rdb-dir>
+```
+
+An **opt-in RDB module** like the rest, `Insert`/`Upsert`, no dependencies. It **adds and names; it never
+overwrites captured wire data** — a quest that already has a row keeps every harvested scalar, and only
+`Name`, its line membership (when it has none) and the line's own catalog columns are written. Where we have
+the wire, the wire is the better evidence. `Verified` rows are skipped entirely, as everywhere else.
+
+What it landed on first run:
+
+| table | before | after |
+|---|---:|---:|
+| `QuestLines` | 973 | 2209 |
+| `QuestDefinitions` | 2037 | 5048 |
+| `QuestGoalDefinitions` | 170 | 7317 |
+| `QuestLineRewards` | 0 | 3943 |
+
+Three gaps in the client's own data are recorded rather than papered over:
+
+- **20 placeholder lines.** 63 catalog quests point at a line id the catalog's `main_quest` list does not
+  define. A placeholder row carries the id and nothing else, which keeps those quests instead of dropping
+  them to satisfy an FK — the same pattern `ImportOps` uses for a quest whose Map is not in the catalog.
+- **2 goals with no quest**, counted in the module's output rather than skipped silently.
+- **17 rows of 14560 have a duplicate id whose content DIFFERS** (2 lines, 15 goals). The importer takes the
+  last, because nothing in the data separates them; the report names the ids so the choice is visible.
+
+Two model consequences worth knowing:
+
+- **`QuestDefinition.MapId` is now nullable.** The catalog carries no map, and the column was a NOT NULL FK
+  whose "0 = none" case never occurred *because the importer skipped any quest whose map it could not
+  resolve*. Nullable is both the honest model and what lets a mapless quest exist.
+- **`QuestGoalDefinition.Separator` (the kind tag) is now nullable.** NULL means "never seen on the wire",
+  which is every catalog goal. It is deliberately not 0: there is no kind 0, and 0 was the un-harvested
+  default that #548 removed — reusing it would resurrect that exact ambiguity.
+
 ## Finding the next such table
 
 The sweep that found this one is worth repeating for the other named data tables: iterate

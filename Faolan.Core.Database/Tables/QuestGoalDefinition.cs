@@ -24,6 +24,19 @@ namespace Faolan.Core.Database.Tables
 		[Key, DatabaseGenerated(DatabaseGeneratedOption.None)]
 		public uint GoalId { get; set; }
 
+		// The designers' name for the goal, in plaintext, from the client's quest catalog (RDB 1000104,
+		// `QuestGoal.name`; see docs/rdb/quest-catalog-1000104.md) - "Kill the Scavenger", "Enter the jungle".
+		// It is the SAME sentence the encrypted LDB category 50304 carries, but free: no page, no captured key. That
+		// makes it a useful cross-check on `--report ldb-quest-text` as well as content in its own right, and it
+		// covers all 7301 catalog goals against the 168 the corpus decrypts. Null for a goal the catalog omits.
+		[MaxLength(256)]
+		public string? Name { get; set; }
+
+		// The goal's phase within its quest - `QuestGoal.phase`, populated on every catalog row. 1-based, and it is
+		// the catalog's ordering of a quest's goals (the beach starter's "Enter the jungle" is phase 1 and "Kill
+		// slavemaster Saddur" phase 2). 0 for a goal the catalog omits.
+		public uint Phase { get; set; }
+
 		// The map the goal's objective/marker sits on (all goal maps are in the Maps catalog).
 		// NULL when the goal has no world marker. 449 of the 2850 captured @609 goals are like this, and mapId==0
 		// coincides with markerX==markerY==0 in EVERY one of them (zero counter-examples), so it is the wire's way of
@@ -186,7 +199,13 @@ namespace Faolan.Core.Database.Tables
 
 		// The [1][k] separator's k word - and it is the goal's KIND TAG, not a framing artefact: see QuestGoalKind for
 		// the decode and its evidence. Kept under its wire-derived name because it is a captured field.
-		public uint Separator { get; set; }
+		//
+		// NULL = this goal has never been seen on the wire, so it has no kind - which is every goal that comes from
+		// the client's quest catalog (RDB 1000104) rather than a capture. Nullable rather than 0 because THERE IS NO
+		// KIND 0 (see QuestGoalKind): 0 was the un-harvested default that #548 removed, and reusing it for "never
+		// captured" would resurrect exactly the ambiguity that bug had. `SeedContentTests
+		// .NoGoalCarriesTheUnharvestedKindZero` still fails on a literal 0, so a real harvest miss is still caught.
+		public uint? Separator { get; set; }
 		public uint Sequence { get; set; } // the per-goal ordinal `N` (1, 2, ...)
 		public uint TrailingCategory { get; set; }
 

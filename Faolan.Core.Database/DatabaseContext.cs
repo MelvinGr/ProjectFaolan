@@ -87,6 +87,7 @@ namespace Faolan.Core.Database
 		DbSet<PatrolNodeWord> PatrolNodeWords { get; }
 		DbSet<WorldObjectWord> WorldObjectWords { get; }
 		DbSet<QuestLine> QuestLines { get; }
+		DbSet<QuestLineReward> QuestLineRewards { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
 		DbSet<QuestTextRef> QuestTextRefs { get; }
@@ -182,6 +183,7 @@ namespace Faolan.Core.Database
 		public DbSet<PatrolNodeWord> PatrolNodeWords { get; set; }
 		public DbSet<WorldObjectWord> WorldObjectWords { get; set; }
 		public DbSet<QuestLine> QuestLines { get; set; }
+		public DbSet<QuestLineReward> QuestLineRewards { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
 		public DbSet<QuestTextRef> QuestTextRefs { get; set; }

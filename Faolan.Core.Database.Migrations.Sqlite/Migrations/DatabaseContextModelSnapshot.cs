@@ -2758,7 +2758,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Level")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("MapId")
+                    b.Property<uint?>("MapId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("MarkerX")
@@ -2766,6 +2766,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Property<uint>("MarkerY")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
 
                     b.Property<uint?>("NextQuestId")
                         .HasColumnType("INTEGER");
@@ -2853,6 +2857,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("MarkerY")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Name")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
                     b.Property<uint>("ObjectiveCategory")
                         .HasColumnType("INTEGER");
 
@@ -2864,6 +2872,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("Partial")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Phase")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("QuestDefinitionId")
@@ -2891,7 +2902,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
-                    b.Property<uint>("Separator")
+                    b.Property<uint?>("Separator")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("Sequence")
@@ -2945,6 +2956,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("QuestLineId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("FirstQuestId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("LastQuestId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("Magic")
                         .HasColumnType("INTEGER");
 
@@ -2952,6 +2969,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("MapRefId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint?>("PrevQuestLineId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("RegionCategory")
@@ -2963,6 +2987,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("TableField1")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("Tier")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("TitleCategory")
                         .HasColumnType("INTEGER");
 
@@ -2972,6 +2999,28 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasKey("QuestLineId");
 
                     b.ToTable("QuestLines");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.QuestLineReward", b =>
+                {
+                    b.Property<uint>("QuestLineId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Pos")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("ItemTemplateId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Optional")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("RewardType")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("QuestLineId", "Pos");
+
+                    b.ToTable("QuestLineRewards");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestTextRef", b =>
@@ -4751,9 +4800,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
                         .WithMany()
-                        .HasForeignKey("MapId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("MapId");
 
                     b.HasOne("Faolan.Core.Database.Tables.QuestLine", "Line")
                         .WithMany("Quests")
@@ -4956,6 +5003,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Navigation("TitleKey")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.QuestLineReward", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.QuestLine", "Line")
+                        .WithMany("Rewards")
+                        .HasForeignKey("QuestLineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Line");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestTextRef", b =>
@@ -5365,6 +5423,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestLine", b =>
                 {
                     b.Navigation("Quests");
+
+                    b.Navigation("Rewards");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Realm", b =>

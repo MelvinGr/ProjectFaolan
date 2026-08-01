@@ -138,7 +138,7 @@
 									<td>
 										<input class="n" @bind="g.RequiredCount"/>
 									</td>
-									<td class="ro kind">@KindLabel(g.Separator)</td>
+									<td class="ro kind">@(g.Separator is { } k ? KindLabel(k) : "—")</td>
 									<td>
 										<input class="n" @bind="g.MapId" placeholder="—"/>
 									</td>
