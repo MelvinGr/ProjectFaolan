@@ -62,7 +62,7 @@ namespace Faolan.GameServer.World
 			// rather than a silent failure.
 			var ground = _sim.Terrain?.GroundHeight(victim.MapId, to.X, to.Z);
 			if (ground is { } y)
-				to = new Vector3(to.X, y, to.Z);
+				to = to with { Y = y };
 			else if (_sim.Terrain is { Available: true })
 				_logger.LogDebug("Knockback: no ground height at ({X:F1}, {Z:F1}) on map {Map}; leaving the destination unsnapped.", to.X, to.Z, victim.MapId);
 

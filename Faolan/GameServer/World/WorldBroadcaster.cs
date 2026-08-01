@@ -849,7 +849,7 @@ namespace Faolan.GameServer.World
 				// better answer: the creature was demonstrably standing there.
 				var dropPos = deadNpc.Position;
 				if (_sim.Terrain?.GroundHeight(deadNpc.MapId, deadNpc.Position.X, deadNpc.Position.Z) is { } groundY && MathF.Abs(groundY - deadNpc.Position.Y) <= MaxLootGroundSnap)
-					dropPos = new Vector3(deadNpc.Position.X, groundY, deadNpc.Position.Z);
+					dropPos = deadNpc.Position with { Y = groundY };
 
 				var bag = await SpawnLootBagAt(deadNpc.MapId, deadNpc.InstanceId, dropPos, deadNpc.Rotation, items, cash, deadNpc.LastAttackerHandle ?? 0, deadNpc.Name, deadNpc.LootContainer);
 				_logger.LogInformation(

@@ -125,13 +125,19 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		private bool HasCollisionLineOfSight(uint mapId, Vector3 from, Vector3 to)
+		private bool HasCollisionLineOfSight(uint mapId, Vector3 fromm, Vector3 to)
 		{
 			if (!_collision.TryGetValue(mapId, out var col))
 				return true;
 
-			var eyeFrom = new Vector3(from.X, from.Y + EyeHeight, from.Z);
-			var eyeTo = new Vector3(to.X, to.Y + EyeHeight, to.Z);
+			var eyeFrom = fromm with
+			{
+				Y = fromm.Y + EyeHeight
+			};
+			var eyeTo = to with
+			{
+				Y = to.Y + EyeHeight
+			};
 			return !col.SegmentBlocked(eyeFrom, eyeTo);
 		}
 
