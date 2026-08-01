@@ -1623,7 +1623,7 @@ namespace Faolan.Importer.Captures
 			quest.IndexTableField2 = 7;
 			quest.IndexTableField3 = 0;
 			quest.IndexTrailerWord = 0x000156E7;
-			quest.IndexGoalSteps = "10238,12369,12373,10320,12371,10286,10287,10915";
+			quest.IndexAreaQuestIds = "10238,12369,12373,10320,12371,10286,10287,10915";
 
 			// Overlay the two goals' full @609 detail (find-or-create by GoalId): the extractor may have already emitted
 			// goal 1448 as the harvested PRIMARY goal (wire fields only) - this completes it and adds goal 3490 - so the
@@ -1765,7 +1765,7 @@ namespace Faolan.Importer.Captures
 			quest.IndexTableField1 = 1;
 			quest.IndexTableField2 = 3;
 			quest.IndexTableField3 = 0;
-			quest.IndexGoalSteps = "13479,13563,13480,12407";
+			quest.IndexAreaQuestIds = "13479,13563,13480,12407";
 
 			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == 5744);
 			if (goal != null)

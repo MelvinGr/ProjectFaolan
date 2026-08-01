@@ -67,11 +67,21 @@ namespace Faolan.Core.Database.Tables
 		// improves; no code change is needed to widen coverage.
 		public bool ObjectiveRegionVerified { get; set; }
 
+		// The AREA's quest catalog - every quest of this quest's area, ordered by JournalSequence - as CSV. NOT this
+		// quest's goals and NOT its chain, both of which the old name "IndexGoalSteps" invited: quest 10238's list is
+		// area 241's eight quests at sequences 1-8, while its own goals are [1448,3490]; 13479's is area 1054's four.
+		// A fresh character with nothing completed carries the whole list, so it is static area data.
+		//
+		// ⚠️ Vestigial, and deliberately kept only as a FALLBACK: QuestIndexRegions.ForQuests prefers the catalog the
+		// caller loads from the DB (the area's quests, ordered by sequence) and reads this only when none was passed,
+		// which today is the two hand-seeded quests. Do not harvest it for more quests - the DB already derives it.
 		[MaxLength(128)]
-		public string? IndexGoalSteps { get; set; }
+		public string? IndexAreaQuestIds { get; set; }
 
-		// Quest index region: the W6QT goal-id table's marker + three lead words + trailer word, and the goal-step ids
-		// (CSV, the client's 1..n goal index). Beach 10238: marker 0x7E2, fields 1/7/0, trailer 0x156E7, 8 steps.
+		// Quest index region: the area table's marker + three lead words + trailer word. Beach 10238: marker 0x7E2,
+		// fields 1/7/0, trailer 0x156E7, and area 241's 8 quests as the table body (see IndexAreaQuestIds - the body is
+		// the AREA CATALOG, not "the client's 1..n goal index", which is what this said until the list was checked
+		// against the area's own rows).
 		//
 		// IndexMagic is the AREA's `ACGHash` token, not a per-quest magic: the client reads it through `FUN_005d7190`,
 		// which only checks the four bytes are `[0-9A-Z_]` (see docs/re/questc-region-decode.md). Area 241 = "W6QT",
@@ -148,8 +158,8 @@ namespace Faolan.Core.Database.Tables
 
 		// The Quest_c record's @+0x2c - the first quest of the SERIES this one belongs to, which is the quest's own id
 		// for a standalone quest (84 of the 99 captured records) and an earlier step of the same chain for the rest:
-		// 10915 and 12371 both carry 10238, the beach starter, and both appear in ITS IndexGoalSteps list; 12068 carries
-		// 12067; 13986 carries 13984. Harvested, never derived - only the HEAD carries IndexGoalSteps, so a member has
+		// 10915 and 12371 both carry 10238, the beach starter, and both appear in ITS IndexAreaQuestIds list; 12068 carries
+		// 12067; 13986 carries 13984. Harvested, never derived - only the HEAD carries IndexAreaQuestIds, so a member has
 		// nothing locally that names its series, and NextQuestId gives successors rather than the start (Gitea #566).
 		// 0 = never captured; the builder then falls back to the quest's own id, which is right for a standalone quest
 		// and is what we emitted for everything before this column existed.

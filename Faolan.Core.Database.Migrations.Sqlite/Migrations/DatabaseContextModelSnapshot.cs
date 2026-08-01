@@ -2767,7 +2767,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<bool>("HasSnapshotRecord")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("IndexGoalSteps")
+                    b.Property<string>("IndexAreaQuestIds")
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 

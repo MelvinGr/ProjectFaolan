@@ -40,7 +40,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 				var catalogIds = catalog != null
 					? catalog.Select(d => d.QuestId).ToList()
-					: ParseGoalSteps(q.IndexGoalSteps);
+					: ParseAreaQuestIds(q.IndexAreaQuestIds);
 
 				blocks.Add(new QuestIndexRegion.Block
 				{
@@ -92,7 +92,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			};
 		}
 
-		public static List<uint> ParseGoalSteps(string? csv)
+		public static List<uint> ParseAreaQuestIds(string? csv)
 		{
 			return [.. (csv ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Select(uint.Parse)];
 		}
