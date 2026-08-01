@@ -163,7 +163,7 @@ namespace Faolan.Core.Database.Tables
 		// the World-Boss Mastery meta. The client has a `MainQuest_c` distinct from `Quest_c`, so bit 10 selecting
 		// that flavour is the natural read - but it is NOT proven: the catalog's own `MainQuest.type`, which would
 		// have named it, is 0 on all 2181 rows. Bits 3 and 4 remain open ("expansion", "repeatable" and "group" are
-		// each ruled out by counterexamples - see the handoff and Gitea #569).
+		// each ruled out by counterexamples - see the handoff and Gitea #570).
 		public uint SnapshotQuestLineFlags { get; set; }
 
 		// @+0x28 - a reward magnitude carried on the LAST step of a quest line. What is proven is its POSITION, not

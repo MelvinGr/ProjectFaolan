@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Rdb
 {
-	// The client's own quest catalog, RDB type 1000104 (#568) - see docs/rdb/quest-catalog-1000104.md.
+	// The client's own quest catalog, RDB type 1000104 (#569) - see docs/rdb/quest-catalog-1000104.md.
 	//
 	// This is the DEFINITION side of the quest system. Everything the DB held before came from CAPTURES, so it covered
 	// exactly the quests some captured character happened to hold or complete; the catalog covers the whole game and

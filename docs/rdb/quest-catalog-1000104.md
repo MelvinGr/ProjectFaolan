@@ -1,5 +1,7 @@
 # RDB 1000104 — `RDBQUESTGIVERS`, the client's quest catalog
 
+<!-- Gitea #569 (the catalog) · #570 (the still-unnamed @+0x14 bits) -->
+
 The client ships its whole quest catalog as one RDB entry: **type `1000104`, id 0**, 728,765 bytes
 decompressed. It is a **12-byte RDB header followed by a raw `QuestGiverList` protobuf** — the schema this
 repo already carried in [`Faolan.Core/Protobuf/aoc-client-protos.proto`](../../Faolan.Core/Protobuf/aoc-client-protos.proto)

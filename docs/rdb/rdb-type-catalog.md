@@ -53,7 +53,7 @@ fields (compressed on-disk bytes).
 | 1000099 | World-data export (spawn/dynel)? | 1 | 1 | 0 | 9.7 KB |
 | 1000102 | Structure/asset name index | 743 | 231 | 512 | 6.5 KB |
 | 1000103 | STATICAIPOINTS2 | 652 | 0 | 652 | 37.8 KB |
-| 1000104 | * RDBQUESTGIVERS — the QUEST CATALOG (`QuestGiverList` protobuf; #568) | 1 | 1 | 0 | 332.4 KB |
+| 1000104 | * RDBQUESTGIVERS — the QUEST CATALOG (`QuestGiverList` protobuf; #569) | 1 | 1 | 0 | 332.4 KB |
 | 1000105 | Playfield/zone metadata (protobuf) | 1 | 1 | 0 | 17 B |
 | 1000107 | Playfield/zone metadata (protobuf) | 1 | 1 | 0 | 16 B |
 | 1000108 | Playfield/zone metadata (protobuf) | 1 | 1 | 0 | 62.0 KB |

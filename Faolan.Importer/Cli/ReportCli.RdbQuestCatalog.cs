@@ -7,7 +7,7 @@ using Faolan.Core.Rdb;
 
 namespace Faolan.Importer.Cli
 {
-	// `--report rdb-quest-catalog` - the client's own quest catalog, RDB type 1000104 (#568).
+	// `--report rdb-quest-catalog` - the client's own quest catalog, RDB type 1000104 (#569).
 	//
 	// This is the `RDBQUESTGIVERS` data table the client prints at startup: a 12-byte RDB header followed by a raw
 	// `QuestGiverList` protobuf, whose schema this repo already carried in `Faolan.Core/Protobuf` but had never read.

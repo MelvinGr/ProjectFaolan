@@ -17,7 +17,7 @@ namespace Faolan.Core.Database.Tables
 	// Quest's chapters, which are ONE line among the 2181.
 	//
 	// Harvested from the completed-quest journal of captured snapshots (CompletedQuestJournalRegion, Gitea #390),
-	// which is the only place the line's goal-table name word appears; the catalog fills in the rest (#568).
+	// which is the only place the line's goal-table name word appears; the catalog fills in the rest (#569).
 	public class QuestLine
 	{
 		// The line's text id - the same id its <remoteformat category="50300"> title record carries, what
