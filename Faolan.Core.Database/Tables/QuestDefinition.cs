@@ -139,7 +139,11 @@ namespace Faolan.Core.Database.Tables
 		//   * @+0x28 and @+0xf0 are near-mutually-exclusive - a quest carries one or the other, never both, with a
 		//     single exception (13479 carries 80 in both);
 		//   * @+0xf8 is non-zero only where @+0xf0 is, and runs ~10-37% of it - so F0/F8 read as a pair.
-		// Named for their offsets until something pins WHICH quantity: nothing in the captures labels them.
+		// Named for their offsets until something pins WHICH quantity: nothing in the captures labels them, and a
+		// static RE pass could not either (docs/re/questc-region-decode.md) - the client's writer emits them with no
+		// per-field assert to name them. That pass also found `QuestRewardNotifyIIR_c` and
+		// `QuestRewardSelectionIIR_c`, i.e. rewards have their OWN messages, which is evidence against the otherwise
+		// tempting reading of these as a reward carried on the journal record.
 		public uint SnapshotUnknown28 { get; set; }
 
 		// @+0xec: 1 in every one of the 99 captured records - no quest varies it. Kept as a column rather than a

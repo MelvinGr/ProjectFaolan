@@ -164,3 +164,43 @@ Reading a progressed journal was never blocked by a spec or a corpus — the str
 decoded, just attributed to the wrong owner. The lesson is the recurring one: **a grammar pinned only by the
 single-element/degenerate capture is not pinned**, and a "constant" that appears once per record is worth
 checking against a second capture before calling it a magic.
+
+## Static RE pass on the record's unnamed fields (2026-08-01)
+
+What the client can and cannot tell us about `@+0x14`, `@+0x28`, `@+0xf0`, `@+0xf8` and `@+0x11c`. The short
+answer: the STRUCTURE is confirmed from both sides, and the NAMES are not in the binary — anyone continuing
+this should trace a consumer, not hunt for another string.
+
+**The class.** RTTI is intact: the type descriptor `.?AVQuest_c@@` is at `021cf360`, its complete-object
+locator at `020dc260`, and the vtable at `01fdfd18` — only three virtuals (`FUN_0091d090`, `FUN_0091ce50`,
+`FUN_0091ce60`). Its source file is `quest.cpp`; the record's string pool sits right after the vtable.
+
+**Reader and writer agree with our codec.** `FUN_0091df50` reads the record and `FUN_0091d260` writes it back
+(the byte-swap-then-emit pattern), and between them they touch exactly the offsets `QuestcRecordCodec` models,
+in the order it reads them — including `@+0x20`/`@+0x24` and `@+0xf8`/`@+0xfc` as the two u64 pairs. The reader
+is NOT virtual (no pointer to it exists anywhere in the image) and has exactly two callers, `FUN_0091f5c0` and
+`FUN_00917e20`, both thin parse-loop wrappers that never touch the fields.
+
+**Why the names are not recoverable by string anchor.** The writer is label-free — it emits scalars with no
+per-field assert, unlike e.g. `DispatchSetQuestMarker`, whose asserts name `i_cNPC` and `i_eMarker`. The quest
+module's string pool names plenty of METHODS and one member, but nothing on this record:
+
+| string | what it gives |
+|---|---|
+| `QuestHolder_t::UpdateCurrentProgress() m_pcCurrentQuest is NULL.` | the holder class + its member |
+| `QuestGoal_c::SetParent()` / `SetSolvedTimes()` / `GetQuestLevel()` | goal API; "SolvedTimes" is the goal's progress count |
+| `QuestGoal_c::GetQuestLevel() … Returning Stat value` / `Returning Quest value` | the goal's level resolves from a STAT first, the quest second |
+| `MainQuest_c::WriteToStream` | `mainquest.cpp` is a separate class from `quest.cpp` |
+| `QuestRewardNotifyIIR_c`, `QuestRewardSelectionIIR_c` | rewards have their OWN IIRs |
+| `QuestJournalIIR_c::ReadSubClass()`, `PatrolIIR_c`, `RDBQuestGivers` | neighbouring subsystems |
+
+Two of those bear on the open question directly. Rewards being delivered by their own IIRs is evidence
+AGAINST reading the level-scaled `@+0x28`/`@+0xf0`/`@+0xf8` as a reward carried on the journal record — it is
+still the best fit for their magnitudes, but the client does not obviously need them there. And
+`GetQuestLevel()` returning "the Stat value" or "the Quest value" says a goal's level has two sources, which is
+the kind of level-adjacent pairing `@+0x118` (level..level+5) already hints at.
+
+**Exhausted anchors, so don't repeat them:** the vtable (3 slots, none of them a getter), the reader's callers,
+a whole-image scan for `[reg + 0xf0]` (778 functions — the offset is far too common to filter on), and the
+module's strings. What is left is the semantic route: follow a parsed record from `FUN_0091f5c0` into the
+journal UI and find the code that formats these words for display.
