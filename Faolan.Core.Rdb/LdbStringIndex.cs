@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using Faolan.Core.Extensions;
 
@@ -117,6 +118,45 @@ namespace Faolan.Core.Rdb
 			return body.Length < 48 || body[12..].ReadU32Le(0) != Magic
 				? 0u
 				: body[12..].ReadU32Le(8);
+		}
+
+		// (category, id) -> the finished string, over the ENGLISH pages of the PLAINTEXT categories - roughly half the
+		// LDB (52000 regions, 51200 bounded_areas, 51000 npc_template, 50200/50201 item, 55000 simpledynels, ...).
+		// A <remoteformat>/typed reference into one of these carries no key and needs none, so resolving it is a
+		// dictionary lookup once this walk has run (#561).
+		//
+		// Both filters are the page's OWN statement rather than something sniffed from the text. The language comes
+		// from the client's language records (whole pages ship untranslated, so a text sniffer unions several
+		// languages and silently yields French), and `flags` is the header's encryption bit, whose set is exactly the
+		// eleven encrypted categories EncryptedLdbBlobs owns.
+		public static Dictionary<(uint Category, uint Id), string> EnglishPlaintext(RdbReader rdb)
+		{
+			var language = LdbLanguageIndex.LanguageByPage(rdb);
+			var strings = new Dictionary<(uint, uint), string>();
+
+			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(x => x.IsLocal))
+			{
+				if (!language.TryGetValue(e.Id, out var lang) || lang != LdbLanguageIndex.English)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue; // not a readable record (CDN-only / not zlib)
+				}
+
+				if (CategoryOf(body) == 0 || FlagsOf(body) == 1)
+					continue; // not a TDC2 page, or an ENCRYPTED one
+
+				foreach (var entry in Parse(body))
+					strings[(entry.Category, entry.Id)] = entry.Value;
+			}
+
+			return strings;
 		}
 
 		public readonly record struct Entry(uint Category, uint Id, string Value);

@@ -328,35 +328,13 @@ namespace Faolan.Importer.Cli
 		// Kept as its OWN walk rather than folded into EncryptedLdbBlobs, which would hand every existing caller a
 		// second dictionary it does not want: the plaintext side includes the item-name category, ~100k strings, and
 		// --report ldb-quest-text has no use for them. The cost is one extra pass for the one report that wants both.
+		//
+		// The walk itself lives on LdbStringIndex, because the importer wants it too (RdbQuestGoalTargetImporter) and
+		// this is the RDB grammar's own concern, not a report's.
 		internal static Dictionary<(uint Category, uint Id), string> PlaintextLdbStringsFor(string rdbDir)
 		{
 			using var rdb = new RdbReader(rdbDir);
-			var language = LdbLanguageIndex.LanguageByPage(rdb);
-			var strings = new Dictionary<(uint, uint), string>();
-
-			foreach (var e in rdb.EntriesOfType(LdbLanguageIndex.PageType).Where(x => x.IsLocal))
-			{
-				if (!language.TryGetValue(e.Id, out var lang) || lang != LdbLanguageIndex.English)
-					continue;
-
-				byte[] body;
-				try
-				{
-					body = rdb.ReadDecompressed(e);
-				}
-				catch
-				{
-					continue; // not a readable record (CDN-only / not zlib)
-				}
-
-				if (LdbStringIndex.CategoryOf(body) == 0 || LdbStringIndex.FlagsOf(body) == 1)
-					continue; // not a TDC2 page, or an ENCRYPTED one (EncryptedLdbBlobs owns those)
-
-				foreach (var entry in LdbStringIndex.Parse(body))
-					strings[(entry.Category, entry.Id)] = entry.Value;
-			}
-
-			return strings;
+			return LdbStringIndex.EnglishPlaintext(rdb);
 		}
 
 		private static Dictionary<(uint Category, uint Id), byte[]> EncryptedLdbBlobs(string rdbDir)

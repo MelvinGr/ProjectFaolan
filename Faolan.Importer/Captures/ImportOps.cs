@@ -1649,6 +1649,7 @@ namespace Faolan.Importer.Captures
 			{
 				goal2.GoalType = QuestGoalType.Kill;
 				goal2.TargetName = "Saddur";
+				goal2.GatesTargetVisibility = true; // one-time story target: hidden until 10238 is active, stays dead
 			}
 
 			await db.SaveChangesAsync();
@@ -1687,7 +1688,9 @@ namespace Faolan.Importer.Captures
 		private static async Task SeedCasildaChain(DatabaseContext db)
 		{
 			await Chain(db, 13479, 13563);
-			await SeedGoal(db, 13479, 5744, QuestGoalType.Kill, "Scavenger Tuut", required: 1);
+			// gatesVisibility: Tuut is a one-time story target - hidden until 13479 is active, and he stays dead
+			// (retail solo-instances him). The only kill goal besides Saddur that gets it; see GatesTargetVisibility.
+			await SeedGoal(db, 13479, 5744, QuestGoalType.Kill, "Scavenger Tuut", required: 1, gatesVisibility: true);
 			// The loot stage's key item: Scavenger Tuut's bag drops 319224 "Scavenger's Key" (#261), so the player sees
 			// and takes the actual key, not just an empty source-matched bag.
 			await Chain(db, 13563, 13480);
@@ -1764,7 +1767,8 @@ namespace Faolan.Importer.Captures
 		// BOOTSTRAP-ONLY (#262): only configures an UN-WIRED goal (still the fresh-harvest default: GoalType Kill, no
 		// TargetName/QuestItemId), so a re-import never clobbers trigger fields set by hand (the Quest editor) or a prior
 		// run. A newly-created goal is un-wired, so a fresh import still bootstraps.
-		private static async Task SeedGoal(DatabaseContext db, uint questId, uint goalId, QuestGoalType type, string? target = null, uint? questItemId = null, uint? required = null)
+		private static async Task SeedGoal(DatabaseContext db, uint questId, uint goalId, QuestGoalType type, string? target = null, uint? questItemId = null,
+			uint? required = null, bool gatesVisibility = false)
 		{
 			var quest = await db.QuestDefinitions.Include(q => q.Goals).FirstOrDefaultAsync(q => q.QuestId == questId);
 			if (quest == null)
@@ -1787,6 +1791,9 @@ namespace Faolan.Importer.Captures
 			goal.GoalType = type;
 			goal.TargetName = target;
 			goal.QuestItemId = questItemId;
+			// Editorial, and off by default: a one-time story target hides until its quest is active and stays dead.
+			// See QuestGoalDefinition.GatesTargetVisibility for why this is never derived from having a TargetName.
+			goal.GatesTargetVisibility = gatesVisibility;
 			if (required is { } r)
 				goal.RequiredCount = r;
 			if (goal.Sequence == 0)

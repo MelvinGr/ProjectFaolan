@@ -274,13 +274,17 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.NpcSpells.Where(s => s.NpcTemplate.Name.ToLower() == lowered).ToArrayAsync();
 		}
 
+		// NPC name -> the quest ids that reveal it (#261). ⚠️ Membership is the goal's own GatesTargetVisibility flag,
+		// NOT "a Kill goal that happens to carry a TargetName". The gate keys on the NAME and forces NoRespawn, so
+		// implying it from the target made every mechanically-resolved kill target (#521) hide its whole population and
+		// stop respawning - see QuestGoalDefinition.GatesTargetVisibility for the quest that broke.
 		public async Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var givers = (await ctx.ConversationNodes.Where(n => n.GrantQuestId > 0).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet();
 
 			var killTargets = await ctx
-				.QuestGoalDefinitions.Where(g => g.GoalType == QuestGoalType.Kill && g.TargetName != null && g.TargetName != "")
+				.QuestGoalDefinitions.Where(g => g.GatesTargetVisibility && g.TargetName != null && g.TargetName != "")
 				.Join(ctx.QuestDefinitions, g => g.QuestDefinitionId, d => d.QuestId, (g, d) => new
 				{
 					g.TargetName,

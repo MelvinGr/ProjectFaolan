@@ -2866,6 +2866,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("Extra6")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("GatesTargetVisibility")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("GoalIdEcho")
                         .HasColumnType("INTEGER");
 

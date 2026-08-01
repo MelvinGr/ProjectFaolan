@@ -237,6 +237,68 @@ namespace Faolan.Tests
 			Assert.Equal((uint)QuestGoalKind.Kill, goals.Single(g => g.GoalId == 3490).Separator);
 		}
 
+		// Every goal whose trailing reference is an npc_template (LDB category 51000) names its target, and where we
+		// hold that template the name is the CATALOG's - i.e. the exact string the runtime compares against
+		// (QuestProgress.MatchingKillGoal's name fallback, ComputeGiverMarkerState).
+		//
+		// The distinction is the whole point of #521's work item 1. LDB[51000] is keyed by template id and carries the
+		// client's own name, but 27 of our 1,018 templates were captured under the shared placeholder `Halen van
+		// Dummy`, and for those the LDB's real name would look resolved and never match. So the catalog wins wherever
+		// it exists; the LDB fills only the templates we do not hold, which are inert until their map is imported.
+		[Fact]
+		public async Task NpcGoals_NameTheirTargetWithTheCatalogsOwnName()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var goals = await db.QuestGoalDefinitions.Where(g => g.TrailingCategory == 51000 && g.TrailingRefId > 0).ToListAsync(ct);
+			Assert.True(goals.Count >= 24, $"only {goals.Count} npc-referencing goals - the harvest carries 24.");
+
+			var unnamed = goals.Where(g => string.IsNullOrEmpty(g.TargetName)).Select(g => g.GoalId).ToList();
+			Assert.True(unnamed.Count == 0, $"npc-referencing goals with no TargetName: {string.Join(", ", unnamed)}");
+
+			var templates = await db.NpcTemplates.ToDictionaryAsync(t => t.TemplateId, t => t.Name, ct);
+			foreach (var g in goals)
+			{
+				if (templates.TryGetValue(g.TrailingRefId, out var stored))
+					Assert.Equal(stored, g.TargetName);
+			}
+		}
+
+		// A quest-gated kill target must be killable ENOUGH TIMES to finish its goal. The gate forces NoRespawn (a
+		// story target stays dead), so the world has to hold at least `RequiredCount` spawns of that name - otherwise
+		// the goal sticks one short with nothing left alive and the quest is permanently uncompletable.
+		//
+		// ⚠️ This is the gate on the bug #521 surfaced, not a hypothetical. Membership used to be DERIVED from "a Kill
+		// goal that has a TargetName", which was true of the only two goals ever wired (Saddur, Scavenger Tuut - both
+		// unique) and false the moment the target names were filled mechanically: quest 12057 asks for 9 Vanir Polluter
+		// kills against 8 spawns in the world. `GatesTargetVisibility` is now an explicit, hand-set column, and this
+		// asserts the property that makes setting one safe rather than the current membership.
+		[Fact]
+		public async Task GatedKillTargets_HaveEnoughSpawnsToFinishTheGoal()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var gated = await db.QuestGoalDefinitions.Where(g => g.GatesTargetVisibility).ToListAsync(ct);
+			Assert.NotEmpty(gated); // the two story targets; an empty set would mean the flag was lost, not that it is unused
+
+			var spawnsByName = await db
+				.NpcSpawns.GroupBy(s => s.NpcTemplate.Name)
+				.Select(grp => new { Name = grp.Key, Count = grp.Count() })
+				.ToDictionaryAsync(x => x.Name, x => x.Count, ct);
+
+			foreach (var g in gated)
+			{
+				Assert.False(string.IsNullOrEmpty(g.TargetName), $"goal {g.GoalId} gates visibility but names no target");
+				var spawns = spawnsByName.GetValueOrDefault(g.TargetName!, 0);
+				var needed = Math.Max(1, (int)g.RequiredCount);
+				Assert.True(spawns >= needed,
+					$"goal {g.GoalId} (quest {g.QuestDefinitionId}) needs {needed} kill(s) of '{g.TargetName}' but the world holds {spawns} spawn(s), " +
+					"and a gated target does not respawn - the quest can never complete.");
+			}
+		}
+
 		// ⚠️ NO SHIPPED GOAL CARRIES KIND 0, because the wire never sends one (#548). `QuestGoalKind` used to declare
 		// `Untargeted = 0` on the strength of 11 rows holding it - which were not a kind at all but the importer's
 		// un-harvested default: the full-update path set `Separator` nowhere, so every goal the corpus only ever

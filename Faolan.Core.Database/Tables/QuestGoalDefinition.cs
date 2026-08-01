@@ -110,6 +110,21 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? TargetName { get; set; }
 
+		// TRUE when killing this goal's target is a ONE-TIME STORY event, which makes that NPC quest-GATED: it is
+		// streamed only to a player holding this quest active, and it does not respawn once killed
+		// (DatabaseRepository.GetQuestGatedNpcMap -> WorldEntity.GateQuestIds / NoRespawn, #261). Saddur and Scavenger
+		// Tuut are the two, and retail solo-instances both.
+		//
+		// ⚠️ This used to be IMPLIED by "a Kill goal that has a TargetName", which held for the only two such goals ever
+		// wired and is false in general (#521). Two reasons it had to become a column:
+		//   - the gate keys on the NAME, so it hides EVERY same-named NPC from every player not on that quest;
+		//   - it forces NoRespawn, so a goal asking for N kills is capped at however many spawns the world holds.
+		// Quest 12057 asks for 9 Vanir Polluter kills and the world holds 8 spawns, so the implied rule turned the
+		// mechanical TargetName fill this issue asks for into a PERMANENTLY uncompletable quest - a goal stuck at 8/9
+		// with nothing left alive. Whether a kill target is a unique story NPC or a population mob is an editorial call
+		// the client's data does not state anywhere we can read, so it is a hand-set column, never a rule.
+		public bool GatesTargetVisibility { get; set; }
+
 		// A PRECONDITION the client states in the goal's own objective text, decoded with it (#520). Two shapes exist in
 		// the corpus and both are recorded even though only one can be enforced yet:
 		//

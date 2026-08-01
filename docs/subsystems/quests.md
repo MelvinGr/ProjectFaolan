@@ -89,6 +89,24 @@ And it found `10`, `24` and `25` — three values the enum did not have at all.
 All 107 resolve. That reference is the target, so `TargetName` is mostly a label: kill goals already match on the
 template id and only fall back to the name.
 
+**The `51000` half fills `TargetName` mechanically** (`RdbQuestGoalTargetImporter`), and which source it takes
+from is load-bearing. `LDB[51000]` is keyed by template id, so the goal names its target twice — as an id and as a
+plaintext string — and the two id spaces line up: all 1,018 `NpcTemplates` have an `LDB[51000]` entry and 991
+agree exactly with the name our captures recorded. The **27 that differ are all rows captured under the shared
+placeholder `Halen van Dummy`**, where the LDB carries the real name.
+
+`TargetName` is a *match key*, compared against the live entity's name — which is the captured one. So the
+**catalog wins wherever it exists**, and the LDB fills only the templates we do not hold (18 of the 24 goals,
+inert until their map is imported). Writing `Beggar` where the wire says `Halen van Dummy` would look resolved
+and silently never match.
+
+The other three categories are deliberately not written into it: an item name in a column the kill matcher reads
+as an NPC name makes it hunt a mob called *Stolen Goods*; `51100` resolves to editor **group** names (`Watch`,
+`Undeads`, `Posha's men`) matching no NPC; and `51200` is a region, whose geometry is already `RegionId`.
+
+`--report quest-goal-targets` is the evidence path — every goal's trailing reference resolved, with the
+per-category agreement rate against the catalogs the runtime actually matches against.
+
 **The goal's own objective TEXT is readable** (as of #520). Every goal's `ObjectiveCategory` is `50304`
 (`quest_goal_templates.goal_name`) with `ObjectiveRefId == GoalId`. That category is one of eleven **encrypted**
 LDB categories, and the key is the `key=` attribute the server sends alongside the reference — stored on the goal
@@ -176,6 +194,23 @@ Shabaka. A `LIKE` match reads as a hit and wires the goal to the wrong NPC on th
 ⚠️ Two goals are deliberately **excluded** from the rule: 11880 and 11881 carry a **rank precondition** in their
 text (*"Give Note of Recommendation to Itsing When You Have Become an Acolyte (Rank 1)"*), so a bare talk trigger
 would complete them early. They need the rank gate first.
+
+### A gated kill target is an editorial call, never a rule
+
+Some kill targets are one-time story NPCs: they are streamed only to a player holding the quest active, and they
+do not respawn once killed (`WorldEntity.GateQuestIds` / `NoRespawn`, fed by
+`DatabaseRepository.GetQuestGatedNpcMap`). Saddur and Scavenger Tuut are the two, and retail solo-instances both.
+
+Membership is the goal's own **`GatesTargetVisibility`** column, set by hand. It used to be *derived* from "a
+`Kill` goal that has a `TargetName`", which was true of the only two goals ever wired and false in general — the
+gate keys on the **name**, so it hides every same-named NPC in the world, and it forces `NoRespawn`, which caps a
+goal at however many spawns exist. Filling the target names mechanically therefore turned quest 12057 (*kill 9
+Vanir Polluters*, 8 spawns in the world) into a permanently uncompletable quest, stuck at 8/9 with nothing left
+alive.
+
+Whether a target is a unique story NPC or a population mob is not stated anywhere in the client data we can read,
+so it is a column and not a rule. `SeedContentTests.GatedKillTargets_HaveEnoughSpawnsToFinishTheGoal` asserts the
+property that makes setting one safe, rather than the current membership.
 
 ### A delivery checks that the player is carrying the goods
 

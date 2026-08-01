@@ -75,6 +75,14 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB (plaintext LDB) + DB (the goal catalog), no corpus: what each goal's TRAILING typed reference resolves
+			// to, and whether that string can serve as the match key `TargetName` is (#521).
+			if (report == "quest-goal-targets")
+			{
+				await QuestGoalTargets(RdbDir());
+				return 0;
+			}
+
 			// The NPC-dialogue half of the same encrypted set (categories 50000-50003); --report-arg filters by NPC name.
 			if (report == "ldb-dialogue")
 			{
@@ -588,7 +596,7 @@ namespace Faolan.Importer.Cli
 
 				default:
 				{
-					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets, ldb-strings, ldb-resolve, ldb-quest-text, bounded-areas.");
+					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets, ldb-strings, ldb-resolve, ldb-quest-text, quest-goal-targets, bounded-areas.");
 					return 1;
 				}
 			}
