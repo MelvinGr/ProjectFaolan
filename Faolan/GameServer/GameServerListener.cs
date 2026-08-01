@@ -461,9 +461,15 @@ namespace Faolan.GameServer
 				Endpoints.TradepostAgentType => HandleTradepostPacket(client, packet, body),
 
 				// GameCharAgentProject ("post-ready family"): the in-world RequestAggroStatus poll GATES the loading
-				// screen (without the reply the client retries forever + never opens chat). Existing-character world login
-				// only - the create-editor/create-world flows own this class during their own handshake and must not divert.
-				Endpoints.GameCharAgentProjectType => client.Session is { EntryMode: WorldEntryMode.Login or WorldEntryMode.TeleportReentry, Character.Name: not null }
+				// screen (without the reply the client retries forever + never opens chat).
+				//
+				// Routed on EVERY connection role, create flows included (#564). It used to be gated to an existing
+				// character's world login, on the belief that "the create flows own this class during their own
+				// handshake" - they do not: the create-editor's handshake packets are on GameAgent, and what this
+				// gate actually dropped was the poll the client fires at the five editor scene characters as soon as
+				// they are streamed (before the name is committed). Retail answers those - 55/55 in
+				// account-stricken998-character-create-no-worldenter, 95/95 in Barbarian-create - so we do too.
+				Endpoints.GameCharAgentProjectType => client.Session.Character != null
 					? HandleGameCharAgentProject(client, packet, body)
 					: Task.CompletedTask,
 

@@ -35,7 +35,6 @@ namespace Faolan.Core.Network
 		// (sub 0x0003) resolves its 1-based index against a STABLE snapshot - "Claim All" fires one redeem per row
 		// using the original indices, and deleting rows as they redeem would otherwise shift every later index.
 		IReadOnlyList<uint>? ClaimSlots { get; set; }
-		List<uint> CreateEditorObservedRequestIds { get; }
 
 		List<uint> WeaveComponents { get; }
 		// Where the client PARKED the seated character. Null until the first move after sitting reports it - a bench has
@@ -90,8 +89,8 @@ namespace Faolan.Core.Network
 		// the TRANSIENT "the editor UI is active" question, distinct from EntryMode == CreateEditor (the role at
 		// auth): the create connection names the character mid-connection (CommitCharacterName), after which
 		// this flips to false while the MODE stays CreateEditor. Handshake steps that must behave
-		// differently before vs after the name is committed (the instance-echo route, the 0x205F create branch,
-		// the create-vs-login SendReadyForPlayScreen body) key on THIS, not the role flag.
+		// differently before vs after the name is committed (the 0x205F create branch, the create-vs-login
+		// SendReadyForPlayScreen body) key on THIS, not the role flag.
 		bool IsUnnamedCreatePhase { get; }
 		bool PostMorphBurstSent { get; set; }
 		bool SeatedHoldConfirmed { get; set; }
@@ -207,7 +206,6 @@ namespace Faolan.Core.Network
 		// The claim ids in the order last sent to this client (see the interface), so "Claim All"'s per-row redeems
 		// resolve their original 1-based index even as rows are deleted mid-batch.
 		public IReadOnlyList<uint>? ClaimSlots { get; set; }
-		public List<uint> CreateEditorObservedRequestIds { get; } = [];
 		public List<uint> WeaveComponents { get; } = [];
 
 		// The player's position at the moment they sat: standup only fires once they've moved away from it (the client

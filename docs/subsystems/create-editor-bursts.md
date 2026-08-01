@@ -30,17 +30,20 @@ Dissector: `CreateEditorRecordTests` (default-globs and validates across every `
 
 Every editor download is opcode `0x2000`, but `0x2000` is **not** one packet shape. It multiplexes by the
 `(SenderClass, ReceiverClass)` endpoint pair (the usual GameServer RPC-class multiplexing). On a create
-editor stream four distinct sub-protocols ride `0x2000`:
+editor stream these distinct sub-protocols ride `0x2000`:
 
 | Sender → Receiver class | meaning | framing |
 |---|---|---|
 | `b171ce13 → 6c67c147` (GameAgent → GameInterface) | **IIR carrier** | `[u32 len][u32 iirType][body]`, `len = 4 + len(body)` |
-| `5b9756fc → 28377648` | entity register (the `0x201c`-style handshake) | `[u32 0x0000C350][u32 handle][u32 value]` |
+| `28377648 → 5b9756fc` (c2s) | **`RequestAggroStatus`** — the client asking what colour a scene character's overhead name is | two ID32s: `[u32 0x0000C350][u32 self][u32 0x0000C350][u32 target]` |
+| `5b9756fc → 28377648` (s2c) | **`DispatchUpdateAggroStatus`** — the reply | `[u32 0x0000C350][u32 target][u32 cCategory]`, `cCategory` 0 friendly / 1 hostile / 2 neutral |
 | `604ddba0 → 0c384054` | server-id text token | `[u16 len][ascii hex token]` |
 | `6dd55614 → bbd560c8` | ack | `[u32 0x00000001]` |
 
 So the first filter is the class pair, **not** the opcode. Reading `body[4:8]` as an "iirType" on the wrong
-pair yields garbage that looks like entity handles (`0x0009FF9x`) — that was the initial red herring.
+pair yields garbage that looks like entity handles (`0x0009FF9x`) — that was the initial red herring, and the
+server fell for it too: the `RequestAggroStatus` poll was handled as a "create-editor instance echo" whose
+"subopcode" was the `self` id and whose "requestId" was the polled target, until it was retired in #564.
 
 ## 2. IIR record inventory (create-no-worldenter, 98 carrier records, 15 types)
 

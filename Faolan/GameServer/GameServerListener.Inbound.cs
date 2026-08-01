@@ -42,20 +42,6 @@ namespace Faolan.GameServer
 			var iirLength = body.ReadUInt32();
 			var iirType = body.ReadUInt32<IirTypes>();
 
-			// The shared `body` is now positioned PAST the [iirLength][iirType] prefix. The sub-handlers that continue
-			// reading (ScryScriptIIR -> HandleCommandPacket, the create-editor instance echo, and CoreClaim) read from
-			// this position directly - the streaming cursor that the old ConanPacket.Body shared and that the removed
-			// `subPacket` slice used to reconstruct (#407).
-
-			// During the create-editor handshake the client echoes its own instance id as the 0x2000 subopcode.
-			// Retail used a fixed id (0x021662C8, or Strie's 0x02165EFF); we hand out the character's real id, so
-			// the subopcode is dynamic - match it against the session instance and route it to the echo handler.
-			if (client.Session.IsUnnamedCreatePhase && client.Session.Account?.ClientInstance == (uint)iirType)
-			{
-				await HandleCreateEditorInstanceEcho(client, body);
-				return;
-			}
-
 			switch (iirType)
 			{
 				case IirTypes.CombatReactiveIIR:
@@ -153,8 +139,9 @@ namespace Faolan.GameServer
 					// any whose area this position falls in. In-memory distance test (targets cached on the entity).
 					if (moveEntity != null)
 						await CheckPlayerReachGoals(client, moveEntity, livePosition);
-						if (moveEntity != null)
-							await CheckPlayerApproachConversations(client, moveEntity, livePosition); // #523
+
+					if (moveEntity != null)
+						await CheckPlayerApproachConversations(client, moveEntity, livePosition); // #523
 
 					// #495/#504: the world's own damage sources. Fall damage lands HERE rather than on the world tick
 					// because a fall's size is only known on the record that reports the landing, and a hazard's client-
@@ -234,7 +221,7 @@ namespace Faolan.GameServer
 							// with the post-ready burst - 0x2024 + CharInPlayIIR + 0xF508F4C1 + the creation script
 							// (Blablatest necro create: client CharInPlayIIR at f90 -> server burst at f95).
 							Logger.LogInformation("Create-editor: CharInPlayIIR received; sending the retail post-ready burst to launch the editor.");
-							await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client, client.Session.CreateEditorObservedRequestIds);
+							await CreateFlowService.SendRetailCreateEditorPostReadyBurst(client);
 							break;
 						}
 
@@ -566,26 +553,6 @@ namespace Faolan.GameServer
 			}
 		}
 
-		// Handles the create-editor "instance echo": the client repeats its own client instance id as a 0x2000
-		// subopcode while the editor is loading. We count these to time the post-0x205F and post-ready bursts, 		// exactly as retail does, and ack standalone ones. (Retail used a fixed instance; we hand out the
-		// character's real id, so the matching is done dynamically by the caller.)
-		private async Task HandleCreateEditorInstanceEcho(INetworkClient client, FaolanStream body)
-		{
-			// The instance-echo carries [ack0][requestId]; read them directly (a short body throws, surfacing the
-			// unexpected shape, rather than being silently swallowed).
-			var ack0 = body.ReadUInt32();
-			var requestId = body.ReadUInt32();
-			Logger.LogInformation("Create-editor instance-echo decoded: ack0={Ack0:X}, requestId={RequestId:X}.", ack0, requestId);
-
-			if (!client.Session.CreateEditorObservedRequestIds.Contains(requestId))
-				client.Session.CreateEditorObservedRequestIds.Add(requestId);
-
-			// Retail just ACKs the client's create-editor instance-echoes (there is no special post-0x205F burst); the
-			// burst that actually launches the editor is sent on CharInPlayIIR.
-			Logger.LogInformation("Acknowledging create-editor instance-echo with requestId={RequestId:X}.", requestId);
-			await CreateFlowService.SendRetailCreateEditorPostReadyAck(client, requestId);
-		}
-
 		// GameAgent (connection-class) dispatch: auth / chat / ping / server-stats. Routed here by receiver class.
 		private async Task HandleGameAgentPacket(INetworkClient client, Rpc packet, FaolanStream body)
 		{
@@ -700,7 +667,6 @@ namespace Faolan.GameServer
 					}
 
 					client.Session.HasPendingPost205FFollowUp = false;
-					client.Session.CreateEditorObservedRequestIds.Clear();
 					client.Session.MorphAckCounter = 0;
 					client.Session.MorphActivitySequence = 0;
 					client.Session.PostMorphBurstSent = false;
@@ -1524,6 +1490,10 @@ namespace Faolan.GameServer
 			var player = _simulation.PlayerWorldEntity(client);
 			if (player != null && _simulation.World.ZoneForEntity(player).TryGet(targetInstance, out var target))
 				category = target.Disposition;
+			else if (CreateFlowService.EditorSceneDispositions.TryGetValue(targetInstance, out var editorCategory))
+				// The create-editor scene is a scripted burst, not a simulated zone, so its five characters are in no
+				// zone to resolve - their retail categories are carried with the burst instead (#564).
+				category = editorCategory;
 
 			await client.SendAsync(new Rpc(ExistingCharacterPostReadyReportServerIdSenderEndpoint, Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, instance),
 				UpdateAggroStatusCodec.Opcode, UpdateAggroStatusCodec.Build(new UpdateAggroStatus(request.Target, category))));

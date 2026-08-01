@@ -48,8 +48,8 @@ There are **two different questions** the handlers ask, and confusing them is wh
   `true` to `false` while the mode stays `CreateEditor`.
 
 So `IsUnnamedCreatePhase` implies the `CreateEditor` mode, but **not** the reverse. Handshake steps that must
-behave differently before vs after the name is committed (the instance-echo route, the `0x205F` create branch,
-the create-vs-login `SendReadyForPlayScreen` body) key on `IsUnnamedCreatePhase`. Steps that
+behave differently before vs after the name is committed (the `0x205F` create branch, the create-vs-login
+`SendReadyForPlayScreen` body) key on `IsUnnamedCreatePhase`. Steps that
 care about the connection's role for its whole life (which world entry to send; how `CharInPlayIIR` is routed)
 key on the mode. Both predicates live in one place — `NetworkClientSession.cs` — with the explanation.
 

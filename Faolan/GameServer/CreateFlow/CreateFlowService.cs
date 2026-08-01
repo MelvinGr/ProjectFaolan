@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -65,8 +66,25 @@ namespace Faolan.GameServer.CreateFlow
 		// mutated from different connection threads (add on one connection, consume on the reconnect). Value unused.
 		private static readonly ConcurrentDictionary<uint, byte> PendingCreateWorldEntry = new ConcurrentDictionary<uint, byte>();
 
-		private static readonly ProtoEndpoint RetailCreateEditorPostReadyAckSender = Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x59);
 		private static readonly byte[] EditorAvatarSnapshot = Program.LoadEmbeddedResource("Faolan.CreateEditorAvatarSnapshot.bin");
+
+		// The overhead name-COLOUR category retail answers RequestAggroStatus with for each of the five editor scene
+		// characters (0 friendly / 2 neutral - see UpdateAggroStatusCodec). The client polls all five as soon as the
+		// editor scene is streamed, before the character is named, and retail answers every poll: 55/55 in
+		// account-stricken998-character-create-no-worldenter, 95/95 in Barbarian-create.
+		//
+		// Keyed by the burst's own handles (the captured 0x0009FF92-96 the editor scene is emitted with, above). The
+		// categories are per ROLE, not per session: the same five characters carry the same categories under three
+		// different handle blocks - Female Template friendly, the other four neutral (stricken998 0x9FF92-96,
+		// Barbarian-create 0x4302E-32, Strie_rogue-assassin_create 0x818A2-A6).
+		internal static readonly FrozenDictionary<uint, uint> EditorSceneDispositions = new Dictionary<uint, uint>
+		{
+			[0x0009FF92] = WorldEntity.DispositionNeutral, // Stygian Female
+			[0x0009FF93] = WorldEntity.DispositionNeutral, // Saddur
+			[0x0009FF94] = WorldEntity.DispositionNeutral, // Male Template
+			[0x0009FF95] = WorldEntity.DispositionFriendly, // Female Template
+			[0x0009FF96] = WorldEntity.DispositionNeutral // Stygian Slaver
+		}.ToFrozenDictionary();
 
 		// The 18 galley scene-prop dynels the create-editor initial burst streams, in retail send order. Each is a
 		// WorldObjects row on the editor map (4000), built byte-exact via WorldObjectCodec (see
@@ -1109,26 +1127,15 @@ namespace Faolan.GameServer.CreateFlow
 				.SetRaw(CharacterStatId.PlayerId, 0x59EA5C54);
 		}
 
-		internal static Task SendRetailCreateEditorPostReadyAck(INetworkClient client, uint requestId)
-		{
-			return client.SendAsync(new Rpc(RetailCreateEditorPostReadyAckSender, client.Endpoint(Endpoints.GameCharInterfaceProjectType, client.Session.Account.ClientInstance),
-				GameInterfaceOpcodes.DispatchPassBlob, b => b
-					.WriteUInt32(EntityClass.Character)
-					.WriteUInt32(requestId)
-					.WriteUInt32(requestId == 0x0009FF95
-						? 0x00000000u
-						: 0x00000002u)));
-		}
-
 		// Verbatim replay of the fixed tail of the retail create-editor post-ready follow-up from
 		// Captures/account-stricken998-character-create-no-worldenter.tshark.json (rows 198-199, 203-204).
-		// The leading 0x0009FF92-0x0009FF96 ack packets are generated dynamically from the request ids the
-		// client actually sends so the live flow can advance even when it stalls before all 5 retail requests.
-		internal static async Task SendRetailCreateEditorPostReadyBurst(INetworkClient client, IReadOnlyList<uint> requestIds)
+		//
+		// It used to be preceded by a hand-rolled ack per observed "instance echo" request id. Those acks were
+		// UpdateAggroStatus replies under another name (#564) and the ids were the five editor scene entities the
+		// client polls; they are answered where every other poll is, in HandleRequestAggroStatus, off the client's
+		// own RequestAggroStatus rather than replayed here.
+		internal static async Task SendRetailCreateEditorPostReadyBurst(INetworkClient client)
 		{
-			foreach (var requestId in requestIds)
-				await SendRetailCreateEditorPostReadyAck(client, requestId);
-
 			var id = client.Session.Account.ClientInstance;
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id),
 				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots,
