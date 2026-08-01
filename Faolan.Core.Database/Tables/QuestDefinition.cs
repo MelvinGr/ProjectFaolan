@@ -79,7 +79,7 @@ namespace Faolan.Core.Database.Tables
 		// carries the same value in its area header, which is where the importer harvests it from (#544); in a
 		// multi-quest index each held quest contributes its own block keyed by this (#255). Stored per quest because
 		// that is the grain both regions consume it at.
-		public uint IndexMagic { get; set; }
+		public uint IndexMagic { get; set; } // 4 bytes string
 		public uint IndexMarker { get; set; }
 		public uint IndexTableField1 { get; set; }
 		public uint IndexTableField2 { get; set; }

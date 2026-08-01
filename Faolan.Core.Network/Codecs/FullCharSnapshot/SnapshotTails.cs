@@ -149,20 +149,20 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			if (def.Goals.Count == 0 || !def.ObjectiveRegionVerified || area is not { Magic: not 0 })
 				return false;
 
-			// ⚠️ TEMPORARILY OFF (#389). Everything above is satisfied by 9 of NecroL80's quests, but the @609
-			// OBJECTIVE region we would generate for them is not trustworthy yet: regenerating the corpus reproduces
-			// only 5 of 99 quests byte-exact (CapturedObjectiveRegions_RebuildFromTheDatabase_ByteExact - 570 differ
-			// in length, 1030 differ at equal length). Shipping it asserts the client on statlist.cpp:134.
+			// The blanket "objectiveGateGreen = false" that used to end this method is GONE (#389). It was added when
+			// regenerating the corpus reproduced only 5 of 99 objective regions byte-exact; that number is now 99 of 99
+			// (CapturedObjectiveRegions_RebuildFromTheDatabase_ByteExact), so the per-quest ObjectiveRegionVerified flag
+			// above is doing the job it exists for and the blanket override only kept every quest out.
 			//
-			// The quest index and the completed journal DO regenerate byte-exact (23/23 and 81/81), so this is the
-			// one region left. Flip objectiveGateGreen to true when the @609 objective region reproduces the wire -
-			// not before: a snapshot the client rejects takes the whole login with it, and the completed journal
-			// rides along with the active one.
-			// ReSharper disable once ConditionIsAlwaysTrueOrFalse
-			var objectiveGateGreen = false;
-			if (!objectiveGateGreen)
-				return false;
-
+			// Two fixes got it there, both in the importer: the verification now compares LIKE WITH LIKE (retail has
+			// more than one spelling of a region and picks by the record's FieldF0 - see
+			// ObjectiveGoalExtractor.CapturedRegions), and it runs AFTER quest-wiring re-applies the hand-authored goal
+			// fields the harvest clobbers, so it judges the rows we actually ship rather than an intermediate state.
+			//
+			// ⚠️ The hazard the override guarded against is real and unchanged: a region the client cannot parse takes
+			// the WHOLE login down (statlist.cpp:134), and the completed journal rides along with the active one. What
+			// keeps that away is the flag - so widen what gets flagged only behind a byte-exact regeneration gate, and
+			// never by flipping a quest's flag by hand.
 			var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();
 			return HeaderSlots.All(slots.Contains);
 		}

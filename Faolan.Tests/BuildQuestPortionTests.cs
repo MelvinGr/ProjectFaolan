@@ -110,6 +110,28 @@ namespace Faolan.Tests
 			Assert.True(slice.SequenceEqual(built), $"13479 record must match the capture; first diff @{diff} of {built.Length}");
 		}
 
+		// The beach starter must be able to RIDE the login snapshot. Retail ships the journal in the snapshot and sends
+		// no quest packet at login, so a quest that is not snapshot-eligible simply does not exist in the J-panel after
+		// a relog - which is what "enter the jungle is gone after relogging" was: the quest row was Active the whole
+		// time, but IsSnapshotEligible said no, so the region shipped empty and the live restore path had been deleted
+		// (#389). Every new character holds this quest, so it is the one that must not regress.
+		[Fact]
+		public async Task TheBeachStarter_IsSnapshotEligible_SoItSurvivesARelog()
+		{
+			await using var db = new DatabaseContext(TestDb.Options(DbPath));
+			var def = await db.QuestDefinitions.Include(q => q.Goals).Include(q => q.TextRefs)
+				.FirstAsync(q => q.QuestId == 10238, TestContext.Current.CancellationToken);
+			var area = await db.QuestAreas.FirstAsync(a => a.AreaId == def.AreaId, TestContext.Current.CancellationToken);
+
+			Assert.True(def.ObjectiveRegionVerified, "10238's @609 objective region must be verified byte-exact against the captures");
+			Assert.True(SnapshotTails.IsSnapshotEligible(def, area), "the beach starter must ride the login snapshot");
+
+			// And the region it produces must be non-empty - eligibility is worthless if the portion comes out as the
+			// empty-quest form the create path uses.
+			var portion = SnapshotTails.QuestPortion([def], def, CaptureInstance);
+			Assert.NotEqual(SnapshotTails.EmptyQuestPortion(), portion);
+		}
+
 		private static int IndexOf(byte[] hay, byte[] needle)
 		{
 			for (var i = 0; i + needle.Length <= hay.Length; i++)

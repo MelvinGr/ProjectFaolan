@@ -34,6 +34,9 @@ namespace Faolan.Tests
 			int compared = 0, exact = 0, skipped = 0, lenDiff = 0, sameLenDiff = 0;
 			_ = lenDiff;
 			var failByQuest = new Dictionary<uint, int>();
+			// Failures in the variant we actually emit (record FieldF0 == the def's SnapshotUnknownF0) - the ones that
+			// would mean shipping bytes retail never sent. A failure against another variant is not one of those.
+			var failByOurVariant = new Dictionary<uint, int>();
 			var fieldDiffs = new Dictionary<string, int>();
 			var seenQuest = new HashSet<uint>();
 			var shown = 0;
@@ -65,6 +68,8 @@ namespace Faolan.Tests
 				}
 
 				failByQuest[rec.QuestId] = failByQuest.GetValueOrDefault(rec.QuestId) + 1;
+				if (rec.FieldF0 == def.SnapshotUnknownF0)
+					failByOurVariant[rec.QuestId] = failByOurVariant.GetValueOrDefault(rec.QuestId) + 1;
 
 				// Aggregate WHICH field differs, so the tail can be worked in priority order.
 				var rebuiltGoals = QuestObjectiveRegionCodec.Parse(built).Goals;
@@ -276,14 +281,18 @@ namespace Faolan.Tests
 				o.WriteLine($"  {first}");
 
 			// The hard gate is on what we SHIP: a quest flagged ObjectiveRegionVerified must rebuild byte-exact in
-			// every capture it appears in. Overall coverage is reported, not asserted - the region still has undecoded
-			// fields, and the flag is what keeps the unreproducible ones out of the login snapshot.
+			// every capture OF THE VARIANT WE EMIT - the captures whose record carries the same FieldF0 as the record
+			// we would send (ObjectiveGoalExtractor.CapturedRegions documents why F0 is the discriminator). Comparing
+			// across variants failed the beach starter for faithfully rendering the variant we don't emit.
+			// Overall coverage is reported, not asserted - the region still has undecoded fields, and the flag is what
+			// keeps the unreproducible ones out of the login snapshot.
 			var shipped = defs.Values.Where(d => d.ObjectiveRegionVerified).Select(d => d.QuestId).ToHashSet();
-			var shippedButFailing = failByQuest.Keys.Where(shipped.Contains).ToList();
-			o.WriteLine($"  quests flagged verified={shipped.Count}; of those FAILING here={shippedButFailing.Count}");
+			var shippedButFailing = failByOurVariant.Keys.Where(shipped.Contains).ToList();
+			o.WriteLine($"  quests flagged verified={shipped.Count}; of those FAILING here={failByQuest.Keys.Count(shipped.Contains)} (in OUR variant={shippedButFailing.Count})");
 
 			Assert.True(compared > 0, "no captured objective region could be rebuilt");
-			Assert.True(shippedButFailing.Count == 0, $"quests flagged ObjectiveRegionVerified must rebuild byte-exact, but these do not: {string.Join(",", shippedButFailing.Take(10))}");
+			Assert.True(shippedButFailing.Count == 0,
+				$"quests flagged ObjectiveRegionVerified must rebuild byte-exact in every capture of the variant we emit, but these do not: {string.Join(",", shippedButFailing.Take(10))}");
 		}
 
 		[Fact]

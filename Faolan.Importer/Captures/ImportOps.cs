@@ -1317,7 +1317,20 @@ namespace Faolan.Importer.Captures
 		// Marks every quest whose @609 objective region, rebuilt from the rows just imported, reproduces the captured
 		// bytes exactly. Only those may ride the login snapshot - the region still has undecoded fields, and shipping
 		// one we cannot reproduce asserts the client (statlist.cpp:134).
-		public static async Task<(int Verified, int Total)> VerifyObjectiveRegions(DatabaseContext db, IReadOnlyDictionary<uint, List<List<QuestObjectiveGoal>>> capturedByQuest)
+		// Flags each quest whose @609 objective region we can rebuild EXACTLY as retail sent it - the gate that decides
+		// what may ride the login snapshot, because a region the client cannot parse asserts it (statlist.cpp:134).
+		//
+		// Compared LIKE WITH LIKE: only against the captures whose record carries the same `FieldF0` variant as the
+		// record we would ship for that quest (see ObjectiveGoalExtractor.CapturedRegions for the evidence that F0
+		// selects the region's spelling). Comparing against every capture regardless of variant failed a quest for
+		// being a faithful rendering of the variant we DON'T emit: quest 10238 - the beach starter every new character
+		// holds - rebuilds byte-exact in all 13 of its F0=150 captures and differs by 21 bytes from the 7 F0=175 ones,
+		// which cost it the flag and left the login journal empty (#389).
+		//
+		// The safety property is unchanged and is the one that matters: the exact bytes we ship are bytes retail sent.
+		// A quest with NO capture of our variant stays unflagged - unverifiable is not verified.
+		public static async Task<(int Verified, int Total)> VerifyObjectiveRegions(DatabaseContext db,
+			IReadOnlyDictionary<uint, List<(uint Variant, List<QuestObjectiveGoal> Goals)>> capturedByQuest)
 		{
 			var defs = await db.QuestDefinitions.Include(q => q.Goals).ToDictionaryAsync(q => q.QuestId);
 			int verified = 0, total = 0;
@@ -1328,12 +1341,25 @@ namespace Faolan.Importer.Captures
 					continue;
 
 				total++;
-				def.ObjectiveRegionVerified = captures.All(goals => QuestObjectiveRegionCodec
-					.Build(QuestObjectiveRegions.ForQuest(def, goals[0].Instance))
-					.SequenceEqual(QuestObjectiveRegionCodec.Build(new QuestObjectiveRegion
-					{
-						Goals = goals
-					})));
+
+				bool Reproduces((uint Variant, List<QuestObjectiveGoal> Goals) c)
+				{
+					return QuestObjectiveRegionCodec
+						.Build(QuestObjectiveRegions.ForQuest(def, c.Goals[0].Instance))
+						.SequenceEqual(QuestObjectiveRegionCodec.Build(new QuestObjectiveRegion
+						{
+							Goals = c.Goals
+						}));
+				}
+
+				// Two conditions, and both matter:
+				//   * at least ONE capture reproduces      - the bytes we ship are bytes retail sent, not a near-miss
+				//     that happens to have no same-variant capture to contradict it;
+				//   * every capture of OUR variant reproduces - no counter-example among the records we actually emit.
+				// A quest whose region does not depend on the variant satisfies these exactly as it did under the old
+				// all-captures rule (its same-variant set is a subset of a set that all matches), so nothing that was
+				// verified before is weakened; a quest that only matches SOMEONE ELSE's variant still fails the second.
+				def.ObjectiveRegionVerified = captures.Any(Reproduces) && captures.Where(c => c.Variant == def.SnapshotUnknownF0).All(Reproduces);
 
 				if (def.ObjectiveRegionVerified)
 					verified++;

@@ -928,9 +928,11 @@ namespace Faolan.Importer.Modules
 			var goals = ObjectiveGoalExtractor.Extract(packets);
 			var addedGoals = await ImportOps.ImportObjectiveGoals(ctx.Db, goals);
 
-			// Only quests whose objective region provably rebuilds may ride the login snapshot.
-			var (verified, verifiable) = await ImportOps.VerifyObjectiveRegions(ctx.Db, ObjectiveGoalExtractor.CapturedRegions(packets));
-			Console.WriteLine($"  objective regions verified byte-exact: {verified} of {verifiable} quests.");
+			// NB the objective-region verification does NOT run here - it runs at the end of quest-wiring, because the
+			// rows it judges are not final until that overlay has re-applied the hand-authored fields this harvest
+			// clobbers (goal 1448's TrailingLocalized; see IImportModule.RequiredAfter). Verifying here flagged the
+			// quest against an intermediate state, which is how the beach starter stayed unverified while the SHIPPED
+			// rows rebuild byte-exact (#389).
 
 			return new ImportResult($"{defs.Count} quest definitions, {addedGoals} objective goals, {areaCount} quest areas " +
 			                        $"({areas.Count} with wire data), {addedCompleted} completed-journal quests added ({filledCompleted} already known).");
@@ -960,6 +962,14 @@ namespace Faolan.Importer.Modules
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			await ImportOps.WireQuests(ctx.Db);
+
+			// Only quests whose objective region provably rebuilds may ride the login snapshot. Verified HERE, as the
+			// last thing that touches these rows: `quests` refreshes the goal fields from the captures and this overlay
+			// then re-applies the hand-authored ones, so a check run before it judges bytes we never ship.
+			var (verified, verifiable) = await ImportOps.VerifyObjectiveRegions(ctx.Db,
+				ObjectiveGoalExtractor.CapturedRegions(ctx.Captures.SelectMany(c => c.Packets).ToList()));
+			Console.WriteLine($"  objective regions verified byte-exact: {verified} of {verifiable} quests.");
+
 			return new ImportResult("quest wiring applied (Casilda + Shipwrecked chains + sourced location quests).");
 		}
 	}

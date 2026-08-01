@@ -11,11 +11,18 @@ namespace Faolan.Importer.Extractors
 	public static class ObjectiveGoalExtractor
 	{
 		// The captured objective goals per quest, exactly as the wire carried them - the oracle the importer compares
-		// a rebuilt region against (ImportOps.VerifyObjectiveRegions). First capture of a quest wins, matching how
-		// Extract harvests the rows themselves.
-		public static Dictionary<uint, List<List<QuestObjectiveGoal>>> CapturedRegions(IReadOnlyList<CapturedPacket> packets)
+		// a rebuilt region against (ImportOps.VerifyObjectiveRegions).
+		//
+		// EVERY capture of the quest, not just the first, and each one TAGGED with its record's `FieldF0`: retail has
+		// more than one spelling of the same quest's region, and F0 is what selects it. Quest 10238's goal 1448 carries
+		// its trailing text as `<remoteformat …></remoteformat>` (95 B) in every capture whose record has F0=150, and
+		// as the 21-byte-shorter `<localized … flags="" …>` in every capture whose record has F0=175 - 20 of 20
+		// occurrences, no exceptions, with every other scalar on the goal identical. So "reproduces one capture but not
+		// another" is not necessarily a broken region: it can be a faithful region of the OTHER variant. The verifier
+		// compares like with like by grouping on this tag; what F0 itself means is still undecoded (#389).
+		public static Dictionary<uint, List<(uint Variant, List<QuestObjectiveGoal> Goals)>> CapturedRegions(IReadOnlyList<CapturedPacket> packets)
 		{
-			var byQuest = new Dictionary<uint, List<List<QuestObjectiveGoal>>>();
+			var byQuest = new Dictionary<uint, List<(uint Variant, List<QuestObjectiveGoal> Goals)>>();
 			if (packets == null)
 				return byQuest;
 
@@ -26,13 +33,11 @@ namespace Faolan.Importer.Extractors
 
 				foreach (var record in journal)
 				{
-					// EVERY capture of the quest, not just the first: a region that reproduces one capture but not
-					// another is not safe to ship (goal 1448's trailing record is spelled differently across captures).
 					if (record.Objectives is { Goals.Count: > 0 } objectives)
 					{
 						(byQuest.TryGetValue(record.QuestId, out var all)
 							? all
-							: byQuest[record.QuestId] = []).Add(objectives.Goals);
+							: byQuest[record.QuestId] = []).Add((record.FieldF0, objectives.Goals));
 					}
 				}
 			}
