@@ -5,6 +5,7 @@ using System.Numerics;
 using Faolan.Core.Constants;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network.Constants;
 
 namespace Faolan.Importer.Extractors
 {
@@ -58,6 +59,15 @@ namespace Faolan.Importer.Extractors
 				if (task.Handle is 0 or >= EntityHandles.CharacterInstanceBase)
 					continue; // a player's MoveTask, not an NPC patrol
 
+				// Reject a task that APPROACHES A CHARACTER (a mode-8 node, MoveTaskNodes.ApproachTarget): walking to a
+				// player is a scripted follow - an escort or a companion - and never an idle patrol. The loop-shape test
+				// below does NOT catch it, because a long meandering escort walks far enough to look loop-shaped: Casilda's
+				// rescue walk from her cage to the city gate came in as a 25-waypoint "patrol" on her spawn, so the world
+				// tick wandered her along it from the moment she spawned - before the player had freed her - which both
+				// moved her off the cage and cancelled her captive struggle pose (a walking NPC plays locomotion).
+				if (ApproachesACharacter(task.Task))
+					continue;
+
 				var waypoints = new List<Vector3>();
 				CollectPathWaypoints(task.Task, waypoints);
 				if (waypoints.Count < 2)
@@ -93,6 +103,23 @@ namespace Faolan.Importer.Extractors
 		private static float Bits(uint raw)
 		{
 			return BitConverter.UInt32BitsToSingle(raw);
+		}
+
+		// Whether a move-task tree contains a mode-8 approach node aimed at a CHARACTER (EntityClass.Character) - i.e.
+		// the NPC walks to a PLAYER. That makes the whole task a scripted follow (escort / companion), never an idle
+		// patrol, whatever shape its path happens to have.
+		private static bool ApproachesACharacter(MoveTaskNode node)
+		{
+			if (node.Mode == MoveTaskNodes.ModeApproachTarget && node.ApproachType == EntityClass.Character)
+				return true;
+
+			foreach (var child in node.Children)
+			{
+				if (ApproachesACharacter(child))
+					return true;
+			}
+
+			return false;
 		}
 
 		// Gathers every PathMoveTask (mode 1) waypoint in a move-task tree (recursing into mode-4 ListMoveTask). The
