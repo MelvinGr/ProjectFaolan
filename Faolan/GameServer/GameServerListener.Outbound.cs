@@ -22,6 +22,7 @@ using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
 using Faolan.Core.Protobuf;
 using Faolan.GameServer.Economy;
+using Faolan.GameServer.Inventory;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 using ProtoBuf;
@@ -49,6 +50,11 @@ namespace Faolan.GameServer
 		Task IEconomyOutbound.SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason)
 		{
 			return SendUpdateCash(client, balanceTin, reason);
+		}
+
+		Task<uint> IEconomyOutbound.TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count)
+		{
+			return TakeItemsFromInventory(client, itemTemplateId, count);
 		}
 
 		// IGameServerProvider seam: pushes the guild tag onto the character's live world connection, if it is
@@ -349,6 +355,47 @@ namespace Faolan.GameServer
 			// ShacklesOff capture shows. A player-initiated move is NOT followed by one: the client already knows.
 			await SendUpdateInventory(client);
 			return true;
+		}
+
+		// Takes `count` of an item template OUT of the player's inventory and returns how many were actually removed
+		// (IEconomyOutbound). The inverse of GrantItemToBackpack, used by a quest HAND-IN: delivering three stone bricks
+		// to Turach takes the three bricks.
+		//
+		// Deliberately NOT backpack-only, unlike RemoveItemFromBackpack. A quest item lives in the Quest container
+		// (0x71), so a bag-only walk would report success while removing nothing - and the delivery check that gates
+		// this sums the same way, across every container.
+		//
+		// Removes EXACTLY `count`: a slot holding more than is still wanted is DECREMENTED, never cleared, so handing
+		// in 3 of 5 bricks leaves 2. Slots are taken in order and a partial take is reported rather than silently
+		// tolerated - the caller has already verified the player holds enough, so a short result means the inventory
+		// changed underneath us and is worth a log line, not a shrug.
+		private async Task<uint> TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count)
+		{
+			if (count == 0)
+				return 0;
+
+			var characterId = client.Session.Character.Id;
+			var steps = InventoryTake.Plan(await Database.GetCharacterInventory(characterId), itemTemplateId, count);
+
+			foreach (var step in steps)
+			{
+				if (step.Remaining == 0)
+					await Database.SetCharacterInventorySlot(characterId, step.Container, step.Slot, null);
+				else
+					await Database.SetCharacterInventorySlot(characterId, step.Container, step.Slot, itemTemplateId, step.Remaining);
+
+				await SendRemoveItem(client, step.Container, (uint)step.Slot, step.Taken);
+			}
+
+			var removed = InventoryTake.Total(steps);
+			if (removed > 0)
+			{
+				// Same follow-up as RemoveItemFromBackpack, and for the same reason: this is a SERVER-initiated removal,
+				// which retail follows with both containers in full (#380).
+				await SendUpdateInventory(client);
+			}
+
+			return removed;
 		}
 
 		// Answers a TradeskillRequestIIR (recipe-book open) with the TradeskillReplyIIR (0x9062D559) recipe list built

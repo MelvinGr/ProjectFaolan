@@ -272,7 +272,9 @@ namespace Faolan.GameServer
 			// into it (Casilda's captive pose) without a construction cycle.
 			_questHandler = new QuestHandlerService(database, _simulation, logger);
 			_broadcaster = new WorldBroadcaster(_simulation, database, logger, _questHandler);
-			_questProgression = new QuestProgressionService(database, _broadcaster, _questHandler, agentServerDispatcher, logger);
+			// `this` as IEconomyOutbound: a Deliver goal's hand-in takes the goods out of the inventory, which is an
+			// economy op the listener owns - the same seam ShopService/BankService reach the wallet and grants through.
+			_questProgression = new QuestProgressionService(database, _broadcaster, this, _questHandler, agentServerDispatcher, logger);
 			// #439: what a spell makes the SERVER do (summon a pet, arm a proc) - dispatched from the SpellEffect rows
 			// instead of from spell ids hardcoded into the cast path. Reaches the wire through ISpellEffectOutbound,
 			// which this listener implements (GameServerListener.Buffs.cs).

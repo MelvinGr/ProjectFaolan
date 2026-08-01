@@ -6,6 +6,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.GameServer.Inventory;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
@@ -278,6 +279,60 @@ namespace Faolan.Tests
 			};
 			Assert.False(QuestProgress.CanHandIn(single, 0));
 			Assert.True(QuestProgress.CanHandIn(single, 1));
+		}
+
+		// The hand-in TAKES the goods (#521), and the two ways that goes wrong are both invisible from a single full
+		// stack: over-taking a larger stack, and missing a stack split across cells or containers.
+		[Fact]
+		public void InventoryTake_TakesExactlyWhatIsAskedFor_AcrossSplitStacksAndContainers()
+		{
+			// "Deliver 3 stone bricks to Turach" against FIVE bricks in one quest-container cell: 3 come out, 2 stay.
+			// Clearing the cell would destroy items the player legitimately keeps.
+			var oneBigStack = new List<CharacterInventory>
+			{
+				Row(ContainerKind.Quest, 0, 193400, 5)
+			};
+			var plan = InventoryTake.Plan(oneBigStack, 193400, 3);
+			var step = Assert.Single(plan);
+			Assert.Equal((3u, 2u), (step.Taken, step.Remaining)); // decremented, NOT cleared
+			Assert.Equal(3u, InventoryTake.Total(plan));
+
+			// Split across two containers and three cells, with an unrelated item in between: the walk spans them and
+			// STOPS at the count - the last brick-holding cell is untouched.
+			var split = new List<CharacterInventory>
+			{
+				Row(ContainerKind.Bag, 4, 999999),
+				Row(ContainerKind.Quest, 2, 193400),
+				Row(ContainerKind.Bag, 1, 193400),
+				Row(ContainerKind.Bag, 7, 193400)
+			};
+			plan = InventoryTake.Plan(split, 193400, 3);
+			Assert.Equal(3, plan.Count);
+			Assert.Equal(3u, InventoryTake.Total(plan));
+			Assert.All(plan, s => Assert.Equal(1u, s.Taken));
+			Assert.DoesNotContain(plan, s => s.Container == ContainerKind.Bag && s.Slot == 4); // never the other item
+
+			plan = InventoryTake.Plan(split, 193400, 2);
+			Assert.Equal(2u, InventoryTake.Total(plan));
+			Assert.Equal(2, plan.Count); // stopped early - the third brick stays
+
+			// Not holding enough is reported as a SHORT plan, not an exception and not an over-take. The caller has
+			// already gated on CanHandIn, so this is the "inventory moved underneath us" case.
+			plan = InventoryTake.Plan(oneBigStack, 193400, 9);
+			Assert.Equal(5u, InventoryTake.Total(plan));
+
+			// Degenerate inputs take nothing rather than everything.
+			Assert.Empty(InventoryTake.Plan(split, 193400, 0));
+			Assert.Empty(InventoryTake.Plan(split, 0, 3));
+			Assert.Empty(InventoryTake.Plan(split, 12345, 3));
+
+			static CharacterInventory Row(ContainerKind container, int slot, uint itemId, uint count = 1) => new()
+			{
+				Container = container,
+				Slot = slot,
+				ItemId = itemId,
+				Count = count
+			};
 		}
 
 		[Fact]

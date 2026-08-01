@@ -8,6 +8,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.Core.Network.Server.ChatServer;
+using Faolan.GameServer.Economy;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -35,14 +36,20 @@ namespace Faolan.GameServer.Quest
 		private const float ReachRadius = 40f;
 		private readonly IChatServerDispatcher _agents;
 		private readonly IDatabaseRepository _database;
+
+		// The inventory half of a hand-in: a Deliver goal TAKES what it hands over. Reached through the economy port
+		// rather than the listener itself, like every other cross-cutting outbound op (CLAUDE.md "narrow port").
+		private readonly IEconomyOutbound _economy;
 		private readonly ILogger _logger;
 		private readonly IQuestOutbound _outbound;
 		private readonly QuestHandlerService _questHandler;
 
-		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, QuestHandlerService questHandler, IChatServerDispatcher agents, ILogger logger)
+		public QuestProgressionService(IDatabaseRepository database, IQuestOutbound outbound, IEconomyOutbound economy, QuestHandlerService questHandler,
+			IChatServerDispatcher agents, ILogger logger)
 		{
 			_database = database;
 			_outbound = outbound;
+			_economy = economy;
 			_questHandler = questHandler;
 			_agents = agents;
 			_logger = logger;
@@ -309,6 +316,14 @@ namespace Faolan.GameServer.Quest
 					? required
 					: Math.Min(required, current + step);
 
+				// The hand-in TAKES the goods. Placed AFTER the `current >= required` re-fire guard above, so talking to
+				// the recipient a second time cannot take a second set. Nothing in the corpus shows the removal - retail
+				// completes the delivery and moves on without a captured DispatchRemoveItem - so this is Melvin's call
+				// (2026-08-01) rather than a decoded fact: a delivery the player walks away from still holding is not a
+				// delivery. HoldsDeliveryItem has already verified the count is present.
+				if (QuestProgress.IsDelivery(goal))
+					await ConsumeDeliveryItems(client!, character.Id, goal, required);
+
 				changed = true;
 				await PersistGoalProgress(character.Id, quest, def, goal, progress);
 
@@ -333,12 +348,30 @@ namespace Faolan.GameServer.Quest
 				await _outbound.RefreshQuestVisibility(client!);
 		}
 
-		// Whether the player is carrying what a DELIVER goal hands over (#521); the rule itself is QuestProgress.CanHandIn
-		// and this only supplies the count. Non-deliveries never touch the DB - IsDelivery is checked first, so a kill or
-		// a collect pays nothing for this.
+		// The other half of the hand-in (#521): HoldsDeliveryItem checks, this TAKES. `required` is the count the goal asks for,
+		// which is what the check demanded, so it is what gets handed over - extras the player is carrying stay theirs.
 		//
-		// ⚠️ It checks, it does not CONSUME. Retail presumably takes the item on hand-in, but nothing in the corpus shows
-		// the removal, and destroying a player's item on an unproven inference is the worse error. Open on #521.
+		// ⚠️ Nothing in the corpus shows the removal (retail completes the delivery without a captured
+		// DispatchRemoveItem in the frames around it), so this is a design decision - Melvin's, 2026-08-01 - and not a
+		// decoded fact: a delivery you walk away from still holding the goods is not a delivery. Recorded here because
+		// the day a capture shows otherwise, this is the one place to change.
+		//
+		// A short take is LOGGED rather than tolerated silently: the caller has already verified the player holds
+		// enough, so removing fewer means the inventory moved underneath us. The goal still advances - refusing to
+		// complete a quest the player has legitimately finished is the worse failure of the two.
+		private async Task ConsumeDeliveryItems(INetworkClient client, uint characterId, QuestGoalDefinition goal, uint required)
+		{
+			var wanted = Math.Max(1u, required);
+			var taken = await _economy.TakeItemsFromInventory(client, goal.TrailingRefId, wanted);
+			if (taken < wanted)
+			{
+				_logger.LogWarning("Hand-in of goal {Goal}: took {Taken} of {Wanted} x item {Item} from character {Character} - the delivery check passed, so the inventory changed mid-hand-in.",
+					goal.GoalId, taken, wanted, goal.TrailingRefId, characterId);
+			}
+		}
+
+		// Whether the player is carrying what a DELIVER goal hands over; the rule itself is QuestProgress.CanHandIn and
+		// this only supplies the count. ConsumeDeliveryItems is what takes them once the hand-in goes through.
 		private async Task<bool> HoldsDeliveryItem(uint characterId, QuestGoalDefinition goal)
 		{
 			if (!QuestProgress.IsDelivery(goal))

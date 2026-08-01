@@ -228,8 +228,21 @@ The full count is required — "deliver 3 stone bricks" is not satisfied by carr
 since a stack can be split. A failed hand-in says so on-screen rather than silently doing nothing: the player is
 on the right quest talking to the right NPC, so silence reads as a broken quest.
 
-⚠️ It **checks**, it does not **consume**. Retail presumably takes the item, but nothing in the corpus shows the
-removal, and destroying a player's item on an unproven inference is the worse error. Open on Gitea #521.
+**And it consumes.** A completed hand-in takes the goods: `ConsumeDeliveryItems` → `TakeItemsFromInventory`,
+which is the inverse of `GrantItemToBackpack` and runs off the same port. Two things it gets right that a
+single full stack would hide — a stack **larger** than the goal asks for is decremented rather than cleared (hand
+in 3 of 5 bricks and 2 stay yours), and a stack **split** across cells or containers is spanned, stopping the
+moment the count is met. The arithmetic is the pure `InventoryTake.Plan`, gated by
+`QuestTests.InventoryTake_TakesExactlyWhatIsAskedFor_AcrossSplitStacksAndContainers`.
+
+It runs **after** the re-fire guard (`current >= required`), so talking to the recipient a second time cannot take
+a second set. It is deliberately not backpack-only: a quest item lives in the Quest container (`0x71`), which
+`RemoveItemFromBackpack` cannot reach — the same span the delivery check sums over.
+
+⚠️ This is a **design decision, not a decoded fact**. Nothing in the corpus shows the removal; retail completes
+the delivery without a captured `DispatchRemoveItem` in the surrounding frames. It is taken because a delivery
+the player walks away from still holding is not a delivery. If a capture ever shows otherwise, `ConsumeDeliveryItems`
+is the one place to change.
 
 ### The escort ends at the city DOOR, and the farewell follows the completion
 

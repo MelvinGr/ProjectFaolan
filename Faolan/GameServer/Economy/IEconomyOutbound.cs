@@ -24,5 +24,12 @@ namespace Faolan.GameServer.Economy
 
 		// Push the wallet update (absolute balance in TIN) to the client. See GameServerListener.Outbound.cs SendUpdateCash.
 		Task SendUpdateCash(INetworkClient client, ulong balanceTin, UpdateCashReason reason);
+
+		// Take `count` of an item template OUT of the player's inventory, across containers and across split stacks,
+		// returning how many were actually removed. The inverse of GrantItemToBackpack, and deliberately not
+		// backpack-only: a quest item lives in the Quest container (0x71), not the bag, so RemoveItemFromBackpack
+		// cannot reach it. Removes exactly `count` - a stack larger than what is asked for is decremented, never
+		// cleared. See GameServerListener.Outbound.cs TakeItemsFromInventory.
+		Task<uint> TakeItemsFromInventory(INetworkClient client, uint itemTemplateId, uint count);
 	}
 }
