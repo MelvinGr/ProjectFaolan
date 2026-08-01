@@ -1031,6 +1031,13 @@ namespace Faolan.Importer.Captures
 				// quest index seeds it by hand for two quests, and an area no journal was captured for must not lose it.
 				if (def.IndexMagic != 0)
 					existing.IndexMagic = def.IndexMagic;
+
+				// The series HEAD off the captured Quest_c record (#566), same rule: only overwrite when the harvest has
+				// one. NB the other Snapshot* scalars deliberately do NOT refresh here - they land only when a row is
+				// first added - so a column added later reaches an existing row through a line like this one or not at
+				// all. That is why this one is here and why adding the column alone left all 108 rows at 0.
+				if (def.SnapshotChainHeadQuestId != 0)
+					existing.SnapshotChainHeadQuestId = def.SnapshotChainHeadQuestId;
 				db.QuestTextRefs.RemoveRange(existing.TextRefs);
 				existing.TextRefs = def.TextRefs;
 

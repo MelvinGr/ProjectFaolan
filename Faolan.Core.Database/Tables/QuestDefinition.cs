@@ -146,6 +146,15 @@ namespace Faolan.Core.Database.Tables
 		// tempting reading of these as a reward carried on the journal record.
 		public uint SnapshotUnknown28 { get; set; }
 
+		// The Quest_c record's @+0x2c - the first quest of the SERIES this one belongs to, which is the quest's own id
+		// for a standalone quest (84 of the 99 captured records) and an earlier step of the same chain for the rest:
+		// 10915 and 12371 both carry 10238, the beach starter, and both appear in ITS IndexGoalSteps list; 12068 carries
+		// 12067; 13986 carries 13984. Harvested, never derived - only the HEAD carries IndexGoalSteps, so a member has
+		// nothing locally that names its series, and NextQuestId gives successors rather than the start (Gitea #566).
+		// 0 = never captured; the builder then falls back to the quest's own id, which is right for a standalone quest
+		// and is what we emitted for everything before this column existed.
+		public uint SnapshotChainHeadQuestId { get; set; }
+
 		// @+0xec: 1 in every one of the 99 captured records - no quest varies it. Kept as a column rather than a
 		// literal so a capture that ever disagrees shows up as data, not as a wrong constant baked into the builder.
 		public uint SnapshotUnknownEc { get; set; }

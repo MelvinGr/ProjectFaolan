@@ -2810,6 +2810,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<bool>("ObjectiveRegionVerified")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("SnapshotChainHeadQuestId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("SnapshotUnknown118")
                         .HasColumnType("INTEGER");
 

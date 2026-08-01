@@ -37,7 +37,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 				Region2 = Slot(QuestTextSlot.MapName),
 				FieldEc = def.SnapshotUnknownEc,
 				AreaId = def.AreaId,
-				Field2c = def.QuestId,
+				// @+0x2c is the series HEAD, not this quest's id (#566) - equal for a standalone quest, an earlier
+				// step for a chain member. Falls back to the own id when the column was never harvested, which is
+				// both the standalone answer and what we emitted before the column existed.
+				Field2c = def.SnapshotChainHeadQuestId == 0
+					? def.QuestId
+					: def.SnapshotChainHeadQuestId,
 				Field11c = 0,
 				Accept = 0,
 				Field28 = def.SnapshotUnknown28,

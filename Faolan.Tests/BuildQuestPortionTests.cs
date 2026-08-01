@@ -132,6 +132,23 @@ namespace Faolan.Tests
 			Assert.NotEqual(SnapshotTails.EmptyQuestPortion(), portion);
 		}
 
+		// @+0x2c carries the SERIES HEAD, not the quest's own id (#566). A standalone quest is its own head, so the
+		// two agree for 84 of the 99 captured records and the distinction only shows on a chain member - which is why
+		// emitting `def.QuestId` unconditionally looked right for years. 12407 (escort Casilda) is the clearest case:
+		// its head is 13479, the "kill Scavenger Tuut" quest that starts that chain.
+		[Theory]
+		[InlineData(12407u, 13479u)] // escort Casilda -> the chain's first quest
+		[InlineData(10915u, 10238u)] // a Shipwrecked step -> the beach starter
+		[InlineData(12371u, 10238u)]
+		[InlineData(10238u, 10238u)] // the head itself is its own head
+		[InlineData(13479u, 13479u)]
+		public async Task QuestcRecord_CarriesTheSeriesHead(uint questId, uint expectedHead)
+		{
+			var def = await LoadDefinition(questId);
+			Assert.Equal(expectedHead, def.SnapshotChainHeadQuestId);
+			Assert.Equal(expectedHead, QuestcRecords.ForQuest(def, def.Level).Field2c);
+		}
+
 		private static int IndexOf(byte[] hay, byte[] needle)
 		{
 			for (var i = 0; i + needle.Length <= hay.Length; i++)
