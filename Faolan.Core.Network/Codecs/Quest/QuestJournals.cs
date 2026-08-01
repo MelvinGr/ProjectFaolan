@@ -21,8 +21,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var first = definitions[0];
 
 			var area = new QuestJournalArea(
-				first.AreaId,
-				QuestTextTokens.Record(first, QuestTextSlot.AreaTitle),
+				first.QuestLineId,
+				QuestTextTokens.Record(first, QuestTextSlot.QuestLineTitle),
 				QuestTextTokens.Record(first, QuestTextSlot.MapName),
 				QuestTextTokens.Record(first, QuestTextSlot.RegionName),
 				[.. definitions.Select(d => new QuestJournalEntry(d.QuestId, QuestTextTokens.Record(d, QuestTextSlot.Title), QuestTextTokens.Record(d, QuestTextSlot.ListSubLine)))])

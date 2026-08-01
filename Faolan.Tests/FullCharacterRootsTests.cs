@@ -200,11 +200,11 @@ namespace Faolan.Tests
 
 			var original = FullCharSnapshotSubClassCodec.Build(parts.SubClass);
 
-			// The lead quest's STATE word (@20) is a modelled field on the journal record, so writing it is an
+			// The lead quest's LEVEL word (@+0x10) is a modelled field on the journal record, so writing it is an
 			// ordinary value edit rather than a byte patch - and it stays fixed-width.
-			parts.SubClass.Quests.Records[0].State = 42;
+			parts.SubClass.Quests.Records[0].Level = 42;
 			var patched = FullCharSnapshotSubClassCodec.Parse(FullCharSnapshotSubClassCodec.Build(parts.SubClass));
-			Assert.Equal(42u, patched.Quests.Records[0].State);
+			Assert.Equal(42u, patched.Quests.Records[0].Level);
 			Assert.Equal(original.Length, FullCharSnapshotSubClassCodec.Build(parts.SubClass).Length);
 
 			// The live-vitals patch slots round-trip too. The bigboy capture is the tails model's reference

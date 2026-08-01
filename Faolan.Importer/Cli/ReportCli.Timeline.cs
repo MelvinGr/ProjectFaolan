@@ -409,7 +409,7 @@ namespace Faolan.Importer.Cli
 					.Where(s => s.Length > 0).Distinct());
 				var entries = area.Entries.Select(e =>
 					(e.QuestId == journal.Current.QuestId ? ">" : "") + $"{e.QuestId} \"{look.Line(e.Title)}\"");
-				parts.Add($"\"{look.Line(area.AreaTitle)}\"" + (where.Length > 0 ? $" ({where})" : "")
+				parts.Add($"\"{look.Line(area.QuestLineTitle)}\"" + (where.Length > 0 ? $" ({where})" : "")
 				          + $" {area.Entries.Count} quest(s): " + string.Join(", ", entries));
 			}
 

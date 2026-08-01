@@ -14,13 +14,15 @@ namespace Faolan.Core.Database.Tables
 	// set from the RDB by the importer and never DB-generated. No synthetic Id (BaseEntity dropped).
 	public class QuestDefinition
 	{
-		// The quest's region/area id (e.g. 1054), carried raw in both the journal and full-update packets.
-		public uint AreaId { get; set; }
+		// The quest LINE this quest is a step of (e.g. 1054), carried raw in both the journal and full-update packets.
+		// It is the client's `Quest.main_quest_template_id` (RDB 1000104), which is what identifies our QuestLine as
+		// the client's MainQuest.
+		public uint QuestLineId { get; set; }
 
-		// The area this quest is grouped under. Every referenced area has a row: the importer inserts a placeholder
-		// (Magic 0) for any area the captures never showed a completed quest in, the same way it does for Maps.
-		[ForeignKey(nameof(AreaId))]
-		public virtual QuestArea Area { get; set; } = null!;
+		// The line this quest is grouped under. Every referenced line has a row: the importer inserts a placeholder
+		// (Magic 0) for any line the captures never showed a completed quest in, the same way it does for Maps.
+		[ForeignKey(nameof(QuestLineId))]
+		public virtual QuestLine Line { get; set; } = null!;
 
 		// The primary objective's goal id (e.g. 0x1670 = 5744), echoed in QuestGoal and the full-update.
 		public uint GoalId { get; set; }
@@ -67,19 +69,19 @@ namespace Faolan.Core.Database.Tables
 		// improves; no code change is needed to widen coverage.
 		public bool ObjectiveRegionVerified { get; set; }
 
-		// The AREA's quest catalog - every quest of this quest's area, ordered by JournalSequence - as CSV. NOT this
+		// The LINE's quest catalog - every step of this quest's line, ordered by JournalSequence - as CSV. NOT this
 		// quest's goals and NOT its chain, both of which the old name "IndexGoalSteps" invited: quest 10238's list is
-		// area 241's eight quests at sequences 1-8, while its own goals are [1448,3490]; 13479's is area 1054's four.
-		// A fresh character with nothing completed carries the whole list, so it is static area data.
+		// line 241's eight quests at sequences 1-8, while its own goals are [1448,3490]; 13479's is line 1054's four.
+		// A fresh character with nothing completed carries the whole list, so it is static line data.
 		//
 		// ⚠️ Vestigial, and deliberately kept only as a FALLBACK: QuestIndexRegions.ForQuests prefers the catalog the
-		// caller loads from the DB (the area's quests, ordered by sequence) and reads this only when none was passed,
+		// caller loads from the DB (the line's quests, ordered by sequence) and reads this only when none was passed,
 		// which today is the two hand-seeded quests. Do not harvest it for more quests - the DB already derives it.
 		[MaxLength(128)]
-		public string? IndexAreaQuestIds { get; set; }
+		public string? IndexQuestLineQuestIds { get; set; }
 
 		// Quest index region: the area table's marker + three lead words + trailer word. Beach 10238: marker 0x7E2,
-		// fields 1/7/0, trailer 0x156E7, and area 241's 8 quests as the table body (see IndexAreaQuestIds - the body is
+		// fields 1/7/0, trailer 0x156E7, and area 241's 8 quests as the table body (see IndexQuestLineQuestIds - the body is
 		// the AREA CATALOG, not "the client's 1..n goal index", which is what this said until the list was checked
 		// against the area's own rows).
 		//
@@ -130,36 +132,48 @@ namespace Faolan.Core.Database.Tables
 
 		// A level-ADJACENT value: across the captured journals it runs level..level+5 (NecroL80 L80 -> 80-83,
 		// Hakotep L24 -> 19-30). Its exact meaning is undecoded, hence the name. Was called SnapshotN, which was
-		// doubly wrong - it is not `n` (that is SnapshotUnknown14, a different word at a different offset).
+		// doubly wrong - it is not `n` (that is SnapshotQuestLineFlags, a different word at a different offset).
 		public uint SnapshotUnknown118 { get; set; }
 
-		// The Quest_c record's word @+0x14. A per-quest FLAG WORD, not a count - measured over the 99 quests with a
-		// captured record: it takes just five values (2, 10, 18, 26, 1042) and EVERY one of them is ≡ 2 (mod 8), so
-		// the low three bits are fixed (010) and the rest toggle. It was documented as "the per-quest goal count",
-		// which the corpus disproves outright: 2 appears on records carrying 1, 2, 3 and 6 goals, 10 on 1, 2, 4 and 7,
-		// and the beach quest's 1042 on 1, 2, 3 and 12. Constant per quest across every character and capture.
-		public uint SnapshotUnknown14 { get; set; }
-
-		// @+0x28, @+0xf0 and @+0xf8: three per-quest magnitudes that SCALE WITH THE QUEST'S LEVEL, which is what says
-		// they are content values (a reward, a cost, a duration) rather than flags or offsets. Across the captured
-		// records: level 21-24 quests carry thousands (F0 2800-6300), level 70 carries 15421/34417, level 76 87227,
-		// level 77 102300, level 80 up to 170500.
+		// The Quest_c record's word @+0x14. A FLAG WORD OF THE QUEST LINE, not a count and not per-quest - measured
+		// over the 99 quests with a captured record it takes just five values (2, 10, 18, 26, 1042), every one ≡ 2
+		// (mod 8), so the low three bits are fixed (010) and bits 3, 4 and 10 toggle. It was documented as "the
+		// per-quest goal count", which the corpus disproves outright: 2 appears on records carrying 1, 2, 3 and 6
+		// goals, 10 on 1, 2, 4 and 7, and the beach quest's 1042 on 1, 2, 3 and 12.
 		//
-		// Two structural facts hold across the corpus and are the lead worth pulling on next:
-		//   * @+0x28 and @+0xf0 are near-mutually-exclusive - a quest carries one or the other, never both, with a
-		//     single exception (13479 carries 80 in both);
-		//   * @+0xf8 is non-zero only where @+0xf0 is, and runs ~10-37% of it - so F0/F8 read as a pair.
-		// Named for their offsets until something pins WHICH quantity: nothing in the captures labels them, and a
-		// static RE pass could not either (docs/re/questc-region-decode.md) - the client's writer emits them with no
-		// per-field assert to name them. That pass also found `QuestRewardNotifyIIR_c` and
-		// `QuestRewardSelectionIIR_c`, i.e. rewards have their OWN messages, which is evidence against the otherwise
-		// tempting reading of these as a reward carried on the journal record.
-		public uint SnapshotUnknown28 { get; set; }
+		// Its SCOPE is settled even though its meaning is not: the value is constant per quest across every character
+		// and capture (2626 records, 141 snapshots), AND constant across every quest of the same line - all 90 lines
+		// with captured quests agree, zero conflicts. So it is an attribute of the line, inherited by each step; that
+		// is why it is stored here rather than on QuestLine only when a line has no captured quest to carry it.
+		//
+		// Bit 10 (0x400) marks the player-PROGRESSION lines: the 10 quests carrying it are the Destiny steps
+		// (Shipwrecked x4, Casilda x2, Blood and Sweat, To Battle a God), the Alchemist tier-4 progression parent, and
+		// the World-Boss Mastery meta. The client has a `MainQuest_c` distinct from `Quest_c`, so bit 10 selecting
+		// that flavour is the natural read - but it is NOT proven: the catalog's own `MainQuest.type`, which would
+		// have named it, is 0 on all 2181 rows. Bits 3 and 4 remain open ("expansion", "repeatable" and "group" are
+		// each ruled out by counterexamples - see the handoff and Gitea #569).
+		public uint SnapshotQuestLineFlags { get; set; }
+
+		// @+0x28 - a reward magnitude carried on the LAST step of a quest line. What is proven is its POSITION, not
+		// its currency: crossing the populated slot against the line's first/last step (from the client's catalog,
+		// RDB 1000104) over the 94 captured quests with a catalog row gives
+		//     @+0x28      last step 25  (19 single-step lines + 6 multi)   first 1   middle 0
+		//     @+0xf0/f8   last step  0                                     first 33  middle 7
+		// so @+0x28 lands on the final step and the XP/cash pair never does. In a one-step line the step IS the line,
+		// which is why 19 of the 25 are single-step. That is also the whole of the "near-mutual-exclusivity" this
+		// comment used to record as an unexplained curiosity.
+		//
+		// Reading: @+0xf0/@+0xf8 are the STEP's own reward and this is the reward for completing the LINE. It scales
+		// with level like the pair does (level 23 -> 900..4981, level 30 -> 5553, level 70 -> 15421, level 80 ->
+		// 69337..138674, the level-80 values being exactly {1, 4/3, 5/3, 2} x 69337). Whether it is XP, cash or
+		// something else is NOT established - the client's `MainQuest.xp_reward`/`cash_reward` are populated on only
+		// 23/18 of 2181 rows, so the catalog cannot settle it, and the magnitudes are computed server-side.
+		public uint SnapshotQuestLineReward { get; set; }
 
 		// The Quest_c record's @+0x2c - the first quest of the SERIES this one belongs to, which is the quest's own id
 		// for a standalone quest (84 of the 99 captured records) and an earlier step of the same chain for the rest:
-		// 10915 and 12371 both carry 10238, the beach starter, and both appear in ITS IndexAreaQuestIds list; 12068 carries
-		// 12067; 13986 carries 13984. Harvested, never derived - only the HEAD carries IndexAreaQuestIds, so a member has
+		// 10915 and 12371 both carry 10238, the beach starter, and both appear in ITS IndexQuestLineQuestIds list; 12068 carries
+		// 12067; 13986 carries 13984. Harvested, never derived - only the HEAD carries IndexQuestLineQuestIds, so a member has
 		// nothing locally that names its series, and NextQuestId gives successors rather than the start (Gitea #566).
 		// 0 = never captured; the builder then falls back to the quest's own id, which is right for a standalone quest
 		// and is what we emitted for everything before this column existed.
@@ -169,14 +183,27 @@ namespace Faolan.Core.Database.Tables
 		// literal so a capture that ever disagrees shows up as data, not as a wrong constant baked into the builder.
 		public uint SnapshotUnknownEc { get; set; }
 
-		// See the @+0x28 note above for the magnitude. F0 additionally selects WHICH SPELLING the quest's @609
-		// objective region uses for its trailing text: the beach starter is the one quest captured with two variants,
-		// and its goal 1448 carries `<remoteformat …></remoteformat>` in all 15 captures whose record has F0=150 and
-		// the 21-byte-shorter `<localized … flags="" …>` in all 5 with F0=175 (every other scalar identical). The
-		// importer's region verification groups on this so it compares like with like (#389).
-		public uint SnapshotUnknownF0 { get; set; }
+		// @+0xf0 and @+0xf8 - THIS STEP's own reward: experience and money. Two independent lines say so, neither a
+		// restatement of the other:
+		//   * the client's quest catalog (RDB 1000104) gives its quest lines exactly one reward pair, `xp_reward` and
+		//     `cash_reward`, in that order and of these shapes (u32 then a wider money value);
+		//   * the magnitudes coincide. The `[Thunder River]` lines carry `xp_reward = 45800`, which is exactly the
+		//     captured @+0xf0 of quests 13895 and 14427, and the catalog's low-level cash/xp ratios (715/60, 1000/157,
+		//     455/36 -> 0.08-0.16) match the wire's (150/15, 370/44, 550/66 -> 0.10-0.12).
+		// They are populated on a line's first/middle steps and never on its last - see SnapshotQuestLineReward.
+		//
+		// ⚠️ @+0xf8 tracks @+0xf0 through a level-dependent factor (~0.267 around level 23 rising to ~1.10 at 80), but
+		// 99 samples do not close the law and the residuals disagree. Do NOT derive one from the other - the catalog
+		// says they are two separately authored numbers that merely correlate.
+		//
+		// @+0xf0 additionally selects WHICH SPELLING the quest's @609 objective region uses for its trailing text: the
+		// beach starter is the one quest captured with two variants, and its goal 1448 carries
+		// `<remoteformat …></remoteformat>` in all 15 captures whose record has 150 and the 21-byte-shorter
+		// `<localized … flags="" …>` in all 5 with 175 (every other scalar identical). The importer's region
+		// verification groups on this so it compares like with like (#389).
+		public uint SnapshotXpReward { get; set; }
 
-		public ulong SnapshotUnknownF8 { get; set; }
+		public ulong SnapshotCashReward { get; set; }
 	}
 
 	// The server-side trigger that advances a quest goal (Gitea #261). Persisted as an int; ordering is stable.
@@ -269,7 +296,7 @@ namespace Faolan.Core.Database.Tables
 		ListSubLine = 2, // category 50303 - journal list sub-line
 		Objective = 3, // category 50304 - objective text (full-update)
 		ObjectiveLocalized = 4, // <localized> objective detail (full-update)
-		AreaTitle = 5, // category 50300 - region/journal title (shared header)
+		QuestLineTitle = 5, // category 50300 - the quest LINE's title (shared header)
 		RegionName = 6, // category 52000, id 4 - region name (shared header)
 		MapName = 7 // category 52000, id = map id - map name (shared header)
 	}

@@ -75,6 +75,14 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB only, no corpus and no DB: the client's own quest catalog, RDB type 1000104 (#568). The DEFINITION
+			// side of the quest system - every quest in the game, with the designers' names in plaintext.
+			if (report == "rdb-quest-catalog")
+			{
+				RdbQuestCatalog(RdbDir(), arg);
+				return 0;
+			}
+
 			// RDB (plaintext LDB) + DB (the goal catalog), no corpus: what each goal's TRAILING typed reference resolves
 			// to, and whether that string can serve as the match key `TargetName` is (#521).
 			if (report == "quest-goal-targets")
@@ -596,7 +604,7 @@ namespace Faolan.Importer.Cli
 
 				default:
 				{
-					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets, ldb-strings, ldb-resolve, ldb-quest-text, quest-goal-targets, bounded-areas.");
+					await Console.Error.WriteLineAsync($"Unknown report '{report}'. Known: coverage, conversation-states, anim, worldobj, spell-fields, rdb-assets, ldb-strings, ldb-resolve, ldb-quest-text, quest-goal-targets, bounded-areas, rdb-quest-catalog.");
 					return 1;
 				}
 			}

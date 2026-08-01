@@ -574,9 +574,9 @@ namespace Faolan.GameServer
 				? []
 				: await LoadCompletedJournal(character);
 
-			// The quest INDEX needs, per active quest, its AREA's 4CC and that area's full quest catalog ordered by
+			// The quest INDEX needs, per active quest, its LINE's 4CC and that line's full quest catalog ordered by
 			// JournalSequence (#390) - neither is per-quest data.
-			var (indexAreas, areaCatalog) = await LoadAreaCatalog(snapshotQuests);
+			var (indexLines, lineCatalog) = await LoadLineCatalog(snapshotQuests);
 			var instance = client.Session.Character.Id;
 			var equipped = new Dictionary<ulong, (Item Item, uint Hash)>();
 			foreach (var slot in InventoryEquippedSlots)
@@ -593,7 +593,7 @@ namespace Faolan.GameServer
 			var typedRoot = FullCharacterRoots.ForCharacter(characterTags, FullCharacterRoots.FullExpansionFlags, FullCharacterRoots.FullSubscriptionFlags, false, true,
 				FullCharacterRoots.Containers(instance, equipped, bagFirst, inventoryRows ?? []));
 			var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
-				indexAreas, areaCatalog);
+				indexLines, lineCatalog);
 			var snapshot = BuildWorldEntrySnapshot(client, typedRoot, tails);
 
 			// TODO: Just send all? no need to batch them

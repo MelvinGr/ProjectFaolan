@@ -103,12 +103,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 		{
 			ArgumentNullException.ThrowIfNull(v);
 			s.WriteUInt32(Opcode).WriteUInt32(EntityClass.Character).WriteUInt32(v.PlayerHandle).WriteByte((byte)0x01)
-				.WriteUInt32((uint)v.Operation).WriteUInt32(v.AreaId).WriteUInt32(v.TrackedQuestId).WriteUInt32(v.Entries.Count);
+				.WriteUInt32((uint)v.Operation).WriteUInt32(v.QuestLineId).WriteUInt32(v.TrackedQuestId).WriteUInt32(v.Entries.Count);
 
 			foreach (var e in v.Entries)
 				s.WriteUInt32(e.Ordinal).WriteUInt32(e.QuestId);
 
-			s.WriteString(v.AreaTitle);
+			s.WriteString(v.QuestLineTitle);
 			s.WriteUInt32(v.Unknown0).WriteUInt32(v.Unknown1).WriteUInt32(v.Unknown2).WriteUInt16(v.LeavingMissionArea);
 		}
 	}
@@ -133,10 +133,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 	public sealed record MainQuestUpdateIIR(
 		uint PlayerHandle,
 		MainQuestUpdateOp Operation,
-		uint AreaId,
+		uint QuestLineId,
 		uint TrackedQuestId,
 		IReadOnlyList<MainQuestUpdateEntry> Entries,
-		string AreaTitle)
+		string QuestLineTitle)
 	{
 		// The three trailing words. `Activate()`'s Add case forwards all three into the character's quest holder
 		// (`FUN_00810840` stores two of them at holder+0x48 / +0x50); nothing names or checks them. Across the 46

@@ -5,16 +5,16 @@ using Faolan.Core.Database.Tables;
 
 namespace Faolan.Importer.Extractors
 {
-	// Harvests QuestArea rows from the COMPLETED-quest journal of captured snapshots
+	// Harvests QuestLine rows from the COMPLETED-quest journal of captured snapshots
 	// (CompletedQuestJournalRegion, Gitea #390) - the only place an area's goal-table name word appears on the wire.
 	//
 	// The 4CC is a property of the AREA, not of a quest, which is why QuestDefinition.IndexMagic - modelling it
 	// per-quest - only ever had two rows filled from the beach/Casilda seeds (#389).
-	public static class QuestAreaExtractor
+	public static class QuestLineExtractor
 	{
-		public static List<QuestArea> Extract(IReadOnlyList<CapturedPacket> packets)
+		public static List<QuestLine> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
-			var byArea = new Dictionary<uint, QuestArea>();
+			var byArea = new Dictionary<uint, QuestLine>();
 			if (packets == null)
 				return [];
 
@@ -27,23 +27,23 @@ namespace Faolan.Importer.Extractors
 				{
 					// First writer wins: every capture of the same area carries the same words, and a later partial
 					// read should not overwrite a good one.
-					if (byArea.ContainsKey(area.AreaId))
+					if (byArea.ContainsKey(area.QuestLineId))
 						continue;
 
-					var title = Parse(area.AreaTitle);
+					var title = Parse(area.QuestLineTitle);
 					var map = Parse(area.MapName);
 					var region = Parse(area.RegionName);
 					if (title == null || map == null || region == null)
 						continue;
 
-					byArea[area.AreaId] = new QuestArea
+					byArea[area.QuestLineId] = new QuestLine
 					{
-						AreaId = area.AreaId,
+						QuestLineId = area.QuestLineId,
 						Magic = area.Magic,
 						TableField1 = area.TableField1,
-						AreaTitleRefId = title.RefId,
-						AreaTitleCategory = title.Category,
-						AreaTitleKey = LdbKey.Decode(title.Key) ?? new(),
+						TitleRefId = title.RefId,
+						TitleCategory = title.Category,
+						TitleKey = LdbKey.Decode(title.Key) ?? new(),
 						MapRefId = map.RefId,
 						MapCategory = map.Category,
 						MapKey = LdbKey.Decode(map.Key) ?? new(),
@@ -68,13 +68,13 @@ namespace Faolan.Importer.Extractors
 						continue;
 
 					var quest = journal.FirstOrDefault(r => r.QuestId == block.TrailerQuestId);
-					if (quest == null || quest.AreaId == 0 || byArea.ContainsKey(quest.AreaId))
+					if (quest == null || quest.QuestLineId == 0 || byArea.ContainsKey(quest.QuestLineId))
 						continue;
 
 					// Only the 4CC is available here - the area's header records are not part of the index.
-					byArea[quest.AreaId] = new QuestArea
+					byArea[quest.QuestLineId] = new QuestLine
 					{
-						AreaId = quest.AreaId,
+						QuestLineId = quest.QuestLineId,
 						Magic = block.Magic
 					};
 				}

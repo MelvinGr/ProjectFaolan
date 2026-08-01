@@ -52,7 +52,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var def in byQuest.Values)
 			{
-				if (hashByArea.TryGetValue(def.AreaId, out var hash))
+				if (hashByArea.TryGetValue(def.QuestLineId, out var hash))
 					def.IndexMagic = hash;
 			}
 
@@ -115,9 +115,9 @@ namespace Faolan.Importer.Extractors
 				return; // not a well-formed full-update
 
 			var def = GetOrAdd(byQuest, record.QuestId);
-			def.AreaId = record.AreaId;
+			def.QuestLineId = record.QuestLineId;
 			def.GoalId = objective.Id;
-			def.Level = record.State;
+			def.Level = record.Level;
 
 			var (region, map) = RegionAndMap(record);
 			if (map != null)
@@ -129,7 +129,7 @@ namespace Faolan.Importer.Extractors
 
 			SetRef(def, QuestTextSlot.Title, title);
 			SetRef(def, QuestTextSlot.Summary, TextRef(record.Summary));
-			SetRef(def, QuestTextSlot.AreaTitle, areaTitle);
+			SetRef(def, QuestTextSlot.QuestLineTitle, areaTitle);
 			SetRef(def, QuestTextSlot.RegionName, region);
 			SetRef(def, QuestTextSlot.MapName, map);
 			SetRef(def, QuestTextSlot.Objective, objective);
@@ -202,7 +202,7 @@ namespace Faolan.Importer.Extractors
 			foreach (var area in new[] { list.Area }.Concat(list.MoreAreas))
 			{
 				if (area.AcgHash != 0)
-					hashByArea[area.AreaId] = area.AcgHash;
+					hashByArea[area.QuestLineId] = area.AcgHash;
 
 				foreach (var entry in area.Entries)
 				{
@@ -225,27 +225,27 @@ namespace Faolan.Importer.Extractors
 				return; // not a well-formed record
 
 			var def = GetOrAdd(byQuest, record.QuestId);
-			def.AreaId = record.AreaId;
+			def.QuestLineId = record.QuestLineId;
 			def.HasSnapshotRecord = true;
 
 			// The record's state word IS the quest level (see QuestDefinition.Level). Do not clobber a value already
 			// harvested from a QuestFullUpdate - they agree where both exist, and the full-update is the older source.
 			if (def.Level == 0)
-				def.Level = record.State;
+				def.Level = record.Level;
 
-			def.SnapshotUnknown14 = record.Unknown14;
+			def.SnapshotQuestLineFlags = record.QuestLineFlags;
 			def.SnapshotUnknown118 = record.Field118;
 			def.SnapshotUnknownEc = record.FieldEc;
-			def.SnapshotUnknownF0 = record.FieldF0;
-			def.SnapshotUnknownF8 = record.FieldF8;
-			def.SnapshotUnknown28 = record.Field28;
+			def.SnapshotXpReward = record.XpReward;
+			def.SnapshotCashReward = record.CashReward;
+			def.SnapshotQuestLineReward = record.QuestLineReward;
 			def.SnapshotChainHeadQuestId = record.Field2c;
 
 			var (region, map) = RegionAndMap(record);
 
 			SetRef(def, QuestTextSlot.Title, title);
 			SetRef(def, QuestTextSlot.Summary, TextRef(record.Summary));
-			SetRef(def, QuestTextSlot.AreaTitle, areaTitle);
+			SetRef(def, QuestTextSlot.QuestLineTitle, areaTitle);
 			SetRef(def, QuestTextSlot.RegionName, region);
 			SetRef(def, QuestTextSlot.MapName, map);
 			if (map != null && def.MapId == 0)

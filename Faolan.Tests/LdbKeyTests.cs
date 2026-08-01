@@ -107,9 +107,9 @@ namespace Faolan.Tests
 			var keys = (await db.QuestGoalDefinitions.AsNoTracking().Select(g => g.ObjectiveKey).ToListAsync(ct))
 				.Concat(await db.QuestGoalDefinitions.AsNoTracking().Select(g => g.TrailingKey).ToListAsync(ct))
 				.Concat(await db.QuestTextRefs.AsNoTracking().Select(r => r.KeyText).ToListAsync(ct))
-				.Concat(await db.QuestAreas.AsNoTracking().Select(a => a.AreaTitleKey).ToListAsync(ct))
-				.Concat(await db.QuestAreas.AsNoTracking().Select(a => a.MapKey).ToListAsync(ct))
-				.Concat(await db.QuestAreas.AsNoTracking().Select(a => a.RegionKey).ToListAsync(ct))
+				.Concat(await db.QuestLines.AsNoTracking().Select(a => a.TitleKey).ToListAsync(ct))
+				.Concat(await db.QuestLines.AsNoTracking().Select(a => a.MapKey).ToListAsync(ct))
+				.Concat(await db.QuestLines.AsNoTracking().Select(a => a.RegionKey).ToListAsync(ct))
 				// ...and the DIALOGUE half of the encrypted set (categories 50000-50003): conversation screens and
 				// their parameters, stock phrases, NPC barks, world-object display text.
 				.Concat(await db.ConversationScreens.AsNoTracking().Select(c => c.Key).ToListAsync(ct))

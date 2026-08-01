@@ -324,7 +324,7 @@ scanner was positive-controlled. It was looking for a 16-byte binary constant; t
 base-85 string, different for every string, delivered per reference**.
 
 ⚠️ **We already hold 27,037 of these keys**, harvested from captures across eleven columns — the QUEST half
-(`QuestGoalDefinition.ObjectiveKey`/`TrailingKey`, `QuestTextRef.KeyText`, `QuestArea.AreaTitleKey`/`MapKey`/
+(`QuestGoalDefinition.ObjectiveKey`/`TrailingKey`, `QuestTextRef.KeyText`, `QuestLine.TitleKey`/`MapKey`/
 `RegionKey`) and the DIALOGUE half (`ConversationScreen.Key`, `ConversationScreenParameter.ContentKey`,
 `StockPhrase.FormatKey`, `NpcChatter.FormatKey`, `WorldObject.DisplayKey`). They are stored as
 the **128-bit TEA key** (`ProtoDecryptionKey`, the same shape an item template's key uses), not as the wire

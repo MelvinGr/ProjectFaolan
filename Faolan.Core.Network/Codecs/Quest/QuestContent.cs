@@ -5,7 +5,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	public static class QuestContent
 	{
 		// The category of the area journal-title remoteformat.
-		public const uint AreaTitleCategory = 50300;
+		public const uint TitleCategory = 50300;
 
 		// The Tortage beach world-entry snapshot (0x737A6DF9) embeds quest 10238 ("Shipwrecked") in its tails, with its
 		// FULL multi-objective journal record, for every character (snapshot_embeds_strie_quest). The snapshot is the

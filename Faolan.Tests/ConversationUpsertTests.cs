@@ -19,7 +19,7 @@ namespace Faolan.Tests
 	// answer PATH, so the two contribute different rows and must UNION, not overwrite each other.
 	public class ConversationUpsertTests
 	{
-		private const uint AreaId = 241;
+		private const uint QuestLineId = 241;
 		private const uint GrantedQuestId = 13479;
 		private const uint MapId = 4010;
 		private const uint TypeId = 42008;
@@ -139,14 +139,14 @@ namespace Faolan.Tests
 					Id = MapId,
 					Name = "Tortage Island"
 				});
-				db.QuestAreas.Add(new QuestArea
+				db.QuestLines.Add(new QuestLine
 				{
-					AreaId = AreaId
+					QuestLineId = QuestLineId
 				});
 				db.QuestDefinitions.Add(new QuestDefinition
 				{
 					QuestId = GrantedQuestId,
-					AreaId = AreaId,
+					QuestLineId = QuestLineId,
 					MapId = MapId
 				});
 				await db.SaveChangesAsync(TestContext.Current.CancellationToken);

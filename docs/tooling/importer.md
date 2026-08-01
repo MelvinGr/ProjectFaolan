@@ -207,7 +207,12 @@ Read-only inspection modes are **not** imports and don't share the import runner
 dumps every record of one phase in full),
 `bounded-areas` (the client's trigger-volume survey — no arg prints the census, `--report-arg <bucket>` lists one
 bucket and cross-checks it against what we already hold; see
-[bounded-areas-1000053.md](../rdb/bounded-areas-1000053.md)), … — the report's
+[bounded-areas-1000053.md](../rdb/bounded-areas-1000053.md)),
+`rdb-quest-catalog` (the client's OWN quest catalog, RDB type 1000104 — 2181 quest lines / 5042 quests / 7327
+goals with the designers' names in plaintext. No arg prints a summary, a populated-field census and three flat
+TSV sections; `--report-arg <line or quest id>` prints that line as a tree. It also cross-checks `MainQuest.hash`
+against the four `ACGHash` line tokens recovered from captures, which is what establishes that our `QuestLineId`
+IS the client's `MainQuest.template_id`; see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)), … — the report's
 target comes from `--report-arg`), read captures or the DB, and never write — independent of `--dry-run`.
 
 ## Decisions

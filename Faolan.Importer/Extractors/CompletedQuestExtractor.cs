@@ -31,13 +31,13 @@ namespace Faolan.Importer.Extractors
 
 				foreach (var area in completed.Areas)
 				{
-					var areaTitle = Parse(area.AreaTitle);
+					var areaTitle = Parse(area.QuestLineTitle);
 					var region = Parse(area.RegionName);
 					var map = Parse(area.MapName);
 					if (areaTitle == null || region == null || map == null)
 						continue;
 
-					areas.TryAdd(area.AreaId, new AreaHeader(area.AreaId, map.RefId, areaTitle, region, map));
+					areas.TryAdd(area.QuestLineId, new AreaHeader(area.QuestLineId, map.RefId, areaTitle, region, map));
 
 					foreach (var q in area.Quests)
 					{
@@ -49,7 +49,7 @@ namespace Faolan.Importer.Extractors
 						if (title == null || subLine == null)
 							continue;
 
-						quests[q.QuestId] = new CompletedQuest(q.QuestId, area.AreaId, map.RefId, q.Sequence, title, subLine);
+						quests[q.QuestId] = new CompletedQuest(q.QuestId, area.QuestLineId, map.RefId, q.Sequence, title, subLine);
 					}
 				}
 			}
@@ -92,12 +92,12 @@ namespace Faolan.Importer.Extractors
 			return new TextRef(AttrUInt(xml, "id"), AttrUInt(xml, "category"), key, Attr(xml, "flags"), xml.Contains("<localized", StringComparison.Ordinal), Attr(xml, "token"));
 		}
 
-		public sealed record CompletedQuest(uint QuestId, uint AreaId, uint MapId, uint Sequence, TextRef Title, TextRef SubLine);
+		public sealed record CompletedQuest(uint QuestId, uint QuestLineId, uint MapId, uint Sequence, TextRef Title, TextRef SubLine);
 
 		public sealed record TextRef(uint RefId, uint Category, string Key, string? Flags, bool IsLocalized, string? Token);
 
 		public sealed record Harvest(List<CompletedQuest> Quests, Dictionary<uint, AreaHeader> Areas);
 
-		public sealed record AreaHeader(uint AreaId, uint MapId, TextRef Title, TextRef Region, TextRef Map);
+		public sealed record AreaHeader(uint QuestLineId, uint MapId, TextRef Title, TextRef Region, TextRef Map);
 	}
 }

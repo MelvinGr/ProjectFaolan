@@ -487,56 +487,56 @@ namespace Faolan.GameServer
 		// The area rows + area quest catalogs the quest INDEX needs for a set of active quests. The catalog is every
 		// quest of the area ordered by JournalSequence - static area data, not the character's journal: a freshly
 		// created character carries its area's whole list in the captures (#390).
-		private async Task<(Dictionary<uint, QuestArea> Areas, Dictionary<uint, IReadOnlyList<QuestDefinition>> Catalog)> LoadAreaCatalog(IReadOnlyList<QuestDefinition> quests)
+		private async Task<(Dictionary<uint, QuestLine> Lines, Dictionary<uint, IReadOnlyList<QuestDefinition>> Catalog)> LoadLineCatalog(IReadOnlyList<QuestDefinition> quests)
 		{
-			var areas = new Dictionary<uint, QuestArea>();
+			var lines = new Dictionary<uint, QuestLine>();
 			var catalog = new Dictionary<uint, IReadOnlyList<QuestDefinition>>();
 			if (quests.Count == 0)
-				return (areas, catalog);
+				return (lines, catalog);
 
-			var allAreas = (await Database.GetQuestAreas()).ToDictionary(a => a.AreaId);
-			foreach (var areaId in quests.Select(q => q.AreaId).Distinct())
+			var allLines = (await Database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
+			foreach (var lineId in quests.Select(q => q.QuestLineId).Distinct())
 			{
-				if (allAreas.TryGetValue(areaId, out var area))
-					areas[areaId] = area;
+				if (allLines.TryGetValue(lineId, out var line))
+					lines[lineId] = line;
 
-				catalog[areaId] = await Database.GetQuestDefinitionsByArea(areaId);
+				catalog[lineId] = await Database.GetQuestDefinitionsByLine(lineId);
 			}
 
-			return (areas, catalog);
+			return (lines, catalog);
 		}
 
-		// The character's COMPLETED-quest journal, grouped by area (#390) - the Completed tab's contents. Retail ships
+		// The character's COMPLETED-quest journal, grouped by quest line (#390) - the Completed tab's contents. Retail ships
 		// this in the login snapshot and sends no quest packets at all before the first in-session accept, so this is
 		// the ONLY path that populates that tab.
 		//
 		// The order is ours to choose: the wire order is per-character in the captures, but the client re-sorts for
 		// display (retail renders alphabetically while the wire does not), so a stable areaId/questId ordering is
 		// enough. A quest whose area has no row, or that has no definition, is skipped rather than guessed at.
-		private async Task<List<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>> LoadCompletedJournal(Character character)
+		private async Task<List<(QuestLine Line, IReadOnlyList<QuestDefinition> Quests)>> LoadCompletedJournal(Character character)
 		{
-			var groups = new List<(QuestArea, IReadOnlyList<QuestDefinition>)>();
+			var groups = new List<(QuestLine, IReadOnlyList<QuestDefinition>)>();
 
 			var completed = (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Completed).ToList();
 			if (completed.Count == 0)
 				return groups;
 
-			var areas = (await Database.GetQuestAreas()).ToDictionary(a => a.AreaId);
-			var byArea = new SortedDictionary<uint, List<QuestDefinition>>();
+			var lines = (await Database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
+			var byLine = new SortedDictionary<uint, List<QuestDefinition>>();
 
 			foreach (var cq in completed)
 			{
 				var def = await Database.GetQuestDefinition(cq.QuestId);
-				if (def == null || def.AreaId == 0 || !areas.ContainsKey(def.AreaId))
+				if (def == null || def.QuestLineId == 0 || !lines.ContainsKey(def.QuestLineId))
 					continue;
 
-				(byArea.TryGetValue(def.AreaId, out var list)
+				(byLine.TryGetValue(def.QuestLineId, out var list)
 					? list
-					: byArea[def.AreaId] = []).Add(def);
+					: byLine[def.QuestLineId] = []).Add(def);
 			}
 
-			foreach (var (areaId, defs) in byArea)
-				groups.Add((areas[areaId], defs.OrderBy(d => d.QuestId).ToList()));
+			foreach (var (lineId, defs) in byLine)
+				groups.Add((lines[lineId], defs.OrderBy(d => d.QuestId).ToList()));
 
 			return groups;
 		}
@@ -553,11 +553,11 @@ namespace Faolan.GameServer
 
 			// Data-driven: the journal is exactly the character's ACTIVE, snapshot-eligible quests - no quest is forced
 			// in. A completed/abandoned quest (not Active) is excluded, so it never lingers as a phantom (#...).
-			var areaRows = (await Database.GetQuestAreas()).ToDictionary(a => a.AreaId);
+			var lineRows = (await Database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
 			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
 			{
 				var def = await Database.GetQuestDefinition(cq.QuestId);
-				if (def != null && areaRows.TryGetValue(def.AreaId, out var area) && SnapshotTails.IsSnapshotEligible(def, area))
+				if (def != null && lineRows.TryGetValue(def.QuestLineId, out var line) && SnapshotTails.IsSnapshotEligible(def, line))
 					quests.Add(def);
 			}
 

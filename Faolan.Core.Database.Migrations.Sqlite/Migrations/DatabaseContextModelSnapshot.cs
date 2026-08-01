@@ -2719,46 +2719,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("PatrolNodeWords");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.QuestArea", b =>
-                {
-                    b.Property<uint>("AreaId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("AreaTitleCategory")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("AreaTitleRefId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Magic")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("MapCategory")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("MapRefId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("RegionCategory")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("RegionRefId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("TableField1")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("AreaId");
-
-                    b.ToTable("QuestAreas");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestDefinition", b =>
                 {
                     b.Property<uint>("QuestId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("AreaId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("GoalId")
@@ -2767,15 +2730,15 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<bool>("HasSnapshotRecord")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("IndexAreaQuestIds")
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
                     b.Property<uint>("IndexMagic")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("IndexMarker")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("IndexQuestLineQuestIds")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
 
                     b.Property<uint>("IndexTableField1")
                         .HasColumnType("INTEGER");
@@ -2810,25 +2773,28 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<bool>("ObjectiveRegionVerified")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("QuestLineId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("SnapshotCashReward")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("SnapshotChainHeadQuestId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("SnapshotQuestLineFlags")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("SnapshotQuestLineReward")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("SnapshotUnknown118")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("SnapshotUnknown14")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("SnapshotUnknown28")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("SnapshotUnknownEc")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("SnapshotUnknownF0")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<ulong>("SnapshotUnknownF8")
+                    b.Property<uint>("SnapshotXpReward")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("Verified")
@@ -2836,9 +2802,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.HasKey("QuestId");
 
-                    b.HasIndex("AreaId");
-
                     b.HasIndex("MapId");
+
+                    b.HasIndex("QuestLineId");
 
                     b.ToTable("QuestDefinitions");
                 });
@@ -2972,6 +2938,40 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasIndex("RegionId");
 
                     b.ToTable("QuestGoalDefinitions");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.QuestLine", b =>
+                {
+                    b.Property<uint>("QuestLineId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Magic")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("MapCategory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("MapRefId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("RegionCategory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("RegionRefId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("TableField1")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("TitleCategory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("TitleRefId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("QuestLineId");
+
+                    b.ToTable("QuestLines");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestTextRef", b =>
@@ -4747,120 +4747,21 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("PatrolNode");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.QuestArea", b =>
-                {
-                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "AreaTitleKey", b1 =>
-                        {
-                            b1.Property<uint>("QuestAreaAreaId")
-                                .HasColumnType("INTEGER");
-
-                            b1.Property<uint>("Key1")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("AreaTitleKey1");
-
-                            b1.Property<uint>("Key2")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("AreaTitleKey2");
-
-                            b1.Property<uint>("Key3")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("AreaTitleKey3");
-
-                            b1.Property<uint>("Key4")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("AreaTitleKey4");
-
-                            b1.HasKey("QuestAreaAreaId");
-
-                            b1.ToTable("QuestAreas");
-
-                            b1.WithOwner()
-                                .HasForeignKey("QuestAreaAreaId");
-                        });
-
-                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "MapKey", b1 =>
-                        {
-                            b1.Property<uint>("QuestAreaAreaId")
-                                .HasColumnType("INTEGER");
-
-                            b1.Property<uint>("Key1")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("MapKey1");
-
-                            b1.Property<uint>("Key2")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("MapKey2");
-
-                            b1.Property<uint>("Key3")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("MapKey3");
-
-                            b1.Property<uint>("Key4")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("MapKey4");
-
-                            b1.HasKey("QuestAreaAreaId");
-
-                            b1.ToTable("QuestAreas");
-
-                            b1.WithOwner()
-                                .HasForeignKey("QuestAreaAreaId");
-                        });
-
-                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "RegionKey", b1 =>
-                        {
-                            b1.Property<uint>("QuestAreaAreaId")
-                                .HasColumnType("INTEGER");
-
-                            b1.Property<uint>("Key1")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("RegionKey1");
-
-                            b1.Property<uint>("Key2")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("RegionKey2");
-
-                            b1.Property<uint>("Key3")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("RegionKey3");
-
-                            b1.Property<uint>("Key4")
-                                .HasColumnType("INTEGER")
-                                .HasColumnName("RegionKey4");
-
-                            b1.HasKey("QuestAreaAreaId");
-
-                            b1.ToTable("QuestAreas");
-
-                            b1.WithOwner()
-                                .HasForeignKey("QuestAreaAreaId");
-                        });
-
-                    b.Navigation("AreaTitleKey")
-                        .IsRequired();
-
-                    b.Navigation("MapKey")
-                        .IsRequired();
-
-                    b.Navigation("RegionKey")
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestDefinition", b =>
                 {
-                    b.HasOne("Faolan.Core.Database.Tables.QuestArea", "Area")
-                        .WithMany("Quests")
-                        .HasForeignKey("AreaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("Faolan.Core.Database.Tables.Map", "Map")
                         .WithMany()
                         .HasForeignKey("MapId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Area");
+                    b.HasOne("Faolan.Core.Database.Tables.QuestLine", "Line")
+                        .WithMany("Quests")
+                        .HasForeignKey("QuestLineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Line");
 
                     b.Navigation("Map");
                 });
@@ -4955,6 +4856,105 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Region");
 
                     b.Navigation("TrailingKey")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.QuestLine", b =>
+                {
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "MapKey", b1 =>
+                        {
+                            b1.Property<uint>("QuestLineId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("MapKey1");
+
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("MapKey2");
+
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("MapKey3");
+
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("MapKey4");
+
+                            b1.HasKey("QuestLineId");
+
+                            b1.ToTable("QuestLines");
+
+                            b1.WithOwner()
+                                .HasForeignKey("QuestLineId");
+                        });
+
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "RegionKey", b1 =>
+                        {
+                            b1.Property<uint>("QuestLineId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("RegionKey1");
+
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("RegionKey2");
+
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("RegionKey3");
+
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("RegionKey4");
+
+                            b1.HasKey("QuestLineId");
+
+                            b1.ToTable("QuestLines");
+
+                            b1.WithOwner()
+                                .HasForeignKey("QuestLineId");
+                        });
+
+                    b.OwnsOne("Faolan.Core.Protobuf.ProtoDecryptionKey", "TitleKey", b1 =>
+                        {
+                            b1.Property<uint>("QuestLineId")
+                                .HasColumnType("INTEGER");
+
+                            b1.Property<uint>("Key1")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("TitleKey1");
+
+                            b1.Property<uint>("Key2")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("TitleKey2");
+
+                            b1.Property<uint>("Key3")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("TitleKey3");
+
+                            b1.Property<uint>("Key4")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("TitleKey4");
+
+                            b1.HasKey("QuestLineId");
+
+                            b1.ToTable("QuestLines");
+
+                            b1.WithOwner()
+                                .HasForeignKey("QuestLineId");
+                        });
+
+                    b.Navigation("MapKey")
+                        .IsRequired();
+
+                    b.Navigation("RegionKey")
+                        .IsRequired();
+
+                    b.Navigation("TitleKey")
                         .IsRequired();
                 });
 
@@ -5355,16 +5355,16 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Words");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.QuestArea", b =>
-                {
-                    b.Navigation("Quests");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.QuestDefinition", b =>
                 {
                     b.Navigation("Goals");
 
                     b.Navigation("TextRefs");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.QuestLine", b =>
+                {
+                    b.Navigation("Quests");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.Realm", b =>

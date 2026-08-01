@@ -13,14 +13,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// One journal record from a QuestDefinition: its 5 header text refs + areaId, plus the per-quest scalars that
 		// are carried from the capture rather than derived (the Snapshot* columns). The numeric objective lists are
 		// left empty - the objective TEXT rides in the strings; see docs/re/fullplayer-snapshot-reader.md.
-		public static QuestcRecord ForQuest(QuestDefinition def, uint state)
+		public static QuestcRecord ForQuest(QuestDefinition def, uint level)
 		{
 			ArgumentNullException.ThrowIfNull(def);
 
 			return new QuestcRecord
 			{
 				QuestId = def.QuestId,
-				State = state,
+				Level = level,
 				Field114 = 0,
 				// The SnapshotUnknown118 column feeds field118 despite its name - the DB column keeps the old
 				// (mislabeled) name to avoid a rename migration.
@@ -29,14 +29,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 				// quest, which is only right for the beach journal - captured records vary (NecroL80's run 2, 10, ...).
 				// Substituting a constant here is the same mistake as defaulting the vanity mask: the wire must carry
 				// what retail carried.
-				Unknown14 = def.SnapshotUnknown14,
+				QuestLineFlags = def.SnapshotQuestLineFlags,
 				Title = Slot(QuestTextSlot.Title),
 				Summary = Slot(QuestTextSlot.Summary),
-				Area = Slot(QuestTextSlot.AreaTitle),
+				Area = Slot(QuestTextSlot.QuestLineTitle),
 				Region1 = Slot(QuestTextSlot.RegionName),
 				Region2 = Slot(QuestTextSlot.MapName),
 				FieldEc = def.SnapshotUnknownEc,
-				AreaId = def.AreaId,
+				QuestLineId = def.QuestLineId,
 				// @+0x2c is the series HEAD, not this quest's id (#566) - equal for a standalone quest, an earlier
 				// step for a chain member. Falls back to the own id when the column was never harvested, which is
 				// both the standalone answer and what we emitted before the column existed.
@@ -45,9 +45,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 					: def.SnapshotChainHeadQuestId,
 				Field11c = 0,
 				Accept = 0,
-				Field28 = def.SnapshotUnknown28,
-				FieldF0 = def.SnapshotUnknownF0,
-				FieldF8 = def.SnapshotUnknownF8
+				QuestLineReward = def.SnapshotQuestLineReward,
+				XpReward = def.SnapshotXpReward,
+				CashReward = def.SnapshotCashReward
 			};
 
 			string Slot(QuestTextSlot slot)

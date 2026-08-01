@@ -77,8 +77,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 		internal static void Write(FaolanStream s, QuestJournalArea v)
 		{
 			ArgumentNullException.ThrowIfNull(v);
-			s.WriteUInt32(v.AreaId);
-			s.WriteString(v.AreaTitle);
+			s.WriteUInt32(v.QuestLineId);
+			s.WriteString(v.QuestLineTitle);
 			s.WriteString(v.MapName);
 			s.WriteString(v.RegionName);
 			s.WriteUInt32(v.AcgHash);
@@ -118,8 +118,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 	// One area's block of the journal: the shared header plus that area's quest lines.
 	public sealed record QuestJournalArea(
-		uint AreaId,
-		string AreaTitle, // <remoteformat category=50300>
+		uint QuestLineId,
+		string QuestLineTitle, // <remoteformat category=50300>
 		string MapName, // <remoteformat category=52000>
 		string RegionName, // <remoteformat category=52000>
 		IReadOnlyList<QuestJournalEntry> Entries)

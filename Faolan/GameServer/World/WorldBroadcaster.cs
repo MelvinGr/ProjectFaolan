@@ -2249,7 +2249,7 @@ namespace Faolan.GameServer.World
 		// player's active quests with the tracked one FIRST. The area-title slot comes from the tracked quest's def.
 		public static Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds)
 		{
-			var body = MainQuestUpdateCodec.Build(client.Session.Character.Id, trackedDef.AreaId, trackedDef.QuestId, activeQuestIds, QuestTextTokens.Record(trackedDef, QuestTextSlot.AreaTitle));
+			var body = MainQuestUpdateCodec.Build(client.Session.Character.Id, trackedDef.QuestLineId, trackedDef.QuestId, activeQuestIds, QuestTextTokens.Record(trackedDef, QuestTextSlot.QuestLineTitle));
 			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));
 		}

@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// opposite order (#390). It is not stored either, since the client demonstrably re-sorts for display (retail
 		// renders alphabetically while the wire does not), so callers pass whatever deterministic order they like and
 		// the tests pass a capture's own order to compare byte-for-byte.
-		public static CompletedQuestJournalRegion ForAreas(IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)> groups)
+		public static CompletedQuestJournalRegion ForAreas(IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)> groups)
 		{
 			ArgumentNullException.ThrowIfNull(groups);
 
@@ -23,8 +23,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			{
 				var group = new CompletedQuestJournalRegion.AreaGroup
 				{
-					AreaId = area.AreaId,
-					AreaTitle = QuestTextTokens.RemoteFormat(area.AreaTitleRefId, area.AreaTitleCategory, area.AreaTitleKey),
+					QuestLineId = area.QuestLineId,
+					QuestLineTitle = QuestTextTokens.RemoteFormat(area.TitleRefId, area.TitleCategory, area.TitleKey),
 					MapName = QuestTextTokens.RemoteFormat(area.MapRefId, area.MapCategory, area.MapKey),
 					RegionName = QuestTextTokens.RemoteFormat(area.RegionRefId, area.RegionCategory, area.RegionKey),
 					Magic = area.Magic,

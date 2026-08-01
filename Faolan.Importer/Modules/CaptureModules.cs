@@ -912,10 +912,10 @@ namespace Faolan.Importer.Modules
 			var packets = ctx.Captures.SelectMany(c => c.Packets).ToList();
 			var defs = QuestDefinitionExtractor.Extract(packets);
 
-			// Areas FIRST: QuestDefinition.AreaId is an FK, so every area a definition points at must already have a
+			// Areas FIRST: QuestDefinition.QuestLineId is an FK, so every area a definition points at must already have a
 			// row. The 4CCs come from the completed-quest journal (#390); the rest are placeholders.
-			var areas = QuestAreaExtractor.Extract(packets);
-			var areaCount = await ImportOps.ImportQuestAreas(ctx.Db, areas, defs.Select(d => d.AreaId).Where(id => id != 0).Distinct().ToList());
+			var areas = QuestLineExtractor.Extract(packets);
+			var areaCount = await ImportOps.ImportQuestLines(ctx.Db, areas, defs.Select(d => d.QuestLineId).Where(id => id != 0).Distinct().ToList());
 
 			await ImportOps.ImportQuestDefinitions(ctx.Db, defs, ctx.Force);
 

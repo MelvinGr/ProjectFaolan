@@ -15,7 +15,7 @@ namespace Faolan.Tests
 {
 	// CONSTRUCT, don't replay: rebuild captured completed-quest journal regions from DB rows and compare byte-for-byte
 	// against the capture (#390). This is the gate that matters for generation - the parse round-trip only proves the
-	// codec agrees with itself, whereas this proves the harvested QuestDefinitions/QuestAreas actually reproduce the
+	// codec agrees with itself, whereas this proves the harvested QuestDefinitions/QuestLines actually reproduce the
 	// wire.
 	//
 	// Ordering is an INPUT, not stored state: the wire order is per-character and not derivable, and the client
@@ -34,7 +34,7 @@ namespace Faolan.Tests
 			int compared = 0, exact = 0, skipped = 0, lenDiff = 0, sameLenDiff = 0;
 			_ = lenDiff;
 			var failByQuest = new Dictionary<uint, int>();
-			// Failures in the variant we actually emit (record FieldF0 == the def's SnapshotUnknownF0) - the ones that
+			// Failures in the variant we actually emit (record XpReward == the def's SnapshotXpReward) - the ones that
 			// would mean shipping bytes retail never sent. A failure against another variant is not one of those.
 			var failByOurVariant = new Dictionary<uint, int>();
 			var fieldDiffs = new Dictionary<string, int>();
@@ -68,7 +68,7 @@ namespace Faolan.Tests
 				}
 
 				failByQuest[rec.QuestId] = failByQuest.GetValueOrDefault(rec.QuestId) + 1;
-				if (rec.FieldF0 == def.SnapshotUnknownF0)
+				if (rec.XpReward == def.SnapshotXpReward)
 					failByOurVariant[rec.QuestId] = failByOurVariant.GetValueOrDefault(rec.QuestId) + 1;
 
 				// Aggregate WHICH field differs, so the tail can be worked in priority order.
@@ -281,7 +281,7 @@ namespace Faolan.Tests
 				o.WriteLine($"  {first}");
 
 			// The hard gate is on what we SHIP: a quest flagged ObjectiveRegionVerified must rebuild byte-exact in
-			// every capture OF THE VARIANT WE EMIT - the captures whose record carries the same FieldF0 as the record
+			// every capture OF THE VARIANT WE EMIT - the captures whose record carries the same XpReward as the record
 			// we would send (ObjectiveGoalExtractor.CapturedRegions documents why F0 is the discriminator). Comparing
 			// across variants failed the beach starter for faithfully rendering the variant we don't emit.
 			// Overall coverage is reported, not asserted - the region still has undecoded fields, and the flag is what
@@ -300,9 +300,9 @@ namespace Faolan.Tests
 		{
 			await using var db = new DatabaseContext(TestDb.Options(TestPaths.FaolanDb));
 			var defs = await db.QuestDefinitions.ToDictionaryAsync(q => q.QuestId, TestContext.Current.CancellationToken);
-			var areaRows = await db.QuestAreas.ToDictionaryAsync(a => a.AreaId, TestContext.Current.CancellationToken);
-			var catalogs = (await db.QuestDefinitions.Where(q => q.AreaId != 0).ToListAsync(TestContext.Current.CancellationToken))
-				.GroupBy(q => q.AreaId)
+			var areaRows = await db.QuestLines.ToDictionaryAsync(a => a.QuestLineId, TestContext.Current.CancellationToken);
+			var catalogs = (await db.QuestDefinitions.Where(q => q.QuestLineId != 0).ToListAsync(TestContext.Current.CancellationToken))
+				.GroupBy(q => q.QuestLineId)
 				.ToDictionary(g => g.Key, g => (IReadOnlyList<QuestDefinition>)[.. g.OrderBy(q => q.JournalSequence)]);
 
 			int compared = 0, exact = 0, notGeneratable = 0;
@@ -373,9 +373,9 @@ namespace Faolan.Tests
 					foreach (var blk in captured.Blocks)
 					{
 						var def = defs.GetValueOrDefault(blk.TrailerQuestId);
-						if (def == null || !areaRows.TryGetValue(def.AreaId, out var area) || area.Magic != blk.Magic)
+						if (def == null || !areaRows.TryGetValue(def.QuestLineId, out var area) || area.Magic != blk.Magic)
 							return false;
-						if (!catalogs.TryGetValue(def.AreaId, out var cat) || cat.Count != blk.AreaQuestIds.Count)
+						if (!catalogs.TryGetValue(def.QuestLineId, out var cat) || cat.Count != blk.AreaQuestIds.Count)
 							return false;
 					}
 
@@ -397,7 +397,7 @@ namespace Faolan.Tests
 			await using var db = new DatabaseContext(TestDb.Options(TestPaths.FaolanDb));
 
 			var defs = await db.QuestDefinitions.Include(q => q.TextRefs).ToDictionaryAsync(q => q.QuestId, TestContext.Current.CancellationToken);
-			var areas = await db.QuestAreas.ToDictionaryAsync(a => a.AreaId, TestContext.Current.CancellationToken);
+			var areas = await db.QuestLines.ToDictionaryAsync(a => a.QuestLineId, TestContext.Current.CancellationToken);
 			o.WriteLine($"catalog: {defs.Count} quest definitions, {areas.Count} areas");
 
 			int regions = 0, rebuilt = 0, skippedUnknown = 0, mismatched = 0;
@@ -409,11 +409,11 @@ namespace Faolan.Tests
 
 				// Only regions whose every area AND quest we actually hold can be rebuilt; anything else would be
 				// testing the harvest's coverage rather than the builder.
-				var groups = new List<(QuestArea, IReadOnlyList<QuestDefinition>)>();
+				var groups = new List<(QuestLine, IReadOnlyList<QuestDefinition>)>();
 				var complete = true;
 				foreach (var g in region.Areas)
 				{
-					if (!areas.TryGetValue(g.AreaId, out var area) || !g.Quests.All(q => defs.ContainsKey(q.QuestId)))
+					if (!areas.TryGetValue(g.QuestLineId, out var area) || !g.Quests.All(q => defs.ContainsKey(q.QuestId)))
 					{
 						complete = false;
 						break;
@@ -454,7 +454,7 @@ namespace Faolan.Tests
 						continue;
 
 					var g = region.Areas[a];
-					firstMismatch = $"{source}: area[{a}] id={g.AreaId} quests={g.Quests.Count} " + $"magic=0x{g.Magic:X8} seqs=[{string.Join(",", g.Quests.Take(5).Select(q => q.Sequence))}] " +
+					firstMismatch = $"{source}: area[{a}] id={g.QuestLineId} quests={g.Quests.Count} " + $"magic=0x{g.Magic:X8} seqs=[{string.Join(",", g.Quests.Take(5).Select(q => q.Sequence))}] " +
 					                $"({cap.Length} B captured vs {got.Length} B built)";
 					break;
 				}
@@ -479,21 +479,21 @@ namespace Faolan.Tests
 		[Fact]
 		public void CompletedJournal_IsNotEmitted_WithoutActiveQuests()
 		{
-			var area = new QuestArea
+			var area = new QuestLine
 			{
-				AreaId = 241,
+				QuestLineId = 241,
 				Magic = 0x57365154,
-				AreaTitleKey = LdbKey.Decode("pARATX1!DX]\\So+0*A9B")!,
+				TitleKey = LdbKey.Decode("pARATX1!DX]\\So+0*A9B")!,
 				MapKey = LdbKey.Decode("pARATX1!DX]\\So+0*A9B")!,
 				RegionKey = LdbKey.Decode("pARATX1!DX]\\So+0*A9B")!
 			};
 			var quest = new QuestDefinition
 			{
 				QuestId = 10238,
-				AreaId = 241,
+				QuestLineId = 241,
 				JournalSequence = 1
 			};
-			var groups = new List<(QuestArea, IReadOnlyList<QuestDefinition>)>
+			var groups = new List<(QuestLine, IReadOnlyList<QuestDefinition>)>
 			{
 				(area, [quest])
 			};

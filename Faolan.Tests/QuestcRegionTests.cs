@@ -29,16 +29,18 @@ namespace Faolan.Tests
 			var region = QuestcRegionCodec.Parse(File.ReadAllBytes(TemplatePath).AsSpan(0, RegionEnd));
 
 			var q = Assert.Single(region.Records);
-			_o.WriteLine($"questId={q.QuestId} state={q.State} unknown14={q.Unknown14} areaId={q.AreaId}");
+			_o.WriteLine($"questId={q.QuestId} level={q.Level} flags={q.QuestLineFlags} questLineId={q.QuestLineId}");
 			Assert.Equal(10238u, q.QuestId); // "Shipwrecked"
-			Assert.Equal(1u, q.State); // active
-			Assert.Equal(241u, q.AreaId); // matches the 50300 area string id
+			// The @+0x10 word is the quest LEVEL, and the beach starter is a level-1 quest. This used to assert the
+			// same 1 as "state == active", which passed only by coincidence.
+			Assert.Equal(1u, q.Level);
+			Assert.Equal(241u, q.QuestLineId); // matches the 50300 quest-line title string id
 			Assert.Equal(4u, q.Field118);
 			// +0x14 - the beach template's value, carried through opaquely. NOT a 0x412 "marker" (asserting it as one
 			// rejected every level-80 snapshot, #384) and NOT a goal count either: this quest has TWO goals while the
 			// word is 0x412, and NecroL80 rec0 holds 2. Reading it as a count crashed the client - see the rename
-			// migration QuestSnapshotUnknown14.
-			Assert.Equal(QuestFullUpdates.LiveUnknown14, q.Unknown14);
+			// migration QuestSnapshotQuestLineFlags.
+			Assert.Equal(QuestFullUpdates.LiveQuestLineFlags, q.QuestLineFlags);
 			Assert.Equal(2, q.Objectives!.Goals.Count);
 			// The record owns its objective region.
 			Assert.NotNull(q.Objectives);

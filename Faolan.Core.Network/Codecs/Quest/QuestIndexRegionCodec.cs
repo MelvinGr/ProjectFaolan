@@ -12,9 +12,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 	//   [u32 count]
 	//   if count == 0:  [u32 terminal 0x000156E7]   (empty index - a char with no snapshot quests)
 	//   else:
-	//     [u32 leadAreaId]                        the FIRST block's quest AreaId (was mis-modelled as a 0x000000F1
+	//     [u32 leadAreaId]                        the FIRST block's quest QuestLineId (was mis-modelled as a 0x000000F1
 	//                                             "sentinel" - constant only because every golden is a beach char,
-	//                                             AreaId 241 == 0xF1; #391)
+	//                                             QuestLineId 241 == 0xF1; #391)
 	//     ONE goal-table BLOCK per held quest, in the same order as the ids:
 	//       [u32 magic]                           the AREA's goal-table NAME word ("W6QT" 0x57365154, "RRL3" ...)
 	//       [u32 tf1][u32 tf2][u32 tf3]           tf2 == count-1, tf3 == 0 across the corpus
@@ -161,7 +161,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// The quest index: the held quest ids plus one chained area-catalog block per held quest.
 	public sealed record QuestIndexRegion
 	{
-		// The first block's quest AreaId (the head of the block chain). Only meaningful when the index is non-empty;
+		// The first block's quest QuestLineId (the head of the block chain). Only meaningful when the index is non-empty;
 		// for a beach char this is 241 == 0xF1, which is why it read as a constant "sentinel" until #391.
 		public uint LeadAreaId { get; init; }
 
@@ -184,7 +184,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			// it must be carried, not regenerated as i+1 (#391). Write requires the two lists to be the same length.
 			public List<uint> AreaQuestIds { get; init; } = [];
 			public List<uint> AreaQuestSequences { get; init; } = [];
-			public uint ChainWord { get; init; } // next held quest's AreaId, or IndexTerminalWord (last)
+			public uint ChainWord { get; init; } // next held quest's QuestLineId, or IndexTerminalWord (last)
 			public uint Magic { get; init; } // the area's goal-table name word (W6QT / RRL3 / ...)
 			public uint TableField1 { get; init; }
 			public uint TableField2 { get; init; }

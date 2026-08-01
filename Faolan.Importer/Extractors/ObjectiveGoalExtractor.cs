@@ -13,7 +13,7 @@ namespace Faolan.Importer.Extractors
 		// The captured objective goals per quest, exactly as the wire carried them - the oracle the importer compares
 		// a rebuilt region against (ImportOps.VerifyObjectiveRegions).
 		//
-		// EVERY capture of the quest, not just the first, and each one TAGGED with its record's `FieldF0`: retail has
+		// EVERY capture of the quest, not just the first, and each one TAGGED with its record's `XpReward`: retail has
 		// more than one spelling of the same quest's region, and F0 is what selects it. Quest 10238's goal 1448 carries
 		// its trailing text as `<remoteformat …></remoteformat>` (95 B) in every capture whose record has F0=150, and
 		// as the 21-byte-shorter `<localized … flags="" …>` in every capture whose record has F0=175 - 20 of 20
@@ -37,7 +37,7 @@ namespace Faolan.Importer.Extractors
 					{
 						(byQuest.TryGetValue(record.QuestId, out var all)
 							? all
-							: byQuest[record.QuestId] = []).Add((record.FieldF0, objectives.Goals));
+							: byQuest[record.QuestId] = []).Add((record.XpReward, objectives.Goals));
 					}
 				}
 			}

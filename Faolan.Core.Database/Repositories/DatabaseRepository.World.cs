@@ -16,9 +16,9 @@ namespace Faolan.Core.Database.Repositories
 		Task<TravelDestination[]> GetTravelDestinations(string npcName);
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<Map[]> GetMaps();
-		Task<QuestArea[]> GetQuestAreas();
+		Task<QuestLine[]> GetQuestLines();
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
-		Task<QuestDefinition[]> GetQuestDefinitionsByArea(uint areaId);
+		Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId);
 		Task<RespawnPoint?> GetRespawnPoint(uint id);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
@@ -95,10 +95,10 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Maps.OrderBy(m => m.Id).ToArrayAsync();
 		}
 
-		public async Task<QuestArea[]> GetQuestAreas()
+		public async Task<QuestLine[]> GetQuestLines()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.QuestAreas.OrderBy(a => a.AreaId).ToArrayAsync();
+			return await ctx.QuestLines.OrderBy(a => a.QuestLineId).ToArrayAsync();
 		}
 
 		public async Task<QuestDefinition?> GetQuestDefinition(uint questId)
@@ -113,12 +113,12 @@ namespace Faolan.Core.Database.Repositories
 				.FirstOrDefaultAsync(q => q.QuestId == questId);
 		}
 
-		// Every quest of an area, ordered by its position within that area (JournalSequence) - the quest index's
-		// per-area id list.
-		public async Task<QuestDefinition[]> GetQuestDefinitionsByArea(uint areaId)
+		// Every step of a quest line, ordered by its position within that line (JournalSequence) - the quest index's
+		// per-line id list.
+		public async Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.QuestDefinitions.Where(q => q.AreaId == areaId).OrderBy(q => q.JournalSequence).ToArrayAsync();
+			return await ctx.QuestDefinitions.Where(q => q.QuestLineId == questLineId).OrderBy(q => q.JournalSequence).ToArrayAsync();
 		}
 
 		public async Task<RespawnPoint?> GetRespawnPoint(uint id)

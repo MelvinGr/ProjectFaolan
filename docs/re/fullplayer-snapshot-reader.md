@@ -43,7 +43,7 @@ NEXT held quest's `AreaId`, the LAST block = the primary's `IndexTrailerWord`. *
 PER-QUEST CONSTANTS** (byte-identical across a quest's active AND completed login captures — NOT progress-bearing; the
 beach record is the same fresh 601 B early or late). Builder: `SnapshotTails.QuestPortion(quests, primary,
 instance)` + a `BuildFromScratch(quests, primary, ...)` overload (beach-only delegates → byte-identical). New
-`QuestDefinition` cols: `Level`, `SnapshotUnknown28`, `IndexMagic` (+migrations; `SnapshotState` was collapsed into
+`QuestDefinition` cols: `Level`, `SnapshotQuestLineReward`, `IndexMagic` (+migrations; `SnapshotState` was collapsed into
 `Level` and the `SnapshotField*` scalars renamed `SnapshotUnknown*` on 2026-07-20). A held quest joins the snapshot
 only if `FullCharSnapshotSubClass.IsSnapshotEligible` — record scalars + the 5 header text refs + @609 goals +
 `ObjectiveRegionVerified` + its area's 4CC. ⚠️ There is NO live fallback any more: `RestorePlayerQuests` was deleted
@@ -193,7 +193,7 @@ Multi-quest decode notes:
    client's List A reads 2 records with List B/C/MainQuest consuming 10238's objregion, or List A interleaves
    record+objregion per quest.
 2. ~~**Harvest 13479's snapshot scalars + goals**~~ DONE 2026-07-20: harvested for every captured quest, not just
-   the seeds (`ObjectiveGoalExtractor`, `QuestAreaExtractor`, `CompletedQuestExtractor`). ⚠️ The index block's
+   the seeds (`ObjectiveGoalExtractor`, `QuestLineExtractor`, `CompletedQuestExtractor`). ⚠️ The index block's
    `GoalSteps` are NOT goal ids - they are the AREA's quest catalog, renamed `Block.AreaQuestIds`.
 
 ## Class id → reader
@@ -581,4 +581,4 @@ at all - not from the RDB, not from a table. Only captures carry it. (The RDB se
 this reason, not merely because records are compressed.)
 
 Practical consequence: an area's 4CC becomes available only once a capture shows that area in a
-completed-quest journal. See `QuestArea.Magic` and Gitea #389/#390.
+completed-quest journal. See `QuestLine.Magic` and Gitea #389/#390.

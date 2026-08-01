@@ -10,12 +10,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 	public static class QuestIndexRegions
 	{
 		// The index for the held quests, already ordered (primary first). Each quest contributes a goal-table block
-		// from its seeded index fields; the block trailers chain to the next quest's AreaId, terminating on
+		// from its seeded index fields; the block trailers chain to the next quest's QuestLineId, terminating on
 		// IndexTerminalWord.
 		//
-		// `areas` maps areaId -> that area's QuestArea row; `areaCatalog` maps areaId -> every quest in the area,
+		// `areas` maps areaId -> that area's QuestLine row; `areaCatalog` maps areaId -> every quest in the area,
 		// ordered by JournalSequence. Both are needed because a block is NOT self-contained (see Block.AreaQuestIds).
-		public static QuestIndexRegion ForQuests(IReadOnlyList<QuestDefinition> ordered, QuestDefinition primary, IReadOnlyDictionary<uint, QuestArea>? areas = null,
+		public static QuestIndexRegion ForQuests(IReadOnlyList<QuestDefinition> ordered, QuestDefinition primary, IReadOnlyDictionary<uint, QuestLine>? areas = null,
 			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
 		{
 			ArgumentNullException.ThrowIfNull(ordered);
@@ -25,10 +25,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 			for (var i = 0; i < ordered.Count; i++)
 			{
 				var q = ordered[i];
-				var magic = areas != null && areas.TryGetValue(q.AreaId, out var a)
+				var magic = areas != null && areas.TryGetValue(q.QuestLineId, out var a)
 					? a.Magic
 					: q.IndexMagic;
-				var catalog = areaCatalog != null && areaCatalog.TryGetValue(q.AreaId, out var c)
+				var catalog = areaCatalog != null && areaCatalog.TryGetValue(q.QuestLineId, out var c)
 					? c
 					: null;
 
@@ -40,7 +40,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 
 				var catalogIds = catalog != null
 					? catalog.Select(d => d.QuestId).ToList()
-					: ParseAreaQuestIds(q.IndexAreaQuestIds);
+					: ParseAreaQuestIds(q.IndexQuestLineQuestIds);
 
 				blocks.Add(new QuestIndexRegion.Block
 				{
@@ -73,10 +73,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 					TrailerA = 1,
 					TrailerB = 0,
 					TrailerC = 0,
-					// The trailers CHAIN: each carries the NEXT held quest's AreaId, and the LAST carries the terminal
+					// The trailers CHAIN: each carries the NEXT held quest's QuestLineId, and the LAST carries the terminal
 					// word - a constant 0x156E7 in every capture, the same word the empty quest portion ends on.
 					ChainWord = i + 1 < ordered.Count
-						? ordered[i + 1].AreaId
+						? ordered[i + 1].QuestLineId
 						: QuestIndexRegionCodec.IndexTerminalWord
 				});
 			}
@@ -86,7 +86,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				QuestIds = [.. ordered.Select(q => q.QuestId)],
 				// The head of the block chain is the first (primary) quest's area; for a beach char this is 241 (0xF1).
 				LeadAreaId = ordered.Count > 0
-					? ordered[0].AreaId
+					? ordered[0].QuestLineId
 					: 0,
 				Blocks = blocks
 			};

@@ -84,13 +84,13 @@ namespace Faolan.Tests
 
 			var record = new QuestcRecord
 			{
-				QuestId = 0x34A7, State = 3, Field118 = 3, Unknown14 = QuestFullUpdates.LiveUnknown14,
+				QuestId = 0x34A7, Level = 3, Field118 = 3, QuestLineFlags = QuestFullUpdates.LiveQuestLineFlags,
 				Title = QuestTextTokens.RemoteFormat(13479, 50301, "@MSeS6Le,s-7YMf0t1R6"),
 				Summary = QuestTextTokens.RemoteFormat(13479, 50302, "iHLlH81PhqeCC&#36;cD0VwJ"),
 				Area = QuestTextTokens.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"),
 				Region1 = QuestTextTokens.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr"),
 				Region2 = QuestTextTokens.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/"),
-				FieldEc = 1, AreaId = 1054, Field2c = 0x34A7, Field28 = 0x50, FieldF0 = 0x64,
+				FieldEc = 1, QuestLineId = 1054, Field2c = 0x34A7, QuestLineReward = 0x50, XpReward = 0x64,
 				Objectives = new QuestObjectiveRegion
 				{
 					Goals = [goal]
@@ -473,7 +473,7 @@ namespace Faolan.Tests
 			var packets = QuestPackets("casilda-quest-packets.bin");
 			var def = QuestDefinitionExtractor.Extract(packets).Single(d => d.QuestId == 0x34A7);
 
-			Assert.Equal(1054u, def.AreaId);
+			Assert.Equal(1054u, def.QuestLineId);
 			Assert.Equal(0x1670u, def.GoalId);
 			Assert.Equal(4010u, def.MapId);
 			Assert.Equal(0x147u, def.MarkerX);
@@ -493,8 +493,8 @@ namespace Faolan.Tests
 			Assert.Equal(CaptureBody(OfferFixture, IirTypes.QuestFullUpdateIIR), Convert.ToHexString(full).ToLowerInvariant());
 
 			// Quest-log LIST (the packet that POPULATES the J-panel) - byte-exact against frame 687. The captured
-			// character had four active quests (tracked 13479 first); the area-title slot is the 13479 def's AreaTitle.
-			var logList = MainQuestUpdateCodec.Build(0x0131720B, def.AreaId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], QuestTextTokens.Record(def, QuestTextSlot.AreaTitle));
+			// character had four active quests (tracked 13479 first); the area-title slot is the 13479 def's QuestLineTitle.
+			var logList = MainQuestUpdateCodec.Build(0x0131720B, def.QuestLineId, 0x34A7, [0x34A7, 0x34FB, 0x34A8, 0x3077], QuestTextTokens.Record(def, QuestTextSlot.QuestLineTitle));
 			Assert.Equal(CaptureBody(OfferFixture, IirTypes.MainQuestUpdateIIR), Convert.ToHexString(logList).ToLowerInvariant());
 
 			// Inverse: Parse recovers the handle, tracked id, and the exact quest-id list (the CaptureQuestImporter

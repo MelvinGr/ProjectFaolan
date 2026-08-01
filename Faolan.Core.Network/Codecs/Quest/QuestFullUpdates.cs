@@ -9,14 +9,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// Not a codec.
 	//
 	// The record it builds is the LIVE-GRANT shape - the one the Casilda golden pins - which differs from the snapshot
-	// journal's shape (QuestcRecords.ForQuest) in the scalars it fills: FieldEc 1, Field118 3, Field28 0x50,
-	// FieldF0 0x64, FieldF8 0 and a single synthesized goal record, versus the per-quest Snapshot* columns. The two
+	// journal's shape (QuestcRecords.ForQuest) in the scalars it fills: FieldEc 1, Field118 3, QuestLineReward 0x50,
+	// XpReward 0x64, CashReward 0 and a single synthesized goal record, versus the per-quest Snapshot* columns. The two
 	// were separate hand-rolled encoders until #530 wave 5 showed they write the same record.
 	public static class QuestFullUpdates
 	{
-		// The `n` slot (QuestcRecord.Unknown14) the live full-update carries. NOT a ListFrame word (1042 is not a
-		// multiple of 1009) and NOT a goal count - see QuestcRecord.Unknown14.
-		public const uint LiveUnknown14 = 0x412;
+		// The `n` slot (QuestcRecord.QuestLineFlags) the live full-update carries. NOT a ListFrame word (1042 is not a
+		// multiple of 1009) and NOT a goal count - see QuestcRecord.QuestLineFlags.
+		public const uint LiveQuestLineFlags = 0x412;
 
 		// The quest a full-update record is ABOUT, without decoding the record around it.
 		//
@@ -93,23 +93,23 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var record = new QuestcRecord
 			{
 				QuestId = def.QuestId,
-				State = level,
+				Level = level,
 				Field114 = 0,
 				Field118 = LiveField118,
-				Unknown14 = LiveUnknown14,
+				QuestLineFlags = LiveQuestLineFlags,
 				Title = QuestTextTokens.Record(def, QuestTextSlot.Title),
 				Summary = QuestTextTokens.Record(def, QuestTextSlot.Summary),
-				Area = QuestTextTokens.Record(def, QuestTextSlot.AreaTitle),
+				Area = QuestTextTokens.Record(def, QuestTextSlot.QuestLineTitle),
 				Region1 = QuestTextTokens.Record(def, QuestTextSlot.RegionName),
 				Region2 = QuestTextTokens.Record(def, QuestTextSlot.MapName),
 				FieldEc = LiveFieldEc,
-				AreaId = def.AreaId,
+				QuestLineId = def.QuestLineId,
 				Field2c = def.QuestId,
 				Field11c = 0,
 				Accept = 0,
-				Field28 = LiveField28,
-				FieldF0 = LiveFieldF0,
-				FieldF8 = 0,
+				QuestLineReward = LiveField28,
+				XpReward = LiveFieldF0,
+				CashReward = 0,
 				Objectives = new QuestObjectiveRegion
 				{
 					Goals = [goal]

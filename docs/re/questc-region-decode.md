@@ -69,20 +69,20 @@ with no separate count word, unlike the record lists which carry both. That is w
 [listKey=questId]
 u32 ver(=1)
 u32 questId          (+0xc)
-u32 state            (+0x10)
+u32 level            (+0x10)  the quest LEVEL (see below); modelled as QuestcRecord.Level
 u32 field114         (+0x114)          # beach codec MISLABELS this as "Zero"
 u32 field118         (+0x118)          # beach codec MISLABELS this as "N"
-u32 n                (+0x14)  goal count; beach codec MISLABELS this "Marker" and ASSERTS ==0x412 (beach-only!)
+u32 lineFlags        (+0x14)  a flag word of the quest LINE - NOT a goal count (see below)
 string title, summary, area, region1, region2   # cats 50301/50302/50300/52000/52000
 u32 fieldEc          (+0xec)
 u32 areaId           (+0xcc)
 u32 field2c          (+0x2c)           # beach codec MISLABELS this "questId2" and ASSERTS ==questId (beach-only!)
 u32 field11c         (+0x11c)
 u64 accept           (+0x20)
-u32 field28          (+0x28)
+u32 lineReward       (+0x28)  reward on the line's LAST step (see below)
 objlist obj1, obj2                     # each: [u32 count][count × ObjRec]
-u32 fieldF0          (+0xf0)
-u64 fieldF8          (+0xf8)
+u32 xpReward         (+0xf0)  this step's experience reward
+u64 cashReward       (+0xf8)  this step's money reward
 objlist obj3, obj4
 progress-sublist                       # <-- the piece the beach template never exercises
 ```
@@ -204,3 +204,82 @@ the kind of level-adjacent pairing `@+0x118` (level..level+5) already hints at.
 a whole-image scan for `[reg + 0xf0]` (778 functions — the offset is far too common to filter on), and the
 module's strings. What is left is the semantic route: follow a parsed record from `FUN_0091f5c0` into the
 journal UI and find the code that formats these words for display.
+
+## What the unnamed fields ARE (2026-08-01, from the client's quest catalog)
+
+The static pass above ended with "the names are not in the binary — trace a consumer". They were not in the
+binary; they were in the client's **data**. Cross-referencing the captured records against RDB type 1000104
+([quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)) named three of the five and pinned the scope of
+a fourth. The probe is 2626 captured records over 141 snapshots, covering 99 distinct quests.
+
+**The control that made this tractable: every one of these words is DEFINITION data.** Per quest, across all
+2626 records and every captured character, `@+0x14`, `@+0x28`, `@+0x2c`, `@+0xec`, `@+0x114`, `@+0x118` and
+`@+0x11c` never vary; `@+0xf0`/`@+0xf8` vary on exactly one quest (10238, the known two-spelling variant) and
+`@+0x10` on three. 97 of the 99 quests appear in more than one capture, so this is not a single-source
+artefact. A definition field has a definition-side source, which is what pointed at the catalog.
+
+### `@+0x10` — the quest LEVEL, not a state
+
+It equals the DB `Level` on 96 of the 99 captured quests (12373, 17402 and 17403 differ by 1–2, i.e. the row
+took its level from a different capture). Both writers already fed it a level. It was modelled as
+`QuestcRecord.State` until this pass, which made `QuestcRegionTests` assert `Equal(1u, q.State) // active` on
+the beach starter — passing only because that quest happens to be **level 1**. Distinct from
+`QuestCodec.State` (`StateActive`/`StateCompleted`), a real state on a different message.
+
+### `@+0xf0` / `@+0xf8` — this step's EXPERIENCE and MONEY reward
+
+[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — the client's quest catalog gives a quest line exactly one reward pair, `xp_reward` (field 15) and
+`cash_reward` (field 16), in that order and of these shapes (u32 then a wider money value); and the magnitudes
+coincide — the `[Thunder River]` lines carry `xp_reward = 45800`, exactly the captured `@+0xf0` of quests
+13895 and 14427, while the catalog's low-level cash/xp ratios (715/60, 1000/157, 455/36 → 0.08–0.16) match the
+wire's (150/15, 370/44, 550/66 → 0.10–0.12).]
+
+⚠️ `@+0xf8` tracks `@+0xf0` through a level-dependent factor (~0.267 around level 23 rising to ~1.10 at 80),
+but 99 samples do not close the law and the residuals disagree. **Do not derive one from the other** — the
+catalog says they are two separately authored numbers that merely correlate.
+
+⚠️ The catalog is NOT a harvest source for the magnitudes: `xp_reward`/`cash_reward` are populated on only
+23/18 of its 2181 lines. The values are computed server-side.
+
+`@+0xf0` additionally selects which SPELLING the quest's @609 objective region uses for its trailing text —
+see the `ObjectiveRegionVerified` note on `QuestDefinition`.
+
+### `@+0x28` — the reward for completing the LINE
+
+[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — crossing the populated slot against the step's position in its line (from the catalog's
+`first_quest_template_id`/`last_quest_template_id`) over the 94 captured quests that have a catalog row:
+
+| slot populated | last step | first step | middle |
+|---|---:|---:|---:|
+| `@+0x28` | **25** (19 single-step lines + 6 multi) | 1 | 0 |
+| `@+0xf0`/`@+0xf8` | **0** | 33 | 7 |
+
+`@+0x28` lands on the final step and the XP/cash pair never does. In a one-step line the step IS the line,
+which is why 19 of the 25 are single-step.]
+
+That is the whole of the "near-mutual-exclusivity" this decode used to record as an unexplained curiosity.
+Reading: `@+0xf0`/`@+0xf8` are the STEP's reward, `@+0x28` the LINE's. Its **currency is not established** —
+only its position — because the catalog's own reward columns are too sparse to settle it.
+
+### `@+0x14` — a flag word of the quest LINE
+
+Five values across the corpus (2, 10, 18, 26, 1042), every one ≡ 2 (mod 8): bits 0–2 fixed `010`, bits 3, 4
+and 10 toggling. Definitively **not** a goal count — 2 appears on records carrying 1, 2, 3 and 6 goals.
+
+[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — its SCOPE is the line, not the quest: the value is constant across every quest of the same line in all
+**90** lines that have a captured quest, with zero conflicts.]
+
+**Bit 10 (`0x400`)** marks the player-PROGRESSION lines — the 10 quests carrying it are the Destiny steps
+(Shipwrecked ×4, Casilda ×2, Blood and Sweat, To Battle a God), the Alchemist tier-4 progression parent, and
+the World-Boss Mastery meta. The client has a `MainQuest_c` distinct from `Quest_c`, so bit 10 selecting that
+flavour is the natural read — but it is **not proven**: the catalog's `MainQuest.type`, the field that would
+have named it, is 0 on all 2181 rows.
+
+**Bits 3 and 4 remain open.** Ruled out by counterexample: "expansion" (17402/17403 are in Khitai with bit 4
+clear, while 17740 is in a base-game zone with it clear too), "repeatable" and "group" (the `[Rep]` and
+`[Group]` dev tags land on 14421/14427, which do not carry bit 3).
+
+### `@+0x11c` — 1 on exactly the newest content
+
+1 for 19314, 19364, 19365, 19522 and 19620 (World Bosses, Anniversary 2014, Halloween 2015, Onslaught), 0 for
+the other 94. Meaning open.

@@ -86,7 +86,7 @@ namespace Faolan.Core.Database
 		DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; }
 		DbSet<PatrolNodeWord> PatrolNodeWords { get; }
 		DbSet<WorldObjectWord> WorldObjectWords { get; }
-		DbSet<QuestArea> QuestAreas { get; }
+		DbSet<QuestLine> QuestLines { get; }
 		DbSet<QuestDefinition> QuestDefinitions { get; }
 		DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; }
 		DbSet<QuestTextRef> QuestTextRefs { get; }
@@ -181,7 +181,7 @@ namespace Faolan.Core.Database
 		public DbSet<PatrolNodeWaypoint> PatrolNodeWaypoints { get; set; }
 		public DbSet<PatrolNodeWord> PatrolNodeWords { get; set; }
 		public DbSet<WorldObjectWord> WorldObjectWords { get; set; }
-		public DbSet<QuestArea> QuestAreas { get; set; }
+		public DbSet<QuestLine> QuestLines { get; set; }
 		public DbSet<QuestDefinition> QuestDefinitions { get; set; }
 		public DbSet<QuestGoalDefinition> QuestGoalDefinitions { get; set; }
 		public DbSet<QuestTextRef> QuestTextRefs { get; set; }
@@ -281,9 +281,9 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<QuestGoalDefinition>().OwnsOne(g => g.ObjectiveKey, k => OwnNamedKey(k, "ObjectiveKey"));
 			modelBuilder.Entity<QuestGoalDefinition>().OwnsOne(g => g.TrailingKey, k => OwnNamedKey(k, "TrailingKey"));
 			modelBuilder.Entity<QuestTextRef>().OwnsOne(r => r.KeyText, k => OwnNamedKey(k, "KeyText"));
-			modelBuilder.Entity<QuestArea>().OwnsOne(a => a.AreaTitleKey, k => OwnNamedKey(k, "AreaTitleKey"));
-			modelBuilder.Entity<QuestArea>().OwnsOne(a => a.MapKey, k => OwnNamedKey(k, "MapKey"));
-			modelBuilder.Entity<QuestArea>().OwnsOne(a => a.RegionKey, k => OwnNamedKey(k, "RegionKey"));
+			modelBuilder.Entity<QuestLine>().OwnsOne(a => a.TitleKey, k => OwnNamedKey(k, "TitleKey"));
+			modelBuilder.Entity<QuestLine>().OwnsOne(a => a.MapKey, k => OwnNamedKey(k, "MapKey"));
+			modelBuilder.Entity<QuestLine>().OwnsOne(a => a.RegionKey, k => OwnNamedKey(k, "RegionKey"));
 			modelBuilder.Entity<ConversationScreen>().OwnsOne(c => c.Key, k => OwnNamedKey(k, "Key"));
 			modelBuilder.Entity<ConversationScreenParameter>().OwnsOne(p => p.ContentKey, k => OwnNamedKey(k, "ContentKey"));
 			modelBuilder.Entity<StockPhrase>().OwnsOne(p => p.FormatKey, k => OwnNamedKey(k, "FormatKey"));

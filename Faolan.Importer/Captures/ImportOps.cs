@@ -370,7 +370,7 @@ namespace Faolan.Importer.Captures
 		{
 			var existing = await db.QuestDefinitions.Include(q => q.TextRefs).ToDictionaryAsync(q => q.QuestId);
 			var maps = await db.Maps.Select(m => m.Id).ToHashSetAsync();
-			var areas = await db.QuestAreas.Select(a => a.AreaId).ToHashSetAsync();
+			var areas = await db.QuestLines.Select(a => a.QuestLineId).ToHashSetAsync();
 			int added = 0, filled = 0;
 
 			foreach (var q in harvest.Quests)
@@ -386,11 +386,11 @@ namespace Faolan.Importer.Captures
 					});
 				}
 
-				if (q.AreaId != 0 && areas.Add(q.AreaId))
+				if (q.QuestLineId != 0 && areas.Add(q.QuestLineId))
 				{
-					db.QuestAreas.Add(new QuestArea
+					db.QuestLines.Add(new QuestLine
 					{
-						AreaId = q.AreaId
+						QuestLineId = q.QuestLineId
 					});
 				}
 
@@ -399,7 +399,7 @@ namespace Faolan.Importer.Captures
 					def = new QuestDefinition
 					{
 						QuestId = q.QuestId,
-						AreaId = q.AreaId,
+						QuestLineId = q.QuestLineId,
 						MapId = q.MapId,
 						JournalSequence = q.Sequence
 					};
@@ -417,9 +417,9 @@ namespace Faolan.Importer.Captures
 				AddRefIfMissing(def, QuestTextSlot.Title, q.Title);
 				AddRefIfMissing(def, QuestTextSlot.ListSubLine, q.SubLine);
 
-				if (harvest.Areas.TryGetValue(q.AreaId, out var header))
+				if (harvest.Areas.TryGetValue(q.QuestLineId, out var header))
 				{
-					AddRefIfMissing(def, QuestTextSlot.AreaTitle, header.Title);
+					AddRefIfMissing(def, QuestTextSlot.QuestLineTitle, header.Title);
 					AddRefIfMissing(def, QuestTextSlot.RegionName, header.Region);
 					AddRefIfMissing(def, QuestTextSlot.MapName, header.Map);
 				}
@@ -907,16 +907,16 @@ namespace Faolan.Importer.Captures
 
 		// Quest journal-content definitions, refreshed per harvested quest; un-harvested quests untouched.
 		// Quest AREAS - the grouping tier of the journal tree. `harvested` carries the wire words (the 4CC), which only
-		// the completed-quest journal exposes (#390); `referenced` is every AreaId a quest definition points at.
+		// the completed-quest journal exposes (#390); `referenced` is every QuestLineId a quest definition points at.
 		//
-		// QuestDefinition.AreaId is a real FK, so a row must exist for EVERY referenced area before definitions are
+		// QuestDefinition.QuestLineId is a real FK, so a row must exist for EVERY referenced area before definitions are
 		// saved - the captures only show areas a character actually completed a quest in, which is far short of the
 		// areas quests live in. Anything unharvested gets a placeholder (Magic 0), exactly as Maps do; a missing row
 		// would otherwise fail the FK check on rebuild.
-		public static async Task<int> ImportQuestAreas(DatabaseContext db, IReadOnlyList<QuestArea> harvested, IReadOnlyCollection<uint> referenced)
+		public static async Task<int> ImportQuestLines(DatabaseContext db, IReadOnlyList<QuestLine> harvested, IReadOnlyCollection<uint> referenced)
 		{
-			var existing = await db.QuestAreas.ToDictionaryAsync(a => a.AreaId);
-			var byArea = harvested.ToDictionary(a => a.AreaId);
+			var existing = await db.QuestLines.ToDictionaryAsync(a => a.QuestLineId);
+			var byArea = harvested.ToDictionary(a => a.QuestLineId);
 			var added = 0;
 
 			foreach (var areaId in byArea.Keys.Concat(referenced).Distinct())
@@ -931,9 +931,9 @@ namespace Faolan.Importer.Captures
 
 					row.Magic = wire.Magic;
 					row.TableField1 = wire.TableField1;
-					row.AreaTitleRefId = wire.AreaTitleRefId;
-					row.AreaTitleCategory = wire.AreaTitleCategory;
-					row.AreaTitleKey = wire.AreaTitleKey;
+					row.TitleRefId = wire.TitleRefId;
+					row.TitleCategory = wire.TitleCategory;
+					row.TitleKey = wire.TitleKey;
 					row.MapRefId = wire.MapRefId;
 					row.MapCategory = wire.MapCategory;
 					row.MapKey = wire.MapKey;
@@ -943,14 +943,14 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				db.QuestAreas.Add(new QuestArea
+				db.QuestLines.Add(new QuestLine
 				{
-					AreaId = areaId,
+					QuestLineId = areaId,
 					Magic = wire?.Magic ?? 0,
 					TableField1 = wire?.TableField1 ?? 0,
-					AreaTitleRefId = wire?.AreaTitleRefId ?? 0,
-					AreaTitleCategory = wire?.AreaTitleCategory ?? 0,
-					AreaTitleKey = wire?.AreaTitleKey ?? new(),
+					TitleRefId = wire?.TitleRefId ?? 0,
+					TitleCategory = wire?.TitleCategory ?? 0,
+					TitleKey = wire?.TitleKey ?? new(),
 					MapRefId = wire?.MapRefId ?? 0,
 					MapCategory = wire?.MapCategory ?? 0,
 					MapKey = wire?.MapKey ?? new(),
@@ -1020,7 +1020,7 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				existing.AreaId = def.AreaId;
+				existing.QuestLineId = def.QuestLineId;
 				existing.GoalId = def.GoalId;
 				existing.Level = def.Level;
 				existing.MapId = def.MapId;
@@ -1327,7 +1327,7 @@ namespace Faolan.Importer.Captures
 		// Flags each quest whose @609 objective region we can rebuild EXACTLY as retail sent it - the gate that decides
 		// what may ride the login snapshot, because a region the client cannot parse asserts it (statlist.cpp:134).
 		//
-		// Compared LIKE WITH LIKE: only against the captures whose record carries the same `FieldF0` variant as the
+		// Compared LIKE WITH LIKE: only against the captures whose record carries the same `XpReward` variant as the
 		// record we would ship for that quest (see ObjectiveGoalExtractor.CapturedRegions for the evidence that F0
 		// selects the region's spelling). Comparing against every capture regardless of variant failed a quest for
 		// being a faithful rendering of the variant we DON'T emit: quest 10238 - the beach starter every new character
@@ -1366,7 +1366,7 @@ namespace Faolan.Importer.Captures
 				// A quest whose region does not depend on the variant satisfies these exactly as it did under the old
 				// all-captures rule (its same-variant set is a subset of a set that all matches), so nothing that was
 				// verified before is weakened; a quest that only matches SOMEONE ELSE's variant still fails the second.
-				def.ObjectiveRegionVerified = captures.Any(Reproduces) && captures.Where(c => c.Variant == def.SnapshotUnknownF0).All(Reproduces);
+				def.ObjectiveRegionVerified = captures.Any(Reproduces) && captures.Where(c => c.Variant == def.SnapshotXpReward).All(Reproduces);
 
 				if (def.ObjectiveRegionVerified)
 					verified++;
@@ -1610,20 +1610,20 @@ namespace Faolan.Importer.Captures
 				return;
 
 			quest.SnapshotUnknown118 = 4;
-			quest.SnapshotUnknown14 = QuestFullUpdates.LiveUnknown14; // the beach record's `n` (@+0x14)
+			quest.SnapshotQuestLineFlags = QuestFullUpdates.LiveQuestLineFlags; // the beach record's `n` (@+0x14)
 			quest.SnapshotUnknownEc = 1;
-			quest.SnapshotUnknownF0 = 0x96;
-			quest.SnapshotUnknownF8 = 15;
+			quest.SnapshotXpReward = 0x96;
+			quest.SnapshotCashReward = 15;
 			quest.Level = 1;
 			quest.HasSnapshotRecord = true;
-			quest.SnapshotUnknown28 = 0;
+			quest.SnapshotQuestLineReward = 0;
 			quest.IndexMagic = 0x57365154;
 			quest.IndexMarker = 0x7E2;
 			quest.IndexTableField1 = 1;
 			quest.IndexTableField2 = 7;
 			quest.IndexTableField3 = 0;
 			quest.IndexTrailerWord = 0x000156E7;
-			quest.IndexAreaQuestIds = "10238,12369,12373,10320,12371,10286,10287,10915";
+			quest.IndexQuestLineQuestIds = "10238,12369,12373,10320,12371,10286,10287,10915";
 
 			// Overlay the two goals' full @609 detail (find-or-create by GoalId): the extractor may have already emitted
 			// goal 1448 as the harvested PRIMARY goal (wire fields only) - this completes it and adds goal 3490 - so the
@@ -1756,16 +1756,16 @@ namespace Faolan.Importer.Captures
 			quest.Level = 3;
 			quest.HasSnapshotRecord = true;
 			quest.SnapshotUnknown118 = 3;
-			quest.SnapshotUnknown14 = QuestFullUpdates.LiveUnknown14;
+			quest.SnapshotQuestLineFlags = QuestFullUpdates.LiveQuestLineFlags;
 			quest.SnapshotUnknownEc = 1;
-			quest.SnapshotUnknownF0 = 80;
-			quest.SnapshotUnknownF8 = 7;
-			quest.SnapshotUnknown28 = 80;
+			quest.SnapshotXpReward = 80;
+			quest.SnapshotCashReward = 7;
+			quest.SnapshotQuestLineReward = 80;
 			quest.IndexMagic = 0x52524C33;
 			quest.IndexTableField1 = 1;
 			quest.IndexTableField2 = 3;
 			quest.IndexTableField3 = 0;
-			quest.IndexAreaQuestIds = "13479,13563,13480,12407";
+			quest.IndexQuestLineQuestIds = "13479,13563,13480,12407";
 
 			var goal = quest.Goals.FirstOrDefault(g => g.GoalId == 5744);
 			if (goal != null)

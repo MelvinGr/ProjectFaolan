@@ -64,8 +64,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			{
 				var area = new CompletedQuestJournalRegion.AreaGroup
 				{
-					AreaId = r.ReadU32Be(),
-					AreaTitle = r.ReadStringU16Length(),
+					QuestLineId = r.ReadU32Be(),
+					QuestLineTitle = r.ReadStringU16Length(),
 					MapName = r.ReadStringU16Length(),
 					RegionName = r.ReadStringU16Length(),
 					Magic = r.ReadU32Be(),
@@ -104,8 +104,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 			s.WriteUInt32(ListFrame.ForCount(v.Areas.Count));
 			foreach (var area in v.Areas)
 			{
-				s.WriteUInt32(area.AreaId);
-				s.WriteString(area.AreaTitle);
+				s.WriteUInt32(area.QuestLineId);
+				s.WriteString(area.QuestLineTitle);
 				s.WriteString(area.MapName);
 				s.WriteString(area.RegionName);
 				s.WriteUInt32(area.Magic);
@@ -133,12 +133,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// One area's completed quests, with the area/region/map header the client's tree groups them under.
 		public sealed record AreaGroup
 		{
-			public uint AreaId { get; init; }
+			public uint QuestLineId { get; init; }
 			public List<QuestEntry> Quests { get; init; } = [];
-			public string AreaTitle { get; init; } = "";
+			public string QuestLineTitle { get; init; } = "";
 
 			// MAP comes first on the wire, then REGION. The three tiers, fine to coarse:
-			//   AreaId    917 distinct   the leaf grouping the journal tree renders
+			//   QuestLineId    917 distinct   the leaf grouping the journal tree renders
 			//   MapName    68 distinct   the playfield - 4010 "Tortage Island", 4020 "City of Tortage"
 			//   RegionName  8 distinct   the coarser grouping above it (ids 1,2,3,4,5,8,5000,1000000)
 			// So a MAP HAS MANY AREAS, and the region above it holds several maps.

@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// The quest portion's length for the beach starter, kept as the documented landmark for the region split.
 		public const int QuestPortionLength = 1292;
 
-		private static readonly QuestTextSlot[] HeaderSlots = [QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.AreaTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName];
+		private static readonly QuestTextSlot[] HeaderSlots = [QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.QuestLineTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName];
 
 		// The quest region a character with NO snapshot quests carries. Byte-exact constant across all 20 create
 		// captures: a freshly created character's snapshot has ZERO quest blocks (the starter quest is delivered
@@ -52,7 +52,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// empty (byte-identical to the captured beach tails).
 		public static FullCharSnapshotSubClass FromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null,
 			IReadOnlyList<uint>? knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)>? statSheet = null,
-			IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>? completedQuests = null, IReadOnlyDictionary<uint, QuestArea>? areas = null,
+			IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)>? completedQuests = null, IReadOnlyDictionary<uint, QuestLine>? areas = null,
 			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
@@ -138,7 +138,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// in StatList_t ("(nSize%1009)==0 && nSize>0, inconsistent IdentityList"). A round-trip through our own
 		// codec will NOT catch that - reader and writer share the model - so widen this only with a byte-exact
 		// regeneration test behind it.
-		public static bool IsSnapshotEligible(QuestDefinition? def, QuestArea? area)
+		public static bool IsSnapshotEligible(QuestDefinition? def, QuestLine? area)
 		{
 			if (def is not { HasSnapshotRecord: true })
 				return false;
@@ -155,7 +155,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// above is doing the job it exists for and the blanket override only kept every quest out.
 			//
 			// Two fixes got it there, both in the importer: the verification now compares LIKE WITH LIKE (retail has
-			// more than one spelling of a region and picks by the record's FieldF0 - see
+			// more than one spelling of a region and picks by the record's XpReward - see
 			// ObjectiveGoalExtractor.CapturedRegions), and it runs AFTER quest-wiring re-applies the hand-authored goal
 			// fields the harvest clobbers, so it judges the rows we actually ship rather than an intermediate state.
 			//
@@ -175,7 +175,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// compeltefirstquest 2-quest snapshot: beach + Casilda). Quests are ordered primary-first then by id (the
 		// captured order). Reproduces that capture's 2247-byte quest region byte-exact (BuildQuestPortionTests).
 		public static byte[] QuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance,
-			IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>? completed = null, IReadOnlyDictionary<uint, QuestArea>? areas = null,
+			IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)>? completed = null, IReadOnlyDictionary<uint, QuestLine>? areas = null,
 			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
 		{
 			var (journal, completedRegion, index) = QuestRegions(quests, primary, instance, completed, areas, areaCatalog);
@@ -188,8 +188,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// owned by the primary (tracked) quest - its goal-steps/table/trailer - but lists every held quest's id.
 		// Primary ordered first.
 		private static (QuestcRegion Journal, CompletedQuestJournalRegion Completed, QuestIndexRegion Index) QuestRegions(IReadOnlyList<QuestDefinition> quests,
-			QuestDefinition primary, uint instance, IReadOnlyList<(QuestArea Area, IReadOnlyList<QuestDefinition> Quests)>? completed,
-			IReadOnlyDictionary<uint, QuestArea>? areas, IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog)
+			QuestDefinition primary, uint instance, IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)>? completed,
+			IReadOnlyDictionary<uint, QuestLine>? areas, IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
 

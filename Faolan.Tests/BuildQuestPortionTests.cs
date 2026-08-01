@@ -121,7 +121,7 @@ namespace Faolan.Tests
 			await using var db = new DatabaseContext(TestDb.Options(DbPath));
 			var def = await db.QuestDefinitions.Include(q => q.Goals).Include(q => q.TextRefs)
 				.FirstAsync(q => q.QuestId == 10238, TestContext.Current.CancellationToken);
-			var area = await db.QuestAreas.FirstAsync(a => a.AreaId == def.AreaId, TestContext.Current.CancellationToken);
+			var area = await db.QuestLines.FirstAsync(a => a.QuestLineId == def.QuestLineId, TestContext.Current.CancellationToken);
 
 			Assert.True(def.ObjectiveRegionVerified, "10238's @609 objective region must be verified byte-exact against the captures");
 			Assert.True(SnapshotTails.IsSnapshotEligible(def, area), "the beach starter must ride the login snapshot");
