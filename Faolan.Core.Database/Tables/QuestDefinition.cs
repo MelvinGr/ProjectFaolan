@@ -123,14 +123,34 @@ namespace Faolan.Core.Database.Tables
 		// doubly wrong - it is not `n` (that is SnapshotUnknown14, a different word at a different offset).
 		public uint SnapshotUnknown118 { get; set; }
 
-		// The Quest_c record's `n` word (@+0x14) - the per-quest goal count. NOT the 0x412 the beach template happens
-		// to carry: captured journals vary (NecroL80's records run 2, 10, ...). QuestcRecord.BuildSingle used to emit the
-		// beach constant for every quest, which is fine while the only generated journal IS the beach one, and wrong
-		// the moment a real character's journal is regenerated - so it is stored per quest. Beach 10238 keeps 0x412,
-		// so its golden stays byte-exact.
+		// The Quest_c record's word @+0x14. A per-quest FLAG WORD, not a count - measured over the 99 quests with a
+		// captured record: it takes just five values (2, 10, 18, 26, 1042) and EVERY one of them is ≡ 2 (mod 8), so
+		// the low three bits are fixed (010) and the rest toggle. It was documented as "the per-quest goal count",
+		// which the corpus disproves outright: 2 appears on records carrying 1, 2, 3 and 6 goals, 10 on 1, 2, 4 and 7,
+		// and the beach quest's 1042 on 1, 2, 3 and 12. Constant per quest across every character and capture.
 		public uint SnapshotUnknown14 { get; set; }
+
+		// @+0x28, @+0xf0 and @+0xf8: three per-quest magnitudes that SCALE WITH THE QUEST'S LEVEL, which is what says
+		// they are content values (a reward, a cost, a duration) rather than flags or offsets. Across the captured
+		// records: level 21-24 quests carry thousands (F0 2800-6300), level 70 carries 15421/34417, level 76 87227,
+		// level 77 102300, level 80 up to 170500.
+		//
+		// Two structural facts hold across the corpus and are the lead worth pulling on next:
+		//   * @+0x28 and @+0xf0 are near-mutually-exclusive - a quest carries one or the other, never both, with a
+		//     single exception (13479 carries 80 in both);
+		//   * @+0xf8 is non-zero only where @+0xf0 is, and runs ~10-37% of it - so F0/F8 read as a pair.
+		// Named for their offsets until something pins WHICH quantity: nothing in the captures labels them.
 		public uint SnapshotUnknown28 { get; set; }
+
+		// @+0xec: 1 in every one of the 99 captured records - no quest varies it. Kept as a column rather than a
+		// literal so a capture that ever disagrees shows up as data, not as a wrong constant baked into the builder.
 		public uint SnapshotUnknownEc { get; set; }
+
+		// See the @+0x28 note above for the magnitude. F0 additionally selects WHICH SPELLING the quest's @609
+		// objective region uses for its trailing text: the beach starter is the one quest captured with two variants,
+		// and its goal 1448 carries `<remoteformat …></remoteformat>` in all 15 captures whose record has F0=150 and
+		// the 21-byte-shorter `<localized … flags="" …>` in all 5 with F0=175 (every other scalar identical). The
+		// importer's region verification groups on this so it compares like with like (#389).
 		public uint SnapshotUnknownF0 { get; set; }
 
 		public ulong SnapshotUnknownF8 { get; set; }

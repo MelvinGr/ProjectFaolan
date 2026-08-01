@@ -192,7 +192,14 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public uint Field118 { get; init; } // @+0x118
 		public uint Field11c { get; init; } // @+0x11c (=0)
 		public uint Field28 { get; init; } // @+0x28 (=0 on the beach template; 0x50 in the live full-update)
-		public uint Field2c { get; init; } // @+0x2c - equals questId on the beach template, but NOT in general
+		// @+0x2c - the CHAIN HEAD: the first quest of the series this quest belongs to, which is the quest's own id for
+		// a standalone one. Measured over the 99 quests with a captured record: 84 carry their own id and every one of
+		// the other 15 carries an earlier quest that is a step of the same chain - 10915 and 12371 both carry 10238
+		// (the beach starter, and both appear in ITS IndexGoalSteps list), 12068 carries 12067, 13986 carries 13984.
+		// ⚠️ QuestcRecords.ForQuest still emits `def.QuestId` unconditionally, which is right for 84 of them and wrong
+		// for a chain member - the head is not derivable from what we store (only the head itself carries
+		// IndexGoalSteps), so it needs harvesting into its own column. Tracked in Gitea #566.
+		public uint Field2c { get; init; }
 		public uint FieldEc { get; init; } // @+0xec (=1 in template)
 		public uint FieldF0 { get; init; } // @+0xf0 (=0x96 in the template, 0x64 in the live full-update)
 
