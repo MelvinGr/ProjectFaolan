@@ -24,8 +24,8 @@ namespace Faolan.Tests
 		// stays full - matching the retail login-while-dead capture (Stihetfv #50: health(f7)=0, life(f6) full).
 		// An alive character keeps cur==max. This is the FA015807 analogue of the snapshot HealthCurrent=0
 		// (#214); the SimpleChar is built from THIS packet, not the 0x737A6DF9 snapshot.
-		[Theory, InlineData(false, 19600u), InlineData(true, 0u)]
-		// alive: current health == max (196 * 100)
+		[Theory, InlineData(false, 13000u), InlineData(true, 0u)]
+		// alive: current health == max (Guardian L1 = 130, x100 wire scale)
 		// dead:  current health == 0,   max/life stays full
 		public void Build_DeadCharacter_ZeroesCurrentHealthKeepsLifeFull(bool isDead, uint expectedHealth)
 		{
@@ -34,20 +34,15 @@ namespace Faolan.Tests
 				Name = "Testie",
 				Race = Race.Cimmerian,
 				Sex = Sex.Male,
+				Class = ConanClass.Guardian,
 				Level = 1,
-				IsDead = isDead,
-				MaxStats = new CharacterMaxStats
-				{
-					Health = 196,
-					Mana = 0,
-					Stamina = 197
-				}
+				IsDead = isDead
 			};
 
 			var message = PlayerCharacterIirs.ForCharacter(character, new CharacterEquipment());
 
 			Assert.Equal(expectedHealth, message.Stats.Health);
-			Assert.Equal(196u * 100, message.Stats.Life); // life (max) is full regardless of dead state
+			Assert.Equal(character.MaxVitals().Health * 100, message.Stats.Life); // life (max) is full regardless of dead state
 			if (isDead)
 			{
 				Assert.Equal(29u, message.Stats.BccState); // bcc_state=29 = the Dead behavior-controller state (alive=1)

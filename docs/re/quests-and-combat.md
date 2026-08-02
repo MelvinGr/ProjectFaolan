@@ -42,21 +42,23 @@ count-prefixed record block (applies the ×100 vitals / ×10 attribute scale); `
 alone, on the belief that "max rides the snapshot" — true at world entry and wrong for every later change, which
 left a levelled character's bar pinned to its seed max. A vitals push now emits the whole
 `EntityVitals.ToVitalsBlock` (current AND max), and a path that CHANGES a max calls
-`CombatService.ReseedFromMaxStats` first. `BuildVitals(client)` sources Health/Stamina/Mana from the
-character's persisted **`CharacterMaxStats`** (now an active DbSet/table with a 1-1 cascade to Character,
-schema since squashed into the `InitialCreate` migration), seeded on creation via `CharacterMaxStats.CreateDefaults(class, level)`;
-legacy characters with no row fall back to computed defaults in-memory. Those defaults are no longer "rough class/level
+`CombatService.ReseedFromMaxStats` first. `BuildVitals(client)` sources Health/Stamina/Mana from
+**`Character.MaxVitals()`**, which COMPUTES them from (Class, Level) via `CharacterMaxStats.CreateDefaults`. They
+used to be a persisted `CharacterMaxStats` row; storing a value that is a pure function of two other columns is
+what let it go stale, because only the `.level` GM command refreshed it — a combat level-up wrote the new Level and
+left the row at its creation value, so the next login re-seeded current health from the old ceiling (a level-2
+necromancer reading 89/955, #578). The table is dropped and there is nothing left to keep in sync; an imported
+character reports the same ceiling as a created one of the same class and level. Those values are no longer "rough class/level
 values anchored on AssassinL23": the LEVEL-1 anchors are retail-verified per class (decoded out of the world-entry
 vitals push in the create captures — Guardian 130, Conqueror 168, Dark Templar 128, Barbarian 118, Ranger 133,
 Necromancer / Herald of Xotli 89, Assassin 98), and the per-class BASE curve is the client's own `HitsManaAndStamina_c`
 table (RDB 1000511, `CharacterMaxStats.ClassBaseHundredths`), which reproduces all 16 captured level-up pushes exactly. The create-editor commits the chosen class
-before naming, so `CommitCharacterName` calls `Character.RegenerateMaxStats()` (updates the seeded row in place)
-to replace the level-1 rogue baseline with the chosen class's vitals. (Of the live stat-testing GM commands, `.setstatrange` and
+before naming, and nothing has to be regenerated for it: the vitals follow the stored Class the moment it is
+written. (Of the live stat-testing GM commands, `.setstatrange` and
 `.vitals` were removed; **`.setstat` is still registered** and is the instrument for measuring a stat's DISPLAY
 scale — send a known raw value, read the rendered number. It is also how the two vitals CHANNELS were told apart:
 `.setstat 1 <v>` moves the health bar's max, `.setstat 27 <v>` moves nothing the bar draws.) Round-trip tests
-(`CharacterStatBlockTests`, `CharacterMaxStatsTests`, `DatabaseRepositoryTests.CreateCharacter_SeedsDefaultMaxStats`)
-cover bytes, defaults, and cascade. `ApplySpell` (0x6B87E316) was already implemented (caster + `0000` + spellId +
+(`CharacterStatBlockTests`, `CharacterMaxStatsTests`) cover the bytes and the derived values. `ApplySpell` (0x6B87E316) was already implemented (caster + `0000` + spellId +
 `0000C350` + target + data); its builders now live in `Faolan.Core.Network/Codecs/Combat/` (`MagicBuffDataCodec`,
 `MagicBuffCodec`, `DeathSequence`).
 

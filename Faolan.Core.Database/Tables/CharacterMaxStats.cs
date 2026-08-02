@@ -1,20 +1,14 @@
 using System;
-using System.ComponentModel.DataAnnotations.Schema;
 using Faolan.Core.Enums;
-using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
-	[PrimaryKey(nameof(CharacterId))]
+	// A computed VALUE, not a table (#578). It used to be a one-to-one row beside Character, but it is a pure
+	// function of (Class, Level) - so storing it only created something that could disagree with the level, which is
+	// exactly what happened: a combat level-up wrote the new Level and left the row behind, and the next login
+	// re-seeded current health from the stale ceiling. Build it with Character.MaxVitals().
 	public class CharacterMaxStats
 	{
-		public uint CharacterId { get; set; }
-
-		// The one-to-one's DEPENDENT side: this attribute is what tells EF the FK lives here rather than on
-		// Character, which the fluent HasForeignKey<CharacterMaxStats> used to say.
-		[ForeignKey(nameof(CharacterId))]
-		public virtual Character Character { get; set; } = null!;
-
 		// Player-facing values (what the character sheet shows), e.g. Health 1270. The on-wire ×100 vitals scale
 		// is applied at send time, not stored.
 		public uint Health { get; set; }

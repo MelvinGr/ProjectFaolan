@@ -162,14 +162,11 @@ namespace Faolan.Web.Components.Pages
 		private async Task LoadSheet(Character c)
 		{
 			await using var db = await DbFactory.CreateDbContextAsync();
-			var full = await db.Characters.Include(x => x.MaxStats).Include(x => x.Map).Include(x => x.Guild).FirstOrDefaultAsync(x => x.Id == c.Id);
+			var full = await db.Characters.Include(x => x.Map).Include(x => x.Guild).FirstOrDefaultAsync(x => x.Id == c.Id);
 
-			var stats = full?.MaxStats;
-			if (stats == null && full != null)
-			{
-				full.RegenerateMaxStats(); // older rows may predate the MaxStats block
-				stats = full.MaxStats;
-			}
+			// Vitals are DERIVED from (Class, Level) rather than stored, so there is no row to include and no older
+			// row to back-fill (#578).
+			var stats = full?.MaxVitals();
 
 			_health = stats?.Health ?? 0;
 			_mana = stats?.Mana ?? 0;

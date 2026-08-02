@@ -56,10 +56,6 @@ namespace Faolan.Core.Database.Tables
 		public virtual CharacterBody? Body { get; set; }
 		public virtual CharacterEquipment? Equipment { get; set; }
 
-		// One-to-one max-stat block (Health/Mana/Stamina, player-facing values). Created with class/level
-		// defaults on character creation; the ×100 vitals wire scale is applied when sending (CharacterStatBlock).
-		public virtual CharacterMaxStats? MaxStats { get; set; }
-
 		// The appearance resources chosen in the create editor (hair/beard mesh, hair/eye/skin color, tattoos,
 		// scars), in editor send order. Resolved via MorphTarget into the spawn scaffold's weighted entries - which,
 		// with Body's morph sliders, is the WHOLE of the spawn's appearance entry table. That table used to be stored
@@ -195,21 +191,19 @@ namespace Faolan.Core.Database.Tables
 			return $"{base.ToString()}: {Name}";
 		}
 
-		// Recomputes MaxStats from the current Class/Level. Updates the existing row in place when present (so EF
-		// keeps tracking the same row instead of orphaning/duplicating it) and creates it otherwise. Call when the
-		// class or level changes - e.g. once the create-editor commits the chosen class.
-		public void RegenerateMaxStats()
+		// The vitals ceiling for this character's Class/Level. COMPUTED, never stored (#578).
+		//
+		// It used to be a persisted `CharacterMaxStats` row, and storing a value that is a pure function of two other
+		// columns is what made the bug: only the `.level` GM command refreshed it, so a combat level-up wrote the new
+		// Level and left the row at its creation value. The next login re-seeded current health from that stale
+		// ceiling and the player came back at a fraction of their bar - a level-2 necromancer reading 89/955. There is
+		// nothing to keep in sync now, so it cannot go stale again.
+		//
+		// This is the BASE the client adds to, not the number it draws: gear, class-feat and buff terms are layered on
+		// top by EntityVitals.FromCharacter. See CharacterMaxStats for the curve itself.
+		public CharacterMaxStats MaxVitals()
 		{
-			var defaults = CharacterMaxStats.CreateDefaults(Class, Level);
-			if (MaxStats == null)
-			{
-				MaxStats = defaults;
-				return;
-			}
-
-			MaxStats.Health = defaults.Health;
-			MaxStats.Mana = defaults.Mana;
-			MaxStats.Stamina = defaults.Stamina;
+			return CharacterMaxStats.CreateDefaults(Class, Level);
 		}
 	}
 }

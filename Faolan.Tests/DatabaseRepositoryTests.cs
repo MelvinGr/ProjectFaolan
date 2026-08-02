@@ -241,15 +241,14 @@ namespace Faolan.Tests
 					TestDb.SeedWorld(ctx, accountId, realmId);
 				}
 
-				// CreateCharacter should cascade-insert a default MaxStats row (level-1 baseline).
+				// Vitals are DERIVED from (Class, Level) (#578) - there is no row to cascade-insert, and a reloaded
+				// character reports the same ceiling as the one just created because both compute it.
 				var created = await repo.CreateCharacter(accountId, realmId);
-				Assert.NotNull(created.MaxStats);
+				Assert.True(created.MaxVitals().Health > 0);
 
-				// Reload across a fresh context: the MaxStats row is loaded with the character.
 				var loaded = await repo.GetCharacterForAccount(accountId, created.Id);
-				Assert.NotNull(loaded!.MaxStats);
-				Assert.True(loaded.MaxStats!.Health > 0);
-				Assert.True(loaded.MaxStats.Stamina > 0);
+				Assert.Equal(created.MaxVitals().Health, loaded!.MaxVitals().Health);
+				Assert.True(loaded.MaxVitals().Stamina > 0);
 			}
 			finally
 			{
@@ -494,8 +493,12 @@ namespace Faolan.Tests
 			}
 		}
 
+		// Vitals FOLLOW the class/level committed by the editor with nothing to regenerate or keep in sync, because
+		// they are computed rather than stored (#578). This used to assert that a MaxStats row was updated in place
+		// and that exactly one existed; the row is gone, so what is left to prove is that the committed class is what
+		// the character reports.
 		[Fact]
-		public async Task RegenerateMaxStats_OnNameCommit_UpdatesSingleRow()
+		public async Task MaxVitals_OnNameCommit_FollowTheCommittedClass()
 		{
 			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-repo-{Guid.NewGuid():N}.db");
 			try
@@ -518,17 +521,13 @@ namespace Faolan.Tests
 				character!.Class = ConanClass.Necromancer;
 				character.Level = 20;
 				character.Name = "Mage";
-				character.RegenerateMaxStats();
 				await repo.SaveCharacter(character);
 
-				// Reload: stats reflect the chosen class, and exactly one MaxStats row exists (updated in place).
+				// Reload: vitals reflect the chosen class purely from the stored Class/Level.
 				var reloaded = await repo.GetCharacterForAccount(accountId, created.Id);
 				var expected = CharacterMaxStats.CreateDefaults(ConanClass.Necromancer, 20);
-				Assert.Equal(expected.Mana, reloaded!.MaxStats!.Mana);
-				Assert.Equal(expected.Health, reloaded.MaxStats.Health);
-
-				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
-					Assert.Equal(1, await ctx.CharacterMaxStats.CountAsync(s => s.CharacterId == created.Id, TestContext.Current.CancellationToken));
+				Assert.Equal(expected.Mana, reloaded!.MaxVitals().Mana);
+				Assert.Equal(expected.Health, reloaded.MaxVitals().Health);
 			}
 			finally
 			{
@@ -650,8 +649,8 @@ namespace Faolan.Tests
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 
-				var created = await repo.CreateCharacter(accountId, realmId); // seeds a MaxStats nav row
-				Assert.NotNull(created.MaxStats);
+				var created = await repo.CreateCharacter(accountId, realmId);
+				Assert.True(created.MaxVitals().Health > 0);
 
 				Assert.False(created.HasBind); // a fresh character is unbound (BindMapId 0)
 
@@ -671,9 +670,8 @@ namespace Faolan.Tests
 				Assert.Equal(7u, loaded.BindRespawnPointId);
 				Assert.Equal(2040u, (await repo.GetRespawnPoint(7))!.MapId);
 
-				// The MaxStats navigation the full-graph save would have rewritten is still intact.
-				Assert.NotNull(loaded.MaxStats);
-				Assert.True(loaded.MaxStats!.Health > 0);
+				// Vitals track the level the targeted writes just changed - nothing to rewrite, nothing to go stale.
+				Assert.Equal(CharacterMaxStats.CreateDefaults(loaded.Class, 17).Health, loaded.MaxVitals().Health);
 			}
 			finally
 			{

@@ -22,6 +22,14 @@ namespace Faolan.Tests
 		private const uint BeachStarterQuestId = 10238;
 		private const uint TemplateInstance = 0x0802E5D4;
 
+		// A freshly created character - with a CLASS, because vitals are derived from (Class, Level) and there is
+		// deliberately no fallback curve for an unset class (a 0 is a corrupt row, not a new character). This is what
+		// DatabaseRepository.CreateCharacter allocates.
+		private static Character Fresh()
+		{
+			return new Character { Class = ConanClass.Barbarian, Level = 1 };
+		}
+
 		// A character with NO stored sheet is the create path, not corruption: it must still build the skeleton.
 		[Fact]
 		public async Task EmptyStatSheet_StillBuilds_TheBaselineSkeleton()
@@ -29,7 +37,7 @@ namespace Faolan.Tests
 			var def = await LoadDefinition();
 			Assert.NotNull(def);
 
-			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, new Character(), TemplateInstance, null, [], []));
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, Fresh(), TemplateInstance, null, [], []));
 			Assert.NotEmpty(built);
 		}
 
@@ -52,7 +60,7 @@ namespace Faolan.Tests
 			for (var i = 0; i < SubClassStatBlock.SheetSize - 1; i++)
 				partial.Add((CharacterStatId.Level, 1));
 
-			var ex = Assert.Throws<InvalidOperationException>(() => SnapshotTails.FromScratch(def, new Character(), TemplateInstance, null, [], partial));
+			var ex = Assert.Throws<InvalidOperationException>(() => SnapshotTails.FromScratch(def, Fresh(), TemplateInstance, null, [], partial));
 
 			Assert.Contains($"{SubClassStatBlock.SheetSize}", ex.Message);
 		}

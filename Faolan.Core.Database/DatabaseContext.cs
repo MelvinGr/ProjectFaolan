@@ -34,7 +34,6 @@ namespace Faolan.Core.Database
 		DbSet<CharacterFeat> CharacterFeats { get; }
 		DbSet<CharacterFeatSpec> CharacterFeatSpecs { get; }
 		DbSet<CharacterInventory> CharacterInventory { get; }
-		DbSet<CharacterMaxStats> CharacterMaxStats { get; }
 		DbSet<CharacterQuest> CharacterQuests { get; }
 		DbSet<CharacterQuestGoal> CharacterQuestGoals { get; }
 		DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; }
@@ -130,7 +129,6 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterFeat> CharacterFeats { get; set; }
 		public DbSet<CharacterFeatSpec> CharacterFeatSpecs { get; set; }
 		public DbSet<CharacterInventory> CharacterInventory { get; set; }
-		public DbSet<CharacterMaxStats> CharacterMaxStats { get; set; }
 		public DbSet<CharacterQuest> CharacterQuests { get; set; }
 		public DbSet<CharacterQuestGoal> CharacterQuestGoals { get; set; }
 		public DbSet<CharacterRespawnPoint> CharacterRespawnPoints { get; set; }
@@ -369,8 +367,6 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<MailAttachment>().HasOne(a => a.Item).WithMany().OnDelete(DeleteBehavior.Restrict);
 			modelBuilder.Entity<TradepostListing>().HasOne(t => t.TemplateItem).WithMany().OnDelete(DeleteBehavior.Restrict);
 
-			// One-to-one Character <-> CharacterMaxStats, keyed by CharacterId; deletes cascade with the character.
-			modelBuilder.Entity<Character>().HasOne(c => c.MaxStats).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.Inventory).WithOne(i => i.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.Skills).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.ScaffoldPairs).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);

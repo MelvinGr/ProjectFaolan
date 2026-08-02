@@ -715,7 +715,8 @@ namespace Faolan.GameServer
 			// level-DOWN (the bar's fill = Exp/MaxExp with Exp > MaxExp, or Exp for a level whose threshold is now below
 			// the carried total). Fresh level = empty bar.
 			character.Experience = 0;
-			character.RegenerateMaxStats();
+			// No vitals row to refresh: the ceiling is DERIVED from (Class, Level), so setting the level above is
+			// already the new max (#578).
 			await Database.SaveCharacter(character);
 
 			// Push Level AND a refreshed XP bar (Exp/MaxExp) so a GM `.level` ding shows exactly like an XP-driven ding

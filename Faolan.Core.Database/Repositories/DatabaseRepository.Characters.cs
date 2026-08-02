@@ -262,8 +262,6 @@ namespace Faolan.Core.Database.Repositories
 					Position = Map.NewPlayerSpawnSpawnPoint.Position
 				};
 
-				character.MaxStats = CharacterMaxStats.CreateDefaults(character.Class, character.Level);
-
 				// Every character gets its equipment row HERE, with the character itself, so "a character has one" is an
 				// invariant established at creation rather than something each reader has to cope with. The slots are all
 				// empty - the first-login starter gear (#220) fills them - but the ROW exists, which is what the spawn and
@@ -932,7 +930,6 @@ namespace Faolan.Core.Database.Repositories
 				.Include(c => c.Account)
 				.Include(c => c.Body)
 				.Include(c => c.BodyResources)
-				.Include(c => c.MaxStats)
 				.Include(c => c.Equipment)
 				.Include(c => c.Skills)
 				.Include(c => c.Feats)

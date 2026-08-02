@@ -120,7 +120,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// the snapshot's HealthCurrent (#214 step 2) left the avatar standing. Verified against the retail
 			// login-while-dead capture (Stihetfv FA015807 #50): CharacterStats.health(f7)=0, life(f6)=19600 full,
 			// and can_fall(f20)=0 (alive=1).
-			var maxStats = character.MaxStats;
+			var maxStats = character.MaxVitals();
 			if (maxStats != null)
 			{
 				stats.Life = maxStats.Health * 100;

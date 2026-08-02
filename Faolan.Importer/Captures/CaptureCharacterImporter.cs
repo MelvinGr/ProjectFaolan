@@ -289,16 +289,11 @@ namespace Faolan.Importer.Captures
 			character.RotationZ = scaffold.Rotation.Z;
 			character.RotationW = scaffold.Rotation.W;
 
-			// Vitals from the IIR's max side (x100 wire scale); class is not in the spawn, so fall back to the
-			// class-default baseline only when the capture carries nothing.
-			character.MaxStats = stats.Health > 0
-				? new CharacterMaxStats
-				{
-					Health = stats.Health / 100,
-					Stamina = stats.MaxStamina / 100,
-					Mana = stats.MaxMana / 100
-				}
-				: CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			// The captured vitals are deliberately NOT stored. Vitals are derived from (Class, Level) like every other
+			// character's, so an imported character is no different from a created one (#578) - carrying the capture's
+			// own numbers is what made an imported L80 necromancer's ceiling disagree with the curve by ~2x, and a
+			// stored copy is what let the value go stale in the first place. The wire scale the capture uses (x100) is
+			// applied at send time.
 
 			// The rendered looks, stored as the TRUE wire values (the spawn rebuild emits them as-is).
 			character.Body = new CharacterBody

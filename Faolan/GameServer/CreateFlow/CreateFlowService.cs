@@ -433,10 +433,10 @@ namespace Faolan.GameServer.CreateFlow
 			}
 
 			character.Name = name;
-			// The class is chosen before naming (the final editor step), so regenerate vitals from the now-known
-			// class/level - replacing the level-1 rogue baseline seeded at row allocation.
-			character.RegenerateMaxStats();
-			// Persist the whole accumulated editor graph (name + sex/race/morphs Body + MaxStats) as one unit of work.
+			// Nothing to regenerate: vitals are DERIVED from (Class, Level) at read time, so the class chosen in the
+			// final editor step is reflected the moment it is stored - there is no level-1 rogue baseline left to
+			// replace (#578).
+			// Persist the whole accumulated editor graph (name + sex/race/morphs Body) as one unit of work.
 			await _database.SaveCharacter(character);
 
 			// Seed the spawn scaffold and the starter gear HERE, the first moment either can be right: both are

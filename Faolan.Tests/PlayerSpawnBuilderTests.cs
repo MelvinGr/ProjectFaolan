@@ -80,12 +80,7 @@ namespace Faolan.Tests
 				Race = Race.Cimmerian,
 				Sex = Sex.Male,
 				Level = 1,
-				MaxStats = new CharacterMaxStats
-				{
-					Health = 100,
-					Mana = 0,
-					Stamina = 200
-				}
+				Class = ConanClass.Guardian
 			};
 			var message = PlayerCharacterIirs.ForCharacter(character, new CharacterEquipment());
 

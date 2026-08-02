@@ -97,11 +97,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				// nothing: CaptureCharacterImporter seeds MaxStats FROM the captured stats, so the values that reach
 				// the wire here are the captured ones anyway on the first login - they simply track the character
 				// from then on.
-				if (character.MaxStats != null)
-				{
-					var v = character.MaxStats.SnapshotVitals(character.Class);
-					block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
-				}
+				var v = character.MaxVitals().SnapshotVitals(character.Class);
+				block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
 
 				// #214: a dead character logs in dead - zero current-health so the client shows the release window.
 				// Unconditional: whichever baseline the sheet came from, it now carries a full-health pool.

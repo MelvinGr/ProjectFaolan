@@ -240,13 +240,17 @@ namespace Faolan.Tests
 			// Sustaining Wrath (Rank 9): stat 1 = 180000 at the ×100 vitals scale -> +1800 health.
 			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
-			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = ConanClass.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } });
+			// The base is DERIVED from (Class, Level) (#578), so take it from the character rather than restating a
+			// number - what this test is about is the +1800 landing ON it, not what it happens to be.
+			var character = new Character { Class = ConanClass.BearShaman, Level = 80 };
+			var baseHp = character.MaxVitals().Health;
+			entity.Vitals = EntityVitals.FromCharacter(character);
 
 			entity.ActiveBuffs[4239610 << 8] = new ActiveBuff(4239610 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
 			var applied = BuffStatEffects.Recompute(entity, catalog);
 
-			Assert.Equal([(CharacterStatId.HealthMax, 8141u)], applied); // 6341 + 1800, not the bare 1800
-			Assert.Equal(8141u, entity.Vitals.MaxHealth);
+			Assert.Equal([(CharacterStatId.HealthMax, baseHp + 1800)], applied); // the whole pool, not the bare 1800
+			Assert.Equal(baseHp + 1800, entity.Vitals.MaxHealth);
 		}
 
 		// …and when it ends the pool comes back down, taking CURRENT with it: a player left above their own bar would
@@ -256,18 +260,20 @@ namespace Faolan.Tests
 		{
 			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
-			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = ConanClass.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } });
+			var character = new Character { Class = ConanClass.BearShaman, Level = 80 };
+			var baseHp = character.MaxVitals().Health;
+			entity.Vitals = EntityVitals.FromCharacter(character);
 
 			entity.ActiveBuffs[4239610 << 8] = new ActiveBuff(4239610 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
 			BuffStatEffects.Recompute(entity, catalog);
-			entity.Vitals.Health = 8141;
+			entity.Vitals.Health = baseHp + 1800;
 
 			entity.ActiveBuffs.Clear();
 			var removed = BuffStatEffects.Recompute(entity, catalog);
 
-			Assert.Equal([(CharacterStatId.HealthMax, 6341u)], removed);
-			Assert.Equal(6341u, entity.Vitals.MaxHealth);
-			Assert.Equal(6341u, entity.Vitals.Health); // clamped down with the max, not left above the bar
+			Assert.Equal([(CharacterStatId.HealthMax, baseHp)], removed);
+			Assert.Equal(baseHp, entity.Vitals.MaxHealth);
+			Assert.Equal(baseHp, entity.Vitals.Health); // clamped down with the max, not left above the bar
 		}
 
 		// A max pool is `base + gear + buffs`, and the buff is added to the gear-inclusive base rather than replacing it.
@@ -277,15 +283,16 @@ namespace Faolan.Tests
 			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 584 };
-			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = ConanClass.BearShaman, Level = 80, MaxStats = new CharacterMaxStats { Health = 6341 } },
-				entity.GearBonuses);
+			var character = new Character { Class = ConanClass.BearShaman, Level = 80 };
+			var baseHp = character.MaxVitals().Health;
+			entity.Vitals = EntityVitals.FromCharacter(character, entity.GearBonuses);
 
-			Assert.Equal(6925u, entity.Vitals.MaxHealth); // gear alone, before any buff
+			Assert.Equal(baseHp + 584, entity.Vitals.MaxHealth); // gear alone, before any buff
 
 			entity.ActiveBuffs[4239610 << 8] = new ActiveBuff(4239610 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
 			BuffStatEffects.Recompute(entity, catalog);
 
-			Assert.Equal(8725u, entity.Vitals.MaxHealth); // 6341 + 584 gear + 1800 buff
+			Assert.Equal(baseHp + 584 + 1800, entity.Vitals.MaxHealth); // base + 584 gear + 1800 buff
 		}
 
 		// #473: a GEAR-ONLY change to a max pool must APPLY, with no buff involved. The recompute used to `continue`
@@ -299,30 +306,27 @@ namespace Faolan.Tests
 			var entity = Player();
 			// FromCharacter, not FromMax: only it seeds BaseMaxHealth, which is what SetMaxFromBonus adds the bonus
 			// ONTO. (Production always comes through FromCharacter - GetOrAddPlayerVitals and RegisterPlayerInWorld.)
-			entity.Vitals = EntityVitals.FromCharacter(new Character
-			{
-				Class = ConanClass.Guardian,
-				Level = 1,
-				MaxStats = new CharacterMaxStats { Health = 1000 }
-			});
+			var character = new Character { Class = ConanClass.Guardian, Level = 1 };
+			var baseHp = character.MaxVitals().Health;
+			entity.Vitals = EntityVitals.FromCharacter(character);
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 0 };
 
 			// First sync seeds off gear alone: it APPLIES but reports nothing (that is not news).
 			Assert.Empty(BuffStatEffects.Recompute(entity, catalog));
-			Assert.Equal(1000u, entity.Vitals.MaxHealth);
+			Assert.Equal(baseHp, entity.Vitals.MaxHealth);
 
 			// Now equip a +25 HP piece. The max must move, and be reported so the caller can act on it.
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 25 };
 			var changed = BuffStatEffects.Recompute(entity, catalog);
 
-			Assert.Equal(1025u, entity.Vitals.MaxHealth);
+			Assert.Equal(baseHp + 25, entity.Vitals.MaxHealth);
 			Assert.Contains(changed, c => c.Stat == CharacterStatId.HealthMax);
 
 			// And taking it off comes back down, clamping current with it.
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 0 };
 			BuffStatEffects.Recompute(entity, catalog);
-			Assert.Equal(1000u, entity.Vitals.MaxHealth);
-			Assert.Equal(1000u, entity.Vitals.Health); // current clamped down, not left above the bar
+			Assert.Equal(baseHp, entity.Vitals.MaxHealth);
+			Assert.Equal(baseHp, entity.Vitals.Health); // current clamped down, not left above the bar
 		}
 
 		private static WorldEntity Player()

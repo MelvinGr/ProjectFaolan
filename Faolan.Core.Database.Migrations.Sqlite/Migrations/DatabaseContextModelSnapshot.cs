@@ -746,25 +746,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         });
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterMaxStats", b =>
-                {
-                    b.Property<uint>("CharacterId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Health")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Mana")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("Stamina")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("CharacterId");
-
-                    b.ToTable("CharacterMaxStats");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterQuest", b =>
                 {
                     b.Property<uint>("Id")
@@ -4045,17 +4026,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Item");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterMaxStats", b =>
-                {
-                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
-                        .WithOne("MaxStats")
-                        .HasForeignKey("Faolan.Core.Database.Tables.CharacterMaxStats", "CharacterId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Character");
-                });
-
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterQuest", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
@@ -5302,8 +5272,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Feats");
 
                     b.Navigation("Inventory");
-
-                    b.Navigation("MaxStats");
 
                     b.Navigation("Quests");
 

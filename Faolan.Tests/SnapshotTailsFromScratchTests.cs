@@ -50,8 +50,7 @@ namespace Faolan.Tests
 				// the captured 3 - so the golden states who the template's character is instead of inheriting it.
 				Sex = Sex.Female,
 				// ...and whose ACCOUNT it is: the sheet's PlayerId is the account's, not the character's (#478).
-				AccountId = 0x59EA506E,
-				MaxStats = CharacterMaxStats.CreateDefaults(ConanClass.Assassin, 1)
+				AccountId = 0x59EA506E
 			};
 			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, strie, TemplateInstance));
 
@@ -65,8 +64,8 @@ namespace Faolan.Tests
 		// rows in CharacterStats rendered its capture-time health for ever: the same 1270 at level 10 and at level 40
 		// in-client, while armour mitigation moved with the level and proved the client knew.
 		//
-		// Nothing is lost by overriding, because CaptureCharacterImporter seeds MaxStats FROM the captured stats - so
-		// an imported character emits its captured numbers on the first login and simply tracks itself after.
+		// Nothing is lost by overriding: vitals are DERIVED from (Class, Level) (#578), so an imported character and a
+		// created one of the same class and level report the same numbers.
 		[Fact]
 		public async Task BuildFromScratch_ImportedSheet_StillTakesItsVitalsFromTheCharacter()
 		{
@@ -77,8 +76,7 @@ namespace Faolan.Tests
 			{
 				Level = 7,
 				Experience = 98760,
-				Class = ConanClass.Assassin,
-				MaxStats = new CharacterMaxStats { Health = 4321, Mana = 765, Stamina = 543 }
+				Class = ConanClass.Assassin
 			};
 
 			// A captured sheet carrying a DIFFERENT health from the character's - the shape that used to win.
@@ -89,7 +87,7 @@ namespace Faolan.Tests
 			var fromCapture = SnapshotTails.FromScratch(def, character, 0x0802ABCD, statSheet: captured);
 			var fromScratch = SnapshotTails.FromScratch(def, character, 0x0802ABCD);
 
-			Assert.Equal(4321u, fromCapture.PostAccessBlock!.CurrentHp);
+			Assert.Equal(character.MaxVitals().Health, fromCapture.PostAccessBlock!.CurrentHp);
 			Assert.Equal(fromScratch.PostAccessBlock!.CurrentHp, fromCapture.PostAccessBlock.CurrentHp);
 			Assert.Equal(fromScratch.PostAccessBlock.GetStat(CharacterStatId.HealthMax), fromCapture.PostAccessBlock.GetStat(CharacterStatId.HealthMax));
 		}
@@ -109,7 +107,6 @@ namespace Faolan.Tests
 				Class = ConanClass.Barbarian,
 				Level = 7,
 				Experience = 98760,
-				MaxStats = Stats(),
 				IsDead = false
 			};
 			var dead = new Character
@@ -117,7 +114,6 @@ namespace Faolan.Tests
 				Class = ConanClass.Barbarian,
 				Level = 7,
 				Experience = 98760,
-				MaxStats = Stats(),
 				IsDead = true
 			};
 			const uint live = 0x0802ABCD;
@@ -125,7 +121,7 @@ namespace Faolan.Tests
 			var aliveSubClass = SnapshotTails.FromScratch(def, alive, live);
 			var deadSubClass = SnapshotTails.FromScratch(def, dead, live);
 
-			Assert.Equal(4321u, aliveSubClass.PostAccessBlock!.CurrentHp); // alive: full current health
+			Assert.Equal(alive.MaxVitals().Health, aliveSubClass.PostAccessBlock!.CurrentHp); // alive: full current health
 			Assert.Equal(0u, deadSubClass.PostAccessBlock!.CurrentHp); // dead: current health = 0 (the gate)
 
 			// Max HP is untouched by death - HealthMax stays full in both.
@@ -133,15 +129,6 @@ namespace Faolan.Tests
 			Assert.True(deadSubClass.PostAccessBlock.GetStat(CharacterStatId.HealthMax) > 0u, "dead snapshot keeps the max-health side populated");
 			return;
 
-			CharacterMaxStats Stats()
-			{
-				return new CharacterMaxStats
-				{
-					Health = 4321,
-					Mana = 765,
-					Stamina = 543
-				};
-			}
 		}
 
 		[Fact]
@@ -189,13 +176,7 @@ namespace Faolan.Tests
 			{
 				Class = ConanClass.Barbarian,
 				Level = 7,
-				Experience = 98760,
-				MaxStats = new CharacterMaxStats
-				{
-					Health = 4321,
-					Mana = 765,
-					Stamina = 543
-				}
+				Experience = 98760
 			};
 			const uint live = 0x0802ABCD;
 
@@ -211,9 +192,9 @@ namespace Faolan.Tests
 
 			// The live character's vitals/XP landed in the decoded stat slots (the part the production flip changes).
 			Assert.NotNull(tails.PostAccessBlock);
-			Assert.Equal(4321u, tails.PostAccessBlock!.CurrentHp);
-			Assert.Equal(765u, tails.PostAccessBlock.CurrentMana);
-			Assert.Equal(543u, tails.PostAccessBlock.CurrentStamina);
+			Assert.Equal(character.MaxVitals().Health, tails.PostAccessBlock!.CurrentHp);
+			Assert.Equal(character.MaxVitals().Mana, tails.PostAccessBlock.CurrentMana);
+			Assert.Equal(character.MaxVitals().Stamina, tails.PostAccessBlock.CurrentStamina);
 
 			// The XP bar is authored as a consistent triple by stat id (#447): within-level progress in 0x34, the
 			// curve's to-next-level cost in 0x15E - word [80] - and a zero base for the current level.

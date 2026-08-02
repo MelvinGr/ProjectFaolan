@@ -516,7 +516,7 @@ namespace Faolan.GameServer
 		internal static Rpc BuildVitals(INetworkClient client)
 		{
 			var character = client.Session.Character;
-			var stats = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			var stats = character.MaxVitals();
 			// Emit the full value under the CURRENT ids (0x001B/0x01F8/0x01FA) - the retail full-spawn announce sends
 			// current (== max at full health); the max ids ride the snapshot/tails. (in-client proof: CapturedCharacterStats.)
 			// Also carry Level + Exp/MaxExp so the XP bar reflects the character's REAL progress: the snapshot tails

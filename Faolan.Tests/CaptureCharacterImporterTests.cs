@@ -73,8 +73,7 @@ namespace Faolan.Tests
 				Assert.Equal((1, 1, 0), result);
 
 				var character = await db
-					.Characters.Include(c => c.MaxStats)
-					.Include(c => c.Body)
+					.Characters.Include(c => c.Body)
 					.Include(c => c.Skills)
 					.Include(c => c.BodyResources)
 					.SingleAsync(c => c.Name == "Dikketest", TestContext.Current.CancellationToken);
@@ -99,7 +98,10 @@ namespace Faolan.Tests
 				// which confirms all four components (incl. the new RotationW) were read - not the W=1 fresh default.
 				Assert.Equal(1f, character.Rotation.LengthSquared(), 0.001f);
 				Assert.NotEqual(1f, character.RotationW); // a real captured W, not the identity fallback
-				Assert.NotNull(character.MaxStats);
+
+				// The capture's own vitals are deliberately NOT carried: vitals are derived from (Class, Level) so an
+				// imported character is no different from a created one (#578).
+				Assert.Equal(CharacterMaxStats.CreateDefaults(character.Class, character.Level).Health, character.MaxVitals().Health);
 
 				// The spawn's 7 morph entries must reach CharacterBody, which IS the appearance now: it is what
 				// Faolan.Web renders from and what the spawn's entry table is regenerated from. They used to stay at

@@ -177,7 +177,7 @@ namespace Faolan.GameServer.Combat
 		public static EntityVitals FromCharacter(Character character, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
 			IReadOnlyDictionary<CharacterStatId, int>? classBase = null)
 		{
-			var max = character.MaxStats ?? CharacterMaxStats.CreateDefaults(character.Class, character.Level);
+			var max = character.MaxVitals();
 
 			// The client builds its max the same way and we can read its arithmetic straight off the ClientInterface
 			// channel (#450). For a level-80 Necromancer it took OUR snapshot value as the base and added its own terms:

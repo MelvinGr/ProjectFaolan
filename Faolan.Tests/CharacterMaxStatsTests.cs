@@ -43,43 +43,45 @@ namespace Faolan.Tests
 			Assert.Equal(0u, stats.Mana);
 		}
 
+		// The ceiling FOLLOWS the level with nothing to keep in sync, because it is computed rather than stored
+		// (#578). It used to be a persisted CharacterMaxStats row that only the `.level` GM command refreshed, so a
+		// combat level-up wrote the new Level and left the row at its creation value - a level-2 necromancer came back
+		// from a relog reading 89/955, its current health seeded from the level-1 ceiling.
 		[Fact]
-		public void RegenerateMaxStats_CreatesRow_WhenMissing()
+		public void MaxVitals_FollowTheLevel_WithNothingToKeepInSync()
 		{
-			var character = new Character
-			{
-				Class = ConanClass.Guardian,
-				Level = 5
-			};
-			Assert.Null(character.MaxStats);
+			var character = new Character { Class = ConanClass.Necromancer, Level = 1 };
+			var atOne = character.MaxVitals();
 
-			character.RegenerateMaxStats();
+			character.Level = 2;
+			var atTwo = character.MaxVitals();
 
-			Assert.NotNull(character.MaxStats);
-			Assert.Equal(CharacterMaxStats.CreateDefaults(ConanClass.Guardian, 5).Health, character.MaxStats!.Health);
+			Assert.Equal(CharacterMaxStats.CreateDefaults(ConanClass.Necromancer, 1).Health, atOne.Health);
+			Assert.Equal(CharacterMaxStats.CreateDefaults(ConanClass.Necromancer, 2).Health, atTwo.Health);
+			Assert.True(atTwo.Health > atOne.Health);
 		}
 
+		// Two characters of the same class and level have the SAME ceiling regardless of where they came from. An
+		// imported character used to carry the capture's own vitals, so it disagreed with a created one by ~2x at L80;
+		// deriving is what makes them identical - an imported character must be no different from a created one.
 		[Fact]
-		public void RegenerateMaxStats_UpdatesExistingRowInPlace()
+		public void MaxVitals_AreIdenticalForImportedAndCreatedCharacters()
 		{
-			// The placeholder class every character row is allocated with (DatabaseRepository.CreateCharacter hands
-			// out a Cimmerian barbarian), NOT an unset one - ConanClass has no zero member and there is deliberately
-			// no fallback row, so a character with no class cannot produce vitals at all.
-			var character = new Character
-			{
-				Class = ConanClass.Barbarian,
-				Level = 1
-			};
-			character.RegenerateMaxStats();
-			var seeded = character.MaxStats;
+			var created = new Character { Class = ConanClass.Necromancer, Level = 80 };
+			var imported = new Character { Class = ConanClass.Necromancer, Level = 80 };
 
-			// The editor commits a mage class at a higher level -> stats regenerate into the SAME row.
-			character.Class = ConanClass.Necromancer;
-			character.Level = 20;
-			character.RegenerateMaxStats();
+			Assert.Equal(created.MaxVitals().Health, imported.MaxVitals().Health);
+			Assert.Equal(created.MaxVitals().Mana, imported.MaxVitals().Mana);
+		}
 
-			Assert.Same(seeded, character.MaxStats); // same tracked row, not a replacement
-			Assert.Equal(CharacterMaxStats.CreateDefaults(ConanClass.Necromancer, 20).Mana, character.MaxStats!.Mana);
+		// A class with no such pool never gains one - the client hides a bar whose max is 0, so a necromancer must not
+		// acquire stamina by levelling.
+		[Fact]
+		public void MaxVitals_DoNotGrowAPoolTheClassDoesNotHave()
+		{
+			var character = new Character { Class = ConanClass.Necromancer, Level = 40 };
+
+			Assert.Equal(0u, character.MaxVitals().Stamina);
 		}
 	}
 }

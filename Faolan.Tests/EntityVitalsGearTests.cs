@@ -15,7 +15,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void DeadCharacter_StaysDeadEvenWithGear()
 		{
-			var character = Guardian(320, 179);
+			var character = Guardian();
 			character.IsDead = true;
 
 			var vitals = EntityVitals.FromCharacter(character, new Dictionary<CharacterStatId, int>
@@ -23,7 +23,7 @@ namespace Faolan.Tests
 				[CharacterStatId.HealthMax] = 328
 			});
 
-			Assert.Equal(648u, vitals.MaxHealth); // max still gear-boosted
+			Assert.Equal(BaseHp() + 328, vitals.MaxHealth); // max still gear-boosted
 			Assert.Equal(0u, vitals.Health); // but a dead login stays dead
 		}
 
@@ -36,21 +36,21 @@ namespace Faolan.Tests
 				[CharacterStatId.StaminaMax] = 50
 			};
 
-			var vitals = EntityVitals.FromCharacter(Guardian(320, 179), gear);
+			var vitals = EntityVitals.FromCharacter(Guardian(), gear);
 
-			Assert.Equal(648u, vitals.MaxHealth); // 320 + 328
-			Assert.Equal(648u, vitals.Health); // current fills to the geared max, so the bar is full
-			Assert.Equal(229u, vitals.MaxStamina); // 179 + 50
+			Assert.Equal(BaseHp() + 328, vitals.MaxHealth);
+			Assert.Equal(BaseHp() + 328, vitals.Health); // current fills to the geared max, so the bar is full
+			Assert.Equal(BaseStamina() + 50, vitals.MaxStamina);
 		}
 
 		[Fact]
 		public void NoGear_UsesTheBaseMax()
 		{
-			var vitals = EntityVitals.FromCharacter(Guardian(320, 179));
+			var vitals = EntityVitals.FromCharacter(Guardian());
 
-			Assert.Equal(320u, vitals.MaxHealth);
-			Assert.Equal(320u, vitals.Health); // seeds full
-			Assert.Equal(179u, vitals.MaxStamina);
+			Assert.Equal(BaseHp(), vitals.MaxHealth);
+			Assert.Equal(BaseHp(), vitals.Health); // seeds full
+			Assert.Equal(BaseStamina(), vitals.MaxStamina);
 		}
 
 		// #450: a vitals push has to carry the MAX ids, not just the current ones. The bug this pins was a
@@ -60,16 +60,16 @@ namespace Faolan.Tests
 		[Fact]
 		public void VitalsBlock_CarriesTheMaxIdsAndNotJustTheCurrentOnes()
 		{
-			var vitals = EntityVitals.FromCharacter(Guardian(320, 179));
+			var vitals = EntityVitals.FromCharacter(Guardian());
 			vitals.Health = 100; // current below max, so the two ids cannot be confused for each other
 			vitals.Stamina = 50;
 
 			var ids = vitals.ToVitalsBlock().Records;
 
 			Assert.Equal(100u * 100, ids.Single(r => r.StatId == CharacterStatId.HealthCurrent).RawValue);
-			Assert.Equal(320u * 100, ids.Single(r => r.StatId == CharacterStatId.HealthMax).RawValue);
+			Assert.Equal(BaseHp() * 100, ids.Single(r => r.StatId == CharacterStatId.HealthMax).RawValue);
 			Assert.Equal(50u * 100, ids.Single(r => r.StatId == CharacterStatId.StaminaCurrent).RawValue);
-			Assert.Equal(179u * 100, ids.Single(r => r.StatId == CharacterStatId.StaminaMax).RawValue);
+			Assert.Equal(BaseStamina() * 100, ids.Single(r => r.StatId == CharacterStatId.StaminaMax).RawValue);
 			Assert.Contains(ids, r => r.StatId == CharacterStatId.ManaCurrent);
 			Assert.Contains(ids, r => r.StatId == CharacterStatId.ManaMax);
 		}
@@ -100,19 +100,21 @@ namespace Faolan.Tests
 			Assert.Equal(expected, stat.GetScale());
 		}
 
-		private static Character Guardian(uint hp, uint stamina)
+		// The base is DERIVED from (Class, Level) (#578), so a fixture picks a level rather than injecting numbers.
+		// Level 4 keeps the old shape of these cases - a few hundred HP, a stamina pool, no mana.
+		private static Character Guardian()
 		{
-			return new Character
-			{
-				Class = ConanClass.Guardian,
-				Level = 1,
-				MaxStats = new CharacterMaxStats
-				{
-					Health = hp,
-					Stamina = stamina,
-					Mana = 0
-				}
-			};
+			return new Character { Class = ConanClass.Guardian, Level = 4 };
+		}
+
+		private static uint BaseHp()
+		{
+			return Guardian().MaxVitals().Health;
+		}
+
+		private static uint BaseStamina()
+		{
+			return Guardian().MaxVitals().Stamina;
 		}
 	}
 }

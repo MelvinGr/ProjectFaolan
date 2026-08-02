@@ -413,7 +413,12 @@ namespace Faolan.GameServer.Combat
 			if (levelsGained > 0)
 			{
 				character.Level = (ushort)Math.Min(character.Level + levelsGained, LevelingResolver.MaxLevel);
-				character.RegenerateMaxStats();
+
+				// No ceiling to store: the vitals max is DERIVED from (Class, Level), so writing the level IS writing
+				// the new max (#578). It used to be a persisted CharacterMaxStats row that only the `.level` GM command
+				// ever updated - a combat level-up wrote the level and left the row at its creation value, so the next
+				// login re-seeded current health from the old ceiling and the player came back at a fraction of their
+				// bar (a level-2 necromancer reading 89/955).
 				await _database.SetCharacterProgress(character.Id, character.Experience, character.Level);
 				await PushLevelUp(killer!, character, levelsGained);
 				_logger.LogInformation("Combat: {Name} gained {Xp} XP and reached level {Level}.", character.Name, xp, character.Level);
