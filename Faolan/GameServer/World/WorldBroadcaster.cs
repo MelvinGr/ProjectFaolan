@@ -1761,16 +1761,52 @@ namespace Faolan.GameServer.World
 				return QuestMarkerNone;
 
 			var held = Array.Find(quests, q => q.QuestId == questId);
-			// '!' when the quest isn't held yet; '?' once its objective is done but it's still ACTIVE (awaiting turn-in
-			// at the giver - the quest is only marked Completed on turn-in, not on the kill, #47/#241); and the SILVER
-			// '!' while it is in progress or after it has been turned in. That last case used to send 0x00, which drew
-			// no marker at all where retail draws the greyed one (#559) - the NPC is still part of the chain, it just
-			// has nothing for you at this moment.
-			return held == null
-				? QuestMarkerAvailable
-				: held is { State: QuestState.Active, GoalRequired: > 0 } && held.GoalProgress >= held.GoalRequired
-					? QuestMarkerTurnIn
-					: QuestMarkerUnavailable;
+			// '?' once the objective is done but the quest is still ACTIVE (awaiting turn-in at the giver - a quest is
+			// only marked Completed on turn-in, not on the kill, #47/#241). Otherwise, held or not, the choice is
+			// between the GOLD '!' and the SILVER one, and it is the same question both times: does this NPC have
+			// something for you RIGHT NOW (#559)?
+			//   * not held, and every earlier step of its line is done -> GOLD, it is yours to take;
+			//   * not held, but the line has not reached it -> SILVER. This is Turach at login in
+			//     `xxx_mage-necromancer_login_play2_tortage_city_first-quests`: his "The Quarry" is step 5 of line 241
+			//     and the player has done none of steps 1-4, so retail greys him rather than drawing no marker;
+			//   * held and in progress, or turned in -> SILVER, he is still part of the chain with nothing to give.
+			if (held is { State: QuestState.Active, GoalRequired: > 0 } && held.GoalProgress >= held.GoalRequired)
+				return QuestMarkerTurnIn;
+
+			if (held != null)
+				return QuestMarkerUnavailable;
+
+			return giverQuest != null && !await IsLineReady(giverQuest, quests)
+				? QuestMarkerUnavailable
+				: QuestMarkerAvailable;
+		}
+
+		// #559: whether `quest`'s line has actually reached it - every EARLIER step of the same quest line completed.
+		// This is what separates the gold '!' from the silver one for a quest the player does not hold: retail greys a
+		// giver whose quest exists but is not yet reachable, rather than drawing no marker.
+		//
+		// ⚠️ JournalSequence 0 is a legitimate captured value, not "unordered" - 74 captured quests carry it and 182
+		// lines have it on every step (see GetQuestDefinitionsByLine). A line ordered entirely by 0s cannot say what
+		// comes first, so a 0 on either side is skipped rather than guessed at: an unorderable line stays GOLD, which is
+		// the behaviour before this gate existed. Only a genuine lower sequence gates.
+		private async Task<bool> IsLineReady(QuestDefinition quest, CharacterQuest[] quests)
+		{
+			return quest.JournalSequence == 0 || LineReached(quest, await _database.GetQuestDefinitionsByLine(quest.QuestLineId), quests);
+		}
+
+		// The rule itself, split from the fetch so it can be tested against the real quest lines without a broadcaster.
+		internal static bool LineReached(QuestDefinition quest, IEnumerable<QuestDefinition> line, CharacterQuest[] quests)
+		{
+			foreach (var step in line)
+			{
+				if (step.JournalSequence == 0 || step.JournalSequence >= quest.JournalSequence)
+					continue;
+
+				if (Array.Find(quests, q => q.QuestId == step.QuestId) is not { State: QuestState.Completed })
+					return false;
+			}
+
+			return true;
 		}
 
 		// Dispatches interest events. `move` (the mover's Move components) is required to forward Move events and is
