@@ -129,14 +129,24 @@ namespace Faolan.Core.Database.Tables
 		///     stamina per point of each of three attributes.
 		/// </summary>
 		/// <remarks>
-		///     Which column feeds which attribute is not observable from the table, because every class's weights are
-		///     equal WITHIN a pool (health 8; mana 3,3; stamina 2,2,2) - only each pool's attribute SET is. Those sets
-		///     are pinned by the captures: health is Constitution alone (AssassinL23's 448-point gap is 8 x 56 exactly,
-		///     and the client's own health accessor reads stat 0x326); stamina is Strength + Dexterity + Constitution,
-		///     the only triple of the five that makes AssassinL23's 310-point gap (2 x 155); mana is Intelligence +
-		///     Wisdom. Mana is the one with slack: every captured caster happens to carry equal Wisdom and Dexterity
-		///     (110/110 on both level-80 mages, 33/33 on the Herald), so the corpus cannot separate Wisdom from
-		///     Dexterity here - Wisdom is the reading, and a caster with unequal ones would settle it.
+		///     ✅ SETTLED FROM THE CLIENT (#587), which the corpus could not do. Each pool has its own accessor and
+		///     the stat ids it reads ARE the attribute set - no inference:
+		///     <list type="bullet">
+		///         <item><c>FUN_0111aa30</c> health - reads <c>0x326</c> alone, and calls the one-weight lookup
+		///             <c>FUN_0113e730</c>, which returns <c>w[8]/10 x score</c>.</item>
+		///         <item><c>FUN_0111ab60</c> mana - reads <c>0x328</c> and <c>0x32A</c>, and ONLY those two, then
+		///             calls the two-weight <c>FUN_0113e7d0</c>: <c>w[9]/10 x Intelligence + w[10]/10 x Wisdom</c>.</item>
+		///         <item><c>FUN_0111ad20</c> stamina - reads <c>0x324</c>, <c>0x326</c> and <c>0x32E</c>.</item>
+		///     </list>
+		///     So mana really is Intelligence + Wisdom and <c>0x32E</c> Dexterity appears in the STAMINA accessor and
+		///     nowhere near mana. It used to be the one term with slack - every captured caster happens to carry equal
+		///     Wisdom and Dexterity (110/110 on both level-80 mages, 33/33 on the Herald), so the corpus could not
+		///     separate them and this shipped as a reading. It is now a measurement.
+		///     <para>
+		///         The column ORDER is settled with it, which the table alone also cannot show (every class's weights
+		///         are equal within a pool - health 8; mana 3,3; stamina 2,2,2): <c>[8]</c> Constitution, <c>[9]</c>
+		///         Intelligence, <c>[10]</c> Wisdom. See docs/rdb/client-data-tables.md.
+		///     </para>
 		/// </remarks>
 		public static (uint Health, uint Mana, uint Stamina) AttributeScaledHundredths(ConanClass @class, VitalAttributes attributes)
 		{

@@ -302,13 +302,27 @@ without a pool carries zeroes in that pool's columns (an Assassin's row is `8000
 pool(level) = base(level) + Σ weight[i] × attribute[i] / 10 + the class ClassAttributeBases pool row
 ```
 
-Which column feeds which attribute is not observable here, because every class's weights are equal WITHIN a pool —
-only each pool's attribute SET is. Those sets come from the captures: **health = Constitution** (AssassinL23's
-448-point gap over the base is 8 × 56 exactly, and the client's own health accessor `FUN_0111aa30` reads stat
-`0x326`), **stamina = Strength + Dexterity + Constitution** (the only triple of the five that makes their
-310-point gap, 2 × 155), **mana = Intelligence + Wisdom**. Mana is the one with slack: every captured caster
-happens to carry equal Wisdom and Dexterity (110/110 on both level-80 mages, 33/33 on the Herald), so the corpus
-cannot separate the two there.
+✅ **Both the sets and the column ORDER come from the client (#587), not from inference.** The table alone shows
+neither, because every class's weights are equal within a pool. But each pool has its own accessor, and the stat
+ids it reads *are* its attribute set:
+
+| accessor | reads | lookup | returns |
+|---|---|---|---|
+| `FUN_0111aa30` health | `0x326` | `FUN_0113e730` | `w[8]/10 × Constitution` |
+| `FUN_0111ab60` mana | `0x328`, `0x32A` | `FUN_0113e7d0` | `w[9]/10 × Intelligence + w[10]/10 × Wisdom` |
+| `FUN_0111ad20` stamina | `0x324`, `0x326`, `0x32E` | | Strength + Constitution + Dexterity |
+
+Each accessor converts a raw stat to a display score the same way — `(value − 10) × 0.1`, the class row's flat 10
+wire being 1 display — and divides the result by 100 on the way out.
+
+So **health = Constitution**, **mana = Intelligence + Wisdom**, **stamina = Strength + Dexterity + Constitution**,
+and the weight columns are `[8]` Constitution, `[9]` Intelligence, `[10]` Wisdom.
+
+⚠️ Mana used to be the one term with slack, and this is what removed it: every captured caster happens to carry
+equal Wisdom and Dexterity (110/110 on both level-80 mages, 33/33 on the Herald), so the corpus could not separate
+"mana scales off Wisdom" from "mana scales off Dexterity" — and there is no `0x32E` anywhere in the mana accessor.
+The captures still corroborate the sets independently (AssassinL23's 448-point health gap is 8 × 56 exactly; their
+310-point stamina gap is 2 × 155, the only triple of the five that makes it).
 
 **Verified against every anchor we hold.** All twelve classes' level-1 character sheets (where the attribute base
 is a flat 1, so each pool is base + 8 / + 6 / + 6 plus the `ClassAttributeBases` HealthMax row — Guardian 130,
