@@ -358,8 +358,7 @@ namespace Faolan.GameServer
 			var bankSlot = (int)body.ReadUInt32();
 			var price = body.ReadUInt64();
 
-			var rows = await Database.GetCharacterInventory(character.Id);
-			var row = rows.FirstOrDefault(r => r.Container == ContainerKind.Bank && r.Slot == bankSlot);
+			var row = await Database.GetInventorySlot(character.Id, ContainerKind.Bank, bankSlot);
 			if (row?.Item == null)
 			{
 				Logger.LogWarning("Tradepost SELL: {Char} has no bank item at slot {Slot}.", character.Name, bankSlot);
@@ -480,8 +479,7 @@ namespace Faolan.GameServer
 			// Attach the sender's bank item (if a slot was given and an item sits there). The item STAYS in the
 			// sender's bank with a "mail-pending" overlay (it does NOT leave on send) - it only leaves when the
 			// recipient TAKES it (GetMailItem), and the overlay clears if the sender cancels the mail.
-			var rows = await Database.GetCharacterInventory(character.Id);
-			var row = rows.FirstOrDefault(r => r.Container == ContainerKind.Bank && r.Slot == bankSlot);
+			var row = await Database.GetInventorySlot(character.Id, ContainerKind.Bank, bankSlot);
 			if (row?.Item != null)
 			{
 				mail.SenderBankSlot = (uint)bankSlot;

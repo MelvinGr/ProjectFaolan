@@ -189,8 +189,7 @@ namespace Faolan.GameServer
 		private async Task<int?> FindFreeBagSlot(uint characterId)
 		{
 			var equipment = await Database.GetCharacterEquipment(characterId);
-			var rows = await Database.GetCharacterInventory(characterId);
-			var taken = rows.Where(r => r.Container == ContainerKind.Bag).Select(r => r.Slot).ToHashSet();
+			var taken = (await Database.GetCharacterInventory(characterId, ContainerKind.Bag)).Select(r => r.Slot).ToHashSet();
 			if (equipment?.FirstPosBag is { Hash: not 0 })
 				taken.Add(1);
 			var capacity = (int)(BaseBackpackSlots + (equipment?.Bag?.BagExtraSlots ?? 0));
@@ -212,8 +211,7 @@ namespace Faolan.GameServer
 			if (preferred is { } slot && (slot < 0 || slot >= capacity))
 				throw new ArgumentOutOfRangeException(nameof(preferred), slot, $"a requested {container} slot outside 0..{capacity - 1} cannot come from the client - the body was misread.");
 
-			var rows = await Database.GetCharacterInventory(characterId);
-			var taken = rows.Where(r => r.Container == container).Select(r => r.Slot).ToHashSet();
+			var taken = (await Database.GetCharacterInventory(characterId, container)).Select(r => r.Slot).ToHashSet();
 			if (preferred is { } wanted && !taken.Contains(wanted))
 				return wanted;
 

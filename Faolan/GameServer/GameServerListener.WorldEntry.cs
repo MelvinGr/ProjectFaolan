@@ -376,9 +376,9 @@ namespace Faolan.GameServer
 		{
 			var character = client.Session.Character;
 
-			var rows = await Database.GetCharacterInventory(character.Id);
+			var rows = await Database.GetCharacterInventory(character.Id, ContainerKind.Bag);
 			var pushed = 0;
-			foreach (var row in rows.Where(r => r is { Container: ContainerKind.Bag, ItemId: not null, Item.Hash: 0 }))
+			foreach (var row in rows.Where(r => r is { ItemId: not null, Item.Hash: 0 }))
 			{
 				var slot = (ulong)row.Slot;
 				var entry = SnapshotItems.InventoryEntry(FullCharacterRoots.ItemId(character.Id, ContainerKind.Bag, slot), row.Item!, 0,

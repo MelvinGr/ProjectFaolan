@@ -100,7 +100,7 @@ namespace Faolan.GameServer.Economy
 			if (!TryGetSide(characterId, out var session, out var side))
 				return;
 
-			var row = (await _database.GetCharacterInventory(characterId)).FirstOrDefault(r => r.Container == ContainerKind.Bag && r.Slot == (int)itemPos);
+			var row = await _database.GetInventorySlot(characterId, ContainerKind.Bag, (int)itemPos);
 			if (row?.Item == null)
 			{
 				_logger.LogWarning("Trade: {Character:X8} offered empty bag slot {Slot}.", characterId, itemPos);
@@ -183,8 +183,8 @@ namespace Faolan.GameServer.Economy
 		// and move the cash. A full receiver keeps the item - dropping it on the floor would be worse than not trading it.
 		private async Task Exchange(TradeSide from, TradeSide to)
 		{
-			var receiverRows = await _database.GetCharacterInventory(to.CharacterId);
-			var used = receiverRows.Where(r => r is { Container: ContainerKind.Bag, ItemId: not null }).Select(r => r.Slot).ToHashSet();
+			var receiverRows = await _database.GetCharacterInventory(to.CharacterId, ContainerKind.Bag);
+			var used = receiverRows.Where(r => r.ItemId != null).Select(r => r.Slot).ToHashSet();
 
 			foreach (var (_, offered) in from.Items)
 			{

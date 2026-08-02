@@ -44,8 +44,7 @@ namespace Faolan.GameServer.Economy
 		public async Task ResendBank(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
-			var rows = await _database.GetCharacterInventory(characterId);
-			var bankRows = rows.Where(r => r.Container == ContainerKind.Bank).ToList();
+			var bankRows = (await _database.GetCharacterInventory(characterId, ContainerKind.Bank)).ToList();
 			var bank = FullCharacterRoots.Container(ContainerKind.Bank, BankMaxSize, BankDisabledSlots, characterId, bankRows);
 			await SendBank(client, bank);
 		}
@@ -96,8 +95,7 @@ namespace Faolan.GameServer.Economy
 			if (sKind == ContainerKind.Bank && dKind == ContainerKind.Bag)
 			{
 				var dPos = move.DestinationItemPos;
-				var rows = await _database.GetCharacterInventory(character.Id);
-				var row = rows.FirstOrDefault(r => r.Container == ContainerKind.Bag && r.Slot == dPos);
+				var row = await _database.GetInventorySlot(character.Id, ContainerKind.Bag, dPos);
 				if (row?.ItemId == null)
 					return;
 

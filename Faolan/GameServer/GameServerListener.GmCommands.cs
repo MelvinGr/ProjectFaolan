@@ -681,8 +681,7 @@ namespace Faolan.GameServer
 		private async Task<int> SendAuctionHouseOpen(INetworkClient client, Vector3 accessPosition)
 		{
 			var characterId = client.Session.Character.Id;
-			var rows = await Database.GetCharacterInventory(characterId);
-			var bankRows = rows.Where(r => r.Container == ContainerKind.Bank).ToList();
+			var bankRows = (await Database.GetCharacterInventory(characterId, ContainerKind.Bank)).ToList();
 			var bank = FullCharacterRoots.Container(ContainerKind.Bank, 50, 30, characterId, bankRows);
 
 			await _bank.SendBank(client, bank);

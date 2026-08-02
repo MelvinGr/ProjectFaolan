@@ -35,7 +35,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
 		Task<FeatEffect[]> GetCharacterFeatEffects(uint characterId);
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
-		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
+		Task<CharacterInventory[]> GetCharacterInventory(uint characterId, ContainerKind? container = null);
+		Task<CharacterInventory?> GetInventorySlot(uint characterId, ContainerKind container, int slot);
 		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId, QuestState? state = null);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
@@ -428,10 +429,26 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.Characters.WithSessionNavigations().FirstOrDefaultAsync(c => c.AccountId == accountId && c.Id == clientInstance);
 		}
 
-		public async Task<CharacterInventory[]> GetCharacterInventory(uint characterId)
+		// `container` filters in SQL, like the quest reads' state: most callers want one container (the bag, the bank),
+		// not the whole inventory. Null (the default) returns every row, which is what the snapshot builder wants.
+		public async Task<CharacterInventory[]> GetCharacterInventory(uint characterId, ContainerKind? container = null)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterInventory.Include(i => i.Item).Where(i => i.CharacterId == characterId).ToArrayAsync();
+			return await ctx
+				.CharacterInventory.Include(i => i.Item)
+				.Where(i => i.CharacterId == characterId && (container == null || i.Container == container))
+				.ToArrayAsync();
+		}
+
+		// ONE slot. The equip / item-use / trade / tradepost paths all want a single (container, slot) row and were
+		// reading the character's whole inventory to pick it out in memory - small (21-127 rows) but paid on every
+		// inventory action, and it reads as a scan of something it isn't.
+		public async Task<CharacterInventory?> GetInventorySlot(uint characterId, ContainerKind container, int slot)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.CharacterInventory.Include(i => i.Item)
+				.FirstOrDefaultAsync(i => i.CharacterId == characterId && i.Container == container && i.Slot == slot);
 		}
 
 		public async Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId)

@@ -141,7 +141,7 @@ namespace Faolan.GameServer.Economy
 					return;
 				}
 
-			var row = (await _database.GetCharacterInventory(character.Id)).FirstOrDefault(i => i.Container == (ContainerKind)container && i.Slot == (int)slot);
+			var row = await _database.GetInventorySlot(character.Id, (ContainerKind)container, (int)slot);
 			if (row?.Item == null)
 			{
 				_logger.LogWarning("SellItem to shop {Shop:X}: no item in container {Container} slot {Slot} for {Character}.", shopId, container, slot, character.Name);

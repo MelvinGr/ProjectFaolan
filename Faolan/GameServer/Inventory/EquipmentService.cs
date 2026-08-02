@@ -55,8 +55,7 @@ namespace Faolan.GameServer.Inventory
 			if (kind == bag && pos == firstBagPos)
 			{
 				var equipment = await _database.GetCharacterEquipment(character.Id);
-				var rows = await _database.GetCharacterInventory(character.Id);
-				if (equipment?.FirstPosBag != null && rows.All(r => !(r is { Container: (ContainerKind)bag, Slot: firstBagPos })))
+				if (equipment?.FirstPosBag != null && await _database.GetInventorySlot(character.Id, (ContainerKind)bag, firstBagPos) == null)
 				{
 					equipment.FirstPosBag = null;
 					await _database.SaveCharacterEquipment(equipment);
@@ -99,8 +98,7 @@ namespace Faolan.GameServer.Inventory
 
 			// Consume the bag row the item came from (no-op when the source was the seeded FirstPosBag or a
 			// captured-only entry).
-			var bagRows = await _database.GetCharacterInventory(character.Id);
-			if (bagRows.Any(r => r.Container == ContainerKind.Bag && r.Slot == fromBagSlot && r.ItemId == item.Id))
+			if (await _database.GetInventorySlot(character.Id, ContainerKind.Bag, fromBagSlot) is { ItemId: var held } && held == item.Id)
 				await _database.SetCharacterInventorySlot(character.Id, ContainerKind.Bag, fromBagSlot, null);
 
 			_logger.LogInformation("Persisted EQUIP: {Name} ({Id}) bag[{BagSlot}] -> {Slot} for character {CharacterId}.", item.Name, item.Id, fromBagSlot, targetSlot, character.Id);
@@ -185,8 +183,7 @@ namespace Faolan.GameServer.Inventory
 				return;
 
 			const int bag = (int)ContainerKind.Bag;
-			var rows = await _database.GetCharacterInventory(character.Id);
-			var src = rows.FirstOrDefault(r => r.Container == (ContainerKind)bag && r.Slot == sourceSlot);
+			var src = await _database.GetInventorySlot(character.Id, (ContainerKind)bag, sourceSlot);
 			if (src?.ItemId == null || src.Count <= splitSize)
 			{
 				_logger.LogInformation("Split not persisted: bag[{Slot}] is not a splittable stack (count <= split size).", sourceSlot);
