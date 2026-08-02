@@ -51,14 +51,26 @@ namespace Faolan.Importer.Captures
 
 				var character = packet.Receiver.Instance;
 
-				if (packet is { Opcode: 0x2005, Body.Length: 12 })
+				// The wallet (0x2005) is a 12-byte body. Anything else under that opcode is NOT a wallet and NOT a
+				// shortcut bar - it must never reach the bar parser below. Opcodes are per-interface, so 0x2005 on
+				// this conversation also carries auction/trader traffic, and the `Body.Length: 12` test used to be
+				// the only thing separating the two: a longer 0x2005 fell straight through into the bar branch,
+				// where a first word that happened to divide by 0x3F1 read as a list count and the strict codec threw
+				// on the first non-zero "padding" word. That exception was unhandled, so ONE such packet aborted the
+				// whole import run - which is why captured characters had no hotbar AND no quests: the quest module
+				// never got to run.
+				if (packet.Opcode == 0x2005)
 				{
-					money[character] = packet.BodyReader().ReadUInt64(); // last one wins (absolute balance)
+					if (packet.Body.Length == 12)
+						money[character] = packet.BodyReader().ReadUInt64(); // last one wins (absolute balance)
+
 					continue;
 				}
 
 				// DispatchShortcutBarReply (0x2076): the whole saved bar - the SAME body ShortcutBarReplyCodec builds,
 				// so parse it with that codec instead of a hand-rolled 0x3F1 loop. Latest in the capture wins.
+				// The codec is STRICT, which is what surfaced the type-1 record tail the old tolerant reader silently
+				// discarded (three ReadUInt32s into nothing) - see that codec.
 				var body = packet.BodyReader().ReadRemainingArray();
 				if (body.Length < 4)
 					continue;

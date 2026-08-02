@@ -22,8 +22,17 @@ namespace Faolan.Core.Network.Codecs
 	{
 		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchShortcutBarReply;
 
-		// The three words that pad each record out to 24 bytes. Zero in every captured bar.
-		private const int PaddingWords = 3;
+			// A type-1 record's tail names WHERE the shortcut points: [u32 0][u32 containerKind][u32 ownerCharacterId].
+		// It is not padding - that reading held only because types 2/3/4 leave it zero, and a strict "expect 0" threw
+		// on the first real one, which aborted the whole capture import (no hotbar AND no quests for any imported
+		// character). Across the corpus all 207 type-1 records agree exactly: word 4 is 0, word 5 is 0x68 = container
+		// 104 (the player's own bag), and word 6 is the bar owner's instance - so the tail is DERIVED here rather than
+		// stored per row. Types 2/3/4 (4264 records) carry three zeros.
+		private const uint InventoryContainerKind = 0x68;
+
+		// The record kind whose tail is populated: a slot pointing into the owner's own inventory (its `Id` is the
+		// position there, and every captured one sits in the 0x4Exx special-bar range).
+		private const uint InventorySlotType = 1;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(ShortcutBarReply value)
@@ -33,10 +42,11 @@ namespace Faolan.Core.Network.Codecs
 			return s.ToArray();
 		}
 
-		// The player's persisted bar rows.
-		public static byte[] Build(IReadOnlyList<CharacterShortcut> shortcuts)
+		// The player's persisted bar rows. `owner` is the character the bar belongs to - a type-1 record's tail names
+		// it on the wire, and it is not stored per row because it is the same character for every row.
+		public static byte[] Build(uint owner, IReadOnlyList<CharacterShortcut> shortcuts)
 		{
-			return Build(new ShortcutBarReply([.. shortcuts.Select(sc => new ShortcutEntry(sc.Slot, sc.ShortcutType, sc.TargetId))]));
+			return Build(new ShortcutBarReply(owner, [.. shortcuts.Select(sc => new ShortcutEntry(sc.Slot, sc.ShortcutType, sc.TargetId))]));
 		}
 
 		public static ShortcutBarReply Parse(in ReadOnlySpan<byte> data)
@@ -51,14 +61,26 @@ namespace Faolan.Core.Network.Codecs
 		{
 			var count = r.ReadListCount();
 			var entries = new List<ShortcutEntry>(count);
+			uint owner = 0;
 			for (var i = 0; i < count; i++)
 			{
-				entries.Add(new ShortcutEntry(r.ReadU32Be(), r.ReadU32Be(), r.ReadU32Be()));
-				for (var w = 0; w < PaddingWords; w++)
-					r.ExpectU32Be(0, "shortcut record padding");
+				var entry = new ShortcutEntry(r.ReadU32Be(), r.ReadU32Be(), r.ReadU32Be());
+				entries.Add(entry);
+
+				r.ExpectU32Be(0, "shortcut record tail word 4");
+				if (entry.Type == InventorySlotType)
+				{
+					r.ExpectU32Be(InventoryContainerKind, "shortcut inventory container kind");
+					owner = r.ReadU32Be();
+				}
+				else
+				{
+					r.ExpectU32Be(0, "shortcut record tail word 5");
+					r.ExpectU32Be(0, "shortcut record tail word 6");
+				}
 			}
 
-			return new ShortcutBarReply(entries);
+			return new ShortcutBarReply(owner, entries);
 		}
 
 		internal static void Write(FaolanStream s, ShortcutBarReply v)
@@ -68,15 +90,17 @@ namespace Faolan.Core.Network.Codecs
 			s.WriteUInt32(ListFrame.ForCount(v.Entries.Count));
 			foreach (var e in v.Entries)
 			{
-				s.WriteUInt32(e.Slot).WriteUInt32(e.Type).WriteUInt32(e.Id);
-				for (var w = 0; w < PaddingWords; w++)
-					s.WriteUInt32(0);
+				s.WriteUInt32(e.Slot).WriteUInt32(e.Type).WriteUInt32(e.Id).WriteUInt32(0);
+				if (e.Type == InventorySlotType)
+					s.WriteUInt32(InventoryContainerKind).WriteUInt32(v.Owner);
+				else
+					s.WriteUInt32(0).WriteUInt32(0);
 			}
 		}
 	}
 
-	// The saved action bar: one entry per occupied slot.
-	public sealed record ShortcutBarReply(IReadOnlyList<ShortcutEntry> Entries);
+	// The saved action bar, plus the character it belongs to (a type-1 record's tail names the owner on the wire).
+	public sealed record ShortcutBarReply(uint Owner, IReadOnlyList<ShortcutEntry> Entries);
 
 	// One 24-byte bar record: [u32 slot][u32 type][u32 id][u32 0 x3].
 	public readonly record struct ShortcutEntry(uint Slot, uint Type, uint Id);
