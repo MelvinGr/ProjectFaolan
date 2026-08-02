@@ -509,6 +509,29 @@ namespace Faolan.GameServer.World
 			_patrolReissueRemaining = 25.0 + Random.Shared.NextDouble() * 35.0;
 		}
 
+		// #565: whether the entity has strayed beyond `leash` from its TERRITORY - what the leash check really wants to
+		// know. `homeDistance` is the horizontal distance to its spawn, which is the whole story for a stationary NPC.
+		// For a PATROLLER the route is territory too: a captured route can run hundreds of units, so an anchor past the
+		// leash is a legitimate destination, not a player dragging it. Without this the #266 wander and the leash fight
+		// each other - the wander assigns a far anchor, the next tick reads it as "led too far from spawn" and walks the
+		// NPC straight back off its own route, every cycle. Only a position far from spawn AND from every anchor is a
+		// real stray, so a dragged patroller still leashes.
+		public bool BeyondLeash(float homeDistance, float leash)
+		{
+			if (homeDistance <= leash)
+				return false; // inside the leash of its spawn: nothing a route could add
+
+			foreach (var waypoint in PatrolWaypoints)
+			{
+				var dx = waypoint.X - Position.X;
+				var dz = waypoint.Z - Position.Z;
+				if (dx * dx + dz * dz <= leash * leash)
+					return false;
+			}
+
+			return true;
+		}
+
 		// Whether `viewer` (a player) may see this entity in interest streaming. Ungated entities are visible to all;
 		// a gated NPC requires the viewer to hold one of its gating quests active.
 		public bool IsVisibleTo(WorldEntity viewer)

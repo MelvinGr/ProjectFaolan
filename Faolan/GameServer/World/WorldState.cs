@@ -314,10 +314,11 @@ namespace Faolan.GameServer.World
 					var homeDz = entity.SpawnPosition.Z - entity.Position.Z;
 					var homeDist = MathF.Sqrt(homeDx * homeDx + homeDz * homeDz);
 
-					// Leash: once led too far from spawn, disengage and keep returning home until arrived (ignoring
+					// Leash: once led too far from its territory, disengage and keep returning home until arrived (ignoring
 					// re-aggro) so a player hovering at the edge can't ping-pong it. A returning NPC walks back, then
-					// heals to full on arrival.
-					if (homeDist > NpcLeashRange)
+					// heals to full on arrival. Territory is spawn plus - for a patroller - its route (#565: measuring
+					// against spawn alone made the #266 wander and this check fight over every far anchor).
+					if (entity.BeyondLeash(homeDist, NpcLeashRange))
 						entity.Returning = true;
 
 					// De-aggro return: when an NPC loses its target (the player left aggro range) while away from its
@@ -332,11 +333,19 @@ namespace Faolan.GameServer.World
 						entity.ArmAttackCooldown(NpcAttackInterval);
 						if (homeDist > NpcMeleeRange)
 						{
-							StepAndStream(entity, homeDx, homeDz, homeDist, 0f, WorldTickEffectType.NpcMove, null!);
+							// #565: the walk home also descends to the SPAWN's altitude. Movement otherwise keeps the
+							// entity's current Y ("keep terrain Y"), which is right for a chase (the ground under the
+							// path) but wrong here - the stray Y is whatever height it was led/wandered to, so the NPC
+							// would walk the whole way home at that altitude and arrive floating above its spawn.
+							StepAndStream(entity, homeDx, homeDz, homeDist, 0f, WorldTickEffectType.NpcMove, null!, entity.SpawnPosition.Y);
 							continue;
 						}
 
 						entity.Returning = false;
+						// #565: home again - plant the spawn's altitude. The walk down closes the height gap in proportion
+						// to the horizontal one, but it stops NpcMeleeRange short of the spawn, so that same fraction of
+						// the gap would be left standing. Arriving is the point to be exact about it.
+						entity.Position = new Vector3(entity.Position.X, entity.SpawnPosition.Y, entity.Position.Z);
 						entity.Vitals.ReviveToFull(); // home again
 						EndMove(entity, true, WorldTickEffectType.NpcMove); // arrived: flush + stop (#190/#272)
 						continue;
@@ -444,7 +453,7 @@ namespace Faolan.GameServer.World
 			// segment since the last one (#272), so the client interpolates ~6u segments instead of a per-tick snap. The
 			// model position advances every call regardless; `moveType` is NpcMove (chase/return) or NpcFollow (companion)
 			// so the loop gates/handles it correctly. `target` rides the effect (the aggro/leader the broadcaster wants).
-			void StepAndStream(WorldEntity e, float dx, float dz, float dist, float stopShort, WorldTickEffectType moveType, WorldEntity target)
+			void StepAndStream(WorldEntity e, float dx, float dz, float dist, float stopShort, WorldTickEffectType moveType, WorldEntity target, float? targetY = null)
 			{
 				if (!e.Moving) // a fresh move: anchor the first segment at the start point
 				{
@@ -452,7 +461,7 @@ namespace Faolan.GameServer.World
 					e.Moving = true;
 				}
 
-				StepToward(e, dx, dz, dist, deltaSeconds, stopShort);
+				StepToward(e, dx, dz, dist, deltaSeconds, stopShort, targetY);
 				if (Vector3.DistanceSquared(e.MoveOrigin, e.Position) < MoveBroadcastSegment * MoveBroadcastSegment)
 					return; // segment too short to broadcast yet - keep accumulating
 
@@ -571,10 +580,20 @@ namespace Faolan.GameServer.World
 		// `stopShort` leaves that many units short of the point (melee range when chasing, follow range when following);
 		// 0 lands on it (returning home). The broadcast anchor (MoveOrigin) is managed by StepAndStream, not here, so a
 		// caller that wants the step broadcast must go through StepAndStream.
-		private static void StepToward(WorldEntity entity, float dx, float dz, float distance, double deltaSeconds, float stopShort = 0f)
+		// `targetY` (#565) closes the vertical gap over the same walk instead of keeping the current Y: the return home
+		// knows the altitude it is walking to (the spawn's), so it descends smoothly rather than arriving and snapping.
+		private static void StepToward(WorldEntity entity, float dx, float dz, float distance, double deltaSeconds, float stopShort = 0f, float? targetY = null)
 		{
 			var travel = MathF.Min((float)(NpcMoveSpeed * deltaSeconds), distance - stopShort);
-			entity.Position = new Vector3(entity.Position.X + dx / distance * travel, entity.Position.Y, entity.Position.Z + dz / distance * travel);
+			var y = entity.Position.Y;
+			if (targetY is { } destY)
+			{
+				// Close the same FRACTION of the height gap as of the horizontal distance, so both land together.
+				var remaining = distance - stopShort;
+				y += (destY - y) * (remaining > 1e-4f ? MathF.Min(1f, travel / remaining) : 1f);
+			}
+
+			entity.Position = new Vector3(entity.Position.X + dx / distance * travel, y, entity.Position.Z + dz / distance * travel);
 		}
 	}
 }
