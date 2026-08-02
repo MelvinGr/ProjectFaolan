@@ -1242,7 +1242,7 @@ namespace Faolan.GameServer.World
 			zone.RemoveWorldObject(node.Handle);
 		}
 
-// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
+		// The quest-marker state byte for a handle the client polled via 0x2020 (resolves the entity in the player's
 		// zone). 0x00 when it isn't a quest-giver in view. Lets the poll reply (SendSpawnCheckResponse) carry the
 		// correct, state-driven marker instead of a hardcoded value.
 		public async Task<byte> QuestMarkerStateForHandle(INetworkClient client, uint handle)
@@ -1736,13 +1736,19 @@ namespace Faolan.GameServer.World
 			// SEPARATE source from the giver logic below: the giver quest (13479) is already Completed/superseded by
 			// then, so without this Casilda showed no '?'. Decoded from the captive-quest capture: retail sends 0x2008
 			// state 0x04 to her handle at the loot->talk transition (Blablatest fr1455).
-			foreach (var q in quests)
+			// ⚠️ This runs once per 0x2020 spawn poll, and the client polls once per NPC it is loading - ~77 of them on
+			// the Tortage beach. A query per ACTIVE quest here (plus the GetCharacterQuests above) made each poll ~12 DB
+			// round trips / ~257ms, so the client's serialized poll queue took ~20s to drain and every request behind it
+			// - including its 5s latency check - measured that backlog. One batched read instead; the order is
+			// preserved, so the FIRST matching active quest still wins.
+			var active = Array.FindAll(quests, q => q.State == QuestState.Active);
+			var definitions = (await _database.GetQuestDefinitions([.. active.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
+			foreach (var q in active)
 			{
-				if (q.State != QuestState.Active)
-					continue;
+				var qGoal = definitions.TryGetValue(q.QuestId, out var qDef)
+					? qDef.Goals.OrderBy(g => g.Sequence).FirstOrDefault()
+					: null;
 
-				var qDef = await _database.GetQuestDefinition(q.QuestId);
-				var qGoal = qDef?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
 				if (qGoal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(qGoal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
 					return QuestMarkerTurnIn;
 			}

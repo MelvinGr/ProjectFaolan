@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Enums;
@@ -11,7 +12,7 @@ using Faolan.GameServer.World;
 namespace Faolan.GameServer.Session
 {
 	// The connection keep-alive / latency replies the client polls with in-world:
-	//   LatencyCheck (c2s 0x2085) -> Pong (0x2082): echo the counter + a server tick.
+	//   LatencyCheck (c2s 0x2085) -> Pong (0x2082): echo the counter + the server's 64-bit uptime counter.
 	//   Ping         (c2s 0x2005) -> GameServerStats (0x2009): a server-load readout float.
 	// Both are fixed-shape replies with a tiny bit of per-reply data (the echoed counter / the tick / the measured tick
 	// rate). Extracted out of the GameServerListener dispatch switch as a composed collaborator (#200); the two switch
@@ -35,15 +36,31 @@ namespace Faolan.GameServer.Session
 			_metrics = metrics;
 		}
 
-		// LatencyCheck (0x2085): reply body = [counter echoed][0x00000012][server tick]. The tick is a
-		// monotonically increasing microsecond timer (gameplay dumps: ~5,000,000 per ~5s interval, ms precision).
+		// The process start, for the uptime counter below. Stopwatch rather than Environment.TickCount64 because the
+		// counter must be monotonic and rooted at OUR start, not at the machine's boot.
+		private static readonly long Started = Stopwatch.GetTimestamp();
+
+		// LatencyCheck (0x2085): reply body = [counter echoed][uptime hi][uptime lo].
+		//
+		// ⚠️ The last two words are ONE 64-bit MICROSECOND counter, high word first - not a constant and a tick. Proven
+		// over the corpus: (hi << 32 | lo) advances at exactly wall-clock rate across every captured pong (182/186 and
+		// 23/23 in the two NecroL80 sessions), and its absolute value is the retail server's UPTIME - 2.60 days and 4.73
+		// days in those two. That is also why the high word looks like a per-session constant in any one capture and
+		// takes 83 different values across the corpus: it only ticks once per 71.6 minutes.
+		//
+		// It used to send a hardcoded 0x00000012 high word with a low word taken from Environment.TickCount64 (the
+		// MACHINE's boot time, wrapped to u32). 0x12 is a real captured value, but only because it was one retail
+		// server's uptime bucket - so the pair was a 64-bit counter that never advanced its high half and jumped
+		// BACKWARDS by 71.6 minutes every time the low half wrapped.
 		public static Task HandleLatencyCheck(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var counter = body.ReadUInt32();
-			var tick = unchecked((uint)(Environment.TickCount64 * 1000L));
+			var uptime = (ulong)Stopwatch.GetElapsedTime(Started).TotalMicroseconds;
 
 			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchPong, (byte[])[0x01],
-				b => b.WriteUInt32(counter).WriteUInt32(0x00000012).WriteUInt32(tick)));
+				b => b.WriteUInt32(counter)
+					.WriteUInt32((uint)(uptime >> 32))
+					.WriteUInt32((uint)uptime)));
 		}
 
 		// Ping (0x2005, empty): reply on GameAgent with GameServerStats. Client signature (docs/re/aoc-client-rpc-methods.md)

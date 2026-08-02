@@ -43,7 +43,21 @@ namespace Faolan.Tests
 			Assert.Equal(new byte[] { 0x01 }, pong.HeaderData.ToArray());
 			var body = pong.BodyReader();
 			Assert.Equal(counter, body.ReadUInt32());
-			Assert.Equal(0x00000012u, body.ReadUInt32());
+
+			// The last two words are ONE 64-bit microsecond uptime counter, high word first (see KeepAliveService) -
+			// so the high word is 0 until the process has been up 71.6 minutes, and the pair only ever moves FORWARD.
+			// The old assertion pinned the high word to a hardcoded 0x12, which is what let the pair run backwards.
+			var high = body.ReadUInt32();
+			var low = body.ReadUInt32();
+			var first = ((ulong)high << 32) | low;
+			Assert.Equal(0u, high);
+			Assert.InRange(first, 1uL, (ulong)TimeSpan.FromHours(1).TotalMicroseconds);
+
+			await KeepAliveService.HandleLatencyCheck(client, incoming, incoming.BodyReader());
+			var second = Rpc.Parse(client.Sent!).BodyReader();
+			second.ReadUInt32();
+			var later = ((ulong)second.ReadUInt32() << 32) | second.ReadUInt32();
+			Assert.True(later >= first, $"the uptime counter must advance monotonically: {first} then {later}");
 		}
 
 		[Fact]
