@@ -62,7 +62,7 @@ from what the table appears to hold.
 | 1000625 | `FUN_00847890` | `TokenStateTable` |
 | 1000626 | `FUN_006cb5f0` | `CoreChatFilterDataTable` |
 | 1000627 | `FUN_013b21c0` | `GroupFinderActivitiesTable` |
-| 1065103 | `FUN_008379e0` | `PvPConRating_c` |
+| 1065103 | `FUN_008379e0` | `PvPConRating_c` — a per-level con rating (decoded below) |
 
 ## Decoded: 1000505 `RDBPlayerClassData_c` — the class registry
 
@@ -391,6 +391,50 @@ What the data says:
 
 Shipped as `ClassComboScaling` (raw, unscaled — a consumer applies the ÷100 itself), imported by the opt-in
 `rdb-combo-scaling` module and gated by `ClassComboScalingTests`.
+
+## Decoded: 1065103 `PvPConRating_c` — a per-LEVEL con rating, and the shipped file neutralises itself
+
+200 records of `[u32 level][u32 conRating]` after the ordinary 16-byte header (`[1065103][1][1][200]`). The parse
+callback `FUN_00837a40` (from loader `FUN_008379e0`) names the first word itself, in the client's own error string:
+
+```
+"Tried to load PvPConRating data for an invalid level: %d"     CoreCharacter\Data\PvPConRating.cpp:0x23
+```
+
+It bounds that word to `1..512` and stores the second one **indexed by it**, into a flat array:
+
+```c
+if (level - 1U < 0x200)  vector[level - 1] = conRating;      // else the error above
+```
+
+⚠️ **Each level appears TWICE, and the second entry wins.** The file is interleaved per level — first a
+decade-BANDED value, then a flat `9`:
+
+| levels | banded value (first entry) | second entry |
+|---|---|---|
+| 1–19 | 4 | 9 |
+| 20–29 | 5 | 9 |
+| 30–39 | 6 | 9 |
+| 40–49 | 7 | 9 |
+| 50–59 | 8 | 9 |
+| 60–100 | 9 | 9 |
+
+Because the store is indexed rather than appended, the flat pass overwrites the banded one, so **on this build the
+loaded table is a constant 9 for every level 1–100**. The banded curve ships but is dead. Whether that is intended
+(the band is legacy, disabled by shipping a flat second pass) or a data bug is not decidable from the file. [V0]
+
+**No consumer is reachable statically.** The table's singleton (`DAT_03c03114`) is referenced by exactly two
+functions — this parse callback and the singleton's own constructor — so every reader goes through an accessor on
+the object rather than touching the global, and the RTTI route that named the class does not reach them. What the
+rating MEANS is therefore open; the name plus a per-level array of 4–9 reads like the level spread over which PvP
+counts, but that is a reading, not a decode.
+
+Nothing imports it, deliberately: a table whose effective contents are one constant and whose consumer is unknown
+would be a column nothing could act on. Reproduce with:
+
+```zsh
+dotnet run --project Faolan.Importer -- --report rdb-dump --report-arg 1065103 --out <dir> --RdbDir <rdb-dir>
+```
 
 ## ⚠️ ARMOR_MITIGATION is empty
 
