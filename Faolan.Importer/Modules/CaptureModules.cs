@@ -970,7 +970,11 @@ namespace Faolan.Importer.Modules
 				ObjectiveGoalExtractor.CapturedRegions(ctx.Captures.SelectMany(c => c.Packets).ToList()));
 			Console.WriteLine($"  objective regions verified byte-exact: {verified} of {verifiable} quests.");
 
-			return new ImportResult("quest wiring applied (Casilda + Shipwrecked chains + sourced location quests).");
+			// AFTER the verification, which is the gate it reads.
+			var seeded = await ImportOps.SeedDerivedSnapshotRecords(ctx.Db);
+			Console.WriteLine($"  derived a Quest_c record for {seeded} quest(s) that had everything but one.");
+
+			return new ImportResult($"quest wiring applied (Casilda + Shipwrecked chains + sourced location quests); {seeded} derived snapshot record(s).");
 		}
 	}
 

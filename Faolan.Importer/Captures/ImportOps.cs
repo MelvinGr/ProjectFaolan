@@ -1382,6 +1382,77 @@ namespace Faolan.Importer.Captures
 			return (verified, total);
 		}
 
+		// DERIVE a Quest_c record for a quest that has everything the login snapshot needs EXCEPT the record itself
+		// (#389). Run AFTER VerifyObjectiveRegions, because the objective region's verdict is the gate it reads.
+		//
+		// The candidates are quests whose region provably rebuilds, whose line carries its 4CC, and which have all
+		// five header text refs and a level - i.e. every part of the snapshot portion is already proven EXCEPT the
+		// dozen record scalars, which no capture ever carried for them. Seventeen quests qualify today.
+		//
+		// ⚠️ This SYNTHESISES wire data, which SnapshotTails.IsSnapshotEligible warns against ("never by flipping a
+		// quest's flag by hand"). What makes it defensible is that the record's SHAPE is fixed and only its VALUES
+		// are invented, and every invented value was proven harmless IN-CLIENT by sweeping it on a live login:
+		//   * @+0x14 takes five observed values and the client renders all five without complaint (only the `Share`
+		//     button changes, on bit 4) - so an inherited or defaulted flag word is cosmetic, not structural;
+		//   * @+0x28 is the XP the journal prints, so 0 renders "XP: 0" - wrong, but only wrong on screen;
+		//   * @+0xf0 / @+0xf8 changed nothing visible at any value tried.
+		// The scalars that ARE structural are the constants: FieldEc 1, Field114 0, Field11c 0, and the chain head,
+		// which QuestcRecords.ForQuest already falls back to the quest's own id for.
+		//
+		// A quest with NO captured sibling in its line gets flags 2 - the modal captured value (52 of 99) and the one
+		// with bit 4 CLEAR, i.e. shareable. That is the permissive choice on the only bit whose meaning is known.
+		public static async Task<int> SeedDerivedSnapshotRecords(DatabaseContext db)
+		{
+			ArgumentNullException.ThrowIfNull(db);
+
+			// The flag word is a property of the LINE, so a captured sibling states it for the whole line.
+			var lineFlags = await db
+				.QuestDefinitions.Where(q => q.HasSnapshotRecord && q.SnapshotQuestLineFlags != 0)
+				.GroupBy(q => q.QuestLineId)
+				.Select(g => new { Line = g.Key, Flags = g.Max(q => q.SnapshotQuestLineFlags) })
+				.ToDictionaryAsync(x => x.Line, x => x.Flags);
+
+			var candidates = await db
+				.QuestDefinitions.Include(q => q.Goals)
+				.Include(q => q.TextRefs)
+				.Include(q => q.Line)
+				.Where(q => !q.HasSnapshotRecord && q.ObjectiveRegionVerified && q.Level != 0)
+				.ToListAsync();
+
+			var seeded = 0;
+			foreach (var def in candidates)
+			{
+				// Exactly the other arms of IsSnapshotEligible, so this can never flag a quest the gate would reject.
+				if (def.Goals.Count == 0 || def.Line is not { Magic: not 0 })
+					continue;
+
+				var slots = def.TextRefs.Select(t => t.Slot).ToHashSet();
+				if (!SnapshotHeaderSlots.All(slots.Contains))
+					continue;
+
+				def.SnapshotQuestLineFlags = lineFlags.TryGetValue(def.QuestLineId, out var f)
+					? f
+					: DefaultQuestLineFlags;
+				def.SnapshotUnknownEc = 1;
+
+				// @+0x118 runs level..level+5 across the captured records; the level itself is the low end of that
+				// range and the only value we can derive rather than guess.
+				def.SnapshotUnknown118 = def.Level;
+				def.HasSnapshotRecord = true;
+				seeded++;
+			}
+
+			await db.SaveChangesAsync();
+			return seeded;
+		}
+
+		// Mirrors SnapshotTails.HeaderSlots, which is private to the codec layer.
+		private static readonly QuestTextSlot[] SnapshotHeaderSlots =
+			[QuestTextSlot.Title, QuestTextSlot.Summary, QuestTextSlot.QuestLineTitle, QuestTextSlot.RegionName, QuestTextSlot.MapName];
+
+		// The modal captured @+0x14 (52 of 99) and the one with bit 4 clear - the shareable, permissive default.
+		private const uint DefaultQuestLineFlags = 2;
+
 		// Overlay the hand-authored quest WIRING onto the harvested definitions - the fields captures don't carry: the
 		// server trigger (GoalType/TargetName/QuestItemId via SeedGoal), the chain successor (NextQuestId via Chain), and
 		// the byte-exact @609/snapshot detail the beach + Casilda quests need. Run as its OWN importer module

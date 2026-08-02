@@ -312,3 +312,39 @@ whatever really drives that omission rather than being the field's meaning.
 ⚠️ An earlier version of this note explained the same observation as "content newer than the RDB". That was
 wrong — the client is the same build the captures came from, and its own LDB carries the text for those
 quests.
+
+## Synthesising a Quest_c record — the snapshot ceiling, 82 → 99
+
+`SnapshotTails.IsSnapshotEligible` wants five things: the record scalars, a non-empty goal list, a verified
+objective region, the line's 4CC, and the five header text refs. Seventeen quests had **everything but the
+record** — no capture ever carried one for them — so they sat out of the login snapshot.
+
+`ImportOps.SeedDerivedSnapshotRecords` derives one, running after `VerifyObjectiveRegions` because that
+verdict is its gate. It re-tests every other arm of `IsSnapshotEligible`, so it can never flag a quest the
+gate would reject. What it fills:
+
+| field | derived from |
+|---|---|
+| `@+0x14` flags | the line — a captured sibling states it for the whole line; else 2, the modal value and bit-4-clear (shareable) |
+| `@+0x118` | the quest's `Level` (captured values run level..level+5; the level is that range's low end) |
+| `@+0xec` | 1 — constant in all 99 captured records |
+| `@+0x28`, `@+0xf0`, `@+0xf8` | left 0 |
+| `@+0x2c` chain head | left 0; `QuestcRecords.ForQuest` already falls back to the quest's own id |
+
+⚠️ This SYNTHESISES wire data, which the gate's own comment warns against. What makes it defensible is that
+the record's **shape** is fixed and only its **values** are invented, and each invented value was proven
+harmless in-client before being shipped: `@+0x14` renders without complaint at all five observed values (only
+the `Share` button moves, on bit 4), `@+0x28` is the printed XP so 0 renders "XP: 0", and `@+0xf0`/`@+0xf8`
+changed nothing visible at any value tried.
+
+[V1: Faolan.ClientLauncher/Program.cs — verified on a live login: character Hakotep holds 21 snapshot-eligible
+active quests of which **5 are derived records**, and the client's journal header reads `Quests (21/45)` — the
+exact count — with the derived quests rendered and **no `statlist.cpp:134` assert** in the client log. The
+hazard the gate guards against is real for the objective REGION; the record scalars are safe to derive.]
+
+⚠️ The cost is cosmetic and visible: a derived quest shows **`XP: 0`**, because `@+0x28` is not recoverable for
+a quest no capture carried. It is wrong on screen, not wrong on the wire.
+
+**This does not generalise far.** The remaining 4940 quests are not blocked by the record — they have no goal
+data at all (only 108 quests have wire goals, and only 99 a captured @609 region to verify against). The limit
+is capture coverage of the objective region, not decode.
