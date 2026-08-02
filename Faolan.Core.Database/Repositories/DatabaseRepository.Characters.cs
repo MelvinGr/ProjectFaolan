@@ -579,13 +579,18 @@ namespace Faolan.Core.Database.Repositories
 
 			// #400: fold in only the ACTIVE weapon set's two weapon slots (armour + jewellery always apply); counting
 			// both the melee and ranged sets when both are equipped would double-count.
-			var ids = equipment.StatBearingItemIds(activeSet).ToHashSet();
-			if (ids.Count == 0)
+			var worn = equipment.StatBearingItemIds(activeSet).ToArray();
+			if (worn.Length == 0)
 				return [];
 
+			// #585: the DISTINCT set is for the query only - `IN (...)` cannot use a duplicate, and loading the same
+			// template twice would just be a second copy of the same row. The RESULT must go back to one entry per
+			// occupied SLOT: two identical rings are two slots granting the stat, and returning the distinct set
+			// silently halved every stat the character wore twice - their pools, their attribute scores, and (since
+			// #580) the attribute-scaled part of every pool with them.
+			var ids = worn.Distinct().ToArray();
 			var byId = await ctx.Items.AsNoTracking().Include(i => i.StatModifiers).Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
-			// Preserve one entry per occupied slot (duplicates included) so a stat granted by two worn copies stacks.
-			return ids.Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
+			return worn.Where(byId.ContainsKey).Select(id => byId[id]).ToArray();
 		}
 
 		// The (min, max) damage of the character's equipped MELEE main-hand weapon (MainHandLeft), for melee resolution

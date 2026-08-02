@@ -194,7 +194,7 @@ namespace Faolan.GameServer.World
 				// plus the per-spell attribute overrides. Same inputs as the pools above (VitalAttributes.From), so
 				// the two never disagree about what the character's Intelligence is.
 				Attributes = VitalAttributes.From(classBase, statBonuses),
-				CasterClass = character.Class,
+				CharacterClass = character.Class,
 				SpellScalingAttributes = spellScalingAttributes ?? new Dictionary<uint, uint>()
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map

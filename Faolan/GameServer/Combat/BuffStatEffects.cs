@@ -181,25 +181,41 @@ namespace Faolan.GameServer.Combat
 				Sum(catalog.PercentBySpellBase, buffId >> 8, percent);
 			}
 
+			// #584: the ATTRIBUTES are resolved and pushed into the entity FIRST, before the loop below, because the
+			// three max pools scale off them - `class base + Σ weight × attribute + class row + flat bonuses` - and
+			// only the flat half was ever tracked live. A +10 Constitution buff is worth +80 max health on an
+			// Assassin and was worth 0, because SetMaxFromBonus re-applied the flat term on top of an attribute term
+			// frozen at world entry. Doing it inside the loop would not fix it: HonoredStats is a dictionary, the
+			// max-pool handlers come before the attributes in it, and they would read yesterday's Constitution.
+			var attributes = VitalAttributes.From(entity.ClassBase, new Dictionary<CharacterStatId, int>
+			{
+				[CharacterStatId.Strength] = Buffed(CharacterStatId.Strength),
+				[CharacterStatId.Constitution] = Buffed(CharacterStatId.Constitution),
+				[CharacterStatId.Intelligence] = Buffed(CharacterStatId.Intelligence),
+				[CharacterStatId.Wisdom] = Buffed(CharacterStatId.Wisdom),
+				[CharacterStatId.Dexterity] = Buffed(CharacterStatId.Dexterity)
+			});
+
+			var rebased = false;
+			if (entity.Attributes != attributes)
+			{
+				entity.Attributes = attributes;
+				// The rebase moves the BASE only; the loop below re-applies each pool's flat gear/buff term on top of
+				// it through SetMaxFromBonus, which is the same order world entry uses.
+				rebased = entity.Vitals?.RebaseFromAttributes(entity.CharacterClass, (ushort)entity.Level, attributes, entity.ClassBase) ?? false;
+			}
+
 			var changed = new List<(CharacterStatId Stat, uint Value)>();
 			foreach (var (stat, apply) in HonoredStats)
 			{
-				// The percentage scales the flat total, which is what "+2% Critical Rating" means - the elixir is worth
-				// more on a well-geared character. Percentages ADD to each other rather than compounding: two +2% buffs
-				// are +4%, not +4.04%. Truncated, like every other client-side percentage read (see the regen sheet's
-				// integer divide in #442) - a percentage of 0 leaves the value bit-identical either way.
-				var buffed = entity.GearBonuses.GetValueOrDefault(stat) + flat.GetValueOrDefault(stat);
-				var pct = percent.GetValueOrDefault(stat);
-				if (pct != 0)
-					buffed = (int)((long)buffed * (PercentScale + pct) / PercentScale);
+				var value = (uint)Buffed(stat);
 
-				var value = buffed > 0
-					? (uint)buffed
-					: 0u; // a debuff can only take a stat to 0, never negative
-
-				// Genuinely unchanged since the last sync - nothing to apply and nothing to report.
+				// Genuinely unchanged since the last sync - nothing to apply and nothing to report. A max pool is the
+				// exception when the attribute rebase above moved its BASE: the flat bonus is what this compares, and
+				// it is unchanged precisely in the case that matters (a +Constitution buff carries no HealthMax), so
+				// skipping here would drop the new ceiling on the floor.
 				var seeded = entity.BuffedStats.TryGetValue(stat, out var previous);
-				if (seeded && previous == value)
+				if (seeded && previous == value && !(rebased && stat is CharacterStatId.HealthMax or CharacterStatId.ManaMax or CharacterStatId.StaminaMax))
 					continue;
 
 				// ⚠️ APPLY first, and unconditionally. This used to `continue` before applying whenever the stat was
@@ -213,13 +229,30 @@ namespace Faolan.GameServer.Combat
 
 				// The FIRST seed off gear alone is not news - it is what the entity already had at world entry - so it
 				// applies but is not reported. Only a later change is.
-				if (!seeded && flat.GetValueOrDefault(stat) == 0 && pct == 0)
+				if (!seeded && flat.GetValueOrDefault(stat) == 0 && percent.GetValueOrDefault(stat) == 0)
 					continue;
 
 				changed.Add((stat, applied));
 			}
 
 			return changed;
+
+			// The percentage scales the flat total, which is what "+2% Critical Rating" means - the elixir is worth
+			// more on a well-geared character. Percentages ADD to each other rather than compounding: two +2% buffs
+			// are +4%, not +4.04%. Truncated, like every other client-side percentage read (see the regen sheet's
+			// integer divide in #442) - a percentage of 0 leaves the value bit-identical either way. A debuff can only
+			// take a stat to 0, never negative.
+			int Buffed(CharacterStatId stat)
+			{
+				var total = entity.GearBonuses.GetValueOrDefault(stat) + flat.GetValueOrDefault(stat);
+				var pct = percent.GetValueOrDefault(stat);
+				if (pct != 0)
+					total = (int)((long)total * (PercentScale + pct) / PercentScale);
+
+				return total > 0
+					? total
+					: 0;
+			}
 
 			static void Sum(IReadOnlyDictionary<uint, (CharacterStatId Stat, int Amount)[]> from, uint spellBase, Dictionary<CharacterStatId, int> into)
 			{

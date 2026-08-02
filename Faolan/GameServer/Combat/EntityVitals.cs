@@ -82,6 +82,33 @@ namespace Faolan.GameServer.Combat
 			}
 		}
 
+		/// <summary>
+		///     Recomputes the three <c>BaseMax*</c> pools from a NEW set of attribute scores (#584), for when a buff,
+		///     a debuff or an equip moves an attribute mid-session. Returns true when anything actually moved.
+		///     <para>
+		///         Each pool is <c>class base + Σ weight × attribute + class row + flat pool bonuses</c>, and only the
+		///         FLAT half tracked live: <see cref="SetMaxFromBonus" /> re-applies it on every buff change, while the
+		///         attribute half was computed once in <see cref="FromCharacter" /> and then frozen. So a +10
+		///         Constitution buff - worth +80 max health on an Assassin - was worth exactly nothing.
+		///     </para>
+		///     <para>
+		///         ⚠️ This sets the BASE only. The caller must re-run <see cref="SetMaxFromBonus" /> for each pool
+		///         afterwards, or the flat gear/buff term is dropped along with the stale base it was sitting on.
+		///     </para>
+		/// </summary>
+		public bool RebaseFromAttributes(ConanClass @class, ushort level, VitalAttributes attributes,
+			IReadOnlyDictionary<CharacterStatId, int>? classBase = null)
+		{
+			var max = CharacterMaxStats.For(@class, level, attributes, classBase);
+			if (BaseMaxHealth == max.Health && BaseMaxMana == max.Mana && BaseMaxStamina == max.Stamina)
+				return false;
+
+			BaseMaxHealth = max.Health;
+			BaseMaxMana = max.Mana;
+			BaseMaxStamina = max.Stamina;
+			return true;
+		}
+
 		/// <summary>Applies a health delta (negative = damage, positive = heal), clamped to <c>[0, MaxHealth]</c>.</summary>
 		public void ApplyHealthDelta(int delta)
 		{
@@ -238,7 +265,7 @@ namespace Faolan.GameServer.Combat
 			// The remaining term - buffs that raise a max pool (Focused Mind's +mana, Sustaining Wrath's +health) - is
 			// not here because it is not fixed at world entry: BuffStatEffects re-applies it through SetMaxFromBonus on
 			// every change to the entity's live buffs, on top of the base these terms establish. A buff that raises an
-			// ATTRIBUTE does not yet move the pool it scales (it would have to re-run For); tracked in #450.
+			// ATTRIBUTE re-runs For through RebaseFromAttributes, on the same path and for the same reason (#584).
 			var max = character.MaxVitals(VitalAttributes.From(classBase, statBonuses), classBase);
 
 			var vitals = FromMax(max.Health, max.Mana, max.Stamina);

@@ -209,10 +209,11 @@ namespace Faolan.GameServer.World
 		public VitalAttributes Attributes { get; set; }
 
 		/// <summary>
-		///     The character's class, kept beside <see cref="Attributes" /> because the magic-damage scaling attribute
-		///     is chosen by class. <c>ConanClass.Commoner</c> for NPCs, which takes the Wisdom branch and scores 0.
+		///     The character's class, kept beside <see cref="Attributes" /> because both things that read the
+		///     attributes need it: the magic-damage scaling attribute is chosen by class, and the pool curve is keyed
+		///     on it. <c>ConanClass.Commoner</c> for NPCs, which takes the Wisdom branch and scores 0.
 		/// </summary>
-		public ConanClass CasterClass { get; set; }
+		public ConanClass CharacterClass { get; set; }
 
 		/// <summary>
 		///     This entity's Magic Damage for one spell, in display units: the flat worn-gear rating in
@@ -221,7 +222,7 @@ namespace Faolan.GameServer.World
 		/// </summary>
 		public uint MagicDamageFor(uint spellId)
 		{
-			return CombatResolver.ResolveMagicDamage(MagicDamage, CasterClass, Attributes, SpellScalingAttributes.GetValueOrDefault(spellId));
+			return CombatResolver.ResolveMagicDamage(MagicDamage, CharacterClass, Attributes, SpellScalingAttributes.GetValueOrDefault(spellId));
 		}
 
 		// The last value BuffStatEffects computed for each stat it owns (gear + buffs, display units). Its purpose is

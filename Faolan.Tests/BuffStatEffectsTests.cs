@@ -331,6 +331,78 @@ namespace Faolan.Tests
 			Assert.Equal(baseHp, entity.Vitals.Health); // current clamped down, not left above the bar
 		}
 
+		// #584: a buff that raises an ATTRIBUTE has to move the pool that attribute scales. Each pool is
+		// `class base + Σ weight × attribute + class row + flat bonuses`, and only the flat half was tracked live, so
+		// a +10 Constitution buff on an Assassin (health weight 8) was worth 0 instead of +80.
+		[Fact]
+		public void AttributeBuff_MovesThePoolItScales()
+		{
+			// Constitution is stored in DISPLAY units on a spell record (see BuffStatEffects.SpellScale), so 10 = +10.
+			var catalog = BuffStatEffects.BuildCatalog([Row(3197, CharacterStatId.Constitution, FlatKind, 10)]);
+			var entity = Player();
+			entity.CharacterClass = ConanClass.Assassin;
+			entity.Level = 1;
+			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = ConanClass.Assassin, Level = 1 }, null,
+				ClassAttributeBase());
+			entity.ClassBase = ClassAttributeBase();
+
+			// Seed the unbuffed state the way world entry does, so the assertion is about the CHANGE.
+			BuffStatEffects.Recompute(entity, catalog);
+			var before = entity.Vitals.MaxHealth;
+			Assert.Equal(1u, entity.Attributes.Constitution); // the level-1 class row: a flat 10 wire = 1 display
+
+			entity.ActiveBuffs[3197 << 8] = new ActiveBuff(3197 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			var applied = BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(11u, entity.Attributes.Constitution);
+			// The Assassin's health weight is 8000 thousandths, i.e. 8 display health per point of Constitution.
+			Assert.Equal(before + 80, entity.Vitals.MaxHealth);
+			// ...and the client is TOLD, or its bar stops at the old ceiling.
+			Assert.Contains(applied, a => a.Stat == CharacterStatId.HealthMax && a.Value == entity.Vitals.MaxHealth);
+
+			// And it comes back off when the buff ends.
+			entity.ActiveBuffs.Clear();
+			BuffStatEffects.Recompute(entity, catalog);
+			Assert.Equal(before, entity.Vitals.MaxHealth);
+		}
+
+		// The attribute term must not EAT the flat one: a pool carrying both a +Constitution buff and a flat +HealthMax
+		// bonus has to end up with the sum, which is what SetMaxFromBonus-on-top-of-the-rebase means.
+		[Fact]
+		public void AttributeBuff_AddsToTheFlatPoolBonusRatherThanReplacingIt()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([Row(3197, CharacterStatId.Constitution, FlatKind, 10)]);
+			var entity = Player();
+			entity.CharacterClass = ConanClass.Assassin;
+			entity.Level = 1;
+			entity.ClassBase = ClassAttributeBase();
+			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 25 };
+			entity.Vitals = EntityVitals.FromCharacter(new Character { Class = ConanClass.Assassin, Level = 1 },
+				entity.GearBonuses, entity.ClassBase);
+
+			BuffStatEffects.Recompute(entity, catalog);
+			var before = entity.Vitals.MaxHealth;
+
+			entity.ActiveBuffs[3197 << 8] = new ActiveBuff(3197 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(before + 80, entity.Vitals.MaxHealth); // the +25 ring is still in there
+		}
+
+		// The level-1 ClassAttributeBases row: a flat 10 wire (= 1 display) for all five attributes of all twelve
+		// classes, which is what VitalAttributes.LevelOneBase documents.
+		private static Dictionary<CharacterStatId, int> ClassAttributeBase()
+		{
+			return new Dictionary<CharacterStatId, int>
+			{
+				[CharacterStatId.Strength] = 10,
+				[CharacterStatId.Constitution] = 10,
+				[CharacterStatId.Intelligence] = 10,
+				[CharacterStatId.Wisdom] = 10,
+				[CharacterStatId.Dexterity] = 10
+			};
+		}
+
 		private static WorldEntity Player()
 		{
 			return new WorldEntity(0x1000, 2040, true, "Tester", null!);
