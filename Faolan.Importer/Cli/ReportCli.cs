@@ -54,6 +54,12 @@ namespace Faolan.Importer.Cli
 			if (report == "apply-seed")
 				return ApplySeed();
 
+			if (report == "terrain-los")
+			{
+				await TerrainLos(arg);
+				return 0;
+			}
+
 			// RDB-only, no corpus: the client's stat-name table (LDB cat 615).
 			if (report == "ldb-stat-names")
 			{

@@ -7,6 +7,15 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
+	// Which half of the line-of-sight test rejected a ray, or None when it is clear. The two halves fail for entirely
+	// different reasons, so a diagnostic that cannot tell them apart cannot point at a cause (#577).
+	public enum LineOfSightBlocker
+	{
+		None,
+		Terrain,
+		Collision
+	}
+
 	// Server-side terrain for #284: ground-height snapping (loot bags / corpses sit on the floor, not at a creature's
 	// death-moment Y) and line-of-sight (NPCs don't aggro over a hill / across a drop / through a building wall). The
 	// data is the per-playfield RDB heightmap (type 1066611) + collision mesh (type 1000012), but the game server does
@@ -66,8 +75,23 @@ namespace Faolan.GameServer.World
 		// that the range + tier-1 vertical gate would have wrongly allowed.
 		public bool HasLineOfSight(uint mapId, Vector3 from, Vector3 to)
 		{
+			return Trace(mapId, from, to) == LineOfSightBlocker.None;
+		}
+
+		// The same test as <see cref="HasLineOfSight" />, but it says WHICH gate rejected the ray. Aggro that collapses
+		// to melee range looks identical whichever half is doing it, and the two have completely different causes - a
+		// heightmap that reads high, versus a collision mesh that contains the ground it is supposed to sit on - so
+		// "is line-of-sight culling this" is not an answerable question without attribution. `--report terrain-los`
+		// tabulates it over real spawn positions (#577).
+		public LineOfSightBlocker Trace(uint mapId, Vector3 from, Vector3 to)
+		{
 			EnsureLoaded(mapId);
-			return HasTerrainLineOfSight(mapId, from, to) && HasCollisionLineOfSight(mapId, from, to);
+			if (!HasTerrainLineOfSight(mapId, from, to))
+				return LineOfSightBlocker.Terrain;
+
+			return HasCollisionLineOfSight(mapId, from, to)
+				? LineOfSightBlocker.None
+				: LineOfSightBlocker.Collision;
 		}
 
 		// Pre-load a map's terrain into the cache. Called fire-and-forget from world entry so the first aggro / loot on
