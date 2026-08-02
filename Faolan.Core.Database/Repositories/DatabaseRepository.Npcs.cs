@@ -264,6 +264,12 @@ namespace Faolan.Core.Database.Repositories
 				.Include(n => n.PatrolNodes)
 				.ThenInclude(pn => pn.Words)
 				.Where(n => n.MapId == mapId && (forClass == null || n.ClassId == null || n.ClassId == forClass))
+				// SIX collection navigations off one root. As a single query that is one JOIN whose row count is their
+				// PRODUCT - every morph repeated once per equipment slot per spell per chatter line per patrol word - and
+				// EF then dedups it client-side. It cost 2.3s to return Tortage beach's 95 spawns, which is the bulk of
+				// the first-entry stall on a map (the zone load is memoized, so it is paid once per map per process).
+				// Split, each collection is its own flat read.
+				.AsSplitQuery()
 				.ToArrayAsync();
 		}
 

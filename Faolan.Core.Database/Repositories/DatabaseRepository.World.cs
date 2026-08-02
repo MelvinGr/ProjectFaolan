@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
@@ -18,6 +19,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Map[]> GetMaps();
 		Task<QuestLine[]> GetQuestLines();
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
+		Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds);
 		Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId);
 		Task<RespawnPoint?> GetRespawnPoint(uint id);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
@@ -111,6 +113,35 @@ namespace Faolan.Core.Database.Repositories
 				.Include(q => q.Goals)
 				.ThenInclude(g => g.Region!.Vertices)
 				.FirstOrDefaultAsync(q => q.QuestId == questId);
+		}
+
+		// The batched form of GetQuestDefinition, for the login path. The snapshot needs a definition for EVERY quest in
+		// the character's journal, and doing that one id at a time meant one round trip - and one fresh DbContext - per
+		// quest: 158 of them for a level-23 character (~3.0s) and 1512 for a level-80 one (~25.3s), on a path retail
+		// completes in 0.8s. Same Includes as the singular form, so callers get identical rows.
+		//
+		// Split query for the same reason it is on GetNpcSpawns: TextRefs, Goals and each Goal's region ring are three
+		// collection levels, and one JOIN multiplies them together. Chunked so a journal of any size stays clear of a
+		// provider's IN-list ceiling - the round trips are then per 500 quests, not per quest.
+		public async Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds)
+		{
+			if (questIds.Count == 0)
+				return [];
+
+			var definitions = new List<QuestDefinition>(questIds.Count);
+			foreach (var chunk in questIds.Distinct().Chunk(500))
+			{
+				await using var ctx = await _contextFactory.CreateDbContextAsync();
+				definitions.AddRange(await ctx
+					.QuestDefinitions.Include(q => q.TextRefs)
+					.Include(q => q.Goals)
+					.ThenInclude(g => g.Region!.Vertices)
+					.Where(q => chunk.Contains(q.QuestId))
+					.AsSplitQuery()
+					.ToArrayAsync());
+			}
+
+			return [.. definitions];
 		}
 
 		// Every step of a quest line, ordered by its position within that line (JournalSequence) - the quest index's

@@ -505,11 +505,13 @@ namespace Faolan.GameServer
 
 			var lines = (await Database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
 			var byLine = new SortedDictionary<uint, List<QuestDefinition>>();
+			// One batched read rather than a query per completed quest: the journal is the whole tab, so this loop ran
+			// 158 times for a level-23 character and 1512 for a level-80 one, each time opening its own context.
+			var definitions = (await Database.GetQuestDefinitions([.. completed.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
 
 			foreach (var cq in completed)
 			{
-				var def = await Database.GetQuestDefinition(cq.QuestId);
-				if (def == null || def.QuestLineId == 0 || !lines.ContainsKey(def.QuestLineId))
+				if (!definitions.TryGetValue(cq.QuestId, out var def) || def.QuestLineId == 0 || !lines.ContainsKey(def.QuestLineId))
 					continue;
 
 				(byLine.TryGetValue(def.QuestLineId, out var list)
@@ -536,10 +538,14 @@ namespace Faolan.GameServer
 			// Data-driven: the journal is exactly the character's ACTIVE, snapshot-eligible quests - no quest is forced
 			// in. A completed/abandoned quest (not Active) is excluded, so it never lingers as a phantom (#...).
 			var lineRows = (await Database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
-			foreach (var cq in (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active))
+			// Batched like the completed journal above. The journal ORDER is the character's own CharacterQuests order -
+			// it picks the primary (tracked) quest below - so the rows are still walked in that order, only the
+			// definitions behind them are now fetched in one go.
+			var active = (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).ToArray();
+			var definitions = (await Database.GetQuestDefinitions([.. active.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
+			foreach (var cq in active)
 			{
-				var def = await Database.GetQuestDefinition(cq.QuestId);
-				if (def != null && lineRows.TryGetValue(def.QuestLineId, out var line) && SnapshotTails.IsSnapshotEligible(def, line))
+				if (definitions.TryGetValue(cq.QuestId, out var def) && lineRows.TryGetValue(def.QuestLineId, out var line) && SnapshotTails.IsSnapshotEligible(def, line))
 					quests.Add(def);
 			}
 
