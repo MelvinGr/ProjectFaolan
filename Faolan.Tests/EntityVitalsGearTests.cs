@@ -67,7 +67,12 @@ namespace Faolan.Tests
 			var ids = vitals.ToVitalsBlock().Records;
 
 			Assert.Equal(100u * 100, ids.Single(r => r.StatId == CharacterStatId.HealthCurrent).RawValue);
-			Assert.Equal(BaseHp() * 100, ids.Single(r => r.StatId == CharacterStatId.HealthMax).RawValue);
+			// HealthMax carries the class BASE, not our ceiling: the client tops it up with its own gear/feat/attribute
+			// terms, so sending the ceiling made it top up an already-topped-up number and draw 1754 where retail drew
+			// 1270 (#580). Stamina/mana need no such split - their anchors were read off the base already.
+			Assert.Equal(vitals.MaxHealthWireBase * 100, ids.Single(r => r.StatId == CharacterStatId.HealthMax).RawValue);
+			Assert.True(vitals.MaxHealthWireBase < vitals.MaxHealth, "the wire base must sit below the server ceiling");
+			Assert.Equal(CharacterMaxStats.ClassBaseHundredths(ConanClass.Guardian, 4).Health / 100, vitals.MaxHealthWireBase);
 			Assert.Equal(50u * 100, ids.Single(r => r.StatId == CharacterStatId.StaminaCurrent).RawValue);
 			Assert.Equal(BaseStamina() * 100, ids.Single(r => r.StatId == CharacterStatId.StaminaMax).RawValue);
 			Assert.Contains(ids, r => r.StatId == CharacterStatId.ManaCurrent);

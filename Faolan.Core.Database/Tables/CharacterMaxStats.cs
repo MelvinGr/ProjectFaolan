@@ -15,28 +15,27 @@ namespace Faolan.Core.Database.Tables
 		public uint Mana { get; set; }
 		public uint Stamina { get; set; }
 
-		// The FullChar snapshot stat block (TailsPostAccessBlock) carries, besides the DISPLAYED max for each pool, a
-		// slightly-lower "base/secondary" value the client reads into a parallel slot. From the four archetypes' retail
-		// LOGIN snapshots (decode_statblock.py over Necro/Guardian/Assassin/Bear-Shaman): mana base = displayed-6,
-		// stamina base = displayed-6, HP base = displayed - a per-class L1 delta (Necro 9, Guardian 10, Assassin/
-		// BearShaman 8). Authoring the WHOLE per-class block (both the displayed AND base slots) keeps it internally
-		// consistent - patching only the displayed slot and leaving the base at the Strie template's Rogue value was the
-		// suspected #4 (wrong mana) / "gear vanished" inconsistency.
-		// Returned in display units (the block scales ×100 at write time). #186/#4.
-		public (uint Hp, uint HpBase, uint Mana, uint ManaBase, uint Stamina, uint StaminaBase) SnapshotVitals(ConanClass @class)
+		// The FullChar snapshot stat block (TailsPostAccessBlock) carries, besides the DISPLAYED max for each pool, the
+		// class BASE the client reads into a parallel slot. Authoring the WHOLE per-class block (both slots) keeps it
+		// internally consistent - patching only the displayed slot and leaving the base at the Strie template's Rogue
+		// value was the suspected #4 (wrong mana) / "gear vanished" inconsistency.
+		// Returned in display units (the block scales ×100 at write time). #186/#4/#580.
+		public (uint Hp, uint HpBase, uint Mana, uint ManaBase, uint Stamina, uint StaminaBase) SnapshotVitals(ConanClass @class, ushort level)
 		{
-			var a = Archetype(@class);
-			var hpDelta = (uint)(a.HpL1 - a.HpBaseL1);
-			var hpBase = Health > hpDelta
-				? Health - hpDelta
-				: Health;
-			var manaBase = Mana > 6
-				? Mana - 6
-				: 0; // 0-pool classes stay 0; mana base is 6 below the displayed max
-			var staminaBase = Stamina > 6
-				? Stamina - 6
-				: 0;
-			return (Health, hpBase, Mana, manaBase, Stamina, staminaBase);
+			// The three "base" slots are the CLASS BASE - the same quantity a live vitals push carries in stat
+			// 0x0001/0x01F9/0x01FB - which the client tops up with its own gear/feat/attribute terms to get the number
+			// it draws.
+			//
+			// They used to be hand-fitted offsets from the displayed value: health minus a per-class L1 delta
+			// (Necro 9, Guardian 10, Assassin 8), mana and stamina minus 6. Those were read off retail LOGIN snapshots,
+			// which are all level 1 - and at level 1 they are exactly the class base (Assassin 98-8 = 90 = 9000/100;
+			// mana 246-6 = 240 = 24000/100; stamina 236-6 = 230 = 23000/100). So the deltas were the L1 coincidence of
+			// this curve, and they only diverge higher up, where the two grow at different rates (health 53/level
+			// against the base's 31). That divergence is what made the client draw 1754 at L23 where retail drew 1270
+			// (#580) - it was topping up an already-topped-up number.
+			var (hpBase, manaBase, staminaBase) = ClassBaseHundredths(@class, level);
+
+			return (Health, hpBase / 100, Mana, Mana == 0 ? 0 : manaBase / 100, Stamina, Stamina == 0 ? 0 : staminaBase / 100);
 		}
 
 		// Retail's CLASS BASE for the three pools at `level`, in WIRE hundredths - the exact value retail puts in
@@ -68,6 +67,29 @@ namespace Faolan.Core.Database.Tables
 					? 0u
 					: (uint)(b + grow * steps / 10);
 			}
+		}
+
+		// How far our HEALTH ceiling sits above the class BASE the wire carries - the amount to take off before putting
+		// health in a stat 0x0001 slot.
+		//
+		// The two curves in this file are anchored to DIFFERENT quantities, which is the whole of #580. Stamina's L1
+		// anchor was read off the base (Assassin L23: CreateDefaults 742 vs ClassBaseHundredths 736, and the client
+		// draws retail's 1148 from it), but health's was read off the CHARACTER SHEET (CreateDefaults 1264 vs a class
+		// base of 772 - and 1264 is retail's DISPLAYED 1270). Sending the sheet value where a base belongs made the
+		// client top up an already-topped-up number: measured in-client at L23, base+gear 1314 drew 1754 where retail's
+		// 822 drew 1270, the client adding the same ~440-448 to each.
+		//
+		// So health is the only pool that needs correcting, and it is corrected at the WIRE boundary rather than by
+		// lowering the ceiling: the ceiling is what regen fills toward, and CreateDefaults' health is right for THAT -
+		// it already approximates the displayed max. See EntityVitals.MaxHealthWireBase.
+		public static uint HealthSheetOverBase(ConanClass @class, ushort level)
+		{
+			var sheet = CreateDefaults(@class, level).Health;
+			var classBase = ClassBaseHundredths(@class, level).Health / 100;
+
+			return sheet > classBase
+				? sheet - classBase
+				: 0;
 		}
 
 		// RDB 1000511's six vitals words per class: (health, healthGrowth, mana, manaGrowth, stamina, staminaGrowth).

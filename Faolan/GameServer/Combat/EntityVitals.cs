@@ -30,6 +30,19 @@ namespace Faolan.GameServer.Combat
 		/// </summary>
 		public uint BaseMaxHealth { get; private set; }
 
+		// How far MaxHealth sits above the class base, so the wire can carry the base while the server keeps the
+		// ceiling. Set by FromCharacter; 0 for a non-player entity, whose max IS what it reports.
+		public uint HealthSheetOverBase { get; private set; }
+
+		// What goes in the stat 0x0001 slot: the class BASE, which the client tops up with its own gear/feat/attribute
+		// terms to produce the number it draws. MaxHealth is OUR ceiling - what regen fills toward - and is a
+		// different quantity; sending it here made the client top up an already-topped-up value and draw 1754 where
+		// retail drew 1270 (#580). Stamina and mana need no such correction: their anchors were read off the base
+		// already, and their drawn maxima match retail exactly.
+		public uint MaxHealthWireBase => MaxHealth > HealthSheetOverBase
+			? MaxHealth - HealthSheetOverBase
+			: MaxHealth;
+
 		public uint BaseMaxMana { get; private set; }
 		public uint BaseMaxStamina { get; private set; }
 
@@ -160,7 +173,7 @@ namespace Faolan.GameServer.Combat
 		{
 			return new CharacterStatBlock()
 				.Set(CharacterStatId.HealthCurrent, Health)
-				.Set(CharacterStatId.HealthMax, MaxHealth)
+				.Set(CharacterStatId.HealthMax, MaxHealthWireBase)
 				.Set(CharacterStatId.StaminaCurrent, Stamina)
 				.Set(CharacterStatId.StaminaMax, MaxStamina)
 				.Set(CharacterStatId.ManaCurrent, Mana)
@@ -192,6 +205,7 @@ namespace Faolan.GameServer.Combat
 			var vitals = FromMax(AddClassBase(max.Health, classBase, CharacterStatId.HealthMax),
 				AddClassBase(max.Mana, classBase, CharacterStatId.ManaMax),
 				AddClassBase(max.Stamina, classBase, CharacterStatId.StaminaMax));
+			vitals.HealthSheetOverBase = CharacterMaxStats.HealthSheetOverBase(character.Class, character.Level);
 			vitals.BaseMaxHealth = vitals.MaxHealth;
 			vitals.BaseMaxMana = vitals.MaxMana;
 			vitals.BaseMaxStamina = vitals.MaxStamina;

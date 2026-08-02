@@ -42,7 +42,11 @@ namespace Faolan.Tests
 			var message = PlayerCharacterIirs.ForCharacter(character, new CharacterEquipment());
 
 			Assert.Equal(expectedHealth, message.Stats.Health);
-			Assert.Equal(character.MaxVitals().Health * 100, message.Stats.Life); // life (max) is full regardless of dead state
+			// `life` carries the CLASS BASE, which the client tops up - not our sheet ceiling. Retail proves the split
+			// in one packet: Stihetfv (Conqueror L2) has life 19600 = 196 = the class base against current health 229
+			// (#580). It stays full regardless of dead state; only `health` is zeroed.
+			Assert.Equal(CharacterMaxStats.ClassBaseHundredths(character.Class, character.Level).Health, message.Stats.Life);
+			Assert.True(message.Stats.Life < character.MaxVitals().Health * 100, "the base must sit below the sheet ceiling");
 			if (isDead)
 			{
 				Assert.Equal(29u, message.Stats.BccState); // bcc_state=29 = the Dead behavior-controller state (alive=1)

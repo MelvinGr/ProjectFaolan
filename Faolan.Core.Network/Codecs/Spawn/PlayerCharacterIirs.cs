@@ -120,16 +120,21 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// the snapshot's HealthCurrent (#214 step 2) left the avatar standing. Verified against the retail
 			// login-while-dead capture (Stihetfv FA015807 #50): CharacterStats.health(f7)=0, life(f6)=19600 full,
 			// and can_fall(f20)=0 (alive=1).
+			// The max-side fields carry the CLASS BASE, which the client tops up; the current-side fields carry the
+			// full value. Retail proves the split in one packet - Stihetfv (Conqueror L2) has life 19600 = 196 = this
+			// curve's class base, against current health 229, and our sheet curve gives 228 for that same character.
+			// Sending the sheet value in the max slot made the client top up an already-topped-up number (#580).
 			var maxStats = character.MaxVitals();
+			var (baseHealth, baseMana, baseStamina) = CharacterMaxStats.ClassBaseHundredths(character.Class, character.Level);
 			if (maxStats != null)
 			{
-				stats.Life = maxStats.Health * 100;
+				stats.Life = baseHealth;
 				stats.Health = character.IsDead
 					? 0
 					: maxStats.Health * 100;
-				stats.MaxStamina = maxStats.Stamina * 100;
+				stats.MaxStamina = maxStats.Stamina == 0 ? 0 : baseStamina;
 				stats.Stamina = maxStats.Stamina * 100;
-				stats.MaxMana = maxStats.Mana * 100;
+				stats.MaxMana = maxStats.Mana == 0 ? 0 : baseMana;
 				stats.Mana = maxStats.Mana * 100;
 			}
 			// Remaining CharacterStats fields (looks_package, side, ...) stay captured.

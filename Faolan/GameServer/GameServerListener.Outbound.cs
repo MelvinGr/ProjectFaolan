@@ -18,6 +18,7 @@ using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
+using Faolan.GameServer.Combat;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
 using Faolan.Core.Protobuf;
@@ -511,12 +512,17 @@ namespace Faolan.GameServer
 			return VitalsPacket.BuildStatUpdate(client, stats, entityHandle);
 		}
 
-		// Builds the player's own vitals (0x96B8DC59) from the live character's MaxStats - the world-entry replay
-		// emits this instead of replaying the captured player's vitals.
-		internal static Rpc BuildVitals(INetworkClient client)
+		// Builds the player's own vitals (0x96B8DC59) from the player's LIVE world-model vitals - the world-entry
+		// replay emits this instead of replaying the captured player's vitals.
+		//
+		// `vitals` must be the live EntityVitals, not `character.MaxVitals()`. The raw class/level curve does not
+		// include worn gear, so sending it told the client a current the server did not agree with: an L23 Assassin
+		// with +156 stamina of gear was announced at 742 while the world model held 898, and the bar sat short of
+		// where regen would immediately put it.
+		internal static Rpc BuildVitals(INetworkClient client, EntityVitals vitals)
 		{
 			var character = client.Session.Character;
-			var stats = character.MaxVitals();
+			var stats = new CharacterMaxStats { Health = vitals.MaxHealth, Mana = vitals.MaxMana, Stamina = vitals.MaxStamina };
 			// Emit the full value under the CURRENT ids (0x001B/0x01F8/0x01FA) - the retail full-spawn announce sends
 			// current (== max at full health); the max ids ride the snapshot/tails. (in-client proof: CapturedCharacterStats.)
 			// Also carry Level + Exp/MaxExp so the XP bar reflects the character's REAL progress: the snapshot tails
