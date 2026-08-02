@@ -98,13 +98,15 @@ namespace Faolan.GameServer.Quest
 		// Active/Completed escort quest, or 0 if none. Used to resolve the escortee live by ID rather than by name.
 		private async Task<uint> EscorteeTemplateId(uint characterId)
 		{
-			foreach (var quest in await _database.GetCharacterQuests(characterId))
+			// ⚠️ This wants Active AND Completed, so on a level-80 character the per-quest lookup it replaces was over
+			// 1500 queries - the completed journal never shrinks. One batched read of every held quest instead (the two
+			// states it skips are a rounding error next to the journal); order is preserved, so the first escort wins.
+			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(characterId))
 			{
-				if (quest.State != QuestState.Active && quest.State != QuestState.Completed)
+				if (quest.State is not (QuestState.Active or QuestState.Completed))
 					continue;
 
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				if (def?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
+				if (def.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
 					return escort.TrailingRefId;
 			}
 

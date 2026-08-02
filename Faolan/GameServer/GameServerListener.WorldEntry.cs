@@ -667,13 +667,9 @@ namespace Faolan.GameServer
 			// #262: if the player logs in mid-escort (an escort stage active), resume the escortee's follow now - the
 			// live grant-trigger only fires on the talk itself, so without this a relog leaves her at the cage. Data-
 			// driven off the Escort goal + its escortee template id (no hard-coded quest id / name).
-			foreach (var q in await Database.GetCharacterQuests(character.Id))
+			foreach (var (_, qdef) in await Database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
-				if (q.State != QuestState.Active)
-					continue;
-
-				var qdef = await Database.GetQuestDefinition(q.QuestId);
-				if (qdef?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
+				if (qdef.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort) is { TrailingRefId: not 0 } escort)
 				{
 					_broadcaster.SetNpcFollowByTemplate(mapId, escort.TrailingRefId, client.Session.Character.Id, true);
 					break;

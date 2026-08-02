@@ -37,7 +37,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId);
 		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId);
-		Task<CharacterQuest[]> GetCharacterQuests(uint characterId);
+		Task<CharacterQuest[]> GetCharacterQuests(uint characterId, QuestState? state = null);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
 		Task<CharacterStat[]> GetCharacterStats(uint characterId);
@@ -440,10 +440,13 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.CharacterQuestGoals.Where(g => g.CharacterId == characterId && g.QuestId == questId).ToArrayAsync();
 		}
 
-		public async Task<CharacterQuest[]> GetCharacterQuests(uint characterId)
+		// `state` filters in SQL rather than in the caller: the goal-matching paths want only the ACTIVE quests, and a
+		// level-80 character holds 1500+ completed ones they would otherwise materialise and discard on every call.
+		// Null (the default) returns every held quest, which is what the journal and the escort lookup want.
+		public async Task<CharacterQuest[]> GetCharacterQuests(uint characterId, QuestState? state = null)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterQuests.Where(q => q.CharacterId == characterId).ToArrayAsync();
+			return await ctx.CharacterQuests.Where(q => q.CharacterId == characterId && (state == null || q.State == state)).ToArrayAsync();
 		}
 
 		public async Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId)

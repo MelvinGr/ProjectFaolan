@@ -1693,13 +1693,11 @@ namespace Faolan.GameServer.World
 			if (string.IsNullOrEmpty(npcName))
 				return null;
 
-			foreach (var quest in await _database.GetCharacterQuests(characterId))
+			// One batched read rather than a query per active quest - this sits on the LOOT path, so it ran per kill
+			// that could drop a bag.
+			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(characterId, QuestState.Active))
 			{
-				if (quest.State != QuestState.Active)
-					continue;
-
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				var goal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+				var goal = def.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
 				if (goal is not { GoalType: QuestGoalType.LootFromNpc } || !string.Equals(goal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
 					continue;
 
@@ -1729,26 +1727,20 @@ namespace Faolan.GameServer.World
 			if (npcName == null || character == null)
 				return QuestMarkerNone;
 
-			var quests = await _database.GetCharacterQuests(character.Id);
-
 			// '?' (0x04) when the player has an ACTIVE quest whose current goal is to TALK to this NPC - she's the
 			// next step (e.g. the Casilda chain's talk-to-free stage 13480, active after looting Tuut's key). This is a
 			// SEPARATE source from the giver logic below: the giver quest (13479) is already Completed/superseded by
 			// then, so without this Casilda showed no '?'. Decoded from the captive-quest capture: retail sends 0x2008
 			// state 0x04 to her handle at the loot->talk transition (Blablatest fr1455).
 			// ⚠️ This runs once per 0x2020 spawn poll, and the client polls once per NPC it is loading - ~77 of them on
-			// the Tortage beach. A query per ACTIVE quest here (plus the GetCharacterQuests above) made each poll ~12 DB
-			// round trips / ~257ms, so the client's serialized poll queue took ~20s to drain and every request behind it
-			// - including its 5s latency check - measured that backlog. One batched read instead; the order is
-			// preserved, so the FIRST matching active quest still wins.
-			var active = Array.FindAll(quests, q => q.State == QuestState.Active);
-			var definitions = (await _database.GetQuestDefinitions([.. active.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
-			foreach (var q in active)
+			// the Tortage beach. A query per ACTIVE quest here made each poll ~12 DB round trips / ~257ms, so the
+			// client's serialized poll queue took ~20s to drain and every request behind it - including its 5s latency
+			// check - measured that backlog. One batched read instead; order is preserved, so the FIRST match wins.
+			// The giver logic below needs the raw rows in EVERY state (held / completed), so that stays a plain read.
+			var quests = await _database.GetCharacterQuests(character.Id);
+			foreach (var (_, qDef) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
-				var qGoal = definitions.TryGetValue(q.QuestId, out var qDef)
-					? qDef.Goals.OrderBy(g => g.Sequence).FirstOrDefault()
-					: null;
-
+				var qGoal = qDef.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
 				if (qGoal?.GoalType == QuestGoalType.TalkToNpc && string.Equals(qGoal.TargetName, npcName, StringComparison.OrdinalIgnoreCase))
 					return QuestMarkerTurnIn;
 			}

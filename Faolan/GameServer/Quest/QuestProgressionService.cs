@@ -110,17 +110,13 @@ namespace Faolan.GameServer.Quest
 		// the same door: the farewell plays once, and the zone line behaves normally afterwards.
 		public async Task<bool> HasActiveEscortGoal(uint characterId, string npcName)
 		{
-			foreach (var quest in await _database.GetCharacterQuests(characterId))
+			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(characterId, QuestState.Active))
 			{
-				if (quest.State != QuestState.Active)
-					continue;
-
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				var goal = def?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort && string.Equals(g.TargetName, npcName, StringComparison.OrdinalIgnoreCase));
+				var goal = def.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort && string.Equals(g.TargetName, npcName, StringComparison.OrdinalIgnoreCase));
 				if (goal == null)
 					continue;
 
-				if (await GoalProgressOf(characterId, quest, def!, goal) < GoalRequired(quest, def!, goal))
+				if (await GoalProgressOf(characterId, quest, def, goal) < GoalRequired(quest, def, goal))
 					return true;
 			}
 
@@ -134,15 +130,8 @@ namespace Faolan.GameServer.Quest
 		public async Task<List<ReachGoalTarget>> LoadReachGoals(uint characterId)
 		{
 			var targets = new List<ReachGoalTarget>();
-			foreach (var quest in await _database.GetCharacterQuests(characterId))
+			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(characterId, QuestState.Active))
 			{
-				if (quest.State != QuestState.Active)
-					continue;
-
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				if (def == null)
-					continue;
-
 				foreach (var goal in def.Goals.Where(g => g.GoalType == QuestGoalType.ReachArea))
 				{
 					var required = GoalRequired(quest, def, goal);
@@ -171,23 +160,19 @@ namespace Faolan.GameServer.Quest
 				return;
 
 			var changed = false;
-			foreach (var quest in await _database.GetCharacterQuests(character.Id))
+			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
-				if (quest.State != QuestState.Active)
-					continue;
-
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				var goal = def?.Goals.FirstOrDefault(g => g.GoalId == goalId);
+				var goal = def.Goals.FirstOrDefault(g => g.GoalId == goalId);
 				if (goal == null)
 					continue;
 
-				var required = GoalRequired(quest, def!, goal);
-				if (await GoalProgressOf(character.Id, quest, def!, goal) >= required)
+				var required = GoalRequired(quest, def, goal);
+				if (await GoalProgressOf(character.Id, quest, def, goal) >= required)
 					continue; // already solved
 
 				changed = true;
-				await PersistGoalProgress(character.Id, quest, def!, goal, required); // solve = jump to required
-				if (await AllGoalsComplete(character.Id, quest, def!, goal, required))
+				await PersistGoalProgress(character.Id, quest, def, goal, required); // solve = jump to required
+				if (await AllGoalsComplete(character.Id, quest, def, goal, required))
 					await CompleteObjective(client!, character, quest, def!, goal, required);
 				else
 					await SendGoalUpdate(client!, quest.QuestId, goal.GoalId, QuestGoalUpdate.Satisfied); // this goal done, others pending
@@ -211,17 +196,13 @@ namespace Faolan.GameServer.Quest
 		{
 			var character = client.Session.Character;
 
-			foreach (var quest in await _database.GetCharacterQuests(character.Id))
+			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
-				if (quest.State != QuestState.Active)
-					continue;
-
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				var goal = def?.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.CollectItem);
+				var goal = def.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.CollectItem);
 				if (goal == null || goal.TrailingRefId == 0)
 					continue;
 
-				if (await GoalProgressOf(character.Id, quest, def!, goal) >= GoalRequired(quest, def!, goal))
+				if (await GoalProgressOf(character.Id, quest, def, goal) >= GoalRequired(quest, def, goal))
 					continue; // this collect goal is already full
 
 				return goal.TrailingRefId;
@@ -260,15 +241,8 @@ namespace Faolan.GameServer.Quest
 			// Snapshot the quests up front: CompleteAndSupersede writes the next stage Active, but the captured chain
 			// never re-matches the same trigger on the just-granted stage, so iterating the snapshot is safe.
 			var changed = false;
-			foreach (var quest in await _database.GetCharacterQuests(character.Id))
+			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
-				if (quest.State != QuestState.Active)
-					continue;
-
-				var def = await _database.GetQuestDefinition(quest.QuestId);
-				if (def == null)
-					continue;
-
 				// Match the goal to advance: a kill by the STABLE target template id (TrailingRefId), name as fallback; a
 				// collect by its item id (TrailingRefId); a LOOT by the bag's source NPC AND the item received; talk/escort
 				// by name (the NPC greeting's name) - #262.

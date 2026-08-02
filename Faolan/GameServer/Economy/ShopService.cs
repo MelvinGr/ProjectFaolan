@@ -228,13 +228,9 @@ namespace Faolan.GameServer.Economy
 		// window. This sets up the server-side state so the BUY round-trip is complete and exercisable.
 		public async Task SendShopData(INetworkClient client, Shop shop, uint npcHandle)
 		{
-			// The codec's item resolver is synchronous; pre-resolve each ware's Items row up front.
-			var resolved = new Dictionary<uint, Item>();
-			foreach (var ware in shop.Items)
-			{
-				if (!resolved.ContainsKey(ware.ItemTemplateId))
-					resolved[ware.ItemTemplateId] = (await _database.GetItem(ware.ItemTemplateId))!;
-			}
+			// The codec's item resolver is synchronous; pre-resolve every ware's Items row up front, in ONE read rather
+			// than a query per ware (a stocked vendor is dozens of them, paid on every window open).
+			var resolved = (await _database.GetItems([.. shop.Items.Select(w => w.ItemTemplateId).Distinct()])).ToDictionary(i => i.Id);
 
 			var instance = (uint)(0x00010000 + (Interlocked.Increment(ref _shopInstanceSeq) & 0xFFFF));
 			var body = ShopContentCodec.Build(instance, npcHandle, shop.MaxSize, shop.Items, id => resolved.GetValueOrDefault(id)!);

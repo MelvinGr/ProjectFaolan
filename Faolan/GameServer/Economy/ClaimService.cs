@@ -58,11 +58,12 @@ namespace Faolan.GameServer.Economy
 					return;
 				}
 
+				// One read for every listed claim's item rather than a query per row.
+				var items = (await _database.GetItems([.. rows.Select(r => r.ItemTemplateId).Distinct()])).ToDictionary(i => i.Id);
 				for (var i = 0; i < rows.Length; i++)
 				{
-					var item = await _database.GetItem(rows[i].ItemTemplateId);
 					var qty = rows[i].Quantity?.ToString() ?? "∞"; // null = infinite charges
-					await _chat.SendSystemMessage(characterId, $"#{i + 1}: {qty}x '{item?.Name ?? "?"}' (template {rows[i].ItemTemplateId})");
+					await _chat.SendSystemMessage(characterId, $"#{i + 1}: {qty}x '{items.GetValueOrDefault(rows[i].ItemTemplateId)?.Name ?? "?"}' (template {rows[i].ItemTemplateId})");
 				}
 
 				return;

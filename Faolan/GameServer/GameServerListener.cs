@@ -477,12 +477,15 @@ namespace Faolan.GameServer
 				return (lines, catalog);
 
 			var allLines = (await Database.GetQuestLines()).ToDictionary(a => a.QuestLineId);
-			foreach (var lineId in quests.Select(q => q.QuestLineId).Distinct())
+			var lineIds = quests.Select(q => q.QuestLineId).Distinct().ToArray();
+			// One read for every line's catalog rather than a query per line.
+			var catalogs = await Database.GetQuestDefinitionsByLines(lineIds);
+			foreach (var lineId in lineIds)
 			{
 				if (allLines.TryGetValue(lineId, out var line))
 					lines[lineId] = line;
 
-				catalog[lineId] = await Database.GetQuestDefinitionsByLine(lineId);
+				catalog[lineId] = catalogs.GetValueOrDefault(lineId, []);
 			}
 
 			return (lines, catalog);

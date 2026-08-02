@@ -20,7 +20,9 @@ namespace Faolan.Core.Database.Repositories
 		Task<QuestLine[]> GetQuestLines();
 		Task<QuestDefinition?> GetQuestDefinition(uint questId);
 		Task<QuestDefinition[]> GetQuestDefinitions(IReadOnlyCollection<uint> questIds);
+		Task<(CharacterQuest Quest, QuestDefinition Definition)[]> GetCharacterQuestsWithDefinitions(uint characterId, QuestState? state = null);
 		Task<QuestDefinition[]> GetQuestDefinitionsByLine(uint questLineId);
+		Task<Dictionary<uint, QuestDefinition[]>> GetQuestDefinitionsByLines(IReadOnlyCollection<uint> questLineIds);
 		Task<RespawnPoint?> GetRespawnPoint(uint id);
 		Task<RespawnPoint[]> GetRespawnPoints(uint mapId);
 		Task<WorldObject[]> GetWorldObjects(uint mapId);
@@ -144,6 +146,29 @@ namespace Faolan.Core.Database.Repositories
 			return [.. definitions];
 		}
 
+		// The character's held quests in the given STATE, each paired with its definition, in CharacterQuests order -
+		// as ONE batched read. Null (the default) takes every held quest.
+		//
+		// ⚠️ This is THE way to ask "the player's quests and what they require". Every goal-matching path needs the
+		// pair, and each used to walk the quests calling GetQuestDefinition per quest: a query per quest, each on its
+		// own DbContext. Those paths are live ones - a kill, a pickup, a door use, a loot, the 0x2020 spawn poll - so
+		// the cost was paid over and over during play, and the escort lookup walked COMPLETED quests too (1500+ on a
+		// level-80 character). Batching it at the call site worked but had to be re-derived every time; here it is
+		// impossible to get wrong.
+		//
+		// A quest whose definition is missing is DROPPED, which is what every caller already did - the ones reading
+		// `def?.Goals` fell through to `goal == null -> continue`, the rest tested `def == null` explicitly.
+		public async Task<(CharacterQuest Quest, QuestDefinition Definition)[]> GetCharacterQuestsWithDefinitions(uint characterId, QuestState? state = null)
+		{
+			var held = await GetCharacterQuests(characterId, state);
+			if (held.Length == 0)
+				return [];
+
+			var definitions = (await GetQuestDefinitions([.. held.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
+
+			return [.. held.Where(q => definitions.ContainsKey(q.QuestId)).Select(q => (q, definitions[q.QuestId]))];
+		}
+
 		// Every step of a quest line, ordered by its position within that line (JournalSequence) - the quest index's
 		// per-line id list, which QuestIndexRegions.ForQuests turns into a block's `AreaQuestIds` and its
 		// (sequence, remaining) pair.
@@ -165,6 +190,25 @@ namespace Faolan.Core.Database.Repositories
 				.QuestDefinitions.Where(q => q.QuestLineId == questLineId && q.TextRefs.Any())
 				.OrderBy(q => q.JournalSequence)
 				.ToArrayAsync();
+		}
+
+		// The batched form, for the login quest INDEX: it needs the catalog of every line the character holds a quest in,
+		// and asking line by line was a query each. Same filter and same JournalSequence order as the singular form, so a
+		// line's list is identical either way - a line with no qualifying step is simply absent, exactly as an empty
+		// array from the singular form would be.
+		public async Task<Dictionary<uint, QuestDefinition[]>> GetQuestDefinitionsByLines(IReadOnlyCollection<uint> questLineIds)
+		{
+			if (questLineIds.Count == 0)
+				return [];
+
+			var ids = questLineIds.Distinct().ToArray();
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var rows = await ctx
+				.QuestDefinitions.Where(q => ids.Contains(q.QuestLineId) && q.TextRefs.Any())
+				.OrderBy(q => q.JournalSequence)
+				.ToArrayAsync();
+
+			return rows.GroupBy(q => q.QuestLineId).ToDictionary(g => g.Key, g => g.ToArray());
 		}
 
 		public async Task<RespawnPoint?> GetRespawnPoint(uint id)
