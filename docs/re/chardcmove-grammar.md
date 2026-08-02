@@ -174,5 +174,8 @@ Decoded + dissected (this doc + `CharDCMoveCodec`). **Construct DONE:** `CharDCM
 byte-exact, golden-tested in `DeadReckoningCodecTests`. **Wired (#190):** the sim emits a `StopIIR` (`StopCodec`)
 when an NPC arrives home and stops moving (`WorldTickEffectType.NpcStopped` → `BroadcastNpcStop`); the
 per-tick move still uses `MoveTaskCodec` (swapping it for `CharDCMove` is optional polish). All
-self-contained records are sent via `WorldBroadcaster.SendWorldRecord` (NOT `SendWorldIir`, which would
-double-prefix the codec's own length). Needs in-client verification.
+self-contained records are sent via `WorldIir.Send`, which writes the carrier's `[u32 len]` because that length
+belongs to the sender (#530 rule 2); the codecs emit a bare record. (This used to read "via `SendWorldRecord`,
+NOT `SendWorldIir`, which would double-prefix the codec's own length" — both senders and that hazard are gone:
+#530 moved every self-prefixing codec onto the bare-record shape and left exactly one sender.) Needs in-client
+verification.

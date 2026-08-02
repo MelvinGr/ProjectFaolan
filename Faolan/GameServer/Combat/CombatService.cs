@@ -521,7 +521,7 @@ namespace Faolan.GameServer.Combat
 			}
 
 			foreach (var (attributeId, amount) in AttributeGrowth.ForLevelGain(character.Class, character.Level, levelsGained))
-				await SendWorldFeedback(killer,
+				await SendWorldPacket(killer,
 					FormatFeedbackCodec.Build(instance, new AttributeChanged(attributeId, amount)));
 
 			var vitals = await ReseedFromMaxStats(killer);
@@ -699,18 +699,16 @@ namespace Faolan.GameServer.Combat
 			return client.SendAsync(VitalsPacket.BuildStatUpdate(client, stats, entityHandle));
 		}
 
-		// Frames a FormatFeedbackIIR body (which already carries its own u32 length prefix) raw on the world
-		// conversation - unlike SendWorldPacket, which length-wraps a bare body.
-		private static Task SendWorldFeedback(INetworkClient client, byte[] feedbackBody)
+		// Puts a bare 0x2000 record on the world conversation. Delegates to WorldIir so this file does not hold a
+		// fourth private DispatchPassBlob sender - see WorldIir's header for why that matters.
+		//
+		// There WAS a second one here, SendWorldFeedback, which sent a FormatFeedbackIIR verbatim because that codec
+		// used to prefix its own u32 length. #530 wave 2 moved the length onto the sender and this file was missed, so
+		// the level-up attribute-gain feedback went out with no length and the client read the IIR type 0x8D5A8B6B as
+		// its payload length - the same unframed-record disconnect as the loot bag in #576.
+		private static Task SendWorldPacket(INetworkClient client, byte[] record)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, feedbackBody));
-		}
-
-		// Frames a raw 0x2000 body on the world conversation.
-		private static Task SendWorldPacket(INetworkClient client, byte[] body)
-		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
-				s => s.WriteArrayUInt32Length(body)));
+			return WorldIir.Send(client, record);
 		}
 	}
 }

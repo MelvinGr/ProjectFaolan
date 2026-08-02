@@ -45,6 +45,9 @@ namespace Faolan.Tests
 		};
 		private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
 
+		// The tail of a `WriteArray(` whose arguments are ONLY hex byte literals - a verbatim capture blob.
+		private static readonly Regex ByteLiteralsOnly = new(@"^\s*0x[0-9A-Fa-f]{2}\s*(,\s*0x[0-9A-Fa-f]{2}\s*)*\)");
+
 		// 8-hex-digit literals; IIR opcodes are 32-bit BKDR-31 hashes so they always appear in this form.
 		private static readonly Regex HexLiteral = new(@"0x[0-9A-Fa-f]{8}\b");
 		private static readonly Regex LineComment = new(@"//.*$", RegexOptions.Multiline);
@@ -275,6 +278,91 @@ namespace Faolan.Tests
 			}
 
 			Assert.True(offenders.Count == 0, "IIR opcodes must come from IirTypes, not a hex literal:\n  " + string.Join("\n  ", offenders));
+		}
+
+		// (8) EVERY DispatchPassBlob body is length-framed by its SENDER (#530 rule 2). A codec emits a bare record
+		// `[u32 iirType][record]`; the carrier's `[u32 len]` is written at the send site, so a body argument that is
+		// just a `Build(...)` result puts the IIR TYPE where the client reads a length.
+		//
+		// This is a KILL, not a glitch, and it has landed three times. AddToGroupIIR went out unframed and the client
+		// read 0x0DF44B73 as a 234 MB payload, dropping the connection for both members of a team (see WorldIir's
+		// header). Then #530 moved the length off two codecs that used to prefix their own, and the two verbatim send
+		// sites that depended on that were missed - wave 3 for WorldObjectCodec (every mid-session loot bag: 0xF096251E
+		// read as a ~4 GB length, so the client left the instant an NPC died, #576) and wave 2 for FormatFeedbackCodec
+		// (the level-up attribute gain). Nothing in the type system connects the two halves: both sides are `byte[]`,
+		// so moving the length compiles clean on the day it breaks the wire. That is what this test is for.
+		//
+		// Detection is deliberately blunt: the body expression must either frame (`WriteArrayUInt32Length`) or be a
+		// verbatim byte-literal blob whose framing is baked into the captured bytes. Anything else must earn an
+		// allowlist entry naming why - which is one line to write and the exact moment to ask whether the callee still
+		// prefixes its own length.
+		[Fact]
+		public void EveryDispatchPassBlobBodyIsLengthFramedBySender()
+		{
+			// Send sites whose body is ALREADY `[u32 len][record]` when it arrives, with the reason. Not a place to
+			// silence the test: if a codec stopped prefixing its own length, the fix is at the call site, not here.
+			Dictionary<string, string> allowlist = new(StringComparer.Ordinal)
+			{
+				["GameServerListener.Outbound.cs"] = "FrameWorldEntryRecord takes a body that already carries its [u32 bodyLen] - its parameter is named bodyWithLenPrefix, and its one caller writes that prefix itself",
+				["CreateFlowService.cs"] = "the create-editor 12-byte [entityClass][handle][0] body on the GameCharInterfaceProject receiver is not an IIR record at all, so it carries no record length"
+			};
+
+			var offenders = new List<string>();
+			var checkedCount = 0;
+			foreach (var file in Directory.EnumerateFiles(TestPaths.Repo("Faolan"), "*.cs", SearchOption.AllDirectories))
+			{
+				var source = File.ReadAllText(file);
+				var name = Path.GetFileName(file);
+				foreach (var body in DispatchPassBlobBodies(source))
+				{
+					checkedCount++;
+					if (body.Contains("WriteArrayUInt32Length", StringComparison.Ordinal) || IsVerbatimByteBlob(body) || allowlist.ContainsKey(name))
+						continue;
+
+					offenders.Add($"{name}: DispatchPassBlob body is not length-framed: {Collapse(body)}");
+				}
+			}
+
+			Assert.True(offenders.Count == 0,
+				"A DispatchPassBlob body must be framed by the sender (WorldIir.Send / WriteArrayUInt32Length) - a bare record makes the client read the IIR type as a length and drop the connection:\n  "
+				+ string.Join("\n  ", offenders));
+			Assert.True(checkedCount >= 40, $"only {checkedCount} DispatchPassBlob sends found - the scan is probably broken");
+		}
+
+		// The final argument of each `new Rpc(..., DispatchPassBlob, <body>)`: everything from the opcode to the paren
+		// that closes the constructor, found by depth-counting so a nested call's own parens don't end it early.
+		private static IEnumerable<string> DispatchPassBlobBodies(string source)
+		{
+			const string marker = "GameInterfaceOpcodes.DispatchPassBlob,";
+			for (var at = source.IndexOf(marker, StringComparison.Ordinal); at >= 0; at = source.IndexOf(marker, at + 1, StringComparison.Ordinal))
+			{
+				var start = at + marker.Length;
+				var depth = 0;
+				var end = start;
+				for (; end < source.Length; end++)
+				{
+					if (source[end] == '(')
+						depth++;
+					else if (source[end] == ')' && depth-- == 0)
+						break;
+				}
+
+				yield return source[start..end];
+			}
+		}
+
+		// A hand-carried capture blob - `[0x00, 0x00, 0x00, 0x1F, 0xA3, ...]` - where the leading bytes ARE the length
+		// and there is no codec on the other side to move it. Recognised as "byte literals and nothing else".
+		private static bool IsVerbatimByteBlob(string body)
+		{
+			var writes = body.IndexOf("WriteArray(", StringComparison.Ordinal);
+			return writes >= 0 && ByteLiteralsOnly.IsMatch(body[(writes + "WriteArray(".Length)..]);
+		}
+
+		private static string Collapse(string body)
+		{
+			var one = string.Join(' ', body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+			return one.Length <= 100 ? one : one[..100] + "…";
 		}
 
 		// (2) The pre-#317 name must not reappear on a static const. (Instance members named SubOpcode - the

@@ -111,11 +111,12 @@ The Necromancer weave is built end-to-end and byte-exact (golden tests `Spellwea
 
 - `SpellweaveService` (`Faolan/GameServer/Combat/SpellweaveService.cs`) — the weave FSM + the trance-meter /
   energy loop. Session state on `NetworkClientSession`: `IsSpellweaving`, `WeaveComponents`, `SpellweaveBuffStack`,
-  `Energy`/`EnergyMax`/`IsSprinting`/`EnergyLoopActive`. It reaches the wire through narrow listener seams (ctor
-  args): `ApplySpellweaveBuff` (the 54-byte buff blob, via the shared `ApplySpell` path since #274),
-  `SendWorldIir`, `SendBuffRemoval` (rank-1 end-twins, relayed to viewers so the pose ends on their screens too),
-  `SendSprintBar` (`0x200E`), `EnsureEnergyLoop`, and `isMounted` — the trance roots the caster and plays a kneeling
-  pose, so opening one from the saddle is refused with an on-screen line rather than pinning a rider mid-gallop.
+  `Energy`/`EnergyMax`/`IsSprinting`/`EnergyLoopActive`. It reaches the wire through one narrow port the listener
+  implements, `ISpellweaveOutbound`: `ApplyBuff` (the trance buff and each component's own buff, via the shared
+  `ApplySpell` path since #274), `RemoveBuff` (rank-1 end-twins, relayed to viewers so the pose ends on their
+  screens too), `SendFeedback`, `SendSprintBar` (`0x200E`), `EnsureEnergyLoop`, and `IsMounted` — the trance roots
+  the caster and plays a kneeling pose, so opening one from the saddle is refused with an on-screen line rather
+  than pinning a rider mid-gallop.
 - `CombatReactiveCodec` (`Faolan.Core.Network/Codecs/Combat/CombatReactiveCodec.cs`) — reactive-list, stat-gauge,
   buff-data and fire-stage builders.
 - `BehaviorAnimations` (`Faolan.Core.Network/Codecs/Combat/BehaviorAnimations.cs`) — the trance /

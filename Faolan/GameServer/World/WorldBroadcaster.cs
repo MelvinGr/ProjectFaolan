@@ -2438,12 +2438,18 @@ namespace Faolan.GameServer.World
 			};
 		}
 
-		// Sends a prebuilt LootBagFullUpdateIIR body (handle + transform already baked by WorldObjectCodec) on
-		// the world conversation. Unlike SendWorldSpawn this does NOT re-patch the position - the body is already
-		// placed at the corpse's spot.
-		private static Task SendLootBagUpdate(INetworkClient recipient, byte[] body)
+		// Sends a prebuilt LootBagFullUpdateIIR RECORD (handle + transform already baked by WorldObjectCodec) on the
+		// world conversation. Unlike SendWorldSpawn this does NOT re-patch the position - the record is already placed
+		// at the corpse's spot.
+		//
+		// The carrier's [u32 len] is WorldIir.Send's, because it belongs to the sender (#530 rule 2). This used to send
+		// the record verbatim, back when WorldObjectBuilder prefixed its own length; #530 wave 3 moved that length off
+		// the codec and this call site was missed, so from then on every mid-session bag went out with the length gone
+		// and the client read the IIR type 0xF096251E as a ~4 GB payload and dropped the connection the instant an NPC
+		// died (#576) - the same failure the WorldIir header records for AddToGroupIIR.
+		private static Task SendLootBagUpdate(INetworkClient recipient, byte[] record)
 		{
-			return recipient.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, recipient.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob, body));
+			return WorldIir.Send(recipient, record);
 		}
 
 		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
