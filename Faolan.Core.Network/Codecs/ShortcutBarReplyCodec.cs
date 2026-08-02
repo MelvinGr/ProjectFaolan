@@ -15,7 +15,8 @@ namespace Faolan.Core.Network.Codecs
 	//
 	// The leading word is the ordinary ListFrame count (Strie 15*1009=0x3B1F/14 recs, Hoxxling 23*1009=0x5AA7/22,
 	// NecroL80 73*1009=0x11FB9/72). slot = bar position (page 1 = 0..12, page 2 = +100, special bars at 20000+).
-	// type = shortcut kind (4 = ability/spell/feat, 2 = item). id = the ability/item id. The c2s side (AddShortcut
+	// type = shortcut kind (4 = ability/spell/feat, 3 = COMBO, 2 = item, 1 = a slot in the owner's own bag). id =
+	// the ability/combo/item id - for type 1 it is the position in that bag. The c2s side (AddShortcut
 	// 0x206E / UpdateShortcut 0x206F / RemoveShortcut 0x2071) already persists into CharacterShortcut; this rebuilds
 	// the bar from those rows so it survives relog.
 	public static class ShortcutBarReplyCodec

@@ -355,7 +355,9 @@ namespace Faolan.Importer.Modules
 	// the ability grants resolve against).
 	public sealed class CharacterAbilitiesModule : IImportModule
 	{
-		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(AbilitiesModule)];
+		// CharacterStateModule too: the combo pass reads the imported action bars (a type-3 shortcut is a combo), which
+		// is the only per-character combo evidence for a character past the create flow.
+		public IReadOnlyList<string> DependsOn => [nameof(CharactersModule), nameof(AbilitiesModule), nameof(CharacterStateModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -365,7 +367,7 @@ namespace Faolan.Importer.Modules
 
 		public ImportSource Source => ImportSource.Captures;
 
-		public string Description => "Per-character ability sets (0x2052) + combo books (ComboBookIIR).";
+		public string Description => "Per-character ability sets (0x2052) + combo books (ComboBookIIR + action-bar combos).";
 		public string Name => "character-abilities";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)

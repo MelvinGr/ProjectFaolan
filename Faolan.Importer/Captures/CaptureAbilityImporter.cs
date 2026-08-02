@@ -31,6 +31,10 @@ namespace Faolan.Importer.Captures
 	{
 		private const uint ChangeClassSubOpcode = ScryScriptCodec.Opcode; // client->server character-editor script callback
 		private const uint ComboBookSubOpcode = ComboBookCodec.Opcode;
+
+		// A saved action-bar slot holding a COMBO (ShortcutBarReplyCodec's record `type`). The bar is the only
+		// per-character combo evidence for a character above the create flow.
+		private const uint ComboShortcutType = 3;
 		private const ushort AddSpecialAbilityOpcode = (ushort)GameCharInterfaceOpcodes.DispatchAddSpecialAbility;
 
 		// The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive
@@ -433,6 +437,24 @@ namespace Faolan.Importer.Captures
 			var byCharacter = new Dictionary<uint, HashSet<uint>>();
 			foreach (var packet in rawPackets)
 				TryReadCharacterGrant(packet, byCharacter, true);
+
+			// SECOND source: the character's own ACTION BAR. A ComboBookIIR only ever reaches a character during the
+			// create flow / early levels, so it covers exactly the characters the level filter skips and NONE of the
+			// ones we import - which is why this used to seed nothing at all. A saved bar, though, names combos
+			// directly: a type-3 shortcut IS a combo (see ShortcutBarReplyCodec), and every captured one resolves to a
+			// catalogued combo. It is a floor rather than the whole book - only what the player kept on the bar - but
+			// it is that character's real, evidenced set, and GrantCharacterCombos unions it with the class/level map.
+			//
+			// Runs off CharacterShortcuts, so this module must run AFTER character-state (declared in its DependsOn).
+			foreach (var row in await db.CharacterShortcuts.Where(s => s.ShortcutType == ComboShortcutType).Select(s => new { s.CharacterId, s.TargetId }).ToListAsync())
+			{
+				if (!await db.Combos.AnyAsync(c => c.Id == row.TargetId))
+					continue; // a bar slot pointing at something we have not catalogued as a combo
+
+				(byCharacter.TryGetValue(row.CharacterId, out var set)
+					? set
+					: byCharacter[row.CharacterId] = []).Add(row.TargetId);
+			}
 
 			var (characters, inserted) = await SeedPerCharacterAsync(db, byCharacter,
 				async cid => (await db.CharacterCombos.Where(c => c.CharacterId == cid).Select(c => c.ComboId).ToListAsync()).ToHashSet(), (cid, id) => db.CharacterCombos.Add(new CharacterCombo
