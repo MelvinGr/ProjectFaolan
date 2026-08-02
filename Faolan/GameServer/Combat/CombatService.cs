@@ -309,7 +309,7 @@ namespace Faolan.GameServer.Combat
 
 			var cost = CombatResolver.ResolveSpellManaCost(spellId, client.Session.Character.Level);
 			player.ApplyManaDelta(-(int)cost);
-			await SendStatUpdate(client, player.ToVitalsBlock(), client.Session.Character.Id);
+			await SendStatUpdate(client, player.ToCurrentsBlock(), client.Session.Character.Id); // #586: a cast MOVES mana
 		}
 
 		// Damages every attackable NPC within GroundAoeRadiusUnits of `target` for one tick: shows the floating
@@ -381,7 +381,8 @@ namespace Faolan.GameServer.Combat
 			if (onDamaged != null)
 				await onDamaged();
 
-			await SendStatUpdate(client, target.ToVitalsBlock(), targetHandle);
+			// #586: a hit MOVES a pool, so retail's currents-only form is what goes out here.
+			await SendStatUpdate(client, target.ToCurrentsBlock(), targetHandle);
 
 			if (target.IsDead)
 				await OnNpcKilled(client, targetHandle, npcEntity!, cause);

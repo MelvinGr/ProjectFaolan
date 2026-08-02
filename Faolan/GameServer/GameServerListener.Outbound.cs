@@ -670,12 +670,24 @@ namespace Faolan.GameServer
 				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots, ValidResurrectionSpotsCodec.Build(ValidResurrectionSpotLists.Known(deathPosition, spots))));
 		}
 
-		// A vitals push emits the whole EntityVitals.ToVitalsBlock (current AND max) - there is deliberately no
-		// currents-only sender here any more. There used to be a `SendVitals` pair that emitted the three CURRENT ids
-		// alone, justified as "matches the retail full-spawn announce; max rides the snapshot". That holds for the
-		// SPAWN ANNOUNCE and nowhere else: the max ids reach the client only when something sends them, so every
-		// later max change was invisible and the bar kept its world-entry seed (#450). Use
-		// CombatService.ReseedFromMaxStats(client).ToVitalsBlock() when a max changes.
+		// WHICH of the two vitals blocks to send is decided by WHAT MOVED, and both forms are retail's (#586).
+		//
+		// `EntityVitals.ToCurrentsBlock` - the three CURRENT ids - is for a push where only a current moved: a hit, a
+		// cast's mana cost, the regen tick, fall damage. It is what retail overwhelmingly sends
+		// (`--report vitals-shape`: 3,694 of the 4,900 blocks on a non-own handle carry exactly
+		// {HealthCurrent, StaminaCurrent, ManaCurrent}).
+		//
+		// `EntityVitals.ToVitalsBlock` - current AND max - is for a push where a MAX moved: a level-up, a gear or buff
+		// change to a pool, a GM `.setstat`. Use CombatService.ReseedFromMaxStats(client).ToVitalsBlock() there.
+		//
+		// ⚠️ The rule is "what moved", NOT "always send everything", and it is not "always send currents" either.
+		// There used to be a blanket `SendVitals` pair emitting the three currents alone, justified as "matches the
+		// retail full-spawn announce; max rides the snapshot" - and it was removed because the max ids reach the
+		// client only when something sends them, so every later max change was invisible and the bar kept its
+		// world-entry seed (#450). The replacement over-corrected the other way: sending all six on every swing is
+		// three fabricated records per entity per hit on the hottest path in the game, and for an NPC - which has no
+		// class curve, so ClassBasePools is null - the max ids fall back to our ceiling, which is not the quantity
+		// that slot holds. Neither blanket is right; the split above is.
 
 		// Pushes a ChatTextIIR (raw remoteformat XML) to the client's chat window. Addressed to the player's
 		// GameInterface instance, on the world conversation.

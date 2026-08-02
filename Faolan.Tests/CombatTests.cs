@@ -205,6 +205,20 @@ namespace Faolan.Tests
 			Assert.Equal("060000001b0000189c000000010000189c000001f80000189c000001f90000189c000001fa0000189c000001fb0000189c", ToHex(CharacterStatBlockCodec.Build(v.ToVitalsBlock())));
 		}
 
+		// #586: the CURRENTS-only form, which is what retail sends when a pool MOVES (a hit, a cast, the regen tick).
+		// Measured over the corpus with `--report vitals-shape`: 3,694 of the 4,900 0x96B8DC59 blocks on a handle that
+		// is not the session's own carry exactly these three ids, and only 16 carry the six-record form.
+		[Fact]
+		public void ToCurrentsBlock_EmitsTheThreeCurrentsOnly()
+		{
+			var v = EntityVitals.FromMax(63, 63, 63);
+
+			// count(03) + HealthCurrent(001B) + StaminaCurrent(01F8) + ManaCurrent(01FA), each 6300 = 0x189C. No max
+			// id: sending one here would be three fabricated records per entity per swing, and for an NPC - which has
+			// no class curve - the max slot would carry our ceiling rather than the class base that slot holds.
+			Assert.Equal("030000001b0000189c000001f80000189c000001fa0000189c", ToHex(CharacterStatBlockCodec.Build(v.ToCurrentsBlock())));
+		}
+
 		private static string ToHex(byte[] bytes)
 		{
 			var chars = new char[bytes.Length * 2];

@@ -168,6 +168,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "vitals-shape":
+				{
+					VitalsShape(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "anim":
 				{
 					Anim(NamedCapture.LoadAll(capturesDir), arg ?? "Casilda");
@@ -1512,6 +1518,91 @@ namespace Faolan.Importer.Cli
 			var path = Path.Combine(outDir, "ldb-stat-names.tsv");
 			File.WriteAllLines(path, lines);
 			Console.WriteLine($"wrote {path}");
+		}
+
+		// --report vitals-shape [--report-arg <capture-name-substring>]
+		//
+		// WHICH stat ids retail puts in a 0x96B8DC59 StatUpdateIIR, grouped by the RECORD SET the block carries and
+		// by whose handle it is on (#586). We send all six vitals ids - HpCur/HpMax/StamCur/StamMax/ManaCur/ManaMax -
+		// for every entity; the claim this measures is that retail sends only the three CURRENTS on a non-player
+		// handle, and six only on the player's own.
+		//
+		// The player's handle is not labelled on the wire, so it is DERIVED rather than assumed: it is the handle the
+		// capture's FullPlayerCharacter snapshot (0x737A6DF9) is about, which is the one entity a session has exactly
+		// one of. A capture with no snapshot is reported separately rather than guessed at.
+		private static void VitalsShape(IReadOnlyList<NamedCapture> captures, string? arg)
+		{
+			var byShape = new Dictionary<(bool Player, string Ids), int>();
+			var examples = new Dictionary<(bool Player, string Ids), string>();
+			var noSnapshot = 0;
+
+			foreach (var c in captures)
+			{
+				if (!string.IsNullOrWhiteSpace(arg) && !c.Name.Contains(arg, StringComparison.OrdinalIgnoreCase))
+					continue;
+
+				// The session's own character handle, from its FullPlayerCharacter snapshot.
+				uint? playerHandle = null;
+				foreach (var p in c.Packets)
+				{
+					if (p is not { IsIirCarrier: true, SubOpcode: FullPlayerCharacterCodec.Opcode } || p.Record.Length < 12)
+						continue;
+
+					// [type][entityClass][handle] - the same prologue StatUpdateIIR carries.
+					playerHandle = p.Record.ReadU32Be(8);
+					break;
+				}
+
+				if (playerHandle == null)
+				{
+					noSnapshot++;
+					continue;
+				}
+
+				foreach (var p in c.Packets)
+				{
+					if (p is not { IsIirCarrier: true, SubOpcode: StatUpdateCodec.Opcode })
+						continue;
+
+					StatUpdateIIR update;
+					try
+					{
+						update = StatUpdateCodec.Parse(p.Record);
+					}
+					catch (CodecParseException)
+					{
+						continue; // a body the codec cannot account for is not evidence about the id SET
+					}
+
+					var ids = string.Join(",", update.Stats.Records.Select(e => $"0x{(uint)e.StatId:X4}").OrderBy(x => x));
+					var key = (update.EntityHandle == playerHandle, ids);
+					byShape[key] = byShape.GetValueOrDefault(key) + 1;
+					if (!examples.ContainsKey(key))
+						examples[key] = c.Name;
+				}
+			}
+
+			Console.WriteLine($"StatUpdateIIR (0x{StatUpdateCodec.Opcode:X8}) record sets, by whose handle they are on");
+			if (noSnapshot > 0)
+				Console.WriteLine($"  ({noSnapshot} capture(s) skipped - no FullPlayerCharacter snapshot, so no player handle to compare against)");
+			Console.WriteLine();
+
+			foreach (var player in new[] { true, false })
+			{
+				Console.WriteLine(player ? "--- the session's OWN character" : "--- every OTHER handle (NPCs, other players)");
+				var rows = byShape.Where(kv => kv.Key.Player == player).OrderByDescending(kv => kv.Value).ToList();
+				if (rows.Count == 0)
+				{
+					Console.WriteLine("    (none)");
+					Console.WriteLine();
+					continue;
+				}
+
+				foreach (var (key, n) in rows)
+					Console.WriteLine($"    {n,7}  [{key.Ids}]   e.g. {examples[key][..Math.Min(46, examples[key].Length)]}");
+
+				Console.WriteLine();
+			}
 		}
 
 		// One 0x5D85BFC7 MapChange body per distinct map across the captures, so the map-build constants can be diffed

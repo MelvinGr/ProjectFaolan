@@ -77,7 +77,9 @@ namespace Faolan.GameServer
 
 		Task IWorldOutbound.PushVitals(INetworkClient client, EntityVitals vitals)
 		{
-			return SendStatUpdate(client, vitals.ToVitalsBlock(), client.Session.Character.Id);
+			// #586: every caller of this - the regen tick, fall damage, lava, drowning - moves a CURRENT and nothing
+			// else, which is the case retail answers with the three-record currents-only block.
+			return SendStatUpdate(client, vitals.ToCurrentsBlock(), client.Session.Character.Id);
 		}
 
 		// #348: the sub-area crossing banner the world tick fires - forwards to the Outbound partial's sender.

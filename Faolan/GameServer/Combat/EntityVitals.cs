@@ -243,6 +243,32 @@ namespace Faolan.GameServer.Combat
 		}
 
 		/// <summary>
+		///     The three CURRENTS only - what retail sends when a pool MOVES, as opposed to when it is seeded (#586).
+		///     <para>
+		///         Measured over the whole corpus (<c>--report vitals-shape</c>): of the 4,900 <c>0x96B8DC59</c>
+		///         blocks retail sends on a handle that is not the session's own character, <b>3,694 carry exactly
+		///         <c>{HealthCurrent, StaminaCurrent, ManaCurrent}</c></b> and only 16 carry the six-record
+		///         current+max form - and those 16 sit in the multi-character captures, i.e. another player coming
+		///         into interest range, which is a SEED rather than a change. The six-record form on the session's own
+		///         handle is likewise rare (81 blocks) against a flood of single-stat pushes.
+		///     </para>
+		///     <para>
+		///         So the max ids belong to the seed, not to the update. Sending them on every hit - which is what
+		///         <see cref="ToVitalsBlock" /> did everywhere - is three extra records per entity per swing on the
+		///         hottest packet path in the game, and for an NPC they are a fabrication besides: an NPC has no class
+		///         curve, so <see cref="ClassBasePools" /> is null and the max ids fall back to carrying our own
+		///         ceiling, which is not the quantity that slot holds for a player.
+		///     </para>
+		/// </summary>
+		public CharacterStatBlock ToCurrentsBlock()
+		{
+			return new CharacterStatBlock()
+				.Set(CharacterStatId.HealthCurrent, Health)
+				.Set(CharacterStatId.StaminaCurrent, Stamina)
+				.Set(CharacterStatId.ManaCurrent, Mana);
+		}
+
+		/// <summary>
 		///     Full-health vitals seeded from a character's persisted max stats (class/level defaults if it has none),
 		///     PLUS the equipped-gear vital bonuses (#3) so worn +HP/+Stamina/+Mana raises the max and the regen bar can
 		///     fill past the class base. The world model's single seed point for a player's live vitals - used both by
