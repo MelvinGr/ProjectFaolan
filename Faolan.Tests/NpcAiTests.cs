@@ -293,6 +293,28 @@ namespace Faolan.Tests
 			Assert.Equal(CombatResolver.ResolveNpcAttackDamage(1), CombatResolver.ResolveNpcAttackDamage(0));
 		}
 
+		// #572: an NPC's swing must be in the SAME unit as the pool it lands in. It was not - the curve is measured in
+		// wire units (level * 100) while every live pool is the ÷100 display value - so a level-1 mob swung 100 into a
+		// 63-point pool and a level-3 swung 300 into a level-1 player's 88, killing on contact. The test above passed
+		// throughout: monotonic-and-floored is true on either scale, which is exactly how this shipped. This pins the
+		// RATIO instead, which is the thing that was wrong and the thing retail actually measured (~1.5% of a
+		// same-level pool per hit).
+		[Fact]
+		public void ResolveNpcAttackDamage_IsASmallFractionOfASameLevelPool_NotWireUnits()
+		{
+			Assert.Equal(1u, CombatResolver.ResolveNpcAttackDamage(1)); // display units: 1, not the wire 100
+
+			foreach (var level in new uint[] { 1, 2, 3, 5, 10, 20, 40, 60 })
+			{
+				var swing = CombatResolver.ResolveNpcAttackDamage(level);
+				var pool = CombatResolver.NpcMaxHealthForLevel(level);
+
+				// A same-level fight lasts tens of hits, not one. On the wire scale every one of these is >= 100% and
+				// the whole range fails, which is the regression this exists to catch.
+				Assert.InRange(swing * 100.0 / pool, 0.5, 5.0);
+			}
+		}
+
 		[Fact]
 		public void Respawn_ResetsToOriginalSpawnPoint()
 		{

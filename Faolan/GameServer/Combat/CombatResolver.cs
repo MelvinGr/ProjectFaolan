@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Enums;
 
 namespace Faolan.GameServer.Combat
 {
@@ -375,9 +376,26 @@ namespace Faolan.GameServer.Combat
 		// over the corpus, so damage and health share one unit.
 		public const uint NpcAttackDamagePerLevel = 100;
 
+		// ⚠️ THE CONSTANT ABOVE IS IN WIRE UNITS, AND EVERYTHING THIS DAMAGE LANDS IN IS IN DISPLAY UNITS (#572). It has
+		// to be converted here or an NPC hits a hundred times too hard. Every other figure in this fight is display:
+		// `NpcHpAnchors` starts at 63 for level 1, `NpcSpawn.Health` is 63 where the same row's wire `Life` is 6300,
+		// `ResolveMeleeDamage` already divides by `WeaponDamageScale`, and a player's MaxHealth is the ÷100 vitals
+		// value (`CharacterStatId.GetScale`). Only this line was left on the wire scale, so a level-1 mob swung 100
+		// into a 63-point pool and a level-3 swung 300 into a level-1 player's 88 - every hit lethal on contact, which
+		// is exactly what it did in-client.
+		//
+		// The conversion is the SAME ÷100 the vitals stats declare, taken from the stat itself rather than a second
+		// hand-written 100, because this damage is spent against a health pool and must move if that scale ever does.
+		// The measured curve is deliberately left in wire units: its whole evidence base above is in wire numbers
+		// (medians per level, the level-75 cross-checks), and rewriting it to `level * 1` would make every one of those
+		// citations unreadable. Floored at 1 so a level-1 swing still does something.
+		//
+		// Sanity, in display units: level 1 deals 1 against a level-1 player's ~88 pool = 1.1% a hit, which is the
+		// "~1.5% of a same-level player's health pool" the measurement above states; and the player's own ~6 a swing
+		// against a 63-health critter is the ~10 hits to kill that `WeaponDamageScale` is pinned to.
 		public static uint ResolveNpcAttackDamage(uint npcLevel)
 		{
-			return Math.Max(1u, npcLevel) * NpcAttackDamagePerLevel;
+			return Math.Max(1u, Math.Max(1u, npcLevel) * NpcAttackDamagePerLevel / CharacterStatId.HealthMax.GetScale());
 		}
 
 		// Spell damage: the level-scaled base plus the caster's aggregated Magic Damage rating (#399), added flat like
