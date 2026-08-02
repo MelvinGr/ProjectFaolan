@@ -260,23 +260,38 @@ samples do not close the law. Do not derive one from the other.
 `@+0xf0` additionally selects WHICH SPELLING the quest's @609 objective region uses for its trailing text —
 see the `ObjectiveRegionVerified` note on `QuestDefinition`.
 
-### `@+0x14` — a flag word of the quest LINE
+### `@+0x14` — a bitfield of the quest LINE; bit 4 = NOT SHAREABLE
 
 Five values across the corpus (2, 10, 18, 26, 1042), every one ≡ 2 (mod 8): bits 0–2 fixed `010`, bits 3, 4
 and 10 toggling. Definitively **not** a goal count — 2 appears on records carrying 1, 2, 3 and 6 goals.
 
-[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — its SCOPE is the line, not the quest: the value is constant across every quest of the same line in all
-**90** lines that have a captured quest, with zero conflicts.]
+[V1: Faolan.ClientLauncher/Program.cs — its SCOPE is the line, not the quest: the value is constant across
+every quest of the same line in all **90** lines that have a captured quest, with zero conflicts, and constant
+per quest across 2626 captured records.]
 
-**Bit 10 (`0x400`)** marks the player-PROGRESSION lines — the 10 quests carrying it are the Destiny steps
-(Shipwrecked ×4, Casilda ×2, Blood and Sweat, To Battle a God), the Alchemist tier-4 progression parent, and
-the World-Boss Mastery meta. The client has a `MainQuest_c` distinct from `Quest_c`, so bit 10 selecting that
-flavour is the natural read — but it is **not proven**: the catalog's `MainQuest.type`, the field that would
-have named it, is 0 on all 2181 rows.
+**bit 4 (0x10) = the quest may not be SHARED.**
 
-**Bits 3 and 4 remain open.** Ruled out by counterexample: "expansion" (17402/17403 are in Khitai with bit 4
-clear, while 17740 is in a base-game zone with it clear too), "repeatable" and "group" (the `[Rep]` and
-`[Group]` dev tags land on 14421/14427, which do not carry bit 3).
+[V1: Faolan.ClientLauncher/Program.cs — swept live: one rendered quest's column was driven through all five
+observed values, relogging each time, and the journal's detail pane greys out its `Share` button for exactly
+the three values with bit 4 set (18, 26, 1042) and enables it for the two without (2, 10). The captures within
+each class are PIXEL-IDENTICAL, which isolates bit 4 — bit 3 differs between 2 and 10 and between 18 and 26,
+and changes nothing.]
+
+The corpus fits the meaning: bit 4 is set on the Destiny steps, the Alchemist tier-4 progression and the
+Khitai/faction content (37 of the 82 eligible quests), and clear on ordinary side quests (45) — personal-story,
+crafting-progression and faction content being non-shareable is exactly the expected rule.
+
+**bits 3 (0x08) and 10 (0x400) — no effect on the journal panel.** The same sweep rendered 2 vs 10, and 18 vs
+26 vs 1042, pixel-identically, so whatever they drive is not this UI.
+
+⚠️ Two earlier readings are superseded. Bit 4 was guessed as "expansion content", which had counterexamples
+(17402/17403 are in Khitai with it clear); it is sharing, and those are simply shareable Khitai quests. Bit 10
+was read as marking "player-progression lines" on a correlation with the Destiny/Alchemist/Mastery set — that
+correlation stands, but the sweep shows it drives nothing in the journal, so it remains unexplained.
+
+⚠️ Do not read the quest TREE pane in a sweep like this. The client persists its expanded/collapsed and scroll
+state across relogs, so the left pane drifts between runs independently of the data — it produced three
+apparent "classes" that map to no bit at all. Only the detail pane is deterministic.
 
 ### `@+0x11c` — 1 on exactly the quests absent from the client's quest-giver catalog
 

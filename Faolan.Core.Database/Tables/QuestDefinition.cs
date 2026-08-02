@@ -147,23 +147,25 @@ namespace Faolan.Core.Database.Tables
 		// doubly wrong - it is not `n` (that is SnapshotQuestLineFlags, a different word at a different offset).
 		public uint SnapshotUnknown118 { get; set; }
 
-		// The Quest_c record's word @+0x14. A FLAG WORD OF THE QUEST LINE, not a count and not per-quest - measured
-		// over the 99 quests with a captured record it takes just five values (2, 10, 18, 26, 1042), every one ≡ 2
-		// (mod 8), so the low three bits are fixed (010) and bits 3, 4 and 10 toggle. It was documented as "the
-		// per-quest goal count", which the corpus disproves outright: 2 appears on records carrying 1, 2, 3 and 6
-		// goals, 10 on 1, 2, 4 and 7, and the beach quest's 1042 on 1, 2, 3 and 12.
+		// The Quest_c record's word @+0x14 - a BITFIELD, and a property of the quest LINE rather than the quest.
+		// Across the 99 quests with a captured record it takes five values (2, 10, 18, 26, 1042), every one ≡ 2
+		// (mod 8): bits 0-2 are fixed `010` and bits 3, 4 and 10 toggle. Definitively NOT the goal count it was
+		// documented as - 2 appears on records carrying 1, 2, 3 and 6 goals.
 		//
-		// Its SCOPE is settled even though its meaning is not: the value is constant per quest across every character
-		// and capture (2626 records, 141 snapshots), AND constant across every quest of the same line - all 90 lines
-		// with captured quests agree, zero conflicts. So it is an attribute of the line, inherited by each step; that
-		// is why it is stored here rather than on QuestLine only when a line has no captured quest to carry it.
+		// Its SCOPE is settled: constant per quest across 2626 captured records, AND constant across every quest of
+		// the same line in all 90 lines that have one - zero conflicts. So it is the line's, inherited by each step.
 		//
-		// Bit 10 (0x400) marks the player-PROGRESSION lines: the 10 quests carrying it are the Destiny steps
-		// (Shipwrecked x4, Casilda x2, Blood and Sweat, To Battle a God), the Alchemist tier-4 progression parent, and
-		// the World-Boss Mastery meta. The client has a `MainQuest_c` distinct from `Quest_c`, so bit 10 selecting
-		// that flavour is the natural read - but it is NOT proven: the catalog's own `MainQuest.type`, which would
-		// have named it, is 0 on all 2181 rows. Bits 3 and 4 remain open ("expansion", "repeatable" and "group" are
-		// each ruled out by counterexamples - see the handoff and Gitea #570).
+		// **bit 4 (0x10) = the quest may NOT be SHARED.** Proven in-client: sweeping this column through all five
+		// observed values on a rendered quest and relogging, the journal's detail pane greys out its `Share` button
+		// for exactly the three values with bit 4 set (18, 26, 1042) and enables it for the two without (2, 10) -
+		// pixel-identical within each class, so bits 3 and 10 do not affect it. The corpus fits: bit 4 is set on the
+		// Destiny steps, the Alchemist tier-4 progression and the Khitai/faction content (37 of 82), and clear on
+		// ordinary side quests (45).
+		//
+		// **bits 3 (0x08) and 10 (0x400): no effect on the journal panel.** The same sweep rendered 2 vs 10, and 18
+		// vs 26 vs 1042, PIXEL-IDENTICALLY - so whatever they drive is not this UI. Earlier readings of bit 10 as a
+		// "progression line" marker and of bit 4 as "expansion content" were both correlations without a mechanism;
+		// the first is untested elsewhere and the second is now superseded. Gitea #570.
 		public uint SnapshotQuestLineFlags { get; set; }
 
 		// @+0x28 - the quest's EXPERIENCE reward. This is the number the client's journal renders as "XP:" in a

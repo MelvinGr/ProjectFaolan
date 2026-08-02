@@ -219,13 +219,13 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// real state on a different message.
 		public uint Level { get; set; } // settable: world entry patches the lead quest's word
 
-		// @+0x14 - a flag word of the quest LINE, inherited by each of its steps: constant per quest across 2626
-		// captured records AND constant across every quest of the same line (90 of 90 lines agree). NOT a goal count,
-		// despite carrying that name until 2026-07-20: the beach template holds 0x412 (1042) for a TWO-goal quest, and
-		// NecroL80's first record holds 2. Emitting it as a goal count - telling the client "N objectives follow" and
-		// then writing none - desynced the client's cursor and crashed it in StatList_t. NOT a ListFrame word either
-		// (1042 is not a multiple of 1009). Bit 10 marks the progression lines; the rest is open - see
-		// QuestDefinition.SnapshotQuestLineFlags. Carry it through from the capture rather than deriving it.
+		// @+0x14 - a BITFIELD of the quest LINE, inherited by each of its steps: constant per quest across 2626
+		// captured records AND constant across every quest of the same line (90 of 90). NOT a goal count, despite
+		// carrying that name until 2026-07-20 - emitting it as one desynced the client and crashed it in StatList_t.
+		// NOT a ListFrame word either (1042 is not a multiple of 1009).
+		//
+		// bit 4 (0x10) = the quest may not be SHARED - the journal greys its `Share` button. Proven in-client; bits
+		// 3 and 10 change nothing in that panel. See QuestDefinition.SnapshotQuestLineFlags.
 		public uint QuestLineFlags { get; init; }
 		public ulong Accept { get; init; } // @+0x20 u64 (likely acceptTime; =0)
 		// @+0xf8 - NOT the journal's Money: setting it to 999999 left that label blank. Tracks FieldF0 through a
