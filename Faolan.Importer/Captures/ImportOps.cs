@@ -168,10 +168,11 @@ namespace Faolan.Importer.Captures
 			var routeCandidates = new Dictionary<(uint Map, uint Template), List<PatrolPathEntry>>();
 			foreach (var cap in perCap)
 			{
-				var byHandle = cap.All.ToDictionary(e => e.Handle, e => e);
-				foreach (var (handle, route) in cap.Routes)
+				// (map, handle), matching DistinctByHandle - a handle alone is not an identity across a zone change (#571).
+				var byHandle = cap.All.ToDictionary(e => (e.MapId, e.Handle), e => e);
+				foreach (var (key, route) in cap.Routes)
 				{
-					if (route.Waypoints.Count == 0 || !byHandle.TryGetValue(handle, out var spawn))
+					if (route.Waypoints.Count == 0 || !byHandle.TryGetValue(key, out var spawn))
 						continue;
 
 					if (!routeCandidates.TryGetValue((spawn.MapId, spawn.TemplateId), out var list))
@@ -309,7 +310,7 @@ namespace Faolan.Importer.Captures
 				return string.Join("|", r.Waypoints.Select(w => $"{w.X:F1},{w.Y:F1},{w.Z:F1}"));
 			}
 
-			void Take(List<NpcSpawnEntry> chosen, Dictionary<uint, PatrolPathEntry> routes)
+			void Take(List<NpcSpawnEntry> chosen, Dictionary<(uint MapId, uint Handle), PatrolPathEntry> routes)
 			{
 				foreach (var e0 in chosen)
 				{
@@ -356,7 +357,7 @@ namespace Faolan.Importer.Captures
 					// The handle join is sanity-checked positionally (MaxHandleRouteGap) so a RECYCLED handle cannot hand
 					// this spawn a route belonging to a different NPC on the far side of the zone; a rejected route falls
 					// through to the positional backfill, which finds the spawn actually standing on it.
-					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0
+					if (routes.TryGetValue((e.MapId, e.Handle), out var r) && r.Waypoints.Count > 0
 					    && r.Waypoints.Min(w => Vector3.Distance(w, new Vector3(e.X, e.Y, e.Z))) <= MaxHandleRouteGap)
 					{
 						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Waypoints, 0, r.Task)
@@ -1678,13 +1679,18 @@ namespace Faolan.Importer.Captures
 			return summoned;
 		}
 
+		// One entry per distinct mob in a capture. The identity is (MAP, handle), not the bare handle (#571): a handle
+		// is scoped to the PLAYFIELD and the pool starts again on a zone change, so the same number names a different
+		// NPC on the other side of a handoff. Keyed on the handle alone this kept the FIRST sighting and silently
+		// dropped the second map's spawn - measured at 46 collisions across the corpus, every one of them cross-map
+		// (`--report handle-recycling`), with not a single same-map reuse in 11,442 handles.
 		private static List<NpcSpawnEntry> DistinctByHandle(IEnumerable<NpcSpawnEntry> entries)
 		{
-			var seen = new HashSet<uint>();
+			var seen = new HashSet<(uint MapId, uint Handle)>();
 			var result = new List<NpcSpawnEntry>();
 			foreach (var e in entries)
 			{
-				if (seen.Add(e.Handle))
+				if (seen.Add((e.MapId, e.Handle)))
 					result.Add(e);
 			}
 

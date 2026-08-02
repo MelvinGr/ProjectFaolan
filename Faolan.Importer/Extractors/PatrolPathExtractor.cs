@@ -27,13 +27,19 @@ namespace Faolan.Importer.Extractors
 	// same-session mob identity); dedup by (map, position) joins a route to its NPC. Sibling of NpcSpawnExtractor.
 	public static class PatrolPathExtractor
 	{
-		// One patrol route per NPC HANDLE in a capture (#266 patrol). The real route is the mode-1 PathMoveTask
-		// waypoint list, usually nested in a mode-4 ListMoveTask; the whole tree is parsed and columnarized. Keyed by
-		// handle so the importer correlates a route to its spawn; keeps the RICHEST route per handle (the most
-		// complete path seen that session).
-		public static Dictionary<uint, PatrolPathEntry> ExtractByHandle(IReadOnlyList<CapturedPacket> packets)
+		// One patrol route per NPC in a capture (#266 patrol). The real route is the mode-1 PathMoveTask waypoint list,
+		// usually nested in a mode-4 ListMoveTask; the whole tree is parsed and columnarized. Keyed by (map, handle) so
+		// the importer correlates a route to its spawn; keeps the RICHEST route per NPC (the most complete path seen
+		// that session).
+		//
+		// ⚠️ The MAP is half the key, and leaving it out is a real defect, not tidiness (#571): a handle is scoped to
+		// the PLAYFIELD, so the low pool starts again when the player changes zone and the same number names a
+		// different NPC on the other side of the handoff. Measured over the corpus (`--report handle-recycling`), 46
+		// handles carry a second template and 46 of 46 span more than one map - there is not one same-map reuse. Keyed
+		// on the bare handle, one zone's route was handed to the next zone's NPC.
+		public static Dictionary<(uint MapId, uint Handle), PatrolPathEntry> ExtractByHandle(IReadOnlyList<CapturedPacket> packets)
 		{
-			var byHandle = new Dictionary<uint, PatrolPathEntry>();
+			var byHandle = new Dictionary<(uint MapId, uint Handle), PatrolPathEntry>();
 			uint currentMap = 0;
 
 			foreach (var p in packets)
@@ -83,8 +89,8 @@ namespace Faolan.Importer.Extractors
 				if (length < 1f || Vector3.Distance(from, waypoints[^1]) / length > 0.6f)
 					continue; // one-way (chase/approach), not an idle patrol loop
 
-				if (!byHandle.TryGetValue(task.Handle, out var existing) || waypoints.Count > existing.Waypoints.Count)
-					byHandle[task.Handle] = new PatrolPathEntry(currentMap, from, waypoints, task.Handle, task.Task);
+				if (!byHandle.TryGetValue((currentMap, task.Handle), out var existing) || waypoints.Count > existing.Waypoints.Count)
+					byHandle[(currentMap, task.Handle)] = new PatrolPathEntry(currentMap, from, waypoints, task.Handle, task.Task);
 			}
 
 			return byHandle;
