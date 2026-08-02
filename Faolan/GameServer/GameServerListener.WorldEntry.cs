@@ -501,7 +501,7 @@ namespace Faolan.GameServer
 			var characterTags = (await Database.GetCharacterTags(character.Id)).Concat(ItemShopSuppressTags).Distinct().OrderBy(t => t).ToArray();
 			// #262: the player's ACTIVE quest ids, for quest-gated world objects (WorldObject.GateQuestId / SpawnsFor).
 			// Empty for a null character; ungated objects (the default) ignore it.
-			var activeQuestIds = (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).Select(q => q.QuestId).ToHashSet();
+			var activeQuestIds = (await Database.GetCharacterQuests(character.Id, QuestState.Active)).Select(q => q.QuestId).ToHashSet();
 
 			// Populate the shared world model BEFORE building so the player entity exists for the spawn build.
 			// Resolve which COPY (instance) of this map the player joins from its instancing mode (#268): register the

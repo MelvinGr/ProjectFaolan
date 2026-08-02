@@ -502,7 +502,7 @@ namespace Faolan.GameServer
 		{
 			var groups = new List<(QuestLine, IReadOnlyList<QuestDefinition>)>();
 
-			var completed = (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Completed).ToList();
+			var completed = (await Database.GetCharacterQuests(character.Id, QuestState.Completed)).ToList();
 			if (completed.Count == 0)
 				return groups;
 
@@ -544,7 +544,7 @@ namespace Faolan.GameServer
 			// Batched like the completed journal above. The journal ORDER is the character's own CharacterQuests order -
 			// it picks the primary (tracked) quest below - so the rows are still walked in that order, only the
 			// definitions behind them are now fetched in one go.
-			var active = (await Database.GetCharacterQuests(character.Id)).Where(q => q.State == QuestState.Active).ToArray();
+			var active = await Database.GetCharacterQuests(character.Id, QuestState.Active);
 			var definitions = (await Database.GetQuestDefinitions([.. active.Select(q => q.QuestId)])).ToDictionary(d => d.QuestId);
 			foreach (var cq in active)
 			{

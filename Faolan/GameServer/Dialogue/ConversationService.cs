@@ -292,12 +292,12 @@ namespace Faolan.GameServer.Dialogue
 		private async Task SendQuestGrantPackets(INetworkClient client, QuestDefinition grantDef)
 		{
 			var character = client.Session.Character;
-			var active = await _database.GetCharacterQuests(character.Id);
+			var active = await _database.GetCharacterQuests(character.Id, QuestState.Active);
 			var ids = new List<uint>
 			{
 				grantDef.QuestId
 			};
-			ids.AddRange(active.Where(q => q.State == QuestState.Active && q.QuestId != grantDef.QuestId).Select(q => q.QuestId));
+			ids.AddRange(active.Where(q => q.QuestId != grantDef.QuestId).Select(q => q.QuestId));
 
 			await WorldBroadcaster.SendQuestLogList(client, grantDef, ids);
 			await _broadcaster.SendQuestFullUpdate(client, grantDef);
