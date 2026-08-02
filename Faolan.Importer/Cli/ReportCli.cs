@@ -330,6 +330,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "rdb-field-coverage":
+				{
+					RdbFieldCoverage(RdbDir(), arg);
+					return 0;
+				}
+
 				case "feat-catalog":
 				{
 					FeatCatalog(RdbDir(), arg, _options.Out);
@@ -1818,6 +1824,105 @@ namespace Faolan.Importer.Cli
 		// guessable, but they ARE measurable: in a record whose effect list holds exactly ONE element, that element
 		// runs to the end of the record, so `recordLength - elementStart` IS the kind's width. Single-element records
 		// hand the table over directly; multi-element records then become the check.
+		// --report rdb-field-coverage [--report-arg <rdbType>]
+		//
+		// Every property-table field a record type carries, how many records carry it, and whether the importer
+		// READS it. Written after #590, where a shipped field (the spell line, 128) turned out to be sitting in plain
+		// sight in a table we already parsed - the question "what else is in here that we walk straight past?"
+		// deserves a measurement rather than a guess.
+		//
+		// Defaults to the spell type (1040005); pass `<type>` for another, or `<type>:<field>` to DRILL into one field
+		// - its value distribution and named sample records, which is what turns "unread" into "worth reading".
+		//
+		// ⚠️ It reads the ASCENDING property grammar. That is the established one for SPELL records; for 1000020 the
+		// plaintext half is feats and the run is ascending there too, but an ITEM template's table strictly DESCENDS
+		// (RdbItemImporter.TryReadPropertyField) and is not covered by this - so a 1000020 run measures the feats.
+		private static void RdbFieldCoverage(string rdbDir, string? arg)
+		{
+			var spec = (arg ?? "").Split(':', 2, StringSplitOptions.TrimEntries);
+			var type = spec.Length > 0 && uint.TryParse(spec[0], out var t) ? t : SpellTemplateType;
+			var drill = spec.Length == 2 && uint.TryParse(spec[1], out var d) ? d : 0u;
+			// What each importer actually consumes today, so the report can say READ vs unread rather than just
+			// enumerating. Keep in step with the importers; a field that moves here without moving there is exactly
+			// the drift this report exists to surface.
+			var read = type == SpellTemplateType
+				? new Dictionary<uint, string>
+				{
+					[8] = "duration", [79] = "icon", [123] = "rank", [125] = "level", [128] = "spell line (#590)",
+					[129] = "splash percent", [287] = "range", [294] = "cast time", [321] = "effect set",
+					[347] = "splash radius", [348] = "damage rating", [349] = "max targets", [551] = "rank-scaling magnitude"
+				}
+				: new Dictionary<uint, string> { [74] = "value", [104] = "bag", [499] = "quality", [972] = "primary attribute", [1331] = "resource bag" };
+
+			using var rdb = new RdbReader(rdbDir);
+			var records = 0;
+			var counts = new Dictionary<uint, int>();
+			var ranges = new Dictionary<uint, (uint Min, uint Max)>();
+			var drilled = new Dictionary<uint, int>();
+			var samples = new List<string>();
+
+			foreach (var e in rdb.EntriesOfType(type))
+			{
+				if (e.Size == 0)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue;
+				}
+
+				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != type)
+					continue;
+
+				records++;
+				foreach (var (field, value) in RdbSpellImporter.ReadIncreasingFields(body.AsSpan(12)))
+				{
+					counts[field] = counts.GetValueOrDefault(field) + 1;
+					var (min, max) = ranges.TryGetValue(field, out var r) ? r : (uint.MaxValue, 0u);
+					ranges[field] = (Math.Min(min, value), Math.Max(max, value));
+					if (drill != 0 && field == drill)
+					{
+						drilled[value] = drilled.GetValueOrDefault(value) + 1;
+						if (samples.Count < 14)
+						{
+							var (name, _) = RdbFeatImporter.ReadNameAndDescription(body);
+							samples.Add($"{e.Id} {name} = {value}");
+						}
+					}
+				}
+			}
+
+			if (drill != 0)
+			{
+				Console.WriteLine($"RDB type {type} field {drill}: {counts.GetValueOrDefault(drill)} records carry it, {drilled.Count} distinct values");
+				Console.WriteLine();
+				Console.WriteLine("value distribution (top 20):");
+				foreach (var (value, n) in drilled.OrderByDescending(p => p.Value).Take(20))
+					Console.WriteLine($"  {value,12} x{n}");
+				Console.WriteLine();
+				Console.WriteLine("samples:");
+				foreach (var line in samples)
+					Console.WriteLine($"  {line}");
+				return;
+			}
+
+			Console.WriteLine($"RDB type {type}: {records} records, {counts.Count} distinct property fields");
+			Console.WriteLine($"  read by the importer: {counts.Keys.Count(read.ContainsKey)}   unread: {counts.Keys.Count(f => !read.ContainsKey(f))}");
+            Console.WriteLine();
+			Console.WriteLine($"{"field",8} {"records",8} {"min",12} {"max",12}   what");
+			foreach (var (field, n) in counts.OrderByDescending(p => p.Value))
+			{
+				var (min, max) = ranges[field];
+				var what = read.TryGetValue(field, out var name) ? $"READ - {name}" : "";
+				Console.WriteLine($"{field,8} {n,8} {min,12} {max,12}   {what}");
+			}
+		}
+
 		// --report spell-line-ids [--report-arg <lineId>]
 		//
 		// The SPELL-LINE id every spell template carries in property-table field 128 (#590). It is what a feat's

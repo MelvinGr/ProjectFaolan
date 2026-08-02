@@ -45,9 +45,20 @@ namespace Faolan.Importer.Rdb
 	//
 	// Field map (dumped over all 21,502 records, #367): 8=duration, 123=rank, 125=level, 287=range, 294=cast,
 	// 347/129/349=splash radius/percent/max-targets, 348=damage rating, 551=a rank-scaling MAGNITUDE, 79=icon (an id
-	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only). This FIELD RUN carries
-	// no stat ids - 551 says "400" but never "400 of WHAT" - so a buff's magnitudes are server-GDB-only here, same as
-	// mana/damage/recast (docs/subsystems/stat-engine.md). Don't hunt stat deltas among the fields again.
+	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only), 128=the spell LINE
+	// (#590 - see Spell.LineId).
+	//
+	// ⚠️ "This FIELD RUN carries no stat ids" was too strong, and #590 is why it is worth re-testing rather than
+	// repeating: field **847 names an ATTRIBUTE** - 716 records carrying exactly 808 (Intelligence, x482), 810
+	// (Wisdom, x224) and 804 (Strength, x10), which is the stat-id space, and it splits along sensible lines (the
+	// Demonologist's nukes on Intelligence, the curses and DoTs on Wisdom). It is unread; see Gitea #592.
+	//
+	// The narrower claim stands: 551 says "400" but never "400 of WHAT", so a buff's MAGNITUDES are server-GDB-only
+	// here, same as mana/damage/recast (docs/subsystems/stat-engine.md).
+	//
+	// The run is 111 distinct fields wide and the importer reads 13 of them (`--report rdb-field-coverage`). Several
+	// unread ones are on MORE records than the read ones - 54 is on 20,186 of 21,502 - so "we parse this table" is
+	// not the same as "we have this table".
 	//
 	// The `[2][9]` REGION of the same record is the exception, and is imported below: explicit (kind, statId, amount)
 	// records, the same shape item templates carry (docs/rdb/spell-stat-effects.md). It covers potions/elixirs and a
