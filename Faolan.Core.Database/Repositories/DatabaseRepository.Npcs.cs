@@ -278,22 +278,39 @@ namespace Faolan.Core.Database.Repositories
 		// NOT "a Kill goal that happens to carry a TargetName". The gate keys on the NAME and forces NoRespawn, so
 		// implying it from the target made every mechanically-resolved kill target (#521) hide its whole population and
 		// stop respawning - see QuestGoalDefinition.GatesTargetVisibility for the quest that broke.
+		// ⚠️ The flag decides WHICH NPCs are gated; it does NOT decide which quests REVEAL them. Those are two questions
+		// and answering both with `GatesTargetVisibility` softlocked the Casilda chain (#574). Scavenger Tuut is gated
+		// by 13479 "The Scavenger" (Kill, the flagged goal), but 13563 "The Scavenger's Key" (Loot) targets him too -
+		// and killing him COMPLETES 13479, the only quest that was revealing him. He is also NoRespawn, a story kill
+		// target that stays dead. So the moment his loot bag went (expiry, or a server restart - bags are live world
+		// state and are not persisted), Tuut was invisible for good, the key was unobtainable, and Casilda could never
+		// be freed. Reported in-client 2026-08-02: "killed tuut but did not loot ... she is still locked".
+		//
+		// So an NPC is gated if ANY goal targeting it is flagged, and once gated it is revealed by EVERY quest that
+		// targets it - which is what "this NPC still has business with you" actually means. Widening only the reveal
+		// set keeps the flag's original job intact: a mechanically-resolved kill target (#521) that nothing flags
+		// still gates nothing, so it does not hide its population or stop respawning.
 		public async Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var givers = (await ctx.ConversationNodes.Where(n => n.GrantQuestId > 0).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet();
 
-			var killTargets = await ctx
-				.QuestGoalDefinitions.Where(g => g.GatesTargetVisibility && g.TargetName != null && g.TargetName != "")
+			var targeted = await ctx
+				.QuestGoalDefinitions.Where(g => g.TargetName != null && g.TargetName != "")
 				.Join(ctx.QuestDefinitions, g => g.QuestDefinitionId, d => d.QuestId, (g, d) => new
 				{
 					g.TargetName,
-					d.QuestId
+					d.QuestId,
+					g.GatesTargetVisibility
 				})
 				.Distinct()
 				.ToListAsync();
 
-			return killTargets.Where(x => !givers.Contains(x.TargetName!)).GroupBy(x => x.TargetName!).ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
+			var gated = targeted.Where(x => x.GatesTargetVisibility).Select(x => x.TargetName!).ToHashSet();
+
+			return targeted.Where(x => gated.Contains(x.TargetName!) && !givers.Contains(x.TargetName!))
+				.GroupBy(x => x.TargetName!)
+				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
 		}
 
 		public async Task<Dictionary<string, uint>> GetQuestGiverMap()
