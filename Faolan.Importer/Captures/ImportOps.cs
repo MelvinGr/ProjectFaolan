@@ -79,6 +79,18 @@ namespace Faolan.Importer.Captures
 		// 0.0 at the median, 4.4 at p90 and 7.8 at p95.
 		private const float RouteMatchRadius = 10f;
 
+		// #565: the widest spawn-to-route gap a HANDLE-joined route may have before it is read as a mis-join rather than
+		// a route. The handle join is identity evidence and is deliberately far looser than RouteMatchRadius above - an
+		// NPC may well have drifted from its recorded spawn point by the time its MoveTask was issued, and that is a
+		// route, not an error. What it is guarding against is handle RECYCLING: a handle freed by a despawn is reissued
+		// inside the same capture, so a route observed for the first NPC can land on the second one's spawn. That failure
+		// is gross, never marginal - the audit found 30 of 900 routes whose NEAREST waypoint is already beyond this, six
+		// of them compact 16-109u loops sitting 480-640u from the spawn they were joined to (Ymirish Frostshield,
+		// Vanir Champion Elite x2, ...), which no NPC could be walking. Against genuine matches there is a wide margin:
+		// spawn-to-nearest-waypoint is 7.8u at p95 and 23.1u at p95 over ALL routes, so 40 sits ~5x the genuine spread.
+		// A route rejected here still gets the positional backfill below, which is the correct owner-finding path.
+		private const float MaxHandleRouteGap = 40f;
+
 		// `classSpecificMaps` = the maps whose population is per class (Map.ClassSpecific - the city armories). A spawn
 		// harvested on one of them is evidence about ONE class's copy of the playfield, so it is stamped with the class
 		// the capture was played on and elected only against captures of that same class.
@@ -341,7 +353,11 @@ namespace Faolan.Importer.Captures
 
 					// This capture's own observation first; otherwise the unambiguous cross-capture route for the
 					// template, so a session that simply did not catch this NPC walking no longer costs it its path.
-					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0)
+					// The handle join is sanity-checked positionally (MaxHandleRouteGap) so a RECYCLED handle cannot hand
+					// this spawn a route belonging to a different NPC on the far side of the zone; a rejected route falls
+					// through to the positional backfill, which finds the spawn actually standing on it.
+					if (routes.TryGetValue(e.Handle, out var r) && r.Waypoints.Count > 0
+					    && r.Waypoints.Min(w => Vector3.Distance(w, new Vector3(e.X, e.Y, e.Z))) <= MaxHandleRouteGap)
 					{
 						patrols.Add(new PatrolPathEntry(e.MapId, new Vector3(e.X, e.Y, e.Z), r.Waypoints, 0, r.Task)
 						{
