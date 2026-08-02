@@ -28,7 +28,15 @@ namespace Faolan.Core.Database.Tables
 		///     0 when the record has no such field (only 3,158 of 21,502 templates carry one).
 		/// </summary>
 		/// <remarks>
-		///     ⚠️ The field is OVERLOADED and only its class-encoded values are line ids. It also holds small numbers
+		///     ⚠️ <c>ConanClass × 1000 + index</c> is the common CASE, not the encoding (#591). Line <c>50000</c> is a
+		///     real, working line whose high part is not a class - 50 (0x32) is outside the class registry entirely -
+		///     and it resolves perfectly: its five spells are the five ranks of <c>Inferno of Amher</c>, and the five
+		///     feat modifiers pointing at it are the five ranks of <c>Blessing of Amher</c>, a clean
+		///     2.5/5/7.5/10/15% ladder. The feat is named for the spell it boosts. So an id whose <c>/1000</c> is not
+		///     a class is not a corrupt row and not a reason to filter - it is a line the class reading does not
+		///     explain. (<c>440061</c>, one spell, is the other such id.)
+		///     <para>
+		///     The field is also OVERLOADED and only its class-encoded values are line ids. It also holds small numbers
 		///     (1, 2, 4, …) shared by 25-30 unrelated spells apiece - far too coarse to be a line, which is 3-7 ranks -
 		///     so those are some other grouping and are not decoded. Carried raw rather than filtered because the join
 		///     cannot collide: a feat only ever references a class-encoded value.
@@ -36,6 +44,7 @@ namespace Faolan.Core.Database.Tables
 		///         This also qualifies the note on <see cref="Rank" /> above, which said field 128 "is constant (2)
 		///         across that family's ranks". It is constant across a family - that part was right - but the 2 was
 		///         one family's value, not the field's meaning.
+		///     </para>
 		///     </para>
 		/// </remarks>
 		public uint LineId { get; set; }

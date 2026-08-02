@@ -48,6 +48,27 @@ namespace Faolan.Core.Database.Tables
 		///         shows up in-client as a current above (or below) the bar - health 1314 against a 1270 max (#580).
 		///     </para>
 		///     <para>
+		///     <para>
+		///         ⚠️ DemoL80's 177 is now NARROWED, and it is not one thing (#588). `ActiveWeaponSet` is never set by
+		///         the character importer, so every imported character defaults to <c>Primary</c> - and DemoL80's
+		///         SECONDARY set (Jagged Cut +12 Con and Fetish of Caged Fiends +35, against Mindraker's +34) is worth
+		///         13 more Constitution, i.e. 104 more health. That takes the shortfall 177 -> 73.
+		///         <list type="bullet">
+		///             <item>The remaining 73 is NOT Constitution: 73 is not a multiple of the health weight (8), so
+		///                 no attribute total produces it. It is a FLAT health term - a <c>HealthMax</c> record worth
+		///                 73 that our item data does not carry.</item>
+		///             <item>It is not the vanity slots either, and that is worth writing down because they look like
+		///                 the obvious candidate: DemoL80's Canvas Belt (+4 Con) and Northfur Cloak (+23 Con) would add
+		///                 216 health, overshooting by 143. Excluding them, which is what we do, is right.</item>
+		///             <item>Feats are ruled out separately (#589): the pipeline is intact and DemoL80 trained none
+		///                 that grant <c>HealthMax</c>.</item>
+		///         </list>
+		///         What is NOT recoverable today is which weapon set was drawn. There is no capture signal for it -
+		///         the swap is observable (the server stamps the newly-active main slot on a
+		///         <c>SwitchWeaponsButton</c>) but a login carries no such event, and the client derives its own
+		///         display from the equipment container. So the 177 -> 73 above is arithmetic that FITS, not a
+		///         measurement, and the default stays <c>Primary</c> rather than being guessed the other way.
+		///     </para>
 		///         VERIFIED, not fitted. It reproduces the retail character sheet exactly at:
 		///         all TWELVE classes at level 1 (Guardian 130, Conqueror 168, Dark Templar 128/281/178, Assassin
 		///         98/236, Barbarian 118, Ranger 133, the priests 88/171, Bear Shaman 108/171/178, Herald 89/246/121,

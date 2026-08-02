@@ -450,10 +450,34 @@ namespace Faolan.Importer.Rdb
 		// carries (41000, 3500) - Necromancer line 0 (Flesh to Worms), +35.00% - which is exactly what the client's
 		// own tooltip draws.
 		//
-		// ⚠️ Kind 53075 ONLY. The catalog has ~9 more kinds in this same shape (53209 alone is 3,235 records) whose
-		// payloads are NOT known to be a (line, percent) pair; importing them on the strength of the shape would put
-		// invented modifiers on a third of the feat catalog. They stay unimported until each is decoded - survey them
-		// with `--report feat-spell-modifiers`.
+		// ⚠️ Kind 53075 ONLY. The catalog has ~9 more kinds in this same shape (53209 alone is 3,235 records), and the
+		// #591 sweep decoded WHAT EACH ONE POINTS AT without decoding what its payload MEANS. That distinction is the
+		// whole reason they stay out: a reference space is checkable (resolve the ref and see whether it hits), a
+		// magnitude is not, and importing a value as a percent because it sits where 53075's percent sits is exactly
+		// the invention this gate exists to prevent - on a third of the feat catalog.
+		//
+		// The ref spaces, each resolved against the shipped catalogs and corroborated by the feat's own LDB tooltip:
+		//
+		//   53209  x3235  a COMBO id (Combos.Id). `Dread Lord` - "Reduces the reuse time of all combos" - carries six,
+		//                 every one a DarkTemplar_NN_lifetapbuff combo. value is 0 throughout, so the record is a pure
+		//                 reference: a LIST of what the feat applies to, with the magnitude somewhere else.
+		//   53062   x475  a spell LINE id (Spell.LineId), the SAME space 53075 uses. `Brutal Maiming` - "Increases the
+		//                 chance of the Disable combo inflicting critical damage" - points at 20410, which is the
+		//                 Guardian's `Disable` line, by name. Its value (147) is NOT a percent and is undecoded.
+		//   53019  x1010  a spell TEMPLATE id (Spell.Id), and a GRANT rather than a modifier: `Spell Unlocking 60-80`
+		//                 points at Drain Essence ranks 1-4, Blood Pact and Covenant of Vengeance. Its `value` repeats
+		//                 its own KIND (53019), i.e. a sentinel, not a magnitude.
+		//   53212   x421  a spell TEMPLATE id, also a grant - and the feat is NAMED for the spell (`Touch of Death`
+		//                 -> the spell `Touch of Death`). value 0 throughout.
+		//   53054   x593  a spell TEMPLATE id (`Fiendish Hand` -> `Dark Hand`, `Combo - Skewer` -> `Skewered`), but
+		//                 with a varying value and SEVERAL records per (feat, spell) - three on Fiendish Hand carrying
+		//                 347/348/349. Undecoded.
+		//   53030   x962  not a player feat at all - the `Dimach Item k1/k2/k3` crafting entries, all pointing at one
+		//                 constant ref (43464) with value 100.
+		//
+		// So three of the six are GRANTS, not modifiers, which is a second reason the shape is not enough: importing
+		// them here would file a spell the feat gives you as a boost to a spell you already have. Survey them with
+		// `--report feat-spell-modifiers`, which prints each kind with its feat name and the LDB description.
 		public static IReadOnlyList<ItemTemplateStatModifiers.Modifier> ParseSpellModifiers(byte[] body)
 		{
 			return body.Length <= 12

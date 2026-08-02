@@ -332,6 +332,19 @@ captured 179); and, at level, the four captured characters' world-entry pushes �
 1270/1148/74, Hakotep (Herald L24) 1414/759/1584, NecroL80 (Necromancer L80) 6341 health / 6523 mana, DemoL80
 (Demonologist L80) 5830 mana. Ten of the eleven measurable pools land exactly; the eleventh (DemoL80's health) is
 177 low because our item data for that character is short.
+
+⚠️ That 177 is now narrowed, and it is not one thing (#588). `ActiveWeaponSet` is never set by the character
+importer, so every imported character defaults to `Primary` — and DemoL80's SECONDARY set (Jagged Cut +12
+Constitution and Fetish of Caged Fiends +35, against Mindraker's +34) is worth 13 more Constitution, i.e. 104 more
+health, taking the shortfall to **73**. The remaining 73 is **not** Constitution — 73 is not a multiple of the
+health weight 8, so no attribute total produces it — so it is a flat `HealthMax` record our item data does not
+carry. It is not the vanity slots either, which is worth recording because they look like the obvious candidate:
+DemoL80's Canvas Belt (+4 Con) and Northfur Cloak (+23 Con) would add 216 health, overshooting by 143, so excluding
+them is right. Feats were ruled out separately (#589).
+
+Which weapon set was actually drawn is **not recoverable from the corpus**: the swap is observable (the server
+stamps the newly-active main slot on a `SwitchWeaponsButton`) but a login carries no such event, and the client
+derives its own display from the equipment container. So the 177 → 73 is arithmetic that fits, not a measurement.
 [V3: CharacterMaxStatsTests.EveryClass_AtLevelOne_ReproducesItsCapturedSheet]
 [V3: EntityVitalsGearTests.AssassinL23_AtLevel23_MatchesTheCapturedRetailPools]
 
