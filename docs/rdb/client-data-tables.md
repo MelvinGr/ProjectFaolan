@@ -37,6 +37,11 @@ HELPER=104d760 analyzeHeadless <data-repo>/Ghidra aoc -process AgeOfConan.exe \
 `RDBComboLookup_c`; on the two tables the sweep cannot name it is not, and dumping their vftable shows only the
 `DataTable_c<T>` scaffolding. So the vtable is a route in, not *the* route in — a miss there says nothing.
 
+**And a miss there is not the end of it.** The two tables RTTI cannot reach (1000080 / 1000081) were named from
+their parse callbacks' ASSERTS instead, which carry the client's own source path (`RDBHairReplacement.cpp`). Every
+`FUN_004a6a30(msg, "<file>.cpp", <line>, ...)` call is an assert site, and the file name is the class. That route
+works wherever a callback validates anything, which most of them do.
+
 ## Registry
 
 Every row below is from that one sweep, so the class names are the client's own RTTI rather than an inference
@@ -49,7 +54,7 @@ from what the table appears to hold.
 | 1000044 | `FUN_00844890` | `FeatPointsTable_c` — the FEATPOINTS per-level table |
 | 1000071 | `FUN_00d8fab0` | `TexScriptMeshGroupValues_c` (named elsewhere; not in a vtable) |
 | 1000076 | `FUN_0103f2d0` | `RDBMorphNameIDs_c` — the morph-target registry |
-| 1000080, 1000081 | `FUN_0100d220` | **(unnamed)** — not in a vtable, so RTTI cannot reach it |
+| 1000080, 1000081 | `FUN_0100d220` | **`RDBHairReplacement`** — named from its asserts' source path, not RTTI (decoded below) |
 | 1000505–1000508 | `FUN_00708690` | `RDBPlayerClassData_c` |
 | 1000509, 1000510, 1000512 | `FUN_00911930` | `PlayfieldPvPData_c` |
 | 1000511 | `FUN_0113e170` | `HitsManaAndStamina_c` — the per-class/level vitals curve (#3) |
@@ -218,8 +223,8 @@ extra word AFTER the count (a 20-byte header), and 1000099 and 1000511 put the c
 | 1000043 | `FeatClassTable_c` | 9916 | 20 B | 40 B | |
 | 1000044 | `FeatPointsTable_c` | 71 | 16 B | 12 B | `[level 10..80][points][tsPoints]` |
 | 1000071 | `TexScriptMeshGroupValues_c` | 1220 | 20 B | 8 B | |
-| 1000080 | (unnamed) | 8 | 16 B | 8 B | |
-| 1000081 | (unnamed) | 100 | 16 B | 12 B | |
+| 1000080 | `RDBHairReplacement` (default) | 8 | 16 B | 8 B | |
+| 1000081 | `RDBHairReplacement` (override) | 100 | 16 B | 12 B | |
 | 1000099 | `FeatClassTable_c` | 3096 | 20 B | 12 B | count is the FIFTH word |
 | 1000505 | `RDBPlayerClassData_c` | 17 | — | — | does not divide — variable-width |
 | 1000506 | `RDBPlayerClassData_c` | 27 / 16 | 16 B | 8 B | two entries (id 0 and id 1) |
@@ -391,6 +396,50 @@ What the data says:
 
 Shipped as `ClassComboScaling` (raw, unscaled — a consumer applies the ÷100 itself), imported by the opt-in
 `rdb-combo-scaling` module and gated by `ClassComboScalingTests`.
+
+## Decoded: 1000080 / 1000081 — `RDBHairReplacement`, the two tables RTTI could not name
+
+The registry lists these as **(unnamed)** because their loader is not in a vtable, so the RTTI walk cannot reach
+them. The parse callbacks name the class anyway — they carry the client's own **source file** in their asserts:
+
+```
+"nHairType < uint32(nRows)"  /  "Illegal read of hair type.  Hairtype should be sequential"
+        RDBHairReplacement.cpp:0x2c
+"ReadDefaultFromRDB must be called before this function"
+        RDBHairReplacement.cpp:0x36
+```
+
+That second assert also orders them: **1000080 is the DEFAULT table and is read first**, 1000081 is the override.
+
+### 1000080 — the per-hair-type default, 8 records of `[u32 hairType][u32 replacementMesh]`
+
+`FUN_0100d330` pre-sizes a vector to the record count, then per record reads the hair type, bound-checks it against
+that count (the first assert above) and stores the second word at that index. Eight hair types, 0–7, and the file
+lists them out of order (6, 5, 7, 4, 1, 2, 3, 0) — which is exactly why the store is indexed rather than appended:
+
+| hair type | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| replacement | `0xFFFFFFFF` | 0 | 208255 | 0 | `0xFFFFFFFF` | 0 | 208255 | 0 |
+
+208255 resolves to a **type 1010001 RenderMesh** (`--report rdb-id 208255`), i.e. a real geometry blob, so the
+non-zero entries name an actual replacement mesh. What 0 and `0xFFFFFFFF` distinguish is not decoded — "leave the
+hair alone" and "hide it entirely" is the obvious reading of a hair-replacement table, and is a reading. [V0]
+
+### 1000081 — the per-head override, 100 records of `[u32 hairType][u32 headAsset][u32 replacementMesh]`
+
+`FUN_0100d6c0` reads THREE words per record and stores only the third, into a container keyed on the first two —
+a `map[(hairType, headAsset)] = replacementMesh`. Every shipped row carries hair type **3**, so only one hair type
+has overrides at all.
+
+Both id columns resolve to RDB assets: the replacement is always a **1010001 RenderMesh** (566205, 565876, 208252,
+3068336), and the head asset is either a 1010001 mesh or a **1010030** look (4188728, 4189150, 3394697 …).
+
+So the subsystem is "what your hair turns into when something is on your head" — the standard helmet-flattens-hair
+mechanism — with a default per hair type and a table of exceptions per (hair type, head asset).
+
+Nothing imports it. It is client-side appearance: the client already loads both tables and owns the mesh swap, and
+the server never names a hair mesh. Recorded here because #469 asks what the tables ARE, and because these two were
+the only ones with no name at all.
 
 ## Decoded: 1065103 `PvPConRating_c` — a per-LEVEL con rating, and the shipped file neutralises itself
 
