@@ -316,6 +316,10 @@ namespace Faolan.GameServer.Dialogue
 			// navigation nobody loads (lazy loading is off), so the guild is fetched by id.
 			var character = client.Session.Character;
 			var playerName = character?.Name ?? "";
+			// #418: the grammatical gender the localized text declines the player's name against. Every captured
+			// screen carries flags="m" because every capture's player was male, so carrying the stored flag declined
+			// a female character as male in every line of dialogue naming her.
+			var playerSex = character?.Sex ?? Sex.None;
 			var guildName = character?.GuildId is { } guildId
 				? (await _database.GetGuild(guildId))?.Name ?? ""
 				: "";
@@ -372,7 +376,7 @@ namespace Faolan.GameServer.Dialogue
 				if (subOp == ConversationSubOpcode.SetDialogueCamera)
 					await SendDialogueCamera(client, senderInstance, liveInstance, clickedNpcHandle, CameraArgsOf(p));
 				else
-					await SendConstructedKnubot(client, senderInstance, liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName, npcGuildName));
+					await SendConstructedKnubot(client, senderInstance, liveInstance, BuildKnubotFromColumns(p, liveInstance, clickedNpcHandle, playerName, guildName, npcGuildName, playerSex));
 			}
 
 			if (grantDef != null && !grantSent) // no AnswerList on this screen - send after the (terminal) screen
@@ -496,7 +500,8 @@ namespace Faolan.GameServer.Dialogue
 		// rows are gated byte-exact at import (ConversationScreenCodec.Parse), so this build is authoritative - no
 		// Data-path fallback. Byte-identical to the raw-capture construct for the same inputs
 		// (ConversationConstructTests). The record carries NO length prefix - the sender frames it (#530 rule 2).
-		internal static byte[] BuildKnubotFromColumns(ConversationPacket p, uint liveInstance, uint npcHandle, string playerName, string guildName, string npcGuildName = "")
+		internal static byte[] BuildKnubotFromColumns(ConversationPacket p, uint liveInstance, uint npcHandle, string playerName, string guildName, string npcGuildName = "",
+			Sex playerSex = Sex.None)
 		{
 			var env = p.Env ?? 0;
 			var screens = ConversationScreenColumns.ToScreens(p.Screens); // ordered RemoteFormatScreen list
@@ -520,7 +525,7 @@ namespace Faolan.GameServer.Dialogue
 				// (player name, their guild, the NPC guild label) from the live values.
 				var screen = string.IsNullOrEmpty(playerName)
 					? screens[i]
-					: RemoteFormatSession.WithLivePlayer(screens[i], playerName, guildName ?? "", npcGuildName ?? "");
+					: RemoteFormatSession.WithLivePlayer(screens[i], playerName, guildName ?? "", npcGuildName ?? "", playerSex);
 
 				return Encoding.Latin1.GetBytes(RemoteFormatScreenCodec.Build(screen));
 			}

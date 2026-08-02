@@ -1,6 +1,7 @@
 using System.Linq;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Text;
+using Faolan.Core.Enums;
 using Xunit;
 
 namespace Faolan.Tests
@@ -72,6 +73,35 @@ namespace Faolan.Tests
 			Assert.Null(s.Antitag);
 			Assert.Empty(s.Parameters);
 			Assert.Equal("100", s.Category);
+		}
+
+		// #418: the female token is "f", recovered from the client rather than guessed - every captured screen carries
+		// flags="m" because every capture's player was male, so a female character was declined as male in every line
+		// of dialogue naming her. FUN_011012a0 reads stat 0x3B (Sex) and pushes 0x6d ('m') for 2 and 0x66 ('f') for 3,
+		// with no third branch - so a sex that is neither carries NO token.
+		[Theory]
+		[InlineData(Sex.Male, "m")]
+		[InlineData(Sex.Female, "f")]
+		[InlineData(Sex.Neuter, "")]
+		public void WithLivePlayer_DeclinesTheNameSlotAgainstTheLivePlayersSex(Sex sex, string expected)
+		{
+			var live = RemoteFormatSession.WithLivePlayer(RemoteFormatScreenCodec.Parse(AppendXml), "Conan", "Cimmerians",
+				RemoteFormatSession.NotInGuildLabel("Project Faolan"), sex);
+
+			var name = Assert.Single(live.Parameters, p => p.Name == "name");
+			Assert.Equal(expected, RemoteFormatSession.FlagsOf(name.InnerRaw));
+		}
+
+		// Sex.None means "no live sex", and has to leave the CAPTURED flags alone - the construct-vs-capture gates
+		// re-encode a parsed screen and expect it back byte-identical.
+		[Fact]
+		public void WithLivePlayer_WithNoSex_KeepsTheCapturedFlags()
+		{
+			var parsed = RemoteFormatScreenCodec.Parse(AppendXml);
+			var captured = RemoteFormatSession.FlagsOf(Assert.Single(parsed.Parameters, p => p.Name == "name").InnerRaw);
+			var live = RemoteFormatSession.WithLivePlayer(parsed, "Conan", "Cimmerians", RemoteFormatSession.NotInGuildLabel("Project Faolan"));
+
+			Assert.Equal(captured, RemoteFormatSession.FlagsOf(Assert.Single(live.Parameters, p => p.Name == "name").InnerRaw));
 		}
 
 		[Fact]

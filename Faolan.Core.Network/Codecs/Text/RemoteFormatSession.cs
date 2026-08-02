@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Faolan.Core.Enums;
 
 namespace Faolan.Core.Network.Codecs.Text
 {
@@ -59,11 +60,46 @@ namespace Faolan.Core.Network.Codecs.Text
 			return new RemoteFormatParameter(name, $"<stringentry string=\"{value}\" flags=\"{flags}\" >");
 		}
 
+		/// <summary>
+		///     The <c>flags</c> token the client declines localized text against for a character of this
+		///     <paramref name="sex" />: <c>"m"</c>, <c>"f"</c>, or empty when it is neither (#418).
+		/// </summary>
+		/// <remarks>
+		///     RECOVERED FROM THE CLIENT, because the corpus cannot say: all 718 captured screens carry
+		///     <c>flags="m"</c> - every capture's player was male - so <c>"f"</c> was a guess, and an unknown token
+		///     could break the client's lookup rather than fall back. <c>FUN_011012a0</c> reads stat <c>0x3B</c> (Sex)
+		///     and branches on exactly two values:
+		///     <code>
+		///     PUSH 0x3b ; CALL getStat
+		///     SUB  EAX,0x2 ; JZ  -> PUSH 0x6d   ; sex 2 (Male)   -> 'm'
+		///     DEC  EAX     ; JNZ -> skip        ; anything but 3 -> no token at all
+		///                    PUSH 0x66          ; sex 3 (Female) -> 'f'
+		///     CALL toupper ; SUB EAX,0x41 ; MOV EAX,[EAX*4 + 0x21a2ad0]   ; index into the token table
+		///     </code>
+		///     So the token really is the plain letter, the mapping is our <see cref="Sex" /> enum verbatim, and a
+		///     third value is not "some other token" but NO token - which is why this returns empty rather than
+		///     inventing one.
+		/// </remarks>
+		public static string GenderFlag(Sex sex)
+		{
+			return sex switch
+			{
+				Sex.Male => "m",
+				Sex.Female => "f",
+				_ => ""
+			};
+		}
+
 		// Regenerate the session string-entry parameters (name = player, guildname = their guild, npcguildname = the
-		// NPC's guild label) from live values, preserving each parameter's captured flags (the grammatical gender the
-		// localized text declines against). A slot carrying a <localized …> element instead - npcguildname's
+		// NPC's guild label) from live values. A slot carrying a <localized …> element instead - npcguildname's
 		// "StrangerGuild" token variant, npcname, the grammar tokens - is content, not session state, and is kept.
-		public static RemoteFormatScreen WithLivePlayer(RemoteFormatScreen s, string playerName, string guildName, string npcGuildName)
+		//
+		// `playerSex` drives the "name" slot's flags (#418). The other two keep their CAPTURED flags: they decline
+		// against the guild's name, not the player's, and nothing has decoded what governs them. Passing
+		// Sex.None keeps the captured flags on "name" too, which is what the construct-vs-capture gates want - a
+		// re-encode of a parsed screen has to come back byte-identical.
+		public static RemoteFormatScreen WithLivePlayer(RemoteFormatScreen s, string playerName, string guildName, string npcGuildName,
+			Sex playerSex = Sex.None)
 		{
 			ArgumentNullException.ThrowIfNull(s);
 			var pars = new List<RemoteFormatParameter>(s.Parameters.Count);
@@ -71,7 +107,9 @@ namespace Faolan.Core.Network.Codecs.Text
 				? p
 				: p.Name switch
 				{
-					"name"         => StringEntry("name", playerName, FlagsOf(p.InnerRaw)),
+					"name" => StringEntry("name", playerName, playerSex == Sex.None
+						? FlagsOf(p.InnerRaw)
+						: GenderFlag(playerSex)),
 					"guildname"    => StringEntry("guildname", guildName, FlagsOf(p.InnerRaw)),
 					"npcguildname" => StringEntry("npcguildname", npcGuildName, FlagsOf(p.InnerRaw)),
 					_              => p
