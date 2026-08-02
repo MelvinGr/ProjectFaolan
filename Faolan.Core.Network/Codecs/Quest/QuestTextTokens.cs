@@ -70,7 +70,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// A QuestTextRef -> on-wire token. A MISSING slot falls back to an empty remoteformat so the framing stays
 		// valid (the client simply renders nothing for that slot) - dropping the record instead would shorten the body
 		// and desync everything after it.
-		public static string Record(QuestDefinition def, QuestTextSlot slot)
+		public static string Record(QuestDefinition def, QuestTextSlot slot) // TODO: Move to QuestDefinition ?
 		{
 			var r = def?.TextRefs.FirstOrDefault(t => t.Slot == slot);
 			if (r == null)
