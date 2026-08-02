@@ -115,8 +115,20 @@ and don't contain.
   diff a feat's ranks with `--report feat-record --report-arg [<rdbType>/]<id>[,<id>...]` (the word that MOVES
   across ranks is the magnitude, the one that stays is the target).
 
-  **Not yet imported and not yet applied.** There is no table for these and no consumer: feats reach the server
-  only as a flat `CharacterStatId → value` map, so a per-spell modifier has nowhere to land. Open work: Gitea #590.
+  **Imported and applied**, for kind 53075 only. `FeatSpellModifier` holds `(feat → spell line, percent × 100)`;
+  `Spell.LineId` holds field 128; `DatabaseRepository.GetCharacterSpellBoosts` joins the two and fans the line out
+  to every RANK, giving `spellId → percent × 100` in ONE query at world entry (`WorldEntity.SpellBoosts`), so the
+  cast path is a dictionary lookup rather than a per-cast query. `CombatResolver.ResolveSpellDamage` applies it
+  last, over the finished number including Magic Damage — the client's wording is "Increase to damage or healing on
+  <spell>", not a bonus to one term.
+
+  End to end on the captured Necromancer: NecroL80's `Decomposition` (wire 80004, rank 5) gives **+35.0% on all five
+  Flesh to Worms ranks**, which is what the in-client tooltip reads; 52 of her spells are boosted in total.
+
+  ⚠️ **Kind 53075 ONLY is imported.** The other ~9 kinds have the same record shape but their payloads are not
+  known to be a (line, percent) pair, and importing them on the strength of the shape would put invented modifiers
+  on a third of the feat catalog. Still open on #590: those kinds (53209 alone is 3,235 records) and the 5 records
+  referencing a class 50 that does not exist.
 - **Training ENFORCES the tree.** `FeatService` rejects a train whose resulting set leaves a prerequisite unmet
   (`FeatRules.MissingPrerequisites`), alongside the existing point-budget check.
   ⚠️ A prerequisite is satisfied by the **same base at an equal-or-higher rank**, not by the exact id. The graph

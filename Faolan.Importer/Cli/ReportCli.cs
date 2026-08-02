@@ -1858,7 +1858,8 @@ namespace Faolan.Importer.Cli
 					continue;
 
 				scanned++;
-				if (!TryReadAscendingProperty(body.AsSpan(12), SpellLineField, out var line) || line == 0)
+				var line = RdbSpellImporter.ReadIncreasingFields(body.AsSpan(12)).GetValueOrDefault(SpellLineField);
+				if (line == 0)
 					continue;
 
 				carrying++;
@@ -1887,53 +1888,6 @@ namespace Faolan.Importer.Cli
 
 		// Property-table field 128: the spell's LINE id, shared by all its ranks.
 		private const uint SpellLineField = 128;
-
-		// The ASCENDING twin of RdbItemImporter.TryReadPropertyField: the longest run of [fieldId][value] u32 LE pairs
-		// with strictly INCREASING fieldId in (0, 2000]. Deliberately a separate reader rather than a direction flag on
-		// the item one - a spell record's run genuinely ascends and an item's genuinely descends, and a shared reader
-		// that accepted either would also accept a run that is neither.
-		private static bool TryReadAscendingProperty(ReadOnlySpan<byte> body, uint fieldId, out uint value)
-		{
-			value = 0;
-			var words = body.Length / 4;
-			var bestLen = 0;
-			var bestFound = false;
-			var bestValue = 0u;
-			for (var start = 0; start + 1 < words; start++)
-			{
-				uint last = 0;
-				var haveLast = false;
-				var len = 0;
-				var found = false;
-				var fv = 0u;
-				for (var j = start; j + 1 < words; j += 2)
-				{
-					var fid = body.ReadU32Le(j * 4);
-					if (fid == 0 || fid > 2000 || (haveLast && fid <= last))
-						break;
-
-					if (fid == fieldId)
-					{
-						found = true;
-						fv = body.ReadU32Le((j + 1) * 4);
-					}
-
-					last = fid;
-					haveLast = true;
-					len++;
-				}
-
-				if (len > bestLen)
-				{
-					bestLen = len;
-					bestFound = found;
-					bestValue = fv;
-				}
-			}
-
-			value = bestValue;
-			return bestFound;
-		}
 
 		// --report feat-table [--report-arg <value>]
 		//
@@ -2039,7 +1993,8 @@ namespace Faolan.Importer.Cli
 				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != FeatTemplateType)
 					continue;
 
-				var hits = OutOfRangeModifiers(body);
+				var hits = ItemTemplateStatModifiers.ParseRejected(body.AsSpan(12))
+					.Select(m => (Kind: m.Kind, Reference: m.StatId, Value: m.WireAmount)).ToList();
 				if (hits.Count == 0)
 					continue;
 
@@ -2075,28 +2030,6 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("most-referenced targets:");
 			foreach (var (reference, n) in refCounts.OrderByDescending(p => p.Value).Take(20))
 				Console.WriteLine($"  ref {reference} x{n}");
-		}
-
-		// The same signature ItemTemplateStatModifiers anchors on, but keeping ONLY the records it rejects - so the
-		// two can never disagree about where a record is, just about which ones count.
-		private static List<(uint Kind, uint Reference, uint Value)> OutOfRangeModifiers(byte[] body)
-		{
-			var found = new List<(uint, uint, uint)>();
-			var span = body.AsSpan(12);
-			for (var off = 4; off + 32 <= span.Length; off++)
-			{
-				if (span.ReadU32Le(off - 4) != 0 || span.ReadU32Le(off) != 4 || span.ReadU32Le(off + 4) != 0 || span.ReadU32Le(off + 8) != 1
-				    || span.ReadU32Le(off + 12) != 0 || span.ReadU32Le(off + 16) != 2 || span.ReadU32Le(off + 20) != 9)
-					continue;
-
-				var reference = span.ReadU32Le(off + 24);
-				if (reference is not 0 and < 0x1000)
-					continue; // a real stat id - the importer already has it
-
-				found.Add((off >= 8 ? span.ReadU32Le(off - 8) : 0, reference, span.ReadU32Le(off + 28)));
-			}
-
-			return found;
 		}
 
 		// --report feat-record --report-arg [<rdbType>/]<id>[,<id>...]

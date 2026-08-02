@@ -154,7 +154,7 @@ namespace Faolan.GameServer.World
 		// position/vitals; the Character is only re-read on a fresh entry/teleport. Idempotent (GetOrAdd keeps the
 		// existing entity, so vitals aren't reset across re-entry/teleport/respawn).
 		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
-			IReadOnlyDictionary<CharacterStatId, int>? classBase = null)
+			IReadOnlyDictionary<CharacterStatId, int>? classBase = null, IReadOnlyDictionary<uint, int>? spellBoosts = null)
 		{
 			var character = client.Session.Character;
 
@@ -186,7 +186,9 @@ namespace Faolan.GameServer.World
 				// #367: keep the gear bonuses themselves, not just their sum into the fields above - they are the
 				// baseline a buff's stat delta is added to (and removed from) by BuffStatEffects.
 				GearBonuses = statBonuses ?? new Dictionary<CharacterStatId, int>(),
-				ClassBase = classBase ?? new Dictionary<CharacterStatId, int>()
+				ClassBase = classBase ?? new Dictionary<CharacterStatId, int>(),
+				// #590: the feat boosts for this character's spells, already fanned out from line to rank.
+				SpellBoosts = spellBoosts ?? new Dictionary<uint, int>()
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.

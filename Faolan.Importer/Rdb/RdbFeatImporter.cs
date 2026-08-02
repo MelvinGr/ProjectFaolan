@@ -58,6 +58,7 @@ namespace Faolan.Importer.Rdb
 
 			var found = new List<Feat>();
 			var featEffects = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.Modifier>>();
+			var featSpellMods = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.Modifier>>();
 			var skippedUnnamed = 0;
 
 			foreach (var e in rdb.EntriesOfType(TemplateType))
@@ -91,6 +92,7 @@ namespace Faolan.Importer.Rdb
 				var parsed = ParseName(name);
 				var effects = ParseEffects(body);
 				featEffects[e.Id] = effects;
+				featSpellMods[e.Id] = ParseSpellModifiers(body);
 				found.Add(new Feat
 				{
 					Id = e.Id,
@@ -172,6 +174,28 @@ namespace Faolan.Importer.Rdb
 				row.Flags = feat.Flags;
 				row.TemplateCategory = feat.TemplateCategory;
 				updated++;
+			}
+
+			// The SPELL modifiers (#590), the same delete+reinsert and for the same reason. Written before the stat
+			// effects only because both scope their delete to every feat PARSED, and doing them together keeps that
+			// one rule visible in one place.
+			var spellModRows = 0;
+			var spellTouched = featSpellMods.Keys.ToHashSet();
+			db.FeatSpellModifiers.RemoveRange(await db.FeatSpellModifiers.Where(m => spellTouched.Contains(m.FeatId)).ToListAsync());
+			foreach (var (featId, list) in featSpellMods.Where(kv => kv.Value.Count > 0))
+			{
+				for (var i = 0; i < list.Count; i++)
+				{
+					db.FeatSpellModifiers.Add(new FeatSpellModifier
+					{
+						FeatId = featId,
+						Sequence = i,
+						SpellLineId = list[i].StatId,
+						PercentHundredths = list[i].WireAmount,
+						EffectKind = list[i].Kind
+					});
+					spellModRows++;
+				}
 			}
 
 			// Effects are delete+reinsert per feat: the list is wholly derived from the record, so reconciling element
@@ -420,6 +444,25 @@ namespace Faolan.Importer.Rdb
 				? []
 				: [.. ItemTemplateStatModifiers.Parse(body.AsSpan(12)).Where(m => m.Kind != TagRecordKind)];
 		}
+
+		// The feat's SPELL modifiers (#590): the records the stat parser REJECTS, because their payload's first word
+		// is a spell-LINE id rather than a stat id and so fails its `statId < 0x1000` bound. `Decomposition` rank 5
+		// carries (41000, 3500) - Necromancer line 0 (Flesh to Worms), +35.00% - which is exactly what the client's
+		// own tooltip draws.
+		//
+		// ⚠️ Kind 53075 ONLY. The catalog has ~9 more kinds in this same shape (53209 alone is 3,235 records) whose
+		// payloads are NOT known to be a (line, percent) pair; importing them on the strength of the shape would put
+		// invented modifiers on a third of the feat catalog. They stay unimported until each is decoded - survey them
+		// with `--report feat-spell-modifiers`.
+		public static IReadOnlyList<ItemTemplateStatModifiers.Modifier> ParseSpellModifiers(byte[] body)
+		{
+			return body.Length <= 12
+				? []
+				: [.. ItemTemplateStatModifiers.ParseRejected(body.AsSpan(12)).Where(m => m.Kind == SpellModifierKind)];
+		}
+
+		// The one effect kind whose (reference, magnitude) payload is decoded: a spell line and a percent x 100.
+		private const uint SpellModifierKind = 53075;
 
 		// Kind 53182 is NOT a stat modifier and must not be imported as one. Its element has the same signature, so
 		// the shared parser returns it, but the payload is (index, FOURCC) rather than (statId, amount): the "amount"

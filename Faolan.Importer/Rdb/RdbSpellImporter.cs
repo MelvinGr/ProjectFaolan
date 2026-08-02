@@ -82,6 +82,9 @@ namespace Faolan.Importer.Rdb
 		// 123 - the spell's RANK. Named in the #367 field dump but never lifted until now; the rank used to come from
 		// the "(Rank N)" suffix in the name, and with the ellatha scrape gone the RDB is the only source.
 		private const uint RankField = 0x07B;
+		// 128 - the spell's LINE id when it is class-encoded (ConanClass x 1000 + index); see Spell.LineId for why
+		// it is carried raw.
+		private const uint LineField = 0x080;
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 		private const uint SpellDataType = 1040005;
 
@@ -177,6 +180,7 @@ namespace Faolan.Importer.Rdb
 				var level = fields.TryGetValue(LevelField, out var lv) && lv <= byte.MaxValue
 					? (byte)lv
 					: (byte)0;
+				var lineId = fields.GetValueOrDefault(LineField);
 				var rank = fields.TryGetValue(RankField, out var rk) && rk <= byte.MaxValue
 					? (byte)rk
 					: (byte)0;
@@ -204,7 +208,8 @@ namespace Faolan.Importer.Rdb
 						DamageRating = damageRating,
 						DurationMs = durationMs,
 						Level = level,
-						Rank = rank
+						Rank = rank,
+						LineId = lineId
 					};
 					byId[entry.Id] = spell;
 					toAdd.Add(spell);
@@ -244,8 +249,9 @@ namespace Faolan.Importer.Rdb
 				}
 
 				// Rank is set unconditionally, unlike level: the RDB is its ONLY source, so there is no other value
-				// to defer to and a 0 here means the record genuinely carries no rank.
+				// to defer to and a 0 here means the record genuinely carries no rank. LineId likewise (#590).
 				spell.Rank = rank;
+				spell.LineId = lineId;
 			}
 
 			if (toAdd.Count > 0)
@@ -305,7 +311,10 @@ namespace Faolan.Importer.Rdb
 		// run of [fieldId u32][value u32] LE pairs with strictly-INCREASING fieldId in (0, 2000], starting at any
 		// offset - the spell-data grammar (the inverse of the item-template's strictly-decreasing table). Returns the
 		// fieldId -> value map of that best run.
-		private static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body)
+		// `internal` because --report spell-line-ids needs the SAME parse - a second copy of a grammar this fiddly
+		// (a longest strictly-increasing run, not a fixed offset) is how a report quietly stops agreeing with the
+		// importer, exactly as RdbItemImporter.TryReadPropertyField already learned.
+		internal static Dictionary<uint, uint> ReadIncreasingFields(ReadOnlySpan<byte> body)
 		{
 			var words = body.Length / 4;
 			var best = new Dictionary<uint, uint>();

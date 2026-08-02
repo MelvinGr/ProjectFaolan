@@ -527,7 +527,12 @@ namespace Faolan.GameServer
 					character.Class, character.Level, character.Name);
 			}
 
-			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase);
+			// #590: what the character's trained feats do to their SPELLS - "+35% on Flesh to Worms" and the like.
+			// Keyed by spell id (the feat names a line; the fan-out to its ranks is resolved in the query), so the
+			// cast path never has to look one up.
+			var spellBoosts = await Database.GetCharacterSpellBoosts(character.Id);
+
+			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId, character.Class);
 			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them

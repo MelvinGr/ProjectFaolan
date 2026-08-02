@@ -402,13 +402,26 @@ namespace Faolan.GameServer.Combat
 		// retail's spell-damage bonus. magicDamage is 0 for NPC casts / callers without gear. Per-spell power isn't
 		// decoded (every spell shares the base), so this is still provisional; Magic Damage at least makes geared
 		// casters hit harder.
-		public static int ResolveSpellDamage(uint spellId, ushort casterLevel, uint magicDamage = 0)
+		// `spellLinePercentHundredths` is the caster's FEAT boost for this spell's line (#590) - 3500 = +35%, which is
+		// what `Decomposition` rank 5 grants every rank of Flesh to Worms. It scales the whole result, Magic Damage
+		// included, because the client's own wording is "Increase to damage or healing on <spell>" rather than a
+		// bonus to one term. Applied last so the percent is over the finished number.
+		public static int ResolveSpellDamage(uint spellId, ushort casterLevel, uint magicDamage = 0, int spellLinePercentHundredths = 0)
 		{
 			var level = casterLevel == 0
 				? (ushort)1
 				: casterLevel;
-			return 20 + level * 5 + (int)magicDamage;
+			var damage = 20 + level * 5 + (int)magicDamage;
+			if (spellLinePercentHundredths == 0)
+				return damage;
+
+			// A debuff-shaped negative can only ever take the hit to 1, never to 0 or below - a boosted spell that
+			// stops dealing damage would read as a miss.
+			return Math.Max(1, (int)((long)damage * (PercentScale + spellLinePercentHundredths) / PercentScale));
 		}
+
+		// A percent modifier is stored x100 (3500 = 35.00%), so 100% is 10000.
+		private const int PercentScale = 10000;
 
 		// Provisional mana cost for a cast. Per-spell costs aren't decoded from captures yet (like damage), so this
 		// is a simple level-scaled value just so casting visibly drains the mana bar (the spell/mana analogue of the

@@ -177,6 +177,23 @@ namespace Faolan.GameServer.World
 		// deltas as buffs come and go (BuffStatEffects.Sync). Empty for NPCs and for a player with no stat gear.
 		public IReadOnlyDictionary<CharacterStatId, int> GearBonuses { get; set; } = new Dictionary<CharacterStatId, int>();
 
+		/// <summary>
+		///     The per-SPELL boosts this entity's trained feats grant (#590), as <c>spellId -> percent x 100</c> - a
+		///     Necromancer with `Decomposition` rank 5 carries +3500 on every RANK of Flesh to Worms. The feat names a
+		///     spell LINE; the fan-out to its ranks is resolved once at world entry (beside the gear bonuses) so the
+		///     cast path stays a dictionary lookup. Empty for NPCs and for a character with no spell feats.
+		/// </summary>
+		public IReadOnlyDictionary<uint, int> SpellBoosts { get; set; } = new Dictionary<uint, int>();
+
+		/// <summary>
+		///     This entity's feat boost for one spell, in hundredths of a percent; 0 when it has none, which is most
+		///     spells for most characters. Passed to <c>CombatResolver.ResolveSpellDamage</c>.
+		/// </summary>
+		public int SpellBoost(uint spellId)
+		{
+			return SpellBoosts.GetValueOrDefault(spellId);
+		}
+
 		// The last value BuffStatEffects computed for each stat it owns (gear + buffs, display units). Its purpose is
 		// to answer "did this change?" so a sync pushes only what moved; the authoritative live values are the rating
 		// fields themselves.

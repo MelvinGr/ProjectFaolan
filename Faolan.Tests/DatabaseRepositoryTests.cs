@@ -851,6 +851,62 @@ namespace Faolan.Tests
 			}
 		}
 
+		// #590: a feat's SPELL boost reaches combat as `spellId -> percent x 100`, which takes TWO hops the query has
+		// to get right - CharacterFeats holds the WIRE feat id while the modifier rows are keyed by the TEMPLATE id
+		// (different id spaces, hence FeatIdMaps), and the modifier then names a spell LINE that fans out to every
+		// RANK. This is Decomposition rank 5 in miniature: one feat, one line, three ranks of the spell.
+		[Fact]
+		public async Task SpellBoosts_ResolveThroughTheIdMapAndFanOutToEveryRank()
+		{
+			var dbPath = Path.Combine(Path.GetTempPath(), $"faolan-boosts-{Guid.NewGuid():N}.db");
+			try
+			{
+				const uint characterId = 7;
+				const uint wireFeatId = 80004, templateId = 1173628, otherTemplateId = 1173600;
+				const uint line = 41000;
+
+				var (repo, factory) = NewRepo(dbPath);
+				await using (var ctx = await factory.CreateDbContextAsync(TestContext.Current.CancellationToken))
+				{
+					await ctx.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+					ctx.Accounts.Add(new Account { Id = 1, UserName = "t", Password = "t", LastIpAddress = "" });
+					ctx.Realms.Add(new Realm { Id = 1, Name = "Test", IpAddress = "127.0.0.1" });
+					ctx.Maps.Add(new Map { Id = Map.TortageBeachId, Name = "Tortage Beach" });
+					ctx.Characters.Add(new Character
+					{
+						Id = characterId, Name = "Caster", AccountId = 1, RealmId = 1, Class = ConanClass.Necromancer, Race = Race.Stygian
+					});
+					ctx.CharacterFeatSpecs.Add(new CharacterFeatSpec { CharacterId = characterId, Index = 0 });
+					ctx.CharacterFeats.Add(new CharacterFeat { CharacterId = characterId, SpecIndex = 0, FeatId = wireFeatId, Sequence = 0 });
+					ctx.FeatIdMaps.Add(new FeatIdMap { WireFeatId = wireFeatId, TemplateId = templateId, BaseIndex = 800, Rank = 4 });
+					ctx.Feats.Add(new Feat { Id = templateId, Name = "Decomposition", BaseName = "Decomposition" });
+					ctx.Feats.Add(new Feat { Id = otherTemplateId, Name = "Untrained", BaseName = "Untrained" });
+					ctx.FeatSpellModifiers.Add(new FeatSpellModifier { FeatId = templateId, Sequence = 0, SpellLineId = line, PercentHundredths = 3500, EffectKind = 53075 });
+					// A modifier on a feat the character has NOT trained, on the same line: it must not leak in.
+					ctx.FeatSpellModifiers.Add(new FeatSpellModifier { FeatId = otherTemplateId, Sequence = 0, SpellLineId = line, PercentHundredths = 9900, EffectKind = 53075 });
+					// Three ranks of the boosted line, plus one spell on another line that must stay unboosted.
+					ctx.Spells.Add(new Spell { Id = 144675, Name = "Flesh to Worms (Rank 3)", LineId = line });
+					ctx.Spells.Add(new Spell { Id = 144676, Name = "Flesh to Worms (Rank 4)", LineId = line });
+					ctx.Spells.Add(new Spell { Id = 144677, Name = "Flesh to Worms (Rank 5)", LineId = line });
+					ctx.Spells.Add(new Spell { Id = 144308, Name = "Pestilential Blast (Rank 2)", LineId = 41001 });
+					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+				}
+
+				var boosts = await repo.GetCharacterSpellBoosts(characterId);
+
+				// Every rank of the line, at the trained feat's percent - the feat names a line, not a rank.
+				Assert.Equal(3, boosts.Count);
+				Assert.Equal(3500, boosts[144675]);
+				Assert.Equal(3500, boosts[144676]);
+				Assert.Equal(3500, boosts[144677]);
+				Assert.DoesNotContain(144308u, boosts.Keys); // a different line is untouched
+			}
+			finally
+			{
+				TestDb.Delete(dbPath);
+			}
+		}
+
 		private static (DatabaseRepository repo, IDbContextFactory<DatabaseContext> factory) NewRepo(string path)
 		{
 			var options = TestDb.Options(path);

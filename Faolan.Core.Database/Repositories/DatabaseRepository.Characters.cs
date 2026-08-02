@@ -34,6 +34,15 @@ namespace Faolan.Core.Database.Repositories
 		Task<uint[]> GetCharacterFeats(uint characterId);
 		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
 		Task<FeatEffect[]> GetCharacterFeatEffects(uint characterId);
+
+		/// <summary>
+		///     The per-SPELL boosts a character's trained feats grant (#590), as <c>spellId -> percent x 100</c>.
+		///     Resolved through the spell LINE the feat actually names, so every rank of a boosted spell is in the
+		///     result and combat needs no line lookup of its own. Summed per spell, because two different feats can
+		///     boost the same line; a character holds only the HIGHEST rank of each feat, so the ranks of one feat
+		///     never stack with each other.
+		/// </summary>
+		Task<IReadOnlyDictionary<uint, int>> GetCharacterSpellBoosts(uint characterId);
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId, ContainerKind? container = null);
 		Task<CharacterInventory?> GetInventorySlot(uint characterId, ContainerKind container, int slot);
@@ -407,6 +416,26 @@ namespace Faolan.Core.Database.Repositories
 				join map in ctx.FeatIdMaps on feat.FeatId equals map.WireFeatId
 				join effect in ctx.FeatEffects on map.TemplateId equals effect.FeatId
 				select effect).ToArrayAsync();
+		}
+
+		public async Task<IReadOnlyDictionary<uint, int>> GetCharacterSpellBoosts(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			// Two hops. CharacterFeats holds the WIRE feat id and the modifier rows are keyed by the TEMPLATE id (a
+			// different id space, hence FeatIdMaps); then the modifier names a spell LINE, which fans out to every
+			// RANK of that spell. Resolving the fan-out HERE - once, at world entry - is what keeps the cast path a
+			// dictionary lookup instead of a per-cast query.
+			var rows = await (from feat in ctx.CharacterFeats.Where(f => f.CharacterId == characterId)
+				join map in ctx.FeatIdMaps on feat.FeatId equals map.WireFeatId
+				join mod in ctx.FeatSpellModifiers on map.TemplateId equals mod.FeatId
+				join spell in ctx.Spells on mod.SpellLineId equals spell.LineId
+				select new { spell.Id, mod.PercentHundredths }).ToArrayAsync();
+
+			var totals = new Dictionary<uint, int>();
+			foreach (var row in rows)
+				totals[row.Id] = totals.GetValueOrDefault(row.Id) + (int)row.PercentHundredths;
+
+			return totals;
 		}
 
 		// The prerequisite edges for `featIds` (FeatPrereq, imported from the client's own feat table), as

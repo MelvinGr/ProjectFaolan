@@ -40,6 +40,29 @@ namespace Faolan.Core.Rdb
 		// repeats a stat id in the corpus, but the parser stays faithful to what's on the wire).
 		public static IReadOnlyList<Modifier> Parse(ReadOnlySpan<byte> body)
 		{
+			return Scan(body, true);
+		}
+
+		/// <summary>
+		///     The records <see cref="Parse" /> REJECTS - those whose payload's first word is outside the stat-id
+		///     range. That bound is right for a stat modifier and wrong for the rest: a FEAT's spell modifier puts a
+		///     spell-LINE id there and the magnitude second, so `Decomposition` rank 5 reads (41000, 3500) = "+35.00%
+		///     on Necromancer line 0, Flesh to Worms" (#590). Same scan, opposite filter - deliberately not a second
+		///     copy of the signature walk, so the two can never disagree about where a record IS, only about which
+		///     ones count.
+		///     <para>
+		///         The KIND is what says how to read one; only 53075 is decoded. See
+		///         <c>RdbFeatImporter.ParseSpellModifiers</c> and `--report feat-spell-modifiers`.
+		///     </para>
+		/// </summary>
+		public static IReadOnlyList<Modifier> ParseRejected(ReadOnlySpan<byte> body)
+		{
+			return Scan(body, false);
+		}
+
+		// One signature walk for both readers. `inStatRange` picks which side of the stat-id bound to keep.
+		private static IReadOnlyList<Modifier> Scan(ReadOnlySpan<byte> body, bool inStatRange)
+		{
 			var mods = new List<Modifier>();
 			// The full record is [kind][0][4][0][1][0][2][9][statId][amount]; anchor on the 6-word signature
 			// (4,0,1,0,2,9) at off..off+20 with the preceding [.. ][0] word, then statId at off+24, amount at off+28.
@@ -59,7 +82,7 @@ namespace Faolan.Core.Rdb
 					continue;
 
 				var statId = W(body, off + 24);
-				if (statId is 0 or >= MaxStatId)
+				if (statId == 0 || statId < MaxStatId != inStatRange)
 					continue;
 
 				mods.Add(new Modifier(off >= 8 ? W(body, off - 8) : 0, statId, W(body, off + 28)));

@@ -1420,6 +1420,28 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("FeatPrereqs");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatSpellModifier", b =>
+                {
+                    b.Property<uint>("FeatId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("EffectKind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("PercentHundredths")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("SpellLineId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("FeatId", "Sequence");
+
+                    b.ToTable("FeatSpellModifiers");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.Guild", b =>
                 {
                     b.Property<uint>("Id")
@@ -3284,6 +3306,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<byte>("Level")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("LineId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<ushort>("ManaCost")
                         .HasColumnType("INTEGER");
 
@@ -4340,6 +4365,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasOne("Faolan.Core.Database.Tables.FeatIdMap", "Feat")
                         .WithMany()
                         .HasForeignKey("WireFeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatSpellModifier", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
+                        .WithMany()
+                        .HasForeignKey("FeatId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

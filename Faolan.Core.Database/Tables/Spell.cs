@@ -19,6 +19,26 @@ namespace Faolan.Core.Database.Tables
 		// x10-encoded rank 1 are the same value - and guessing would silently corrupt one of them. The #367 field dump
 		// labelled 123 "rank"; this is that label qualified, not overturned.
 		public byte Rank { get; set; }
+
+		/// <summary>
+		///     RDB field 128 (0x80) of the spell's type-1040005 record, carried RAW. When it is
+		///     <c>ConanClass × 1000 + lineIndex</c> it is the spell's LINE - what a feat's spell modifier points at
+		///     (<see cref="FeatSpellModifier.SpellLineId" />): 41000 is Necromancer line 0, and the five
+		///     <c>Flesh to Worms</c> ranks all carry it, which is how a feat boosts a spell without naming a rank.
+		///     0 when the record has no such field (only 3,158 of 21,502 templates carry one).
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ The field is OVERLOADED and only its class-encoded values are line ids. It also holds small numbers
+		///     (1, 2, 4, …) shared by 25-30 unrelated spells apiece - far too coarse to be a line, which is 3-7 ranks -
+		///     so those are some other grouping and are not decoded. Carried raw rather than filtered because the join
+		///     cannot collide: a feat only ever references a class-encoded value.
+		///     <para>
+		///         This also qualifies the note on <see cref="Rank" /> above, which said field 128 "is constant (2)
+		///         across that family's ranks". It is constant across a family - that part was right - but the 2 was
+		///         one family's value, not the field's meaning.
+		///     </para>
+		/// </remarks>
+		public uint LineId { get; set; }
 		public float DamageRating { get; set; } // spell damage rating percent (RDB field 0x15C / 100)
 		public float Range { get; set; } // target range in metres (RDB field 0x11F / 100)
 
