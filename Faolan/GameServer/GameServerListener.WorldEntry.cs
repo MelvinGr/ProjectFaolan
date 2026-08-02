@@ -508,9 +508,13 @@ namespace Faolan.GameServer
 			// player first (which picks/keeps their instance), then populate THAT instance's NPCs.
 			var map = await Database.GetMap(mapId) ?? throw new  InvalidOperationException();
 			// #3/#251: the additive stat bonuses the player carries into the world - equipped GEAR plus trained FEATS -
-			// so their live vitals seed with both. Feats contribute only where the feat's RDB template is one of the
-			// plaintext ones; the TEA-encrypted majority yields no effect rows, so a character can hold feats that add
-			// nothing yet (see GetCharacterFeatEffects).
+			// so their live vitals seed with both.
+			//
+			// A character routinely gets NOTHING from the feat half, and that is a BUILD, not a gap (#589). The feat
+			// pipeline is whole: FeatIdMaps carries all 6,593 entries of the client's own FeatTable_t, 2,939 of them
+			// have stat effects and 808 grant HealthMax (`Mage: HP 1`..`5` among them). Our three imported characters
+			// spend every point they have - both level-80 mages come to exactly 79 - on class-tree abilities and spell
+			// nodes, so their feat contribution is a true zero. Do not read an empty result here as missing data.
 			var statBonuses = MaxStatAggregator.Combine(
 				MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet)),
 				MaxStatAggregator.AggregateFeatBonuses(await Database.GetCharacterFeatEffects(character.Id)));
