@@ -137,6 +137,43 @@ Two model consequences worth knowing:
   which is every catalog goal. It is deliberately not 0: there is no kind 0, and 0 was the un-harvested
   default that #548 removed — reusing it would resurrect that exact ambiguity.
 
+## ⚠️ The catalog is a SNAPSHOT, and it lags the live content
+
+It is not "every quest in the game" — it is every quest **as of the patch the RDB was built from**. Its
+ceilings are quest id **18533** and goal id **12885**; the captures carry content above both.
+
+Everything the DB holds above those ceilings came from the wire and the catalog knows nothing about it — and
+the split is exact, with no other gaps: **6 quests** (19314, 19363, 19364, 19365, 19522, 19620) and
+**18 goals** (13962–14446) are the *only* rows in the whole DB with no catalog `Name`, and every one of them
+is above the ceiling. They are the World-Boss Mastery meta, Anniversary 2014, Halloween 2015 and Onslaught.
+
+[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — five of those six are exactly the quests carrying
+`Quest_c` `@+0x11c == 1` (the sixth, 19363, has no captured journal record at all, so the wire never stated a
+value for it), which is an independent signal picking out the same content: `@+0x11c` was
+recorded as "1 for the newest quests, meaning open", and the catalog's ceiling now gives that observation a
+mechanism rather than a coincidence. n = 6, so it is a lead and not a decode.]
+
+So: treat a missing catalog name as "newer than this RDB", not as "the client has no name for it".
+
+## Cross-checked against the encrypted LDB — 152 of 152 exact
+
+The catalog's `QuestGoal.name` and the encrypted LDB category **50304**
+(`quest_goal_templates.goal_name`) are the SAME field reached two entirely independent ways: a protobuf data
+table on disk, versus a ciphertext page unlocked by a key the *server* sent us and we captured.
+
+[V1: Faolan.Importer/Cli/ReportCli.LdbQuestText.cs — on every goal where both are available the two strings
+are **byte-identical**: 152 agree, 0 differ, with no normalisation needed. `--report ldb-quest-text` now runs
+this comparison on every invocation and prints the tally, so a crossed key, a wrong page or a bad catalog
+dedup shows up as a diff instead of going unnoticed.]
+
+Two consequences:
+
+- It **validates both paths at once** — the catalog import and the LDB decryption independently agree.
+- The catalog name is a usable stand-in for the objective text, so `--report ldb-quest-text` falls back to it
+  where no key was captured. That takes the report from **170** readable objective lines to **7317**. Lines
+  sourced that way are marked `[catalog]` so the provenance stays visible in an output whose whole purpose is
+  to be the evidence other typings are taken from.
+
 ## Finding the next such table
 
 The sweep that found this one is worth repeating for the other named data tables: iterate

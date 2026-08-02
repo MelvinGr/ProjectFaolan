@@ -99,9 +99,13 @@ namespace Faolan.Importer.Cli
 				var verdict = Verdict(g.TrailingCategory, g.TrailingRefId, resolved ? text! : null, templatesById, templatesByName, itemsById,
 					spawnedNames, c);
 
-				var kind = Enum.IsDefined(typeof(QuestGoalKind), g.Separator)
-					? ((QuestGoalKind)g.Separator).ToString()
-					: $"?{g.Separator}";
+				// NULL = the goal has never been on the wire (a catalog-only goal), so it has no kind - distinct from
+				// a kind the corpus has not mapped, which prints as `?<value>`.
+				var kind = g.Separator is not { } sep
+					? "-"
+					: Enum.IsDefined(typeof(QuestGoalKind), sep)
+						? ((QuestGoalKind)sep).ToString()
+						: $"?{sep}";
 
 				Console.WriteLine(
 					$"{g.GoalId}\t{g.QuestDefinitionId}\t{g.TrailingCategory}\t{g.TrailingRefId}\t{kind}\t{(g.Partial ? "(partial)" : g.GoalType.ToString())}\t{(g.Partial ? "-" : g.RequiredCount.ToString())}\t{g.TargetName ?? "-"}\t{(resolved ? Flatten(text!) : "(unresolved)")}\t{verdict}");

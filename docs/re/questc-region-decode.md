@@ -279,7 +279,15 @@ have named it, is 0 on all 2181 rows.
 clear, while 17740 is in a base-game zone with it clear too), "repeatable" and "group" (the `[Rep]` and
 `[Group]` dev tags land on 14421/14427, which do not carry bit 3).
 
-### `@+0x11c` — 1 on exactly the newest content
+### `@+0x11c` — 1 on exactly the content newer than the client's quest catalog
 
 1 for 19314, 19364, 19365, 19522 and 19620 (World Bosses, Anniversary 2014, Halloween 2015, Onslaught), 0 for
-the other 94. Meaning open.
+the other 94.
+
+A second, independent signal picks out the same set. The client's quest catalog (RDB 1000104) is a SNAPSHOT
+that stops at quest id 18533 and goal id 12885, and those five quests are all above that ceiling — they are
+the only captured quests it carries no entry for. So "the newest content" is not just an impression from the
+ids: the client's own data draws the line in the same place.
+
+⚠️ Still a LEAD, not a decode — n = 5, and "newer than this RDB build" is a property of our snapshot rather
+than something the wire would sensibly encode. What it does rule out is the field being per-quest noise.

@@ -59,7 +59,8 @@ namespace Faolan.Importer.Cli
 					g.GoalType,
 					g.Partial,
 					g.TargetName,
-					g.RequiredCount
+					g.RequiredCount,
+					g.Name
 				})
 				.ToListAsync();
 
@@ -76,6 +77,14 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("goal\tquest\tkind\tgoalType\tcount\ttarget\tobjective text");
 
 			int decrypted = 0, noKey = 0, noCipher = 0, failed = 0;
+
+			// The CROSS-CHECK. The client's quest catalog (RDB 1000104) carries `QuestGoal.name` in plaintext, and the
+			// encrypted LDB category 50304 is `quest_goal_templates.goal_name` - the SAME field, reached two entirely
+			// independent ways: a protobuf data table on disk, versus a ciphertext page unlocked by a key the SERVER
+			// sent us. Where both exist they must be identical, and a disagreement means one of the two paths is wrong
+			// (a crossed key, the wrong page, a bad catalog dedup). Cheap to check, so check it every run.
+			int agree = 0, catalogOnly = 0;
+			var disagree = new List<string>();
 			foreach (var g in goals)
 			{
 				var category = g.ObjectiveCategory == 0
@@ -108,16 +117,48 @@ namespace Faolan.Importer.Cli
 					}
 				}
 
-				var kind = Enum.IsDefined(typeof(QuestGoalKind), g.Separator)
-					? ((QuestGoalKind)g.Separator).ToString()
-					: $"?{g.Separator}";
+				// NULL = the goal has never been on the wire (a catalog-only goal), so it has no kind - distinct from
+				// a kind the corpus has not mapped, which prints as `?<value>`.
+				// Where no key was captured the catalog name IS the objective text - proven identical on every goal
+				// where both are available - so print it rather than "(no key captured)", marked `[catalog]` so the
+				// provenance of a line this report is used as EVIDENCE for stays visible.
+				if (g.ObjectiveKey.IsEmpty && g.Name != null)
+				{
+					text = g.Name;
+					catalogOnly++;
+				}
+				else if (g.Name != null && !text.StartsWith('('))
+				{
+					if (g.Name == text)
+						agree++;
+					else
+						disagree.Add($"goal {g.GoalId} (quest {g.QuestDefinitionId})\n      catalog: {g.Name}\n      ldb    : {text}");
+				}
+
+				var kind = g.Separator is not { } sep
+					? "-"
+					: Enum.IsDefined(typeof(QuestGoalKind), sep)
+						? ((QuestGoalKind)sep).ToString()
+						: $"?{sep}";
+
+				var source = g.ObjectiveKey.IsEmpty && g.Name != null
+					? "[catalog] "
+					: "";
 
 				Console.WriteLine(
-					$"{g.GoalId}\t{g.QuestDefinitionId}\t{kind}\t{(g.Partial ? "(partial)" : g.GoalType.ToString())}\t{(g.Partial ? "-" : g.RequiredCount.ToString())}\t{g.TargetName ?? "-"}\t{Flatten(text)}");
+					$"{g.GoalId}\t{g.QuestDefinitionId}\t{kind}\t{(g.Partial ? "(partial)" : g.GoalType.ToString())}\t{(g.Partial ? "-" : g.RequiredCount.ToString())}\t{g.TargetName ?? "-"}\t{source}{Flatten(text)}");
 			}
 
 			Console.WriteLine();
 			Console.WriteLine($"decrypted {decrypted}/{goals.Count}; {noKey} with no captured key, {noCipher} absent from the English pages, {failed} FAILED");
+			Console.WriteLine($"catalog name used for {catalogOnly} goal(s) with no captured key");
+			Console.WriteLine($"cross-check vs the client's quest catalog: {agree} agree, {disagree.Count} DIFFER");
+			if (disagree.Count > 0)
+			{
+				Console.WriteLine("⚠️  the catalog and the decrypted LDB disagree - they are the same field reached two ways, so one path is WRONG:");
+				foreach (var d in disagree)
+					Console.WriteLine($"    {d}");
+			}
 
 			// A failure is the interesting outcome: the key and the ciphertext are independent sources, so a mismatch
 			// means one of them is wrong (a re-harvest that crossed keys, or the wrong page picked).
