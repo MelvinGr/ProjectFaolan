@@ -137,23 +137,35 @@ Two model consequences worth knowing:
   which is every catalog goal. It is deliberately not 0: there is no kind 0, and 0 was the un-harvested
   default that #548 removed — reusing it would resurrect that exact ambiguity.
 
-## ⚠️ The catalog is a SNAPSHOT, and it lags the live content
+## ⚠️ The catalog is a SUBSET of the quests the client knows about
 
-It is not "every quest in the game" — it is every quest **as of the patch the RDB was built from**. Its
-ceilings are quest id **18533** and goal id **12885**; the captures carry content above both.
+It is not "every quest in the game". Comparing it against the **same client build's** LDB — category 50301 is
+the quest title, keyed by quest id — the two disagree in both directions:
 
-Everything the DB holds above those ceilings came from the wire and the catalog knows nothing about it — and
-the split is exact, with no other gaps: **6 quests** (19314, 19363, 19364, 19365, 19522, 19620) and
-**18 goals** (13962–14446) are the *only* rows in the whole DB with no catalog `Name`, and every one of them
-is above the ceiling. They are the World-Boss Mastery meta, Anniversary 2014, Halloween 2015 and Onslaught.
+| | |
+|---|---:|
+| quest ids with an LDB title (50301) | 5920 |
+| quests in the catalog (1000104) | 5042 |
+| in the LDB but **not** in the catalog | 952 (123 below the catalog's own highest id, 829 above it) |
+| in the catalog but **not** in the LDB | 74 |
 
-[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — five of those six are exactly the quests carrying
-`Quest_c` `@+0x11c == 1` (the sixth, 19363, has no captured journal record at all, so the wire never stated a
-value for it), which is an independent signal picking out the same content: `@+0x11c` was
-recorded as "1 for the newest quests, meaning open", and the catalog's ceiling now gives that observation a
-mechanism rather than a coincidence. n = 6, so it is a lead and not a decode.]
+The catalog's highest quest id is 18533 and the LDB's is 19628, but the 123 below that line are the reason
+this is **not** a simple cutoff: the catalog has holes inside its own range, and it also lists 74 quests the
+LDB has no title for.
 
-So: treat a missing catalog name as "newer than this RDB", not as "the client has no name for it".
+**Why it is a subset is NOT established.** The table is `RDBQUESTGIVERS`, so "it enumerates the quests
+reachable from a giver, and script-granted / event / meta quests are not" is the obvious candidate — but it
+is unproven, the giver lists in this entry are empty, and the catalog does carry `[Event_Halloween]`,
+`[Event_Midwinter]` and `[..._Mastery]` lines, so being event content is plainly not disqualifying on its own.
+
+⚠️ Do NOT explain the gap as the catalog being older than the captures. The client has not been patched and
+is the same build the captures came from, and that build's own LDB carries text for the quests the catalog
+lacks — including all six our corpus touches, whose goal strings decrypt cleanly from its English pages.
+
+In our DB the gap shows up as exactly **6 quests** (19314, 19363, 19364, 19365, 19522, 19620) and **18 goals**
+(13962–14446) with no catalog `Name` — the ones our captures happened to touch among those 952. So a missing
+catalog name means "this quest is not in the quest-giver catalog", not "the client has no name for it": the
+LDB does.
 
 ## Cross-checked against the encrypted LDB — 152 of 152 exact
 

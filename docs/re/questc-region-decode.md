@@ -279,15 +279,22 @@ have named it, is 0 on all 2181 rows.
 clear, while 17740 is in a base-game zone with it clear too), "repeatable" and "group" (the `[Rep]` and
 `[Group]` dev tags land on 14421/14427, which do not carry bit 3).
 
-### `@+0x11c` — 1 on exactly the content newer than the client's quest catalog
+### `@+0x11c` — 1 on exactly the quests absent from the client's quest-giver catalog
 
 1 for 19314, 19364, 19365, 19522 and 19620 (World Bosses, Anniversary 2014, Halloween 2015, Onslaught), 0 for
 the other 94.
 
-A second, independent signal picks out the same set. The client's quest catalog (RDB 1000104) is a SNAPSHOT
-that stops at quest id 18533 and goal id 12885, and those five quests are all above that ceiling — they are
-the only captured quests it carries no entry for. So "the newest content" is not just an impression from the
-ids: the client's own data draws the line in the same place.
+A second, independent signal picks out the same set: those are exactly the captured quests that have **no
+entry in RDB 1000104**, the client's quest-giver catalog (the sixth such quest, 19363, has no captured journal
+record at all, so the wire never stated a `@+0x11c` for it). Among the 99 quests we can see both sides of, the
+two agree perfectly.
 
-⚠️ Still a LEAD, not a decode — n = 5, and "newer than this RDB build" is a property of our snapshot rather
-than something the wire would sensibly encode. What it does rule out is the field being per-quest noise.
+That suggests the flag marks a quest reached some way OTHER than a quest giver — script-granted, event, meta,
+raid-finder — which fits what those five are. ⚠️ It is a HYPOTHESIS: n = 5, and the catalog omits 952 of the
+client's 5920 quests for reasons that are themselves not established (see
+[quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)), so the correlation may be inherited from
+whatever really drives that omission rather than being the field's meaning.
+
+⚠️ An earlier version of this note explained the same observation as "content newer than the RDB". That was
+wrong — the client is the same build the captures came from, and its own LDB carries the text for those
+quests.
