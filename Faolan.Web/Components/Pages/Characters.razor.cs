@@ -164,9 +164,17 @@ namespace Faolan.Web.Components.Pages
 			await using var db = await DbFactory.CreateDbContextAsync();
 			var full = await db.Characters.Include(x => x.Map).Include(x => x.Guild).FirstOrDefaultAsync(x => x.Id == c.Id);
 
-			// Vitals are DERIVED from (Class, Level) rather than stored, so there is no row to include and no older
-			// row to back-fill (#578).
-			var stats = full?.MaxVitals();
+			// Vitals are DERIVED rather than stored, so there is no row to include and no older row to back-fill
+			// (#578). The derivation scales off the character's ATTRIBUTES, which are the class/level base (#444) plus
+			// worn gear; this page reads the base only, so the numbers here are the character's pools UNGEARED - a
+			// floor, not what the client draws. Aggregating equipped items is the game server's job
+			// (MaxStatAggregator), not this page's.
+			var classBase = full == null
+				? null
+				: await db.ClassAttributeBases.AsNoTracking()
+					.Where(r => r.Class == full.Class && r.Level == full.Level)
+					.ToDictionaryAsync(r => r.StatId, r => r.Amount);
+			var stats = full?.MaxVitals(VitalAttributes.From(classBase, null), classBase);
 
 			_health = stats?.Health ?? 0;
 			_mana = stats?.Mana ?? 0;

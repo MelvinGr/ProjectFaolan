@@ -93,7 +93,7 @@ The table names ids for effects a server has to apply, which is a shortcut for w
 | `Character_SetupDefaultStatsScript` | 17581 |
 
 `Character_SetupDefaultStatsScript` is the script the client names as the source of a character's DEFAULT stats —
-the per-class/level curve our `CharacterMaxStats.CreateDefaults` currently approximates from L1 anchors only.
+the per-class/level curve `CharacterMaxStats.For` builds from RDB 1000511 (base + growth + attribute weights).
 
 ## Other constants worth knowing
 

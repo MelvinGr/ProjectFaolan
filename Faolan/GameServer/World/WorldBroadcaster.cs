@@ -2360,7 +2360,10 @@ namespace Faolan.GameServer.World
 			// (WithSessionNavigations). It did not, once: the session copy came back with Body + MaxStats only, so the
 			// build failed - and that failure landed on the ENTERING player, hanging them on the loading screen over a
 			// row missing from somebody ELSE's session object.
-			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation, PlayerCharacterIirs.ForCharacter(character, equipment), character,
+			// The vitals in the record are the subject's LIVE ceiling - the same value they see on their own sheet, so
+			// a third party's health bar reads what its owner's does rather than a gear-less class curve (#580).
+			return PlayerSpawnBuilder.BuildFromScratch(character.Id, playfieldToken, subject.Position, rotation,
+				PlayerCharacterIirs.ForCharacter(character, equipment, subject.Vitals?.ToMaxStats()!), character,
 				await _database.GetMorphTargetRegistry());
 		}
 

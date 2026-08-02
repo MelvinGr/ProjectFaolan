@@ -592,7 +592,10 @@ namespace Faolan.GameServer
 
 			var typedRoot = FullCharacterRoots.ForCharacter(characterTags, FullCharacterRoots.FullExpansionFlags, FullCharacterRoots.FullSubscriptionFlags, false, true,
 				FullCharacterRoots.Containers(instance, equipped, bagFirst, inventoryRows ?? []));
-			var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
+			// The snapshot's current-side vitals are the LIVE ceiling (gear included), the same value the vitals push
+			// after it carries - so the sheet does not flick from one max to the other on entry (#580).
+			var liveMax = _simulation.PlayerWorldEntity(client)!.Vitals.ToMaxStats();
+			var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, liveMax, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
 				indexLines, lineCatalog);
 			var snapshot = BuildWorldEntrySnapshot(client, typedRoot, tails);
 
@@ -616,7 +619,7 @@ namespace Faolan.GameServer
 			var (worldObjectRecords, worldObjectTotal) = _broadcaster.BuildEntryWorldObjects(client, _simulation.PlayerWorldEntity(client)!, activeQuestIds);
 			toSend.AddRange(worldObjectRecords);
 
-			toSend.Add(BuildBurstlessPlayerSpawn(client, equipment, playfieldToken, await Database.GetMorphTargetRegistry()));
+			toSend.Add(BuildBurstlessPlayerSpawn(client, equipment, playfieldToken, await Database.GetMorphTargetRegistry(), liveMax));
 
 			toSend.Add(snapshot);
 
@@ -809,12 +812,13 @@ namespace Faolan.GameServer
 		// are first known, and a character without them throws in the builder. One character object throughout - the
 		// session copy carries the scaffold rows (WithSessionNavigations) - so identity, transform and scaffold cannot
 		// disagree.
-		private static Rpc BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, uint playfield, IReadOnlyDictionary<string, MorphTarget> morphRegistry)
+		private static Rpc BuildBurstlessPlayerSpawn(INetworkClient client, CharacterEquipment equipment, uint playfield, IReadOnlyDictionary<string, MorphTarget> morphRegistry,
+			CharacterMaxStats maxVitals)
 		{
 			var character = client.Session.Character;
 			// The CharacterIIR is built from code (PlayerCharacterIirs, formerly PlayerCharacterIirTemplate.bin, #258):
 			// the fixed render template with this character's name/identity/looks/worn gear applied.
-			var message = PlayerCharacterIirs.ForCharacter(character, equipment);
+			var message = PlayerCharacterIirs.ForCharacter(character, equipment, maxVitals);
 
 			// A near-zero stored quaternion (the degenerate W=0 default) can't be realised by the avatar; fall back to
 			// identity rather than risk it (the live splice path guards the same way).

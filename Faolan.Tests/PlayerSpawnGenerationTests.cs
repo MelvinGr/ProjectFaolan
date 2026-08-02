@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -39,14 +40,18 @@ namespace Faolan.Tests
 				IsDead = isDead
 			};
 
-			var message = PlayerCharacterIirs.ForCharacter(character, new CharacterEquipment());
+			// A Guardian's level-1 sheet reads 130 health: 120 class base + 8 x 1 Constitution + the class/level
+			// ClassAttributeBases HealthMax row (200 wire = 2). All three terms, or the number is not retail's.
+			var classAttributeBase = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 200 };
+			var maxVitals = character.MaxVitals(VitalAttributes.LevelOneBase, classAttributeBase);
+			var message = PlayerCharacterIirs.ForCharacter(character, new CharacterEquipment(), maxVitals);
 
 			Assert.Equal(expectedHealth, message.Stats.Health);
 			// `life` carries the CLASS BASE, which the client tops up - not our sheet ceiling. Retail proves the split
 			// in one packet: Stihetfv (Conqueror L2) has life 19600 = 196 = the class base against current health 229
 			// (#580). It stays full regardless of dead state; only `health` is zeroed.
 			Assert.Equal(CharacterMaxStats.ClassBaseHundredths(character.Class, character.Level).Health, message.Stats.Life);
-			Assert.True(message.Stats.Life < character.MaxVitals().Health * 100, "the base must sit below the sheet ceiling");
+			Assert.True(message.Stats.Life < maxVitals.Health * 100, "the base must sit below the sheet ceiling");
 			if (isDead)
 			{
 				Assert.Equal(29u, message.Stats.BccState); // bcc_state=29 = the Dead behavior-controller state (alive=1)

@@ -38,11 +38,11 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 
 		// Single-quest convenience (golden tests + the single-quest path): FromScratch([beach], beach) ==
 		// FromScratch(beach), so byte-identical.
-		public static FullCharSnapshotSubClass FromScratch(QuestDefinition beachDef, Character character, uint instance, uint? playfieldToken = null,
-			IReadOnlyList<uint>? knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)>? statSheet = null)
+		public static FullCharSnapshotSubClass FromScratch(QuestDefinition beachDef, Character character, CharacterMaxStats maxVitals, uint instance,
+			uint? playfieldToken = null, IReadOnlyList<uint>? knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)>? statSheet = null)
 		{
 			ArgumentNullException.ThrowIfNull(beachDef);
-			return FromScratch([beachDef], beachDef, character, instance, playfieldToken, knownSpellIds, statSheet);
+			return FromScratch([beachDef], beachDef, character, maxVitals, instance, playfieldToken, knownSpellIds, statSheet);
 		}
 
 		// The player's full set of snapshot-eligible held quests (#255): the journal region carries every held
@@ -50,7 +50,13 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// beach quest when held). `knownSpellIds` are the character's learned spells - built INTO the stat block's
 		// known-list so they persist across relog + place on the action bar (#74/#71); null/empty leaves the list
 		// empty (byte-identical to the captured beach tails).
-		public static FullCharSnapshotSubClass FromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, uint instance, uint? playfieldToken = null,
+		//
+		// `maxVitals` is the character's LIVE ceiling - the world entity's EntityVitals, which is the only thing that
+		// knows the character's gear. It is required rather than re-derived here because the class/level curve alone
+		// is not the number the client draws (#580), and a snapshot that disagrees with the vitals push that follows
+		// it shows the sheet flicking from one max to the other. Ignored (and may be null) when `character` is null,
+		// which is the template/golden path.
+		public static FullCharSnapshotSubClass FromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, CharacterMaxStats maxVitals, uint instance, uint? playfieldToken = null,
 			IReadOnlyList<uint>? knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)>? statSheet = null,
 			IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)>? completedQuests = null, IReadOnlyDictionary<uint, QuestLine>? areas = null,
 			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
@@ -97,7 +103,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				// nothing: CaptureCharacterImporter seeds MaxStats FROM the captured stats, so the values that reach
 				// the wire here are the captured ones anyway on the first login - they simply track the character
 				// from then on.
-				var v = character.MaxVitals().SnapshotVitals(character.Class, character.Level);
+				ArgumentNullException.ThrowIfNull(maxVitals);
+				var v = maxVitals.SnapshotVitals(character.Class, character.Level);
 				block.ApplyClassVitals(v.Hp, v.HpBase, v.Mana, v.ManaBase, v.Stamina, v.StaminaBase);
 
 				// #214: a dead character logs in dead - zero current-health so the client shows the release window.

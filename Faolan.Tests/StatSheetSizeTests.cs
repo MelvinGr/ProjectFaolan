@@ -30,6 +30,12 @@ namespace Faolan.Tests
 			return new Character { Class = ConanClass.Barbarian, Level = 1 };
 		}
 
+		// Its vitals ceiling: no gear, so the level-1 attribute base is the whole of it.
+		private static CharacterMaxStats FreshMax()
+		{
+			return Fresh().MaxVitals(VitalAttributes.LevelOneBase);
+		}
+
 		// A character with NO stored sheet is the create path, not corruption: it must still build the skeleton.
 		[Fact]
 		public async Task EmptyStatSheet_StillBuilds_TheBaselineSkeleton()
@@ -37,7 +43,7 @@ namespace Faolan.Tests
 			var def = await LoadDefinition();
 			Assert.NotNull(def);
 
-			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, Fresh(), TemplateInstance, null, [], []));
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, Fresh(), FreshMax(), TemplateInstance, null, [], []));
 			Assert.NotEmpty(built);
 		}
 
@@ -60,7 +66,7 @@ namespace Faolan.Tests
 			for (var i = 0; i < SubClassStatBlock.SheetSize - 1; i++)
 				partial.Add((CharacterStatId.Level, 1));
 
-			var ex = Assert.Throws<InvalidOperationException>(() => SnapshotTails.FromScratch(def, Fresh(), TemplateInstance, null, [], partial));
+			var ex = Assert.Throws<InvalidOperationException>(() => SnapshotTails.FromScratch(def, Fresh(), FreshMax(), TemplateInstance, null, [], partial));
 
 			Assert.Contains($"{SubClassStatBlock.SheetSize}", ex.Message);
 		}

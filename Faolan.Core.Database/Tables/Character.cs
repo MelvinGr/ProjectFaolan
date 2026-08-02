@@ -191,19 +191,24 @@ namespace Faolan.Core.Database.Tables
 			return $"{base.ToString()}: {Name}";
 		}
 
-		// The vitals ceiling for this character's Class/Level. COMPUTED, never stored (#578).
+		// The vitals ceiling for this character's Class/Level and ATTRIBUTES. COMPUTED, never stored (#578).
 		//
-		// It used to be a persisted `CharacterMaxStats` row, and storing a value that is a pure function of two other
-		// columns is what made the bug: only the `.level` GM command refreshed it, so a combat level-up wrote the new
+		// It used to be a persisted `CharacterMaxStats` row, and storing a value that is a pure function of other
+		// state is what made the bug: only the `.level` GM command refreshed it, so a combat level-up wrote the new
 		// Level and left the row at its creation value. The next login re-seeded current health from that stale
 		// ceiling and the player came back at a fraction of their bar - a level-2 necromancer reading 89/955. There is
 		// nothing to keep in sync now, so it cannot go stale again.
 		//
-		// This is the BASE the client adds to, not the number it draws: gear, class-feat and buff terms are layered on
-		// top by EntityVitals.FromCharacter. See CharacterMaxStats for the curve itself.
-		public CharacterMaxStats MaxVitals()
+		// The attributes are a REQUIRED argument rather than something read off the character, because they are not on
+		// it: an attribute score is the class/level base (#444, a DB table) plus worn gear, and both live above this
+		// type. A caller with no character state to hand - a golden test, a create-flow build - passes
+		// VitalAttributes.LevelOneBase, which is the real level-1 row and not a stand-in.
+		//
+		// What comes out IS the number the client draws, minus the flat gear/feat pool bonuses layered on by
+		// EntityVitals.FromCharacter. See CharacterMaxStats.For.
+		public CharacterMaxStats MaxVitals(VitalAttributes attributes, IReadOnlyDictionary<CharacterStatId, int>? classAttributeBase = null)
 		{
-			return CharacterMaxStats.CreateDefaults(Class, Level);
+			return CharacterMaxStats.For(Class, Level, attributes, classAttributeBase);
 		}
 	}
 }

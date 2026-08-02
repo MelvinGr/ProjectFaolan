@@ -101,7 +101,7 @@ namespace Faolan.Tests
 
 				// The capture's own vitals are deliberately NOT carried: vitals are derived from (Class, Level) so an
 				// imported character is no different from a created one (#578).
-				Assert.Equal(CharacterMaxStats.CreateDefaults(character.Class, character.Level).Health, character.MaxVitals().Health);
+				Assert.Equal(CharacterMaxStats.For(character.Class, character.Level, VitalAttributes.LevelOneBase).Health, character.MaxVitals(VitalAttributes.LevelOneBase).Health);
 
 				// The spawn's 7 morph entries must reach CharacterBody, which IS the appearance now: it is what
 				// Faolan.Web renders from and what the spawn's entry table is regenerated from. They used to stay at

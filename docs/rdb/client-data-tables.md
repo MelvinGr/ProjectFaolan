@@ -246,8 +246,8 @@ work is tracked in Gitea #469.
 
 95 records of 14 × i32 (5 races × 19 class slots), 20-byte header with the count in the FIFTH word. Words `[0]`
 and `[1]` are the race and the class; `[2..4]` are the health/mana/stamina **base** in hundredths and `[5..7]`
-their **growth** in thousandths. The remaining six (`8000,3000,3000,2000,2000,2000` and its zeroed variants) are
-constant per pool-set and undecoded. Dump it with `--report rdb-class-vitals`.
+their **growth** in thousandths. The remaining six (`[8..13]`) are the **attribute weights** — see below. Dump it
+with `--report rdb-class-vitals`.
 
 ```
 base(level) = baseWord + growthWord * (level - 1) / 10
@@ -282,15 +282,47 @@ The table is keyed by (race, class) and is race-INVARIANT with one exception: ra
 growth of **59** where every other race carries 40. Nothing else differs across the five races.
 
 ⚠️ **The base is NOT the displayed maximum.** Retail routinely sends a base *below* the current in the same
-packet, and the client tops it up from gear, feats and attributes: an L23 Assassin whose character sheet reads
-1270 health has a class base of 772. So this curve is one of three terms, not the whole sum, and swapping it in
-as the max would LOWER every character's ceiling. `CharacterMaxStats.ClassBaseHundredths` exposes it and says so;
-open work on the remaining terms is tracked in Gitea #450 / #3.
+packet, and the client tops it up: an L23 Assassin whose character sheet reads 1270 health has a class base of
+772. So this curve is one term of the sum, not the sum, and swapping it in as the max would LOWER every
+character's ceiling. `CharacterMaxStats.ClassBaseHundredths` exposes it and says so; the whole sum is
+`CharacterMaxStats.For`.
 
 Independent corroboration that this word IS the same quantity our snapshot has always carried as the "HP base"
-slot: all twelve of `CharacterMaxStats`'s hand-anchored `hpBaseL1` values, read off retail login snapshots long
-before this table was decoded, equal this table's health base exactly. The mana and stamina bases sit 6 below the
-sheet's displayed value for every class.
+slot: all twelve of `CharacterMaxStats`'s hand-anchored level-1 HP-base values, read off retail login snapshots
+long before this table was decoded, equal this table's health base exactly.
+
+### Words `[8..13]` — the attribute weights
+
+The trailing six are the per-attribute weights in **thousandths**, one column per attribute a pool scales off:
+health takes one (`8000` for every class), mana two (`3000,3000`), stamina three (`2000,2000,2000`), and a class
+without a pool carries zeroes in that pool's columns (an Assassin's row is `8000,0,0,2000,2000,2000`). A term is
+`weight × attributeScore / 10`, which lands in the same hundredths as the base.
+
+```
+pool(level) = base(level) + Σ weight[i] × attribute[i] / 10 + the class ClassAttributeBases pool row
+```
+
+Which column feeds which attribute is not observable here, because every class's weights are equal WITHIN a pool —
+only each pool's attribute SET is. Those sets come from the captures: **health = Constitution** (AssassinL23's
+448-point gap over the base is 8 × 56 exactly, and the client's own health accessor `FUN_0111aa30` reads stat
+`0x326`), **stamina = Strength + Dexterity + Constitution** (the only triple of the five that makes their
+310-point gap, 2 × 155), **mana = Intelligence + Wisdom**. Mana is the one with slack: every captured caster
+happens to carry equal Wisdom and Dexterity (110/110 on both level-80 mages, 33/33 on the Herald), so the corpus
+cannot separate the two there.
+
+**Verified against every anchor we hold.** All twelve classes' level-1 character sheets (where the attribute base
+is a flat 1, so each pool is base + 8 / + 6 / + 6 plus the `ClassAttributeBases` HealthMax row — Guardian 130,
+Conqueror 168, Dark Templar 128/281/178, Assassin 98/236, Barbarian 118, Ranger 133, the priests 88/171, Bear
+Shaman 108/171/178, Herald 89/246/121, the mages 89/246, including the Guardian's 178.5 stamina rounding to the
+captured 179); and, at level, the four captured characters' world-entry pushes — AssassinL23 (Assassin L23)
+1270/1148/74, Hakotep (Herald L24) 1414/759/1584, NecroL80 (Necromancer L80) 6341 health / 6523 mana, DemoL80
+(Demonologist L80) 5830 mana. Ten of the eleven measurable pools land exactly; the eleventh (DemoL80's health) is
+177 low because our item data for that character is short.
+[V3: CharacterMaxStatsTests.EveryClass_AtLevelOne_ReproducesItsCapturedSheet]
+[V3: EntityVitalsGearTests.AssassinL23_AtLevel23_MatchesTheCapturedRetailPools]
+
+This is also what explains the old hand-read offsets: the mana and stamina bases sat "6 below the sheet" for
+every class because at level 1 every attribute is 1, and 3+3 and 2+2+2 are both 6.
 
 ## 1000513 `RDBComboLookup_c` — the combo damage/stamina curve
 

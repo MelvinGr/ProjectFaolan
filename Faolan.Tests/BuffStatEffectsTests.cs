@@ -243,8 +243,8 @@ namespace Faolan.Tests
 			// The base is DERIVED from (Class, Level) (#578), so take it from the character rather than restating a
 			// number - what this test is about is the +1800 landing ON it, not what it happens to be.
 			var character = new Character { Class = ConanClass.BearShaman, Level = 80 };
-			var baseHp = character.MaxVitals().Health;
 			entity.Vitals = EntityVitals.FromCharacter(character);
+			var baseHp = entity.Vitals.BaseMaxHealth;
 
 			entity.ActiveBuffs[4239610 << 8] = new ActiveBuff(4239610 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
 			var applied = BuffStatEffects.Recompute(entity, catalog);
@@ -261,8 +261,8 @@ namespace Faolan.Tests
 			var catalog = BuffStatEffects.BuildCatalog([Row(4239610, CharacterStatId.HealthMax, 53045, 180000)]);
 			var entity = Player();
 			var character = new Character { Class = ConanClass.BearShaman, Level = 80 };
-			var baseHp = character.MaxVitals().Health;
 			entity.Vitals = EntityVitals.FromCharacter(character);
+			var baseHp = entity.Vitals.BaseMaxHealth;
 
 			entity.ActiveBuffs[4239610 << 8] = new ActiveBuff(4239610 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
 			BuffStatEffects.Recompute(entity, catalog);
@@ -284,8 +284,10 @@ namespace Faolan.Tests
 			var entity = Player();
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 584 };
 			var character = new Character { Class = ConanClass.BearShaman, Level = 80 };
-			var baseHp = character.MaxVitals().Health;
 			entity.Vitals = EntityVitals.FromCharacter(character, entity.GearBonuses);
+			// The pool BEFORE gear and buffs - taken off the same object the test then buffs, so the two cannot
+			// disagree about how it was derived.
+			var baseHp = entity.Vitals.BaseMaxHealth;
 
 			Assert.Equal(baseHp + 584, entity.Vitals.MaxHealth); // gear alone, before any buff
 
@@ -307,8 +309,8 @@ namespace Faolan.Tests
 			// FromCharacter, not FromMax: only it seeds BaseMaxHealth, which is what SetMaxFromBonus adds the bonus
 			// ONTO. (Production always comes through FromCharacter - GetOrAddPlayerVitals and RegisterPlayerInWorld.)
 			var character = new Character { Class = ConanClass.Guardian, Level = 1 };
-			var baseHp = character.MaxVitals().Health;
 			entity.Vitals = EntityVitals.FromCharacter(character);
+			var baseHp = entity.Vitals.BaseMaxHealth;
 			entity.GearBonuses = new Dictionary<CharacterStatId, int> { [CharacterStatId.HealthMax] = 0 };
 
 			// First sync seeds off gear alone: it APPLIES but reports nothing (that is not news).

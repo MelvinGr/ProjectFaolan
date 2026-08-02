@@ -43,16 +43,18 @@ alone, on the belief that "max rides the snapshot" — true at world entry and w
 left a levelled character's bar pinned to its seed max. A vitals push now emits the whole
 `EntityVitals.ToVitalsBlock` (current AND max), and a path that CHANGES a max calls
 `CombatService.ReseedFromMaxStats` first. `BuildVitals(client)` sources Health/Stamina/Mana from
-**`Character.MaxVitals()`**, which COMPUTES them from (Class, Level) via `CharacterMaxStats.CreateDefaults`. They
+the player's LIVE `EntityVitals`, whose ceiling **`Character.MaxVitals`** COMPUTES from (Class, Level) and the
+character's attributes via `CharacterMaxStats.For`. They
 used to be a persisted `CharacterMaxStats` row; storing a value that is a pure function of two other columns is
 what let it go stale, because only the `.level` GM command refreshed it — a combat level-up wrote the new Level and
 left the row at its creation value, so the next login re-seeded current health from the old ceiling (a level-2
 necromancer reading 89/955, #578). The table is dropped and there is nothing left to keep in sync; an imported
 character reports the same ceiling as a created one of the same class and level. Those values are no longer "rough class/level
-values anchored on AssassinL23": the LEVEL-1 anchors are retail-verified per class (decoded out of the world-entry
-vitals push in the create captures — Guardian 130, Conqueror 168, Dark Templar 128, Barbarian 118, Ranger 133,
-Necromancer / Herald of Xotli 89, Assassin 98), and the per-class BASE curve is the client's own `HitsManaAndStamina_c`
-table (RDB 1000511, `CharacterMaxStats.ClassBaseHundredths`), which reproduces all 16 captured level-up pushes exactly. The create-editor commits the chosen class
+values anchored on AssassinL23", and no longer fitted at all: the whole curve is the client's own
+`HitsManaAndStamina_c` table (RDB 1000511) — its base/growth words as `CharacterMaxStats.ClassBaseHundredths`,
+which reproduces all 16 captured level-up pushes exactly, plus its attribute weights as
+`CharacterMaxStats.AttributeScaledHundredths`. Together they reproduce every retail level-1 sheet across all
+twelve classes and the captured pools of the four level-23-to-80 characters (see `docs/rdb/client-data-tables.md`). The create-editor commits the chosen class
 before naming, and nothing has to be regenerated for it: the vitals follow the stored Class the moment it is
 written. (Of the live stat-testing GM commands, `.setstatrange` and
 `.vitals` were removed; **`.setstat` is still registered** and is the instrument for measuring a stat's DISPLAY

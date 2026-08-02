@@ -22,6 +22,14 @@ namespace Faolan.Tests
 	public class SnapshotTailsFromScratchTests
 	{
 		private const uint BeachStarterQuestId = 10238;
+
+		// A character's vitals ceiling with no gear and the level-1 attribute base - which is what every character in
+		// this file is (freshly-built, no equipment). The world-entry path passes the LIVE EntityVitals instead.
+		private static CharacterMaxStats MaxOf(Character character)
+		{
+			return character.MaxVitals(VitalAttributes.LevelOneBase);
+		}
+
 		private const uint TemplateInstance = 0x02165EFF;
 		private static readonly string DbPath = TestPaths.FaolanDb;
 		private static readonly string TemplatePath = TestPaths.Asset("BeachTailsTemplate.bin");
@@ -52,7 +60,7 @@ namespace Faolan.Tests
 				// ...and whose ACCOUNT it is: the sheet's PlayerId is the account's, not the character's (#478).
 				AccountId = 0x59EA506E
 			};
-			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, strie, TemplateInstance));
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, strie, MaxOf(strie), TemplateInstance));
 
 			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.True(template.SequenceEqual(built), "authoring the per-class block for an Assassin L1 must still equal the captured Strie template byte-for-byte");
@@ -84,10 +92,10 @@ namespace Faolan.Tests
 				.Select(p => ((CharacterStatId)p.Id, p.Value))
 				.ToList();
 
-			var fromCapture = SnapshotTails.FromScratch(def, character, 0x0802ABCD, statSheet: captured);
-			var fromScratch = SnapshotTails.FromScratch(def, character, 0x0802ABCD);
+			var fromCapture = SnapshotTails.FromScratch(def, character, MaxOf(character), 0x0802ABCD, statSheet: captured);
+			var fromScratch = SnapshotTails.FromScratch(def, character, MaxOf(character), 0x0802ABCD);
 
-			Assert.Equal(character.MaxVitals().Health, fromCapture.PostAccessBlock!.CurrentHp);
+			Assert.Equal(character.MaxVitals(VitalAttributes.LevelOneBase).Health, fromCapture.PostAccessBlock!.CurrentHp);
 			Assert.Equal(fromScratch.PostAccessBlock!.CurrentHp, fromCapture.PostAccessBlock.CurrentHp);
 			Assert.Equal(fromScratch.PostAccessBlock.GetStat(CharacterStatId.HealthMax), fromCapture.PostAccessBlock.GetStat(CharacterStatId.HealthMax));
 		}
@@ -118,10 +126,10 @@ namespace Faolan.Tests
 			};
 			const uint live = 0x0802ABCD;
 
-			var aliveSubClass = SnapshotTails.FromScratch(def, alive, live);
-			var deadSubClass = SnapshotTails.FromScratch(def, dead, live);
+			var aliveSubClass = SnapshotTails.FromScratch(def, alive, MaxOf(alive), live);
+			var deadSubClass = SnapshotTails.FromScratch(def, dead, MaxOf(dead), live);
 
-			Assert.Equal(alive.MaxVitals().Health, aliveSubClass.PostAccessBlock!.CurrentHp); // alive: full current health
+			Assert.Equal(alive.MaxVitals(VitalAttributes.LevelOneBase).Health, aliveSubClass.PostAccessBlock!.CurrentHp); // alive: full current health
 			Assert.Equal(0u, deadSubClass.PostAccessBlock!.CurrentHp); // dead: current health = 0 (the gate)
 
 			// Max HP is untouched by death - HealthMax stays full in both.
@@ -136,7 +144,7 @@ namespace Faolan.Tests
 		{
 			var def = await LoadDefinition(BeachStarterQuestId);
 			const uint live = 0x0802ABCD;
-			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, null!, live));
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, null!, null!, live));
 
 			// the template instance must be gone, the live one present (raw big-endian)
 			var needleOld = new byte[] { 0x02, 0x16, 0x5E, 0xFF };
@@ -153,7 +161,7 @@ namespace Faolan.Tests
 
 			// character = null -> the stat skeleton stays at its (Strie) baseline, instance = the template's, so no
 			// re-addressing: the assembly must equal the captured tails exactly.
-			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, null!, TemplateInstance));
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, null!, null!, TemplateInstance));
 
 			var template = await File.ReadAllBytesAsync(TemplatePath, TestContext.Current.CancellationToken);
 			Assert.Equal(template.Length, built.Length);
@@ -180,7 +188,7 @@ namespace Faolan.Tests
 			};
 			const uint live = 0x0802ABCD;
 
-			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, character, live));
+			var built = FullCharSnapshotSubClassCodec.Build(SnapshotTails.FromScratch(def, character, MaxOf(character), live));
 
 			// Re-parses without throwing, and is byte-lossless through the typed model.
 			var tails = FullCharSnapshotSubClassCodec.Parse(built);
@@ -192,9 +200,9 @@ namespace Faolan.Tests
 
 			// The live character's vitals/XP landed in the decoded stat slots (the part the production flip changes).
 			Assert.NotNull(tails.PostAccessBlock);
-			Assert.Equal(character.MaxVitals().Health, tails.PostAccessBlock!.CurrentHp);
-			Assert.Equal(character.MaxVitals().Mana, tails.PostAccessBlock.CurrentMana);
-			Assert.Equal(character.MaxVitals().Stamina, tails.PostAccessBlock.CurrentStamina);
+			Assert.Equal(character.MaxVitals(VitalAttributes.LevelOneBase).Health, tails.PostAccessBlock!.CurrentHp);
+			Assert.Equal(character.MaxVitals(VitalAttributes.LevelOneBase).Mana, tails.PostAccessBlock.CurrentMana);
+			Assert.Equal(character.MaxVitals(VitalAttributes.LevelOneBase).Stamina, tails.PostAccessBlock.CurrentStamina);
 
 			// The XP bar is authored as a consistent triple by stat id (#447): within-level progress in 0x34, the
 			// curve's to-next-level cost in 0x15E - word [80] - and a zero base for the current level.

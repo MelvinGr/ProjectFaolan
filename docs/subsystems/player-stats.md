@@ -65,6 +65,30 @@ screenshot anchor (taken at full) and the spawn-capture test both match those id
 old code sent the delta under the *max* id, so a heal/damage grew the player's MAX bar instead of moving
 current). See `CharacterStatBlockTests`.
 
+## The max ids carry the CLASS BASE, not the drawn maximum
+
+The two ids of a pair are not "current" and "the number on the bar". The **current** id carries the whole pool;
+the **max** id carries the class/level BASE, which the client tops up with its own attribute, gear and feat terms
+to produce what it draws. Retail's world-entry push for AssassinL23 (Assassin L23) carries both in one packet:
+
+| id | | raw | what it is |
+|---|---|---|---|
+| `0x001B` | HealthCurrent | 127000 | the pool — and what the sheet draws as the MAX, 1270 |
+| `0x0001` | HealthMax | 77200 | the class base, 772 |
+| `0x01F8` | StaminaCurrent | 114800 | 1148 |
+| `0x01F9` | StaminaMax | 73600 | 736 |
+| `0x01FA` | ManaCurrent | 7400 | 74 — entirely from a worn item |
+| `0x01FB` | ManaMax | **0** | an Assassin has no mana pool, item or not |
+
+Two consequences the server has to respect:
+
+- **The server's ceiling must BE the drawn maximum.** Putting our ceiling in a max slot makes the client top up
+  an already-topped-up number (it drew 1754 where retail drew 1270); putting the class base in the current slot
+  tells the client a current the server does not hold. `CharacterMaxStats.For` computes the ceiling and
+  `EntityVitals.ClassBasePools` carries the base — see `docs/rdb/client-data-tables.md` for the curve.
+- **A 0 in a max slot is what hides a bar.** A class with no mana pool sends `ManaMax 0` even while wearing a
+  +74 mana item; sending the item's 74 there makes a mana bar appear on the next vitals push.
+
 ## Regen moves the SAME stats, through the same client setter (`RegenIIR` 0x28D0AC99)
 
 Retail does not push a full `0x96B8DC59` block per regen tick — it sends `RegenIIR`, a 12-byte

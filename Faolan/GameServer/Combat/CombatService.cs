@@ -154,12 +154,7 @@ namespace Faolan.GameServer.Combat
 			var seeded = EntityVitals.FromCharacter(character, statBonuses, classBase);
 			var vitals = GetOrAddPlayerVitals(client);
 
-			vitals.MaxHealth = seeded.MaxHealth;
-			vitals.MaxStamina = seeded.MaxStamina;
-			vitals.MaxMana = seeded.MaxMana;
-			vitals.Health = seeded.MaxHealth;
-			vitals.Stamina = seeded.MaxStamina;
-			vitals.Mana = seeded.MaxMana;
+			vitals.ReseedMaxFrom(seeded);
 			return vitals;
 		}
 

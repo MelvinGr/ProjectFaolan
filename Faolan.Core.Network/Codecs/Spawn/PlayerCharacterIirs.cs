@@ -21,7 +21,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// The player-spawn message for `character` (worn `equipment` applied). character == null returns the bare
 		// render template (fixed constants + Strie's identity/looks fallbacks, no worn gear).
-		public static ProtoCoreCharacterIIR ForCharacter(Character character, CharacterEquipment equipment)
+		//
+		// `maxVitals` is the character's LIVE ceiling (the world entity's EntityVitals) - the current-side vitals
+		// fields carry it, and only the live value knows the character's gear. Ignored when `character` is null.
+		public static ProtoCoreCharacterIIR ForCharacter(Character character, CharacterEquipment equipment, CharacterMaxStats maxVitals = null!)
 		{
 			var message = new ProtoCoreCharacterIIR
 			{
@@ -77,7 +80,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			};
 
 			if (character != null)
-				ApplyCharacter(message, character, equipment);
+				ApplyCharacter(message, character, equipment, maxVitals);
 
 			// GM Level: drive player_stats.gm_level from the account type (GM/Admin -> non-zero -> retail GM mode).
 			// Only set when non-zero so the bare template (character == null) and normal players don't serialize the
@@ -92,7 +95,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Overrides `message` in place from the character: name, identity (sex/race/level + cur==max vitals), editor
 		// looks, worn equipment, and the dead-state signals. Fields with no DB value (race/sex 0, no Body, no buildable
 		// gear) keep the template's captured value.
-		private static void ApplyCharacter(ProtoCoreCharacterIIR message, Character character, CharacterEquipment equipment)
+		private static void ApplyCharacter(ProtoCoreCharacterIIR message, Character character, CharacterEquipment equipment, CharacterMaxStats maxVitals)
 		{
 			message.Name = character.Name;
 
@@ -124,18 +127,17 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			// full value. Retail proves the split in one packet - Stihetfv (Conqueror L2) has life 19600 = 196 = this
 			// curve's class base, against current health 229, and our sheet curve gives 228 for that same character.
 			// Sending the sheet value in the max slot made the client top up an already-topped-up number (#580).
-			var maxStats = character.MaxVitals();
 			var (baseHealth, baseMana, baseStamina) = CharacterMaxStats.ClassBaseHundredths(character.Class, character.Level);
-			if (maxStats != null)
+			if (maxVitals != null)
 			{
 				stats.Life = baseHealth;
 				stats.Health = character.IsDead
 					? 0
-					: maxStats.Health * 100;
-				stats.MaxStamina = maxStats.Stamina == 0 ? 0 : baseStamina;
-				stats.Stamina = maxStats.Stamina * 100;
-				stats.MaxMana = maxStats.Mana == 0 ? 0 : baseMana;
-				stats.Mana = maxStats.Mana * 100;
+					: maxVitals.Health * 100;
+				stats.MaxStamina = baseStamina;
+				stats.Stamina = maxVitals.Stamina * 100;
+				stats.MaxMana = baseMana;
+				stats.Mana = maxVitals.Mana * 100;
 			}
 			// Remaining CharacterStats fields (looks_package, side, ...) stay captured.
 

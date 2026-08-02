@@ -244,11 +244,11 @@ namespace Faolan.Tests
 				// Vitals are DERIVED from (Class, Level) (#578) - there is no row to cascade-insert, and a reloaded
 				// character reports the same ceiling as the one just created because both compute it.
 				var created = await repo.CreateCharacter(accountId, realmId);
-				Assert.True(created.MaxVitals().Health > 0);
+				Assert.True(created.MaxVitals(VitalAttributes.LevelOneBase).Health > 0);
 
 				var loaded = await repo.GetCharacterForAccount(accountId, created.Id);
-				Assert.Equal(created.MaxVitals().Health, loaded!.MaxVitals().Health);
-				Assert.True(loaded.MaxVitals().Stamina > 0);
+				Assert.Equal(created.MaxVitals(VitalAttributes.LevelOneBase).Health, loaded!.MaxVitals(VitalAttributes.LevelOneBase).Health);
+				Assert.True(loaded.MaxVitals(VitalAttributes.LevelOneBase).Stamina > 0);
 			}
 			finally
 			{
@@ -525,9 +525,9 @@ namespace Faolan.Tests
 
 				// Reload: vitals reflect the chosen class purely from the stored Class/Level.
 				var reloaded = await repo.GetCharacterForAccount(accountId, created.Id);
-				var expected = CharacterMaxStats.CreateDefaults(ConanClass.Necromancer, 20);
-				Assert.Equal(expected.Mana, reloaded!.MaxVitals().Mana);
-				Assert.Equal(expected.Health, reloaded.MaxVitals().Health);
+				var expected = CharacterMaxStats.For(ConanClass.Necromancer, 20, VitalAttributes.LevelOneBase);
+				Assert.Equal(expected.Mana, reloaded!.MaxVitals(VitalAttributes.LevelOneBase).Mana);
+				Assert.Equal(expected.Health, reloaded.MaxVitals(VitalAttributes.LevelOneBase).Health);
 			}
 			finally
 			{
@@ -650,7 +650,7 @@ namespace Faolan.Tests
 				}
 
 				var created = await repo.CreateCharacter(accountId, realmId);
-				Assert.True(created.MaxVitals().Health > 0);
+				Assert.True(created.MaxVitals(VitalAttributes.LevelOneBase).Health > 0);
 
 				Assert.False(created.HasBind); // a fresh character is unbound (BindMapId 0)
 
@@ -671,7 +671,7 @@ namespace Faolan.Tests
 				Assert.Equal(2040u, (await repo.GetRespawnPoint(7))!.MapId);
 
 				// Vitals track the level the targeted writes just changed - nothing to rewrite, nothing to go stale.
-				Assert.Equal(CharacterMaxStats.CreateDefaults(loaded.Class, 17).Health, loaded.MaxVitals().Health);
+				Assert.Equal(CharacterMaxStats.For(loaded.Class, 17, VitalAttributes.LevelOneBase).Health, loaded.MaxVitals(VitalAttributes.LevelOneBase).Health);
 			}
 			finally
 			{

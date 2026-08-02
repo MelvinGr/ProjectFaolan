@@ -196,10 +196,16 @@ namespace Faolan.GameServer.World
 				? (int)buffed
 				: GearBonuses.GetValueOrDefault(attribute);
 
-			// The class/level BASE (#444) is in the same WIRE scale as the gear bonus, so they add directly. It is
-			// empty for a (class, level) we have not decoded, in which case this is gear + buffs only and reads LOW -
-			// the honest shortfall, not a silent zero base.
-			return (uint)Math.Max(0, ClassBase.GetValueOrDefault(attribute) + geared);
+			// ⚠️ The two sources are in DIFFERENT scales and the base has to be converted before it meets the bonus.
+			// ClassAttributeBase.Amount is the RAW WIRE value (AssassinL23's Constitution base is 170) while
+			// MaxStatAggregator has already divided gear by the stat's scale (their gear Constitution is 39) - and
+			// their sheet reads 56, which is 170/10 + 39. Adding them raw returned 209, so every attribute-driven
+			// formula (regen, armour and protection mitigation) read about ten times high for any character whose
+			// class/level base is decoded.
+			//
+			// The base is empty for a (class, level) we have not decoded, in which case this is gear + buffs only and
+			// reads LOW - the honest shortfall, not a silent zero base.
+			return (uint)Math.Max(0, ClassBase.GetValueOrDefault(attribute) / (int)attribute.GetScale() + geared);
 		}
 
 		// The same score at the ×10 WIRE scale the client's stat store holds: `raw = display × 10 + 10`. The +10 is the
