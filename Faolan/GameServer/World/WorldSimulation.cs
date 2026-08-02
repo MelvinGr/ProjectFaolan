@@ -154,7 +154,8 @@ namespace Faolan.GameServer.World
 		// position/vitals; the Character is only re-read on a fresh entry/teleport. Idempotent (GetOrAdd keeps the
 		// existing entity, so vitals aren't reset across re-entry/teleport/respawn).
 		public void RegisterPlayerInWorld(INetworkClient client, MapInstanceMode instanceMode = MapInstanceMode.Shared, IReadOnlyDictionary<CharacterStatId, int>? statBonuses = null,
-			IReadOnlyDictionary<CharacterStatId, int>? classBase = null, IReadOnlyDictionary<uint, int>? spellBoosts = null)
+			IReadOnlyDictionary<CharacterStatId, int>? classBase = null, IReadOnlyDictionary<uint, int>? spellBoosts = null,
+			IReadOnlyDictionary<uint, uint>? spellScalingAttributes = null)
 		{
 			var character = client.Session.Character;
 
@@ -188,7 +189,13 @@ namespace Faolan.GameServer.World
 				GearBonuses = statBonuses ?? new Dictionary<CharacterStatId, int>(),
 				ClassBase = classBase ?? new Dictionary<CharacterStatId, int>(),
 				// #590: the feat boosts for this character's spells, already fanned out from line to rank.
-				SpellBoosts = spellBoosts ?? new Dictionary<uint, int>()
+				SpellBoosts = spellBoosts ?? new Dictionary<uint, int>(),
+				// #592: the caster's attribute scores and class, which is what the magic-damage scaling term reads,
+				// plus the per-spell attribute overrides. Same inputs as the pools above (VitalAttributes.From), so
+				// the two never disagree about what the character's Intelligence is.
+				Attributes = VitalAttributes.From(classBase, statBonuses),
+				CasterClass = character.Class,
+				SpellScalingAttributes = spellScalingAttributes ?? new Dictionary<uint, uint>()
 			});
 			// Re-apply the account-persisted GM toggles (#279): the live entity is fresh on each world entry (a map
 			// change is a new world connection), so these would otherwise be lost on every zone. Only GMs ever carry them.

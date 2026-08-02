@@ -43,6 +43,14 @@ namespace Faolan.Core.Database.Repositories
 		///     never stack with each other.
 		/// </summary>
 		Task<IReadOnlyDictionary<uint, int>> GetCharacterSpellBoosts(uint characterId);
+
+		/// <summary>
+		///     The per-spell scaling-attribute OVERRIDES among a character's KNOWN spells (#592), as
+		///     <c>spellId -> wire stat id</c>. Only spells whose template carries RDB field 847 appear; every other
+		///     spell takes the caster's class attribute (<c>CombatResolver.MagicDamageAttribute</c>), so an absent
+		///     entry means "no override", not "no scaling".
+		/// </summary>
+		Task<IReadOnlyDictionary<uint, uint>> GetCharacterSpellScalingAttributes(uint characterId);
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId, ContainerKind? container = null);
 		Task<CharacterInventory?> GetInventorySlot(uint characterId, ContainerKind container, int slot);
@@ -436,6 +444,20 @@ namespace Faolan.Core.Database.Repositories
 				totals[row.Id] = totals.GetValueOrDefault(row.Id) + (int)row.PercentHundredths;
 
 			return totals;
+		}
+
+		public async Task<IReadOnlyDictionary<uint, uint>> GetCharacterSpellScalingAttributes(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			// Only the character's OWN spells, and only the ones that actually carry an override - 716 of the 21,502
+			// templates do, so a character typically has a handful or none, and the cast path stays a dictionary
+			// lookup (the same reason GetCharacterSpellBoosts resolves its fan-out here).
+			var rows = await (from known in ctx.CharacterSpells.Where(c => c.CharacterId == characterId)
+				join spell in ctx.Spells on known.SpellId equals spell.Id
+				where spell.ScalingAttribute != 0
+				select new { spell.Id, spell.ScalingAttribute }).ToArrayAsync();
+
+			return rows.ToDictionary(r => r.Id, r => r.ScalingAttribute);
 		}
 
 		// The prerequisite edges for `featIds` (FeatPrereq, imported from the client's own feat table), as

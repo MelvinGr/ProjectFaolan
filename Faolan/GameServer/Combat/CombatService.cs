@@ -87,7 +87,7 @@ namespace Faolan.GameServer.Combat
 		public async Task ChannelGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId, int channelMs, uint castToken)
 		{
 			var casterLevel = client.Session.Character.Level;
-			var total = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamage ?? 0,
+			var total = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamageFor(spellId) ?? 0,
 				_sim.PlayerWorldEntity(client)?.SpellBoost(spellId) ?? 0);
 			var tickCount = Math.Max(1, channelMs / GroundAoeTickIntervalMs);
 			var perTick = Math.Max(1, total / tickCount);
@@ -177,7 +177,7 @@ namespace Faolan.GameServer.Combat
 		public async Task ResolveGroundAoe(INetworkClient client, uint casterHandle, Vector3 target, uint spellId)
 		{
 			var casterLevel = client.Session.Character.Level;
-			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamage ?? 0,
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, _sim.PlayerWorldEntity(client)?.MagicDamageFor(spellId) ?? 0,
 				_sim.PlayerWorldEntity(client)?.SpellBoost(spellId) ?? 0);
 			var count = await ApplyAoeTick(client, casterHandle, target, spellId, damage);
 			_logger.LogInformation("Ground AoE spell 0x{Spell:X} at {Pos}: hit {Count} target(s) for {Damage} each.", spellId, target, count, damage);
@@ -191,7 +191,7 @@ namespace Faolan.GameServer.Combat
 			var caster = _sim.PlayerWorldEntity(client);
 			caster?.LastCombatAt = DateTimeOffset.UtcNow; // casting at a target -> in combat
 			var casterLevel = client.Session.Character.Level;
-			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, caster?.MagicDamage ?? 0, caster?.SpellBoost(spellId) ?? 0);
+			var damage = CombatResolver.ResolveSpellDamage(spellId, casterLevel, caster?.MagicDamageFor(spellId) ?? 0, caster?.SpellBoost(spellId) ?? 0);
 			await ApplyNpcDamage(client, targetHandle, damage, $"spell {spellId} from 0x{casterHandle:X8}",
 				() => SendSpellDamageNumber(client, targetHandle, casterHandle, damage, spellId));
 		}

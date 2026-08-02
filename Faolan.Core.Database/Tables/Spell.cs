@@ -39,6 +39,26 @@ namespace Faolan.Core.Database.Tables
 		///     </para>
 		/// </remarks>
 		public uint LineId { get; set; }
+
+		/// <summary>
+		///     RDB field 847 (0x34F) of the spell's type-1040005 record: the ATTRIBUTE this spell's magnitude scales
+		///     off, as a wire stat id. Exactly three values over the 716 records that carry one -
+		///     <see cref="CharacterStatId.Intelligence" /> (0x328, ×482), <see cref="CharacterStatId.Wisdom" />
+		///     (0x32A, ×224) and <see cref="CharacterStatId.Strength" /> (0x324, ×10) - and it splits where a reader
+		///     would expect: the Demonologist's nukes (Hellfire Stream, Shockstrike, Fires of Gehenna) on
+		///     Intelligence, the curses and DoTs (Venomous Curse, Poisonous Incantation) on Wisdom. 0 when the record
+		///     carries no such field, which is the overwhelming majority - see the remarks for what happens then.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ This is a per-spell OVERRIDE, not the general rule, which is why a 0 here is not a gap. The client
+		///     picks a caster's scaling attribute by CLASS, not by spell: its magic-damage accessor
+		///     (<c>FUN_01118ce0</c>) defaults to Wisdom (0x32A) and switches to Intelligence (0x328) only for
+		///     Necromancer (0x29), Herald of Xotli (0x2B) and Demonologist (0x2C) - see
+		///     <c>docs/rdb/spell-scaling.md</c>. So the class default covers every spell and field 847 names the
+		///     handful that deviate. <c>CombatResolver.ResolveSpellDamage</c> reads it that way round.
+		/// </remarks>
+		public uint ScalingAttribute { get; set; }
+
 		public float DamageRating { get; set; } // spell damage rating percent (RDB field 0x15C / 100)
 		public float Range { get; set; } // target range in metres (RDB field 0x11F / 100)
 

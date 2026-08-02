@@ -51,7 +51,9 @@ namespace Faolan.Importer.Rdb
 	// ⚠️ "This FIELD RUN carries no stat ids" was too strong, and #590 is why it is worth re-testing rather than
 	// repeating: field **847 names an ATTRIBUTE** - 716 records carrying exactly 808 (Intelligence, x482), 810
 	// (Wisdom, x224) and 804 (Strength, x10), which is the stat-id space, and it splits along sensible lines (the
-	// Demonologist's nukes on Intelligence, the curses and DoTs on Wisdom). It is unread; see Gitea #592.
+	// Demonologist's nukes on Intelligence, the curses and DoTs on Wisdom). It is now READ, into
+	// Spell.ScalingAttribute, as a per-spell OVERRIDE of the client's per-CLASS default (#592,
+	// docs/rdb/spell-scaling.md).
 	//
 	// The narrower claim stands: 551 says "400" but never "400 of WHAT", so a buff's MAGNITUDES are server-GDB-only
 	// here, same as mana/damage/recast (docs/subsystems/stat-engine.md).
@@ -97,6 +99,10 @@ namespace Faolan.Importer.Rdb
 		// it is carried raw.
 		private const uint LineField = 0x080;
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
+
+		// 847 - the spell's scaling ATTRIBUTE as a wire stat id (808 Intelligence / 810 Wisdom / 804 Strength); see
+		// Spell.ScalingAttribute. A per-spell OVERRIDE of the client's per-class default, so most records carry none.
+		private const uint ScalingAttributeField = 0x34F;
 		private const uint SpellDataType = 1040005;
 
 		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
@@ -192,6 +198,12 @@ namespace Faolan.Importer.Rdb
 					? (byte)lv
 					: (byte)0;
 				var lineId = fields.GetValueOrDefault(LineField);
+				// Only the three attribute stat ids the field is ever observed to take are accepted. It is an
+				// override read straight into a combat formula, so an unexpected value must land as "no override"
+				// rather than as a stat id nothing scales off (#592).
+				var scalingAttribute = fields.TryGetValue(ScalingAttributeField, out var sa) && IsAttributeStat(sa)
+					? sa
+					: 0u;
 				var rank = fields.TryGetValue(RankField, out var rk) && rk <= byte.MaxValue
 					? (byte)rk
 					: (byte)0;
@@ -220,7 +232,8 @@ namespace Faolan.Importer.Rdb
 						DurationMs = durationMs,
 						Level = level,
 						Rank = rank,
-						LineId = lineId
+						LineId = lineId,
+						ScalingAttribute = scalingAttribute
 					};
 					byId[entry.Id] = spell;
 					toAdd.Add(spell);
@@ -263,6 +276,7 @@ namespace Faolan.Importer.Rdb
 				// to defer to and a 0 here means the record genuinely carries no rank. LineId likewise (#590).
 				spell.Rank = rank;
 				spell.LineId = lineId;
+				spell.ScalingAttribute = scalingAttribute;
 			}
 
 			if (toAdd.Count > 0)
@@ -317,6 +331,13 @@ namespace Faolan.Importer.Rdb
 				return s.StartsWith(tag, StringComparison.OrdinalIgnoreCase) && (s.Length == tag.Length || !char.IsLetter(s[tag.Length]));
 			}
 		}
+
+		// The five wire stat ids that are character ATTRIBUTES. Field 847 is only ever one of Strength / Intelligence
+		// / Wisdom in the shipped data; the other two are accepted because the field's meaning is "an attribute", and
+		// a Constitution- or Dexterity-scaled spell would be a datum, not a parse failure.
+		private static bool IsAttributeStat(uint statId) =>
+			(CharacterStatId)statId is CharacterStatId.Strength or CharacterStatId.Constitution
+				or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity;
 
 		// Reads the spell-data field table from a record body (the span AFTER the 12-byte RDB-Id header): the LONGEST
 		// run of [fieldId u32][value u32] LE pairs with strictly-INCREASING fieldId in (0, 2000], starting at any

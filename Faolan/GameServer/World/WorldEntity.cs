@@ -194,6 +194,36 @@ namespace Faolan.GameServer.World
 			return SpellBoosts.GetValueOrDefault(spellId);
 		}
 
+		/// <summary>
+		///     The per-SPELL scaling-attribute OVERRIDES among this entity's known spells (#592), as
+		///     <c>spellId -> wire stat id</c> - RDB property field 847, see <c>Spell.ScalingAttribute</c>. Only the
+		///     handful of spells that deviate from the caster's class attribute carry one; everything else takes the
+		///     class rule in <c>CombatResolver.MagicDamageAttribute</c>. Empty for NPCs.
+		/// </summary>
+		public IReadOnlyDictionary<uint, uint> SpellScalingAttributes { get; set; } = new Dictionary<uint, uint>();
+
+		/// <summary>
+		///     This entity's attribute scores, in display units, as they were at world entry (class base + gear). The
+		///     magic-damage scaling term reads them; the pools read them through <c>CharacterMaxStats</c>.
+		/// </summary>
+		public VitalAttributes Attributes { get; set; }
+
+		/// <summary>
+		///     The character's class, kept beside <see cref="Attributes" /> because the magic-damage scaling attribute
+		///     is chosen by class. <c>ConanClass.Commoner</c> for NPCs, which takes the Wisdom branch and scores 0.
+		/// </summary>
+		public ConanClass CasterClass { get; set; }
+
+		/// <summary>
+		///     This entity's Magic Damage for one spell, in display units: the flat worn-gear rating in
+		///     <see cref="MagicDamage" /> plus the client's attribute-scaled term. Per-spell rather than cached
+		///     because a spell may override which attribute it scales off (<see cref="SpellScalingAttributes" />).
+		/// </summary>
+		public uint MagicDamageFor(uint spellId)
+		{
+			return CombatResolver.ResolveMagicDamage(MagicDamage, CasterClass, Attributes, SpellScalingAttributes.GetValueOrDefault(spellId));
+		}
+
 		// The last value BuffStatEffects computed for each stat it owns (gear + buffs, display units). Its purpose is
 		// to answer "did this change?" so a sync pushes only what moved; the authoritative live values are the rating
 		// fields themselves.

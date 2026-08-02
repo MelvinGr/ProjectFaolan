@@ -1,4 +1,5 @@
 using System;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 
 namespace Faolan.GameServer.Combat
@@ -422,6 +423,65 @@ namespace Faolan.GameServer.Combat
 
 		// A percent modifier is stored x100 (3500 = 35.00%), so 100% is 10000.
 		private const int PercentScale = 10000;
+
+		// The client's TKW_MagicalDpsAbilityModifier tweak (RDB 1000516; the client's own misspelling of TWK_), in
+		// per-mille so the arithmetic stays integral: 0.6 x the caster's scaling attribute is added to their Magic
+		// Damage. RECOVERED FROM THE CLIENT, not fitted - its magic-damage accessor FUN_01118ce0 reads the tweak into
+		// XMM0, multiplies by the attribute score and truncates:
+		//
+		//     MOVSS XMM0, [0x02d24370]     ; the tweak's value (the Tweak_c object at 0x2d24368 + 8)
+		//     CALL  0x007184d0             ; attribute score -> XMM0
+		//     MULSS XMM0, [ESP+0xc]        ; x tweak
+		//     MULSS XMM0, [0x01f24468]     ; x 100 (the wire's hundredths)
+		//     CVTTSS2SI EBX, XMM0          ; truncate, not round
+		//
+		// so `magicDamage = schoolStat + trunc(attribute x 0.6) + flatGearMagicDamage` in DISPLAY units.
+		// See docs/rdb/spell-scaling.md.
+		private const uint MagicalDpsAbilityModifierPerMille = 600;
+
+		// Which ATTRIBUTE a caster's magic damage scales off. The client picks it by CLASS, not by spell
+		// (FUN_01118ce0): Wisdom for every caster, EXCEPT Necromancer (0x29), Herald of Xotli (0x2B) and Demonologist
+		// (0x2C), which use Intelligence.
+		//
+		// ✅ CONFIRMED INDEPENDENTLY by the RDB. Spell property field 847 (Spell.ScalingAttribute) names an attribute
+		// per SPELL, and grouping the 716 records that carry one by their spell line's class reproduces this rule
+		// exactly: Necromancer 153, Herald 41 and Demonologist 126 records on Intelligence; Priest of Mitra 32,
+		// Tempest of Set 48 and Dark Templar 3 on Wisdom (and the Conqueror's 5 on Strength, a non-caster taking the
+		// physical branch). Two unrelated sources, no disagreement.
+		//
+		// `spellScalingAttribute` is that field, and it OVERRIDES the class rule - which is the only reason it exists,
+		// since the class rule already covers every spell. 0 (the overwhelming majority of templates) means "no
+		// override"; a Demonologist's six Wisdom-scaled spells are what it is for.
+		public static CharacterStatId MagicDamageAttribute(ConanClass casterClass, uint spellScalingAttribute = 0)
+		{
+			if (spellScalingAttribute != 0)
+				return (CharacterStatId)spellScalingAttribute;
+
+			return casterClass is ConanClass.Necromancer or ConanClass.HeraldOfXotli or ConanClass.Demonologist
+				? CharacterStatId.Intelligence
+				: CharacterStatId.Wisdom;
+		}
+
+		/// <summary>
+		///     A caster's Magic Damage in DISPLAY units: the flat rating their worn gear grants, plus the
+		///     attribute-scaled term the client adds on top (<see cref="MagicDamageAttribute" /> x 0.6). This is the
+		///     value that goes into <see cref="ResolveSpellDamage" />'s <c>magicDamage</c>.
+		/// </summary>
+		public static uint ResolveMagicDamage(uint gearMagicDamage, ConanClass casterClass, VitalAttributes attributes, uint spellScalingAttribute = 0)
+		{
+			var score = MagicDamageAttribute(casterClass, spellScalingAttribute) switch
+			{
+				CharacterStatId.Strength => attributes.Strength,
+				CharacterStatId.Constitution => attributes.Constitution,
+				CharacterStatId.Intelligence => attributes.Intelligence,
+				CharacterStatId.Wisdom => attributes.Wisdom,
+				CharacterStatId.Dexterity => attributes.Dexterity,
+				_ => 0u
+			};
+
+			// Truncating, like the client's CVTTSS2SI - not rounding.
+			return gearMagicDamage + score * MagicalDpsAbilityModifierPerMille / 1000;
+		}
 
 		// Provisional mana cost for a cast. Per-spell costs aren't decoded from captures yet (like damage), so this
 		// is a simple level-scaled value just so casting visibly drains the mana bar (the spell/mana analogue of the

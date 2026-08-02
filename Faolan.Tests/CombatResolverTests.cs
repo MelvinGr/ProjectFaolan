@@ -1,3 +1,5 @@
+using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.GameServer.Combat;
 using Xunit;
 
@@ -69,6 +71,49 @@ namespace Faolan.Tests
 
 			Assert.Equal(baseDmg + 52, geared);
 			Assert.Equal(baseDmg, CombatResolver.ResolveSpellDamage(123, 10)); // no gear = base
+		}
+
+		// The client's own rule, recovered from FUN_01118ce0 and confirmed independently by RDB field 847 -
+		// docs/rdb/spell-scaling.md. Wisdom for every caster; Intelligence for the three classes the client
+		// special-cases; and the rate is TKW_MagicalDpsAbilityModifier = 0.6, truncated (the client's CVTTSS2SI).
+		[Theory]
+		[InlineData(ConanClass.Necromancer, CharacterStatId.Intelligence)]
+		[InlineData(ConanClass.Demonologist, CharacterStatId.Intelligence)]
+		[InlineData(ConanClass.HeraldOfXotli, CharacterStatId.Intelligence)]
+		[InlineData(ConanClass.PriestOfMitra, CharacterStatId.Wisdom)]
+		[InlineData(ConanClass.TempestOfSet, CharacterStatId.Wisdom)]
+		[InlineData(ConanClass.DarkTemplar, CharacterStatId.Wisdom)]
+		[InlineData(ConanClass.Assassin, CharacterStatId.Wisdom)]
+		public void MagicDamage_ScalesOffTheClassAttribute_AtTheClientsTweakedRate(ConanClass @class, CharacterStatId expected)
+		{
+			Assert.Equal(expected, CombatResolver.MagicDamageAttribute(@class));
+
+			// Intelligence 110, Wisdom 40 - deliberately unequal, so the two branches cannot both pass by accident.
+			var attributes = new VitalAttributes(Strength: 20, Constitution: 30, Intelligence: 110, Wisdom: 40, Dexterity: 50);
+			var score = expected == CharacterStatId.Intelligence ? 110u : 40u;
+
+			Assert.Equal(score * 600 / 1000, CombatResolver.ResolveMagicDamage(0, @class, attributes));
+			// The worn-gear rating is added FLAT on top of the attribute term, not scaled by it.
+			Assert.Equal(52 + score * 600 / 1000, CombatResolver.ResolveMagicDamage(52, @class, attributes));
+		}
+
+		// RDB field 847 is a per-spell OVERRIDE of the class rule - the six Demonologist spells that scale off Wisdom
+		// where their class scales off Intelligence. 0 means "no override", NOT "no scaling".
+		[Fact]
+		public void MagicDamage_SpellScalingAttribute_OverridesTheClassRule()
+		{
+			var attributes = new VitalAttributes(Strength: 200, Constitution: 30, Intelligence: 110, Wisdom: 40, Dexterity: 50);
+
+			Assert.Equal(CharacterStatId.Intelligence, CombatResolver.MagicDamageAttribute(ConanClass.Demonologist));
+			Assert.Equal(CharacterStatId.Wisdom,
+				CombatResolver.MagicDamageAttribute(ConanClass.Demonologist, (uint)CharacterStatId.Wisdom));
+
+			Assert.Equal(110u * 600 / 1000, CombatResolver.ResolveMagicDamage(0, ConanClass.Demonologist, attributes));
+			Assert.Equal(40u * 600 / 1000,
+				CombatResolver.ResolveMagicDamage(0, ConanClass.Demonologist, attributes, (uint)CharacterStatId.Wisdom));
+			// The Conqueror's five Strength-scaled records: an attribute outside the caster pair still resolves.
+			Assert.Equal(200u * 600 / 1000,
+				CombatResolver.ResolveMagicDamage(0, ConanClass.Conqueror, attributes, (uint)CharacterStatId.Strength));
 		}
 
 		[Fact]

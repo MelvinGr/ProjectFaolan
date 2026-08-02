@@ -1831,8 +1831,14 @@ namespace Faolan.Importer.Cli
 		// sight in a table we already parsed - the question "what else is in here that we walk straight past?"
 		// deserves a measurement rather than a guess.
 		//
-		// Defaults to the spell type (1040005); pass `<type>` for another, or `<type>:<field>` to DRILL into one field
-		// - its value distribution and named sample records, which is what turns "unread" into "worth reading".
+		// Defaults to the spell type (1040005); pass `<type>` for another, or `<type>:<field>[,<field>...]` to DRILL
+		// into fields - each one's value distribution and named sample records, which is what turns "unread" into
+		// "worth reading". Several fields drill in ONE pass over the type; a pass costs a full decompress of every
+		// record (21,502 for spells), so drilling them one at a time is the same measurement for N times the wait.
+		//
+		// Append `x<field>` to CROSS-TABULATE the drilled fields against another one - `1040005:348x847` prints, for
+		// each value of 847, the distribution of 348 among the records carrying both. That is the shape that answers
+		// "does this field VARY WITH that one", which a pair of independent histograms cannot.
 		//
 		// ⚠️ It reads the ASCENDING property grammar. That is the established one for SPELL records; for 1000020 the
 		// plaintext half is feats and the run is ascending there too, but an ITEM template's table strictly DESCENDS
@@ -1841,7 +1847,14 @@ namespace Faolan.Importer.Cli
 		{
 			var spec = (arg ?? "").Split(':', 2, StringSplitOptions.TrimEntries);
 			var type = spec.Length > 0 && uint.TryParse(spec[0], out var t) ? t : SpellTemplateType;
-			var drill = spec.Length == 2 && uint.TryParse(spec[1], out var d) ? d : 0u;
+			var drillSpec = spec.Length == 2 ? spec[1] : "";
+			var againstSplit = drillSpec.Split('x', 2, StringSplitOptions.TrimEntries);
+			var against = againstSplit.Length == 2 && uint.TryParse(againstSplit[1], out var a) ? a : 0u;
+			var drills = againstSplit[0]
+				.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+				.Select(s => uint.TryParse(s, out var d) ? d : 0u)
+				.Where(d => d != 0)
+				.ToArray();
 			// What each importer actually consumes today, so the report can say READ vs unread rather than just
 			// enumerating. Keep in step with the importers; a field that moves here without moving there is exactly
 			// the drift this report exists to surface.
@@ -1850,7 +1863,8 @@ namespace Faolan.Importer.Cli
 				{
 					[8] = "duration", [79] = "icon", [123] = "rank", [125] = "level", [128] = "spell line (#590)",
 					[129] = "splash percent", [287] = "range", [294] = "cast time", [321] = "effect set",
-					[347] = "splash radius", [348] = "damage rating", [349] = "max targets", [551] = "rank-scaling magnitude"
+					[347] = "splash radius", [348] = "damage rating", [349] = "max targets", [551] = "rank-scaling magnitude",
+					[847] = "scaling attribute (#592)"
 				}
 				: new Dictionary<uint, string> { [74] = "value", [104] = "bag", [499] = "quality", [972] = "primary attribute", [1331] = "resource bag" };
 
@@ -1858,8 +1872,11 @@ namespace Faolan.Importer.Cli
 			var records = 0;
 			var counts = new Dictionary<uint, int>();
 			var ranges = new Dictionary<uint, (uint Min, uint Max)>();
-			var drilled = new Dictionary<uint, int>();
-			var samples = new List<string>();
+			// drilled[field][value] = how many records carry that value; crossed[field][(against, value)] likewise but
+			// split by the -x- field's value on the SAME record.
+			var drilled = drills.ToDictionary(f => f, _ => new Dictionary<uint, int>());
+			var crossed = drills.ToDictionary(f => f, _ => new Dictionary<(uint Against, uint Value), int>());
+			var samples = drills.ToDictionary(f => f, _ => new List<string>());
 
 			foreach (var e in rdb.EntriesOfType(type))
 			{
@@ -1880,34 +1897,69 @@ namespace Faolan.Importer.Cli
 					continue;
 
 				records++;
+				// The whole record's fields first: a cross-tab needs the -x- field's value on this record, and the
+				// property run is ascending, so a field drilled BEFORE the one it is crossed against is not yet known
+				// while walking. A repeated field is last-wins, matching the importers.
+				var fields = new Dictionary<uint, uint>();
 				foreach (var (field, value) in RdbSpellImporter.ReadIncreasingFields(body.AsSpan(12)))
 				{
 					counts[field] = counts.GetValueOrDefault(field) + 1;
 					var (min, max) = ranges.TryGetValue(field, out var r) ? r : (uint.MaxValue, 0u);
 					ranges[field] = (Math.Min(min, value), Math.Max(max, value));
-					if (drill != 0 && field == drill)
+					fields[field] = value;
+				}
+
+				foreach (var drill in drills)
+				{
+					if (!fields.TryGetValue(drill, out var value))
+						continue;
+
+					drilled[drill][value] = drilled[drill].GetValueOrDefault(value) + 1;
+					if (against != 0 && fields.TryGetValue(against, out var againstValue))
 					{
-						drilled[value] = drilled.GetValueOrDefault(value) + 1;
-						if (samples.Count < 14)
-						{
-							var (name, _) = RdbFeatImporter.ReadNameAndDescription(body);
-							samples.Add($"{e.Id} {name} = {value}");
-						}
+						var key = (againstValue, value);
+						crossed[drill][key] = crossed[drill].GetValueOrDefault(key) + 1;
+					}
+
+					if (samples[drill].Count < 14)
+					{
+						var (name, _) = RdbFeatImporter.ReadNameAndDescription(body);
+						var cross = against != 0 && fields.TryGetValue(against, out var av) ? $"   [{against}={av}]" : "";
+						samples[drill].Add($"{e.Id} {name} = {value}{cross}");
 					}
 				}
 			}
 
-			if (drill != 0)
+			if (drills.Length > 0)
 			{
-				Console.WriteLine($"RDB type {type} field {drill}: {counts.GetValueOrDefault(drill)} records carry it, {drilled.Count} distinct values");
-				Console.WriteLine();
-				Console.WriteLine("value distribution (top 20):");
-				foreach (var (value, n) in drilled.OrderByDescending(p => p.Value).Take(20))
-					Console.WriteLine($"  {value,12} x{n}");
-				Console.WriteLine();
-				Console.WriteLine("samples:");
-				foreach (var line in samples)
-					Console.WriteLine($"  {line}");
+				foreach (var drill in drills)
+				{
+					Console.WriteLine($"RDB type {type} field {drill}: {drilled[drill].Values.Sum()} records carry it, {drilled[drill].Count} distinct values");
+					Console.WriteLine();
+					Console.WriteLine("value distribution (top 20):");
+					foreach (var (value, n) in drilled[drill].OrderByDescending(p => p.Value).Take(20))
+						Console.WriteLine($"  {value,12} x{n}");
+
+					if (against != 0)
+					{
+						Console.WriteLine();
+						Console.WriteLine($"crossed with field {against} (top 10 values of {drill} per {against}):");
+						foreach (var group in crossed[drill].GroupBy(p => p.Key.Against).OrderBy(g => g.Key))
+						{
+							var total = group.Sum(p => p.Value);
+							Console.WriteLine($"  {against}={group.Key}  ({total} records, {group.Count()} distinct {drill})");
+							foreach (var (key, n) in group.OrderByDescending(p => p.Value).Take(10))
+								Console.WriteLine($"      {key.Value,12} x{n}");
+						}
+					}
+
+					Console.WriteLine();
+					Console.WriteLine("samples:");
+					foreach (var line in samples[drill])
+						Console.WriteLine($"  {line}");
+					Console.WriteLine();
+				}
+
 				return;
 			}
 

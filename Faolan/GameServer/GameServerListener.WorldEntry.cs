@@ -531,8 +531,11 @@ namespace Faolan.GameServer
 			// Keyed by spell id (the feat names a line; the fan-out to its ranks is resolved in the query), so the
 			// cast path never has to look one up.
 			var spellBoosts = await Database.GetCharacterSpellBoosts(character.Id);
+			// #592: the handful of the character's spells that override which ATTRIBUTE their damage scales off. The
+			// class rule covers the rest, so this is usually empty.
+			var spellScaling = await Database.GetCharacterSpellScalingAttributes(character.Id);
 
-			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts);
+			_simulation.RegisterPlayerInWorld(client, map.InstanceMode, statBonuses, classBase, spellBoosts, spellScaling);
 			var instanceId = _simulation.PlayerWorldEntity(client)?.InstanceId ?? WorldState.DefaultInstance;
 			await _broadcaster.EnsureZoneNpcs(mapId, instanceId, character.Class);
 			// The map's static world objects, loaded into the zone once (#424) - the entry + interest passes read them
