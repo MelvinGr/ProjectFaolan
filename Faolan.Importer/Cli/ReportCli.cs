@@ -306,6 +306,30 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "feat-record":
+				{
+					FeatRecord(RdbDir(), arg);
+					return 0;
+				}
+
+				case "feat-spell-modifiers":
+				{
+					FeatSpellModifiers(RdbDir(), arg);
+					return 0;
+				}
+
+				case "feat-table":
+				{
+					FeatTable(RdbDir(), arg);
+					return 0;
+				}
+
+				case "spell-line-ids":
+				{
+					SpellLineIds(RdbDir(), arg);
+					return 0;
+				}
+
 				case "feat-catalog":
 				{
 					FeatCatalog(RdbDir(), arg, _options.Out);
@@ -1794,6 +1818,377 @@ namespace Faolan.Importer.Cli
 		// guessable, but they ARE measurable: in a record whose effect list holds exactly ONE element, that element
 		// runs to the end of the record, so `recordLength - elementStart` IS the kind's width. Single-element records
 		// hand the table over directly; multi-element records then become the check.
+		// --report spell-line-ids [--report-arg <lineId>]
+		//
+		// The SPELL-LINE id every spell template carries in property-table field 128 (#590). It is what a feat's
+		// modifier record references: `Decomposition` points at 41000 and `Flesh to Worms` carries 41000, so a feat's
+		// "+35% on Flesh to Worms" resolves through this and nothing else.
+		//
+		// The id is `ConanClass x 1000 + lineIndex` - Necromancer (41) owns 41000 Flesh to Worms, 41001 Pestilential
+		// Blast, 41005 Ice Strike - which is why the same line id is shared by every RANK of a spell, and why a feat
+		// can name a spell without naming a rank.
+		//
+		// ⚠️ A spell template's property table ASCENDS, where an item's strictly DESCENDS (RdbItemImporter's
+		// TryReadPropertyField). Same [fieldId][value] grammar, opposite direction - reusing the item reader here
+		// finds nothing at all.
+		private static void SpellLineIds(string rdbDir, string? arg)
+		{
+			var wanted = uint.TryParse(arg, out var w) ? w : 0u;
+			using var rdb = new RdbReader(rdbDir);
+			var byLine = new SortedDictionary<uint, List<string>>();
+			var scanned = 0;
+			var carrying = 0;
+
+			foreach (var e in rdb.EntriesOfType(SpellTemplateType))
+			{
+				if (e.Size == 0)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue;
+				}
+
+				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != SpellTemplateType)
+					continue;
+
+				scanned++;
+				if (!TryReadAscendingProperty(body.AsSpan(12), SpellLineField, out var line) || line == 0)
+					continue;
+
+				carrying++;
+				if (wanted != 0 && line != wanted)
+					continue;
+
+				var (name, _) = RdbFeatImporter.ReadNameAndDescription(body);
+				byLine.TryAdd(line, []);
+				byLine[line].Add($"{e.Id} {name}");
+			}
+
+			Console.WriteLine($"spell templates scanned {scanned}, carrying field {SpellLineField}: {carrying}");
+			Console.WriteLine();
+			foreach (var (line, names) in byLine)
+			{
+				var @class = line / 1000;
+				var known = Enum.IsDefined(typeof(ConanClass), (ConanClass)@class) ? ((ConanClass)@class).ToString() : $"class {@class}?";
+				Console.WriteLine($"  {line}  ({known}, line {line % 1000})  x{names.Count}");
+				foreach (var n in names.Take(wanted != 0 ? 40 : 3))
+					Console.WriteLine($"      {n}");
+			}
+		}
+
+		// RDB 1040005 - the spell template type (feats/spells/items share one record layout).
+		private const uint SpellTemplateType = 1040005;
+
+		// Property-table field 128: the spell's LINE id, shared by all its ranks.
+		private const uint SpellLineField = 128;
+
+		// The ASCENDING twin of RdbItemImporter.TryReadPropertyField: the longest run of [fieldId][value] u32 LE pairs
+		// with strictly INCREASING fieldId in (0, 2000]. Deliberately a separate reader rather than a direction flag on
+		// the item one - a spell record's run genuinely ascends and an item's genuinely descends, and a shared reader
+		// that accepted either would also accept a run that is neither.
+		private static bool TryReadAscendingProperty(ReadOnlySpan<byte> body, uint fieldId, out uint value)
+		{
+			value = 0;
+			var words = body.Length / 4;
+			var bestLen = 0;
+			var bestFound = false;
+			var bestValue = 0u;
+			for (var start = 0; start + 1 < words; start++)
+			{
+				uint last = 0;
+				var haveLast = false;
+				var len = 0;
+				var found = false;
+				var fv = 0u;
+				for (var j = start; j + 1 < words; j += 2)
+				{
+					var fid = body.ReadU32Le(j * 4);
+					if (fid == 0 || fid > 2000 || (haveLast && fid <= last))
+						break;
+
+					if (fid == fieldId)
+					{
+						found = true;
+						fv = body.ReadU32Le((j + 1) * 4);
+					}
+
+					last = fid;
+					haveLast = true;
+					len++;
+				}
+
+				if (len > bestLen)
+				{
+					bestLen = len;
+					bestFound = found;
+					bestValue = fv;
+				}
+			}
+
+			value = bestValue;
+			return bestFound;
+		}
+
+		// --report feat-table [--report-arg <value>]
+		//
+		// All TWELVE words of every entry in the client's feat table (RDB 1000042 id 1). The importer reads six of
+		// them - (wire, template), the three prereq columns, the root flag and the base index - and #590 needs to know
+		// what the other six hold, because a feat's modifier record references a target id in a ~20000-45000 space
+		// that resolves against nothing we import. With `--report-arg <value>` it reports which COLUMN, if any, holds
+		// that value - which is the whole question.
+		private static void FeatTable(string rdbDir, string? arg)
+		{
+			var needle = uint.TryParse(arg, out var v) ? v : 0u;
+			using var rdb = new RdbReader(rdbDir);
+			var matches = rdb.EntriesOfType(1000042u).Where(e => e.Id == 1).ToList();
+			if (matches.Count == 0)
+			{
+				Console.WriteLine("feat-table: RDB 1000042 id 1 not present");
+				return;
+			}
+
+			var body = rdb.ReadDecompressed(matches[0]);
+			var count = (int)BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(12));
+			Console.WriteLine($"feat table: {count} entries, {body.Length} bytes");
+
+			const int header = 20, stride = 48, words = 12;
+			var columnHits = new int[words];
+			var perColumnRange = new (uint Min, uint Max)[words];
+			for (var c = 0; c < words; c++)
+				perColumnRange[c] = (uint.MaxValue, 0);
+
+			var shown = 0;
+			for (var i = 0; i < count; i++)
+			{
+				var at = header + (i * stride);
+				if (at + stride > body.Length)
+					break;
+
+				var w = new uint[words];
+				for (var c = 0; c < words; c++)
+					w[c] = BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(at + (c * 4)));
+
+				for (var c = 0; c < words; c++)
+				{
+					if (w[c] == 0)
+						continue;
+
+					perColumnRange[c] = (Math.Min(perColumnRange[c].Min, w[c]), Math.Max(perColumnRange[c].Max, w[c]));
+					if (needle != 0 && w[c] == needle)
+					{
+						columnHits[c]++;
+						if (shown++ < 12)
+							Console.WriteLine($"  hit col[{c}] entry {i}: " + string.Join(' ', w.Select(x => x.ToString().PadLeft(9))));
+					}
+				}
+
+				if (needle == 0 && i < 6)
+					Console.WriteLine($"  entry {i}: " + string.Join(' ', w.Select(x => x.ToString().PadLeft(9))));
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("per-column non-zero range:");
+			for (var c = 0; c < words; c++)
+			{
+				var known = c switch
+				{
+					0 => " (wire id)", 1 => " (template id)", 2 or 3 or 4 => " (prereq)", 8 => " (root flag)", 10 => " (base index)", _ => ""
+				};
+				var range = perColumnRange[c].Min == uint.MaxValue ? "all zero" : $"{perColumnRange[c].Min}..{perColumnRange[c].Max}";
+				Console.WriteLine($"  col[{c,2}] {range}{known}" + (needle != 0 ? $"   hits={columnHits[c]}" : ""));
+			}
+		}
+
+		// --report feat-spell-modifiers [--report-arg <kind>]
+		//
+		// #590. Every feat template's modifier records whose payload's first word is OUTSIDE the stat-id range -
+		// exactly the ones ItemTemplateStatModifiers.Parse drops on `statId >= 0x1000`. That bound is right for a STAT
+		// modifier and wrong for whatever these are: `Decomposition` rank 5 carries (41000, 3500) under kind 53075,
+		// and 3500 is the +35.00% its in-client tooltip shows. So the reference is the first word and the magnitude is
+		// the second, and this report is what says how many feats are in that shape and which kinds they use.
+		private static void FeatSpellModifiers(string rdbDir, string? arg)
+		{
+			var onlyKind = uint.TryParse(arg, out var k) ? k : 0u;
+			using var rdb = new RdbReader(rdbDir);
+			var byKind = new Dictionary<uint, int>();
+			var samples = new Dictionary<uint, List<string>>();
+			var refCounts = new Dictionary<uint, int>();
+			var feats = 0;
+
+			foreach (var e in rdb.EntriesOfType(FeatTemplateType))
+			{
+				if (e.Size == 0)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue;
+				}
+
+				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != FeatTemplateType)
+					continue;
+
+				var hits = OutOfRangeModifiers(body);
+				if (hits.Count == 0)
+					continue;
+
+				feats++;
+				var (name, description) = RdbFeatImporter.ReadNameAndDescription(body);
+				foreach (var (kind, reference, value) in hits)
+				{
+					if (onlyKind != 0 && kind != onlyKind)
+						continue;
+
+					byKind[kind] = byKind.GetValueOrDefault(kind) + 1;
+					refCounts[reference] = refCounts.GetValueOrDefault(reference) + 1;
+					samples.TryAdd(kind, []);
+					// With a kind filter the caller is decoding THAT kind, so print every row and its description -
+					// the description names the spell the feat modifies, which is the only handle we have on what the
+					// reference id means. Unfiltered it is a census, so a few samples per kind is enough.
+					if (onlyKind != 0 || samples[kind].Count < 6)
+						samples[kind].Add($"{e.Id}\t{name}\tref={reference}\tvalue={value}\t{description.Replace('\t', ' ')}");
+				}
+			}
+
+			Console.WriteLine($"feat templates carrying an out-of-stat-range modifier: {feats}");
+			Console.WriteLine();
+			Console.WriteLine("by KIND:");
+			foreach (var (kind, n) in byKind.OrderByDescending(p => p.Value))
+			{
+				Console.WriteLine($"  {kind} (0x{kind:X})  x{n}");
+				foreach (var line in samples[kind])
+					Console.WriteLine($"      {line}");
+			}
+
+			Console.WriteLine();
+			Console.WriteLine("most-referenced targets:");
+			foreach (var (reference, n) in refCounts.OrderByDescending(p => p.Value).Take(20))
+				Console.WriteLine($"  ref {reference} x{n}");
+		}
+
+		// The same signature ItemTemplateStatModifiers anchors on, but keeping ONLY the records it rejects - so the
+		// two can never disagree about where a record is, just about which ones count.
+		private static List<(uint Kind, uint Reference, uint Value)> OutOfRangeModifiers(byte[] body)
+		{
+			var found = new List<(uint, uint, uint)>();
+			var span = body.AsSpan(12);
+			for (var off = 4; off + 32 <= span.Length; off++)
+			{
+				if (span.ReadU32Le(off - 4) != 0 || span.ReadU32Le(off) != 4 || span.ReadU32Le(off + 4) != 0 || span.ReadU32Le(off + 8) != 1
+				    || span.ReadU32Le(off + 12) != 0 || span.ReadU32Le(off + 16) != 2 || span.ReadU32Le(off + 20) != 9)
+					continue;
+
+				var reference = span.ReadU32Le(off + 24);
+				if (reference is not 0 and < 0x1000)
+					continue; // a real stat id - the importer already has it
+
+				found.Add((off >= 8 ? span.ReadU32Le(off - 8) : 0, reference, span.ReadU32Le(off + 28)));
+			}
+
+			return found;
+		}
+
+		// --report feat-record --report-arg [<rdbType>/]<id>[,<id>...]
+		//
+		// The RAW words of one or more feat templates, side by side. Built for #590: a feat like `Decomposition`
+		// carries "+35% to Flesh to Worms" that the stat-modifier region does not hold, so finding where the client
+		// keeps it means diffing the five RANKS of one feat against each other - the words that MOVE across ranks are
+		// the magnitude, the ones that stay are the target. Passing several ids prints a per-word diff column for
+		// exactly that.
+		private static void FeatRecord(string rdbDir, string? arg)
+		{
+			// An optional `<type>/` prefix dumps a record of ANOTHER RDB type with the same machinery - spell
+			// templates (1040005) share the feat/item record layout, and #590 needs to compare the two.
+			var spec = (arg ?? "").Split('/', 2, StringSplitOptions.TrimEntries);
+			var type = spec.Length == 2 && uint.TryParse(spec[0], out var t) ? t : FeatTemplateType;
+			var ids = spec[^1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+				.Select(x => uint.TryParse(x, out var v) ? v : 0).Where(v => v != 0).ToArray();
+			if (ids.Length == 0)
+			{
+				Console.WriteLine("feat-record: pass one or more template ids, e.g. --report-arg 1173623,1173628");
+				return;
+			}
+
+			using var rdb = new RdbReader(rdbDir);
+			var bodies = new Dictionary<uint, byte[]>();
+			foreach (var e in rdb.EntriesOfType(type))
+			{
+				if (e.Size == 0 || !ids.Contains(e.Id))
+					continue;
+
+				try
+				{
+					bodies[e.Id] = rdb.ReadDecompressed(e);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"  {e.Id}: unreadable ({ex.GetType().Name})");
+				}
+			}
+
+			foreach (var id in ids)
+			{
+				if (!bodies.TryGetValue(id, out var body))
+				{
+					Console.WriteLine($"{id}: not present in RDB type {type}");
+					continue;
+				}
+
+				var (name, description) = RdbFeatImporter.ReadNameAndDescription(body);
+				var (start, count) = RdbFeatImporter.EffectTail(body);
+				Console.WriteLine($"=== {id}  {body.Length} bytes  name=\"{name}\"  effects={count} (at {start})");
+				Console.WriteLine($"    desc: {description}");
+			}
+
+			// A hex dump per record. The text is variable-length, so everything after it is NOT 4-aligned to the
+			// record start - the word grid below will straddle the real fields, and this is what lets a reader
+			// re-cut them by eye.
+			foreach (var id in ids.Where(bodies.ContainsKey))
+			{
+				var body = bodies[id];
+				Console.WriteLine();
+				Console.WriteLine($"--- {id} hex");
+				for (var off = 0; off < body.Length; off += 16)
+				{
+					var run = Math.Min(16, body.Length - off);
+					var hex = string.Join(' ', Enumerable.Range(0, run).Select(k => body[off + k].ToString("x2")));
+					var ascii = string.Concat(Enumerable.Range(0, run).Select(k => body[off + k] is >= 0x20 and < 0x7F ? (char)body[off + k] : '.'));
+					Console.WriteLine($"  {off,4:d}  {hex.PadRight(47)}  {ascii}");
+				}
+			}
+
+			// The word-by-word view. Only the words the records DISAGREE on are interesting when several are given,
+			// so those are flagged - that is the whole point of passing a feat's five ranks at once.
+			var present = ids.Where(bodies.ContainsKey).ToArray();
+			if (present.Length == 0)
+				return;
+
+			var longest = present.Max(i => bodies[i].Length);
+			Console.WriteLine();
+			Console.WriteLine("offset   " + string.Join("  ", present.Select(i => i.ToString().PadLeft(10))) + "   diff");
+			for (var off = 0; off + 4 <= longest; off += 4)
+			{
+				var words = present.Select(i => bodies[i].Length >= off + 4
+					? BinaryPrimitives.ReadUInt32LittleEndian(bodies[i].AsSpan(off))
+					: (uint?)null).ToArray();
+				var differs = words.Distinct().Count() > 1;
+				Console.WriteLine($"  [{off,4}]  "
+					+ string.Join("  ", words.Select(w => (w?.ToString() ?? "-").PadLeft(10)))
+					+ (differs ? "   <<<" : ""));
+			}
+		}
+
 		private static void FeatEffectWidths(string rdbDir)
 		{
 			using var rdb = new RdbReader(rdbDir);

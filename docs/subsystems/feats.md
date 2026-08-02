@@ -60,8 +60,63 @@ and don't contain.
   `ItemStatModifier.Amount` is raw wire. Strength (scale 10) carries 1..9 in the feat table and HealthMax
   (scale 100) carries 100..700 - dividing those would under-grant every feat by 10x or 100x.
   **2,939 of the 6,593 mapped feats have readable effects.** The captured characters DO now resolve - all 56 of
-  their feats name a real feat - but only 9 of those 56 carry stat effects; the rest are feats whose record has no
-  modifier region (Hellfire's tooltip is "reduces the casting time of Hellfire Breath", which is not a stat).
+  their feats name a real feat - but only 9 of those 56 carry stat effects.
+- ⚠️ **The other 47 are NOT feats "whose record has no modifier region" — that claim was wrong (#590).** Their
+  records carry a modifier record in the ordinary place, with the ordinary `4,0,1,0,2,9` signature; the parser
+  finds it and then **drops it**, because `ItemTemplateStatModifiers.Parse` bounds the payload's first word to
+  `< 0x1000` on the reasoning that it is a stat id. For these it is not a stat id — it is a REFERENCE to whatever
+  the feat modifies, and the second word is the magnitude:
+
+  | | |
+  |---|---|
+  | feat | `Decomposition`, the Necromancer's "+35% damage or healing on Flesh to Worms" |
+  | ranks (wire 80000–80004) | templates 1173623 / 24 / 26 / 27 / 28 |
+  | kind | 53075 |
+  | payload across the five ranks | `(41000, 1000)` `(41000, 1500)` `(41000, 2000)` `(41000, 2500)` `(41000, 3500)` |
+
+  The magnitude decodes cleanly as **percent × 100**: 10%, 15%, 20%, 25%, **35%** — and 35% is exactly what the
+  in-client tooltip shows for rank 5. The reference (`41000`) is constant across ranks, which is what a target
+  should be.
+
+  **The reference is a SPELL-LINE id**, and it decodes as:
+
+  ```
+  spellLineId = ConanClass x 1000 + lineIndex        41000 = Necromancer (41), line 0 = Flesh to Worms
+  ```
+
+  It is carried by the SPELL templates themselves, in **property-table field 128** — so a feat names a spell LINE
+  and therefore all of its ranks at once, which is exactly what a feat needs to do. Resolve one with
+  `--report spell-line-ids --report-arg <lineId>`: 41000 returns the five `Flesh to Worms` ranks (144674–144677 +
+  1206011) and nothing else. 3,158 of the 21,502 spell templates carry the field.
+
+  ⚠️ **A spell template's property table ASCENDS**, where an item's strictly DESCENDS
+  (`RdbItemImporter.TryReadPropertyField`). Same `[fieldId][value]` grammar, opposite direction — the item reader
+  finds nothing at all on a spell.
+
+  **Cross-validated from both ends, independently.** The feat side was derived from which feats share a reference
+  (`Decomposition`, `Empowered Flesh to Worms` and `Worm Swarm` all point at 41000), the spell side from the
+  templates' own field 128 — and the two agree on every case checked:
+
+  | ref | predicted from the feat names | spell templates carrying field 128 = ref |
+  |---|---|---|
+  | 41000 | Flesh to Worms | Flesh to Worms ranks 1–5 |
+  | 41001 | Pestilential Blast | Pestilential Blast ranks 2–6 |
+  | 41005 | Ice Strike | Ice Strike ranks 2–6 |
+  | 28101 | Call Lightning | Call Lightning (Tempest of Set) |
+  | 24017 | Smite | Smite (Priest of Mitra) |
+  | 44006 | Shockstrike | Shockstrike (Demonologist) |
+
+  337 of the 342 kind-53075 records have a `ref / 1000` that is a real `ConanClass`, and the feats grouped under
+  each class are that class's own. (The 5 exceptions all use `50000`, a class 50 that does not exist — unresolved.)
+
+  Catalog-wide there are **2,361 feat templates** carrying an out-of-stat-range record across ~10 kinds (53209
+  x3235, 53019 x1010, 53030 x962, 53054 x593, 53212 x561, 53062 x475, 53075 x342, …); only 53075 is decoded here,
+  the rest are surveyed but unread. Survey with `--report feat-spell-modifiers [--report-arg <kind>]`; dump and
+  diff a feat's ranks with `--report feat-record --report-arg [<rdbType>/]<id>[,<id>...]` (the word that MOVES
+  across ranks is the magnitude, the one that stays is the target).
+
+  **Not yet imported and not yet applied.** There is no table for these and no consumer: feats reach the server
+  only as a flat `CharacterStatId → value` map, so a per-spell modifier has nowhere to land. Open work: Gitea #590.
 - **Training ENFORCES the tree.** `FeatService` rejects a train whose resulting set leaves a prerequisite unmet
   (`FeatRules.MissingPrerequisites`), alongside the existing point-budget check.
   ⚠️ A prerequisite is satisfied by the **same base at an equal-or-higher rank**, not by the exact id. The graph
