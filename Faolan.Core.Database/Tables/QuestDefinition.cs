@@ -167,15 +167,33 @@ namespace Faolan.Core.Database.Tables
 		//
 		// **bit 4 (0x10) = the quest may NOT be SHARED.** Proven in-client: sweeping this column through all five
 		// observed values on a rendered quest and relogging, the journal's detail pane greys out its `Share` button
-		// for exactly the three values with bit 4 set (18, 26, 1042) and enables it for the two without (2, 10) -
-		// pixel-identical within each class, so bits 3 and 10 do not affect it. The corpus fits: bit 4 is set on the
+		// for exactly the three values with bit 4 set (18, 26, 1042) and enables it for the two without (2, 10).
+		// ⚠️ That sweep ALSO reported the classes as pixel-identical internally, which was read as "bits 3 and 10
+		// affect nothing" - wrong for bit 10, whose effect a GM account suppresses (see below). The corpus fits: bit 4 is set on the
 		// Destiny steps, the Alchemist tier-4 progression and the Khitai/faction content (37 of 82), and clear on
 		// ordinary side quests (45).
 		//
-		// **bits 3 (0x08) and 10 (0x400): no effect on the journal panel.** The same sweep rendered 2 vs 10, and 18
-		// vs 26 vs 1042, PIXEL-IDENTICALLY - so whatever they drive is not this UI. Earlier readings of bit 10 as a
-		// "progression line" marker and of bit 4 as "expansion content" were both correlations without a mechanism;
-		// the first is untested elsewhere and the second is now superseded. Gitea #570.
+		// **bit 10 (0x400) = the quest may NOT be DELETED.** The exact sibling of bit 4, one widget along: the journal's
+		// detail pane has two action buttons, and the client enables each by NEGATING its bit -
+		// `enabled = ~(flags >> 4) & 1` drives Share, `~(flags >> 10) & 1` drives Delete.
+		//
+		// ⚠️ It is overridden for GAME MASTERS, which is why an in-client sweep could not see it and this sat unnamed
+		// through two wrong guesses. The client's branch is
+		//     if (flags & 0x400)  enabled = (GmLevel != 0);   // stat 0x0D7
+		//     else                enabled = 1;
+		// so on a GM account the button is force-enabled whatever the bit says - and the account the sweep ran on is
+		// `Administrator`. The earlier note that 18/26/1042 render "pixel-identically" was true and misleading: the
+		// difference was real and being suppressed by the observer's own GM level.
+		//
+		// [in-client] Proven by A/B on ONE quest with a single variable changed. Quest 10238 "The Slaver" on a
+		// NON-GM account: flags 1042 (bit 10 set) -> Delete greyed; flags 18 (bit 10 clear, bit 4 left set) -> Delete
+		// enabled. Same character, same quest, same solo state. The corpus agrees with the meaning - bit 10 is the
+		// Tortage Destiny storyline (The Slaver, The Quarry, The City of Tortage, Nadini, Casilda, The Scavenger) plus
+		// the Alchemist progression, i.e. exactly the quests retail refuses to let you abandon.
+		//
+		// **bit 3 (0x08): still unnamed.** It has no effect on this panel (the sweep is trustworthy there - no GM
+		// override is involved) and a read-watchpoint on a live record caught only the bit-10 test, so its consumer is
+		// elsewhere. It is 6 quests: 12381, 12583, 12889, 13473, 16004, 16183. Gitea #570.
 		public uint QuestLineFlags { get; set; }
 
 		// @+0x20 - the quest's MONEY reward, the twin of XpReward below (u64 money at 0x20, u32 xp at 0x28,

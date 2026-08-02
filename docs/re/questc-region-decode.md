@@ -277,7 +277,7 @@ samples do not close the law. Do not derive one from the other.
 `@+0xf0` additionally selects WHICH SPELLING the quest's @609 objective region uses for its trailing text —
 see the `ObjectiveRegionVerified` note on `QuestDefinition`.
 
-### `@+0x14` — a bitfield of the quest LINE; bit 4 = NOT SHAREABLE
+### `@+0x14` — a bitfield of the quest LINE; bit 4 = NOT SHAREABLE, bit 10 = NOT DELETABLE
 
 Five values across the corpus (2, 10, 18, 26, 1042), every one ≡ 2 (mod 8): bits 0–2 fixed `010`, bits 3, 4
 and 10 toggling. Definitively **not** a goal count — 2 appears on records carrying 1, 2, 3 and 6 goals.
@@ -298,13 +298,45 @@ The corpus fits the meaning: bit 4 is set on the Destiny steps, the Alchemist ti
 Khitai/faction content (37 of the 82 eligible quests), and clear on ordinary side quests (45) — personal-story,
 crafting-progression and faction content being non-shareable is exactly the expected rule.
 
-**bits 3 (0x08) and 10 (0x400) — no effect on the journal panel.** The same sweep rendered 2 vs 10, and 18 vs
-26 vs 1042, pixel-identically, so whatever they drive is not this UI.
+**bit 10 (0x400) = the quest may not be DELETED.**
 
-⚠️ Two earlier readings are superseded. Bit 4 was guessed as "expansion content", which had counterexamples
-(17402/17403 are in Khitai with it clear); it is sharing, and those are simply shareable Khitai quests. Bit 10
-was read as marking "player-progression lines" on a correlation with the Destiny/Alchemist/Mastery set — that
-correlation stands, but the sweep shows it drives nothing in the journal, so it remains unexplained.
+The exact sibling of bit 4, one widget along. The detail pane's two action buttons are enabled by NEGATING
+their bit — the client computes `enabled = ~(flags >> 4) & 1` for Share and `~(flags >> 10) & 1` for Delete.
+
+[V1: `tools/ghidra/DumpQuestLineFlagBits.java` + a live read-watchpoint — a `rwatch` on a running client's
+`Quest_c @+0x14` caught two PCs, both inside `FUN_01617260`, the panel refresh. Its Share branch is
+`FUN_00ae4170(~(byte)(*(uint *)(param_3 + 0x14) >> 4) & 1)` on the widget at `+0x52c`, and the bit-10 branch is
+the same shape on `+0x528`.]
+
+⚠️ **It is overridden for GAME MASTERS**, which is why the in-client sweep could not see it:
+
+```c
+if (flags & 0x400)  enabled = (GmLevel != 0);   // stat 0x0D7
+else                enabled = 1;
+```
+
+On a GM account the button is force-enabled whatever the bit says, and the account every sweep ran on is
+`Administrator`. The earlier note that 18/26/1042 render "pixel-identically" was true and actively misleading —
+the difference was real and being suppressed by the observer's own GM level. **A null result from an in-client
+sweep is only as good as the account it was run on.**
+
+[V1: `Faolan.ClientLauncher/Program.cs` — proven by A/B on ONE quest with a single variable changed. Quest 10238
+"The Slaver" on a NON-GM account: flags 1042 (bit 10 set) → Delete greyed; flags 18 (bit 10 clear, bit 4 left
+set) → Delete enabled. Same character, same quest, same solo state.]
+
+The corpus agrees: bit 10 is the Tortage Destiny storyline (The Slaver, The Quarry, The City of Tortage, Nadini,
+Casilda, The Scavenger) plus the Alchemist progression — exactly the quests retail refuses to let you abandon.
+The old "player-progression lines" reading was the same set seen without its mechanism.
+
+⚠️ **Share is also disabled when you are not in a group**, independently of bit 4. A solo observation of a greyed
+Share button says nothing about the bit; only an A/B on the bit does.
+
+**bit 3 (0x08) — still unnamed.** No effect on this panel, and unlike bit 10 that null is trustworthy: no GM
+override is involved in its branch, and a read-watchpoint on a live record caught only the bit-10 test, so its
+consumer is elsewhere. Six quests carry it: 12381, 12583, 12889, 13473, 16004, 16183.
+
+⚠️ One earlier reading is superseded. Bit 4 was guessed as "expansion content", which had counterexamples
+(17402/17403 are in Khitai with it clear); it is sharing, and those are simply shareable Khitai quests.
 
 ⚠️ Do not read the quest TREE pane in a sweep like this. The client persists its expanded/collapsed and scroll
 state across relogs, so the left pane drifts between runs independently of the data — it produced three
