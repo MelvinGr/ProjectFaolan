@@ -2783,6 +2783,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("SnapshotChainHeadQuestId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<ulong>("SnapshotMoneyReward")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("SnapshotQuestLineFlags")
                         .HasColumnType("INTEGER");
 

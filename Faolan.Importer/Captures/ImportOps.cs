@@ -1044,6 +1044,11 @@ namespace Faolan.Importer.Captures
 				// all. That is why this one is here and why adding the column alone left all 108 rows at 0.
 				if (def.SnapshotChainHeadQuestId != 0)
 					existing.SnapshotChainHeadQuestId = def.SnapshotChainHeadQuestId;
+
+				// The MONEY reward off the same record (@+0x20), same rule. 21 of the 99 captured quests carry one;
+				// it was emitted as a constant 0 for years under the name `Accept`, so every value was discarded.
+				if (def.SnapshotMoneyReward != 0)
+					existing.SnapshotMoneyReward = def.SnapshotMoneyReward;
 				db.QuestTextRefs.RemoveRange(existing.TextRefs);
 				existing.TextRefs = def.TextRefs;
 

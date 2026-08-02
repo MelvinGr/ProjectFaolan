@@ -108,7 +108,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				QuestLineId = def.QuestLineId,
 				Field2c = def.QuestId,
 				Field11c = 0,
-				Accept = 0,
+				MoneyReward = def.SnapshotMoneyReward,
 				XpReward = LiveField28,
 				FieldF0 = LiveFieldF0,
 				FieldF8 = 0,

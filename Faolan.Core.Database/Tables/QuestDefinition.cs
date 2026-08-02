@@ -178,6 +178,17 @@ namespace Faolan.Core.Database.Tables
 		// the first is untested elsewhere and the second is now superseded. Gitea #570.
 		public uint SnapshotQuestLineFlags { get; set; }
 
+		// @+0x20 - the quest's MONEY reward, the twin of SnapshotXpReward below (u64 money at 0x20, u32 xp at 0x28,
+		// adjacent in the struct). Stored RAW as the wire carries it, which is in TIN - 100 tin = 1 copper, 100
+		// copper = 1 silver. The client's journal prints it on the `Money:` line, so the harvested 214 of quest 13507
+		// renders "2C 14T", 111200 renders "11S 12C" and 250000 renders "25S".
+		//
+		// [in-client] Established the same way as the XP field - driven to a value and read back off the panel.
+		// It was modelled as `QuestcRecord.Accept`, "likely acceptTime", and emitted as a CONSTANT 0, which threw the
+		// value away: 21 of the 99 captured quests carry a non-zero one, constant per quest across every character and
+		// capture. The set is a subset of the quests carrying an XP reward - some quests pay experience only.
+		public ulong SnapshotMoneyReward { get; set; }
+
 		// @+0x28 - the quest's EXPERIENCE reward. This is the number the client's journal renders as "XP:" in a
 		// quest's detail pane, established IN-CLIENT rather than inferred: driving quest 13227's column to 5553, 0 and
 		// 7777 in turn and relogging produced "XP: 5553", "XP: 0" and "XP: 7777", with nothing else changed.

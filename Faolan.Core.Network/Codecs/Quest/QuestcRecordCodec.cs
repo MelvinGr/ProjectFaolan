@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 	// Wire:
 	//   [u32 listKey(=questId)][u32 ver(=1)][u32 questId][u32 state][u32 field114][u32 field118][u32 n]
 	//   [string title][string summary][string area][string region1][string region2]
-	//   [u32 fieldEc][u32 areaId][u32 field2c][u32 field11c][u64 accept][u32 field28]
+	//   [u32 fieldEc][u32 areaId][u32 field2c][u32 field11c][u64 money][u32 xpReward]
 	//   [objlist1][objlist2][u32 fieldF0][u64 fieldF8][objlist3][objlist4]
 	//   [objective region]
 	// where each objlist = [u32 count] then count × ObjRec (16 raw u32s, unvalidated - empty for the beach starter).
@@ -65,7 +65,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			var areaId = r.ReadU32Be();
 			var field2c = r.ReadU32Be();
 			var field11c = r.ReadU32Be();
-			var accept = r.ReadU64Be();
+			var money = r.ReadU64Be();
 			var field28 = r.ReadU32Be();
 
 			var obj1 = ReadObjList(ref r);
@@ -91,7 +91,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 				QuestLineId = areaId,
 				Field2c = field2c,
 				Field11c = field11c,
-				Accept = accept,
+				MoneyReward = money,
 				XpReward = field28,
 				FieldF0 = fieldF0,
 				FieldF8 = fieldF8,
@@ -124,7 +124,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 			s.WriteUInt32(v.QuestLineId);
 			s.WriteUInt32(v.Field2c);
 			s.WriteUInt32(v.Field11c);
-			s.WriteUInt64(v.Accept);
+			s.WriteUInt64(v.MoneyReward);
 			s.WriteUInt32(v.XpReward);
 
 			WriteObjList(s, v.Obj1);
@@ -227,7 +227,15 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// bit 4 (0x10) = the quest may not be SHARED - the journal greys its `Share` button. Proven in-client; bits
 		// 3 and 10 change nothing in that panel. See QuestDefinition.SnapshotQuestLineFlags.
 		public uint QuestLineFlags { get; init; }
-		public ulong Accept { get; init; } // @+0x20 u64 (likely acceptTime; =0)
+		// @+0x20 - the quest's MONEY reward, and the twin of XpReward at @+0x28 (u64 money, then u32 xp - the two
+		// sit adjacent in the struct). The journal's detail pane prints it on the `Money:` line. The unit is TIN,
+		// with 100 tin = 1 copper and 100 copper = 1 silver: 214 renders "2C 14T" and 250000 renders "25S".
+		//
+		// ⚠️ It was called `Accept` and documented as "likely acceptTime" - it is not a time. 21 of the 99 captured
+		// quests carry a non-zero value, constant per quest across every character and capture, and the set is a
+		// subset of the quests carrying an XP reward (some quests pay XP only). Proven in-client by driving it and
+		// reading the panel back; see QuestDefinition.SnapshotMoneyReward.
+		public ulong MoneyReward { get; init; }
 		// @+0xf8 - NOT the journal's Money: setting it to 999999 left that label blank. Tracks FieldF0 through a
 		// level-dependent factor that 99 samples do not close - do NOT derive one from the other.
 		public ulong FieldF8 { get; init; } // (=15 in the template, 0 in the live full-update)

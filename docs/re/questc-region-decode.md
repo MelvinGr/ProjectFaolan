@@ -78,7 +78,7 @@ u32 fieldEc          (+0xec)
 u32 areaId           (+0xcc)
 u32 field2c          (+0x2c)           # beach codec MISLABELS this "questId2" and ASSERTS ==questId (beach-only!)
 u32 field11c         (+0x11c)
-u64 accept           (+0x20)
+u64 money            (+0x20)  the quest's MONEY reward, in TIN (see below)
 u32 xpReward         (+0x28)  the quest's EXPERIENCE reward (see below)
 objlist obj1, obj2                     # each: [u32 count][count × ObjRec]
 u32 fieldF0          (+0xf0)  NOT the journal's XP (see below)
@@ -239,6 +239,23 @@ Its positional law still holds and is still unexplained: `@+0x28` is populated o
 line (25 of 26 captured cases) and `@+0xf0`/`@+0xf8` never are. It scales with level — level 23 → 900..4981,
 level 30 → 5553, level 70 → 15421, level 80 → 69337..138674, the level-80 values being exactly
 {1, 4/3, 5/3, 2} × 69337.
+
+### `@+0x20` — the quest's MONEY reward (settled IN-CLIENT)
+
+The twin of `@+0x28`: a u64 money at 0x20 and a u32 XP at 0x28, adjacent in the struct, and the two lines the
+journal's detail pane prints as `Money:` and `XP:`.
+
+[V1: Faolan.ClientLauncher/Program.cs — driving it live on a rendered quest, 111200 rendered `11S 12C` and
+250000 rendered `25S`; the harvested 214 of quest 13507 renders `2C 14T`. So the unit is TIN, with 100 tin =
+1 copper and 100 copper = 1 silver.]
+
+⚠️ It was modelled as `Accept`, "likely acceptTime", and **emitted as a constant 0** — so every captured value
+was thrown away. 21 of the 99 captured quests carry one, constant per quest across every character and
+capture, and that set is a SUBSET of the quests carrying an XP reward: some quests pay experience only.
+
+At level 80 the harvested pairs run money ≈ **1.10 ×** xp (152546/138674, 127115/115562, 101684/92449). That
+is the same ratio `@+0xf8`/`@+0xf0` shows at level 80, which is the strongest hint yet that those two are the
+same (xp, money) pair at a different scope — see below — though still not proof.
 
 ### `@+0xf0` / `@+0xf8` — NOT the journal's XP or Money
 

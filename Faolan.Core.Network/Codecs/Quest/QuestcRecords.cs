@@ -44,7 +44,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 					? def.QuestId
 					: def.SnapshotChainHeadQuestId,
 				Field11c = 0,
-				Accept = 0,
+				MoneyReward = def.SnapshotMoneyReward,
 				XpReward = def.SnapshotXpReward,
 				FieldF0 = def.SnapshotUnknownF0,
 				FieldF8 = def.SnapshotUnknownF8
