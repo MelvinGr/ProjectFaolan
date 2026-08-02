@@ -236,9 +236,9 @@ namespace Faolan.Importer.Extractors
 			def.SnapshotQuestLineFlags = record.QuestLineFlags;
 			def.SnapshotUnknown118 = record.Field118;
 			def.SnapshotUnknownEc = record.FieldEc;
+			def.SnapshotUnknownF0 = record.FieldF0;
+			def.SnapshotUnknownF8 = record.FieldF8;
 			def.SnapshotXpReward = record.XpReward;
-			def.SnapshotCashReward = record.CashReward;
-			def.SnapshotQuestLineReward = record.QuestLineReward;
 			def.SnapshotChainHeadQuestId = record.Field2c;
 
 			var (region, map) = RegionAndMap(record);

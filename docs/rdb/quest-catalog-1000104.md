@@ -88,84 +88,23 @@ narrative order, which is what says the pointer is a prerequisite rather than an
 for exactly that, are empty. A line gives you its first and last step and its membership; the order of the
 ones between is still hand-authored (`ImportOps.Chain`).
 
-## The reward fields name the journal record's scalars
+## The reward fields do NOT name the journal record's scalars
 
-`MainQuest` carries exactly one reward pair, `xp_reward` (15) and `cash_reward` (16). They are populated on
-too few rows to harvest from, but they are what NAMES two of the `Quest_c` journal record's long-unnamed
-words — see [questc-region-decode.md](../re/questc-region-decode.md).
+`MainQuest` carries exactly one reward pair, `xp_reward` (15) and `cash_reward` (16), populated on only 23 and
+18 of its 2181 lines.
 
-[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — `[Thunder River] Voyage of the Dead`, `Turning Point` and `Pools of Blood` each carry `xp_reward =
-45800`, which is exactly the captured `Quest_c` `@+0xf0` of quests 13895 and 14427; and the catalog's
-low-level cash/xp ratios (715/60, 1000/157, 455/36 → 0.08–0.16) match the wire's (150/15, 370/44, 550/66 →
-0.10–0.12).]
+⚠️ **This document previously claimed that pair NAMES the `Quest_c` record's `@+0xf0`/`@+0xf8`.** An in-client
+test disproved it — the journal's `XP:` comes from `@+0x28`, and `@+0xf0`/`@+0xf8` drive neither `XP:` nor
+`Money:`. See [questc-region-decode.md](../re/questc-region-decode.md). The magnitude coincidence that
+motivated the claim is real and still unexplained:
 
-## Importing it
+[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — `[Thunder River] Voyage of the Dead`, `Turning Point`
+and `Pools of Blood` each carry `xp_reward = 45800`, which is exactly the captured `Quest_c` `@+0xf0` of quests
+13895 and 14427; and the catalog's low-level cash/xp ratios (715/60, 1000/157, 455/36 → 0.08–0.16) match the
+wire's `@+0xf8`/`@+0xf0` (150/15, 370/44, 550/66 → 0.10–0.12).]
 
-```zsh
-dotnet run --project Faolan.Importer -- --only rdb-quest-catalog --RdbDir <rdb-dir>
-```
-
-An **opt-in RDB module** like the rest, `Insert`/`Upsert`, no dependencies. It **adds and names; it never
-overwrites captured wire data** — a quest that already has a row keeps every harvested scalar, and only
-`Name`, its line membership (when it has none) and the line's own catalog columns are written. Where we have
-the wire, the wire is the better evidence. `Verified` rows are skipped entirely, as everywhere else.
-
-What it landed on first run:
-
-| table | before | after |
-|---|---:|---:|
-| `QuestLines` | 973 | 2209 |
-| `QuestDefinitions` | 2037 | 5048 |
-| `QuestGoalDefinitions` | 170 | 7317 |
-| `QuestLineRewards` | 0 | 3943 |
-
-Three gaps in the client's own data are recorded rather than papered over:
-
-- **20 placeholder lines.** 63 catalog quests point at a line id the catalog's `main_quest` list does not
-  define. A placeholder row carries the id and nothing else, which keeps those quests instead of dropping
-  them to satisfy an FK — the same pattern `ImportOps` uses for a quest whose Map is not in the catalog.
-- **2 goals with no quest**, counted in the module's output rather than skipped silently.
-- **17 rows of 14560 have a duplicate id whose content DIFFERS** (2 lines, 15 goals). The importer takes the
-  last, because nothing in the data separates them; the report names the ids so the choice is visible.
-
-Two model consequences worth knowing:
-
-- **`QuestDefinition.MapId` is now nullable.** The catalog carries no map, and the column was a NOT NULL FK
-  whose "0 = none" case never occurred *because the importer skipped any quest whose map it could not
-  resolve*. Nullable is both the honest model and what lets a mapless quest exist.
-- **`QuestGoalDefinition.Separator` (the kind tag) is now nullable.** NULL means "never seen on the wire",
-  which is every catalog goal. It is deliberately not 0: there is no kind 0, and 0 was the un-harvested
-  default that #548 removed — reusing it would resurrect that exact ambiguity.
-
-## ⚠️ The catalog is a SUBSET of the quests the client knows about
-
-It is not "every quest in the game". Comparing it against the **same client build's** LDB — category 50301 is
-the quest title, keyed by quest id — the two disagree in both directions:
-
-| | |
-|---|---:|
-| quest ids with an LDB title (50301) | 5920 |
-| quests in the catalog (1000104) | 5042 |
-| in the LDB but **not** in the catalog | 952 (123 below the catalog's own highest id, 829 above it) |
-| in the catalog but **not** in the LDB | 74 |
-
-The catalog's highest quest id is 18533 and the LDB's is 19628, but the 123 below that line are the reason
-this is **not** a simple cutoff: the catalog has holes inside its own range, and it also lists 74 quests the
-LDB has no title for.
-
-**Why it is a subset is NOT established.** The table is `RDBQUESTGIVERS`, so "it enumerates the quests
-reachable from a giver, and script-granted / event / meta quests are not" is the obvious candidate — but it
-is unproven, the giver lists in this entry are empty, and the catalog does carry `[Event_Halloween]`,
-`[Event_Midwinter]` and `[..._Mastery]` lines, so being event content is plainly not disqualifying on its own.
-
-⚠️ Do NOT explain the gap as the catalog being older than the captures. The client has not been patched and
-is the same build the captures came from, and that build's own LDB carries text for the quests the catalog
-lacks — including all six our corpus touches, whose goal strings decrypt cleanly from its English pages.
-
-In our DB the gap shows up as exactly **6 quests** (19314, 19363, 19364, 19365, 19522, 19620) and **18 goals**
-(13962–14446) with no catalog `Name` — the ones our captures happened to touch among those 952. So a missing
-catalog name means "this quest is not in the quest-giver catalog", not "the client has no name for it": the
-LDB does.
+A LINE-level reward that a step's detail pane never renders would fit both the coincidence and the in-client
+result, but nothing establishes it.
 
 ## Cross-checked against the encrypted LDB — 152 of 152 exact
 

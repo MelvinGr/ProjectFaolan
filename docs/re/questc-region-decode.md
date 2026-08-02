@@ -79,10 +79,10 @@ u32 areaId           (+0xcc)
 u32 field2c          (+0x2c)           # beach codec MISLABELS this "questId2" and ASSERTS ==questId (beach-only!)
 u32 field11c         (+0x11c)
 u64 accept           (+0x20)
-u32 lineReward       (+0x28)  reward on the line's LAST step (see below)
+u32 xpReward         (+0x28)  the quest's EXPERIENCE reward (see below)
 objlist obj1, obj2                     # each: [u32 count][count × ObjRec]
-u32 xpReward         (+0xf0)  this step's experience reward
-u64 cashReward       (+0xf8)  this step's money reward
+u32 fieldF0          (+0xf0)  NOT the journal's XP (see below)
+u64 fieldF8          (+0xf8)  NOT the journal's Money (see below)
 objlist obj3, obj4
 progress-sublist                       # <-- the piece the beach template never exercises
 ```
@@ -226,40 +226,39 @@ took its level from a different capture). Both writers already fed it a level. I
 the beach starter — passing only because that quest happens to be **level 1**. Distinct from
 `QuestCodec.State` (`StateActive`/`StateCompleted`), a real state on a different message.
 
-### `@+0xf0` / `@+0xf8` — this step's EXPERIENCE and MONEY reward
+### `@+0x28` — the quest's EXPERIENCE reward (settled IN-CLIENT)
 
-[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — the client's quest catalog gives a quest line exactly one reward pair, `xp_reward` (field 15) and
-`cash_reward` (field 16), in that order and of these shapes (u32 then a wider money value); and the magnitudes
-coincide — the `[Thunder River]` lines carry `xp_reward = 45800`, exactly the captured `@+0xf0` of quests
-13895 and 14427, while the catalog's low-level cash/xp ratios (715/60, 1000/157, 455/36 → 0.08–0.16) match the
-wire's (150/15, 370/44, 550/66 → 0.10–0.12).]
+The client's journal renders a quest's detail pane with an `XP:` and a `Money:` line, and `XP:` is this field.
 
-⚠️ `@+0xf8` tracks `@+0xf0` through a level-dependent factor (~0.267 around level 23 rising to ~1.10 at 80),
-but 99 samples do not close the law and the residuals disagree. **Do not derive one from the other** — the
-catalog says they are two separately authored numbers that merely correlate.
+[V1: Faolan.ClientLauncher/Program.cs — driven live against a local server: quest 13227's column was set to
+5553, then 0, then 7777, relogging between each, and the panel read back `XP: 5553`, `XP: 0`, `XP: 7777` with
+nothing else changed. In the same runs `@+0xf0 = 8888` and `@+0xf8 = 999999` produced no change to either
+label — `Money:` stayed blank.]
 
-⚠️ The catalog is NOT a harvest source for the magnitudes: `xp_reward`/`cash_reward` are populated on only
-23/18 of its 2181 lines. The values are computed server-side.
+Its positional law still holds and is still unexplained: `@+0x28` is populated on the LAST step of a quest
+line (25 of 26 captured cases) and `@+0xf0`/`@+0xf8` never are. It scales with level — level 23 → 900..4981,
+level 30 → 5553, level 70 → 15421, level 80 → 69337..138674, the level-80 values being exactly
+{1, 4/3, 5/3, 2} × 69337.
 
-`@+0xf0` additionally selects which SPELLING the quest's @609 objective region uses for its trailing text —
+### `@+0xf0` / `@+0xf8` — NOT the journal's XP or Money
+
+⚠️ **An earlier version of this document named these two `XpReward` and `CashReward`.** That was inferred from
+the client catalog's `xp_reward`/`cash_reward` pair plus a magnitude coincidence, and the in-client test above
+disproved it: with both set to large distinctive values the quest pane showed the XP from `@+0x28` and left
+`Money:` blank. **A field-name match in a neighbouring data file is not evidence about the wire.**
+
+What remains true, and unexplained: the catalog gives a quest LINE exactly one `xp_reward`/`cash_reward` pair,
+and the magnitudes coincide — the `[Thunder River]` lines carry `xp_reward = 45800`, exactly the captured
+`@+0xf0` of quests 13895 and 14427, and the catalog's low-level cash/xp ratios (715/60, 1000/157, 455/36 →
+0.08–0.16) match the wire's `@+0xf8`/`@+0xf0` (150/15, 370/44, 550/66 → 0.10–0.12). A LINE-level reward the
+step pane never renders would fit both observations — but that is a guess, and the last guess here was wrong,
+so the two keep their offsets as names.
+
+⚠️ `@+0xf8` tracks `@+0xf0` through a level-dependent factor (~0.267 at level 23 rising to ~1.10 at 80), but 99
+samples do not close the law. Do not derive one from the other.
+
+`@+0xf0` additionally selects WHICH SPELLING the quest's @609 objective region uses for its trailing text —
 see the `ObjectiveRegionVerified` note on `QuestDefinition`.
-
-### `@+0x28` — the reward for completing the LINE
-
-[V1: Faolan.Importer/Cli/ReportCli.RdbQuestCatalog.cs — crossing the populated slot against the step's position in its line (from the catalog's
-`first_quest_template_id`/`last_quest_template_id`) over the 94 captured quests that have a catalog row:
-
-| slot populated | last step | first step | middle |
-|---|---:|---:|---:|
-| `@+0x28` | **25** (19 single-step lines + 6 multi) | 1 | 0 |
-| `@+0xf0`/`@+0xf8` | **0** | 33 | 7 |
-
-`@+0x28` lands on the final step and the XP/cash pair never does. In a one-step line the step IS the line,
-which is why 19 of the 25 are single-step.]
-
-That is the whole of the "near-mutual-exclusivity" this decode used to record as an unexplained curiosity.
-Reading: `@+0xf0`/`@+0xf8` are the STEP's reward, `@+0x28` the LINE's. Its **currency is not established** —
-only its position — because the catalog's own reward columns are too sparse to settle it.
 
 ### `@+0x14` — a flag word of the quest LINE
 

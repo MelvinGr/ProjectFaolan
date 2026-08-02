@@ -166,21 +166,20 @@ namespace Faolan.Core.Database.Tables
 		// each ruled out by counterexamples - see the handoff and Gitea #570).
 		public uint SnapshotQuestLineFlags { get; set; }
 
-		// @+0x28 - a reward magnitude carried on the LAST step of a quest line. What is proven is its POSITION, not
-		// its currency: crossing the populated slot against the line's first/last step (from the client's catalog,
-		// RDB 1000104) over the 94 captured quests with a catalog row gives
-		//     @+0x28      last step 25  (19 single-step lines + 6 multi)   first 1   middle 0
-		//     @+0xf0/f8   last step  0                                     first 33  middle 7
-		// so @+0x28 lands on the final step and the XP/cash pair never does. In a one-step line the step IS the line,
-		// which is why 19 of the 25 are single-step. That is also the whole of the "near-mutual-exclusivity" this
-		// comment used to record as an unexplained curiosity.
+		// @+0x28 - the quest's EXPERIENCE reward. This is the number the client's journal renders as "XP:" in a
+		// quest's detail pane, established IN-CLIENT rather than inferred: driving quest 13227's column to 5553, 0 and
+		// 7777 in turn and relogging produced "XP: 5553", "XP: 0" and "XP: 7777", with nothing else changed.
 		//
-		// Reading: @+0xf0/@+0xf8 are the STEP's own reward and this is the reward for completing the LINE. It scales
-		// with level like the pair does (level 23 -> 900..4981, level 30 -> 5553, level 70 -> 15421, level 80 ->
-		// 69337..138674, the level-80 values being exactly {1, 4/3, 5/3, 2} x 69337). Whether it is XP, cash or
-		// something else is NOT established - the client's `MainQuest.xp_reward`/`cash_reward` are populated on only
-		// 23/18 of 2181 rows, so the catalog cannot settle it, and the magnitudes are computed server-side.
-		public uint SnapshotQuestLineReward { get; set; }
+		// ⚠️ It was called SnapshotQuestLineReward, and @+0xf0/@+0xf8 were called SnapshotXpReward/SnapshotCashReward,
+		// on the strength of the client catalog's `xp_reward`/`cash_reward` pair and a magnitude coincidence. The
+		// in-client test overturned that: with @+0xf0=8888 and @+0xf8=999999 the panel showed "XP: 7777" (this field)
+		// and left "Money:" blank. A field-name match in a neighbouring data file is not evidence about the wire.
+		//
+		// Its positional law still holds and is still unexplained: it is populated on the LAST step of a quest line
+		// (25 of 26 captured cases) and @+0xf0/@+0xf8 never are. It scales with level - level 23 -> 900..4981, level 30
+		// -> 5553, level 70 -> 15421, level 80 -> 69337..138674, the level-80 values being exactly {1, 4/3, 5/3, 2} x
+		// 69337.
+		public uint SnapshotXpReward { get; set; }
 
 		// The Quest_c record's @+0x2c - the first quest of the SERIES this one belongs to, which is the quest's own id
 		// for a standalone quest (84 of the 99 captured records) and an earlier step of the same chain for the rest:
@@ -195,27 +194,27 @@ namespace Faolan.Core.Database.Tables
 		// literal so a capture that ever disagrees shows up as data, not as a wrong constant baked into the builder.
 		public uint SnapshotUnknownEc { get; set; }
 
-		// @+0xf0 and @+0xf8 - THIS STEP's own reward: experience and money. Two independent lines say so, neither a
-		// restatement of the other:
-		//   * the client's quest catalog (RDB 1000104) gives its quest lines exactly one reward pair, `xp_reward` and
-		//     `cash_reward`, in that order and of these shapes (u32 then a wider money value);
-		//   * the magnitudes coincide. The `[Thunder River]` lines carry `xp_reward = 45800`, which is exactly the
-		//     captured @+0xf0 of quests 13895 and 14427, and the catalog's low-level cash/xp ratios (715/60, 1000/157,
-		//     455/36 -> 0.08-0.16) match the wire's (150/15, 370/44, 550/66 -> 0.10-0.12).
-		// They are populated on a line's first/middle steps and never on its last - see SnapshotQuestLineReward.
+		// @+0xf0 and @+0xf8 - two per-quest magnitudes that are NOT the journal's XP or Money. Setting them to 8888
+		// and 999999 on a rendered quest changed neither label (the XP came from @+0x28 and "Money:" stayed blank), so
+		// whatever they are, the quest detail pane does not show them.
 		//
-		// ⚠️ @+0xf8 tracks @+0xf0 through a level-dependent factor (~0.267 around level 23 rising to ~1.10 at 80), but
-		// 99 samples do not close the law and the residuals disagree. Do NOT derive one from the other - the catalog
-		// says they are two separately authored numbers that merely correlate.
+		// What is still true about them, and unexplained: the client's quest catalog (RDB 1000104) gives a quest line
+		// exactly one `xp_reward`/`cash_reward` pair, and the magnitudes coincide - the `[Thunder River]` lines carry
+		// `xp_reward = 45800`, which is exactly the captured @+0xf0 of quests 13895 and 14427, and the catalog's
+		// low-level cash/xp ratios (715/60, 1000/157, 455/36 -> 0.08-0.16) match the wire's @+0xf8/@+0xf0 (150/15,
+		// 370/44, 550/66 -> 0.10-0.12). A LINE-level reward the step pane never renders would fit both observations,
+		// but that is a guess and the last guess here was wrong - so they keep their offsets as names.
+		//
+		// ⚠️ @+0xf8 tracks @+0xf0 through a level-dependent factor (~0.267 around level 23 rising to ~1.10 at 80) but
+		// 99 samples do not close the law - do NOT derive one from the other.
 		//
 		// @+0xf0 additionally selects WHICH SPELLING the quest's @609 objective region uses for its trailing text: the
 		// beach starter is the one quest captured with two variants, and its goal 1448 carries
 		// `<remoteformat …></remoteformat>` in all 15 captures whose record has 150 and the 21-byte-shorter
-		// `<localized … flags="" …>` in all 5 with 175 (every other scalar identical). The importer's region
-		// verification groups on this so it compares like with like (#389).
-		public uint SnapshotXpReward { get; set; }
+		// `<localized … flags="" …>` in all 5 with 175. The importer's region verification groups on this (#389).
+		public uint SnapshotUnknownF0 { get; set; }
 
-		public ulong SnapshotCashReward { get; set; }
+		public ulong SnapshotUnknownF8 { get; set; }
 	}
 
 	// The server-side trigger that advances a quest goal (Gitea #261). Persisted as an int; ordering is stable.

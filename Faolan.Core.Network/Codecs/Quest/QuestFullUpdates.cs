@@ -109,9 +109,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 				Field2c = def.QuestId,
 				Field11c = 0,
 				Accept = 0,
-				QuestLineReward = LiveField28,
-				XpReward = LiveFieldF0,
-				CashReward = 0,
+				XpReward = LiveField28,
+				FieldF0 = LiveFieldF0,
+				FieldF8 = 0,
 				Objectives = new QuestObjectiveRegion
 				{
 					Goals = [goal]

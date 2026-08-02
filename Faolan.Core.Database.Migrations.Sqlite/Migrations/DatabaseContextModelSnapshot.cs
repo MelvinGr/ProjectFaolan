@@ -2780,22 +2780,22 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("QuestLineId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<ulong>("SnapshotCashReward")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("SnapshotChainHeadQuestId")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("SnapshotQuestLineFlags")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("SnapshotQuestLineReward")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("SnapshotUnknown118")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("SnapshotUnknownEc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("SnapshotUnknownF0")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("SnapshotUnknownF8")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("SnapshotXpReward")

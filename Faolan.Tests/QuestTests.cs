@@ -90,7 +90,7 @@ namespace Faolan.Tests
 				Area = QuestTextTokens.RemoteFormat(1054, 50300, "HD*04&#36;OI3kFza?c54,PZ"),
 				Region1 = QuestTextTokens.RemoteFormat(4, 52000, "q7i^yK%uD&quot;FmM`F&amp;2iwr"),
 				Region2 = QuestTextTokens.RemoteFormat(4010, 52000, "4r7Ld6vDEY4cdU5[&#39;v3/"),
-				FieldEc = 1, QuestLineId = 1054, Field2c = 0x34A7, QuestLineReward = 0x50, XpReward = 0x64,
+				FieldEc = 1, QuestLineId = 1054, Field2c = 0x34A7, XpReward = 0x50, FieldF0 = 0x64,
 				Objectives = new QuestObjectiveRegion
 				{
 					Goals = [goal]

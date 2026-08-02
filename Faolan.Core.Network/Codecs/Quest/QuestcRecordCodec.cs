@@ -92,9 +92,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 				Field2c = field2c,
 				Field11c = field11c,
 				Accept = accept,
-				QuestLineReward = field28,
-				XpReward = fieldF0,
-				CashReward = fieldF8,
+				XpReward = field28,
+				FieldF0 = fieldF0,
+				FieldF8 = fieldF8,
 				Obj1 = obj1,
 				Obj2 = obj2,
 				Obj3 = obj3,
@@ -125,12 +125,12 @@ namespace Faolan.Core.Network.Codecs.Quest
 			s.WriteUInt32(v.Field2c);
 			s.WriteUInt32(v.Field11c);
 			s.WriteUInt64(v.Accept);
-			s.WriteUInt32(v.QuestLineReward);
+			s.WriteUInt32(v.XpReward);
 
 			WriteObjList(s, v.Obj1);
 			WriteObjList(s, v.Obj2);
-			s.WriteUInt32(v.XpReward);
-			s.WriteUInt64(v.CashReward);
+			s.WriteUInt32(v.FieldF0);
+			s.WriteUInt64(v.FieldF8);
 			WriteObjList(s, v.Obj3);
 			WriteObjList(s, v.Obj4);
 
@@ -191,10 +191,10 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public uint Field114 { get; init; } // @+0x114 (=0 on the beach template)
 		public uint Field118 { get; init; } // @+0x118
 		public uint Field11c { get; init; } // @+0x11c (=0)
-		// @+0x28 - a reward magnitude carried on the LAST step of a quest line (25 of 26 captured cases; the XP/cash
-		// pair below is never on the last step). Its POSITION is proven, its currency is not - see QuestDefinition
-		// .SnapshotQuestLineReward. (=0 on the beach template; 0x50 in the live full-update.)
-		public uint QuestLineReward { get; init; }
+		// @+0x28 - the quest's EXPERIENCE reward: the number the journal's detail pane renders as "XP:". Proven
+		// in-client by driving one quest's value to 5553, 0 and 7777 and reading the panel back. See
+		// QuestDefinition.SnapshotXpReward. (=0 on the beach template; 0x50 in the live full-update.)
+		public uint XpReward { get; init; }
 		// @+0x2c - the CHAIN HEAD: the first quest of the series this quest belongs to, which is the quest's own id for
 		// a standalone one. Measured over the 99 quests with a captured record: 84 carry their own id and every one of
 		// the other 15 carries an earlier quest that is a step of the same chain - 10915 and 12371 both carry 10238
@@ -204,12 +204,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// IndexQuestLineQuestIds), so it needs harvesting into its own column. Tracked in Gitea #566.
 		public uint Field2c { get; init; }
 		public uint FieldEc { get; init; } // @+0xec (=1 in template)
-		// @+0xf0 - THIS step's own experience reward, and @+0xf8 below its money reward. The client's quest catalog
-		// (RDB 1000104) gives a quest line exactly one `xp_reward`/`cash_reward` pair in this order and of these
-		// shapes, and the magnitudes coincide (`[Thunder River]` lines carry xp_reward 45800, which is the captured
-		// @+0xf0 of quests 13895/14427). @+0xf0 also selects the objective region's text spelling - see
-		// QuestDefinition.SnapshotXpReward. (=0x96 in the template, 0x64 in the live full-update.)
-		public uint XpReward { get; init; }
+		// @+0xf0 - NOT the journal's XP (that is XpReward above, verified in-client) and not its Money either.
+		// Correlates with the client catalog's line-level `xp_reward`, which is suggestive and not established -
+		// see QuestDefinition.SnapshotUnknownF0. Also selects the objective region's text spelling.
+		// (=0x96 in the template, 0x64 in the live full-update.)
+		public uint FieldF0 { get; init; }
 
 		// @+0x10 - the quest's LEVEL, not a state. It equals the DB `Level` on 96 of the 99 quests with a captured
 		// record (the three that differ - 12373, 17402, 17403 - differ by 1-2, i.e. the row took its level from a
@@ -229,8 +228,8 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// QuestDefinition.SnapshotQuestLineFlags. Carry it through from the capture rather than deriving it.
 		public uint QuestLineFlags { get; init; }
 		public ulong Accept { get; init; } // @+0x20 u64 (likely acceptTime; =0)
-		// @+0xf8 - this step's MONEY reward (see XpReward). ⚠️ It correlates with @+0xf0 through a level-dependent
-		// factor but the law does not close over 99 samples - do NOT derive one from the other.
-		public ulong CashReward { get; init; } // (=15 in the template, 0 in the live full-update)
+		// @+0xf8 - NOT the journal's Money: setting it to 999999 left that label blank. Tracks FieldF0 through a
+		// level-dependent factor that 99 samples do not close - do NOT derive one from the other.
+		public ulong FieldF8 { get; init; } // (=15 in the template, 0 in the live full-update)
 	}
 }

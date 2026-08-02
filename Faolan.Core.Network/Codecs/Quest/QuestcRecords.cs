@@ -45,9 +45,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 					: def.SnapshotChainHeadQuestId,
 				Field11c = 0,
 				Accept = 0,
-				QuestLineReward = def.SnapshotQuestLineReward,
 				XpReward = def.SnapshotXpReward,
-				CashReward = def.SnapshotCashReward
+				FieldF0 = def.SnapshotUnknownF0,
+				FieldF8 = def.SnapshotUnknownF8
 			};
 
 			string Slot(QuestTextSlot slot)

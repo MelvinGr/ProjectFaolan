@@ -1372,7 +1372,7 @@ namespace Faolan.Importer.Captures
 				// A quest whose region does not depend on the variant satisfies these exactly as it did under the old
 				// all-captures rule (its same-variant set is a subset of a set that all matches), so nothing that was
 				// verified before is weakened; a quest that only matches SOMEONE ELSE's variant still fails the second.
-				def.ObjectiveRegionVerified = captures.Any(Reproduces) && captures.Where(c => c.Variant == def.SnapshotXpReward).All(Reproduces);
+				def.ObjectiveRegionVerified = captures.Any(Reproduces) && captures.Where(c => c.Variant == def.SnapshotUnknownF0).All(Reproduces);
 
 				if (def.ObjectiveRegionVerified)
 					verified++;
@@ -1618,11 +1618,11 @@ namespace Faolan.Importer.Captures
 			quest.SnapshotUnknown118 = 4;
 			quest.SnapshotQuestLineFlags = QuestFullUpdates.LiveQuestLineFlags; // the beach record's `n` (@+0x14)
 			quest.SnapshotUnknownEc = 1;
-			quest.SnapshotXpReward = 0x96;
-			quest.SnapshotCashReward = 15;
+			quest.SnapshotUnknownF0 = 0x96;
+			quest.SnapshotUnknownF8 = 15;
 			quest.Level = 1;
 			quest.HasSnapshotRecord = true;
-			quest.SnapshotQuestLineReward = 0;
+			quest.SnapshotXpReward = 0;
 			quest.IndexMagic = 0x57365154;
 			quest.IndexMarker = 0x7E2;
 			quest.IndexTableField1 = 1;
@@ -1764,9 +1764,9 @@ namespace Faolan.Importer.Captures
 			quest.SnapshotUnknown118 = 3;
 			quest.SnapshotQuestLineFlags = QuestFullUpdates.LiveQuestLineFlags;
 			quest.SnapshotUnknownEc = 1;
+			quest.SnapshotUnknownF0 = 80;
+			quest.SnapshotUnknownF8 = 7;
 			quest.SnapshotXpReward = 80;
-			quest.SnapshotCashReward = 7;
-			quest.SnapshotQuestLineReward = 80;
 			quest.IndexMagic = 0x52524C33;
 			quest.IndexTableField1 = 1;
 			quest.IndexTableField2 = 3;
