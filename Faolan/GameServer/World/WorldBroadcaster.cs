@@ -2200,7 +2200,7 @@ namespace Faolan.GameServer.World
 			string? lootSourceName = null, LootContainerTemplateId variant = LootContainerTemplateId.Bag)
 		{
 			// #363 container variant: default is the generic bag; a boss/raid drop passes a bigger chest (LargeChest, …).
-			var template = GetLootTemplate(variant);
+			var template = LootContainerTemplate.Create(variant);
 			if (template == null)
 				return null;
 
@@ -2239,7 +2239,7 @@ namespace Faolan.GameServer.World
 				if (viewer.Client == null)
 					continue;
 
-				await SendLootBagUpdate(viewer.Client, body);
+				await WorldIir.Send(viewer.Client, body);
 				// #263: the LootBagFullUpdateIIR alone only renders a NEW world object on a playfield (re)load - the
 				// client otherwise treats it as an update to an object it doesn't have yet (verified: our bags only
 				// appeared after a relog). Retail follows the FullUpdate with a NewAllowedLooterIIR at the bag's
@@ -2417,14 +2417,6 @@ namespace Faolan.GameServer.World
 			return pool.Points[Random.Shared.Next(pool.Points.Length)];
 		}
 
-		// The loot-bag definition (#249): the baked canonical "Bag of loot" (columns + embedded KdTreeTail), built FROM
-		// SCRATCH by WorldObjectCodec.Build - map-independent, needs NO captured loot-bag WorldObject in
-		// the world (deleting static world bags no longer breaks kill-loot). Null only if the geometry asset is missing.
-		private static WorldObject GetLootTemplate(LootContainerTemplateId variant = LootContainerTemplateId.Bag)
-		{
-			return LootContainerTemplate.Create(variant);
-		}
-
 		// Short nameplate-friendly tag for a spawn area's creature-resolution provenance (#363).
 		private static string ResolvedTag(SpawnResolutionSource resolvedBy)
 		{
@@ -2436,20 +2428,6 @@ namespace Faolan.GameServer.World
 				SpawnResolutionSource.Manual        => "manual",
 				_                                   => "unresolved"
 			};
-		}
-
-		// Sends a prebuilt LootBagFullUpdateIIR RECORD (handle + transform already baked by WorldObjectCodec) on the
-		// world conversation. Unlike SendWorldSpawn this does NOT re-patch the position - the record is already placed
-		// at the corpse's spot.
-		//
-		// The carrier's [u32 len] is WorldIir.Send's, because it belongs to the sender (#530 rule 2). This used to send
-		// the record verbatim, back when WorldObjectBuilder prefixed its own length; #530 wave 3 moved that length off
-		// the codec and this call site was missed, so from then on every mid-session bag went out with the length gone
-		// and the client read the IIR type 0xF096251E as a ~4 GB payload and dropped the connection the instant an NPC
-		// died (#576) - the same failure the WorldIir header records for AddToGroupIIR.
-		private static Task SendLootBagUpdate(INetworkClient recipient, byte[] record)
-		{
-			return WorldIir.Send(recipient, record);
 		}
 
 		// #266 patrol: issue the NPC's captured patrol route as a MoveTask so the CLIENT walks it (retail drives idle
@@ -2511,6 +2489,5 @@ namespace Faolan.GameServer.World
 		// WorldObjectId is the used object's STABLE row id (null when the handle resolved to nothing), so a caller can
 		// look the object up in the DB - the handle itself is session-volatile and useless as a key (#523).
 		public readonly record struct UsedObjectInteraction(InteractAction Action, ZoneLineDestination Teleport, uint? WorldObjectId = null);
-
 	}
 }

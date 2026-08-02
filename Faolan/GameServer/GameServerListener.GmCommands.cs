@@ -19,6 +19,7 @@ using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Economy;
+using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
@@ -537,7 +538,7 @@ namespace Faolan.GameServer
 		private async Task OpenAuctionHouseCommand(INetworkClient client)
 		{
 			var characterId = client.Session.Character.Id;
-			var entity = PlayerWorldEntity(client);
+			var entity = _simulation.PlayerWorldEntity(client);
 			if (entity == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, "No world entity for the player yet.");

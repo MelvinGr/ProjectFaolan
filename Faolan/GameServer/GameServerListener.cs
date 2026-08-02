@@ -283,10 +283,7 @@ namespace Faolan.GameServer
 			// the roll + the two Fatality ids every captured burst carries.
 			_fatality = new FatalityService(logger, this, _spellEffects);
 			_buffStats = new BuffStatEffects(database, logger);
-			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a),
-				SendLearnSpell, _fatality); // announced level-up ability + spell unlocks (#209/#73/#74), fatality burst (#140)
-			// Seven Func<> seams collapsed into ISpellweaveOutbound, which this listener implements
-			// (GameServerListener.Buffs.cs) - see the port for why.
+			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality);
 			_spellweave = new SpellweaveService(logger, this);
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression);
 			_stockConversation = new StockConversationService(logger, database);
@@ -424,21 +421,6 @@ namespace Faolan.GameServer
 			await base.ClientDisconnected(client);
 		}
 
-		// GameCharAgent.RequestBindLocation (0x2002 on the GameCharAgent class): the client repeatedly polls its
-		// bind/home playfield (the Totem of Origin destination, #64); body = the player's ID32. Retail answers each
-		// with a 4-byte 0x2002 [u32 playfieldId] (verified 1:1 across 13 captures). Routed here by receiver class so
-		// it never collides with GameAgent.ChatVicinity, which shares opcode 0x2002.
-		// #197: after each recv batch drains, fire the create-editor post-morph trio deterministically (when the
-		// batch that carried Finish + the SetMorphValue burst is fully received) instead of the debounce timer.
-		// Guarded to the create-editor customization phase; a no-op for every other connection/batch.
-		protected override Task ReceivedBatchComplete(INetworkClient client)
-		{
-			if (client.Session.EntryMode == WorldEntryMode.CreateEditor)
-				return CreateFlowService.FlushPostMorphBurstOnBatchDrained(client);
-
-			return Task.CompletedTask;
-		}
-
 		protected override Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
 			// Lift the parsed frame into the structured Rpc the handlers dispatch on (Gitea #407); the total wire length
@@ -565,17 +547,6 @@ namespace Faolan.GameServer
 			// held, else the first held quest (null only when the character holds none -> empty region).
 			var primary = quests.FirstOrDefault(q => q.QuestId == BeachStarterQuestId) ?? quests.FirstOrDefault();
 			return (quests, primary);
-		}
-
-		// Periodically flushes the live world state to the DB so a crash loses at most one interval. Persistence is
-		// otherwise event-driven (disconnect, teleport, .save) and needs no game loop; this is just a cheap timer
-		// (Gitea #404). The simulation tick, when it lands, can absorb this.
-		// The player's live world entity for this connection (the authoritative transform + vitals), or null if not yet
-		// in the world. Thin delegate to the simulation, which owns the player registry; kept so the other listener
-		// partials (broadcast, combat, GM) read it unchanged.
-		private WorldEntity? PlayerWorldEntity(INetworkClient client)
-		{
-			return _simulation.PlayerWorldEntity(client);
 		}
 
 		// Resolves a map argument (numeric id, exact case-insensitive name, or first name-contains match) to its Map row, 		// or null if nothing matches. Shared by the `.teleport <name>` and `.teleport <name> x y z` forms (#247).

@@ -477,7 +477,7 @@ namespace Faolan.GameServer
 				[CharacterStatId.MountSpeed] = 100
 			}, self);
 
-			var entity = PlayerWorldEntity(client);
+			var entity = _simulation.PlayerWorldEntity(client);
 			entity?.IsMounted = true;
 			entity?.MountRideStat = mount.RideStat;
 

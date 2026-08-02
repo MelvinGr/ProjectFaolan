@@ -104,7 +104,7 @@ namespace Faolan.GameServer
 					// which only runs on world entry. So there is no entity to hold the transform, and writing it to the
 					// session Character is right there: for an editor avatar the character row IS the live state, and it
 					// is what the world entry that follows will spawn from.
-					var moveEntity = PlayerWorldEntity(client);
+					var moveEntity = _simulation.PlayerWorldEntity(client);
 
 					// The pre-move position, so a real TRANSLATION below can interrupt an in-flight cast (#347).
 					var previousPosition = moveEntity?.Position ?? sessionCharacter.Position;
@@ -1638,7 +1638,7 @@ namespace Faolan.GameServer
 						// this end-twin + StatUpd), and both immediate and timer-deferred dismount show it. It is a client-side
 						// ground/height recalculation on the mount->ground transition; a fix would need live client RE. #27.
 						var mount = MountCatalog.ForId(from) ?? throw new InvalidOperationException($"SummonMount: unknown mount id 0x{from:X8} (not in MountCatalog)");
-						var playerEntity = PlayerWorldEntity(client);
+						var playerEntity = _simulation.PlayerWorldEntity(client);
 						var dismounting = playerEntity?.IsMounted ?? false;
 						Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.CreatureName, dismounting
 							? "dismount"
@@ -1978,7 +1978,7 @@ namespace Faolan.GameServer
 								// destination hasn't been captured yet, surface a message (like the missing-vendor
 								// case) rather than a silent no-op.
 								var dest = interaction.Teleport;
-								var currentMap = PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
+								var currentMap = _simulation.PlayerWorldEntity(client)?.MapId ?? client.Session.Character.MapId;
 								if (dest.DestMapId == 0)
 								{
 									await _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id,
@@ -2039,7 +2039,7 @@ namespace Faolan.GameServer
 								// Unknown object: no bench/door/loot behavior. Surface the gap the same way as an
 								// un-imported vendor/dialogue NPC (notify the player, never a silent no-op).
 								// Float the bubble over the clicked object so the client shows it in place.
-								var usedEntity = PlayerWorldEntity(client);
+								var usedEntity = _simulation.PlayerWorldEntity(client);
 								var usedName = usedEntity != null && _simulation.World.ZoneForEntity(usedEntity).TryGetWorldObject(target, out var usedObj)
 									? usedObj.Row.Name
 									: null;
@@ -2095,7 +2095,7 @@ namespace Faolan.GameServer
 						// is the stable key (like shop vendors above); the player is standing next to the auctioneer to
 						// click it, so their own position trivially satisfies the 15-unit client proximity check.
 						if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
-						    talkedNpcName == AuctioneerNpcName && PlayerWorldEntity(client) is { } auctioneerPlayer)
+						    talkedNpcName == AuctioneerNpcName && _simulation.PlayerWorldEntity(client) is { } auctioneerPlayer)
 						{
 							await SendAuctionHouseOpen(client, auctioneerPlayer.Position);
 							break;
