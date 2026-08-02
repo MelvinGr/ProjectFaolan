@@ -51,7 +51,28 @@ namespace Faolan.Core.Network.Logging
 			if (body.Length < sizeof(uint) * 2)
 				return false;
 
-			payloadLength = body.ReadU32Be(0);
+			var declared = body.ReadU32Be(0);
+
+			// #575: the opcode and receiver class are NOT enough to know this body is an IIR carrier. The same
+			// (PassBlob, GameInterface) pair also carries the remoteformat FEEDBACK payloads, whose body starts with an
+			// ID32 - and reading one of those as a header printed `subOpcode=0x0000C350, payloadLength=2371521387`
+			// against a 528-byte body. Five of them land between a level-up ding and its AttributeChanged lines, so the
+			// trace looked like a malformed burst at exactly the moment a client disconnected. `0xC350` is an ID32, not
+			// a length or an opcode - the same trap as the 0x3F1 list-count word.
+			//
+			// ⚠️ The ENDPOINT cannot tell them apart, so do not try to narrow the receiver check instead. The two
+			// senders are otherwise identical - same sender endpoint, same `Endpoints.GameInterfaceType` receiver, same
+			// DispatchPassBlob opcode; compare CombatService.SendWorldPacket with SendWorldFeedback. The ONLY structural
+			// difference is that a carrier's body goes through `WriteArrayUInt32Length` and a feedback body does not.
+			//
+			// So the length IS the discriminator, not a heuristic standing in for one: the declared payload is
+			// everything after that length word, making `bodyLength == payloadLength + 4` true of every genuine carrier
+			// and of nothing else. Deliberately NOT a check that the type is a known IirTypes - an UNKNOWN IIR is
+			// exactly what a trace should still show as raw hex; it is the length that says whether this is a carrier.
+			if (declared + (long)sizeof(uint) != rpc.Body.Length)
+				return false;
+
+			payloadLength = declared;
 			iir = body.ReadU32Be(sizeof(uint));
 			return true;
 		}
