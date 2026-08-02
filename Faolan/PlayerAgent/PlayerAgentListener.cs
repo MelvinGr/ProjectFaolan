@@ -157,6 +157,17 @@ namespace Faolan.PlayerAgent
 
 				case PlayerAgentOpcodes.ReceivedCharacterSettings: // after 0x20B9
 				{
+					// #573: this step normally follows LoginCharacter, which selects the character - but a client that
+					// resumes the sequence after its connection was replaced sends this one WITHOUT that one, and every
+					// handoff below needs the selected character. Recover it from the account's last-played id; if there
+					// is nothing to recover the client is out of sequence, which is not something to throw over.
+					if (!await EnsureSessionCharacter(client))
+					{
+						Logger.LogWarning("ReceivedCharacterSettings with no character selected and no last-played id on account {AccountId:X8} - skipping the handoff block.",
+							client.Session.Account?.Id ?? 0);
+						break;
+					}
+
 					// Retail order (login dump): CsPlayerAgent, then ChatServer, then GameServer, then gametweaks.
 					await SendCsPlayerAgent(client, packet.Sender);
 					await SendChatServer(client, packet.Sender);

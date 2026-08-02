@@ -8,6 +8,7 @@ using Faolan.Core.Network;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
+using Microsoft.Extensions.Logging;
 
 namespace Faolan.PlayerAgent
 {
@@ -21,7 +22,38 @@ namespace Faolan.PlayerAgent
 		// address, not the process-global config. Resolved from the selected character (ClientInstance is set at EnterWorld).
 		private async Task<Realm> ResolveActiveRealm(INetworkClient client)
 		{
-			return await Database.GetRealm(client.Session.Character.RealmId) ?? throw new Exception($"Character {client.Session.Character.Id:X8} has no realm to route to.");
+			var character = client.Session.Character
+			                ?? throw new Exception("No character is selected, so there is no realm to route to.");
+			return await Database.GetRealm(character.RealmId) ?? throw new Exception($"Character {character.Id:X8} has no realm to route to.");
+		}
+
+		// #573: re-establishes `Session.Character` when the client resumes the login sequence PAST character selection.
+		// The handoff block (CsPlayerAgent/ChatServer/GameServer) is driven by `ReceivedCharacterSettings`, which
+		// normally arrives after `LoginCharacter` has selected the character - but a client whose connection was
+		// replaced mid-flow (the server restarted under it) re-sends the later step WITHOUT the earlier one. Every
+		// sender in that block then dereferences a null `Session.Character`, which threw and dropped the connection,
+		// so the client reconnected, resumed at the same step and was dropped again - a login loop, observed live.
+		//
+		// The account row remembers which character it was playing: `ClientInstance` is written and SAVED at
+		// LoginCharacter, and is the pre-selection-safe field `SendCharacterList` already relies on. So the session is
+		// rebuilt from it rather than the client being bounced. Returns false when there is genuinely nothing to
+		// recover (a fresh account that has never entered a character), and the caller then skips the handoff block
+		// instead of throwing - the client is simply out of sequence, which is not a server error.
+		private async Task<bool> EnsureSessionCharacter(INetworkClient client)
+		{
+			if (client.Session.Character != null)
+				return true;
+
+			var lastPlayed = client.Session.Account?.ClientInstance ?? 0;
+			if (lastPlayed == 0)
+				return false;
+
+			client.Session.Character = (await Database.GetCharacter(lastPlayed))!;
+			if (client.Session.Character == null)
+				return false;
+
+			Logger.LogInformation("Recovered session character {CharacterId:X8} from the account's last-played id - the client resumed login past character selection (#573).", lastPlayed);
+			return true;
 		}
 
 		private async Task SendCharacterList(INetworkClient client, ProtoEndpoint receiver)
