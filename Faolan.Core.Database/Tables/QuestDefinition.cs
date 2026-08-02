@@ -66,10 +66,20 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<QuestGoalDefinition> Goals { get; set; } = [];
 		public virtual ICollection<QuestTextRef> TextRefs { get; set; } = [];
 
-		// True once this quest's Quest_c record scalars are known (seeded, or harvested from a captured journal), i.e.
-		// the record can be GENERATED. Previously inferred from `SnapshotState != 0` - but that word turned out to be
-		// the quest LEVEL (it collapsed into Level), and plenty of definitions carry a level with no record scalars at
-		// all, so the inference would have made them falsely eligible. An explicit flag says what was actually meant.
+		// True once this quest's Quest_c record scalars are known, i.e. the record can be GENERATED - either HARVESTED
+		// from a captured journal (82 quests) or DERIVED for a quest that had everything else
+		// (ImportOps.SeedDerivedSnapshotRecords, 17 quests). Previously inferred from `SnapshotState != 0` - but that
+		// word turned out to be the quest LEVEL (it collapsed into Level), and plenty of definitions carry a level
+		// with no record scalars at all, so the inference would have made them falsely eligible. It cannot be inferred
+		// from the Snapshot* columns either: every one of them is legitimately 0 on some captured record.
+		//
+		// ⚠️ NOT redundant with ObjectiveRegionVerified, even though the two currently agree on all 5048 rows (99 set,
+		// 4949 clear). They are independent facts about different halves of the snapshot portion, set by different
+		// processes: this one says we can build the RECORD, that one says the @609 REGION provably rebuilds. The
+		// agreement is a property of today's data - verification stands at 99 of 99 - not of the model. The moment a
+		// capture lands whose region does NOT rebuild, the pair separates into (record yes, region no), and excluding
+		// that quest is the entire reason ObjectiveRegionVerified exists: an unreproducible region takes the whole
+		// login down (statlist.cpp:134), while a missing record just means the quest cannot be offered.
 		public bool HasSnapshotRecord { get; set; }
 
 		// True when the quest's @609 objective region, REBUILT from these rows, reproduces the captured bytes exactly.
