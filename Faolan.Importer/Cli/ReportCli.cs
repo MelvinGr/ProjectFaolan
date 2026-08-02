@@ -156,6 +156,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "handle-recycling":
+				{
+					HandleRecycling(NamedCapture.LoadAll(capturesDir));
+					return 0;
+				}
+
 				case "coverage":
 				{
 					await Coverage(NamedCapture.LoadAll(capturesDir), arg, RdbDir());
@@ -669,6 +675,60 @@ namespace Faolan.Importer.Cli
 						: "(unreadable)";
 					Console.WriteLine($"{c.Name[..Math.Min(40, c.Name.Length)]} | handle 0x{e.Handle:X} | AnimIdleId={anim} | pos=({e.X:0.#},{e.Z:0.#})");
 				}
+		}
+
+		// #571: how often a single capture reuses one entity handle for MORE THAN ONE NPC, and what the spawn import
+		// loses to it. Handles are recycled - a handle freed by a despawn is reissued later in the same session - but
+		// the import treats a handle as a capture-scoped mob identity: `DistinctByHandle` keeps the FIRST spawn per
+		// handle and silently drops every later one, and the patrol join used to hand the survivor the other NPC's
+		// route (fixed in #565 by a positional sanity check, which is where this was found).
+		//
+		// ⚠️ Only a change of TEMPLATE proves it. The obvious-looking test - the same handle seen at two distant
+		// positions - does NOT: an NPC that WANDERS or patrols streams in again wherever it has walked to, and over a
+		// long session a cow covers a couple of hundred units. Counting distance-apart-only reuses reported 229 handles
+		// where the provable figure is far smaller, and every inflated one was a Wild Cow / Conarch Guard seen at three
+		// points of its own route. So distance is reported SEPARATELY as ambiguous and is never added to the total: a
+		// different template on one handle is the only thing that cannot be one mob moving.
+		private static void HandleRecycling(IReadOnlyList<NamedCapture> captures)
+		{
+			var provenHandles = 0;
+			var provenLost = 0;
+			var ambiguousHandles = 0;
+			foreach (var capture in captures)
+			{
+				var byHandle = new Dictionary<uint, List<NpcSpawnEntry>>();
+				foreach (var e in NpcSpawnExtractor.Extract(capture.Packets))
+				{
+					if (!byHandle.TryGetValue(e.Handle, out var list))
+						byHandle[e.Handle] = list = [];
+
+					if (!list.Exists(p => p.TemplateId == e.TemplateId))
+						list.Add(e); // one entry per DISTINCT template on this handle
+				}
+
+				var proven = byHandle.Where(kv => kv.Value.Count > 1).ToList();
+				var crossMap = proven.Count(kv => kv.Value.Select(e => e.MapId).Distinct().Count() > 1);
+				if (proven.Count > 0)
+					Console.WriteLine($"  ({crossMap} of {proven.Count} span more than one MAP)");
+				ambiguousHandles += byHandle.Count(kv => kv.Value.Count == 1);
+				if (proven.Count == 0)
+					continue;
+
+				var lost = proven.Sum(kv => kv.Value.Count - 1); // DistinctByHandle keeps the first, drops the rest
+				provenHandles += proven.Count;
+				provenLost += lost;
+				Console.WriteLine($"{capture.Name[..Math.Min(60, capture.Name.Length)]} | handles proven recycled: {proven.Count} | spawns dropped: {lost}");
+				foreach (var (handle, seen) in proven.OrderByDescending(kv => kv.Value.Count))
+				{
+					var who = seen.Select(e => $"map {e.MapId}: {e.Name ?? "?"}#{e.TemplateId}@({e.X:0.#},{e.Z:0.#})");
+					Console.WriteLine($"    0x{handle:X8} -> {string.Join("  |  ", who)}");
+				}
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"TOTAL over {captures.Count} captures: {provenHandles} handle(s) PROVEN recycled (a second template on the same handle), "
+			                  + $"costing {provenLost} spawn observation(s) to DistinctByHandle. {ambiguousHandles} single-template handle(s) were not counted - "
+			                  + "a repeat sighting of one template is a mob that moved, not evidence of reuse.");
 		}
 
 		private static void ConversationStates(IReadOnlyList<NamedCapture> captures)
