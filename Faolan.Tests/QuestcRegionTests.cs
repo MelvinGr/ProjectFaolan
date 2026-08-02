@@ -39,7 +39,7 @@ namespace Faolan.Tests
 			// +0x14 - the beach template's value, carried through opaquely. NOT a 0x412 "marker" (asserting it as one
 			// rejected every level-80 snapshot, #384) and NOT a goal count either: this quest has TWO goals while the
 			// word is 0x412, and NecroL80 rec0 holds 2. Reading it as a count crashed the client - see the rename
-			// migration QuestSnapshotQuestLineFlags.
+			// migration QuestQuestLineFlags.
 			Assert.Equal(QuestFullUpdates.LiveQuestLineFlags, q.QuestLineFlags);
 			Assert.Equal(2, q.Objectives!.Goals.Count);
 			// The record owns its objective region.

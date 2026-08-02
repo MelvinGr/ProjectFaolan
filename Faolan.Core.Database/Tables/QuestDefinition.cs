@@ -154,8 +154,8 @@ namespace Faolan.Core.Database.Tables
 
 		// A level-ADJACENT value: across the captured journals it runs level..level+5 (NecroL80 L80 -> 80-83,
 		// Hakotep L24 -> 19-30). Its exact meaning is undecoded, hence the name. Was called SnapshotN, which was
-		// doubly wrong - it is not `n` (that is SnapshotQuestLineFlags, a different word at a different offset).
-		public uint SnapshotUnknown118 { get; set; }
+		// doubly wrong - it is not `n` (that is QuestLineFlags, a different word at a different offset).
+		public uint Field118 { get; set; }
 
 		// The Quest_c record's word @+0x14 - a BITFIELD, and a property of the quest LINE rather than the quest.
 		// Across the 99 quests with a captured record it takes five values (2, 10, 18, 26, 1042), every one ≡ 2
@@ -176,9 +176,9 @@ namespace Faolan.Core.Database.Tables
 		// vs 26 vs 1042, PIXEL-IDENTICALLY - so whatever they drive is not this UI. Earlier readings of bit 10 as a
 		// "progression line" marker and of bit 4 as "expansion content" were both correlations without a mechanism;
 		// the first is untested elsewhere and the second is now superseded. Gitea #570.
-		public uint SnapshotQuestLineFlags { get; set; }
+		public uint QuestLineFlags { get; set; }
 
-		// @+0x20 - the quest's MONEY reward, the twin of SnapshotXpReward below (u64 money at 0x20, u32 xp at 0x28,
+		// @+0x20 - the quest's MONEY reward, the twin of XpReward below (u64 money at 0x20, u32 xp at 0x28,
 		// adjacent in the struct). Stored RAW as the wire carries it, which is in TIN - 100 tin = 1 copper, 100
 		// copper = 1 silver. The client's journal prints it on the `Money:` line, so the harvested 214 of quest 13507
 		// renders "2C 14T", 111200 renders "11S 12C" and 250000 renders "25S".
@@ -187,13 +187,13 @@ namespace Faolan.Core.Database.Tables
 		// It was modelled as `QuestcRecord.Accept`, "likely acceptTime", and emitted as a CONSTANT 0, which threw the
 		// value away: 21 of the 99 captured quests carry a non-zero one, constant per quest across every character and
 		// capture. The set is a subset of the quests carrying an XP reward - some quests pay experience only.
-		public ulong SnapshotMoneyReward { get; set; }
+		public ulong MoneyReward { get; set; }
 
 		// @+0x28 - the quest's EXPERIENCE reward. This is the number the client's journal renders as "XP:" in a
 		// quest's detail pane, established IN-CLIENT rather than inferred: driving quest 13227's column to 5553, 0 and
 		// 7777 in turn and relogging produced "XP: 5553", "XP: 0" and "XP: 7777", with nothing else changed.
 		//
-		// ⚠️ It was called SnapshotQuestLineReward, and @+0xf0/@+0xf8 were called SnapshotXpReward/SnapshotCashReward,
+		// ⚠️ It was called SnapshotQuestLineReward, and @+0xf0/@+0xf8 were called XpReward/SnapshotCashReward,
 		// on the strength of the client catalog's `xp_reward`/`cash_reward` pair and a magnitude coincidence. The
 		// in-client test overturned that: with @+0xf0=8888 and @+0xf8=999999 the panel showed "XP: 7777" (this field)
 		// and left "Money:" blank. A field-name match in a neighbouring data file is not evidence about the wire.
@@ -202,7 +202,7 @@ namespace Faolan.Core.Database.Tables
 		// (25 of 26 captured cases) and @+0xf0/@+0xf8 never are. It scales with level - level 23 -> 900..4981, level 30
 		// -> 5553, level 70 -> 15421, level 80 -> 69337..138674, the level-80 values being exactly {1, 4/3, 5/3, 2} x
 		// 69337.
-		public uint SnapshotXpReward { get; set; }
+		public uint XpReward { get; set; }
 
 		// The Quest_c record's @+0x2c - the first quest of the SERIES this one belongs to, which is the quest's own id
 		// for a standalone quest (84 of the 99 captured records) and an earlier step of the same chain for the rest:
@@ -211,11 +211,11 @@ namespace Faolan.Core.Database.Tables
 		// nothing locally that names its series, and NextQuestId gives successors rather than the start (Gitea #566).
 		// 0 = never captured; the builder then falls back to the quest's own id, which is right for a standalone quest
 		// and is what we emitted for everything before this column existed.
-		public uint SnapshotChainHeadQuestId { get; set; }
+		public uint ChainHeadQuestId { get; set; }
 
 		// @+0xec: 1 in every one of the 99 captured records - no quest varies it. Kept as a column rather than a
 		// literal so a capture that ever disagrees shows up as data, not as a wrong constant baked into the builder.
-		public uint SnapshotUnknownEc { get; set; }
+		public uint FieldEc { get; set; }
 
 		// @+0xf0 and @+0xf8 - two per-quest magnitudes that are NOT the journal's XP or Money. Setting them to 8888
 		// and 999999 on a rendered quest changed neither label (the XP came from @+0x28 and "Money:" stayed blank), so
@@ -235,9 +235,9 @@ namespace Faolan.Core.Database.Tables
 		// beach starter is the one quest captured with two variants, and its goal 1448 carries
 		// `<remoteformat …></remoteformat>` in all 15 captures whose record has 150 and the 21-byte-shorter
 		// `<localized … flags="" …>` in all 5 with 175. The importer's region verification groups on this (#389).
-		public uint SnapshotUnknownF0 { get; set; }
+		public uint FieldF0 { get; set; }
 
-		public ulong SnapshotUnknownF8 { get; set; }
+		public ulong FieldF8 { get; set; }
 	}
 
 	// The server-side trigger that advances a quest goal (Gitea #261). Persisted as an int; ordering is stable.

@@ -2724,6 +2724,21 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("QuestId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("ChainHeadQuestId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Field118")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("FieldEc")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("FieldF0")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<ulong>("FieldF8")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("GoalId")
                         .HasColumnType("INTEGER");
 
@@ -2767,6 +2782,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("MarkerY")
                         .HasColumnType("INTEGER");
 
+                    b.Property<ulong>("MoneyReward")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
@@ -2777,34 +2795,16 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<bool>("ObjectiveRegionVerified")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("QuestLineFlags")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("QuestLineId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("SnapshotChainHeadQuestId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<ulong>("SnapshotMoneyReward")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("SnapshotQuestLineFlags")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("SnapshotUnknown118")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("SnapshotUnknownEc")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("SnapshotUnknownF0")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<ulong>("SnapshotUnknownF8")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<uint>("SnapshotXpReward")
-                        .HasColumnType("INTEGER");
-
                     b.Property<bool>("Verified")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("XpReward")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("QuestId");

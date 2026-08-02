@@ -22,32 +22,32 @@ namespace Faolan.Core.Network.Codecs.Quest
 				QuestId = def.QuestId,
 				Level = level,
 				Field114 = 0,
-				// The SnapshotUnknown118 column feeds field118 despite its name - the DB column keeps the old
+				// The Field118 column feeds field118 despite its name - the DB column keeps the old
 				// (mislabeled) name to avoid a rename migration.
-				Field118 = def.SnapshotUnknown118,
+				Field118 = def.Field118,
 				// Carried through from the capture, meaning unknown. This used to emit a constant 0x412 for EVERY
 				// quest, which is only right for the beach journal - captured records vary (NecroL80's run 2, 10, ...).
 				// Substituting a constant here is the same mistake as defaulting the vanity mask: the wire must carry
 				// what retail carried.
-				QuestLineFlags = def.SnapshotQuestLineFlags,
+				QuestLineFlags = def.QuestLineFlags,
 				Title = Slot(QuestTextSlot.Title),
 				Summary = Slot(QuestTextSlot.Summary),
 				Area = Slot(QuestTextSlot.QuestLineTitle),
 				Region1 = Slot(QuestTextSlot.RegionName),
 				Region2 = Slot(QuestTextSlot.MapName),
-				FieldEc = def.SnapshotUnknownEc,
+				FieldEc = def.FieldEc,
 				QuestLineId = def.QuestLineId,
 				// @+0x2c is the series HEAD, not this quest's id (#566) - equal for a standalone quest, an earlier
 				// step for a chain member. Falls back to the own id when the column was never harvested, which is
 				// both the standalone answer and what we emitted before the column existed.
-				Field2c = def.SnapshotChainHeadQuestId == 0
+				Field2c = def.ChainHeadQuestId == 0
 					? def.QuestId
-					: def.SnapshotChainHeadQuestId,
+					: def.ChainHeadQuestId,
 				Field11c = 0,
-				MoneyReward = def.SnapshotMoneyReward,
-				XpReward = def.SnapshotXpReward,
-				FieldF0 = def.SnapshotUnknownF0,
-				FieldF8 = def.SnapshotUnknownF8
+				MoneyReward = def.MoneyReward,
+				XpReward = def.XpReward,
+				FieldF0 = def.FieldF0,
+				FieldF8 = def.FieldF8
 			};
 
 			string Slot(QuestTextSlot slot)

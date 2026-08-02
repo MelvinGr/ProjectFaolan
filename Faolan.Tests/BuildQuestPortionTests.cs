@@ -145,7 +145,7 @@ namespace Faolan.Tests
 		public async Task QuestcRecord_CarriesTheSeriesHead(uint questId, uint expectedHead)
 		{
 			var def = await LoadDefinition(questId);
-			Assert.Equal(expectedHead, def.SnapshotChainHeadQuestId);
+			Assert.Equal(expectedHead, def.ChainHeadQuestId);
 			Assert.Equal(expectedHead, QuestcRecords.ForQuest(def, def.Level).Field2c);
 		}
 

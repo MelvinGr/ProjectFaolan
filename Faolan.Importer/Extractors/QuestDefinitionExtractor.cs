@@ -233,14 +233,14 @@ namespace Faolan.Importer.Extractors
 			if (def.Level == 0)
 				def.Level = record.Level;
 
-			def.SnapshotQuestLineFlags = record.QuestLineFlags;
-			def.SnapshotUnknown118 = record.Field118;
-			def.SnapshotUnknownEc = record.FieldEc;
-			def.SnapshotUnknownF0 = record.FieldF0;
-			def.SnapshotUnknownF8 = record.FieldF8;
-			def.SnapshotXpReward = record.XpReward;
-			def.SnapshotMoneyReward = record.MoneyReward;
-			def.SnapshotChainHeadQuestId = record.Field2c;
+			def.QuestLineFlags = record.QuestLineFlags;
+			def.Field118 = record.Field118;
+			def.FieldEc = record.FieldEc;
+			def.FieldF0 = record.FieldF0;
+			def.FieldF8 = record.FieldF8;
+			def.XpReward = record.XpReward;
+			def.MoneyReward = record.MoneyReward;
+			def.ChainHeadQuestId = record.Field2c;
 
 			var (region, map) = RegionAndMap(record);
 

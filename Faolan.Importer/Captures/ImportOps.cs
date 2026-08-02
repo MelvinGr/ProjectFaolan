@@ -1042,13 +1042,13 @@ namespace Faolan.Importer.Captures
 				// one. NB the other Snapshot* scalars deliberately do NOT refresh here - they land only when a row is
 				// first added - so a column added later reaches an existing row through a line like this one or not at
 				// all. That is why this one is here and why adding the column alone left all 108 rows at 0.
-				if (def.SnapshotChainHeadQuestId != 0)
-					existing.SnapshotChainHeadQuestId = def.SnapshotChainHeadQuestId;
+				if (def.ChainHeadQuestId != 0)
+					existing.ChainHeadQuestId = def.ChainHeadQuestId;
 
 				// The MONEY reward off the same record (@+0x20), same rule. 21 of the 99 captured quests carry one;
 				// it was emitted as a constant 0 for years under the name `Accept`, so every value was discarded.
-				if (def.SnapshotMoneyReward != 0)
-					existing.SnapshotMoneyReward = def.SnapshotMoneyReward;
+				if (def.MoneyReward != 0)
+					existing.MoneyReward = def.MoneyReward;
 				db.QuestTextRefs.RemoveRange(existing.TextRefs);
 				existing.TextRefs = def.TextRefs;
 
@@ -1377,7 +1377,7 @@ namespace Faolan.Importer.Captures
 				// A quest whose region does not depend on the variant satisfies these exactly as it did under the old
 				// all-captures rule (its same-variant set is a subset of a set that all matches), so nothing that was
 				// verified before is weakened; a quest that only matches SOMEONE ELSE's variant still fails the second.
-				def.ObjectiveRegionVerified = captures.Any(Reproduces) && captures.Where(c => c.Variant == def.SnapshotUnknownF0).All(Reproduces);
+				def.ObjectiveRegionVerified = captures.Any(Reproduces) && captures.Where(c => c.Variant == def.FieldF0).All(Reproduces);
 
 				if (def.ObjectiveRegionVerified)
 					verified++;
@@ -1412,9 +1412,9 @@ namespace Faolan.Importer.Captures
 
 			// The flag word is a property of the LINE, so a captured sibling states it for the whole line.
 			var lineFlags = await db
-				.QuestDefinitions.Where(q => q.HasSnapshotRecord && q.SnapshotQuestLineFlags != 0)
+				.QuestDefinitions.Where(q => q.HasSnapshotRecord && q.QuestLineFlags != 0)
 				.GroupBy(q => q.QuestLineId)
-				.Select(g => new { Line = g.Key, Flags = g.Max(q => q.SnapshotQuestLineFlags) })
+				.Select(g => new { Line = g.Key, Flags = g.Max(q => q.QuestLineFlags) })
 				.ToDictionaryAsync(x => x.Line, x => x.Flags);
 
 			var candidates = await db
@@ -1435,14 +1435,14 @@ namespace Faolan.Importer.Captures
 				if (!SnapshotHeaderSlots.All(slots.Contains))
 					continue;
 
-				def.SnapshotQuestLineFlags = lineFlags.TryGetValue(def.QuestLineId, out var f)
+				def.QuestLineFlags = lineFlags.TryGetValue(def.QuestLineId, out var f)
 					? f
 					: DefaultQuestLineFlags;
-				def.SnapshotUnknownEc = 1;
+				def.FieldEc = 1;
 
 				// @+0x118 runs level..level+5 across the captured records; the level itself is the low end of that
 				// range and the only value we can derive rather than guess.
-				def.SnapshotUnknown118 = def.Level;
+				def.Field118 = def.Level;
 				def.HasSnapshotRecord = true;
 				seeded++;
 			}
@@ -1691,14 +1691,14 @@ namespace Faolan.Importer.Captures
 			if (quest == null)
 				return;
 
-			quest.SnapshotUnknown118 = 4;
-			quest.SnapshotQuestLineFlags = QuestFullUpdates.LiveQuestLineFlags; // the beach record's `n` (@+0x14)
-			quest.SnapshotUnknownEc = 1;
-			quest.SnapshotUnknownF0 = 0x96;
-			quest.SnapshotUnknownF8 = 15;
+			quest.Field118 = 4;
+			quest.QuestLineFlags = QuestFullUpdates.LiveQuestLineFlags; // the beach record's `n` (@+0x14)
+			quest.FieldEc = 1;
+			quest.FieldF0 = 0x96;
+			quest.FieldF8 = 15;
 			quest.Level = 1;
 			quest.HasSnapshotRecord = true;
-			quest.SnapshotXpReward = 0;
+			quest.XpReward = 0;
 			quest.IndexMagic = 0x57365154;
 			quest.IndexMarker = 0x7E2;
 			quest.IndexTableField1 = 1;
@@ -1837,12 +1837,12 @@ namespace Faolan.Importer.Captures
 
 			quest.Level = 3;
 			quest.HasSnapshotRecord = true;
-			quest.SnapshotUnknown118 = 3;
-			quest.SnapshotQuestLineFlags = QuestFullUpdates.LiveQuestLineFlags;
-			quest.SnapshotUnknownEc = 1;
-			quest.SnapshotUnknownF0 = 80;
-			quest.SnapshotUnknownF8 = 7;
-			quest.SnapshotXpReward = 80;
+			quest.Field118 = 3;
+			quest.QuestLineFlags = QuestFullUpdates.LiveQuestLineFlags;
+			quest.FieldEc = 1;
+			quest.FieldF0 = 80;
+			quest.FieldF8 = 7;
+			quest.XpReward = 80;
 			quest.IndexMagic = 0x52524C33;
 			quest.IndexTableField1 = 1;
 			quest.IndexTableField2 = 3;

@@ -34,7 +34,7 @@ namespace Faolan.Tests
 			int compared = 0, exact = 0, skipped = 0, lenDiff = 0, sameLenDiff = 0;
 			_ = lenDiff;
 			var failByQuest = new Dictionary<uint, int>();
-			// Failures in the variant we actually emit (record XpReward == the def's SnapshotUnknownF0) - the ones that
+			// Failures in the variant we actually emit (record XpReward == the def's FieldF0) - the ones that
 			// would mean shipping bytes retail never sent. A failure against another variant is not one of those.
 			var failByOurVariant = new Dictionary<uint, int>();
 			var fieldDiffs = new Dictionary<string, int>();
@@ -68,7 +68,7 @@ namespace Faolan.Tests
 				}
 
 				failByQuest[rec.QuestId] = failByQuest.GetValueOrDefault(rec.QuestId) + 1;
-				if (rec.XpReward == def.SnapshotUnknownF0)
+				if (rec.XpReward == def.FieldF0)
 					failByOurVariant[rec.QuestId] = failByOurVariant.GetValueOrDefault(rec.QuestId) + 1;
 
 				// Aggregate WHICH field differs, so the tail can be worked in priority order.

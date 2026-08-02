@@ -193,7 +193,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public uint Field11c { get; init; } // @+0x11c (=0)
 		// @+0x28 - the quest's EXPERIENCE reward: the number the journal's detail pane renders as "XP:". Proven
 		// in-client by driving one quest's value to 5553, 0 and 7777 and reading the panel back. See
-		// QuestDefinition.SnapshotXpReward. (=0 on the beach template; 0x50 in the live full-update.)
+		// QuestDefinition.XpReward. (=0 on the beach template; 0x50 in the live full-update.)
 		public uint XpReward { get; init; }
 		// @+0x2c - the CHAIN HEAD: the first quest of the series this quest belongs to, which is the quest's own id for
 		// a standalone one. Measured over the 99 quests with a captured record: 84 carry their own id and every one of
@@ -206,7 +206,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		public uint FieldEc { get; init; } // @+0xec (=1 in template)
 		// @+0xf0 - NOT the journal's XP (that is XpReward above, verified in-client) and not its Money either.
 		// Correlates with the client catalog's line-level `xp_reward`, which is suggestive and not established -
-		// see QuestDefinition.SnapshotUnknownF0. Also selects the objective region's text spelling.
+		// see QuestDefinition.FieldF0. Also selects the objective region's text spelling.
 		// (=0x96 in the template, 0x64 in the live full-update.)
 		public uint FieldF0 { get; init; }
 
@@ -225,7 +225,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// NOT a ListFrame word either (1042 is not a multiple of 1009).
 		//
 		// bit 4 (0x10) = the quest may not be SHARED - the journal greys its `Share` button. Proven in-client; bits
-		// 3 and 10 change nothing in that panel. See QuestDefinition.SnapshotQuestLineFlags.
+		// 3 and 10 change nothing in that panel. See QuestDefinition.QuestLineFlags.
 		public uint QuestLineFlags { get; init; }
 		// @+0x20 - the quest's MONEY reward, and the twin of XpReward at @+0x28 (u64 money, then u32 xp - the two
 		// sit adjacent in the struct). The journal's detail pane prints it on the `Money:` line. The unit is TIN,
@@ -234,7 +234,7 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// ⚠️ It was called `Accept` and documented as "likely acceptTime" - it is not a time. 21 of the 99 captured
 		// quests carry a non-zero value, constant per quest across every character and capture, and the set is a
 		// subset of the quests carrying an XP reward (some quests pay XP only). Proven in-client by driving it and
-		// reading the panel back; see QuestDefinition.SnapshotMoneyReward.
+		// reading the panel back; see QuestDefinition.MoneyReward.
 		public ulong MoneyReward { get; init; }
 		// @+0xf8 - NOT the journal's Money: setting it to 999999 left that label blank. Tracks FieldF0 through a
 		// level-dependent factor that 99 samples do not close - do NOT derive one from the other.

@@ -63,7 +63,7 @@ namespace Faolan.Tests
 			var def = await LoadDefinition(BeachStarterQuestId);
 			Assert.NotNull(def);
 
-			// All scalars sourced from the DB (SnapshotUnknown118/FieldEc/XpReward/CashReward) - no literals but the per-char state.
+			// All scalars sourced from the DB (Field118/FieldEc/XpReward/CashReward) - no literals but the per-char state.
 			var record = QuestcRecords.ForQuest(def, BeachState);
 			var region = new QuestcRegion
 			{
