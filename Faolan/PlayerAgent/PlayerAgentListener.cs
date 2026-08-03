@@ -23,13 +23,18 @@ namespace Faolan.PlayerAgent
 
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
-			var opcode = (PlayerAgentOpcodes)packet.Opcode;
+			// Dispatch on the METHOD, not the opcode. On this interface pair the opcode is only the method varint's
+			// first group (`0x2080 | (constant & 0x7F)`), so two methods can share one - `0x20EC` is both
+			// ReceivedCharacterSettings and AuthenticateLoggedIn, `0x20D6` both VerifyLanguageSetting and
+			// UpdateCharacterPreview, and retail sends all four. Reassembling the varint is what tells them apart
+			// (#608); an opcode-keyed switch would read an 8-byte AuthenticateLoggedIn as a no-arg ack.
+			var method = (PlayerAgentMethods)RpcHeaderData.MethodConstant(packet.Opcode, packet.HeaderData.Span);
 			LogPacketReceived(packet);
 
 			var body = packet.BodyReader();
-			switch (opcode)
+			switch (method)
 			{
-				case PlayerAgentOpcodes.Authenticate:
+				case PlayerAgentMethods.Authenticate:
 				{
 					var accountId = body.ReadUInt32();
 					var cookie = body.ReadUInt32();
@@ -46,7 +51,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.GetStartupData:
+				case PlayerAgentMethods.GetStartupData:
 				{
 					// PlayerAgent.GetStartupData(const String& md5) - a single wire string (u16 length + LATIN1), NOT a
 					// bare u16: the client's checksum over its CACHED startup data, so the server can skip resending
@@ -62,7 +67,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.FinishGetStartupData:
+				case PlayerAgentMethods.FinishGetStartupData:
 				{
 					// PlayerAgent.FinishGetStartupData(const CharacterCheckSumMap& characterMap) - the client reporting
 					// the md5 it has cached PER CHARACTER, the entry-level twin of GetStartupData's whole-list md5.
@@ -94,7 +99,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.LoadFacebookToken:
+				case PlayerAgentMethods.LoadFacebookToken:
 				{
 					// headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
 					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceOpcodes.OnFacebookTokenResult, b => b.WriteUInt16(0).WriteByte(0)));
@@ -102,7 +107,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.LoginCharacter:
+				case PlayerAgentMethods.LoginCharacter:
 				{
 					// PlayerAgent.LoginCharacter(ID32::InstanceType nCharInstance, const StrStrMap& dataMap,
 					//   const std::string& cClientLanguage, const uint16 regionCode, const uint16 ageCode,
@@ -147,7 +152,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.VerifyLanguageSetting:
+				case PlayerAgentMethods.VerifyLanguageSetting:
 				{
 					var languageId = body.ReadUInt32();
 
@@ -156,7 +161,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.ReceivedCharacterSettings: // after 0x20B9
+				case PlayerAgentMethods.ReceivedCharacterSettings: // after 0x20B9
 				{
 					// #573: this step normally follows LoginCharacter, which selects the character - but a client that
 					// resumes the sequence after its connection was replaced sends this one WITHOUT that one, and every
@@ -178,7 +183,7 @@ namespace Faolan.PlayerAgent
 					// its wire format are GameTweaksCodec's (#530 wave 7). Opcode 0x1A07 names no method by itself - the
 					// header tail does, as a full method reference (#609), so this send says which of the four it is.
 					await client.SendAsync(new Rpc(ServiceConnectionSender, packet.Sender, PlayerInterfaceOpcodes.OverrideGameTweaks,
-						GameTweaksCodec.Build(GameTweakSets.Defaults())) { HeaderDataOverride = PlayerAgentMethodIds.MethodReference("OverrideGameTweaks") });
+						GameTweaksCodec.Build(GameTweakSets.Defaults())) { HeaderDataOverride = PlayerAgentMethodIds.MethodReference(PlayerInterfaceMethods.OverrideGameTweaks) });
 
 					break;
 				}
@@ -190,7 +195,7 @@ namespace Faolan.PlayerAgent
 				// constant tail LoginCharacter carries - an empty count-framed field where `cRDBDSN` sits, zeroed
 				// region/age/gender, the "_" placeholder IGR id, and userType/serviceType 0 - so it is read to keep the
 				// body fully consumed, not because any of it varies.
-				case PlayerAgentOpcodes.CreateCharacterWithData:
+				case PlayerAgentMethods.CreateCharacterWithData:
 				{
 					var realmId = body.ReadUInt32();
 
@@ -226,7 +231,7 @@ namespace Faolan.PlayerAgent
 					break;
 				}
 
-				case PlayerAgentOpcodes.RequestDeleteCharacter:
+				case PlayerAgentMethods.RequestDeleteCharacter:
 				{
 					var characterId = body.ReadUInt32();
 					Logger.LogInformation("DeleteCharacter request: characterId={CharacterId:X8}.", characterId);

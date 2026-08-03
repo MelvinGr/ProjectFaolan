@@ -842,16 +842,82 @@ namespace Faolan.Core.Enums
 		// ---------------------------------------------------------------------------------------------------------
 	}
 
-	// PlayerAgent (c2s) / PlayerInterface (s2c) is the ONE interface that carries a METHOD ID in its RPC header after
-	// the 16-bit opcode (`Rpc.HeaderData` - empty for every other interface). The client dispatches on that id. It is a
-	// protobuf VARINT, and it is DERIVED - `PlayerAgentMethodIds.WireId(registrationConstant)` = the client's own
-	// registration constant >> 7, which reproduces all 22 observed header tails exactly (#320). That file is the single
-	// source; `WriteHeader` appends it and `gen/opcodes.md` reads it.
+	// The PlayerAgent (c2s) / PlayerInterface (s2c) METHOD CONSTANTS - the 32-bit value the client registers each method
+	// with, and the thing that actually names a method on this interface pair. Read off the client's own registration
+	// table (`DumpPlayerAgentCtor.java` / `StrXrefs.java`), so every name is the client's; 25 c2s + 26 s2c is the
+	// complete interface.
 	//
-	// ⚠️ **The opcode is a per-CONNECTION registration index here, not a method key.** On a second PlayerAgent
-	// connection retail sends `0x20EC` for `AuthenticateLoggedIn` and `0x20D6` for `UpdateCharacterPreview`, where the
-	// login connection used them for `ReceivedCharacterSettings` and `VerifyLanguageSetting`. The values below are the
-	// opcodes retail's LOGIN connection used, which is the only thing a capture can establish.
+	// These are the SOURCE the wire encoding is derived from, not a parallel catalog: the RPC header's method field is
+	// `varint(constant)`, which the codebase splits into a 16-bit `Opcode` and a trailing tail (see `RpcHeaderData`).
+	// `PlayerAgentMethodIds` reads these enums for both directions of that.
+	public enum PlayerAgentMethods : uint
+	{
+		Authenticate = 0x9CB2CB03,
+		AuthenticateLoggedIn = 0x9D991E6C,
+		LoginFromCrash = 0xCBDE126E,
+		CreateCharacter = 0xBE735486,
+		CreateCharacterWithData = 0xCA2C4E5E,
+		LoginCharacter = 0xEF616EB6,
+		RenameCharacter = 0x1B2CF268,
+		RequestDeleteCharacter = 0xC3C5C31D,
+		VerifyLanguageSetting = 0x9847AED6,
+		AddOfflineLevel = 0x2976E1B7,
+		UnlockCharacter = 0x9C370D1E,
+		SetHardcoreLevel = 0x6A6B621C,
+		GetDimensionList = 0x43476328,
+		RequestSuggestNickname = 0xDBE172E5,
+		GetStartupData = 0x6A546D41,
+		LoadFacebookToken = 0xD3907026,
+		SaveFacebookToken = 0xD8AD362B,
+		UpdateFacebookFriends = 0x3A96B2B3,
+		RecruitFacebookFriends = 0x5B51044B,
+		UpdateSubscriptionSettings = 0x516C9EF5,
+		UpdateCharacterSettings = 0x01035784,
+		UpdateCharacterPreview = 0x4D661656,
+		FinishGetStartupData = 0xDFD8518E,
+		ReceivedCharacterSettings = 0x3C7C926C,
+		ClientReplyKeepCookie = 0x43D90C1B
+	}
+
+	public enum PlayerInterfaceMethods : uint
+	{
+		OnFacebookTokenResult = 0x52454C9C,
+		OnUpdateFacebookFriends = 0x88750390,
+		OnFacebookFriendSignedUp = 0x7955BD80,
+		AuthenticateAck = 0x5DC18991,
+		LoginConnectReady = 0xD8B66C79,
+		CSServerConnectReady = 0x5AED2A60,
+		ChatServerConnectReady = 0x23A632FA,
+		UpdateClientPlayerData = 0xC414C5EF,
+		SetDimensionList = 0xF899B14C,
+		SetStats = 0xA7C86A29,
+		SuggestNicknameResult = 0xE8EAD4F8,
+		PlayerSetupComplete = 0x4F91A58C,
+		LoginQueuePosition = 0x0FE09F03,
+		OfflineLevelApplied = 0x3E8F0623,
+		CharacterUnlocked = 0x5CE97913,
+		HardcoreLevelSet = 0x1562CE84,
+		SendSubscriptionSettings = 0x15F7AF22,
+		SendCharacterSettings = 0x233605B9,
+		SendCharacterPreview = 0x206B6EE5,
+		SendCharacterSettingsCheckSumMap = 0x0C09CA25,
+		VerifyClientStillConnected = 0x00C46317,
+		OverrideGameTweaks = 0x7C47F763,
+		CharacterNeedsNewName = 0x9625EB4A,
+		LoginProblem = 0xD4063CA0,
+		TeleportProblem = 0xE33EBAE1,
+		ResetLanguage = 0xD4C59816
+	}
+
+	// PlayerAgent (c2s) / PlayerInterface (s2c) is the ONE interface pair whose methods are registered by 32-bit HASH
+	// rather than by index, so its RPC header method field is a 4-5 group varint and the codebase's `[u16 opcode][tail]`
+	// split cuts it after the first group (`RpcHeaderData`, Gitea #319/#320/#610).
+	//
+	// ⚠️ **The opcode is NOT a method key here.** It is `0x2080 | (constant & 0x7F)`, so two methods whose constants
+	// share their low 7 bits share an opcode: `0x20EC` is BOTH `ReceivedCharacterSettings` and `AuthenticateLoggedIn`,
+	// `0x20D6` is BOTH `VerifyLanguageSetting` and `UpdateCharacterPreview` - all four are in the corpus. The values
+	// below are the ones retail's LOGIN connection used, kept for the dissector and the generated docs; **inbound
+	// dispatch keys on `PlayerAgentMethods`, not on this enum** (#608).
 	//
 	// Every name is the client's own, read off the registration table (`DumpPlayerAgentCtor.java`) rather than invented
 	// or inferred from behaviour - see docs/re/aoc-rpc-method-opcodes.md and the naming rule in

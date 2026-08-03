@@ -83,6 +83,17 @@ namespace Faolan.Tests
 			}
 		}
 
+		// The collision #608 is about, stated as bytes: the SAME opcode with two different tails is two different
+		// methods, and only the reassembled varint tells them apart. Retail sends all four of these; an opcode-keyed
+		// dispatch would read an 8-byte `AuthenticateLoggedIn` as the no-arg `ReceivedCharacterSettings` ack.
+		[Theory, InlineData(0x20EC, "a4f2e303", PlayerAgentMethods.ReceivedCharacterSettings), InlineData(0x20EC, "bce4ec09", PlayerAgentMethods.AuthenticateLoggedIn),
+		 InlineData(0x20D6, "dd9ec209", PlayerAgentMethods.VerifyLanguageSetting), InlineData(0x20D6, "ac98eb04", PlayerAgentMethods.UpdateCharacterPreview)]
+		public void OneOpcode_CanNameTwoMethods(int opcode, string tail, PlayerAgentMethods expected)
+		{
+			Assert.Equal(expected, (PlayerAgentMethods)RpcHeaderData.MethodConstant((ushort)opcode, Convert.FromHexString(tail)));
+			Assert.Equal((ushort)opcode, (ushort)(0x2080 | ((uint)expected & 0x7F)));
+		}
+
 		// The receiver CLASS picks the registration scheme, which is the whole reason `For` takes it: the same opcode
 		// number means an index on 15 of the 17 classes and a per-connection registration slot on the other two. Rows
 		// are one per class, taken from the corpus scan of all 120 dumps grouped by (ReceiverClass, Opcode).

@@ -60,6 +60,26 @@ namespace Faolan.Core.Network.Constants
 				: ForOpcode(opcode);
 		}
 
+		// The method a header names: the INVERSE of the (Opcode, headerData) split this class maintains, reassembling
+		// the protobuf varint the two halves really are. The opcode's low byte is the varint's first group and the
+		// header data is the rest, so the result is the method's registration constant - the index itself on the 15
+		// index-registered classes, and the 32-bit constant on PlayerAgent/PlayerInterface.
+		//
+		// ⚠️ This, not the opcode, is what identifies a method on the hashed pair. `0x2080 | (constant & 0x7F)` means
+		// two methods that share their low 7 bits share an opcode - `0x20EC` and `0x20D6` each name two, all four in
+		// the corpus - so an inbound dispatch keyed on the opcode alone runs the wrong handler (#608).
+		public static uint MethodConstant(ushort opcode, ReadOnlySpan<byte> headerData)
+		{
+			if (opcode < MethodIndexBase)
+				throw new ArgumentOutOfRangeException(nameof(opcode), opcode, "Not a method-carrying opcode: the field-4 tag is 0x20, so the high byte must be 0x20.");
+
+			var value = (uint)(opcode & 0x7F);
+			for (var i = 0; i < headerData.Length; i++)
+				value |= (uint)(headerData[i] & 0x7F) << (7 * (i + 1));
+
+			return value;
+		}
+
 		// The header data for an opcode on an INDEX-registered interface (i.e. anything but PlayerAgent /
 		// PlayerInterface, whose ids come from PlayerAgentMethodIds). Null when the method's index is below 128 and
 		// the field is therefore not written at all.

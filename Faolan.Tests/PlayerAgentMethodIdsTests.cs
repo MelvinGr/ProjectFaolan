@@ -43,9 +43,9 @@ namespace Faolan.Tests
 		// retail bytes (118 sightings each across the corpus) - so deriving them is proven against retail, not against
 		// itself. That the four decode to exactly the four methods the handoff sends, in that order, is what says the
 		// reading is right rather than an arithmetic coincidence.
-		[Theory, InlineData("ChatServerConnectReady", "0d3857157d100120fae5989d02"), InlineData("CSServerConnectReady", "0d3857157d100120e0d4b4d705"),
-		 InlineData("LoginConnectReady", "0d3857157d100120f9d8d9c50d"), InlineData("OverrideGameTweaks", "0d3857157d100120e3ee9fe207")]
-		public void MethodReference_ReproducesTheCapturedHandoffTails(string method, string expected)
+		[Theory, InlineData(PlayerInterfaceMethods.ChatServerConnectReady, "0d3857157d100120fae5989d02"), InlineData(PlayerInterfaceMethods.CSServerConnectReady, "0d3857157d100120e0d4b4d705"),
+		 InlineData(PlayerInterfaceMethods.LoginConnectReady, "0d3857157d100120f9d8d9c50d"), InlineData(PlayerInterfaceMethods.OverrideGameTweaks, "0d3857157d100120e3ee9fe207")]
+		public void MethodReference_ReproducesTheCapturedHandoffTails(PlayerInterfaceMethods method, string expected)
 		{
 			Assert.Equal(expected, Convert.ToHexString(PlayerAgentMethodIds.MethodReference(method)).ToLowerInvariant());
 		}

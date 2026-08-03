@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
+using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Protobuf;
 
@@ -45,66 +46,12 @@ namespace Faolan.Core.Network.Constants
 		// (token), which is why this one is named here rather than there.
 		private const byte MethodReferenceTag = 0x20;
 
-		// c2s: `PlayerAgentProxy_t`'s registration constants, in registration order. All 25 the client has.
-		public static readonly IReadOnlyDictionary<string, uint> PlayerAgentRegistration = new Dictionary<string, uint>
-		{
-			["Authenticate"] = 0x9CB2CB03,
-			["AuthenticateLoggedIn"] = 0x9D991E6C,
-			["LoginFromCrash"] = 0xCBDE126E,
-			["CreateCharacter"] = 0xBE735486,
-			["CreateCharacterWithData"] = 0xCA2C4E5E,
-			["LoginCharacter"] = 0xEF616EB6,
-			["RenameCharacter"] = 0x1B2CF268,
-			["RequestDeleteCharacter"] = 0xC3C5C31D,
-			["VerifyLanguageSetting"] = 0x9847AED6,
-			["AddOfflineLevel"] = 0x2976E1B7,
-			["UnlockCharacter"] = 0x9C370D1E,
-			["SetHardcoreLevel"] = 0x6A6B621C,
-			["GetDimensionList"] = 0x43476328,
-			["RequestSuggestNickname"] = 0xDBE172E5,
-			["GetStartupData"] = 0x6A546D41,
-			["LoadFacebookToken"] = 0xD3907026,
-			["SaveFacebookToken"] = 0xD8AD362B,
-			["UpdateFacebookFriends"] = 0x3A96B2B3,
-			["RecruitFacebookFriends"] = 0x5B51044B,
-			["UpdateSubscriptionSettings"] = 0x516C9EF5,
-			["UpdateCharacterSettings"] = 0x01035784,
-			["UpdateCharacterPreview"] = 0x4D661656,
-			["FinishGetStartupData"] = 0xDFD8518E,
-			["ReceivedCharacterSettings"] = 0x3C7C926C,
-			["ClientReplyKeepCookie"] = 0x43D90C1B
-		};
+		// The client's registration constants, keyed by name. Derived from the `PlayerAgentMethods` /
+		// `PlayerInterfaceMethods` enums (Faolan.Core/Enums/Opcodes.cs) so the constants live in exactly one place -
+		// they are a typed catalog the inbound dispatch switches on (#608), not just a table this file reads.
+		public static readonly IReadOnlyDictionary<string, uint> PlayerAgentRegistration = Registration<PlayerAgentMethods>();
 
-		// s2c: `PlayerInterface`'s registration constants. All 26.
-		public static readonly IReadOnlyDictionary<string, uint> PlayerInterfaceRegistration = new Dictionary<string, uint>
-		{
-			["OnFacebookTokenResult"] = 0x52454C9C,
-			["OnUpdateFacebookFriends"] = 0x88750390,
-			["OnFacebookFriendSignedUp"] = 0x7955BD80,
-			["AuthenticateAck"] = 0x5DC18991,
-			["LoginConnectReady"] = 0xD8B66C79,
-			["CSServerConnectReady"] = 0x5AED2A60,
-			["ChatServerConnectReady"] = 0x23A632FA,
-			["UpdateClientPlayerData"] = 0xC414C5EF,
-			["SetDimensionList"] = 0xF899B14C,
-			["SetStats"] = 0xA7C86A29,
-			["SuggestNicknameResult"] = 0xE8EAD4F8,
-			["PlayerSetupComplete"] = 0x4F91A58C,
-			["LoginQueuePosition"] = 0x0FE09F03,
-			["OfflineLevelApplied"] = 0x3E8F0623,
-			["CharacterUnlocked"] = 0x5CE97913,
-			["HardcoreLevelSet"] = 0x1562CE84,
-			["SendSubscriptionSettings"] = 0x15F7AF22,
-			["SendCharacterSettings"] = 0x233605B9,
-			["SendCharacterPreview"] = 0x206B6EE5,
-			["SendCharacterSettingsCheckSumMap"] = 0x0C09CA25,
-			["VerifyClientStillConnected"] = 0x00C46317,
-			["OverrideGameTweaks"] = 0x7C47F763,
-			["CharacterNeedsNewName"] = 0x9625EB4A,
-			["LoginProblem"] = 0xD4063CA0,
-			["TeleportProblem"] = 0xE33EBAE1,
-			["ResetLanguage"] = 0xD4C59816
-		};
+		public static readonly IReadOnlyDictionary<string, uint> PlayerInterfaceRegistration = Registration<PlayerInterfaceMethods>();
 
 		// The opcode a method was OBSERVED under, for the methods the corpus shows. Only these are asserted: an opcode
 		// here is only the varint's first group (see the warning above) and so collides, which is why this maps what
@@ -176,9 +123,9 @@ namespace Faolan.Core.Network.Constants
 		// generic carrier whose header tail selects the PlayerInterface method that fires, and the four tails in the
 		// corpus (118 sightings each) decode to ChatServerConnectReady, CSServerConnectReady, LoginConnectReady and
 		// OverrideGameTweaks - exactly the four the login handoff sends, in the order it sends them.
-		public static byte[] MethodReference(string method)
+		public static byte[] MethodReference(PlayerInterfaceMethods method)
 		{
-			var constant = Varint(Registration(method));
+			var constant = Varint((uint)method);
 			var reference = new byte[8 + constant.Length];
 			reference[0] = (byte)ProtoEndpoint.FieldTags.Type;
 			BinaryPrimitives.WriteUInt32LittleEndian(reference.AsSpan(1), Endpoints.PlayerInterfaceType);
@@ -211,6 +158,11 @@ namespace Faolan.Core.Network.Constants
 		private static uint Registration(string method)
 		{
 			return PlayerAgentRegistration.TryGetValue(method, out var c) ? c : PlayerInterfaceRegistration[method];
+		}
+
+		private static IReadOnlyDictionary<string, uint> Registration<T>() where T : struct, Enum
+		{
+			return Enum.GetValues<T>().ToDictionary(m => m.ToString()!, m => Convert.ToUInt32(m));
 		}
 	}
 }

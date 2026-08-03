@@ -125,7 +125,7 @@ namespace Faolan.PlayerAgent
 			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
 				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.ChatServerPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id))
 			{
-				HeaderDataOverride = PlayerAgentMethodIds.MethodReference("ChatServerConnectReady")
+				HeaderDataOverride = PlayerAgentMethodIds.MethodReference(PlayerInterfaceMethods.ChatServerConnectReady)
 			});
 		}
 
@@ -135,7 +135,7 @@ namespace Faolan.PlayerAgent
 			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
 				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.CsPlayerAgentPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id))
 			{
-				HeaderDataOverride = PlayerAgentMethodIds.MethodReference("CSServerConnectReady")
+				HeaderDataOverride = PlayerAgentMethodIds.MethodReference(PlayerInterfaceMethods.CSServerConnectReady)
 			});
 		}
 
@@ -152,7 +152,7 @@ namespace Faolan.PlayerAgent
 					.WriteUInt32(client.Session.Character.Id)
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x9C, 0x50, 0x01, 0xC9, 0x43, 0xC1, 0x00))
 			{
-				HeaderDataOverride = PlayerAgentMethodIds.MethodReference("LoginConnectReady")
+				HeaderDataOverride = PlayerAgentMethodIds.MethodReference(PlayerInterfaceMethods.LoginConnectReady)
 			});
 		}
 
