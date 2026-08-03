@@ -531,7 +531,7 @@ namespace Faolan.GameServer.Combat
 
 			var block = vitals
 				.ToVitalsBlock()
-				.Set(CharacterStatId.Level, character.Level)
+				.SetLevel(character.Level)
 				.Set(CharacterStatId.Exp, character.Experience)
 				.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
 			await SendStatUpdate(killer, block, killer.Session.Character.Id);

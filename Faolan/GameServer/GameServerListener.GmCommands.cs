@@ -729,7 +729,10 @@ namespace Faolan.GameServer
 			await SendStatUpdate(client,
 				(await _combat.ReseedFromMaxStats(client))
 					.ToVitalsBlock()
-					.Set(CharacterStatId.Level, level)
+					// Level AND ApprenticeLevel: the nameplate renders max() of the two, so pushing Level alone left
+					// a level-DOWN showing the old level over the health bar while the sheet showed the new one
+					// (#472). See CharacterStatBlock.SetLevel.
+					.SetLevel(level)
 					.Set(CharacterStatId.Exp, character.Experience)
 					.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)),
 				client.Session.Character.Id);

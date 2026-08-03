@@ -127,6 +127,23 @@ namespace Faolan.Tests
 			Assert.Equal(ToHex(built), ToHex(CharacterStatBlockCodec.Build(CharacterStatBlockCodec.Parse(built))));
 		}
 
+		// ApprenticeLevel (0x3C5) is the mentor system's EFFECTIVE level, not a copy of Level - but we do not model
+		// mentoring, so the two are equal for every character we serve and a level change has to re-state BOTH. The
+		// over-head nameplate renders max(0x36, 0x3C5) (client nameplate text builder FUN_011d8b00), so a push that
+		// moved only Level left a level-DOWN showing the stale higher number over the health bar while the character
+		// sheet (0x36 alone) showed the new one (#472).
+		[Fact]
+		public void SetLevel_RestatesTheUnmentoredApprenticeLevelAlongsideLevel()
+		{
+			var block = new CharacterStatBlock().SetLevel(10);
+
+			Assert.Equal(10u, block[CharacterStatId.Level]);
+			Assert.Equal(10u, block[CharacterStatId.ApprenticeLevel]);
+			// Both are scale-1 stats, so the wire values are the level itself - the client's max() of two equal
+			// numbers is the level whichever way it resolves it.
+			Assert.Equal([(CharacterStatId.Level, 10u), (CharacterStatId.ApprenticeLevel, 10u)], block.Records);
+		}
+
 		private static byte[] FromHex(string hex)
 		{
 			var bytes = new byte[hex.Length / 2];

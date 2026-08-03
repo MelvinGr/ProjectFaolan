@@ -50,6 +50,34 @@ The nameplate object is created from the LDB name **at spawn time**, so `SetName
 spawn AND use `nameType=3` (or 4) so `FUN_006ed100` re-runs the OverheadText refresh — otherwise the name is
 stored but the existing plate isn't redrawn.
 
+## What the plate renders beside the name: `max(Level, ApprenticeLevel)` (#472)
+
+The `" (%d)"` after the name is **not** the Level stat. The nameplate text builder (`FUN_011d8b00`) reads BOTH
+level stats off the entity and formats the larger of the two:
+
+```c
+iVar4 = GetStat(0x36,  0);     // Level
+iVar5 = GetStat(0x3c5, 2);     // ApprenticeLevel — the mentor system's EFFECTIVE level
+if (iVar5 < iVar4) iVar5 = iVar4;
+if (*(int *)(param_1 + 0x68) == 0xe) iVar5 = 100;   // one entity kind renders a flat 100
+FUN_010cf890(" (%d)", iVar5);
+```
+
+That is correct for a mentored character — the plate is meant to show the level you effectively fight at — and
+it is why a STALE `ApprenticeLevel` is visible: it wins the `max` and the plate disagrees with the character
+sheet, which reads `0x36` alone. `.level 10` on a level-23 character showed `10` on the sheet and `(23)` over
+the health bar, because `ApprenticeLevel` had been seeded at world entry and never re-stated.
+
+It is **not** a missing refresh. The plate SUBSCRIBES to the stats it renders — `FUN_011d79e0` registers
+`FUN_011d9490` as the change callback for `0xD7` (GmLevel), `0x36` (Level), `0x3C5` (ApprenticeLevel), `0x46`
+(PvpLevel), `0x1E86AE` and `0x579` — and rebuilt correctly on the Level push, then re-read the same stale max.
+
+Retail never lets the two drift: `apprentice_level` is serialized on **all 17,717 captured spawns** and equals
+`level` in every one (zero differing). So an un-mentored announce re-states both, which is what
+`CharacterStatBlock.SetLevel` is for. ⚠️ `SimpleChar_t::SetStat` additionally CLAMPS `0x3C5` back to the Level
+stat for a value `< 1` or `> 80` on a non-GM client, logging
+`Trying to set e_ApprenticeLevel to %d in SimpleChar::SetStat.`
+
 ## Failure signatures (client log)
 
 - Wrong grammar → `n3InfoItemRemote::Construct: ReadSubClass for IIR -1379005222 (SetNameIIR_t) failed! …

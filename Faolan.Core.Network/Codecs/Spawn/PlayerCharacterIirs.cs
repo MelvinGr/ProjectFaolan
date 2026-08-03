@@ -114,6 +114,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			stats.Sex = (uint)character.Sex;
 			stats.Race = (uint)character.Race;
 			stats.Level = character.Level;
+			// ApprenticeLevel is the mentor system's EFFECTIVE level (#144), not a copy of Level - but retail keeps
+			// the two equal for an un-mentored character and NEVER omits it: all 17,717 captured spawns carry
+			// apprentice_level, and it equals level in every one (zero differing). Leaving the template's 1 here
+			// while overriding Level was the one place our spawn broke that invariant, and it matters twice over -
+			// the client DIVIDES by it for armour mitigation, and the over-head nameplate renders
+			// max(Level, ApprenticeLevel). See CharacterStatBlock.SetLevel (#472).
+			stats.ApprenticeLevel = character.Level;
 
 			// Vitals (cur==max) from the persisted MaxStats, on the ×100 wire scale (Strie's life 9000 = 90).
 			// A DEAD character logs in with CURRENT health = 0 (life/max stays full): this FA015807 is the
