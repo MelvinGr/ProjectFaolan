@@ -99,19 +99,19 @@ namespace Faolan.Core.Network.Codecs.World
 		internal static TeleportIIR Read(ref SpanReader r)
 		{
 			var subopOffset = r.Position;
-			var subop = r.ReadU32Be();
+			var subop = (IirTypes)r.ReadU32Be();
 			r.ExpectU32Be(EntityClass.Character, "entity class");
 			var clientInstance = r.ReadU32Be();
 			var env = r.ReadU8();
 
-			if (subop == (uint)IirTypes.IntendedTeleportIIR)
+			if (subop == IirTypes.IntendedTeleportIIR)
 			{
 				var proxy = PlayfieldProxy.Read(ref r);
 				return new IntendedTeleportIIR(clientInstance, env, proxy, r.ReadU8());
 			}
 
-			if (subop != (uint)IirTypes.N3TeleportIIR)
-				throw CodecParseException.Unexpected(nameof(TeleportCodec), subopOffset, "IntendedTeleportIIR or n3TeleportIIR", $"0x{subop:X8}");
+			if (subop != IirTypes.N3TeleportIIR)
+				throw CodecParseException.Unexpected(nameof(TeleportCodec), subopOffset, "IntendedTeleportIIR or n3TeleportIIR", $"0x{(uint)subop:X8}");
 
 			// The two n3Teleport forms are told apart by their LEADING BLOCK: the cross-map announce opens with six
 			// zero words and a 1.0f, the same-map one with the arrival position and a 2D heading. They are only

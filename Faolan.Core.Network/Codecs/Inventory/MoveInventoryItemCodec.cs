@@ -21,6 +21,12 @@ namespace Faolan.Core.Network.Codecs.Inventory
 	{
 		public const uint Opcode = (uint)IirTypes.MoveInventoryItemIIR;
 
+		// This body starts at the ENTITY CLASS, not at the sub-opcode: it is c2s, and the opcode above is what
+		// the RPC FRAME carries, not the first word of the record. Declared rather than left to be inferred -
+		// handing a codec the wrong slice reads four bytes out of step and returns plausible values instead of
+		// failing, so where a body begins has to be part of what the type says (Gitea #531).
+		public const bool OpcodeIsInTheFrame = true;
+
 		public static MoveInventoryItemIIR Parse(in ReadOnlySpan<byte> data)
 		{
 			var r = new SpanReader(data, nameof(MoveInventoryItemCodec));

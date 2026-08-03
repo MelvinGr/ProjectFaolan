@@ -208,7 +208,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			{
 				var start = methods[i].Index;
 				var end = i + 1 < methods.Count
-					? methods[i + 1].Index
+					? StartOfLeadingTrivia(text, methods[i + 1].Index)
 					: text.Length;
 				var body = text[start..end];
 				if (body.Contains(codec, StringComparison.Ordinal) && IsByteExact(body, codec))
@@ -216,6 +216,32 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			}
 
 			return null;
+		}
+
+		// Walks BACK from a method declaration over the blank lines, `//` comments and `[Attribute]` lines directly
+		// above it - that trivia belongs to the method BELOW, not to the one before it.
+		//
+		// ⚠️ Without this, a method's slice ran to the next method's DECLARATION, so the next method's doc comment was
+		// attributed to the previous method's body. A comment is enough to satisfy `body.Contains(codec)`, so merely
+		// NAMING a codec in prose above a test could credit it with the byte-exact golden of the test above - which is
+		// exactly what happened: a comment about `DeleteItemCodec`/`MoveInventoryItemCodec` promoted both from V2 to V3
+		// on the strength of `BuildParseRoundTripsOverTheCorpus`. Both are PARSE-ONLY c2s codecs with no serialize path
+		// at all, which `IsByteExact` goes out of its way to protect against, so the claim was doubly wrong. A
+		// generated page states what is proven; a mention is not a proof.
+		private static int StartOfLeadingTrivia(string text, int declaration)
+		{
+			var at = declaration;
+			while (at > 0)
+			{
+				var lineStart = text.LastIndexOf('\n', Math.Max(0, at - 2)) + 1;
+				var line = text[lineStart..at].Trim();
+				if (line.Length != 0 && !line.StartsWith("//", StringComparison.Ordinal) && !(line.StartsWith('[') && line.EndsWith(']')))
+					break;
+
+				at = lineStart;
+			}
+
+			return at;
 		}
 
 		// A scope (whole test file, or one method body) is byte-exact for `codec` if it carries one of the explicit

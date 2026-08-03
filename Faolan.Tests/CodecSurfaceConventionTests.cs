@@ -460,6 +460,155 @@ namespace Faolan.Tests
 			Assert.True(covered > 200, $"the corpus round-trip only exercised {covered} bodies - it is reflecting its way to nothing");
 		}
 
+		// ---- rule 17: where a body STARTS ----------------------------------------------------------------
+		//
+		// Two codecs can both take `Parse(in ReadOnlySpan<byte>)` and disagree about which byte is byte 0. Handing
+		// one the other's slice does NOT fail cleanly: it reads four bytes out of step and either runs off the end
+		// or returns plausible values. That cost a `StatDamageIIR` reporting `Flags +0.02` where the capture said
+		// `HealthCurrent -37.25`, and 110 silently undecodable messages in `--report timeline` (Gitea #531).
+		//
+		// The split the issue describes - one group starting at a u32 LENGTH, the other at the sub-opcode - is gone;
+		// the #530 sweep closed it, and a census of all 141 codecs with a standalone `Parse` finds no codec consuming
+		// a leading length. What was missing is the thing that keeps it gone, which is this gate.
+		//
+		// It is BEHAVIOURAL rather than textual on purpose. A source-shape rule ("the first statement must be an
+		// ExpectU32Be") would pass for a codec that reads the word and ignores it, which is precisely the failure
+		// being guarded against. So: take a body the codec is known to ACCEPT, corrupt its first word, and require a
+		// throw. A codec whose body starts at the sub-opcode cannot survive that; one that starts four bytes earlier
+		// or later never looked at it.
+		//
+		// ⚠️ There IS a legitimate second convention and it is DECLARED, not excused. A c2s IIR (`DeleteItemCodec`,
+		// `MoveInventoryItemCodec`) carries its sub-opcode in the RPC frame, so its body genuinely starts at the
+		// entity class - `[u32 0xC350][u32 charInstance]…`. Those codecs say so with `OpcodeIsInTheFrame`, which is
+		// the issue's own fix direction 1: put the answer in the type, where the next caller will see it. That is a
+		// declaration a codec makes about itself, not an allowlist this test keeps - adding a name here is not
+		// possible, and setting the flag on a codec whose body really does start at its opcode makes the gate
+		// FAIL rather than pass, because the corrupted-word body would then have to parse and does not.
+		[Fact]
+		public void IirBodiesStartAtTheirSubOpcode()
+		{
+			var failures = new List<string>();
+			var checkedCodecs = 0;
+			foreach (var t in CodecModules)
+			{
+				var parse = Methods(t).SingleOrDefault(m => m.Name == "Parse");
+				if (parse == null || DeclaredOpcodes(t).Count() != 1)
+					continue;
+
+				var opcode = DeclaredOpcodes(t).Single();
+				var body = CorpusExtract.PacketsOfType((uint)opcode).Select(e => e.Body[4..]).FirstOrDefault(b => b.Length >= 4);
+				if (body == null)
+					continue;
+
+				var parser = ParserFor(parse);
+				try
+				{
+					parser(body);
+				}
+				catch (CodecParseException)
+				{
+					continue; // not a body this codec accepts - BuildParseRoundTripsOverTheCorpus owns that failure
+				}
+
+				checkedCodecs++;
+				var corrupted = body.ToArray();
+				corrupted[0] ^= 0xFF;
+
+				var declaresFramedOpcode = Fields(t).Any(f => f.Name == "OpcodeIsInTheFrame");
+				bool rejected;
+				try
+				{
+					parser(corrupted);
+					rejected = false;
+				}
+				catch (CodecParseException)
+				{
+					rejected = true;
+				}
+
+				if (rejected == declaresFramedOpcode)
+				{
+					failures.Add(declaresFramedOpcode
+						? $"{t.Name} declares OpcodeIsInTheFrame, but its Parse rejects a body whose FIRST WORD was corrupted - so the body does start at the sub-opcode and the declaration is wrong"
+						: $"{t.Name} accepted a body whose first word is not {opcode} - its Parse does not start at the sub-opcode, and nothing says where it does start");
+				}
+			}
+
+			Assert.True(failures.Count == 0, "a codec must start at its sub-opcode, or declare that the frame carries it:\n  " + string.Join("\n  ", failures));
+
+			// The corpus extract carries 9 IIR types, so the behavioural half reaches 8 codecs of the ~90 that declare
+			// an opcode. That is worth having and is nowhere near enough on its own - the 80-odd it cannot reach would
+			// pass in silence, which is the failure mode this gate exists to prevent in the first place.
+			Assert.True(checkedCodecs > 5, $"the body-start gate only exercised {checkedCodecs} codecs - it is reflecting its way to nothing");
+		}
+
+		// The SOURCE half of rule 17, covering every IIR codec rather than the 8 the corpus can reach. It is the
+		// weaker statement - it checks that the codec NAMES the word it opens with, not that it validates it - but
+		// naming is the whole of what #531 asks for: nothing in `Parse(in ReadOnlySpan<byte>)` said which byte was
+		// byte 0, so both readings looked equally plausible at a call site. A first read of `var len = r.ReadU32Be()`
+		// and one of `r.ExpectU32Be(Opcode, ...)` are the same shape and only the second says what it is.
+		[Fact]
+		public void IirCodecsNameTheWordTheyOpenWith()
+		{
+			var failures = new List<string>();
+			var checkedCodecs = 0;
+			foreach (var t in CodecModules)
+			{
+				if (Methods(t).All(m => m.Name != "Parse") || !DeclaredOpcodes(t).Any())
+					continue;
+
+				var file = CodecSourceFiles().FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == t.Name);
+				if (file == null)
+					continue;
+
+				var first = FirstConsumingStatement(File.ReadAllText(file));
+				if (first == null)
+					continue;
+
+				checkedCodecs++;
+				if (Fields(t).Any(f => f.Name == "OpcodeIsInTheFrame"))
+					continue;
+
+				// Three spellings, all of which name the opening word: assert it is THE opcode (the single-opcode
+				// case), read it as an `IirTypes` to dispatch on (a genuine family), or - having declared the frame
+				// carries the opcode - open at the entity class instead.
+				if (!first.Contains("ExpectU32Be(Opcode", StringComparison.Ordinal)
+					&& !first.Contains("IirTypes)r.ReadU32Be()", StringComparison.Ordinal)
+					&& !first.Contains("ExpectU32Be(EntityClass", StringComparison.Ordinal))
+					failures.Add($"{t.Name}: opens with `{first.Trim()}`");
+			}
+
+			Assert.True(failures.Count == 0,
+				"an IIR codec must open by NAMING the word it consumes - `ExpectU32Be(Opcode, ...)`, a cast to IirTypes for a "
+				+ "family, or `OpcodeIsInTheFrame` plus the entity class. An unnamed leading u32 is indistinguishable from a "
+				+ "length prefix, which is Gitea #531:\n  " + string.Join("\n  ", failures));
+			Assert.True(checkedCodecs > 50, $"the naming gate only exercised {checkedCodecs} codecs - it is reflecting its way to nothing");
+		}
+
+		// The first statement of a codec's decode path that CONSUMES bytes: the body of `internal Read(ref SpanReader
+		// r)` where there is one, else of the public `Parse`. Comments and the SpanReader construction are skipped -
+		// they consume nothing.
+		private static string? FirstConsumingStatement(string source)
+		{
+			var entry = Regex.Match(source, @"(?:internal|private) static [\w<>?\[\], ]+ Read\(ref SpanReader r\)\s*\{(.*?)\n\t\t\}", RegexOptions.Singleline);
+			if (!entry.Success)
+				entry = Regex.Match(source, @"public static [\w<>?\[\], ]+ Parse\(in ReadOnlySpan<byte>[^)]*\)\s*\{(.*?)\n\t\t\}", RegexOptions.Singleline);
+
+			if (!entry.Success)
+				return null;
+
+			foreach (var line in entry.Groups[1].Value.Split('\n'))
+			{
+				var code = line.Trim();
+				if (code.Length == 0 || code.StartsWith("//", StringComparison.Ordinal) || code.StartsWith("var r = new SpanReader", StringComparison.Ordinal))
+					continue;
+				if (code.Contains("r.Expect", StringComparison.Ordinal) || code.Contains("r.Read", StringComparison.Ordinal) || code.Contains("r.Peek", StringComparison.Ordinal))
+					return code;
+			}
+
+			return null;
+		}
+
 		// LIVE from wave 7b: Economy held the last two implementations (`TradepostListingCodec.ParsedResults` and
 		// `ShopContentCodec.ShopContent`) and `PlayfieldProxy` the third, deferred by wave 3 because Economy consumed
 		// its stream `Read`. The interface FILE goes in wave 9; nothing implements it from here.
