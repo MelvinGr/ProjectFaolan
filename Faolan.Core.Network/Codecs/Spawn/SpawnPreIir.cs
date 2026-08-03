@@ -13,11 +13,13 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	// the player's model also carried the 5 bytes of the embedded CoreCharacter header that its parse happened to cut
 	// into. Those two fields belong to the message, not to the scaffold, and now live on SimpleCharFullUpdateIIR.
 	//
-	// The 53 u32 are read in WIRE order but scattered into NON-CONTIGUOUS C++ struct fields 0x184..0x264; the inline
-	// char buffer over that region holds an NPC's RDB script-binding diagnostic string (ScriptGroup / Script /
-	// Command names + <font color=...> markup), null-padded. So the block carries NO session-volatile instance
-	// handles - the only stale reference in a spawn is the playfield token in the transform (SpawnTransformPatch),
-	// which is why a carried-over scaffold re-addresses cleanly once the token is fixed.
+	// The 53 u32 are read in WIRE order but scattered into NON-CONTIGUOUS C++ struct fields 0x184..0x264, and the
+	// client applies each to the dynel as a STAT (WordStatIds). On an NPC the server fills only THREE of the 53
+	// (w17, w18, w38) and the rest goes out carrying unrelated server-side data - script-engine diagnostics, LDB
+	// <localized> fragments - which is why an NPC's block reads as text and why 591 captured Pillagers carry 551
+	// distinct blocks (#603). So the block carries NO session-volatile instance handles either way: the only stale
+	// reference in a spawn is the playfield token in the transform (SpawnTransformPatch), which is why a
+	// carried-over scaffold re-addresses cleanly once the token is fixed.
 	//
 	// The per-spawn sublist is EMPTY on 11,394 of the 11,400 captured NPC spawns, which is why it was long held as
 	// the raw 4-byte `0x3F1` framing word; on a PLAYER it is the character's saved FEAT SPECS - named, with a
@@ -36,11 +38,10 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// framing word. 1 + 6 + 53*4 + 4 = 223. A scaffold whose sublist has entries is wider - use ByteCount.
 		public const int FixedLength = 1 + FlagCount + WordCount * 4 + 4;
 
-		// The wire index of the one word that is reliably non-zero on a freshly-spawned NPC. The cross-capture sweep
-		// (tools/capture/classify_fa015807_fields.py over 5026 scaffolds) showed every other word is per-instance
-		// runtime state (target/owner handles, timers, action counters) that is 0 on an idle fresh spawn, and that
-		// the most-minimal captured scaffolds carry exactly ONE non-zero word here. Its struct offset is 0x1fc.
-		// A captured PLAYER frame carries the same modal value in the same slot.
+		// The wire index of the one word the retail server reliably WRITES on an NPC spawn - one of the three
+		// (w17, w18, w38) the leaked-text sweep found it never leaves alone, and the only one of the three that is
+		// non-zero (#603). The most-minimal captured scaffolds carry exactly ONE non-zero word, here. Its struct
+		// offset is 0x1fc. A captured PLAYER frame carries the same modal value in the same slot.
 		public const int CategoryWordIndex = 17;
 
 		// The modal value of the category word across the corpus (111 = 0x6f, ~49% of all NPCs; it is a 5-state
@@ -81,10 +82,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		///     <para>
 		///         What the ids say it holds is the character's PvP / MINIGAME CAREER: the LDB stat table names
 		///         `Fatalities` (0x564), `Minigames Abandoned` (0x560), and the `Annihilation` / `Capture the Skull` /
-		///         `Siege` win-loss pairs (0x29A..0x29F), sitting beside `Kills` (0x290) and `Deaths` (0x292). That is
-		///         why the block is all zeros on every NPC and on a fresh character - an NPC has no PvP career - which
-		///         is the same observation the "per-instance runtime state, 0 on a fresh spawn" reading was built on,
-		///         with the right cause under it.
+		///         `Siege` win-loss pairs (0x29A..0x29F), sitting beside `Kills` (0x290) and `Deaths` (0x292). A fresh
+		///         character has no career yet, which is why a fresh player's block is near-empty.
+		///     </para>
+		///     <para>
+		///         ⚠️ An NPC has no career either, but its block is NOT zero and must not be read as one (#603). The
+		///         retail server writes only w17, w18 and w38 on an NPC spawn and sends the other 50 words carrying
+		///         data it never wrote for that NPC - script-engine diagnostics, LDB `&lt;localized&gt;` fragments,
+		///         binary. 591 captured Pillagers carry 551 distinct blocks. Ours sends zeros
+		///         (<see cref="SpawnPreIirs.Minimal" />), which is the shape retail's three written slots describe.
 		///     </para>
 		///     <para>
 		///         Two slots are FLOATS: words 14 (0x546) and 35 (0x545) go out through a different setter on the
@@ -127,7 +133,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public const int VanityShownMaskWordIndex = 4;
 
 		// The C++ struct offset each of the 53 u32 is stored to, in WIRE order. Only used to reassemble the
-		// script-binding char buffer (DecodeScriptText); irrelevant to byte-exact wire round-trip.
+		// leaked-server-text view (DecodeScriptText); irrelevant to byte-exact wire round-trip.
 		internal static readonly int[] WordStructOffsets =
 		[
 			0x184, 0x188, 0x18c, 0x190, 0x194, 0x198, 0x19c, 0x1a8, 0x1b0, 0x1c0, 0x1c8, 0x1d0, 0x1d8, 0x1e0, 0x1e8, 0x1f0, 0x1b8, 0x1fc, 0x200, 0x204, 0x208, 0x210, 0x214, 0x218, 0x21c, 0x220,
@@ -174,7 +180,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 
 		// Reassembles the 53 u32 in C++ struct-offset order, little-endian (the stream byteswaps on read, so the
 		// wire is LE), into the contiguous inline char buffer, and returns its printable runs joined by ' | '.
-		// This is the NPC's script-binding diagnostic string - a per-instance text view, for diagnostics/tests.
+		// On an NPC this is server-side script-engine diagnostic text the server left in the block rather than
+		// anything about this NPC (#603) - a view for diagnostics/tests, never a source of content.
 		public string DecodeScriptText()
 		{
 			const int baseOffset = 0x184;
@@ -241,9 +248,11 @@ namespace Faolan.Core.Network.Codecs.Spawn
 	{
 		// The from-scratch pre-IIR scaffold for a freshly-spawned NPC: version 0x05, all flags 0, all 53 words 0
 		// except the category word (defaulted to 0x6f), and the empty 0x3F1 sublist. This is the "last un-lifted
-		// part" of the from-DB NPC spawn (Gitea #185), sourced from NOTHING - the sweep proved the scaffold carries
-		// no per-NPC config and no session-volatile reference, only per-instance runtime state that is 0 on a fresh
-		// spawn. Its encoding is byte-identical to the most-minimal captured NPC scaffolds.
+		// part" of the from-DB NPC spawn (Gitea #185), sourced from NOTHING - and #603 showed that is the CORRECT
+		// shape rather than a safe fallback: over the captured NPC spawns the retail server fills only w17, w18 and
+		// w38, and whatever the other 50 words carry is data it never wrote for this NPC. Reproducing a captured
+		// block would be reproducing retail's leak. Its encoding is byte-identical to the most-minimal captured
+		// NPC scaffolds.
 		public static SpawnPreIir Minimal(uint category = SpawnPreIir.DefaultCategory)
 		{
 			return new SpawnPreIir

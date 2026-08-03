@@ -113,18 +113,62 @@ it. The from-scratch minimal scaffold stays exactly as it is; what changes is th
 be zeros rather than assumed safe. When minigames/PvP stats are implemented (#146 / #503), this is where they
 go out.
 
-### ⚠️ It conflicts with the char-buffer reading below, and the apply says how
+### It does NOT conflict with the char-buffer reading — an NPC's block is UNINITIALISED SERVER DATA (2026-08-03, #603 closed)
 
-The section that follows concludes the same `0x184..0x264` region is an inline **char buffer** holding an NPC's
-RDB script-binding text — decoded, contiguous, and not a coincidence. Both cannot be true of the same bytes for
-the same entity.
+The section further down concludes the same `0x184..0x264` region is an inline **char buffer** holding an NPC's
+RDB script-binding text. The reconciliation first proposed here was a **union discriminated by dynel kind** —
+PvP career for a player, script text for an NPC — because the apply writes the whole block inside
+`if (virtual_predicate_0x60(dynel) == 0)` and applies only three stats unconditionally outside it (`+0x1e0`
+`0x0A5`, `+0x1e4` `0x090`, `+0x208` `0x57F`).
 
-The leading reconciliation, from the apply's own control flow: the whole stat block is written inside
-`if (virtual_predicate_0x60(dynel) == 0)`, and only **three** stats are applied unconditionally outside it
-(`+0x1e0` `0x0A5`, `+0x1e4` `0x090`, `+0x208` `0x57F`). So the region is plausibly a **union discriminated by
-dynel kind** — PvP career for a player character, script-binding text for an NPC — which would make both
-decodes right about their own half. That predicate has not been identified, so this is a hypothesis with the
-branch to check, not a finding. Open in Gitea #603.
+**There is no union.** The block is a stat block on every spawn, and what an NPC carries in it is server data
+that has nothing to do with that NPC. Three independent lines say so.
+
+**1. Slot `0x60` is not a kind predicate.** Resolving `SimpleChar_t`'s primary vtable (`0203e93c`) with the new
+`tools/ghidra/FindVtableForClass.java` and reading slot 24 gives `FUN_006ea600`, a one-line getter:
+`return this->u8 @ +0x1e8`. Sweeping the slot across every RTTI-discoverable vtable in the image
+(`tools/ghidra/DumpVirtualSlotAcrossClasses.java`, 714 vtables, 62 distinct targets) shows the dynel family
+splits two ways and neither way is player-vs-NPC:
+
+| classes | slot `0x60` |
+|---|---|
+| `n3Dynel`, `n3VisualDynel`, `SimpleDynel`, `GameCodeDynel`, `ClimbingDynel` | `FUN_00594fe0` — `return 1` |
+| `CoreCharacter`, `SimpleChar_t` | `FUN_006ea600` — `return this->u8 @ +0x1e8` |
+
+So the guard means *"this is a character"*, not *"this is a player"*. The flag is written once, in
+`CoreCharacter::CoreCharacter` (`FUN_006eace0`, `MOV byte ptr [ESI + 0x1e8],AL` @`006ead90`), as
+`flag = (arg == 0)`. The only construction path from this message is
+`SimpleCharFullUpdateIIR_t::CreateDynel` (vtable slot 10, `FUN_01121570`), which branches on
+`TEST byte ptr [ESI + 0x5c],0x1` and passes `1` when the bit is clear, `0` when set — and the base IIR ctor
+(`FUN_014582b0`, `MOV dword ptr [EBX + 0x5c],EDI` with `EDI == 0`) leaves it **clear**. Clear → arg `1` →
+flag `0` → predicate `0` → **the stat block is applied**. That is the default, for players and NPCs alike.
+
+**2. An NPC's block is not per-type, so it cannot be that NPC's script binding.** Grouping every captured NPC
+spawn by name: of the 705 names sighted more than once, **700 carry a varying block**. 591 captured Pillagers
+carry **551 distinct** 53-word blocks. Gated by
+`SpawnPreIirCorpusTests.AnNpcsScaffold_IsPerSighting_NotPerType`.
+
+**3. The content belongs to unrelated server subsystems.** Four Pillagers in a *single* capture carry a
+teleport-script error, a melee-library trace, an LDB `<localized>` fragment complete with a decryption key for a
+**guild-name** parameter, and unstructured binary. A player's block, by contrast, is numeric and stable — the
+same character in the same session carries identical words, and **not one of the 317 captured player frames
+contains a printable run** while 5438 of 17400 NPC frames do
+(`SpawnPreIirCorpusTests.OnlyNpcScaffolds_CarryLeakedServerText`).
+
+**How much the server does write: exactly 3 of the 53 words.** Over the 1171 frames visibly carrying leaked
+text, ask per word whether it is ever *string interior* (all four bytes printable — a zero-padded small integer
+like `111` is `'o'` plus nulls and must not count). Every slot lands at 70–90% **except `w17`, `w18` and `w38`,
+which land at 0.0%**: the leak never reaches them because the server fills them. Gated by
+`SpawnPreIirCorpusTests.OnlyThreeScaffoldSlots_AreWrittenOnAnNpcSpawn`.
+
+That is the whole mechanism, and it is exactly the shape `SpawnPreIirs.Minimal()` already emits — zeros
+everywhere but the category word `w17`. So the from-scratch scaffold is not merely "safe": reproducing a
+captured NPC's block would be reproducing retail's leak.
+
+⚠️ **What is NOT established** is the allocation mechanism. "Uninitialised heap" and "a shared server-side
+scratch buffer that is legitimately reused" both fit the captures, and nothing here distinguishes them. The
+claim that holds is the narrower one: *the other 50 words are not written for that NPC and carry unrelated
+server-side data*.
 
 ## Kind-level Ghidra RE — the block is a fixed-width char buffer, read as 53×U32 (2026-06-15, superseded in part — see above)
 The original plan was a **column↔offset map**: diff the 53 scaffold U32s across spawn rows, find the few
@@ -162,11 +206,15 @@ ScriptFormula defined at ScriptCommands/ShowFIFOMessageFromServerScriptCommand.c
 'showfifomessagefromserver' … <font color="green"> … Command 'if' (id=54)
 ```
 
-So the dominant content of the pre-IIR scaffold is the NPC's **RDB script-engine binding / diagnostic
-string** — ScriptGroup / Script / Command names + ids + the `<font color=…>` feedback markup, null-padded
-into the fixed-width buffer. It is per-instance text the client reads into a struct char buffer (and
-evidently keeps for script/debug, not geometry). Source: the RDB script layer (`[[lua_vm]]` /
-`[[protocol_onscreen_feedback]]`), keyed per NPC type.
+So the dominant content of an NPC's pre-IIR scaffold is **server-side script-engine diagnostic text** —
+ScriptGroup / Script / Command names + ids, `<font color=…>` feedback markup and `<localized>` LDB fragments.
+
+⚠️ **The reassembly is right; the attribution in the original version of this paragraph was not.** It read the
+text as "the NPC's script binding, keyed per NPC type". It is neither the NPC's nor per-type: 591 captured
+Pillagers carry 551 distinct blocks, and one capture's Pillagers carry text from four unrelated server
+subsystems. The region is the PvP/minigame stat block above, which the server simply does not fill in for an
+NPC — see *"an NPC's block is UNINITIALISED SERVER DATA"*. What the text is good for is what it accidentally
+reveals about the retail server (Gitea #604), not what it says about the NPC carrying it.
 
 ## The POST-IIR is runtime state, NOT appearance — "missing hair" was the playfield token (corrected 2026-06-17)
 

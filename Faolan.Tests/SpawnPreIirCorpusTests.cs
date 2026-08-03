@@ -95,6 +95,131 @@ namespace Faolan.Tests
 			], specs.Order().ToArray());
 		}
 
+		// The scaffold is ONE grammar carrying ONE meaning - a PvP/minigame stat block (SpawnPreIir.WordStatIds) -
+		// and what an NPC carries in it is UNINITIALISED RETAIL SERVER MEMORY, not content of its own (#603).
+		//
+		// This gate is the measurement that settles it, and it has to read the corpus: the claim is about how the
+		// same NPC varies BETWEEN sightings, which a single fixture cannot express. If the block held per-type
+		// content - the "RDB script-binding text, keyed per NPC type" reading this replaces - then every Pillager
+		// would carry the same 53 words. 591 captured Pillagers carry 551 distinct blocks.
+		[Fact]
+		public void AnNpcsScaffold_IsPerSighting_NotPerType()
+		{
+			var byName = new Dictionary<string, (HashSet<string> Blocks, int Sightings)>();
+
+			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
+			{
+				if (!SpawnBodyReader.TryParse(body, out var spawn) || SpawnBodyReader.IsPlayer(spawn))
+					continue;
+
+				var name = spawn.Character.Name;
+				if (name.Length == 0)
+					continue;
+
+				var block = string.Join(",", spawn.PreIir.Words.Select(w => w.ToString("x8")));
+				var e = byName.GetValueOrDefault(name, (Blocks: new HashSet<string>(), Sightings: 0));
+				e.Blocks.Add(block);
+				byName[name] = (e.Blocks, e.Sightings + 1);
+			}
+
+			// Only names actually seen more than once can say anything about stability.
+			var repeats = byName.Values.Where(v => v.Sightings > 1).ToList();
+			var varies = repeats.Count(v => v.Blocks.Count > 1);
+
+			Assert.Equal(705, repeats.Count);
+			Assert.Equal(700, varies);
+		}
+
+		// The other half of the same measurement, from the PLAYER side, and the reason "it is server memory" is a
+		// finding rather than a guess: the leaked text only ever appears where the server has nothing to write.
+		//
+		// A player's block is the character's real PvP career, so it is numeric and STABLE - the same character in
+		// the same session carries the same words. An NPC has no career, the server leaves the buffer alone, and
+		// what goes out is whatever was in it: script-engine error strings, `<localized>` LDB markup, and unrelated
+		// binary. Not one of the 317 captured player frames carries a printable run.
+		[Fact]
+		public void OnlyNpcScaffolds_CarryLeakedServerText()
+		{
+			int playersWithText = 0, players = 0, npcsWithText = 0, npcs = 0;
+
+			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
+			{
+				if (!SpawnBodyReader.TryParse(body, out var spawn))
+					continue;
+
+				var hasText = spawn.PreIir.DecodeScriptText().Length > 3;
+				if (SpawnBodyReader.IsPlayer(spawn))
+				{
+					players++;
+					if (hasText) playersWithText++;
+				}
+				else
+				{
+					npcs++;
+					if (hasText) npcsWithText++;
+				}
+			}
+
+			Assert.Equal(317, players);
+			Assert.Equal(0, playersWithText);
+			Assert.Equal(17400, npcs);
+			Assert.Equal(5438, npcsWithText);
+		}
+
+		// WHICH slots the server actually writes on an NPC spawn - the measurement that turns "the NPC block is
+		// leaked server data" from an inference about content into a statement about mechanism (#603).
+		//
+		// Take only the frames that are visibly carrying leaked text, and ask per word: is this slot ever the
+		// INTERIOR of a string (all four bytes printable, no zero padding - a zero-padded small integer like 111
+		// is 'o' followed by nulls and must not count, which is what a laxer test gets wrong). Every slot but
+		// three lands at 70-90%. Exactly w17, w18 and w38 land at 0.0% - the leak never touches them because the
+		// server writes them. That is 3 of 53, and SpawnPreIirs.Minimal already emits exactly that shape: zeros
+		// everywhere except the category word.
+		[Fact]
+		public void OnlyThreeScaffoldSlots_AreWrittenOnAnNpcSpawn()
+		{
+			var stringInterior = new int[SpawnPreIir.WordCount];
+			var textHeavy = 0;
+
+			foreach (var (_, body) in CorpusExtract.OfType((uint)IirTypes.SimpleCharFullUpdateIIR))
+			{
+				if (!SpawnBodyReader.TryParse(body, out var spawn) || SpawnBodyReader.IsPlayer(spawn))
+					continue;
+
+				var words = spawn.PreIir.Words;
+				if (words.Count(IsStringInterior) < 30)
+					continue;
+
+				textHeavy++;
+				for (var i = 0; i < words.Length; i++)
+					if (IsStringInterior(words[i]))
+						stringInterior[i]++;
+			}
+
+			Assert.Equal(1171, textHeavy);
+
+			var never = Enumerable.Range(0, SpawnPreIir.WordCount).Where(i => stringInterior[i] == 0).ToArray();
+			Assert.Equal([SpawnPreIir.CategoryWordIndex, 18, 38], never);
+
+			// ...and every other slot is text in the clear majority of them, so the three are a real gap and not
+			// three slots that merely happened to hold a number.
+			foreach (var i in Enumerable.Range(0, SpawnPreIir.WordCount).Except(never))
+				Assert.True(stringInterior[i] > textHeavy * 2 / 3, $"w{i} is string-interior in only {stringInterior[i]}/{textHeavy} frames");
+		}
+
+		// All four bytes printable. A word must not qualify on zero padding - see the test above.
+		private static bool IsStringInterior(uint word)
+		{
+			for (var shift = 0; shift < 32; shift += 8)
+			{
+				var b = (byte)(word >> shift);
+				if (b is < 0x20 or >= 0x7f)
+					return false;
+			}
+
+			return true;
+		}
+
 		// The scaffold's fields are the client's, not ours, and three of them are independently corroborated: the
 		// category word carries the SAME modal value the NPC sweep found, the vanity word sits where #336 found a
 		// u32 by a completely different route, and the frame's last two fields are the embedded CoreCharacter's
