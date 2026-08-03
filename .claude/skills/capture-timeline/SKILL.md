@@ -92,11 +92,17 @@ If a message shows only hex and it matters, add a **codec** in `Faolan.Core.Netw
 inline. The whole reason the timeline moved out of a Python script is that a second implementation of
 the wire grammar drifts — and it did, four wrong offsets before anyone noticed by eye.
 
-⚠️ **The two codec families disagree on framing, and both are right for their own `Build`.**
-`WorldQuest`, `MagicBuffCodec` and `LookAtCodec` start at the SUB-OPCODE (the length prefix stripped);
-`StatDamageCodec`, `HateListCodec`, `ChainKill` and `CombatShieldCodec` write through
-`WriteArrayUInt32Length` and so read the u32 LENGTH first. Passing the wrong one does not fail cleanly —
-it reads four bytes short and runs off the end of the buffer.
+⚠️ **Every IIR codec's body starts at the SUB-OPCODE — hand it the record with the u32 carrier length
+already stripped.** Passing the wrong slice does not fail cleanly: it reads four bytes out of step and
+either runs off the end or returns plausible values (that is how a `StatDamageIIR` once reported
+`Flags +0.02` where the capture said `HealthCurrent -37.25`).
+
+There used to be a second family that read a u32 LENGTH first, and the two were indistinguishable from a
+`Parse(in ReadOnlySpan<byte>)` signature. That split is gone (#530) and now GATED (#531): a codec must
+either open by consuming its own opcode word, or declare `OpcodeIsInTheFrame` — which the c2s codecs
+(`DeleteItemCodec`, `MoveInventoryItemCodec`) do, because their sub-opcode rides in the RPC frame and their
+body genuinely starts at the entity class. So the answer is always in the codec's own type; you never have
+to guess, and a new codec that leaves it unsaid fails the build.
 
 ## Gotchas this workflow exists to encode
 
