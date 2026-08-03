@@ -39,6 +39,17 @@ ENUM_TO_CLASS = {
     "TradepostInterfaceOpcodes": "TradepostInterface",
 }
 
+# The two classes whose methods are registered by 32-bit HASH, not by index. Their RPC
+# header field is a multi-group varint, and the codebase's `[u16 opcode][trailing bytes]`
+# split cuts it after the first group - so the opcode alone does NOT identify the method:
+# it is `0x2080 | (constant & 0x7F)`, and two methods sharing their low 7 bits share an
+# opcode (0x20EC, 0x20D6 - retail sends both of each pair). These tables are keyed by the
+# reassembled 32-bit constant so the dissector can tell them apart (Gitea #608/#610).
+METHOD_CONSTANT_ENUMS = {
+    "PlayerAgentMethods": "PlayerAgent",
+    "PlayerInterfaceMethods": "PlayerInterface",
+}
+
 # Standalone (non-class-keyed) tables: the IIR type-name catalog carried inside the
 # GameAgent/GameInterface 0x2000 PassBlob packets, and the ChatServer chat opcodes
 # (chat packets have no RpcHeader, so they can't ride the class-keyed tables).
@@ -93,7 +104,7 @@ def main() -> int:
         entries = [(e["name"], int(e["value"], 16)) for e in ENTRY_RE.finditer(m["body"])]
         enums[m["name"]] = entries
 
-    missing = [e for e in list(ENUM_TO_CLASS) + list(STANDALONE_ENUMS) if not enums.get(e)]
+    missing = [e for e in list(ENUM_TO_CLASS) + list(STANDALONE_ENUMS) + list(METHOD_CONSTANT_ENUMS) if not enums.get(e)]
     if missing:
         print(f"error: enums missing/empty in {source_path}: {', '.join(missing)}", file=sys.stderr)
         return 1
@@ -140,6 +151,18 @@ def main() -> int:
         out.append("")
         table_rows.append((EXPECTED_CLASS_IDS[class_name], var))
 
+    constant_rows = []
+    for enum_name, class_name in METHOD_CONSTANT_ENUMS.items():
+        var = f"faolan_constants_{class_name.lower()}"
+        out.append(f"/* {class_name} <- {enum_name}: keyed by the 32-bit registration constant, NOT the opcode */")
+        out.append(f"static const value_string {var}[] = {{")
+        for entry_name, value in enums[enum_name]:
+            out.append(f'    {{0x{value:08X}, "{entry_name}"}},')
+        out.append("    {0, NULL}")
+        out.append("};")
+        out.append("")
+        constant_rows.append((EXPECTED_CLASS_IDS[class_name], var))
+
     out.append("typedef struct faolan_class_methods")
     out.append("{")
     out.append("    uint32_t class_id;")
@@ -151,6 +174,12 @@ def main() -> int:
         out.append(f"    {{0x{class_id:08X}, {var}}},")
     out.append("};")
     out.append("")
+    out.append("/* Keyed by the reassembled method varint rather than the opcode - see METHOD_CONSTANT_ENUMS. */")
+    out.append("static const faolan_class_methods_t faolan_class_constant_tables[] = {")
+    for class_id, var in sorted(constant_rows):
+        out.append(f"    {{0x{class_id:08X}, {var}}},")
+    out.append("};")
+    out.append("")
     out.append("#endif /* FAOLAN_OPCODE_NAMES_H */")
     out.append("")
 
@@ -159,9 +188,10 @@ def main() -> int:
 
     total = sum(len(enums[e]) for e in ENUM_TO_CLASS)
     extra = sum(len(enums[e]) for e in STANDALONE_ENUMS)
+    constants = sum(len(enums[e]) for e in METHOD_CONSTANT_ENUMS)
     print(
         f"gen_opcode_names: {len(ENUM_TO_CLASS)} classes, {total} named methods, "
-        f"{extra} IIR/chat names -> {output_path}"
+        f"{constants} method constants, {extra} IIR/chat names -> {output_path}"
     )
     return 0
 

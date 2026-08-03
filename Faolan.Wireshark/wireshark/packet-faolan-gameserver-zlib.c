@@ -227,6 +227,33 @@ static const char *class_name(wmem_allocator_t *pool, uint32_t class_id)
     return name != NULL ? name : wmem_strdup_printf(pool, "0x%08x", class_id);
 }
 
+/* PlayerAgent/PlayerInterface register their methods by 32-bit HASH, so the opcode does NOT
+   identify the method: what looks like [u16 BE opcode][trailing header bytes] is one protobuf
+   varint (field 4, tag 0x20) holding the method's registration constant, cut after its first
+   group. Reassembling it is the only way to tell apart the two methods that share an opcode -
+   0x20EC is BOTH ReceivedCharacterSettings and AuthenticateLoggedIn, 0x20D6 BOTH
+   VerifyLanguageSetting and UpdateCharacterPreview, and retail sends all four (#608/#610).
+   Returns NULL for a class that is not hash-registered, or a constant with no recovered name. */
+static const char *method_name_by_constant(uint32_t receiver_class, uint16_t opcode, tvbuff_t *tvb, uint32_t tail_start, uint32_t tail_end)
+{
+    for (size_t i = 0; i < array_length(faolan_class_constant_tables); i++) {
+        if (faolan_class_constant_tables[i].class_id != receiver_class) {
+            continue;
+        }
+
+        /* The opcode's low byte is the varint's first group; each trailing byte adds seven more bits. */
+        uint32_t constant = (uint32_t)(opcode & 0x7F);
+        uint32_t shift = 7;
+        for (uint32_t p = tail_start; p < tail_end && shift < 32; p++, shift += 7) {
+            constant |= (uint32_t)(tvb_get_uint8(tvb, p) & 0x7F) << shift;
+        }
+
+        return try_val_to_str(constant, faolan_class_constant_tables[i].methods);
+    }
+
+    return NULL;
+}
+
 /* Resolves a (receiver class id, 16-bit opcode) pair to its recovered method name - the C
    equivalent of the server's GameServerMethodNames.Resolve(). The GameServer connection
    multiplexes several RPC class-pairs, so the SAME opcode means different methods per class;
@@ -440,10 +467,14 @@ static void dissect_conan_packet(
     const uint16_t opcode = tvb_get_ntohs(tvb, pos);
     proto_item *opcode_item = proto_tree_add_item(pkt_tree, hf_faolan_pkt_opcode, tvb, pos, 2, ENC_BIG_ENDIAN);
 
-    /* Method name resolved by (receiver class, opcode) - the receiver's method table names
-       the call; PlayerAgent/PlayerInterface only carry their behavior-verified subset (they
-       use 32-bit hash dispatch, not 0x2000+index), unresolved opcodes stay raw hex. */
-    const char *method = method_name(receiver_class, opcode);
+    /* Method name resolved by (receiver class, opcode) - the receiver's method table names the call,
+       since a connection multiplexes several class-pairs and the same opcode means different things
+       on each. On the two hash-registered classes the opcode is only the method varint's first group,
+       so the whole varint is reassembled first and that answer wins; unresolved opcodes stay raw hex. */
+    const char *method = method_name_by_constant(receiver_class, opcode, tvb, pos + 2, hdr_end);
+    if (method == NULL) {
+        method = method_name(receiver_class, opcode);
+    }
     if (method != NULL) {
         proto_item_append_text(opcode_item, " (%s)", method);
         proto_item *method_item = proto_tree_add_string(pkt_tree, hf_faolan_pkt_method, tvb, pos, 2, method);
