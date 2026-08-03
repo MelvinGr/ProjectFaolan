@@ -2580,11 +2580,12 @@ namespace Faolan.Importer.Cli
 
 			// Per kind: how many elements carry it, one sample (feat id + name + the whole payload), and whether the
 			// pair view and the key-addressed view agree on that sample.
-			var seen = new Dictionary<uint, (int Count, uint FeatId, string FeatName, uint[] Values)>();
+			var seen = new Dictionary<uint, (int Count, uint FeatId, string FeatName, ItemTemplateStatModifiers.Element Sample)>();
 			// Every distinct payload of the FILTERED kind, so a single-kind run reads as a census of that kind's
 			// slots rather than one sample - which is what makes "slot 1 tracks the tooltip, slot 3 does not"
 			// checkable instead of asserted.
-			var samples = new List<(uint Id, string Name, uint[] Values)>();
+			var samples = new List<(uint Id, string Name, ItemTemplateStatModifiers.Element Element)>();
+			var textAudit = new Dictionary<string, List<(uint Id, string Name, uint Kind, string Bytes)>>();
 
 			foreach (var e in rdb.EntriesOfType(templateType))
 			{
@@ -2605,17 +2606,46 @@ namespace Faolan.Importer.Cli
 					continue;
 
 				var name = RdbFeatImporter.ReadNameAndDescription(body).Name;
-				foreach (var element in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+				var located = ItemTemplateStatModifiers.ParseElements(body.AsSpan(12));
+				for (var i = 0; i < located.Count; i++)
+				{
+					// A text-carrying element whose successor is known: its measured width settles the length word.
+					if (located[i].Type is not { IsFixedWidth: false } tt || i + 1 >= located.Count)
+						continue;
+
+					var measured = located[i + 1].Offset - located[i].Offset;
+					var texts = tt.Keys.Count(k => GameActionTypes.TextKeys.Contains(k));
+					var fixedSlots = tt.Keys.Length - texts;
+					// 32-byte prefix + one u32 per non-text slot + per text slot either [u32 len][len bytes] or
+					// [u16 len][len bytes]. The string BYTES are the same either way, so the two forms differ only by
+					// 2 bytes per text slot - which is exactly what the measured width can tell apart.
+					var bytes = measured - 32 - 4 * fixedSlots;
+					var slotStart = 12 + located[i].Offset + 32 + 4 * tt.Keys.TakeWhile(k => !GameActionTypes.TextKeys.Contains(k)).Count();
+					var raw = string.Join(" ", Enumerable.Range(0, Math.Min(24, body.Length - slotStart)).Select(k => body[slotStart + k].ToString("x2")));
+					var u32Len = texts == 1 && slotStart + 4 <= body.Length ? BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(slotStart)) : uint.MaxValue;
+					var u16Len = texts == 1 && slotStart + 2 <= body.Length ? BinaryPrimitives.ReadUInt16LittleEndian(body.AsSpan(slotStart)) : ushort.MaxValue;
+					var form = texts != 1
+						? $"{texts} text slots - not decided"
+						: bytes == 4 + u32Len
+							? "[u32 len][bytes]"
+							: bytes == 2 + u16Len
+								? "[u16 len][bytes]"
+								: "NEITHER";
+					textAudit.TryAdd(form, []);
+					textAudit[form].Add((e.Id, name, located[i].Kind, raw));
+				}
+
+				foreach (var element in located)
 				{
 					if (only != 0 && element.Kind != only)
 						continue;
 
 					var prior = seen.GetValueOrDefault(element.Kind);
 					seen[element.Kind] = prior.Count == 0
-						? (1, e.Id, name, element.Values)
-						: (prior.Count + 1, prior.FeatId, prior.FeatName, prior.Values);
+						? (1, e.Id, name, element)
+						: (prior.Count + 1, prior.FeatId, prior.FeatName, prior.Sample);
 					if (only != 0)
-						samples.Add((e.Id, name, element.Values));
+						samples.Add((e.Id, name, element));
 				}
 			}
 
@@ -2638,12 +2668,27 @@ namespace Faolan.Importer.Cli
 					: $"MISREAD: Stat @{(statSlot < 0 ? "none" : statSlot.ToString())}, magnitude @{(magnitudeSlot < 0 ? "none" : magnitudeSlot.ToString())}";
 				Console.WriteLine($"           {verdict}");
 
-				var payload = type == null
-					? string.Join(" ", hit.Values.Select((v, i) => $"[{i}]={v}"))
-					: string.Join(" ", type.Keys.Select((key, i) => $"{key}={(i < hit.Values.Length ? hit.Values[i].ToString() : "-")}"));
-				Console.WriteLine($"           e.g. feat {hit.FeatId} \"{hit.FeatName}\": {payload}");
-				Console.WriteLine($"           pair view would import (StatId={(hit.Values.Length > 0 ? hit.Values[0] : 0)}, "
-					+ $"Value={(hit.Values.Length > 1 ? hit.Values[1] : 0)})");
+				Console.WriteLine($"           e.g. feat {hit.FeatId} \"{hit.FeatName}\": {Payload(hit.Sample)}  ({hit.Sample.WidthBytes}B)");
+				Console.WriteLine($"           pair view would import (StatId={(hit.Sample.Values.Length > 0 ? hit.Sample.Values[0] : 0)}, "
+					+ $"Value={(hit.Sample.Values.Length > 1 ? hit.Sample.Values[1] : 0)})");
+			}
+
+			// The TEXT-slot audit (#596). A text slot is `[length][bytes]`, and which width that length word is has to
+			// be MEASURED, not assumed: an element's true width is the distance to the next element's type word, so
+			// the reading whose payload ends exactly there is the right one. Printed as a tally per (kind, width form)
+			// with the raw bytes of the first disagreement, because "some records read as u16" is a shrug and "kind
+			// 53261 reads `12 00 'Hash=WMTW;Level=40'` and tiles at 56B" is a lead.
+			if (textAudit.Count > 0)
+			{
+				Console.WriteLine();
+				Console.WriteLine("--- text slots, by which length word makes the element tile to its measured width:");
+				foreach (var (form, hits) in textAudit.OrderByDescending(a => a.Value.Count))
+				{
+					Console.WriteLine($"  {form} x{hits.Count}");
+					foreach (var byKind in hits.GroupBy(h => h.Kind).OrderByDescending(g => g.Count()))
+						Console.WriteLine($"      kind {byKind.Key} {GameActionTypes.Get(byKind.Key)?.Name ?? "<unregistered>",-36} x{byKind.Count(),-4} "
+							+ $"e.g. {byKind.First().Id} \"{byKind.First().Name}\": {byKind.First().Bytes}");
+				}
 			}
 
 			if (samples.Count == 0)
@@ -2652,12 +2697,22 @@ namespace Faolan.Importer.Cli
 			var only_ = GameActionTypes.Get(only);
 			Console.WriteLine();
 			Console.WriteLine($"--- every {only} ({only_?.Name ?? "<unregistered>"}) element, by key:");
-			foreach (var (id, name, values) in samples.OrderBy(s => s.Name).ThenBy(s => s.Id))
+			foreach (var (id, name, element) in samples.OrderBy(s => s.Name).ThenBy(s => s.Id))
+				Console.WriteLine($"  {id,10} {name,-44} {Payload(element)}  ({element.WidthBytes}B)");
+
+			return;
+
+			// One element as `key=value` pairs, in key order. A TEXT slot prints the STRING rather than its byte
+			// length, which is what makes a string-aware read visible in the output at all.
+			static string Payload(ItemTemplateStatModifiers.Element element)
 			{
-				var payload = only_ == null
-					? string.Join(" ", values.Select((v, i) => $"[{i}]={v}"))
-					: string.Join(" ", only_.Keys.Select((key, i) => $"{key}={(i < values.Length ? values[i].ToString() : "-")}"));
-				Console.WriteLine($"  {id,10} {name,-44} {payload}");
+				return element.Type is not { } t
+					? string.Join(" ", element.Values.Select((v, i) => $"[{i}]={v}"))
+					: string.Join(" ", t.Keys.Select((key, i) => i >= element.Values.Length
+						? $"{key}=-"
+						: element.Texts[i] is { } text
+							? $"{key}=\"{text}\""
+							: $"{key}={element.Values[i]}"));
 			}
 		}
 

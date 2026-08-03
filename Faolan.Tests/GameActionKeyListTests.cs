@@ -152,14 +152,13 @@ namespace Faolan.Tests
 			Assert.Null(element.Value(GameActionTypes.KeyStat));
 		}
 
-		// `8 + len(keyList)` describes an element whose every slot is a u32, and key 209 is TEXT - `[u32 byteLength]
-		// [bytes, the NUL included]`. Shape taken from feat 12362, where a `HeadText` element measures 47 bytes:
-		// 32 header + 4 + "Dimach\0" + the one u32 slot after it. A width that is not a multiple of four is the tell,
-		// and no fixed-width layout can produce one. The element must still be LOCATED - it is what bounds its
-		// neighbour's width - but it carries no positional values, because reading them would take the string's
-		// length for the first slot (#595, follow-up #596).
+		// `8 + len(keyList)` describes an element whose every slot is a u32, and keys 209/210 are TEXT - `[u16
+		// byteLength][bytes]` (#596). A text slot shifts every slot after it by an odd number of bytes, which is both
+		// why such an element has no fixed width and why it has to be WALKED rather than indexed: a positional read
+		// past the string takes its length for the next slot's value. Shape taken from spell 4609400 "Path of the
+		// Enlightened", whose `SetMorphValue` element reads `[u16 3]["arm"][u32 -10]` and tiles at 41 bytes.
 		[Fact]
-		public void AnElementWithATextSlotIsLocatedButNotReadPositionally()
+		public void AnElementWithATextSlotIsWalkedSoTheSlotsAfterItStayAligned()
 		{
 			var body = new byte[96];
 			void W(int at, uint v)
@@ -167,32 +166,39 @@ namespace Faolan.Tests
 				BitConverter.GetBytes(v).CopyTo(body, at);
 			}
 
-			// [HeadText][0][4][0][1][0][2][9][u32 7]["Dimach\0"][u32 3]  then a `Modify` element right after it.
-			W(4, 53057);
+			// [SetMorphValue][0][4][0][1][0][2][9][u16 3]["arm"][u32 -10]  then a `Modify` element right after it.
+			W(4, 53010);
 			W(12, 4);
 			W(20, 1);
 			W(28, 2);
 			W(32, 9);
-			W(36, 7);
-			"Dimach\0"u8.ToArray().CopyTo(body, 40);
-			W(47, 3);
-			W(51, 53045);
-			W(59, 4);
-			W(67, 1);
-			W(75, 2);
-			W(79, 9);
-			W(83, 0x324);
-			W(87, 12);
+			BitConverter.GetBytes((ushort)3).CopyTo(body, 36);
+			"arm"u8.ToArray().CopyTo(body, 38);
+			W(41, unchecked((uint)-10));
+			W(45, 53045);
+			W(53, 4);
+			W(61, 1);
+			W(69, 2);
+			W(73, 9);
+			W(77, 0x324);
+			W(81, 12);
 
 			var elements = ItemTemplateStatModifiers.ParseElements(body);
 			Assert.Equal(2, elements.Count);
-			Assert.Equal(53057u, elements[0].Kind);
-			Assert.Empty(elements[0].Values);
-			Assert.Null(elements[0].Value(GameActionTypes.KeyValue));
+			Assert.Equal(53010u, elements[0].Kind);
 
-			// 47 bytes to the next element - the measurement the report makes, and the reason the model needs the
-			// exception rather than a wider fixed width.
-			Assert.Equal(47, elements[1].Offset - elements[0].Offset);
+			// The string itself, and - the point of walking - the u32 AFTER it, read at its real offset.
+			Assert.Equal("arm", elements[0].Text(GameActionTypes.KeyEventString));
+			Assert.Equal(unchecked((uint)-10), elements[0].Value(GameActionTypes.KeyValue));
+
+			// A text slot's Value is its BYTE LENGTH - what the u16 actually holds - not the string.
+			Assert.Equal(3u, elements[0].Value(GameActionTypes.KeyEventString));
+			Assert.Null(elements[0].Text(GameActionTypes.KeyValue));
+
+			// 41 bytes to the next element - the measurement the report makes, and what settles the length word's
+			// width: the u32 form would put this element's end two bytes past where its neighbour begins.
+			Assert.Equal(41, elements[1].Offset - elements[0].Offset);
+			Assert.Equal(41, elements[0].WidthBytes);
 			Assert.Equal(53045u, elements[1].Kind);
 			Assert.Equal(0x324u, elements[1].Value(GameActionTypes.KeyStat));
 			Assert.Equal(12u, elements[1].Value(GameActionTypes.KeyValue));

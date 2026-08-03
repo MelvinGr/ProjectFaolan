@@ -13,7 +13,7 @@ flat "header + verbatim tail" the capture-only model first suggested). Gitea #19
   `2 × 0x3F1` ⇒ **1 element**. Then `count` elements, each a 0x68-byte `GameActionData` object constructed by
   `FUN_008985c0` (the ctor — sets up the three typed property maps + defaults) and deserialized by `FUN_00899a60`.
 - **Element deserialize** `FUN_00899a60`: the exact wire layout is in the section below (positional, driven by a
-  static per-type descriptor; string values for keys `0x4d9`/`0x4da`, u32 otherwise).
+  static per-type descriptor; string values for keys `0x4d9`/`0x4da` — key indices 209/210 — u32 otherwise).
 
 ## Why the bodies looked multi-form
 
@@ -129,17 +129,40 @@ It reaches **27 kinds against the ceiling pass's 17**, all exact, and settles bo
 
 ### The width model has ONE exception: a TEXT slot
 
-`8 + len(keyList)` describes an element whose every slot is a u32. **Key `209` (`EventString`) is text**, written
-`[u32 byteLength][bytes, the NUL included]`, which makes any element carrying it variable-width. Measured, not
-assumed: a `HeadText` element in feat 12362 tiles at **47 bytes** — not a multiple of four, which no all-u32
-layout can produce — and reads `[u32 7]["Dimach\0"][u32 3]`. The same key is what `SetMorphValue`'s 67-byte record
-was carrying all along, filed as "an ASCII mesh name" after the element when it is a slot *inside* it.
+`8 + len(keyList)` describes an element whose every slot is a u32. **Keys `209` and `210` (`EventString`) are
+text**, written `[u16 byteLength][bytes]`, which makes any element carrying one variable-width — and variable by
+an ODD number of bytes, so the payload has to be WALKED slot by slot rather than indexed. `SetMorphValue`'s
+"ASCII mesh name after the element" was this slot *inside* it all along.
 
-`GameActionTypes.TextKeys` holds the keys proven text (just `209`), `GameActionType.IsFixedWidth` reports the
-consequence, and `ItemTemplateStatModifiers.ParseElements` locates such an element but yields **no** positional
-values for it — reading them would take the string's length for the first slot. ⚠️ The client reads a string for
-two `GameActionStat_e` ids (`0x4d9`/`0x4da`, below) and *which key indices those are* is still open: an
-unregistered kind in that same record (53044) also carries a string, under a key list we do not have. Gitea #596.
+**The set is closed, and read out of the client** `[V1: tools/ghidra/DecompileFns.java]`. The deserializer
+`FUN_00899a60` takes the string branch for exactly two `GameActionStat_e` ids, `0x4d9` and `0x4da`; the key-index
+table it reads (`&DAT_025073c0`, built by `FUN_00897bd0`, 244 of its 255 slots written as constants) maps index
+**209 → `0x4d9`** and **210 → `0x4da`**, and nothing else to either. So a type is variable-width iff its key list
+contains 209 or 210 — `GenerateName` and `NewTextEffect` are the only two carrying both.
+
+**The length word is a u16, not a u32.** Same source: the string read is `FUN_0048f840` → `FUN_00cbf840` mode 0,
+which reads a u16 and treats `>= 0x8000` as an escape into a long form no shipped template uses. The records
+agree — of the 880 text-carrying elements in the feat and spell catalogs, **653 tile EXACTLY** under it (the
+distance to the next element's type word equals `32 + 4×fixedSlots + 2 + len`), and the strings come out whole
+with the slots after them aligned:
+
+| element | payload, by key |
+|---|---|
+| `SetMorphValue` in spell 4609400 | `209="arm" 39=-10` — 41 B |
+| `StartParticleEffect` in spell 3832933 | `209="spell_curseofflies" …` — the 0x12-byte slot is exactly the name |
+| `StartServerSideScryScriptWithParams` in spell 325651 | `39=227065 209="spawnHash=NSAO;pointCost=1;petBuff=783738;spellID=325651"` |
+
+None of them carries a NUL inside the counted length.
+
+`GameActionTypes.TextKeys`, `GameActionType.IsFixedWidth` and `ItemTemplateStatModifiers.ParseElements` implement
+this; `--report feat-effect-kinds` prints the audit, bucketing every text-carrying element by which length word
+makes it tile to its measured width.
+
+⚠️ **Six elements do not tile under it**, all of them `HeadText` (53057), which reads cleanly as
+`[u32 7]["Dimach\0"][u32 3]` — a u32 length, the NUL counted — and measures two bytes wider than the u16 form
+allows. That is one kind out of the eleven that carry text and is not modelled; the walk stops at such a slot
+rather than guessing, so the element is still located and its earlier slots still read. Open thread on Gitea #596,
+together with the unregistered kind 53044, which carries a string under a key list the client does not register.
 
 ### Two shipped-data anomalies, both confined and both characterised
 

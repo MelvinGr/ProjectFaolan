@@ -54,21 +54,31 @@ namespace Faolan.Core.Rdb
 		public const int KeyLowLevel = 172;
 		public const int KeyHighLevel = 173;
 
+		// The TEXT slots (see <see cref="TextKeys" />). 209 is the one every string-carrying type uses; 210 is the
+		// second string on `GenerateName` and `NewTextEffect`, the only two types that carry both.
+		public const int KeyEventString = 209;
+		public const int KeyEventString2 = 210;
+
 		/// <summary>
-		///     Keys whose slot holds TEXT rather than a u32 - `[u32 byteLength][bytes, the NUL included]` - which is
-		///     what makes an element carrying one VARIABLE-width, so `8 + len(keyList)` does not describe it.
+		///     Keys whose slot holds TEXT rather than a u32 - `[u16 byteLength][bytes]` - which is what makes an
+		///     element carrying one VARIABLE-width, and by an ODD number of bytes, so `8 + len(keyList)` does not
+		///     describe it and the payload has to be WALKED rather than indexed.
 		///     <para>
-		///         Measured, not assumed (Gitea #595): tiling gives `HeadText` (key `209` EventString, then `39`) a
-		///         width of **47 bytes** in feat 12362 - not a multiple of four, which no all-u32 layout can produce -
-		///         and the bytes there read `[u32 7]["Dimach\0"][u32 3]`. The same key explains `SetMorphValue`'s
-		///         67-byte record, whose surplus the earlier ceiling measurement filed as trailing record content when
-		///         it was this slot's mesh name all along.
+		///         The set is CLOSED, and read out of the client rather than inferred (Gitea #596): the GameAction
+		///         deserializer `FUN_00899a60` takes the string branch for exactly two `GameActionStat_e` ids,
+		///         `0x4d9` and `0x4da`, and the key-index table `FUN_00897bd0` builds maps index `209` to `0x4d9` and
+		///         index `210` to `0x4da` and nothing else to either. So a type is variable-width iff its key list
+		///         contains 209 or 210.
 		///     </para>
-		///     ⚠️ `209` is the only key PROVEN to be text; the client reads a string for two `GameActionStat_e` ids
-		///     (`0x4d9`/`0x4da`, docs/re/gameactionlist-grammar.md) and which key indices those are is open work -
-		///     an unregistered kind in the same record (53044) also carries a string, under a key list we do not have.
+		///     <para>
+		///         The u16 is likewise the client's own string primitive (`FUN_0048f840` -> `FUN_00cbf840` mode 0,
+		///         which reads a u16 and treats `>= 0x8000` as an escape into a long form), and it is what the shipped
+		///         records measure - 653 of the 880 text-carrying elements in the feat and spell catalogs tile
+		///         EXACTLY under it. ⚠️ Six do not, all of them `HeadText`, which reads as `[u32 7]["Dimach\0"]`; that
+		///         is the open thread on #596. See <c>ItemTemplateStatModifiers.ParseElements</c>.
+		///     </para>
 		/// </summary>
-		public static readonly System.Collections.Generic.HashSet<int> TextKeys = [209];
+		public static readonly System.Collections.Generic.HashSet<int> TextKeys = [KeyEventString, KeyEventString2];
 
 		private static readonly Dictionary<uint, GameActionType> ById = new()
 		{

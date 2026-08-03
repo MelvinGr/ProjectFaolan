@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Faolan.Core.Extensions;
 
 namespace Faolan.Core.Rdb
@@ -93,30 +94,62 @@ namespace Faolan.Core.Rdb
 				// old fixed-10-word reader assumed, which is all any caller of the pair readers below ever used.
 				var type = GameActionTypes.Get(kind);
 
-				// A type with a TEXT slot is variable-width: that slot is `[u32 len][bytes]`, so every slot after it
-				// sits at an offset only a string-aware reader knows. Emit the element - it is real, and its position
-				// is what the width harvest measures - but with NO values, because a positional read past the string
-				// would report the string's LENGTH as a stat id and the bytes after it as a magnitude. That is where
-				// `SetMorphValue`'s mesh name was coming from. Reading them properly is Gitea #596.
-				if (type is { IsFixedWidth: false })
+				// The payload is walked SLOT BY SLOT rather than indexed, because a TEXT slot is `[u16 byteLength]
+				// [bytes]` and so shifts every slot after it - and by an ODD number of bytes, which is why a
+				// text-carrying element has no fixed width and why a positional read past one reported the string's
+				// LENGTH as the next slot's value (Gitea #596). `SetMorphValue`'s "mesh name after the element" was
+				// this slot all along.
+				//
+				// The u16 is the client's own string primitive: the GameAction deserializer `FUN_00899a60` takes the
+				// string branch for exactly `GameActionStat_e` 0x4d9/0x4da and calls `FUN_0048f840` -> `FUN_00cbf840`
+				// mode 0, which reads a u16 and treats >= 0x8000 as an escape into a long form. It is also what the
+				// shipped records measure: of the 880 text-carrying elements in the feat and spell catalogs, 653 tile
+				// EXACTLY under this reading (`--report feat-effect-kinds`), and the strings come out whole -
+				// "spell_curseofflies" as a 0x12-byte slot, "arm" as a 3-byte one, neither carrying a NUL.
+				//
+				// ⚠️ 6 elements do NOT - all of them `HeadText`, which reads as `[u32 7]["Dimach\0"][u32 3]` and tiles
+				// two bytes wider than the u16 form allows. Not modelled; it is the open thread on #596.
+				//
+				// An UNREGISTERED kind has no key list, so it keeps the two u32 slots the pair readers below need and
+				// nothing more.
+				var keys = type?.Keys ?? [GameActionTypes.KeyStat, GameActionTypes.KeyValue];
+				var values = new List<uint>(keys.Length);
+				var texts = new List<string?>(keys.Length);
+				var at = off + 24;
+				foreach (var key in keys)
 				{
-					elements.Add(new Element(off - 8, kind, []));
-					continue;
+					// Read as many slots as the body HOLDS, not as many as the key list wants. Where an element is
+					// followed by too few bytes for its full payload, dropping it would hide the one thing worth
+					// seeing: an element narrower than its type says (Gitea #595). It is still reported - with a
+					// short value array, so `Value(key)` returns null for the slots that are not there and every
+					// caller that needs a whole modifier rejects it on its own terms rather than on this scan's
+					// silence.
+					if (at + 4 > body.Length)
+						break;
+
+					if (!GameActionTypes.TextKeys.Contains(key))
+					{
+						values.Add(W(body, at));
+						texts.Add(null);
+						at += 4;
+						continue;
+					}
+
+					// A length that runs past the body is a mis-anchored element, not a long string: stop rather
+					// than resynchronise on bytes that are not this element's. `>= 0x8000` is the client's own
+					// escape into a long form, which no shipped template uses - so it is a mis-anchor here too.
+					var length = body.ReadU16Le(at);
+					if (length >= 0x8000 || at + 2 + length > body.Length)
+						break;
+
+					// Latin1, the wire's string encoding. The count does NOT include a terminator in any shipped
+					// record; the trim is there so one would not become part of the value if it ever did.
+					texts.Add(Encoding.Latin1.GetString(body.Slice(at + 2, length)).TrimEnd('\0'));
+					values.Add(length);
+					at += 2 + length;
 				}
 
-				var keys = type?.Keys.Length ?? 2;
-
-				// Read as many slots as the body HOLDS, not as many as the key list wants. Where an element is
-				// followed by too few bytes for its full payload, dropping it would hide the one thing worth seeing:
-				// an element narrower than its type says (Gitea #595). It is still reported - with a short value
-				// array, so `Value(key)` returns null for the slots that are not there and every caller that needs a
-				// whole modifier rejects it on its own terms rather than on this scan's silence.
-				var avail = Math.Clamp((body.Length - (off + 24)) / 4, 0, keys);
-				var values = new uint[avail];
-				for (var i = 0; i < avail; i++)
-					values[i] = W(body, off + 24 + 4 * i);
-
-				elements.Add(new Element(off - 8, kind, values));
+				elements.Add(new Element(off - 8, kind, [.. values], [.. texts], at - (off - 8)));
 			}
 
 			return elements;
@@ -206,16 +239,30 @@ namespace Faolan.Core.Rdb
 		///         (`--report feat-effect-widths`, Gitea #595).
 		///     </para>
 		/// </summary>
-		public readonly record struct Element(int Offset, uint Kind, uint[] Values)
+		public readonly record struct Element(int Offset, uint Kind, uint[] Values, string?[] Texts, int WidthBytes)
 		{
 			/// <summary>The registered type, or null when the kind is not a GameAction the client knows.</summary>
 			public GameActionType? Type => GameActionTypes.Get(Kind);
 
-			/// <summary>The value of the slot carrying <paramref name="key" />, or null when this type has no such slot.</summary>
+			/// <summary>
+			///     The value of the slot carrying <paramref name="key" />, or null when this type has no such slot.
+			///     A TEXT slot reports its BYTE LENGTH here, which is what is stored in the u32 - reach for
+			///     <see cref="Text" /> for the string itself.
+			/// </summary>
 			public uint? Value(int key)
 			{
 				var slot = Type?.SlotOf(key) ?? -1;
 				return slot >= 0 && slot < Values.Length ? Values[slot] : null;
+			}
+
+			/// <summary>
+			///     The string in the slot carrying <paramref name="key" />, or null when this type has no such slot
+			///     or that slot is not text (<see cref="GameActionTypes.TextKeys" />).
+			/// </summary>
+			public string? Text(int key)
+			{
+				var slot = Type?.SlotOf(key) ?? -1;
+				return slot >= 0 && slot < Texts.Length ? Texts[slot] : null;
 			}
 
 			// The pair view every caller predating the key lists used: the first two payload words. A one-key element
