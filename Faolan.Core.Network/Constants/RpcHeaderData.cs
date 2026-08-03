@@ -24,7 +24,9 @@ namespace Faolan.Core.Network.Constants
 	//
 	// ⚠️ **`0x01` is not a marker, a flag or a version** — it is a varint's second group. Measured over the whole
 	// capture corpus: 404,208 of 404,210 field-4 frames carry a well-formed varint whose first group is the opcode's
-	// low byte, the two misses being mis-framed packets on `GameInterface` at opcodes outside its 16-method range.
+	// low byte. The two misses are not counter-examples and not packets: both sit inside a desynced decompressed region
+	// of ONE capture (Strie_rogue-assassin_login) and fail an independent CRC recompute under every alignment, while a
+	// normal frame from the same stream matches exactly. Their `0x20A8`/`0x20A9` opcodes are coincidence.
 	// Three facts kill every per-packet reading, and all three fall out of the varint:
 	//   - it is ALWAYS exactly `0x01` (12,056 sightings, never `0x00`, never `0x02`);
 	//   - it is on 100% of the packets of any method that has it (5,917/5,917 pings, 5,689/5,689 pongs), so it is a
@@ -45,8 +47,8 @@ namespace Faolan.Core.Network.Constants
 		//
 		// Measured over the whole capture corpus (120 dumps, 419k RPC frames, the header tail grouped by
 		// (ReceiverClass, Opcode)): every frame on an index-registered class carries exactly `varint(index >> 7)`
-		// except the two mis-framed GameInterface packets already noted above, and every frame on these two classes
-		// carries `varint(registrationConstant >> 7)` for a method the client's own registration tables name.
+		// except the two CRC-invalid buffers already noted above, and every frame on these two classes carries
+		// `varint(registrationConstant >> 7)` for a method the client's own registration tables name.
 		private static readonly uint[] HashRegisteredReceivers = [Endpoints.PlayerAgentType, Endpoints.PlayerInterfaceType];
 
 		// The header data for a message, derived from the pair that fully determines it: the receiver's object CLASS

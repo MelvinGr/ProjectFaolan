@@ -45,8 +45,13 @@ list as a special case:
 
 Measured over the whole capture corpus (120 dumps, 419,300 frames): **404,208 of 404,210** field-4 frames carry a
 well-formed varint whose first group is the opcode's low byte, and the presence of a tail agrees with the
-continuation bit in **every** one. The two misses are mis-framed `GameInterface` packets at opcodes outside its
-16-method range [V3: RpcHeaderDataTests.HeaderData_IsTheMethodIndexHighBits].
+continuation bit in **every** one.
+
+The two misses are **not counter-examples, because neither is a packet.** Both sit inside a desynced decompressed
+region of one capture (`Strie_rogue-assassin_login`) and fail an independent CRC recompute under *every* alignment,
+while a normal frame from the same stream matches exactly; the surrounding buffer carries `DD DD DD` filler and a
+header length of `0xDDDDDDF2`. Their `0x20A8`/`0x20A9` opcodes are coincidence
+[V3: RpcHeaderDataTests.HeaderData_IsTheMethodIndexHighBits].
 
 ### Field 3: the method reference
 

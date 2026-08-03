@@ -22,9 +22,11 @@ Four checks, over every `*.tshark.json` in the data repo:
      to a method the client's own registration table names — read from Opcodes.cs, so nothing is asserted
      against a list of observed bytes.
 
-Anything printed under MISMATCH is a real counter-example. Over the current corpus there are exactly two, both
-in `Strie_rogue-assassin_login`: the mis-framed `GameInterface` packets at `0x20A8`/`0x20A9`, opcodes outside
-its 16-method range. Every one of the 23 methods on the hashed pair resolves, with none unregistered.
+Over the current corpus MISMATCH prints exactly two, both in `Strie_rogue-assassin_login` - and neither is a
+counter-example, because neither is a packet. Both sit inside a desynced decompressed region and FAIL an
+independent CRC recompute under every alignment (a normal frame from the same stream matches exactly), so their
+`0x20A8`/`0x20A9` opcodes are coincidence. Every one of the 23 methods on the hashed pair resolves, none
+unregistered.
 
 Usage:  tools/capture/decode_rpc_method_field.py [Captures/*.tshark.json ...]
 """

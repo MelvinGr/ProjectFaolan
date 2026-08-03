@@ -10,9 +10,9 @@ namespace Faolan.Tests
 	// method's registration constant >> 7, omitted when that is zero (Gitea #319/#320).
 	//
 	// For every interface except PlayerAgent/PlayerInterface the constant IS the method index, so the field is absent
-	// for methods 0-127 and exactly `0x01` for methods 128-255. Measured over the corpus: 402,111 of 402,113
-	// index-registered packets match, the two misses being mis-framed GameInterface packets at opcodes outside its
-	// 16-method range.
+	// for methods 0-127 and exactly `0x01` for methods 128-255. Measured over the corpus: 404,208 of 404,210 frames
+	// match. The two misses are not packets - they sit inside a desynced decompressed region of one capture and fail an
+	// independent CRC recompute under every alignment (#609).
 	public class RpcHeaderDataTests
 	{
 		// The boundary is what makes this a rule rather than a coincidence: 0x2080 is index 128 exactly, and it is the
@@ -95,7 +95,7 @@ namespace Faolan.Tests
 		}
 
 		// The receiver CLASS picks the registration scheme, which is the whole reason `For` takes it: the same opcode
-		// number means an index on 15 of the 17 classes and a per-connection registration slot on the other two. Rows
+		// number means a whole method index on 15 of the 17 classes and only the first varint group on the other two. Rows
 		// are one per class, taken from the corpus scan of all 120 dumps grouped by (ReceiverClass, Opcode).
 		[Theory, InlineData(Endpoints.GameCharInterfaceType, 0x2082, "01"), InlineData(Endpoints.GameCharInterfaceType, 0x206B, null), InlineData(Endpoints.CSPlayerInterfaceType, 0x20A5, "01"),
 		 InlineData(Endpoints.GameInterfaceType, 0x2000, null), InlineData(Endpoints.UniverseAgentType, 0x2001, null),
@@ -131,8 +131,8 @@ namespace Faolan.Tests
 		}
 
 		// An INBOUND frame keeps the tail it arrived with rather than being re-derived. Two reasons, and both are real:
-		// the corpus holds two mis-framed GameInterface packets whose tail contradicts the rule, and on PlayerAgent the
-		// opcode is only a per-connection registration index, so re-deriving would confidently rename the method.
+		// a corrupt or desynced buffer can carry a tail that contradicts the rule, and on PlayerAgent the opcode is only
+		// the method varint's first group, so re-deriving would confidently rename the message.
 		[Fact]
 		public void Parse_KeepsATailThatContradictsTheRule()
 		{

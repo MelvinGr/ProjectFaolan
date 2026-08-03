@@ -25,9 +25,9 @@ namespace Faolan.Core.Network.Protocol
 
 		// The header tail as literally given, when it is NOT the method id the (receiver class, opcode) pair implies.
 		// Two things set it, and nothing else should (Gitea #609):
-		//   - `Parse`, always, so an INBOUND frame re-serializes to the bytes it arrived as - including the handful of
-		//     mis-framed retail packets whose tail contradicts the rule. Null and empty are therefore distinct here:
-		//     null means "derive it", empty means "the wire had none".
+		//   - `Parse`, always, so an INBOUND frame re-serializes to the bytes it arrived as - including a corrupt or
+		//     desynced one whose tail contradicts the rule. Null and empty are therefore distinct here: null means
+		//     "derive it", empty means "the wire had none".
 		//   - the four login handoffs, which ride opcode `0x1A07`. That number is not an opcode: it is protobuf tag
 		//     `0x1A` (field 3, length-delimited) plus its length byte, so the "tail" is one more ProtoEndpoint followed
 		//     by the method field. PlayerAgentMethodIds.MethodReference builds it - see #610.
