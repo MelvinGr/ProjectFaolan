@@ -500,9 +500,10 @@ but its name is not recoverable from strings (catalog also missed it). These are
 
 **Corrected 2026-07 (verified against the wire + Ghidra; supersedes the earlier "hash not recovered" note).**
 
-Unlike every other interface, PlayerAgent/PlayerInterface carries **two** ids in its header:
-`[endpoints][u16 opcode][u32 method-id]`. That trailing `u32` is `Rpc.HeaderData` — **empty for all 16
-other interfaces**, and present only here. Confirmed on all 13 PlayerAgent/PlayerInterface packets (both
+Unlike every other interface, PlayerAgent/PlayerInterface looked like it carried **two** ids in its header:
+`[endpoints][u16 opcode][u32 method-id]`, with that trailing `u32` **empty for all 16 other interfaces** and present
+only here. ⚠️ Superseded by #610: the header carries ONE id, `method_instance` (a varint), and the "two" were that
+varint cut after its first group — long here because these constants are 32-bit hashes rather than small indices. Confirmed on all 13 PlayerAgent/PlayerInterface packets (both
 directions) of `Barbarian-login` — e.g. EnterWorld = opcode `0x20B6` + id `0xDD85FB0E`; RequestSmallCharList =
 `0x20C1` + `0xDAD1D206`. The server already emits it (`WriteHeader(..., InitAuth, [0x93,0x86,0xee,0x05])` =
 `0x9386ee05`). So the `//0x…`-style comments in `Opcodes.cs` are the **wire** id, not a client-internal value.

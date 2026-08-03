@@ -4,7 +4,7 @@
 > `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
-16 enums, 830 entries. The 32-bit IIR sub-opcodes carried inside a `0x2000` PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
+16 enums, 833 entries. The 32-bit IIR sub-opcodes carried inside a `0x2000` PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
 
 ## What is (and is not) verified here [V1]
 
@@ -870,17 +870,17 @@ RPC class **PlayerAgent** (id `0x82F20484`) · C2S (client→server call)
 
 | Opcode | Name | Note |
 |--------|------|------|
-| `0x2083` | `Authenticate` | id 0x01396596 |
-| `0x208E` | `FinishGetStartupData` | id 0x01BFB0A3 |
-| `0x209D` | `RequestDeleteCharacter` | id 0x01878B86 |
-| `0x209E` | `UnlockCharacter` | id 0x01386E1A |
-| `0x20A6` | `LoadFacebookToken` | id 0x01A720E0 |
-| `0x20B6` | `LoginCharacter` | id 0x01DEC2DD |
-| `0x20C1` | `GetStartupData` | id 0x00D4A8DA |
-| `0x20D6` | `VerifyLanguageSetting` | id 0x01308F5D |
-| `0x20DE` | `CreateCharacterWithData` | id 0x0194589C |
-| `0x20EC` | `ReceivedCharacterSettings` | id 0x0078F924 |
-| `0x20F5` | `UpdateSubscriptionSettings` | id 0x00A2D93D |
+| `0x2083` | `Authenticate` | method_instance 0x9CB2CB03 |
+| `0x208E` | `FinishGetStartupData` | method_instance 0xDFD8518E |
+| `0x209D` | `RequestDeleteCharacter` | method_instance 0xC3C5C31D |
+| `0x209E` | `UnlockCharacter` | method_instance 0x9C370D1E |
+| `0x20A6` | `LoadFacebookToken` | method_instance 0xD3907026 |
+| `0x20B6` | `LoginCharacter` | method_instance 0xEF616EB6 |
+| `0x20C1` | `GetStartupData` | method_instance 0x6A546D41 |
+| `0x20D6` | `VerifyLanguageSetting` | method_instance 0x9847AED6 |
+| `0x20DE` | `CreateCharacterWithData` | method_instance 0xCA2C4E5E |
+| `0x20EC` | `ReceivedCharacterSettings` | method_instance 0x3C7C926C |
+| `0x20F5` | `UpdateSubscriptionSettings` | method_instance 0x516C9EF5 |
 
 ## PlayerInterfaceOpcodes
 
@@ -888,16 +888,19 @@ RPC class **PlayerInterface** (id `0x7D155738`) · S2C (server→client dispatch
 
 | Opcode | Name | Note |
 |--------|------|------|
-| `0x1A07` | `OverrideGameTweaks` |  |
-| `0x208C` | `PlayerSetupComplete` | id 0x009F234B |
-| `0x2091` | `AuthenticateAck` | id 0x00BB8313 |
-| `0x2093` | `CharacterUnlocked` | id 0x00B9D2F2 |
-| `0x209C` | `OnFacebookTokenResult` | id 0x00A48A99 |
-| `0x20A5` | `SendCharacterSettingsCheckSumMap` | id 0x00181394 |
-| `0x20B9` | `SendCharacterSettings` | id 0x00466C0B |
-| `0x20CC` | `SetDimensionList` | id 0x01F13362 |
-| `0x20E5` | `SendCharacterPreview` | id 0x0040D6DD |
-| `0x20EF` | `UpdateClientPlayerData` | id 0x0188298B |
+| `0x208C` | `PlayerSetupComplete` | method_instance 0x4F91A58C |
+| `0x2091` | `AuthenticateAck` | method_instance 0x5DC18991 |
+| `0x2093` | `CharacterUnlocked` | method_instance 0x5CE97913 |
+| `0x209C` | `OnFacebookTokenResult` | method_instance 0x52454C9C |
+| `0x20A5` | `SendCharacterSettingsCheckSumMap` | method_instance 0x0C09CA25 |
+| `0x20B9` | `SendCharacterSettings` | method_instance 0x233605B9 |
+| `0x20CC` | `SetDimensionList` | method_instance 0xF899B14C |
+| `0x20E0` | `CSServerConnectReady` | method_instance 0x5AED2A60 |
+| `0x20E3` | `OverrideGameTweaks` | method_instance 0x7C47F763 |
+| `0x20E5` | `SendCharacterPreview` | method_instance 0x206B6EE5 |
+| `0x20EF` | `UpdateClientPlayerData` | method_instance 0xC414C5EF |
+| `0x20F9` | `LoginConnectReady` | method_instance 0xD8B66C79 |
+| `0x20FA` | `ChatServerConnectReady` | method_instance 0x23A632FA |
 
 ## TradepostAgentOpcodes
 

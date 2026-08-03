@@ -24,12 +24,12 @@ namespace Faolan.PlayerAgent
 
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
-			// Dispatch on the METHOD, not the opcode. On this interface pair the opcode is only the method varint's
+			// Dispatch on the METHOD, not the opcode. On this interface pair `Rpc.Opcode` is only the method varint's
 			// first group (`0x2080 | (constant & 0x7F)`), so two methods can share one - `0x20EC` is both
 			// ReceivedCharacterSettings and AuthenticateLoggedIn, `0x20D6` both VerifyLanguageSetting and
-			// UpdateCharacterPreview, and retail sends all four. Reassembling the varint is what tells them apart
-			// (#608); an opcode-keyed switch would read an 8-byte AuthenticateLoggedIn as a no-arg ack.
-			var method = (PlayerAgentMethods)RpcHeaderData.MethodConstant(packet.Opcode, packet.HeaderData.Span);
+			// UpdateCharacterPreview, and retail sends all four. The whole varint is what tells them apart (#608); an
+			// opcode-keyed switch would read an 8-byte AuthenticateLoggedIn as a no-arg ack.
+			var method = (PlayerAgentMethods)packet.Method;
 			LogPacketReceived(packet);
 
 			var body = packet.BodyReader();
@@ -47,7 +47,7 @@ namespace Faolan.PlayerAgent
 					client.Session.Account.AuthStatus = body.ReadUInt32();
 					await Database.SaveAccount(client.Session.Account);
 
-					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceOpcodes.AuthenticateAck, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
+					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceMethods.AuthenticateAck, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
 
 					break;
 				}
@@ -66,7 +66,7 @@ namespace Faolan.PlayerAgent
 
 					Logger.LogDebug("AuthenticateLoggedIn: account {AccountId:X8} re-attaching a settings connection.", resume.AccountId);
 
-					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceOpcodes.AuthenticateAck, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
+					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceMethods.AuthenticateAck, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
 
 					break;
 				}
@@ -154,7 +154,7 @@ namespace Faolan.PlayerAgent
 					await SendCharacterList(client, packet.Sender);
 					await SendRealmList(client, packet.Sender);
 
-					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceOpcodes.PlayerSetupComplete, b => b.WriteUInt32(1)));
+					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceMethods.PlayerSetupComplete, b => b.WriteUInt32(1)));
 
 					break;
 				}
@@ -162,7 +162,7 @@ namespace Faolan.PlayerAgent
 				case PlayerAgentMethods.LoadFacebookToken:
 				{
 					// headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
-					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceOpcodes.OnFacebookTokenResult, b => b.WriteUInt16(0).WriteByte(0)));
+					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceMethods.OnFacebookTokenResult, b => b.WriteUInt16(0).WriteByte(0)));
 
 					break;
 				}
@@ -240,10 +240,10 @@ namespace Faolan.PlayerAgent
 					await SendGameServer(client, packet.Sender);
 
 					// OverrideGameTweaks: the 19 dynamic game tweaks the client applies on login. The named-tweak set and
-					// its wire format are GameTweaksCodec's (#530 wave 7). Opcode 0x1A07 names no method by itself - the
-					// header tail does, as a full method reference (#609), so this send says which of the four it is.
-					await client.SendAsync(new Rpc(ServiceConnectionSender, packet.Sender, PlayerInterfaceOpcodes.OverrideGameTweaks,
-						GameTweaksCodec.Build(GameTweakSets.Defaults())) { HeaderDataOverride = PlayerAgentMethodIds.MethodReference(PlayerInterfaceMethods.OverrideGameTweaks) });
+					// its wire format are GameTweaksCodec's (#530 wave 7). Like the three handoffs above it addresses
+					// the ServiceConnection and restates PlayerInterface#1 as the routing context (#610).
+					await client.SendAsync(new Rpc(ServiceConnectionSender, packet.Sender, PlayerInterfaceMethods.OverrideGameTweaks,
+						GameTweaksCodec.Build(GameTweakSets.Defaults())) { RoutingContext = PlayerInterfaceRoutingContext });
 
 					break;
 				}

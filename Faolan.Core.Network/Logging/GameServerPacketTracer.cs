@@ -4,10 +4,6 @@ using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
-// CS8620 here is a Roslyn false positive: passing (string, ReadOnlyMemory<byte>) tuples to the params tuple-array on the
-// LogPacketWithSubOpcode extension member trips a nullability-inference bug even when the argument and parameter tuple
-// types are identical (verified). The values are non-null - suppress it (see PacketLogFormatter).
-#pragma warning disable CS8620
 
 namespace Faolan.Core.Network.Logging
 {
@@ -29,7 +25,7 @@ namespace Faolan.Core.Network.Logging
 			}
 
 			Logger.LogPacketWithSubOpcode(direction, ChannelName, opcodeName, PacketLogFormatter.OpcodeName(typeof(IirTypes), iir), payloadLength, rpc.Body.Length, rpc.FrameLength,
-				("headerData", rpc.HeaderData), ("body", rpc.Body));
+				rpc.Body);
 		}
 
 		// A PassBlob carrier's body starts [u32 payloadLength][u32 iirType]. Gated on the receiver CLASS as well as the

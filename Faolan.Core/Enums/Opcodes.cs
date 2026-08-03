@@ -848,8 +848,7 @@ namespace Faolan.Core.Enums
 	// complete interface.
 	//
 	// These are the SOURCE the wire encoding is derived from, not a parallel catalog: the RPC header's method field is
-	// `varint(constant)`, which the codebase splits into a 16-bit `Opcode` and a trailing tail (see `RpcHeaderData`).
-	// `PlayerAgentMethodIds` reads these enums for both directions of that.
+	// `varint(constant)`, which `Rpc` writes whole. `PlayerAgentMethodIds` reads these enums for both directions of that.
 	public enum PlayerAgentMethods : uint
 	{
 		Authenticate = 0x9CB2CB03,
@@ -910,8 +909,8 @@ namespace Faolan.Core.Enums
 	}
 
 	// PlayerAgent (c2s) / PlayerInterface (s2c) is the ONE interface pair whose methods are registered by 32-bit HASH
-	// rather than by index, so its RPC header method field is a 4-5 group varint and the codebase's `[u16 opcode][tail]`
-	// split cuts it after the first group (`RpcHeaderData`, Gitea #319/#320/#610).
+	// rather than by index, so its RPC header method field is a 4-5 group varint and `Rpc.Opcode` - the tag byte plus
+	// that varint's first group - names it only partly (Gitea #319/#320/#610).
 	//
 	// ⚠️ **The opcode is NOT a method key here.** It is `0x2080 | (constant & 0x7F)`, so two methods whose constants
 	// share their low 7 bits share an opcode: `0x20EC` is BOTH `ReceivedCharacterSettings` and `AuthenticateLoggedIn`,
@@ -948,9 +947,6 @@ namespace Faolan.Core.Enums
 	// registration table; each one that changed is noted, because the old name is what the rest of the tree called it.
 	public enum PlayerInterfaceOpcodes : ushort
 	{
-		// The one genuine exception to the varint id: it rides the ServiceConnection endpoint with a 13-byte protobuf
-		// endpoint reference in place of a method id, and its call site passes that verbatim.
-		OverrideGameTweaks = 0x1A07,
 		PlayerSetupComplete = 0x208C,      // was "SendCharacterRealmData"
 		AuthenticateAck = 0x2091,          // was "InitAuth"
 		CharacterUnlocked = 0x2093,        // was "Ox2093" - the reply to c2s UnlockCharacter (0x209E)
@@ -959,7 +955,17 @@ namespace Faolan.Core.Enums
 		SendCharacterSettings = 0x20B9,    // was "Ox20B9"
 		SetDimensionList = 0x20CC,         // was "SendRealmList" (a dimension IS a realm)
 		SendCharacterPreview = 0x20E5,     // was "Ox20E5"
-		UpdateClientPlayerData = 0x20EF    // was "SendCharacterList"
+		UpdateClientPlayerData = 0x20EF,   // was "SendCharacterList"
+
+		// The four login handoffs. These four used to share one invented opcode `0x1A07` - which is not an opcode at
+		// all, but RpcHeader field 3's tag plus its length byte, the method varint sitting behind it (#610). Decoded,
+		// they are four ordinary methods that additionally carry a full_routing_context, and their opcodes are the
+		// ordinary view of their constants. The server names the METHOD when it sends them (Rpc takes
+		// PlayerInterfaceMethods); these members exist so the trace and the generated docs can name the frames.
+		CSServerConnectReady = 0x20E0,
+		OverrideGameTweaks = 0x20E3,
+		LoginConnectReady = 0x20F9,
+		ChatServerConnectReady = 0x20FA
 	}
 
 	// UniverseAgent client->server: matches the recovered table exactly (3 methods).

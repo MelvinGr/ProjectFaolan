@@ -3,10 +3,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Network.Packets.ChatServer;
 using Microsoft.Extensions.Logging;
 
-// CS8620 here is a Roslyn false positive: passing (string, ReadOnlyMemory<byte>) tuples to the params tuple-array on the
-// LogPacket/LogUnknownPacket extension members trips a nullability-inference bug even when the argument and parameter
-// tuple types are identical (verified). The values are non-null - suppress it (see PacketLogFormatter).
-#pragma warning disable CS8620
 
 namespace Faolan.Core.Network.Logging
 {
@@ -26,7 +22,7 @@ namespace Faolan.Core.Network.Logging
 		{
 			var packet = ChatServerMessage.Parse(frame);
 			Logger.LogPacket(PacketLogFormatter.Transmitted, ChannelName, PacketLogFormatter.OpcodeName(typeof(ChatServerInterfaceOpcodes), packet.Opcode), packet.Body.Length, packet.FrameLength,
-				("body", packet.Body));
+				packet.Body);
 		}
 
 		// Inbound (RX): the listener dispatched this parsed frame.
@@ -35,7 +31,7 @@ namespace Faolan.Core.Network.Logging
 			try
 			{
 				Logger.LogPacket(PacketLogFormatter.Received, ChannelName, PacketLogFormatter.OpcodeName(typeof(ChatServerOpcodes), packet.Opcode), packet.Body.Length, packet.FrameLength,
-					("body", packet.Body));
+					packet.Body);
 			}
 			catch (Exception ex)
 			{
@@ -48,7 +44,7 @@ namespace Faolan.Core.Network.Logging
 		{
 			try
 			{
-				Logger.LogUnknownPacket(ChannelName, PacketLogFormatter.OpcodeName(typeof(ChatServerOpcodes), packet.Opcode), packet.Body.Length, packet.FrameLength, ("body", packet.Body));
+				Logger.LogUnknownPacket(ChannelName, PacketLogFormatter.OpcodeName(typeof(ChatServerOpcodes), packet.Opcode), packet.Body.Length, packet.FrameLength, packet.Body);
 			}
 			catch (Exception ex)
 			{

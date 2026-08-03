@@ -142,8 +142,9 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x2092 DispatchPvPMatchMakingInfoRequestReturn: PvP matchmaking info (answer to 0x2054
 		// PvPMatchMakingRequestInfo). Retail's "not queued" body is [0x3F1][u32 0] (byte-exact from the login capture);
-		// the header's trailing byte is DERIVED (RpcHeaderData): this method's index is 0x92 = 146, and any index
-		// >= 128 carries varint(index >> 7) = 0x01. It is not a per-message constant (#319).
+		// the header's trailing byte is not a field at all: this method's index is 0x92 = 146, and `method_instance` is
+		// a varint, so any index >= 128 needs a second group - which is that `0x01`. It is not a per-message constant
+		// (#319/#610), and `Rpc` writes it without the call site knowing.
 		private static Task SendPvpMatchMakingInfo(INetworkClient client, Rpc packet)
 		{
 			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn, b => b

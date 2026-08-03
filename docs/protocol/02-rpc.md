@@ -15,7 +15,18 @@ Immediately after the packet's `[length][crc32][hdrlen]` head, and inside `hdrle
 
 Every byte of it is protobuf. `0x0A` and `0x12` are field tags 1 and 2, length-delimited; `0x20` is field tag 4,
 varint, and its value is the method's **32-bit registration constant, whole**
-[V3: RpcHeaderDataTests.TheOpcodeIsTheMethodVarint].
+[V3: RpcHeaderTests.TheOpcodeIsTheMethodVarint].
+
+The client's own schema (`Faolan.Core/Protobuf/aoc-client-protos.proto`, extracted from the client) names all five
+fields, and `Rpc` is written field-for-field against it:
+
+| # | tag | schema | `Rpc` |
+|---|-----|--------|-------|
+| 1 | `0x0A` | `required ProtoEndpoint caller_id` | `Sender` |
+| 2 | `0x12` | `required ProtoEndpoint endpoint_id` | `Receiver` |
+| 3 | `0x1A` | `repeated ProtoEndpoint full_routing_context` | `RoutingContext` |
+| 4 | `0x20` | `required uint32 method_instance` | `Method` |
+| 5 | `0x2A` | `repeated ProtoEndpoint routing_destination` | — (no captured frame carries it) |
 
 ### What used to be read as `[u16 opcode][headerData]`
 
@@ -51,9 +62,9 @@ The two misses are **not counter-examples, because neither is a packet.** Both s
 region of one capture (`Strie_rogue-assassin_login`) and fail an independent CRC recompute under *every* alignment,
 while a normal frame from the same stream matches exactly; the surrounding buffer carries `DD DD DD` filler and a
 header length of `0xDDDDDDF2`. Their `0x20A8`/`0x20A9` opcodes are coincidence
-[V3: RpcHeaderDataTests.HeaderData_IsTheMethodIndexHighBits].
+[V3: RpcHeaderTests.TheContinuationGroupAppearsAtMethod128].
 
-### Field 3: the method reference
+### Field 3: `full_routing_context`
 
 472 frames carry an extra field *before* the method — tag `0x1A`, field 3, length-delimited, holding one more
 `ProtoEndpoint`:
@@ -66,20 +77,31 @@ These are the four login handoffs, and the old reading called all four "opcode `
 with an opaque 13-byte session blob" — `0x1A07` being the field-3 tag plus its length byte, and the "blob" being
 the endpoint plus the method varint. Decoded, the four are `ChatServerConnectReady`, `CSServerConnectReady`,
 `LoginConnectReady` and `OverrideGameTweaks` (118 sightings each) — exactly the four the login handoff sends, in
-the order it sends them [V3: PlayerAgentMethodIdsTests.MethodReference_ReproducesTheCapturedHandoffTails].
+the order it sends them [V3: RpcHeaderTests.TheLoginHandoffs_ReproduceTheCapturedHeaders]. They address the
+ServiceConnection, so the routing context restates the `PlayerInterface` object the method fires on — instance 1
+in every captured frame.
 
 ### The implementation
 
-`RpcHeaderData` and `PlayerAgentMethodIds` are the only implementation; no call site hand-rolls a header tail, and
-none supplies one either — `Rpc` derives it from `(receiver class, opcode)`, which is all the identity there is
-[V3: RpcHeaderDataTests.ASendSuppliesNothing_AndStillCarriesTheByte]. The code still splits the varint into an
-`Opcode` and a derived tail, matching the shape the enums and the dissector are written against; the split is
-byte-identical either way. Folding it back into one varint field is Gitea #610.
+`Rpc` (`Faolan.Core.Network/Protocol/Rpc.cs`) carries `Method` and writes it whole; there is no `Opcode` field and
+no header tail, so nothing can supply one and nothing has to remember to
+[V3: RpcHeaderTests.ASendCarriesTheWholeMethodVarint]. `Rpc.Opcode` survives as a derived **view** — the tag byte
+plus the varint's first group — because the 16 opcode enums and the dissector are written that way, and because on
+the 15 index-registered classes it is the method index exactly. On the hash-registered pair it is lossy and must
+never be used as identity: dispatch and the packet trace both key on `Method` there (#608).
 
-⚠️ The asymmetry is worth knowing when reading old sends: an **extra** tail byte is harmless (the varint ends at
-the first group without a continuation bit, and the stray byte is inside the header's own length, so the body is
+The header is read **strictly**: an unknown tag, a repeated singular field or a missing required one throws
+`InvalidDataException` at the frame boundary, which the receive loop logs against the peer and disconnects. That is
+affordable only because `Method` holds the whole identity — re-serializing a parsed frame reproduces it byte for
+byte, which is what the old opaque tail was buying
+[V3: RpcHeaderTests.EveryCapturedFrame_ParsesStrictlyAndReSerializes]. `Rpc.cs` records why the header is written
+by hand rather than through the generated `RpcHeader` contract.
+
+⚠️ The asymmetry is worth knowing when reading pre-#610 sends: an **extra** tail byte was harmless (the varint ends
+at the first group without a continuation bit, and the stray byte is inside the header's own length, so the body is
 unaffected), while a **missing** one truncates a varint mid-continuation. That is why a spurious `0x01` on the
-trade replies went unnoticed for so long, and why omitting one on a ping would not have.
+trade replies went unnoticed for so long, and why omitting one on a ping would not have. Both are now unrepresentable
+— and both are rejected on the way in.
 
 ## ProtoEndpoint
 

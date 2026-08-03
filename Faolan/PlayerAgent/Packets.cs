@@ -20,6 +20,11 @@ namespace Faolan.PlayerAgent
 		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(Endpoints.PlayerAgentType, 0x02);
 		private static readonly ProtoEndpoint ServiceConnectionSender = Endpoints.Endpoint(Endpoints.PlayerAgentServiceConnectionType, 0x08);
 
+		// `full_routing_context` (RpcHeader field 3) for the four login handoffs: they are addressed to the
+		// ServiceConnection, so they restate the PlayerInterface object the method actually fires on. Constant across
+		// all 472 captured frames - instance 1, never the character or account id (#610).
+		private static readonly ProtoEndpoint PlayerInterfaceRoutingContext = Endpoints.Endpoint(Endpoints.PlayerInterfaceType, 0x01);
+
 		// The active character's realm - the routing target for the world/chat/guild handoffs (#324). Every service
 		// the client is about to connect to lives IN that realm's process, so all three handoffs advertise this realm's
 		// address, not the process-global config. Resolved from the selected character (ClientInstance is set at EnterWorld).
@@ -119,33 +124,33 @@ namespace Faolan.PlayerAgent
 			body.WriteUInt32(0x00000000);
 			body.WriteUInt32(0x00000001);
 
-			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.UpdateClientPlayerData, body.ToArray()));
+			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceMethods.UpdateClientPlayerData, body.ToArray()));
 		}
 
 		private async Task SendChatServer(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var realm = await ResolveActiveRealm(client);
-			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
+			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceMethods.ChatServerConnectReady,
 				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.ChatServerPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id))
 			{
-				HeaderDataOverride = PlayerAgentMethodIds.MethodReference(PlayerInterfaceMethods.ChatServerConnectReady)
+				RoutingContext = PlayerInterfaceRoutingContext
 			});
 		}
 
 		private async Task SendCsPlayerAgent(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var realm = await ResolveActiveRealm(client);
-			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
+			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceMethods.CSServerConnectReady,
 				b => b.WriteUInt32(realm.IpAddressLong).WriteUInt16(realm.CsPlayerAgentPort).WriteUInt32(client.Session.Account.Id).WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id))
 			{
-				HeaderDataOverride = PlayerAgentMethodIds.MethodReference(PlayerInterfaceMethods.CSServerConnectReady)
+				RoutingContext = PlayerInterfaceRoutingContext
 			});
 		}
 
 		private async Task SendGameServer(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var realm = await ResolveActiveRealm(client);
-			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceOpcodes.OverrideGameTweaks,
+			await client.SendAsync(new Rpc(ServiceConnectionSender, receiver, PlayerInterfaceMethods.LoginConnectReady,
 				b => b
 					.WriteString($"{realm.IpAddress}:{realm.Port}")
 					.WriteUInt32(client.Session.Account.Id)
@@ -155,7 +160,7 @@ namespace Faolan.PlayerAgent
 					.WriteUInt32(client.Session.Character.Id)
 					.WriteArray(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x9C, 0x50, 0x01, 0xC9, 0x43, 0xC1, 0x00))
 			{
-				HeaderDataOverride = PlayerAgentMethodIds.MethodReference(PlayerInterfaceMethods.LoginConnectReady)
+				RoutingContext = PlayerInterfaceRoutingContext
 			});
 		}
 
@@ -163,7 +168,7 @@ namespace Faolan.PlayerAgent
 		{
 			var realms = await Database.GetRealms();
 
-			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SetDimensionList, b =>
+			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceMethods.SetDimensionList, b =>
 			{
 				b.WriteUInt32(realms.Length);
 				foreach (var realm in realms)
@@ -201,10 +206,10 @@ namespace Faolan.PlayerAgent
 			foreach (var character in characters)
 			{
 				if (stored.TryGetValue(character.Id, out var row) && row.Preview is { Length: > 0 } preview)
-					await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterPreview, SendCharacterPreviewCodec.Build(new CharacterPreview(character.Id, ClientSettingsBufferCodec.Parse(preview)))));
+					await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceMethods.SendCharacterPreview, SendCharacterPreviewCodec.Build(new CharacterPreview(character.Id, ClientSettingsBufferCodec.Parse(preview)))));
 			}
 
-			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterSettingsCheckSumMap,
+			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceMethods.SendCharacterSettingsCheckSumMap,
 				SendCharacterSettingsCheckSumMapCodec.Build(new CharacterSettingsCheckSumMap([
 					..characters.Select(c => new CharacterSettingsCheckSum(c.Id, CheckSumOf(stored.GetValueOrDefault(c.Id)?.Settings)))
 				]))));
@@ -242,7 +247,7 @@ namespace Faolan.PlayerAgent
 			var stored = (await Database.GetCharacterClientSettings(characterId))?.Settings;
 			var buffer = stored is { Length: > 0 } ? ClientSettingsBufferCodec.Parse(stored) : ClientSettingsBuffer.Empty;
 
-			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterSettings, SendCharacterSettingsCodec.Build(new CharacterSettings(characterId, buffer))));
+			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceMethods.SendCharacterSettings, SendCharacterSettingsCodec.Build(new CharacterSettings(characterId, buffer))));
 		}
 	}
 }

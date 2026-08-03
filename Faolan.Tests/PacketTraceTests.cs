@@ -119,16 +119,18 @@ namespace Faolan.Tests
 				tracer.Transmitted(Sent(rpc, wire));
 				var line = Assert.Single(capture.Messages);
 
-				// The rendered line must carry the frame's real fields (opcode, lengths, the header/body hex), each read
-				// from the independently-parsed packet - never from the Rpc the render used.
-				Assert.Contains(parsed.Opcode.ToHex(), line);
+				// The rendered line must carry the frame's real fields (its identity, lengths, the body hex), each read
+				// from the independently-parsed packet - never from the Rpc the render used. The identity is the METHOD
+				// on the two hash-registered classes, where the opcode carries only 7 of its 32 bits and would name the
+				// wrong one of a colliding pair (#608/#610), and the opcode everywhere else.
+				var identity = parsed.Receiver.Type is Endpoints.PlayerAgentType or Endpoints.PlayerInterfaceType
+					? parsed.Method.ToHex()
+					: parsed.Opcode.ToHex();
+				Assert.Contains(identity, line);
 				Assert.Contains($"bodyLength={parsed.Body.Length}", line);
 				Assert.Contains($"packetLength={wire.Length}", line);
 				if (parsed.Body.Length > 0)
 					Assert.Contains(parsed.Body.ToHex(), line);
-
-				if (parsed.HeaderData.Length > 0)
-					Assert.Contains(parsed.HeaderData.ToHex(), line);
 			});
 		}
 
@@ -148,8 +150,13 @@ namespace Faolan.Tests
 					(byte[])[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00, 0x00, 0x01])
 			];
 
-			// A carrier that also carries interface HeaderData after the opcode.
-			yield return [new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob, (byte[])[0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44]) { HeaderDataOverride = (byte[])[0xDE, 0xAD, 0xBE, 0xEF] }];
+			// A frame on the hash-registered pair, whose method needs five varint groups and whose opcode names it only
+			// partly - the line has to come off the METHOD there, not the opcode (#608/#610).
+			yield return
+			[
+				new Rpc(Endpoints.Endpoint(Endpoints.PlayerAgentType, 0x02), Endpoints.Endpoint(Endpoints.PlayerInterfaceType, 0x01), PlayerInterfaceMethods.AuthenticateAck,
+					(byte[])[0x00, 0x00, 0x00, 0x01])
+			];
 
 			// An empty-body carrier.
 			yield return [new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob, ReadOnlyMemory<byte>.Empty)];

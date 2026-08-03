@@ -236,8 +236,10 @@ Still to do: the trade and friend HANDLERS (the codecs and their byte-exact gate
 
 Verified in-client 2026-07-25: invite, accept, leave and kick all work.
 
-**The reply carries a trailing header byte.** `DispatchReplyTeamInvite` (`0x209F`) goes out with `headerData` `0x01`,
-the same RpcHeader tail `KeepAliveService`'s `DispatchPong` puts on this interface. Retail carries it on both the
+**The reply carries a trailing header byte.** `DispatchReplyTeamInvite` (`0x209F`) goes out with a trailing `0x01`,
+the same byte `KeepAliveService`'s `DispatchPong` puts on this interface. It is not a field of its own: method 0x9F
+is >= 128, so `method_instance` needs a second varint group and that group is the byte
+([`02-rpc.md`](../protocol/02-rpc.md) — it is written automatically now, see #610). Retail carries it on both the
 request and the reply (`f682`, `f683`) while the CS-tier invite dispatches carry none — which is why the invite itself
 was always accepted. Without it the client **discards the reply**, and since the reply is what raises the window, the
 symptom is: the client takes the invite, echoes it back in `RequestTeamInvite`, and nothing happens. Replaying

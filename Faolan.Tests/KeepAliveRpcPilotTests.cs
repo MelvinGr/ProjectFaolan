@@ -27,7 +27,7 @@ namespace Faolan.Tests
 
 			// Stimulus: an inbound LatencyCheck whose body starts with the counter the reply must echo. Parsed straight
 			// into the Rpc the receive path now dispatches on (Gitea #407).
-			var incoming = Rpc.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance, (ushort)GameCharInterfaceOpcodes.DispatchPong, [],
+			var incoming = Rpc.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance, (ushort)GameCharInterfaceOpcodes.DispatchPong,
 				[0x00, 0x00, 0x00, 0x07]));
 
 			await KeepAliveService.HandleLatencyCheck(client, incoming, incoming.BodyReader());
@@ -40,7 +40,9 @@ namespace Faolan.Tests
 			Assert.Equal(Endpoints.GameCharInterfaceType, pong.Receiver.Type);
 			Assert.Equal(Instance, pong.Receiver.Instance);
 			Assert.Equal((ushort)GameCharInterfaceOpcodes.DispatchPong, pong.Opcode);
-			Assert.Equal(new byte[] { 0x01 }, pong.HeaderData.ToArray());
+			// The method is 0x82 = 130, so its varint needs a second group - the byte that used to be hand-passed as a
+			// "headerData" tail and is now simply part of the method field (#610).
+			Assert.Equal((uint)GameCharInterfaceOpcodes.DispatchPong - 0x2000u, pong.Method);
 			var body = pong.BodyReader();
 			Assert.Equal(counter, body.ReadUInt32());
 
@@ -124,9 +126,9 @@ namespace Faolan.Tests
 			metrics.RecordTick(0.001);
 		}
 
-		private static byte[] BuildFrame(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, ushort opcode, byte[] headerData, byte[] body)
+		private static byte[] BuildFrame(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, ushort opcode, byte[] body)
 		{
-			return new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, body) { HeaderDataOverride = headerData }.Serialize();
+			return new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, body).Serialize();
 		}
 
 		private static CapturingClient ClientAt(uint characterId)

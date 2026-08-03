@@ -36,6 +36,15 @@ namespace Faolan.Core.Network.Protocol
 			[Endpoints.CSPlayerInterfaceType] = typeof(CSPlayerInterfaceOpcodes)
 		};
 
+		// The two classes that register their methods by 32-bit HASH rather than by index. `Rpc.Opcode` carries only 7
+		// of those bits, so it cannot name a method here - `0x20EC` is both ReceivedCharacterSettings and
+		// AuthenticateLoggedIn (#608) - and a frame on one of these is named from Rpc.Method instead.
+		private static readonly IReadOnlyDictionary<uint, Type> MethodEnumsByReceiverType = new Dictionary<uint, Type>
+		{
+			[Endpoints.PlayerAgentType] = typeof(PlayerAgentMethods),
+			[Endpoints.PlayerInterfaceType] = typeof(PlayerInterfaceMethods)
+		};
+
 		// The opcode enum for a given receiver-type hash, but only when that enum actually DEFINES the opcode; else null
 		// so the caller falls back to its own default/expected enum. Both conditions matter: a receiver type we don't
 		// map, and an opcode the mapped enum doesn't carry, are equally "not resolvable here". Used by the DL logger's
@@ -55,6 +64,16 @@ namespace Faolan.Core.Network.Protocol
 		// classes, which the server addresses on the way OUT. Pass it only for a direction whose class family the enum
 		// actually belongs to: an opcode is a method INDEX, so naming an inbound (c2s) method out of an s2c interface
 		// enum would confidently print the WRONG method. That is why the RX side passes none and renders "Unknown".
+		// The name for a whole frame - what the packet trace calls it. Identical to the (receiver class, opcode) form
+		// below except on the two hash-registered classes, where the method constant is the identity and the opcode is
+		// only its first 7 bits.
+		public static string ResolveName(in Rpc rpc, Type? fallbackEnum = null)
+		{
+			return MethodEnumsByReceiverType.TryGetValue(rpc.Receiver.Type, out var methodEnum) && Enum.IsDefined(methodEnum, rpc.Method)
+				? $"{Enum.GetName(methodEnum, rpc.Method)} ({rpc.Method.ToHex()})"
+				: ResolveName(rpc.Receiver.Type, rpc.Opcode, fallbackEnum);
+		}
+
 		public static string ResolveName(uint receiverType, ushort opcode, Type? fallbackEnum = null)
 		{
 			var enumType = OpcodeEnumFor(receiverType, opcode) ?? (fallbackEnum is not null && Enum.IsDefined(fallbackEnum, opcode)
