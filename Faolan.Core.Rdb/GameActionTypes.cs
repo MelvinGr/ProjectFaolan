@@ -69,15 +69,47 @@ namespace Faolan.Core.Rdb
 		// through `KeyAmount` compiles to the same thing and reads as the wrong unit.
 		public const int KeyHighValue = KeyAmount;
 
-		// `UpgradeCombo` (53209): the combo it upgrades, and the two axes it can move. The client leaves 66/67
-		// unnamed in its descriptor, but its own item-tooltip builder `FUN_0149e450` names them by RENDERING them -
-		// it reads GameActionStat_e 0x315/0x316 (= key 66/67 through the key-index table) and branches on each
-		// value's SIGN to pick between the localised `UpgradeCombo_IncreaseDamage`/`_DecreaseDamage` and
-		// `UpgradeCombo_IncreaseCooldown`/`_DecreaseCooldown` strings. Both are SIGNED hundredths of a percent
-		// (rendered `× 0.01` with a `%` suffix). See docs/re/gameactionlist-grammar.md.
-		public const int KeyCombo = 187;
-		public const int KeyComboDamage = 66;
-		public const int KeyComboCooldown = 67;
+		// ⚠️ THE KEYS BELOW ARE PER-TYPE, unlike the ones above. A key index the client NAMES (0 `Stat`, 39 `Value`,
+		// 88 `Spell`, 175 `Amount`) means the same thing on every type that carries it - that is what makes a name
+		// transfer BY KEY. An UNNAMED one carries no such promise, and the catalog proves it does not hold:
+		//
+		//   key 187  a per-SPELL target on `ChangeRecastTime` (53031) and `ChangeHitPercent` (53030) - the slot their
+		//            `...Line...` twins fill with KeyLine - but a per-COMBO target on `UpgradeCombo` (53209).
+		//   key 66   the combo's damage delta on `UpgradeCombo`, a follower SCRIPT GROUP on `SetFollowerScriptGroup`
+		//            (53024), and the proc's incoming/outgoing DIRECTION on the `AddProc` family - the tooltip
+		//            compares it to 1 to pick `AddProcGettingHit` over `AddProcOnHit`.
+		//   key 67   the combo's reuse-time delta on `UpgradeCombo`, and something else again on
+		//            `ChangeInheritedWeaponAttack` (53250), where `Desecrated Blood` carries 100 under a description
+		//            about a spell's "chance to trigger".
+		//
+		// So these names are read as `<Type>_<slot>` and are only valid inside the parser for that type. Naming an
+		// unnamed key globally is how a decode gets exported to a type it was never checked against.
+		//
+		// `UpgradeCombo` (53209): the combo it upgrades plus the two axes it moves. Named from the client's own
+		// item-tooltip builder `FUN_0149e450`, which reads GameActionStat_e 0x315/0x316 (= key 66/67 through the
+		// key-index table) and branches on each value's SIGN to pick between the localised
+		// `UpgradeCombo_IncreaseDamage`/`_DecreaseDamage` and `UpgradeCombo_IncreaseCooldown`/`_DecreaseCooldown`
+		// strings. Both are SIGNED hundredths of a percent (rendered `× 0.01` with a `%` suffix).
+		// See docs/re/gameactionlist-grammar.md.
+		public const int KeyUpgradeComboTarget = 187;
+		public const int KeyUpgradeComboDamage = 66;
+		public const int KeyUpgradeComboCooldown = 67;
+
+		// The PROC family - `AddComboProc` (53212, `[88, 236, 187 combo, 117, 237]`) and `AddSpellLineProc` (53070,
+		// `[88, 236, 1 line, 117, 237, 73]`). The same tooltip builder settles the two spell slots: it tests key 88
+		// and key 236 for a valid spell independently and renders `AddComboProcSelf` when only 88 is set,
+		// `AddComboProcOther` when only 236 is, and `AddComboProcBoth` when both are - so 88 is the spell the proc
+		// puts on the CASTER and 236 the one it puts on the TARGET. 117 is the trigger kind (the `AddProc` branch
+		// dispatches the Hit / Damage / SpellDamage string family on it) and 237 the magnitude it renders last.
+		// `ChangeHitPercent` (53030): the per-SPELL twin of `ChangeLineHitPercent` (53075), which carries its target
+		// in KeyLine. 238 of the 240 distinct references resolve against Spells.Id.
+		public const int KeySpellHitPercentTarget = 187;
+
+		public const int KeyProcSelfSpell = KeySpell;
+		public const int KeyProcTargetSpell = 236;
+		public const int KeyProcTrigger = 117;
+		public const int KeyProcAmount = 237;
+		public const int KeyProcComboTarget = 187;
 
 		// The TEXT slots (see <see cref="TextKeys" />). 209 is the one every string-carrying type uses; 210 is the
 		// second string on `GenerateName` and `NewTextEffect`, the only two types that carry both.

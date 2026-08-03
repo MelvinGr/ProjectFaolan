@@ -173,8 +173,29 @@ and don't contain.
   `Blood for Aid`, matching each feat's own description. Nothing consumes the cooldown half yet — the recast path
   is Gitea #271.
 
-  ⚠️ **Still NOT imported:** the proc / weapon-attack families (53212 `AddComboProc`, 53070 `AddSpellLineProc`,
-  53250 `ChangeInheritedWeaponAttack`) and 53030 `ChangeHitPercent`.
+- **The PROC family — 876 rows in `FeatProc`** (#593). 53212 `AddComboProc` and 53070 `AddSpellLineProc` are one
+  shape with the target space swapped (a combo vs a spell line), so they share a table the way 53054/53062 and
+  53075/53030 do. The two SPELL slots are named by the client's tooltip, which tests keys 88 and 236
+  independently and renders `AddComboProcSelf` / `AddComboProcOther` / `AddComboProcBoth` — so 88 is the proc cast
+  on the CARRIER and 236 the one cast on the TARGET. Both are real in the data: 171 of the 876 rows are
+  target-only. The trigger (key 117) and the magnitude (key 237) are carried RAW — the trigger's value→condition
+  mapping and the magnitude's unit are not pinned, and inventing either would be the exact mistake this catalog
+  keeps punishing.
+
+- **53030 `ChangeHitPercent` — 954 rows, folded into `FeatSpellModifier`** (#593). The per-SPELL twin of 53075:
+  the same three slots with the line slot (key 1) replaced by the spell slot (key 187), the same signed percent
+  ×100. 238 of the 240 distinct references resolve against `Spells.Id`, so `FeatSpellModifier` grew a nullable
+  `SpellId` beside its now-nullable `SpellLineId` and the kind picks the column.
+
+  ⚠️ This kind was written off in the code as "not a player feat at all — the `Dimach Item` crafting entries, all
+  pointing at one constant ref (43464) with value 100". That was the first SAMPLE, not the census: the Dimach rows
+  sort first by feat id, and behind them sit 239 other targets and 55 distinct values including a −20/−40/−60%
+  ladder.
+
+  ⚠️ **Still NOT imported:** 53250 `ChangeInheritedWeaponAttack` (315 records). Its target resolves — 110 of 112
+  references are a `Combos.Id` — but it has no tooltip branch of its own, so keys 66/67/68/84 are unnamed on it,
+  and they are demonstrably NOT what the same key indices mean on `UpgradeCombo`: `Desecrated Blood` carries
+  key 67 = 100 under a description about a spell's "chance to trigger".
 - **The "kind" was never a private id space — it is a GameAction TYPE ID, and the record IS a GameAction element**
   (#591, [gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). Read against the client's own element
   grammar, `[kind][0][4][0][1][0][2][9][…]` is `[typeId][field][version 4][subCount 0][the four always-present
@@ -194,13 +215,13 @@ and don't contain.
   |---|---|---|---|
   | 53209 x3235 | `UpgradeCombo` | **combo, damage %, cooldown %** | `k66` is the DAMAGE delta and `k67` the REUSE-TIME one, both signed ×100 — named off the tooltip's Increase/Decrease string pairs. The old "value 0 throughout" was `k66` on a cooldown-only feat. IMPORTED (#593) |
   | 53019 x1749 | `Spell` | spell template id | a GRANT, and the **only** payload word. The old "its value repeats its own KIND" was the NEXT element's type id, read past the end of a 9-word record |
-  | 53030 x962 | `ChangeHitPercent` | spell, Value, `k55` | the per-spell twin of 53075 |
+  | 53030 x962 | `ChangeHitPercent` | **spell, signed % ×100, `k55`** | the per-spell twin of 53075 — same payload, `Spell.Id` where 53075 has a line. IMPORTED (#593) |
   | 53054 x593 | `SpellStatModifier` | **spell, Stat, Value, Amount** | not "a varying value": the second word is a STAT ID. `Fiendish Hand` carries three records for one spell — stats 347/348/349 — which is why there were "several records per (feat, spell)". IMPORTED (#593) |
   | 53062 x475 | `SpellLineStatModifier` | **line, Stat, Value, Amount** | the same record with the spell slot replaced by a line slot. `Brutal Maiming` = line 20410 (Guardian `Disable`), stat 147, value 2750 — the "147 that does not read as a percent" was the stat id. IMPORTED (#593) |
-  | 53212 x421 | `AddComboProc` | spell, `k236`, combo, `k117`, `k237` | |
+  | 53212 x421 | `AddComboProc` | **self proc spell, target proc spell, combo, trigger, amount** | the "grant" reading was the pair view: the feat is named for its key-88 spell and key 236 is empty on most records. IMPORTED (#593) |
   | 53075 x342 | `ChangeLineHitPercent` | **line, Value, `k55`** | the decoded one; `k55` (1 or 2) was never read before |
-  | 53250 x315 | `ChangeInheritedWeaponAttack` | | |
-  | 53070 x289 | `AddSpellLineProc` | | |
+  | 53250 x315 | `ChangeInheritedWeaponAttack` | combo, `k84`, `k66`, `k67`, `k68`, `k69` | the target resolves (110/112 are a `Combos.Id`); the four magnitude slots do not — no tooltip branch renders this type |
+  | 53070 x289 | `AddSpellLineProc` | **self proc spell, target proc spell, line, trigger, amount, `k73`** | 53212's per-LINE twin; `k73` `Flags` is 0 on every shipped row. IMPORTED (#593) |
   | 53213 / 53211 | `AddProc` / `AddSpellProc` | six words | the live-Frida catalog says four; the RDB widths say six |
 
   ⚠️ **The magnitude is SIGNED.** `Set's Chosen` carries -2000/-4000/-6000/-8000/-10000 across its five ranks on

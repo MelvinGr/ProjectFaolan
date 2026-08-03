@@ -1454,6 +1454,40 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("FeatPrereqs");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatProc", b =>
+                {
+                    b.Property<uint>("FeatId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Amount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("ComboId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("EffectKind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("SelfSpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("SpellLineId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("TargetSpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("Trigger")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("FeatId", "Sequence");
+
+                    b.ToTable("FeatProcs");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatSpellGrant", b =>
                 {
                     b.Property<uint>("FeatId")
@@ -1484,7 +1518,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<int>("PercentHundredths")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("SpellLineId")
+                    b.Property<uint?>("SpellId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("SpellLineId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("FeatId", "Sequence");
@@ -4469,6 +4506,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasOne("Faolan.Core.Database.Tables.FeatIdMap", "Feat")
                         .WithMany()
                         .HasForeignKey("WireFeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatProc", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
+                        .WithMany()
+                        .HasForeignKey("FeatId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

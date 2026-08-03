@@ -58,10 +58,11 @@ namespace Faolan.Importer.Rdb
 
 			var found = new List<Feat>();
 			var featEffects = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.Modifier>>();
-			var featSpellMods = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.Modifier>>();
+			var featSpellMods = new Dictionary<uint, IReadOnlyList<SpellHitPercentModifier>>();
 			var featSpellStatMods = new Dictionary<uint, IReadOnlyList<SpellStatModifier>>();
 			var featSpellGrants = new Dictionary<uint, IReadOnlyList<uint>>();
 			var featComboMods = new Dictionary<uint, IReadOnlyList<ComboModifier>>();
+			var featProcs = new Dictionary<uint, IReadOnlyList<Proc>>();
 			var skippedUnnamed = 0;
 			var misSlicedElements = 0;
 
@@ -101,6 +102,7 @@ namespace Faolan.Importer.Rdb
 				misSlicedElements += misSliced;
 				featSpellGrants[e.Id] = ParseSpellGrants(body);
 				featComboMods[e.Id] = ParseComboModifiers(body);
+				featProcs[e.Id] = ParseProcs(body);
 				found.Add(new Feat
 				{
 					Id = e.Id,
@@ -194,12 +196,16 @@ namespace Faolan.Importer.Rdb
 			{
 				for (var i = 0; i < list.Count; i++)
 				{
+					// The KIND picks the target column - a line under 53075, a single spell under 53030 - exactly as it
+					// does on FeatSpellStatModifier. Never both.
+					var isLine = list[i].Kind == LineHitPercentKind;
 					db.FeatSpellModifiers.Add(new FeatSpellModifier
 					{
 						FeatId = featId,
 						Sequence = i,
-						SpellLineId = list[i].StatId,
-						PercentHundredths = (int)list[i].WireAmount,
+						SpellLineId = isLine ? list[i].TargetId : null,
+						SpellId = isLine ? null : list[i].TargetId,
+						PercentHundredths = list[i].PercentHundredths,
 						EffectKind = list[i].Kind
 					});
 					spellModRows++;
@@ -263,6 +269,29 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
+			// The PROCS (#593), same rule and same scope again.
+			var procRows = 0;
+			db.FeatProcs.RemoveRange(await db.FeatProcs.Where(m => spellTouched.Contains(m.FeatId)).ToListAsync());
+			foreach (var (featId, list) in featProcs.Where(kv => kv.Value.Count > 0))
+			{
+				for (var i = 0; i < list.Count; i++)
+				{
+					db.FeatProcs.Add(new FeatProc
+					{
+						FeatId = featId,
+						Sequence = i,
+						ComboId = list[i].ComboId,
+						SpellLineId = list[i].SpellLineId,
+						SelfSpellId = list[i].SelfSpellId,
+						TargetSpellId = list[i].TargetSpellId,
+						Trigger = list[i].Trigger,
+						Amount = list[i].Amount,
+						EffectKind = list[i].Kind
+					});
+					procRows++;
+				}
+			}
+
 			var effectRows = 0;
 			var wanted = featEffects.Where(kv => kv.Value.Count > 0).ToDictionary(kv => kv.Key, kv => kv.Value);
 
@@ -294,7 +323,7 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0 || spellStatModRows > 0 || spellGrantRows > 0 || comboModRows > 0)
+			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0 || spellStatModRows > 0 || spellGrantRows > 0 || comboModRows > 0 || procRows > 0)
 				await db.SaveChangesAsync();
 
 			// Never silent: a mis-sliced element is data we chose NOT to import, and the count is the only place that
@@ -303,10 +332,10 @@ namespace Faolan.Importer.Rdb
 				logger?.LogWarning("RdbFeatImporter: {MisSliced} spell stat-modifier elements rejected as mis-sliced (a slot held a GameAction type id) - see Gitea #595.", misSlicedElements);
 
 			logger?.LogInformation(
-				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades.",
-				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows);
+				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades, {Procs} procs.",
+				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, procRows);
 
-			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows);
+			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows, procRows);
 		}
 
 		// Splits a catalog name into its tree / group / base / rank. The client encodes all four in the string:
@@ -553,26 +582,59 @@ namespace Faolan.Importer.Rdb
 		//   53019  x1010  a spell TEMPLATE id (Spell.Id), and a GRANT rather than a modifier: `Spell Unlocking 60-80`
 		//                 points at Drain Essence ranks 1-4, Blood Pact and Covenant of Vengeance. Its `value` repeats
 		//                 its own KIND (53019), i.e. a sentinel, not a magnitude.
-		//   53212   x421  a spell TEMPLATE id, also a grant - and the feat is NAMED for the spell (`Touch of Death`
-		//                 -> the spell `Touch of Death`). value 0 throughout.
+		//   53212   x421  a PROC: the pair view read its `Spell` slot (key 88) and called it a grant because the feat
+		//                 is named for that spell (`Touch of Death` -> the spell `Touch of Death`). It also carries a
+		//                 COMBO (key 187) to hang the proc off, a second proc spell for the target, a trigger and a
+		//                 magnitude - decoded and imported now, with 53070, as FeatProc. See ParseProcs.
 		//   53054   x593  a spell TEMPLATE id (`Fiendish Hand` -> `Dark Hand`, `Combo - Skewer` -> `Skewered`), but
 		//                 with a varying value and SEVERAL records per (feat, spell) - three on Fiendish Hand carrying
 		//                 347/348/349. Undecoded.
-		//   53030   x962  not a player feat at all - the `Dimach Item k1/k2/k3` crafting entries, all pointing at one
-		//                 constant ref (43464) with value 100.
+		//   53030   x962  the per-SPELL twin of 53075: key 187 is a `Spell.Id` (238 of 240 distinct refs resolve)
+		//                 where 53075 carries a line, and `Value` the same signed percent x100. IMPORTED as a
+		//                 FeatSpellModifier with SpellId set - see ParseSpellModifiers below.
+		//                 ⚠️ This kind used to be written off here as "not a player feat at all - the `Dimach Item`
+		//                 crafting entries, all pointing at one constant ref (43464) with value 100". That was the
+		//                 first SAMPLE, not the census: the Dimach rows sort first by feat id, and behind them are
+		//                 239 other targets and 55 distinct values including a -20/-40/-60% ladder.
 		//
 		// So three of the six are GRANTS, not modifiers, which is a second reason the shape is not enough: importing
 		// them here would file a spell the feat gives you as a boost to a spell you already have. Survey them with
 		// `--report feat-spell-modifiers`, which prints each kind with its feat name and the LDB description.
-		public static IReadOnlyList<ItemTemplateStatModifiers.Modifier> ParseSpellModifiers(byte[] body)
+		public static IReadOnlyList<SpellHitPercentModifier> ParseSpellModifiers(byte[] body)
 		{
-			return body.Length <= 12
-				? []
-				: [.. ItemTemplateStatModifiers.ParseRejected(body.AsSpan(12)).Where(m => m.Kind == SpellModifierKind)];
+			if (body.Length <= 12)
+				return [];
+
+			var mods = new List<SpellHitPercentModifier>();
+			foreach (var e in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+			{
+				if (e.Kind != LineHitPercentKind && e.Kind != SpellHitPercentKind)
+					continue;
+
+				// Read BY KEY, and by the key the KIND says: 53075 carries its target in the line slot (1) and 53030
+				// in the spell slot (187). The pair view lands on both by luck of position - the target is payload
+				// word 0 either way - which is exactly the coincidence that makes it unsafe to rely on.
+				var target = e.Value(e.Kind == LineHitPercentKind ? GameActionTypes.KeyLine : GameActionTypes.KeySpellHitPercentTarget);
+				var percent = e.Value(GameActionTypes.KeyValue);
+				if (target is null or 0 || percent is null)
+					continue;
+
+				mods.Add(new SpellHitPercentModifier(e.Kind, target.Value, (int)percent.Value));
+			}
+
+			return mods;
 		}
 
-		// The one effect kind whose (reference, magnitude) payload is decoded: a spell line and a percent x 100.
-		private const uint SpellModifierKind = 53075;
+		/// <summary>
+		///     One parsed kind-53075/53030 element: the target - a <c>Spell.LineId</c> under 53075 and a
+		///     <c>Spell.Id</c> under 53030 - and the signed percent ×100 both carry in <c>Value</c>.
+		/// </summary>
+		public readonly record struct SpellHitPercentModifier(uint Kind, uint TargetId, int PercentHundredths);
+
+		// The (reference, magnitude) pair whose payload is decoded, in its two target spaces: a spell LINE (53075,
+		// #590) and a single SPELL (53030, #593). Same three slots, same signed percent x100.
+		private const uint LineHitPercentKind = 53075;
+		private const uint SpellHitPercentKind = 53030;
 
 		// The feat's spell-scoped STAT modifiers (#593): kinds 53054 `SpellStatModifier` and 53062
 		// `SpellLineStatModifier`, the same four-slot payload with the target space swapped.
@@ -677,9 +739,9 @@ namespace Faolan.Importer.Rdb
 
 				// Every slot must be present - a mis-sliced element carrying half a payload is worse than none - and
 				// a record that moves NEITHER axis is a reference with no magnitude, which nothing can consume.
-				var combo = e.Value(GameActionTypes.KeyCombo);
-				var damage = e.Value(GameActionTypes.KeyComboDamage);
-				var cooldown = e.Value(GameActionTypes.KeyComboCooldown);
+				var combo = e.Value(GameActionTypes.KeyUpgradeComboTarget);
+				var damage = e.Value(GameActionTypes.KeyUpgradeComboDamage);
+				var cooldown = e.Value(GameActionTypes.KeyUpgradeComboCooldown);
 				if (combo is null or 0 || damage is null || cooldown is null || (damage == 0 && cooldown == 0))
 					continue;
 
@@ -692,10 +754,66 @@ namespace Faolan.Importer.Rdb
 		/// <summary>One parsed kind-53209 element: the combo, and its two signed hundredths-of-a-percent deltas.</summary>
 		public readonly record struct ComboModifier(uint Kind, uint ComboId, int DamagePercentHundredths, int CooldownPercentHundredths);
 
+		// The PROCS a feat attaches (#593): 53212 `AddComboProc` `[88, 236, 187 combo, 117, 237]` and 53070
+		// `AddSpellLineProc` `[88, 236, 1 line, 117, 237, 73]` - one shape with the target space swapped, the same
+		// pairing 53075/53030 and 53054/53062 have, so they share a table.
+		//
+		// The pair view is what hid these: it returns payload words 0 and 1, i.e. (key 88, key 236), so 53212 read as
+		// "a spell template id, also a grant - the feat is NAMED for the spell, value 0 throughout". The zero was the
+		// SECOND proc spell, empty on all but one record, and the combo it hangs off was three slots further along.
+		//
+		// The two spell slots are named by the client's own tooltip: it tests key 88 and key 236 for a valid spell
+		// independently and renders `AddComboProcSelf` / `AddComboProcOther` / `AddComboProcBoth` accordingly, so 88
+		// is the CARRIER's proc spell and 236 the TARGET's. See docs/re/gameactionlist-grammar.md.
+		public static IReadOnlyList<Proc> ParseProcs(byte[] body)
+		{
+			if (body.Length <= 12)
+				return [];
+
+			var procs = new List<Proc>();
+			foreach (var e in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+			{
+				if (e.Kind != ComboProcKind && e.Kind != SpellLineProcKind)
+					continue;
+
+				var isCombo = e.Kind == ComboProcKind;
+				var target = e.Value(isCombo ? GameActionTypes.KeyProcComboTarget : GameActionTypes.KeyLine);
+				var selfSpell = e.Value(GameActionTypes.KeyProcSelfSpell);
+				var targetSpell = e.Value(GameActionTypes.KeyProcTargetSpell);
+				var trigger = e.Value(GameActionTypes.KeyProcTrigger);
+				var amount = e.Value(GameActionTypes.KeyProcAmount);
+
+				// A proc with nothing to cast is not a proc, and one with nothing to hang off cannot be attached -
+				// either way the element was mis-sliced rather than meaningful.
+				if (target is null or 0 || trigger is null || amount is null || ((selfSpell ?? 0) == 0 && (targetSpell ?? 0) == 0))
+					continue;
+
+				procs.Add(new Proc(e.Kind, isCombo ? target.Value : null, isCombo ? null : target.Value, Nullable(selfSpell), Nullable(targetSpell), trigger.Value,
+					(int)amount.Value));
+			}
+
+			return procs;
+
+			static uint? Nullable(uint? slot)
+			{
+				return slot is null or 0
+					? null
+					: slot;
+			}
+		}
+
+		/// <summary>
+		///     One parsed kind-53212/53070 element. Exactly one of <paramref name="ComboId" /> /
+		///     <paramref name="SpellLineId" /> is set - the kind says which - and at least one of the two proc spells.
+		/// </summary>
+		public readonly record struct Proc(uint Kind, uint? ComboId, uint? SpellLineId, uint? SelfSpellId, uint? TargetSpellId, uint Trigger, int Amount);
+
 		private const uint SpellStatModifierKind = 53054;
 		private const uint SpellLineStatModifierKind = 53062;
 		private const uint SpellGrantKind = 53019;
 		private const uint UpgradeComboKind = 53209;
+		private const uint ComboProcKind = 53212;
+		private const uint SpellLineProcKind = 53070;
 
 		/// <summary>
 		///     One parsed kind-53054/53062 element. <paramref name="TargetId" /> is a <c>Spell.Id</c> under 53054 and a
@@ -765,6 +883,6 @@ namespace Faolan.Importer.Rdb
 		public readonly record struct Parsed(string? Tree, string? Group, string BaseName, int Rank);
 
 		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows, int PrereqEdges, int SpellModifiers, int SpellStatModifiers,
-			int SpellGrants, int ComboModifiers);
+			int SpellGrants, int ComboModifiers, int Procs);
 	}
 }

@@ -267,6 +267,36 @@ whole `Leech Life` ladder and key 66 = 0, while `Hexer` ("improves the damage in
 combos") carries key 66 = `+100` on the `Blood for Aid` ladder and key 67 = 0. Only 5 of the 3,235 records set
 both. Imported as `FeatComboModifier`; the recast path that would consume the cooldown half is Gitea #271.
 
+⚠️ **These names are `UpgradeCombo`-scoped and do not transfer.** A key the client NAMES (0 `Stat`, 39 `Value`,
+88 `Spell`, 175 `Amount`) means the same thing wherever it appears; an unnamed one carries no such promise, and
+the catalog shows it does not hold. Key `187` is a per-SPELL target on `ChangeRecastTime` (53031) and
+`ChangeHitPercent` (53030) but a per-COMBO one here; key `66` is a follower script group on
+`SetFollowerScriptGroup` (53024) and the proc DIRECTION on the `AddProc` family; and `ChangeInheritedWeaponAttack`
+(53250) carries key `67` = 100 under a description about a spell's "chance to trigger". Name an unnamed key
+`<Type>_<slot>` and keep it inside that type's parser.
+
+### The PROC family — key `88` is the CARRIER's spell, key `236` the TARGET's
+
+`AddComboProc` (53212) and `AddSpellLineProc` (53070) carry two spell slots, and which is which comes from the
+same builder. It reads `GameActionStat_e` `0x463` and `0x4f4` — key **88** and key **236** — tests each for a
+valid spell **independently**, and picks one of three localised strings from the pair of results:
+
+| key 88 set | key 236 set | string |
+| --- | --- | --- |
+| ✓ | ✓ | `AddComboProcBoth` |
+| ✓ | ✗ | `AddComboProcSelf` |
+| ✗ | ✓ | `AddComboProcOther` |
+
+So key 88 is the spell the proc casts on the **carrier** and key 236 the one it casts on the **target**. Both are
+real in the shipped data — 171 of the 876 records are target-only — which is why a parser may not require key 88.
+Key `117` is the trigger and key `237` the magnitude the builder renders last; neither is pinned further, and
+both are stored raw. `[V1: tools/ghidra/FindSym.java]` `[V1: tools/ghidra/DisasmWin.java]`
+
+⚠️ The neighbouring `AddProc` branch (`AddProcOnHit` / `AddProcGettingHit` / `…Damage` / `…SpellDamage`) reads
+key `117` and key `66` and belongs to the **generic** proc types, not to these two — it is what says key 117 is a
+trigger condition, but the value→condition mapping it uses has not been checked against 53212/53070's own values
+(`0`/`1` on the combo form, `2`/`3` on the line form).
+
 ### The INTERPOLATED family is a LEVEL RAMP — keys `174`/`172`/`175`/`173`
 
 `InterpolatedModify` (53220), `InterpolatedTempChangeSkill` (53221) and `InterpolatedModifyAsRating` (53068) all

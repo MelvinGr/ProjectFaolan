@@ -29,9 +29,22 @@ namespace Faolan.Core.Database.Tables
 		/// <summary>
 		///     The spell LINE this boosts - <see cref="Spell.LineId" />, i.e. <c>ConanClass × 1000 + lineIndex</c>
 		///     (41000 = Necromancer line 0 = Flesh to Worms). A line, not a spell, so the feat covers every RANK of it
-		///     at once, which is what a feat has to do.
+		///     at once, which is what a feat has to do. Set on a kind-53075 record; null on a kind-53030 one, where
+		///     <see cref="SpellId" /> carries the target instead.
 		/// </summary>
-		public uint SpellLineId { get; set; }
+		public uint? SpellLineId { get; set; }
+
+		/// <summary>
+		///     The single spell this boosts (<see cref="Spell.Id" />), on a kind-53030 <c>ChangeHitPercent</c> record -
+		///     the per-SPELL twin of 53075, the same three slots with the line slot (key 1) replaced by the spell slot
+		///     (key 187). Null on a kind-53075 record; exactly one of the two is ever set.
+		///     <para>
+		///         238 of the 240 distinct references resolve against <c>Spells.Id</c>, which is what says the space is
+		///         a spell and not the COMBO the same key index carries on <c>UpgradeCombo</c> - an unnamed key means a
+		///         different thing on every type that uses it (see <c>GameActionTypes</c>).
+		///     </para>
+		/// </summary>
+		public uint? SpellId { get; set; }
 
 		/// <summary>
 		///     The boost in HUNDREDTHS OF A PERCENT: 3500 = +35.00%. Decoded from the five ranks of
@@ -47,9 +60,10 @@ namespace Faolan.Core.Database.Tables
 		public int PercentHundredths { get; set; }
 
 		/// <summary>
-		///     The effect-KIND tag that opens the record. Only 53075 is decoded (#590); the catalog carries ~9 more
-		///     kinds in this shape (53209 alone is 3,235 records) whose payloads are NOT known to be a
-		///     (line, percent) pair, so the importer takes this kind only and this column is what says so.
+		///     The effect-KIND tag that opens the record, and what says which target column is set: 53075
+		///     <c>ChangeLineHitPercent</c> (#590) fills <see cref="SpellLineId" /> and 53030 <c>ChangeHitPercent</c>
+		///     (#593) fills <see cref="SpellId" />. The two are one payload with the target space swapped, which is why
+		///     they share a table - the same reason 53054 and 53062 share <see cref="FeatSpellStatModifier" />.
 		/// </summary>
 		public uint EffectKind { get; set; }
 	}
