@@ -69,6 +69,16 @@ namespace Faolan.Core.Rdb
 		// through `KeyAmount` compiles to the same thing and reads as the wrong unit.
 		public const int KeyHighValue = KeyAmount;
 
+		// `UpgradeCombo` (53209): the combo it upgrades, and the two axes it can move. The client leaves 66/67
+		// unnamed in its descriptor, but its own item-tooltip builder `FUN_0149e450` names them by RENDERING them -
+		// it reads GameActionStat_e 0x315/0x316 (= key 66/67 through the key-index table) and branches on each
+		// value's SIGN to pick between the localised `UpgradeCombo_IncreaseDamage`/`_DecreaseDamage` and
+		// `UpgradeCombo_IncreaseCooldown`/`_DecreaseCooldown` strings. Both are SIGNED hundredths of a percent
+		// (rendered `× 0.01` with a `%` suffix). See docs/re/gameactionlist-grammar.md.
+		public const int KeyCombo = 187;
+		public const int KeyComboDamage = 66;
+		public const int KeyComboCooldown = 67;
+
 		// The TEXT slots (see <see cref="TextKeys" />). 209 is the one every string-carrying type uses; 210 is the
 		// second string on `GenerateName` and `NewTextEffect`, the only two types that carry both.
 		public const int KeyEventString = 209;

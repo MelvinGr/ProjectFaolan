@@ -61,6 +61,7 @@ namespace Faolan.Importer.Rdb
 			var featSpellMods = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.Modifier>>();
 			var featSpellStatMods = new Dictionary<uint, IReadOnlyList<SpellStatModifier>>();
 			var featSpellGrants = new Dictionary<uint, IReadOnlyList<uint>>();
+			var featComboMods = new Dictionary<uint, IReadOnlyList<ComboModifier>>();
 			var skippedUnnamed = 0;
 			var misSlicedElements = 0;
 
@@ -99,6 +100,7 @@ namespace Faolan.Importer.Rdb
 				featSpellStatMods[e.Id] = ParseSpellStatModifiers(body, out var misSliced);
 				misSlicedElements += misSliced;
 				featSpellGrants[e.Id] = ParseSpellGrants(body);
+				featComboMods[e.Id] = ParseComboModifiers(body);
 				found.Add(new Feat
 				{
 					Id = e.Id,
@@ -241,6 +243,26 @@ namespace Faolan.Importer.Rdb
 
 			// Effects are delete+reinsert per feat: the list is wholly derived from the record, so reconciling element
 			// by element would only risk leaving a stale tail behind.
+			// The combo upgrades (#593), on the same delete+reinsert rule and the same PARSED scope as the three above.
+			var comboModRows = 0;
+			db.FeatComboModifiers.RemoveRange(await db.FeatComboModifiers.Where(m => spellTouched.Contains(m.FeatId)).ToListAsync());
+			foreach (var (featId, list) in featComboMods.Where(kv => kv.Value.Count > 0))
+			{
+				for (var i = 0; i < list.Count; i++)
+				{
+					db.FeatComboModifiers.Add(new FeatComboModifier
+					{
+						FeatId = featId,
+						Sequence = i,
+						ComboId = list[i].ComboId,
+						DamagePercentHundredths = list[i].DamagePercentHundredths,
+						CooldownPercentHundredths = list[i].CooldownPercentHundredths,
+						EffectKind = list[i].Kind
+					});
+					comboModRows++;
+				}
+			}
+
 			var effectRows = 0;
 			var wanted = featEffects.Where(kv => kv.Value.Count > 0).ToDictionary(kv => kv.Key, kv => kv.Value);
 
@@ -272,7 +294,7 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0 || spellStatModRows > 0 || spellGrantRows > 0)
+			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0 || spellStatModRows > 0 || spellGrantRows > 0 || comboModRows > 0)
 				await db.SaveChangesAsync();
 
 			// Never silent: a mis-sliced element is data we chose NOT to import, and the count is the only place that
@@ -281,10 +303,10 @@ namespace Faolan.Importer.Rdb
 				logger?.LogWarning("RdbFeatImporter: {MisSliced} spell stat-modifier elements rejected as mis-sliced (a slot held a GameAction type id) - see Gitea #595.", misSlicedElements);
 
 			logger?.LogInformation(
-				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants.",
-				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows);
+				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants, {ComboMods} combo upgrades.",
+				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows);
 
-			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows);
+			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows, comboModRows);
 		}
 
 		// Splits a catalog name into its tree / group / base / rank. The client encodes all four in the string:
@@ -511,7 +533,8 @@ namespace Faolan.Importer.Rdb
 		// carries (41000, 3500) - Necromancer line 0 (Flesh to Worms), +35.00% - which is exactly what the client's
 		// own tooltip draws.
 		//
-		// ⚠️ Kind 53075 ONLY. The catalog has ~9 more kinds in this same shape (53209 alone is 3,235 records), and the
+		// ⚠️ Kind 53075 ONLY. The catalog has ~9 more kinds in this same shape (53209 alone is 3,235 records, and has
+		// its own parser below), and the
 		// #591 sweep decoded WHAT EACH ONE POINTS AT without decoding what its payload MEANS. That distinction is the
 		// whole reason they stay out: a reference space is checkable (resolve the ref and see whether it hits), a
 		// magnitude is not, and importing a value as a percent because it sits where 53075's percent sits is exactly
@@ -520,8 +543,10 @@ namespace Faolan.Importer.Rdb
 		// The ref spaces, each resolved against the shipped catalogs and corroborated by the feat's own LDB tooltip:
 		//
 		//   53209  x3235  a COMBO id (Combos.Id). `Dread Lord` - "Reduces the reuse time of all combos" - carries six,
-		//                 every one a DarkTemplar_NN_lifetapbuff combo. value is 0 throughout, so the record is a pure
-		//                 reference: a LIST of what the feat applies to, with the magnitude somewhere else.
+		//                 every one a DarkTemplar_NN_lifetapbuff combo. Its payload is DECODED and imported now, as
+		//                 FeatComboModifier - see ParseComboModifiers. The "value 0 throughout" that made it look like
+		//                 a pure reference was key 66 on a cooldown-only feat; the magnitude was in key 67, which the
+		//                 pair view cannot reach.
 		//   53062   x475  a spell LINE id (Spell.LineId), the SAME space 53075 uses. `Brutal Maiming` - "Increases the
 		//                 chance of the Disable combo inflicting critical damage" - points at 20410, which is the
 		//                 Guardian's `Disable` line, by name. Its value (147) is NOT a percent and is undecoded.
@@ -626,9 +651,51 @@ namespace Faolan.Importer.Rdb
 					.Where(id => id != 0)];
 		}
 
+		// The COMBOS a feat upgrades (#593): kind 53209 `UpgradeCombo`, `[187 combo, 66, 67]` - 3,235 records, the
+		// largest single block in the feat catalog and the last of the "decoded shape, undecoded payload" kinds the
+		// #591 sweep left behind.
+		//
+		// Keys 66 and 67 are named out of the CLIENT, not inferred from the feat descriptions: the item-tooltip
+		// builder `FUN_0149e450` reads `GameActionStat_e` 0x315 and 0x316 - which the key-index table maps to key 66
+		// and key 67 - and branches on each one's SIGN to pick between the localised `UpgradeCombo_IncreaseDamage` /
+		// `_DecreaseDamage` and `UpgradeCombo_IncreaseCooldown` / `_DecreaseCooldown` strings. So 66 is the combo's
+		// DAMAGE delta and 67 its REUSE-TIME delta, both signed, both rendered as `value × 0.01` with a `%` suffix -
+		// hundredths of a percent, the same scale kind 53075 uses. See docs/re/gameactionlist-grammar.md.
+		//
+		// ⚠️ Read BOTH slots, and do not fall back to the pair view: it returns (combo, 66) and so reports every
+		// cooldown feat as a no-op with `value = 0`, which is exactly what the catalog looked like before this.
+		public static IReadOnlyList<ComboModifier> ParseComboModifiers(byte[] body)
+		{
+			if (body.Length <= 12)
+				return [];
+
+			var mods = new List<ComboModifier>();
+			foreach (var e in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+			{
+				if (e.Kind != UpgradeComboKind)
+					continue;
+
+				// Every slot must be present - a mis-sliced element carrying half a payload is worse than none - and
+				// a record that moves NEITHER axis is a reference with no magnitude, which nothing can consume.
+				var combo = e.Value(GameActionTypes.KeyCombo);
+				var damage = e.Value(GameActionTypes.KeyComboDamage);
+				var cooldown = e.Value(GameActionTypes.KeyComboCooldown);
+				if (combo is null or 0 || damage is null || cooldown is null || (damage == 0 && cooldown == 0))
+					continue;
+
+				mods.Add(new ComboModifier(e.Kind, combo.Value, (int)damage.Value, (int)cooldown.Value));
+			}
+
+			return mods;
+		}
+
+		/// <summary>One parsed kind-53209 element: the combo, and its two signed hundredths-of-a-percent deltas.</summary>
+		public readonly record struct ComboModifier(uint Kind, uint ComboId, int DamagePercentHundredths, int CooldownPercentHundredths);
+
 		private const uint SpellStatModifierKind = 53054;
 		private const uint SpellLineStatModifierKind = 53062;
 		private const uint SpellGrantKind = 53019;
+		private const uint UpgradeComboKind = 53209;
 
 		/// <summary>
 		///     One parsed kind-53054/53062 element. <paramref name="TargetId" /> is a <c>Spell.Id</c> under 53054 and a
@@ -698,6 +765,6 @@ namespace Faolan.Importer.Rdb
 		public readonly record struct Parsed(string? Tree, string? Group, string BaseName, int Rank);
 
 		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows, int PrereqEdges, int SpellModifiers, int SpellStatModifiers,
-			int SpellGrants);
+			int SpellGrants, int ComboModifiers);
 	}
 }

@@ -243,6 +243,30 @@ Key `55` (`ChangeHitPercent` / `ChangeLineHitPercent`, values 1 or 2) is read ON
 `FUN_014a5670`, never by the tooltip: it participates in sorting/grouping and carries no rendered magnitude, so
 kind 53075's shipped `(line, percent)` decode does not depend on it.
 
+### `UpgradeCombo` (53209) — key `66` is DAMAGE, key `67` is COOLDOWN
+
+The client leaves both slots unnamed in its descriptor, and the pair view (payload words 0 and 1) reads
+`(combo, 66)` — which is why 3,235 records looked like "a pure reference: a LIST of what the feat applies to,
+with the magnitude somewhere else". The magnitude was in the slot the pair view could not see.
+
+The item-tooltip builder `FUN_0149e450` names both by RENDERING them. It reads `GameActionStat_e` `0x315` and
+`0x316` — which the key-index table `&DAT_025073c0` maps to key indices **66** and **67** — and branches on each
+value's SIGN to pick a localised string:
+
+| slot | `GameActionStat_e` | zero | `> 0` | `< 0` |
+| --- | --- | --- | --- | --- |
+| key `66` | `0x315` | skipped (`TEST/JZ` at `014a184f`) | `UpgradeCombo_IncreaseDamage` | `UpgradeCombo_DecreaseDamage` |
+| key `67` | `0x316` | skipped (`TEST/JZ` at `014a192f`) | `UpgradeCombo_IncreaseCooldown` | `UpgradeCombo_DecreaseCooldown` |
+
+Both are rendered `CVTSI2SS` → `MULSS` by the `0.01` at `0x01f2800c` with the hardcoded `%` at `0x01fbcf18`, so
+both are **signed hundredths of a percent** — the same scale kind 53075 uses. `[V1: tools/ghidra/FindSym.java]`
+`[V1: tools/ghidra/DisasmWin.java]` `[V1: tools/ghidra/DisasmFn.java]`
+
+The shipped catalog agrees: `Dread Lord` ("Reduces the reuse time of all combos") carries key 67 = `-100` on the
+whole `Leech Life` ladder and key 66 = 0, while `Hexer` ("improves the damage inflicted by the Blood for Aid
+combos") carries key 66 = `+100` on the `Blood for Aid` ladder and key 67 = 0. Only 5 of the 3,235 records set
+both. Imported as `FeatComboModifier`; the recast path that would consume the cooldown half is Gitea #271.
+
 ### The INTERPOLATED family is a LEVEL RAMP — keys `174`/`172`/`175`/`173`
 
 `InterpolatedModify` (53220), `InterpolatedTempChangeSkill` (53221) and `InterpolatedModifyAsRating` (53068) all

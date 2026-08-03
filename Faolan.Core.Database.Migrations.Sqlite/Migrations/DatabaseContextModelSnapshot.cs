@@ -1359,6 +1359,31 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("Feats");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatComboModifier", b =>
+                {
+                    b.Property<uint>("FeatId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("ComboId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CooldownPercentHundredths")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DamagePercentHundredths")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("EffectKind")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("FeatId", "Sequence");
+
+                    b.ToTable("FeatComboModifiers");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatEffect", b =>
                 {
                     b.Property<uint>("FeatId")
@@ -4415,6 +4440,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("Screen");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.FeatComboModifier", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Feat", "Feat")
+                        .WithMany()
+                        .HasForeignKey("FeatId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Feat");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatEffect", b =>

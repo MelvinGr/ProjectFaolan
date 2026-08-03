@@ -164,8 +164,17 @@ and don't contain.
   (5031395..5031401) is the case — its 53054 elements tile the record at TEN words, not the twelve its key list
   predicts. Open as Gitea #595.
 
-  ⚠️ **Still NOT imported:** 53209 `UpgradeCombo` (a per-combo reuse-time delta, which needs the combo id space
-  joined to `ClassCombos` and a recast path that honours it — Gitea #271), and the proc / weapon-attack families.
+- **`UpgradeCombo` (53209) — 3,214 rows in `FeatComboModifier`** (#593). Its two unnamed slots are named by the
+  client's own tooltip builder, which branches on each one's SIGN to pick between `UpgradeCombo_IncreaseDamage` /
+  `_DecreaseDamage` (key `66`) and `UpgradeCombo_IncreaseCooldown` / `_DecreaseCooldown` (key `67`) — so 66 is the
+  combo's DAMAGE delta and 67 its REUSE-TIME delta, both signed hundredths of a percent
+  ([gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). Every reference resolves against `Combos.Id`.
+  `Dread Lord` carries `-100` cooldown across the whole `Leech Life` ladder and `Hexer` `+100` damage across
+  `Blood for Aid`, matching each feat's own description. Nothing consumes the cooldown half yet — the recast path
+  is Gitea #271.
+
+  ⚠️ **Still NOT imported:** the proc / weapon-attack families (53212 `AddComboProc`, 53070 `AddSpellLineProc`,
+  53250 `ChangeInheritedWeaponAttack`) and 53030 `ChangeHitPercent`.
 - **The "kind" was never a private id space — it is a GameAction TYPE ID, and the record IS a GameAction element**
   (#591, [gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). Read against the client's own element
   grammar, `[kind][0][4][0][1][0][2][9][…]` is `[typeId][field][version 4][subCount 0][the four always-present
@@ -183,7 +192,7 @@ and don't contain.
 
   | kind | name | payload | note |
   |---|---|---|---|
-  | 53209 x3235 | `UpgradeCombo` | combo, `k66`, `k67` | `Dread Lord` "reduces the reuse time of all combos" carries six, `k67` = **-100** on each. The old "value 0 throughout" was `k66`; the magnitude is the word after it |
+  | 53209 x3235 | `UpgradeCombo` | **combo, damage %, cooldown %** | `k66` is the DAMAGE delta and `k67` the REUSE-TIME one, both signed ×100 — named off the tooltip's Increase/Decrease string pairs. The old "value 0 throughout" was `k66` on a cooldown-only feat. IMPORTED (#593) |
   | 53019 x1749 | `Spell` | spell template id | a GRANT, and the **only** payload word. The old "its value repeats its own KIND" was the NEXT element's type id, read past the end of a 9-word record |
   | 53030 x962 | `ChangeHitPercent` | spell, Value, `k55` | the per-spell twin of 53075 |
   | 53054 x593 | `SpellStatModifier` | **spell, Stat, Value, Amount** | not "a varying value": the second word is a STAT ID. `Fiendish Hand` carries three records for one spell — stats 347/348/349 — which is why there were "several records per (feat, spell)". IMPORTED (#593) |
