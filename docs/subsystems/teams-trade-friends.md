@@ -206,6 +206,21 @@ union `GuildService`'s member record already uses. The online value is **not a t
 not a plain constant either (one online friend carries `0x01EDAF93`); its magnitude sits beside the character ids, so an
 id/handle is the better guess. [V0: the friend state's online stamp]
 
+### Claude is a VIRTUAL friend (#100)
+
+Because the list is one-sided and server-pushed, an entry needs no character behind it: there is no accept step and
+no roster the client validates against, so an entry simply *is* the `0x0014` + `0x0028` pair. `ChatServerListener`
+sends one for the synthetic Claude identity (`0xC1A0DE05`) right after the stored list, gated on `McpEnabled` — the
+same gate as the Claude channel, since an entry nobody can answer would be a lie. It reports **online**, which puts
+the stamp on the playfield-token branch, and Claude is in no playfield, so it sends `FriendStateCodec.OnlineStamp` —
+exactly the case that fallback exists for. Level and class have no "none" encoding on this message and are a choice
+rather than a decode.
+
+Nothing is written to `Friends`: `0xC1A0DE05` is not a character id and the FK would refuse it, and the entry is
+regenerated every login. So a removal lasts until the next login (`RemoveFriend` echoes the id and the delete
+no-ops), and a re-add is answered by re-sending the entry rather than by the "No such character" a row lookup would
+produce. The payoff is presence plus one-click access: a tell to that id already lands in the MCP bridge log.
+
 ## How ours is wired
 
 `TeamService` is a composed collaborator of the **CsPlayerAgent listener**, like `GuildService`: the CS tier owns the

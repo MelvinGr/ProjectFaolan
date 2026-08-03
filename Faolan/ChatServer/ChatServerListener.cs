@@ -27,6 +27,11 @@ namespace Faolan.ChatServer
 		private const string PlayfieldChannelName = "~Playfield";
 		private const uint PlayfieldChannelFlag = 0x00008044;
 
+		// The level + class the virtual Claude friend entry reports (#100). See SendClaudeFriendEntry: both are fields
+		// the client's tooltip shows and neither has a "none" encoding, so they are a choice, not a decode.
+		private const byte ClaudeVirtualFriendLevel = 80;
+		private const ConanClass ClaudeVirtualFriendClass = ConanClass.PriestOfMitra;
+
 		private readonly ClaudeChannel _claudeChannel;
 		private readonly IChatServerDispatcher _dispatcher;
 		private readonly IGameServerDispatcher _gameServerDispatcher;
@@ -134,6 +139,11 @@ namespace Faolan.ChatServer
 					foreach (var friend in await Database.GetFriends(character.Id))
 						await SendFriendEntry(client, friend, false);
 
+					// ...plus Claude, the virtual friend (#100). Same gate as the channel: an entry nobody can answer
+					// would be a lie.
+					if (Configuration.McpEnabled)
+						await SendClaudeFriendEntry(client);
+
 					// ...and tell everyone who has US on their list that we are now online. Without this a friend's
 					// status is frozen at whatever it happened to be when the WATCHER logged in: whoever connects first
 					// sees the other as offline forever, because the restore above can only report who is already here.
@@ -228,6 +238,17 @@ namespace Faolan.ChatServer
 				case ChatServerOpcodes.AddFriend:
 				{
 					var friendId = FriendRefCodec.Parse(body.ReadRemainingArray()).CharacterId;
+
+					// Re-adding Claude (#100): there is no character row behind the synthetic identity, so the lookup
+					// below would answer "No such character" for a friend the client can see is online. Re-send the
+					// entry instead - the list is regenerated at login either way, so this only has to satisfy the
+					// client in the moment.
+					if (Configuration.McpEnabled && friendId == ClaudeChannel.SenderId)
+					{
+						await SendClaudeFriendEntry(client);
+						break;
+					}
+
 					var friend = await Database.GetCharacter(friendId);
 					if (friend == null)
 					{
@@ -299,7 +320,28 @@ namespace Faolan.ChatServer
 			}
 		}
 
-		// One friend's list entry:		// One friend's list entry: the id -> NAME binding (0x0014) then its state (0x0028), in retail's order. `presence`
+		// Claude as a VIRTUAL friend (#100): an always-online list entry with no character behind it. It works because
+		// this list is ONE-SIDED and server-pushed - there is no accept step and no roster the client validates an entry
+		// against, so an entry simply IS the two messages SendFriendEntry sends, and the client renders what it is told.
+		// The payoff is presence plus one-click access: a tell addressed to this id already routes into the MCP bridge
+		// (see the Whisper case), so the entry is the missing front door rather than a new channel.
+		//
+		// Deliberately NOT written to the Friends table: SenderId is not a character id, the FK would refuse it, and the
+		// entry is regenerated every login anyway. So a player who removes it gets it back next login - RemoveFriend
+		// echoes the id and the delete no-ops. Worth knowing before that reads as a bug.
+		private async Task SendClaudeFriendEntry(INetworkClient client)
+		{
+			await client.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(ClaudeChannel.SenderId, ClaudeChannel.SenderName)));
+
+			// Online, so the stamp takes the playfield-token branch - and Claude is in no playfield, which is exactly
+			// the case FriendStateCodec.OnlineStamp is the documented fallback for. LEVEL and CLASS are the two fields
+			// the client's hover tooltip shows and the wire encodes no "none" for either, so they are a choice rather
+			// than a fact: the level cap, and the support class, for a friend who exists to answer questions.
+			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendAdded,
+				FriendStateCodec.Build(ClaudeChannel.SenderId, true, ClaudeVirtualFriendLevel, ClaudeVirtualFriendClass, FriendStateCodec.OnlineStamp)));
+		}
+
+		// One friend's list entry: the id -> NAME binding (0x0014) then its state (0x0028), in retail's order. `presence`
 		// prepends the 0x0025 push, which retail sends on an ADD but NOT when restoring the list at login.
 		//
 		// ⚠️ The 0x0014 is not optional decoration. Without it the client holds an id and a state with no name attached
