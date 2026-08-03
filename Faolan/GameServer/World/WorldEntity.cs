@@ -44,6 +44,9 @@ namespace Faolan.GameServer.World
 		// loot bag; counts down while dead-and-not-yet-converted.
 		private double _corpseLingerRemaining;
 
+		// Time (seconds) until this defender moves a shield to another arc (#20); counts down while engaged.
+		private double _shieldShiftRemaining;
+
 		// Remaining time (seconds) until a loot bag expires.
 		private double _expiryRemaining;
 
@@ -376,6 +379,12 @@ namespace Faolan.GameServer.World
 		// stat broadcast that makes the client DRAW the NPC's weapon - without it the NPC swings empty-handed (#218).
 		// The tick flips this and emits an NpcEnterCombat/NpcExitCombat effect on the transition; reset on death/respawn.
 		public bool InCombat { get; set; }
+
+		// Directional combat (#20): this defender's blue shield rose - three guards spread over the left/mid/right
+		// arcs, decimal-packed the way CombatShieldIIR carries it. Rolled when the NPC engages and shifted by one
+		// shield every MinShiftSeconds..MaxShiftSeconds while it stays engaged; a swing into a covered arc is mitigated
+		// by the client's own PvE/PvP shield-bonus table. 0 = no rose (never engaged, or a non-combatant).
+		public uint ShieldDistribution { get; set; }
 		public bool Invisible { get; set; }
 
 		public bool IsCaster => Spells.Count > 0;
@@ -617,6 +626,7 @@ namespace Faolan.GameServer.World
 			_corpseLingerRemaining = CorpseLingerSeconds;
 			_corpseConverted = false;
 			InCombat = false; // combat ends on death; a respawn re-engages from a clean (sheathed) state
+			ShieldDistribution = 0; // the shield rose belongs to the fight; the next engage rolls a fresh one (#20)
 			Moving = false; // a mid-chase death stops moving (the corpse doesn't stream a trailing move, #272)
 		}
 
@@ -662,6 +672,30 @@ namespace Faolan.GameServer.World
 				return false;
 
 			_attackCooldownRemaining = interval;
+			return true;
+		}
+
+		// Rolls this defender's opening shield rose and arms the first shift (#20). Called on the engage transition, so
+		// each fight opens on its own distribution the way retail's do.
+		public void OpenShieldRose(Random random)
+		{
+			ShieldDistribution = CombatShieldRose.Roll(random);
+			_shieldShiftRemaining = CombatShieldRose.NextShiftSeconds(random);
+		}
+
+		// Advances the shield-shift timer by dt; on elapse moves one shield to another arc, re-arms, and returns true so
+		// the caller broadcasts the new rose. False while the rose is unrolled (never engaged) or the timer is running.
+		public bool TickShieldShift(double dt, Random random)
+		{
+			if (ShieldDistribution == 0)
+				return false;
+
+			_shieldShiftRemaining -= dt;
+			if (_shieldShiftRemaining > 0)
+				return false;
+
+			ShieldDistribution = CombatShieldRose.Shift(ShieldDistribution, random);
+			_shieldShiftRemaining = CombatShieldRose.NextShiftSeconds(random);
 			return true;
 		}
 
@@ -738,6 +772,7 @@ namespace Faolan.GameServer.World
 			LootItems.Clear();
 			_corpseConverted = false;
 			InCombat = false; // the fresh NPC starts idle (sheathed); re-aggro re-draws via the combat-mode broadcast
+			ShieldDistribution = 0; // ...and unrolls its shield rose until it engages again (#20)
 			Returning = false;
 			return true;
 		}

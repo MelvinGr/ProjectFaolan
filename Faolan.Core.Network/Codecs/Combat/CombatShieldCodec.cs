@@ -64,6 +64,16 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// CombatShieldIIR (0xCFFD0519).
 	public sealed record CombatShieldIIR(uint Handle, byte Env, uint Value);
 
+	// The three guard arcs the client's shield rose draws, in the digit order the packed `Value` uses. Named for the
+	// client's own `ShieldDirection_e` / `Combat_Shield_{Left,Mid,Right}` (AgeOfConan.exe); the LDB renders them
+	// `ShieldLeft%1%` / `ShieldUp%1%` / `ShieldRight%1%`, so `Mid` is the overhead arc.
+	public enum ShieldArc
+	{
+		Left,
+		Mid,
+		Right
+	}
+
 	// The decimal packing of the guard `Value`. Not encoding - it is how one field's digits mean three arcs, which is
 	// the client's own convention, so it stays off the codec's surface (#530 rule 1).
 	public static class CombatShieldDistribution
@@ -73,6 +83,23 @@ namespace Faolan.Core.Network.Codecs.Combat
 		public static uint Pack(uint left, uint mid, uint right)
 		{
 			return left * 100 + mid * 10 + right;
+		}
+
+		public static (uint Left, uint Mid, uint Right) Unpack(uint value)
+		{
+			return (value / 100 % 10, value / 10 % 10, value % 10);
+		}
+
+		// How many shields cover one arc.
+		public static uint Count(uint value, ShieldArc arc)
+		{
+			var (left, mid, right) = Unpack(value);
+			return arc switch
+			{
+				ShieldArc.Left => left,
+				ShieldArc.Mid => mid,
+				_ => right
+			};
 		}
 	}
 }

@@ -250,6 +250,18 @@ namespace Faolan.GameServer.Combat
 			var crit = CombatResolver.IsCriticalHit(attackerEntity?.CriticalRating ?? 0, Random.Shared.Next(100));
 			if (crit)
 				damage = (uint)CombatResolver.ApplyCritDamage((int)damage, attackerEntity?.CriticalDamageRating ?? 0);
+
+			// #20 directional combat: the swing carries the direction it came from as the LAST word of the request tail
+			// (the Upper Left / Upper Right / Overhead attack ability), and the defender's shield rose says how many of
+			// its three guards cover that arc. An unguarded arc takes 20% MORE, a triple-stacked one 66% less - the
+			// client's own Combat_PvE{0..3}ShieldBonus table. A swing with no direction (a combo step, a spell) is
+			// undirected and passes through unchanged.
+			var swingArc = CombatShieldRose.ArcFor(BehaviorTailScan.AbilityId(BehaviorControlCenterCodec.Parse(rawPayload.AsSpan(sizeof(uint))).Tail));
+			var guard = attackerEntity != null && _sim.World.TryGetZone(attackerEntity.MapId, out var attackerZone)
+				&& attackerZone.TryGet(targetHandle, out var defender)
+					? defender.ShieldDistribution
+					: 0;
+			damage = CombatShieldRose.ApplyArcMitigation(damage, guard, swingArc);
 			const DamageSchool school = DamageSchool.Crushing; // the player's physical-melee damage school (capture-derived)
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing. The record (header, echoed args, 81-byte result

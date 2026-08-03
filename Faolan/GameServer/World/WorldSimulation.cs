@@ -823,6 +823,15 @@ namespace Faolan.GameServer.World
 									break;
 								}
 
+								case WorldTickEffectType.NpcShieldRose:
+								{
+									// #20 directional combat: the defender's blue guard arcs. Gated with the combat sim - the
+									// rose only means anything when the NPC is actually fighting back.
+									if (NpcAutoAttackEnabled)
+										await _output.BroadcastNpcShieldRose(effect.Entity);
+									break;
+								}
+
 								case WorldTickEffectType.NpcStopped:
 								{
 									// The NPC arrived home and stopped; close its move with a StopIIR (#190).

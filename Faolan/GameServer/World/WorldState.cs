@@ -232,6 +232,12 @@ namespace Faolan.GameServer.World
 					if (heartbeatDue)
 						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcHeartbeat));
 
+					// #20: while engaged, the defender moves one shield to another arc every 5-12s (the captured cadence),
+					// so the attacker has to keep re-aiming at the weakest arc. Per-entity timer, not a shared accumulator -
+					// each captured NPC shifts on its own clock.
+					if (entity.TickShieldShift(deltaSeconds, Random.Shared))
+						effects.Add(new WorldTickEffect(entity, WorldTickEffectType.NpcShieldRose));
+
 					// Ambient chatter: NPCs that have captured bark lines (NpcChatter) occasionally speak, staggered by
 					// the per-NPC random roll so they don't all bark at once. The processor picks a random line + sends
 					// it to nearby players (cosmetic). NPCs without a captured group stay silent.
@@ -447,6 +453,18 @@ namespace Faolan.GameServer.World
 				effects.Add(new WorldTickEffect(e, inCombat
 					? WorldTickEffectType.NpcEnterCombat
 					: WorldTickEffectType.NpcExitCombat, target));
+
+				// #20: engaging opens the defender's shield rose (and arms its first shift); disengaging closes it, so a
+				// fresh fight starts on a fresh distribution the way each captured engagement does.
+				if (inCombat)
+				{
+					e.OpenShieldRose(Random.Shared);
+					effects.Add(new WorldTickEffect(e, WorldTickEffectType.NpcShieldRose, target));
+				}
+				else
+				{
+					e.ShieldDistribution = 0;
+				}
 			}
 
 			// Steps `e` toward (dx,dz) this tick and queues a move broadcast ONLY once it has travelled a retail-sized

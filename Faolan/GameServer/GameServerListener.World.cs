@@ -32,6 +32,11 @@ namespace Faolan.GameServer
 			return _broadcaster.BroadcastNpcHeartbeat(npc);
 		}
 
+		Task IWorldOutbound.BroadcastNpcShieldRose(WorldEntity npc)
+		{
+			return _broadcaster.BroadcastNpcShieldRose(npc);
+		}
+
 		Task<WorldEntity?> IWorldOutbound.SwapEncounterLureForBoss(WorldEntity lure)
 		{
 			return _broadcaster.SwapEncounterLureForBoss(lure);

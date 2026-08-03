@@ -21,6 +21,7 @@ namespace Faolan.GameServer.World
 		EncounterBark, // a scripted-encounter LURE (Entity) noticed an approaching player (Target) at its bark radius - cry for help once (#502)
 		EncounterTrigger, // a player (Target) closed to the LURE's (Entity) trigger radius - swap the lure for its boss (#502)
 		EncounterReset, // a scripted-encounter BOSS (Entity) is gone; put its lure back where it stood (#502)
+		NpcShieldRose, // the NPC's (Entity) directional-combat shield rose changed - it engaged, or the shift timer moved a guard to another arc; broadcast the CombatShieldIIR (#20)
 		NpcChatter // an ambient bystander bark: the NPC (Entity) local-says a random RenownBystanderLovers line to nearby players (chat server), purely cosmetic
 	}
 

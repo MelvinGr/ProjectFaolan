@@ -173,9 +173,57 @@ NPCs clustered around the target - `CombatTargeting.CleaveTargets` selects them 
 entities within `DefaultCleaveRadius` of the primary, excluding the primary/players/non-hostile/dead, nearest
 first, capped at `DefaultMaxCleaveTargets`). Each secondary gets its own `DamageResultIIR` + the full
 damage/kill lifecycle. This is the flat "everyone in the cluster takes the swing" half; the directional arc +
-per-direction shield mitigation is #20 (decode #1 = the swing tail direction-ability id, done). The cleave is
+per-direction shield mitigation is the section below. The cleave is
 TARGET-centered rather than a true player-facing cone because the rotation->forward convention isn't decoded;
 radius + cap are provisional, tuned in-client.
+
+## Directional combat: the shield rose (#20)
+
+AoC's signature melee is DIRECTIONAL — the attacker picks an arc, and the defender spreads a finite guard
+across the same arcs, so the swing is worth more into whichever arc is thinnest.
+
+**The arcs.** Three, named by the client itself: `ShieldDirection_e` / `ShieldDirection_n`, the UI strings
+`Combat_Shield_{All,Left,Mid,Right}` and the LDB lines `ShieldLeft%1%` / `ShieldUp%1%` / `ShieldRight%1%` — so
+"Mid" is the overhead arc. The rose is drawn by `CombatRoseView_c` (vtable `0x020a216c`), fed by
+`TargetingModule_t`.
+
+**The attack direction** rides the swing as the LAST word of the `BehaviorControlCenterIIR` request tail — the
+`Normal Attack` ability id, LDB-named: `769094` *Upper Left Attack*, `769095` *Upper Right Attack*, `769099`
+*Overhead Attack*. `769096` / `769097` (*Lower* Left/Right) exist in the ability catalog with slot 0 and appear
+in no capture. `CombatShieldRose.ArcFor` maps them; an ability that is none of the five is undirected and takes
+no arc modifier [V3: CombatShieldRoseTests.ArcFor_MapsTheDirectionAbilitiesToTheirArc].
+
+**The defender's guard** is `CombatShieldIIR` (`0xCFFD0519`, `CombatShieldCodec`) — one u32, decimal-packed
+hundreds=Left, tens=Mid, units=Right, stored by the client as stat `0xA5`. All 110 captured records spread
+exactly **three** shields, and the ten possible spreads all occur
+[V3: CombatShieldRoseTests.EveryCapturedDistribution_SpreadsExactlyThreeShields].
+
+**The shift is a single-shield move on a 5–12 s timer, NOT a reaction to where you swing.** 34 of the 39
+captured transitions move exactly one shield from one arc to another (4 re-send the same value; the one
+3-shield jump, `030 -> 003`, reads as a lossy capture collapsing steps)
+[V3: CombatShieldRoseTests.Shift_MovesExactlyOneShieldToADifferentArc]. The intervals have a hard floor at
+5.0 s with 34 of 39 inside [5, 12] (median 7.3 s) and the five above consistent with dropped packets. The
+"defender AI shifts its guard toward where it is being hit" premise does **not** survive the corpus: over the
+26 transitions with a single gaining arc and at least one swing since the previous update, the gaining arc is
+the most-attacked arc 9 times — **35%, against 33% by chance**
+[V2: Blablabla_soldier-guardian_create_random-actions-combat-levelup-questcomplete.tshark.json].
+The opening spread is likewise flat across the ten compositions (71 engagements, chi-square 2.8 against
+uniform, 9.3 against a per-shield multinomial), so it is rolled, not derived from the NPC.
+
+**The mitigation is the client's own balance sheet, and it is OURS to apply.** RDB 1000516 carries
+`Combat_PvE{0..3}ShieldBonus` = **0.2 / 0 / −0.33 / −0.66** and `Combat_PvP{0..3}ShieldBonus` =
+**0.2 / 0 / −0.15 / −0.30**, indexed by the shields covering the struck arc — a *positive* entry is a bonus to
+the attacker, so an unguarded arc takes 20% more. Ghidra `TweakGlobals` reports **reads=0** on all eight (they
+are registered and never consumed), which is the same tell recast had: these are server numbers shipped in the
+client's tuning table [V1: docs/rdb/client-tweak-table.md].
+
+**Server side.** `CombatShieldRose` (roll / shift / cadence / arc mapping / mitigation) is the policy;
+`WorldEntity.OpenShieldRose` + `TickShieldShift` hold the per-defender state. `WorldState.Tick` rolls the rose
+on the engage transition and shifts it on each entity's own timer, emitting `NpcShieldRose`, which
+`WorldBroadcaster.BroadcastNpcShieldRose` turns into the `CombatShieldIIR` for every CONFIRMED viewer (the
+heartbeat's gating — the rose is drawn on the dynel). `CombatService.SendNormalAttackResponse` reads the swing's
+arc and scales the damage by the table. The rose closes on disengage and on death, so each fight opens on a
+fresh one.
 
 ## NPC counter-attack animation ack (decoded 2026-06-15)
 

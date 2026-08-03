@@ -480,6 +480,20 @@ namespace Faolan.GameServer.World
 			}
 		}
 
+		// The defender's shield rose changed (it engaged, or the shift timer moved a guard): send the CombatShieldIIR to
+		// every viewer that has it CONFIRMED, the same gating as the heartbeat - the rose is drawn ON the dynel, so a
+		// still-loading client has nothing to draw it over.
+		public async Task BroadcastNpcShieldRose(WorldEntity npc)
+		{
+			var record = CombatShieldCodec.Build(npc.Handle, npc.ShieldDistribution);
+
+			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			{
+				if (viewer.Client != null && viewer.Confirmed.Contains(npc.Handle))
+					await WorldIir.Send(viewer.Client, record);
+			}
+		}
+
 		// An NPC moved a retail-sized segment (chasing a target, or returning home): send its MoveTask to every player in
 		// range that already sees it. The body is the 61-byte transform form for the SEGMENT (MoveFrom -> Position, facing
 		// the travel direction); the throttle in WorldState.Tick (#272) only queues this once the NPC has covered
