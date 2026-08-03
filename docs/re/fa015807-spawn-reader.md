@@ -70,7 +70,63 @@ FA015807 records: 4558   version==0x05: 4558/4558   framing failures: 0
 CoreChar ver==0x41 (count==0 records): 4444/4444
 ```
 
-## Kind-level Ghidra RE — the block is a fixed-width char buffer, read as 53×U32 (2026-06-15, DONE)
+## The scaffold is a STAT BLOCK — every slot carries a stat id (2026-08-03, #603)
+
+The scaffold had been filed as opaque per-instance runtime state: reproducible, zero on a fresh spawn, and
+otherwise unattributed. It is not opaque. **`SimpleCharFullUpdateIIR_t::Apply` (`FUN_011215e0`) pushes every
+slot into the dynel as `SetStat(statId, value)` — an explicit id per slot** `[V1:
+tools/ghidra/DumpScaffoldConsumers.java]`, so the block has a key, and the key is a stat id space we already
+name elsewhere.
+
+Found by scanning every instruction for references to the 53 struct offsets and keeping only functions touching
+**≥5 distinct** ones — a shape no unrelated class shares. The reader `FUN_01121c00` comes back with all 53,
+which is the control; `FUN_011215e0` sits beside it in the same translation unit and starts with a
+`dynamic_cast` of its argument to `SimpleChar_t`.
+
+`SpawnPreIir.WordStatIds` and `SpawnPreIir.FlagStatIds` carry the mapping. What it says the block holds is the
+character's **PvP / minigame career**:
+
+| slot | struct | stat | LDB name |
+|---|---|---|---|
+| flag 1 | `+0x1dc` | `0x01F` | Archetype |
+| flag 2 | `+0x1dd` | `0x043` | **Class** |
+| flag 3 | `+0x1de` | `0x12E` | Prestige Class |
+| word 0 | `+0x184` | `0x564` | Fatalities |
+| word 2 / 4 | `+0x18c` / `+0x194` | `0x29A` / `0x29B` | Annihilation Wins / Losses |
+| word 27 / 28 | `+0x1a4` / `+0x1ac` | `0x29C` / `0x29D` | Capture the Skull Wins / Losses |
+| word 31 / 32 | `+0x1cc` / `+0x1d4` | `0x29E` / `0x29F` | Siege Wins / Losses |
+| word 6 | `+0x19c` | `0x560` | Minigames Abandoned |
+| word 13 | `+0x1e0` | `0x0A5` | Shield Allocation |
+| word 34 | `+0x1e4` | `0x090` | Soul Fragments |
+
+47 of the 53 words and 5 of the 6 flags get a stat id; the six trailing words (`+0x24c`..`+0x264`) are the
+sublist's own state, not stats. The ids sit next to `Kills` (`0x290`) and `Deaths` (`0x292`), and most of the
+`0x545..0x593` run is one long unnamed block of the same family.
+
+**Two independent corroborations**, which is what makes a hand-transcribed Ghidra table trustworthy: the class
+byte lands on stat `0x043`, the id #239 recovered from the in-client character sheet, and `+0x1e0` lands on
+`0x0A5` = `CharacterStatId.ShieldAllocation`, which was named long before this. `SpawnPreIirTests` gates both.
+
+**This also explains why the block is all zeros.** An NPC has no PvP career and a fresh character has no
+career yet — so "every word is 0 on an idle fresh spawn" was the right observation with the wrong cause under
+it. The from-scratch minimal scaffold stays exactly as it is; what changes is that the zeros are now *known* to
+be zeros rather than assumed safe. When minigames/PvP stats are implemented (#146 / #503), this is where they
+go out.
+
+### ⚠️ It conflicts with the char-buffer reading below, and the apply says how
+
+The section that follows concludes the same `0x184..0x264` region is an inline **char buffer** holding an NPC's
+RDB script-binding text — decoded, contiguous, and not a coincidence. Both cannot be true of the same bytes for
+the same entity.
+
+The leading reconciliation, from the apply's own control flow: the whole stat block is written inside
+`if (virtual_predicate_0x60(dynel) == 0)`, and only **three** stats are applied unconditionally outside it
+(`+0x1e0` `0x0A5`, `+0x1e4` `0x090`, `+0x208` `0x57F`). So the region is plausibly a **union discriminated by
+dynel kind** — PvP career for a player character, script-binding text for an NPC — which would make both
+decodes right about their own half. That predicate has not been identified, so this is a hypothesis with the
+branch to check, not a finding. Open in Gitea #603.
+
+## Kind-level Ghidra RE — the block is a fixed-width char buffer, read as 53×U32 (2026-06-15, superseded in part — see above)
 The original plan was a **column↔offset map**: diff the 53 scaffold U32s across spawn rows, find the few
 that vary, feed each from a DB column. That model was wrong, and so was a first guess that the slots were a
 mix of `ReadFloat` / string-blob reads. Decompiling the readers themselves settles it

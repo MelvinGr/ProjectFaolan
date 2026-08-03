@@ -1,4 +1,6 @@
+using System.Linq;
 using Faolan.Core;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Tests.Support;
 using Xunit;
@@ -12,6 +14,36 @@ namespace Faolan.Tests
 	// the from-DB path owns the grammar in code instead of slicing the blob.
 	public class SpawnPreIirTests
 	{
+		// The scaffold's slot -> STAT ID key, recovered from SimpleCharFullUpdateIIR_t::Apply (#603). Two things a
+		// hand-transcribed Ghidra table gets wrong quietly, so both are gated: it must stay parallel to the struct-
+		// offset table it is read against, and it must not name the same stat twice - a duplicate means a row was
+		// copied down when the offsets diverged, which is exactly the transcription slip that would otherwise sit
+		// there naming the wrong slot forever.
+		[Fact]
+		public void TheStatKeyIsParallelToTheStructOffsetsAndNamesEachStatOnce()
+		{
+			Assert.Equal(SpawnPreIir.WordCount, SpawnPreIir.WordStructOffsets.Length);
+			Assert.Equal(SpawnPreIir.WordCount, SpawnPreIir.WordStatIds.Length);
+			Assert.Equal(SpawnPreIir.FlagCount, SpawnPreIir.FlagStatIds.Length);
+
+			var applied = SpawnPreIir.WordStatIds.Concat(SpawnPreIir.FlagStatIds).Where(id => id != 0).ToList();
+			Assert.Equal(applied.Count, applied.Distinct().Count());
+		}
+
+		// The slots the key can be checked against a SECOND, independent source. The LDB stat-name table
+		// (docs/re/ldb-stat-names.md, recovered from the client's own strings rather than from this apply function)
+		// names 0x01F Archetype, 0x043 Class, 0x12E Prestige Class and 0x0A5 Shield Allocation - and the flag whose
+		// index #239 identified as the class byte from the in-client character sheet lands on exactly 0x043. If the
+		// transcribed mapping were off by a row, these are what break first.
+		[Fact]
+		public void TheNamedSlotsAgreeWithTheLdbStatTable()
+		{
+			Assert.Equal(0x01Fu, SpawnPreIir.FlagStatIds[SpawnPreIir.ArchetypeFlagIndex]);
+			Assert.Equal(0x043u, SpawnPreIir.FlagStatIds[SpawnPreIir.ClassFlagIndex]);
+			Assert.Equal(0x12Eu, SpawnPreIir.FlagStatIds[SpawnPreIir.PrestigeClassFlagIndex]);
+			Assert.Equal((uint)CharacterStatId.ShieldAllocation, SpawnPreIir.WordStatIds[13]);
+		}
+
 		// The from-scratch FRESH-SPAWN scaffold, built from NOTHING (no captured Data, no DB columns, no session
 		// re-addressing), reproduces a real captured minimal NPC byte-for-byte. SpawnNpcMinimalPanther is
 		// Kier-Dheed's Panther: its pre-IIR has all 53 words 0 except the category word (0x6f) and all flags 0.

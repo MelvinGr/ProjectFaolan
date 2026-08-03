@@ -49,11 +49,60 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		public const uint DefaultCategory = 0x6f;
 
 		// Flags index of the frame's archetype byte (Soldier 1 / Priest 2 / Rogue 3 / Mage 4), abs @135 in the spawn
-		// body. The only genuinely per-character field in the whole scaffold besides the class byte.
+		// body. Applied to the dynel as stat 0x01F `Archetype`.
 		public const int ArchetypeFlagIndex = 1;
 
-		// Flags index of the class byte (0x12 Barbarian .. 0x2c Demonologist), abs @136.
+		// Flags index of the class byte (0x12 Barbarian .. 0x2c Demonologist), abs @136. Applied as stat 0x043
+		// `Class` - which is the corroboration for the whole FlagStatIds/WordStatIds mapping below: 0x043 is what
+		// #239 named the class stat from an entirely different direction (the in-client character sheet).
 		public const int ClassFlagIndex = 2;
+
+		// Flags index of the PRESTIGE class byte, abs @137 - stat 0x12E. Named by the apply, not by a capture: it is
+		// 0 in every captured frame, because prestige classes are Rise of the Godslayer content nothing in the corpus
+		// had.
+		public const int PrestigeClassFlagIndex = 3;
+
+		// The stat id each of the 6 flag bytes is applied to, in flag order. 0 = the byte is not applied as a stat
+		// (flag 0 is consumed as a plain field). See WordStatIds for where these come from.
+		public static readonly uint[] FlagStatIds = [0, 0x01F, 0x043, 0x12E, 0xF4261, 0xF4260];
+
+		/// <summary>
+		///     The dynel STAT ID each of the 53 u32 is applied to, in WIRE order - parallel to
+		///     <see cref="WordStructOffsets" />. 0 where the slot is not applied as a stat (the six trailing words,
+		///     which carry the sublist's own state, and the two byte-packed words whose individual bytes go to
+		///     <see cref="FlagStatIds" /> instead).
+		///     <para>
+		///         Recovered from <c>SimpleCharFullUpdateIIR_t::Apply</c> (<c>FUN_011215e0</c>, found by
+		///         <c>tools/ghidra/DumpScaffoldConsumers.java</c>), which walks the struct region the reader filled and
+		///         pushes every slot into the dynel as <c>SetStat(statId, value)</c> - an explicit id per slot, not a
+		///         positional copy. So the scaffold is not the opaque per-instance state it was filed as: it is a STAT
+		///         BLOCK, and this is its key.
+		///     </para>
+		///     <para>
+		///         What the ids say it holds is the character's PvP / MINIGAME CAREER: the LDB stat table names
+		///         `Fatalities` (0x564), `Minigames Abandoned` (0x560), and the `Annihilation` / `Capture the Skull` /
+		///         `Siege` win-loss pairs (0x29A..0x29F), sitting beside `Kills` (0x290) and `Deaths` (0x292). That is
+		///         why the block is all zeros on every NPC and on a fresh character - an NPC has no PvP career - which
+		///         is the same observation the "per-instance runtime state, 0 on a fresh spawn" reading was built on,
+		///         with the right cause under it.
+		///     </para>
+		///     <para>
+		///         Two slots are FLOATS: words 14 (0x546) and 35 (0x545) go out through a different setter on the
+		///         stat vtable (+0x1c rather than +0xc), which is the one place the apply distinguishes a type. That
+		///         is also what <see cref="ConstantWordIndex" /> is about - a word reading 0x41700000 is 15.0f, and a
+		///         float slot is where a float belongs.
+		///     </para>
+		///     <para>
+		///         ⚠️ Most of the 0x545..0x593 run is NOT named by the LDB table (5 of ~80 ids are), so a slot here
+		///         carries a stat id we can address but not yet name. Naming them is LDB/in-client work, not more RE.
+		///     </para>
+		/// </summary>
+		public static readonly uint[] WordStatIds =
+		[
+			0x564, 0x569, 0x29A, 0x56A, 0x29B, 0x570, 0x560, 0x56B, 0x571, 0x572, 0x56D, 0x56E, 0x573, 0x0A5, 0x546, 0, 0x56C, 0xF428F, 0x1E86AE, 0x579, 0x57F, 0x58C, 0x589, 0x584, 0x585, 0x586,
+			0x575, 0x29C, 0x29D, 0xF425A, 0xF4259, 0x29E, 0x29F, 0, 0x090, 0x545, 0xF425C, 0xF425B, 0x587, 0x58D, 0x588, 0x58E, 0x58F, 0x590, 0x591, 0x592, 0x593, 0, 0, 0, 0, 0,
+			0
+		];
 
 		// Word index of a word that is 0x41700000 (float 15.0) in every captured player frame and 0 on NPCs. Named
 		// for what it is - a constant we can reproduce but cannot yet attribute.
