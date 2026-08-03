@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using Faolan.Core.Database;
 using Faolan.Core.Database.Attributes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -103,6 +105,42 @@ namespace Faolan.Tests
 			Assert.Contains("Privileges", warnings);
 			Assert.Contains("[Flags]", warnings);
 			Assert.DoesNotContain("Row.State", warnings); // and says nothing about the one it did constrain
+		}
+
+		// The rule the attribute's own remarks state - "put it on CLOSED enums only: NOT open ones like
+		// CharacterStatId" - applied to the REAL model rather than restated in prose (#452).
+		//
+		// It was stated twice (on the attribute and in DatabaseContext.OnModelCreating) and violated twice, and the
+		// violation was harmless only by luck: every stat id in the shipped ItemStatModifiers and ClassAttributeBases
+		// happens to be a declared member. `FeatEffect.StatId` is what it looks like when the luck runs out - the SAME
+		// id space, where feats touch 158 ids of which 127 are undeclared, so a CHECK there would reject four fifths
+		// of the table. An importer meeting an unnamed id would have failed as a SQLite constraint violation a long
+		// way from the schema decision that caused it.
+		//
+		// CharacterStatId is the only open enum today; the gate is written against the ATTRIBUTE's own reason - the
+		// enum carrying Unknown fillers for undecoded ids - so a second open enum is caught the day it gets one.
+		[Fact]
+		public void NoOpenEnumColumnIsConstrained()
+		{
+			var offenders = typeof(DatabaseContext).Assembly.GetTypes()
+				.SelectMany(t => t.GetProperties())
+				.Where(p => p.GetCustomAttribute<ConstrainToEnumValuesAttribute>() != null)
+				.Select(p => (Property: p, Enum: Nullable.GetUnderlyingType(p.PropertyType) ?? p.PropertyType))
+				.Where(x => x.Enum.IsEnum && IsOpen(x.Enum))
+				.Select(x => $"{x.Property.DeclaringType?.Name}.{x.Property.Name} ({x.Enum.Name})")
+				.ToArray();
+
+			Assert.True(offenders.Length == 0,
+				"[ConstrainToEnumValues] emits a CHECK against the enum's DECLARED members, so it must not go on an " +
+				"OPEN enum - one still carrying Unknown fillers for undecoded ids. The first row with an unnamed id " +
+				$"fails the CHECK on insert and reads as a corrupt capture. Offending columns: {string.Join(", ", offenders)}");
+		}
+
+		// An enum is OPEN when it declares placeholders for values it has not decoded yet - the property the
+		// attribute's remarks single CharacterStatId out for. A closed enum names every value it accepts.
+		private static bool IsOpen(Type enumType)
+		{
+			return Enum.GetNames(enumType).Any(n => n.StartsWith("Unknown", StringComparison.Ordinal));
 		}
 	}
 }

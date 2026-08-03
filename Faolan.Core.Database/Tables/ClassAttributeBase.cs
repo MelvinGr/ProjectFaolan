@@ -26,7 +26,15 @@ namespace Faolan.Core.Database.Tables
 		public uint Level { get; set; }
 
 		// The wire stat id: 0x0324..0x032E attributes, 0x0001 MaxHealth, 0x0118 Non Combat Mana Regen.
-		[ConstrainToEnumValues]
+		//
+		// ⚠️ NO [ConstrainToEnumValues], and deliberately so (#452). That attribute emits a CHECK against the enum's
+		// DECLARED members, and its own remarks name CharacterStatId as the enum NOT to apply it to: the enum is a
+		// catalog of the stats we have NAMED, not of the stat space, and it carries Unknown fillers precisely because
+		// wire stat ids are still being decoded. FeatEffect.StatId is the demonstration - the SAME id space, where
+		// feats touch 158 ids and 127 are undeclared, so the CHECK would have rejected four fifths of that table.
+		// It was harmless here only by luck (all shipped ids happen to be declared); the first import meeting an
+		// unnamed id would have failed as a SQLite constraint violation a long way from the schema decision that
+		// caused it, reading as a corrupt capture. Typed as the enum anyway, because the value IS one.
 		public CharacterStatId StatId { get; set; }
 
 		// The base at wire scale (see class remarks). Signed for consistency with ItemStatModifier; every observed

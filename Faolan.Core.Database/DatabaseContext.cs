@@ -269,7 +269,10 @@ namespace Faolan.Core.Database
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
 			// Enum columns marked [ConstrainToEnumValues] get a generated CHECK constraint (the allowed list is built from
-			// the enum, so it stays in sync). CharacterStatId is intentionally left open (Unknown fillers for undecoded ids).
+			// the enum, so it stays in sync). CharacterStatId is intentionally left OPEN (Unknown fillers for undecoded
+			// ids) and so must never carry the attribute - a rule that was stated here and on the attribute and
+			// violated in two tables anyway, so it is now GATED by
+			// ConstrainToEnumValuesTests.NoOpenEnumColumnIsConstrained rather than restated (#452).
 			ConstrainToEnumValuesAttribute.ApplyEnumCheckConstraints(modelBuilder, Database.IsNpgsql());
 
 			// Natural-key catalogs whose Id is an external id set by the importer (RDB/wire id), never DB-generated - so
