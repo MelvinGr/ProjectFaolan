@@ -231,7 +231,11 @@ what the entity is DOING. This is what found that the post-IIR header's third wo
 5,739 NPC spawns and 209 of 209 player ones — retiring the duplicate `MinimalPostIirWord2` column and taking
 `--report spawn-diff` from 336 to 508 byte-exact rebuilds (#605). ⚠️ Read purity together with CARDINALITY: purity
 rises for free with the number of distinct candidate values, so a candidate as fine-grained as the sample scores 100%
-while explaining nothing. The table marks those `(fine)`; a real answer is COARSE and near-100%),
+while explaining nothing. The table marks those `(fine)`; a real answer is COARSE and near-100%. ⚠️ Both this
+report and `field-stability` read PRESENCE through `ShouldSerializeX()`, not off the property: protobuf-net
+generates `get => __pbn__X.GetValueOrDefault()`, so an unset optional field reads back as 0 and would be scored as
+one retail sent. Correcting that is what showed `npc_stats.spawn_animation` is never sent as 0 at all — it is
+`(unset)` on 5,265 spawns and `1` on 474, a presence flag rather than a number, #607),
 `scaffold-heap` (the RETAIL SERVER's own memory, harvested out of the NPC spawn scaffold: retail writes 3 of the
 53 scaffold words on an NPC spawn and sends the other 50 carrying whatever was there, so 17,400 captured spawns
 ship 3.3 MB of server-side data. Yields the script engine's ScriptGroup catalogue and C++ source-file inventory,

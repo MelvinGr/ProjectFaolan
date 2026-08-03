@@ -1675,6 +1675,14 @@ namespace Faolan.Importer.Cli
 		// Flattens a protobuf message to name -> printed value, one entry per scalar leaf. Collections are
 		// reported by COUNT: their contents are a separate question (equipment has its own lifted table) and a
 		// per-element key would drown the per-field one this report exists to answer.
+		//
+		// ⚠️ PRESENCE IS A VALUE, and it has to be read through `ShouldSerializeX()` rather than off the property.
+		// protobuf-net generates `get => __pbn__X.GetValueOrDefault()`, so an UNSET optional field reads back as 0
+		// and is indistinguishable from one retail actually sent as 0. Both reports were scoring it that way, which
+		// silently merged "the type does not carry this field" into "the type sends zero" - for
+		// `npc_stats.spawn_animation` that is 904 of 1018 types folded into the modal bucket, i.e. most of what
+		// looked like a 92% agreement. Presence is load-bearing everywhere else in this codebase (`Lift` copies a
+		// field only when it is set, which is what keeps a rebuilt body byte-identical), so it is load-bearing here.
 		private static List<(string Field, string Value)> FieldValues(object? message, string prefix = "", int depth = 0)
 		{
 			var values = new List<(string, string)>();
@@ -1705,6 +1713,13 @@ namespace Faolan.Importer.Cli
 					case null:
 						values.Add((name, "(absent)"));
 						continue;
+				}
+
+				if (message.GetType().GetMethod("ShouldSerialize" + prop.Name, System.Type.EmptyTypes) is { } present
+					&& present.Invoke(message, null) is false)
+				{
+					values.Add((name, "(unset)"));
+					continue;
 				}
 
 				if (prop.PropertyType.IsPrimitive || prop.PropertyType == typeof(string) || prop.PropertyType.IsEnum)

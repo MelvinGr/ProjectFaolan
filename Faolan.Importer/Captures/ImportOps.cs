@@ -2045,25 +2045,44 @@ namespace Faolan.Importer.Captures
 			// The mode is a measurement of the type's OWN sightings, not a corpus-wide guess - which is the line #602
 			// drew. It also covers strictly more types than the old scan: that one needed a minimal-form capture, while
 			// `movement_mode` is present on every captured NPC spawn.
+			//
+			// `npc_stats.spawn_animation` gets the same treatment for the same reason. It is the other field #605
+			// named, `--report field-predictors` finds NOTHING in the spawn body that predicts it (no coarse candidate
+			// beats the 91.7% a constant scores), and it is 77.9% type-stable over fresh sightings - so it has no
+			// derivation and no resting value, and the only honest improvement left is to stop letting the FIRST
+			// sighting speak for the type.
 			var movementModes = new Dictionary<uint, Dictionary<uint, int>>();
+			var spawnAnimations = new Dictionary<uint, Dictionary<uint, int>>();
 			foreach (var e in entries)
 			{
 				if (e.TemplateId == 0)
 					continue;
 
 				var b = WorldObjectColumns.ExtractBody(e.Data);
-				if (b == null || !SpawnBodyReader.TryReadCharacterMessage(b, out var seen) || !seen.Message.ShouldSerializeMovementMode())
+				if (b == null || !SpawnBodyReader.TryReadCharacterMessage(b, out var seen))
 					continue;
 
-				var tally = movementModes.TryGetValue(e.TemplateId, out var t) ? t : movementModes[e.TemplateId] = [];
-				tally[seen.Message.MovementMode] = tally.GetValueOrDefault(seen.Message.MovementMode) + 1;
+				if (seen.Message.ShouldSerializeMovementMode())
+					Tally(movementModes, e.TemplateId, seen.Message.MovementMode);
+				if (seen.Message.npc_stats?.ShouldSerializeSpawnAnimation() == true)
+					Tally(spawnAnimations, e.TemplateId, seen.Message.npc_stats.SpawnAnimation);
 			}
 
-			// Ties broken by the LOWER mode so the lift is deterministic - a dictionary's enumeration order is not a
+			static void Tally(Dictionary<uint, Dictionary<uint, int>> into, uint template, uint value)
+			{
+				var tally = into.TryGetValue(template, out var t) ? t : into[template] = [];
+				tally[value] = tally.GetValueOrDefault(value) + 1;
+			}
+
+			// Ties broken by the LOWER value so the lift is deterministic - a dictionary's enumeration order is not a
 			// tie-break, and a non-deterministic one would churn faolan.sql on every re-import for no semantic change.
-			var modalMovementMode = movementModes.ToDictionary(
-				kv => kv.Key,
-				kv => kv.Value.OrderByDescending(m => m.Value).ThenBy(m => m.Key).First().Key);
+			var modalMovementMode = Modal(movementModes);
+			var modalSpawnAnimation = Modal(spawnAnimations);
+
+			static Dictionary<uint, uint> Modal(Dictionary<uint, Dictionary<uint, int>> tallies)
+			{
+				return tallies.ToDictionary(kv => kv.Key, kv => kv.Value.OrderByDescending(m => m.Value).ThenBy(m => m.Key).First().Key);
+			}
 
 			foreach (var e in entries)
 			{
@@ -2107,12 +2126,14 @@ namespace Faolan.Importer.Captures
 					}
 				}
 
-				// #605: the movement mode is the one field the representative spawn must NOT decide on its own - it is
-				// rolled per spawn event, so overwrite whatever Lift took from the representative with the modal value
-				// over all of this type's sightings. Presence is preserved: a type that never sends the field keeps it
+				// #605: these two are the fields the representative spawn must NOT decide on its own - both are rolled
+				// per spawn event, so overwrite whatever Lift took from the representative with the modal value over
+				// all of this type's sightings. Presence is preserved: a type that never sends the field keeps it
 				// null, which keeps it off the wire.
-				if (npc.StatCore?.MovementMode != null && modalMovementMode.TryGetValue(e.TemplateId, out var modal))
-					npc.StatCore.MovementMode = modal;
+				if (npc.StatCore?.MovementMode != null && modalMovementMode.TryGetValue(e.TemplateId, out var modalMove))
+					npc.StatCore.MovementMode = modalMove;
+				if (npc.StatCore?.SpawnAnimation != null && modalSpawnAnimation.TryGetValue(e.TemplateId, out var modalAnim))
+					npc.StatCore.SpawnAnimation = modalAnim;
 			}
 
 			await db.SaveChangesAsync();

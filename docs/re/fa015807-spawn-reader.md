@@ -299,7 +299,7 @@ about. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameGra
     wrong: it is rolled per spawn EVENT, 61.9% stable across templates even when restricted to freshly-spawned
     NPCs with no move task and no buffs. The type-stability claim was unfalsifiable by construction, because the
     importer scan behind it stopped at the FIRST sighting of each type.
-  - What 1/2/3 MEAN is still open (Gitea #607). What the corpus says: of the 562 spawns carrying an active
+  - What 1/2/3 MEAN is still open (Gitea #606). What the corpus says: of the 562 spawns carrying an active
     move-task plan, 559 are `1`, where a spawn with an empty slot is `2` on 4,064 of 5,168; `3` is 14 sightings,
     every one a Flesheater with an empty slot.
 - `12 + firstRecordLen + 24` is the length only when all three pair lists are empty, i.e. the minimal forms. It
