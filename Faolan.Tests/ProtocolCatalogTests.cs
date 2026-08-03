@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
@@ -29,11 +30,30 @@ namespace Faolan.Tests
 		 InlineData(Endpoints.GameAgentType, (ushort)GameAgentOpcodes.ChatVicinity, "ChatVicinity (0x2002)"),
 		 InlineData(Endpoints.GameCharAgentType, (ushort)GameCharAgentOpcodes.RequestBindLocation, "RequestBindLocation (0x2002)"),
 		 InlineData(Endpoints.GameCharAgentProjectType, (ushort)GameCharAgentProjectOpcodes.AcceptApprenticeTeacher, "AcceptApprenticeTeacher (0x2002)"),
-		 InlineData(Endpoints.PlayerAgentType, (ushort)PlayerAgentOpcodes.Authenticate, "Authenticate (0x2083)"),
 		 InlineData(Endpoints.TradepostAgentType, (ushort)TradepostAgentOpcodes.ItemSearch, "ItemSearch (0x200D)")]
 		public void ResolveName_NamesTheMethodPerClass(uint receiverType, ushort opcode, string expected)
 		{
 			Assert.Equal(expected, ProtocolCatalog.ResolveName(receiverType, opcode));
+		}
+
+		// The hash-registered pair has NO opcode (#613), so a frame there is named from its method constant. Three cases,
+		// and the third is the one that used to be impossible to get right: an unknown method must render as a
+		// constant, never as the 7-bit opcode view that names two methods at once.
+		[Fact]
+		public void ResolveName_NamesTheHashRegisteredPair_FromItsMethod()
+		{
+			var agent = Endpoints.Endpoint(Endpoints.PlayerAgentType, 0x02);
+			var player = Endpoints.Endpoint(Endpoints.PlayerInterfaceType, 0x01);
+
+			Assert.Equal("AuthenticateAck (0x5DC18991)", ProtocolCatalog.ResolveName(new Rpc(agent, player, PlayerInterfaceMethods.AuthenticateAck, ReadOnlyMemory<byte>.Empty)));
+
+			// A login handoff addresses the ServiceConnection, which no receiver-keyed map covers - only the listener's
+			// fall-back method enum can name it. Before #613 this path reached Rpc.Opcode, which now throws.
+			var handoff = new Rpc(Endpoints.Endpoint(Endpoints.PlayerAgentServiceConnectionType, 0x08), Endpoints.Endpoint(Endpoints.PlayerAgentServiceConnectionType, 0x01),
+				PlayerInterfaceMethods.LoginConnectReady, ReadOnlyMemory<byte>.Empty);
+			Assert.Equal("LoginConnectReady (0xD8B66C79)", ProtocolCatalog.ResolveName(in handoff, typeof(PlayerInterfaceMethods)));
+
+			Assert.Equal("Unknown (0xDEADBEEF)", ProtocolCatalog.ResolveName(new Rpc(agent, player, 0xDEADBEEFu, ReadOnlyMemory<byte>.Empty)));
 		}
 
 		// An opcode the mapped class doesn't carry, or a receiver type not in the catalog, both render "Unknown (0xHEX)".

@@ -19,7 +19,10 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 	// advertised a checksum for settings the server did not have, so the client's cache could never agree with it.
 	public static class SendCharacterSettingsCheckSumMapCodec
 	{
-		public const ushort Opcode = (ushort)PlayerInterfaceOpcodes.SendCharacterSettingsCheckSumMap;
+		// The message identity. On PlayerAgent/PlayerInterface that is the method CONSTANT, not an opcode - the
+		// 16-bit view keeps 7 of its 32 bits and names two methods at once, so there is no opcode enum to declare
+		// against (#613).
+		public const uint Method = (uint)PlayerInterfaceMethods.SendCharacterSettingsCheckSumMap;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(CharacterSettingsCheckSumMap value)

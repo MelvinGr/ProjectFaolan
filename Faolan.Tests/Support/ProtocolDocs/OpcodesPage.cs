@@ -31,7 +31,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		// c2s receivers are *Agent classes, s2c receivers *Interface classes.
 		private static readonly (string Enum, string Class)[] EnumToClass =
 		[
-			("UniverseAgentOpcodes", "UniverseAgent"), ("UniverseInterfaceOpcodes", "UniverseInterface"), ("PlayerAgentOpcodes", "PlayerAgent"), ("PlayerInterfaceOpcodes", "PlayerInterface"),
+			("UniverseAgentOpcodes", "UniverseAgent"), ("UniverseInterfaceOpcodes", "UniverseInterface"), ("PlayerAgentMethods", "PlayerAgent"), ("PlayerInterfaceMethods", "PlayerInterface"),
 			("CSPlayerAgentOpcodes", "CSPlayerAgent"), ("CSPlayerInterfaceOpcodes", "CSPlayerInterface"), ("GameAgentOpcodes", "GameAgent"), ("GameInterfaceOpcodes", "GameInterface"),
 			("GameCharAgentOpcodes", "GameCharAgent"), ("GameCharInterfaceOpcodes", "GameCharInterface"), ("GameCharAgentProjectOpcodes", "GameCharAgentProject"),
 			("GameCharInterfaceProjectOpcodes", "GameCharInterfaceProject"), ("TradepostAgentOpcodes", "TradepostAgent"), ("TradepostInterfaceOpcodes", "TradepostInterface")
@@ -60,12 +60,13 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 			const string iirEnum = "IirTypes"; // the 32-bit IIR sub-opcodes live on iir-types.md
 
-			// The RPC method catalogs are the `*Opcodes` enums; IirTypes is the one carrier catalog, listed
-			// here only as a stub that points at its own page.
+			// The RPC method catalogs are the `*Opcodes` enums, plus the `*Methods` pair - PlayerAgent/PlayerInterface
+			// register by 32-bit hash, so they have method constants and no opcodes at all (#613). IirTypes is the one
+			// carrier catalog, listed here only as a stub that points at its own page.
 			var enums = typeof(GameCharAgentOpcodes)
 				.Assembly.GetTypes()
 				.Where(t => t is { IsEnum: true, Namespace: "Faolan.Core.Enums" } &&
-				            (t.Name.EndsWith("Opcodes", StringComparison.Ordinal) || t.Name == iirEnum))
+				            (t.Name.EndsWith("Opcodes", StringComparison.Ordinal) || t.Name.EndsWith("Methods", StringComparison.Ordinal) || t.Name == iirEnum))
 				.OrderBy(t => t.Name, StringComparer.Ordinal)
 				.ToList();
 
@@ -123,17 +124,20 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				}
 
 				sb.AppendLine();
-				sb.AppendLine("| Opcode | Name | Note |");
+				// The hash-registered pair's tables are keyed by method CONSTANT, not by an opcode - naming the column
+				// "Opcode" there would restate the very confusion #613 removed.
+				var isMethodTable = e.Name.EndsWith("Methods", StringComparison.Ordinal);
+				sb.AppendLine(isMethodTable ? "| method_instance | Name | Note |" : "| Opcode | Name | Note |");
 				sb.AppendLine("|--------|------|------|");
 				foreach (var (name, value) in Members(e))
 				{
 					notes.TryGetValue((e.Name, name), out var note);
 
-					// On PlayerAgent/PlayerInterface the opcode is only the first varint group of a 32-bit method
-					// constant; the constant lives in PlayerAgentMethodIds (the single source), not a trailing comment -
-					// surface it as the note here.
-					if (e.Name is "PlayerAgentOpcodes" or "PlayerInterfaceOpcodes" && PlayerAgentMethodIds.MethodInstanceByOpcode.TryGetValue((ushort)value, out var methodInstance))
-						note = $"method_instance 0x{methodInstance:X8}";
+					// The hash-registered pair has no opcode - the table lists method constants. Surface the two bytes a
+					// hex dump would show for it, computed (PlayerAgentMethodIds.ObservedOpcode), since that is how you
+					// find one of these in a capture. It collides, which is why it is a note and not the key (#613).
+					if (e.Name is "PlayerAgentMethods" or "PlayerInterfaceMethods")
+						note = $"reads as 0x{PlayerAgentMethodIds.ObservedOpcode((uint)value):X4} in a dump";
 
 					var width = e.GetEnumUnderlyingType() == typeof(uint)
 						? 8

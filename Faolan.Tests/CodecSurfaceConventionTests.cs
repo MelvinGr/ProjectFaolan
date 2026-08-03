@@ -344,13 +344,13 @@ namespace Faolan.Tests
 			// off its own interface enum, so the identity is recorded somewhere rather than nowhere.
 			var offenders = CodecModules
 				.Where(t => !DeclaredOpcodes(t).Any())
-				.Where(t => Fields(t).All(f => !DeclaresAnOpcode(f)))
+				.Where(t => Fields(t).All(f => !DeclaresItsMessageId(f)))
 				.Where(IsStandaloneMessage)
 				.Select(t => t.Name)
 				.ToList();
 
 			Assert.True(offenders.Count == 0,
-				"an RPC-message codec declares `public const ushort Opcode = (ushort)<Interface>Opcodes.<Method>` and is named for that method:\n  " +
+				"an RPC-message codec declares `public const ushort Opcode = (ushort)<Interface>Opcodes.<Method>` - or, on the hash-registered PlayerAgent/PlayerInterface pair, `public const uint Method = (uint)<Interface>Methods.<Method>` - and is named for that method:\n  " +
 				string.Join("\n  ", offenders));
 		}
 
@@ -364,7 +364,7 @@ namespace Faolan.Tests
 
 			// Via DeclaresAnOpcode, so `HandledOpcodes` (the RPC twin of `HandledTypes`) counts - the plural was the
 			// blind spot wave 7 fixed in RpcMessageCodecsDeclareTheirMethodOpcode and this gate had its own copy of.
-			foreach (var t in CodecModules.Where(t => !DeclaredOpcodes(t).Any() && Fields(t).All(f => !DeclaresAnOpcode(f))))
+			foreach (var t in CodecModules.Where(t => !DeclaredOpcodes(t).Any() && Fields(t).All(f => !DeclaresItsMessageId(f))))
 			{
 				var composed = sources.Any(kv => !kv.Key.EndsWith($"{t.Name}.cs", StringComparison.Ordinal) && kv.Value.Contains($"{t.Name}.", StringComparison.Ordinal));
 				if (!composed && !UncomposedSubRecords.Contains(t.Name))
@@ -680,9 +680,13 @@ namespace Faolan.Tests
 		// A field that records the codec's message identity. `Opcode` is the single-method form and `HandledOpcodes`
 		// the RPC twin of `HandledTypes` (one layout, the verb in the opcode) - the suffix check used to test only for
 		// "Opcode", so a codec declaring the PLURAL was read as declaring nothing at all.
-		private static bool DeclaresAnOpcode(FieldInfo f)
+		// A codec's declared message IDENTITY: `Opcode`/`HandledOpcodes` on the 15 index-registered classes, and
+		// `Method`/`HandledMethods` on PlayerAgent/PlayerInterface, whose methods are registered by 32-bit hash and so
+		// have no opcode to declare against at all (#613).
+		private static bool DeclaresItsMessageId(FieldInfo f)
 		{
-			return f.Name.EndsWith("Opcode", StringComparison.Ordinal) || f.Name.EndsWith("Opcodes", StringComparison.Ordinal);
+			return f.Name.EndsWith("Opcode", StringComparison.Ordinal) || f.Name.EndsWith("Opcodes", StringComparison.Ordinal) ||
+			       f.Name.EndsWith("Method", StringComparison.Ordinal) || f.Name.EndsWith("Methods", StringComparison.Ordinal);
 		}
 
 		// A codec whose Build produces a whole message rather than a fragment: the server layer sends it AND no other

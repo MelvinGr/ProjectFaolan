@@ -4,7 +4,7 @@
 > `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
-16 enums, 833 entries. The 32-bit IIR sub-opcodes carried inside a `0x2000` PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
+16 enums, 860 entries. The 32-bit IIR sub-opcodes carried inside a `0x2000` PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
 
 ## What is (and is not) verified here [V1]
 
@@ -864,43 +864,70 @@ RPC class **GameInterface** (id `0x6C67C147`) · S2C (server→client dispatch)
 The 0x2000-carrier IIR type sub-opcodes (32-bit BKDR-31 hashes of the client IIR type names).
 Catalogued in [`iir-types.md`](iir-types.md).
 
-## PlayerAgentOpcodes
+## PlayerAgentMethods
 
 RPC class **PlayerAgent** (id `0x82F20484`) · C2S (client→server call)
 
-| Opcode | Name | Note |
+| method_instance | Name | Note |
 |--------|------|------|
-| `0x2083` | `Authenticate` | method_instance 0x9CB2CB03 |
-| `0x208E` | `FinishGetStartupData` | method_instance 0xDFD8518E |
-| `0x209D` | `RequestDeleteCharacter` | method_instance 0xC3C5C31D |
-| `0x209E` | `UnlockCharacter` | method_instance 0x9C370D1E |
-| `0x20A6` | `LoadFacebookToken` | method_instance 0xD3907026 |
-| `0x20B6` | `LoginCharacter` | method_instance 0xEF616EB6 |
-| `0x20C1` | `GetStartupData` | method_instance 0x6A546D41 |
-| `0x20D6` | `VerifyLanguageSetting` | method_instance 0x9847AED6 |
-| `0x20DE` | `CreateCharacterWithData` | method_instance 0xCA2C4E5E |
-| `0x20EC` | `ReceivedCharacterSettings` | method_instance 0x3C7C926C |
-| `0x20F5` | `UpdateSubscriptionSettings` | method_instance 0x516C9EF5 |
+| `0x01035784` | `UpdateCharacterSettings` | reads as 0x2084 in a dump |
+| `0x1B2CF268` | `RenameCharacter` | reads as 0x20E8 in a dump |
+| `0x2976E1B7` | `AddOfflineLevel` | reads as 0x20B7 in a dump |
+| `0x3A96B2B3` | `UpdateFacebookFriends` | reads as 0x20B3 in a dump |
+| `0x3C7C926C` | `ReceivedCharacterSettings` | reads as 0x20EC in a dump |
+| `0x43476328` | `GetDimensionList` | reads as 0x20A8 in a dump |
+| `0x43D90C1B` | `ClientReplyKeepCookie` | reads as 0x209B in a dump |
+| `0x4D661656` | `UpdateCharacterPreview` | reads as 0x20D6 in a dump |
+| `0x516C9EF5` | `UpdateSubscriptionSettings` | reads as 0x20F5 in a dump |
+| `0x5B51044B` | `RecruitFacebookFriends` | reads as 0x20CB in a dump |
+| `0x6A546D41` | `GetStartupData` | reads as 0x20C1 in a dump |
+| `0x6A6B621C` | `SetHardcoreLevel` | reads as 0x209C in a dump |
+| `0x9847AED6` | `VerifyLanguageSetting` | reads as 0x20D6 in a dump |
+| `0x9C370D1E` | `UnlockCharacter` | reads as 0x209E in a dump |
+| `0x9CB2CB03` | `Authenticate` | reads as 0x2083 in a dump |
+| `0x9D991E6C` | `AuthenticateLoggedIn` | reads as 0x20EC in a dump |
+| `0xBE735486` | `CreateCharacter` | reads as 0x2086 in a dump |
+| `0xC3C5C31D` | `RequestDeleteCharacter` | reads as 0x209D in a dump |
+| `0xCA2C4E5E` | `CreateCharacterWithData` | reads as 0x20DE in a dump |
+| `0xCBDE126E` | `LoginFromCrash` | reads as 0x20EE in a dump |
+| `0xD3907026` | `LoadFacebookToken` | reads as 0x20A6 in a dump |
+| `0xD8AD362B` | `SaveFacebookToken` | reads as 0x20AB in a dump |
+| `0xDBE172E5` | `RequestSuggestNickname` | reads as 0x20E5 in a dump |
+| `0xDFD8518E` | `FinishGetStartupData` | reads as 0x208E in a dump |
+| `0xEF616EB6` | `LoginCharacter` | reads as 0x20B6 in a dump |
 
-## PlayerInterfaceOpcodes
+## PlayerInterfaceMethods
 
 RPC class **PlayerInterface** (id `0x7D155738`) · S2C (server→client dispatch)
 
-| Opcode | Name | Note |
+| method_instance | Name | Note |
 |--------|------|------|
-| `0x208C` | `PlayerSetupComplete` | method_instance 0x4F91A58C |
-| `0x2091` | `AuthenticateAck` | method_instance 0x5DC18991 |
-| `0x2093` | `CharacterUnlocked` | method_instance 0x5CE97913 |
-| `0x209C` | `OnFacebookTokenResult` | method_instance 0x52454C9C |
-| `0x20A5` | `SendCharacterSettingsCheckSumMap` | method_instance 0x0C09CA25 |
-| `0x20B9` | `SendCharacterSettings` | method_instance 0x233605B9 |
-| `0x20CC` | `SetDimensionList` | method_instance 0xF899B14C |
-| `0x20E0` | `CSServerConnectReady` | method_instance 0x5AED2A60 |
-| `0x20E3` | `OverrideGameTweaks` | method_instance 0x7C47F763 |
-| `0x20E5` | `SendCharacterPreview` | method_instance 0x206B6EE5 |
-| `0x20EF` | `UpdateClientPlayerData` | method_instance 0xC414C5EF |
-| `0x20F9` | `LoginConnectReady` | method_instance 0xD8B66C79 |
-| `0x20FA` | `ChatServerConnectReady` | method_instance 0x23A632FA |
+| `0x00C46317` | `VerifyClientStillConnected` | reads as 0x2097 in a dump |
+| `0x0C09CA25` | `SendCharacterSettingsCheckSumMap` | reads as 0x20A5 in a dump |
+| `0x0FE09F03` | `LoginQueuePosition` | reads as 0x2083 in a dump |
+| `0x1562CE84` | `HardcoreLevelSet` | reads as 0x2084 in a dump |
+| `0x15F7AF22` | `SendSubscriptionSettings` | reads as 0x20A2 in a dump |
+| `0x206B6EE5` | `SendCharacterPreview` | reads as 0x20E5 in a dump |
+| `0x233605B9` | `SendCharacterSettings` | reads as 0x20B9 in a dump |
+| `0x23A632FA` | `ChatServerConnectReady` | reads as 0x20FA in a dump |
+| `0x3E8F0623` | `OfflineLevelApplied` | reads as 0x20A3 in a dump |
+| `0x4F91A58C` | `PlayerSetupComplete` | reads as 0x208C in a dump |
+| `0x52454C9C` | `OnFacebookTokenResult` | reads as 0x209C in a dump |
+| `0x5AED2A60` | `CSServerConnectReady` | reads as 0x20E0 in a dump |
+| `0x5CE97913` | `CharacterUnlocked` | reads as 0x2093 in a dump |
+| `0x5DC18991` | `AuthenticateAck` | reads as 0x2091 in a dump |
+| `0x7955BD80` | `OnFacebookFriendSignedUp` | reads as 0x2080 in a dump |
+| `0x7C47F763` | `OverrideGameTweaks` | reads as 0x20E3 in a dump |
+| `0x88750390` | `OnUpdateFacebookFriends` | reads as 0x2090 in a dump |
+| `0x9625EB4A` | `CharacterNeedsNewName` | reads as 0x20CA in a dump |
+| `0xA7C86A29` | `SetStats` | reads as 0x20A9 in a dump |
+| `0xC414C5EF` | `UpdateClientPlayerData` | reads as 0x20EF in a dump |
+| `0xD4063CA0` | `LoginProblem` | reads as 0x20A0 in a dump |
+| `0xD4C59816` | `ResetLanguage` | reads as 0x2096 in a dump |
+| `0xD8B66C79` | `LoginConnectReady` | reads as 0x20F9 in a dump |
+| `0xE33EBAE1` | `TeleportProblem` | reads as 0x20E1 in a dump |
+| `0xE8EAD4F8` | `SuggestNicknameResult` | reads as 0x20F8 in a dump |
+| `0xF899B14C` | `SetDimensionList` | reads as 0x20CC in a dump |
 
 ## TradepostAgentOpcodes
 

@@ -45,60 +45,40 @@ namespace Faolan.Core.Network.Constants
 
 		public static readonly IReadOnlyDictionary<string, uint> PlayerInterfaceRegistration = Registration<PlayerInterfaceMethods>();
 
-		// The opcode a method was OBSERVED under, for the methods the corpus shows. Only these are listed: an opcode
-		// here is only the method varint's first group (see the warning above) and so collides, which is why this maps
-		// what retail was seen doing rather than claiming a general opcode->method function.
-		private static readonly IReadOnlyDictionary<ushort, string> ObservedOpcodes = new Dictionary<ushort, string>
-		{
-			// s2c PlayerInterface — the ones the server sends.
-			[(ushort)PlayerInterfaceOpcodes.PlayerSetupComplete] = "PlayerSetupComplete",
-			[(ushort)PlayerInterfaceOpcodes.AuthenticateAck] = "AuthenticateAck",
-			[(ushort)PlayerInterfaceOpcodes.CharacterUnlocked] = "CharacterUnlocked",
-			[(ushort)PlayerInterfaceOpcodes.OnFacebookTokenResult] = "OnFacebookTokenResult",
-			[(ushort)PlayerInterfaceOpcodes.SendCharacterSettingsCheckSumMap] = "SendCharacterSettingsCheckSumMap",
-			[(ushort)PlayerInterfaceOpcodes.SendCharacterSettings] = "SendCharacterSettings",
-			[(ushort)PlayerInterfaceOpcodes.SetDimensionList] = "SetDimensionList",
-			[(ushort)PlayerInterfaceOpcodes.SendCharacterPreview] = "SendCharacterPreview",
-			[(ushort)PlayerInterfaceOpcodes.UpdateClientPlayerData] = "UpdateClientPlayerData",
+		// The methods the corpus actually shows, in each direction. Named rather than keyed by opcode: an opcode here is
+		// only the method varint's first group and COLLIDES (`0x20EC` names two of these), so it cannot be a key - which
+		// is why the `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` enums were deleted in #613. This is a record of what
+		// retail was seen sending, not a general opcode->method function.
+		public static readonly IReadOnlyList<PlayerInterfaceMethods> ObservedInterfaceMethods =
+		[
+			// s2c — the ones the server sends.
+			PlayerInterfaceMethods.PlayerSetupComplete, PlayerInterfaceMethods.AuthenticateAck, PlayerInterfaceMethods.CharacterUnlocked,
+			PlayerInterfaceMethods.OnFacebookTokenResult, PlayerInterfaceMethods.SendCharacterSettingsCheckSumMap, PlayerInterfaceMethods.SendCharacterSettings,
+			PlayerInterfaceMethods.SetDimensionList, PlayerInterfaceMethods.SendCharacterPreview, PlayerInterfaceMethods.UpdateClientPlayerData,
 
 			// The four login handoffs. They carry a full_routing_context (RpcHeader field 3) as well, which is why the
 			// codebase used to read all four as one opcode `0x1A07` - that was field 3's tag plus its length byte, and
-			// the method varint sat behind it (#610). Their opcodes are the ordinary view of their method constants.
-			[(ushort)PlayerInterfaceOpcodes.ChatServerConnectReady] = "ChatServerConnectReady",
-			[(ushort)PlayerInterfaceOpcodes.CSServerConnectReady] = "CSServerConnectReady",
-			[(ushort)PlayerInterfaceOpcodes.LoginConnectReady] = "LoginConnectReady",
-			[(ushort)PlayerInterfaceOpcodes.OverrideGameTweaks] = "OverrideGameTweaks",
+			// the method varint sat behind it (#610).
+			PlayerInterfaceMethods.ChatServerConnectReady, PlayerInterfaceMethods.CSServerConnectReady,
+			PlayerInterfaceMethods.LoginConnectReady, PlayerInterfaceMethods.OverrideGameTweaks
+		];
 
-			// c2s PlayerAgent — received, not sent; here for the dissector and the generated docs.
-			[(ushort)PlayerAgentOpcodes.Authenticate] = "Authenticate",
-			[(ushort)PlayerAgentOpcodes.FinishGetStartupData] = "FinishGetStartupData",
-			[(ushort)PlayerAgentOpcodes.RequestDeleteCharacter] = "RequestDeleteCharacter",
-			[(ushort)PlayerAgentOpcodes.UnlockCharacter] = "UnlockCharacter",
-			[(ushort)PlayerAgentOpcodes.LoadFacebookToken] = "LoadFacebookToken",
-			[(ushort)PlayerAgentOpcodes.LoginCharacter] = "LoginCharacter",
-			[(ushort)PlayerAgentOpcodes.GetStartupData] = "GetStartupData",
-			[(ushort)PlayerAgentOpcodes.VerifyLanguageSetting] = "VerifyLanguageSetting",
-			[(ushort)PlayerAgentOpcodes.CreateCharacterWithData] = "CreateCharacterWithData",
-			[(ushort)PlayerAgentOpcodes.ReceivedCharacterSettings] = "ReceivedCharacterSettings",
-			[(ushort)PlayerAgentOpcodes.UpdateSubscriptionSettings] = "UpdateSubscriptionSettings"
-		};
+		// c2s — received, not sent; here for the dissector and the generated docs.
+		public static readonly IReadOnlyList<PlayerAgentMethods> ObservedAgentMethods =
+		[
+			PlayerAgentMethods.Authenticate, PlayerAgentMethods.FinishGetStartupData, PlayerAgentMethods.RequestDeleteCharacter,
+			PlayerAgentMethods.UnlockCharacter, PlayerAgentMethods.LoadFacebookToken, PlayerAgentMethods.LoginCharacter,
+			PlayerAgentMethods.GetStartupData, PlayerAgentMethods.VerifyLanguageSetting, PlayerAgentMethods.CreateCharacterWithData,
+			PlayerAgentMethods.ReceivedCharacterSettings, PlayerAgentMethods.UpdateSubscriptionSettings
+		];
 
-		// opcode -> the method's registration constant (`method_instance`), for the opcodes retail was observed using.
-		// Read by `gen/opcodes.md`, which annotates those two enums with the id their opcode is only the first group of.
-		public static IReadOnlyDictionary<ushort, uint> MethodInstanceByOpcode
+		// The two bytes you would read off a hex dump for this method: the method field's tag, then its varint's first
+		// group. COMPUTED, because it is a rendering of the constant rather than a fact about the method - it collides,
+		// so it can name a frame in a capture but must never key anything. `Rpc.Opcode` refuses to return it for these
+		// methods at all (#613); this is the display-only escape hatch, used by `gen/opcodes.md`.
+		public static ushort ObservedOpcode(uint methodInstance)
 		{
-			get
-			{
-				var map = new Dictionary<ushort, uint>();
-				foreach (var (opcode, method) in ObservedOpcodes)
-					map[opcode] = Registration(method);
-				return map;
-			}
-		}
-
-		private static uint Registration(string method)
-		{
-			return PlayerAgentRegistration.TryGetValue(method, out var c) ? c : PlayerInterfaceRegistration[method];
+			return (ushort)(0x2000 | (methodInstance & 0x7F) | (methodInstance > 0x7F ? 0x80u : 0u));
 		}
 
 		private static IReadOnlyDictionary<string, uint> Registration<T>() where T : struct, Enum

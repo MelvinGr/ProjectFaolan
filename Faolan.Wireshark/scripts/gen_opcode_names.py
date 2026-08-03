@@ -19,14 +19,13 @@ import sys
 
 # enum name in Opcodes.cs -> client RPC class whose methods it catalogs. The receiver
 # endpoint's class id picks the table (c2s receivers are *Agent classes, s2c receivers
-# *Interface classes). PlayerAgent/PlayerInterface use 32-bit hash dispatch, not
-# 0x2000+index, but their enums hold actual observed wire values so they map the same
-# way. The ChatServer chat enums are excluded: chat packets carry no RpcHeader.
+# *Interface classes). PlayerAgent/PlayerInterface are NOT here: they use 32-bit hash
+# dispatch, so they have no opcodes to key a table with (their `*Opcodes` enums were
+# deleted in Gitea #613) - they are keyed by method constant below instead.
+# The ChatServer chat enums are excluded: chat packets carry no RpcHeader.
 ENUM_TO_CLASS = {
     "UniverseAgentOpcodes": "UniverseAgent",
     "UniverseInterfaceOpcodes": "UniverseInterface",
-    "PlayerAgentOpcodes": "PlayerAgent",
-    "PlayerInterfaceOpcodes": "PlayerInterface",
     "CSPlayerAgentOpcodes": "CSPlayerAgent",
     "CSPlayerInterfaceOpcodes": "CSPlayerInterface",
     "GameAgentOpcodes": "GameAgent",

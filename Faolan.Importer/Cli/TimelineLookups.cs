@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -10,6 +11,7 @@ using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
@@ -150,8 +152,6 @@ namespace Faolan.Importer.Cli
 		{
 			[Endpoints.UniverseAgentType] = typeof(UniverseAgentOpcodes),
 			[Endpoints.UniverseInterfaceType] = typeof(UniverseInterfaceOpcodes),
-			[Endpoints.PlayerAgentType] = typeof(PlayerAgentOpcodes),
-			[Endpoints.PlayerInterfaceType] = typeof(PlayerInterfaceOpcodes),
 			[Endpoints.CSPlayerAgentType] = typeof(CSPlayerAgentOpcodes),
 			[Endpoints.CSPlayerInterfaceType] = typeof(CSPlayerInterfaceOpcodes),
 			[Endpoints.GameAgentType] = typeof(GameAgentOpcodes),
@@ -178,10 +178,43 @@ namespace Faolan.Importer.Cli
 		// A KNOWN receiver is authoritative: if its interface does not define the opcode, the answer is that we cannot
 		// name it, NOT the name a different interface happens to have at that number. Falling through would rebuild
 		// the bug.
+		// The two classes that register by 32-bit HASH, so their frames are named from the method constant rather than
+		// from an opcode that cannot tell two of them apart (#608/#613).
+		private static readonly Dictionary<uint, Type> MethodsByReceiver = new()
+		{
+			[Endpoints.PlayerAgentType] = typeof(PlayerAgentMethods),
+			[Endpoints.PlayerInterfaceType] = typeof(PlayerInterfaceMethods)
+		};
+
+		// Re-reads the frame for its `method_instance`. The catch is deliberate and narrow: this is a REPORT over
+		// captures that are known to contain mis-framed buffers (a lossy capture's three such packets are noted above),
+		// and a diagnostic should render those as a raw id rather than abort the whole timeline. Nothing on the wire
+		// path swallows a parse failure.
+		private static string NameOfMethod(CapturedPacket packet, Type methods)
+		{
+			uint method;
+			try
+			{
+				method = Rpc.Parse(packet.Bytes).Method;
+			}
+			catch (IOException)
+			{
+				return $"0x{packet.Opcode:x4} (unparseable header)";
+			}
+
+			return Enum.GetName(methods, method) ?? $"0x{method:x8}";
+		}
+
 		public string NameOf(CapturedPacket packet, uint iir, string tier)
 		{
 			if (iir != 0)
 				return IirNames.TryGetValue(iir, out var n) ? n : $"0x{iir:x8}";
+
+			// PlayerAgent/PlayerInterface have no opcodes (#613). The dump's u16 is only the method varint's FIRST
+			// group there and collides - `0x20EC` is both ReceivedCharacterSettings and AuthenticateLoggedIn - so the
+			// frame is re-read for its whole method constant and named from that.
+			if (MethodsByReceiver.TryGetValue(packet.ReceiverClass, out var methods))
+				return NameOfMethod(packet, methods);
 
 			var opcode = (ushort)packet.Opcode;
 			if (InterfaceByReceiver.TryGetValue(packet.ReceiverClass, out var iface))
@@ -209,9 +242,8 @@ namespace Faolan.Importer.Cli
 				case "universe":
 					yield return c2s ? typeof(UniverseAgentOpcodes) : typeof(UniverseInterfaceOpcodes);
 					break;
-				case "playeragent":
-					yield return c2s ? typeof(PlayerAgentOpcodes) : typeof(PlayerInterfaceOpcodes);
-					break;
+				// No "playeragent" case: that pair is named from its method constant (MethodsByReceiver), which needs
+				// the frame, and its enums are uint-backed so a bare u16 opcode could not index them anyway (#613).
 				case "cs":
 					yield return c2s ? typeof(CSPlayerAgentOpcodes) : typeof(CSPlayerInterfaceOpcodes);
 					break;

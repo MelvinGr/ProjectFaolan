@@ -849,12 +849,25 @@ namespace Faolan.Core.Enums
 	//
 	// These are the SOURCE the wire encoding is derived from, not a parallel catalog: the RPC header's method field is
 	// `varint(constant)`, which `Rpc` writes whole. `PlayerAgentMethodIds` reads these enums for both directions of that.
+	//
+	// ⚠️ **This pair has no opcodes, and there is no opcode enum for it** (Gitea #613). Every other class registers its
+	// methods by INDEX, so `Rpc.Opcode` - the method field's tag byte plus its varint's first group - is an exact,
+	// invertible view of the method there. Here the constants are 32-bit HASHES, so that view keeps 7 of 32 bits and
+	// two methods whose constants share their low 7 bits share it: `0x20EC` is BOTH `ReceivedCharacterSettings` and
+	// `AuthenticateLoggedIn`, `0x20D6` BOTH `VerifyLanguageSetting` and `UpdateCharacterPreview` - all four in the
+	// corpus. There used to be `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` enums listing the observed opcodes; they
+	// were deleted because a value that names two methods cannot be a catalog key, and `Rpc.Opcode` now THROWS here
+	// rather than handing back the lossy half. Dispatch, naming and the docs all read these constants (#608/#610).
+	// To find one of these in a hex dump, `PlayerAgentMethodIds.ObservedOpcode` computes the two bytes you would see.
 	public enum PlayerAgentMethods : uint
 	{
 		Authenticate = 0x9CB2CB03,
 		AuthenticateLoggedIn = 0x9D991E6C,
 		LoginFromCrash = 0xCBDE126E,
 		CreateCharacter = 0xBE735486,
+
+		// Retail sends THIS one, not plain `CreateCharacter` - the client has both, and `CreateCharacter` has never
+		// been seen on the wire.
 		CreateCharacterWithData = 0xCA2C4E5E,
 		LoginCharacter = 0xEF616EB6,
 		RenameCharacter = 0x1B2CF268,
@@ -878,28 +891,35 @@ namespace Faolan.Core.Enums
 		ClientReplyKeepCookie = 0x43D90C1B
 	}
 
+	// Server->client. Nine of these names were INVENTED from observed behaviour until #320 recovered the client's own
+	// registration table; each one that changed carries the old name, because that is what the rest of the tree called
+	// it and what older notes and captures refer to.
 	public enum PlayerInterfaceMethods : uint
 	{
-		OnFacebookTokenResult = 0x52454C9C,
+		OnFacebookTokenResult = 0x52454C9C,   // was "Ox209C" - the reply to c2s LoadFacebookToken
 		OnUpdateFacebookFriends = 0x88750390,
 		OnFacebookFriendSignedUp = 0x7955BD80,
-		AuthenticateAck = 0x5DC18991,
+		AuthenticateAck = 0x5DC18991,         // was "InitAuth"
+
+		// The four login handoffs. They additionally carry a `full_routing_context` (RpcHeader field 3), which is what
+		// the codebase used to read as one invented opcode `0x1A07` plus an opaque 13-byte "session blob" (#610).
 		LoginConnectReady = 0xD8B66C79,
 		CSServerConnectReady = 0x5AED2A60,
 		ChatServerConnectReady = 0x23A632FA,
-		UpdateClientPlayerData = 0xC414C5EF,
-		SetDimensionList = 0xF899B14C,
+
+		UpdateClientPlayerData = 0xC414C5EF,  // was "SendCharacterList"
+		SetDimensionList = 0xF899B14C,        // was "SendRealmList" (a dimension IS a realm)
 		SetStats = 0xA7C86A29,
 		SuggestNicknameResult = 0xE8EAD4F8,
-		PlayerSetupComplete = 0x4F91A58C,
+		PlayerSetupComplete = 0x4F91A58C,     // was "SendCharacterRealmData"
 		LoginQueuePosition = 0x0FE09F03,
 		OfflineLevelApplied = 0x3E8F0623,
-		CharacterUnlocked = 0x5CE97913,
+		CharacterUnlocked = 0x5CE97913,       // was "Ox2093" - the reply to c2s UnlockCharacter
 		HardcoreLevelSet = 0x1562CE84,
 		SendSubscriptionSettings = 0x15F7AF22,
-		SendCharacterSettings = 0x233605B9,
-		SendCharacterPreview = 0x206B6EE5,
-		SendCharacterSettingsCheckSumMap = 0x0C09CA25,
+		SendCharacterSettings = 0x233605B9,   // was "Ox20B9"
+		SendCharacterPreview = 0x206B6EE5,    // was "Ox20E5"
+		SendCharacterSettingsCheckSumMap = 0x0C09CA25, // was "SmallCharList"
 		VerifyClientStillConnected = 0x00C46317,
 		OverrideGameTweaks = 0x7C47F763,
 		CharacterNeedsNewName = 0x9625EB4A,
@@ -907,67 +927,6 @@ namespace Faolan.Core.Enums
 		TeleportProblem = 0xE33EBAE1,
 		ResetLanguage = 0xD4C59816
 	}
-
-	// PlayerAgent (c2s) / PlayerInterface (s2c) is the ONE interface pair whose methods are registered by 32-bit HASH
-	// rather than by index, so its RPC header method field is a 4-5 group varint and `Rpc.Opcode` - the tag byte plus
-	// that varint's first group - names it only partly (Gitea #319/#320/#610).
-	//
-	// ⚠️ **The opcode is NOT a method key here.** It is `0x2080 | (constant & 0x7F)`, so two methods whose constants
-	// share their low 7 bits share an opcode: `0x20EC` is BOTH `ReceivedCharacterSettings` and `AuthenticateLoggedIn`,
-	// `0x20D6` is BOTH `VerifyLanguageSetting` and `UpdateCharacterPreview` - all four are in the corpus. The values
-	// below are the ones retail's LOGIN connection used, kept for the dissector and the generated docs; **inbound
-	// dispatch keys on `PlayerAgentMethods`, not on this enum** (#608).
-	//
-	// Every name is the client's own, read off the registration table (`DumpPlayerAgentCtor.java`) rather than invented
-	// or inferred from behaviour - see docs/re/aoc-rpc-method-opcodes.md and the naming rule in
-	// [[iir_names_must_be_the_client_class]].
-	public enum PlayerAgentOpcodes : ushort
-	{
-		Authenticate = 0x2083,
-		FinishGetStartupData = 0x208E,
-		RequestDeleteCharacter = 0x209D,
-		UnlockCharacter = 0x209E,
-		LoadFacebookToken = 0x20A6,
-		LoginCharacter = 0x20B6,
-		GetStartupData = 0x20C1,
-
-		// ⚠️ On the LOGIN connection. A later connection uses this opcode for UpdateCharacterPreview.
-		VerifyLanguageSetting = 0x20D6,
-
-		// NOT `CreateCharacter`: the client has both, and the id retail sends here (0x9CB1D10C = 0xCA2C4E5E >> 7) is
-		// `CreateCharacterWithData`'s. Plain `CreateCharacter` has never been seen on the wire.
-		CreateCharacterWithData = 0x20DE,
-
-		// ⚠️ On the LOGIN connection. A later connection uses this opcode for AuthenticateLoggedIn.
-		ReceivedCharacterSettings = 0x20EC,
-		UpdateSubscriptionSettings = 0x20F5
-	}
-
-	// Server->client. The names below were INVENTED from observed behaviour until #320 recovered the client's own
-	// registration table; each one that changed is noted, because the old name is what the rest of the tree called it.
-	public enum PlayerInterfaceOpcodes : ushort
-	{
-		PlayerSetupComplete = 0x208C,      // was "SendCharacterRealmData"
-		AuthenticateAck = 0x2091,          // was "InitAuth"
-		CharacterUnlocked = 0x2093,        // was "Ox2093" - the reply to c2s UnlockCharacter (0x209E)
-		OnFacebookTokenResult = 0x209C,    // was "Ox209C" - the reply to c2s LoadFacebookToken (0x20A6)
-		SendCharacterSettingsCheckSumMap = 0x20A5, // was "SmallCharList"
-		SendCharacterSettings = 0x20B9,    // was "Ox20B9"
-		SetDimensionList = 0x20CC,         // was "SendRealmList" (a dimension IS a realm)
-		SendCharacterPreview = 0x20E5,     // was "Ox20E5"
-		UpdateClientPlayerData = 0x20EF,   // was "SendCharacterList"
-
-		// The four login handoffs. These four used to share one invented opcode `0x1A07` - which is not an opcode at
-		// all, but RpcHeader field 3's tag plus its length byte, the method varint sitting behind it (#610). Decoded,
-		// they are four ordinary methods that additionally carry a full_routing_context, and their opcodes are the
-		// ordinary view of their constants. The server names the METHOD when it sends them (Rpc takes
-		// PlayerInterfaceMethods); these members exist so the trace and the generated docs can name the frames.
-		CSServerConnectReady = 0x20E0,
-		OverrideGameTweaks = 0x20E3,
-		LoginConnectReady = 0x20F9,
-		ChatServerConnectReady = 0x20FA
-	}
-
 	// UniverseAgent client->server: matches the recovered table exactly (3 methods).
 	public enum UniverseAgentOpcodes : ushort
 	{

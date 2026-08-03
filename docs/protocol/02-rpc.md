@@ -86,9 +86,16 @@ in every captured frame.
 `Rpc` (`Faolan.Core.Network/Protocol/Rpc.cs`) carries `Method` and writes it whole; there is no `Opcode` field and
 no header tail, so nothing can supply one and nothing has to remember to
 [V3: RpcHeaderTests.ASendCarriesTheWholeMethodVarint]. `Rpc.Opcode` survives as a derived **view** — the tag byte
-plus the varint's first group — because the 16 opcode enums and the dissector are written that way, and because on
-the 15 index-registered classes it is the method index exactly. On the hash-registered pair it is lossy and must
-never be used as identity: dispatch and the packet trace both key on `Method` there (#608).
+plus the varint's first group, which is what you read off a hex dump — because the opcode enums and the dissector
+are written that way, and because on the index-registered classes it is the method index exactly, so `0x2000 + index`
+is a faithful rendering of the wire rather than a fiction.
+
+⚠️ **On the hash-registered pair there is no opcode, and asking for one throws** rather than returning 7 of the
+constant's 32 bits [V3: RpcHeaderTests.AHashRegisteredMethod_HasNoOpcode]. There is no `PlayerAgentOpcodes` /
+`PlayerInterfaceOpcodes` enum either — a value that names two methods cannot be a catalog key, which is exactly how
+an opcode-keyed dispatch ran the wrong handler (#608). Dispatch, the packet trace, the timeline report and the
+generated docs all read `Method` there; `PlayerAgentMethodIds.ObservedOpcode` computes the dump reading when a
+human needs to find one of these in a capture (#613). Callers that can see either kind gate on `Rpc.HasOpcode`.
 
 The header is read **strictly**: an unknown tag, a repeated singular field or a missing required one throws
 `InvalidDataException` at the frame boundary, which the receive loop logs against the peer and disconnects. That is

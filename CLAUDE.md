@@ -279,7 +279,12 @@ the DECODE issue that removes it again. One follow-up remains: #533 (row↔value
   method. When several METHODS genuinely share one body — `DispatchTeamJoin`/`DispatchTeamLeave`/
   `DispatchSetNewTeamLeader` are the same layout with the verb in the opcode — declare
   `public static readonly <Interface>Opcodes[] HandledOpcodes`, the RPC twin of `HandledTypes`; picking one of the
-  three as *the* `Opcode` would be a lie about the other two. **Sub-record codecs** (`CharacterStatBlock`,
+  three as *the* `Opcode` would be a lie about the other two.
+  ⚠️ **On PlayerAgent/PlayerInterface it is `public const uint Method = (uint)<Interface>Methods.<Method>` instead**
+  (`GameTweaksCodec`, `SendCharacterSettingsCodec`, …). That pair registers its methods by 32-bit HASH, so it has no
+  opcode at all: the 16-bit view keeps 7 of those bits and names two methods at once, and there is deliberately no
+  `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` enum to declare against (Gitea #613 — `Rpc.Opcode` throws there).
+  **Sub-record codecs** (`CharacterStatBlock`,
   `StatList`, `MoveTaskNode`, …) are composed inside a larger body, never sent alone, and so declare nothing —
   that's expected, not an omission.
 - **Wire encode/decode lives in `Codecs/`, nowhere else.** A service, listener or importer that needs a message

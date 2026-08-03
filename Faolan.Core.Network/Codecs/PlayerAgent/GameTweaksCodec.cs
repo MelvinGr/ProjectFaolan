@@ -22,7 +22,10 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 	// 13-byte session header-extra this method rides with.
 	public static class GameTweaksCodec
 	{
-		public const ushort Opcode = (ushort)PlayerInterfaceOpcodes.OverrideGameTweaks;
+		// The message identity. On PlayerAgent/PlayerInterface that is the method CONSTANT, not an opcode - the
+		// 16-bit view keeps 7 of its 32 bits and names two methods at once, so there is no opcode enum to declare
+		// against (#613).
+		public const uint Method = (uint)PlayerInterfaceMethods.OverrideGameTweaks;
 
 		// The 4-byte prefix retail sends, replayed verbatim: a tweak-table id/version. NOT the entry count - the
 		// client infers that by reading to the end of the stream.

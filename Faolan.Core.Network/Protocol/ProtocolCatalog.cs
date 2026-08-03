@@ -21,7 +21,6 @@ namespace Faolan.Core.Network.Protocol
 		{
 			// c2s: the client addresses the server's *Agent endpoint (the inbound UL trace).
 			[Endpoints.UniverseAgentType] = typeof(UniverseAgentOpcodes),
-			[Endpoints.PlayerAgentType] = typeof(PlayerAgentOpcodes),
 			[Endpoints.CSPlayerAgentType] = typeof(CSPlayerAgentOpcodes),
 			[Endpoints.GameAgentType] = typeof(GameAgentOpcodes),
 			[Endpoints.GameCharAgentType] = typeof(GameCharAgentOpcodes),
@@ -36,9 +35,10 @@ namespace Faolan.Core.Network.Protocol
 			[Endpoints.CSPlayerInterfaceType] = typeof(CSPlayerInterfaceOpcodes)
 		};
 
-		// The two classes that register their methods by 32-bit HASH rather than by index. `Rpc.Opcode` carries only 7
-		// of those bits, so it cannot name a method here - `0x20EC` is both ReceivedCharacterSettings and
-		// AuthenticateLoggedIn (#608) - and a frame on one of these is named from Rpc.Method instead.
+		// The two classes that register their methods by 32-bit HASH rather than by index, and so have no opcode at all:
+		// `Rpc.Opcode` would keep 7 of those bits and throws instead (#613), since `0x20EC` names both
+		// ReceivedCharacterSettings and AuthenticateLoggedIn (#608). A frame on one of these is named from Rpc.Method.
+		// There is deliberately no `*Opcodes` enum for this pair to sit in the map above.
 		private static readonly IReadOnlyDictionary<uint, Type> MethodEnumsByReceiverType = new Dictionary<uint, Type>
 		{
 			[Endpoints.PlayerAgentType] = typeof(PlayerAgentMethods),
@@ -65,24 +65,43 @@ namespace Faolan.Core.Network.Protocol
 		// actually belongs to: an opcode is a method INDEX, so naming an inbound (c2s) method out of an s2c interface
 		// enum would confidently print the WRONG method. That is why the RX side passes none and renders "Unknown".
 		// The name for a whole frame - what the packet trace calls it. Identical to the (receiver class, opcode) form
-		// below except on the two hash-registered classes, where the method constant is the identity and the opcode is
-		// only its first 7 bits.
+		// below except on a hash-registered method, which has no opcode to name it with.
+		//
+		// The branch is on the METHOD, not on the receiver class, and that matters: the four login handoffs address the
+		// ServiceConnection rather than either class in the map above, so a receiver-keyed test would fall through to
+		// `rpc.Opcode` - which now throws for exactly these (#613). Their `fallbackEnum` (PlayerInterfaceMethods) names
+		// them instead.
 		public static string ResolveName(in Rpc rpc, Type? fallbackEnum = null)
 		{
-			return MethodEnumsByReceiverType.TryGetValue(rpc.Receiver.Type, out var methodEnum) && Enum.IsDefined(methodEnum, rpc.Method)
+			if (rpc.HasOpcode)
+				return ResolveName(rpc.Receiver.Type, rpc.Opcode, fallbackEnum);
+
+			var methodEnum = MethodEnumsByReceiverType.TryGetValue(rpc.Receiver.Type, out var byReceiver) && Enum.IsDefined(byReceiver, rpc.Method)
+				? byReceiver
+				: Defining(fallbackEnum, rpc.Method);
+
+			return methodEnum is not null
 				? $"{Enum.GetName(methodEnum, rpc.Method)} ({rpc.Method.ToHex()})"
-				: ResolveName(rpc.Receiver.Type, rpc.Opcode, fallbackEnum);
+				: $"Unknown ({rpc.Method.ToHex()})";
 		}
 
 		public static string ResolveName(uint receiverType, ushort opcode, Type? fallbackEnum = null)
 		{
-			var enumType = OpcodeEnumFor(receiverType, opcode) ?? (fallbackEnum is not null && Enum.IsDefined(fallbackEnum, opcode)
-				? fallbackEnum
-				: null);
+			var enumType = OpcodeEnumFor(receiverType, opcode) ?? Defining(fallbackEnum, opcode);
 
 			return enumType is not null
 				? $"{Enum.GetName(enumType, opcode)} ({opcode.ToHex()})"
 				: $"Unknown ({opcode.ToHex()})";
+		}
+
+		// `fallbackEnum`, but only when it both DEFINES the value and is backed by the value's own width. The width
+		// check is not defensive noise: the login tier's fallback is now a uint-backed method enum while the opcode
+		// overload passes a ushort, and Enum.IsDefined THROWS on that mismatch rather than returning false.
+		private static Type? Defining(Type? fallbackEnum, object value)
+		{
+			return fallbackEnum is not null && Enum.GetUnderlyingType(fallbackEnum) == value.GetType() && Enum.IsDefined(fallbackEnum, value)
+				? fallbackEnum
+				: null;
 		}
 	}
 }

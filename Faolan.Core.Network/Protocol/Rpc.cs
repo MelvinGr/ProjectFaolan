@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using Faolan.Core.Crypt;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
@@ -94,21 +95,26 @@ namespace Faolan.Core.Network.Protocol
 		// throws on a second rather than dropping it.
 		public ProtoEndpoint? RoutingContext { get; init; }
 
+		// True when this message HAS an opcode: when its method is a registration INDEX, which is every class except
+		// the hash-registered PlayerAgent/PlayerInterface pair. An index is one or two varint groups, so the whole of
+		// it survives in the opcode's low byte.
+		public bool HasOpcode => Method <= byte.MaxValue;
+
 		// The 16-bit opcode the codebase and the opcode enums are written in terms of: a VIEW over Method, not a field.
 		// Its definition is literally the first two bytes this message serializes for its method field - the tag, then
-		// the varint's FIRST GROUP - which is where the old `[u16 opcode][headerData]` reading cut the header.
+		// the varint's FIRST GROUP - which is where the old `[u16 opcode][headerData]` reading cut the header, and what
+		// you read off a hex dump. On an index-registered class it is exact and invertible (`MethodIndexBase + Method`),
+		// which is why the enums' `0x2000 + index` spelling is a faithful rendering of the wire rather than a fiction.
 		//
-		// On the 15 index-registered classes that is exact and invertible: the method is its index, every opcode enum
-		// member is in 0x2000-0x20FF, and the view is plain `MethodIndexBase + Method` there.
-		//
-		// ⚠️ On the hash-registered pair it is LOSSY - 7 of the constant's 32 bits - so it is a naming convenience and
-		// never an identity. Two methods whose constants share their low 7 bits share an opcode: `0x20EC` is both
-		// ReceivedCharacterSettings and AuthenticateLoggedIn, `0x20D6` both VerifyLanguageSetting and
-		// UpdateCharacterPreview (#608). Dispatch and name from Method there.
-		//
-		// The enums being spelled `0x2000 + index` is the only reason this view exists at all; rebasing them onto
-		// `method_instance` would delete it. Gitea #613.
-		public ushort Opcode => (ushort)((MethodInstanceTag << 8) | FirstVarintGroup(Method));
+		// ⚠️ **It THROWS on the hash-registered pair** rather than handing back 7 bits of a 32-bit constant (#613).
+		// Those two methods whose constants share their low 7 bits share the value - `0x20EC` is both
+		// ReceivedCharacterSettings and AuthenticateLoggedIn - so anything that took it as identity ran the wrong
+		// handler (#608). There is no opcode to give, so the honest answer is to refuse rather than to round. Callers
+		// that might see either kind branch on HasOpcode; the login tier dispatches and names from Method throughout.
+		public ushort Opcode => HasOpcode
+			? (ushort)((MethodInstanceTag << 8) | FirstVarintGroup(Method))
+			: throw new InvalidOperationException(
+				$"Method 0x{Method:X8} is a 32-bit registration constant (PlayerAgent/PlayerInterface), which has no opcode - the 16-bit view would keep only 7 of its bits and name two methods at once. Use Method, or gate on HasOpcode.");
 
 		// Body-building overloads: build the body inline with the fluent FaolanStream writers, e.g.
 		//   new Rpc(sender, receiver, opcode, b => b.WriteUInt32(x).WriteArrayUInt32Length(blob))
@@ -143,6 +149,19 @@ namespace Faolan.Core.Network.Protocol
 		// by a helper. Distinct from the Action<FaolanStream> overloads (a byte[] is not a delegate).
 		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> body) : this(sender, receiver, MethodOf(opcode), body)
 		{
+		}
+
+		// ⚠️ The record's SYNTHESIZED ToString prints every readable property, which includes `Opcode` - and that throws
+		// on a hash-registered method (#613), so merely logging a login-tier frame, or letting a test runner format one
+		// in a failure message, would fail with an unrelated exception. Print the message's STATE instead: the derived
+		// views are not state, and nothing should recompute them just to render a line.
+		private bool PrintMembers(StringBuilder builder)
+		{
+			builder.Append($"Sender = {Sender}, Receiver = {Receiver}, Method = 0x{Method:X8}, Body = {Body.Length} bytes, FrameLength = {FrameLength}");
+			if (RoutingContext is not null)
+				builder.Append($", RoutingContext = {RoutingContext}");
+
+			return true;
 		}
 
 		// A fresh reader over the body, for the RECEIVE path (handlers read fields sequentially off it). The send path
@@ -328,16 +347,12 @@ namespace Faolan.Core.Network.Protocol
 		// through whole; a ushort-backed opcode enum goes through MethodOf. A value that overflows its backing type
 		// throws here (fail-fast) rather than silently truncating.
 		//
-		// ⚠️ The two hash-registered enums are rejected outright. Their opcodes ARE in 0x20xx, so MethodOf(ushort)
-		// would happily turn `AuthenticateAck` (0x2091) into method 0x91 and put a two-group varint on the wire where
-		// retail sends five - the one way this fold could go silently wrong. Those sends name the method.
+		// This used to reject `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` explicitly: their opcodes ARE in 0x20xx, so
+		// MethodOf(ushort) would have turned `AuthenticateAck` (0x2091) into method 0x91 and put a two-group varint on
+		// the wire where retail sends five. Those enums no longer exist (#613), so the mistake is now unmakeable rather
+		// than caught - which is why there is no guard here any more.
 		private static uint MethodOf(Enum opcode)
 		{
-			if (opcode is PlayerAgentOpcodes or PlayerInterfaceOpcodes)
-				throw new ArgumentException(
-					$"{opcode.GetType().Name}.{opcode} is a VIEW of a hash-registered method, not a method index - the opcode carries only 7 of its 32 bits. Pass the PlayerAgentMethods/PlayerInterfaceMethods member instead.",
-					nameof(opcode));
-
 			return Enum.GetUnderlyingType(opcode.GetType()) == typeof(uint)
 				? Convert.ToUInt32(opcode)
 				: MethodOf(Convert.ToUInt16(opcode));

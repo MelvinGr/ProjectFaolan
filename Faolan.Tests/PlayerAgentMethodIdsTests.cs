@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 using Xunit;
@@ -22,38 +24,40 @@ namespace Faolan.Tests
 			Assert.Equal(0x5DC18991u, PlayerAgentMethodIds.PlayerInterfaceRegistration["AuthenticateAck"]);
 		}
 
-		// Every observed opcode is the tag byte plus its method's first varint group. This is what makes the opcode
-		// enums on this pair a VIEW rather than a parallel catalog: each member's value is computable from the constant,
-		// so a member that drifts fails here.
+		// The observed methods are the ones the corpus shows, and every one of them READS as `0x2080 | (constant & 0x7F)`
+		// in a hex dump - which is how you find one in a capture, and simultaneously why that value cannot be a catalog
+		// key. `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` were deleted for exactly this reason (#613).
 		[Fact]
-		public void EveryObservedOpcode_IsItsMethodsFirstGroup()
+		public void EveryObservedMethod_ReadsAsItsFirstVarintGroup()
 		{
-			Assert.NotEmpty(PlayerAgentMethodIds.MethodInstanceByOpcode);
+			Assert.NotEmpty(PlayerAgentMethodIds.ObservedAgentMethods);
+			Assert.NotEmpty(PlayerAgentMethodIds.ObservedInterfaceMethods);
 
-			foreach (var (opcode, method) in PlayerAgentMethodIds.MethodInstanceByOpcode)
-				Assert.Equal(opcode, (ushort)(0x2080 | (method & 0x7F)));
+			foreach (var method in PlayerAgentMethodIds.ObservedAgentMethods.Cast<Enum>().Concat(PlayerAgentMethodIds.ObservedInterfaceMethods.Cast<Enum>()))
+			{
+				var constant = Convert.ToUInt32(method);
+				Assert.Equal((ushort)(0x2080 | (constant & 0x7F)), PlayerAgentMethodIds.ObservedOpcode(constant));
+			}
 		}
 
-		// The two opcodes that each name TWO methods (#608). They are in the map once - it is keyed by opcode - which is
-		// exactly why an opcode cannot be the dispatch key on this pair.
+		// The two dump readings that each name TWO methods (#608) - the whole reason this pair has no opcode catalog.
 		[Theory, InlineData(0x20EC, PlayerAgentMethods.ReceivedCharacterSettings, PlayerAgentMethods.AuthenticateLoggedIn),
 		 InlineData(0x20D6, PlayerAgentMethods.VerifyLanguageSetting, PlayerAgentMethods.UpdateCharacterPreview)]
-		public void TheCollidingPairs_ShareAnOpcode(int opcode, PlayerAgentMethods first, PlayerAgentMethods second)
+		public void TheCollidingPairs_ReadTheSameInADump(int reading, PlayerAgentMethods first, PlayerAgentMethods second)
 		{
-			Assert.Equal((ushort)opcode, (ushort)(0x2080 | ((uint)first & 0x7F)));
-			Assert.Equal((ushort)opcode, (ushort)(0x2080 | ((uint)second & 0x7F)));
+			Assert.Equal((ushort)reading, PlayerAgentMethodIds.ObservedOpcode((uint)first));
+			Assert.Equal((ushort)reading, PlayerAgentMethodIds.ObservedOpcode((uint)second));
 			Assert.NotEqual(first, second);
 		}
 
-		// The four login handoffs are named like any other method now. They used to share one invented opcode `0x1A07`,
-		// which is why they were absent from this map entirely (the bytes RpcHeaderTests locks are the same four).
-		[Theory, InlineData(PlayerInterfaceOpcodes.ChatServerConnectReady, PlayerInterfaceMethods.ChatServerConnectReady),
-		 InlineData(PlayerInterfaceOpcodes.CSServerConnectReady, PlayerInterfaceMethods.CSServerConnectReady),
-		 InlineData(PlayerInterfaceOpcodes.LoginConnectReady, PlayerInterfaceMethods.LoginConnectReady),
-		 InlineData(PlayerInterfaceOpcodes.OverrideGameTweaks, PlayerInterfaceMethods.OverrideGameTweaks)]
-		public void TheLoginHandoffs_AreOrdinaryMethods(PlayerInterfaceOpcodes opcode, PlayerInterfaceMethods method)
+		// The four login handoffs are ordinary methods, observed like the rest. They used to share one invented opcode
+		// `0x1A07` - not an opcode at all, but RpcHeader field 3's tag plus its length (#610).
+		[Theory, InlineData(PlayerInterfaceMethods.ChatServerConnectReady, 0x20FA), InlineData(PlayerInterfaceMethods.CSServerConnectReady, 0x20E0),
+		 InlineData(PlayerInterfaceMethods.LoginConnectReady, 0x20F9), InlineData(PlayerInterfaceMethods.OverrideGameTweaks, 0x20E3)]
+		public void TheLoginHandoffs_AreOrdinaryMethods(PlayerInterfaceMethods method, int reading)
 		{
-			Assert.Equal((uint)method, PlayerAgentMethodIds.MethodInstanceByOpcode[(ushort)opcode]);
+			Assert.Contains(method, PlayerAgentMethodIds.ObservedInterfaceMethods);
+			Assert.Equal((ushort)reading, PlayerAgentMethodIds.ObservedOpcode((uint)method));
 		}
 	}
 }

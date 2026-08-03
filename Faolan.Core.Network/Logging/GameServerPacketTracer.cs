@@ -37,7 +37,9 @@ namespace Faolan.Core.Network.Logging
 			payloadLength = 0;
 			iir = 0;
 
-			if (rpc.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+			// HasOpcode first: a hash-registered method has none and asking throws (#613). The login tier never carries
+			// a PassBlob, so "no opcode" is simply "not this carrier".
+			if (!rpc.HasOpcode || rpc.Opcode != (ushort)GameAgentOpcodes.PassBlob)
 				return false;
 
 			if (rpc.Receiver.Type != Endpoints.GameAgentType && rpc.Receiver.Type != Endpoints.GameInterfaceType)

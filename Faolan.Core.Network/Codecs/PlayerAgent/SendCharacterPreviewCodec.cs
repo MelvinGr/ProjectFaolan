@@ -16,7 +16,10 @@ namespace Faolan.Core.Network.Codecs.PlayerAgent
 	// is the whole mechanism: the client authors its own preview and the server only keeps it.
 	public static class SendCharacterPreviewCodec
 	{
-		public const ushort Opcode = (ushort)PlayerInterfaceOpcodes.SendCharacterPreview;
+		// The message identity. On PlayerAgent/PlayerInterface that is the method CONSTANT, not an opcode - the
+		// 16-bit view keeps 7 of its 32 bits and names two methods at once, so there is no opcode enum to declare
+		// against (#613).
+		public const uint Method = (uint)PlayerInterfaceMethods.SendCharacterPreview;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(CharacterPreview value)
