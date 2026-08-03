@@ -40,6 +40,13 @@ public class DumpGameActionKeyLists extends GhidraScript {
 	static final int NAMES = 0x5c;
 	// The key list ends at this sentinel rather than carrying a count.
 	static final long TERMINATOR = 0xffL;
+	// The id space the descriptor ARRAY spans, straight out of the lookup `FUN_008c3910`:
+	// `descriptor = &DAT_025077c8 + (id - 0xCF09) * 0x41` undefined4s (= 0x104 bytes), guarded by
+	// `(id - 0xCF09) <= 0x11D`. So the array has 0x11E = 286 slots, and an id in range whose slot the
+	// initialiser never writes is a HOLE - a retired type, not a type this script missed. See the
+	// `unregistered` line the run prints (Gitea #596).
+	static final long FIRST_ID = 0xcf09L;
+	static final long LAST_ID = 0xd026L;
 
 	String strAt(long a) {
 		if (a < 0x400000L) return null;
@@ -229,7 +236,22 @@ public class DumpGameActionKeyLists extends GhidraScript {
 						+ "\t" + (8 + d.keys.size()) + "\t" + keys + "\t" + fields + "\t" + d.form);
 			}
 		}
-		println("descriptors: " + out.size() + "  named keys: " + keyNames.size());
+		// The HOLES. The array is indexed by id, so "in range but never written" is a fact about the client, not a
+		// gap in this walk - and it is the only thing that can tell a retired type apart from one the walk missed.
+		// Corroborate it outside the initialiser before believing it: a registered type owns an
+		// `e_Type_GC_GameAction_<Name>` string, so the image holding exactly as many of those as there are
+		// descriptors says every named type was reached. Mirrored in `GameActionTypes.UnregisteredIds`.
+		StringBuilder holes = new StringBuilder();
+		for (long id = FIRST_ID; id <= LAST_ID; id++)
+			if (!out.containsKey(id)) holes.append(holes.length() == 0 ? "" : ", ").append(id);
+		int named = 0;
+		for (Data d : currentProgram.getListing().getDefinedData(true))
+			if (d.hasStringValue() && String.valueOf(d.getValue()).startsWith("e_Type_GC_GameAction_")
+					&& String.valueOf(d.getValue()).length() > "e_Type_GC_GameAction_".length()) named++;
+
+		println("descriptors: " + out.size() + " of " + (LAST_ID - FIRST_ID + 1) + " slots"
+				+ "  named keys: " + keyNames.size() + "  e_Type_GC_GameAction_* strings in the image: " + named);
+		println("unregistered: " + holes);
 		println("wrote " + OUT + "gameaction-keylists.tsv");
 	}
 }

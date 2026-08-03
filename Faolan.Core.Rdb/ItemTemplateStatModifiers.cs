@@ -100,18 +100,26 @@ namespace Faolan.Core.Rdb
 				// LENGTH as the next slot's value (Gitea #596). `SetMorphValue`'s "mesh name after the element" was
 				// this slot all along.
 				//
-				// The u16 is the client's own string primitive: the GameAction deserializer `FUN_00899a60` takes the
-				// string branch for exactly `GameActionStat_e` 0x4d9/0x4da and calls `FUN_0048f840` -> `FUN_00cbf840`
-				// mode 0, which reads a u16 and treats >= 0x8000 as an escape into a long form. It is also what the
-				// shipped records measure: of the 880 text-carrying elements in the feat and spell catalogs, 653 tile
-				// EXACTLY under this reading (`--report feat-effect-kinds`), and the strings come out whole -
-				// "spell_curseofflies" as a 0x12-byte slot, "arm" as a 3-byte one, neither carrying a NUL.
+				// The u16 is the client's own string primitive, and the only one on this path: the deserializer
+				// `FUN_00899a60` takes the string branch for exactly `GameActionStat_e` 0x4d9/0x4da and calls
+				// `FUN_0048f840` -> `FUN_00cbf840` mode 0, which reads a u16 and treats >= 0x8000 as an escape into a
+				// long form; the WRITER `FUN_00899440` emits the same u16 with the same escape, and neither branches
+				// on the type. It is also what the shipped records measure: of the 880 text-carrying elements in the
+				// feat and spell catalogs, 653 tile EXACTLY under this reading (`--report feat-effect-kinds`), and the
+				// strings come out whole - "spell_curseofflies" as a 0x12-byte slot, "arm" as a 3-byte one, neither
+				// carrying a NUL.
 				//
-				// ⚠️ 6 elements do NOT - all of them `HeadText`, which reads as `[u32 7]["Dimach\0"][u32 3]` and tiles
-				// two bytes wider than the u16 form allows. Not modelled; it is the open thread on #596.
+				// ⚠️ 7 elements do NOT - all of them `HeadText`, reading `[u32 7]["Dimach\0"][u32 3]` two bytes wider
+				// than the u16 form allows. Deliberately still not modelled: they are RETIRED DATA (#596), sitting in
+				// the same low-id feat templates (3753, 12362..12386) that carry the retired kind 53044 and a
+				// `ChangeHitPercent` padded with terminator words, while every u16 record in either catalog is
+				// template id 791547 or higher. A second length width here would be a tolerant reader for bytes the
+				// client itself refuses to stream.
 				//
 				// An UNREGISTERED kind has no key list, so it keeps the two u32 slots the pair readers below need and
-				// nothing more.
+				// nothing more. That is not a decode gap waiting to be filled: the catalog covers every id the client
+				// registers, and the ids it does not are RETIRED (GameActionTypes.UnregisteredIds), so an element
+				// carrying one is data the client refuses to stream at all.
 				var keys = type?.Keys ?? [GameActionTypes.KeyStat, GameActionTypes.KeyValue];
 				var values = new List<uint>(keys.Length);
 				var texts = new List<string?>(keys.Length);

@@ -140,11 +140,16 @@ table it reads (`&DAT_025073c0`, built by `FUN_00897bd0`, 244 of its 255 slots w
 **209 → `0x4d9`** and **210 → `0x4da`**, and nothing else to either. So a type is variable-width iff its key list
 contains 209 or 210 — `GenerateName` and `NewTextEffect` are the only two carrying both.
 
-**The length word is a u16, not a u32.** Same source: the string read is `FUN_0048f840` → `FUN_00cbf840` mode 0,
-which reads a u16 and treats `>= 0x8000` as an escape into a long form no shipped template uses. The records
-agree — of the 880 text-carrying elements in the feat and spell catalogs, **653 tile EXACTLY** under it (the
-distance to the next element's type word equals `32 + 4×fixedSlots + 2 + len`), and the strings come out whole
-with the slots after them aligned:
+**The length word is a u16, not a u32, and there is no second form.** Same source, now settled on BOTH sides of
+the stream `[V1: tools/ghidra/DecompileFns.java]`: the read is `FUN_0048f840` → `FUN_00cbf840` mode 0, which
+reads a u16 and treats `>= 0x8000` as an escape into a long form no shipped template uses, and the **writer**
+`FUN_00899440` emits that same u16 with the same escape (`0xFFFF`, then `0x01FF`, then the u32). `FUN_00cbf840`
+*does* have a u32 mode — `param_2 == 2` reads the length through `FUN_0048f900` — but nothing on the GameAction
+path passes it, and neither side branches on the TYPE: the string branch is chosen by the stat key alone. So a
+u32-length string cannot be produced or consumed by this client. The records agree — of the 880 text-carrying
+elements in the feat and spell catalogs, **653 tile EXACTLY** under the u16 (the distance to the next element's
+type word equals `32 + 4×fixedSlots + 2 + len`), and the strings come out whole with the slots after them
+aligned:
 
 | element | payload, by key |
 |---|---|
@@ -158,11 +163,24 @@ None of them carries a NUL inside the counted length.
 this; `--report feat-effect-kinds` prints the audit, bucketing every text-carrying element by which length word
 makes it tile to its measured width.
 
-⚠️ **Six elements do not tile under it**, all of them `HeadText` (53057), which reads cleanly as
-`[u32 7]["Dimach\0"][u32 3]` — a u32 length, the NUL counted — and measures two bytes wider than the u16 form
-allows. That is one kind out of the eleven that carry text and is not modelled; the walk stops at such a slot
-rather than guessing, so the element is still located and its earlier slots still read. Open thread on Gitea #596,
-together with the unregistered kind 53044, which carries a string under a key list the client does not register.
+⚠️ **Seven elements do not tile under it** — all of them `HeadText` (53057), reading `[u32 7]["Dimach\0"][u32 3]`
+with the NUL counted, two bytes wider than the u16 form allows. They are **retired data, not a second form**
+(Gitea #596, closed). Three things put them there rather than in the grammar:
+
+- the client has one string branch and it is a u16, on the read side and the write side both (above), so it
+  cannot have written these and cannot read them back;
+- they cluster with the other two stale shapes. All seven sit in feat templates `3753` and `12362..12386`, and
+  six of those same templates also carry the retired kind **53044** (a string under a type id the client
+  registers nothing for — see [the id space](#the-full-type-id-catalog--260-types-and-the-id-space-the-client-asserts))
+  and a `ChangeHitPercent` padded out with four terminator words. Feat 12362's element region runs
+  `53030`(+4 pad) → `53057`(u32 string) → `53002` → `53044`(u32 string): the one element in it that the current
+  catalog reads cleanly end to end is the one with no stale shape;
+- they are separated from live data by two orders of magnitude of template id. Every u16 text element in either
+  catalog is id **791547 or higher**; every u32 one is **12386 or lower**.
+
+The walk stops at such a slot rather than guessing a second length width, so the element is still located and its
+earlier slots still read. `--report feat-effect-kinds` prints every member of each bucket, which is what makes
+"all seven are one kind, in one id band" checkable rather than asserted.
 
 ### Two shipped-data anomalies, both confined and both characterised
 
@@ -179,7 +197,8 @@ Tiling leaves exactly two kinds disagreeing, and neither is the model being wron
   `0xCF3E`, which is what `RdbFeatImporter.ParseSpellStatModifiers` rejects on.
 - **`ChangeHitPercent` (53030) at 15 words, ×6** — the `Dimach Item k1/k2/k3` crafting entries (e.g. 12362). Its
   three values (43464, 100, 100) are followed by **four `0x000000FF` words** — the key list's own terminator value,
-  as padding. Also Gitea #596.
+  as padding. Same six templates as the u32-string `HeadText` and the retired kind 53044 above, so it is the third
+  face of one stale authoring vintage rather than a third puzzle (Gitea #596, closed).
 
 Neither is reachable as a stat modifier: the importer rejects both on general rules (a magnitude that is a
 registered GameAction type id was never ours; a stat outside the id range likewise), not by name.
@@ -478,6 +497,28 @@ So the valid ids are **`0xCF09..0xD026`** — 286 slots, of which 260 are regist
 dropped packet: it pops an "Assertion Failed" dialog and takes the client down. `GameActionTypeId.Validate`
 enforces the range before anything is built.
 
+### The other 26 slots are RETIRED ids — the catalog is complete (#596)
+
+The table is a flat array indexed by the id, so an in-range id is either registered or a **hole**; there is no
+third state. 26 ids are holes: `53001, 53017, 53039, 53044, 53126, 53127, 53131, 53133, 53142, 53143, 53145,
+53146, 53147, 53149, 53151, 53156, 53157, 53158, 53161, 53181, 53186, 53216, 53248, 53258, 53279, 53280`.
+
+That they are the client's holes rather than the recovery's blind spots is the load-bearing claim, so it is
+checked three ways `[V1: tools/ghidra/DumpGameActionKeyLists.java]`:
+
+1. `FUN_008bdf40` writes 260 of the 286 slots and never mentions these ids;
+2. a whole-image scan for the id constant finds **zero** hits (`ConstScan CONST=cf34`) — not in the initialiser,
+   not anywhere;
+3. the image holds exactly **260** `e_Type_GC_GameAction_*` name strings, matching the 260 descriptors, so every
+   type the client can name was reached.
+
+A retired id therefore has no descriptor, no key list and no name in the client at all. Both the element reader
+`FUN_00899a60` and the writer `FUN_00899440` test the slot's id word for zero and log *"Tried to stream unknown
+GameActionData with type N"* instead of reading a payload — so shipped data carrying one (kind **53044**, in seven
+low-id feat templates) is content this client cannot parse. `GameActionTypes.UnregisteredIds` mirrors the list and
+`GameActionKeyListTests.TheRegisteredTypesAndTheRetiredIdsPartitionTheIdSpace` keeps the two sets a partition of
+the range, so a later re-dump that recovers one of them fails the build rather than silently re-opening the question.
+
 `FUN_008bdf40` initialises the table, writing the name pointer at `descriptor+0` and **the id at `descriptor+8`**.
 Reading the id from `descriptor+8` and deriving it from the address both give the same answer for all 171 inline
 registrations; the other 89 register via `CALL FUN_008bde20`, which passes the id in `ECX`.
@@ -494,6 +535,9 @@ This was not caught by review. `StartFlymode` came out as `0xD12D` instead of `0
 sent (2026-07-29). Only the range assert caught it. The lesson: for a table index, validate against the client's
 own BOUNDS, never against another derivation of the same quantity.
 
-⚠️ **KeyLists are still NOT recoverable statically.** The descriptor table is BSS — filled at runtime — so a read
-of `descriptor+0xc` returns zeros; the JSON's key lists come from a live Frida dump. A type in this TSV but not in
-the JSON has an **unknown parameter list**, and assuming an empty one is a guess to be proven in-client.
+⚠️ **"KeyLists are not recoverable statically" was wrong** — superseded by
+[the 2026-08-03 resolution](#resolved-2026-08-03--the-whole-descriptor-table-is-statically-recoverable-and-it-names-the-rdb-modifier-record-591)
+above. The reasoning that produced it is still worth keeping, because it is a trap: the descriptor table is BSS,
+so *reading* `descriptor+0xc` out of the image returns zeros. What that rules out is reading the DATA — not
+reading the initialiser that writes it. `DumpGameActionKeyLists.java` walks `FUN_008bdf40`'s stores instead and
+reaches all 260, against the 68 the live Frida dump got.

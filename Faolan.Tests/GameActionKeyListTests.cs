@@ -47,7 +47,28 @@ namespace Faolan.Tests
 		public void EveryTypeIsInsideTheIdSpaceTheClientAsserts()
 		{
 			foreach (var type in GameActionTypes.All)
-				Assert.InRange(type.Id, 0xCF09u, 0xD026u);
+				Assert.InRange(type.Id, GameActionTypes.FirstId, GameActionTypes.LastId);
+		}
+
+		// The catalog is COMPLETE, and this is what says so (#596). The descriptor table is a flat array indexed by
+		// the id, so every id in the range is either registered or a hole - there is no third state. Asserting that
+		// the two sets PARTITION the range is what turns "the dump found 260" into "the client has 260": if a later
+		// re-dump recovers one of the 26, the tsv gains a row and this fails until `UnregisteredIds` gives it up, and
+		// an id that fell out of the tsv fails the same way rather than quietly becoming "retired".
+		//
+		// Without it, an unregistered kind in shipped data (53044) reads as a gap in our recovery rather than as
+		// what it is: content the client itself refuses to stream.
+		[Fact]
+		public void TheRegisteredTypesAndTheRetiredIdsPartitionTheIdSpace()
+		{
+			var registered = GameActionTypes.All.Select(t => t.Id).ToHashSet();
+			Assert.Empty(registered.Intersect(GameActionTypes.UnregisteredIds));
+
+			var span = Enumerable.Range((int)GameActionTypes.FirstId, (int)(GameActionTypes.LastId - GameActionTypes.FirstId + 1))
+				.Select(i => (uint)i)
+				.ToHashSet();
+			Assert.Equal(span.Count, registered.Count + GameActionTypes.UnregisteredIds.Count);
+			Assert.Empty(span.Except(registered).Except(GameActionTypes.UnregisteredIds));
 		}
 
 		// The whole point of the key list: an element carries exactly one u32 per key after a fixed 8-word prefix,

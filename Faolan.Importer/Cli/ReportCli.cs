@@ -2584,7 +2584,7 @@ namespace Faolan.Importer.Cli
 			// Every distinct payload of the FILTERED kind, so a single-kind run reads as a census of that kind's
 			// slots rather than one sample - which is what makes "slot 1 tracks the tooltip, slot 3 does not"
 			// checkable instead of asserted.
-			var samples = new List<(uint Id, string Name, ItemTemplateStatModifiers.Element Element)>();
+			var samples = new List<(uint Id, string Name, ItemTemplateStatModifiers.Element Element, string Raw)>();
 			var textAudit = new Dictionary<string, List<(uint Id, string Name, uint Kind, string Bytes)>>();
 
 			foreach (var e in rdb.EntriesOfType(templateType))
@@ -2645,7 +2645,14 @@ namespace Faolan.Importer.Cli
 						? (1, e.Id, name, element)
 						: (prior.Count + 1, prior.FeatId, prior.FeatName, prior.Sample);
 					if (only != 0)
-						samples.Add((e.Id, name, element));
+					{
+						// The payload BYTES, from the four always-present values onward. An UNREGISTERED kind has no
+						// key list, so the key=value rendering below invents two slots for it and shows nothing else -
+						// the bytes are the only way to see what such a record actually holds (Gitea #596).
+						var from = 12 + element.Offset + 24;
+						samples.Add((e.Id, name, element,
+							string.Join(" ", Enumerable.Range(0, Math.Clamp(body.Length - from, 0, 48)).Select(k => body[from + k].ToString("x2")))));
+					}
 				}
 			}
 
@@ -2686,8 +2693,16 @@ namespace Faolan.Importer.Cli
 				{
 					Console.WriteLine($"  {form} x{hits.Count}");
 					foreach (var byKind in hits.GroupBy(h => h.Kind).OrderByDescending(g => g.Count()))
-						Console.WriteLine($"      kind {byKind.Key} {GameActionTypes.Get(byKind.Key)?.Name ?? "<unregistered>",-36} x{byKind.Count(),-4} "
-							+ $"e.g. {byKind.First().Id} \"{byKind.First().Name}\": {byKind.First().Bytes}");
+					{
+						Console.WriteLine($"      kind {byKind.Key} {GameActionTypes.Get(byKind.Key)?.Name ?? "<unregistered>",-36} x{byKind.Count()}");
+						// Up to eight members, not one. A length word is settled by the records that DISAGREE with the
+						// rule, and a bucket printed as a single example cannot show whether its members agree with
+						// each other - which is the whole question when a form holds six records (Gitea #596).
+						foreach (var hit in byKind.Take(8))
+							Console.WriteLine($"          {hit.Id,10} \"{hit.Name}\": {hit.Bytes}");
+						if (byKind.Count() > 8)
+							Console.WriteLine($"          ... and {byKind.Count() - 8} more");
+					}
 				}
 			}
 
@@ -2697,8 +2712,11 @@ namespace Faolan.Importer.Cli
 			var only_ = GameActionTypes.Get(only);
 			Console.WriteLine();
 			Console.WriteLine($"--- every {only} ({only_?.Name ?? "<unregistered>"}) element, by key:");
-			foreach (var (id, name, element) in samples.OrderBy(s => s.Name).ThenBy(s => s.Id))
+			foreach (var (id, name, element, raw) in samples.OrderBy(s => s.Name).ThenBy(s => s.Id))
+			{
 				Console.WriteLine($"  {id,10} {name,-44} {Payload(element)}  ({element.WidthBytes}B)");
+				Console.WriteLine($"             payload {raw}");
+			}
 
 			return;
 

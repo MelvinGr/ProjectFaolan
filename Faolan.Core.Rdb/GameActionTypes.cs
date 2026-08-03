@@ -128,14 +128,60 @@ namespace Faolan.Core.Rdb
 		///         contains 209 or 210.
 		///     </para>
 		///     <para>
-		///         The u16 is likewise the client's own string primitive (`FUN_0048f840` -> `FUN_00cbf840` mode 0,
-		///         which reads a u16 and treats `>= 0x8000` as an escape into a long form), and it is what the shipped
-		///         records measure - 653 of the 880 text-carrying elements in the feat and spell catalogs tile
-		///         EXACTLY under it. ⚠️ Six do not, all of them `HeadText`, which reads as `[u32 7]["Dimach\0"]`; that
-		///         is the open thread on #596. See <c>ItemTemplateStatModifiers.ParseElements</c>.
+		///         The u16 is likewise the client's own string primitive, and it is the ONLY form on this path -
+		///         settled on both sides of the stream (#596). The reader `FUN_00899a60` calls `FUN_0048f840` ->
+		///         `FUN_00cbf840` with mode 0, which reads a u16 and treats `>= 0x8000` as an escape into a long
+		///         form; the WRITER `FUN_00899440` emits that same u16 with the same escape (`0xffff` then `0x1ff`).
+		///         Neither branches on the type - the string branch is chosen by the STAT KEY - so `FUN_00cbf840`'s
+		///         u32 mode (`param_2 == 2`) belongs to some other stream and can never be reached from a
+		///         GameAction element.
+		///     </para>
+		///     <para>
+		///         The shipped records agree: 653 of the 880 text-carrying elements in the feat and spell catalogs
+		///         tile EXACTLY under the u16 reading. ⚠️ SEVEN do not - all of them `HeadText`, reading
+		///         `[u32 7]["Dimach\0"]` with the NUL counted - and those seven are RETIRED DATA, not a second form:
+		///         they sit in feat templates 3753 and 12362..12386, the same low-id band that carries the retired
+		///         kind 53044 (see <see cref="UnregisteredIds" />) and a `ChangeHitPercent` padded with four
+		///         terminator words, while every u16 record in either catalog is id 791547 or higher. The client
+		///         cannot read them either. So the walk stops at such a slot rather than guessing a second length
+		///         width. See <c>ItemTemplateStatModifiers.ParseElements</c>.
 		///     </para>
 		/// </summary>
 		public static readonly System.Collections.Generic.HashSet<int> TextKeys = [KeyEventString, KeyEventString2];
+
+		/// <summary>
+		///     The id space the client asserts on, straight out of the descriptor lookup `FUN_008c3910`:
+		///     `descriptor = &amp;DAT_025077c8 + (id - 0xCF09) * 0x104` bytes, guarded by `(id - 0xCF09) &lt;= 0x11D`.
+		///     So the descriptor table is a flat ARRAY of 286 slots indexed by the type id itself.
+		/// </summary>
+		public const uint FirstId = 0xCF09;
+
+		/// <inheritdoc cref="FirstId" />
+		public const uint LastId = 0xD026;
+
+		/// <summary>
+		///     The 26 ids inside <see cref="FirstId" />..<see cref="LastId" /> that the client registers NOTHING for -
+		///     retired types, not types the recovery missed (Gitea #596).
+		///     <para>
+		///         Proven three ways, because "the dump skipped it" is the obvious competing explanation:
+		///         the initialiser `FUN_008bdf40` writes 260 of the array's 286 slots and never mentions these ids;
+		///         a scan of the whole image finds their id constant NOWHERE (`0xCF34` has zero hits); and the image
+		///         holds exactly 260 `e_Type_GC_GameAction_*` name strings, so every NAMED type was reached. A
+		///         retired id therefore has no descriptor, no key list and no name anywhere in the client.
+		///     </para>
+		///     <para>
+		///         What that means for a reader: both the element reader `FUN_00899a60` and the writer
+		///         `FUN_00899440` test the slot's id word for 0 and log `"Tried to stream unknown GameActionData with
+		///         type N"` rather than reading a payload - so shipped data carrying one of these (kind 53044 sits in
+		///         seven low-id feat templates) is content the client itself cannot parse. Reading it is not a gap to
+		///         close; it is data that predates the catalog.
+		///     </para>
+		/// </summary>
+		public static readonly System.Collections.Generic.IReadOnlySet<uint> UnregisteredIds = new System.Collections.Generic.HashSet<uint>
+		{
+			53001, 53017, 53039, 53044, 53126, 53127, 53131, 53133, 53142, 53143, 53145, 53146, 53147,
+			53149, 53151, 53156, 53157, 53158, 53161, 53181, 53186, 53216, 53248, 53258, 53279, 53280
+		};
 
 		private static readonly Dictionary<uint, GameActionType> ById = new()
 		{
