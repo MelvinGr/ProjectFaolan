@@ -37,11 +37,13 @@ namespace Faolan.Core.Network.Codecs.World
 			return s.ToArray();
 		}
 
+		// The positions are carried VERBATIM, including an empty list (#453). An empty list used to be substituted with
+		// `[0]` - which reads as harmless "default to the first slot" and is not: the bare `ListFrame.ForCount(0)`
+		// (0x3F1) is a real captured shape, 50 of the 148 records in the corpus, sitting alongside each bag's removal
+		// message. Substituting made that shape inexpressible and turned a "removed nothing" into "removed slot 0".
 		public static byte[] Build(uint bagHandle, params uint[] removedPositions)
 		{
-			return Build(new LootRemoveItemsIIR(bagHandle, removedPositions.Length == 0
-				? [0u]
-				: removedPositions));
+			return Build(new LootRemoveItemsIIR(bagHandle, removedPositions));
 		}
 
 		public static LootRemoveItemsIIR Parse(in ReadOnlySpan<byte> data)

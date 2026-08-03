@@ -319,17 +319,22 @@ namespace Faolan.GameServer.World
 		// leaves the bag in the world with its remaining contents; it still fades on its own expiry (TickExpiry).
 		// Retail loot-all finish decoded from the hoxxling gameplay capture (frame 4470): LootRemoveItems ->
 		// DispatchCloseLootBag (0x2038) -> NewCurrentLooter/NewAllowedLooter reset -> n3ToClientFade -> UpdateSimpleDynel.
-		public async Task AfterLootTake(INetworkClient client, uint bagHandle, uint removedPos = 0)
+		public async Task AfterLootTake(INetworkClient client, uint bagHandle, params uint[] removedPositions)
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player == null || !_sim.World.ZoneForEntity(player).TryGet(bagHandle, out var bag))
 				return;
 
-			// Per-take ACK: tell the client which display slot to remove from the open window - the looted item's Pos
-			// (the srcPos it dragged), echoed in the trailing u32 (decoded from loot-drag-1538). The client removes that
-			// slot and compacts; a partial take leaves the bag open with its remaining items - NO re-render (re-sending
-			// the full object stacked a second window). Loot-all passes removedPos 0 (matches the captured loot-all ACK).
-			await WorldIir.Send(client, LootRemoveItemsCodec.Build(bag.Handle, removedPos));
+			// Per-take ACK: tell the client which display slot(s) to remove from the open window. The client removes
+			// them and compacts; a partial take leaves the bag open with its remaining items - NO re-render (re-sending
+			// the full object stacked a second window).
+			//
+			// The list is a REAL list, not a one-element formality (#453). Measured over all 148 LootRemoveItems
+			// records in the corpus, the element count takes 0, 1, 2, 3 and 4, and the positions are the contiguous
+			// run [0..n-1] in every record but one - the exception being loot-drag-1538's single drag of slot 1, which
+			// sends exactly [1]. So a loot-all of n items is ONE message listing all n slots, not n messages, and this
+			// used to send [0] for every loot-all: the client was told to drop the first slot and nothing else.
+			await WorldIir.Send(client, LootRemoveItemsCodec.Build(bag.Handle, removedPositions ?? []));
 
 			if (bag.LootItems.Any(i => i != 0) || bag.CashTin > 0)
 				return; // items/coins remain (0 = a drag-looted slot) - keep the bag open; client drives close (0x2044)

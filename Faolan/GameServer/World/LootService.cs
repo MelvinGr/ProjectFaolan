@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database.Repositories;
@@ -98,8 +99,10 @@ namespace Faolan.GameServer.World
 				_logger.LogInformation("Loot: granted {Granted} of {Count} item(s) from bag 0x{Bag:X8} to {Player}.", granted, items.Count, bagHandle, client.Session.Character?.Name);
 			}
 
-			// Confirm the take + (since loot-all empties it) consume/fade the bag.
-			await _broadcaster.AfterLootTake(client, bagHandle);
+			// Confirm the take + (since loot-all empties it) consume/fade the bag. A loot-all removes EVERY item slot
+			// the bag handed over, and retail says so in one message listing them all - the contiguous run [0..n-1]
+			// (#453). Passing nothing here sent a one-element [0] and left the client showing every slot but the first.
+			await _broadcaster.AfterLootTake(client, bagHandle, [.. Enumerable.Range(0, items.Count).Select(i => (uint)i)]);
 		}
 
 		// 0x2045 TryLootCash: credit the bag's coins. Coins AUTO-LOOT when the window opens - this is the client's very

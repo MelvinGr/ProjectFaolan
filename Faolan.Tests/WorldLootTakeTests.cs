@@ -20,7 +20,9 @@ namespace Faolan.Tests
 		[Fact]
 		public void LootRemoveItems_MatchesCapture()
 		{
-			Assert.Equal("700101620000c87a000021fe0000000000000007e200000000", Convert.ToHexStringLower(LootRemoveItemsCodec.Build(Bag)));
+			// Explicitly [0] - a ONE-element list naming slot 0, which is what this capture sends. It used to be
+			// spelled `Build(Bag)` and rely on the empty->[0] substitution the codec no longer does (#453).
+			Assert.Equal("700101620000c87a000021fe0000000000000007e200000000", Convert.ToHexStringLower(LootRemoveItemsCodec.Build(Bag, 0)));
 		}
 
 		// Per-drag ACK names the looted display Pos in the trailing u32: loot-drag-1538 frame 3266 (bag 0x22ec, dragged
@@ -30,6 +32,33 @@ namespace Faolan.Tests
 		public void LootRemoveItems_RemovedPos_MatchesDragCapture()
 		{
 			Assert.Equal("700101620000c87a000022ec0000000000000007e200000001", Convert.ToHexStringLower(LootRemoveItemsCodec.Build(0x000022ec, 1)));
+		}
+
+		// The removed-slot list is a REAL list, and retail uses it (#453). Measured over all 148 LootRemoveItems records
+		// in the corpus the element count takes 0, 1, 2, 3 and 4 - so a loot-all of n items is ONE message naming all n
+		// slots, not n messages, and not the single `[0]` the loot-all path used to send.
+		//
+		// Both goldens are from NecroL80_mage-necromancer_login_combat: bag 0x8e8 held three items and bag 0x8ea two.
+		// The list-frame words are the giveaway that these are counts and not landmarks - 0x0fc4 = 4 * 0x3F1 and
+		// 0x0bd3 = 3 * 0x3F1, next to the 0x07e2 (= 2 * 0x3F1) that the single-element captures made look constant.
+		[Theory, InlineData(0x000008e8u, 3, "700101620000c87a000008e8000000000000000fc4000000000000000100000002"),
+			InlineData(0x000008eau, 2, "700101620000c87a000008ea000000000000000bd30000000000000001")]
+		public void LootRemoveItems_MultiSlot_MatchesCapture(uint bag, int slots, string expected)
+		{
+			var positions = new uint[slots];
+			for (var i = 0; i < slots; i++)
+				positions[i] = (uint)i;
+
+			Assert.Equal(expected, Convert.ToHexStringLower(LootRemoveItemsCodec.Build(bag, positions)));
+		}
+
+		// The EMPTY list is a captured shape too - 50 of the 148 records - and it is the bare 0x3F1 the list-frame
+		// notes warn reads as a terminator. Every captured bag gets one alongside its removal message, which matches
+		// the corpus's own TryLootCash -> TryLootAll ordering: taking the coins removes no item slot.
+		[Fact]
+		public void LootRemoveItems_EmptyList_IsTheBare0x3F1()
+		{
+			Assert.Equal("700101620000c87a000021fe0000000000000003f1", Convert.ToHexStringLower(LootRemoveItemsCodec.Build(Bag)));
 		}
 
 		[Fact]
