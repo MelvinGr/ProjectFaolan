@@ -210,6 +210,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "spawn-diff":
+				{
+					SpawnDiff(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "snapshot":
 				{
 					SnapshotScan(NamedCapture.LoadAll(capturesDir));
@@ -1230,6 +1236,248 @@ namespace Faolan.Importer.Cli
 		// stat-update IIR carries none - tools/capture/scan_npc_armor_stat.py.) The spawn's character message has a
 		// `generic_stats` repeated-uint32 field; this censuses it over every captured NPC spawn using the real
 		// protobuf decoder, because hand-scanning the wire for the field tag matches inside strings.
+		// --report spawn-diff [--report-arg <name substring>]
+		//
+		// Rebuilds every CAPTURED NPC spawn from the DB row it was imported into and compares the two - the question
+		// "does the NPC we send look like the NPC retail sent", asked of the shipped data rather than of a golden
+		// fixture. That is what an in-client "this NPC renders wrong" report needs, and what the equipment-row and
+		// stat-core queries cannot answer on their own: both can be faithful while the record assembled from them is
+		// not.
+		//
+		// It compares the two parts that DESCRIBE the entity and that we claim to reproduce - the embedded
+		// CoreCharacter message (identity, stats, worn equipment) and the post-IIR appearance/morph table - plus the
+		// CoreChar header word. It deliberately does NOT compare whole records: our pre-IIR is the generated minimal
+		// scaffold by design (#243), so a byte-exact record comparison reports every spawn in the corpus as different
+		// and says nothing about appearance.
+		//
+		// The match is exact: a captured record is found by the row's OWN derived key (map + position), over the login
+		// burst only - the window the importer imports through, since a mid-session spawn is the same NPC at wherever
+		// it had WANDERED to and keys to no row. A row we cannot find, or a type with no lifted stat core, is reported
+		// rather than skipped: "not compared" is a different answer from "matches".
+		//
+		// ⚠️ NOROW is not by itself a data gap. The key is built with a NULL class, so every placement on a
+		// CLASS-SPECIFIC map (the city armories, where the class is part of the identity) keys to nothing here - the
+		// quartermasters are all NOROW for that reason alone. Read a NOROW as "go look", not as "missing".
+		private static void SpawnDiff(IReadOnlyList<NamedCapture> captures, string? filter)
+		{
+			// The client's spawn poll, which ends the login-burst window (NpcSpawnExtractor names it the same way).
+			const uint SpawnPollOpcode = 0x2020;
+
+			using var db = OpenDb();
+			var rows = db
+				.NpcSpawns.AsNoTracking()
+				.Include(s => s.NpcTemplate).ThenInclude(t => t.StatCore)
+				.Include(s => s.Equipment).ThenInclude(e => e.Item)
+				.Include(s => s.Morphs)
+				.AsSplitQuery()
+				.ToDictionary(s => s.Id);
+
+			// Per template: how the captured records for it compared. Keyed by NAME because that is what an in-client
+			// report names, and a name can span several template ids (two "Poacher" types stand on one map).
+			var tally = new SortedDictionary<string, SpawnVerdict>();
+			var seen = new HashSet<(uint, float, float, float)>();
+
+			foreach (var capture in captures)
+			{
+				uint map = 0;
+				var sawPoll = false;
+				foreach (var p in capture.Packets)
+				{
+					if (p is { IsIirCarrier: true, IsDownload: true, SubOpcode: PlayfieldFCodec.Opcode })
+					{
+						if (p.TryParse(PlayfieldFCodec.Parse, out var change))
+							map = change.MapId;
+
+						sawPoll = false;
+						continue;
+					}
+
+					// The LOGIN BURST window only, the same gate NpcSpawnExtractor.ExtractLoginBurst imports through
+					// (the client's 0x2020 spawn poll ends it).
+					if (p.Opcode == SpawnPollOpcode)
+					{
+						sawPoll = true;
+						continue;
+					}
+
+					if (sawPoll || map == 0 || p is not { IsIirCarrier: true, IsDownload: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
+						continue;
+
+					SimpleCharFullUpdateIIR captured;
+					try
+					{
+						captured = SimpleCharFullUpdateCodec.Parse(p.Record);
+					}
+					catch (CodecParseException)
+					{
+						continue; // a body the codec cannot account for is not one we build; #243's mid-session forms
+					}
+
+					// Neither the player's own spawn nor another player's is an NpcSpawn row.
+					if (captured.Handle >= EntityHandles.CharacterInstanceBase || captured.Character?.player_stats != null)
+						continue;
+
+					var name = captured.Character?.Name ?? "";
+					if (!string.IsNullOrEmpty(filter) && !name.Contains(filter, StringComparison.OrdinalIgnoreCase))
+						continue;
+
+					// One verdict per PHYSICAL spawn, not per captured send: the same NPC is re-sent on every login in
+					// every capture, and counting those would weight the tally by how often a zone was visited.
+					var pos = captured.Position;
+					if (!seen.Add((map, pos.X, pos.Y, pos.Z)))
+						continue;
+
+					var v = tally.GetValueOrDefault(name) ?? (tally[name] = new SpawnVerdict());
+					if (!rows.TryGetValue(NpcSpawn.ComputeId(map, pos.X, pos.Y, pos.Z, null), out var row))
+					{
+						v.NoRow++;
+						continue;
+					}
+
+					SimpleCharFullUpdateIIR ours;
+					try
+					{
+						ours = SimpleCharFullUpdateCodec.Parse(NpcSpawnBuilder.BuildLive(row, captured.Handle, (uint)captured.Playfield));
+					}
+					catch (Exception e) when (e is InvalidOperationException or CodecParseException)
+					{
+						v.Failed++;
+						v.Note ??= e.Message;
+						continue;
+					}
+
+					var faults = new List<string>();
+					if (captured.CoreCharIirHeader != ours.CoreCharIirHeader)
+						faults.Add($"iir header 0x{captured.CoreCharIirHeader:X} vs 0x{ours.CoreCharIirHeader:X}");
+
+					var theirMsg = captured.Character?.ToProtobuf() ?? [];
+					var ourMsg = ours.Character?.ToProtobuf() ?? [];
+					if (!theirMsg.AsSpan().SequenceEqual(ourMsg))
+					{
+						// WHICH fields, not just "the message differs". Named fields are what turn a diff into a lead:
+						// "we send MonsterScale 100 where retail sends 97" is actionable, "758B vs 758B" is not.
+						var fields = FieldDiff(captured.Character, ours.Character);
+						faults.Add($"message {theirMsg.Length}B vs {ourMsg.Length}B"
+							+ $" (equip {captured.Character?.InventoryEntries.Count ?? 0} vs {ours.Character?.InventoryEntries.Count ?? 0})"
+							+ (fields.Count > 0 ? $" [{string.Join(", ", fields.Take(6))}{(fields.Count > 6 ? ", ..." : "")}]" : ""));
+					}
+
+					var theirMorphs = Morphs(captured);
+					var ourMorphs = Morphs(ours);
+					if (!theirMorphs.SequenceEqual(ourMorphs))
+						faults.Add($"appearance {theirMorphs.Count} morphs vs {ourMorphs.Count}"
+							+ (theirMorphs.Count == ourMorphs.Count ? " (same count, different values)" : ""));
+					else if (captured.Post?.Word2 != ours.Post?.Word2)
+						faults.Add($"post-IIR word2 {captured.Post?.Word2} vs {ours.Post?.Word2}");
+
+					if (faults.Count == 0)
+					{
+						v.Same++;
+						continue;
+					}
+
+					v.Differ++;
+					v.Note ??= string.Join("; ", faults);
+				}
+			}
+
+			Console.WriteLine("spawn-diff: every captured NPC spawn rebuilt from its DB row - CoreCharacter message +");
+			Console.WriteLine("appearance table compared (the pre-IIR is our generated scaffold by design, so it is not).");
+			Console.WriteLine("DIFFER = an NPC we describe differently from retail. NOROW/FAILED were not compared at all.");
+			Console.WriteLine();
+			Console.WriteLine($"{"npc",-34} {"same",6} {"differ",7} {"norow",6} {"failed",7}");
+			foreach (var (name, v) in tally.OrderByDescending(x => x.Value.Differ + x.Value.Failed).ThenBy(x => x.Key))
+			{
+				Console.WriteLine($"{(name.Length > 33 ? name[..33] : name),-34} {v.Same,6} {v.Differ,7} {v.NoRow,6} {v.Failed,7}");
+				if (v.Note != null)
+					Console.WriteLine($"    {v.Note}");
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"totals: {tally.Sum(t => t.Value.Same)} match, {tally.Sum(t => t.Value.Differ)} differ, "
+				+ $"{tally.Sum(t => t.Value.NoRow)} with no DB row, {tally.Sum(t => t.Value.Failed)} unbuildable, over {tally.Count} names");
+
+			return;
+
+			// The appearance table as (morph id, value) pairs. Empty for an animal, whose post-IIR carries no entry
+			// slot of this shape - so "0 vs 0" is a match, not two absences papering over each other.
+			static List<(uint, float)> Morphs(SimpleCharFullUpdateIIR spawn)
+			{
+				return spawn.Post?.Slot is NpcEntrySlot npc
+					? npc.Morphs.Select(m => (m.MorphId, m.Value)).ToList()
+					: [];
+			}
+		}
+
+		// Names the SCALAR fields two protobuf messages disagree on, recursing into sub-messages. Reflective rather
+		// than a hand-written field list because the message is generated: a field added to the schema has to show up
+		// here without anyone remembering to add it, or the diff quietly under-reports.
+		//
+		// Repeated fields report only their COUNT - element-wise diffing them is the caller's job when it matters
+		// (worn equipment already has its own line) - and a null-vs-set sub-message is named rather than walked.
+		private static List<string> FieldDiff(object? theirs, object? ours, string prefix = "", int depth = 0)
+		{
+			var diffs = new List<string>();
+			if (depth > 3 || (theirs == null && ours == null))
+				return diffs;
+
+			if (theirs == null || ours == null)
+			{
+				diffs.Add($"{prefix.TrimEnd('.')} {(theirs == null ? "absent" : "present")} vs {(ours == null ? "absent" : "present")}");
+				return diffs;
+			}
+
+			foreach (var prop in theirs.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+			{
+				if (prop.GetIndexParameters().Length > 0)
+					continue;
+
+				object? a, b;
+				try
+				{
+					a = prop.GetValue(theirs);
+					b = prop.GetValue(ours);
+				}
+				catch (System.Reflection.TargetInvocationException)
+				{
+					continue; // protobuf-net throws on an unset field with no default; nothing to compare
+				}
+
+				var name = prefix + prop.Name;
+				if (a is System.Collections.ICollection ca && b is System.Collections.ICollection cb)
+				{
+					if (ca.Count != cb.Count)
+						diffs.Add($"{name} count {ca.Count} vs {cb.Count}");
+
+					continue;
+				}
+
+				if (prop.PropertyType.IsPrimitive || prop.PropertyType == typeof(string) || prop.PropertyType.IsEnum)
+				{
+					if (!Equals(a, b))
+						diffs.Add($"{name} {a} vs {b}");
+
+					continue;
+				}
+
+				if (prop.PropertyType.IsClass && prop.PropertyType != typeof(byte[]))
+					diffs.AddRange(FieldDiff(a, b, name + ".", depth + 1));
+			}
+
+			return diffs;
+		}
+
+		// One NPC name's spawn-diff outcome. A class rather than a tuple because the counters are bumped one at a
+		// time down a long loop, and a record struct there reads as five re-assignments of the whole verdict.
+		private sealed class SpawnVerdict
+		{
+			public int Same;
+			public int Differ;
+			public int NoRow;
+			public int Failed;
+			public string? Note;
+		}
+
 		private static void NpcGenericStats(IReadOnlyList<NamedCapture> captures)
 		{
 			var lengths = new Dictionary<int, int>();
