@@ -46,6 +46,41 @@ namespace Faolan.Tests
 			Assert.Equal(transient, WorldObjectExtractor.IsTransientLootContainer(name));
 		}
 
+		// #554: `IsClosed` is the one identity field that changes during play - the map 4020 "Wharf Door" is captured
+		// closed in one session and open (the field ABSENT) in another - so first-seen made ordinal capture FILENAME
+		// order decide a door's world-entry state. The value is really session state and should come from the live
+		// world (#598); until it does, the merge must at least reach the same answer whatever order the captures
+		// arrive in, which is what the reversed case asserts. The all-null case is the sanity check that being
+		// order-independent is not just "it always picks the same slot".
+		[Theory, InlineData(true, null, true), InlineData(null, true, true), InlineData(null, null, null), InlineData(false, null, false), InlineData(true, false, true)]
+		public void Merge_ResolvesTheOpenClosedStateByWhatTheEntrySaysNotByCaptureOrder(bool? first, bool? second, bool? expected)
+		{
+			var entries = new List<WorldObjectEntry>
+			{
+				Door(first),
+				Door(second)
+			};
+
+			var merged = Assert.Single(WorldObjectExtractor.Merge(entries, out var conflicts));
+			Assert.Equal(expected, merged.IsClosed);
+			Assert.Equal(first == second ? 0 : 1, conflicts);
+
+			// The same two entries the other way round - the whole point of the ticket.
+			entries.Reverse();
+			Assert.Equal(expected, Assert.Single(WorldObjectExtractor.Merge(entries)).IsClosed);
+		}
+
+		// Two entries that are the SAME object by the dedup key (map, spawn point, display identity) and differ only
+		// in the state field.
+		private static WorldObjectEntry Door(bool? isClosed)
+		{
+			return new WorldObjectEntry(4020, 0x66AEDD50, 0, 1f, 2f, 3f, [])
+			{
+				DisplayName = "Wharf Door",
+				IsClosed = isClosed
+			};
+		}
+
 		// A REAL PlayfieldFIIR, built by the codec: PlayfieldFCodec.Parse reads the record to its last byte (#530
 		// rule 3), so a synthetic body with the map id at the right offset is not a MapChange any more.
 		private static CapturedPacket MapChange(uint mapId)

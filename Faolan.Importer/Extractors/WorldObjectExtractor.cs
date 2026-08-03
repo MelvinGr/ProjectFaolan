@@ -17,6 +17,11 @@ namespace Faolan.Importer.Extractors
 		// The display_name identity (localized id) that disambiguates two props sharing an exact position (#222).
 		public string DisplayName { get; init; } = string.Empty;
 		public string Name { get; init; } = string.Empty;
+
+		// proto field 12, as this capture saw it - null when ABSENT. The ONE identity field observed to change
+		// during play, so it is the one Merge cannot resolve by taking whichever capture sorted first (#554). Carried
+		// here rather than re-read from `Data` at merge time so there is a single place the field is parsed.
+		public bool? IsClosed { get; init; }
 	}
 
 	// Extracts the static world objects per map from a capture: tracks the current map (MapChange 5D85BFC7), then
@@ -81,25 +86,81 @@ namespace Faolan.Importer.Extractors
 					RotW = rotation.W,
 					ObjectId = objectId,
 					Name = name,
-					DisplayName = displayName
+					DisplayName = displayName,
+					IsClosed = identity.ShouldSerializeIsClosed()
+						? identity.IsClosed
+						: null
 				});
 			}
 
 			return entries;
 		}
 
-		// Dedup by (map, spawn point, identity); keep the first seen. Identity (the display_name) is part of the key
-		// because two distinct props can occupy the EXACT same coordinates (#222) - position alone would drop one.
-		// ⚠️ First-seen means ordinal CAPTURE FILENAME order, which is arbitrary for any field that changes during
-		// play: the same door is captured both closed and open, so which state ships is decided by file order rather
-		// than by the door (Gitea #554).
+		// Dedup by (map, spawn point, identity). Identity (the display_name) is part of the key because two distinct
+		// props can occupy the EXACT same coordinates (#222) - position alone would drop one.
+		//
+		// The structural fields agree across captures, so for those any candidate would do. `IsClosed` does NOT
+		// (#554): the map 4020 "Wharf Door" is captured closed in one session and open in another, and taking the
+		// first-seen entry made ordinal CAPTURE FILENAME order the thing that decided a door's state. Adding a
+		// capture that happened to sort earlier and caught that door open would have flipped the shipped row, and no
+		// test would have noticed - both are legitimate wire shapes, so the whole-corpus lift gate passes either way.
+		//
+		// ⚠️ INTERIM. `IsClosed` is SESSION state, not a placement fact (Melvin's call, 2026-08-03): a door captured
+		// open was opened by the capturing player, so no capture is evidence of anything but that moment. What is a
+		// definition is only whether the object HAS a door state at all - the field being present. The end state is
+		// that the value comes from the live world at world entry and the import stops carrying it, the way a
+		// container's loot contents already do; that needs a live door-state store and a schema change, so it is
+		// Gitea #598.
+		//
+		// Until then the row still has to carry SOMETHING, because the identity message is rebuilt byte-exact from
+		// the columns and field 12 sits inside it. So the choice is at least made deterministic: candidates are
+		// ranked closed-present > present > absent, a property of the ENTRY rather than of the file it came from,
+		// which is what stops a newly added capture from silently flipping a door open at world entry.
 		public static List<WorldObjectEntry> Merge(IEnumerable<WorldObjectEntry> all)
 		{
+			return Merge(all, out _);
+		}
+
+		/// <summary>
+		///     As <see cref="Merge(IEnumerable{WorldObjectEntry})" />, reporting how many objects were captured in
+		///     DISAGREEING states - so an import can say it resolved them rather than resolving them silently. A
+		///     count above zero is not a fault; it is the corpus having seen a door both ways.
+		/// </summary>
+		public static List<WorldObjectEntry> Merge(IEnumerable<WorldObjectEntry> all, out int stateConflicts)
+		{
+			stateConflicts = 0;
 			var seen = new Dictionary<(uint, float, float, float, string), WorldObjectEntry>();
 			foreach (var e in all)
-				seen.TryAdd((e.MapId, e.X, e.Y, e.Z, e.DisplayName), e);
+			{
+				var key = (e.MapId, e.X, e.Y, e.Z, e.DisplayName);
+				if (!seen.TryGetValue(key, out var kept))
+				{
+					seen[key] = e;
+					continue;
+				}
+
+				if (kept.IsClosed == e.IsClosed)
+					continue;
+
+				stateConflicts++;
+				if (Rank(e) > Rank(kept))
+					seen[key] = e;
+			}
 
 			return seen.Values.ToList();
+		}
+
+		// Closed-and-explicit beats explicit beats absent. Deliberately NOT a tie-break that falls through to
+		// "whichever came first": every candidate is ranked by what it SAYS, so the winner is the same whatever
+		// order the captures are read in.
+		private static int Rank(WorldObjectEntry e)
+		{
+			return e.IsClosed switch
+			{
+				true => 2,
+				false => 1,
+				null => 0
+			};
 		}
 
 		// A LootBagFullUpdateIIR object is a TRANSIENT loot-container DROP (skip it) unless it was PLACED by the world

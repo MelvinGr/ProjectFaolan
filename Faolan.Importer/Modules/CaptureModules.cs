@@ -751,7 +751,7 @@ namespace Faolan.Importer.Modules
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
-			var objects = WorldObjectExtractor.Merge(ctx.Captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets)));
+			var objects = WorldObjectExtractor.Merge(ctx.Captures.SelectMany(c => WorldObjectExtractor.Extract(c.Packets)), out var stateConflicts);
 
 			// Overwrite deletes every stored row the harvest did not yield, so the table is by construction what the
 			// captures say. Upsert cannot: it re-writes the live rows and leaves the dead ones, reporting a row-count
@@ -759,7 +759,13 @@ namespace Faolan.Importer.Modules
 			// corpus you are importing is a SUPERSET of the one that built the table - read the warning on
 			// ImportOps.ImportWorldObjects before pointing it at the shipped faolan.db.
 			await ImportOps.ImportWorldObjects(ctx.Db, objects, ctx.ModeFor(Name) == WriteMode.Overwrite);
-			return new ImportResult($"{objects.Count} world objects.");
+
+			// Say when a door was captured in two different states, rather than resolving it silently (#554). The
+			// resolution is deterministic, but the fact that the corpus disagreed is worth reading in the log.
+			var resolved = stateConflicts == 0
+				? ""
+				: $" ({stateConflicts} captured in disagreeing open/closed states, resolved to the world-entry state)";
+			return new ImportResult($"{objects.Count} world objects.{resolved}");
 		}
 	}
 
