@@ -55,6 +55,21 @@ namespace Faolan.Tests
 			Assert.Equal(0x0000_00A1_B2C3_D4E5UL, ClientAddGuildRenownCodec.Parse(built).Amount);
 		}
 
+		// #132's guild-bank pair. Neither body is captured, so what is actually gated here is the WIDTH: the amount and
+		// the balance are u64 (the client declares `uint64 amount` and `Guild.Cash` is a u64), and a u32 would silently
+		// truncate any guild bank past ~43 gold.
+		[Fact]
+		public void GuildBank_CarriesU64Amounts()
+		{
+			const ulong amount = 0x0000_0002_0000_0001; // needs more than 32 bits
+
+			Assert.Equal(sizeof(ulong), GuildWithdrawMoneyCodec.Build(amount).Length);
+			Assert.Equal(amount, GuildWithdrawMoneyCodec.Parse(GuildWithdrawMoneyCodec.Build(amount)).AmountTin);
+
+			Assert.Equal(sizeof(ulong), GuildUpdateCashCodec.Build(amount).Length);
+			Assert.Equal(amount, GuildUpdateCashCodec.Parse(GuildUpdateCashCodec.Build(amount)).CashTin);
+		}
+
 		[Fact]
 		public void RenownHistory_EmptyIsTheCapturedLength()
 		{

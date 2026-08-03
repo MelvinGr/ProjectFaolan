@@ -28,6 +28,7 @@ namespace Faolan.Tests
 				return Task.FromResult(true);
 			}
 
+			public Task<bool> CreditCharacterCash(uint characterId, ulong amountTin) => Task.FromResult(false);
 			public bool DisconnectCharacter(uint characterId) => false;
 			public CharacterLiveState? GetCharacterLiveState(uint characterId) => null;
 			public IEnumerable<INetworkClientSession> GetWorldSessions() => [];

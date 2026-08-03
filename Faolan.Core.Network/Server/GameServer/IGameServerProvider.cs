@@ -59,5 +59,18 @@ namespace Faolan.Core.Network.Server.GameServer
 		///     the recipient is not connected to this listener.
 		/// </summary>
 		Task<bool> SendGroupMembership(uint recipientId, uint memberId, uint teamId, uint leaderId, bool joined);
+
+		/// <summary>
+		///     Adds <paramref name="amountTin" /> to a connected character's wallet, persists it and pushes the
+		///     UpdateCash the client renders. Returns false when the character is not connected here, so the caller can
+		///     refuse rather than move money nobody will see.
+		///     <para>
+		///         The wallet is the GAME tier's: it lives on the live session's <c>Character.Money</c> and the client
+		///         learns of a change only through that tier's UpdateCash. A guild-bank withdrawal is decided on the CS
+		///         tier (which owns <c>Guild.Cash</c> and the rank ladder) and paid out here, so this is the seam
+		///         between the two halves of one transaction — hence "credit the connected character", not "set money".
+		///     </para>
+		/// </summary>
+		Task<bool> CreditCharacterCash(uint characterId, ulong amountTin);
 	}
 }

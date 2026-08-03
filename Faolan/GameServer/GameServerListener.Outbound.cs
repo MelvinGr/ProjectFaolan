@@ -58,6 +58,26 @@ namespace Faolan.GameServer
 			return TakeItemsFromInventory(client, itemTemplateId, count);
 		}
 
+		// IGameServerProvider seam: the PAY-OUT half of a guild-bank withdrawal (#132). The CS tier decides it (it owns
+		// Guild.Cash and the rank ladder) and this tier pays it, because the wallet lives on the live session and the
+		// client only learns of a change through this tier's UpdateCash.
+		//
+		// Refusing when the character is not connected here is the point, not a technicality: the caller debits the
+		// guild only if this returns true, so a payout that nobody could receive never happens rather than vanishing.
+		public async Task<bool> CreditCharacterCash(uint characterId, ulong amountTin)
+		{
+			var client = ClientForCharacter(characterId);
+			var character = client?.Session.Character;
+			if (character == null)
+				return false;
+
+			character.Money += amountTin;
+			await Database.SetCharacterMoney(character.Id, character.Money);
+			await SendUpdateCash(client!, character.Money, UpdateCashReason.Gain);
+			Logger.LogInformation("CreditCharacterCash: {Character} received {Amount} tin (wallet {Balance}).", character.Name, amountTin, character.Money);
+			return true;
+		}
+
 		// IGameServerProvider seam: pushes the guild tag onto the character's live world connection, if it is
 		// connected to this listener. Used by the CsPlayerAgent guild flow (accept/create/leave) so the in-world
 		// tag updates without a relog.

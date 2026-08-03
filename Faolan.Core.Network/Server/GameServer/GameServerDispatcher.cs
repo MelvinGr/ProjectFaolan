@@ -35,6 +35,12 @@ namespace Faolan.Core.Network.Server.GameServer
 			return Provider?.GetZoneEntities(mapId) ?? [];
 		}
 
+		public async Task<bool> CreditCharacterCash(uint characterId, ulong amountTin)
+		{
+			var provider = Provider;
+			return provider != null && await provider.CreditCharacterCash(characterId, amountTin);
+		}
+
 		public async Task<bool> RunGmCommand(uint characterId, string commandText)
 		{
 			var provider = Provider;

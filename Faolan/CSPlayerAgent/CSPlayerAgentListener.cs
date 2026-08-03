@@ -268,6 +268,13 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
+				case CSPlayerAgentMethods.GuildWithdrawMoney:
+				{
+					await _guild.HandleGuildWithdrawMoney(client, body);
+
+					break;
+				}
+
 				case CSPlayerAgentMethods.GuildMessageOfTheDay:
 				{
 					await _guild.HandleGuildMessageOfTheDay(client, packet, body);

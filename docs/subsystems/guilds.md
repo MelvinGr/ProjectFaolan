@@ -118,6 +118,28 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
 - Create path: the capture-true `CreateGuild` RPC (0x2021 → `HandleCreateGuild`), triggered in-client from a
   registrar NPC window. There is no GM guild-create command — creation is only via that in-world registrar window.
 
+### The guild bank (#132)
+
+One-way by design: **there is no deposit method.** Guild money is fed by the guild TAX (`0x2029`), and
+`GuildWithdrawMoney` (c2s `0x2035`, `[u64 amount]`) pays it back out. The `GuildTransferMoney` /
+`GuildWithdrawMoney` pair on *GameCharAgent* (`0x2011`/`0x2012`) are inter-agent server notifications carrying a
+guild INSTANCE id — not client packets, and a realm-scoped server that mutates `Guild.Cash` directly never needs
+them.
+
+Neither body is captured (no captured session opened the bank UI, across all 215), so both come from the client's
+method table — see the gap register. The transaction **spans two tiers**: the CS tier owns `Guild.Cash` and the
+rank ladder, the game tier owns the wallet and is the only one whose `UpdateCash` the client renders, so
+`GuildService` debits the guild and pays out through `IGameServerDispatcher.CreditCharacterCash`.
+
+Two deliberate choices, both about not minting money:
+
+- **Debit first, credit second.** If the credit is refused (the member is not on this realm's game host) the guild
+  is refunded. The other order would leave the money in both places on a failure between the steps, and a money
+  handler is exactly where a dupe hides (#368). Losing a withdrawal is recoverable; minting one is not.
+- **Leader only.** Retail has per-rank bank permissions and nothing pins which rung they hang off, so the rule is
+  the narrowest one that cannot be abused, by that guild's own governing form (`GuildRankLadder.LeaderRank` — the
+  top rung is 3, 4 or 5 depending on the form).
+
 ### The two renown messages (#104)
 
 Both were on the open list as "replayed blob" / "semantics unknown"; both are decoded, from the client's recovered

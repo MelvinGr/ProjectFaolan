@@ -273,6 +273,70 @@ namespace Faolan.CSPlayerAgent
 			}
 		}
 
+		// 0x2035 GuildWithdrawMoney(uint64 amount): the guild bank pays out to a member's wallet (#132). There is no
+		// DEPOSIT counterpart - guild money is fed by the guild TAX (0x2029), which is why this is a one-way door.
+		//
+		// The transaction spans both tiers: the CS tier owns Guild.Cash and the rank ladder, the GAME tier owns the
+		// wallet and is the only one whose UpdateCash the client renders. So the guild is debited HERE and the payout
+		// goes through IGameServerDispatcher.CreditCharacterCash.
+		//
+		// ORDER MATTERS, and it is deliberately the pessimistic one: debit + persist the guild FIRST, then credit. If
+		// the credit is refused (the member is not on this realm's game host) the guild is refunded. Done the other way
+		// round, a failure between the two steps would leave money in BOTH places - and a money handler is exactly
+		// where a dupe hides (#368). Losing a withdrawal is recoverable; minting one is not.
+		public async Task HandleGuildWithdrawMoney(INetworkClient client, FaolanStream body)
+		{
+			var character = client.Session.Character;
+			var request = GuildWithdrawMoneyCodec.Parse(body.ReadRemainingArray());
+
+			if (character?.GuildId is not { } guildId)
+				return;
+
+			var guild = await _database.GetGuild(guildId);
+			if (guild == null)
+				return;
+
+			// WHO may withdraw is a policy nothing in the corpus or the client pins, so it is the narrowest rule that
+			// cannot be abused: the guild LEADER only, by that guild's own governing form (the top rung is 3, 4 or 5
+			// depending on the form - GuildRankLadder). Per-rank bank permissions are real in retail and are follow-up
+			// work; refusing everyone else is the safe default until they are modelled.
+			// [V0: which guild ranks may withdraw from the bank]
+			var leaderRank = GuildRankLadder.LeaderRank(guild.GovernmentForm);
+			if ((byte?)character.GuildRank != leaderRank)
+			{
+				_logger.LogInformation("GuildWithdrawMoney refused: {Character} is rank {Rank} in \"{Guild}\", not the leader rank {Leader}.", character.Name, (byte?)character.GuildRank,
+					guild.Name, leaderRank);
+				return;
+			}
+
+			if (request.AmountTin == 0 || request.AmountTin > guild.Cash)
+			{
+				_logger.LogInformation("GuildWithdrawMoney refused: {Character} asked for {Amount} tin of \"{Guild}\"'s {Balance}.", character.Name, request.AmountTin, guild.Name, guild.Cash);
+				return;
+			}
+
+			guild.Cash -= request.AmountTin;
+			await _database.SaveGuild(guild);
+
+			if (!await _gameServerDispatcher.CreditCharacterCash(character.Id, request.AmountTin))
+			{
+				// Nobody could receive it - put it back rather than leave it nowhere.
+				guild.Cash += request.AmountTin;
+				await _database.SaveGuild(guild);
+				_logger.LogWarning("GuildWithdrawMoney rolled back: {Character} is not on this realm's game host.", character.Name);
+				return;
+			}
+
+			_logger.LogInformation("Guild \"{Guild}\": {Character} withdrew {Amount} tin (bank {Balance}).", guild.Name, character.Name, request.AmountTin, guild.Cash);
+
+			// Everyone who can see the guild window sees the new balance.
+			foreach (var member in guild.Members)
+			{
+				if (_clientForCharacter(member.Id) is { } memberClient && memberClient.Session.Character != null)
+					await memberClient.SendAsync(new Rpc(PushSender, PushReceiver, GuildUpdateCashCodec.Method, GuildUpdateCashCodec.Build(guild.Cash)));
+			}
+		}
+
 		// Pushes guild state to a freshly authenticated guilded character: retail sends the 0x203F full update
 		// right after the Authenticate ack.
 		public async Task SendGuildStateOnLogin(INetworkClient client, Rpc packet)
