@@ -105,9 +105,9 @@ namespace Faolan.CSPlayerAgent
 
 			_pendingInvites[target.Id] = inviter.Id;
 
-			await Send(inviterClient, CSPlayerInterfaceOpcodes.DispatchYouInvitedToTeam, TeamMemberRecordCodec.Build(MemberOf(target)));
+			await Send(inviterClient, CSPlayerInterfaceMethods.DispatchYouInvitedToTeam, TeamMemberRecordCodec.Build(MemberOf(target)));
 
-			await Push(target.Id, CSPlayerInterfaceOpcodes.DispatchTeamInvite, TeamInviteCodec.Build(MemberOf(inviter), message));
+			await Push(target.Id, CSPlayerInterfaceMethods.DispatchTeamInvite, TeamInviteCodec.Build(MemberOf(inviter), message));
 			_logger.LogInformation("Team: {Inviter} invited {Target}.", inviter.Name, target.Name);
 		}
 
@@ -132,7 +132,7 @@ namespace Faolan.CSPlayerAgent
 			_teamByCharacter[accepterId] = team.Id;
 
 			await BroadcastRoster(team);
-			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchTeamJoin, TeamMemberEventCodec.Build(team.Id, MemberOf(accepter)));
+			await Broadcast(team, CSPlayerInterfaceMethods.DispatchTeamJoin, TeamMemberEventCodec.Build(team.Id, MemberOf(accepter)));
 			await PushMembership(team, accepterId, true);
 			_logger.LogInformation("Team 0x{Team:X8}: {Character} joined ({Count} member(s), leader {Leader}).", team.Id, accepter.Name, team.Members.Count, inviter.Name);
 		}
@@ -145,7 +145,7 @@ namespace Faolan.CSPlayerAgent
 			if (TeamOf(characterId) == null)
 				return false;
 
-			await Remove(characterId, CSPlayerInterfaceOpcodes.DispatchTeamLeave, "left");
+			await Remove(characterId, CSPlayerInterfaceMethods.DispatchTeamLeave, "left");
 			return true;
 		}
 
@@ -160,15 +160,15 @@ namespace Faolan.CSPlayerAgent
 			}
 
 			if (CharacterOf(targetId) is { } target)
-				await Push(targetId, CSPlayerInterfaceOpcodes.DispatchYouGotKickedFromTeam, TeamMemberRecordCodec.Build(MemberOf(target)));
+				await Push(targetId, CSPlayerInterfaceMethods.DispatchYouGotKickedFromTeam, TeamMemberRecordCodec.Build(MemberOf(target)));
 
-			await Remove(targetId, CSPlayerInterfaceOpcodes.DispatchTeamLeave, "was kicked");
+			await Remove(targetId, CSPlayerInterfaceMethods.DispatchTeamLeave, "was kicked");
 			return true;
 		}
 
 		// A member leaving for any reason - voluntarily, kicked, or disconnected. Dissolves the team at one member,
 		// which is what retail does: a one-person team is no team.
-		private async Task Remove(uint characterId, CSPlayerInterfaceOpcodes opcode, string why)
+		private async Task Remove(uint characterId, CSPlayerInterfaceMethods opcode, string why)
 		{
 			if (TeamOf(characterId) is not { } teamId || !_teams.TryGetValue(teamId, out var team))
 				return;
@@ -194,7 +194,7 @@ namespace Faolan.CSPlayerAgent
 			{
 				team.LeaderId = team.Members[0];
 				if (CharacterOf(team.LeaderId) is { } newLeader)
-					await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchSetNewTeamLeader, TeamMemberEventCodec.Build(team.Id, MemberOf(newLeader)));
+					await Broadcast(team, CSPlayerInterfaceMethods.DispatchSetNewTeamLeader, TeamMemberEventCodec.Build(team.Id, MemberOf(newLeader)));
 			}
 
 			_logger.LogInformation("Team 0x{Team:X8}: {Character} {Why} ({Count} member(s) left).", team.Id, leaver?.Name ?? $"0x{characterId:X8}", why, team.Members.Count);
@@ -211,7 +211,7 @@ namespace Faolan.CSPlayerAgent
 				team.Remove(last);
 				_teamByCharacter.TryRemove(last, out _);
 				if (CharacterOf(last) is { } member)
-					await Push(last, CSPlayerInterfaceOpcodes.DispatchTeamLeave, TeamMemberEventCodec.Build(team.Id, MemberOf(member)));
+					await Push(last, CSPlayerInterfaceMethods.DispatchTeamLeave, TeamMemberEventCodec.Build(team.Id, MemberOf(member)));
 
 				await _gameServerDispatcher.SendGroupMembership(last, last, team.Id, 0, false);
 			}
@@ -229,7 +229,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 
 			var body = TeamRosterCodec.Build(team.Id, team.LeaderId, records);
-			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchYouJoinedTeam, body);
+			await Broadcast(team, CSPlayerInterfaceMethods.DispatchYouJoinedTeam, body);
 		}
 
 		// AddToGroupIIR / RemoveFromGroupIIR to every member's WORLD connection. The capture sends one record per
@@ -272,7 +272,7 @@ namespace Faolan.CSPlayerAgent
 			team.UseNeedGreed = useNeedGreed;
 			team.LootThreshold = lootThreshold;
 
-			await Broadcast(team, CSPlayerInterfaceOpcodes.DispatchTeamLootOptionChanged, TeamLootOptionCodec.Build(new TeamLootOption(lootMode, useNeedGreed, lootThreshold)));
+			await Broadcast(team, CSPlayerInterfaceMethods.DispatchTeamLootOptionChanged, TeamLootOptionCodec.Build(new TeamLootOption(lootMode, useNeedGreed, lootThreshold)));
 
 			_logger.LogInformation("Team 0x{Team:X8}: loot mode {Mode}, need/greed {NeedGreed}, threshold {Threshold}.", team.Id, lootMode, useNeedGreed, lootThreshold);
 			return true;
@@ -289,12 +289,12 @@ namespace Faolan.CSPlayerAgent
 			return created;
 		}
 
-		private Task Broadcast(LiveTeam team, CSPlayerInterfaceOpcodes opcode, byte[] body)
+		private Task Broadcast(LiveTeam team, CSPlayerInterfaceMethods opcode, byte[] body)
 		{
 			return Task.WhenAll(team.Members.Select(member => Push(member, opcode, body)));
 		}
 
-		private async Task Push(uint characterId, CSPlayerInterfaceOpcodes opcode, byte[] body)
+		private async Task Push(uint characterId, CSPlayerInterfaceMethods opcode, byte[] body)
 		{
 			if (_csClientForCharacter(characterId) is { } client)
 				await Send(client, opcode, body);
@@ -305,7 +305,7 @@ namespace Faolan.CSPlayerAgent
 		// the client routes the packet to the right interface object: a push addressed to instance 0 arrives and is
 		// dropped, which is why the invited client received DispatchTeamInvite, answered it with RequestTeamInvite, and
 		// still showed no invite window.
-		private static Task Send(INetworkClient client, CSPlayerInterfaceOpcodes opcode, byte[] body)
+		private static Task Send(INetworkClient client, CSPlayerInterfaceMethods opcode, byte[] body)
 		{
 			return client.SendAsync(new Rpc(PushSender, client.Endpoint(Endpoints.CSPlayerInterfaceType), (ushort)opcode, body));
 		}

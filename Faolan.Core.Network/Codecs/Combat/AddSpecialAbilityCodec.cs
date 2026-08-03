@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// parser. (Modelling it is a #393-adjacent follow-up; the importer harvests only Slot/Id/Data.)
 	public static class AddSpecialAbilityCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchAddSpecialAbility;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchAddSpecialAbility;
 
 		public const int BodyLength = 81;
 

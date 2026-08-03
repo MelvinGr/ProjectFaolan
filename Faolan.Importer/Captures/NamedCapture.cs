@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Captures
 {

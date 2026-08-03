@@ -3,7 +3,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using Faolan.Core.Crypt;
-using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
@@ -76,10 +75,6 @@ namespace Faolan.Core.Network.Protocol
 		private const byte MethodInstanceTag = 0x20;
 		private const byte RoutingDestinationTag = 0x2A;
 
-		// The base the 16-bit opcode enums are written from: the method field's tag in the high byte. Method 0 is
-		// therefore opcode 0x2000, which is why every interface's first method reads as `0x2000`.
-		public const ushort MethodIndexBase = MethodInstanceTag << 8;
-
 		// The total wire frame length. Stamped by whoever turns the message into (or out of) bytes: Parse
 		// on the receive path, and the transport on the send path once the serializer has determined the size
 		// (`rpc with { FrameLength = … }`). 0 on a freshly built Rpc, whose length isn't knowable yet. The packet trace
@@ -95,27 +90,6 @@ namespace Faolan.Core.Network.Protocol
 		// throws on a second rather than dropping it.
 		public ProtoEndpoint? RoutingContext { get; init; }
 
-		// True when this message HAS an opcode: when its method is a registration INDEX, which is every class except
-		// the hash-registered PlayerAgent/PlayerInterface pair. An index is one or two varint groups, so the whole of
-		// it survives in the opcode's low byte.
-		public bool HasOpcode => Method <= byte.MaxValue;
-
-		// The 16-bit opcode the codebase and the opcode enums are written in terms of: a VIEW over Method, not a field.
-		// Its definition is literally the first two bytes this message serializes for its method field - the tag, then
-		// the varint's FIRST GROUP - which is where the old `[u16 opcode][headerData]` reading cut the header, and what
-		// you read off a hex dump. On an index-registered class it is exact and invertible (`MethodIndexBase + Method`),
-		// which is why the enums' `0x2000 + index` spelling is a faithful rendering of the wire rather than a fiction.
-		//
-		// ⚠️ **It THROWS on the hash-registered pair** rather than handing back 7 bits of a 32-bit constant (#613).
-		// Those two methods whose constants share their low 7 bits share the value - `0x20EC` is both
-		// ReceivedCharacterSettings and AuthenticateLoggedIn - so anything that took it as identity ran the wrong
-		// handler (#608). There is no opcode to give, so the honest answer is to refuse rather than to round. Callers
-		// that might see either kind branch on HasOpcode; the login tier dispatches and names from Method throughout.
-		public ushort Opcode => HasOpcode
-			? (ushort)((MethodInstanceTag << 8) | FirstVarintGroup(Method))
-			: throw new InvalidOperationException(
-				$"Method 0x{Method:X8} is a 32-bit registration constant (PlayerAgent/PlayerInterface), which has no opcode - the 16-bit view would keep only 7 of its bits and name two methods at once. Use Method, or gate on HasOpcode.");
-
 		// Body-building overloads: build the body inline with the fluent FaolanStream writers, e.g.
 		//   new Rpc(sender, receiver, opcode, b => b.WriteUInt32(x).WriteArrayUInt32Length(blob))
 		// instead of newing + disposing a stream at every call site. The scratch stream is created and DISPOSED here
@@ -125,36 +99,22 @@ namespace Faolan.Core.Network.Protocol
 		{
 		}
 
-		// Opcode overloads, for the 15 index-registered interfaces whose method IS its registration index (so the
-		// enums' `0x2000 + index` spelling names it exactly). An exact-match `ushort` parameter beats the implicit
-		// widening to the `uint method` ctor, so a call site passing an opcode cannot silently land on the method
-		// overload. The hash-registered PlayerAgent/PlayerInterface pair has no such mapping and is rejected by
-		// MethodOf - those sends name a PlayerAgentMethods/PlayerInterfaceMethods member instead.
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, ReadOnlyMemory<byte> body) : this(sender, receiver, MethodOf(opcode), body)
-		{
-		}
-
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, Action<FaolanStream> body) : this(sender, receiver, MethodOf(opcode), body)
-		{
-		}
-
-		// Enum overloads so call sites pass GameInterfaceOpcodes.Foo (or PlayerInterfaceMethods.Foo) directly instead
-		// of casting every one. Constructors can't be generic, so the param is the boxing base Enum - one negligible
-		// box per packet.
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, Action<FaolanStream> body) : this(sender, receiver, MethodOf(opcode), body)
+		// Enum overloads so call sites pass GameInterfaceMethods.Foo (or PlayerInterfaceMethods.Foo) directly instead
+		// of casting every one. Every method enum is `: uint` and its members ARE the method_instance constant (#615),
+		// so this is a widening convert with no arithmetic. Constructors can't be generic, so the param is the boxing
+		// base Enum - one negligible box per packet.
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum method, Action<FaolanStream> body) : this(sender, receiver, Convert.ToUInt32(method), body)
 		{
 		}
 
 		// Byte body - for the many sends whose whole body is a single pre-encoded blob (codec.Build()) or a stream built
 		// by a helper. Distinct from the Action<FaolanStream> overloads (a byte[] is not a delegate).
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> body) : this(sender, receiver, MethodOf(opcode), body)
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum method, ReadOnlyMemory<byte> body) : this(sender, receiver, Convert.ToUInt32(method), body)
 		{
 		}
 
-		// ⚠️ The record's SYNTHESIZED ToString prints every readable property, which includes `Opcode` - and that throws
-		// on a hash-registered method (#613), so merely logging a login-tier frame, or letting a test runner format one
-		// in a failure message, would fail with an unrelated exception. Print the message's STATE instead: the derived
-		// views are not state, and nothing should recompute them just to render a line.
+		// The record's SYNTHESIZED ToString prints every readable property one per line; print the message's STATE on
+		// one line instead, with Method in the hex the enums are written in.
 		private bool PrintMembers(StringBuilder builder)
 		{
 			builder.Append($"Sender = {Sender}, Receiver = {Receiver}, Method = 0x{Method:X8}, Body = {Body.Length} bytes, FrameLength = {FrameLength}");
@@ -329,41 +289,6 @@ namespace Faolan.Core.Network.Protocol
 		public static Rpc Parse(ReadOnlySpan<byte> frame)
 		{
 			return Parse(frame.ToArray());
-		}
-
-		// The method a 16-bit opcode names, on the 15 interfaces that register their methods by INDEX: the index is the
-		// opcode's low byte, which is the whole of a one- or two-group varint. Every opcode in every enum is in
-		// 0x2000-0x20FF, so this is exact and Opcode round-trips it.
-		private static uint MethodOf(ushort opcode)
-		{
-			if (opcode >> 8 != MethodInstanceTag)
-				throw new ArgumentOutOfRangeException(nameof(opcode), opcode,
-					$"Not an opcode: the method field's tag is 0x{MethodInstanceTag:X2}, so an opcode's high byte must be too. A PlayerAgent/PlayerInterface send names a PlayerAgentMethods/PlayerInterfaceMethods member instead.");
-
-			return (uint)(opcode - MethodIndexBase);
-		}
-
-		// The uint-backed enums (PlayerAgentMethods / PlayerInterfaceMethods) ARE the registration constant, so they go
-		// through whole; a ushort-backed opcode enum goes through MethodOf. A value that overflows its backing type
-		// throws here (fail-fast) rather than silently truncating.
-		//
-		// This used to reject `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` explicitly: their opcodes ARE in 0x20xx, so
-		// MethodOf(ushort) would have turned `AuthenticateAck` (0x2091) into method 0x91 and put a two-group varint on
-		// the wire where retail sends five. Those enums no longer exist (#613), so the mistake is now unmakeable rather
-		// than caught - which is why there is no guard here any more.
-		private static uint MethodOf(Enum opcode)
-		{
-			return Enum.GetUnderlyingType(opcode.GetType()) == typeof(uint)
-				? Convert.ToUInt32(opcode)
-				: MethodOf(Convert.ToUInt16(opcode));
-		}
-
-		// The FIRST byte WriteVarint will emit for `value`: its low 7 bits, with the continuation bit set when more
-		// groups follow. This is the byte the opcode's low half is, so Opcode is defined in terms of it rather than
-		// restating the encoding as bit arithmetic.
-		private static byte FirstVarintGroup(uint value)
-		{
-			return (byte)(value <= 0x7F ? value : (value & 0x7F) | 0x80);
 		}
 
 		// The byte count of `value` as a base-128 varint - what WriteVarint will emit, needed for headerLen before it

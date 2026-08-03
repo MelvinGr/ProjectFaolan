@@ -22,7 +22,7 @@ namespace Faolan.GameServer.World
 		// The usual case: `record` is [u32 iirType][record] and the carrier's [u32 len] is written here.
 		public static Task Send(INetworkClient client, params byte[] record)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(record)));
 		}
 	}

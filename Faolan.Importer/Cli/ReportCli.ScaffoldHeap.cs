@@ -8,7 +8,6 @@ using Faolan.Core.Constants;
 using Faolan.Core.Crypt;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Importer.Captures;
-using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Cli
 {

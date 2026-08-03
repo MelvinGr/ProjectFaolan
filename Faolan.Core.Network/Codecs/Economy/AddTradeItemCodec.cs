@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// Split out of `PlayerTradeCodec` in #530 wave 7; byte-gated by TeamTradeFriendCodecTests.
 	public static class AddTradeItemCodec
 	{
-		public const ushort Opcode = (ushort)GameCharAgentOpcodes.AddTradeItem;
+		public const uint Method = (uint)GameCharAgentMethods.AddTradeItem;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(AddTradeItem value)

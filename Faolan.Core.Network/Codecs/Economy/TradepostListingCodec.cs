@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// The value used to be a self-serializing `ICodec<ParsedResults>` (#530 wave 7 retired the interface here).
 	public static class TradepostListingCodec
 	{
-		public const ushort Opcode = (ushort)TradepostInterfaceOpcodes.DispatchTradepostSearchResults;
+		public const uint Method = (uint)TradepostInterfaceMethods.DispatchTradepostSearchResults;
 
 		// The flag word (stat 0) every captured listing carries; the default for a freshly-created listing.
 		public const uint DefaultEntryFlags = 0x421;

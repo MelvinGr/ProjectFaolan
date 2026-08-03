@@ -17,7 +17,7 @@ namespace Faolan.Core.Network.Codecs.Team
 	// keeps the leader check, the live-team state and the fan-out. NEEDS in-client verification of the echo.
 	public static class TeamLootOptionCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchTeamLootOptionChanged;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchTeamLootOptionChanged;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(TeamLootOption value)

@@ -7,7 +7,6 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Codecs.Team;
-using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -27,7 +26,7 @@ namespace Faolan.CSPlayerAgent
 			var rankings = GuildRankings.FromGuilds(
 				guilds.Select(g => new GuildRankings.Row(g.Id, g.Name ?? "", g.RenownValor, g.RenownGlory, g.RenownArtistry, (uint)(g.Members?.Count ?? 0), g.Level)));
 
-			await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GuildRankingsCodec.Opcode, GuildRankingsCodec.Build(rankings)));
+			await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GuildRankingsCodec.Method, GuildRankingsCodec.Build(rankings)));
 		}
 
 		// 0x205C DispatchGuildSearchResult: the guild-finder browse list (client requests it with 0x2043
@@ -60,7 +59,7 @@ namespace Faolan.CSPlayerAgent
 					(uint)g.RenownTotal, 0))
 				.ToList());
 
-			await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GuildSearchResultCodec.Opcode, GuildSearchResultCodec.Build(result)));
+			await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GuildSearchResultCodec.Method, GuildSearchResultCodec.Build(result)));
 		}
 
 		// An inclusive range where 0 means "unbounded" at either end. The search widgets send 0/0 when the player has
@@ -102,7 +101,7 @@ namespace Faolan.CSPlayerAgent
 
 			Logger.LogDebug("CharacterSearch: {Count} online character(s) matched.", matches.Count);
 
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CharacterSearchResultCodec.Opcode, CharacterSearchResultCodec.Build(new CharacterSearchResult(matches))));
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CharacterSearchResultCodec.Method, CharacterSearchResultCodec.Build(new CharacterSearchResult(matches))));
 		}
 
 		// One page of "who" results. The client's own request carries i_nSkipResults, so it pages, and the reply method
@@ -116,7 +115,7 @@ namespace Faolan.CSPlayerAgent
 		// renown history, so we emit it zeroed (a flat graph) - the honest empty form for a guild with no history.
 		private static Task SendGuildRenownHistory(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildRenownHistoryUpdate, new byte[112]));
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildRenownHistoryUpdate, new byte[112]));
 		}
 
 		// 0x20A5 DispatchMassivePvpInfoRequestReturn: the Massive-PvP minigame guild leaderboard (the client polls it
@@ -134,7 +133,7 @@ namespace Faolan.CSPlayerAgent
 		// drops.) Build the real records here if/when a minigame subsystem exists.
 		private static Task SendMassivePvpInfo(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchMassivePvpInfoRequestReturn, b => b
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchMassivePvpInfoRequestReturn, b => b
 				.WriteUInt32(0) // last-update timestamp (cosmetic; 0 = never updated)
 				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed guild list ((0+1)*0x3F1)
 				.WriteUInt32(1))); // trailing guildCount+1 (= 1 for the empty board) - the field the client read past
@@ -147,7 +146,7 @@ namespace Faolan.CSPlayerAgent
 		// (#319/#610), and `Rpc` writes it without the call site knowing.
 		private static Task SendPvpMatchMakingInfo(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn, b => b
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchPvPMatchMakingInfoRequestReturn, b => b
 				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed record list
 				.WriteUInt32(0))); // trailer
 		}
@@ -157,7 +156,7 @@ namespace Faolan.CSPlayerAgent
 		// login capture, where Hoxxling's search returned nothing).
 		private static Task SendTeamSearchResult(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchTeamSearchResult, b => b
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchTeamSearchResult, b => b
 				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed record list
 				.WriteByte(0x00))); // list trailer
 		}

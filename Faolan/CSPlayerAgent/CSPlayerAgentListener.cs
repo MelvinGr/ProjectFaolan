@@ -36,7 +36,7 @@ namespace Faolan.CSPlayerAgent
 		// `port` is the hosting realm's CsPlayerAgentPort (from its Realm row - the single source of truth for the
 		// realm-local service ports, #324), passed in at registration rather than read from global config.
 		public CsPlayerAgentListener(ushort port, ILogger<CsPlayerAgentListener> logger, IConfiguration configuration, IDatabaseRepository database, IGameServerDispatcher gameServerDispatcher,
-			ICsPlayerAgentDispatcher csPlayerAgentDispatcher) : base(port, logger, configuration, database, new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceOpcodes)))
+			ICsPlayerAgentDispatcher csPlayerAgentDispatcher) : base(port, logger, configuration, database, new ConanPacketTracer(logger, "CsPlayerAgent", typeof(CSPlayerInterfaceMethods)))
 		{
 			_gameServerDispatcher = gameServerDispatcher;
 			_csPlayerAgentDispatcher = csPlayerAgentDispatcher;
@@ -70,7 +70,7 @@ namespace Faolan.CSPlayerAgent
 
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
-			var opcode = (CSPlayerAgentOpcodes)packet.Opcode;
+			var method = (CSPlayerAgentMethods)packet.Method;
 			LogPacketReceived(packet);
 
 			// One reader over the body for the whole dispatch: BodyReader() hands out a fresh cursor per call, so the
@@ -78,9 +78,9 @@ namespace Faolan.CSPlayerAgent
 			// it directly; those that hand off to a GuildService handler pass it in (the handler no longer re-reads).
 			var body = packet.BodyReader();
 
-			switch (opcode)
+			switch (method)
 			{
-				case CSPlayerAgentOpcodes.Authenticate:
+				case CSPlayerAgentMethods.Authenticate:
 				{
 					var characterId = body.ReadUInt32();
 					var accountId = body.ReadUInt32();
@@ -97,18 +97,18 @@ namespace Faolan.CSPlayerAgent
 					client.Session.Character = await Database.GetCharacterForAccount(accountId, characterId)
 						?? throw new Exception($"Character not found for account {accountId:X} and client instance {characterId:X}");
 
-					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchAuthenticateAck, b => b.WriteUInt32(authReply)));
+					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchAuthenticateAck, b => b.WriteUInt32(authReply)));
 
 					// Guilded character: retail pushes the 0x203F full guild update right after the
 					// Authenticate ack (claim_login_reward dump), before the 0x20D0/0x20C5 pair.
 					await _guild.SendGuildStateOnLogin(client, packet);
 
-					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderUpdateFeaturedActivities,
+					await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGroupFinderUpdateFeaturedActivities,
 						b => b.WriteArray(0x00, 0x00, 0x03, 0xF1)));
 
 					//if(character.Name == null)
 					{
-						await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGroupFinderRemoved,
+						await client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGroupFinderRemoved,
 							b => b
 								.WriteString("<remoteformat token=\"GroupFinderCharacterLeftPlayfield\" category=\"100\" key=\"nKY&amp;+hL^I7&#36;M@PO`z&#39;Y0\" knubot=\"0\"  ></remoteformat>")
 								.WriteByte(0x01)));
@@ -120,7 +120,7 @@ namespace Faolan.CSPlayerAgent
 				// 0x2003 TeamInvite(const ID32& i_cTargetID, const std::string& i_cMessage, bool i_bCheckCriminalStatus):
 				// the leader (or a solo player) invites someone into a team. Body is 11 B in all 4 captures - the ID32,
 				// an EMPTY message and the flag - which is why only the first 8 read for so long.
-				case CSPlayerAgentOpcodes.TeamInvite:
+				case CSPlayerAgentMethods.TeamInvite:
 				{
 					var invite = TeamInviteRequestCodec.Parse(body.ReadRemainingArray());
 					var targetId = invite.Target.Id;
@@ -146,7 +146,7 @@ namespace Faolan.CSPlayerAgent
 
 				// 0x2008 AcceptTeamInvite([ID32 inviter]): the invitee joins. The inviter is taken from OUR pending
 				// invite rather than the body, so a forged body cannot pull someone into a team they never invited to.
-				case CSPlayerAgentOpcodes.AcceptTeamInvite:
+				case CSPlayerAgentMethods.AcceptTeamInvite:
 				{
 					EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)); // the inviter, echoed by the client
 					await _teams.AcceptInvite(client.Session.Character.Id);
@@ -154,7 +154,7 @@ namespace Faolan.CSPlayerAgent
 				}
 
 				// 0x2009 DeclineTeamInvite: drop the pending invite. Nothing goes on the wire in the capture.
-				case CSPlayerAgentOpcodes.DeclineTeamInvite:
+				case CSPlayerAgentMethods.DeclineTeamInvite:
 				{
 					_teams.Decline(client.Session.Character.Id);
 					break;
@@ -167,35 +167,35 @@ namespace Faolan.CSPlayerAgent
 				// 0x201E ClientRequestGuildInfo(const ID32&) occurs 141 times, always 8 bytes, always exactly that
 				// shape, and does fire at login. Reading two words that are not there would have desynced the body
 				// stream the moment a retreat vote was actually cast.
-				case CSPlayerAgentOpcodes.StartVoteRetreat:
+				case CSPlayerAgentMethods.StartVoteRetreat:
 				{
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.RaidInviteCharacterByName:
+				case CSPlayerAgentMethods.RaidInviteCharacterByName:
 				{
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.GuildGovernmentForm:
-				{
-
-					break;
-				}
-
-				case CSPlayerAgentOpcodes.AddGuildRenown:
+				case CSPlayerAgentMethods.GuildGovernmentForm:
 				{
 
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.RemoveGuildRenown:
+				case CSPlayerAgentMethods.AddGuildRenown:
 				{
 
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.ClientRequestGuildInfo:
+				case CSPlayerAgentMethods.RemoveGuildRenown:
+				{
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.ClientRequestGuildInfo:
 				{
 					await _guild.HandleClientRequestGuildInfo(client, packet, body);
 
@@ -203,7 +203,7 @@ namespace Faolan.CSPlayerAgent
 				}
 
 				// 0x201F ClientRequestGuildName([ID32 guild]): resolve a guild id to its display name (#463).
-				case CSPlayerAgentOpcodes.ClientRequestGuildName:
+				case CSPlayerAgentMethods.ClientRequestGuildName:
 				{
 					await _guild.HandleClientRequestGuildName(client, packet, body);
 
@@ -213,7 +213,7 @@ namespace Faolan.CSPlayerAgent
 				// 0x2006 TeamSetLootOption(int i_eLootMode, bool i_bUseNeedGreed, int i_nNewLootThreshold) - the
 				// leader changes the group's loot rules (#463). Echoed to every member as
 				// DispatchTeamLootOptionChanged; NEEDS in-client verification.
-				case CSPlayerAgentOpcodes.TeamSetLootOption:
+				case CSPlayerAgentMethods.TeamSetLootOption:
 				{
 					var loot = TeamLootOptionCodec.Parse(body.ReadRemainingArray());
 
@@ -223,14 +223,14 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.AcceptGuildInvitation:
+				case CSPlayerAgentMethods.AcceptGuildInvitation:
 				{
 					await _guild.HandleAcceptGuildInvitation(client, packet, body);
 
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.DeclineGuildInvitation:
+				case CSPlayerAgentMethods.DeclineGuildInvitation:
 				{
 					var characterId = client.Session.Character?.Id ?? 0;
 					var declinedGuild = _guild.DeclineGuildInvitation(characterId);
@@ -240,42 +240,42 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.CreateGuild:
+				case CSPlayerAgentMethods.CreateGuild:
 				{
 					await _guild.HandleCreateGuild(client, packet, body);
 
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.GuildInviteByName:
+				case CSPlayerAgentMethods.GuildInviteByName:
 				{
 					await _guild.HandleGuildInviteByName(client, packet, body);
 
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.GuildInvite:
+				case CSPlayerAgentMethods.GuildInvite:
 				{
 					await _guild.HandleGuildInvite(client, packet, body);
 
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.GuildLeave:
+				case CSPlayerAgentMethods.GuildLeave:
 				{
 					await _guild.HandleGuildLeave(client);
 
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.GuildMessageOfTheDay:
+				case CSPlayerAgentMethods.GuildMessageOfTheDay:
 				{
 					await _guild.HandleGuildMessageOfTheDay(client, packet, body);
 
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.MassivePvpInfoRequest:
+				case CSPlayerAgentMethods.MassivePvpInfoRequest:
 				{
 					// The client polls the Massive-PvP guild leaderboard with 0x2077; retail answers each with a 0x20A5
 					// DispatchMassivePvpInfoRequestReturn (verified in the login dump: 0x2077 -> 0x20A5).
@@ -284,7 +284,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.GuildRequestMemberList:
+				case CSPlayerAgentMethods.GuildRequestMemberList:
 				{
 					// Retail answers the member-list request with a fresh 0x203F full update plus the 0x20A5 leaderboard.
 					await _guild.SendGuildStateOnLogin(client, packet);
@@ -293,7 +293,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.RequestRenownHistory:
+				case CSPlayerAgentMethods.RequestRenownHistory:
 				{
 					// The renown-over-time graph in the guild window (retail answers with 0x2039). We track no history,
 					// so we return a zeroed block (flat graph).
@@ -302,7 +302,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.SearchForGuilds:
+				case CSPlayerAgentMethods.SearchForGuilds:
 				{
 					// SearchForGuilds(uint16 i_nMinMembers, uint16 i_nMaxMembers, uint8 i_nMinLevel, uint8 i_nMaxLevel,
 					// const String& i_cNameSearch) - the guild-finder browse window (0x2043 -> 0x205C). The 8-byte
@@ -319,7 +319,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.CharacterSearch:
+				case CSPlayerAgentMethods.CharacterSearch:
 				{
 					// CharacterSearch(int i_eSearchmode, const InstanceVec_t& i_cPlayfieldVec, int i_nMinLevel,
 					// int i_nMaxLevel, const IntVec_t& i_nClassVec, const IntVec_t& i_nRaceVec, uint32 i_nSkipResults,
@@ -343,7 +343,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.SearchForTeam:
+				case CSPlayerAgentMethods.SearchForTeam:
 				{
 					// SearchForTeam(const InstanceVec_t& i_cPlayfieldVec, int i_nMinLevel, int i_nMaxLevel,
 					// int memberCountMin, int memberCountMax, uint32 i_nSkipResults) - LFG team search
@@ -365,7 +365,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.PvPMatchMakingRequestInfo:
+				case CSPlayerAgentMethods.PvPMatchMakingRequestInfo:
 				{
 					// PvPMatchMakingRequestInfo(int i_QueueType) - PvP matchmaking info (0x2054 -> 0x2092). Empty /
 					// not-queued result regardless of the queue asked about.
@@ -378,14 +378,14 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.PvPMatchMakingIsInMatchMaking:
+				case CSPlayerAgentMethods.PvPMatchMakingIsInMatchMaking:
 				{
 					// "Am I queued for PvP matchmaking?" (0x2055). Retail sends no response; consume it so it isn't
 					// logged as unhandled.
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.EchoGroupFinderRemoved:
+				case CSPlayerAgentMethods.EchoGroupFinderRemoved:
 				{
 					// The client echoes a GroupFinder remoteformat back to us (e.g.
 					// token="GroupFinderCharacterLeftPlayfield") - a notification the server consumes; no response
@@ -394,7 +394,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.EchoGroupFinderUpdateFeaturedActivities:
+				case CSPlayerAgentMethods.EchoGroupFinderUpdateFeaturedActivities:
 				{
 					// The echoed body is the activities list itself, and 0x000003F1 is a ListFrame count word, not a
 					// constant: the client is handing back an EMPTY list (count 0), which is what we sent it.
@@ -407,7 +407,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.RemovePvpPoints:
+				case CSPlayerAgentMethods.RemovePvpPoints:
 				{
 					var data = body.ReadRemainingArray();
 
@@ -417,7 +417,7 @@ namespace Faolan.CSPlayerAgent
 					break;
 				}
 
-				case CSPlayerAgentOpcodes.RequestRenownRankings:
+				case CSPlayerAgentMethods.RequestRenownRankings:
 				{
 					await SendGuildList(client, packet);
 

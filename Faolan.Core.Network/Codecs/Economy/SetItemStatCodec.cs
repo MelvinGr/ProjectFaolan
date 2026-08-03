@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// BankStorageTests.
 	public static class SetItemStatCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchSetItemStat;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchSetItemStat;
 
 		// The stat id the bank's per-slot REGISTRATION carries (see SetItemStats.SlotRegistration).
 		public const uint SlotRegistrationStat = 0x17;

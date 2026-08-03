@@ -1,3 +1,4 @@
+using Faolan.Core.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,7 +9,6 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Text;
-using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Captures
 {
@@ -21,8 +21,8 @@ namespace Faolan.Importer.Captures
 	// parameters would not round-trip through these columns, so it is rejected loudly rather than truncated.
 	public static class CaptureStockPhraseImporter
 	{
-		private const ushort PlayStockphraseAsSubtitle = 0x205E; // c2s request
-		private const ushort ReceivedStockPhraseText = 0x205D; // s2c reply
+		private static readonly uint PlayStockphraseAsSubtitle = CapturedPacket.Wire(GameCharAgentMethods.PlayStockphraseAsSubtitle); // c2s request
+		private static readonly uint ReceivedStockPhraseText = CapturedPacket.Wire(GameCharInterfaceMethods.DispatchReceivedStockPhraseText); // s2c reply
 
 		public static IEnumerable<(string Key, byte[] RemoteFormat)> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -40,7 +40,7 @@ namespace Faolan.Importer.Captures
 
 				var body = p.Bytes.AsSpan(bodyStart);
 
-				if (p.Opcode == PlayStockphraseAsSubtitle)
+				if (p.WireOpcode == PlayStockphraseAsSubtitle)
 				{
 					// [8-byte ProtoID][u16 strLen][{stock_N}][u32 threadCtx]
 					if (body.Length < 8 + 2 + 4)
@@ -54,7 +54,7 @@ namespace Faolan.Importer.Captures
 					var tc = body.ReadU32Be(10 + strLen);
 					pending[tc] = key;
 				}
-				else if (p.Opcode == ReceivedStockPhraseText)
+				else if (p.WireOpcode == ReceivedStockPhraseText)
 				{
 					// [u32 threadCtx][u16 textLen][remoteformat]
 					if (body.Length < 6)

@@ -11,7 +11,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// `GuildService.WriteGuildInviteBody` in #530 wave 7.
 	public static class GuildInviteCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchGuildInvite;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildInvite;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(GuildInvite value)

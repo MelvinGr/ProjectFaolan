@@ -7,7 +7,7 @@ Dissector + validation: `GuildPacketTests`.
 ## Where guilds live on the wire
 
 All guild RPCs run on the **CsPlayerAgent** connection (port 7001, `faolan.json` `CSPlayerAgentPort`). The 16-bit opcode after the
-RpcHeader is a **method index** (0x2000 + position) into the recovered RPC tables
+RpcHeader is a **method index** (its position, rendered `0x2000 + position` in a dump) into the recovered RPC tables
 (`docs/re/aoc-client-rpc-methods.json`):
 
 - client→server: `CSPlayerAgent.client_to_server` — alignment verified (0x201C = `AcceptGuildInvitation`
@@ -123,7 +123,7 @@ Open work is tracked in Gitea #104.
 
 Hunt for the 277-byte renown-block reader. The s2c (CSPlayerInterface) dispatch indices DRIFT vs the
 recovered name table, so the wire-opcode→handler mapping must be confirmed per-function by its assert
-string, not by `0x2000 + index`. Confirmed so far (decompiles via `tools/ghidra/DecompileFns.java`):
+string, not by a registration index. Confirmed so far (decompiles via `tools/ghidra/DecompileFns.java`):
 
 - `FUN_013428d0` = `DispatchGuildUpdate`     (reads one leading member + member list)
 - `FUN_01344670` = `DispatchGuildMemberList` (member list only)

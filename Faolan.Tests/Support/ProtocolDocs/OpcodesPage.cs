@@ -4,11 +4,11 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 
 namespace Faolan.Tests.Support.ProtocolDocs
 {
-	// Generates docs/protocol/gen/opcodes.md from the COMPILED opcode enums (reflection, not source parsing), so the
+	// Generates docs/protocol/gen/opcodes.md from the COMPILED method enums (reflection, not source parsing), so the
 	// page can never disagree with what the server actually dispatches. Trailing `// ...` notes are lifted from
 	// Opcodes.cs as best-effort prose enrichment only - they are never the source of the names or values.
 	//
@@ -31,10 +31,10 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		// c2s receivers are *Agent classes, s2c receivers *Interface classes.
 		private static readonly (string Enum, string Class)[] EnumToClass =
 		[
-			("UniverseAgentOpcodes", "UniverseAgent"), ("UniverseInterfaceOpcodes", "UniverseInterface"), ("PlayerAgentMethods", "PlayerAgent"), ("PlayerInterfaceMethods", "PlayerInterface"),
-			("CSPlayerAgentOpcodes", "CSPlayerAgent"), ("CSPlayerInterfaceOpcodes", "CSPlayerInterface"), ("GameAgentOpcodes", "GameAgent"), ("GameInterfaceOpcodes", "GameInterface"),
-			("GameCharAgentOpcodes", "GameCharAgent"), ("GameCharInterfaceOpcodes", "GameCharInterface"), ("GameCharAgentProjectOpcodes", "GameCharAgentProject"),
-			("GameCharInterfaceProjectOpcodes", "GameCharInterfaceProject"), ("TradepostAgentOpcodes", "TradepostAgent"), ("TradepostInterfaceOpcodes", "TradepostInterface")
+			("UniverseAgentMethods", "UniverseAgent"), ("UniverseInterfaceMethods", "UniverseInterface"), ("PlayerAgentMethods", "PlayerAgent"), ("PlayerInterfaceMethods", "PlayerInterface"),
+			("CSPlayerAgentMethods", "CSPlayerAgent"), ("CSPlayerInterfaceMethods", "CSPlayerInterface"), ("GameAgentMethods", "GameAgent"), ("GameInterfaceMethods", "GameInterface"),
+			("GameCharAgentMethods", "GameCharAgent"), ("GameCharInterfaceMethods", "GameCharInterface"), ("GameCharAgentProjectMethods", "GameCharAgentProject"),
+			("GameCharInterfaceProjectMethods", "GameCharInterfaceProject"), ("TradepostAgentMethods", "TradepostAgent"), ("TradepostInterfaceMethods", "TradepostInterface")
 		];
 
 		public static uint Bkdr31(string name)
@@ -60,10 +60,10 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 			const string iirEnum = "IirTypes"; // the 32-bit IIR sub-opcodes live on iir-types.md
 
-			// The RPC method catalogs are the `*Opcodes` enums, plus the `*Methods` pair - PlayerAgent/PlayerInterface
-			// register by 32-bit hash, so they have method constants and no opcodes at all (#613). IirTypes is the one
-			// carrier catalog, listed here only as a stub that points at its own page.
-			var enums = typeof(GameCharAgentOpcodes)
+			// The RPC method catalogs are the `*Methods` enums; the two `ChatServer*Opcodes` are here too because chat
+			// carries no RpcHeader and its numbers really are opcodes. IirTypes is the one carrier catalog, listed here
+			// only as a stub that points at its own page.
+			var enums = typeof(GameCharAgentMethods)
 				.Assembly.GetTypes()
 				.Where(t => t is { IsEnum: true, Namespace: "Faolan.Core.Enums" } &&
 				            (t.Name.EndsWith("Opcodes", StringComparison.Ordinal) || t.Name.EndsWith("Methods", StringComparison.Ordinal) || t.Name == iirEnum))
@@ -80,14 +80,19 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("> `Faolan.Core/Enums/Opcodes.cs`, read by reflection.");
 			sb.AppendLine("> Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.");
 			sb.AppendLine();
-			sb.AppendLine($"{tabled.Count} enums, {total} entries. The 32-bit IIR sub-opcodes carried inside a `0x2000` PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).");
+			sb.AppendLine($"{tabled.Count} enums, {total} entries. The 32-bit IIR sub-opcodes carried inside a PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).");
 			sb.AppendLine();
 			sb.AppendLine("## What is (and is not) verified here [V1]");
 			sb.AppendLine();
 			sb.AppendLine("- **Names + values** are the server's curated method catalogs — the same tables that drive the");
-			sb.AppendLine("  Wireshark dissector, recovered from the client's RPC method registration (16-bit opcode =");
-			sb.AppendLine("  `0x2000 + registration index`). This is a **V1** fact: the opcode set is complete and client-verified.");
-			sb.AppendLine("- **A named opcode does NOT mean the message BODY is decoded.** Body layouts are documented");
+			sb.AppendLine("  Wireshark dissector, recovered from the client's RPC method registration. A value here IS the");
+			sb.AppendLine("  `method_instance` the RpcHeader carries (field 4, one varint): the registration INDEX on the");
+			sb.AppendLine("  index-registered classes, the 32-bit registration HASH on PlayerAgent/PlayerInterface. This is a");
+			sb.AppendLine("  **V1** fact: the method set is complete and client-verified.");
+			sb.AppendLine("- **Reads as** is what a hex dump, the Wireshark plugin and a `.tshark.json` show for it — the method");
+			sb.AppendLine("  field's tag `0x20` then the varint's first group. A rendering, never an identity: on the hashed pair");
+			sb.AppendLine("  it keeps 7 of 32 bits and names two methods at once (#613/#615).");
+			sb.AppendLine("- **A named method does NOT mean the message BODY is decoded.** Body layouts are documented");
 			sb.AppendLine("  per-message (and gated by golden tests) elsewhere; see [`coverage.md`](coverage.md) for which have one.");
 			sb.AppendLine("- **Direction** is the RpcHeader receiver's role: `*Agent` classes receive client→server calls (C2S),");
 			sb.AppendLine("  `*Interface` classes receive server→client dispatches (S2C). ChatServer chat carries no RpcHeader.");
@@ -101,7 +106,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 
 				if (e.Name == iirEnum)
 				{
-					sb.AppendLine("The 0x2000-carrier IIR type sub-opcodes (32-bit BKDR-31 hashes of the client IIR type names).");
+					sb.AppendLine("The PassBlob-carrier IIR type sub-opcodes (32-bit BKDR-31 hashes of the client IIR type names).");
 					sb.AppendLine("Catalogued in [`iir-types.md`](iir-types.md).");
 					sb.AppendLine();
 					continue;
@@ -124,25 +129,23 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				}
 
 				sb.AppendLine();
-				// The hash-registered pair's tables are keyed by method CONSTANT, not by an opcode - naming the column
-				// "Opcode" there would restate the very confusion #613 removed.
-				var isMethodTable = e.Name.EndsWith("Methods", StringComparison.Ordinal);
-				sb.AppendLine(isMethodTable ? "| method_instance | Name | Note |" : "| Opcode | Name | Note |");
-				sb.AppendLine("|--------|------|------|");
+				// An RPC table is keyed by the method CONSTANT, with the two bytes a dump shows for it alongside - the
+				// column the codebase used to call "Opcode", kept so the 3,961 in-repo `0x2NNN` references remain
+				// findable, but no longer the key (#613/#615). The chat enums have no RpcHeader and no method field, so
+				// their numbers really are opcodes and there is nothing to render.
+				var isRpc = e.Name.EndsWith("Methods", StringComparison.Ordinal);
+				sb.AppendLine(isRpc ? "| method_instance | Reads as | Name | Note |" : "| Opcode | Name | Note |");
+				sb.AppendLine(isRpc ? "|-----------------|----------|------|------|" : "|--------|------|------|");
 				foreach (var (name, value) in Members(e))
 				{
 					notes.TryGetValue((e.Name, name), out var note);
 
-					// The hash-registered pair has no opcode - the table lists method constants. Surface the two bytes a
-					// hex dump would show for it, computed (PlayerAgentMethodIds.ObservedOpcode), since that is how you
-					// find one of these in a capture. It collides, which is why it is a note and not the key (#613).
-					if (e.Name is "PlayerAgentMethods" or "PlayerInterfaceMethods")
-						note = $"reads as 0x{PlayerAgentMethodIds.ObservedOpcode((uint)value):X4} in a dump";
-
-					var width = e.GetEnumUnderlyingType() == typeof(uint)
-						? 8
-						: 4;
-					sb.AppendLine($"| `0x{value.ToString("X" + width)}` | `{name}` | {EscapeCell(note)} |");
+					// A registration index fits two digits; a 32-bit hash needs eight. Padding every index to eight
+					// would bury the number the enum is actually written in.
+					var id = $"`0x{value.ToString(value <= 0xFF ? "X2" : "X8")}`";
+					sb.AppendLine(isRpc
+						? $"| {id} | `0x{WireOpcode.Of((uint)value):X4}` | `{name}` | {EscapeCell(note)} |"
+						: $"| `0x{value:X4}` | `{name}` | {EscapeCell(note)} |");
 				}
 
 				sb.AppendLine();

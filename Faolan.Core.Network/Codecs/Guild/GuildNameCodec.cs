@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// Moved in from `GuildService.WriteGuildNameBody` in #530 wave 7; byte-exact in GuildPacketTests.
 	public static class GuildNameCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchGuildName;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildName;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(GuildName value)

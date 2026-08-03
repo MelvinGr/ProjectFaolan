@@ -555,7 +555,7 @@ because in-world the client streams 0x2000 packets keyed by its own instance (e.
 
 ## 16-bit RpcHeader opcodes per server (method indices - Stage 3b, NOT hashes)
 
-**RESOLVED (2026-06-12, guild work):** the opcode is `0x2000 + the method's position` in the recovered
+**RESOLVED (2026-06-12, guild work):** the method IS the method's position in the recovered
 client→server RPC table (`docs/re/aoc-client-rpc-methods.json`) — registration order = table order. Anchored on
 CSPlayerAgent `0x201C` = `AcceptGuildInvitation` (fired exactly once on the guild-accept click) and bulk-verified
 by tabulating `(RpcHeader caller class, opcode)` across all capture JSONs (independent semantic hits:
@@ -567,7 +567,7 @@ small class tables top out early (TradepostAgent `0x2013`, project `0x200C`, Gam
 **s2c tables RESOLVED (2026-06-13, Ghidra):** the server→client "drift" is now fully explained and the true
 tables recovered from `AgeOfConan.exe`. The base is `0x2000` for every interface **except PlayerAgent/
 PlayerInterface** (login; observed c2s wire `0x2083..0x20F5`, base ≠ 0x2000 — those opcodes stay
-behavior-derived). For all others, `wire = 0x2000 + registration index`. c2s registration order is *identical*
+behavior-derived). For all others, the method IS the registration index (a dump renders it `0x2000 + index`). c2s registration order is *identical*
 to `aoc-client-rpc-methods.json` (proven: the proxy constructors register methods in that exact order). The s2c
 drift was caused by the live build inserting extra dispatch methods — mostly **no-arg** methods that emit no
 `stream bad` string, so the string-extracted catalog missed them and every later method shifted. Recovered by

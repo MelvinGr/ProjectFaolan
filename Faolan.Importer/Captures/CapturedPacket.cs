@@ -1,8 +1,8 @@
 using System;
-using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Enums;
 
-namespace Faolan.Importer.Extractors
+namespace Faolan.Importer.Captures
 {
 	// A captured on-wire packet with the metadata the extractors need, uniform across the .json dumps and the
 	// .pcapng analyzer output. Constructed by TsharkCaptureReader; consumed by every extractor and importer.
@@ -16,24 +16,43 @@ namespace Faolan.Importer.Extractors
 	// they default. They exist for the `--report timeline` reader, which has to say WHEN, on which service tier and
 	// in which direction something happened - questions the bytes alone cannot answer.
 	public readonly record struct CapturedPacket(
-		long Ticks, bool IsDownload, uint Opcode, uint SubOpcode, byte[] Bytes,
+		long Ticks, bool IsDownload, uint WireOpcode, uint SubOpcode, byte[] Bytes,
 		int Frame = 0, string Direction = "", int Port = 0, string Protocol = "Conan",
 		uint SenderClass = 0, uint ReceiverClass = 0)
 	{
+		// ## The positional `WireOpcode`, and why it is not `Rpc.Method`
+		//
+		// It is a `Protocol.WireOpcode` - the method field's first two bytes as one u16 - read verbatim out of the
+		// dump's `"Opcode"` field by `TsharkCaptureReader`. A RECORDED value, produced by the Wireshark plugin before
+		// our code sees it, and it stays in that space rather than being converted once at the reader because the
+		// conversion is not total: on the fifteen index-registered classes the low byte IS the method, but on the
+		// hash-registered PlayerAgent/PlayerInterface pair it keeps 7 of 32 bits and names two methods at once
+		// (#613/#608), so a `Method` here would be a lie on exactly those frames.
+		//
+		// ⚠️ Since #615 the method enums hold `method_instance` itself (`GameAgentMethods.PassBlob = 0x00`) while this
+		// holds the two bytes recorded for it (`0x2000`), so `WireOpcode == (uint)SomeMethods.X` compiles and is
+		// silently FALSE - the failure this ticket was executed to make impossible. Hence `Wire(...)`: the one place
+		// the two spaces are bridged, and what every extractor's filter goes through instead of a bare cast.
+		// Fully qualified: `WireOpcode` unqualified is this record's own positional property.
+		public static uint Wire(Enum method)
+		{
+			return Core.Network.Protocol.WireOpcode.Of(method);
+		}
+
 		// Whether this packet is the PassBlob IIR CARRIER - the one whose body is a length-prefixed IIR record rather
 		// than a typed RPC argument list. Almost every extractor opens by filtering on it.
 		//
-		// The value comes from the opcode enum, because it already has a name: `PassBlob` c2s
-		// (GameAgentOpcodes) and `DispatchPassBlob` s2c (GameInterfaceOpcodes) are the two directions of ONE method
-		// on ONE conversation, and every 0x2000 packet in the corpus is GameAgent (0xB171CE13) <-> GameInterface
+		// The value comes from the method enum, because it already has a name: `PassBlob` c2s
+		// (GameAgentMethods) and `DispatchPassBlob` s2c (GameInterfaceMethods) are the two directions of ONE method
+		// on ONE conversation, and every method-0 packet in the corpus is GameAgent (0xB171CE13) <-> GameInterface
 		// (0x6C67C147) - all 30158 of them. Our own world sends agree: WorldIir.Send and every outbound builder use
-		// GameInterfaceOpcodes.DispatchPassBlob.
+		// GameInterfaceMethods.DispatchPassBlob.
 		//
 		// It is a PROPERTY here rather than a shared constant because the fourteen call sites do not agree on
 		// direction - some pin IsDownload, most do not - so naming the direction at each of them would be inventing
 		// precision the filter does not have. A bool also works in a property pattern, which a cast expression
 		// cannot: `p is { IsIirCarrier: true, SubOpcode: X }`.
-		public bool IsIirCarrier => Opcode == (uint)GameAgentOpcodes.PassBlob;
+		public bool IsIirCarrier => WireOpcode == Wire(GameAgentMethods.PassBlob);
 
 		// The body within the full on-wire packet: [len4][crc4][headerLen4][header][body]. Empty when the packet is
 		// too short to carry the fixed 12-byte prologue, or when its header length runs past the end.

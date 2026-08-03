@@ -14,11 +14,14 @@ namespace Faolan.Tests
 {
 	// The RpcHeader is protobuf and its method field is ONE varint - not a `[u16 opcode][headerData tail]` pair
 	// (Gitea #319/#320/#609/#610). These gates hold the fold in place: that the split was byte-identical (so nothing on
-	// the wire moved), that `Rpc.Opcode` is a derived VIEW of the method rather than a stored field, and that the header
-	// is now read strictly rather than carried through as opaque bytes.
+	// the wire moved), that the two bytes a hex dump shows are a derived RENDERING of the method (`WireOpcode`) rather
+	// than a field, and that the header is now read strictly rather than carried through as opaque bytes.
+	//
+	// Since #615 the method enums ARE the `method_instance` constant, so `Rpc.Opcode` is gone entirely and a send
+	// carries its member's value with no arithmetic in between - which is what `AMethodEnumMemberIsTheWireField` says.
 	//
 	// Measured over the corpus: 404,208 of 404,210 field-4 frames carry a well-formed varint whose first group is the
-	// opcode's low byte. The two misses are not packets - they sit inside a desynced decompressed region of one capture
+	// dump's low byte. The two misses are not packets - they sit inside a desynced decompressed region of one capture
 	// and fail an independent CRC recompute under every alignment (#609).
 	public class RpcHeaderTests
 	{
@@ -44,8 +47,9 @@ namespace Faolan.Tests
 				Assert.Equal(0x20, opcode >> 8);
 				Assert.Equal(varint[0], (byte)(opcode & 0xFF));
 
-				// ...and Rpc refuses to hand that reading back as an opcode, because it names two methods (#613).
-				Assert.False(new Rpc(Agent, Character, method, ReadOnlyMemory<byte>.Empty).HasOpcode);
+				// ...and the frame carries the CONSTANT, not that reading - which is the whole point, since the reading
+				// names two methods (#613).
+				Assert.Equal(method, Rpc.Parse(new Rpc(Agent, Character, method, ReadOnlyMemory<byte>.Empty).Serialize()).Method);
 			}
 
 			// And on an index-registered interface the same field is the plain method index: one group below 128, two
@@ -56,19 +60,21 @@ namespace Faolan.Tests
 
 		// The half a "constant marker" reading could never account for: the second group appears exactly at method 128
 		// and is always exactly 0x01 up to 255, because that is what a varint's second group IS. 0x2080 is the lowest
-		// opcode in the whole corpus that carries the byte, and 12,056 sightings are all 0x01.
-		[Theory, InlineData(0x2000, 1), InlineData(0x207F, 1), InlineData(0x2080, 2), InlineData(0x2085, 2), InlineData(0x2082, 2), InlineData(0x20FF, 2)]
-		public void TheContinuationGroupAppearsAtMethod128(int opcode, int expectedGroups)
+		// value in the whole corpus whose dump reading carries the byte, and 12,056 sightings are all 0x01.
+		[Theory, InlineData(0x00, 1, 0x2000), InlineData(0x7F, 1, 0x207F), InlineData(0x80, 2, 0x2080), InlineData(0x85, 2, 0x2085),
+		 InlineData(0x82, 2, 0x2082), InlineData(0xFF, 2, 0x20FF)]
+		public void TheContinuationGroupAppearsAtMethod128(uint method, int expectedGroups, int dumpReading)
 		{
-			var method = (uint)(opcode - Rpc.MethodIndexBase);
 			var varint = Varint(method);
 
 			Assert.Equal(expectedGroups, varint.Length);
 			if (expectedGroups == 2)
 				Assert.Equal(0x01, varint[1]);
 
-			// …and the opcode is recovered from the method, so the enums' `0x2000 + index` spelling is exact.
-			Assert.Equal((ushort)opcode, new Rpc(Agent, Character, method, ReadOnlyMemory<byte>.Empty).Opcode);
+			// …and the two bytes a dump shows are the tag plus that first group, which is why an index-registered
+			// method used to be WRITTEN as `0x2000 + index` (#615 renumbered the enums onto the index itself).
+			Assert.Equal((ushort)dumpReading, WireOpcode.Of(method));
+			Assert.Equal(varint[0], (byte)(WireOpcode.Of(method) & 0xFF));
 		}
 
 		// A send supplies nothing and still carries the whole varint: the pong's method is 130, so the second group goes
@@ -77,7 +83,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void ASendCarriesTheWholeMethodVarint()
 		{
-			var pong = new Rpc(Agent, Character, GameCharInterfaceOpcodes.DispatchPong, (byte[])[0x00, 0x00, 0x00, 0x07]);
+			var pong = new Rpc(Agent, Character, GameCharInterfaceMethods.DispatchPong, (byte[])[0x00, 0x00, 0x00, 0x07]);
 
 			Assert.Equal(0x82u, pong.Method);
 			Assert.Contains("208201", Convert.ToHexString(pong.Serialize()).ToLowerInvariant());
@@ -85,12 +91,12 @@ namespace Faolan.Tests
 		}
 
 		// …and a method below the boundary stays bare, which is the half the trade replies used to get wrong: all seven
-		// ride opcodes 0x2068-0x206E (methods 104-110) and every one hand-passed a `0x01` retail's captures do not carry.
-		[Theory, InlineData(GameCharInterfaceOpcodes.DispatchRequestTrade), InlineData(GameCharInterfaceOpcodes.Reserved0x206B), InlineData(GameCharInterfaceOpcodes.DispatchPartnerUpdatedCash),
-		 InlineData(GameCharInterfaceOpcodes.DispatchCharacterNameReply)]
-		public void ALowIndexSend_StaysOneGroup(GameCharInterfaceOpcodes opcode)
+		// are methods 0x68-0x6E (104-110) and every one hand-passed a `0x01` retail's captures do not carry.
+		[Theory, InlineData(GameCharInterfaceMethods.DispatchRequestTrade), InlineData(GameCharInterfaceMethods.Reserved0x6B), InlineData(GameCharInterfaceMethods.DispatchPartnerUpdatedCash),
+		 InlineData(GameCharInterfaceMethods.DispatchCharacterNameReply)]
+		public void ALowIndexSend_StaysOneGroup(GameCharInterfaceMethods method)
 		{
-			var rpc = new Rpc(Agent, Character, opcode, ReadOnlyMemory<byte>.Empty);
+			var rpc = new Rpc(Agent, Character, method, ReadOnlyMemory<byte>.Empty);
 
 			Assert.True(rpc.Method < 0x80);
 			Assert.Single(Varint(rpc.Method));
@@ -109,9 +115,8 @@ namespace Faolan.Tests
 			// Both members of a pair READ the same in a dump...
 			Assert.Equal((ushort)opcode, PlayerAgentMethodIds.ObservedOpcode(parsed.Method));
 
-			// ...and the method is what tells them apart. The frame refuses to offer the reading as an opcode (#613).
+			// ...and the method is what tells them apart - it is the only identity the frame has (#613).
 			Assert.Equal(method, (PlayerAgentMethods)parsed.Method);
-			Assert.False(parsed.HasOpcode);
 		}
 
 		// The four login handoffs, whole: header field 3 (`full_routing_context`) restating PlayerInterface#1, then the
@@ -143,7 +148,7 @@ namespace Faolan.Tests
 		[Fact]
 		public void Parse_RejectsAHeaderItCannotAccountFor()
 		{
-			var valid = new Rpc(Agent, Character, GameCharInterfaceOpcodes.DispatchPong, ReadOnlyMemory<byte>.Empty).Serialize();
+			var valid = new Rpc(Agent, Character, GameCharInterfaceMethods.DispatchPong, ReadOnlyMemory<byte>.Empty).Serialize();
 			Assert.Equal(0x82u, Rpc.Parse(valid).Method);
 
 			// A trailing byte after the method varint: it belonged to no field, and used to be kept verbatim as
@@ -177,13 +182,12 @@ namespace Faolan.Tests
 			{
 				var parsed = Rpc.Parse(entry.Full);
 
-				// The archive records the wire opcode the dump read. It agrees with the parsed one wherever a method
-				// HAS an opcode - i.e. everywhere but the hash-registered pair, where the archived value is only the
-				// varint's first group and the frame refuses to reproduce it as an opcode (#613).
-				if (parsed.HasOpcode)
-					Assert.Equal(entry.Opcode, parsed.Opcode);
-				else
-					Assert.Equal((ushort)entry.Opcode, PlayerAgentMethodIds.ObservedOpcode(parsed.Method));
+				// The archive records the two bytes the dump read for the method field. They are a RENDERING of the
+				// parsed method, so recomputing them from it reproduces the archived value on every frame - including
+				// the hash-registered pair, where that rendering is all a dump can show and is not an identity (#613).
+				// The archived value stays in wire space: fixtures.bin cannot be regenerated without the private
+				// corpus, so #615 converts at the comparison rather than redefining the stored field.
+				Assert.Equal((ushort)entry.Opcode, WireOpcode.Of(parsed.Method));
 
 				Assert.Equal(entry.Full[8..], parsed.Serialize()[8..]);
 				frames++;
@@ -193,24 +197,33 @@ namespace Faolan.Tests
 			Assert.True(frames > 40_000, $"expected the whole corpus, walked only {frames} frames");
 		}
 
-		// A hash-registered method has NO opcode, and asking for one throws rather than returning 7 of its 32 bits
-		// (#613). Before this it returned a number that names two methods at once, which is what let an opcode-keyed
-		// dispatch run the wrong handler (#608).
+		// #615, stated: a `*Methods` member IS the `method_instance` this frame writes, on BOTH kinds of class, with no
+		// base added or subtracted anywhere. That is what let `Rpc.Opcode`, `HasOpcode`, `MethodIndexBase` and the
+		// ushort constructor overloads all delete - and it is what makes a dispatch `switch ((FooMethods)packet.Method)`
+		// rather than arithmetic. Asserted end to end (build -> serialize -> parse), so a conversion sneaking back in
+		// anywhere on that path fails here.
 		[Fact]
-		public void AHashRegisteredMethod_HasNoOpcode()
+		public void AMethodEnumMemberIsTheWireField()
 		{
-			var ack = new Rpc(Agent, Character, PlayerInterfaceMethods.AuthenticateAck, ReadOnlyMemory<byte>.Empty);
+			foreach (var method in new Enum[]
+			         {
+				         GameCharInterfaceMethods.DispatchPong, GameCharInterfaceMethods.DispatchAddItem, GameAgentMethods.PassBlob,
+				         CSPlayerAgentMethods.Authenticate, TradepostInterfaceMethods.DispatchMailMessage,
+				         PlayerInterfaceMethods.AuthenticateAck, PlayerAgentMethods.LoginCharacter
+			         })
+			{
+				var rpc = new Rpc(Agent, Character, method, ReadOnlyMemory<byte>.Empty);
 
-			Assert.False(ack.HasOpcode);
-			Assert.Throws<InvalidOperationException>(() => ack.Opcode);
+				Assert.Equal(Convert.ToUInt32(method), rpc.Method);
+				Assert.Equal(Convert.ToUInt32(method), Rpc.Parse(rpc.Serialize()).Method);
+			}
 
-			// The method itself is unharmed - it is the whole identity, and it is what goes on the wire.
-			Assert.Equal((uint)PlayerInterfaceMethods.AuthenticateAck, ack.Method);
-
-			// An index-registered method still has one, exactly.
-			var pong = new Rpc(Agent, Character, GameCharInterfaceOpcodes.DispatchPong, ReadOnlyMemory<byte>.Empty);
-			Assert.True(pong.HasOpcode);
-			Assert.Equal((ushort)GameCharInterfaceOpcodes.DispatchPong, pong.Opcode);
+			// Every method enum is uint-backed for the same reason: the member is the field, and the field is a uint32.
+			foreach (var type in typeof(GameCharInterfaceMethods).Assembly.GetTypes())
+			{
+				if (type is { IsEnum: true, Namespace: "Faolan.Core.Enums" } && type.Name.EndsWith("Methods", StringComparison.Ordinal))
+					Assert.Equal(typeof(uint), Enum.GetUnderlyingType(type));
+			}
 		}
 
 		// Rewrites the frame's header to `header || suffix`, keeping the length/CRC honest - the only way to build a

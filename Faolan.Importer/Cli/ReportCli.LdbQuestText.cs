@@ -320,7 +320,7 @@ namespace Faolan.Importer.Cli
 		// whose category is one of the encrypted ones AND whose key decrypts are included - a plaintext slot is already
 		// readable elsewhere and a keyless one has nothing to say here.
 		private static async Task<Dictionary<uint, List<(QuestTextSlot Slot, string Text)>>> QuestTitles(
-			Faolan.Core.Database.DatabaseContext db, Dictionary<(uint Category, uint Id), byte[]> ciphertext,
+			Core.Database.DatabaseContext db, Dictionary<(uint Category, uint Id), byte[]> ciphertext,
 			HashSet<uint>? onlyQuests)
 		{
 			var refs = await db

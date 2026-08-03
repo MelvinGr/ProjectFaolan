@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Enums;
 using Faolan.Importer.Captures;
-using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -24,7 +23,7 @@ namespace Faolan.Tests
 			// spawned around it, so the importer still has to SELECT the wanted mount by name out of a crowd of
 			// unwanted ones rather than being handed it alone. The leading MapChange is load-bearing - NpcSpawnExtractor
 			// tracks the current map and drops every spawn it sees before one.
-			var packets = CapturedFixture.Packets("mount-spawns.bin").Select(p => new CapturedPacket(0, true, (uint)GameInterfaceOpcodes.DispatchPassBlob, p.Iir, p.Full)).ToList();
+			var packets = CapturedFixture.Packets("mount-spawns.bin").Select(p => new CapturedPacket(0, true, CapturedPacket.Wire(GameInterfaceMethods.DispatchPassBlob), p.Iir, p.Full)).ToList();
 
 			Assert.Equal((uint)IirTypes.PlayfieldFIIR, packets[0].SubOpcode);
 			Assert.All(packets.Skip(1), p => Assert.Equal((uint)IirTypes.SimpleCharFullUpdateIIR, p.SubOpcode));

@@ -38,7 +38,7 @@ namespace Faolan.Tests
 			byte[] sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 			byte[] receiver = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, 0xFF, 0xBD, 0xD9, 0x10];
 
-			var produced = new Rpc(Endpoints.EndpointFromBytes(sender), Endpoints.EndpointFromBytes(receiver), packet.Opcode, b => b.WriteArrayUInt32Length(s =>
+			var produced = new Rpc(Endpoints.EndpointFromBytes(sender), Endpoints.EndpointFromBytes(receiver), packet.Method, b => b.WriteArrayUInt32Length(s =>
 			{
 				s.WriteUInt32(subOpcode);
 				s.WriteUInt32(c350);
@@ -133,7 +133,7 @@ namespace Faolan.Tests
 			byte[] sender = [0x0D, 0x13, 0xCE, 0x71, 0xB1, 0x10, 0x58];
 			byte[] receiver = [0x0D, 0x47, 0xC1, 0x67, 0x6C, 0x10, .. EncodeVarint(newInstance)];
 
-			var produced = new Rpc(Endpoints.EndpointFromBytes(sender), Endpoints.EndpointFromBytes(receiver), packet.Opcode, b => b.WriteArrayUInt32Length(s =>
+			var produced = new Rpc(Endpoints.EndpointFromBytes(sender), Endpoints.EndpointFromBytes(receiver), packet.Method, b => b.WriteArrayUInt32Length(s =>
 			{
 				s.WriteUInt32(subOpcode);
 				s.WriteUInt32(c350);

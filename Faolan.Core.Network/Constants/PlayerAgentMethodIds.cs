@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Enums;
+using Faolan.Core.Network.Protocol;
 
 namespace Faolan.Core.Network.Constants
 {
@@ -30,8 +31,8 @@ namespace Faolan.Core.Network.Constants
 	//   s2c: STR=AuthenticateAck MAX=3 analyzeHeadless ... -postScript StrXrefs.java
 	// Both print `<constant>; FUN_00487900(); FUN_0040ec10("<Name>", <len>)` triples — the registration idiom.
 	//
-	// ⚠️ **The 16-bit opcode is NOT a method key on this interface.** `Rpc.Opcode` is a lossy view of the method varint
-	// — `0x2080 | (constant & 0x7F)` here, since every constant needs more than one group — so two methods whose
+	// ⚠️ **The 16-bit opcode is NOT a method key on this interface.** `WireOpcode.Of` is a lossy view of the method
+	// varint — `0x2080 | (constant & 0x7F)` here, since every constant needs more than one group — so two methods whose
 	// constants share their low 7 bits share an opcode, and both such pairs are in the corpus: `0x20EC` is
 	// `ReceivedCharacterSettings` (0x3C7C926C) AND `AuthenticateLoggedIn` (0x9D991E6C); `0x20D6` is
 	// `VerifyLanguageSetting` (0x9847AED6) AND `UpdateCharacterPreview` (0x4D661656). Inbound dispatch keys on
@@ -72,13 +73,12 @@ namespace Faolan.Core.Network.Constants
 			PlayerAgentMethods.ReceivedCharacterSettings, PlayerAgentMethods.UpdateSubscriptionSettings
 		];
 
-		// The two bytes you would read off a hex dump for this method: the method field's tag, then its varint's first
-		// group. COMPUTED, because it is a rendering of the constant rather than a fact about the method - it collides,
-		// so it can name a frame in a capture but must never key anything. `Rpc.Opcode` refuses to return it for these
-		// methods at all (#613); this is the display-only escape hatch, used by `gen/opcodes.md`.
+		// The two bytes you would read off a hex dump for this method. A rendering of the constant rather than a fact
+		// about the method - it collides, so it can name a frame in a capture but must never key anything (#613/#615).
+		// Named here for the login tier's reading of it; `WireOpcode.Of` is the general form and does the work.
 		public static ushort ObservedOpcode(uint methodInstance)
 		{
-			return (ushort)(0x2000 | (methodInstance & 0x7F) | (methodInstance > 0x7F ? 0x80u : 0u));
+			return WireOpcode.Of(methodInstance);
 		}
 
 		private static IReadOnlyDictionary<string, uint> Registration<T>() where T : struct, Enum

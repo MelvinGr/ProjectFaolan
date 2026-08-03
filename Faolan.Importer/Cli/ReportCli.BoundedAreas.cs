@@ -194,7 +194,7 @@ namespace Faolan.Importer.Cli
 		// In both cases the dedicated table carries strictly more than the trigger volume does, so the overlap is a
 		// CHECK on what we imported rather than a source to import from.
 		private static async Task<(Dictionary<uint, List<(string Label, float X, float Z)>> Probes, string? Kind)> CrossCheckProbes(
-			Faolan.Core.Database.DatabaseContext db, BoundedAreaBucket bucket)
+			Core.Database.DatabaseContext db, BoundedAreaBucket bucket)
 		{
 			switch (bucket)
 			{

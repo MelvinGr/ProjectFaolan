@@ -17,7 +17,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// columns, so Parse rejects it rather than importing a row that would rebuild different bytes.
 	public static class SetDialogueCameraCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchSetDialogueCamera;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchSetDialogueCamera;
 
 		public static byte[] Build(SetDialogueCamera value)
 		{

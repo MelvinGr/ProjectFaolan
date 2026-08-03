@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// TeamTradeFriendCodecTests.
 	public static class TradeCashCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchPartnerUpdatedCash;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchPartnerUpdatedCash;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(TradeCash value)

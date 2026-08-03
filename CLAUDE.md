@@ -212,13 +212,21 @@ Two things already run ahead of that move:
   raw `BinaryPrimitives` is the case where the span IS the value, not a field at an offset: a fixed-width
   scratch buffer flushed to a stream (`FaolanStream`, `GlbWriter`, `FctxEncoder`) or a 4-byte length prefix
   accumulated across recv boundaries (`ConanMessageFramer._lengthBuffer`).
-- 16-bit RPC opcodes are **method indices**: `wire = 0x2000 + registration index`, per interface, base
-  0x2000 for every interface except PlayerAgent/PlayerInterface (32-bit hash dispatch — login, still open).
+- **An RPC message is identified by its `method_instance`** (RpcHeader field 4, one varint), and **every
+  `*Methods` enum member IS that constant** (Gitea #615) — a registration INDEX per interface, or a 32-bit
+  registration HASH on PlayerAgent/PlayerInterface. So `Rpc` carries `Method` and nothing else: no `Opcode`,
+  no base to add, and a dispatch is `switch ((GameCharInterfaceMethods)packet.Method)`.
+  ⚠️ **`0x2NNN` is the WIRE RENDERING, not the identity** — the method field's tag `0x20` plus the varint's
+  first group, which is what a hex dump, the Wireshark plugin and a `.tshark.json`'s `"Opcode"` field show.
+  `DispatchAddItem = 0x20` reads as `0x2020`. It is exact on the index-registered classes and LOSSY on the
+  hashed pair (7 of 32 bits; `0x20EC` names two methods), which is why it never keys anything: use
+  `WireOpcode.Of(method)` to render one, and `CapturedPacket.Wire(...)` to compare against a value a dump
+  recorded. `docs/protocol/gen/opcodes.md` lists both columns.
   Both directions are recovered from the client (`docs/re/aoc-rpc-method-opcodes.md`, scripts in
   `tools/ghidra/`): c2s order == `docs/re/aoc-client-rpc-methods.json`; the s2c "Dispatch" tables are the
   per-class dispatcher switches (the old "drift" was just extra no-arg dispatch methods the string catalog
   missed). Full per-class catalogs are in `Faolan.Core/Enums/Opcodes.cs`. 32-bit sub-opcodes
-  inside 0x2000 are BKDR-31 hashes of the client's IIR type names (`docs/re/aoc-opcode-ids.md`).
+  inside a PassBlob are BKDR-31 hashes of the client's IIR type names (`docs/re/aoc-opcode-ids.md`).
 - Session-volatile values (entity handles, shop ids, conversation ids) must never be persistence keys;
   the stable key is the NPC/vendor NAME (conversations, shops) or the character id.
 
@@ -274,16 +282,14 @@ the DECODE issue that removes it again. One follow-up remains: #533 (row↔value
   the test fails on it. This is what makes `grep IirTypes.<Type>` find every emitter, and it
   is what `docs/protocol/gen/coverage.md` reads to attribute each type to its builder.
   **One IIR, one codec** — two codecs declaring the same opcode are the same codec and must be merged.
-  **RPC-message codecs** (whole method bodies: `GuildSearchResultCodec`, `MailMessageCodec`, …) do the same against
-  their own interface enum (`(ushort)CSPlayerInterfaceOpcodes.<Method>`) and are named for the client's RPC
-  method. When several METHODS genuinely share one body — `DispatchTeamJoin`/`DispatchTeamLeave`/
-  `DispatchSetNewTeamLeader` are the same layout with the verb in the opcode — declare
-  `public static readonly <Interface>Opcodes[] HandledOpcodes`, the RPC twin of `HandledTypes`; picking one of the
-  three as *the* `Opcode` would be a lie about the other two.
-  ⚠️ **On PlayerAgent/PlayerInterface it is `public const uint Method = (uint)<Interface>Methods.<Method>` instead**
-  (`GameTweaksCodec`, `SendCharacterSettingsCodec`, …). That pair registers its methods by 32-bit HASH, so it has no
-  opcode at all: the 16-bit view keeps 7 of those bits and names two methods at once, and there is deliberately no
-  `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` enum to declare against (Gitea #613 — `Rpc.Opcode` throws there).
+  **RPC-message codecs** (whole method bodies: `GuildSearchResultCodec`, `MailMessageCodec`, …) declare
+  `public const uint Method = (uint)<Interface>Methods.<Method>;` — on EVERY class, hash-registered or not (#615) —
+  and are named for the client's RPC method. When several METHODS genuinely share one body —
+  `DispatchTeamJoin`/`DispatchTeamLeave`/`DispatchSetNewTeamLeader` are the same layout with the verb in the
+  method — declare `public static readonly <Interface>Methods[] HandledMethods`, the RPC twin of `HandledTypes`;
+  picking one of the three as *the* `Method` would be a lie about the other two.
+  There is deliberately no `PlayerAgentOpcodes`/`PlayerInterfaceOpcodes` enum, and no `*Opcodes` enum at all
+  outside the two `ChatServer*Opcodes` (chat carries no RpcHeader, so its numbers really are opcodes).
   **Sub-record codecs** (`CharacterStatBlock`,
   `StatList`, `MoveTaskNode`, …) are composed inside a larger body, never sent alone, and so declare nothing —
   that's expected, not an omission.

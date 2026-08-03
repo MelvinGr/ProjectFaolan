@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Logging
 	// reader of the trace actually wants to see; every other tier's body is opaque, so they use the base tracer.
 	public sealed class GameServerPacketTracer : ConanPacketTracer
 	{
-		public GameServerPacketTracer(ILogger logger) : base(logger, "GameServer", typeof(GameCharInterfaceOpcodes))
+		public GameServerPacketTracer(ILogger logger) : base(logger, "GameServer", typeof(GameCharInterfaceMethods))
 		{
 		}
 
@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Logging
 		}
 
 		// A PassBlob carrier's body starts [u32 payloadLength][u32 iirType]. Gated on the receiver CLASS as well as the
-		// opcode: 0x2000 is PassBlob only on the GameAgent (c2s) / GameInterface (s2c) pair, and names a completely
+		// method: method 0 is PassBlob only on the GameAgent (c2s) / GameInterface (s2c) pair, and names a completely
 		// different method on every other class (GameCharAgent.RequestAggroStatus, GameCharInterface.
 		// DispatchUpdateAggroStatus, …), whose body would then be mis-read as an IIR header.
 		private static bool TryReadIirHeader(in Rpc rpc, out uint payloadLength, out uint iir)
@@ -37,9 +37,7 @@ namespace Faolan.Core.Network.Logging
 			payloadLength = 0;
 			iir = 0;
 
-			// HasOpcode first: a hash-registered method has none and asking throws (#613). The login tier never carries
-			// a PassBlob, so "no opcode" is simply "not this carrier".
-			if (!rpc.HasOpcode || rpc.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+			if (rpc.Method != (uint)GameAgentMethods.PassBlob)
 				return false;
 
 			if (rpc.Receiver.Type != Endpoints.GameAgentType && rpc.Receiver.Type != Endpoints.GameInterfaceType)

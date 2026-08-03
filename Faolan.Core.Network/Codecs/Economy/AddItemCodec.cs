@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// LISTENER's stream, which is why Economy could not reach rule 1 until the parent sends moved (#530 wave 7).
 	public static class AddItemCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchAddItem;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchAddItem;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(AddItem value)

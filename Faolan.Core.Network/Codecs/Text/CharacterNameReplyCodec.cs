@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Codecs.Text
 	// Moved in from `GameServerListener.Inbound`'s inline stream build in #530 wave 7.
 	public static class CharacterNameReplyCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchCharacterNameReply;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchCharacterNameReply;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(CharacterNameReply value)

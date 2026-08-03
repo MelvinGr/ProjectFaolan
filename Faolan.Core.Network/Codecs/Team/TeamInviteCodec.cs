@@ -20,7 +20,7 @@ namespace Faolan.Core.Network.Codecs.Team
 	// capture carries a non-empty note.]
 	public static class TeamInviteCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchTeamInvite;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchTeamInvite;
 
 		public static byte[] Build(TeamInvite value)
 		{

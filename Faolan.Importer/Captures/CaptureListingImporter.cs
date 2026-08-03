@@ -8,7 +8,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Protobuf;
-using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -22,7 +21,8 @@ namespace Faolan.Importer.Captures
 	public static class CaptureListingImporter
 	{
 		// TradepostInterface class id (the search-results sender) in little-endian wire order - the discriminator
-		// that tells a Tradepost 0x2005 apart from the colliding GameCharInterface DispatchUpdateCash (also 0x2005).
+		// that tells DispatchTradepostSearchResults apart from GameCharInterface.DispatchUpdateCash: a method is a
+		// per-interface INDEX and both are index 0x05, so they are the same two bytes on the wire.
 		private static readonly byte[] TradepostInterfaceLe = [0xB5, 0xD5, 0xC2, 0xF2]; // 0xF2C2D5B5
 
 		public static List<TradepostListing> Extract(IReadOnlyList<CapturedPacket> packets)
@@ -30,7 +30,7 @@ namespace Faolan.Importer.Captures
 			var listings = new List<TradepostListing>();
 			foreach (var p in packets)
 			{
-				if (!p.IsDownload || p.Opcode != 0x2005 || p.Bytes.Length < 16)
+				if (!p.IsDownload || p.WireOpcode != CapturedPacket.Wire(TradepostInterfaceMethods.DispatchTradepostSearchResults) || p.Bytes.Length < 16)
 					continue;
 
 				var headerLen = (int)p.Bytes.ReadU32Be(8);

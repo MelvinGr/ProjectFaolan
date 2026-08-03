@@ -6,7 +6,6 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Protocol;
-using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -113,7 +112,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var parsed = Rpc.Parse(packet.Bytes);
-				if (parsed.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+				if (parsed.Method != (uint)GameAgentMethods.PassBlob)
 					return;
 
 				var inner = parsed.BodyReader().ReadArrayUInt32Length();

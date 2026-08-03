@@ -162,7 +162,7 @@ namespace Faolan.GameServer.Economy
 			await _database.SetCharacterMoney(character.Id, character.Money);
 			_lastShopSale[client] = new LastShopSale((int)container, (int)slot, row.ItemId ?? 0, row.Count, price);
 
-			await client.SendAsync(new Rpc(packet.Receiver, packet.Sender, GameCharInterfaceOpcodes.DispatchItemSoldToShop, b => WriteItemSoldBody(b, container, sellerId, slot)));
+			await client.SendAsync(new Rpc(packet.Receiver, packet.Sender, GameCharInterfaceMethods.DispatchItemSoldToShop, b => WriteItemSoldBody(b, container, sellerId, slot)));
 			await _outbound.SendUpdateCash(client, character.Money, UpdateCashReason.Gain);
 
 			_logger.LogInformation("Shop: {Character} sold \"{Item}\" x{Count} (container {Container} slot {Slot}) for {Price} tin (wallet {Balance}).", character.Name, row.Item.Name, row.Count,
@@ -239,7 +239,7 @@ namespace Faolan.GameServer.Economy
 			var waresByPos = shop.Items.Where(w => resolved.GetValueOrDefault(w.ItemTemplateId) != null).ToDictionary(w => w.Pos);
 			_openShop[client] = new OpenShop(instance, shop.VendorName, waresByPos);
 
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchShopData, body));
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchShopData, body));
 
 			_logger.LogInformation("Shop: served \"{Vendor}\" (instance 0x{Instance:X}, {Count} wares) to {Character}.", shop.VendorName, instance, waresByPos.Count, client.Session.Character?.Name);
 		}
@@ -278,7 +278,7 @@ namespace Faolan.GameServer.Economy
 		// The world-conversation IIR carrier (same framing every world IIR uses; cf. CombatService.SendWorldPacket).
 		private static Task SendWorldPacket(INetworkClient client, byte[] body)
 		{
-			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchPassBlob,
+			return client.SendAsync(new Rpc(GameServerListener.WorldSenderEndpoint, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(body)));
 		}
 

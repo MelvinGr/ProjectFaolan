@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations.Schema;
-using Faolan.Core.Database.Attributes;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 

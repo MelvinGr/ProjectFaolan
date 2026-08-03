@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// world (GameServerListener.Inbound). The reply is `UpdateAggroStatusCodec`.
 	public static class RequestAggroStatusCodec
 	{
-		public const ushort Opcode = (ushort)GameCharAgentProjectOpcodes.RequestAggroStatus;
+		public const uint Method = (uint)GameCharAgentProjectMethods.RequestAggroStatus;
 
 		public static byte[] Build(RequestAggroStatus value)
 		{

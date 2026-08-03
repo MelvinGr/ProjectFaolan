@@ -7,6 +7,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Quest;
 using Faolan.GameServer.Inventory;
+using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Faolan.Tests.Support;
 using Xunit;
@@ -570,7 +571,7 @@ namespace Faolan.Tests
 		// sub-opcode it dispatches on comes from the packet itself.
 		private static List<CapturedPacket> QuestPackets(string asset)
 		{
-			return CapturedFixture.Packets(asset).Select(p => new CapturedPacket(0, true, (uint)GameInterfaceOpcodes.DispatchPassBlob, p.Iir, p.Full)).ToList();
+			return CapturedFixture.Packets(asset).Select(p => new CapturedPacket(0, true, CapturedPacket.Wire(GameInterfaceMethods.DispatchPassBlob), p.Iir, p.Full)).ToList();
 		}
 
 		// The body (sub-opcode onward, dropping the 4-byte length prefix) of the captured packet of type `iir`, to

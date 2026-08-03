@@ -102,7 +102,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+				if (packet.Method != (uint)GameAgentMethods.PassBlob)
 					return false;
 
 				var payload = new FaolanStream(packet.BodyReader().ReadArrayUInt32Length());

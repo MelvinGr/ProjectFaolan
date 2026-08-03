@@ -1,6 +1,6 @@
 # AoC RPC method opcodes — recovered from AgeOfConan.exe (Ghidra, 2026-06-13)
 
-Ground-truth 16-bit RPC method ids, recovered by RE'ing the client. **`wire opcode = 0x2000 + method
+Ground-truth RPC method ids, recovered by RE'ing the client. **`wire rendering = 0x2000 + method
 registration index`**, and the registration index is per-interface and contiguous from 0. The base is
 `0x2000` for every interface EXCEPT PlayerAgent/PlayerInterface (see the note at the end).
 
@@ -507,7 +507,7 @@ varint cut after its first group — long here because these constants are 32-bi
 directions) of `Barbarian-login` — e.g. EnterWorld = opcode `0x20B6` + id `0xDD85FB0E`; RequestSmallCharList =
 `0x20C1` + `0xDAD1D206`. The server already emits it (`WriteHeader(..., InitAuth, [0x93,0x86,0xee,0x05])` =
 `0x9386ee05`). So the `//0x…`-style comments in `Opcodes.cs` are the **wire** id, not a client-internal value.
-The 16-bit opcode is a normal `0x2000+index` value (indices 0x83..0xEF) carried alongside; the client dispatches
+The two bytes a dump shows are the usual `0x2000 + first varint group` (readings 0x2083..0x20EF) carried alongside; the client dispatches
 on the 32-bit id.
 
 **s2c POST-AUTH table recovered** (`PlayerInterfaceDispatch_t::DispatchMethod` = `FUN_00484270`, a binary-search

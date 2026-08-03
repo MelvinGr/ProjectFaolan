@@ -7,7 +7,7 @@
  *
  * Packet layout: [u32 BE length][u32 crc32][u32 BE hdrlen][RpcHeader][body]
  *          RpcHeader = 0x0A-tagged sender ProtoEndpoint + 0x12-tagged receiver ProtoEndpoint
- *          + u16 BE method opcode + optional trailing header bytes. A ProtoEndpoint is
+ *          + the method_instance varint (rendered as a u16 "opcode" plus its remaining groups). A ProtoEndpoint is
  *          [0x0D <class id fixed32 LE>][0x10 <instance varint>]; the class ids are BKDR-31
  *          hashes of the client's agent/interface class names (docs/re/aoc-opcode-ids.md).
  *
@@ -110,12 +110,12 @@ static const value_string faolan_class_names[] = {
     {0, NULL}
 };
 
-/* The connection-level service pair whose 0x2000 (PassBlob/DispatchPassBlob) is the IIR
+/* The connection-level service pair whose method 0 (PassBlob/DispatchPassBlob) is the IIR
    carrier: body = [u32 len][u32 IIR type id][record], len covering everything after itself.
-   Other classes' 0x2000 are ordinary first-slot methods (Authenticate, GetAllMails, ...). */
+   Other classes' method 0 are ordinary first-slot methods (Authenticate, GetAllMails, ...). */
 #define FAOLAN_CLASS_GAMEAGENT 0xB171CE13u
 #define FAOLAN_CLASS_GAMEINTERFACE 0x6C67C147u
-#define FAOLAN_OPCODE_PASSBLOB 0x2000u
+#define FAOLAN_METHOD_PASSBLOB 0x00000000u
 
 /* Direction from the receiver endpoint: *Agent classes receive client->server calls,
    *Interface classes server->client dispatches. Falls back to the conversation-initiator
@@ -242,36 +242,25 @@ static uint32_t method_constant(tvbuff_t *tvb, uint16_t opcode, uint32_t tail_st
     return constant;
 }
 
-/* PlayerAgent/PlayerInterface register their methods by 32-bit HASH, so the opcode does NOT
-   identify the method: what looks like [u16 BE opcode][trailing header bytes] is one protobuf
-   varint (field 4, tag 0x20) holding the method's registration constant, cut after its first
-   group. Reassembling it is the only way to tell apart the two methods that share an opcode -
-   0x20EC is BOTH ReceivedCharacterSettings and AuthenticateLoggedIn, 0x20D6 BOTH
-   VerifyLanguageSetting and UpdateCharacterPreview, and retail sends all four (#608/#610).
-   Returns NULL for a class that is not hash-registered, or a constant with no recovered name. */
-static const char *method_name_by_constant(uint32_t receiver_class, uint16_t opcode, tvbuff_t *tvb, uint32_t tail_start, uint32_t tail_end)
-{
-    for (size_t i = 0; i < array_length(faolan_class_constant_tables); i++) {
-        if (faolan_class_constant_tables[i].class_id != receiver_class) {
-            continue;
-        }
+/* Resolves a (receiver class id, method_instance) pair to its recovered method name - the C
+   equivalent of the server's ProtocolCatalog.ResolveName(). The GameServer connection
+   multiplexes several RPC class-pairs, so the SAME method constant means different methods per
+   class; the receiver endpoint's class picks the table. Tables are generated from the C# method
+   enums (faolan_opcode_names.h). Returns NULL when the pair has no recovered name.
 
-        return try_val_to_str(method_constant(tvb, opcode, tail_start, tail_end), faolan_class_constant_tables[i].methods);
-    }
-
-    return NULL;
-}
-
-/* Resolves a (receiver class id, 16-bit opcode) pair to its recovered method name - the C
-   equivalent of the server's GameServerMethodNames.Resolve(). The GameServer connection
-   multiplexes several RPC class-pairs, so the SAME opcode means different methods per class;
-   the receiver endpoint's class picks the table. Tables are generated from the C# opcode
-   enums (faolan_opcode_names.h). Returns NULL when the pair has no recovered name. */
-static const char *method_name(uint32_t receiver_class, uint16_t opcode)
+   It is keyed by the WHOLE varint, not by the 16-bit opcode, and that is not a nicety on the two
+   hash-registered classes: PlayerAgent/PlayerInterface register by 32-bit hash, so what looks
+   like [u16 BE opcode][trailing header bytes] is one protobuf varint cut after its first group,
+   and two methods sharing their low 7 bits share the cut - 0x20EC is BOTH
+   ReceivedCharacterSettings and AuthenticateLoggedIn, 0x20D6 BOTH VerifyLanguageSetting and
+   UpdateCharacterPreview, and retail sends all four (#608/#610). It used to take two lookups
+   because the index-registered enums were written as `0x2000 + index`; #615 renumbered them onto
+   the constant, so one table shape serves both kinds. */
+static const char *method_name(uint32_t receiver_class, uint32_t method)
 {
     for (size_t i = 0; i < array_length(faolan_class_method_tables); i++) {
         if (faolan_class_method_tables[i].class_id == receiver_class) {
-            return try_val_to_str(opcode, faolan_class_method_tables[i].methods);
+            return try_val_to_str(method, faolan_class_method_tables[i].methods);
         }
     }
 
@@ -473,16 +462,15 @@ static void dissect_conan_packet(
     }
 
     const uint16_t opcode = tvb_get_ntohs(tvb, pos);
+    const uint32_t method_id = method_constant(tvb, opcode, pos + 2, hdr_end);
     proto_item *opcode_item = proto_tree_add_item(pkt_tree, hf_faolan_pkt_opcode, tvb, pos, 2, ENC_BIG_ENDIAN);
 
-    /* Method name resolved by (receiver class, opcode) - the receiver's method table names the call,
-       since a connection multiplexes several class-pairs and the same opcode means different things
-       on each. On the two hash-registered classes the opcode is only the method varint's first group,
-       so the whole varint is reassembled first and that answer wins; unresolved opcodes stay raw hex. */
-    const char *method = method_name_by_constant(receiver_class, opcode, tvb, pos + 2, hdr_end);
-    if (method == NULL) {
-        method = method_name(receiver_class, opcode);
-    }
+    /* Method name resolved by (receiver class, method_instance) - the receiver's method table names
+       the call, since a connection multiplexes several class-pairs and the same constant means
+       different things on each. The WHOLE varint is the key, never the 16-bit opcode: that reading
+       names two methods at once on the hash-registered pair (#613/#615). Unresolved methods stay raw
+       hex. */
+    const char *method = method_name(receiver_class, method_id);
     if (method != NULL) {
         proto_item_append_text(opcode_item, " (%s)", method);
         proto_item *method_item = proto_tree_add_string(pkt_tree, hf_faolan_pkt_method, tvb, pos, 2, method);
@@ -493,7 +481,7 @@ static void dissect_conan_packet(
        of the header. There is no separate trailing "header extra" blob to show: those bytes are the rest
        of this varint (#610), and rendering them as their own field is what made the same value look like
        an opcode plus an unexplained marker byte. */
-    proto_item *id_item = proto_tree_add_uint(pkt_tree, hf_faolan_pkt_method_id, tvb, pos, (int)(hdr_end - pos), method_constant(tvb, opcode, pos + 2, hdr_end));
+    proto_item *id_item = proto_tree_add_uint(pkt_tree, hf_faolan_pkt_method_id, tvb, pos, (int)(hdr_end - pos), method_id);
     proto_item_set_generated(id_item);
     pos += 2;
     if (pos < hdr_end) {
@@ -509,11 +497,11 @@ static void dissect_conan_packet(
         proto_tree_add_item(pkt_tree, hf_faolan_pkt_body, tvb, hdr_end, body_len, ENC_NA);
     }
 
-    /* IIR carrier: GameAgent/GameInterface 0x2000 (PassBlob) bodies are
+    /* IIR carrier: GameAgent/GameInterface PassBlob (method 0) bodies are
        [u32 len][u32 IIR type id][record] with len covering everything after itself; the id
        is the BKDR-31 hash of the client's IIR C++ type name (docs/re/aoc-opcode-ids.md). */
     const char *iir_name = NULL;
-    if (opcode == FAOLAN_OPCODE_PASSBLOB &&
+    if (method_id == FAOLAN_METHOD_PASSBLOB &&
         (receiver_class == FAOLAN_CLASS_GAMEAGENT || receiver_class == FAOLAN_CLASS_GAMEINTERFACE) &&
         body_len >= 8 &&
         (uint64_t)tvb_get_ntohl(tvb, hdr_end) + 4 == body_len) {
@@ -526,12 +514,12 @@ static void dissect_conan_packet(
     }
 
     /* Call description: method name when recovered (plus the carried IIR type for PassBlob),
-       raw opcode hex otherwise. */
+       else the method_instance constant - the identity, not the two bytes it renders as (#615). */
     const char *call = method != NULL
         ? (iir_name != NULL
             ? wmem_strdup_printf(pinfo->pool, "%s:%s", method, iir_name)
             : method)
-        : wmem_strdup_printf(pinfo->pool, "0x%04x", opcode);
+        : wmem_strdup_printf(pinfo->pool, "method 0x%08x", method_id);
 
     proto_item_append_text(pkt_item, ": %s -> %s %s, body %u bytes",
         class_name(pinfo->pool, sender_class),
@@ -1117,16 +1105,16 @@ void proto_register_faolan_gs_zlib(void)
         {&hf_faolan_pkt_len, {"Packet Length", "faolan.pkt.len", FT_UINT32, BASE_DEC, NULL, 0x0, "Bytes following the length field", HFILL}},
         {&hf_faolan_pkt_crc, {"CRC-32", "faolan.pkt.crc", FT_UINT32, BASE_HEX, NULL, 0x0, "CRC-32 over everything after the 8-byte length+crc prefix", HFILL}},
         {&hf_faolan_pkt_unknown_prefix, {"Damaged Bytes", "faolan.pkt.damaged_bytes", FT_BYTES, BASE_NONE, NULL, 0x0, "Corrupted bytes skipped to realign the header (decompression ran across a capture hole)", HFILL}},
-        {&hf_faolan_pkt_hdr_len, {"Header Length", "faolan.pkt.header_len", FT_UINT32, BASE_DEC, NULL, 0x0, "RpcHeader length (endpoints + opcode + extra)", HFILL}},
+        {&hf_faolan_pkt_hdr_len, {"Header Length", "faolan.pkt.header_len", FT_UINT32, BASE_DEC, NULL, 0x0, "RpcHeader length (endpoints + method_instance)", HFILL}},
         {&hf_faolan_pkt_sender_class, {"Sender Class", "faolan.pkt.sender_class", FT_UINT32, BASE_HEX, VALS(faolan_class_names), 0x0, "RpcHeader caller_id ProtoEndpoint.type (BKDR-31 class-name hash)", HFILL}},
         {&hf_faolan_pkt_sender_instance, {"Sender Instance", "faolan.pkt.sender_instance", FT_UINT64, BASE_HEX, NULL, 0x0, "RpcHeader caller_id ProtoEndpoint.instance (character/zone id)", HFILL}},
         {&hf_faolan_pkt_receiver_class, {"Receiver Class", "faolan.pkt.receiver_class", FT_UINT32, BASE_HEX, VALS(faolan_class_names), 0x0, "RpcHeader endpoint_id ProtoEndpoint.type (BKDR-31 class-name hash)", HFILL}},
         {&hf_faolan_pkt_receiver_instance, {"Receiver Instance", "faolan.pkt.receiver_instance", FT_UINT64, BASE_HEX, NULL, 0x0, "RpcHeader endpoint_id ProtoEndpoint.instance (character/zone id)", HFILL}},
-        {&hf_faolan_pkt_opcode, {"Opcode", "faolan.pkt.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "Method index (0x2000 + position) into the receiver class's RPC table", HFILL}},
-        {&hf_faolan_pkt_method, {"Method", "faolan.pkt.method", FT_STRING, BASE_NONE, NULL, 0x0, "Method name for (receiver class, opcode), from the C# Opcodes.cs catalogs", HFILL}},
+        {&hf_faolan_pkt_opcode, {"Opcode", "faolan.pkt.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "The method field's first two bytes - its tag 0x20 and the varint's first group. A rendering, not an identity: see Method Id", HFILL}},
+        {&hf_faolan_pkt_method, {"Method", "faolan.pkt.method", FT_STRING, BASE_NONE, NULL, 0x0, "Method name for (receiver class, method_instance), from the C# Opcodes.cs catalogs", HFILL}},
         {&hf_faolan_pkt_iir, {"IIR Type", "faolan.pkt.iir", FT_UINT32, BASE_HEX, VALS(faolan_iir_names), 0x0, "IIR type id carried in a PassBlob 0x2000 body (BKDR-31 hash of the client IIR class name)", HFILL}},
         {&hf_faolan_pkt_direction, {"Direction", "faolan.pkt.direction", FT_STRING, BASE_NONE, NULL, 0x0, "c2s (receiver is an *Agent class) or s2c (receiver is an *Interface class)", HFILL}},
-        {&hf_faolan_pkt_method_id, {"Method Id", "faolan.pkt.method_id", FT_UINT32, BASE_HEX, NULL, 0x0, "The method's registration constant - the varint the opcode and the bytes after it form", HFILL}},
+        {&hf_faolan_pkt_method_id, {"Method Id", "faolan.pkt.method_id", FT_UINT32, BASE_HEX, NULL, 0x0, "method_instance (RpcHeader field 4), whole - the registration constant the opcode bytes and the bytes after them form. THE method identity, and what the name tables are keyed by", HFILL}},
         {&hf_faolan_pkt_body, {"Body", "faolan.pkt.body", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}},
 
         {&hf_faolan_chat_opcode, {"Chat Opcode", "faolan.chat.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "ChatServer chat opcode", HFILL}},

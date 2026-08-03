@@ -333,7 +333,7 @@ namespace Faolan.Tests
 		// that closes the constructor, found by depth-counting so a nested call's own parens don't end it early.
 		private static IEnumerable<string> DispatchPassBlobBodies(string source)
 		{
-			const string marker = "GameInterfaceOpcodes.DispatchPassBlob,";
+			const string marker = "GameInterfaceMethods.DispatchPassBlob,";
 			for (var at = source.IndexOf(marker, StringComparison.Ordinal); at >= 0; at = source.IndexOf(marker, at + 1, StringComparison.Ordinal))
 			{
 				var start = at + marker.Length;

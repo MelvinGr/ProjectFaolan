@@ -19,7 +19,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// Was `TradepostResponses.ParseSearch(FaolanStream)`, which read the five fields and stopped (#530 wave 7).
 	public static class TradepostItemSearchCodec
 	{
-		public const ushort Opcode = (ushort)TradepostAgentOpcodes.ItemSearch;
+		public const uint Method = (uint)TradepostAgentMethods.ItemSearch;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(TradepostItemSearch value)

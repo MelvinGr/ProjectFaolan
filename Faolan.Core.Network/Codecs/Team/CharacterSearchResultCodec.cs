@@ -20,7 +20,7 @@ namespace Faolan.Core.Network.Codecs.Team
 	// even for an empty result or the client reads the empty frame and runs off the end (#408).
 	public static class CharacterSearchResultCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchCharacterSearchResult;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchCharacterSearchResult;
 
 		// Per-entry trailer. The u16 is 0 in every captured entry; the 0x04 is constant across all five bodies and all
 		// of their entries, so it is carried rather than named. [V0]

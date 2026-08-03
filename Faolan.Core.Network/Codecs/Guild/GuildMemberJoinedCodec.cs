@@ -11,7 +11,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// Moved in from `GuildService.SendGuildMemberJoined` in #530 wave 7.
 	public static class GuildMemberJoinedCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchGuildMemberJoined;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildMemberJoined;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(GuildMemberJoined value)

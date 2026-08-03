@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// Was two `TradepostResponses` senders that each wrote their own body (#530 wave 7); the sends stay in `Faolan/`.
 	public static class SendMailResultCodec
 	{
-		public const ushort Opcode = (ushort)TradepostInterfaceOpcodes.DispatchSendMailResult;
+		public const uint Method = (uint)TradepostInterfaceMethods.DispatchSendMailResult;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(SendMailResult value)

@@ -3,6 +3,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
@@ -30,7 +31,7 @@ namespace Faolan.Importer.Extractors
 		// True when the packet is a 0x2000 carrier at all - a cheap pre-filter for callers scanning every packet.
 		public static bool IsCarrier(uint opcode)
 		{
-			return opcode == (uint)GameAgentOpcodes.PassBlob;
+			return opcode == (uint)GameAgentMethods.PassBlob;
 		}
 
 		// The journal records a snapshot packet carries, with the character they belong to. Returns false for any

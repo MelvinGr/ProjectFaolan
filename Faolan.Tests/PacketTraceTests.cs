@@ -24,33 +24,33 @@ namespace Faolan.Tests
 		private static readonly ProtoEndpoint Receiver = Endpoints.Endpoint(Endpoints.GameInterfaceType, 0x0012D687);
 		private static readonly ProtoEndpoint Sender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x58);
 
-		// The IIR sub-opcode is a property of the GameAgent/GameInterface class pair, NOT of the number 0x2000: on every
-		// other RPC class 0x2000 is a different method whose body would be misread as an [payloadLength][iir] header.
+		// The IIR sub-opcode is a property of the GameAgent/GameInterface class pair, NOT of method 0: on every other
+		// RPC class method 0 is a different method whose body would be misread as an [payloadLength][iir] header.
 		[Fact]
-		public void Opcode0x2000_OnAnotherClass_IsNotReadAsAnIirCarrier()
+		public void Method0_OnAnotherClass_IsNotReadAsAnIirCarrier()
 		{
 			var capture = new CapturingLogger();
 			var tracer = Tracer(capture);
 
-			var rpc = new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceOpcodes.DispatchUpdateAggroStatus,
+			var rpc = new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceMethods.DispatchUpdateAggroStatus,
 				(byte[])[0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44]);
 
 			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
 
 			var line = Assert.Single(capture.Messages);
-			Assert.Contains("DispatchUpdateAggroStatus (0x2000)", line);
+			Assert.Contains("DispatchUpdateAggroStatus (0x00000000)", line);
 			Assert.DoesNotContain("subOpcode=", line);
 		}
 
 		// A PassBlob carrier names the IIR it carries - in BOTH directions. The inbound trace used to drop it, so an
-		// inbound 0x2000 read as a bare "PassBlob" with no hint of which IIR the client had sent.
+		// inbound method 0 read as a bare "PassBlob" with no hint of which IIR the client had sent.
 		[Fact]
 		public void PassBlobCarrier_NamesItsIir_InBothDirections()
 		{
 			var capture = new CapturingLogger();
 			var tracer = Tracer(capture);
 
-			var rpc = new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), Endpoints.Endpoint(Endpoints.GameAgentType, 0x0012D687), GameAgentOpcodes.PassBlob,
+			var rpc = new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x58), Endpoints.Endpoint(Endpoints.GameAgentType, 0x0012D687), GameAgentMethods.PassBlob,
 				body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)IirTypes.MoveTaskIIR).WriteUInt32(0x11223344)));
 
 			tracer.Received(Rpc.Parse(rpc.Serialize()));
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 			Assert.All(capture.Messages, line =>
 			{
 				Assert.Contains($"subOpcode={nameof(IirTypes.MoveTaskIIR)}", line);
-				Assert.Contains("PassBlob (0x2000)", line);
+				Assert.Contains("PassBlob (0x00000000)", line);
 			});
 		}
 
@@ -69,15 +69,15 @@ namespace Faolan.Tests
 		public void PlainConanTracer_DoesNotReadABodyAsAnIirCarrier()
 		{
 			var capture = new CapturingLogger();
-			var tracer = new ConanPacketTracer(capture, "UniverseAgent", typeof(UniverseInterfaceOpcodes));
+			var tracer = new ConanPacketTracer(capture, "UniverseAgent", typeof(UniverseInterfaceMethods));
 
-			var rpc = new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
+			var rpc = new Rpc(Sender, Receiver, GameInterfaceMethods.DispatchPassBlob,
 				body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)IirTypes.MoveTaskIIR).WriteUInt32(0x11223344)));
 
 			tracer.Transmitted(Sent(rpc, rpc.Serialize()));
 
 			var line = Assert.Single(capture.Messages);
-			Assert.Contains("DispatchPassBlob (0x2000)", line);
+			Assert.Contains("DispatchPassBlob (0x00000000)", line);
 			Assert.DoesNotContain("subOpcode=", line);
 		}
 
@@ -120,12 +120,11 @@ namespace Faolan.Tests
 				var line = Assert.Single(capture.Messages);
 
 				// The rendered line must carry the frame's real fields (its identity, lengths, the body hex), each read
-				// from the independently-parsed packet - never from the Rpc the render used. The identity is the METHOD
-				// on the two hash-registered classes, where the opcode carries only 7 of its 32 bits and would name the
-				// wrong one of a colliding pair (#608/#610), and the opcode everywhere else.
-				var identity = parsed.Receiver.Type is Endpoints.PlayerAgentType or Endpoints.PlayerInterfaceType
-					? parsed.Method.ToHex()
-					: parsed.Opcode.ToHex();
+				// from the independently-parsed packet - never from the Rpc the render used. The identity is always the
+				// METHOD (#615): before it, the two hash-registered classes had to be special-cased because the opcode
+				// view carries only 7 of a 32-bit constant's bits and would name the wrong one of a colliding pair
+				// (#608/#610), while every other class rendered the opcode.
+				var identity = parsed.Method.ToHex();
 				Assert.Contains(identity, line);
 				Assert.Contains($"bodyLength={parsed.Body.Length}", line);
 				Assert.Contains($"packetLength={wire.Length}", line);
@@ -139,14 +138,14 @@ namespace Faolan.Tests
 			// A PassBlob (IIR) carrier: [u32 payloadLen][u32 subOpcode][payload] - exercises the sub-opcode branch.
 			yield return
 			[
-				new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob,
+				new Rpc(Sender, Receiver, GameInterfaceMethods.DispatchPassBlob,
 					body => body.WriteArrayUInt32Length(s => s.WriteUInt32((uint)IirTypes.StatUpdateIIR).WriteUInt32(0x0000C350).WriteUInt32(0x0012D687)))
 			];
 
 			// A non-PassBlob carrier with a plain byte body (no sub-opcode branch).
 			yield return
 			[
-				new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceOpcodes.DispatchUpdateCash,
+				new Rpc(Sender, Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x0012D687), GameCharInterfaceMethods.DispatchUpdateCash,
 					(byte[])[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00, 0x00, 0x01])
 			];
 
@@ -159,7 +158,7 @@ namespace Faolan.Tests
 			];
 
 			// An empty-body carrier.
-			yield return [new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob, ReadOnlyMemory<byte>.Empty)];
+			yield return [new Rpc(Sender, Receiver, GameInterfaceMethods.DispatchPassBlob, ReadOnlyMemory<byte>.Empty)];
 		}
 
 		// What the transport hands the tracer for a send: the built Rpc with the serialized frame's size stamped on it

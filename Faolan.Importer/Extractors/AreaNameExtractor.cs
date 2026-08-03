@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {

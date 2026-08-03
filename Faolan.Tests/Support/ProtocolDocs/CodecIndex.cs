@@ -35,7 +35,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 		public int CodecsWithGolden => CodecGolden.Count(kv => kv.Value);
 		public int Dissectors { get; private set; }
 
-		public int RpcOpcodeTotal { get; private set; }
+		public int RpcMethodTotal { get; private set; }
 
 		public string Level(string iir)
 		{
@@ -152,9 +152,13 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				.Where(x => x.Value >= 0x10000) // drop the command opcode (see iir-types.md)
 				.OrderBy(x => x.Name, StringComparer.Ordinal));
 
-			idx.RpcOpcodeTotal = typeof(GameCharAgentOpcodes)
+			// The RPC method catalogs: every `*Methods` enum, plus the two `ChatServer*Opcodes` (chat carries no
+			// RpcHeader, so its numbers really are opcodes). IirTypes is counted above. Before #615 this counted
+			// `*Opcodes` alone, which is why renaming the twelve would otherwise have quietly dropped it to 18.
+			idx.RpcMethodTotal = typeof(GameCharAgentMethods)
 				.Assembly.GetTypes()
-				.Where(t => t is { IsEnum: true, Namespace: "Faolan.Core.Enums" } && t.Name.EndsWith("Opcodes", StringComparison.Ordinal)) // the RPC method catalogs; IirTypes is counted above
+				.Where(t => t is { IsEnum: true, Namespace: "Faolan.Core.Enums" } &&
+				            (t.Name.EndsWith("Methods", StringComparison.Ordinal) || t.Name.StartsWith("ChatServer", StringComparison.Ordinal)))
 				.Sum(t => t.GetFields(BindingFlags.Public | BindingFlags.Static).Length);
 			idx.Dissectors = SourceFiles(Path.Combine(repo, "tools", "capture"), "decode_*.py", SearchOption.TopDirectoryOnly).Count;
 

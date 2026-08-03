@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {

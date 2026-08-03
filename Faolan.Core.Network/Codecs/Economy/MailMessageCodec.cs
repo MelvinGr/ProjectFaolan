@@ -26,7 +26,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// mapping is `MailColumns` next door (#530 wave 7 / #533).
 	public static class MailMessageCodec
 	{
-		public const ushort Opcode = (ushort)TradepostInterfaceOpcodes.DispatchMailMessage;
+		public const uint Method = (uint)TradepostInterfaceMethods.DispatchMailMessage;
 
 		// The attachment entry's only stat (matches the capture).
 		public const uint StatQuantity = 26;

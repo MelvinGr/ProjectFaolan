@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Crypt;
 using Faolan.Core.Database.Tables;
+using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {

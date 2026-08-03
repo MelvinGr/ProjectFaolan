@@ -1,7 +1,7 @@
 using System;
 using Faolan.Core.Extensions;
 
-namespace Faolan.Importer.Extractors
+namespace Faolan.Importer.Captures
 {
 	// The mixed-stream reading shape #530 §4 blesses: an importer sweep dispatches on the packet's SUB-OPCODE first
 	// and only then calls the codec, so `Parse` stays strict (rule 4) and the sweep still gets to say "not mine".

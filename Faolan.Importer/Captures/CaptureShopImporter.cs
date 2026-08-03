@@ -1,3 +1,4 @@
+using Faolan.Core.Enums;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -32,7 +33,7 @@ namespace Faolan.Importer.Captures
 			var shops = new List<ShopEntry>();
 			foreach (var p in packets)
 			{
-				if (!p.IsDownload || p.Opcode != 0x2033 || p.Bytes.Length < 44)
+				if (!p.IsDownload || p.WireOpcode != CapturedPacket.Wire(GameCharInterfaceMethods.DispatchShopData) || p.Bytes.Length < 44)
 					continue;
 
 				var headerLen = (int)p.Bytes.ReadU32Be(8);

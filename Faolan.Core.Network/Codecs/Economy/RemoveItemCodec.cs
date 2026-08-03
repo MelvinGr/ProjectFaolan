@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// `RemoveItemBody.WriteRemoveItemBody(FaolanStream, …)` (#530 wave 7).
 	public static class RemoveItemCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchRemoveItem;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchRemoveItem;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(RemoveItem value)

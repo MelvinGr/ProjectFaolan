@@ -35,7 +35,7 @@ namespace Faolan.Importer.Captures
 		// A saved action-bar slot holding a COMBO (ShortcutBarReplyCodec's record `type`). The bar is the only
 		// per-character combo evidence for a character above the create flow.
 		private const uint ComboShortcutType = 3;
-		private const ushort AddSpecialAbilityOpcode = (ushort)GameCharInterfaceOpcodes.DispatchAddSpecialAbility;
+		private const uint AddSpecialAbility = (uint)GameCharInterfaceMethods.DispatchAddSpecialAbility;
 
 		// The RDB combo-catalog name-prefix -> class map. Unlike abilities, combos have no per-character grant to derive
 		// from (retail never re-emits a ComboBookIIR on login - the combo book rides the 0x2076 world-entry snapshot
@@ -549,7 +549,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != AddSpecialAbilityOpcode)
+				if (packet.Method != AddSpecialAbility)
 					return;
 
 				var body = packet.BodyReader().ReadRemainingArray();
@@ -643,7 +643,7 @@ namespace Faolan.Importer.Captures
 				uint id;
 				if (isCombo)
 				{
-					if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob || body.Length < 22 || body.ReadU32Be(4) != ComboBookSubOpcode)
+					if (packet.Method != (uint)GameAgentMethods.PassBlob || body.Length < 22 || body.ReadU32Be(4) != ComboBookSubOpcode)
 						return;
 
 					id = ComboBookCodec.Parse(body.AsSpan(4)).ComboId;
@@ -651,7 +651,7 @@ namespace Faolan.Importer.Captures
 				else
 				{
 					// The same 0x2052 grant AddSpecialAbilityCodec parses; take its validated id.
-					if (packet.Opcode != AddSpecialAbilityOpcode)
+					if (packet.Method != AddSpecialAbility)
 						return;
 
 					uint id2;

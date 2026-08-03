@@ -10,13 +10,13 @@ namespace Faolan.Core.Network.Codecs.Economy
 	//
 	// ONE body, TWO methods: `DispatchTradeAddedItem` (0x2070) goes to the adder and
 	// `DispatchTradePartnerAddedItem` (0x206F) to the other party, so only the opcode says whose side of the table the
-	// item is on - which is why this declares `HandledOpcodes` rather than picking one of the two.
+	// item is on - which is why this declares `HandledMethods` rather than picking one of the two.
 	//
 	// Split out of `PlayerTradeCodec` in #530 wave 7; byte-gated by TeamTradeFriendCodecTests.
 	public static class TradeAddedItemCodec
 	{
-		public static readonly GameCharInterfaceOpcodes[] HandledOpcodes =
-			[GameCharInterfaceOpcodes.DispatchTradeAddedItem, GameCharInterfaceOpcodes.DispatchTradePartnerAddedItem];
+		public static readonly GameCharInterfaceMethods[] HandledMethods =
+			[GameCharInterfaceMethods.DispatchTradeAddedItem, GameCharInterfaceMethods.DispatchTradePartnerAddedItem];
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(TradeAddedItem value)

@@ -22,7 +22,7 @@ namespace Faolan.UniverseAgent
 			// verified equal in the 105 captures that contain both (tools/capture/scan_account_id_vs_playerid.py),
 			// with NO base added. So the two must stay in step: if this ever sends something other than Account.Id,
 			// SnapshotStatSheet's PlayerId has to follow (#478).
-			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceOpcodes.DispatchAckAuthenticate, b => b
+			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceMethods.DispatchAckAuthenticate, b => b
 				.WriteUInt32(client.Session.Account.AuthStatus) // authstatus 0x01
 				.WriteUInt64(0x0000271200000000u + client.Session.Account.Id)
 				.WriteString($"{Configuration.ServerIpAddress}:{Configuration.PlayerAgentPort}")
@@ -32,18 +32,18 @@ namespace Faolan.UniverseAgent
 
 		private static Task InitAuth(INetworkClient client)
 		{
-			return client.SendAsync(new Rpc(Sender, AuthChallengeReceiver, UniverseInterfaceOpcodes.DispatchChallenge, b => b.WriteString(client.Session.Account.AuthChallenge.ToString("N"))));
+			return client.SendAsync(new Rpc(Sender, AuthChallengeReceiver, UniverseInterfaceMethods.DispatchChallenge, b => b.WriteString(client.Session.Account.AuthChallenge.ToString("N"))));
 		}
 
 		private static Task SendInvalidLogin(INetworkClient client, ProtoEndpoint receiver, InvalidLoginReasons reason)
 		{
-			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceOpcodes.DispatchAckAuthenticate,
+			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceMethods.DispatchAckAuthenticate,
 				b => b.WriteArray(0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00).WriteByte(reason)));
 		}
 
 		private static Task SetRegionState(INetworkClient client, ProtoEndpoint receiver)
 		{
-			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceOpcodes.DispatchSetRegionState,
+			return client.SendAsync(new Rpc(Sender, receiver, UniverseInterfaceMethods.DispatchSetRegionState,
 				b => b.WriteArray(0x01, 0x01, 0x01, 0x01, 0x3f, 0x80, 0x00, 0x00, 0x3f, 0x80, 0x00, 0x00, 0x01, 0x01, 0x00)));
 		}
 	}

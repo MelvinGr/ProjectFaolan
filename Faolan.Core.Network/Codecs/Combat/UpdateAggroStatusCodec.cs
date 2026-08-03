@@ -14,10 +14,10 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//
 	// ⚠️ 0x2000 here is the RPC method index on GameCharInterfaceProject, NOT the PassBlob IIR carrier that shares the
 	// number on GameInterface - the opcode space is PER INTERFACE. The server used to spell the send with
-	// `GameInterfaceOpcodes.DispatchPassBlob`, which is the same word on the wire and the wrong name for it.
+	// `GameInterfaceMethods.DispatchPassBlob`, which is the same word on the wire and the wrong name for it.
 	public static class UpdateAggroStatusCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceProjectOpcodes.DispatchUpdateAggroStatus;
+		public const uint Method = (uint)GameCharInterfaceProjectMethods.DispatchUpdateAggroStatus;
 
 		public static byte[] Build(UpdateAggroStatus value)
 		{

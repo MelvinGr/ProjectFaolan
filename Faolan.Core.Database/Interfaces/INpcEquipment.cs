@@ -1,4 +1,6 @@
-namespace Faolan.Core.Database.Tables
+using Faolan.Core.Database.Tables;
+
+namespace Faolan.Core.Database.Interfaces
 {
 	// The stored shape of one worn-equipment entry of an NPC's CharacterIIR (the f23 inventory_entry list),
 	// shared by the per-PLACEMENT NpcSpawnEquipment and the per-TYPE NpcEquipment (a summon-only pet/mount carries

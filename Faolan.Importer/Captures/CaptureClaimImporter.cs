@@ -30,7 +30,7 @@ namespace Faolan.Importer.Captures
 				try
 				{
 					var packet = Rpc.Parse(bytes);
-					if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+					if (packet.Method != (uint)GameAgentMethods.PassBlob)
 						continue;
 
 					payload = packet.BodyReader().ReadArrayUInt32Length();

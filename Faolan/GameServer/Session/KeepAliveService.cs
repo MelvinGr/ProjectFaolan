@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Enums;
@@ -57,7 +56,7 @@ namespace Faolan.GameServer.Session
 			var counter = body.ReadUInt32();
 			var uptime = ServerUptimeClock.Microseconds;
 
-			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchPong,
+			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceMethods.DispatchPong,
 				b => b.WriteUInt32(counter)
 					.WriteUInt32((uint)(uptime >> 32))
 					.WriteUInt32((uint)uptime)));
@@ -81,7 +80,7 @@ namespace Faolan.GameServer.Session
 		{
 			var frameRate = (float)_metrics.Current.TicksPerSecond;
 
-			return client.SendAsync(new Rpc(PingSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceOpcodes.DispatchGameServerStats,
+			return client.SendAsync(new Rpc(PingSender, client.Endpoint(Endpoints.GameInterfaceType), GameInterfaceMethods.DispatchGameServerStats,
 				b => b.WriteFloat(frameRate).WriteUInt32(0).WriteUInt32(0)));
 		}
 	}

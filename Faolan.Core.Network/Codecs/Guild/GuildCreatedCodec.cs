@@ -15,7 +15,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// Moved in from `GuildService.WriteGuildCreatedBody` in #530 wave 7.
 	public static class GuildCreatedCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchGuildCreated;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildCreated;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(GuildCreated value)

@@ -159,7 +159,7 @@ namespace Faolan.Importer.Extractors
 		private static void ExtractFromAddItem(byte[] packetBytes, IDictionary<uint, CapturedItem> into, IDictionary<uint, ItemType>? types)
 		{
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != AddItemCodec.Opcode)
+			if (packet.Method != AddItemCodec.Method)
 				return;
 
 			AddItem add;
@@ -194,7 +194,7 @@ namespace Faolan.Importer.Extractors
 		private static void ExtractFromBankIir(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+			if (packet.Method != (uint)GameAgentMethods.PassBlob)
 				return;
 
 			var record = packet.BodyReader().ReadArrayUInt32Length();
@@ -231,7 +231,7 @@ namespace Faolan.Importer.Extractors
 		private static void ExtractFromClaimList(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+			if (packet.Method != (uint)GameAgentMethods.PassBlob)
 				return;
 
 			var payload = packet.BodyReader().ReadArrayUInt32Length();
@@ -272,7 +272,7 @@ namespace Faolan.Importer.Extractors
 		private static void ExtractFromLootBag(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+			if (packet.Method != (uint)GameAgentMethods.PassBlob)
 				return;
 
 			var payload = packet.BodyReader().ReadArrayUInt32Length();
@@ -296,7 +296,7 @@ namespace Faolan.Importer.Extractors
 		private static void ExtractFromMail(byte[] packetBytes, IDictionary<uint, CapturedItem> into)
 		{
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != 0x2002)
+			if (packet.Method != MailMessageCodec.Method)
 				return;
 
 			var mail = MailMessageCodec.Parse(packet.Body.Span);
@@ -400,7 +400,7 @@ namespace Faolan.Importer.Extractors
 			root = null!;
 
 			var packet = Rpc.Parse(packetBytes);
-			if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+			if (packet.Method != (uint)GameAgentMethods.PassBlob)
 				return false;
 
 			var record = packet.BodyReader().ReadArrayUInt32Length();

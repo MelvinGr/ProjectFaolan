@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Team
 	// flagging exists.
 	public static class TeamInviteRequestCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerAgentOpcodes.TeamInvite;
+		public const uint Method = (uint)CSPlayerAgentMethods.TeamInvite;
 
 		public static byte[] Build(TeamInviteRequest value)
 		{

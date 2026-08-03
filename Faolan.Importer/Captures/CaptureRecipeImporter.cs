@@ -7,7 +7,6 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Protobuf;
-using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures

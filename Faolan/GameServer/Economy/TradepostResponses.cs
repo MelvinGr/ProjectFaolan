@@ -41,20 +41,20 @@ namespace Faolan.GameServer.Economy
 		// preview; with attachments it carries the bought item.
 		public static Task SendMailMessage(INetworkClient client, Mail mail, bool includeAttachments, uint interfaceInstance = DefaultInterfaceInstance)
 		{
-			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchMailMessage, MailMessageCodec.Build(mail, includeAttachments), interfaceInstance));
+			return client.SendAsync(Build(TradepostInterfaceMethods.DispatchMailMessage, MailMessageCodec.Build(mail, includeAttachments), interfaceInstance));
 		}
 
 		// DispatchSendMailResult (0x2003) - the result of a mark/delete/cancel op.
 		public static Task SendMailResult(INetworkClient client, bool success, byte error = 0, uint interfaceInstance = DefaultInterfaceInstance)
 		{
-			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchSendMailResult, SendMailResultCodec.Build(new MailOpResult(success, error)), interfaceInstance));
+			return client.SendAsync(Build(TradepostInterfaceMethods.DispatchSendMailResult, SendMailResultCodec.Build(new MailOpResult(success, error)), interfaceInstance));
 		}
 
 		// DispatchSendMailResult for a player SendMail (0x2002 -> 0x2003). success=0 lets the client show
 		// "couldn't send" (e.g. a bad recipient).
 		public static Task SendMailSendResult(INetworkClient client, bool success, uint interfaceInstance = DefaultInterfaceInstance)
 		{
-			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchSendMailResult, SendMailResultCodec.Build(SendMailResults.Send(success)), interfaceInstance));
+			return client.SendAsync(Build(TradepostInterfaceMethods.DispatchSendMailResult, SendMailResultCodec.Build(SendMailResults.Send(success)), interfaceInstance));
 		}
 
 		// Open the auction house at `position` (the auctioneer/player location) so the client's within-radius check
@@ -62,13 +62,13 @@ namespace Faolan.GameServer.Economy
 		// player's live position (the capture shows DispatchOpenTradepost precedes TradepostOpen).
 		public static Task SendOpenTradepost(INetworkClient client, Vector3 position, uint interfaceInstance = DefaultInterfaceInstance)
 		{
-			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchOpenTradepost, OpenTradepostCodec.Build(position), interfaceInstance));
+			return client.SendAsync(Build(TradepostInterfaceMethods.DispatchOpenTradepost, OpenTradepostCodec.Build(position), interfaceInstance));
 		}
 
 		// DispatchRetrieveMailResult (0x2004).
 		public static Task SendRetrieveMailResult(INetworkClient client, uint interfaceInstance = DefaultInterfaceInstance)
 		{
-			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchRetrieveMailResult, RetrieveMailAck, interfaceInstance));
+			return client.SendAsync(Build(TradepostInterfaceMethods.DispatchRetrieveMailResult, RetrieveMailAck, interfaceInstance));
 		}
 
 		// Reply to TradepostItemSearch with DB-backed listings for the searched item (rows built byte-exact by
@@ -87,10 +87,10 @@ namespace Faolan.GameServer.Economy
 		{
 			var head = ListFrame.ForCount(listings.Count); // the LIST COUNT, not a category echo - see TradepostListingCodec
 
-			return client.SendAsync(Build(TradepostInterfaceOpcodes.DispatchTradepostSearchResults, TradepostListingCodec.Build(head, listings), interfaceInstance));
+			return client.SendAsync(Build(TradepostInterfaceMethods.DispatchTradepostSearchResults, TradepostListingCodec.Build(head, listings), interfaceInstance));
 		}
 
-		private static Rpc Build(TradepostInterfaceOpcodes method, byte[] body, uint interfaceInstance)
+		private static Rpc Build(TradepostInterfaceMethods method, byte[] body, uint interfaceInstance)
 		{
 			var sender = new ProtoEndpoint
 			{

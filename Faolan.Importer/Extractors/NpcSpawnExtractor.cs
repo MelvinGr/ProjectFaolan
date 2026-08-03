@@ -6,6 +6,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
@@ -50,7 +51,10 @@ namespace Faolan.Importer.Extractors
 	// (>= 0x02000000), whereas NPC handles are small. Dedup key is (map, position); the handle/name vary.
 	public static class NpcSpawnExtractor
 	{
-		private const uint Opcode2020 = 0x2020; // client spawn poll - ends the pre-poll login burst window
+		// The client's spawn poll - ends the pre-poll login burst window. A WIRE opcode (the method tag 0x20 plus the
+		// method's first varint group) rather than a named method: the class it is sent to has never been pinned, and a
+		// method index is only a name once you know which interface it indexes (#615).
+		private const uint SpawnPollWireOpcode = 0x2020;
 
 		// Every FA015807 spawn in the capture (login burst AND mid-session interest/respawn spawns), all maps. This
 		// accretes the cross-session UNION - the same physical NPC at slightly different spots across sessions - so
@@ -107,7 +111,7 @@ namespace Faolan.Importer.Extractors
 				if (currentMap == 0)
 					continue;
 
-				if (p.Opcode == Opcode2020) // client spawn poll - ends the pre-poll burst window
+				if (p.WireOpcode == SpawnPollWireOpcode) // client spawn poll - ends the pre-poll burst window
 				{
 					sawPoll = true;
 					continue;

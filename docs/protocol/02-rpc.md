@@ -85,17 +85,23 @@ in every captured frame.
 
 `Rpc` (`Faolan.Core.Network/Protocol/Rpc.cs`) carries `Method` and writes it whole; there is no `Opcode` field and
 no header tail, so nothing can supply one and nothing has to remember to
-[V3: RpcHeaderTests.ASendCarriesTheWholeMethodVarint]. `Rpc.Opcode` survives as a derived **view** — the tag byte
-plus the varint's first group, which is what you read off a hex dump — because the opcode enums and the dissector
-are written that way, and because on the index-registered classes it is the method index exactly, so `0x2000 + index`
-is a faithful rendering of the wire rather than a fiction.
+[V3: RpcHeaderTests.ASendCarriesTheWholeMethodVarint]. **Every method enum member IS that `method_instance`
+constant** — `GameCharInterfaceMethods.DispatchPong = 0x82`, `PlayerInterfaceMethods.AuthenticateAck = 0x5DC18991` —
+so a send is a widening convert with no arithmetic anywhere, and a dispatch is
+`switch ((GameCharInterfaceMethods)packet.Method)` [V3: RpcHeaderTests.AMethodEnumMemberIsTheWireField].
 
-⚠️ **On the hash-registered pair there is no opcode, and asking for one throws** rather than returning 7 of the
-constant's 32 bits [V3: RpcHeaderTests.AHashRegisteredMethod_HasNoOpcode]. There is no `PlayerAgentOpcodes` /
-`PlayerInterfaceOpcodes` enum either — a value that names two methods cannot be a catalog key, which is exactly how
-an opcode-keyed dispatch ran the wrong handler (#608). Dispatch, the packet trace, the timeline report and the
-generated docs all read `Method` there; `PlayerAgentMethodIds.ObservedOpcode` computes the dump reading when a
-human needs to find one of these in a capture (#613). Callers that can see either kind gate on `Rpc.HasOpcode`.
+The twelve index-registered enums used to be written as `0x2000 + index` — the two bytes a hex dump shows — with an
+`Rpc.Opcode` view converting between the two. #615 renumbered them onto the index itself and deleted `Rpc.Opcode`,
+`Rpc.HasOpcode`, `Rpc.MethodIndexBase` and the `ushort` constructor overloads with it, because "exact on most
+classes" is precisely the property that let a lossy value be used as a key:
+
+⚠️ **On the hash-registered pair those two bytes keep 7 of the constant's 32 bits and name two methods at once**
+[V3: RpcHeaderTests.OneOpcode_CanNameTwoMethods], so there is no opcode to key on and there is no
+`PlayerAgentOpcodes` / `PlayerInterfaceOpcodes` enum — which is exactly how an opcode-keyed dispatch ran the wrong
+handler (#608). Dispatch, the packet trace, the timeline report and the
+generated docs all read `Method`, on every class. `WireOpcode.Of(method)` computes the dump reading when a human
+needs to find a frame in a capture, and `gen/opcodes.md` prints it in a **Reads as** column beside every method
+(#613/#615).
 
 The header is read **strictly**: an unknown tag, a repeated singular field or a missing required one throws
 `InvalidDataException` at the frame boundary, which the receive loop logs against the peer and disconnects. That is
@@ -128,28 +134,34 @@ though the rest of the protocol is big-endian (see [`04-encoding.md`](04-encodin
 `WriteHeader(ProtoEndpoint, …)` overload serializes byte-identically to the hand-rolled arrays it replaced.
 [V3: ProtoEndpointGoldenTests.Endpoint_SerializesToHandRolledHeaderBytes]
 
-## Opcodes are method indices
+## Methods are registration indices
 
-For every interface except one, the 16-bit opcode is a **method index**:
+For every interface except one, `method_instance` is a **method index** — the method's position in the client's
+per-class RPC registration. Both directions were recovered from the client: c2s order is the registration order;
+s2c "Dispatch" indices are the per-class dispatcher switch indices. [V1: tools/ghidra/DumpRpcTables.java]
+
+⚠️ **Two number spaces, and this document uses both.** A method's identity is the index (`0x20` =
+`DispatchAddItem`), and that is what `Opcodes.cs`, the codecs and the dissector's tables are keyed by. What a hex
+dump, the Wireshark plugin's `Opcode` column and a `.tshark.json`'s `"Opcode"` field show is its **wire rendering**
+— the method field's tag byte then the varint's first group:
 
 ```
-wire opcode = 0x2000 + registration index
+wire rendering = 0x2000 | first varint group of the method   (= 0x2000 + index, for an index <= 0xFF)
 ```
 
-The index is the method's position in the client's per-class RPC registration. Both directions were recovered
-from the client: c2s order is the registration order; s2c "Dispatch" opcodes are the per-class dispatcher switch
-indices. [V1: tools/ghidra/DumpRpcTables.java]
+So `0x2020` and `DispatchAddItem = 0x20` are the same method. Prose below that quotes a `0x2NNN` is quoting bytes
+seen in a capture and stays literally true; `gen/opcodes.md` lists both columns for every method.
 
-The full per-interface catalog — 819 entries across 16 enums, with direction and class id — is **generated** from
+The full per-interface catalog — 860 entries across 16 enums, with direction and class id — is **generated** from
 `Opcodes.cs`, not written here: [`gen/opcodes.md`](gen/opcodes.md).
 
-> A named opcode is **not** a decoded message. `gen/opcodes.md` enumerates every opcode (V1); whether its body is
+> A named method is **not** a decoded message. `gen/opcodes.md` enumerates every method (V1); whether its body is
 > understood is a separate question answered by [`gen/coverage.md`](gen/coverage.md).
 
 ### The one exception
 
 PlayerAgent/PlayerInterface registers its methods with a 32-bit HASH rather than a small index, so the same varint
-field carries a 4–5 group value and the `0x2000 + index` reading has nothing to hold on to. Nothing else about the
+field carries a 4–5 group value and the wire rendering above collapses 32 bits into 7. Nothing else about the
 header differs.
 
 ⚠️ **The 16-bit "opcode" is not a method key on this interface** — but not because it is per-connection, which is
@@ -173,8 +185,8 @@ the opcode we called `CreateCharacter` is `CreateCharacterWithData`. See
 ## Multiplexing
 
 One GameServer TCP connection carries roughly four RPC class-pairs at once (e.g. GameCharAgent ↔
-GameCharInterface, plus project/tradepost variants). A packet is routed by the pair `(receiver class id, opcode)`,
-never by the connection. This is why the same opcode number means different things on different class ids, and why
+GameCharInterface, plus project/tradepost variants). A packet is routed by the pair `(receiver class id, method)`,
+never by the connection. This is why the same method index means different things on different class ids, and why
 cross-listener actions go through dispatcher seams rather than direct references. [V1: tools/ghidra/DumpDispatch.java]
 
 Direction convention: `*Agent` classes receive client→server calls; `*Interface` classes receive server→client
@@ -184,9 +196,9 @@ dispatches.
 
 The client logs its proxy method **signatures** — name, parameter names and C++ types — and those strings are
 recovered in [`../re/aoc-client-rpc-methods.json`](../re/aoc-client-rpc-methods.json) (376 client→server methods
-across 14 interfaces). Combined with the `wire = 0x2000 + index` mapping above, that turns a client→server body
-from "some u32s" into a typed record: look the opcode's index up in the interface's method list, and the params
-are the fields in wire order. The C++ types map onto the encodings in [`04-encoding.md`](04-encoding.md):
+across 14 interfaces). Combined with the method-is-the-registration-index mapping above, that turns a client→server
+body from "some u32s" into a typed record: look the method up by index in the interface's method list, and the
+params are the fields in wire order. The C++ types map onto the encodings in [`04-encoding.md`](04-encoding.md):
 
 | C++ in the signature | on the wire |
 |---|---|

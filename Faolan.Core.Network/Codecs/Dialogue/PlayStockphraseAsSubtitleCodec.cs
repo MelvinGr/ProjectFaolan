@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// parse" with no detail.
 	public static class PlayStockphraseAsSubtitleCodec
 	{
-		public const ushort Opcode = (ushort)GameCharAgentOpcodes.PlayStockphraseAsSubtitle;
+		public const uint Method = (uint)GameCharAgentMethods.PlayStockphraseAsSubtitle;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(PlayStockphraseAsSubtitle value)

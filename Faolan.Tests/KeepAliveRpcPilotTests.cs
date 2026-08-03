@@ -27,7 +27,7 @@ namespace Faolan.Tests
 
 			// Stimulus: an inbound LatencyCheck whose body starts with the counter the reply must echo. Parsed straight
 			// into the Rpc the receive path now dispatches on (Gitea #407).
-			var incoming = Rpc.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance, (ushort)GameCharInterfaceOpcodes.DispatchPong,
+			var incoming = Rpc.Parse(BuildFrame(Endpoints.GameCharAgentType, 0x08, Endpoints.GameCharInterfaceType, Instance, (ushort)GameCharInterfaceMethods.DispatchPong,
 				[0x00, 0x00, 0x00, 0x07]));
 
 			await KeepAliveService.HandleLatencyCheck(client, incoming, incoming.BodyReader());
@@ -39,10 +39,9 @@ namespace Faolan.Tests
 			Assert.Equal(Endpoints.GameCharAgentType, pong.Sender.Type);
 			Assert.Equal(Endpoints.GameCharInterfaceType, pong.Receiver.Type);
 			Assert.Equal(Instance, pong.Receiver.Instance);
-			Assert.Equal((ushort)GameCharInterfaceOpcodes.DispatchPong, pong.Opcode);
 			// The method is 0x82 = 130, so its varint needs a second group - the byte that used to be hand-passed as a
 			// "headerData" tail and is now simply part of the method field (#610).
-			Assert.Equal((uint)GameCharInterfaceOpcodes.DispatchPong - 0x2000u, pong.Method);
+			Assert.Equal((uint)GameCharInterfaceMethods.DispatchPong, pong.Method);
 			var body = pong.BodyReader();
 			Assert.Equal(counter, body.ReadUInt32());
 
@@ -83,7 +82,7 @@ namespace Faolan.Tests
 			Assert.Equal(Endpoints.GameAgentType, stats.Sender.Type);
 			Assert.Equal(Endpoints.GameInterfaceType, stats.Receiver.Type);
 			Assert.Equal(Instance, stats.Receiver.Instance);
-			Assert.Equal((ushort)GameInterfaceOpcodes.DispatchGameServerStats, stats.Opcode);
+			Assert.Equal((uint)GameInterfaceMethods.DispatchGameServerStats, stats.Method);
 
 			// The rate the gauge holds, EXACTLY - the handler's contract is "report the measurement", so the assertion
 			// must not restate the arithmetic (a rate asserted against a recomputed expectation would pass on a
@@ -126,9 +125,9 @@ namespace Faolan.Tests
 			metrics.RecordTick(0.001);
 		}
 
-		private static byte[] BuildFrame(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, ushort opcode, byte[] body)
+		private static byte[] BuildFrame(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, uint method, byte[] body)
 		{
-			return new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, body).Serialize();
+			return new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), method, (ReadOnlyMemory<byte>)body).Serialize();
 		}
 
 		private static CapturingClient ClientAt(uint characterId)

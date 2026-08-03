@@ -6,7 +6,6 @@ using System.IO;
 using System.Text.Json;
 using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
-using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Captures
 {

@@ -20,7 +20,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// The value used to be a self-serializing `ICodec<ShopContent>` (#530 wave 7 retired the interface here).
 	public static class ShopContentCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchShopData;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchShopData;
 
 		public const uint ShopEntryFlags = 0x200000;
 

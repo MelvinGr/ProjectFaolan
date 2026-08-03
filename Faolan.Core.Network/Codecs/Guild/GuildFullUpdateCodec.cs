@@ -22,7 +22,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// Moved in from `GuildService.SendGuildFullUpdate` in #530 wave 7 - the service kept the fan-out and the send.
 	public static class GuildFullUpdateCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchGuildUpdate;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildUpdate;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(GuildFullUpdate value)

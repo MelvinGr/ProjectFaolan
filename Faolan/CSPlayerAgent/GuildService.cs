@@ -113,7 +113,7 @@ namespace Faolan.CSPlayerAgent
 			{
 				// [charId][guild ID32][03][02][charId][01] - the constants are not decoded (likely rank/flags);
 				// taken verbatim from the capture (Dahviie, same-guild reply).
-				await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateMember,
+				await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildUpdateMember,
 					b => b.WriteUInt32(targetId).WriteUInt32(EntityClass.Guild).WriteUInt32(targetGuildId).WriteByte(0x03).WriteByte(0x02).WriteUInt32(targetId).WriteByte(0x01)));
 				return;
 			}
@@ -125,7 +125,7 @@ namespace Faolan.CSPlayerAgent
 			// [charId][guild ID32][03][guildId][02][05][name][u32 0x3F1 = an EMPTY list][u32 0][u32 0] - verbatim from
 			// the capture ("The Undreamed" reply); 0x3F1 also appears in the Authenticate 0x20D0 trailer, so it
 			// is a server-wide constant rather than guild data.
-			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildUpdateOther,
+			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildUpdateOther,
 				b => b
 					.WriteUInt32(targetId)
 					.WriteUInt32(EntityClass.Guild)
@@ -160,7 +160,7 @@ namespace Faolan.CSPlayerAgent
 				return;
 			}
 
-			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchGuildName,
+			await client.SendAsync(new Rpc(ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildName,
 				GuildNameCodec.Build(new GuildName(guildId, guild.Name))));
 		}
 
@@ -354,14 +354,14 @@ namespace Faolan.CSPlayerAgent
 			var roster = guild.Members.Where(m => m.Name != null).Select(MemberRecord).ToList();
 			var body = GuildFullUpdateCodec.Build(new GuildFullUpdate(GuildHeaders.ForFullUpdate(guild), MemberRecord(self), roster));
 
-			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildUpdate, body));
+			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceMethods.DispatchGuildUpdate, body));
 		}
 
 		// 0x202F member joined. Retail fans this out to every online guild member (including the joiner, right after
 		// its 0x203F).
 		private Task SendGuildMemberJoined(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Character member)
 		{
-			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMemberJoined, GuildMemberJoinedCodec.Build(MemberRecord(member))));
+			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceMethods.DispatchGuildMemberJoined, GuildMemberJoinedCodec.Build(MemberRecord(member))));
 		}
 
 		// A stored member as a roster record, with the live-session fields (online / playfield / last-seen) resolved
@@ -396,14 +396,14 @@ namespace Faolan.CSPlayerAgent
 		{
 			var body = GuildCreatedCodec.Build(new GuildCreated(GuildMemberRecords.FromCharacter(creator, true, creator.MapId, 0), GuildHeaders.ForGuildCreate(guild, form)));
 
-			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildCreated, body));
+			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceMethods.DispatchGuildCreated, body));
 		}
 
 		private static Task SendGuildInvite(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Guild guild, uint inviteeId, string inviterName)
 		{
 			var body = GuildInviteCodec.Build(new GuildInvite(guild.Id, guild.Name, inviteeId, inviterName));
 
-			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildInvite, body));
+			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceMethods.DispatchGuildInvite, body));
 		}
 
 		// 0x2057 DispatchGuildMessageOfTheDayChanged(i_cMessageOfTheDay): retail's TARGETED MOTD-change push - updates
@@ -412,7 +412,7 @@ namespace Faolan.CSPlayerAgent
 		// guild strings (docs/re/aoc-client-rpc-methods.json). Validate in-client.
 		private static async Task SendGuildMessageOfTheDayChanged(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, string motd)
 		{
-			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceOpcodes.DispatchGuildMessageOfTheDayChanged, b => b.WriteString(motd)));
+			await client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceMethods.DispatchGuildMessageOfTheDayChanged, b => b.WriteString(motd)));
 		}
 
 		// A guild invite offered to a character, awaiting AcceptGuildInvitation/DeclineGuildInvitation. Keyed by

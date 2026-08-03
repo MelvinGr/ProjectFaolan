@@ -31,7 +31,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// the correct prefix and a single end-of-body 0x00 lands exactly where the per-record one goes. They break at 2+.
 	public static class ValidResurrectionSpotsCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchValidResurrectionSpots;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchValidResurrectionSpots;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(ValidResurrectionSpots value)

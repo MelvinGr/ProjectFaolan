@@ -15,19 +15,19 @@ namespace Faolan.UniverseAgent
 	public partial class UniverseAgentListener : RpcServer
 	{
 		public UniverseAgentListener(ILogger<UniverseAgentListener> logger, IConfiguration configuration, IDatabaseRepository database) : base(configuration.UniverseAgentPort, logger, configuration,
-			database, new ConanPacketTracer(logger, "UniverseAgent", typeof(UniverseInterfaceOpcodes)))
+			database, new ConanPacketTracer(logger, "UniverseAgent", typeof(UniverseInterfaceMethods)))
 		{
 		}
 
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
-			var opcode = (UniverseAgentOpcodes)packet.Opcode;
+			var method = (UniverseAgentMethods)packet.Method;
 			LogPacketReceived(packet);
 
 			var body = packet.BodyReader();
-			switch (opcode)
+			switch (method)
 			{
-				case UniverseAgentOpcodes.InitiateAuthentication:
+				case UniverseAgentMethods.InitiateAuthentication:
 				{
 					// UniverseAgent.InitiateAuthentication(const std::string& username, const uint32 nGameID) - the
 					// client's own signature (docs/re/aoc-client-rpc-methods.json). nGameID is the product/title id
@@ -59,7 +59,7 @@ namespace Faolan.UniverseAgent
 					break;
 				}
 
-				case UniverseAgentOpcodes.AnswerChallenge:
+				case UniverseAgentMethods.AnswerChallenge:
 				{
 					var loginKey = body.ReadString();
 					var account = client.Session.Account;

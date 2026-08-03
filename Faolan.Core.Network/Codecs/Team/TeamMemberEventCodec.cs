@@ -7,14 +7,14 @@ namespace Faolan.Core.Network.Codecs.Team
 {
 	// s2c DispatchTeamJoin (0x2013) / DispatchTeamLeave (0x2012) / DispatchSetNewTeamLeader (0x2016): which team, and
 	// the member it happened to. [u32 0xDEA9][u32 teamId][TeamMemberRecord]. All three share one layout - the OPCODE
-	// carries the verb, which is why this declares HandledOpcodes rather than picking one of the three.
+	// carries the verb, which is why this declares HandledMethods rather than picking one of the three.
 	//
 	// Team instances are minted sequentially by the CS tier - the capture's three groupings are 0x0051DD9A,
 	// 0x0051DD9B, 0x0051DD9C.
 	public static class TeamMemberEventCodec
 	{
-		public static readonly CSPlayerInterfaceOpcodes[] HandledOpcodes =
-			[CSPlayerInterfaceOpcodes.DispatchTeamJoin, CSPlayerInterfaceOpcodes.DispatchTeamLeave, CSPlayerInterfaceOpcodes.DispatchSetNewTeamLeader];
+		public static readonly CSPlayerInterfaceMethods[] HandledMethods =
+			[CSPlayerInterfaceMethods.DispatchTeamJoin, CSPlayerInterfaceMethods.DispatchTeamLeave, CSPlayerInterfaceMethods.DispatchSetNewTeamLeader];
 
 		public static byte[] Build(TeamMemberEvent value)
 		{

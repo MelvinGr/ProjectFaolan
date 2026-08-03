@@ -548,7 +548,7 @@ namespace Faolan.GameServer.Dialogue
 		private static Task SendConstructedKnubot(INetworkClient client, uint senderInstance, uint liveInstance, byte[] record)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, senderInstance), Endpoints.Endpoint(Endpoints.GameInterfaceType, liveInstance),
-				GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
+				GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 		}
 
 		// Constructs the dialogue camera (DispatchSetDialogueCamera 0x2015) from the structured columns (#188):
@@ -557,7 +557,7 @@ namespace Faolan.GameServer.Dialogue
 		internal static Rpc BuildDialogueCameraPacket(uint agentInstance, uint liveInstance, uint npcHandle, CameraArgs camera)
 		{
 			return new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, agentInstance), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, liveInstance),
-				SetDialogueCameraCodec.Opcode, SetDialogueCameraCodec.Build(npcHandle, liveInstance, camera));
+				SetDialogueCameraCodec.Method, SetDialogueCameraCodec.Build(npcHandle, liveInstance, camera));
 		}
 
 		private static Task SendDialogueCamera(INetworkClient client, uint agentInstance, uint liveInstance, uint npcHandle, CameraArgs camera)

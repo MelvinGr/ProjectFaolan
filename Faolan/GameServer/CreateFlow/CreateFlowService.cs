@@ -372,11 +372,11 @@ namespace Faolan.GameServer.CreateFlow
 
 			// (a) The create-world handshake - the three records the verbatim scene burst opened with (the shared
 			// Hello handshake at GameServerListener is skipped for isCreateWorldEntry, so send it here).
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchReportDimesionID,
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceMethods.DispatchReportDimesionID,
 				(byte[])[0x00, 0x01, 0x31]));
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchReportServerID,
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceMethods.DispatchReportServerID,
 				(byte[])[0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x03]));
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchAckAuthenticate,
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceMethods.DispatchAckAuthenticate,
 				(byte[])[0x00, 0x00, 0x00, 0x01]));
 
 			// (b) The live-char world (constructed; same path existing-char logins use). The intro cutscene does NOT
@@ -410,7 +410,7 @@ namespace Faolan.GameServer.CreateFlow
 					f6Field1: 4617355, f6Field2: 7004418));
 			await SendScry(client, ScryScriptCodec.Build(id, 385910));
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceProjectType, id),
-				GameInterfaceOpcodes.DispatchPassBlob, (byte[])[0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x00]));
+				GameInterfaceMethods.DispatchPassBlob, (byte[])[0x00, 0x00, 0xC3, 0x50, 0x00, 0x01, 0x7E, 0x03, 0x00, 0x00, 0x00, 0x00]));
 		}
 
 		private async Task<NameCommitResult> CommitCharacterName(INetworkClient client, string? name)
@@ -974,7 +974,7 @@ namespace Faolan.GameServer.CreateFlow
 				0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x03, 0xF1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xF1
 			]));
 
-			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob,
+			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceMethods.DispatchPassBlob,
 				b => b
 					.WriteArray(0x00, 0x00, 0x1F, 0x8E, 0x73, 0x7A, 0x6D, 0xF9, 0x00, 0x00, 0xC3, 0x50)
 					.WriteUInt32(id)
@@ -1138,7 +1138,7 @@ namespace Faolan.GameServer.CreateFlow
 		{
 			var id = client.Session.Account.ClientInstance;
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x59), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id),
-				GameCharInterfaceOpcodes.DispatchValidResurrectionSpots,
+				GameCharInterfaceMethods.DispatchValidResurrectionSpots,
 				(byte[])
 				[
 					0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD, 0x00, 0x00, 0x07, 0xE2, 0x43, 0xA7, 0x40, 0x00, 0x43, 0x14, 0x66, 0x66, 0x44, 0x25, 0x4C, 0xCD, 0x00, 0x00,
@@ -1264,7 +1264,7 @@ namespace Faolan.GameServer.CreateFlow
 		// re-prepend it.
 		private static Task SendCreateEditor2000Record(INetworkClient client, byte[] record)
 		{
-			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
+			return client.SendAsync(new Rpc(MorphAckSender, Receiver(client), GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 		}
 
 		// Emits a GameActionListIIR (0xF508F4C1) carrier for `dynel`, delivered to frame `id`. The fixed record
@@ -1272,7 +1272,7 @@ namespace Faolan.GameServer.CreateFlow
 		// the still-opaque property-map action tail rides verbatim; the carrier length is computed from the body.
 		private static Task SendGameActionListRecord(INetworkClient client, byte agentSub, uint id, uint dynel, byte[] actionTail)
 		{
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, agentSub), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob,
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, agentSub), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(GameActionListCodec.Build(new GameActionListIIR(id, dynel, 0u, actionTail)))));
 		}
 
@@ -1281,7 +1281,7 @@ namespace Faolan.GameServer.CreateFlow
 		// burst funnels its records through here instead of re-spelling the PacketStream chain.
 		private static Task SendIirRecord(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, byte[] record)
 		{
-			return client.SendAsync(new Rpc(sender, receiver, GameInterfaceOpcodes.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
+			return client.SendAsync(new Rpc(sender, receiver, GameInterfaceMethods.DispatchPassBlob, s => s.WriteArrayUInt32Length(record)));
 		}
 
 		// Sends the SetMorphValueIIR ack for one SetMorphValue (SetMorphValueCodec owns the layout).
@@ -1348,7 +1348,7 @@ namespace Faolan.GameServer.CreateFlow
 		private static Task SendScry(INetworkClient client, byte[] scry)
 		{
 			var id = client.Session.Account.ClientInstance;
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceOpcodes.DispatchPassBlob,
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, id), GameInterfaceMethods.DispatchPassBlob,
 				s => s.WriteArrayUInt32Length(scry)));
 		}
 

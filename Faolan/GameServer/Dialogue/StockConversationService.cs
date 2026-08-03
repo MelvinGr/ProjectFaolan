@@ -58,7 +58,7 @@ namespace Faolan.GameServer.Dialogue
 
 			var id = client.Session.Character.Id;
 			await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id),
-				GameCharInterfaceOpcodes.DispatchReceivedStockPhraseText, ReceivedStockPhraseTextCodec.Build(new ReceivedStockPhraseText(threadContext, RemoteFormatScreenCodec.Build(RemoteFormatScreens.ForStockPhrase(phrase))))));
+				GameCharInterfaceMethods.DispatchReceivedStockPhraseText, ReceivedStockPhraseTextCodec.Build(new ReceivedStockPhraseText(threadContext, RemoteFormatScreenCodec.Build(RemoteFormatScreens.ForStockPhrase(phrase))))));
 
 			_logger.LogInformation("PlayStockphraseAsSubtitle: answered {Key} (tc=0x{Tc:X8}) for client {Id} (#234 cutscene speech)", stockKey, threadContext, id);
 		}

@@ -297,7 +297,7 @@ namespace Faolan.Importer.Extractors
 					active = false;
 					screen = [];
 				}
-				else if (p.IsDownload && active && (p.Opcode == SetDialogueCameraCodec.Opcode || (p.IsIirCarrier && ResponseSubOpcodes.Contains(p.SubOpcode))))
+				else if (p.IsDownload && active && (p.WireOpcode == CapturedPacket.Wire(GameCharInterfaceMethods.DispatchSetDialogueCamera) || (p.IsIirCarrier && ResponseSubOpcodes.Contains(p.SubOpcode))))
 				{
 					screen.Add(p.Bytes);
 					if (serverInitiated && serverNpcTemplate == 0)

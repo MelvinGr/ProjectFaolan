@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Xunit;
 

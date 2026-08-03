@@ -4,6 +4,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
+using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {
@@ -31,7 +32,7 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var p in packets)
 			{
-				if (!p.IsDownload || p.Opcode != (uint)GameCharInterfaceProjectOpcodes.DispatchUpdateAggroStatus || p.Bytes.Length < 12)
+				if (!p.IsDownload || p.WireOpcode != CapturedPacket.Wire(GameCharInterfaceProjectMethods.DispatchUpdateAggroStatus) || p.Bytes.Length < 12)
 					continue;
 
 				var headerLen = (int)p.Bytes.ReadU32Be(8);

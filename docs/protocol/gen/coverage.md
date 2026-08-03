@@ -7,7 +7,7 @@
 
 ## Headline
 
-- **809** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
+- **860** RPC methods — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).
 - **80** IIR carrier types: **62 V3** (byte-exact builder), **18 V2** (built, no golden), **0 V1** (no builder found).
 - **67** codec classes, **50** with a byte-exact test.
 - **8** Python dissectors (`tools/capture/decode_*.py`).
@@ -30,7 +30,7 @@ forbids a bare opcode hex literal anywhere in `Codecs/`, so every emitter names 
 `IirTypes.<Type>` member and is attributed here. (Before #317 the scan fell back on a
 `<Name>Iir` identifier regex, and ~9 built types showed a false V1.)
 
-**Limitation (honest):** RPC method opcodes are dispatched inline in the listeners with no explicit
+**Limitation (honest):** RPC methods are dispatched inline in the listeners with no explicit
 opcode→handler map, so their per-body decode status is not auto-correlated here — only their
 existence (V1). The IIR-type rows below ARE code-correlated. The byte-exact-test signal is a
 heuristic (codec class referenced by a test that asserts on bytes); it can over- or under-count at

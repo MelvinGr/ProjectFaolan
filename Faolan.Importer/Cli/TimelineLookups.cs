@@ -12,7 +12,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Importer.Extractors;
+using Faolan.Importer.Captures;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Cli
@@ -113,7 +113,7 @@ namespace Faolan.Importer.Cli
 				Spells = await db.Spells.AsNoTracking().ToDictionaryAsync(s => s.Id, s => s.Name)
 			};
 
-			var abilities = await db.Set<Faolan.Core.Database.Tables.Ability>().AsNoTracking()
+			var abilities = await db.Set<Core.Database.Tables.Ability>().AsNoTracking()
 				.Select(a => new { a.Id, a.Slot, a.Name }).ToListAsync();
 			look.Abilities = abilities.GroupBy(a => a.Id).ToDictionary(g => g.Key, g => g.First().Name);
 			look.AbilityBySlot = abilities.GroupBy(a => a.Slot).ToDictionary(g => g.Key, g => g.First().Name);
@@ -150,18 +150,18 @@ namespace Faolan.Importer.Cli
 		// capture (their "bodies" are the first bytes of an RpcHeader).
 		private static readonly Dictionary<uint, Type> InterfaceByReceiver = new()
 		{
-			[Endpoints.UniverseAgentType] = typeof(UniverseAgentOpcodes),
-			[Endpoints.UniverseInterfaceType] = typeof(UniverseInterfaceOpcodes),
-			[Endpoints.CSPlayerAgentType] = typeof(CSPlayerAgentOpcodes),
-			[Endpoints.CSPlayerInterfaceType] = typeof(CSPlayerInterfaceOpcodes),
-			[Endpoints.GameAgentType] = typeof(GameAgentOpcodes),
-			[Endpoints.GameInterfaceType] = typeof(GameInterfaceOpcodes),
-			[Endpoints.GameCharAgentType] = typeof(GameCharAgentOpcodes),
-			[Endpoints.GameCharInterfaceType] = typeof(GameCharInterfaceOpcodes),
-			[Endpoints.GameCharAgentProjectType] = typeof(GameCharAgentProjectOpcodes),
-			[Endpoints.GameCharInterfaceProjectType] = typeof(GameCharInterfaceProjectOpcodes),
-			[Endpoints.TradepostAgentType] = typeof(TradepostAgentOpcodes),
-			[Endpoints.TradepostInterfaceType] = typeof(TradepostInterfaceOpcodes)
+			[Endpoints.UniverseAgentType] = typeof(UniverseAgentMethods),
+			[Endpoints.UniverseInterfaceType] = typeof(UniverseInterfaceMethods),
+			[Endpoints.CSPlayerAgentType] = typeof(CSPlayerAgentMethods),
+			[Endpoints.CSPlayerInterfaceType] = typeof(CSPlayerInterfaceMethods),
+			[Endpoints.GameAgentType] = typeof(GameAgentMethods),
+			[Endpoints.GameInterfaceType] = typeof(GameInterfaceMethods),
+			[Endpoints.GameCharAgentType] = typeof(GameCharAgentMethods),
+			[Endpoints.GameCharInterfaceType] = typeof(GameCharInterfaceMethods),
+			[Endpoints.GameCharAgentProjectType] = typeof(GameCharAgentProjectMethods),
+			[Endpoints.GameCharInterfaceProjectType] = typeof(GameCharInterfaceProjectMethods),
+			[Endpoints.TradepostAgentType] = typeof(TradepostAgentMethods),
+			[Endpoints.TradepostInterfaceType] = typeof(TradepostInterfaceMethods)
 		};
 
 		// The message's name. An IIR names itself through IirTypes; an RPC method is named by its INTERFACE, and the
@@ -199,7 +199,7 @@ namespace Faolan.Importer.Cli
 			}
 			catch (IOException)
 			{
-				return $"0x{packet.Opcode:x4} (unparseable header)";
+				return $"0x{packet.WireOpcode:x4} (unparseable header)";
 			}
 
 			return Enum.GetName(methods, method) ?? $"0x{method:x8}";
@@ -216,9 +216,9 @@ namespace Faolan.Importer.Cli
 			if (MethodsByReceiver.TryGetValue(packet.ReceiverClass, out var methods))
 				return NameOfMethod(packet, methods);
 
-			var opcode = (ushort)packet.Opcode;
+			var opcode = (ushort)packet.WireOpcode;
 			if (InterfaceByReceiver.TryGetValue(packet.ReceiverClass, out var iface))
-				return Enum.GetName(iface, opcode) ?? $"0x{packet.Opcode:x4}";
+				return Enum.GetName(iface, opcode) ?? $"0x{packet.WireOpcode:x4}";
 
 			// ChatServer frames carry NO RpcHeader, so they have no endpoint to key off and the tier is all there is
 			// (TsharkCaptureReader leaves SenderClass/ReceiverClass zero for them). Its two enums do not collide with
@@ -230,7 +230,7 @@ namespace Faolan.Importer.Cli
 					return name;
 			}
 
-			return $"0x{packet.Opcode:x4}";
+			return $"0x{packet.WireOpcode:x4}";
 		}
 
 		// The endpoint-less fallback. Only the chat tier reaches it in the corpus; the other tiers are listed so a
@@ -240,20 +240,20 @@ namespace Faolan.Importer.Cli
 			switch (tier)
 			{
 				case "universe":
-					yield return c2s ? typeof(UniverseAgentOpcodes) : typeof(UniverseInterfaceOpcodes);
+					yield return c2s ? typeof(UniverseAgentMethods) : typeof(UniverseInterfaceMethods);
 					break;
 				// No "playeragent" case: that pair is named from its method constant (MethodsByReceiver), which needs
 				// the frame, and its enums are uint-backed so a bare u16 opcode could not index them anyway (#613).
 				case "cs":
-					yield return c2s ? typeof(CSPlayerAgentOpcodes) : typeof(CSPlayerInterfaceOpcodes);
+					yield return c2s ? typeof(CSPlayerAgentMethods) : typeof(CSPlayerInterfaceMethods);
 					break;
 				case "chat":
 					yield return c2s ? typeof(ChatServerOpcodes) : typeof(ChatServerInterfaceOpcodes);
 					break;
 				default:
-					yield return c2s ? typeof(GameAgentOpcodes) : typeof(GameInterfaceOpcodes);
-					yield return c2s ? typeof(GameCharAgentOpcodes) : typeof(GameCharInterfaceOpcodes);
-					yield return c2s ? typeof(TradepostAgentOpcodes) : typeof(TradepostInterfaceOpcodes);
+					yield return c2s ? typeof(GameAgentMethods) : typeof(GameInterfaceMethods);
+					yield return c2s ? typeof(GameCharAgentMethods) : typeof(GameCharInterfaceMethods);
+					yield return c2s ? typeof(TradepostAgentMethods) : typeof(TradepostInterfaceMethods);
 					break;
 			}
 		}

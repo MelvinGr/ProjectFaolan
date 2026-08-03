@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Team
 	// never raises the invite window, which looks exactly like a wrong body and is not one.
 	public static class ReplyTeamInviteCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchReplyTeamInvite;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchReplyTeamInvite;
 
 		public static byte[] Build(ReplyTeamInvite value)
 		{

@@ -443,9 +443,7 @@ namespace Faolan.GameServer
 				// gate actually dropped was the poll the client fires at the five editor scene characters as soon as
 				// they are streamed (before the name is committed). Retail answers those - 55/55 in
 				// account-stricken998-character-create-no-worldenter, 95/95 in Barbarian-create - so we do too.
-				Endpoints.GameCharAgentProjectType => client.Session.Character != null
-					? HandleGameCharAgentProject(client, packet, body)
-					: Task.CompletedTask,
+				Endpoints.GameCharAgentProjectType => HandleGameCharAgentProject(client, packet, body),
 
 				// GameCharAgent: the 0x2002/0x2003 collision forms (bind/tutorial) PLUS every per-character method
 				// (loot / shop / respawn / shortcut / latency / ...) - the loopback confirmed these all arrive here.

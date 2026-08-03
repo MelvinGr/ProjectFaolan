@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Enums;
@@ -63,7 +62,7 @@ namespace Faolan.Tests
 			// 1. What the client stores, taken from the bytes KeepAliveService actually puts on the wire.
 			var client = new RecordingNetworkClient(Instance);
 			var latencyCheck = Rpc.Parse(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, Instance),
-				(ushort)GameCharInterfaceOpcodes.DispatchPong, (byte[])[0x00, 0x00, 0x00, 0x07]).Serialize());
+				(ushort)GameCharInterfaceMethods.DispatchPong, (byte[])[0x00, 0x00, 0x00, 0x07]).Serialize());
 			await KeepAliveService.HandleLatencyCheck(client, latencyCheck, latencyCheck.BodyReader());
 
 			var pong = Rpc.Parse(client.Sent[^1]).BodyReader();

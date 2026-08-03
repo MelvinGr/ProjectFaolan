@@ -5,7 +5,7 @@ using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Protobuf;
-using Faolan.Importer.Extractors;
+using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
 using Xunit;
 
@@ -113,7 +113,7 @@ namespace Faolan.Tests
 		{
 			var packet = CapturedFixture.Packets("recipe-book-reply.bin").Single();
 			Assert.Equal((uint)IirTypes.TradeskillReplyIIR, packet.Iir);
-			return new CapturedPacket(0, true, (uint)GameInterfaceOpcodes.DispatchPassBlob, packet.Iir, packet.Full);
+			return new CapturedPacket(0, true, CapturedPacket.Wire(GameInterfaceMethods.DispatchPassBlob), packet.Iir, packet.Full);
 		}
 
 		// Mirrors CaptureRecipeImporter.BuildRow + item harvest, in-memory: a Recipe row whose RecipeItems each carry

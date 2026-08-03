@@ -13,7 +13,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// results" / end marker - constant in the capture). We ignore the 0x2043 filter and return the realm's guilds.
 	public static class GuildSearchResultCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchGuildSearchResult;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildSearchResult;
 
 		private const byte Trailer = 0x01;
 

@@ -75,7 +75,8 @@ or per-session.
 
 ### The two unnamed trade replies
 **Tracked: Gitea #101.** [V0: the two unnamed trade replies 0x206B and 0x206D] Both are EMPTY-bodied s2c replies in
-the player-trade flow and both are `Reserved0x…` in our opcode catalog, i.e. the client's string table gave no name.
+the player-trade flow and both are `Reserved0x…` (methods `0x6B` / `0x6D` on GameCharInterface) in our catalog, i.e.
+the client's string table gave no name.
 Their ROLE is unambiguous from the capture — `0x206B` acks your own accept, `0x206D` lands on both sides as the
 trade commits (immediately followed by the `TradeCompletedSuccessfully` overlay) — so the flow is implementable; it
 is the client-side NAMES that are missing, which needs the CsPlayerInterface/GameServer dispatch tables in Ghidra.

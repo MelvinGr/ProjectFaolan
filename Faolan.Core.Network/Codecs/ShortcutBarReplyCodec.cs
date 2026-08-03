@@ -21,7 +21,7 @@ namespace Faolan.Core.Network.Codecs
 	// the bar from those rows so it survives relog.
 	public static class ShortcutBarReplyCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchShortcutBarReply;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchShortcutBarReply;
 
 			// A type-1 record's tail names WHERE the shortcut points: [u32 0][u32 containerKind][u32 ownerCharacterId].
 		// It is not padding - that reading held only because types 2/3/4 leave it zero, and a strict "expect 0" threw

@@ -11,7 +11,6 @@ using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Protobuf;
-using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Importer.Captures
@@ -29,7 +28,10 @@ namespace Faolan.Importer.Captures
 		// ClaimsModule used to keep a hand-copied duplicate with a comment pointing here, which is exactly how the
 		// two drift.
 		internal const string ImportAccountName = "faolan";
-		private const uint CharacterListOpcode = 0x20EF; // PlayerAgent SendCharacterList
+		// PlayerAgent.SendCharacterList. A WIRE opcode, and it has to stay one: PlayerAgent registers its methods by
+		// 32-bit HASH, so the two bytes the dump recorded keep 7 of those 32 bits and there is no method to name it with
+		// (#613). `PlayerAgentMethodIds.ObservedOpcode` is the same view computed from the constant.
+		private const uint CharacterListWireOpcode = 0x20EF;
 		private const uint InventorySnapshotSubOpcode = FullPlayerCharacterCodec.Opcode;
 		private const uint MapChangeSubOpcode = PlayfieldFCodec.Opcode;
 
@@ -112,7 +114,7 @@ namespace Faolan.Importer.Captures
 				var spawns = new List<(string Name, byte[] Body, uint MapId, uint Handle)>();
 				foreach (var p in capture)
 				{
-					if (p is { Opcode: CharacterListOpcode, IsDownload: true })
+					if (p is { WireOpcode: CharacterListWireOpcode, IsDownload: true })
 					{
 						HarvestCharacterList(p.Bytes, charList);
 						continue;

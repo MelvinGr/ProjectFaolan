@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// oracle yet, so they are not built - see #73.)
 	public static class LearnSpellCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchLearnSpell;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchLearnSpell;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(LearnSpell value)

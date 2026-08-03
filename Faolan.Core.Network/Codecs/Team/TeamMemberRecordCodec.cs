@@ -17,11 +17,11 @@ namespace Faolan.Core.Network.Codecs.Team
 	//
 	// It is BOTH a sub-record (every other team message composes it) and, on its own, the whole body of two RPC
 	// methods - DispatchYouInvitedToTeam and DispatchYouGotKickedFromTeam send nothing but the member - which is why
-	// it declares HandledOpcodes rather than a single Opcode.
+	// it declares HandledMethods rather than a single Opcode.
 	public static class TeamMemberRecordCodec
 	{
 		// The two methods whose body is a bare member record.
-		public static readonly CSPlayerInterfaceOpcodes[] HandledOpcodes = [CSPlayerInterfaceOpcodes.DispatchYouInvitedToTeam, CSPlayerInterfaceOpcodes.DispatchYouGotKickedFromTeam];
+		public static readonly CSPlayerInterfaceMethods[] HandledMethods = [CSPlayerInterfaceMethods.DispatchYouInvitedToTeam, CSPlayerInterfaceMethods.DispatchYouGotKickedFromTeam];
 
 		// The constants, in wire order. Named by position deliberately: every captured record agrees on them, so a
 		// name would be a guess. Field7Head is the first THREE bytes of what used to be `Field7 = 0x00000162` - its

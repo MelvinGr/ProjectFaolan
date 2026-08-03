@@ -1279,7 +1279,7 @@ namespace Faolan.Importer.Cli
 		private static void SpawnDiff(IReadOnlyList<NamedCapture> captures, string? filter)
 		{
 			// The client's spawn poll, which ends the login-burst window (NpcSpawnExtractor names it the same way).
-			const uint SpawnPollOpcode = 0x2020;
+			const uint SpawnPollWireOpcode = 0x2020; // a WIRE opcode - the poll's interface has never been pinned (#615)
 
 			using var db = OpenDb();
 			var rows = db
@@ -1311,8 +1311,8 @@ namespace Faolan.Importer.Cli
 					}
 
 					// The LOGIN BURST window only, the same gate NpcSpawnExtractor.ExtractLoginBurst imports through
-					// (the client's 0x2020 spawn poll ends it).
-					if (p.Opcode == SpawnPollOpcode)
+					// (the client's spawn poll ends it).
+					if (p.WireOpcode == SpawnPollWireOpcode)
 					{
 						sawPoll = true;
 						continue;
@@ -1459,7 +1459,7 @@ namespace Faolan.Importer.Cli
 		// inflate every field toward 100%. The single-sighting types are counted and reported separately.
 		private static void FieldStability(IReadOnlyList<NamedCapture> captures, string? filter)
 		{
-			const uint SpawnPollOpcode = 0x2020;
+			const uint SpawnPollWireOpcode = 0x2020; // a WIRE opcode - the poll's interface has never been pinned (#615)
 
 			// field name -> npc TEMPLATE -> the distinct values seen for it
 			var fields = new SortedDictionary<string, Dictionary<uint, HashSet<string>>>(StringComparer.Ordinal);
@@ -1491,7 +1491,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					if (p.Opcode == SpawnPollOpcode)
+					if (p.WireOpcode == SpawnPollWireOpcode)
 					{
 						sawPoll = true;
 						continue;
@@ -1651,8 +1651,8 @@ namespace Faolan.Importer.Cli
 				//     not a uniformly-sampled clock. A real clock would be roughly uniform across the range.
 				//
 				// So the test is the FREQUENCY share of the strictly-interior values, never their distinct count.
-				var interior = values.Count(v => float.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var f) && f > 0 && f < 1);
-				var interiorDistinct = distinct.Count(v => float.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var f) && f > 0 && f < 1);
+				var interior = values.Count(v => float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) && f > 0 && f < 1);
+				var interiorDistinct = distinct.Count(v => float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var f) && f > 0 && f < 1);
 				if (interiorDistinct > distinct.Count / 2)
 				{
 					var share = 100.0 * interior / values.Count;
@@ -1715,7 +1715,7 @@ namespace Faolan.Importer.Cli
 						continue;
 				}
 
-				if (message.GetType().GetMethod("ShouldSerialize" + prop.Name, System.Type.EmptyTypes) is { } present
+				if (message.GetType().GetMethod("ShouldSerialize" + prop.Name, Type.EmptyTypes) is { } present
 					&& present.Invoke(message, null) is false)
 				{
 					values.Add((name, "(unset)"));
@@ -1723,7 +1723,7 @@ namespace Faolan.Importer.Cli
 				}
 
 				if (prop.PropertyType.IsPrimitive || prop.PropertyType == typeof(string) || prop.PropertyType.IsEnum)
-					values.Add((name, Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture) ?? ""));
+					values.Add((name, Convert.ToString(v, CultureInfo.InvariantCulture) ?? ""));
 				else if (prop.PropertyType.IsClass && prop.PropertyType != typeof(byte[]))
 					values.AddRange(FieldValues(v, name + ".", depth + 1));
 			}
@@ -1757,7 +1757,7 @@ namespace Faolan.Importer.Cli
 		// invisible to a report that only walks the protobuf.
 		private static void FieldPredictors(IReadOnlyList<NamedCapture> captures, string? target)
 		{
-			const uint SpawnPollOpcode = 0x2020;
+			const uint SpawnPollWireOpcode = 0x2020; // a WIRE opcode - the poll's interface has never been pinned (#615)
 			target = string.IsNullOrWhiteSpace(target) ? "MovementMode" : target.Trim();
 
 			// One row per SIGHTING - deliberately not deduped by placement, unlike the type table in field-stability.
@@ -1784,7 +1784,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					if (p.Opcode == SpawnPollOpcode)
+					if (p.WireOpcode == SpawnPollWireOpcode)
 					{
 						sawPoll = true;
 						continue;
@@ -2466,7 +2466,7 @@ namespace Faolan.Importer.Cli
 			foreach (var c in captures)
 				foreach (var p in c.Packets)
 				{
-					if (p.Opcode != 0x2000u || p.SubOpcode != PlayfieldFCodec.Opcode || p.Bytes.Length < 16)
+					if (!p.IsIirCarrier || p.SubOpcode != PlayfieldFCodec.Opcode || p.Bytes.Length < 16)
 						continue;
 
 					var body = p.Bytes[(12 + (int)p.Bytes.ReadU32Be(8))..];
@@ -2510,10 +2510,10 @@ namespace Faolan.Importer.Cli
 				var subs = new Dictionary<(bool Dl, uint Op, uint Sub), int>();
 				foreach (var p in c.Packets)
 				{
-					ops[(p.IsDownload, p.Opcode)] = ops.GetValueOrDefault((p.IsDownload, p.Opcode)) + 1;
-					subs[(p.IsDownload, p.Opcode, p.SubOpcode)] = subs.GetValueOrDefault((p.IsDownload, p.Opcode, p.SubOpcode)) + 1;
-					opCols.Add((p.Opcode, p.IsDownload));
-					subCols.Add((p.Opcode, p.SubOpcode, p.IsDownload));
+					ops[(p.IsDownload, p.WireOpcode)] = ops.GetValueOrDefault((p.IsDownload, p.WireOpcode)) + 1;
+					subs[(p.IsDownload, p.WireOpcode, p.SubOpcode)] = subs.GetValueOrDefault((p.IsDownload, p.WireOpcode, p.SubOpcode)) + 1;
+					opCols.Add((p.WireOpcode, p.IsDownload));
+					subCols.Add((p.WireOpcode, p.SubOpcode, p.IsDownload));
 				}
 
 				perCapOp[c.Name] = ops;
@@ -2563,7 +2563,7 @@ namespace Faolan.Importer.Cli
 				var counts = new Dictionary<(bool Dl, uint Op, uint Sub), int>();
 				foreach (var p in c.Packets)
 				{
-					var k = (p.IsDownload, p.Opcode, p.SubOpcode);
+					var k = (p.IsDownload, p.WireOpcode, p.SubOpcode);
 					counts[k] = counts.GetValueOrDefault(k) + 1;
 					globalCount[k] = globalCount.GetValueOrDefault(k) + 1;
 					(globalDumps.TryGetValue(k, out var s)
@@ -4371,7 +4371,7 @@ namespace Faolan.Importer.Cli
 				var counts = new Dictionary<(bool Dl, uint Sub), int>();
 				foreach (var p in c.Packets)
 				{
-					if (p.Opcode != op)
+					if (p.WireOpcode != op)
 						continue;
 
 					counts[(p.IsDownload, p.SubOpcode)] = counts.GetValueOrDefault((p.IsDownload, p.SubOpcode)) + 1;

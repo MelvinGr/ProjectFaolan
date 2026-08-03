@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using Faolan.Core.Database.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables

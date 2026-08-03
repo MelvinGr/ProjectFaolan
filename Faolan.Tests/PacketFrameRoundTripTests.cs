@@ -30,9 +30,9 @@ namespace Faolan.Tests
 		// The two keepalive replies from KeepAliveService are the seed cases (GameServerStats, a one-group method;
 		// Pong, whose method needs a second varint group - what used to be read as a 1-byte "headerData"), plus a
 		// 32-bit hashed method and a login handoff, which is the only shape that carries a full_routing_context.
-		[Theory, InlineData(Endpoints.GameAgentType, 0x08u, Endpoints.GameInterfaceType, 0x3BC035ECu, (uint)GameInterfaceOpcodes.DispatchGameServerStats - 0x2000u, 0u,
+		[Theory, InlineData(Endpoints.GameAgentType, 0x08u, Endpoints.GameInterfaceType, 0x3BC035ECu, (uint)GameInterfaceMethods.DispatchGameServerStats, 0u,
 			 "42B32A07000000000000000000000000"),
-		 InlineData(Endpoints.GameCharAgentType, 0x08u, Endpoints.GameCharInterfaceType, 0x3BC035ECu, (uint)GameCharInterfaceOpcodes.DispatchPong - 0x2000u, 0u, "0000000700000012AF50A848"),
+		 InlineData(Endpoints.GameCharAgentType, 0x08u, Endpoints.GameCharInterfaceType, 0x3BC035ECu, (uint)GameCharInterfaceMethods.DispatchPong, 0u, "0000000700000012AF50A848"),
 		 InlineData(Endpoints.PlayerAgentType, 0x02u, Endpoints.PlayerInterfaceType, 0x01u, (uint)PlayerInterfaceMethods.AuthenticateAck, 0u, "00000001"),
 		 InlineData(Endpoints.PlayerAgentServiceConnectionType, 0x08u, Endpoints.PlayerInterfaceType, 0x01u, (uint)PlayerInterfaceMethods.LoginConnectReady, Endpoints.PlayerInterfaceType, "DEADBEEF")]
 		public void Frame_Builder_And_Parser_AreMutualInverses(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, uint method, uint routingContextType, string bodyHex)

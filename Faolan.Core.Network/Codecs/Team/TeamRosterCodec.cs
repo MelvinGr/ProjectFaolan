@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Team
 	// constant. The leader's own record comes first in every capture.
 	public static class TeamRosterCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchYouJoinedTeam;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchYouJoinedTeam;
 
 		// The roster's trailing LOOT SETTINGS block, byte-identical in all six captured rosters, and the same shape
 		// the client sends in TeamSetLootOption ([u32][u8][u32]). Carried as captured until a capture varies it.

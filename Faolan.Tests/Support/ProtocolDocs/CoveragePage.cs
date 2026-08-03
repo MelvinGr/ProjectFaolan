@@ -43,7 +43,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 				}
 			}
 
-			var rpcTotal = idx.RpcOpcodeTotal;
+			var rpcTotal = idx.RpcMethodTotal;
 			var dissectors = idx.Dissectors;
 			var codecsWithGolden = idx.CodecsWithGolden;
 			var codecGoldenCount = idx.CodecGolden.Count;
@@ -58,7 +58,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine();
 			sb.AppendLine("## Headline");
 			sb.AppendLine();
-			sb.AppendLine($"- **{rpcTotal}** RPC method opcodes — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).");
+			sb.AppendLine($"- **{rpcTotal}** RPC methods — all **V1** (enumerated + client-verified). See [`opcodes.md`](opcodes.md).");
 			sb.AppendLine($"- **{iirTypes.Count}** IIR carrier types: **{v3} V3** (byte-exact builder), **{v2} V2** (built, no golden), **{v1} V1** (no builder found).");
 			sb.AppendLine($"- **{codecGoldenCount}** codec classes, **{codecsWithGolden}** with a byte-exact test.");
 			sb.AppendLine($"- **{dissectors}** Python dissectors (`tools/capture/decode_*.py`).");
@@ -81,7 +81,7 @@ namespace Faolan.Tests.Support.ProtocolDocs
 			sb.AppendLine("`IirTypes.<Type>` member and is attributed here. (Before #317 the scan fell back on a");
 			sb.AppendLine("`<Name>Iir` identifier regex, and ~9 built types showed a false V1.)");
 			sb.AppendLine();
-			sb.AppendLine("**Limitation (honest):** RPC method opcodes are dispatched inline in the listeners with no explicit");
+			sb.AppendLine("**Limitation (honest):** RPC methods are dispatched inline in the listeners with no explicit");
 			sb.AppendLine("opcode→handler map, so their per-body decode status is not auto-correlated here — only their");
 			sb.AppendLine("existence (V1). The IIR-type rows below ARE code-correlated. The byte-exact-test signal is a");
 			sb.AppendLine("heuristic (codec class referenced by a test that asserts on bytes); it can over- or under-count at");

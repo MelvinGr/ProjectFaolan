@@ -10,7 +10,6 @@ using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -35,12 +34,13 @@ namespace Faolan.Importer.Captures
 
 		// MoveItemToBar / AddShortcut. The client's first one ends the create starting-kit phase (its bar drags
 		// follow the grants); any DispatchLearnSpell after it is in-session leveling, not a starter.
-		private const ushort AddShortcutOpcode = 0x206E;
+		private const uint AddShortcut = (uint)GameCharAgentMethods.AddShortcut;
 
-		// The DispatchLearnSpell (s2c 0x200A) grant: sender = GameCharAgent, receiver = GameCharInterface (the
-		// character), body = [u32 spellId] (#73). The class pair disambiguates the 0x200A opcode collisions on other
-		// conversations (CharacterSearch etc.); the receiver-instance == character-id is the s2c-direction filter.
-		private const ushort LearnSpellOpcode = 0x200A;
+		// The DispatchLearnSpell grant: sender = GameCharAgent, receiver = GameCharInterface (the character),
+		// body = [u32 spellId] (#73). A method is a per-interface INDEX, so the class pair is what disambiguates it
+		// from the methods that share index 0x0A on other conversations (CharacterSearch etc.); the
+		// receiver-instance == character-id is the s2c-direction filter.
+		private const uint LearnSpell = LearnSpellCodec.Method;
 
 		public static async Task<(int Seen, int Inserted)> ImportAsync(IDatabaseContext db, IEnumerable<byte[]> rawPackets, ILogger? logger = null)
 		{
@@ -458,7 +458,7 @@ namespace Faolan.Importer.Captures
 					continue;
 				}
 
-				if (p.Opcode != LearnSpellOpcode)
+				if (p.WireOpcode != CapturedPacket.Wire(GameCharInterfaceMethods.DispatchLearnSpell))
 					continue;
 
 				var ids = new HashSet<uint>();
@@ -480,12 +480,12 @@ namespace Faolan.Importer.Captures
 			}
 		}
 
-		// True if the packet is the client's MoveItemToBar (0x206E) - the create starting-kit boundary.
+		// True if the packet is the client's MoveItemToBar (GameCharAgent.AddShortcut) - the create starting-kit boundary.
 		private static bool IsBarDrag(byte[] packetBytes)
 		{
 			try
 			{
-				return Rpc.Parse(packetBytes).Opcode == AddShortcutOpcode;
+				return Rpc.Parse(packetBytes).Method == AddShortcut;
 			}
 			catch
 			{
@@ -505,14 +505,14 @@ namespace Faolan.Importer.Captures
 				: packet[bodyStart..];
 		}
 
-		// A DispatchLearnSpell grant: opcode 0x200A, GameCharAgent -> GameCharInterface, 4-byte [u32 spellId] body.
+		// A DispatchLearnSpell grant: GameCharAgent -> GameCharInterface, 4-byte [u32 spellId] body.
 		// The c2s direction has the classes swapped, so the sender/receiver class pair selects only the s2c grant.
 		private static void TryReadLearnSpell(byte[] packetBytes, IDictionary<uint, HashSet<uint>> byCharacter)
 		{
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != Endpoints.GameCharAgentType || packet.Receiver.Type != Endpoints.GameCharInterfaceType)
+				if (packet.Method != LearnSpell || packet.Sender.Type != Endpoints.GameCharAgentType || packet.Receiver.Type != Endpoints.GameCharInterfaceType)
 					return;
 
 				var body = packet.BodyReader().ReadRemainingArray();
@@ -539,7 +539,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != LearnSpellOpcode || packet.Sender.Type != Endpoints.GameCharAgentType || packet.Receiver.Type != Endpoints.GameCharInterfaceType)
+				if (packet.Method != LearnSpell || packet.Sender.Type != Endpoints.GameCharAgentType || packet.Receiver.Type != Endpoints.GameCharInterfaceType)
 					return;
 
 				var body = packet.BodyReader().ReadRemainingArray();
@@ -604,7 +604,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+				if (packet.Method != (uint)GameAgentMethods.PassBlob)
 					return false;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
@@ -636,7 +636,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+				if (packet.Method != (uint)GameAgentMethods.PassBlob)
 					return false;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();
@@ -662,7 +662,7 @@ namespace Faolan.Importer.Captures
 			try
 			{
 				var packet = Rpc.Parse(packetBytes);
-				if (packet.Opcode != (ushort)GameAgentOpcodes.PassBlob)
+				if (packet.Method != (uint)GameAgentMethods.PassBlob)
 					return;
 
 				var inner = packet.BodyReader().ReadArrayUInt32Length();

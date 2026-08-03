@@ -12,7 +12,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	{
 		// Answer 1 = the confirm button; every captured answer is 1.
 		public const uint Confirm = 1;
-		public const ushort Opcode = (ushort)GameCharAgentOpcodes.ScryMessageBoxAnswer;
+		public const uint Method = (uint)GameCharAgentMethods.ScryMessageBoxAnswer;
 
 		public static byte[] Build(ScryMessageBoxAnswer value)
 		{

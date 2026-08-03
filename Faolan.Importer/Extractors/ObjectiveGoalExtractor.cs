@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Faolan.Core.Network.Codecs.Quest;
+using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {

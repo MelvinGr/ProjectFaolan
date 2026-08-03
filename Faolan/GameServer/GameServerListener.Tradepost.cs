@@ -195,7 +195,7 @@ namespace Faolan.GameServer
 
 		// The mailbox ops (GetAllMails / GetMailByID / GetItemData preview / GetMailItem take / MarkMailRead /
 		// DeleteMail). All address the buyer's own mail by the wire MailId; GetMailItem grants the escrowed item.
-		private async Task HandleTradepostMailOp(INetworkClient client, Rpc packet, FaolanStream body, TradepostAgentOpcodes method)
+		private async Task HandleTradepostMailOp(INetworkClient client, Rpc packet, FaolanStream body, TradepostAgentMethods method)
 		{
 			var character = client.Session.Character;
 
@@ -203,7 +203,7 @@ namespace Faolan.GameServer
 
 			switch (method)
 			{
-				case TradepostAgentOpcodes.GetAllMails:
+				case TradepostAgentMethods.GetAllMails:
 				{
 					var mails = await Database.GetMailsForRecipient(character.Name!, character.RealmId);
 					foreach (var m in mails)
@@ -213,7 +213,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case TradepostAgentOpcodes.GetMailByID:
+				case TradepostAgentMethods.GetMailByID:
 				{
 					var mail = await Database.GetMailByWireId(body.ReadUInt64());
 					if (mail != null)
@@ -221,7 +221,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case TradepostAgentOpcodes.GetItemData:
+				case TradepostAgentMethods.GetItemData:
 				{
 					// Preview: the mail WITH its attachment (the client shows the item in the mail; nothing is granted).
 					var mail = await Database.GetMailByWireId(body.ReadUInt64());
@@ -230,7 +230,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case TradepostAgentOpcodes.GetMailItem:
+				case TradepostAgentMethods.GetMailItem:
 				{
 					var mailId = body.ReadUInt64();
 					var itemInstanceId = body.ReadUInt64();
@@ -238,7 +238,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case TradepostAgentOpcodes.MarkMailRead:
+				case TradepostAgentMethods.MarkMailRead:
 				{
 					var mailId = body.ReadUInt64();
 					await Database.SetMailRead(mailId, true);
@@ -246,7 +246,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case TradepostAgentOpcodes.DeleteMail:
+				case TradepostAgentMethods.DeleteMail:
 				{
 					var mailId = body.ReadUInt64();
 					await Database.DeleteMail(mailId);
@@ -261,10 +261,10 @@ namespace Faolan.GameServer
 		// TradepostResponses. Grammar in docs/subsystems/tradepost-protocol.md.
 		private async Task HandleTradepostPacket(INetworkClient client, Rpc packet, FaolanStream body)
 		{
-			var opcode = (TradepostAgentOpcodes)packet.Opcode;
-			switch (opcode)
+			var method = (TradepostAgentMethods)packet.Method;
+			switch (method)
 			{
-				case TradepostAgentOpcodes.UpdateItemTimeouts:
+				case TradepostAgentMethods.UpdateItemTimeouts:
 				{
 					// Sent (empty body) AFTER the client received DispatchOpenTradepost (auctioneer / .ah) - the
 					// observed "window opened" signal; nothing to send back, just log.
@@ -272,7 +272,7 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case TradepostAgentOpcodes.ItemSearch:
+				case TradepostAgentMethods.ItemSearch:
 				{
 					var query = TradepostItemSearchCodec.Parse(body.ReadRemainingArray());
 					var listings = await Database.GetTradepostListings(query.ItemId, client.Session.Character.RealmId); // #324: realm-local market
@@ -284,59 +284,59 @@ namespace Faolan.GameServer
 					break;
 				}
 
-				case TradepostAgentOpcodes.BuyItem:
+				case TradepostAgentMethods.BuyItem:
 				{
 					// BUY -> debit the buyer + deliver the item via a system mail.
 					await HandleTradepostBuy(client, packet, body);
 					break;
 				}
 
-				case TradepostAgentOpcodes.TradepostSellItem:
+				case TradepostAgentMethods.TradepostSellItem:
 				{
 					// SELL -> list a bank item for sale (creates a listing + escrows the item out of the bank).
 					await HandleTradepostSell(client, packet, body);
 					break;
 				}
 
-				case TradepostAgentOpcodes.TradepostChangeItemPrice:
+				case TradepostAgentMethods.TradepostChangeItemPrice:
 				{
 					await HandleTradepostChangePrice(client, packet, body);
 					break;
 				}
 
-				case TradepostAgentOpcodes.TradepostCancelSellItem:
+				case TradepostAgentMethods.TradepostCancelSellItem:
 				{
 					await HandleTradepostCancelSell(client, packet, body);
 					break;
 				}
 
-				case TradepostAgentOpcodes.SendMail:
+				case TradepostAgentMethods.SendMail:
 				{
 					await HandleTradepostSendMail(client, packet, body);
 					break;
 				}
 
-				case TradepostAgentOpcodes.CancelMail:
+				case TradepostAgentMethods.CancelMail:
 				{
 					await HandleTradepostCancelMail(client, packet, body);
 					break;
 				}
 
-				case TradepostAgentOpcodes.Close:
+				case TradepostAgentMethods.Close:
 				{
 					Logger.LogInformation("Tradepost: {Char} closed the auction house.", client.Session.Character.Name);
 					break;
 				}
 
 				// Mailbox retrieval ops: poll / preview / take the bought item / mark-read / delete.
-				case TradepostAgentOpcodes.GetAllMails:
-				case TradepostAgentOpcodes.GetMailByID:
-				case TradepostAgentOpcodes.GetItemData:
-				case TradepostAgentOpcodes.GetMailItem:
-				case TradepostAgentOpcodes.MarkMailRead:
-				case TradepostAgentOpcodes.DeleteMail:
+				case TradepostAgentMethods.GetAllMails:
+				case TradepostAgentMethods.GetMailByID:
+				case TradepostAgentMethods.GetItemData:
+				case TradepostAgentMethods.GetMailItem:
+				case TradepostAgentMethods.MarkMailRead:
+				case TradepostAgentMethods.DeleteMail:
 				{
-					await HandleTradepostMailOp(client, packet, body, opcode);
+					await HandleTradepostMailOp(client, packet, body, method);
 					break;
 				}
 

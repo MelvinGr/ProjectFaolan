@@ -14,7 +14,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// Was `TradepostResponses.BuildAccessPointBody` (#530 wave 7); byte-exact in TradepostResponseTests.
 	public static class OpenTradepostCodec
 	{
-		public const ushort Opcode = (ushort)TradepostInterfaceOpcodes.DispatchOpenTradepost;
+		public const uint Method = (uint)TradepostInterfaceMethods.DispatchOpenTradepost;
 
 		// The radius retail sends with the Tortage auctioneer.
 		public const float AccessRadius = 15.0f;

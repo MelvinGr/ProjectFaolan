@@ -5,7 +5,6 @@ using System.Linq;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Importer.Captures;
-using Faolan.Importer.Extractors;
 
 namespace Faolan.Importer.Cli
 {

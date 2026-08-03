@@ -68,14 +68,16 @@ LISTENERS = [
 # Where a delegated handler body might live.
 SOURCE_ROOTS = ["Faolan", "Faolan.Core", "Faolan.Core.Network"]
 
-ENUM_DECL = re.compile(r"\benum\s+([A-Za-z0-9_]*Opcodes)\b")
+ENUM_DECL = re.compile(r"\benum\s+([A-Za-z0-9_]*Methods)\b")
 ENUM_MEMBER = re.compile(r"^\s*([A-Za-z0-9_]+)\s*=\s*0x([0-9A-Fa-f]+)")
 ENDPOINT_CONST = re.compile(r"public const uint ([A-Za-z0-9_]+)\s*=\s*0x([0-9A-Fa-f]+)")
+# The method field's protobuf tag in the high byte - what a dump records the method as (see WireOpcode.cs).
+WIRE_OPCODE_BASE = 0x2000
 CATALOG_ENTRY = re.compile(r"\[Endpoints\.([A-Za-z0-9_]+)\]\s*=\s*typeof\(([A-Za-z0-9_]+)\)")
 
 METHOD_DEF = re.compile(
     r"^\s*(?:public|private|internal|protected|static|async|sealed|override|\s)*[\w<>,\[\]\?\. ]+\s+([A-Za-z0-9_]+)\s*\(([^)]*)\)\s*$")
-CASE = re.compile(r"case\s+([A-Za-z0-9_]+Opcodes)\.([A-Za-z0-9_]+)\s*:")
+CASE = re.compile(r"case\s+([A-Za-z0-9_]+Methods)\.([A-Za-z0-9_]+)\s*:")
 READ = re.compile(r"\b(?:body|reader|stream|s)\.(Read[A-Za-z0-9]*)\s*[(<]")
 WHOLE_BODY = re.compile(r"\bbody\.(ToArray|GetBuffer|Remaining)\b")
 # Every `name(` on a line that mentions `body`. Deliberately not one-regex-per-call: calls NEST
@@ -154,12 +156,18 @@ def consumed(text, methods, depth=0, seen=None):
 
 
 def opcode_index(sources):
-    """(receiverClass, opcode) -> enum member name, resolved exactly the way the server routes.
+    """(receiverClass, wire opcode) -> enum member name, resolved exactly the way the server routes.
 
     Matching on the METHOD NAME in the dump is wrong twice over: it is whatever `Opcodes.cs` was called when
     the dump was written (several have been renamed since - `EnterWorld` -> `LoginCharacter`,
-    `RequestSmallCharList` -> `GetStartupData`), and the same 16-bit opcode means a DIFFERENT method on every
-    interface. So resolve it the way `ProtocolCatalog` does: receiver class hash -> opcode enum -> member.
+    `RequestSmallCharList` -> `GetStartupData`), and the same method index means a DIFFERENT method on every
+    interface. So resolve it the way `ProtocolCatalog` does: receiver class hash -> method enum -> member.
+
+    Keyed by the WIRE opcode the dump recorded, because that is what the dump has. Since #615 the enum member
+    is the `method_instance` constant itself, so `WIRE_OPCODE_BASE` is added back here - the one place this
+    script crosses the two number spaces. It is exact for every index-registered class (an index <= 0xFF is
+    one varint group, or two whose first group equals it); the hashed PlayerAgent/PlayerInterface pair is not
+    in the c2s corpus this walks.
     """
     types = {name: int(value, 16) for name, value in ENDPOINT_CONST.findall(sources["Faolan.Core.Network/Constants/Endpoints.cs"])}
     enum_by_class = {}
@@ -178,7 +186,7 @@ def opcode_index(sources):
         if member and current:
             members[current].setdefault(int(member.group(2), 16), member.group(1))
 
-    return {(cls, value): (name, enum_name)
+    return {(cls, WIRE_OPCODE_BASE | value): (name, enum_name)
             for cls, enum_name in enum_by_class.items()
             for value, name in members.get(enum_name, {}).items()}
 

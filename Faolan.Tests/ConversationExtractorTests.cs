@@ -3,6 +3,7 @@ using System.Linq;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Protobuf;
+using Faolan.Importer.Captures;
 using Faolan.Importer.Extractors;
 using Xunit;
 

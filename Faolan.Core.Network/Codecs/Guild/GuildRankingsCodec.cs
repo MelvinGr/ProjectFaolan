@@ -29,7 +29,7 @@ namespace Faolan.Core.Network.Codecs.Guild
 	// what makes the client abort the dispatch and drop the CsPlayerAgent connection.
 	public static class GuildRankingsCodec
 	{
-		public const ushort Opcode = (ushort)CSPlayerInterfaceOpcodes.DispatchGuildRankingsUpdate;
+		public const uint Method = (uint)CSPlayerInterfaceMethods.DispatchGuildRankingsUpdate;
 
 		public static byte[] Build(GuildRankings value)
 		{

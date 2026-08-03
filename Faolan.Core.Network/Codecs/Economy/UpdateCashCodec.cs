@@ -10,7 +10,7 @@ namespace Faolan.Core.Network.Codecs.Economy
 	// `UpdateCashBody.WriteUpdateCashBody(FaolanStream, …)` (#530 wave 7).
 	public static class UpdateCashCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchUpdateCash;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchUpdateCash;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(UpdateCash value)

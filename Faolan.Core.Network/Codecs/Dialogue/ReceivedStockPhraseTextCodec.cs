@@ -16,7 +16,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// StockPhrases lookup and the send.
 	public static class ReceivedStockPhraseTextCodec
 	{
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchReceivedStockPhraseText;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchReceivedStockPhraseText;
 
 		// CANONICAL - the only method here that writes bytes.
 		public static byte[] Build(ReceivedStockPhraseText value)

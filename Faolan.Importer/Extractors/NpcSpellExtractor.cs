@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Combat;
+using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
 {

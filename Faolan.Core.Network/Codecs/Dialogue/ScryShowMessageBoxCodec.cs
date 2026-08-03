@@ -38,7 +38,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	{
 		// The client's map-name string category, which is what makes `id` readable as a map id.
 		public const uint MapNameCategory = 520;
-		public const ushort Opcode = (ushort)GameCharInterfaceOpcodes.DispatchScryShowMessageBox;
+		public const uint Method = (uint)GameCharInterfaceMethods.DispatchScryShowMessageBox;
 
 		// How many opaque context words sit between the XML and the thread id.
 		private const int ContextWords = 6;

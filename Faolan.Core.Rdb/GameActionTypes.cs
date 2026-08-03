@@ -147,7 +147,7 @@ namespace Faolan.Core.Rdb
 		///         width. See <c>ItemTemplateStatModifiers.ParseElements</c>.
 		///     </para>
 		/// </summary>
-		public static readonly System.Collections.Generic.HashSet<int> TextKeys = [KeyEventString, KeyEventString2];
+		public static readonly HashSet<int> TextKeys = [KeyEventString, KeyEventString2];
 
 		/// <summary>
 		///     The id space the client asserts on, straight out of the descriptor lookup `FUN_008c3910`:
@@ -177,7 +177,7 @@ namespace Faolan.Core.Rdb
 		///         close; it is data that predates the catalog.
 		///     </para>
 		/// </summary>
-		public static readonly System.Collections.Generic.IReadOnlySet<uint> UnregisteredIds = new System.Collections.Generic.HashSet<uint>
+		public static readonly IReadOnlySet<uint> UnregisteredIds = new HashSet<uint>
 		{
 			53001, 53017, 53039, 53044, 53126, 53127, 53131, 53133, 53142, 53143, 53145, 53146, 53147,
 			53149, 53151, 53156, 53157, 53158, 53161, 53181, 53186, 53216, 53248, 53258, 53279, 53280

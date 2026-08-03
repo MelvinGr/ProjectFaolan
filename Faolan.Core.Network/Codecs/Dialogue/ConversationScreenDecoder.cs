@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Protocol;
 
 namespace Faolan.Core.Network.Codecs.Dialogue
 {
@@ -20,7 +21,7 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 	// with the rest of the importer's reading.
 	//
 	// The non-Knubot packets in a conversation node (~48 of 355 in faolan.db) are NOT dialogue text - they are
-	// DispatchSetDialogueCamera (opcode 0x2015, GameCharAgent 0xA9ECB95D -> GameCharInterface 0x8B87F791): the
+	// DispatchSetDialogueCamera (GameCharAgent 0xA9ECB95D -> GameCharInterface 0x8B87F791): the
 	// cinematic conversation camera. No remoteformat text, so nothing to structure.
 	public static class ConversationScreenDecoder
 	{
@@ -28,7 +29,13 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 		public const uint AppendText = (uint)IirTypes.KnubotAppendTextIIR; // 0x4A3D899A
 		public const uint CloseChatWindow = (uint)IirTypes.KnubotCloseChatWindowIIR; // 0xC4AF39EB
 		public const uint OpenChatWindow = (uint)IirTypes.KnubotOpenChatWindowIIR; // 0x045B0B0F
-		public const uint SetDialogueCamera = SetDialogueCameraCodec.Opcode; // a 16-bit RPC opcode, not an IIR sub
+		public const uint SetDialogueCamera = SetDialogueCameraCodec.Method; // an RPC method, not an IIR sub
+
+		// The same method as the two bytes that END the rpcHeader - the method field's tag 0x20 followed by its
+		// varint, whose whole of a sub-0x80 index is one group. This is the one place the decoder needs that view,
+		// because it scans the frame by offset instead of parsing it; `SetDialogueCamera` above is the method itself,
+		// which is what ConversationPacket.SubOpcode stores (#615).
+		private static readonly ushort SetDialogueCameraWireOpcode = WireOpcode.Of(SetDialogueCameraCodec.Method);
 
 		public static Columns? Decode(byte[] data)
 		{
@@ -71,13 +78,13 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			};
 		}
 
-		// DispatchSetDialogueCamera (opcode 0x2015 in the rpcHeader, not an IIR sub). We store the GameCharAgent
+		// DispatchSetDialogueCamera (a method in the rpcHeader, not an IIR sub). We store the GameCharAgent
 		// sender instance (varies per conversation) + the typed camera args; the npc/player are re-addressed live at
 		// send time.
 		private static Columns? DecodeCamera(byte[] data, int headerLen, int start)
 		{
-			// opcode is the 16-bit word ending the rpcHeader (at headerLen-2 from the header start @ offset 12).
-			if (10 + headerLen + 2 > data.Length || data.ReadU16Be(10 + headerLen) != SetDialogueCamera)
+			// the method's two wire bytes end the rpcHeader (at headerLen-2 from the header start @ offset 12).
+			if (10 + headerLen + 2 > data.Length || data.ReadU16Be(10 + headerLen) != SetDialogueCameraWireOpcode)
 				return null;
 
 			try
