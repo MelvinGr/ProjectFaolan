@@ -7,6 +7,7 @@ using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Guild;
 using Faolan.Core.Network.Codecs.Team;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Logging;
 
@@ -141,10 +142,11 @@ namespace Faolan.CSPlayerAgent
 
 		// 0x2092 DispatchPvPMatchMakingInfoRequestReturn: PvP matchmaking info (answer to 0x2054
 		// PvPMatchMakingRequestInfo). Retail's "not queued" body is [0x3F1][u32 0] (byte-exact from the login capture);
-		// the header carries the same 0x01 extra byte as the capture.
+		// the header's trailing byte is DERIVED (RpcHeaderData): this method's index is 0x92 = 146, and any index
+		// >= 128 carries varint(index >> 7) = 0x01. It is not a per-message constant (#319).
 		private static Task SendPvpMatchMakingInfo(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn, (byte[])[0x01], b => b
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn, RpcHeaderData.ForOpcode(CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn), b => b
 				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed record list
 				.WriteUInt32(0))); // trailer
 		}

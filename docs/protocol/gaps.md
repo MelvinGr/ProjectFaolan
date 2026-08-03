@@ -15,15 +15,6 @@ Every gap below is a tracked Gitea issue (`melvin/projectfaolan`), so it lives o
 
 ## Transport
 
-### RpcHeader trailing headerData — the `0x01` marker's meaning
-**Tracked: Gitea #319.** The grammar is decoded and is simpler than it looked: the field is a protobuf VARINT
-carrying the method id, so the "four per-opcode cases" were three encodings of one thing plus one real exception
-(see [`02-rpc.md`](02-rpc.md)). #320 closed the 3-byte case — `0x94A760` is not a constant, it is
-`SendCharacterSettingsCheckSumMap`'s id. The **only** thing left is the *semantic* of the 1-byte `0x01`, i.e. what
-method id 1 means on the ping/pong (`0x2085`/`0x2082`) and a few CSPlayerInterface dispatches. We emit it correctly
-(`KeepAliveService`); its label needs the client's generic RPC-header parser (Ghidra) — low ROI, on no send path
-that depends on the meaning.
-
 ---
 
 ## RPC

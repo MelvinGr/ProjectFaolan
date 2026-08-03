@@ -21,7 +21,7 @@ All 22 distinct header tails in the corpus are valid varints, including the two 
 
 | bytes | varint value | what |
 |---|---|---|
-| 1 (`0x01`) | 1 | the latency marker on the ping/pong (`0x2085` c2s / `0x2082` `DispatchPong` s2c) and a few CSPlayerInterface dispatches — the vast majority of packets. |
+| 1 (`0x01`) | 1 | **not a marker**: every interface but PlayerAgent/PlayerInterface registers its methods by plain INDEX, so `index >> 7` is 1 for any method numbered 128–255 and 0 (elided) for 0–127. That is the whole of it. |
 | 3 (`0x94A760`) | 1 577 876 | **not a constant**: `PlayerInterface.SendCharacterSettingsCheckSumMap`'s method id. It is three bytes because a varint is as long as its value needs. |
 | 4 | 4.2M – 32.6M | every other PlayerAgent/PlayerInterface method id. |
 | 13 | — | the ONE genuine exception: `OverrideGameTweaks` (`0x1A07`) rides the ServiceConnection endpoint and carries a **protobuf endpoint reference** in place of an id: `0x0D <fixed32 class id 0x7D155738 = PlayerInterface> 0x10 <varint 1> 0x20 <varint per-session instance id>`. |
@@ -29,6 +29,23 @@ All 22 distinct header tails in the corpus are valid varints, including the two 
 That the last byte of a 4-byte id is always small (`0x02`–`0x0F`) is the tell: it is the top bits of a 25-bit varint,
 not the low byte of a 32-bit hash. Reading it as a fixed `u32` is what made three encodings of one field look like
 three unrelated cases.
+
+**So there is ONE rule for all 17 interfaces**, and `RpcHeaderData` / `PlayerAgentMethodIds` are its only
+implementation — no call site hand-rolls a header tail any more:
+
+```
+headerData = varint(registrationConstant >> 7),  omitted when that value is 0
+```
+
+PlayerAgent/PlayerInterface register with a 32-bit hash, so theirs is 3–4 bytes; every other interface registers by
+index, so theirs is one byte (`0x01`, methods 128–255) or nothing at all (methods 0–127). Measured over the whole
+corpus: **402,111 of 402,113** index-registered packets match, the two misses being mis-framed `GameInterface`
+packets at opcodes outside its 16-method range [V3: RpcHeaderDataTests.HeaderData_IsTheMethodIndexHighBits].
+
+Three facts rule out every per-packet reading of `0x01` (a flag, an ack request, a latency bit): it is **always
+exactly `0x01`** across 12,056 sightings and never `0x00` or `0x02`; it is on **100%** of the packets of any method
+that has it (5,917/5,917 pings, 5,689/5,689 pongs), so it belongs to the METHOD; and the lowest opcode carrying it
+is **`0x2080` — index 128 exactly**, the boundary the rule predicts.
 
 ## ProtoEndpoint## ProtoEndpoint
 
