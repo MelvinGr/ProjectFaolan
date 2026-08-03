@@ -61,6 +61,8 @@ static int hf_faolan_pkt_sender_class = -1;
 static int hf_faolan_pkt_sender_instance = -1;
 static int hf_faolan_pkt_receiver_class = -1;
 static int hf_faolan_pkt_receiver_instance = -1;
+static int hf_faolan_pkt_routing_class = -1;
+static int hf_faolan_pkt_routing_instance = -1;
 static int hf_faolan_pkt_opcode = -1;
 static int hf_faolan_pkt_method = -1;
 static int hf_faolan_pkt_iir = -1;
@@ -79,6 +81,7 @@ static gint ett_faolan = -1;
 static gint ett_faolan_pkt = -1;
 static gint ett_faolan_pkt_sender = -1;
 static gint ett_faolan_pkt_receiver = -1;
+static gint ett_faolan_pkt_routing = -1;
 static gint ett_faolan_chat_pkt = -1;
 
 static expert_field ei_faolan_inflate_failed = EI_INIT;
@@ -292,13 +295,57 @@ static uint64_t read_varint(tvbuff_t *tvb, uint32_t offset, uint32_t end, uint32
 
 /* Dissects one serialized ProtoEndpoint header field: [tag 0x0A/0x12][len][0x0D <fixed32 LE
    class>][0x10 <varint instance>]. Returns the bytes consumed (0 on malformed input). */
+/* Which RpcHeader field an endpoint came out of. Three, not two: field 3 (full_routing_context) is also a
+   ProtoEndpoint, and reading it is what stops the four login handoffs being misframed (#618). */
+typedef enum {
+    FAOLAN_EP_SENDER,   /* field 1, caller_id      */
+    FAOLAN_EP_RECEIVER, /* field 2, endpoint_id    */
+    FAOLAN_EP_ROUTING   /* field 3, full_routing_context */
+} faolan_endpoint_role_t;
+
+static int endpoint_ett(faolan_endpoint_role_t role)
+{
+    switch (role) {
+        case FAOLAN_EP_SENDER:  return ett_faolan_pkt_sender;
+        case FAOLAN_EP_ROUTING: return ett_faolan_pkt_routing;
+        default:                return ett_faolan_pkt_receiver;
+    }
+}
+
+static const char *endpoint_label(faolan_endpoint_role_t role)
+{
+    switch (role) {
+        case FAOLAN_EP_SENDER:  return "Sender";
+        case FAOLAN_EP_ROUTING: return "Routing Context";
+        default:                return "Receiver";
+    }
+}
+
+static int endpoint_class_hf(faolan_endpoint_role_t role)
+{
+    switch (role) {
+        case FAOLAN_EP_SENDER:  return hf_faolan_pkt_sender_class;
+        case FAOLAN_EP_ROUTING: return hf_faolan_pkt_routing_class;
+        default:                return hf_faolan_pkt_receiver_class;
+    }
+}
+
+static int endpoint_instance_hf(faolan_endpoint_role_t role)
+{
+    switch (role) {
+        case FAOLAN_EP_SENDER:  return hf_faolan_pkt_sender_instance;
+        case FAOLAN_EP_ROUTING: return hf_faolan_pkt_routing_instance;
+        default:                return hf_faolan_pkt_receiver_instance;
+    }
+}
+
 static uint32_t dissect_proto_endpoint(
     tvbuff_t *tvb,
     packet_info *pinfo,
     proto_tree *tree,
     uint32_t offset,
     uint32_t end,
-    bool is_sender,
+    faolan_endpoint_role_t role,
     uint32_t *class_id)
 {
     *class_id = 0;
@@ -316,9 +363,7 @@ static uint32_t dissect_proto_endpoint(
 
     proto_tree *ep_tree = proto_tree_add_subtree(
         tree, tvb, offset, 2 + field_len,
-        is_sender ? ett_faolan_pkt_sender : ett_faolan_pkt_receiver,
-        NULL,
-        is_sender ? "Sender" : "Receiver");
+        endpoint_ett(role), NULL, endpoint_label(role));
 
     uint32_t pos = offset + 2;
     while (pos < inner_end) {
@@ -326,10 +371,7 @@ static uint32_t dissect_proto_endpoint(
 
         if (tag == 0x0D && pos + 5 <= inner_end) {
             *class_id = tvb_get_letohl(tvb, pos + 1);
-            proto_tree_add_item(
-                ep_tree,
-                is_sender ? hf_faolan_pkt_sender_class : hf_faolan_pkt_receiver_class,
-                tvb, pos + 1, 4, ENC_LITTLE_ENDIAN);
+            proto_tree_add_item(ep_tree, endpoint_class_hf(role), tvb, pos + 1, 4, ENC_LITTLE_ENDIAN);
             pos += 5;
         } else if (tag == 0x10) {
             uint32_t varint_len = 0;
@@ -339,10 +381,7 @@ static uint32_t dissect_proto_endpoint(
                 break;
             }
 
-            proto_tree_add_uint64(
-                ep_tree,
-                is_sender ? hf_faolan_pkt_sender_instance : hf_faolan_pkt_receiver_instance,
-                tvb, pos + 1, varint_len, instance);
+            proto_tree_add_uint64(ep_tree, endpoint_instance_hf(role), tvb, pos + 1, varint_len, instance);
             pos += 1 + varint_len;
         } else {
             break;
@@ -426,25 +465,35 @@ static void dissect_conan_packet(
     uint32_t pos = hdr_len_offset + 4;
     uint32_t sender_class = 0;
     uint32_t receiver_class = 0;
+    uint32_t routing_class = 0;
     bool have_sender = false;
     bool have_receiver = false;
+    bool have_routing = false;
 
-    /* The RpcHeader carries sender_id (protobuf field 1, tag 0x0A) and endpoint_id (field 2, tag 0x12),
-       but the two can appear in EITHER order: client->server requests write sender-then-receiver, while
-       our server->client replies swap the endpoints (WriteHeader(ReceiverBytes, SenderBytes, ...)) so the
-       receiver (0x12) is emitted first. Dispatch each endpoint by its own tag instead of assuming a fixed
-       order - otherwise a receiver-first reply skips the sender (class "None") and reads the opcode from
-       the sender's 0x0A tag+len bytes (the CSPlayerAgent op=0x0a0a misframe, #108). */
+    /* The RpcHeader's endpoint fields, dispatched by TAG rather than by position, because they do not appear
+       in a fixed order: client->server requests write sender-then-receiver, while our server->client replies
+       swap them (WriteHeader(ReceiverBytes, SenderBytes, ...)) so the receiver (0x12) comes first. Assuming an
+       order made a receiver-first reply skip the sender (class "None") and read the opcode out of the sender's
+       0x0A tag+len bytes (the CSPlayerAgent op=0x0a0a misframe, #108).
+
+       Field 3, full_routing_context (tag 0x1A), is a ProtoEndpoint too - the object the method actually fires
+       on when that is not the receiver. Only the four login handoffs carry it (472 frames), and stopping the
+       loop at it is what made all four dissect as "opcode 0x1A07": that is field 3's tag plus its length byte,
+       and the method varint sat behind the endpoint it introduces (#618, the same misreading #609/#610 removed
+       from the server). */
     while (pos < hdr_end) {
         const uint8_t tag = tvb_get_uint8(tvb, pos);
         uint32_t consumed = 0;
 
         if (tag == 0x0A && !have_sender) {
-            consumed = dissect_proto_endpoint(tvb, pinfo, pkt_tree, pos, hdr_end, true, &sender_class);
+            consumed = dissect_proto_endpoint(tvb, pinfo, pkt_tree, pos, hdr_end, FAOLAN_EP_SENDER, &sender_class);
             have_sender = true;
         } else if (tag == 0x12 && !have_receiver) {
-            consumed = dissect_proto_endpoint(tvb, pinfo, pkt_tree, pos, hdr_end, false, &receiver_class);
+            consumed = dissect_proto_endpoint(tvb, pinfo, pkt_tree, pos, hdr_end, FAOLAN_EP_RECEIVER, &receiver_class);
             have_receiver = true;
+        } else if (tag == 0x1A && !have_routing) {
+            consumed = dissect_proto_endpoint(tvb, pinfo, pkt_tree, pos, hdr_end, FAOLAN_EP_ROUTING, &routing_class);
+            have_routing = true;
         } else {
             break;
         }
@@ -465,11 +514,18 @@ static void dissect_conan_packet(
     const uint32_t method_id = method_constant(tvb, opcode, pos + 2, hdr_end);
     proto_item *opcode_item = proto_tree_add_item(pkt_tree, hf_faolan_pkt_opcode, tvb, pos, 2, ENC_BIG_ENDIAN);
 
-    /* Method name resolved by (receiver class, method_instance) - the receiver's method table names
-       the call, since a connection multiplexes several class-pairs and the same constant means
-       different things on each. The WHOLE varint is the key, never the 16-bit opcode: that reading
-       names two methods at once on the hash-registered pair (#613/#615). Unresolved methods stay raw
-       hex. */
+    /* Method name resolved by (receiver class, method_instance) - the receiver's method table names the call,
+       since a connection multiplexes several class-pairs and the same constant means different things on each.
+       The WHOLE varint is the key, never the 16-bit opcode: that reading names two methods at once on the
+       hash-registered pair (#613/#615). Unresolved methods stay raw hex.
+
+       The receiver is the right key on the login handoffs too, and it is worth saying why, because the server
+       needs a hint there and this does not: retail addresses those frames sender=ServiceConnection (0x1D359116)
+       -> receiver=PlayerInterface, so the receiver already names them once the header walk reads past
+       full_routing_context (#618). `ProtocolCatalog.ResolveName` takes a fallback enum for its own synthetic
+       ServiceConnection-addressed case; no captured frame has that shape. Keying on the routing context
+       instead would be identical on all 472 captured frames - it restates PlayerInterface - so it would be an
+       untested branch bought with nothing. */
     const char *method = method_name(receiver_class, method_id);
     if (method != NULL) {
         proto_item_append_text(opcode_item, " (%s)", method);
@@ -605,9 +661,10 @@ static void scan_ascii_host_ports(const uint8_t *data, uint32_t len)
     }
 }
 
-/* Locates the opcode and body of a framed packet blob (mirrors dissect_conan_packet without
-   a tvb). Returns false when the header does not parse. */
-static bool parse_packet_blob(const uint8_t *pkt, uint32_t len, uint16_t *opcode, uint32_t *body_offset)
+/* Locates the body of a framed packet blob and says whether its header carried a
+   full_routing_context (field 3), which is what identifies a login handoff. Mirrors
+   dissect_conan_packet's header walk without a tvb; returns false when the header does not parse. */
+static bool parse_packet_blob(const uint8_t *pkt, uint32_t len, bool *has_routing_context, uint32_t *body_offset)
 {
     if (len < 14) {
         return false;
@@ -620,8 +677,13 @@ static bool parse_packet_blob(const uint8_t *pkt, uint32_t len, uint16_t *opcode
         return false;
     }
 
+    *has_routing_context = false;
+
     uint32_t pos = 12;
-    while (pos + 2 <= hdr_end && (pkt[pos] == 0x0A || pkt[pos] == 0x12)) {
+    while (pos + 2 <= hdr_end && (pkt[pos] == 0x0A || pkt[pos] == 0x12 || pkt[pos] == 0x1A)) {
+        if (pkt[pos] == 0x1A) {
+            *has_routing_context = true;
+        }
         pos += 2 + pkt[pos + 1];
     }
 
@@ -629,7 +691,6 @@ static bool parse_packet_blob(const uint8_t *pkt, uint32_t len, uint16_t *opcode
         return false;
     }
 
-    *opcode = (uint16_t)((pkt[pos] << 8) | pkt[pos + 1]);
     *body_offset = hdr_end;
     return true;
 }
@@ -638,10 +699,15 @@ static void follow_advertised_ports(const uint8_t *pkt, uint32_t len)
 {
     scan_ascii_host_ports(pkt, len);
 
-    uint16_t opcode = 0;
+    /* The binary service handoffs are exactly the frames carrying a full_routing_context - the four
+       login handoffs, which address the ServiceConnection and restate PlayerInterface there. This used
+       to test `opcode == 0x1A07`, which is that field's tag plus its length byte read as an opcode
+       because the walk above stopped at it: the same misreading #609/#610 removed from the server and
+       #618 from the dissector proper. Same frames, named for what distinguishes them. */
+    bool has_routing_context = false;
     uint32_t body_offset = 0;
-    if (parse_packet_blob(pkt, len, &opcode, &body_offset) &&
-        opcode == 0x1A07 &&
+    if (parse_packet_blob(pkt, len, &has_routing_context, &body_offset) &&
+        has_routing_context &&
         body_offset + 6 <= len) {
         /* Binary service handoff: [u32 ip][u16 port BE][account id][...] */
         const uint8_t *body = pkt + body_offset;
@@ -1110,6 +1176,8 @@ void proto_register_faolan_gs_zlib(void)
         {&hf_faolan_pkt_sender_instance, {"Sender Instance", "faolan.pkt.sender_instance", FT_UINT64, BASE_HEX, NULL, 0x0, "RpcHeader caller_id ProtoEndpoint.instance (character/zone id)", HFILL}},
         {&hf_faolan_pkt_receiver_class, {"Receiver Class", "faolan.pkt.receiver_class", FT_UINT32, BASE_HEX, VALS(faolan_class_names), 0x0, "RpcHeader endpoint_id ProtoEndpoint.type (BKDR-31 class-name hash)", HFILL}},
         {&hf_faolan_pkt_receiver_instance, {"Receiver Instance", "faolan.pkt.receiver_instance", FT_UINT64, BASE_HEX, NULL, 0x0, "RpcHeader endpoint_id ProtoEndpoint.instance (character/zone id)", HFILL}},
+        {&hf_faolan_pkt_routing_class, {"Routing Context Class", "faolan.pkt.routing_class", FT_UINT32, BASE_HEX, VALS(faolan_class_names), 0x0, "RpcHeader full_routing_context ProtoEndpoint.type - the object the method fires on when that is not the receiver (the four login handoffs)", HFILL}},
+        {&hf_faolan_pkt_routing_instance, {"Routing Context Instance", "faolan.pkt.routing_instance", FT_UINT64, BASE_HEX, NULL, 0x0, "RpcHeader full_routing_context ProtoEndpoint.instance", HFILL}},
         {&hf_faolan_pkt_opcode, {"Opcode", "faolan.pkt.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "The method field's first two bytes - its tag 0x20 and the varint's first group. A rendering, not an identity: see Method Id", HFILL}},
         {&hf_faolan_pkt_method, {"Method", "faolan.pkt.method", FT_STRING, BASE_NONE, NULL, 0x0, "Method name for (receiver class, method_instance), from the C# Opcodes.cs catalogs", HFILL}},
         {&hf_faolan_pkt_iir, {"IIR Type", "faolan.pkt.iir", FT_UINT32, BASE_HEX, VALS(faolan_iir_names), 0x0, "IIR type id carried in a PassBlob 0x2000 body (BKDR-31 hash of the client IIR class name)", HFILL}},
@@ -1129,6 +1197,7 @@ void proto_register_faolan_gs_zlib(void)
         &ett_faolan_pkt,
         &ett_faolan_pkt_sender,
         &ett_faolan_pkt_receiver,
+        &ett_faolan_pkt_routing,
         &ett_faolan_chat_pkt,
     };
 

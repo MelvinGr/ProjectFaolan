@@ -182,11 +182,15 @@ server sends:
 - The **world conversation** (`0xb171ce13:0x57` → `0x6C67C147:char`) is established by `0x200b` / `0x200c` /
   `0x2001` immediately after the client's `0x2003`, THEN the burst (`5D85BFC7` MapChange → dynels → `FA015807`).
   Our server already replicates this exact sequence.
-- The only novel pre-burst packet, frame 41's **`0x1a07` from class `0x1d359116:0x57`**, is NOT a world-conversation
+- The only novel pre-burst packet, frame 41 from class `0x1d359116:0x57`, is NOT a world-conversation
   registration: its bodies decode to the **multi-agent address handoff** (ASCII `gs013-nj4.ageofconan.com:7028`) +
-  per-char init stats + global game config (`AAPointsPerLevel`, `AlternateAdvancement_*`). Our own opcode enum
-  even labels `0x1A07` as `Send{CsPlayerAgent,ChatServer,GameServer}` — the agent-address advert, which we already
-  perform (the client connects to our agents). So it's a red herring for the remote-resolution gate.
+  per-char init stats + global game config (`AAPointsPerLevel`, `AlternateAdvancement_*`) — the agent-address
+  advert, which we already perform (the client connects to our agents). So it's a red herring for the
+  remote-resolution gate.
+  _(This was written up as "opcode `0x1a07`", which is not an opcode: it is RpcHeader field 3's tag plus its
+  length byte, read as one by a header walk that stopped there. The frame is a login handoff carrying a
+  `full_routing_context`; #609/#610 fixed the server's reading and #618 the dissector's, so both now name the
+  method — see `docs/protocol/02-rpc.md` "Field 3".)_
 
 **So the handshake diff finds NO discrete packet we omit** — corroborating the earlier byte-level loopback
 comparison ("our world-entry handshake is structurally identical to retail's"). Combined with part 6 (retail uses

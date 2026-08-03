@@ -15,20 +15,30 @@ Wireshark without the JSON dump + Python dissector pipeline.
   transitions mid-stream with flag 01.
   _(Note: the C# `ConanMessageFramer` only detects the marker at receive-chunk starts; this
   plugin handles it at any packet boundary.)_
-- **RpcHeader dissection**: sender/receiver `ProtoEndpoint`s (class id resolved to the 14
-  recovered client class names - BKDR-31 hashes, see `docs/re/aoc-opcode-ids.md` - plus the
-  instance), the 16-bit method opcode, trailing header bytes, body. The two
-  endpoints are dispatched by their protobuf tag (sender = field 1 / `0x0A`, receiver =
-  field 2 / `0x12`) in **either order** - server->client replies swap them (receiver-first),
-  so a fixed sender-then-receiver assumption misframed those (the old CSPlayerAgent
-  `op=0x0a0a` bug, #108).
-- **Method names**: the (receiver class, opcode) pair resolves to its recovered method name
-  (`faolan.pkt.method`, e.g. `GameCharAgent TryLootItem`) via tables **generated at build
-  time from the server's curated C# catalogs** (`Faolan.Core/Enums/Opcodes.cs`,
-  `scripts/gen_opcode_names.py`) - the plugin never drifts from what the server calls a
-  method. PlayerAgent/PlayerInterface (32-bit hash dispatch, not `0x2000 + index`) only
-  resolve their behavior-verified subset; everything else falls back to raw hex.
-- **IIR type resolution**: GameAgent/GameInterface `0x2000` (PassBlob) bodies are the IIR
+- **RpcHeader dissection**: the `ProtoEndpoint`s (class id resolved to the 14 recovered client
+  class names - BKDR-31 hashes, see `docs/re/aoc-opcode-ids.md` - plus the instance), the
+  `method_instance` varint, body. Endpoints are dispatched by their protobuf TAG rather than by
+  position, in **any order**, because they do not have a fixed one:
+  - sender = field 1 / `0x0A`, receiver = field 2 / `0x12` - server->client replies swap them
+    (receiver-first), so a fixed sender-then-receiver assumption misframed those (the old
+    CSPlayerAgent `op=0x0a0a` bug, #108);
+  - `full_routing_context` = field 3 / `0x1A` (`faolan.pkt.routing_class`) - the object the method
+    fires on when that is not the receiver. Only the four login handoffs carry it (472 frames in the
+    corpus). Stopping the walk there made all four read as "opcode `0x1A07`" - that field's tag plus
+    its length byte - which is the misreading #609/#610 removed from the server and #618 from here.
+- **Method identity is `method_instance`, not a 16-bit opcode.** `faolan.pkt.method_id` is the whole
+  varint and is what the name tables are keyed by; `faolan.pkt.opcode` is kept as the two bytes a hex
+  dump shows (the tag plus the varint's first group), which is a rendering and not an identity - on
+  the hash-registered pair it keeps 7 of 32 bits and names two methods at once (#613/#615).
+- **Method names**: the (class, `method_instance`) pair resolves to its recovered method name
+  (`faolan.pkt.method`, e.g. `GameCharAgent TryLootItem`) via tables **generated at build time from
+  the server's curated C# catalogs** (`Faolan.Core/Enums/Opcodes.cs`, `scripts/gen_opcode_names.py`) -
+  the plugin never drifts from what the server calls a method. One table shape covers every class,
+  including the hash-registered PlayerAgent/PlayerInterface, since #615 made each enum member the
+  constant itself. The key is the RECEIVER class - including on the login handoffs, which retail
+  addresses `sender=ServiceConnection -> receiver=PlayerInterface`, so they name themselves once the
+  walk reads past field 3. Unresolved methods fall back to raw hex.
+- **IIR type resolution**: GameAgent/GameInterface PassBlob (method 0) bodies are the IIR
   carrier `[u32 len][u32 IIR type id][record]`; the id (BKDR-31 hash of the client IIR
   class name) is dissected as `faolan.pkt.iir` and resolved against the catalog in
   `Opcodes.cs` (`IirTypes`), so COL_INFO reads e.g.
@@ -39,7 +49,8 @@ Wireshark without the JSON dump + Python dissector pipeline.
 - **CRC verification**: the packet crc is a plain CRC-32 (zlib `crc32()`) over everything
   after the 8-byte length+crc prefix; mismatches get expert warnings.
 - **Auto-follow**: service handoffs advertise the next service's address (ASCII `host:port`
-  or the binary `[u32 ip][u16 port]` form in the 0x1A07 handoffs). Advertised ports are
+  or the binary `[u32 ip][u16 port]` form in the login handoffs, found by their
+  `full_routing_context`). Advertised ports are
   registered automatically, so a whole session dissects from just the fixed UniverseAgent
   port (7010, the default binding).
 - **ChatServer chat**: connections that fail Conan validation (first-packet CRC) but walk
