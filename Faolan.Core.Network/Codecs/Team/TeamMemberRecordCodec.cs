@@ -152,10 +152,13 @@ namespace Faolan.Core.Network.Codecs.Team
 		// A member record from a character row. The 9-byte per-character opaque is left at ZERO: it is CS-tier state we
 		// cannot derive (see gaps.md), so we send nothing rather than something invented.
 		//
-		// `mapId` is passed in so the caller can use the member's LIVE playfield: Character.MapId is only written at
-		// save points, so it lags a player who has since changed map. The client shows the playfield in the team window
-		// and treats members in another one differently, so it is worth taking from the live world where there is one.
-		public static TeamMemberRecord FromCharacter(Character character, uint mapId)
+		// `mapId` and `playfieldToken` are passed in so the caller can use the member's LIVE playfield: Character.MapId
+		// is only written at save points, so it lags a player who has since changed map, and the instance TOKEN is not
+		// a column at all - it is minted per playfield instance by the running world (#454). The client shows the
+		// playfield in the team window and treats members in another one differently, so both are worth taking from
+		// the live world where there is one. A null token keeps the captured constant, which is what a member the game
+		// host does not have in a zone has to fall back to.
+		public static TeamMemberRecord FromCharacter(Character character, uint mapId, uint? playfieldToken = null)
 		{
 			return new TeamMemberRecord
 			{
@@ -163,7 +166,8 @@ namespace Faolan.Core.Network.Codecs.Team
 				Name = character.Name ?? "", // a nameless character cannot happen post-create, but the wire needs a string
 				Class = character.Class,
 				Level = character.Level,
-				MapId = mapId
+				MapId = mapId,
+				Playfield = PlayfieldProxy.ForInstance(mapId, playfieldToken ?? CapturedPlayfieldToken)
 			};
 		}
 	}

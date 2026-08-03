@@ -15,7 +15,8 @@ namespace Faolan.Core.Network.Server.GameServer
 	///     A connected character's live world state (the authoritative in-memory view, as opposed to the DB row):
 	///     transform + map, vitals and server-tracked buffs. Null fields mean the world layer doesn't track them.
 	/// </summary>
-	public sealed record CharacterLiveState(uint CharacterId, string Name, uint Handle, uint MapId, float X, float Y, float Z, uint? Health, uint? MaxHealth, IReadOnlyList<string> ActiveBuffs)
+	public sealed record CharacterLiveState(uint CharacterId, string Name, uint Handle, uint MapId, uint PlayfieldToken, float X, float Y, float Z, uint? Health, uint? MaxHealth,
+		IReadOnlyList<string> ActiveBuffs)
 	{
 		public string HandleHex => $"0x{Handle:X8}";
 	}

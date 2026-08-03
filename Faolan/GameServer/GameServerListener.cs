@@ -327,8 +327,8 @@ namespace Faolan.GameServer
 				return null;
 
 			var buffs = entity.ActiveBuffs.Keys.OrderBy(id => id).Select(id => $"0x{id:X8}").ToArray();
-			return new CharacterLiveState(characterId, entity.Name, entity.Handle, entity.MapId, entity.Position.X, entity.Position.Y, entity.Position.Z, entity.Vitals?.Health,
-				entity.Vitals?.MaxHealth, buffs);
+			return new CharacterLiveState(characterId, entity.Name, entity.Handle, entity.MapId, _simulation.World.ZoneForEntity(entity).PlayfieldToken, entity.Position.X,
+				entity.Position.Y, entity.Position.Z, entity.Vitals?.Health, entity.Vitals?.MaxHealth, buffs);
 		}
 
 		public IReadOnlyList<ZoneEntityInfo> GetZoneEntities(uint mapId)

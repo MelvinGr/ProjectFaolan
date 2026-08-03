@@ -31,6 +31,10 @@ namespace Faolan.Core.Network.Codecs.Text
 	// GuildService's member record already carries the same online/last-seen union off the same column.
 	public static class FriendStateCodec
 	{
+		// The captured token, kept as the FALLBACK only: the chat tier sources the friend's real one from the game
+		// host through IGameServerDispatcher, and this is what an online friend the game host has no live zone for
+		// gets instead. Sending a stale token is still better than sending a last-seen time on the online branch,
+		// which is what the client would then read as one.
 		public const uint OnlineStamp = 0x01EDA8B2;
 		public const ushort Opcode = (ushort)ChatServerInterfaceOpcodes.FriendAdded;
 

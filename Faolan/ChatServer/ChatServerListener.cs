@@ -315,13 +315,16 @@ namespace Faolan.ChatServer
 			await client.SendAsync(new ChatServerMessage(ChatSenderInfoCodec.Opcode, ChatSenderInfoCodec.Build(friend.Id, name)));
 
 			// The stamp is a UNION on the online flag: an OFFLINE friend gets a real unix LAST-SEEN (the captured offline
-			// friend's value is 2h06 before the capture was taken, which is what identified it), an online one gets the
-			// captured constant, whose meaning is still open (Gitea #426 - it is not a time at all: 0x01EDA8B2 reads as
-			// 1971). Same shape GuildService's member record already uses, and the same column.
+			// friend's value is 2h06 before the capture was taken, which is what identified it), and an ONLINE one gets
+			// the PLAYFIELD INSTANCE TOKEN of the playfield they are in (#426, answered by #454 - the same 0x01EDA8B2
+			// turned out to be the instance token inside `TeamMemberRecord`'s embedded PlayfieldProxy, which is why it
+			// is not a time and reads as 1971). That is a LIVE value, so it comes from the game tier through the
+			// dispatcher seam rather than from a column; the captured constant remains the fallback for a friend the
+			// game host does not have in a zone. Same union GuildService's member record already uses.
 			// The logout announce has to say "offline" while the socket is still up, so the caller can override.
 			var online = onlineOverride ?? ClientForCharacter(friend.Id) != null;
 			var stamp = online
-				? FriendStateCodec.OnlineStamp
+				? _gameServerDispatcher.GetCharacterLiveState(friend.Id)?.PlayfieldToken ?? FriendStateCodec.OnlineStamp
 				: (uint)friend.LastConnection!.Value.ToUnixTimeSeconds();
 
 			await client.SendAsync(new ChatServerMessage(ChatServerInterfaceOpcodes.FriendAdded, FriendStateCodec.Build(friend.Id, online, (byte)friend.Level, friend.Class, stamp)));

@@ -66,7 +66,8 @@ namespace Faolan.CSPlayerAgent
 		// Character.MapId column, which only updates at save points - see TeamMemberRecord.FromCharacter.
 		private TeamMemberRecord MemberOf(Character character)
 		{
-			return TeamMemberRecord.FromCharacter(character, _gameServerDispatcher.GetCharacterLiveState(character.Id)?.MapId ?? character.MapId);
+			var live = _gameServerDispatcher.GetCharacterLiveState(character.Id);
+			return TeamMemberRecord.FromCharacter(character, live?.MapId ?? character.MapId, live?.PlayfieldToken);
 		}
 
 		// 0x2009 DeclineTeamInvite: forget the pending invite. Retail puts nothing on the wire for it.
