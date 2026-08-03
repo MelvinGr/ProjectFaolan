@@ -1,0 +1,312 @@
+using System.Collections.Generic;
+
+namespace Faolan.Core.Rdb
+{
+	/// <summary>
+	///     One GameAction type as the client registers it: its id, its name, and its KEY LIST - the ordered field
+	///     grammar of every element of that type. An element carries exactly one u32 per key, after a fixed 8-word
+	///     prefix, so <see cref="Keys" />.Length is what makes the element's width knowable.
+	/// </summary>
+	public sealed record GameActionType(uint Id, string Name, int[] Keys)
+	{
+		/// <summary>Element width in u32 words: the 8-word prefix plus one value per key.</summary>
+		public int WidthWords => 8 + Keys.Length;
+
+		/// <summary>Payload slot carrying the given key, or -1.</summary>
+		public int SlotOf(int key)
+		{
+			return System.Array.IndexOf(Keys, key);
+		}
+	}
+
+	// The client's GameAction type catalog, recovered STATICALLY from the initialiser FUN_008bdf40
+	// (tools/ghidra/DumpGameActionKeyLists.java -> docs/re/gameaction-keylists.tsv, which this mirrors; the
+	// GameActionKeyListTests gate keeps the two in step). See docs/re/gameactionlist-grammar.md.
+	//
+	// Why it lives here rather than next to the wire codecs: the same descriptor governs the RDB feat/spell/item
+	// modifier record, which is a GameAction element stored in a template rather than sent on the wire, and that
+	// is the reader this table exists to drive (ItemTemplateStatModifiers).
+	public static class GameActionTypes
+	{
+		// Key indices the client NAMES in its own descriptors (docs/re/gameaction-keylists.tsv, `fields` column).
+		// Only the ones a modifier record needs are named here.
+		public const int KeyStat = 0;
+		public const int KeyLine = 1;      // unnamed by the client, but it is the slot every `...Line...` type
+		                                   // carries where its per-spell twin carries a spell (53069 vs 53031)
+		public const int KeyValue = 39;
+		public const int KeyAmount = 175;
+		public const int KeySpell = 88;    // the slot SpellStatModifier carries where SpellLineStatModifier has KeyLine
+
+		private static readonly Dictionary<uint, GameActionType> ById = new()
+		{
+			[53002] = new GameActionType(53002, "Hit", [0, 2, 37, 71]),  // 0=Stat
+			[53003] = new GameActionType(53003, "AddLayeredSkinnedMesh", [194, 39]),
+			[53004] = new GameActionType(53004, "StartParticleEffectOnHead", [209, 86, 138, 28, 29, 30]),  // 28=RelXPos 29=RelYPos 30=RelZPos
+			[53005] = new GameActionType(53005, "BindAtLocation", []),
+			[53006] = new GameActionType(53006, "TeleportToBindLocation", []),
+			[53007] = new GameActionType(53007, "HitPercentage", [0, 39, 1, 71]),  // 0=Stat
+			[53008] = new GameActionType(53008, "Remove", [12]),
+			[53009] = new GameActionType(53009, "Charge", [187, 248, 245, 243, 254]),
+			[53010] = new GameActionType(53010, "SetMorphValue", [209, 39]),
+			[53011] = new GameActionType(53011, "AudioEffect", [17, 18, 19, 20, 11]),  // 17=AudioEffectID 18=AudioEffectDuration 19=AudioEffectRepeat 20=AudioEffectVolume 11=Radius
+			[53012] = new GameActionType(53012, "Skill", [0, 39, 24]),  // 0=Stat 39=Value 24=SkillType
+			[53013] = new GameActionType(53013, "DPSHit", [0, 39, 66, 71]),  // 0=Stat
+			[53014] = new GameActionType(53014, "TimedEffect", [0, 39, 11, 46, 25]),  // 0=Stat 11=Radius 25=TimedLength
+			[53015] = new GameActionType(53015, "AddFormation", [187]),
+			[53016] = new GameActionType(53016, "Teleport", [28, 29, 30, 151, 31]),  // 28=RelXPos 29=RelYPos 30=RelZPos
+			[53018] = new GameActionType(53018, "AreaRangeFormula", [88, 2, 11]),  // 11=Radius
+			[53019] = new GameActionType(53019, "Spell", [39]),
+			[53020] = new GameActionType(53020, "Bandaging", []),
+			[53021] = new GameActionType(53021, "RenewMana", []),
+			[53022] = new GameActionType(53022, "LayeredVisualLocation", [193, 194, 195, 196, 197, 198, 199, 200, 201, 39]),
+			[53023] = new GameActionType(53023, "CatMesh", [44]),
+			[53024] = new GameActionType(53024, "SetFollowerScriptGroup", [66]),
+			[53025] = new GameActionType(53025, "AddHateToPets", [66]),
+			[53026] = new GameActionType(53026, "Set", [55, 0, 39]),  // 0=Stat
+			[53027] = new GameActionType(53027, "ItemText", [39, 209]),
+			[53028] = new GameActionType(53028, "PolyMorph", []),
+			[53029] = new GameActionType(53029, "ChangeModifyPercent", [187, 39, 55]),
+			[53030] = new GameActionType(53030, "ChangeHitPercent", [187, 39, 55]),
+			[53031] = new GameActionType(53031, "ChangeRecastTime", [187, 39]),
+			[53032] = new GameActionType(53032, "AOERadiusModification", [187, 11]),  // 11=Radius
+			[53033] = new GameActionType(53033, "ApplyFactionRank", [66, 67]),
+			[53034] = new GameActionType(53034, "SummonFollower", []),
+			[53035] = new GameActionType(53035, "EnterSiegeTargeting", []),
+			[53036] = new GameActionType(53036, "SpawnQuest", [209]),
+			[53037] = new GameActionType(53037, "Charmed", [66, 67, 68, 69, 163, 39]),
+			[53038] = new GameActionType(53038, "PlaceTrap", [77, 84, 88, 25, 66, 67, 68]),  // 77=Hash 84=Level 25=TimedLength
+			[53040] = new GameActionType(53040, "StartTracking", [39]),  // 39=Tier
+			[53041] = new GameActionType(53041, "ModifyBasedOnStat", [174, 175, 0, 207]),  // 174=Substate 175=Amount 0=Stat
+			[53042] = new GameActionType(53042, "Modify_PowerSurge", [39]),
+			[53043] = new GameActionType(53043, "ExecuteBccAction", [243]),
+			[53045] = new GameActionType(53045, "Modify", [0, 39]),  // 0=Stat
+			[53046] = new GameActionType(53046, "AddAbsorb", [0, 70, 33, 34, 88]),  // 0=Stat
+			[53047] = new GameActionType(53047, "CameraShake", [204, 249, 191]),
+			[53048] = new GameActionType(53048, "Name", [209]),
+			[53049] = new GameActionType(53049, "SpawnMonster", [47, 48, 39, 72, 73, 28, 29, 30, 77]),  // 72=TimeExist 73=Flags 28=RelXPos 29=RelYPos 30=RelZPos 77=Hash
+			[53050] = new GameActionType(53050, "RemoveBuffs", []),
+			[53051] = new GameActionType(53051, "CastNano", [39]),
+			[53052] = new GameActionType(53052, "StrTexture", [58, 56, 8]),
+			[53053] = new GameActionType(53053, "CameraRoll", [191]),
+			[53054] = new GameActionType(53054, "SpellStatModifier", [88, 0, 39, 175]),  // 0=Stat 175=Amount
+			[53055] = new GameActionType(53055, "AttractorMesh", [56, 8]),
+			[53056] = new GameActionType(53056, "RemoveCowardStatus", []),
+			[53057] = new GameActionType(53057, "HeadText", [209, 39]),
+			[53058] = new GameActionType(53058, "SpawnRemotePet", [77, 39, 88, 175]),  // 77=Hash 175=Amount
+			[53059] = new GameActionType(53059, "LineTeleport", [9, 10, 31, 100]),
+			[53060] = new GameActionType(53060, "MonsterShape", [39, 25]),  // 39=Value 25=TimedLength
+			[53061] = new GameActionType(53061, "BCCCastSpell", [39]),
+			[53062] = new GameActionType(53062, "SpellLineStatModifier", [1, 0, 39, 175]),  // 0=Stat 175=Amount
+			[53063] = new GameActionType(53063, "SpawnMonsterACG", [77, 84, 72, 73, 28, 29, 30, 103]),  // 77=Hash 84=Level 72=TimeExist 73=Flags 28=RelXPos 29=RelYPos 30=RelZPos 103=NPCMaster
+			[53064] = new GameActionType(53064, "SpawnItemOnCharacter", [77, 84, 85, 72, 73, 28, 29, 30]),  // 77=Hash 84=Level 72=TimeExist 73=Flags 28=RelXPos 29=RelYPos 30=RelZPos
+			[53065] = new GameActionType(53065, "CoreSpellStatModifier", [88, 0, 39, 175, 1305]),  // 0=Stat 175=Amount 1305=FloatValue
+			[53066] = new GameActionType(53066, "TeamFormula", [88]),
+			[53067] = new GameActionType(53067, "ModifyAsRating", [0, 39]),  // 0=Stat
+			[53068] = new GameActionType(53068, "InterpolatedModifyAsRating", [0, 174, 172, 175, 173]),  // 0=Stat 174=Substate 175=Amount
+			[53069] = new GameActionType(53069, "ChangeLineRecastTime", [1, 39]),
+			[53070] = new GameActionType(53070, "AddSpellLineProc", [88, 236, 1, 117, 237, 73]),  // 73=Flags
+			[53071] = new GameActionType(53071, "DoorToAutoDoor", [31, 90, 91]),
+			[53072] = new GameActionType(53072, "StopAudioEffect", [17]),  // 17=AudioEffectID
+			[53073] = new GameActionType(53073, "AreaHit", [0, 2, 37, 71, 11]),  // 0=Stat 11=Radius
+			[53074] = new GameActionType(53074, "LineAOERadiusModification", [1, 11]),  // 11=Radius
+			[53075] = new GameActionType(53075, "ChangeLineHitPercent", [1, 39, 55]),
+			[53076] = new GameActionType(53076, "CoreSpellLineStatModifier", [1, 0, 39, 175, 1305]),  // 0=Stat 175=Amount 1305=FloatValue
+			[53077] = new GameActionType(53077, "SetSpellLineRecastTime", [1, 39]),
+			[53078] = new GameActionType(53078, "CastSpellOnOwner", [39]),
+			[53079] = new GameActionType(53079, "CastInvertibleBuff", [39]),
+			[53080] = new GameActionType(53080, "PetFormula", [39, 64]),
+			[53081] = new GameActionType(53081, "ProxyForceTeleport", []),
+			[53082] = new GameActionType(53082, "ProxyTeleport", [94, 95, 96, 97, 98, 99]),
+			[53083] = new GameActionType(53083, "ProxyTeleportLine", [94, 95, 96, 97, 98, 99, 100]),
+			[53084] = new GameActionType(53084, "ColumnFormula", [88, 238, 39, 170, 93, 250, 66, 67]),
+			[53085] = new GameActionType(53085, "Recovery", []),
+			[53086] = new GameActionType(53086, "EnableShieldTaunt", []),
+			[53087] = new GameActionType(53087, "AreaFormula", [88, 11]),  // 11=Radius
+			[53088] = new GameActionType(53088, "FilteredAreaFormula", [88, 11, 170, 93, 250]),  // 11=Radius
+			[53089] = new GameActionType(53089, "ItemFormula", [88, 39]),
+			[53090] = new GameActionType(53090, "EnableCriminalStatus", []),
+			[53091] = new GameActionType(53091, "FEDOCSTest", []),
+			[53092] = new GameActionType(53092, "SetTradingPostAccess", [39, 11]),  // 39=Value 11=Radius
+			[53093] = new GameActionType(53093, "LockMetaline", [39, 72, 66, 67]),  // 72=TimeExist
+			[53094] = new GameActionType(53094, "RestoreChar", []),
+			[53095] = new GameActionType(53095, "DisableMinigames", []),
+			[53096] = new GameActionType(53096, "CoreFilteredAreaFormula", [88, 11, 170, 93, 250, 66, 67, 138, 212, 2]),  // 11=Radius
+			[53097] = new GameActionType(53097, "ChangeTokenPoints", [66, 67]),
+			[53098] = new GameActionType(53098, "TargetSpellStatModifier", [88, 0, 39, 175]),  // 0=Stat 175=Amount
+			[53099] = new GameActionType(53099, "TargetSpellLineStatModifier", [1, 0, 39, 175]),  // 0=Stat 175=Amount
+			[53100] = new GameActionType(53100, "HateValueAdd", [239, 240]),
+			[53101] = new GameActionType(53101, "HateSetAdd", [242, 240]),
+			[53102] = new GameActionType(53102, "HateModify", [241, 240]),
+			[53103] = new GameActionType(53103, "HatelistStepUp", []),
+			[53104] = new GameActionType(53104, "HatelistStepDown", []),
+			[53105] = new GameActionType(53105, "RemoveBuff", [84, 116, 39]),  // 84=Level
+			[53106] = new GameActionType(53106, "TriggerUse", []),
+			[53107] = new GameActionType(53107, "HatelistStepToTop", []),
+			[53108] = new GameActionType(53108, "AddBuffCounter", [1, 39, 187]),
+			[53109] = new GameActionType(53109, "RemoveBuffCounter", [1, 39, 187, 66]),
+			[53110] = new GameActionType(53110, "TempChangeSkill", [0, 39]),  // 0=Stat
+			[53111] = new GameActionType(53111, "Assign", [0, 39]),  // 0=Stat
+			[53112] = new GameActionType(53112, "TransferBuffCounter", []),
+			[53113] = new GameActionType(53113, "ModifyGameAction", [1, 193, 174, 175, 1307, 1305]),  // 174=Substate 175=Amount 1305=FloatValue
+			[53114] = new GameActionType(53114, "RegisterTemplateSetEntry", []),
+			[53115] = new GameActionType(53115, "OpenDialog", [209, 39, 117]),
+			[53116] = new GameActionType(53116, "LockSpellLine", []),
+			[53117] = new GameActionType(53117, "ModifySpellLineCooldown", []),
+			[53118] = new GameActionType(53118, "ModifyTemplateCooldown", []),
+			[53119] = new GameActionType(53119, "LockAllSpells", []),
+			[53120] = new GameActionType(53120, "AddSkill", [0, 39, 1305]),  // 0=Stat 39=Value 1305=FloatValue
+			[53121] = new GameActionType(53121, "Feared", [66, 163, 67]),
+			[53122] = new GameActionType(53122, "Stun", []),
+			[53123] = new GameActionType(53123, "RemoveSpellLineBuff", [39, 174]),  // 174=Substate
+			[53124] = new GameActionType(53124, "CoreLockSpellLineTemplate", [39, 66, 67]),
+			[53125] = new GameActionType(53125, "RndSpawnMonsterACG", [39]),
+			[53128] = new GameActionType(53128, "AddTokenStateCounter", [66, 39]),
+			[53129] = new GameActionType(53129, "Root", []),
+			[53130] = new GameActionType(53130, "GrantAccessToPlayfield", []),
+			[53132] = new GameActionType(53132, "GenerateName", [209, 210, 39]),
+			[53134] = new GameActionType(53134, "NewTextEffect", [209, 210, 39]),
+			[53135] = new GameActionType(53135, "RemoveTokenStateCounter", [66, 39]),
+			[53136] = new GameActionType(53136, "TransferTokenStateCounter", [66, 67, 39, 1]),
+			[53137] = new GameActionType(53137, "StartParticleEffectOnMount", [209, 86, 28, 29, 30]),  // 28=RelXPos 29=RelYPos 30=RelZPos
+			[53138] = new GameActionType(53138, "StartFlymode", []),
+			[53139] = new GameActionType(53139, "SetFlag", [0, 39]),  // 0=Stat 39=Value
+			[53140] = new GameActionType(53140, "ClearFlag", [0, 39]),  // 0=Stat 39=Value
+			[53141] = new GameActionType(53141, "ToggleFlag", [0, 39]),  // 0=Stat 39=Value
+			[53144] = new GameActionType(53144, "TeleportToSaveSpot", []),
+			[53148] = new GameActionType(53148, "PersistentStatChange", []),
+			[53150] = new GameActionType(53150, "ExecuteGenericAttack", []),
+			[53152] = new GameActionType(53152, "ActivateFeatSpec", []),
+			[53153] = new GameActionType(53153, "CorePersistentGroundEffect", []),
+			[53154] = new GameActionType(53154, "SummonTeamMember", []),
+			[53155] = new GameActionType(53155, "SummonWholeTeam", []),
+			[53159] = new GameActionType(53159, "CoreRandomPointAreaFormula", [88, 11, 170, 171]),  // 11=Radius
+			[53160] = new GameActionType(53160, "Clone", []),
+			[53162] = new GameActionType(53162, "NanoResistance", [152, 39]),
+			[53163] = new GameActionType(53163, "AddDiminishingReturn", [39, 174, 1]),  // 174=Substate
+			[53164] = new GameActionType(53164, "SaveHere", []),
+			[53165] = new GameActionType(53165, "ProxyTeleport_WithPetHandling", [94, 95, 96, 97, 98, 99]),
+			[53166] = new GameActionType(53166, "TransferBuff", []),
+			[53167] = new GameActionType(53167, "TransferSpellLine", []),
+			[53168] = new GameActionType(53168, "StartEffect", [187, 6, 5, 28, 29, 30]),  // 28=RelXPos 29=RelYPos 30=RelZPos
+			[53169] = new GameActionType(53169, "DamageRedirect", []),
+			[53170] = new GameActionType(53170, "InheritedComboAttack", [224, 222, 226, 71, 221]),
+			[53171] = new GameActionType(53171, "InheritedComboHit", [224, 66, 71, 221, 88]),
+			[53172] = new GameActionType(53172, "AdjustHitTable", [67, 66, 39]),
+			[53173] = new GameActionType(53173, "AdjustSpellHitTable", [67, 66, 187, 39]),
+			[53174] = new GameActionType(53174, "AdjustSpellLineHitTable", [67, 66, 187, 39]),
+			[53175] = new GameActionType(53175, "AddLeech", [39, 174, 192]),  // 174=Substate
+			[53176] = new GameActionType(53176, "DisplayLearnAbility", [1, 187]),
+			[53177] = new GameActionType(53177, "Dispell", [0, 39]),  // 0=Stat
+			[53178] = new GameActionType(53178, "MultiHit", [187, 3]),
+			[53179] = new GameActionType(53179, "TeleportToGuildCity", []),
+			[53180] = new GameActionType(53180, "Tracer", [28, 29, 30, 134, 135, 136, 87, 73, 89]),  // 28=RelXPos 29=RelYPos 30=RelZPos 73=Flags
+			[53182] = new GameActionType(53182, "SpecialAbility", [39, 77, 84, 174]),  // 39=Value 77=Hash 84=Level 174=Substate
+			[53183] = new GameActionType(53183, "AddSelfResurrectionSpell", [88, 67, 188]),
+			[53184] = new GameActionType(53184, "StatMultiplier", [0, 39]),  // 0=Stat
+			[53185] = new GameActionType(53185, "Drain", [0, 2, 37, 71, 39]),  // 0=Stat
+			[53187] = new GameActionType(53187, "Heal", []),
+			[53188] = new GameActionType(53188, "DialogFeedback", [209]),
+			[53189] = new GameActionType(53189, "AddPercentSkillModifier", [66, 24, 67, 39]),  // 24=SkillType
+			[53190] = new GameActionType(53190, "StartSpellWeavingMode", [88, 66, 67, 68, 69]),
+			[53191] = new GameActionType(53191, "AddComboHate", [110, 240, 111]),
+			[53192] = new GameActionType(53192, "SpawnMonsterACGRot", [77, 84, 72, 73, 28, 29, 30, 103, 151]),  // 77=Hash 84=Level 72=TimeExist 73=Flags 28=RelXPos 29=RelYPos 30=RelZPos 103=NPCMaster
+			[53193] = new GameActionType(53193, "PolymorphAttack", [44, 7]),
+			[53194] = new GameActionType(53194, "Interrupt", [123]),
+			[53195] = new GameActionType(53195, "DebuffDPS", [66, 174, 67, 175, 68, 176, 69, 177]),  // 174=Substate 175=Amount
+			[53196] = new GameActionType(53196, "SpecialHit", [0, 2, 37, 71]),  // 0=Stat
+			[53197] = new GameActionType(53197, "BCCCastSpellOnGround", [39]),
+			[53198] = new GameActionType(53198, "LearnRecipe", [39]),
+			[53199] = new GameActionType(53199, "InheritedWeaponAttackHateFlag", []),
+			[53200] = new GameActionType(53200, "LockPicking", [66]),
+			[53201] = new GameActionType(53201, "RemoveSpell", [39]),
+			[53202] = new GameActionType(53202, "LockTemplate", [187, 66, 67]),
+			[53203] = new GameActionType(53203, "PickPocket", []),
+			[53204] = new GameActionType(53204, "AddBliss", [174]),  // 174=Substate
+			[53205] = new GameActionType(53205, "AddSwaying", [174]),  // 174=Substate
+			[53206] = new GameActionType(53206, "AddFocus", [174]),  // 174=Substate
+			[53207] = new GameActionType(53207, "Feedback", [39]),
+			[53208] = new GameActionType(53208, "PerformCorruptionCheck", [66, 67]),
+			[53209] = new GameActionType(53209, "UpgradeCombo", [187, 66, 67]),
+			[53210] = new GameActionType(53210, "AddGuildRenown", [39, 175]),  // 39=Type 175=Amount
+			[53211] = new GameActionType(53211, "AddSpellProc", [88, 236, 187, 117, 237, 73]),  // 73=Flags
+			[53212] = new GameActionType(53212, "AddComboProc", [88, 236, 187, 117, 237]),
+			[53213] = new GameActionType(53213, "AddProc", [88, 236, 117, 73, 237, 66]),  // 73=Flags
+			[53214] = new GameActionType(53214, "DrunkBrawlingSpecial", [224]),
+			[53215] = new GameActionType(53215, "SetMaxModifier", [0, 39]),  // 0=Stat 39=Value
+			[53217] = new GameActionType(53217, "Knockback", [191, 238]),
+			[53218] = new GameActionType(53218, "EnableDefensiveStance", []),
+			[53219] = new GameActionType(53219, "InterpolatedHit", [0, 168, 170, 172, 169, 171, 173, 71]),  // 0=Stat
+			[53220] = new GameActionType(53220, "InterpolatedModify", [0, 174, 172, 175, 173]),  // 0=Stat 174=Substate 175=Amount
+			[53221] = new GameActionType(53221, "InterpolatedTempChangeSkill", [0, 174, 172, 175, 173]),  // 0=Stat 174=Substate 175=Amount
+			[53222] = new GameActionType(53222, "InterpolatedSpawnPetACG", [77, 176, 172, 177, 173, 72, 73, 28, 29, 30, 103, 128, 129, 130, 131, 132, 133]),  // 77=Hash 72=TimeExist 73=Flags 28=RelXPos 29=RelYPos 30=RelZPos 103=NPCMaster
+			[53223] = new GameActionType(53223, "CastingLevelModifier", [0, 39]),  // 0=Stat
+			[53224] = new GameActionType(53224, "TeamPropagatedBuff", [88]),
+			[53225] = new GameActionType(53225, "InheritedWeaponAttack", [71, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235]),
+			[53226] = new GameActionType(53226, "SetSpellRecastTime", [88, 39]),
+			[53227] = new GameActionType(53227, "ResurrectTarget", [188]),
+			[53228] = new GameActionType(53228, "VisualLocation", [193, 194, 195, 196, 197, 198, 199, 200, 201]),
+			[53229] = new GameActionType(53229, "StartClientSideScryScript", [39]),  // 39=ScriptID
+			[53230] = new GameActionType(53230, "StartServerSideScryScript", [39]),  // 39=ScriptID
+			[53231] = new GameActionType(53231, "StopScryScript", [39]),  // 39=ScriptID
+			[53232] = new GameActionType(53232, "DynamicKDTree", [39]),
+			[53233] = new GameActionType(53233, "SetBaseAnim", [209]),
+			[53234] = new GameActionType(53234, "InterpolatedMagicHit", []),
+			[53235] = new GameActionType(53235, "CinematicCamera", [202, 203, 204, 205, 209]),
+			[53236] = new GameActionType(53236, "CombatSpecialMove", [209, 189, 39, 207, 43, 206, 187]),
+			[53237] = new GameActionType(53237, "PlayActionAnim", [209]),
+			[53238] = new GameActionType(53238, "StartParticleEffect", [209, 86, 138, 28, 29, 30]),  // 28=RelXPos 29=RelYPos 30=RelZPos
+			[53239] = new GameActionType(53239, "StopParticleEffect", [209, 86]),
+			[53240] = new GameActionType(53240, "AddSkinnedMesh", [194]),
+			[53241] = new GameActionType(53241, "SendScryEvent", [209, 39, 5, 6]),  // 209=EventString
+			[53242] = new GameActionType(53242, "Disarm", [172, 173, 168, 170, 169, 171]),
+			[53243] = new GameActionType(53243, "StartParticleEffectOnEquippedItem", [209, 193, 86, 138, 28, 29, 30]),  // 28=RelXPos 29=RelYPos 30=RelZPos
+			[53244] = new GameActionType(53244, "SummonMount", [76, 205, 201]),
+			[53245] = new GameActionType(53245, "BanishMount", []),
+			[53246] = new GameActionType(53246, "RegisterSubSpellForSpellLine", []),
+			[53247] = new GameActionType(53247, "AreaKnockback", [11, 191, 238]),  // 11=Radius
+			[53249] = new GameActionType(53249, "ColumnAddTargets", [11, 238]),  // 11=Radius
+			[53250] = new GameActionType(53250, "ChangeInheritedWeaponAttack", [187, 84, 66, 67, 68, 69]),  // 84=Level
+			[53251] = new GameActionType(53251, "CodeHooks", [39, 175]),  // 175=Amount
+			[53252] = new GameActionType(53252, "OverrideMostHatedTarget", []),
+			[53253] = new GameActionType(53253, "ChargeSpecialAbility", [187, 248, 245, 243]),
+			[53254] = new GameActionType(53254, "UpdateCommunityCharacter", [39, 175]),  // 175=Amount
+			[53255] = new GameActionType(53255, "AddCleaveTargets", [212, 213, 11, 33]),  // 11=Radius
+			[53256] = new GameActionType(53256, "MagicHit", [39, 71]),
+			[53257] = new GameActionType(53257, "WeaponHit", [244]),
+			[53259] = new GameActionType(53259, "ConeFormula", [88, 212, 213, 11]),  // 11=Radius
+			[53260] = new GameActionType(53260, "StartClientSideScryScriptWithParams", [39, 209]),  // 39=ScriptID 209=ScriptParams
+			[53261] = new GameActionType(53261, "StartServerSideScryScriptWithParams", [39, 209]),  // 39=ScriptID 209=ScriptParams
+			[53262] = new GameActionType(53262, "DefensiveStance", [88]),
+			[53263] = new GameActionType(53263, "ParryStance", [88]),
+			[53264] = new GameActionType(53264, "FrenzyStance", [88]),
+			[53265] = new GameActionType(53265, "ChangeSubstate", [39]),
+			[53266] = new GameActionType(53266, "SetCatMesh", [193, 194, 195, 196, 197, 198, 199, 200, 201]),
+			[53267] = new GameActionType(53267, "Fatality", []),
+			[53268] = new GameActionType(53268, "SetIdleBaseAnim", [209]),
+			[53269] = new GameActionType(53269, "AddTexScript", [39]),  // 39=ScriptID
+			[53270] = new GameActionType(53270, "RemoveTexScript", [39, 204]),  // 39=ScriptID
+			[53271] = new GameActionType(53271, "Search", []),
+			[53272] = new GameActionType(53272, "Sneak", []),
+			[53273] = new GameActionType(53273, "AttackAddTargets", [212, 213, 11]),  // 11=Radius
+			[53274] = new GameActionType(53274, "RefreshAirSupply", []),
+			[53275] = new GameActionType(53275, "ToggleSubstate", [39]),
+			[53276] = new GameActionType(53276, "AddTexScriptWithParams", [39, 204, 54, 209]),
+			[53277] = new GameActionType(53277, "TryEnterDrunkenBrawling", []),
+			[53278] = new GameActionType(53278, "BindAtSetLocation", [251, 252, 253]),
+			[53281] = new GameActionType(53281, "AddTag", []),
+			[53282] = new GameActionType(53282, "GlobalAOERadiusModification", [11]),  // 11=Radius
+			[53283] = new GameActionType(53283, "GlobalSpellStatModifier", [0, 39, 175]),  // 0=Stat 175=Amount
+			[53284] = new GameActionType(53284, "GlobalCoreSpellStatModifier", [0, 39, 175, 1305]),  // 0=Stat 175=Amount 1305=FloatValue
+			[53285] = new GameActionType(53285, "GlobalTargetSpellStatModifier", [0, 39, 175]),  // 0=Stat 175=Amount
+			[53286] = new GameActionType(53286, "GlobalModifyGameAction", [193, 174, 175, 1307, 1305]),  // 174=Substate 175=Amount 1305=FloatValue
+		};
+
+		public static IReadOnlyCollection<GameActionType> All => ById.Values;
+
+		/// <summary>The registered type, or null - an id outside 0xCF09..0xD026 is not a GameAction at all.</summary>
+		public static GameActionType? Get(uint id)
+		{
+			return ById.GetValueOrDefault(id);
+		}
+	}
+}

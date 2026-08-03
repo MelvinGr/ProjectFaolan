@@ -109,11 +109,11 @@ and don't contain.
   337 of the 342 kind-53075 records have a `ref / 1000` that is a real `ConanClass`, and the feats grouped under
   each class are that class's own. (The 5 exceptions all use `50000`, a class 50 that does not exist — unresolved.)
 
-  Catalog-wide there are **2,361 feat templates** carrying an out-of-stat-range record across ~10 kinds (53209
-  x3235, 53019 x1010, 53030 x962, 53054 x593, 53212 x561, 53062 x475, 53075 x342, …); only 53075 is decoded here,
-  the rest are surveyed but unread. Survey with `--report feat-spell-modifiers [--report-arg <kind>]`; dump and
-  diff a feat's ranks with `--report feat-record --report-arg [<rdbType>/]<id>[,<id>...]` (the word that MOVES
-  across ranks is the magnitude, the one that stays is the target).
+  Catalog-wide **2,789 feat templates** carry an out-of-stat-range record, across 30 kinds — every one of them
+  now named and read by slot (see the kind table below). Survey with
+  `--report feat-spell-modifiers [--report-arg <kind>]`; dump and diff a feat's ranks with
+  `--report feat-record --report-arg [<rdbType>/]<id>[,<id>...]` (the word that MOVES across ranks is the
+  magnitude, the one that stays is the target).
 
   **Imported and applied**, for kind 53075 only. `FeatSpellModifier` holds `(feat → spell line, percent × 100)`;
   `Spell.LineId` holds field 128; `DatabaseRepository.GetCharacterSpellBoosts` joins the two and fans the line out
@@ -125,10 +125,40 @@ and don't contain.
   End to end on the captured Necromancer: NecroL80's `Decomposition` (wire 80004, rank 5) gives **+35.0% on all five
   Flesh to Worms ranks**, which is what the in-client tooltip reads; 52 of her spells are boosted in total.
 
-  ⚠️ **Kind 53075 ONLY is imported.** The other ~9 kinds have the same record shape but their payloads are not
-  known to be a (line, percent) pair, and importing them on the strength of the shape would put invented modifiers
-  on a third of the feat catalog. Still open on #590: those kinds (53209 alone is 3,235 records) and the 5 records
-  referencing a class 50 that does not exist.
+  ⚠️ **Kind 53075 ONLY is imported.** The other kinds are decoded (below) but not imported: three of them are
+  spell GRANTS, so importing them on the shape would file a spell a feat GIVES you as a boost to one you already
+  have.
+- **The "kind" was never a private id space — it is a GameAction TYPE ID, and the record IS a GameAction element**
+  (#591, [gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). Read against the client's own element
+  grammar, `[kind][0][4][0][1][0][2][9][…]` is `[typeId][field][version 4][subCount 0][the four always-present
+  positional values 1,0,2,9][one u32 per key-list entry]`. So:
+
+  - the "6-word signature" is a constant prefix, not a signature;
+  - **a record is `8 + len(keyList)` words wide**, not a fixed 10 — and the key list comes from the client
+    ([`gameaction-keylists.tsv`](../re/gameaction-keylists.tsv), all 260 types, recovered statically by
+    `tools/ghidra/DumpGameActionKeyLists.java`);
+  - **a payload word is addressed by KEY, not by position.** `ItemTemplateStatModifiers.ParseElements` returns the
+    whole element and `Element.Value(key)` picks a slot; `GameActionTypes` holds the table.
+
+  Every kind the feat catalog uses now reads as named fields (`--report feat-spell-modifiers`, which prints them
+  that way), and three of the old open questions dissolve because they were artifacts of the fixed-10-word read:
+
+  | kind | name | payload | note |
+  |---|---|---|---|
+  | 53209 x3235 | `UpgradeCombo` | combo, `k66`, `k67` | `Dread Lord` "reduces the reuse time of all combos" carries six, `k67` = **-100** on each. The old "value 0 throughout" was `k66`; the magnitude is the word after it |
+  | 53019 x1749 | `Spell` | spell template id | a GRANT, and the **only** payload word. The old "its value repeats its own KIND" was the NEXT element's type id, read past the end of a 9-word record |
+  | 53030 x962 | `ChangeHitPercent` | spell, Value, `k55` | the per-spell twin of 53075 |
+  | 53054 x593 | `SpellStatModifier` | **spell, Stat, Value, Amount** | not "a varying value": the second word is a STAT ID. `Fiendish Hand` carries three records for one spell — stats 347/348/349 — which is why there were "several records per (feat, spell)" |
+  | 53062 x475 | `SpellLineStatModifier` | **line, Stat, Value, Amount** | the same record with the spell slot replaced by a line slot. `Brutal Maiming` = line 20410 (Guardian `Disable`), stat 147, value 2750 — the "147 that does not read as a percent" was the stat id |
+  | 53212 x421 | `AddComboProc` | spell, `k236`, combo, `k117`, `k237` | |
+  | 53075 x342 | `ChangeLineHitPercent` | **line, Value, `k55`** | the decoded one; `k55` (1 or 2) was never read before |
+  | 53250 x315 | `ChangeInheritedWeaponAttack` | | |
+  | 53070 x289 | `AddSpellLineProc` | | |
+  | 53213 / 53211 | `AddProc` / `AddSpellProc` | six words | the live-Frida catalog says four; the RDB widths say six |
+
+  ⚠️ **The magnitude is SIGNED.** `Set's Chosen` carries -2000/-4000/-6000/-8000/-10000 across its five ranks on
+  Demonologist lines 44100/44101 — a clean -20%…-100% ladder, and unmistakably a rank ladder rather than a
+  misread. The column is `uint` and every consumer casts to `int`, which recovers it; the DB text does not.
 - **Training ENFORCES the tree.** `FeatService` rejects a train whose resulting set leaves a prerequisite unmet
   (`FeatRules.MissingPrerequisites`), alongside the existing point-budget check.
   ⚠️ A prerequisite is satisfied by the **same base at an equal-or-higher rank**, not by the exact id. The graph

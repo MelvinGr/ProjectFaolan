@@ -60,14 +60,20 @@ namespace Faolan.Core.Rdb
 			return Scan(body, false);
 		}
 
-		// One signature walk for both readers. `inStatRange` picks which side of the stat-id bound to keep.
-		private static IReadOnlyList<Modifier> Scan(ReadOnlySpan<byte> body, bool inStatRange)
+		/// <summary>
+		///     Every GameAction element in the body, whole - kind plus one value per key of that kind's key list.
+		///     This is the primitive both readers above are expressed on; use it when a record's later slots matter
+		///     (a <c>SpellStatModifier</c> carries spell + stat + value + amount, and the pair readers see only the
+		///     first two).
+		/// </summary>
+		public static IReadOnlyList<Element> ParseElements(ReadOnlySpan<byte> body)
 		{
-			var mods = new List<Modifier>();
-			// The full record is [kind][0][4][0][1][0][2][9][statId][amount]; anchor on the 6-word signature
-			// (4,0,1,0,2,9) at off..off+20 with the preceding [.. ][0] word, then statId at off+24, amount at off+28.
-			// The kind sits two words BEFORE the signature, so it is unreadable for a record that starts the body
-			// (off < 8) - those report kind 0, which no policy honors.
+			var elements = new List<Element>();
+			// The element is [typeId][field][4][subCount][v(0x2d5)][v(0x2d6)][v(0x2f2)][v(0x2f5)][one u32 per key].
+			// In a TEMPLATE those middle six words are always `4,0,1,0,2,9`, which is what makes them usable as an
+			// anchor: match them at off..off+20 with the preceding [field][0] word, and the typeId sits two words
+			// BEFORE the anchor - so it is unreadable for an element that starts the body (off < 8), and those report
+			// kind 0, which no policy honors.
 			//
 			// ⚠️ Scan BYTE by byte, not word by word (#441). The region is NOT 4-byte aligned to the body in most
 			// templates - Blackwolf Cap's records start at body offset 297 - and a word-aligned scan simply cannot see
@@ -75,17 +81,41 @@ namespace Faolan.Core.Rdb
 			// client happily applied a full list from the very same bytes. Byte-granular scanning recovers them exactly
 			// (Blackwolf Cap 0 -> 4 records, Con 50 / Int 50 = what the client applies) and changes nothing for the
 			// templates that were already aligned (Royal Signet stays 3, Fine Steelsilk Pants stays 6).
-			for (var off = 4; off + 32 <= body.Length; off++)
+			for (var off = 4; off + 24 <= body.Length; off++)
 			{
 				if (W(body, off - 4) != 0 || W(body, off) != 4 || W(body, off + 4) != 0 || W(body, off + 8) != 1 || W(body, off + 12) != 0 || W(body, off + 16) != 2 ||
 				    W(body, off + 20) != 9)
 					continue;
 
-				var statId = W(body, off + 24);
+				var kind = off >= 8 ? W(body, off - 8) : 0;
+				// How many values follow is a property of the KIND, not a constant: an element carries exactly one
+				// u32 per key-list entry (docs/re/gameactionlist-grammar.md). An unregistered kind gets the two the
+				// old fixed-10-word reader assumed, which is all any caller of the pair readers below ever used.
+				var keys = GameActionTypes.Get(kind)?.Keys.Length ?? 2;
+				if (off + 24 + 4 * keys > body.Length)
+					continue;
+
+				var values = new uint[keys];
+				for (var i = 0; i < keys; i++)
+					values[i] = W(body, off + 24 + 4 * i);
+
+				elements.Add(new Element(kind, values));
+			}
+
+			return elements;
+		}
+
+		// One element walk for both pair readers. `inStatRange` picks which side of the stat-id bound to keep.
+		private static IReadOnlyList<Modifier> Scan(ReadOnlySpan<byte> body, bool inStatRange)
+		{
+			var mods = new List<Modifier>();
+			foreach (var e in ParseElements(body))
+			{
+				var statId = e.First;
 				if (statId == 0 || statId < MaxStatId != inStatRange)
 					continue;
 
-				mods.Add(new Modifier(off >= 8 ? W(body, off - 8) : 0, statId, W(body, off + 28)));
+				mods.Add(new Modifier(e.Kind, statId, e.Second));
 			}
 
 			return mods;
@@ -100,6 +130,35 @@ namespace Faolan.Core.Rdb
 		// One record: its effect KIND (the opening word - see the type comment), the wire stat id, and the amount as it
 		// sits in the template (NOT yet scaled). Divide by CharacterStatId.GetScale() for display - after checking that
 		// the kind means "flat".
+		//
+		// ⚠️ This is the PAIR view: the first two payload words, which is (stat, value) for the plain modifier kinds
+		// and something else for the rest - a `SpellStatModifier` puts the SPELL first and the stat second. Reach for
+		// <see cref="Element" /> when the kind is not known to be a plain modifier.
 		public readonly record struct Modifier(uint Kind, uint StatId, uint WireAmount);
+
+		/// <summary>
+		///     One whole GameAction element: its type id and one value per key of that type's key list, in key order
+		///     (docs/re/gameactionlist-grammar.md). <see cref="Value" /> addresses a slot BY KEY, which is what makes
+		///     a reader independent of where the slot sits - the stat is payload word 0 on `Modify` and word 1 on
+		///     `SpellStatModifier`.
+		/// </summary>
+		public readonly record struct Element(uint Kind, uint[] Values)
+		{
+			/// <summary>The registered type, or null when the kind is not a GameAction the client knows.</summary>
+			public GameActionType? Type => GameActionTypes.Get(Kind);
+
+			/// <summary>The value of the slot carrying <paramref name="key" />, or null when this type has no such slot.</summary>
+			public uint? Value(int key)
+			{
+				var slot = Type?.SlotOf(key) ?? -1;
+				return slot >= 0 && slot < Values.Length ? Values[slot] : null;
+			}
+
+			// The pair view every caller predating the key lists used: the first two payload words. A one-key element
+			// has no second word - it used to read the NEXT element's type id, which is how a `Spell` grant came to
+			// look like it "repeats its own kind" (#591).
+			internal uint First => Values.Length > 0 ? Values[0] : 0;
+			internal uint Second => Values.Length > 1 ? Values[1] : 0;
+		}
 	}
 }

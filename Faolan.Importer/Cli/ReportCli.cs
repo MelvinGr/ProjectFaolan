@@ -2215,11 +2215,15 @@ namespace Faolan.Importer.Cli
 
 		// --report feat-spell-modifiers [--report-arg <kind>]
 		//
-		// #590. Every feat template's modifier records whose payload's first word is OUTSIDE the stat-id range -
+		// #590/#591. Every feat template's modifier records whose payload's first word is OUTSIDE the stat-id range -
 		// exactly the ones ItemTemplateStatModifiers.Parse drops on `statId >= 0x1000`. That bound is right for a STAT
 		// modifier and wrong for whatever these are: `Decomposition` rank 5 carries (41000, 3500) under kind 53075,
-		// and 3500 is the +35.00% its in-client tooltip shows. So the reference is the first word and the magnitude is
-		// the second, and this report is what says how many feats are in that shape and which kinds they use.
+		// and 3500 is the +35.00% its in-client tooltip shows.
+		//
+		// The KIND is a GameAction type id and the payload is that type's KEY LIST, one u32 per key
+		// (docs/re/gameactionlist-grammar.md), so this prints each row as its named slots rather than as a pair -
+		// `SpellStatModifier` puts the spell first and the STAT second, which read positionally looked like a
+		// magnitude that varied for no reason.
 		private static void FeatSpellModifiers(string rdbDir, string? arg)
 		{
 			var onlyKind = uint.TryParse(arg, out var k) ? k : 0u;
@@ -2228,6 +2232,29 @@ namespace Faolan.Importer.Cli
 			var samples = new Dictionary<uint, List<string>>();
 			var refCounts = new Dictionary<uint, int>();
 			var feats = 0;
+
+			// A payload slot printed as `key=value`, with the client's own name for the key where it has one.
+			static string Slots(ItemTemplateStatModifiers.Element e)
+			{
+				var type = e.Type;
+				if (type == null)
+					return string.Join(' ', e.Values.Select((v, i) => $"[{i}]={v}"));
+
+				return string.Join(' ', e.Values.Select((v, i) =>
+				{
+					var key = type.Keys[i];
+					var name = key switch
+					{
+						GameActionTypes.KeyStat => "Stat",
+						GameActionTypes.KeyLine => "Line",
+						GameActionTypes.KeyValue => "Value",
+						GameActionTypes.KeyAmount => "Amount",
+						GameActionTypes.KeySpell => "Spell",
+						_ => $"k{key}"
+					};
+					return $"{name}={v}";
+				}));
+			}
 
 			foreach (var e in rdb.EntriesOfType(FeatTemplateType))
 			{
@@ -2247,26 +2274,30 @@ namespace Faolan.Importer.Cli
 				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != FeatTemplateType)
 					continue;
 
-				var hits = ItemTemplateStatModifiers.ParseRejected(body.AsSpan(12))
-					.Select(m => (Kind: m.Kind, Reference: m.StatId, Value: m.WireAmount)).ToList();
+				// The out-of-stat-range half, kept whole rather than as a pair - the same elements ParseRejected
+				// yields, with every slot the kind declares.
+				var hits = ItemTemplateStatModifiers.ParseElements(body.AsSpan(12))
+					.Where(x => x.Values.Length > 0 && x.Values[0] >= 0x1000)
+					.ToList();
 				if (hits.Count == 0)
 					continue;
 
 				feats++;
 				var (name, description) = RdbFeatImporter.ReadNameAndDescription(body);
-				foreach (var (kind, reference, value) in hits)
+				foreach (var hit in hits)
 				{
+					var kind = hit.Kind;
 					if (onlyKind != 0 && kind != onlyKind)
 						continue;
 
 					byKind[kind] = byKind.GetValueOrDefault(kind) + 1;
-					refCounts[reference] = refCounts.GetValueOrDefault(reference) + 1;
+					refCounts[hit.Values[0]] = refCounts.GetValueOrDefault(hit.Values[0]) + 1;
 					samples.TryAdd(kind, []);
 					// With a kind filter the caller is decoding THAT kind, so print every row and its description -
 					// the description names the spell the feat modifies, which is the only handle we have on what the
 					// reference id means. Unfiltered it is a census, so a few samples per kind is enough.
 					if (onlyKind != 0 || samples[kind].Count < 6)
-						samples[kind].Add($"{e.Id}\t{name}\tref={reference}\tvalue={value}\t{description.Replace('\t', ' ')}");
+						samples[kind].Add($"{e.Id}\t{name}\t{Slots(hit)}\t{description.Replace('\t', ' ')}");
 				}
 			}
 
@@ -2275,7 +2306,8 @@ namespace Faolan.Importer.Cli
 			Console.WriteLine("by KIND:");
 			foreach (var (kind, n) in byKind.OrderByDescending(p => p.Value))
 			{
-				Console.WriteLine($"  {kind} (0x{kind:X})  x{n}");
+				var type = GameActionTypes.Get(kind);
+				Console.WriteLine($"  {kind} (0x{kind:X})  x{n}  {type?.Name ?? "<unregistered>"}");
 				foreach (var line in samples[kind])
 					Console.WriteLine($"      {line}");
 			}
