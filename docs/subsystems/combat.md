@@ -217,13 +217,40 @@ the attacker, so an unguarded arc takes 20% more. Ghidra `TweakGlobals` reports 
 are registered and never consumed), which is the same tell recast had: these are server numbers shipped in the
 client's tuning table [V1: docs/rdb/client-tweak-table.md].
 
-**Server side.** `CombatShieldRose` (roll / shift / cadence / arc mapping / mitigation) is the policy;
-`WorldEntity.OpenShieldRose` + `TickShieldShift` hold the per-defender state. `WorldState.Tick` rolls the rose
+**A PLAYER's rose is the PLAYER'S — it arrives c2s (#620).** The two sides of the same message are owned by
+opposite ends. An NPC's rose is the server's; a player's is the client's: it owns stat `0xA5`, the shield
+keybinds write it locally, and it uploads each change through `n3EngineClient::SendIIRToServer`. The keybind
+handler is `FUN_01117a20` (reached from the five command stubs at `0x00455cb0`..`0x004562b0`), and it has
+exactly the two modes the live game documents — move ONE shield between two arcs, or stack all three on one arc
+— plus a fourth stub that resets to `111`. It writes stat `0xA5` through `FUN_01117d60` and then builds a
+`CombatShieldIIR_c` and sends it, which is the *only* place in the image that message is constructed
+[V1: docs/re/shield-rose-client-upload.md]. The corpus can't see this — all 110 records are downloads, because the
+captured sessions never touched a shield key — so the direction is established from the client, not the wire.
+
+So the server does **not** roll or shift a rose for a player. `WorldState.Tick` skipping players is correct, not
+the gap it looked like. `GameServerListener.HandlePlayerShieldRose` takes the uploaded spread, applies the
+client's own overflow clamp (`CombatShieldRose.Sanitize` — over three shields resets to `111`, which is what
+`FUN_0113de90` does on receipt), stores it on the player's `WorldEntity` and relays it to the viewers who can
+see them. A player enters the world already guarding the retail default `111`, which is also what their own
+snapshot stat sheet carries (`SubClassStatBlock`, `ShieldAllocation` `0x6F`).
+
+The spawn scaffold's shield word (`SpawnPreIir.WordStatIds[13]` → stat `0xA5`) is deliberately left at 0: 310 of
+the 317 captured PLAYER frames carry 0 there, so retail does not seed a viewer's rose from the spawn either.
+
+**Mitigation reads whatever the handle resolves to**, NPC or player, and a player defender switches to the
+`Combat_PvP*` column — the gentler one (−0.15/−0.30 where PvE gives −0.33/−0.66), which is why that column
+exists at all. An NPC's swing at a player still takes no arc: no captured NPC swing carries a direction word
+(the direction ability is the *player's* `Normal Attack`), so there is nothing to aim it with, and the
+geometric reading — "the back is always unshielded" — needs a decoded player-facing vector, which the cleave is
+blocked on too.
+
+**Server side.** `CombatShieldRose` (roll / shift / cadence / arc mapping / clamp / mitigation) is the policy;
+`WorldEntity.OpenShieldRose` + `TickShieldShift` hold the per-NPC state. `WorldState.Tick` rolls the rose
 on the engage transition and shifts it on each entity's own timer, emitting `NpcShieldRose`, which
-`WorldBroadcaster.BroadcastNpcShieldRose` turns into the `CombatShieldIIR` for every CONFIRMED viewer (the
-heartbeat's gating — the rose is drawn on the dynel). `CombatService.SendNormalAttackResponse` reads the swing's
-arc and scales the damage by the table. The rose closes on disengage and on death, so each fight opens on a
-fresh one.
+`WorldBroadcaster.BroadcastShieldRose` turns into the `CombatShieldIIR` for every CONFIRMED viewer (the
+heartbeat's gating — the rose is drawn on the dynel; the owner is skipped, having drawn it already).
+`CombatService.SendNormalAttackResponse` reads the swing's arc and scales the damage by the table. An NPC's rose
+closes on disengage and on death, so each fight opens on a fresh one; a player's is theirs for the session.
 
 ## NPC counter-attack animation ack (decoded 2026-06-15)
 

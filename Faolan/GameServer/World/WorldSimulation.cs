@@ -828,7 +828,7 @@ namespace Faolan.GameServer.World
 									// #20 directional combat: the defender's blue guard arcs. Gated with the combat sim - the
 									// rose only means anything when the NPC is actually fighting back.
 									if (NpcAutoAttackEnabled)
-										await _output.BroadcastNpcShieldRose(effect.Entity);
+										await _output.BroadcastShieldRose(effect.Entity);
 									break;
 								}
 

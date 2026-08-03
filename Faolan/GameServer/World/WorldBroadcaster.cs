@@ -480,16 +480,23 @@ namespace Faolan.GameServer.World
 			}
 		}
 
-		// The defender's shield rose changed (it engaged, or the shift timer moved a guard): send the CombatShieldIIR to
-		// every viewer that has it CONFIRMED, the same gating as the heartbeat - the rose is drawn ON the dynel, so a
-		// still-loading client has nothing to draw it over.
-		public async Task BroadcastNpcShieldRose(WorldEntity npc)
+		// The defender's shield rose changed (an NPC engaged or its shift timer moved a guard; a PLAYER moved one of
+		// theirs, #620): send the CombatShieldIIR to every viewer that has it CONFIRMED, the same gating as the
+		// heartbeat - the rose is drawn ON the dynel, so a still-loading client has nothing to draw it over.
+		//
+		// The OWNER is skipped when the defender is a player: they set stat 0xA5 locally before sending it up, so
+		// echoing it back would only re-apply the value they already drew.
+		public async Task BroadcastShieldRose(WorldEntity entity)
 		{
-			var record = CombatShieldCodec.Build(npc.Handle, npc.ShieldDistribution);
+			ArgumentNullException.ThrowIfNull(entity);
+			var record = CombatShieldCodec.Build(entity.Handle, entity.ShieldDistribution);
 
-			foreach (var viewer in _sim.World.ZoneForEntity(npc).PlayersInRange(npc.Position, WorldSimulation.PlayerInterestRange))
+			foreach (var viewer in _sim.World.ZoneForEntity(entity).PlayersInRange(entity.Position, WorldSimulation.PlayerInterestRange))
 			{
-				if (viewer.Client != null && viewer.Confirmed.Contains(npc.Handle))
+				if (viewer.Handle == entity.Handle)
+					continue;
+
+				if (viewer.Client != null && viewer.Confirmed.Contains(entity.Handle))
 					await WorldIir.Send(viewer.Client, record);
 			}
 		}

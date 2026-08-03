@@ -56,6 +56,12 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				case IirTypes.CombatShieldIIR:
+				{
+					await HandlePlayerShieldRose(client, rawPayload);
+					break;
+				}
+
 				case IirTypes.StatIIR:
 				{
 					// Create-editor (unnamed) avatar stat stream: retail sends no response, we just observe it.
@@ -1466,6 +1472,50 @@ namespace Faolan.GameServer
 					break;
 				}
 			}
+		}
+
+		// #620: the player moved one of their three guards. Unlike an NPC's rose - which the tick rolls and shifts - a
+		// player's rose is the PLAYER'S: the client owns stat 0xA5 and the shield keybinds write it locally
+		// (Ctrl-1 left / Ctrl-2 top / Ctrl-3 right moves one shield, double-tapping stacks all three on that arc), then
+		// it uploads the new spread through `n3EngineClient::SendIIRToServer`. So this is the one direction the
+		// CombatShieldIIR travels for a player, and the server's job is to believe it (within the client's own clamp),
+		// remember it, and relay it to the opponents who need to draw it.
+		//
+		// RE: `AgeOfConan.exe` FUN_01117a20 (the keybind handler, called from the five command stubs at 0x00455cb0..
+		// 0x004562b0) -> FUN_00595f90, whose failure string names it
+		// "n3EngineClient::SendIIRToServer(): Unable to write the IIR to the stream". The handle in the record is the
+		// client's claim; we key off the SESSION like every other c2s that names its own subject.
+		private async Task HandlePlayerShieldRose(INetworkClient client, byte[] rawPayload)
+		{
+			var player = _simulation.PlayerWorldEntity(client);
+			if (player == null)
+				return;
+
+			CombatShieldIIR rose;
+			try
+			{
+				rose = CombatShieldCodec.Parse(rawPayload.AsSpan(sizeof(uint)));
+			}
+			catch (CodecParseException e)
+			{
+				// The codec is STRICT (#530 rule 4) and every captured record is a DOWNLOAD, so the c2s form of this
+				// message is proven from the client's writer rather than from bytes we have seen. Logged loudly with the
+				// body, because a mismatch here is a decode gap worth reading - but not a reason to drop a player
+				// mid-fight over a keypress.
+				Logger.LogError("Unparseable c2s CombatShieldIIR from {Player} ({Length} bytes, {Body}): {Reason}", player.Name, rawPayload.Length,
+					rawPayload.ToHex(), e.Message);
+				return;
+			}
+
+			var distribution = CombatShieldRose.Sanitize(rose.Value);
+			if (distribution == player.ShieldDistribution)
+				return; // the client re-sent the spread it already has (a double-tap onto a full arc); nothing to relay
+
+			player.ShieldDistribution = distribution;
+			await _broadcaster.BroadcastShieldRose(player);
+
+			var (left, mid, right) = CombatShieldDistribution.Unpack(distribution);
+			Logger.LogDebug("Shield rose: {Player} guards {Left}/{Mid}/{Right} (claimed handle 0x{Claimed:X8}).", player.Name, left, mid, right, rose.Handle);
 		}
 
 		private async Task HandleRequestAggroStatus(INetworkClient client, Rpc packet, FaolanStream body)

@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Numerics;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.World;
 using Xunit;
@@ -158,6 +159,38 @@ namespace Faolan.Tests
 			var third = world.Tick(0.1);
 			Assert.Contains(third, e => e.Type == WorldTickEffectType.NpcExitCombat && e.Entity == npc);
 			Assert.False(npc.InCombat);
+		}
+
+		// #620: the two sides of the shield rose are owned by different ends. A player enters the world already guarding
+		// the retail default (one shield per arc) and the tick never touches it - it is the CLIENT that moves a player's
+		// guard, and it uploads each change. An NPC is the mirror: no rose at all until the tick rolls one on engage.
+		[Fact]
+		public void Tick_RollsAnNpcsRose_AndNeverTouchesAPlayers()
+		{
+			var world = new WorldState();
+			var npc = WorldEntity.ForNpc(10, 2040, new Vector3(0, 0, 0), Quaternion.Identity, "Mob", EntityVitals.FromMax(100, 0, 100));
+			npc.Hostile = true;
+			var player = Player(1, 5, 0); // within aggro range (20), so the NPC engages
+
+			Assert.Equal(CombatShieldCodec.DefaultDistribution, player.ShieldDistribution);
+			Assert.Equal(0u, npc.ShieldDistribution); // an unengaged NPC has no rose
+
+			world.Place(npc, 2040, npc.Position, Quaternion.Identity);
+			world.Place(player, 2040, player.Position, Quaternion.Identity);
+
+			var effects = world.Tick(0.1);
+
+			Assert.Contains(effects, e => e.Type == WorldTickEffectType.NpcShieldRose && e.Entity == npc);
+			Assert.NotEqual(0u, npc.ShieldDistribution);
+			// The player is skipped outright: no rose effect names them, and their guard is exactly where they left it.
+			Assert.DoesNotContain(effects, e => e.Entity == player);
+			Assert.Equal(CombatShieldCodec.DefaultDistribution, player.ShieldDistribution);
+
+			// ...and it stays put over the shift cadence, which would have moved a guard on an NPC several times over.
+			for (var i = 0; i < 200; i++)
+				world.Tick(0.1);
+
+			Assert.Equal(CombatShieldCodec.DefaultDistribution, player.ShieldDistribution);
 		}
 
 		[Fact]

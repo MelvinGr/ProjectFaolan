@@ -381,9 +381,13 @@ namespace Faolan.GameServer.World
 		public bool InCombat { get; set; }
 
 		// Directional combat (#20): this defender's blue shield rose - three guards spread over the left/mid/right
-		// arcs, decimal-packed the way CombatShieldIIR carries it. Rolled when the NPC engages and shifted by one
-		// shield every MinShiftSeconds..MaxShiftSeconds while it stays engaged; a swing into a covered arc is mitigated
-		// by the client's own PvE/PvP shield-bonus table. 0 = no rose (never engaged, or a non-combatant).
+		// arcs, decimal-packed the way CombatShieldIIR carries it. A swing into a covered arc is mitigated by the
+		// client's own PvE/PvP shield-bonus table. 0 = no rose (never engaged, or a non-combatant).
+		//
+		// The two sides own it differently (#620). An NPC's rose is OURS: rolled when it engages and shifted by one
+		// shield every MinShiftSeconds..MaxShiftSeconds while it stays engaged. A PLAYER's rose is the PLAYER'S: the
+		// client owns stat 0xA5, moves a guard on the shield keybinds and uploads the new spread as a c2s
+		// CombatShieldIIR, which HandlePlayerShieldRose stores here. So the tick never rolls or shifts a player's.
 		public uint ShieldDistribution { get; set; }
 		public bool Invisible { get; set; }
 
@@ -557,6 +561,10 @@ namespace Faolan.GameServer.World
 			IsPlayer = isPlayer;
 			Name = name;
 			Client = client;
+			// #620: a PLAYER stands with the retail default guard - one shield per arc - from the moment they enter the
+			// world, and moves it themselves from there (the client owns stat 0xA5 and uploads each change). An NPC
+			// starts with no rose at all and rolls one when it engages.
+			ShieldDistribution = isPlayer ? CombatShieldCodec.DefaultDistribution : 0;
 		}
 
 		// Resets the attack cooldown (e.g. when no target is in range), so re-aggro doesn't swing instantly.

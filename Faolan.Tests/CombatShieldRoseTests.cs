@@ -160,6 +160,15 @@ namespace Faolan.Tests
 			Assert.Equal(0u, CombatShieldRose.ApplyArcMitigation(0, 300, ShieldArc.Left));
 		}
 
+		// #620: a player's rose is the only one that arrives from OUTSIDE, so it is the only one that needs the client's
+		// own overflow rule applied to it - FUN_0113de90 resets stat 0xA5 to 111 when the digits sum above three.
+		[Theory, InlineData(300u, 300u), InlineData(111u, 111u), InlineData(21u, 21u), InlineData(0u, 0u), InlineData(333u, 111u), InlineData(999u, 111u),
+		 InlineData(1000u, 111u), InlineData(uint.MaxValue, 111u)]
+		public void Sanitize_AppliesTheClientsOwnOverflowClamp(uint sent, uint expected)
+		{
+			Assert.Equal(expected, CombatShieldRose.Sanitize(sent));
+		}
+
 		[Fact]
 		public void ApplyArcMitigation_LeavesAnUnrolledRoseAlone()
 		{

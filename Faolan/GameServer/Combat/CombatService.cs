@@ -256,12 +256,15 @@ namespace Faolan.GameServer.Combat
 			// its three guards cover that arc. An unguarded arc takes 20% MORE, a triple-stacked one 66% less - the
 			// client's own Combat_PvE{0..3}ShieldBonus table. A swing with no direction (a combo step, a spell) is
 			// undirected and passes through unchanged.
+			// The defender's own rose is read off whatever the handle resolves to, NPC or player alike - a player carries
+			// one now (#620), set by the client and relayed by HandlePlayerShieldRose - and a player defender switches
+			// the table to the PvP column, which is the gentler one (-0.15/-0.30 where PvE mitigates -0.33/-0.66).
 			var swingArc = CombatShieldRose.ArcFor(BehaviorTailScan.AbilityId(BehaviorControlCenterCodec.Parse(rawPayload.AsSpan(sizeof(uint))).Tail));
-			var guard = attackerEntity != null && _sim.World.TryGetZone(attackerEntity.MapId, out var attackerZone)
-				&& attackerZone.TryGet(targetHandle, out var defender)
-					? defender.ShieldDistribution
-					: 0;
-			damage = CombatShieldRose.ApplyArcMitigation(damage, guard, swingArc);
+			WorldEntity? defenderEntity = null;
+			if (attackerEntity != null && _sim.World.TryGetZone(attackerEntity.MapId, out var attackerZone) && attackerZone.TryGet(targetHandle, out var defender))
+				defenderEntity = defender;
+
+			damage = CombatShieldRose.ApplyArcMitigation(damage, defenderEntity?.ShieldDistribution ?? 0, swingArc, defenderEntity?.IsPlayer == true);
 			const DamageSchool school = DamageSchool.Crushing; // the player's physical-melee damage school (capture-derived)
 
 			// 1) BehaviorControlCenterIIR ack - releases the swing. The record (header, echoed args, 81-byte result

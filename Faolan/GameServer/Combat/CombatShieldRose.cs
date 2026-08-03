@@ -82,6 +82,18 @@ namespace Faolan.GameServer.Combat
 			return CombatShieldDistribution.Pack(counts[0], counts[1], counts[2]);
 		}
 
+		// A distribution the CLIENT sent up (#620), reduced to one the client would itself render. The player owns their
+		// own rose - `AgeOfConan.exe` FUN_01117a20 moves a guard on the shield keybinds, writes stat 0xA5 and uploads the
+		// result - so this value is the player's claim, not ours, and it is the one wire number in the system we do not
+		// author. The client applies exactly one rule to an incoming spread (FUN_0113de90, the CombatShieldIIR Activate):
+		// re-read the three digits and, when they sum above TotalShields, write DefaultDistribution back. Applying the
+		// same rule here keeps a hand-built packet from handing a player a `999` rose that the client would never draw.
+		public static uint Sanitize(uint distribution)
+		{
+			var counts = Counts(distribution);
+			return distribution > 999 || counts.Sum(c => c) > TotalShields ? CombatShieldCodec.DefaultDistribution : distribution;
+		}
+
 		// Seconds until this defender shifts again.
 		public static double NextShiftSeconds(Random random)
 		{
