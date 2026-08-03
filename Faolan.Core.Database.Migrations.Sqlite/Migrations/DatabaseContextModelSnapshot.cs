@@ -504,9 +504,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<DateTimeOffset?>("ExpiresAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<uint>("Nonce")
-                        .HasColumnType("INTEGER");
-
                     b.HasKey("CharacterId", "BuffId");
 
                     b.ToTable("CharacterBuffs");

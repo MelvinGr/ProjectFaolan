@@ -62,10 +62,6 @@ namespace Faolan.GameServer
 		// see snapshot_embeds_strie_quest). See CommitCharacterName / QuestContent.BeachStarterQuestId.
 		private const uint BeachStarterQuestId = QuestContent.BeachStarterQuestId;
 
-		// The per-application effect nonce a synthesized self-buff carries (the value the old verbatim Scythe-Shield
-		// blob used; the client does not validate it - #304).
-		private const uint DefaultSelfBuffEffectNonce = 0x14C5C912;
-
 		// The 0x205A (PerformSpecialAction) selector for the "Path of Asura" teleport spell (NecroL80 path-of-azura
 		// capture: PerformSpecialAction 0x4E1 -> retail DispatchRedirectToServer, a long-load teleport). It recalls to
 		// the BOUND location (our single-server DoTeleport is the equivalent of retail's cross-server redirect).
@@ -131,10 +127,6 @@ namespace Faolan.GameServer
 		// normal world/NPC-combat broadcasts use. The client appears to gate the player's own dead-state transition on
 		// the 0x59 endpoint - sending the full sequence from 0x58 left the avatar alive with the release UI shut (#214).
 		private static readonly ProtoEndpoint PlayerDeathSender = Endpoints.Endpoint(Endpoints.GameAgentType, 0x59);
-
-		// Per-application effect-instance id counter for spellweave buffs (so distinct buffs don't collapse onto one
-		// client-side effect). Kept in the 0x18xxxxxx neighbourhood of the captured nonces.
-		private static int _spellweaveEffectSeq;
 
 		// Phase shift for the world clock, in game seconds (#351). The clock itself runs off the wall clock
 		// (GameTimeCodec); this is what `.time` moves so a tester can jump to dusk without waiting out a 4.8h game day.

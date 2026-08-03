@@ -58,7 +58,7 @@ namespace Faolan.Tests
 			var capturedCarrier = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15000000c3500802e5d4" +
 			                                            "00000000000000000083d600000100000001000000000031eb150000005000000000000000000000000000000050000000001560f9bb");
 
-			var built = MagicBuffCodec.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(80));
+			var built = MagicBuffCodec.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(80, 0x1560F9BB));
 
 			Assert.Equal(capturedCarrier, built);
 		}
@@ -66,22 +66,32 @@ namespace Faolan.Tests
 		// #342: retail's WORLD-ENTRY mount restore is the same record as a fresh mount cast. Riding out of the no-mount
 		// King Conan castle (NecroL80_..._login_leave_king_conan_castle-Dismount, the ride buff two records after the
 		// FullChar snapshot), retail re-seats the mount with an apply that differs from the cast above in only 6 of 84
-		// bytes - the per-application effect id and the trailing nonce, both of which vary per application by
-		// definition. So there is no "already active" / silent variant of this record to prefer, which is what rules out
-		// the snapshot-reconstruction approach the ticket proposed: the snapshot has no buff region, and retail would
-		// not use one if it had.
+		// bytes. So there is no "already active" / silent variant of this record to prefer, which is what rules out the
+		// snapshot-reconstruction approach the ticket proposed: the snapshot has no buff region, and retail would not
+		// use one if it had.
+		//
+		// Those 6 bytes were long filed as "the per-application effect id and the trailing nonce, which vary by
+		// definition". They are nothing of the sort, and decoding them (#480) is what turns this pair into evidence for
+		// how a restore is SHAPED:
+		//   * bytes 35..37 are the payload's Duration - 8_509_794 cs (23.638 h) against the fresh cast's 8_640_000
+		//     (24 h). Retail restores with the REMAINING time, not the full duration. 21.7 minutes had elapsed.
+		//   * bytes 77..79 are the payload's absolute EXPIRY STAMP, in milliseconds of the server's uptime.
+		// Subtracting each record's own duration from its own stamp recovers the instant each was APPLIED, and the two
+		// captures - separate files, separate sessions - land 91.8 seconds apart on one server's uptime: 3.15135 days
+		// and 3.15029 days. Two independently captured absolute timestamps agreeing to a minute and a half is what
+		// pins the clock, and it is the same clock DispatchPong carries (see MagicBuffExpiryStampTests).
 		[Fact]
-		public void MountRideBuff_EntryRestoreMatchesAFreshCast_ExceptThePerApplicationIds()
+		public void MountRideBuff_EntryRestoreMatchesAFreshCast_ExceptTheRemainingTimeAndItsExpiry()
 		{
 			var entryRestore = Convert.FromHexString("6b87e3160000c3500802e5d4000031eb15000000c3500802e5d4" +
 			                                         "00000000000000000081d962000100000001000000000031eb15000000500000000000000000000000000000005000000000154bb4d7");
 
-			var built = MagicBuffCodec.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(80));
+			var built = MagicBuffCodec.Build(0x0802e5d4, 0x0802e5d4, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(80, 0x1560F9BB));
 
 			Assert.Equal(entryRestore.Length, built.Length);
-			// Only the per-application effect id (the u32 spanning 35..37) and the trailing nonce (77..79) may differ -
-			// both vary per application by definition. Everything else - spell, endpoints, rank, duration, the whole
-			// 54-byte payload shape - has to match retail's entry restore exactly.
+			// Only the Duration (the low three bytes of the u32 spanning 35..37) and the expiry stamp (77..79) may
+			// differ - a resumed buff has less time left and a different absolute end. Everything else - spell,
+			// endpoints, form byte, the whole 54-byte payload shape - has to match retail's entry restore exactly.
 			var differing = Enumerable.Range(0, built.Length).Where(i => built[i] != entryRestore[i]).ToArray();
 			Assert.Equal([35, 36, 37, 77, 78, 79], differing);
 		}

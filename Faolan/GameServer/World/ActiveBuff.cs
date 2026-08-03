@@ -27,11 +27,6 @@ namespace Faolan.GameServer.World
 		// This DoT's measured tick interval in ms (Spell.DotIntervalMs); 0 = unmeasured, and the tick uses its default.
 		public uint DotIntervalMs { get; init; }
 
-		// The bit needed to reconstruct this buff's ApplySpell payload on relog (#274): the per-application effect
-		// Nonce (last u32 of the payload). Set at apply from the constructed payload; persisted to CharacterBuff for a
-		// self-buff. Default 0 for the NPC-cast debuffs (which are never persisted).
-		public uint Nonce { get; init; }
-
 		public bool Expired(DateTimeOffset now)
 		{
 			return DurationSeconds is { } d && (now - AppliedAt).TotalSeconds >= d;
@@ -49,14 +44,6 @@ namespace Faolan.GameServer.World
 		public static uint DurationMsFromPayload(MagicBuffData? payload)
 		{
 			return payload?.Duration * 10 ?? 0;
-		}
-
-		// The per-application effect nonce an ApplySpell payload carries. It is the LOW half of the record's u64
-		// expiry-stamp slot, which is where our sender puts it - the `effectNonce` spelling is a misnomer the codec
-		// documents and this file keeps because it is also a persisted column name. (#274)
-		public static uint NonceFromPayload(MagicBuffData? payload)
-		{
-			return (uint)(payload?.ExpiryStamp ?? 0);
 		}
 	}
 }

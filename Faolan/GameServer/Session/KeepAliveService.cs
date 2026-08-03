@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Enums;
@@ -36,10 +35,6 @@ namespace Faolan.GameServer.Session
 			_metrics = metrics;
 		}
 
-		// The process start, for the uptime counter below. Stopwatch rather than Environment.TickCount64 because the
-		// counter must be monotonic and rooted at OUR start, not at the machine's boot.
-		private static readonly long Started = Stopwatch.GetTimestamp();
-
 		// LatencyCheck (0x2085): reply body = [counter echoed][uptime hi][uptime lo].
 		//
 		// ⚠️ The last two words are ONE 64-bit MICROSECOND counter, high word first - not a constant and a tick. Proven
@@ -52,10 +47,15 @@ namespace Faolan.GameServer.Session
 		// MACHINE's boot time, wrapped to u32). 0x12 is a real captured value, but only because it was one retail
 		// server's uptime bucket - so the pair was a 64-bit counter that never advanced its high half and jumped
 		// BACKWARDS by 71.6 minutes every time the low half wrapped.
+		//
+		// ⚠️ This reply is the ONLY thing that sets the client's `ServerTime_c`, and its value (÷1000) is the clock
+		// every absolute wire expiry is measured against - today the MagicBuffIIR apply's @46 stamp (#480). That is why
+		// the origin lives in `ServerUptimeClock` instead of a private field here: the two senders have to be the same
+		// clock, and a second origin would desync every buff resume with nothing on the wire looking wrong.
 		public static Task HandleLatencyCheck(INetworkClient client, Rpc packet, FaolanStream body)
 		{
 			var counter = body.ReadUInt32();
-			var uptime = (ulong)Stopwatch.GetElapsedTime(Started).TotalMicroseconds;
+			var uptime = ServerUptimeClock.Microseconds;
 
 			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchPong, (byte[])[0x01],
 				b => b.WriteUInt32(counter)

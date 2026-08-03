@@ -70,7 +70,48 @@ ENDS, which is what a builder needs.
 **`@46–53` is an absolute expiry, not a counter.** `Activate` computes `(stamp64 - <global clock>) / 10` and, if
 that is positive and *shorter* than `Duration`, overwrites `Duration` with it. That is how retail resumes a buff
 that is already partly elapsed (relog, or an entity streaming in mid-buff). It is also why the earlier note said
-"the client does NOT validate it": our synthetic value simply fails the `0 < x <= Duration` test and is ignored.
+"the client does NOT validate it": the synthetic "effect nonce" we used to write simply fails the
+`0 < x <= Duration` test and is ignored.
+
+### The clock is our own pong's uptime counter (#480)
+
+That `<global clock>` is not an unknown — **it is a value only WE can have put there**, and we already send it.
+
+- The global is the u64 at `+0x48` of a `ServerTime_c` singleton (`DAT_02d27428`). Its module ctor
+  (`FUN_007a0d60`) zeroes it and connects one slot to one signal; that slot, `FUN_007a0ea0`, is the **only**
+  writer:
+
+  ```c
+  this[0x48] = (__int64)incoming / 1000;   // µs -> ms
+  this[0x40] = timeGetTime();
+  this[0x50] = (double)this[0x48] * 0.001; // the same value in seconds
+  ```
+
+- The signal's emitter is `GamecodeClient_t` vtable slot 131 → **`DispatchPong`** (GameCharInterface `0x2082`),
+  the reply to the client's `LatencyCheck` (`0x2085`) poll. Its body is
+  `[u32 echoedCounter][u32 uptimeHi][u32 uptimeLo]` — a 64-bit **microsecond** uptime counter (`KeepAliveService`,
+  already corpus-proven to advance at wall-clock rate and to read as the retail server's uptime).
+
+So the client's clock is **the server's uptime in milliseconds**, and the expiry stamp is
+`uptimeMs + durationMs`. `Activate` reads the raw field rather than an accessor that adds elapsed time, so the
+comparison is always against whatever the **last pong** carried.
+
+**Verified over the corpus, not just read out of the client.** Across the 94 captures carrying both a pong and a
+54-byte apply, `stamp − (uptimeMs + duration_cs × 10)` has a **median of +6 ms**, lands within 250 ms for
+**2551 of 2929** applies and within 5 s for 98.6% of them; the residue is captures spanning a reconnect, where
+the nearest pong belongs to a different server instance. Two independent captures of the same retail session
+agree to 92 seconds on when the mount buff was applied (see the `NpcSpellCastCodecTests` cross-check below).
+[V1: tools/ghidra/DumpServerTimeClock.java] [V1: Faolan.Tests/MagicBuffExpiryStampTests.cs]
+
+**What we send now.** `ServerUptimeClock` owns the one origin both senders read — the pong in microseconds, the
+stamp in milliseconds — and `MagicBuffDatas.ApplyNow` sources it. The buff RESTORE path still puts the
+**remaining** time in `Duration` (rather than retail's full duration plus a true expiry) because world entry can
+precede the client's first `LatencyCheck`: with `ServerTime` still 0 the client rejects the stamp and counts down
+`Duration`, so the remaining-time shape is correct either way. Sending the retail shape needs a
+"has this session answered a pong yet" gate — Gitea #601.
+
+⚠️ Retail's captured world-entry mount restore proves the remaining-time shape is what retail uses too: its
+`Duration` is 8,509,794 cs (23.638 h) against a fresh cast's 8,640,000 (24 h) — 21.7 minutes had elapsed.
 
 **`@26` stays open [V0].** It sits in the descriptor beside the spell id and tracks `CastingLevel` closely but not
 exactly across the captures (1563 equal, 283 below, 92 above), so a second input exists. What the read DOES settle
@@ -103,8 +144,11 @@ and the wrong version migrates and builds cleanly while transposing the bytes.
 | `@45` byte `Rank` | `@42` u32 `CastingLevel`, low byte | **not a rank** — the caster's level |
 | `@50–53` u32 counter | the LOW half of the `@46` u64 expiry stamp | not a counter, and not standalone |
 
-The `NpcSpell` columns still round-trip byte-exact, so nothing is broken by this — but `Magnitude` and `Rank`
-are misnomers, and a builder that treats `@50` as an independent u32 is writing half of a 64-bit field.
+The `NpcSpell` columns still round-trip byte-exact, so nothing was ever broken by this — but `Magnitude` and
+`Rank` were misnomers, and a builder that treats `@50` as an independent u32 is writing half of a 64-bit field.
+Both halves of #480 have since landed: the columns carry the client's names, and the stamp is sourced rather
+than invented (so the per-application "effect nonce" — and the `CharacterBuff.Nonce` column that persisted it —
+are gone; a restore recomputes the stamp from `ExpiresAt`).
 
 ## The apply / end pair
 Every cast arrives as a pair of ids differing only in their low byte: **form 0** carries the full 54-byte
@@ -119,7 +163,8 @@ form byte (see above), and the ids pair up as one spell's start and stop rather 
   sim **builds** the wire payload from them via `MagicBuffDataCodec` (#304) — there is no stored blob any more. The
   value at `@10` that the early decode read as a u32 "magnitude" is actually the **Duration** (centiseconds; the
   `@10` u16 read big-endian off a zeroed high half, e.g. Poacher 400 = 4s), which is why the raw 400–4000 range
-  is durations, not HP. The value at `@50` is not stored — it is the low half of the client's expiry stamp.
+  is durations, not HP. The value at `@50` is not stored — it is the low half of the client's expiry stamp,
+  which is session state (the server's uptime at the buff's end) rather than anything about the spell.
 - Importing only the form-0 (non-empty) row per spell is the clean form (the form-1 is a terminator, not a
   standalone cast).
 

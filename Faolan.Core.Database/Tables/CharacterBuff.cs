@@ -13,9 +13,9 @@ namespace Faolan.Core.Database.Tables
 	// handle and a DoT that shouldn't resume across a relog. Buffs owned by a dedicated re-applier (Shield of the
 	// Risen, the mount ride buff) are excluded at save time so they aren't double-applied on entry.
 	//
-	// The wire packet is CONSTRUCTED on restore (SelfBuffCodec.BuildBuffDataLong) rather than replaying a stored blob:
-	// the structured columns (base id = BuffId >> 8, the effect Nonce) are enough to rebuild the ApplySpell payload,
-	// and the duration field is recomputed from ExpiresAt so the client counts down the REMAINING time.
+	// The wire packet is CONSTRUCTED on restore rather than replaying a stored blob: the base id (BuffId >> 8) plus
+	// ExpiresAt are enough to rebuild the ApplySpell payload, with the duration field AND the payload's absolute expiry
+	// stamp both recomputed from ExpiresAt so the client counts down the REMAINING time (#480).
 	[PrimaryKey(nameof(CharacterId), nameof(BuffId))]
 	public class CharacterBuff
 	{
@@ -30,9 +30,5 @@ namespace Faolan.Core.Database.Tables
 		// Absolute UTC expiry, so the REMAINING time survives the relog (remaining = ExpiresAt - now at restore).
 		// Null = a buff with no server duration (lives until cancelled) - restored with a 0 duration field.
 		public DateTimeOffset? ExpiresAt { get; set; }
-
-		// The per-application effect nonce carried in the ApplySpell payload (last u32), preserved so the rebuilt
-		// packet reproduces the original effect instance.
-		public uint Nonce { get; set; }
 	}
 }

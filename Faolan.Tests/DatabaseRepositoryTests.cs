@@ -128,13 +128,11 @@ namespace Faolan.Tests
 					new CharacterBuff
 					{
 						BuffId = 0x02387E03,
-						Nonce = 0x14C5C912,
 						ExpiresAt = expiry
 					},
 					new CharacterBuff
 					{
 						BuffId = 0x0037F298,
-						Nonce = 0x195DA1FE,
 						ExpiresAt = null
 					}
 				]);
@@ -142,10 +140,8 @@ namespace Faolan.Tests
 				var loaded = await repo.GetCharacterBuffs(character.Id);
 				Assert.Equal(2, loaded.Length);
 				var timed = Assert.Single(loaded, b => b.BuffId == 0x02387E03);
-				Assert.Equal(0x14C5C912u, timed.Nonce);
 				Assert.Equal(expiry, timed.ExpiresAt);
 				var permanent = Assert.Single(loaded, b => b.BuffId == 0x0037F298);
-				Assert.Equal(0x195DA1FEu, permanent.Nonce);
 				Assert.Null(permanent.ExpiresAt);
 
 				// Re-save with only the permanent buff (the timed one expired): replace-all drops the missing row.
@@ -153,7 +149,6 @@ namespace Faolan.Tests
 					new CharacterBuff
 					{
 						BuffId = 0x0037F298,
-						Nonce = 0x195DA1FE,
 						ExpiresAt = null
 					}
 				]);

@@ -168,12 +168,12 @@ namespace Faolan.GameServer
 			{
 				var effectWireId = effect.Id << 8;
 				Logger.LogInformation("Cast {Cast} ('{Name}') carries no effect of its own; applying its effect spell {Effect} ('{EffectName}').", spell.Id, spell.Name, effect.Id, effect.Name);
-				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, MagicBuffDatas.Apply(effect.Id, effect.DurationMs / 10, DefaultSelfBuffEffectNonce, CasterLevel(client)));
+				await SendMagicBuffIir(client, applyTo, applyFrom, effectWireId, MagicBuffDatas.ApplyNow(effect.Id, effect.DurationMs / 10, CasterLevel(client)));
 				return;
 			}
 
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.Apply(spellId >> 8, durationCs, DefaultSelfBuffEffectNonce, CasterLevel(client)));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.ApplyNow(spellId >> 8, durationCs, CasterLevel(client)));
 		}
 
 		// Applies a spellweave buff (trance buff on activate, or a component's own spell on add) with the CORRECT
@@ -186,8 +186,7 @@ namespace Faolan.GameServer
 			var spellBase = spellId >> 8;
 			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			var nonce = 0x18000000u | ((uint)Interlocked.Increment(ref _spellweaveEffectSeq) & 0x00FFFFFF);
-			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.Apply(spellBase, durationCs, nonce, CasterLevel(client)));
+			await SendMagicBuffIir(client, applyTo, applyFrom, spellId, MagicBuffDatas.ApplyNow(spellBase, durationCs, CasterLevel(client)));
 		}
 
 		// Shield of the Risen also drops the instant the player commits an AGGRESSIVE action - an offensive cast, a
@@ -249,7 +248,11 @@ namespace Faolan.GameServer
 				}
 
 				var spellBase = buff.BuffId >> 8;
-				await SendMagicBuffIir(client, self, self, buff.BuffId, MagicBuffDatas.Apply(spellBase, remainingCs, buff.Nonce, CasterLevel(client)));
+				// Duration stays the REMAINING time (not the spell's full duration) and the stamp is sourced from it, so
+				// this restores correctly whether or not the client has learned our clock yet: it only learns it from a
+				// DispatchPong, and world entry can precede the first LatencyCheck. With ServerTime still 0 the client
+				// rejects the stamp as longer than Duration and counts down Duration - the same remaining time.
+				await SendMagicBuffIir(client, self, self, buff.BuffId, MagicBuffDatas.ApplyNow(spellBase, remainingCs, CasterLevel(client)));
 				restored++;
 			}
 
@@ -395,11 +398,7 @@ namespace Faolan.GameServer
 					var entity = _simulation.PlayerWorldEntity(client);
 					if (entity != null && entity.Handle == applyTo)
 					{
-						entity.ActiveBuffs[spellId] = new ActiveBuff(spellId, applyFrom, DateTimeOffset.UtcNow, durationMs / 1000f)
-						{
-							// Preserve the effect nonce so the buff can be reconstructed byte-compatibly on relog (#274).
-							Nonce = ActiveBuff.NonceFromPayload(payload)
-						};
+						entity.ActiveBuffs[spellId] = new ActiveBuff(spellId, applyFrom, DateTimeOffset.UtcNow, durationMs / 1000f);
 						// #367: the buff may carry stat deltas (armor/ratings/attributes) - fold them into the live stats.
 						await SyncBuffStats(client);
 					}
@@ -495,8 +494,7 @@ namespace Faolan.GameServer
 		{
 			var spell = await Database.GetSpell(spellBase);
 			var durationCs = (spell?.DurationMs ?? 0) / 10;
-			var nonce = 0x14000000u | (spellBase & 0x00FFFFFF);
-			await SendMagicBuffIir(client, self, self, spellBase << 8, MagicBuffDatas.Apply(spellBase, durationCs, nonce, CasterLevel(client)));
+			await SendMagicBuffIir(client, self, self, spellBase << 8, MagicBuffDatas.ApplyNow(spellBase, durationCs, CasterLevel(client)));
 		}
 
 		// Shield of the Risen (#221): retail applies TWO persistent self-buffs on every world entry - both on a fresh

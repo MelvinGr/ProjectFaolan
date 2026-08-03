@@ -23,15 +23,19 @@ namespace Faolan.Tests
 		public void RideBuffPayload_ReproducesTheCapturedFrame520Blob()
 		{
 			// The verbatim 54-byte ride-buff payload from the mount capture (frame 520): duration@8 = 8_640_000 cs
-			// (24 h), spell base 0x31EB15 @22, magnitude 80, effect nonce 0x1560F9BB @50. Now CONSTRUCTED via
-			// MagicBuffDatas.Apply instead of a verbatim blob.
+			// (24 h), spell base 0x31EB15 @22, casting level 80, and the @46 u64 expiry stamp 0x1560F9BB. Now
+			// CONSTRUCTED via MagicBuffDatas.Apply instead of a verbatim blob.
+			//
+			// That stamp is SESSION state, not a catalog constant: 0x1560F9BB ms = 4.15 days of that retail server's
+			// uptime, which is when the 24 h buff would have ended (#480). It is passed in here because this test
+			// reproduces one captured send; the live sender takes it from ServerUptimeClock.
 			byte[] captured =
 			[
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x83, 0xD6, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x31, 0xEB, 0x15, 0x00, 0x00, 0x00, 0x50,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x15, 0x60, 0xF9, 0xBB
 			];
 
-			Assert.Equal(captured, MagicBuffDataCodec.Build(MountCatalog.RideBuffPayload(80))); // the mount capture is a level-80 character (#438)
+			Assert.Equal(captured, MagicBuffDataCodec.Build(MountCatalog.RideBuffPayload(80, 0x1560F9BB))); // the mount capture is a level-80 character (#438)
 		}
 
 		[Fact]

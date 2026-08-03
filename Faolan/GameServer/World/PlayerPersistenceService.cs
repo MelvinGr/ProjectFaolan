@@ -70,7 +70,6 @@ namespace Faolan.GameServer.World
 					.Select(b => new CharacterBuff
 					{
 						BuffId = b.BuffId,
-						Nonce = b.Nonce,
 						ExpiresAt = b.ExpiresAt
 					})
 					.ToList();

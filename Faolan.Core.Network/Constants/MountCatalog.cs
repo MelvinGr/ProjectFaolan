@@ -36,11 +36,15 @@ namespace Faolan.Core.Network.Constants
 		// spawns the horse but never seats the player (proven in-client 2026-06-17).
 		public const uint RideSpell = 0x31EB1500u;
 
-		// The captured ride-buff facts (the DB Spell row for 0x31EB15 is mislabelled, so these come from the mount
-		// capture, frame 520): a 24 h duration and the per-application effect nonce. The payload itself is the 54-byte
-		// MagicBuffIIR shape SpellweaveCodec builds (the client wants that shape here, not the 50-byte self-buff form).
+		// The captured ride-buff fact (the DB Spell row for 0x31EB15 is mislabelled, so this comes from the mount
+		// capture, frame 520): a 24 h duration. The payload itself is the 54-byte MagicBuffIIR shape SpellweaveCodec
+		// builds (the client wants that shape here, not the 50-byte self-buff form).
+		//
+		// What is NOT a catalog constant is the payload's @46 expiry stamp. That capture's 0x1560F9BB reads as an
+		// "effect nonce" only until you put it on the right clock: it is 358,846,395 ms = 4.15 days of that retail
+		// server's UPTIME, i.e. the moment the 24 h ride buff would have ended (#480). It is session state and is
+		// sourced per send, like every other absolute stamp.
 		private const uint RideBuffDurationCentiseconds = 8_640_000; // 24 h
-		private const uint RideBuffEffectNonce = 0x1560F9BBu;
 
 		public static readonly IReadOnlyList<MountDef> All =
 		[
@@ -64,13 +68,21 @@ namespace Faolan.Core.Network.Constants
 				: null;
 		}
 
-		// The mount RIDE buff's MagicBuffIIR data region (the generic APPLY form), CONSTRUCTED from its base spell
-		// id + captured duration and nonce (byte-identical to the mount-capture frame 520, proven by MountCatalogTests).
+		// The mount RIDE buff's MagicBuffIIR data region (the generic APPLY form), CONSTRUCTED from its base spell id +
+		// captured duration, with the expiry stamp sourced from the live server clock (byte-identical to the
+		// mount-capture frame 520 when that capture's own stamp is supplied - proven by MountCatalogTests).
 		// `riderLevel` fills the payload's @26/@42 words - the mount capture is a level-80 character, which is where the
 		// old hardcoded 80 came from (#438). Returns the VALUE; MagicBuffCodec composes it (#539).
 		public static MagicBuffData RideBuffPayload(uint riderLevel)
 		{
-			return MagicBuffDatas.Apply(RideSpell >> 8, RideBuffDurationCentiseconds, RideBuffEffectNonce, riderLevel);
+			return MagicBuffDatas.ApplyNow(RideSpell >> 8, RideBuffDurationCentiseconds, riderLevel);
+		}
+
+		// The same payload with the expiry stamp supplied - for the golden test, which reproduces one captured send and
+		// therefore has to pin that session's stamp rather than this process's uptime.
+		public static MagicBuffData RideBuffPayload(uint riderLevel, ulong expiryStamp)
+		{
+			return MagicBuffDatas.Apply(RideSpell >> 8, RideBuffDurationCentiseconds, expiryStamp, riderLevel);
 		}
 
 		private static Dictionary<uint, MountDef> BuildById()

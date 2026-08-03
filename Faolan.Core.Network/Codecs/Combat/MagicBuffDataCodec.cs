@@ -43,12 +43,22 @@ namespace Faolan.Core.Network.Codecs.Combat
 	// level in both is what the evidence supports; it is not a claim that it is decoded. What IS settled is that
 	// neither word is a magnitude or a stack count - the question #438 was opened to answer.
 	//
-	// ⚠️ ExpiryStamp is ONE u64 and the client treats it as an ABSOLUTE expiry: Activate computes
-	// (stamp - <global clock>) / 10 and, if that is positive and SHORTER than Duration, overwrites Duration with it.
-	// That is how retail resumes a buff that is already partly elapsed. Our value is written into the low half with a
-	// zero high half, so it fails the `0 < x <= Duration` test and is ignored - which is exactly why it has always
-	// looked like the client does not validate this field. Sourcing it properly is Gitea #480. (The `effectNonce`
-	// spelling at the call sites is a MISNOMER kept only because renaming it reaches into ActiveBuff persistence.)
+	// ExpiryStamp is ONE u64 and the client treats it as an ABSOLUTE expiry: Activate computes
+	// (stamp - <the client's ServerTime>) / 10 and, if that is positive and SHORTER than Duration, overwrites Duration
+	// with it. That is how retail resumes a buff that is already partly elapsed - a relog, or an entity streaming into
+	// view mid-buff.
+	//
+	// **The clock is the server's UPTIME IN MILLISECONDS, and we already send it** (#480). The client's ServerTime_c
+	// has exactly one input: the `DispatchPong` (0x2082) reply to its LatencyCheck poll, whose trailing 64-bit
+	// MICROSECOND uptime counter its signal slot divides by 1000. So `stamp = uptimeMs + durationMs`, and both halves
+	// come out of `ServerUptimeClock`. Verified over the corpus, not just read out of the client: across the 94 captures
+	// carrying both a pong and an apply, `stamp - (uptimeMs + duration_cs*10)` has a MEDIAN of +6 ms and lands within
+	// 250 ms for 2551 of 2929 applies (98.6% within 5 s; the residue is captures spanning a reconnect, where the
+	// nearest pong belongs to a different server instance).
+	// [V1: tools/ghidra/DumpServerTimeClock.java + Faolan.Tests/MagicBuffExpiryStampTests.cs]
+	//
+	// It was long written as a per-application "effect nonce" in the LOW half with a zero high half, which always
+	// failed the `0 < x <= Duration` test - which is exactly why it looked like the client does not validate the field.
 	public static class MagicBuffDataCodec
 	{
 		public const int Length = 54;
@@ -66,9 +76,9 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// The form every live buff send uses: `casterLevel` fills BOTH the descriptor slot and CastingLevel (see the
 		// [V0] note above). It has no default ON PURPOSE, so a new call site has to say whose level it is rather than
 		// inheriting an 80 that is only right for a level-80 character.
-		public static byte[] Build(uint spellBaseId, uint durationCentiseconds, uint effectNonce, uint casterLevel)
+		public static byte[] Build(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint casterLevel)
 		{
-			return Build(MagicBuffDatas.Apply(spellBaseId, durationCentiseconds, effectNonce, casterLevel));
+			return Build(MagicBuffDatas.Apply(spellBaseId, durationCentiseconds, expiryStamp, casterLevel));
 		}
 
 		public static MagicBuffData Parse(in ReadOnlySpan<byte> data)
@@ -117,10 +127,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// Descriptor[0] - the only descriptor word that is a non-zero constant across every captured apply.
 		private const uint DescriptorLead = 1;
 
-		// The APPLY form every buff we send uses.
-		public static MagicBuffData Apply(uint spellBaseId, uint durationCentiseconds, uint effectNonce, uint casterLevel)
+		// The APPLY form every buff we send uses. `expiryStamp` is an ABSOLUTE instant on the server's uptime-milli
+		// clock (`ServerUptimeClock.Milliseconds`), not a duration and not an opaque nonce - see the codec's header.
+		public static MagicBuffData Apply(uint spellBaseId, uint durationCentiseconds, ulong expiryStamp, uint casterLevel)
 		{
-			return new MagicBuffData(0, 0, durationCentiseconds, 0x00, 0x01, [DescriptorLead, 0, spellBaseId, casterLevel, 0, 0, 0], casterLevel, effectNonce);
+			return new MagicBuffData(0, 0, durationCentiseconds, 0x00, 0x01, [DescriptorLead, 0, spellBaseId, casterLevel, 0, 0, 0], casterLevel, expiryStamp);
+		}
+
+		// The APPLY form for a buff starting NOW and running for `durationCentiseconds` - the shape every live cast
+		// wants, with the stamp sourced rather than invented. Kept beside Apply so a call site cannot half-source it.
+		public static MagicBuffData ApplyNow(uint spellBaseId, uint durationCentiseconds, uint casterLevel)
+		{
+			return Apply(spellBaseId, durationCentiseconds, ServerUptimeClock.ExpiryFromNow(durationCentiseconds * 10UL), casterLevel);
 		}
 	}
 
