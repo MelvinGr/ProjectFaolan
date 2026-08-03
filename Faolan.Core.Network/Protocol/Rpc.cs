@@ -50,10 +50,10 @@ namespace Faolan.Core.Network.Protocol
 	//    old `headerData` tail was that bug with a name; protobuf-net's extension data would be the same bug without
 	//    one. Read by hand, an unexpected tag throws (see Parse) - which is how a desynced stream gets caught at the
 	//    frame boundary instead of three subsystems later.
-	// 2. **The frame needs `headerLen` BEFORE the header bytes.** Going through the serializer means serialize to a
-	//    scratch buffer, measure, then copy - an `RpcHeader` plus two `ProtoEndpoint`s plus a buffer per packet, on a
-	//    path every world broadcast takes. Written directly, the length is arithmetic (VarintLength) and the bytes go
-	//    straight into the frame.
+	// 2. **`IExtensible` aside, the serializer would still cost an `RpcHeader` plus two `ProtoEndpoint` objects per
+	//    packet** on a path every world broadcast takes, to produce bytes this writes directly. (The frame needs
+	//    `headerLen` before the header, but that is not the reason: `WriteArrayUInt32Length` measures the header off
+	//    its own writes, which is strictly better than the hand-summed arithmetic that used to live here.)
 	// 3. **Byte-exactness here is the product, not a nicety.** protobuf-net's writer is not automatically identical to
 	//    retail's: `ProtobufExtensions.RepackSingleElementFields` exists because it writes a single-element packed
 	//    field unpacked, one byte short of the capture (#538). Nothing in RpcHeader is packed, so that specific trap
@@ -143,26 +143,31 @@ namespace Faolan.Core.Network.Protocol
 			var sender = Sender.ToProtobuf();
 			var receiver = Receiver.ToProtobuf();
 			var routingContext = RoutingContext?.ToProtobuf();
+			var method = Method; // Rpc is a struct, so the header lambda cannot capture `this` to read it.
 
 			using var stream = new FaolanStream();
 			stream.WriteUInt32(0); // length     - backfilled below
 			stream.WriteUInt32(0); // crc32      - backfilled below
-			// headerLen: each endpoint field costs [tag][byteLen] + its bytes, and method_instance [tag] + its varint.
-			stream.WriteUInt32((uint)(sizeof(byte) * 2 + sender.Length + sizeof(byte) * 2 + receiver.Length +
-			                          (routingContext is null ? 0 : sizeof(byte) * 2 + routingContext.Length) +
-			                          sizeof(byte) + VarintLength(Method)));
-			stream.WriteByte(CallerIdTag);
-			stream.WriteArrayByteLength(sender);
-			stream.WriteByte(EndpointIdTag);
-			stream.WriteArrayByteLength(receiver);
-			if (routingContext is not null)
-			{
-				stream.WriteByte(RoutingContextTag);
-				stream.WriteArrayByteLength(routingContext);
-			}
 
-			stream.WriteByte(MethodInstanceTag);
-			stream.WriteVarint(Method);
+			// headerLen then the header, from the SAME writes - the length is measured off the bytes rather than
+			// predicted from them. It used to be hand-summed ("each endpoint field costs [tag][byteLen] + its bytes,
+			// and method_instance [tag] + its varint", plus a VarintLength helper existing only to feed it), which is
+			// a second, arithmetic description of the header that a new field has to be remembered in twice.
+			stream.WriteArrayUInt32Length(header =>
+			{
+				header.WriteByte(CallerIdTag);
+				header.WriteArrayByteLength(sender);
+				header.WriteByte(EndpointIdTag);
+				header.WriteArrayByteLength(receiver);
+				if (routingContext is not null)
+				{
+					header.WriteByte(RoutingContextTag);
+					header.WriteArrayByteLength(routingContext);
+				}
+
+				header.WriteByte(MethodInstanceTag);
+				header.WriteVarint(method);
+			});
 
 			stream.WriteArray(Body.Span);
 
@@ -289,20 +294,6 @@ namespace Faolan.Core.Network.Protocol
 		public static Rpc Parse(ReadOnlySpan<byte> frame)
 		{
 			return Parse(frame.ToArray());
-		}
-
-		// The byte count of `value` as a base-128 varint - what WriteVarint will emit, needed for headerLen before it
-		// is written.
-		private static int VarintLength(uint value)
-		{
-			var length = 1;
-			while (value >= 0x80)
-			{
-				value >>= 7;
-				length++;
-			}
-
-			return length;
 		}
 
 		private static byte[] BuildBody(Action<FaolanStream> body)
