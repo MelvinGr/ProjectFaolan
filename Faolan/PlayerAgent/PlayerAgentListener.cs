@@ -5,6 +5,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.PlayerAgent;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Logging;
 using Faolan.Core.Network.Protocol;
 using Microsoft.Extensions.Configuration;
@@ -40,7 +41,7 @@ namespace Faolan.PlayerAgent
 					client.Session.Account.AuthStatus = body.ReadUInt32();
 					await Database.SaveAccount(client.Session.Account);
 
-					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.AuthenticateAck, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
+					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceOpcodes.AuthenticateAck, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
 
 					break;
 				}
@@ -88,7 +89,7 @@ namespace Faolan.PlayerAgent
 					await SendCharacterList(client, packet.Sender);
 					await SendRealmList(client, packet.Sender);
 
-					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.PlayerSetupComplete, b => b.WriteUInt32(1)));
+					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceOpcodes.PlayerSetupComplete, b => b.WriteUInt32(1)));
 
 					break;
 				}
@@ -96,7 +97,7 @@ namespace Faolan.PlayerAgent
 				case PlayerAgentOpcodes.LoadFacebookToken:
 				{
 					// headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
-					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.OnFacebookTokenResult, b => b.WriteUInt16(0).WriteByte(0)));
+					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceOpcodes.OnFacebookTokenResult, b => b.WriteUInt16(0).WriteByte(0)));
 
 					break;
 				}
@@ -173,11 +174,11 @@ namespace Faolan.PlayerAgent
 					await SendChatServer(client, packet.Sender);
 					await SendGameServer(client, packet.Sender);
 
-					// OverrideGameTweaks (PlayerInterface 0x1A07): the 19 dynamic game tweaks the client applies on login.
-					// The named-tweak set and its wire format are GameTweaksCodec's (#530 wave 7); the 13-byte session
-					// header-extra this method rides with stays here, because it is framing.
+					// OverrideGameTweaks: the 19 dynamic game tweaks the client applies on login. The named-tweak set and
+					// its wire format are GameTweaksCodec's (#530 wave 7). Opcode 0x1A07 names no method by itself - the
+					// header tail does, as a full method reference (#609), so this send says which of the four it is.
 					await client.SendAsync(new Rpc(ServiceConnectionSender, packet.Sender, PlayerInterfaceOpcodes.OverrideGameTweaks,
-						(byte[])[0x0D, 0x38, 0x57, 0x15, 0x7D, 0x10, 0x01, 0x20, 0xE3, 0xEE, 0x9F, 0xE2, 0x07], GameTweaksCodec.Build(GameTweakSets.Defaults())));
+						GameTweaksCodec.Build(GameTweakSets.Defaults())) { HeaderDataOverride = PlayerAgentMethodIds.MethodReference("OverrideGameTweaks") });
 
 					break;
 				}

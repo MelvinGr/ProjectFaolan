@@ -1,3 +1,4 @@
+using System;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
 using Xunit;
@@ -28,12 +29,25 @@ namespace Faolan.Tests
 			Assert.Equal(new byte[] { 0x94, 0xa7, 0x60 }, PlayerAgentMethodIds.HeaderId((ushort)PlayerInterfaceOpcodes.SendCharacterSettingsCheckSumMap));
 		}
 
-		// The ONE genuine exception left: OverrideGameTweaks rides the ServiceConnection endpoint and carries a 13-byte
-		// protobuf endpoint reference where its id would go, so its call site passes that verbatim.
+		// Opcode 0x1A07 carries no method id, because it names no method: its header tail does.
 		[Fact]
 		public void OverrideGameTweaks_CarriesNoMethodId()
 		{
 			Assert.Null(PlayerAgentMethodIds.HeaderId((ushort)PlayerInterfaceOpcodes.OverrideGameTweaks));
+		}
+
+		// The four 13-byte tails on opcode 0x1A07 - the last thing in the header grammar that was still a literal
+		// byte array in source, written off as an opaque "session blob". They are METHOD REFERENCES (#609):
+		// [0x0D PlayerInterface][0x10 instance 1][0x20 varint(registrationConstant)], the constant WHOLE rather than
+		// >> 7. The expected bytes are the literals the login handoff shipped before this, which are the captured
+		// retail bytes (118 sightings each across the corpus) - so deriving them is proven against retail, not against
+		// itself. That the four decode to exactly the four methods the handoff sends, in that order, is what says the
+		// reading is right rather than an arithmetic coincidence.
+		[Theory, InlineData("ChatServerConnectReady", "0d3857157d100120fae5989d02"), InlineData("CSServerConnectReady", "0d3857157d100120e0d4b4d705"),
+		 InlineData("LoginConnectReady", "0d3857157d100120f9d8d9c50d"), InlineData("OverrideGameTweaks", "0d3857157d100120e3ee9fe207")]
+		public void MethodReference_ReproducesTheCapturedHandoffTails(string method, string expected)
+		{
+			Assert.Equal(expected, Convert.ToHexString(PlayerAgentMethodIds.MethodReference(method)).ToLowerInvariant());
 		}
 
 		// Every id we emit is `registrationConstant >> 7` — the rule, asserted against the client's own table rather

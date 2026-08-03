@@ -149,7 +149,7 @@ namespace Faolan.Tests
 			];
 
 			// A carrier that also carries interface HeaderData after the opcode.
-			yield return [new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob, (byte[])[0xDE, 0xAD, 0xBE, 0xEF], (byte[])[0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44])];
+			yield return [new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob, (byte[])[0x00, 0x00, 0x00, 0x08, 0x11, 0x22, 0x33, 0x44]) { HeaderDataOverride = (byte[])[0xDE, 0xAD, 0xBE, 0xEF] }];
 
 			// An empty-body carrier.
 			yield return [new Rpc(Sender, Receiver, GameInterfaceOpcodes.DispatchPassBlob, ReadOnlyMemory<byte>.Empty)];

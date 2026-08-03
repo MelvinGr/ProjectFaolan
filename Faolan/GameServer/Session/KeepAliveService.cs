@@ -57,7 +57,7 @@ namespace Faolan.GameServer.Session
 			var counter = body.ReadUInt32();
 			var uptime = ServerUptimeClock.Microseconds;
 
-			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchPong, RpcHeaderData.ForOpcode(GameCharInterfaceOpcodes.DispatchPong),
+			return client.SendAsync(new Rpc(LatencySender, client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchPong,
 				b => b.WriteUInt32(counter)
 					.WriteUInt32((uint)(uptime >> 32))
 					.WriteUInt32((uint)uptime)));

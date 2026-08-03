@@ -173,7 +173,7 @@ namespace Faolan.GameServer
 		private Task SendTradeRpc(uint characterId, GameCharInterfaceOpcodes opcode, byte[] body)
 		{
 			return ClientForCharacter(characterId) is { } client
-				? client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType), opcode, (byte[])[0x01], body))
+				? client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType), opcode, body))
 				: Task.CompletedTask;
 		}
 

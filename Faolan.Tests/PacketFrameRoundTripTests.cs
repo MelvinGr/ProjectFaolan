@@ -60,7 +60,7 @@ namespace Faolan.Tests
 		// Builds a whole wire frame through the production serializer.
 		private static byte[] BuildFrame(uint senderType, uint senderInstance, uint receiverType, uint receiverInstance, ushort opcode, byte[] headerData, byte[] body)
 		{
-			return new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, headerData, body).Serialize();
+			return new Rpc(Endpoints.Endpoint(senderType, senderInstance), Endpoints.Endpoint(receiverType, receiverInstance), opcode, body) { HeaderDataOverride = headerData }.Serialize();
 		}
 	}
 }

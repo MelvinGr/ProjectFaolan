@@ -10,44 +10,73 @@ logical RPC interfaces.
 Immediately after the packet's `[length][crc32][hdrlen]` head, and inside `hdrlen` bytes:
 
 ```
-[0x0A][byte len][sender ProtoEndpoint][0x12][byte len][receiver ProtoEndpoint][u16 BE opcode][optional headerData]
+[0x0A][byte len][sender ProtoEndpoint][0x12][byte len][receiver ProtoEndpoint][0x20][method: varint]
 ```
 
-`0x0A` and `0x12` are protobuf field tags (fields 1 and 2, length-delimited). The optional `headerData` after the
-opcode is **a protobuf VARINT carrying the method id** — one grammar, not the four per-opcode cases this table used
-to list [V1: Faolan.Core.Network/Constants/PlayerAgentMethodIds.cs].
+Every byte of it is protobuf. `0x0A` and `0x12` are field tags 1 and 2, length-delimited; `0x20` is field tag 4,
+varint, and its value is the method's **32-bit registration constant, whole**
+[V3: RpcHeaderDataTests.TheOpcodeIsTheMethodVarint].
 
-All 22 distinct header tails in the corpus are valid varints, including the two that were written down as constants:
+### What used to be read as `[u16 opcode][headerData]`
 
-| bytes | varint value | what |
+The two fields above were read for a long time as a big-endian `u16` opcode followed by an optional trailing
+`headerData` blob, because for most methods that split lands in exactly the same place:
+
+| bytes on the wire | read as | actually |
 |---|---|---|
-| 1 (`0x01`) | 1 | **not a marker**: every interface but PlayerAgent/PlayerInterface registers its methods by plain INDEX, so `index >> 7` is 1 for any method numbered 128–255 and 0 (elided) for 0–127. That is the whole of it. |
-| 3 (`0x94A760`) | 1 577 876 | **not a constant**: `PlayerInterface.SendCharacterSettingsCheckSumMap`'s method id. It is three bytes because a varint is as long as its value needs. |
-| 4 | 4.2M – 32.6M | every other PlayerAgent/PlayerInterface method id. |
-| 13 | — | the ONE genuine exception: `OverrideGameTweaks` (`0x1A07`) rides the ServiceConnection endpoint and carries a **protobuf endpoint reference** in place of an id: `0x0D <fixed32 class id 0x7D155738 = PlayerInterface> 0x10 <varint 1> 0x20 <varint per-session instance id>`. |
+| `20 09` | opcode `0x2009`, no headerData | field 4, varint `9` — method 9 |
+| `20 85 01` | opcode `0x2085`, headerData `0x01` | field 4, varint `133` — method 133 |
+| `20 83 96 CB E5 09` | opcode `0x2083`, headerData `96 CB E5 09` | field 4, varint `0x9CB2CB03` — `PlayerAgent.Authenticate` |
 
-That the last byte of a 4-byte id is always small (`0x02`–`0x0F`) is the tell: it is the top bits of a 25-bit varint,
-not the low byte of a 32-bit hash. Reading it as a fixed `u32` is what made three encodings of one field look like
-three unrelated cases.
+A varint's first group is `constant & 0x7F`, with the continuation bit set when more groups follow. So the "opcode"
+is `0x2000 | (constant & 0x7F)` for a one-group value and `0x2080 | (constant & 0x7F)` for a longer one, and the
+"headerData" is the remaining groups. That is the whole of it, and it explains every oddity the old reading had to
+list as a special case:
 
-**So there is ONE rule for all 17 interfaces**, and `RpcHeaderData` / `PlayerAgentMethodIds` are its only
-implementation — no call site hand-rolls a header tail any more:
+- **`0x01` is not a marker, a flag or a latency bit.** It is the second group of a two-group varint, which is why it
+  is *always* exactly `0x01` (12,056 sightings, never `0x00`, never `0x02`) and why it is on **100%** of the packets
+  of any method that has it (5,917/5,917 pings, 5,689/5,689 pongs) — it belongs to the METHOD, not the packet.
+- **`0x2080` is the boundary** because that is where a method constant needs a second varint group. Method 127 fits
+  in one; method 128 does not.
+- **The last byte of a 4-byte tail is always small (`0x02`–`0x0F`)** because it is the varint's *top* group, not the
+  low byte of a hash.
+- **`0x94A760` is not a constant.** It is `PlayerInterface.SendCharacterSettingsCheckSumMap`, three groups long
+  because a varint is as long as its value needs.
+
+Measured over the whole capture corpus (120 dumps, 419,300 frames): **404,208 of 404,210** field-4 frames carry a
+well-formed varint whose first group is the opcode's low byte, and the presence of a tail agrees with the
+continuation bit in **every** one. The two misses are mis-framed `GameInterface` packets at opcodes outside its
+16-method range [V3: RpcHeaderDataTests.HeaderData_IsTheMethodIndexHighBits].
+
+### Field 3: the method reference
+
+472 frames carry an extra field *before* the method — tag `0x1A`, field 3, length-delimited, holding one more
+`ProtoEndpoint`:
 
 ```
-headerData = varint(registrationConstant >> 7),  omitted when that value is 0
+[0x0A sender][0x12 receiver][0x1A][len 7][0x0D 0x7D155738 0x10 0x01][0x20][method: varint]
 ```
 
-PlayerAgent/PlayerInterface register with a 32-bit hash, so theirs is 3–4 bytes; every other interface registers by
-index, so theirs is one byte (`0x01`, methods 128–255) or nothing at all (methods 0–127). Measured over the whole
-corpus: **402,111 of 402,113** index-registered packets match, the two misses being mis-framed `GameInterface`
-packets at opcodes outside its 16-method range [V3: RpcHeaderDataTests.HeaderData_IsTheMethodIndexHighBits].
+These are the four login handoffs, and the old reading called all four "opcode `0x1A07` = `OverrideGameTweaks`
+with an opaque 13-byte session blob" — `0x1A07` being the field-3 tag plus its length byte, and the "blob" being
+the endpoint plus the method varint. Decoded, the four are `ChatServerConnectReady`, `CSServerConnectReady`,
+`LoginConnectReady` and `OverrideGameTweaks` (118 sightings each) — exactly the four the login handoff sends, in
+the order it sends them [V3: PlayerAgentMethodIdsTests.MethodReference_ReproducesTheCapturedHandoffTails].
 
-Three facts rule out every per-packet reading of `0x01` (a flag, an ack request, a latency bit): it is **always
-exactly `0x01`** across 12,056 sightings and never `0x00` or `0x02`; it is on **100%** of the packets of any method
-that has it (5,917/5,917 pings, 5,689/5,689 pongs), so it belongs to the METHOD; and the lowest opcode carrying it
-is **`0x2080` — index 128 exactly**, the boundary the rule predicts.
+### The implementation
 
-## ProtoEndpoint## ProtoEndpoint
+`RpcHeaderData` and `PlayerAgentMethodIds` are the only implementation; no call site hand-rolls a header tail, and
+none supplies one either — `Rpc` derives it from `(receiver class, opcode)`, which is all the identity there is
+[V3: RpcHeaderDataTests.ASendSuppliesNothing_AndStillCarriesTheByte]. The code still splits the varint into an
+`Opcode` and a derived tail, matching the shape the enums and the dissector are written against; the split is
+byte-identical either way. Folding it back into one varint field is Gitea #610.
+
+⚠️ The asymmetry is worth knowing when reading old sends: an **extra** tail byte is harmless (the varint ends at
+the first group without a continuation bit, and the stray byte is inside the header's own length, so the body is
+unaffected), while a **missing** one truncates a varint mid-continuation. That is why a spurious `0x01` on the
+trade replies went unnoticed for so long, and why omitting one on a ping would not have.
+
+## ProtoEndpoint
 
 Both sender and receiver are a `ProtoEndpoint` — the addressing primitive of the whole protocol:
 
@@ -85,17 +114,21 @@ The full per-interface catalog — 819 entries across 16 enums, with direction a
 
 ### The one exception
 
-PlayerAgent/PlayerInterface additionally carries a **method id** in its header (see above), and — uniquely — the
-16-bit opcode on this interface is **not** a method key at all. It is a per-CONNECTION registration index: on a
-second PlayerAgent connection retail sends `0x20EC` for `AuthenticateLoggedIn` where the login connection used it
-for `ReceivedCharacterSettings`, and `0x20D6` for `UpdateCharacterPreview` where it used it for
-`VerifyLanguageSetting`. The client dispatches on the id, which is why this interface never fitted the
-`0x2000 + index` model.
+PlayerAgent/PlayerInterface registers its methods with a 32-bit HASH rather than a small index, so the same varint
+field carries a 4–5 group value and the `0x2000 + index` reading has nothing to hold on to. Nothing else about the
+header differs.
 
-**The id is DERIVED, not tabulated.** None of these values appears anywhere in `AgeOfConan.exe`, which is what made
-"dump the table" a dead end. The client registers each method with a 32-bit constant, and the wire carries
-`constant >> 7` as a varint — a rule that reproduces **all 22** observed ids, 13 c2s and 9 s2c, with no exception.
-Both registration tables (25 c2s + 26 s2c methods, the complete interface) are in
+⚠️ **The 16-bit "opcode" is not a method key on this interface** — but not because it is per-connection, which is
+what the wire looks like until the varint is reassembled. It is `0x2080 | (constant & 0x7F)`, so two methods whose
+constants share their low 7 bits share an opcode: `0x20EC` is `ReceivedCharacterSettings` (`0x3C7C926C`) *and*
+`AuthenticateLoggedIn` (`0x9D991E6C`); `0x20D6` is `VerifyLanguageSetting` (`0x9847AED6`) *and*
+`UpdateCharacterPreview` (`0x4D661656`). Both pairs appear in the corpus. A dispatcher keyed on the opcode alone
+therefore cannot tell them apart — it has to read the whole varint (Gitea #610).
+
+**The constants are DERIVED, not tabulated.** None of the wire values appears anywhere in `AgeOfConan.exe`, which is
+what made "dump the table" a dead end: the wire carries the registration constant varint-encoded, and the varint's
+groups are not a substring of the constant. Reassembling the varint reproduces **all 28** observed methods, 14 c2s
+and 14 s2c, with no exception. Both registration tables (25 c2s + 26 s2c methods, the complete interface) are in
 `PlayerAgentMethodIds` [V1: Faolan.Core.Network/Constants/PlayerAgentMethodIds.cs].
 
 Recovering the constants also gave the interface its real NAMES, replacing nine invented ones — `InitAuth` is
@@ -103,7 +136,7 @@ Recovering the constants also gave the interface its real NAMES, replacing nine 
 the opcode we called `CreateCharacter` is `CreateCharacterWithData`. See
 [`../re/aoc-rpc-method-opcodes.md`](../re/aoc-rpc-method-opcodes.md).
 
-## Multiplexing## Multiplexing
+## Multiplexing
 
 One GameServer TCP connection carries roughly four RPC class-pairs at once (e.g. GameCharAgent ↔
 GameCharInterface, plus project/tradepost variants). A packet is routed by the pair `(receiver class id, opcode)`,

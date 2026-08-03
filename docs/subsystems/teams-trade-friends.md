@@ -236,14 +236,19 @@ Still to do: the trade and friend HANDLERS (the codecs and their byte-exact gate
 
 Verified in-client 2026-07-25: invite, accept, leave and kick all work.
 
-**The reply carries a trailing header byte.** `DispatchReplyTeamInvite` (`0x209F`) must be sent with `headerData`
-`0x01`, the same RpcHeader tail `KeepAliveService`'s `DispatchPong` puts on this interface. Retail carries it on both
-the request and the reply (`f682`, `f683`) while the CS-tier invite dispatches carry none — which is why the invite
-itself was always accepted. Without it the client **discards the reply**, and since the reply is what raises the
-window, the symptom is: the client takes the invite, echoes it back in `RequestTeamInvite`, and nothing happens.
-Replaying retail's own captured bytes for both messages changed nothing, which is what finally pointed at the header
-rather than the body. Across the capture the `0x01` tail appears on `0x2082`, `0x2092`, `0x209F`, `0x20AC`, `0x20AD`,
-`0x20C5` and `0x20D0` — all ≥ `0x2082`, none below.
+**The reply carries a trailing header byte.** `DispatchReplyTeamInvite` (`0x209F`) goes out with `headerData` `0x01`,
+the same RpcHeader tail `KeepAliveService`'s `DispatchPong` puts on this interface. Retail carries it on both the
+request and the reply (`f682`, `f683`) while the CS-tier invite dispatches carry none — which is why the invite itself
+was always accepted. Without it the client **discards the reply**, and since the reply is what raises the window, the
+symptom is: the client takes the invite, echoes it back in `RequestTeamInvite`, and nothing happens. Replaying
+retail's own captured bytes for both messages changed nothing, which is what finally pointed at the header rather
+than the body.
+
+Nothing here passes that byte any more — `Rpc` derives it from `(receiver class, opcode)` (#609), and it is not a
+per-method quirk at all: the opcode and the tail are one protobuf varint naming the method, and `0x209F` is method
+159, which needs two varint groups (see [`../protocol/02-rpc.md`](../protocol/02-rpc.md)). That is also why the
+`0x01` tail appears on exactly `0x2082`, `0x2092`, `0x209F`, `0x20AC`, `0x20AD`, `0x20C5` and `0x20D0` in this
+capture — all ≥ `0x2080`, none below.
 
 
 Every CsPlayerAgent s2c packet is addressed to the **recipient's own** `CSPlayerInterface` instance — its character

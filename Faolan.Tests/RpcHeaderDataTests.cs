@@ -1,5 +1,7 @@
+using System;
 using Faolan.Core.Enums;
 using Faolan.Core.Network.Constants;
+using Faolan.Core.Network.Protocol;
 using Xunit;
 
 namespace Faolan.Tests
@@ -46,6 +48,90 @@ namespace Faolan.Tests
 		{
 			Assert.Null(RpcHeaderData.ForOpcode(GameCharInterfaceOpcodes.DispatchUpdateAggroStatus));
 			Assert.Null(RpcHeaderData.ForOpcode((ushort)0x2001));
+		}
+
+		// What the code splits into `[u16 opcode][headerData]` is ONE protobuf field: tag 0x20 (field 4, varint) whose
+		// value is the method's registration constant, whole. The split is byte-identical - the "opcode" is the tag
+		// plus the varint's first group, and the "headerData" is the rest - and this is the gate that says so, method
+		// by method, against the client's own registration tables. It is also why `0x2080` is the boundary and why the
+		// trailing byte is always exactly `0x01`: those are properties of a varint's first group, not of a marker.
+		[Fact]
+		public void TheOpcodeIsTheMethodVarint()
+		{
+			foreach (var (opcode, wireId) in PlayerAgentMethodIds.ById)
+			{
+				// The observed opcodes are all on the hashed pair, so their constants need more than one group.
+				var constant = (wireId << 7) | (uint)(opcode & 0x7F);
+				var varint = PlayerAgentMethodIds.Varint(constant);
+
+				Assert.Equal(0x20, opcode >> 8);
+				Assert.Equal(varint[0], (byte)(opcode & 0xFF));
+				Assert.Equal(varint[1..], RpcHeaderData.For(Endpoints.PlayerInterfaceType, opcode) ?? RpcHeaderData.For(Endpoints.PlayerAgentType, opcode));
+			}
+
+			// And on an index-registered interface the same reassembly gives the plain method index.
+			Assert.Equal(133u, Reassemble(0x2085, RpcHeaderData.For(Endpoints.GameCharAgentType, 0x2085)!));
+			Assert.Equal(9u, Reassemble(0x2009, []));
+			return;
+
+			static uint Reassemble(ushort opcode, byte[] tail)
+			{
+				var value = (uint)(opcode & 0x7F);
+				for (var i = 0; i < tail.Length; i++)
+					value |= (uint)(tail[i] & 0x7F) << (7 * (i + 1));
+				return value;
+			}
+		}
+
+		// The receiver CLASS picks the registration scheme, which is the whole reason `For` takes it: the same opcode
+		// number means an index on 15 of the 17 classes and a per-connection registration slot on the other two. Rows
+		// are one per class, taken from the corpus scan of all 120 dumps grouped by (ReceiverClass, Opcode).
+		[Theory, InlineData(Endpoints.GameCharInterfaceType, 0x2082, "01"), InlineData(Endpoints.GameCharInterfaceType, 0x206B, null), InlineData(Endpoints.CSPlayerInterfaceType, 0x20A5, "01"),
+		 InlineData(Endpoints.GameInterfaceType, 0x2000, null), InlineData(Endpoints.UniverseAgentType, 0x2001, null),
+		 // The two hash-registered classes take a whole method id where the index rule would say a flat 0x01.
+		 InlineData(Endpoints.PlayerInterfaceType, 0x208C, "cbc6fc04"), InlineData(Endpoints.PlayerInterfaceType, 0x20A5, "94a760"), InlineData(Endpoints.PlayerAgentType, 0x2083, "96cbe509")]
+		public void TheReceiverClass_PicksTheRegistrationScheme(uint receiverType, int opcode, string? expected)
+		{
+			var actual = RpcHeaderData.For(receiverType, (ushort)opcode);
+			Assert.Equal(expected, actual is null ? null : Convert.ToHexString(actual).ToLowerInvariant());
+		}
+
+		// The point of #609: a send supplies nothing and still gets the byte retail always includes. Before this, every
+		// opcode >= 0x2080 that did not explicitly pass it went out a byte short.
+		[Fact]
+		public void ASendSuppliesNothing_AndStillCarriesTheByte()
+		{
+			var pong = new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x3BC035EC), GameCharInterfaceOpcodes.DispatchPong,
+				(byte[])[0x00, 0x00, 0x00, 0x07]);
+
+			Assert.Equal(new byte[] { 0x01 }, pong.HeaderData.ToArray());
+			Assert.Equal(new byte[] { 0x01 }, Rpc.Parse(pong.Serialize()).HeaderData.ToArray());
+		}
+
+		// ...and a method below the boundary stays bare, which is the half the trade replies used to get wrong: all
+		// seven ride opcodes 0x2068-0x206E (indices 104-110) and every one of them hand-passed a 0x01 that retail's own
+		// captures do not carry.
+		[Theory, InlineData(GameCharInterfaceOpcodes.DispatchRequestTrade), InlineData(GameCharInterfaceOpcodes.Reserved0x206B), InlineData(GameCharInterfaceOpcodes.DispatchPartnerUpdatedCash),
+		 InlineData(GameCharInterfaceOpcodes.DispatchCharacterNameReply)]
+		public void ALowIndexSend_StaysBare(GameCharInterfaceOpcodes opcode)
+		{
+			Assert.True(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, 0x3BC035EC), opcode, ReadOnlyMemory<byte>.Empty)
+				.HeaderData.IsEmpty);
+		}
+
+		// An INBOUND frame keeps the tail it arrived with rather than being re-derived. Two reasons, and both are real:
+		// the corpus holds two mis-framed GameInterface packets whose tail contradicts the rule, and on PlayerAgent the
+		// opcode is only a per-connection registration index, so re-deriving would confidently rename the method.
+		[Fact]
+		public void Parse_KeepsATailThatContradictsTheRule()
+		{
+			var frame = new Rpc(Endpoints.Endpoint(Endpoints.GameAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameInterfaceType, 0x3BC035EC), (ushort)0x20A8, ReadOnlyMemory<byte>.Empty)
+				{ HeaderDataOverride = ReadOnlyMemory<byte>.Empty }.Serialize();
+
+			// 0x20A8 is index 168, so the rule says 0x01 - and the two captured packets at this opcode carry nothing.
+			Assert.Equal(new byte[] { 0x01 }, RpcHeaderData.For(Endpoints.GameInterfaceType, 0x20A8));
+			Assert.True(Rpc.Parse(frame).HeaderData.IsEmpty);
+			Assert.Equal(frame, Rpc.Parse(frame).Serialize());
 		}
 	}
 }

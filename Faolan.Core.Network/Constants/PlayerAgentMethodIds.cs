@@ -1,5 +1,8 @@
+using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using Faolan.Core.Enums;
+using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Constants
 {
@@ -18,6 +21,8 @@ namespace Faolan.Core.Network.Constants
 	// 2. **The value is computed, not stored.** None of these ids appears anywhere in `AgeOfConan.exe`, which is what
 	//    made "just dump the table" a dead end. The client registers each method with a 32-bit constant, and what goes
 	//    on the wire is `staticId >> 7`. That rule reproduces **all 22** observed ids — 13 c2s and 9 s2c — exactly.
+	//    (`>> 7` because the varint's first group rides in the opcode's low byte, not because the client shifts
+	//    anything: reassembled, the field is the constant whole. See RpcHeaderData and Gitea #610.)
 	//
 	// So the table below is the client's own registration constants, and the wire encoding is a one-line function of
 	// them. Adding a method means copying one constant, not observing it on the wire.
@@ -28,13 +33,18 @@ namespace Faolan.Core.Network.Constants
 	//   s2c: STR=AuthenticateAck MAX=3 analyzeHeadless ... -postScript StrXrefs.java
 	// Both print `<constant>; FUN_00487900(); FUN_0040ec10("<Name>", <len>)` triples — the registration idiom.
 	//
-	// ⚠️ **The 16-bit opcode is NOT a method key on this interface.** It is a per-connection registration index, and
-	// the corpus proves it: on a second PlayerAgent connection, opcode `0x20EC` carries `AuthenticateLoggedIn` where
-	// the login connection had `ReceivedCharacterSettings`, and `0x20D6` carries `UpdateCharacterPreview` where it had
-	// `VerifyLanguageSetting`. The client dispatches on the method id, which is why this interface never fitted the
-	// `0x2000 + index` model. Our inbound switch still keys on the opcode — tracked separately.
+	// ⚠️ **The 16-bit opcode is NOT a method key on this interface** — and the reason is not that it is per-connection,
+	// which is what it looks like until the varint is reassembled (see RpcHeaderData). It is `0x2080 | (constant &
+	// 0x7F)`, so two methods whose constants share their low 7 bits share an opcode, and both such pairs are in the
+	// corpus: `0x20EC` is `ReceivedCharacterSettings` (0x3C7C926C) AND `AuthenticateLoggedIn` (0x9D991E6C); `0x20D6`
+	// is `VerifyLanguageSetting` (0x9847AED6) AND `UpdateCharacterPreview` (0x4D661656). Our inbound switch keys on
+	// the opcode alone, so it cannot tell either pair apart — tracked as Gitea #610.
 	public static class PlayerAgentMethodIds
 	{
+		// Field 4 of the endpoint sub-message, varint - the method constant. ProtoEndpoint itself stops at field 3
+		// (token), which is why this one is named here rather than there.
+		private const byte MethodReferenceTag = 0x20;
+
 		// c2s: `PlayerAgentProxy_t`'s registration constants, in registration order. All 25 the client has.
 		public static readonly IReadOnlyDictionary<string, uint> PlayerAgentRegistration = new Dictionary<string, uint>
 		{
@@ -97,8 +107,8 @@ namespace Faolan.Core.Network.Constants
 		};
 
 		// The opcode a method was OBSERVED under, for the methods the corpus shows. Only these are asserted: an opcode
-		// is a per-connection index (see the warning above), so this maps what retail's login connection actually used
-		// rather than claiming a general opcode->method function.
+		// here is only the varint's first group (see the warning above) and so collides, which is why this maps what
+		// retail was seen doing rather than claiming a general opcode->method function.
 		private static readonly IReadOnlyDictionary<ushort, string> ObservedOpcodes = new Dictionary<ushort, string>
 		{
 			// s2c PlayerInterface — the ones the server sends.
@@ -146,14 +156,37 @@ namespace Faolan.Core.Network.Constants
 			}
 		}
 
-		// The header bytes for `opcode`, or null when this interface does not carry one for it. `OverrideGameTweaks` is
-		// the one genuine exception in the whole scheme: it rides the ServiceConnection endpoint with a 13-byte
-		// protobuf endpoint reference instead of its method id, so its call site passes that verbatim.
+		// The header bytes for `opcode`, or null when this interface does not carry one for it. Opcode 0x1A07 is the one
+		// exception in the whole scheme and is served by MethodReference below, not from here.
 		public static byte[]? HeaderId(ushort opcode)
 		{
 			return ObservedOpcodes.TryGetValue(opcode, out var method)
 				? Varint(WireId(Registration(method)))
 				: null;
+		}
+
+		// The METHOD REFERENCE that PlayerInterface opcode `0x1A07` carries where every other method carries its id.
+		// This is what the four 13-byte "opaque session blobs" in the login handoff actually are (Gitea #609): the
+		// receiver endpoint restated, plus a FOURTH field holding the target method's registration constant WHOLE -
+		//
+		//     [0x0D <PlayerInterface type, fixed32 LE>][0x10 0x01 (instance)][0x20 varint(registrationConstant)]
+		//
+		// Note `varint(constant)`, not `varint(constant >> 7)`: the >> 7 form is the SHORT id an opcode already
+		// half-names, and there is no opcode here to name it with. So `0x1A07` is not "OverrideGameTweaks" - it is a
+		// generic carrier whose header tail selects the PlayerInterface method that fires, and the four tails in the
+		// corpus (118 sightings each) decode to ChatServerConnectReady, CSServerConnectReady, LoginConnectReady and
+		// OverrideGameTweaks - exactly the four the login handoff sends, in the order it sends them.
+		public static byte[] MethodReference(string method)
+		{
+			var constant = Varint(Registration(method));
+			var reference = new byte[8 + constant.Length];
+			reference[0] = (byte)ProtoEndpoint.FieldTags.Type;
+			BinaryPrimitives.WriteUInt32LittleEndian(reference.AsSpan(1), Endpoints.PlayerInterfaceType);
+			reference[5] = (byte)ProtoEndpoint.FieldTags.Instance;
+			reference[6] = 0x01;
+			reference[7] = MethodReferenceTag;
+			constant.CopyTo(reference, 8);
+			return reference;
 		}
 
 		// Base-128 varint, low group first with the continuation bit on every group but the last - the protobuf

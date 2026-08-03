@@ -897,7 +897,7 @@ namespace Faolan.GameServer
 						// invite record, echoed it back in RequestTeamInvite, and then never raised the window - and
 						// still did not when fed retail's own captured bytes, because the bytes were never the problem.
 						await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType),
-							GameCharInterfaceOpcodes.DispatchReplyTeamInvite, (byte[])[0x01],
+							GameCharInterfaceOpcodes.DispatchReplyTeamInvite,
 							ReplyTeamInviteCodec.Build(TeamMemberRecord.FromCharacter(character, GetCharacterLiveState(character.Id)?.MapId ?? character.MapId))));
 
 					break;
@@ -959,7 +959,7 @@ namespace Faolan.GameServer
 
 					if (await Database.GetCharacter(subjectId) is { Name: { } name })
 						await client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType), GameCharInterfaceOpcodes.DispatchCharacterNameReply,
-							(byte[])[0x01], CharacterNameReplyCodec.Build(new CharacterNameReply(subjectId, name))));
+							CharacterNameReplyCodec.Build(new CharacterNameReply(subjectId, name))));
 					else
 						Logger.LogWarning("RequestCharName for unknown character {CharacterId:X8}; no reply.", subjectId);
 

@@ -134,7 +134,7 @@ namespace Faolan.CSPlayerAgent
 		// drops.) Build the real records here if/when a minigame subsystem exists.
 		private static Task SendMassivePvpInfo(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchMassivePvpInfoRequestReturn, (byte[])[0x01], b => b
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchMassivePvpInfoRequestReturn, b => b
 				.WriteUInt32(0) // last-update timestamp (cosmetic; 0 = never updated)
 				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed guild list ((0+1)*0x3F1)
 				.WriteUInt32(1))); // trailing guildCount+1 (= 1 for the empty board) - the field the client read past
@@ -146,7 +146,7 @@ namespace Faolan.CSPlayerAgent
 		// >= 128 carries varint(index >> 7) = 0x01. It is not a per-message constant (#319).
 		private static Task SendPvpMatchMakingInfo(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn, RpcHeaderData.ForOpcode(CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn), b => b
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceOpcodes.DispatchPvPMatchMakingInfoRequestReturn, b => b
 				.WriteUInt32(ListFrame.ForCount(0)) // empty 0x3F1-framed record list
 				.WriteUInt32(0))); // trailer
 		}

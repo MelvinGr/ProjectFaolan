@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using Faolan.Core.Crypt;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Constants;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Protocol
@@ -13,10 +14,8 @@ namespace Faolan.Core.Network.Protocol
 	// structured-packet-pipeline epic (Gitea #406).
 	//
 	// Sender = RpcHeader.caller_id; Receiver = the addressed object - its Type is the interface hash, which names the
-	// opcode against it (see ProtocolCatalog). HeaderData is the interface-specific header tail (e.g. the PlayerInterface
-	// 32-bit method id, or a keepalive's 1-byte flag); Body is everything after the header. (A collection-expression
-	// header literal must be cast, e.g. (byte[])[0x0D, ...], since [..] can't target ReadOnlyMemory<byte>.)
-	public readonly record struct Rpc(ProtoEndpoint Sender, ProtoEndpoint Receiver, ushort Opcode, ReadOnlyMemory<byte> HeaderData, ReadOnlyMemory<byte> Body)
+	// opcode against it (see ProtocolCatalog). Body is everything after the header.
+	public readonly record struct Rpc(ProtoEndpoint Sender, ProtoEndpoint Receiver, ushort Opcode, ReadOnlyMemory<byte> Body)
 	{
 		// The total wire frame length. Stamped by whoever turns the message into (or out of) bytes: Parse
 		// on the receive path, and the transport on the send path once the serializer has determined the size
@@ -24,17 +23,31 @@ namespace Faolan.Core.Network.Protocol
 		// reports it as packetLength in BOTH directions, so it doesn't have to be threaded alongside the message.
 		public int FrameLength { get; init; }
 
+		// The header tail as literally given, when it is NOT the method id the (receiver class, opcode) pair implies.
+		// Two things set it, and nothing else should (Gitea #609):
+		//   - `Parse`, always, so an INBOUND frame re-serializes to the bytes it arrived as - including the handful of
+		//     mis-framed retail packets whose tail contradicts the rule. Null and empty are therefore distinct here:
+		//     null means "derive it", empty means "the wire had none".
+		//   - the four login handoffs, which ride opcode `0x1A07`. That number is not an opcode: it is protobuf tag
+		//     `0x1A` (field 3, length-delimited) plus its length byte, so the "tail" is one more ProtoEndpoint followed
+		//     by the method field. PlayerAgentMethodIds.MethodReference builds it - see #610.
+		// (A collection-expression literal must be cast, e.g. (byte[])[0x0D, ...], since [..] can't target
+		// ReadOnlyMemory<byte>.)
+		public ReadOnlyMemory<byte>? HeaderDataOverride { get; init; }
+
+		// The interface-specific header tail written after the opcode. DERIVED, not supplied: it is a pure function of
+		// (receiver class, opcode) - `varint(registrationConstant >> 7)`, absent when that is zero - so every send gets
+		// it right by construction instead of by the call site remembering to pass a byte. See RpcHeaderData for the
+		// grammar and the corpus measurement behind it, including why the tail and the Opcode are really one protobuf
+		// varint field that this type still splits in two (#319/#320/#609/#610).
+		public ReadOnlyMemory<byte> HeaderData => HeaderDataOverride ?? RpcHeaderData.For(Receiver?.Type ?? 0, Opcode) ?? default(ReadOnlyMemory<byte>);
+
 		// Body-building overloads: build the body inline with the fluent FaolanStream writers, e.g.
 		//   new Rpc(sender, receiver, opcode, b => b.WriteUInt32(x).WriteArrayUInt32Length(blob))
 		// instead of newing + disposing a stream at every call site. The scratch stream is created and DISPOSED here
 		// (unlike the old fluent PacketStream send pattern). The Action<FaolanStream> is distinct from the primary
 		// ctor's ReadOnlyMemory<byte> Body, so there is no overload ambiguity.
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, ReadOnlyMemory<byte> headerData, Action<FaolanStream> body) : this(sender, receiver, opcode, headerData,
-			BuildBody(body))
-		{
-		}
-
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, Action<FaolanStream> body) : this(sender, receiver, opcode, default, BuildBody(body))
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, Action<FaolanStream> body) : this(sender, receiver, opcode, BuildBody(body))
 		{
 		}
 
@@ -42,27 +55,13 @@ namespace Faolan.Core.Network.Protocol
 		// one (mirrors WriteHeader's Convert.ToUInt16). Constructors can't be generic, so the param is the boxing base
 		// Enum - one negligible box per packet. The 16-bit interface opcodes are ushort-backed; a value that overflows
 		// ushort throws here (fail-fast) rather than silently truncating.
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> headerData, ReadOnlyMemory<byte> body) : this(sender, receiver, Convert.ToUInt16(opcode), headerData,
-			body)
-		{
-		}
-
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> headerData, Action<FaolanStream> body) : this(sender, receiver, Convert.ToUInt16(opcode), headerData,
-			body)
-		{
-		}
-
 		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, Action<FaolanStream> body) : this(sender, receiver, Convert.ToUInt16(opcode), body)
 		{
 		}
 
-		// Byte body, no headerData - for the many sends whose whole body is a single pre-encoded blob (codec.Encode())
-		// or a stream built by a helper. Distinct from the Action<FaolanStream> overloads (a byte[] is not a delegate).
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, ushort opcode, ReadOnlyMemory<byte> body) : this(sender, receiver, opcode, default, body)
-		{
-		}
-
-		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> body) : this(sender, receiver, Convert.ToUInt16(opcode), default, body)
+		// Byte body - for the many sends whose whole body is a single pre-encoded blob (codec.Build()) or a stream built
+		// by a helper. Distinct from the Action<FaolanStream> overloads (a byte[] is not a delegate).
+		public Rpc(ProtoEndpoint sender, ProtoEndpoint receiver, Enum opcode, ReadOnlyMemory<byte> body) : this(sender, receiver, Convert.ToUInt16(opcode), body)
 		{
 		}
 
@@ -139,8 +138,12 @@ namespace Faolan.Core.Network.Protocol
 			var headerData = header.ReadRemainingArray();
 			var body = stream.ReadRemainingArray();
 
-			return new Rpc(sender, receiver, opcode, headerData, body)
+			// The tail is carried through as an override rather than re-derived: on the RECEIVE path the bytes that
+			// arrived are the fact. On PlayerAgent that is not a nicety - the opcode there is only the method varint's
+			// first group, so two methods can share one (0x20EC, 0x20D6) and re-deriving would rename the message.
+			return new Rpc(sender, receiver, opcode, body)
 			{
+				HeaderDataOverride = headerData,
 				FrameLength = frame.Length
 			};
 		}
