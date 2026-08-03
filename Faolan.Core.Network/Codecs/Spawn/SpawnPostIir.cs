@@ -35,9 +35,29 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// fixed-width readers went wrong.
 		public uint FirstRecordLen { get; set; } = 4;
 
-		// The third header word. NOT a count of anything: streams of identical length carry 1, 2 and 3 in it.
-		// Type-stable per NPC and always 2 on a player; meaning unknown, so it is named for its position.
-		public uint Word2 { get; set; } = 2;
+		// The third header word - and it is the entity's MOVEMENT MODE, the same value the embedded
+		// ProtoCoreCharacterIIR carries in its own `movement_mode` field (21). Sent TWICE in one spawn body, in two
+		// unrelated byte regions: this u32 in the post-IIR header, and a protobuf varint inside the character message
+		// ahead of it (Gitea #605, `--report field-predictors`).
+		//
+		// The evidence is a whole-corpus cross-tab, and it is as clean as this kind of claim gets: over 5,739 captured
+		// NPC spawns the two agree on 5,738 - the single exception is a Rocknose part-way through a path plan - and
+		// over 209 captured PLAYER spawns they agree on all 209 (both 2). That second family is what makes it a
+		// protocol fact rather than an NPC convention: the player scaffold is a different grammar and was never part
+		// of the measurement that found it.
+		//
+		// ⚠️ It was long recorded here as "NOT a count of anything, type-stable per NPC, meaning unknown". The first
+		// half was right and is what made the rest findable; the SECOND half was not. It is not type-stable: it is
+		// rolled per spawn event, 61.9% stable across templates even when restricted to freshly-spawned NPCs with no
+		// move task and no buffs. The old claim ("no type is ever seen with two") was unfalsifiable by construction -
+		// the importer scan that produced it stopped at the FIRST sighting of each type, so a second value could not
+		// have been observed. See [[first_record_wins_silently_truncates_repeated_wire_records]].
+		//
+		// What the three values MEAN is not settled and is deliberately not guessed at here. What the corpus does say
+		// is that 1 goes with MOTION: of the 562 spawns carrying an active move-task plan, 559 are 1, where a spawn
+		// with an empty slot is 2 on 4,064 of 5,168. Value 3 is 14 sightings, every one of them a Flesheater with an
+		// empty slot.
+		public uint MovementMode { get; set; } = 2;
 
 		// Whether the first record carries the move-task slot at all: true on every NPC stream, false on every
 		// player one. Kept distinct from `MoveTask == null`, because a fresh NPC has the SLOT with no task in it and

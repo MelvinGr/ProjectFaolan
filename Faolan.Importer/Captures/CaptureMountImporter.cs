@@ -64,7 +64,7 @@ namespace Faolan.Importer.Captures
 					db.NpcTemplates.Add(type);
 				}
 
-				// Lift the whole spawn onto the TYPE (like pets): stat core + no-morph recordCount, and - since a mount
+				// Lift the whole spawn onto the TYPE (like pets): stat core, and - since a mount
 				// has no NpcSpawn placement - its worn equipment + appearance morphs on the type (NpcEquipment/NpcMorph),
 				// so TryBuildFromType assembles the body wholly from columns (Data retired).
 				var body = WorldObjectColumns.ExtractBody(e.Data);
@@ -77,8 +77,6 @@ namespace Faolan.Importer.Captures
 						NpcStatCoreColumns.ClearPerSpawnEventState(type.StatCore);
 					}
 					type.StatCore.IirHeader ??= NpcStatCoreColumns.ReadIirHeaderWord(body);
-					if (type.StatCore.MinimalPostIirWord2 == null && NpcSpawnAppearance.TryReadNoMorphWord2(body, out var rc))
-						type.StatCore.MinimalPostIirWord2 = rc;
 
 					type.Equipment.Clear();
 					foreach (var entry in read.Message.InventoryEntries)

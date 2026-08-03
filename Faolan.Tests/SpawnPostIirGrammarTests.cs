@@ -36,7 +36,7 @@ namespace Faolan.Tests
 				if (spawn.Post.BuffRecords.Count > 0 || spawn.Post.EndPairs.Count > 0 || spawn.Post.EndPairs2.Count > 0 || spawn.Post.EndPairs3.Count > 0)
 					continue;
 
-				var shape = $"len={post.Length} firstRecordLen={spawn.Post.FirstRecordLen} word2={spawn.Post.Word2}";
+				var shape = $"len={post.Length} firstRecordLen={spawn.Post.FirstRecordLen} word2={spawn.Post.MovementMode}";
 				shapes[shape] = shapes.GetValueOrDefault(shape) + 1;
 			}
 
@@ -51,7 +51,7 @@ namespace Faolan.Tests
 
 		// word2 is NOT a record count, which is what it was called until this landed: it takes three different values
 		// across streams of IDENTICAL length, so it cannot be counting anything that occupies bytes. This is the gate
-		// behind the NpcSpawnPostIir.Word2 / NpcStatCore.MinimalPostIirWord2 rename.
+		// behind the SpawnPostIir.MovementMode rename.
 		[Fact]
 		public void Word2_DoesNotAffectTheStreamsLength_SoItIsNotARecordCount()
 		{
@@ -63,7 +63,7 @@ namespace Faolan.Tests
 					continue;
 
 				byLength.TryAdd(post.Length, []);
-				byLength[post.Length].Add(spawn.Post.Word2);
+				byLength[post.Length].Add(spawn.Post.MovementMode);
 			}
 
 			Assert.Equal([1u, 2u, 3u], byLength[41].Order().ToArray());

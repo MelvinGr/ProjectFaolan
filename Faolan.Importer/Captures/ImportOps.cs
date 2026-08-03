@@ -2030,21 +2030,40 @@ namespace Faolan.Importer.Captures
 		{
 			var byTemplate = await db.NpcTemplates.Include(n => n.StatCore).ToDictionaryAsync(n => n.TemplateId);
 
-			// #243: the fresh minimal post-IIR recordCount per type (the type-stable 1 or 2, not an animal/humanoid split),
-			// read from a NO-MORPH CAPTURE (the dump-file body, e.Data) - NOT the stored NpcSpawn.Data column, which is
-			// being retired. The recordCount word is stable per type across minimal AND runtime-bearing captures, so this
-			// reads it off either shape (covering the runtime-bearing types that have no minimal-form capture). Lets a
-			// no-morph spawn build its post-IIR from scratch (BuildMinimalPostIir(rc)) instead of the Data blob.
-			var minimalRcByTemplate = new Dictionary<uint, uint>();
+			// The type's MOVEMENT MODE, taken as the MODAL value over every captured sighting of the type (#605).
+			//
+			// This replaces a scan that read a "minimal post-IIR recordCount" off the FIRST sighting of each type and
+			// stored it in a second column. Two things were wrong with that, and the second is why the first was never
+			// caught. (1) It is the same value as the character message's own `movement_mode`, so the type carried one
+			// number twice, lifted from two different representative spawns - 45 of 368 types ended up disagreeing with
+			// themselves, and a spawn built from such a row went out in a shape retail never sends. (2) The scan
+			// stopped at the first sighting, which is what let it be documented as "type-stable - no type is ever seen
+			// with two". A first-record-wins scan cannot observe a second value, so that claim was unfalsifiable rather
+			// than measured ([[first_record_wins_silently_truncates_repeated_wire_records]]); the field is really
+			// ~62% type-stable.
+			//
+			// The mode is a measurement of the type's OWN sightings, not a corpus-wide guess - which is the line #602
+			// drew. It also covers strictly more types than the old scan: that one needed a minimal-form capture, while
+			// `movement_mode` is present on every captured NPC spawn.
+			var movementModes = new Dictionary<uint, Dictionary<uint, int>>();
 			foreach (var e in entries)
 			{
-				if (e.TemplateId == 0 || minimalRcByTemplate.ContainsKey(e.TemplateId))
+				if (e.TemplateId == 0)
 					continue;
 
 				var b = WorldObjectColumns.ExtractBody(e.Data);
-				if (b != null && NpcSpawnAppearance.TryReadNoMorphWord2(b, out var rc))
-					minimalRcByTemplate[e.TemplateId] = rc;
+				if (b == null || !SpawnBodyReader.TryReadCharacterMessage(b, out var seen) || !seen.Message.ShouldSerializeMovementMode())
+					continue;
+
+				var tally = movementModes.TryGetValue(e.TemplateId, out var t) ? t : movementModes[e.TemplateId] = [];
+				tally[seen.Message.MovementMode] = tally.GetValueOrDefault(seen.Message.MovementMode) + 1;
 			}
+
+			// Ties broken by the LOWER mode so the lift is deterministic - a dictionary's enumeration order is not a
+			// tie-break, and a non-deterministic one would churn faolan.sql on every re-import for no semantic change.
+			var modalMovementMode = movementModes.ToDictionary(
+				kv => kv.Key,
+				kv => kv.Value.OrderByDescending(m => m.Value).ThenBy(m => m.Key).First().Key);
 
 			foreach (var e in entries)
 			{
@@ -2088,9 +2107,12 @@ namespace Faolan.Importer.Captures
 					}
 				}
 
-				// #243: stamp the type's fresh minimal post-IIR recordCount from the dump-derived scan above.
-				if (npc.StatCore != null && minimalRcByTemplate.TryGetValue(e.TemplateId, out var minRc))
-					npc.StatCore.MinimalPostIirWord2 = minRc;
+				// #605: the movement mode is the one field the representative spawn must NOT decide on its own - it is
+				// rolled per spawn event, so overwrite whatever Lift took from the representative with the modal value
+				// over all of this type's sightings. Presence is preserved: a type that never sends the field keeps it
+				// null, which keeps it off the wire.
+				if (npc.StatCore?.MovementMode != null && modalMovementMode.TryGetValue(e.TemplateId, out var modal))
+					npc.StatCore.MovementMode = modal;
 			}
 
 			await db.SaveChangesAsync();

@@ -114,13 +114,12 @@ from typed columns.
       stalling world entry).
 - [x] #243: **the live path now builds 964/988 shipped spawns from scratch (was 786); only 24 keep `Data`.**
       Two RE'd post-IIR shapes are now constructed from columns:
-      - **no-morph NPCs**: the 41-byte minimal post-IIR with a `recordCount` of 1 or 2 and no morph entries. The
-        count is TYPE-STABLE (no type ships both) but its meaning is undecoded and is NOT an animal/humanoid split
-        (both values carry people AND creatures - Kalanthes/merchants are 1, Saddur/guards are 2, Wolf/Chicken are 2,
-        Cobra is 1). Lifted by the importer from a minimal-form CAPTURE (the dump body, not the retiring
-        `NpcSpawn.Data`) into `NpcStatCore.MinimalPostIirRecordCount`; `BuildFromScratch` emits
-        `BuildMinimalPostIir(rc)` for them. Verified in-client 2026-07-08: Kalanthes (rc=1) + Saddur (rc=2) render
-        with correct head/hair.
+      - **no-morph NPCs**: the 41-byte minimal post-IIR whose header third word is 1, 2 or 3, and no morph entries.
+        That word is the entity's MOVEMENT MODE — the same value the embedded character message carries in
+        `movement_mode` — so it is no longer lifted into a column of its own: `NpcSpawnBuilder` reads it off the
+        message (`NpcStatCore.MovementMode`) and the two copies cannot disagree. See #605 and
+        `docs/re/fa015807-spawn-reader.md`. Verified in-client 2026-07-08 (as `recordCount`): Kalanthes (1) +
+        Saddur (2) render with correct head/hair.
       - **runtime-bearing-with-morphs**: a large first record (movement/bounds float triples) with the **morph
         table embedded after it** at `12 + firstRecordLen` (`[count][morphId f32 0 0 strLen str]…` + the shared
         0x3F1 terminator). `NpcSpawnAppearance.TryDecodeAppearanceLenient` skips the runtime record and lifts
@@ -144,8 +143,8 @@ from typed columns.
       captured `NpcSpawn.Data` blob was dropped from the table (`Faolan.Core.Database/Tables/NpcSpawn.cs`); the
       importer lifts these rows from the dump body at import time without persisting it. `TryBuildLive` is the
       SOLE spawn-body path — there is no longer a `Data`-splice fallback in `NpcSpawnBuilder`. The residual
-      no-morph-humanoid recordCounts noted above were closed by the importer's minimal-form lift
-      (`NpcStatCore.MinimalPostIirRecordCount`).
+      no-morph-humanoid header words noted above were closed outright by #605: the word is the movement mode the
+      message already carries, so there is nothing left to derive separately.
 
 ## Class-specific playfields (the city armories)
 

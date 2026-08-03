@@ -59,7 +59,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			foreach (var word in post.HeadWords)
 				stream.WriteUInt32(word);
 
-			stream.WriteUInt32((uint)slot.Length + 4).WriteUInt32(post.Word2).WriteArray(slot).WriteUInt32(ListFrame.ForCount(post.BuffRecords.Count));
+			stream.WriteUInt32((uint)slot.Length + 4).WriteUInt32(post.MovementMode).WriteArray(slot).WriteUInt32(ListFrame.ForCount(post.BuffRecords.Count));
 			foreach (var buff in post.BuffRecords)
 				WriteBuff(stream, buff);
 
@@ -130,7 +130,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				value.HeadWords.Add(r.ReadU32Be());
 
 			value.FirstRecordLen = r.ReadU32Be();
-			value.Word2 = r.ReadU32Be();
+			value.MovementMode = r.ReadU32Be();
 			if (value.FirstRecordLen < 4)
 				throw CodecParseException.Unexpected(nameof(SpawnPostIirCodec), r.Position - 8, "a first-record length that can hold the buff list's framing word", value.FirstRecordLen.ToString());
 

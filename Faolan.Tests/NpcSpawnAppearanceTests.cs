@@ -84,7 +84,7 @@ namespace Faolan.Tests
 		{
 			// The runtime state is a MOVE TASK - decoded in #477, and the reader requires the slot to BE one rather
 			// than accepting any bytes of the right length. A mode-3 Jump node is the shortest real task.
-			var runtime = SpawnPostIirs.Npc(SpawnPostIirs.MinimalHumanoidWord2, morphs);
+			var runtime = SpawnPostIirs.Npc(SpawnPostIirs.MovementModeTwo, morphs);
 			runtime.MoveTask = new MoveTaskNode
 			{
 				Mode = 3,
@@ -109,7 +109,7 @@ namespace Faolan.Tests
 		private static byte[] AppearancePostIir(System.Collections.Generic.IReadOnlyList<NpcAppearanceMorph> morphs)
 		{
 			using var s = new FaolanStream();
-			SpawnPostIirCodec.Write(s, SpawnPostIirs.Npc(SpawnPostIirs.MinimalHumanoidWord2, morphs));
+			SpawnPostIirCodec.Write(s, SpawnPostIirs.Npc(SpawnPostIirs.MovementModeTwo, morphs));
 			return s.ToArray();
 		}
 

@@ -222,6 +222,16 @@ cannot be less stable than the key it is grouped by. ⚠️ Read the third table
 count: 92 of `AnimIdleTimer`'s 94 distinct values lie strictly between 0 and 1, which reads as a continuous
 animation phase, but they carry only 24% of sightings — the field rests at exactly 0 or 1 and is merely caught
 mid-blend, and flattening it to one value cost 167 byte-exact rebuilds before the frequency view caught it),
+`field-predictors` (the question `field-stability` raises but does not answer, for the fields it condemns: a value
+rolled per spawn event belongs in no column, but it still has to be SENT — so is it COMPUTED from something else the
+same spawn already carries? `--report-arg <field>`, default `MovementMode`. Groups every sighting by each candidate
+and scores the share that agree on the target, against the baseline a constant would score. Candidates are the
+character message's fields PLUS synthetic ones off the spawn's MOVE TASK, which is the only part of a spawn that says
+what the entity is DOING. This is what found that the post-IIR header's third word IS `movement_mode` — 5,738 of
+5,739 NPC spawns and 209 of 209 player ones — retiring the duplicate `MinimalPostIirWord2` column and taking
+`--report spawn-diff` from 336 to 508 byte-exact rebuilds (#605). ⚠️ Read purity together with CARDINALITY: purity
+rises for free with the number of distinct candidate values, so a candidate as fine-grained as the sample scores 100%
+while explaining nothing. The table marks those `(fine)`; a real answer is COARSE and near-100%),
 `scaffold-heap` (the RETAIL SERVER's own memory, harvested out of the NPC spawn scaffold: retail writes 3 of the
 53 scaffold words on an NPC spawn and sends the other 50 carrying whatever was there, so 17,400 captured spawns
 ship 3.3 MB of server-side data. Yields the script engine's ScriptGroup catalogue and C++ source-file inventory,

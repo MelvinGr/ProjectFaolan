@@ -20,22 +20,25 @@ namespace Faolan.Tests
 		public void BuildFromScratch_Animal_ParsesAndCarriesMinimalPostIir()
 		{
 			var golden = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnNpcCrocodile")[4..]);
-			var built = SimpleCharFullUpdateCodec.Parse(BuildFromGolden(golden, out var morphs, SpawnPostIirs.MinimalWord2));
+			var built = SimpleCharFullUpdateCodec.Parse(BuildFromGolden(golden, out var morphs));
 
 			Assert.Empty(morphs); // an animal carries no appearance table
 			Assert.Equal(golden.Handle, built.Handle);
-			Assert.Equal(PostIirBytes(SpawnPostIirs.Npc()), PostIirBytes(built.Post));
+			// The rebuilt post-IIR carries the GOLDEN's own movement mode, because the builder reads it off the
+			// message rather than taking it as a parameter (#605) - which is what makes the two copies agree.
+			Assert.Equal(golden.Post.MovementMode, built.Post.MovementMode);
+			Assert.Equal(PostIirBytes(SpawnPostIirs.Npc(golden.Post.MovementMode)), PostIirBytes(built.Post));
 		}
 
 		[Fact]
 		public void BuildFromScratch_Humanoid_ParsesAndCarriesAppearanceTable()
 		{
 			var golden = SimpleCharFullUpdateCodec.Parse(Golden.Bytes("SpawnNpcCasilda")[4..]);
-			var built = SimpleCharFullUpdateCodec.Parse(BuildFromGolden(golden, out var morphs, SpawnPostIirs.MinimalWord2));
+			var built = SimpleCharFullUpdateCodec.Parse(BuildFromGolden(golden, out var morphs));
 
 			Assert.NotEmpty(morphs); // Casilda's appearance/morph table
 			// the post-IIR is the appearance table generated from the decoded morphs (not the minimal form)
-			Assert.Equal(PostIirBytes(SpawnPostIirs.Npc(SpawnPostIirs.MinimalHumanoidWord2, morphs)), PostIirBytes(built.Post));
+			Assert.Equal(PostIirBytes(SpawnPostIirs.Npc(golden.Post.MovementMode, morphs)), PostIirBytes(built.Post));
 			// and the transform round-trips (position/rotation/token preserved through the build)
 			Assert.Equal(golden.Position, built.Position);
 			Assert.Equal(golden.Rotation, built.Rotation);
@@ -44,13 +47,13 @@ namespace Faolan.Tests
 
 		// Decompose a golden capture into the inputs BuildBody takes (IIR header, transform, token, message, morphs)
 		// and reassemble from scratch - the same decomposition BuildLive performs off the DB columns.
-		private static byte[] BuildFromGolden(SimpleCharFullUpdateIIR golden, out List<NpcAppearanceMorph> morphs, uint minimalWord2Value)
+		private static byte[] BuildFromGolden(SimpleCharFullUpdateIIR golden, out List<NpcAppearanceMorph> morphs)
 		{
 			morphs = golden.Post.Slot is NpcEntrySlot npc
 				? npc.Morphs.ToList()
 				: [];
 
-			return NpcSpawnBuilder.BuildBody(golden.Handle, golden.CoreCharIirHeader, golden.Position, golden.Rotation, (uint)golden.Playfield, golden.Character, morphs, minimalWord2Value);
+			return NpcSpawnBuilder.BuildBody(golden.Handle, golden.CoreCharIirHeader, golden.Position, golden.Rotation, (uint)golden.Playfield, golden.Character, morphs);
 		}
 
 		private static byte[] PostIirBytes(SpawnPostIir post)

@@ -31,19 +31,6 @@ namespace Faolan.Core.Database.Tables
 		// from-scratch spawn header can re-emit it without needing its full bit semantics decoded.
 		public uint? IirHeader { get; set; }
 
-		// The THIRD HEADER WORD a NO-MORPH spawn of this type ships in its fresh minimal post-IIR (#243): 1, 2 or 3.
-		// A TYPE-STABLE constant (no type is ever seen with two) whose exact meaning isn't decoded - it is NOT an
-		// animal-vs-humanoid split (both values carry a mix of people and creatures: Kalanthes/merchants are 1,
-		// Saddur/guards are 2, while Wolf/Chicken are 2 and Cobra/Crocodile are 1). Derived at import from a minimal-form
-		// capture. Lets a no-morph spawn build its post-IIR from scratch - BuildMinimalPostIir(word2) - instead of
-		// splicing the captured Data blob. Null for appearance-bearing types (they use their morph rows) and for types
-		// only ever seen in a runtime-bearing form (their fresh word2 is unknown -> stay on Data).
-		//
-		// ⚠️ Was `MinimalPostIirRecordCount` until #475. It counts NOTHING: streams of identical length carry 1, 2
-		// and 3 in it, so it cannot be counting anything that occupies bytes. Renamed to its POSITION, which is all
-		// that is actually known about it.
-		public uint? MinimalPostIirWord2 { get; set; }
-
 		// --- CharacterStats (Stats) ---
 		// Creature model-race code (0..98), a DIFFERENT domain from the 3-value player Race enum - stays raw uint.
 		public uint? Race { get; set; }
@@ -155,6 +142,17 @@ namespace Faolan.Core.Database.Tables
 
 		// --- root ProtoCoreCharacterIIR scalars (outside the sub-messages) ---
 		public bool? CanFall { get; set; }
+
+		// The entity's movement mode: 1, 2 or 3. Sent TWICE in one spawn body - as this protobuf field and as the
+		// post-IIR header's third word - which is why there used to be a second column (`MinimalPostIirWord2`) holding
+		// the same number, lifted from a different representative spawn and disagreeing with this one on 45 of 368
+		// types. There is one value, so there is one column, and `NpcSpawnBuilder` derives the post-IIR word from it
+		// (Gitea #605; the identity is measured in `--report field-predictors` and documented on
+		// `SpawnPostIir.MovementMode`).
+		//
+		// ⚠️ Rolled per SPAWN EVENT, not a property of the type: only ~62% of templates hold one value across their
+		// sightings even when restricted to freshly-spawned NPCs. What is stored is therefore the type's MODAL value
+		// over its own captured sightings - a measurement, not the corpus-wide mode, which is the line #602 drew.
 		public uint? MovementMode { get; set; }
 	}
 }

@@ -75,8 +75,8 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			if (!TryParsePost(body, out var post) || post.HeadWords.Count > 0)
 				return false;
 
-			word2 = post.Word2;
-			return word2 is SpawnPostIirs.MinimalWord2 or SpawnPostIirs.MinimalHumanoidWord2 or SpawnPostIirs.MinimalThirdWord2;
+			word2 = post.MovementMode;
+			return SpawnPostIirs.IsMovementMode(word2);
 		}
 
 		// The post-IIR of a captured body, or false when the body is not a decodable spawn. `body` is the raw wire

@@ -16,11 +16,11 @@ namespace Faolan.Tests
 		[Fact]
 		public void MinimalNpc_HasTheDecodedHeaderGrammar()
 		{
-			var post = Rebuild(SpawnPostIirs.Npc());
+			var post = Rebuild(SpawnPostIirs.Npc(SpawnPostIirs.MovementModeOne));
 
 			Assert.Equal(0u, post.ReadU32Be(0)); // the head-word LIST'S count, 0 - not the constant it read as
 			Assert.Equal(5u, post.ReadU32Be(4)); // the first record: the empty move-task slot + the buff list's frame
-			Assert.Equal(SpawnPostIirs.MinimalWord2, post.ReadU32Be(8));
+			Assert.Equal(SpawnPostIirs.MovementModeOne, post.ReadU32Be(8)); // the third word IS the movement mode (#605)
 			Assert.Equal(ListFrame.Empty, post.ReadU32Be(post.Length - 4)); // the closing pair list, empty
 		}
 
@@ -30,13 +30,15 @@ namespace Faolan.Tests
 			var captured = CapturedPostIir("SpawnNpcCrocodile");
 
 			Assert.Equal(SpawnPostIirs.MinimalNpcLength, captured.Length);
-			Assert.Equal(captured, Rebuild(SpawnPostIirs.Npc()));
+			// The mode is passed EXPLICITLY rather than defaulted: it is this Crocodile's own movement mode (1), and
+			// the builder's fallback (2) is what we send for a type that has none - not a claim about any capture.
+			Assert.Equal(captured, Rebuild(SpawnPostIirs.Npc(SpawnPostIirs.MovementModeOne)));
 		}
 
 		[Fact]
 		public void MinimalNpc_ReproducesThePantherScaffold()
 		{
-			Assert.Equal(CapturedPostIir("SpawnNpcMinimalPanther"), Rebuild(SpawnPostIirs.Npc()));
+			Assert.Equal(CapturedPostIir("SpawnNpcMinimalPanther"), Rebuild(SpawnPostIirs.Npc(SpawnPostIirs.MovementModeOne)));
 		}
 
 		// No head words. That leading u32 is the head-word LIST'S COUNT, not a constant - it is 0 on 11,627 captured
@@ -58,7 +60,7 @@ namespace Faolan.Tests
 		public void TryReadNoMorphWord2_ReadsMinimal_DeclinesAppearance()
 		{
 			Assert.True(NpcSpawnAppearance.TryReadNoMorphWord2(Golden.Bytes("SpawnNpcCrocodile"), out var word2));
-			Assert.Equal(SpawnPostIirs.MinimalWord2, word2);
+			Assert.Equal(SpawnPostIirs.MovementModeOne, word2);
 
 			Assert.False(NpcSpawnAppearance.TryReadNoMorphWord2(Golden.Bytes("SpawnNpcCasilda"), out _));
 		}
@@ -76,7 +78,7 @@ namespace Faolan.Tests
 			var animal = Golden.Bytes("SpawnNpcCrocodile");
 			Assert.True(SpawnBodyReader.TryParse(animal, out var spawn));
 
-			var post = SpawnPostIirs.Npc(SpawnPostIirs.MinimalHumanoidWord2);
+			var post = SpawnPostIirs.Npc(SpawnPostIirs.MovementModeTwo);
 			post.MoveTask = MoveTaskNodes.Walk(new Vector3(1, 2, 3), new Vector3(4, 5, 6));
 			spawn.Post = post;
 
@@ -85,7 +87,7 @@ namespace Faolan.Tests
 			body.WriteU32Be(0, (uint)(body.Length - 4));
 
 			Assert.True(NpcSpawnAppearance.TryReadNoMorphWord2(body, out var word2));
-			Assert.Equal(SpawnPostIirs.MinimalHumanoidWord2, word2);
+			Assert.Equal(SpawnPostIirs.MovementModeTwo, word2);
 		}
 
 		// The captured post-IIR stream, sliced off behind the embedded CharacterIIR.

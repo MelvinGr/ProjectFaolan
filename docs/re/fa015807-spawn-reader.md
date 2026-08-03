@@ -286,10 +286,22 @@ about. [V3: SpawnPostIirGrammarTests.TheNpcAndPlayerPostIirStreams_AreTheSameGra
   that first record. **That single byte is the whole reason the two looked like different formats.**
 - `firstRecordLen` is the length of the FIRST record only. On a player it stays 4 whether the character has 0
   or 3 buffs, because the buff records are that list's *elements*, not further records.
-- ⚠️ **`word2` does not count records.** Streams of identical length carry 1, 2 and 3 in it, so it cannot be
-  counting anything that occupies bytes. It is a type-stable enum of unknown meaning, named for its position -
-  `SpawnPostIir.Word2` and the persisted column `NpcStatCore.MinimalPostIirWord2`, both of which used to say
-  "record count".
+- ⚠️ **The third header word does not count records — it is the entity's MOVEMENT MODE**, the same value the
+  embedded `ProtoCoreCharacterIIR` carries in its own `movement_mode` field (21). One value, sent twice in one
+  spawn body, in two unrelated byte regions. `SpawnPostIir.MovementMode`; re-derive with
+  `--report field-predictors` [V1: Faolan.Importer/Cli/ReportCli.cs].
+  - The evidence is a whole-corpus cross-tab: over **5,739** captured NPC spawns the two agree on **5,738** (the
+    one exception is a Rocknose part-way through a path plan), and over **209** captured PLAYER spawns they agree
+    on all 209. The player family is what makes this a protocol fact rather than an NPC convention — its scaffold
+    is a different grammar and it was not part of the measurement that found the identity.
+  - That it counts nothing was already known (streams of identical length carry 1, 2 and 3), and is what made the
+    real answer findable. What was *also* written down here — "a **type-stable** enum of unknown meaning" — was
+    wrong: it is rolled per spawn EVENT, 61.9% stable across templates even when restricted to freshly-spawned
+    NPCs with no move task and no buffs. The type-stability claim was unfalsifiable by construction, because the
+    importer scan behind it stopped at the FIRST sighting of each type.
+  - What 1/2/3 MEAN is still open (Gitea #607). What the corpus says: of the 562 spawns carrying an active
+    move-task plan, 559 are `1`, where a spawn with an empty slot is `2` on 4,064 of 5,168; `3` is 14 sightings,
+    every one a Flesheater with an empty slot.
 - `12 + firstRecordLen + 24` is the length only when all three pair lists are empty, i.e. the minimal forms. It
   is not a general identity — streams with populated pair lists are longer and still walk exactly.
 

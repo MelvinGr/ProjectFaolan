@@ -2551,9 +2551,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("MaxStamina")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint?>("MinimalPostIirWord2")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint?>("MonsterData")
                         .HasColumnType("INTEGER");
 

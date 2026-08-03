@@ -21,15 +21,22 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// Assembles a whole NPC FA015807 spawn RECORD from scratch (#244) - no captured template. The playfield token
 		// is written into the transform directly (no post-hoc SpawnTransformPatch); the pre-IIR is the minimal
 		// generated scaffold; the post-IIR is the appearance/morph table when `morphs` are given, else the minimal
-		// form with `minimalWord2` (the type-stable 1, 2 or 3 - #243/#475).
+		// form.
 		//
 		// This is the sole NPC spawn-body path (the captured Data blob was retired): every shipped spawn is an
 		// animal, a clean-appearance humanoid, or a no-morph spawn expressible from columns (NpcSpawnFromScratchTests).
 		//
+		// ⚠️ The post-IIR's movement mode is DERIVED from the message rather than passed in, and that is the whole
+		// point of it being a single expression here: the value occurs twice in one spawn body (SpawnPostIir
+		// .MovementMode) and retail sends the same number in both places on 5,738 of 5,739 captured NPC spawns and on
+		// all 209 player ones. It used to arrive from a second stored column, which let the two disagree - 45 of the
+		// 368 shipped types carried a different number in each, so those spawns went out in a shape retail never sent
+		// (#605).
+		//
 		// The u32 carrier length belongs to the SENDER (#530 rule 2) - what comes back is the record.
-		public static byte[] BuildBody(uint handle, uint iirHeader, Vector3 position, Quaternion rotation, uint playfieldToken, ProtoCoreCharacterIIR message, IReadOnlyList<NpcAppearanceMorph> morphs,
-			uint minimalWord2 = SpawnPostIirs.MinimalWord2)
+		public static byte[] BuildBody(uint handle, uint iirHeader, Vector3 position, Quaternion rotation, uint playfieldToken, ProtoCoreCharacterIIR message, IReadOnlyList<NpcAppearanceMorph> morphs)
 		{
+			var movementMode = message.ShouldSerializeMovementMode() ? message.MovementMode : SpawnPostIirs.DefaultMovementMode;
 			return SimpleCharFullUpdateCodec.Build(new SimpleCharFullUpdateIIR
 			{
 				Handle = handle,
@@ -39,9 +46,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				PreIir = SpawnPreIirs.Minimal(),
 				CoreCharIirHeader = iirHeader,
 				Character = message,
-				Post = morphs is { Count: > 0 }
-					? SpawnPostIirs.Npc(SpawnPostIirs.MinimalHumanoidWord2, morphs)
-					: SpawnPostIirs.Npc(minimalWord2)
+				Post = SpawnPostIirs.Npc(movementMode, morphs is { Count: > 0 } ? morphs : null)
 			});
 		}
 
@@ -72,18 +77,16 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				})
 				.ToList();
 			var message = BuildMessageFromType(npc);
-
-			var minimalWord2Value = npc.StatCore.MinimalPostIirWord2 ?? SpawnPostIirs.MinimalWord2;
-			return BuildBody(handle, x, position, rotation, playfieldToken, message, morphs, minimalWord2Value);
+			return BuildBody(handle, x, position, rotation, playfieldToken, message, morphs);
 		}
 
 		// The LIVE spawn path (#244/#243): assemble the whole record from typed columns with `playfieldToken` baked
 		// into the transform - no captured Data, no SpawnTransformPatch. Every shipped spawn is expressible from
 		// scratch: an ANIMAL (no equipment -> minimal post-IIR), a humanoid whose APPEARANCE is lifted into morph
 		// rows (-> the appearance table), or a NO-MORPH spawn whose type carries a known minimal word2 (#243).
-		// THROWS for a row with no lifted type (no StatCore.IirHeader) or a no-morph spawn whose type word2 was never
-		// derived - neither occurs in the shipped DB (988/988 build), so a throw signals un-lifted /
-		// partially-imported data or a missing Include, not a normal outcome.
+		// THROWS for a row with no lifted type (no StatCore.IirHeader) - which does not occur in the shipped DB
+		// (988/988 build), so a throw signals un-lifted / partially-imported data or a missing Include, not a normal
+		// outcome.
 		// NB the dev nameplate LABEL (#363) is NOT baked into the spawn name here: the client draws an NPC's floating
 		// name from its template_id LDB, ignoring the spawn-body Name, so the label is pushed separately as a
 		// SetNameIIR after the spawn (WorldBroadcaster.SendWorldSpawn / SetNameCodec).
@@ -104,16 +107,7 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				.ToList();
 
 			var message = BuildMessageFromColumns(row);
-
-			// Animal or morph-humanoid: the minimal word2 is unused when morphs are present.
-			if (!row.HasEquipment || morphs.Count > 0)
-				return BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs);
-
-			// No-morph spawn: build the minimal form with the type's fresh word2.
-			if (row.NpcTemplate.StatCore.MinimalPostIirWord2 is not { } minimalWord2)
-				throw new InvalidOperationException($"NpcSpawn (id {row.Id}, type '{row.NpcTemplate.Name}') is an equipped no-morph humanoid whose type has no derived MinimalPostIirWord2.");
-
-			return BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs, minimalWord2);
+			return BuildBody(handle, x, row.Position, row.Rotation, playfieldToken, message, morphs);
 		}
 
 		// Constructs the WHOLE ProtoCoreCharacterIIR message for a spawn from typed columns/rows (#244) - no captured
