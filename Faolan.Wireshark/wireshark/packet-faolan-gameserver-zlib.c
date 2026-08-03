@@ -589,10 +589,19 @@ static void dissect_conan_packet(
 /* ---- Auto-follow: register advertised service ports ----
  *
  * The services hand the client the next service's address inside packet bodies: as an ASCII
- * "host:port" string (UniverseAgent realm handoff, GameServer 0x2002 zone-change handoff) or
- * as binary [u32 ip][u16 port BE] (the PlayerAgent 0x1A07 service handoffs). Registering the
- * advertised TCP port makes a whole session dissect from just the fixed UniverseAgent port
- * (chat connections picked up this way are skipped via per-conversation Conan validation). */
+ * "host:port" string (the UniverseAgent realm handoff and the GameServer zone-change handoff) or
+ * as binary [u32 ip][u16 port BE] (the four login handoffs, found by their full_routing_context -
+ * this used to say "the PlayerAgent 0x1A07 handoffs", which was that field's tag read as an
+ * opcode, #618). Registering the advertised TCP port is what makes a whole session dissect from
+ * just the fixed UniverseAgent port, and it is doing nearly all of the work: 99.8% of the frames
+ * this plugin dissects across the capture corpus are on a followed port rather than on 7010.
+ *
+ * The port only ATTACHES the dissector; what a stream IS gets decided by content, per conversation
+ * (see the FAOLAN_CONV_* validation below) - a first packet whose CRC-32 checks out is Conan, one
+ * that instead walks cleanly as [u16 opcode][u16 bodyLen][body] is ChatServer chat and is re-framed
+ * and dissected as such, and anything else is skipped. That split is why the two halves are not
+ * redundant: Conan could be recognised by its CRC alone, but chat carries no checksum, so its much
+ * weaker framing test is only safe on a stream a handoff has already named. */
 
 static void register_followed_port(uint16_t port)
 {
