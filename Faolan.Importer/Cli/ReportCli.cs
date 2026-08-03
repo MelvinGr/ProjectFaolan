@@ -1914,13 +1914,18 @@ namespace Faolan.Importer.Cli
 		// The feat/ability catalog's RDB type.
 		private const uint FeatTemplateType = 1000020;
 
-		// Harvests the feat EFFECT element's kind -> width table empirically (#251).
+		// Harvests the feat EFFECT element's kind -> width table empirically (#251), and CHECKS it against the width
+		// the kind's key list predicts (#591).
 		//
 		// The element opens with a KIND tag (0xCF..) and its width VARIES with that kind, which is what defeats a
-		// fixed-stride walk and left 3.1% of effect rows on stats the client cannot name. The widths are not
-		// guessable, but they ARE measurable: in a record whose effect list holds exactly ONE element, that element
-		// runs to the end of the record, so `recordLength - elementStart` IS the kind's width. Single-element records
-		// hand the table over directly; multi-element records then become the check.
+		// fixed-stride walk and left 3.1% of effect rows on stats the client cannot name. The width is now KNOWN
+		// rather than fitted - an element is `8 + len(keyList)` words and the key lists come from the client
+		// (GameActionTypes) - so what this measures is a CHECK on that, over shipped bytes.
+		//
+		// ⚠️ What it measures is an upper BOUND, not the width: in a record whose effect list holds exactly one
+		// element, `recordLength - elementStart` also swallows anything the record carries AFTER the element list.
+		// That is why the surplus dump matters - where the two disagree it has so far been trailing record content
+		// (a list frame, a mesh name), not element bytes.
 		// --report rdb-field-coverage [--report-arg <rdbType>]
 		//
 		// Every property-table field a record type carries, how many records carry it, and whether the importer
@@ -2412,6 +2417,7 @@ namespace Faolan.Importer.Cli
 		{
 			using var rdb = new RdbReader(rdbDir);
 			var widths = new Dictionary<uint, Dictionary<int, int>>();
+			var surplus = new Dictionary<uint, (uint Id, uint[] Words)>();
 			var singles = 0;
 			var multi = 0;
 
@@ -2448,12 +2454,29 @@ namespace Faolan.Importer.Cli
 				var width = body.Length - start;
 				widths.TryAdd(kind, new Dictionary<int, int>());
 				widths[kind][width] = widths[kind].GetValueOrDefault(width) + 1;
+
+				// A measured width WIDER than the key list predicts is bytes past the element, and this is what says
+				// WHAT they are rather than only that they exist - the difference between "AddSkinnedMesh disagrees"
+				// and "AddSkinnedMesh is followed by `2 9 207912`". Both surpluses seen so far are trailing RECORD
+				// content, not element bytes: `Modify`'s is a pair of list frames (0x7E2, 0x3F1) and
+				// `SetMorphValue`'s is an ASCII mesh name.
+				var predicted = 4 * (GameActionTypes.Get(kind)?.WidthWords ?? 0);
+				if (predicted > 0 && width > predicted && !surplus.ContainsKey(kind))
+					surplus[kind] = (e.Id, [.. Enumerable.Range(0, (width - predicted) / 4)
+						.Select(i => BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(start + predicted + 4 * i)))]);
 			}
 
 			Console.WriteLine($"single-element records: {singles}   multi-element: {multi}");
-			Console.WriteLine("kind -> width(s) observed in single-element records:");
+			Console.WriteLine("kind -> width(s) observed in single-element records, vs the width its KEY LIST predicts:");
 			foreach (var (kind, seen) in widths.OrderByDescending(k => k.Value.Values.Sum()))
-				Console.WriteLine($"  0x{kind:X4}  {string.Join(", ", seen.OrderByDescending(w => w.Value).Select(w => $"{w.Key}B x{w.Value}"))}");
+			{
+				var type = GameActionTypes.Get(kind);
+				var predicted = type != null ? $"{4 * type.WidthWords}B {type.Name}" : "<unregistered>";
+				var agrees = type != null && seen.Keys.Contains(4 * type.WidthWords) ? "" : "   <-- DISAGREES";
+				Console.WriteLine($"  0x{kind:X4}  {string.Join(", ", seen.OrderByDescending(w => w.Value).Select(w => $"{w.Key}B x{w.Value}"))}   predicted {predicted}{agrees}");
+				if (surplus.TryGetValue(kind, out var extra))
+					Console.WriteLine($"            surplus in {extra.Id}: {string.Join(" ", extra.Words.Select(w => $"{w} (0x{w:X})"))}");
+			}
 		}
 
 		// Classify the RDB feat/ability catalog (type 1000020) into PLAINTEXT vs TEA-ENCRYPTED records, and dump the

@@ -105,9 +105,17 @@ initialiser) against measured width (`--report feat-effect-widths`, from single-
 | 53182 | `SpecialAbility` | `39`(Value)`,77`(Hash)`,84`(Level)`,174`(Substate) | 12 |
 | 53213 / 53211 | `AddProc` / `AddSpellProc` | six | 14 |
 
-The two misses are `Charge` (predicted 13, measured 8 — from a single record, likely a coincidental prefix hit)
-and `AddSkinnedMesh` (predicted 9, measured 12 over 117 records — a real disagreement, and the likely cause is a
-key whose value is a STRING rather than a u32, which the element grammar already allows).
+⚠️ **The measurement is an upper BOUND, not the width** — `recordLength - elementStart` also swallows whatever
+the record carries after the element list, which is why an exact match on 17 kinds is the strong result and a
+surplus is not automatically a disagreement. `--report feat-effect-widths` now prints the surplus words, and both
+that occur are trailing RECORD content rather than element bytes: `AddSkinnedMesh` (measured 12 words, predicted
+9) is followed by `2 9 207912`, and `SetMorphValue` by an ASCII mesh name — while `Modify`'s wide variants are
+followed by a pair of list frames (`0x7E2`, `0x3F1`). The element width itself is confirmed independently by
+MULTI-element records, where the elements sit back to back with nothing between them: feat 217728 carries four
+`AddSkinnedMesh` elements at exactly 9 words each.
+
+The one real miss is `Charge` — predicted 13 words, measured 8, i.e. an element with NO payload words at all. It
+is a single record and is more likely a coincidental prefix hit than a real element.
 
 **Key indices that carry a name** (recovered from the types that name their own slots; a name transfers by KEY,
 so it resolves that slot on every type that uses it): `0` Stat, `11` Radius, `17..20` AudioEffect*, `24`
