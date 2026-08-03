@@ -208,6 +208,24 @@ whose tick units are not pinned; nothing server-side depends on it, since the cl
 
 ## Guilds
 
+### The guild management fan-out
+**Tracked: Gitea #104.** [V0: the guild management fan-out] Leave, kick, promote, demote and the invite reply are
+the guild actions **no capture performs**, so the nine bodies in
+[`../subsystems/guilds.md`](../subsystems/guilds.md) come from the client's `CSPlayerInterfaceDispatch_t` readers
+rather than from retail bytes, and nothing gates them byte-exactly. The FIELD widths are certain (each reader names
+its fields in its own assert strings, and the primitives are unambiguous - `FUN_0048f900` u32, `FUN_0048f840`
+string, `FUN_00cba1b0(dst,1)` one byte). What is NOT settled is who retail sends each one to, and the CONTENT of
+`DispatchGuildInviteReplyToInviter`'s `i_cMessage` - a free string we fill with the invitee's name because that is
+the only thing the inviter's toast can need. A two-client retail guild-management session settles all of it.
+
+### Which guild ranks may kick, promote and demote
+**Tracked: Gitea #104.** [V0: which guild ranks may kick, promote and demote] The same gap the bank withdrawal has,
+one rung along: the client ships a per-rung permission BITMASK in RDB 1000518 (strictly nested, `0` subset `30`
+subset `286` subset `6430` subset `7518` subset `0x7FFFFFFF`), which is presumably what gates these - but which BIT
+is kick, which is promote, and whether promote is even permission-gated rather than leader-only, is not recoverable
+from the table alone. We allow the LEADER only, the narrowest rule that cannot be abused, rather than guessing a
+threshold that would quietly let the wrong members remove people.
+
 ### The guild bank's two message bodies
 **Tracked: Gitea #132.** [V0: the guild withdrawal body] [V0: the guild cash update body] `GuildWithdrawMoney`
 (c2s `0x2035`) and `DispatchGuildUpdateCash` (s2c `0x2052`) are the only guild-bank messages that exist —

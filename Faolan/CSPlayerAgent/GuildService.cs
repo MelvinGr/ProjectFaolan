@@ -10,6 +10,7 @@ using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Guild;
+using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Network.Server.GameServer;
@@ -56,13 +57,18 @@ namespace Faolan.CSPlayerAgent
 			_clientForCharacter = clientForCharacter;
 		}
 
-		// 0x201D DeclineGuildInvitation: drop the pending invite (logs the guild it was for). Returns the declined
-		// invite's guild name (or null when there was none) so the listener can log it.
-		public string? DeclineGuildInvitation(uint characterId)
+		// 0x201D DeclineGuildInvitation: drop the pending invite and tell the INVITER (0x2031 with joined=0 - the
+		// same message the accept sends with 1). Returns the declined invite's guild name (or null when there was
+		// none) so the listener can log it.
+		public async Task<string?> DeclineGuildInvitation(uint characterId, string? declinerName)
 		{
-			return _pendingGuildInvites.TryRemove(characterId, out var declined)
-				? declined.GuildName
-				: null;
+			if (!_pendingGuildInvites.TryRemove(characterId, out var declined))
+				return null;
+
+			if (_clientForCharacter(declined.InviterId) is { Session.Character: not null } inviterClient)
+				await SendInviteReplyToInviter(inviterClient, declinerName ?? "", false);
+
+			return declined.GuildName;
 		}
 
 		// 0x201C AcceptGuildInvitation(i_cGuildID): body is the guild ID32 from the 0x202A invite. Retail replies
@@ -94,6 +100,9 @@ namespace Faolan.CSPlayerAgent
 			_logger.LogInformation("{Character} joined guild \"{Guild}\" (invited by {Inviter}).", character.Name, guild.Name, invite.InviterName);
 			await SendGuildFullUpdate(client, ReplySender(packet.Receiver), packet.Sender, guild, character);
 			await BroadcastGuildMemberJoined(guild, character); // includes the joiner, matching retail order
+			if (_clientForCharacter(invite.InviterId) is { Session.Character: not null } inviterClient)
+				await SendInviteReplyToInviter(inviterClient, character.Name ?? "", true);
+
 			await _gameServerDispatcher.SendGuildTag(character.Id, guild.Name);
 		}
 
@@ -228,22 +237,153 @@ namespace Faolan.CSPlayerAgent
 			await InviteCharacterToGuild(client, target, targetName);
 		}
 
-		// 0x2028 GuildLeave. The member-left fan-out packet is not decoded yet (no capture exercises it), so
-		// the other members' rosters refresh on their next member-list request.
-		public async Task HandleGuildLeave(INetworkClient client)
+		// 0x2028 GuildLeave (no body): the member takes themselves out.
+		public Task HandleGuildLeave(INetworkClient client)
 		{
-			var character = client.Session.Character;
-			if (character?.GuildId is not { } guildId)
+			return client.Session.Character is { } character
+				? RemoveFromGuild(character, "left")
+				: Task.CompletedTask;
+		}
+
+		// 0x2027 GuildKick([ID32 target]): an officer takes someone ELSE out. Same removal, different authority check -
+		// and the kicked member is told by the same DispatchGuildMemberLeft everyone else gets, because it names them.
+		public async Task HandleGuildKick(INetworkClient client, FaolanStream body)
+		{
+			var actor = client.Session.Character;
+			var targetId = EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id;
+
+			var target = await AuthorizeRankAction(actor, targetId, "kick");
+			if (target == null)
 				return;
 
+			await RemoveFromGuild(target, $"was kicked by {actor!.Name}");
+		}
+
+		// 0x2025 GuildPromote / 0x2026 GuildDemote ([ID32 target]): move a member one rung up or down their guild's
+		// ladder. Which rungs exist is per governing form (GuildRankLadder), so the bounds are the form's, not a
+		// constant - a Stygian guild has four rungs and an Aquilonian six.
+		//
+		// ⚠️ The TOP rung is the leader's and is not reachable by promotion: handing it out would create a second
+		// leader, and retail transfers leadership through the governing-form change instead
+		// (DispatchGuildGoverningFormChanged carries a `newLeader`). So promotion stops one below it.
+		public async Task HandleGuildRankChange(INetworkClient client, FaolanStream body, bool promote)
+		{
+			var actor = client.Session.Character;
+			var targetId = EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id;
+
+			var target = await AuthorizeRankAction(actor, targetId, promote
+				? "promote"
+				: "demote");
+			if (target == null)
+				return;
+
+			var guild = await _database.GetGuild(target.GuildId!.Value);
+			if (guild == null)
+				return;
+
+			var oldRank = (byte)(target.GuildRank ?? 0);
+			var leaderRank = GuildRankLadder.LeaderRank(guild.GovernmentForm);
+			var newRank = promote
+				? (byte)Math.Min(oldRank + 1, Math.Max(leaderRank - 1, 0))
+				: (byte)Math.Max(oldRank - 1, 0);
+
+			if (newRank == oldRank)
+			{
+				_logger.LogInformation("Guild rank change refused: {Target} is already at rung {Rank} of \"{Guild}\"'s ladder.", target.Name, oldRank, guild.Name);
+				return;
+			}
+
+			if (!await _database.SetCharacterGuild(target.Id, guild.Id, (GuildRank)newRank))
+				return;
+
+			target.GuildRank = (GuildRank)newRank;
+			_logger.LogInformation("Guild \"{Guild}\": {Actor} {Verb}d {Target} from rung {Old} to {New} ({Name}).", guild.Name, actor!.Name, promote
+				? "promote"
+				: "demote", target.Name, oldRank, newRank, GuildRankLadder.NameOf(guild.GovernmentForm, newRank) ?? "?");
+
+			// Three pushes, each to a different audience - see docs/subsystems/guilds.md for why the client needs all
+			// three: the mover's confirmation, the moved member's own notification, and everyone's roster row.
+			await SendRankFeedback(client, guild.GovernmentForm, oldRank, newRank, target.Name ?? "", promote);
+			if (_clientForCharacter(target.Id) is { Session.Character: not null } targetClient)
+				await SendRankChanged(targetClient, newRank, oldRank);
+
+			await BroadcastMemberUpdate(guild, target);
+		}
+
+		// The shared authority check for kick / promote / demote: the actor must be the LEADER of the target's guild,
+		// and may not aim it at themselves. Returns the target when allowed, else null (and logs why).
+		//
+		// ⚠️ Leader-only is deliberately narrower than retail, for the same reason the bank withdrawal is (#132): the
+		// client ships a per-rung permission BITMASK (RDB 1000518) that we do not model, so the choice is between the
+		// narrowest safe rule and a guessed threshold that would let the wrong members kick people.
+		// [V0: which guild ranks may kick, promote and demote]
+		private async Task<Character?> AuthorizeRankAction(Character? actor, uint targetId, string verb)
+		{
+			if (actor?.GuildId is not { } guildId)
+			{
+				_logger.LogWarning("Guild {Verb} by {Actor}: actor is not in a guild.", verb, actor?.Name);
+				return null;
+			}
+
+			var guild = await _database.GetGuild(guildId);
+			if (guild == null)
+				return null;
+
+			if ((byte)(actor.GuildRank ?? 0) != GuildRankLadder.LeaderRank(guild.GovernmentForm))
+			{
+				_logger.LogInformation("Guild {Verb} refused: {Actor} is not the leader of \"{Guild}\".", verb, actor.Name, guild.Name);
+				return null;
+			}
+
+			var target = await _database.GetCharacter(targetId);
+			if (target == null || target.GuildId != guildId || target.Id == actor.Id)
+			{
+				_logger.LogInformation("Guild {Verb} refused: target {TargetId:X8} is not another member of \"{Guild}\".", verb, targetId, guild.Name);
+				return null;
+			}
+
+			return target;
+		}
+
+		// Takes `character` out of their guild and tells everyone who can see the roster, the departing member
+		// included - DispatchGuildMemberLeft names them, so it is their own notification too.
+		private async Task RemoveFromGuild(Character character, string reason)
+		{
+			if (character.GuildId is not { } guildId)
+				return;
+
+			var guild = await _database.GetGuild(guildId);
 			if (!await _database.SetCharacterGuild(character.Id, null, 0))
 				return;
 
 			character.GuildId = null;
 			character.GuildRank = 0;
 
-			_logger.LogInformation("{Character} left guild {GuildId:X}.", character.Name, guildId);
+			_logger.LogInformation("{Character} {Reason} guild {GuildId:X}.", character.Name, reason, guildId);
 			await _gameServerDispatcher.SendGuildTag(character.Id, "");
+
+			if (guild == null)
+				return;
+
+			// Guild.Members was loaded BEFORE the removal, so it still contains the departing member - which is what we
+			// want: retail's roster fan-out reaches them too, and their own client is the one that has to close the
+			// guild window.
+			foreach (var member in guild.Members)
+			{
+				if (_clientForCharacter(member.Id) is { Session.Character: not null } memberClient)
+					await SendMemberLeft(memberClient, character);
+			}
+		}
+
+		// Pushes one member's changed roster row to every online member (rank, online flag, playfield). The narrow
+		// counterpart of re-sending the whole 0x203F full update.
+		private async Task BroadcastMemberUpdate(Guild guild, Character member)
+		{
+			foreach (var recipient in guild.Members)
+			{
+				if (_clientForCharacter(recipient.Id) is { Session.Character: not null } recipientClient)
+					await SendMemberUpdate(recipientClient, member);
+			}
 		}
 
 		// 0x202E GuildMessageOfTheDay(i_cGuildMessageOfTheDay): persists the MOTD and pushes the targeted MOTD-change
@@ -380,6 +520,12 @@ namespace Faolan.CSPlayerAgent
 				_logger.LogWarning("Guild invite to \"{Target}\" by {Inviter}: target {Reason}.", targetLabel, inviter.Name, target == null
 					? "not found"
 					: "is already in a guild");
+				// 0x2034 answers the NO SUCH NAME half only. A target who exists but is already guilded is a different
+				// refusal, and the client's catalog has no code for it - so that one stays silent rather than borrowing
+				// this message and telling the inviter a real character does not exist.
+				if (target == null)
+					await SendInviteNoSuchName(client, targetLabel);
+
 				return;
 			}
 
@@ -394,7 +540,7 @@ namespace Faolan.CSPlayerAgent
 			if (guild == null)
 				return;
 
-			_pendingGuildInvites[target.Id] = new PendingGuildInvite(guild.Id, guild.Name, inviter.Name!);
+			_pendingGuildInvites[target.Id] = new PendingGuildInvite(guild.Id, guild.Name, inviter.Id, inviter.Name!);
 			await SendGuildInvite(targetClient, PushSender, PushReceiver, guild, target.Id, inviter.Name!);
 			_logger.LogInformation("Guild invite: {Inviter} invited {Target} to \"{Guild}\".", inviter.Name, target.Name, guild.Name);
 		}
@@ -426,6 +572,46 @@ namespace Faolan.CSPlayerAgent
 		private Task SendGuildMemberJoined(INetworkClient client, ProtoEndpoint sender, ProtoEndpoint receiver, Character member)
 		{
 			return client.SendAsync(new Rpc(sender, receiver, CSPlayerInterfaceMethods.DispatchGuildMemberJoined, GuildMemberJoinedCodec.Build(MemberRecord(member))));
+		}
+
+		// 0x202E member left - the departure twin of the above, carrying only the id and the NAME (the client's reader
+		// says so; see GuildMemberLeftCodec). Sent to every online member, the departing one included.
+		private static Task SendMemberLeft(INetworkClient client, Character member)
+		{
+			return client.SendAsync(new Rpc(PushSender, PushReceiver, CSPlayerInterfaceMethods.DispatchGuildMemberLeft, GuildMemberLeftCodec.Build(member.Id, member.Name ?? "")));
+		}
+
+		// 0x2030 member update - one roster ROW, for a change that is not a join or a leave (today: a rank move).
+		private Task SendMemberUpdate(INetworkClient client, Character member)
+		{
+			return client.SendAsync(new Rpc(PushSender, PushReceiver, CSPlayerInterfaceMethods.DispatchGuildMemberUpdate, GuildMemberUpdateCodec.Build(MemberRecord(member))));
+		}
+
+		// 0x2032 / 0x2033 - the guild master's own confirmation of a promote/demote. The verb is the OPCODE; the body
+		// is identical either way, which is why the codec declares both methods.
+		private static Task SendRankFeedback(INetworkClient client, GuildGoverningForm form, byte oldRank, byte newRank, string name, bool promote)
+		{
+			return client.SendAsync(new Rpc(PushSender, PushReceiver, promote
+				? CSPlayerInterfaceMethods.DispatchGuildGMPromoteFeedback
+				: CSPlayerInterfaceMethods.DispatchGuildGMDemoteFeedback, GuildRankFeedbackCodec.Build(form, oldRank, newRank, name)));
+		}
+
+		// 0x2065 - "your rank changed", to the member it happened to. Two BYTES, new before old.
+		private static Task SendRankChanged(INetworkClient client, byte newRank, byte oldRank)
+		{
+			return client.SendAsync(new Rpc(PushSender, PushReceiver, CSPlayerInterfaceMethods.DispatchGuildRankChanged, GuildRankChangedCodec.Build(newRank, oldRank)));
+		}
+
+		// 0x2031 - what the INVITER hears back once the invitee answers: the invitee's name, and whether they joined.
+		private static Task SendInviteReplyToInviter(INetworkClient client, string inviteeName, bool joined)
+		{
+			return client.SendAsync(new Rpc(PushSender, PushReceiver, CSPlayerInterfaceMethods.DispatchGuildInviteReplyToInviter, GuildInviteReplyCodec.Build(inviteeName, joined)));
+		}
+
+		// 0x2034 - the inviter typed a name nobody answers to. Echoes the name so the client can put it in the message.
+		private static Task SendInviteNoSuchName(INetworkClient client, string name)
+		{
+			return client.SendAsync(new Rpc(PushSender, PushReceiver, CSPlayerInterfaceMethods.DispatchGuildInviteNoSuchName, GuildInviteNoSuchNameCodec.Build(name)));
 		}
 
 		// A stored member as a roster record, with the live-session fields (online / playfield / last-seen) resolved
@@ -482,6 +668,6 @@ namespace Faolan.CSPlayerAgent
 		// A guild invite offered to a character, awaiting AcceptGuildInvitation/DeclineGuildInvitation. Keyed by
 		// the invitee's character id; entries are dropped on accept/decline (retail also expires them - cooldown
 		// handling can come later).
-		private sealed record PendingGuildInvite(uint GuildId, string GuildName, string InviterName);
+		private sealed record PendingGuildInvite(uint GuildId, string GuildName, uint InviterId, string InviterName);
 	}
 }

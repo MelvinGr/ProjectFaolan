@@ -240,7 +240,7 @@ namespace Faolan.CSPlayerAgent
 				case CSPlayerAgentMethods.DeclineGuildInvitation:
 				{
 					var characterId = client.Session.Character?.Id ?? 0;
-					var declinedGuild = _guild.DeclineGuildInvitation(characterId);
+					var declinedGuild = await _guild.DeclineGuildInvitation(characterId, client.Session.Character?.Name);
 					if (declinedGuild != null)
 						Logger.LogInformation("Guild invite to \"{Guild}\" declined by {CharacterId:X8}.", declinedGuild, characterId);
 
@@ -271,6 +271,23 @@ namespace Faolan.CSPlayerAgent
 				case CSPlayerAgentMethods.GuildLeave:
 				{
 					await _guild.HandleGuildLeave(client);
+
+					break;
+				}
+
+				// 0x2027 GuildKick / 0x2025 GuildPromote / 0x2026 GuildDemote: the three leader-only roster actions
+				// (#104). Each takes the target's ID32 and nothing else; the fan-out they cause is the service's.
+				case CSPlayerAgentMethods.GuildKick:
+				{
+					await _guild.HandleGuildKick(client, body);
+
+					break;
+				}
+
+				case CSPlayerAgentMethods.GuildPromote:
+				case CSPlayerAgentMethods.GuildDemote:
+				{
+					await _guild.HandleGuildRankChange(client, body, method == CSPlayerAgentMethods.GuildPromote);
 
 					break;
 				}

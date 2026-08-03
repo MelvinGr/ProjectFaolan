@@ -163,6 +163,68 @@ guilds share is realm-wide, which is what "highest" reads as
 [V3: GuildRenownCodecTests.RenownHistory_TheHighestEntryIsIdenticalAcrossGuilds]. The column meanings inside an
 entry are still ours, from magnitude alone.
 
+### The management fan-out (#104)
+
+The roster actions no capture performs — leave, kick, promote, demote, and what the inviter is told. Every body here
+comes from the client's own `CSPlayerInterfaceDispatch_t` readers, each located by the assert string that NAMES the
+field it was about to read ("stream bad after 'i_cMemberName'"), so the field order is read rather than inferred.
+⚠️ Nothing here is gated against retail bytes — no capture exercises any of it. [V0: the guild management fan-out]
+
+| method | opcode | reader | body |
+| --- | --- | --- | --- |
+| `DispatchGuildMemberLeft` | `0x202E` | `FUN_013408f0` | `[ID32 member][string memberName]` |
+| `DispatchGuildMemberJoined` | `0x202F` | `FUN_01340aa0` | `[ID32 member][member element]` |
+| `DispatchGuildMemberUpdate` | `0x2030` | `FUN_01340c70` | `[member element]` |
+| `DispatchGuildInviteReplyToInviter` | `0x2031` | `FUN_01340db0` | `[string message][u8 joined]` |
+| `DispatchGuildGMPromoteFeedback` | `0x2032` | `FUN_01340fb0` | `[u32 form][u32 oldRank][u32 newRank][string name]` |
+| `DispatchGuildGMDemoteFeedback` | `0x2033` | `FUN_01341220` | same |
+| `DispatchGuildInviteNoSuchName` | `0x2034` | `FUN_01341490` | `[string name]` |
+| `DispatchGuildOnInviteCooldown` | `0x204E` | `FUN_01343980` | `[u32 inviteCooldownStop]` |
+| `DispatchGuildRankChanged` | `0x2065` | `FUN_013451e0` | `[u8 newRank][u8 oldRank]` |
+
+Three of those would have been guessed wrong, and each is a body the client would have run off the end of:
+
+* **`MemberLeft` is not the mirror of `MemberJoined`.** Joined's second field is the whole member ELEMENT — its
+  reader calls the element deserializer `FUN_00566740` — while Left's calls the STRING primitive `FUN_0048f840`. A
+  departure only needs the row to remove and the name to print. So the catalog's field name `i_cMemberName` is
+  accurate on Left and misleading on Joined, where our capture-verified codec already carried the element.
+* **`RankChanged`'s two ranks are single BYTES**, read with `FUN_00cba1b0(dst, 1)` — not the u32 reader
+  `FUN_0048f900` that every neighbouring guild field uses. Four-byte ranks would put the client six bytes past the
+  end of a two-byte body.
+* **…and in `GMPromoteFeedback` the same ranks ARE u32.** Two readers, two primitives; the asymmetry is real, and it
+  is exactly what a "ranks are one byte everywhere" assumption breaks on.
+
+⚠️ **`GM` in `DispatchGuildGM*Feedback` is GUILD MASTER, not game master.** The client puts `GM` at the FRONT for its
+game-master methods (`DispatchGMGuildNameChanged`, `DispatchGMReplyGuildInfoFromChar`, c2s `GMGuildName`); this pair
+is `DispatchGuild` + `GM`, and its payload is exactly a promoter's toast — who, from which rung to which, and the
+governing form to name them off.
+
+**What the server does.** `GuildLeave` (`0x2028`) and the newly-handled `GuildKick` (`0x2027`) share one removal
+path: clear the guild, clear the in-world tag, then fan `MemberLeft` out to every online member **including the one
+who left** — the message names them, so it is their own notification too, and their client is the one that has to
+close the guild window. `GuildPromote` (`0x2025`) / `GuildDemote` (`0x2026`) move the target one rung along their
+guild's ladder and send three pushes to three different audiences: `GMPromoteFeedback`/`GMDemoteFeedback` to the
+mover, `RankChanged` to the member it happened to, and `MemberUpdate` to everyone so the roster's rank column
+refreshes. Promotion stops one rung BELOW the top: the top rung is the leader's, and handing it out would create a
+second leader — retail transfers leadership through the governing-form change instead
+(`DispatchGuildGoverningFormChanged` carries a `newLeader`).
+
+Accepting or declining an invite now answers the INVITER with `InviteReplyToInviter`, carrying the invitee's name and
+`joined` 1 or 0. An invite typed at a name nobody answers to gets `InviteNoSuchName` back, echoing what was typed. A
+target who EXISTS but is already guilded stays silent — the client's catalog has no code for that refusal, and
+borrowing this one would tell the inviter a real character does not exist.
+
+Two things are decoded but deliberately unsent. `DispatchGuildOnInviteCooldown` (`0x204E`, one u32) needs an invite
+cooldown we do not model — its c2s twin `RemoveGuildInvitationCooldown` (`0x2024`) says retail has one. And WHO may
+kick/promote/demote is leader-only here rather than retail's real rule: the client ships a per-rung permission
+BITMASK (RDB 1000518, see `GuildRankLadder`) that we do not model, so the choice was between the narrowest safe rule
+and a guessed threshold that would let the wrong members kick people.
+[V0: which guild ranks may kick, promote and demote]
+
+The ticket also listed the **invite ACCEPT packet** as undecoded ("not isolated by sub-op in any capture; likely an
+Interact"). It is not an Interact: the c2s table has `AcceptGuildInvitation(const ID32& i_cGuildID)` at `0x201C`,
+which is what has been implemented and working all along.
+
 Open work is tracked in Gitea #104.
 
 ## Ghidra: guild s2c reader topology (2026-06-16, #219)

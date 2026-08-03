@@ -127,5 +127,74 @@ namespace Faolan.Tests
 
 			Assert.Throws<CodecParseException>(() => GuildUpdateCodec.Parse(body));
 		}
+		// ---- the management fan-out (#104) ----------------------------------------------------------------
+		//
+		// No capture performs a kick, a promotion or a departure, so these are pinned against the CLIENT's readers
+		// instead - which is the only evidence there is, and is enough to catch the two field widths that would
+		// otherwise be guessed wrong (see below).
+
+		[Fact]
+		public void GuildMemberLeftBody_IsAnId32ThenTheNameAsAString()
+		{
+			var body = GuildMemberLeftCodec.Build(0x01316E71, "Hoxxling");
+
+			// [0000c350][01316e71][0008 "Hoxxling"] - a STRING, unlike the joined twin's whole member element.
+			Assert.Equal("0000c35001316e710008" + Convert.ToHexStringLower(Encoding.Latin1.GetBytes("Hoxxling")), Convert.ToHexStringLower(body));
+			Assert.Equal(new GuildMemberLeft(0x01316E71, "Hoxxling"), GuildMemberLeftCodec.Parse(body));
+		}
+
+		// ⚠️ The ranks here are ONE BYTE each. The client reads both with the raw-byte primitive, not the u32 reader
+		// its neighbours use, so a four-byte rank would run the client six bytes past the end of the body.
+		[Fact]
+		public void GuildRankChangedBody_IsTwoBytes_NewThenOld()
+		{
+			var body = GuildRankChangedCodec.Build(3, 2);
+
+			Assert.Equal("0302", Convert.ToHexStringLower(body));
+			Assert.Equal(new GuildRankChanged(3, 2), GuildRankChangedCodec.Parse(body));
+		}
+
+		// ...and in the guild master's own feedback they are u32. The asymmetry is real - two readers, two
+		// primitives - which is exactly what a "ranks are one byte everywhere" assumption would break on.
+		[Fact]
+		public void GuildRankFeedbackBody_IsThreeU32ThenTheName()
+		{
+			var body = GuildRankFeedbackCodec.Build(GuildGoverningForm.Aquilonian, 2, 3, "Hoxxling");
+
+			Assert.Equal("000000030000000200000003" + "0008" + Convert.ToHexStringLower(Encoding.Latin1.GetBytes("Hoxxling")), Convert.ToHexStringLower(body));
+			Assert.Equal(new GuildRankFeedback(GuildGoverningForm.Aquilonian, 2, 3, "Hoxxling"), GuildRankFeedbackCodec.Parse(body));
+		}
+
+		[Theory, InlineData(true, "01"), InlineData(false, "00")]
+		public void GuildInviteReplyBody_IsTheNameThenABoolByte(bool joined, string flagHex)
+		{
+			var body = GuildInviteReplyCodec.Build("Hoxxling", joined);
+
+			Assert.Equal("0008" + Convert.ToHexStringLower(Encoding.Latin1.GetBytes("Hoxxling")) + flagHex, Convert.ToHexStringLower(body));
+			Assert.Equal(new GuildInviteReply("Hoxxling", joined), GuildInviteReplyCodec.Parse(body));
+		}
+
+		[Fact]
+		public void GuildInviteNoSuchNameBody_IsJustTheName()
+		{
+			var body = GuildInviteNoSuchNameCodec.Build("Nosuchguy");
+
+			Assert.Equal("0009" + Convert.ToHexStringLower(Encoding.Latin1.GetBytes("Nosuchguy")), Convert.ToHexStringLower(body));
+			Assert.Equal(new GuildInviteNoSuchName("Nosuchguy"), GuildInviteNoSuchNameCodec.Parse(body));
+		}
+
+		// The member UPDATE is the member element alone - no leading id, unlike the joined twin. It must therefore
+		// round-trip to the same bytes the joined body carries after its ID32.
+		[Fact]
+		public void GuildMemberUpdateBody_IsTheMemberElementAlone()
+		{
+			var record = GuildMemberRecordCodec.Parse(Convert.FromHexString(CapturedMemberRecord));
+			var body = GuildMemberUpdateCodec.Build(record);
+
+			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(body));
+			// Compared as BYTES: GuildMemberRecord carries a byte[] of counters, so record equality is reference
+			// equality on it and would pass for two records that agree on nothing else.
+			Assert.Equal(CapturedMemberRecord, Convert.ToHexStringLower(GuildMemberUpdateCodec.Build(GuildMemberUpdateCodec.Parse(body))));
+		}
 	}
 }
