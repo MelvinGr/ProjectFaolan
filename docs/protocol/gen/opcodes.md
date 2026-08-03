@@ -4,7 +4,7 @@
 > `Faolan.Core/Enums/Opcodes.cs`, read by reflection.
 > Regenerate: `FAOLAN_UPDATE_DOCS=1 dotnet test Faolan.Tests --filter ProtocolDocs`.
 
-16 enums, 828 entries. The 32-bit IIR sub-opcodes carried inside a `0x2000` PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
+16 enums, 830 entries. The 32-bit IIR sub-opcodes carried inside a `0x2000` PassBlob (`IirTypes`) are catalogued separately in [`iir-types.md`](iir-types.md).
 
 ## What is (and is not) verified here [V1]
 
@@ -870,15 +870,17 @@ RPC class **PlayerAgent** (id `0x82F20484`) · C2S (client→server call)
 
 | Opcode | Name | Note |
 |--------|------|------|
-| `0x2083` | `Authenticate` | id 0x96CBE509 |
-| `0x208E` | `FinishGetStartupData` | id 0xA3E1FE0D |
-| `0x209D` | `DeleteCharacter` | id 0x86979E0C |
-| `0x20A6` | `LoadFacebookToken` | id 0xE0C19C0D |
-| `0x20B6` | `LoginCharacter` | id 0xDD85FB0E |
-| `0x20C1` | `GetStartupData` | id 0xDAD1D206 |
-| `0x20D6` | `VerifyLanguageSetting` | id 0xDD9EC209 |
-| `0x20DE` | `CreateCharacter` | id 0x9CB1D10C |
-| `0x20EC` | `ReceivedCharacterSettings` | id 0xA4F2E303 |
+| `0x2083` | `Authenticate` | id 0x01396596 |
+| `0x208E` | `FinishGetStartupData` | id 0x01BFB0A3 |
+| `0x209D` | `RequestDeleteCharacter` | id 0x01878B86 |
+| `0x209E` | `UnlockCharacter` | id 0x01386E1A |
+| `0x20A6` | `LoadFacebookToken` | id 0x01A720E0 |
+| `0x20B6` | `LoginCharacter` | id 0x01DEC2DD |
+| `0x20C1` | `GetStartupData` | id 0x00D4A8DA |
+| `0x20D6` | `VerifyLanguageSetting` | id 0x01308F5D |
+| `0x20DE` | `CreateCharacterWithData` | id 0x0194589C |
+| `0x20EC` | `ReceivedCharacterSettings` | id 0x0078F924 |
+| `0x20F5` | `UpdateSubscriptionSettings` | id 0x00A2D93D |
 
 ## PlayerInterfaceOpcodes
 
@@ -886,16 +888,16 @@ RPC class **PlayerInterface** (id `0x7D155738`) · S2C (server→client dispatch
 
 | Opcode | Name | Note |
 |--------|------|------|
-| `0x1A07` | `OverrideGameTweaks` | rides the ServiceConnection endpoint with a 13-byte session header-extra (not the 4-byte id); sent verbatim |
-| `0x208C` | `SendCharacterRealmData` | id 0xCBC6FC04 |
-| `0x2091` | `InitAuth` | id 0x9386EE05 |
-| `0x2093` | `Ox2093` | id 0xF2A5E705 |
-| `0x209C` | `Ox209C` | id 0x99959205 |
-| `0x20A5` | `SmallCharList` | retail sends a 3-byte header-extra 0x94A760 (88/88 captures), not the 4-byte id; sent verbatim |
-| `0x20B9` | `Ox20B9` | id 0x8BD89902 |
-| `0x20CC` | `SendRealmList` | id 0xE2E6C40F |
-| `0x20E5` | `Ox20E5` | id 0xDDAD8302 |
-| `0x20EF` | `SendCharacterList` | id 0x8BD3A00C |
+| `0x1A07` | `OverrideGameTweaks` |  |
+| `0x208C` | `PlayerSetupComplete` | id 0x009F234B |
+| `0x2091` | `AuthenticateAck` | id 0x00BB8313 |
+| `0x2093` | `CharacterUnlocked` | id 0x00B9D2F2 |
+| `0x209C` | `OnFacebookTokenResult` | id 0x00A48A99 |
+| `0x20A5` | `SendCharacterSettingsCheckSumMap` | id 0x00181394 |
+| `0x20B9` | `SendCharacterSettings` | id 0x00466C0B |
+| `0x20CC` | `SetDimensionList` | id 0x01F13362 |
+| `0x20E5` | `SendCharacterPreview` | id 0x0040D6DD |
+| `0x20EF` | `UpdateClientPlayerData` | id 0x0188298B |
 
 ## TradepostAgentOpcodes
 

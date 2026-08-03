@@ -40,7 +40,7 @@ namespace Faolan.PlayerAgent
 					client.Session.Account.AuthStatus = body.ReadUInt32();
 					await Database.SaveAccount(client.Session.Account);
 
-					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.InitAuth, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
+					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.AuthenticateAck, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
 
 					break;
 				}
@@ -88,7 +88,7 @@ namespace Faolan.PlayerAgent
 					await SendCharacterList(client, packet.Sender);
 					await SendRealmList(client, packet.Sender);
 
-					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.SendCharacterRealmData, b => b.WriteUInt32(1)));
+					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.PlayerSetupComplete, b => b.WriteUInt32(1)));
 
 					break;
 				}
@@ -96,7 +96,7 @@ namespace Faolan.PlayerAgent
 				case PlayerAgentOpcodes.LoadFacebookToken:
 				{
 					// headerdata was { 0xE0, 0xC1, 0x9C, 0x0D };
-					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.Ox209C, b => b.WriteUInt16(0).WriteByte(0)));
+					await client.SendAsync(PlayerRpc(Sender, packet.Sender, PlayerInterfaceOpcodes.OnFacebookTokenResult, b => b.WriteUInt16(0).WriteByte(0)));
 
 					break;
 				}
@@ -141,7 +141,7 @@ namespace Faolan.PlayerAgent
 					await Database.UpdateLastInfo(client.Session.Character!.Id, client.IpAddress!);
 					await Database.SaveAccount(client.Session.Account);
 
-					await SendOx20B9(client, packet.Sender);
+					await SendCharacterSettings(client, packet.Sender);
 
 					break;
 				}
@@ -189,7 +189,7 @@ namespace Faolan.PlayerAgent
 				// constant tail LoginCharacter carries - an empty count-framed field where `cRDBDSN` sits, zeroed
 				// region/age/gender, the "_" placeholder IGR id, and userType/serviceType 0 - so it is read to keep the
 				// body fully consumed, not because any of it varies.
-				case PlayerAgentOpcodes.CreateCharacter:
+				case PlayerAgentOpcodes.CreateCharacterWithData:
 				{
 					var realmId = body.ReadUInt32();
 
@@ -220,12 +220,12 @@ namespace Faolan.PlayerAgent
 					Logger.LogInformation("CreateCharacter: created character {CharacterId:X8}; using it as the create-flow client instance.", newCharacter.Id);
 					await Database.SaveAccount(client.Session.Account);
 
-					await SendOx20B9(client, packet.Sender);
+					await SendCharacterSettings(client, packet.Sender);
 
 					break;
 				}
 
-				case PlayerAgentOpcodes.DeleteCharacter:
+				case PlayerAgentOpcodes.RequestDeleteCharacter:
 				{
 					var characterId = body.ReadUInt32();
 					Logger.LogInformation("DeleteCharacter request: characterId={CharacterId:X8}.", characterId);

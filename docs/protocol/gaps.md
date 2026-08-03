@@ -16,27 +16,17 @@ Every gap below is a tracked Gitea issue (`melvin/projectfaolan`), so it lives o
 ## Transport
 
 ### RpcHeader trailing headerData — the `0x01` marker's meaning
-**Tracked: Gitea #319.** The blob's grammar is decoded — four per-opcode/constant cases (see [`02-rpc.md`](02-rpc.md)
-and `tools/capture/decode_rpc_headerdata.py`). The 13-byte `OverrideGameTweaks` case, previously called an opaque
-block, is now decoded too: it is a protobuf endpoint reference to PlayerInterface (class `0x7D155738`) + a per-session
-instance id. The **only** thing left is the *semantic* of the constant 1-byte `0x01` marker (a flag? a version?
-present on ping/pong `0x2085`/`0x2082` and a few CSPlayerInterface dispatches, always exactly `0x01`). We emit it
-correctly (`KeepAliveService`); its label needs the client's generic RPC-header parser (Ghidra) — low ROI, on no
-send path that depends on the meaning.
+**Tracked: Gitea #319.** The grammar is decoded and is simpler than it looked: the field is a protobuf VARINT
+carrying the method id, so the "four per-opcode cases" were three encodings of one thing plus one real exception
+(see [`02-rpc.md`](02-rpc.md)). #320 closed the 3-byte case — `0x94A760` is not a constant, it is
+`SendCharacterSettingsCheckSumMap`'s id. The **only** thing left is the *semantic* of the 1-byte `0x01`, i.e. what
+method id 1 means on the ping/pong (`0x2085`/`0x2082`) and a few CSPlayerInterface dispatches. We emit it correctly
+(`KeepAliveService`); its label needs the client's generic RPC-header parser (Ghidra) — low ROI, on no send path
+that depends on the meaning.
 
 ---
 
 ## RPC
-
-### PlayerAgent 32-bit hash dispatch
-**Tracked: Gitea #320.** Every RPC interface dispatches on a 16-bit method index (`0x2000 + registration index`); PlayerAgent/
-PlayerInterface **additionally** carries a 32-bit method hash on the wire. This is a dump task, not a hash to reverse: the
-login-critical method set is recovered and verified end-to-end (a Frida-under-Wine hook on the client send path correlated
-with a loopback capture) and carried as real associated ids (`PlayerAgentMethodIds`, appended by `WriteHeader`; tests lock
-the bytes). `PlayerAgentMethodIds` maps 9 c2s methods (auth, startup, login, character create/delete, …) plus the
-observed s2c responses. The interface is only PARTIALLY enumerated in `gen/opcodes.md` — the methods never yet observed
-on the wire (character rename, Facebook-token save, hardcore, offline-levels, …) still lack their (opcode, id) pairs,
-harvestable via the same Frida technique. Remove this V0 once all 17 interfaces are fully covered.
 
 ---
 

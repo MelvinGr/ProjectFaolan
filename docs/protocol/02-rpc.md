@@ -14,23 +14,23 @@ Immediately after the packet's `[length][crc32][hdrlen]` head, and inside `hdrle
 ```
 
 `0x0A` and `0x12` are protobuf field tags (fields 1 and 2, length-delimited). The optional `headerData` after the
-opcode is **not a generic grammar** — across every capture it is exactly four per-opcode / constant cases
-(`tools/capture/decode_rpc_headerdata.py` tallies them: 7366 / 1425 / 340 / 89 packets):
+opcode is **a protobuf VARINT carrying the method id** — one grammar, not the four per-opcode cases this table used
+to list [V1: Faolan.Core.Network/Constants/PlayerAgentMethodIds.cs].
 
-| bytes | what | notes |
+All 22 distinct header tails in the corpus are valid varints, including the two that were written down as constants:
+
+| bytes | varint value | what |
 |---|---|---|
-| 1 (`0x01`) | latency marker | constant; rides the ping/pong (`0x2085` c2s / `0x2082` `DispatchPong` s2c) and a few CSPlayerInterface dispatches — the vast majority of packets. |
-| 4 | PlayerAgent/PlayerInterface **32-bit method id** | present ONLY here (empty for all 16 other interfaces); keyed by (opcode, direction), not opcode alone — two 16-bit indices are reused by a c2s method and its s2c twin with different ids. See #320 / [`../re/aoc-rpc-method-opcodes.md`](../re/aoc-rpc-method-opcodes.md). |
-| 3 (`0x94A760`) | PlayerInterface `SmallCharList` (`0x20A5`) | constant. |
-| 13 | PlayerInterface `OverrideGameTweaks` (`0x1A07`) | a **protobuf endpoint reference**, not an opaque block: `0x0D <fixed32 class id 0x7D155738 = PlayerInterface> 0x10 <varint 1> 0x20 <varint per-session instance id>` — consumes all 13 bytes. |
+| 1 (`0x01`) | 1 | the latency marker on the ping/pong (`0x2085` c2s / `0x2082` `DispatchPong` s2c) and a few CSPlayerInterface dispatches — the vast majority of packets. |
+| 3 (`0x94A760`) | 1 577 876 | **not a constant**: `PlayerInterface.SendCharacterSettingsCheckSumMap`'s method id. It is three bytes because a varint is as long as its value needs. |
+| 4 | 4.2M – 32.6M | every other PlayerAgent/PlayerInterface method id. |
+| 13 | — | the ONE genuine exception: `OverrideGameTweaks` (`0x1A07`) rides the ServiceConnection endpoint and carries a **protobuf endpoint reference** in place of an id: `0x0D <fixed32 class id 0x7D155738 = PlayerInterface> 0x10 <varint 1> 0x20 <varint per-session instance id>`. |
 
-So it is the PlayerInterface method id (decoded) plus a constant `0x01` marker plus two PlayerInterface specials —
-not a mystery appended to arbitrary packets. [V1: tools/capture/decode_rpc_headerdata.py]
+That the last byte of a 4-byte id is always small (`0x02`–`0x0F`) is the tell: it is the top bits of a 25-bit varint,
+not the low byte of a 32-bit hash. Reading it as a fixed `u32` is what made three encodings of one field look like
+three unrelated cases.
 
-(The `0x01` marker is always exactly `0x01` in every capture; only its *semantic* — a flag? a version? — is unproven,
-the sole micro-residual on #319. The 13-byte endpoint above is decoded.)
-
-## ProtoEndpoint
+## ProtoEndpoint## ProtoEndpoint
 
 Both sender and receiver are a `ProtoEndpoint` — the addressing primitive of the whole protocol:
 
@@ -68,15 +68,25 @@ The full per-interface catalog — 819 entries across 16 enums, with direction a
 
 ### The one exception
 
-PlayerAgent/PlayerInterface additionally carries a **32-bit method hash** on the wire (alongside the 16-bit
-opcode), not the `0x2000 + index` scheme alone. It is a dump task, not a hash to reverse: the login-critical
-method set is recovered and verified end-to-end (a Frida-under-Wine hook on the client send path correlated with
-a loopback capture) and carried as real associated ids (`PlayerAgentMethodIds` — 9 c2s methods incl. character
-create/delete, appended by `WriteHeader`). Only the methods never yet observed on the wire (character rename,
-Facebook-token save, hardcore, offline-levels, …) still lack their (opcode, hash) pair, harvestable by the same
-technique. [V0: PlayerAgent 32-bit hash dispatch]
+PlayerAgent/PlayerInterface additionally carries a **method id** in its header (see above), and — uniquely — the
+16-bit opcode on this interface is **not** a method key at all. It is a per-CONNECTION registration index: on a
+second PlayerAgent connection retail sends `0x20EC` for `AuthenticateLoggedIn` where the login connection used it
+for `ReceivedCharacterSettings`, and `0x20D6` for `UpdateCharacterPreview` where it used it for
+`VerifyLanguageSetting`. The client dispatches on the id, which is why this interface never fitted the
+`0x2000 + index` model.
 
-## Multiplexing
+**The id is DERIVED, not tabulated.** None of these values appears anywhere in `AgeOfConan.exe`, which is what made
+"dump the table" a dead end. The client registers each method with a 32-bit constant, and the wire carries
+`constant >> 7` as a varint — a rule that reproduces **all 22** observed ids, 13 c2s and 9 s2c, with no exception.
+Both registration tables (25 c2s + 26 s2c methods, the complete interface) are in
+`PlayerAgentMethodIds` [V1: Faolan.Core.Network/Constants/PlayerAgentMethodIds.cs].
+
+Recovering the constants also gave the interface its real NAMES, replacing nine invented ones — `InitAuth` is
+`AuthenticateAck`, `SendRealmList` is `SetDimensionList`, `SmallCharList` is `SendCharacterSettingsCheckSumMap`, and
+the opcode we called `CreateCharacter` is `CreateCharacterWithData`. See
+[`../re/aoc-rpc-method-opcodes.md`](../re/aoc-rpc-method-opcodes.md).
+
+## Multiplexing## Multiplexing
 
 One GameServer TCP connection carries roughly four RPC class-pairs at once (e.g. GameCharAgent ↔
 GameCharInterface, plus project/tradepost variants). A packet is routed by the pair `(receiver class id, opcode)`,

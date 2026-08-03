@@ -595,3 +595,117 @@ All seven wire ids matched the capture-derived enum exactly (independent confirm
 save/hardcore/offline-level/…) — re-run the same Frida hook while performing those actions in-client — and the
 **s2c PlayerInterface** login response names (hook the client's pre-auth receive dispatch). Both are more of the
 same technique; the login path (what we implement) is now proven.
+
+## PlayerAgent / PlayerInterface: the method id is DERIVED (#320, 2026-08-03)
+
+This interface pair carries a method id in its RPC header after the 16-bit opcode. Two things about it kept the
+interface from being enumerated, and both were wrong:
+
+1. **It is a protobuf VARINT, not a fixed `u32`.** All 22 distinct header tails in the corpus are valid varints —
+   including the 1-byte `0x01` and the 3-byte `0x94A760` that the grammar listed as separate "constant" cases. The
+   giveaway is that the last byte of a 4-byte tail is always `0x02`–`0x0F`: those are the top bits of a 25-bit
+   varint, not the low byte of a hash.
+2. **The value is computed, not stored.** No id appears anywhere in `AgeOfConan.exe`, which is why searching for a
+   table found nothing. The client registers each method with a 32-bit constant and the wire carries
+   **`constant >> 7`**. That rule reproduces every observed id — 13 c2s and 9 s2c, 22 of 22, no exception.
+
+⚠️ **The 16-bit opcode is a per-CONNECTION registration index on this interface, not a method key.** The corpus shows
+it directly: on a second PlayerAgent connection retail sends `0x20EC` for `AuthenticateLoggedIn` and `0x20D6` for
+`UpdateCharacterPreview`, where the login connection used those same opcodes for `ReceivedCharacterSettings` and
+`VerifyLanguageSetting`. The client dispatches on the id. The "observed opcode" column below is therefore what
+retail's login connection happened to use, not a general mapping.
+
+Re-derive both tables from the client:
+
+```zsh
+GH=<data-repo>/Ghidra
+# c2s - PlayerAgentProxy_t's constructor
+/opt/ghidra/support/analyzeHeadless "$GH" aoc -process AgeOfConan.exe -noanalysis \
+  -scriptPath tools/ghidra -postScript DumpPlayerAgentCtor.java
+# s2c - the PlayerInterface registration block
+STR=AuthenticateAck MAX=3 /opt/ghidra/support/analyzeHeadless "$GH" aoc -process AgeOfConan.exe -noanalysis \
+  -scriptPath tools/ghidra -postScript StrXrefs.java
+```
+
+Both print the registration idiom `<constant>; FUN_00487900(); FUN_0040ec10("<Name>", <len>)`.
+
+### c2s — `PlayerAgentProxy_t` (25 methods, the complete interface)
+
+| client method | registration constant | wire id (varint) | observed opcode |
+|---|---|---|---|
+| `Authenticate` | `0x9CB2CB03` | `96cbe509` | 0x2083 |
+| `AuthenticateLoggedIn` | `0x9D991E6C` | `bce4ec09` | 0x20EC (2nd conn) |
+| `LoginFromCrash` | `0xCBDE126E` | `a4f8de0c` | — |
+| `CreateCharacter` | `0xBE735486` | `a9cdf30b` | — |
+| `CreateCharacterWithData` | `0xCA2C4E5E` | `9cb1d10c` | 0x20DE |
+| `LoginCharacter` | `0xEF616EB6` | `dd85fb0e` | 0x20B6 |
+| `RenameCharacter` | `0x1B2CF268` | `e4b3d901` | — |
+| `RequestDeleteCharacter` | `0xC3C5C31D` | `86979e0c` | 0x209D |
+| `VerifyLanguageSetting` | `0x9847AED6` | `dd9ec209` | 0x20D6 (login conn) |
+| `AddOfflineLevel` | `0x2976E1B7` | `c3dbcb02` | — |
+| `UnlockCharacter` | `0x9C370D1E` | `9adce109` | 0x209E |
+| `SetHardcoreLevel` | `0x6A6B621C` | `c4add306` | — |
+| `GetDimensionList` | `0x43476328` | `c69d9a04` | — |
+| `RequestSuggestNickname` | `0xDBE172E5` | `e585df0d` | — |
+| `GetStartupData` | `0x6A546D41` | `dad1d206` | 0x20C1 |
+| `LoadFacebookToken` | `0xD3907026` | `e0c19c0d` | 0x20A6 |
+| `SaveFacebookToken` | `0xD8AD362B` | `ecb4c50d` | — |
+| `UpdateFacebookFriends` | `0x3A96B2B3` | `e5dad403` | — |
+| `RecruitFacebookFriends` | `0x5B51044B` | `88c4da05` | — |
+| `UpdateSubscriptionSettings` | `0x516C9EF5` | `bdb28b05` | 0x20F5 |
+| `UpdateCharacterSettings` | `0x01035784` | `af8d08` | — |
+| `UpdateCharacterPreview` | `0x4D661656` | `ac98eb04` | 0x20D6 (2nd conn) |
+| `FinishGetStartupData` | `0xDFD8518E` | `a3e1fe0d` | 0x208E |
+| `ReceivedCharacterSettings` | `0x3C7C926C` | `a4f2e303` | 0x20EC (login conn) |
+| `ClientReplyKeepCookie` | `0x43D90C1B` | `98e49e04` | — |
+
+### s2c — `PlayerInterface` (26 methods, the complete interface)
+
+| client method | registration constant | wire id (varint) | observed opcode |
+|---|---|---|---|
+| `OnFacebookTokenResult` | `0x52454C9C` | `99959205` | 0x209C |
+| `OnUpdateFacebookFriends` | `0x88750390` | `87d4c308` | — |
+| `OnFacebookFriendSignedUp` | `0x7955BD80` | `fbd6ca07` | — |
+| `AuthenticateAck` | `0x5DC18991` | `9386ee05` | 0x2091 |
+| `LoginConnectReady` | `0xD8B66C79` | `d8d9c50d` | — |
+| `CSServerConnectReady` | `0x5AED2A60` | `d4b4d705` | — |
+| `ChatServerConnectReady` | `0x23A632FA` | `e5989d02` | — |
+| `UpdateClientPlayerData` | `0xC414C5EF` | `8bd3a00c` | 0x20EF |
+| `SetDimensionList` | `0xF899B14C` | `e2e6c40f` | 0x20CC |
+| `SetStats` | `0xA7C86A29` | `d4a1be0a` | — |
+| `SuggestNicknameResult` | `0xE8EAD4F8` | `a9abc70e` | — |
+| `PlayerSetupComplete` | `0x4F91A58C` | `cbc6fc04` | 0x208C |
+| `LoginQueuePosition` | `0x0FE09F03` | `be827f` | — |
+| `OfflineLevelApplied` | `0x3E8F0623` | `8cbcf403` | — |
+| `CharacterUnlocked` | `0x5CE97913` | `f2a5e705` | 0x2093 |
+| `HardcoreLevelSet` | `0x1562CE84` | `9d8bab01` | — |
+| `SendSubscriptionSettings` | `0x15F7AF22` | `dedeaf01` | — |
+| `SendCharacterSettings` | `0x233605B9` | `8bd89902` | 0x20B9 |
+| `SendCharacterPreview` | `0x206B6EE5` | `ddad8302` | 0x20E5 |
+| `SendCharacterSettingsCheckSumMap` | `0x0C09CA25` | `94a760` | 0x20A5 |
+| `VerifyClientStillConnected` | `0x00C46317` | `c69106` | — |
+| `OverrideGameTweaks` | `0x7C47F763` | `ee9fe207` | — |
+| `CharacterNeedsNewName` | `0x9625EB4A` | `d697b109` | — |
+| `LoginProblem` | `0xD4063CA0` | `f998a00d` | — |
+| `TeleportProblem` | `0xE33EBAE1` | `f5fa990e` | — |
+| `ResetLanguage` | `0xD4C59816` | `b096a60d` | — |
+
+### Names this corrected
+
+The recovered constants also give the client's own METHOD NAMES, replacing nine that had been invented from observed
+behaviour. Each correction is independently corroborated by request/response pairing in the captures — c2s
+`UnlockCharacter` (`0x209E`) is answered by s2c `CharacterUnlocked` (`0x2093`), and c2s `LoadFacebookToken`
+(`0x20A6`) by s2c `OnFacebookTokenResult` (`0x209C`).
+
+| was | is | note |
+|---|---|---|
+| `InitAuth` | `AuthenticateAck` | |
+| `SendCharacterRealmData` | `PlayerSetupComplete` | |
+| `Ox2093` | `CharacterUnlocked` | the reply to c2s `UnlockCharacter` |
+| `Ox209C` | `OnFacebookTokenResult` | the reply to c2s `LoadFacebookToken` |
+| `SmallCharList` | `SendCharacterSettingsCheckSumMap` | its "constant" 3-byte tail is just its id |
+| `Ox20B9` | `SendCharacterSettings` | |
+| `SendRealmList` | `SetDimensionList` | a dimension IS a realm |
+| `Ox20E5` | `SendCharacterPreview` | |
+| `SendCharacterList` | `UpdateClientPlayerData` | |
+| `CreateCharacter` (`0x20DE`) | `CreateCharacterWithData` | the client has both; plain `CreateCharacter` is never sent |

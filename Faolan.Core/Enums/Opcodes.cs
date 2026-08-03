@@ -842,40 +842,58 @@ namespace Faolan.Core.Enums
 		// ---------------------------------------------------------------------------------------------------------
 	}
 
-	// PlayerAgent (c2s) / PlayerInterface (s2c) is the ONE interface that carries a 32-bit method id in the header,
-	// right after the 16-bit opcode (`Rpc.HeaderData` - empty for every other interface). The client
-	// dispatches on that 32-bit id; the 16-bit opcode is a normal 0x2000+index value carried alongside. The id per
-	// opcode lives in `PlayerAgentMethodIds` (the single source: WriteHeader appends it, gen/opcodes.md reads it) -
-	// all capture-verified. The 7 login-flow names (Authenticate/GetStartupData/FinishGetStartupData/
-	// LoadFacebookToken/LoginCharacter/VerifyLanguageSetting/ReceivedCharacterSettings) are the client's REAL method
-	// names, Frida-proven 2026-07 (hooked SendMethodInvocation during a login, correlated key->name with the wire
-	// (opcode,id) by send order). Create/DeleteCharacter aren't sent by a plain login, so they stay proxy-name-derived
-	// until re-hooked (create/delete a character under the Frida hook). See docs/re/aoc-rpc-method-opcodes.md, #320.
+	// PlayerAgent (c2s) / PlayerInterface (s2c) is the ONE interface that carries a METHOD ID in its RPC header after
+	// the 16-bit opcode (`Rpc.HeaderData` - empty for every other interface). The client dispatches on that id. It is a
+	// protobuf VARINT, and it is DERIVED - `PlayerAgentMethodIds.WireId(registrationConstant)` = the client's own
+	// registration constant >> 7, which reproduces all 22 observed header tails exactly (#320). That file is the single
+	// source; `WriteHeader` appends it and `gen/opcodes.md` reads it.
+	//
+	// ⚠️ **The opcode is a per-CONNECTION registration index here, not a method key.** On a second PlayerAgent
+	// connection retail sends `0x20EC` for `AuthenticateLoggedIn` and `0x20D6` for `UpdateCharacterPreview`, where the
+	// login connection used them for `ReceivedCharacterSettings` and `VerifyLanguageSetting`. The values below are the
+	// opcodes retail's LOGIN connection used, which is the only thing a capture can establish.
+	//
+	// Every name is the client's own, read off the registration table (`DumpPlayerAgentCtor.java`) rather than invented
+	// or inferred from behaviour - see docs/re/aoc-rpc-method-opcodes.md and the naming rule in
+	// [[iir_names_must_be_the_client_class]].
 	public enum PlayerAgentOpcodes : ushort
 	{
 		Authenticate = 0x2083,
 		FinishGetStartupData = 0x208E,
-		DeleteCharacter = 0x209D,
+		RequestDeleteCharacter = 0x209D,
+		UnlockCharacter = 0x209E,
 		LoadFacebookToken = 0x20A6,
 		LoginCharacter = 0x20B6,
 		GetStartupData = 0x20C1,
+
+		// ⚠️ On the LOGIN connection. A later connection uses this opcode for UpdateCharacterPreview.
 		VerifyLanguageSetting = 0x20D6,
-		CreateCharacter = 0x20DE,
-		ReceivedCharacterSettings = 0x20EC
+
+		// NOT `CreateCharacter`: the client has both, and the id retail sends here (0x9CB1D10C = 0xCA2C4E5E >> 7) is
+		// `CreateCharacterWithData`'s. Plain `CreateCharacter` has never been seen on the wire.
+		CreateCharacterWithData = 0x20DE,
+
+		// ⚠️ On the LOGIN connection. A later connection uses this opcode for AuthenticateLoggedIn.
+		ReceivedCharacterSettings = 0x20EC,
+		UpdateSubscriptionSettings = 0x20F5
 	}
 
+	// Server->client. The names below were INVENTED from observed behaviour until #320 recovered the client's own
+	// registration table; each one that changed is noted, because the old name is what the rest of the tree called it.
 	public enum PlayerInterfaceOpcodes : ushort
 	{
-		OverrideGameTweaks = 0x1A07, // rides the ServiceConnection endpoint with a 13-byte session header-extra (not the 4-byte id); sent verbatim
-		SendCharacterRealmData = 0x208C,
-		InitAuth = 0x2091,
-		Ox2093 = 0x2093,
-		Ox209C = 0x209C,
-		SmallCharList = 0x20A5, // retail sends a 3-byte header-extra 0x94A760 (88/88 captures), not the 4-byte id; sent verbatim
-		Ox20B9 = 0x20B9,
-		SendRealmList = 0x20CC,
-		Ox20E5 = 0x20E5,
-		SendCharacterList = 0x20EF
+		// The one genuine exception to the varint id: it rides the ServiceConnection endpoint with a 13-byte protobuf
+		// endpoint reference in place of a method id, and its call site passes that verbatim.
+		OverrideGameTweaks = 0x1A07,
+		PlayerSetupComplete = 0x208C,      // was "SendCharacterRealmData"
+		AuthenticateAck = 0x2091,          // was "InitAuth"
+		CharacterUnlocked = 0x2093,        // was "Ox2093" - the reply to c2s UnlockCharacter (0x209E)
+		OnFacebookTokenResult = 0x209C,    // was "Ox209C" - the reply to c2s LoadFacebookToken (0x20A6)
+		SendCharacterSettingsCheckSumMap = 0x20A5, // was "SmallCharList"
+		SendCharacterSettings = 0x20B9,    // was "Ox20B9"
+		SetDimensionList = 0x20CC,         // was "SendRealmList" (a dimension IS a realm)
+		SendCharacterPreview = 0x20E5,     // was "Ox20E5"
+		UpdateClientPlayerData = 0x20EF    // was "SendCharacterList"
 	}
 
 	// UniverseAgent client->server: matches the recovered table exactly (3 methods).

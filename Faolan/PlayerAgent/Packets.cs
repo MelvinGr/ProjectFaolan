@@ -116,7 +116,7 @@ namespace Faolan.PlayerAgent
 			body.WriteUInt32(0x00000000);
 			body.WriteUInt32(0x00000001);
 
-			await client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterList, body.ToArray()));
+			await client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.UpdateClientPlayerData, body.ToArray()));
 		}
 
 		private async Task SendChatServer(INetworkClient client, ProtoEndpoint receiver)
@@ -154,7 +154,7 @@ namespace Faolan.PlayerAgent
 		{
 			var realms = await Database.GetRealms();
 
-			await client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.SendRealmList, b =>
+			await client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.SetDimensionList, b =>
 			{
 				b.WriteUInt32(realms.Length);
 				foreach (var realm in realms)
@@ -185,7 +185,7 @@ namespace Faolan.PlayerAgent
 		{
 			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
 
-			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SmallCharList, (byte[])[0x94, 0xa7, 0x60], b =>
+			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterSettingsCheckSumMap, PlayerAgentMethodIds.HeaderId((ushort)PlayerInterfaceOpcodes.SendCharacterSettingsCheckSumMap), b =>
 			{
 				b.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
 				foreach (var character in characters)
@@ -213,9 +213,9 @@ namespace Faolan.PlayerAgent
 			return new Rpc(sender, receiver, opcode, PlayerAgentMethodIds.HeaderId((ushort)opcode), body);
 		}
 
-		private static Task SendOx20B9(INetworkClient client, ProtoEndpoint receiver)
+		private static Task SendCharacterSettings(INetworkClient client, ProtoEndpoint receiver)
 		{
-			return client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.Ox20B9, b => b.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteUInt32(0)));
+			return client.SendAsync(PlayerRpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterSettings, b => b.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteUInt32(0)));
 		}
 	}
 }
