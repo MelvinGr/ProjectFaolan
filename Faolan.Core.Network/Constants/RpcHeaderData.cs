@@ -43,7 +43,7 @@ namespace Faolan.Core.Network.Constants
 		// header data from PlayerAgentMethodIds rather than from the opcode. Everything else - all 15 other classes -
 		// is index-registered, so the DEFAULT is the index rule and this set is the exception list.
 		//
-		// Measured over the whole capture corpus (120 dumps, 419k RPC frames, `HeaderExtraHex` grouped by
+		// Measured over the whole capture corpus (120 dumps, 419k RPC frames, the header tail grouped by
 		// (ReceiverClass, Opcode)): every frame on an index-registered class carries exactly `varint(index >> 7)`
 		// except the two mis-framed GameInterface packets already noted above, and every frame on these two classes
 		// carries `varint(registrationConstant >> 7)` for a method the client's own registration tables name.

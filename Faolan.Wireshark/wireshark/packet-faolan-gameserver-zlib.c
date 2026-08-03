@@ -65,7 +65,7 @@ static int hf_faolan_pkt_opcode = -1;
 static int hf_faolan_pkt_method = -1;
 static int hf_faolan_pkt_iir = -1;
 static int hf_faolan_pkt_direction = -1;
-static int hf_faolan_pkt_hdr_extra = -1;
+static int hf_faolan_pkt_method_id = -1;
 static int hf_faolan_pkt_body = -1;
 
 /* ChatServer chat packet fields */
@@ -227,6 +227,21 @@ static const char *class_name(wmem_allocator_t *pool, uint32_t class_id)
     return name != NULL ? name : wmem_strdup_printf(pool, "0x%08x", class_id);
 }
 
+/* The method the RPC header names. What looks like [u16 BE opcode][trailing header bytes] is ONE
+   protobuf field - tag 0x20 (field 4, varint) holding the method's registration constant - and this
+   reassembles it: the opcode's low byte is the varint's first group, each trailing byte adds seven
+   more bits. On the 15 index-registered classes the constant IS the method index; on the two
+   hash-registered ones it is the 32-bit constant. Gitea #610. */
+static uint32_t method_constant(tvbuff_t *tvb, uint16_t opcode, uint32_t tail_start, uint32_t tail_end)
+{
+    uint32_t constant = (uint32_t)(opcode & 0x7F);
+    uint32_t shift = 7;
+    for (uint32_t p = tail_start; p < tail_end && shift < 32; p++, shift += 7) {
+        constant |= (uint32_t)(tvb_get_uint8(tvb, p) & 0x7F) << shift;
+    }
+    return constant;
+}
+
 /* PlayerAgent/PlayerInterface register their methods by 32-bit HASH, so the opcode does NOT
    identify the method: what looks like [u16 BE opcode][trailing header bytes] is one protobuf
    varint (field 4, tag 0x20) holding the method's registration constant, cut after its first
@@ -241,14 +256,7 @@ static const char *method_name_by_constant(uint32_t receiver_class, uint16_t opc
             continue;
         }
 
-        /* The opcode's low byte is the varint's first group; each trailing byte adds seven more bits. */
-        uint32_t constant = (uint32_t)(opcode & 0x7F);
-        uint32_t shift = 7;
-        for (uint32_t p = tail_start; p < tail_end && shift < 32; p++, shift += 7) {
-            constant |= (uint32_t)(tvb_get_uint8(tvb, p) & 0x7F) << shift;
-        }
-
-        return try_val_to_str(constant, faolan_class_constant_tables[i].methods);
+        return try_val_to_str(method_constant(tvb, opcode, tail_start, tail_end), faolan_class_constant_tables[i].methods);
     }
 
     return NULL;
@@ -480,10 +488,16 @@ static void dissect_conan_packet(
         proto_item *method_item = proto_tree_add_string(pkt_tree, hf_faolan_pkt_method, tvb, pos, 2, method);
         proto_item_set_generated(method_item);
     }
-    pos += 2;
 
+    /* The method id, over the WHOLE field it lives in - the opcode and everything after it up to the end
+       of the header. There is no separate trailing "header extra" blob to show: those bytes are the rest
+       of this varint (#610), and rendering them as their own field is what made the same value look like
+       an opcode plus an unexplained marker byte. */
+    proto_item *id_item = proto_tree_add_uint(pkt_tree, hf_faolan_pkt_method_id, tvb, pos, (int)(hdr_end - pos), method_constant(tvb, opcode, pos + 2, hdr_end));
+    proto_item_set_generated(id_item);
+    pos += 2;
     if (pos < hdr_end) {
-        proto_tree_add_item(pkt_tree, hf_faolan_pkt_hdr_extra, tvb, pos, hdr_end - pos, ENC_NA);
+        pos = hdr_end;
     }
 
     const char *direction = packet_direction(receiver_class, from_conv_initiator);
@@ -1112,7 +1126,7 @@ void proto_register_faolan_gs_zlib(void)
         {&hf_faolan_pkt_method, {"Method", "faolan.pkt.method", FT_STRING, BASE_NONE, NULL, 0x0, "Method name for (receiver class, opcode), from the C# Opcodes.cs catalogs", HFILL}},
         {&hf_faolan_pkt_iir, {"IIR Type", "faolan.pkt.iir", FT_UINT32, BASE_HEX, VALS(faolan_iir_names), 0x0, "IIR type id carried in a PassBlob 0x2000 body (BKDR-31 hash of the client IIR class name)", HFILL}},
         {&hf_faolan_pkt_direction, {"Direction", "faolan.pkt.direction", FT_STRING, BASE_NONE, NULL, 0x0, "c2s (receiver is an *Agent class) or s2c (receiver is an *Interface class)", HFILL}},
-        {&hf_faolan_pkt_hdr_extra, {"Header Extra", "faolan.pkt.header_extra", FT_BYTES, BASE_NONE, NULL, 0x0, "Header bytes after the opcode", HFILL}},
+        {&hf_faolan_pkt_method_id, {"Method Id", "faolan.pkt.method_id", FT_UINT32, BASE_HEX, NULL, 0x0, "The method's registration constant - the varint the opcode and the bytes after it form", HFILL}},
         {&hf_faolan_pkt_body, {"Body", "faolan.pkt.body", FT_BYTES, BASE_NONE, NULL, 0x0, NULL, HFILL}},
 
         {&hf_faolan_chat_opcode, {"Chat Opcode", "faolan.chat.opcode", FT_UINT16, BASE_HEX, NULL, 0x0, "ChatServer chat opcode", HFILL}},

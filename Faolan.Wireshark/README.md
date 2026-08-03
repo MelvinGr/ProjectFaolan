@@ -93,7 +93,7 @@ Useful fields:
 | `faolan.pkt.direction`                                            | `c2s`/`s2c` (receiver class Agent/Interface suffix)              |
 | `faolan.pkt.sender_class` / `receiver_class`                      | ProtoEndpoint class id, resolved to class name                   |
 | `faolan.pkt.sender_instance` / `receiver_instance`                | character/zone instance                                          |
-| `faolan.pkt.len` / `crc` / `header_len` / `header_extra` / `body` | packet layout fields                                             |
+| `faolan.pkt.len` / `crc` / `header_len` / `method_id` / `body` | packet layout fields (`method_id` = the varint the opcode and the bytes after it form, #610) |
 | `faolan.chat.opcode` / `method` / `direction` / `len` / `body`    | ChatServer chat packets (names per direction)                   |
 | `faolan.compression_state`                                        | Plain / TransitionHeader / Compressed / Failed / Chat / Skipped  |
 | `faolan.stream_note`                                              | retransmission / out-of-order / capture-gap diagnostics          |

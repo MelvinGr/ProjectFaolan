@@ -83,7 +83,10 @@ def reshape(frames):
                 "ReceiverClass": fields.get("faolan.pkt.receiver_class"),
                 "ReceiverInstance": fields.get("faolan.pkt.receiver_instance"),
                 "Crc32": fields.get("faolan.pkt.crc"),
-                "HeaderExtraHex": dehex(fields.get("faolan.pkt.header_extra") or ""),
+                # The method's registration constant - the varint the opcode and the bytes after it form
+                # (Gitea #610). Replaces the old HeaderExtraHex, which rendered that varint's trailing groups
+                # as if they were a field of their own.
+                "MethodId": fields.get("faolan.pkt.method_id"),
                 "BodyHex": dehex(fields.get("faolan.pkt.body") or fields.get("faolan.chat.body") or ""),
             })
     return {"Packets": packets}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Diff our server's logs.txt GameServer output against a retail capture JSON dump.
 
-Both sides are decoded into (sender, receiver, opcode, headerData, body) so the
+Both sides are decoded into (sender, receiver, opcode, methodId, body) so the
 comparison is independent of the client instance id (only the conversation family
 and the opcode/length structure are compared). Use this to find which packets we
 send wrong / omit during the world-entry flow.
@@ -66,14 +66,16 @@ def _is_gameserver(pk):
 
 
 def dump_tuple(pk):
-    """(sender, receiver, opcode, headerData, body) from a de-framed .tshark.json record — same shape as parse()."""
+    """(sender, receiver, opcode, methodId, body) from a de-framed .tshark.json record — same shape as parse()."""
     if not pk.get('Opcode'):
         return None
     sender = _endpoint_blob(pk['SenderClass'], pk.get('SenderInstance'))
     receiver = _endpoint_blob(pk['ReceiverClass'], pk.get('ReceiverInstance'))
     opcode = int(pk['Opcode'], 16)
-    hd = bytes.fromhex((pk.get('HeaderExtraHex') or '').replace(' ', ''))
-    return sender.hex(), receiver.hex(), opcode, hd.hex(), bytes.fromhex(pk.get('BodyHex') or '')
+    # The dump states the whole method varint; the log side reassembles it the same way from the
+    # opcode plus the bytes after it, so the two are comparable without either naming a "headerData".
+    method_id = int(pk['MethodId'], 16) if pk.get('MethodId') else opcode & 0x7F
+    return sender.hex(), receiver.hex(), opcode, method_id, bytes.fromhex(pk.get('BodyHex') or '')
 
 
 def parse(b):
@@ -84,7 +86,12 @@ def parse(b):
         i += 1; slen, i = _read_varint(b, i); sender = b[i:i+slen]; i += slen
         i += 1; rlen, i = _read_varint(b, i); receiver = b[i:i+rlen]; i += rlen
         opcode = int.from_bytes(b[i:i+2], 'big'); i += 2
-        return sender.hex(), receiver.hex(), opcode, b[i:hend].hex(), b[hend:]
+        # The method: the opcode's low byte is the varint's first group, each remaining header byte
+        # adds seven more bits (#610). Same value the dump's MethodId states.
+        method_id, shift = opcode & 0x7F, 7
+        for x in b[i:hend]:
+            method_id |= (x & 0x7F) << shift; shift += 7
+        return sender.hex(), receiver.hex(), opcode, method_id, b[hend:]
     except Exception:
         return None
 
@@ -144,7 +151,7 @@ def collapsed_timeline(dump_path):
 
 
 def counts_by_family_opcode(pkts, is_dump):
-    # log tuple: (s, r, op, hd, body); dump tuple identical
+    # log tuple: (s, r, op, methodId, body); dump tuple identical
     c = Counter((p[1][:12], hex(p[2])) for p in pkts)
     return c
 
