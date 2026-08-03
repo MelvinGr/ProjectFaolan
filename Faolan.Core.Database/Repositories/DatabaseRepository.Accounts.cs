@@ -21,6 +21,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<bool> SetAccountAuthChallenge(uint accountId, Guid challenge);
 		Task<bool> SetAccountLastInfo(uint accountId, string ipAddress);
 		Task<bool> SetAccountState(uint accountId, AccountState state);
+		Task SetAccountSubscriptionSettings(uint accountId, byte[] settings);
 	}
 
 	public partial class DatabaseRepository
@@ -81,6 +82,14 @@ namespace Faolan.Core.Database.Repositories
 					.SetProperty(a => a.ClientInstance, account.ClientInstance)
 					.SetProperty(a => a.GmGodMode, account.GmGodMode)
 					.SetProperty(a => a.GmInvisible, account.GmInvisible));
+		}
+
+		// The account-wide client settings archive (#611). Its own method rather than a field on SaveAccount: that one
+		// runs on nearly every login step, and rewriting a 1 KB blob each time would be pure churn.
+		public async Task SetAccountSubscriptionSettings(uint accountId, byte[] settings)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			await ctx.Accounts.Where(a => a.Id == accountId).ExecuteUpdateAsync(s => s.SetProperty(a => a.SubscriptionSettings, settings));
 		}
 
 		public async Task SetAccountClaimQuantity(uint claimId, uint? quantity)

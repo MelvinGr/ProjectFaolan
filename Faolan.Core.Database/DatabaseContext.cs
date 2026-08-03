@@ -34,6 +34,7 @@ namespace Faolan.Core.Database
 		DbSet<CharacterBody> CharacterBodies { get; }
 		DbSet<CharacterBodyResource> CharacterBodyResources { get; }
 		DbSet<CharacterBuff> CharacterBuffs { get; }
+		DbSet<CharacterClientSettings> CharacterClientSettings { get; }
 		DbSet<CharacterCombo> CharacterCombos { get; }
 		DbSet<CharacterEquipment> CharacterEquipment { get; }
 		DbSet<CharacterFeat> CharacterFeats { get; }
@@ -134,6 +135,7 @@ namespace Faolan.Core.Database
 		public DbSet<CharacterBody> CharacterBodies { get; set; }
 		public DbSet<CharacterBodyResource> CharacterBodyResources { get; set; }
 		public DbSet<CharacterBuff> CharacterBuffs { get; set; }
+		public DbSet<CharacterClientSettings> CharacterClientSettings { get; set; }
 		public DbSet<CharacterCombo> CharacterCombos { get; set; }
 		public DbSet<CharacterEquipment> CharacterEquipment { get; set; }
 		public DbSet<CharacterFeat> CharacterFeats { get; set; }
@@ -384,6 +386,9 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Character>().HasMany(c => c.Skills).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.ScaffoldPairs).WithOne(s => s.Character).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Character>().HasMany(c => c.BodyResources).WithOne(r => r.Character).OnDelete(DeleteBehavior.Cascade);
+
+			// The client-authored settings/preview blobs delete with the character.
+			modelBuilder.Entity<CharacterClientSettings>().HasOne(s => s.Character).WithOne(c => c.ClientSettings).OnDelete(DeleteBehavior.Cascade);
 
 			// Hotbar shortcuts delete with the character.
 			modelBuilder.Entity<CharacterShortcut>().HasOne(s => s.Character).WithMany(c => c.Shortcuts).OnDelete(DeleteBehavior.Cascade);

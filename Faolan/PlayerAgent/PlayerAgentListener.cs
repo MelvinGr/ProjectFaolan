@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
@@ -47,6 +48,65 @@ namespace Faolan.PlayerAgent
 					await Database.SaveAccount(client.Session.Account);
 
 					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceOpcodes.AuthenticateAck, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
+
+					break;
+				}
+
+				// The SECOND, short-lived PlayerAgent socket the client opens mid-session - while in world, ~80s after the
+				// login connection closed - to push settings it has changed (#611). It bootstraps with the same
+				// (account, cookie) pair the login connection used and wants the same AuthenticateAck back; the uploads
+				// that follow arrive on it without any further handshake.
+				case PlayerAgentMethods.AuthenticateLoggedIn:
+				{
+					var resume = AuthenticateLoggedInCodec.Parse(packet.Body.Span);
+
+					client.Session.Account = (await Database.GetAccount(resume.AccountId))!;
+					if (client.Session.Account == null)
+						throw new Exception($"AuthenticateLoggedIn for unknown account {resume.AccountId:X8}.");
+
+					Logger.LogDebug("AuthenticateLoggedIn: account {AccountId:X8} re-attaching a settings connection.", resume.AccountId);
+
+					await client.SendAsync(new Rpc(Sender, packet.Sender, PlayerInterfaceOpcodes.AuthenticateAck, b => b.WriteUInt32(client.Session.Account.AuthStatus)));
+
+					break;
+				}
+
+				// The three uploads that ride that socket. Each is stored COMPRESSED and byte-for-byte as sent: the
+				// checksum the client compares against is an md5 over exactly those bytes, so re-encoding them would make
+				// every cached client copy read as stale (see ClientSettingsBufferCodec).
+				case PlayerAgentMethods.UpdateSubscriptionSettings:
+				{
+					var upload = UpdateSubscriptionSettingsCodec.Parse(packet.Body.Span);
+					WarnOnCheckSumMismatch(nameof(PlayerAgentMethods.UpdateSubscriptionSettings), upload.Buffer, upload.CheckSum);
+
+					await Database.SetAccountSubscriptionSettings(client.Session.Account.Id, upload.Buffer.Payload);
+
+					Logger.LogInformation("Stored account settings for {AccountId:X8}: {Files} ({Bytes} bytes).", client.Session.Account.Id, string.Join(", ", upload.Buffer.Files.Select(f => f.Name)),
+						upload.Buffer.Payload.Length);
+
+					break;
+				}
+
+				case PlayerAgentMethods.UpdateCharacterSettings:
+				{
+					var upload = UpdateCharacterSettingsCodec.Parse(packet.Body.Span);
+					WarnOnCheckSumMismatch(nameof(PlayerAgentMethods.UpdateCharacterSettings), upload.Buffer, upload.CheckSum);
+
+					await Database.SaveCharacterClientSettings(upload.CharacterId, upload.Buffer.Payload, null);
+
+					Logger.LogInformation("Stored character settings for {CharacterId:X8}: {Files} ({Bytes} bytes).", upload.CharacterId, string.Join(", ", upload.Buffer.Files.Select(f => f.Name)),
+						upload.Buffer.Payload.Length);
+
+					break;
+				}
+
+				case PlayerAgentMethods.UpdateCharacterPreview:
+				{
+					var upload = UpdateCharacterPreviewCodec.Parse(packet.Body.Span);
+
+					await Database.SaveCharacterClientSettings(upload.CharacterId, null, upload.Buffer.Payload);
+
+					Logger.LogInformation("Stored character preview for {CharacterId:X8} ({Bytes} bytes).", upload.CharacterId, upload.Buffer.Payload.Length);
 
 					break;
 				}

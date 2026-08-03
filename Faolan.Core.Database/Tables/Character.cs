@@ -87,6 +87,10 @@ namespace Faolan.Core.Database.Tables
 		public virtual ICollection<CharacterSpell> Spells { get; set; } = [];
 		public virtual ICollection<CharacterTag> Tags { get; set; } = [];
 
+		// The client-authored UI settings + select-screen preview, stored verbatim and handed straight back (#611).
+		// One row at most, and absent until the client first uploads one.
+		public virtual CharacterClientSettings? ClientSettings { get; set; }
+
 		[ConstrainToEnumValues]
 		public ConanClass Class { get; set; }
 

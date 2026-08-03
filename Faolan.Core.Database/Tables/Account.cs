@@ -52,6 +52,11 @@ namespace Faolan.Core.Database.Tables
 
 		public uint AuthStatus { get; set; }
 
+		// The ACCOUNT-wide client settings archive (hotkeys.xml + the account Prefs_2.xml), stored exactly as the client
+		// uploaded it with UpdateSubscriptionSettings (#611). Compressed, and deliberately opaque to the server - see
+		// CharacterClientSettings for why it must not be re-encoded. Null until the client first uploads one.
+		public byte[]? SubscriptionSettings { get; set; }
+
 		// The id the client is currently using for this session: a real Character.Id during normal play, or
 		// the temporary create-editor instance (0x021662C8) during character creation. Deliberately NOT a
 		// foreign key - it must hold the temp instance without a constraint violation (so db.SaveChanges

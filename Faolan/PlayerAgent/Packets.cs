@@ -1,10 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.PlayerAgent;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
 using Faolan.Core.Protobuf;
@@ -182,24 +185,44 @@ namespace Faolan.PlayerAgent
 			}));
 		}
 
-		// The small character list (id + auth challenge per named character). Sent in response to
-		// RequestSmallCharList and again after a delete so the client refreshes. Entry layout is exactly
-		// Id + AuthChallenge (length-prefixed string), verified against retail (Faolanx_mage-necromancer_login: all bytes
-		// consumed, no per-entry trailer - an extra field shifts every following entry and the client loops
-		// once there is more than one character).
+		// The reply to GetStartupData: every character's stored select-screen preview, then the settings checksum map.
+		// That is retail's order and content (Faolanx_mage-necromancer_login frames 8-9) - the previews come FIRST, one
+		// packet each and only for the characters that have one, then one map covering all of them.
+		//
+		// ⚠️ The map's per-character string is the md5 of that character's stored SETTINGS archive (#611), which is how
+		// the client decides whether its cached copy is current; it is EMPTY for a character that has never uploaded
+		// any. It used to be the account's auth challenge - a 32-hex-char value of the right shape and the wrong
+		// meaning, so it advertised a checksum for settings the server did not hold and no cached copy could ever match.
 		private async Task SendSmallCharList(INetworkClient client, ProtoEndpoint receiver)
 		{
 			var characters = await Database.GetCharactersByAccount(client.Session.Account.Id);
+			var stored = (await Database.GetCharacterClientSettingsByAccount(client.Session.Account.Id)).ToDictionary(s => s.CharacterId);
 
-			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterSettingsCheckSumMap, b =>
+			foreach (var character in characters)
 			{
-				b.WriteUInt32(ListFrame.ForCount(characters.Length)); // count-framed character list
-				foreach (var character in characters)
-				{
-					b.WriteUInt32(character.Id);
-					b.WriteString(character.AuthChallenge.ToString("N"));
-				}
-			}));
+				if (stored.TryGetValue(character.Id, out var row) && row.Preview is { Length: > 0 } preview)
+					await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterPreview, SendCharacterPreviewCodec.Build(new CharacterPreview(character.Id, ClientSettingsBufferCodec.Parse(preview)))));
+			}
+
+			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterSettingsCheckSumMap,
+				SendCharacterSettingsCheckSumMapCodec.Build(new CharacterSettingsCheckSumMap([
+					..characters.Select(c => new CharacterSettingsCheckSum(c.Id, CheckSumOf(stored.GetValueOrDefault(c.Id)?.Settings)))
+				]))));
+		}
+
+		// The client sends its own md5 with each settings upload, and it is the value we hand back in the checksum map.
+		// We store the payload rather than the string and recompute it, which only works because the two agree - so say
+		// so out loud if they ever do not, instead of serving a checksum no cached client copy will match.
+		private void WarnOnCheckSumMismatch(string method, ClientSettingsBuffer buffer, string declared)
+		{
+			if (buffer.CheckSum != declared)
+				Logger.LogWarning("{Method}: the client declared md5 {Declared} but the payload hashes to {Computed} - the checksum map will advertise the computed one.", method, declared, buffer.CheckSum);
+		}
+
+		// The md5 the client compares its cache against, over the COMPRESSED archive - see ClientSettingsBuffer.CheckSum.
+		private static string CheckSumOf(byte[]? settings)
+		{
+			return settings is { Length: > 0 } ? ClientSettingsBufferCodec.Parse(settings).CheckSum : "";
 		}
 
 		// The reply receiver echoes the request's caller endpoint (packet.Sender), passed through by the handler - it is
@@ -209,9 +232,17 @@ namespace Faolan.PlayerAgent
 		// it: `Rpc` derives it from (receiver class, opcode) like every other interface's header tail (#609), so the
 		// PlayerRpc helper that used to thread it through is gone. Only OverrideGameTweaks still says its tail out
 		// loud, because its tail is not a method id.
-		private static Task SendCharacterSettings(INetworkClient client, ProtoEndpoint receiver)
+		//
+		// The archive itself is whatever the client last uploaded for this character (#611), handed back verbatim so its
+		// chat tabs, dock bars and per-character preferences come back with it. A character that has never uploaded one
+		// gets the EMPTY buffer, which is the 12-byte body retail sends in all 118 captured sightings.
+		private async Task SendCharacterSettings(INetworkClient client, ProtoEndpoint receiver)
 		{
-			return client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterSettings, b => b.WriteUInt32(EntityClass.Character).WriteUInt32(client.Session.Character.Id).WriteUInt32(0)));
+			var characterId = client.Session.Character.Id;
+			var stored = (await Database.GetCharacterClientSettings(characterId))?.Settings;
+			var buffer = stored is { Length: > 0 } ? ClientSettingsBufferCodec.Parse(stored) : ClientSettingsBuffer.Empty;
+
+			await client.SendAsync(new Rpc(Sender, receiver, PlayerInterfaceOpcodes.SendCharacterSettings, SendCharacterSettingsCodec.Build(new CharacterSettings(characterId, buffer))));
 		}
 	}
 }

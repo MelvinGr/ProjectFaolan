@@ -51,6 +51,11 @@ we've seen_, and names the gaps). Regenerate with
 - ✅ **The Tortage intro cutscene** — drowning, washing ashore, Kalanthes walking up and speaking his lines, all
   in-client; the world it drops you into is constructed from the database like any other login, not replayed
 - 🟡 The tutorial tail after it (combat tutorial → approach Casilda) is not wired yet (#234, #261, #262)
+- 🟡 **Your UI comes back with you** — chat tabs, dock bars, hotkeys and per-character preferences are stored
+  server-side and handed back at the next login, the way retail does it: the client uploads them over a second,
+  short-lived login socket it opens mid-session, and gets them plus its character-select preview back before the
+  roster. Byte-exact against the captures; awaiting an in-client check (#611,
+  [docs](docs/subsystems/client-settings.md))
 
 ### Realms & deployment
 

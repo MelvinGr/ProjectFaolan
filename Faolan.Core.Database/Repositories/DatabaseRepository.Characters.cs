@@ -28,6 +28,9 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character?> GetCharacter(uint id);
 		Task<CharacterAbility[]> GetCharacterAbilities(uint characterId);
 		Task<CharacterBuff[]> GetCharacterBuffs(uint characterId);
+		Task<CharacterClientSettings?> GetCharacterClientSettings(uint characterId);
+		Task<CharacterClientSettings[]> GetCharacterClientSettingsByAccount(uint accountId);
+		Task SaveCharacterClientSettings(uint characterId, byte[]? settings, byte[]? preview);
 		Task<Character?> GetCharacterByName(string name, uint realmId);
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		Task<CharacterEquipment?> GetCharacterEquipment(uint characterId);
@@ -364,6 +367,38 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterBuffs.Where(b => b.CharacterId == characterId).OrderBy(b => b.BuffId).ToArrayAsync();
+		}
+
+		// The client-authored settings/preview blobs (#611), or null when the client has never uploaded either.
+		public async Task<CharacterClientSettings?> GetCharacterClientSettings(uint characterId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterClientSettings.AsNoTracking().FirstOrDefaultAsync(s => s.CharacterId == characterId);
+		}
+
+		// Every stored blob on the account, for the reply to GetStartupData - the checksum map covers all characters and
+		// the preview is sent per character, both before one has been picked.
+		public async Task<CharacterClientSettings[]> GetCharacterClientSettingsByAccount(uint accountId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.CharacterClientSettings.AsNoTracking().Where(s => s.Character.AccountId == accountId).ToArrayAsync();
+		}
+
+		// Upsert of ONE half: a null argument leaves that column alone rather than clearing it, because the client
+		// uploads the settings and the preview as separate messages and either can arrive without the other.
+		public async Task SaveCharacterClientSettings(uint characterId, byte[]? settings, byte[]? preview)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var row = await ctx.CharacterClientSettings.FirstOrDefaultAsync(s => s.CharacterId == characterId);
+			if (row == null)
+			{
+				row = new CharacterClientSettings { CharacterId = characterId };
+				ctx.CharacterClientSettings.Add(row);
+			}
+
+			row.Settings = settings ?? row.Settings;
+			row.Preview = preview ?? row.Preview;
+			await ctx.SaveChangesAsync();
 		}
 
 		public async Task<Character?> GetCharacterByName(string name, uint realmId)

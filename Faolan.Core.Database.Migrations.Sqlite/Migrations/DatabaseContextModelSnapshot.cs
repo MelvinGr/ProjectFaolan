@@ -80,6 +80,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<byte>("State")
                         .HasColumnType("INTEGER");
 
+                    b.Property<byte[]>("SubscriptionSettings")
+                        .HasColumnType("BLOB");
+
                     b.Property<byte>("Type")
                         .HasColumnType("INTEGER");
 
@@ -507,6 +510,22 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasKey("CharacterId", "BuffId");
 
                     b.ToTable("CharacterBuffs");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterClientSettings", b =>
+                {
+                    b.Property<uint>("CharacterId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte[]>("Preview")
+                        .HasColumnType("BLOB");
+
+                    b.Property<byte[]>("Settings")
+                        .HasColumnType("BLOB");
+
+                    b.HasKey("CharacterId");
+
+                    b.ToTable("CharacterClientSettings");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterCombo", b =>
@@ -3920,6 +3939,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Character");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterClientSettings", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
+                        .WithOne("ClientSettings")
+                        .HasForeignKey("Faolan.Core.Database.Tables.CharacterClientSettings", "CharacterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Character");
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.CharacterCombo", b =>
                 {
                     b.HasOne("Faolan.Core.Database.Tables.Character", "Character")
@@ -5457,6 +5487,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("BodyResources");
 
                     b.Navigation("Buffs");
+
+                    b.Navigation("ClientSettings");
 
                     b.Navigation("Equipment");
 
