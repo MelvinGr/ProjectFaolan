@@ -210,6 +210,13 @@ dumps every record of one phase in full),
 `bounded-areas` (the client's trigger-volume survey — no arg prints the census, `--report-arg <bucket>` lists one
 bucket and cross-checks it against what we already hold; see
 [bounded-areas-1000053.md](../rdb/bounded-areas-1000053.md)),
+`field-stability` (for every field of the captured NPC `CoreCharacter` message: is its value a property of the
+TYPE, of the PLACEMENT, or of neither? Two `GROUP BY` tables over retail's own login-burst spawns — by
+`npc_stats.TemplateId`, then by physical map+position. A field no more stable at placement scope than at type
+scope is rolled per SPAWN EVENT and no column can hold it, which is how `VoiceSet` (9.7% / 11.7%),
+`AnimIdleTimer` (50.2% / 45.2%) and `MovementMode` (59.0% / 60.6%) were told apart from the vitals block
+(73.7% / 90.8%), whose `NpcSpawn` columns are the right home. ⚠️ The key is the TemplateId and not the name — a
+name spans several templates, and a field cannot be less stable than the key it is grouped by),
 `rdb-quest-catalog` (the client's OWN quest catalog, RDB type 1000104 — 2181 quest lines / 5042 quests / 7327
 goals with the designers' names in plaintext. No arg prints a summary, a populated-field census and three flat
 TSV sections; `--report-arg <line or quest id>` prints that line as a tree. It also cross-checks `MainQuest.hash`
