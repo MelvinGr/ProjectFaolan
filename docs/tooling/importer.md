@@ -217,6 +217,14 @@ scope is rolled per SPAWN EVENT and no column can hold it, which is how `VoiceSe
 `AnimIdleTimer` (50.2% / 45.2%) and `MovementMode` (59.0% / 60.6%) were told apart from the vitals block
 (73.7% / 90.8%), whose `NpcSpawn` columns are the right home. ⚠️ The key is the TemplateId and not the name — a
 name spans several templates, and a field cannot be less stable than the key it is grouped by),
+`scaffold-heap` (the RETAIL SERVER's own memory, harvested out of the NPC spawn scaffold: retail writes 3 of the
+53 scaffold words on an NPC spawn and sends the other 50 carrying whatever was there, so 17,400 captured spawns
+ship 3.3 MB of server-side data. Yields the script engine's ScriptGroup catalogue and C++ source-file inventory,
+retail's `Universe[1]/Territory[1]/Dimension[N]/GameServer[M]` config tree and its Oracle SQL, plus the odd LDB
+string — `--RdbDir` is OPTIONAL and only decrypts the strings it finds. `--report-arg runs` lists every distinct
+string, `dump` writes a hex dump of every block. ⚠️ Counts are taken per PRINTABLE RUN and anchored on a closing
+delimiter, because a regex run over the whole 228-byte buffer crosses the gaps between leaked strings and
+manufactures roughly half its findings; see [retail-server-heap-leak.md](../re/retail-server-heap-leak.md)),
 `rdb-quest-catalog` (the client's OWN quest catalog, RDB type 1000104 — 2181 quest lines / 5042 quests / 7327
 goals with the designers' names in plaintext. No arg prints a summary, a populated-field census and three flat
 TSV sections; `--report-arg <line or quest id>` prints that line as a tree. It also cross-checks `MainQuest.hash`

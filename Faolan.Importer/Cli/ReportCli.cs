@@ -222,6 +222,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "scaffold-heap":
+				{
+					ScaffoldHeap(NamedCapture.LoadAll(capturesDir), arg, RdbDirOrNull());
+					return 0;
+				}
+
 				case "snapshot":
 				{
 					SnapshotScan(NamedCapture.LoadAll(capturesDir));
@@ -2334,6 +2340,14 @@ namespace Faolan.Importer.Cli
 		// The client's RDB folder is part of the game install, not this repo, so it comes from config like every
 		// other setting - ONE name across all three input methods (#412). RDB-backed reports fail with a clear
 		// message if it is not set anywhere.
+		// The RDB is OPTIONAL for a report that only enriches its output with it (scaffold-heap decrypts the LDB
+		// strings it finds when it can, and names them when it cannot). RdbDir() throws, which is right for a report
+		// that cannot run without it and wrong for one that degrades.
+		private static string? RdbDirOrNull()
+		{
+			return CliConfig.Resolve(_options.ConfigOverrides)["RdbDir"];
+		}
+
 		private static string RdbDir()
 		{
 			return CliConfig.Resolve(_options.ConfigOverrides)["RdbDir"] ??

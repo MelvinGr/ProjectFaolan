@@ -214,7 +214,8 @@ text as "the NPC's script binding, keyed per NPC type". It is neither the NPC's 
 Pillagers carry 551 distinct blocks, and one capture's Pillagers carry text from four unrelated server
 subsystems. The region is the PvP/minigame stat block above, which the server simply does not fill in for an
 NPC — see *"an NPC's block is UNINITIALISED SERVER DATA"*. What the text is good for is what it accidentally
-reveals about the retail server (Gitea #604), not what it says about the NPC carrying it.
+reveals about the retail server, not what it says about the NPC carrying it: that harvest is
+[retail-server-heap-leak.md](retail-server-heap-leak.md), shipped as `--report scaffold-heap`.
 
 ## The POST-IIR is runtime state, NOT appearance — "missing hair" was the playfield token (corrected 2026-06-17)
 

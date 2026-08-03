@@ -178,11 +178,15 @@ namespace Faolan.Core.Network.Codecs.Spawn
 		// The scaffold's width on the wire: the fixed grid plus whatever the sublist costs.
 		public int ByteCount => FixedLength - 4 + SpawnPreFrameSublistCodec.ByteCount(Sublist);
 
-		// Reassembles the 53 u32 in C++ struct-offset order, little-endian (the stream byteswaps on read, so the
-		// wire is LE), into the contiguous inline char buffer, and returns its printable runs joined by ' | '.
-		// On an NPC this is server-side script-engine diagnostic text the server left in the block rather than
-		// anything about this NPC (#603) - a view for diagnostics/tests, never a source of content.
-		public string DecodeScriptText()
+		// Reassembles the 53 u32 into the contiguous 228-byte region 0x184..0x267 they are scattered across in the
+		// client struct, little-endian (the stream byteswaps on read, so the wire is LE). This is the buffer BOTH
+		// readings of the region are taken over: the stat block the apply describes (WordStatIds) and - on an NPC,
+		// where retail writes only three of the 53 slots - whatever server-side data the other 50 happen to carry.
+		//
+		// ⚠️ It is a DIAGNOSTIC view, never a source of content. What it holds on an NPC is a snapshot of the retail
+		// server's own heap, not anything about that NPC (#603); `--report scaffold-heap` is the harvest that mines
+		// it (Gitea #604).
+		public byte[] DecodeScriptBuffer()
 		{
 			const int baseOffset = 0x184;
 			var span = WordStructOffsets[^1] - baseOffset + 4; // 0x264 - 0x184 + 4 = 228
@@ -196,6 +200,14 @@ namespace Faolan.Core.Network.Codecs.Spawn
 				buffer[at + 2] = (byte)((Words[i] >> 16) & 0xFF);
 				buffer[at + 3] = (byte)((Words[i] >> 24) & 0xFF);
 			}
+
+			return buffer;
+		}
+
+		// The printable runs (>= 6 chars) of that buffer, joined by ' | ' - the human-readable form of the same view.
+		public string DecodeScriptText()
+		{
+			var buffer = DecodeScriptBuffer();
 
 			var sb = new StringBuilder();
 			var run = new StringBuilder();
