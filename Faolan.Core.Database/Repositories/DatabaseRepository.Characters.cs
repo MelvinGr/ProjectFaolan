@@ -441,7 +441,7 @@ namespace Faolan.Core.Database.Repositories
 
 			var totals = new Dictionary<uint, int>();
 			foreach (var row in rows)
-				totals[row.Id] = totals.GetValueOrDefault(row.Id) + (int)row.PercentHundredths;
+				totals[row.Id] = totals.GetValueOrDefault(row.Id) + row.PercentHundredths;
 
 			return totals;
 		}

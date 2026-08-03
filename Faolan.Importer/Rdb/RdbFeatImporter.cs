@@ -191,7 +191,7 @@ namespace Faolan.Importer.Rdb
 						FeatId = featId,
 						Sequence = i,
 						SpellLineId = list[i].StatId,
-						PercentHundredths = list[i].WireAmount,
+						PercentHundredths = (int)list[i].WireAmount,
 						EffectKind = list[i].Kind
 					});
 					spellModRows++;

@@ -37,8 +37,14 @@ namespace Faolan.Core.Database.Tables
 		///     The boost in HUNDREDTHS OF A PERCENT: 3500 = +35.00%. Decoded from the five ranks of
 		///     <c>Decomposition</c>, which carry 1000/1500/2000/2500/3500 where the in-client tooltip reads
 		///     10/15/20/25/35%.
+		///     <para>
+		///         SIGNED, and the shipped catalog proves it rather than merely allowing it: <c>Set's Chosen</c>
+		///         steps -2000/-4000/-6000/-8000/-10000 across its five ranks on Demonologist lines 44100/44101,
+		///         which is a rank ladder, not a misread. It was a <c>uint</c> until #591 and every consumer cast
+		///         it back to <c>int</c>, so the runtime was right and only the column and the DB text were not.
+		///     </para>
 		/// </summary>
-		public uint PercentHundredths { get; set; }
+		public int PercentHundredths { get; set; }
 
 		/// <summary>
 		///     The effect-KIND tag that opens the record. Only 53075 is decoded (#590); the catalog carries ~9 more

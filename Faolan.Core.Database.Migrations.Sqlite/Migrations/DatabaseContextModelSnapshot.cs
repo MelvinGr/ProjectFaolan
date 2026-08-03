@@ -1431,7 +1431,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("EffectKind")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("PercentHundredths")
+                    b.Property<int>("PercentHundredths")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("SpellLineId")
