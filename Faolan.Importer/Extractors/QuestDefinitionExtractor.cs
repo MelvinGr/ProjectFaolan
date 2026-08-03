@@ -181,9 +181,9 @@ namespace Faolan.Importer.Extractors
 
 		private const int ReservedWords = 7;
 
+		// reserved[0] is skipped on purpose: it is the goal's per-character SolvedTimes, not quest data (#550).
 		private static void SetReserved(QuestGoalDefinition row, uint[] reserved)
 		{
-			row.Extra0 = reserved[0];
 			row.Extra1 = reserved[1];
 			row.Extra2 = reserved[2];
 			row.Extra3 = reserved[3];

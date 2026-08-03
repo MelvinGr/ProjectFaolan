@@ -2942,9 +2942,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("GoalId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("Extra0")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("Extra1")
                         .HasColumnType("INTEGER");
 

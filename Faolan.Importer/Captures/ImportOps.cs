@@ -767,7 +767,7 @@ namespace Faolan.Importer.Captures
 					row.Unknown1 = g.Unknown1;
 					row.Unknown2 = g.Unknown2;
 					row.GoalIdEcho = g.GoalIdEcho;
-					row.Extra0 = g.Extra0;
+					// reserved[0] is NOT harvested: it is the captured character's SolvedTimes, not quest data (#550).
 					row.Extra1 = g.Extra1;
 					row.Extra2 = g.Extra2;
 					row.Extra3 = g.Extra3;
@@ -815,7 +815,7 @@ namespace Faolan.Importer.Captures
 					Unknown1 = g.Unknown1,
 					Unknown2 = g.Unknown2,
 					GoalIdEcho = g.GoalIdEcho,
-					Extra0 = g.Extra0,
+					// reserved[0] is NOT harvested - see the refresh path above (#550).
 					Extra1 = g.Extra1,
 					Extra2 = g.Extra2,
 					Extra3 = g.Extra3,
@@ -1102,10 +1102,9 @@ namespace Faolan.Importer.Captures
 					g.Separator = hg.Separator;
 					g.RequiredCount = hg.RequiredCount;
 
-					// The reserved (marker, 4CC-tag) pairs, lifted off the full-update body by the codec (#537). The same
+					// The reserved (marker, 4CC-tag) pairs [1..6], lifted off the full-update body by the codec (#537). The same
 					// words the snapshot path harvests, so a goal seen by both gets the same value from either - and a
 					// goal seen ONLY in a full-update stops carrying zeros. Refreshed like the other wire fields.
-					g.Extra0 = hg.Extra0;
 					g.Extra1 = hg.Extra1;
 					g.Extra2 = hg.Extra2;
 					g.Extra3 = hg.Extra3;
@@ -1379,8 +1378,15 @@ namespace Faolan.Importer.Captures
 
 				bool Reproduces((uint Variant, List<QuestObjectiveGoal> Goals) c)
 				{
+					// The goal's SolvedTimes is the CAPTURED CHARACTER's progress, not quest data (#550) - so it is
+					// not on the row and cannot be rebuilt from one. Feeding this capture's own reading in keeps the
+					// comparison honest: every OTHER word still has to match exactly, and a region that only
+					// reproduces because progress was ignored would still fail.
 					return QuestObjectiveRegionCodec
-						.Build(QuestObjectiveRegions.ForQuest(def, c.Goals[0].Instance))
+						.Build(QuestObjectiveRegions.ForQuest(def, c.Goals[0].Instance,
+							g => c.Goals.FirstOrDefault(cg => cg.GoalId == g.GoalId)?.Reserved is { Length: > 0 } r
+								? r[0]
+								: 0))
 						.SequenceEqual(QuestObjectiveRegionCodec.Build(new QuestObjectiveRegion
 						{
 							Goals = c.Goals

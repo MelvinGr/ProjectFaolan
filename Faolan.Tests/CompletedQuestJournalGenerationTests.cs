@@ -55,9 +55,16 @@ namespace Faolan.Tests
 					continue;
 				}
 
-				// Goals carry the live player's instance; take it from the capture so only CONTENT is compared.
+				// Goals carry the live player's instance; take it from the capture so only CONTENT is compared. The
+				// goal's SolvedTimes (reserved[0]) is taken from the capture for the same reason - it is the CAPTURED
+				// CHARACTER's progress, not quest data, so no row can rebuild it (#550). Every other word still has to
+				// match exactly, so this does not weaken the gate: a region that only matched because progress was
+				// ignored would still fail on the 20 words around it.
 				var instance = captured.Goals[0].Instance;
-				var built = QuestObjectiveRegionCodec.Build(QuestObjectiveRegions.ForQuest(def, instance));
+				var built = QuestObjectiveRegionCodec.Build(QuestObjectiveRegions.ForQuest(def, instance,
+					g => captured.Goals.FirstOrDefault(cg => cg.GoalId == g.GoalId)?.Reserved is { Length: > 0 } r
+						? r[0]
+						: 0));
 				var want = QuestObjectiveRegionCodec.Build(captured);
 				compared++;
 				if (built.SequenceEqual(want))

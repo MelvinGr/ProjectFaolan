@@ -22,19 +22,29 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// from" (#548): it recovers the kind tag, the count, the reserved pairs and the per-goal pin. What has never
 		// been verified is that a region rebuilt to INCLUDE them reproduces the wire, and that is the bar here - so
 		// widening this is a byte-exact regeneration job, not a comment change.
-		public static QuestObjectiveRegion ForQuest(QuestDefinition def, uint instance)
+		//
+		// `solvedTimesOf` resolves a goal's PROGRESS - `QuestGoal_c::SolvedTimes`, the first reserved word (#550). It is
+		// per-CHARACTER state and deliberately not on the definition row, so a caller that has no character (the
+		// importer's byte-exact verifier replaying one capture, a golden) passes the reading it is comparing against,
+		// and a caller building a fresh journal passes nothing and gets 0 - which is what an unstarted goal carries.
+		public static QuestObjectiveRegion ForQuest(QuestDefinition def, uint instance, Func<QuestGoalDefinition, uint>? solvedTimesOf = null)
 		{
 			ArgumentNullException.ThrowIfNull(def);
 
 			return new QuestObjectiveRegion
 			{
-				Goals = [.. def.Goals.Where(g => !g.Partial).OrderBy(g => g.RegionOrder).ThenBy(g => g.Sequence).Select(g => ForGoal(def, g, instance))]
+				Goals =
+				[
+					.. def.Goals.Where(g => !g.Partial).OrderBy(g => g.RegionOrder).ThenBy(g => g.Sequence)
+						.Select(g => ForGoal(def, g, instance, solvedTimesOf?.Invoke(g) ?? 0))
+				]
 			};
 		}
 
 		// One goal's record. The MEANINGFUL fields come from the row; the structural ones are synthesized (Lead = 1)
-		// or echoed, and the undecoded scalars are carried per goal from the capture.
-		public static QuestObjectiveGoal ForGoal(QuestDefinition def, QuestGoalDefinition g, uint instance)
+		// or echoed, and the undecoded scalars are carried per goal from the capture. `solvedTimes` is the live
+		// progress - see ForQuest.
+		public static QuestObjectiveGoal ForGoal(QuestDefinition def, QuestGoalDefinition g, uint instance, uint solvedTimes = 0)
 		{
 			ArgumentNullException.ThrowIfNull(def);
 			ArgumentNullException.ThrowIfNull(g);
@@ -54,7 +64,9 @@ namespace Faolan.Core.Network.Codecs.Quest
 				RequiredCount = g.RequiredCount == 0
 					? 1
 					: g.RequiredCount,
-				Reserved = [g.Extra0, g.Extra1, g.Extra2, g.Extra3, g.Extra4, g.Extra5, g.Extra6],
+				// reserved[0] is the goal's live SolvedTimes; [1..6] are the three (marker, identity) reference slots,
+				// which ARE definition data (#546).
+				Reserved = [solvedTimes, g.Extra1, g.Extra2, g.Extra3, g.Extra4, g.Extra5, g.Extra6],
 				SubId = g.SubId,
 				MapId = g.MapId ?? 0,
 				MarkerX = g.MarkerX ?? 0,

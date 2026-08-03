@@ -171,8 +171,22 @@ namespace Faolan.Core.Network.Codecs.Quest
 		// than a per-entry random, every NPC goal carries [5..6], and the only ITEM goals that do are the twelve
 		// `Separator` 20 Deliver goals - i.e. exactly the ones that need a recipient.
 		//
-		// The lead word [0] is a small number - 0 on 155 goals, then 1/2/4/6 - and is not a count of the occupied
-		// slots (goal 3508 carries 4 with one pair; 11252 carries 0 with two). Still undecoded.
+		// ✅ The lead word [0] is `QuestGoal_c::SolvedTimes` - the goal's PROGRESS counter, i.e. how many of
+		// `RequiredCount` the character has done (#550). It is per-CHARACTER state, not quest definition data, which is
+		// why it is not on `QuestGoalDefinition`: `QuestObjectiveRegions.ForQuest` takes it from the live character.
+		//
+		// The client settles it. `FUN_00925dd0` is QuestGoal_c's stream reader and maps the record onto the object
+		// 1:1 - the 21 words land at `+0x24` upward in wire order, so `RequiredCount` (w7) is `+0x38` and this word
+		// (w8) is `+0x3c`. `CoreQuestHolder::QuestGoalEvent` (`FUN_00810070`) then names both: on
+		// `e_QuestGoalEvent_GoalFinished` it calls `SetSolvedTimes(goal, goal->0x38)` - progress jumps to the target -
+		// and on the progress event `SetSolvedTimes(goal, goal->0x3c + delta)`, after which it pushes BOTH words to
+		// the UI as the "x of y" readout. `SetSolvedTimes` (`FUN_00926220`) writes `+0x3c` and logs
+		// "QuestGoal_c::SetSolvedTimes() Character: %d QuestGoal: %d. Set SolvedTimes to: %d.".
+		//
+		// The corpus agrees on every reading: over 4742 snapshot goal records the word NEVER exceeds the goal's
+		// RequiredCount, it lands exactly ON it for each of the goals whose quest the captured character had finished
+		// (4 of 4, 2 of 2, 1 of 1 x12) and short of it where they had not (6 of 13, 1 of 5) - and all 118 goal records
+		// carried by a live QuestFullUpdate, which is the quest GRANT, carry 0.
 		//
 		// ⚠️ A token -> object map is NOT RECOVERABLE from the client (#547), so the Deliver recipients are read out
 		// of the objective TEXT and that is not a stopgap. The client never dereferences a token: `"ACGHash"` occurs

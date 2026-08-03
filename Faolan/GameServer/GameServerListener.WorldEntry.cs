@@ -556,8 +556,10 @@ namespace Faolan.GameServer
 			// the character's held quests in the snapshot. So the snapshot region is data-driven from CharacterQuests on
 			// login, and empty on create.
 			var isCreateEntry = client.Session.EntryMode == WorldEntryMode.CreateWorld;
-			var (snapshotQuests, primaryQuest) = isCreateEntry
-				? (new List<QuestDefinition>(), (QuestDefinition?)null)
+			// A CREATE entry carries no quests, so it also carries no progress - the resolver is only ever asked about
+			// a goal of a quest in `snapshotQuests`.
+			var (snapshotQuests, primaryQuest, solvedTimesOf) = isCreateEntry
+				? (new List<QuestDefinition>(), (QuestDefinition?)null, static (QuestGoalDefinition _) => 0u)
 				: await LoadSnapshotQuests(character);
 			// #74/#71: the character's learned spells ride the snapshot's known-list so they survive relog + place on the
 			// action bar (instead of the per-login DispatchLearnSpell band-aid). Seeded at creation (CharacterLoadout),
@@ -608,7 +610,7 @@ namespace Faolan.GameServer
 			// after it carries - so the sheet does not flick from one max to the other on entry (#580).
 			var liveMax = _simulation.PlayerWorldEntity(client)!.Vitals.ToMaxStats();
 			var tails = SnapshotTails.FromScratch(snapshotQuests, primaryQuest!, client.Session.Character, liveMax, instance, playfieldToken, knownSpellIds, statSheet, completedJournal,
-				indexLines, lineCatalog);
+				indexLines, lineCatalog, solvedTimesOf);
 			var snapshot = BuildWorldEntrySnapshot(client, typedRoot, tails);
 
 			// TODO: Just send all? no need to batch them

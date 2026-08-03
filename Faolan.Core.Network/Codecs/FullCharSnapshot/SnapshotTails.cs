@@ -59,13 +59,15 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public static FullCharSnapshotSubClass FromScratch(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, Character character, CharacterMaxStats maxVitals, uint instance, uint? playfieldToken = null,
 			IReadOnlyList<uint>? knownSpellIds = null, IReadOnlyList<(CharacterStatId Id, uint Value)>? statSheet = null,
 			IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)>? completedQuests = null, IReadOnlyDictionary<uint, QuestLine>? areas = null,
-			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
+			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null, Func<QuestGoalDefinition, uint>? solvedTimesOf = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
 			// `primary` may be null IFF the character holds no snapshot quests (the empty-region create case); when
 			// quests are present QuestRegions enforces a non-null primary.
 
-			var (journal, completed, index) = QuestRegions(quests, primary, instance, completedQuests, areas, areaCatalog);
+			// `solvedTimesOf` is the character's per-goal PROGRESS (#550) - see QuestPortion. Null builds an unstarted
+			// journal, which is correct for the create path and for the goldens.
+			var (journal, completed, index) = QuestRegions(quests, primary, instance, completedQuests, areas, areaCatalog, solvedTimesOf);
 
 			// #74/#71: the character's learned spells are built INTO the stat block's known-list (no-op when empty).
 			var knownList = KnownSpellLists.FromSpellIds(knownSpellIds);
@@ -178,11 +180,16 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// other held quests just add their journal record + their questId to the index list (decoded from the
 		// compeltefirstquest 2-quest snapshot: beach + Casilda). Quests are ordered primary-first then by id (the
 		// captured order). Reproduces that capture's 2247-byte quest region byte-exact (BuildQuestPortionTests).
+		//
+		// `solvedTimesOf` is the player's PROGRESS on a goal - `QuestGoal_c::SolvedTimes` (#550), the goal record's
+		// first reserved word. Omitting it builds an unstarted journal (every goal at 0), which is what the goldens and
+		// a fresh character carry; the live snapshot passes the character's own counters so the journal opens showing
+		// "3 of 7" rather than resetting to zero on every login.
 		public static byte[] QuestPortion(IReadOnlyList<QuestDefinition> quests, QuestDefinition primary, uint instance,
 			IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)>? completed = null, IReadOnlyDictionary<uint, QuestLine>? areas = null,
-			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null)
+			IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog = null, Func<QuestGoalDefinition, uint>? solvedTimesOf = null)
 		{
-			var (journal, completedRegion, index) = QuestRegions(quests, primary, instance, completed, areas, areaCatalog);
+			var (journal, completedRegion, index) = QuestRegions(quests, primary, instance, completed, areas, areaCatalog, solvedTimesOf);
 			return [.. QuestcRegionCodec.Build(journal), .. CompletedQuestJournalRegionCodec.Build(completedRegion), .. QuestIndexRegionCodec.Build(index)];
 		}
 
@@ -193,7 +200,8 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		// Primary ordered first.
 		private static (QuestcRegion Journal, CompletedQuestJournalRegion Completed, QuestIndexRegion Index) QuestRegions(IReadOnlyList<QuestDefinition> quests,
 			QuestDefinition primary, uint instance, IReadOnlyList<(QuestLine Area, IReadOnlyList<QuestDefinition> Quests)>? completed,
-			IReadOnlyDictionary<uint, QuestLine>? areas, IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog)
+			IReadOnlyDictionary<uint, QuestLine>? areas, IReadOnlyDictionary<uint, IReadOnlyList<QuestDefinition>>? areaCatalog,
+			Func<QuestGoalDefinition, uint>? solvedTimesOf = null)
 		{
 			ArgumentNullException.ThrowIfNull(quests);
 
@@ -220,7 +228,7 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 				// The objective region is part of the RECORD (interleaved per quest), so it rides on the record and
 				// QuestcRecordCodec.Write emits it - keeping the writer symmetric with QuestcRegionCodec.Read (#384).
 				var record = QuestcRecords.ForQuest(q, q.Level);
-				record.Objectives = QuestObjectiveRegions.ForQuest(q, instance);
+				record.Objectives = QuestObjectiveRegions.ForQuest(q, instance, solvedTimesOf);
 				journal.Records.Add(record);
 			}
 

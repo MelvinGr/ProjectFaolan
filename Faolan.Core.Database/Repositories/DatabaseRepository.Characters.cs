@@ -54,7 +54,12 @@ namespace Faolan.Core.Database.Repositories
 		Task<Character?> GetCharacterForAccount(uint accountId, uint clientInstance);
 		Task<CharacterInventory[]> GetCharacterInventory(uint characterId, ContainerKind? container = null);
 		Task<CharacterInventory?> GetInventorySlot(uint characterId, ContainerKind container, int slot);
-		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId);
+		/// <summary>
+		///     A character's secondary-goal progress rows. <paramref name="questId" /> filters to one quest; null (the
+		///     default) returns every held quest's rows in ONE query, which is what the world-entry journal wants - it
+		///     needs the progress of every active quest's goals and would otherwise issue one call per quest.
+		/// </summary>
+		Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint? questId = null);
 		Task<CharacterQuest[]> GetCharacterQuests(uint characterId, QuestState? state = null);
 		Task<CharacterShortcut[]> GetCharacterShortcuts(uint characterId);
 		Task<CharacterSpell[]> GetCharacterSpells(uint characterId);
@@ -502,10 +507,12 @@ namespace Faolan.Core.Database.Repositories
 				.FirstOrDefaultAsync(i => i.CharacterId == characterId && i.Container == container && i.Slot == slot);
 		}
 
-		public async Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint questId)
+		public async Task<CharacterQuestGoal[]> GetCharacterQuestGoals(uint characterId, uint? questId = null)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx.CharacterQuestGoals.Where(g => g.CharacterId == characterId && g.QuestId == questId).ToArrayAsync();
+			return await ctx.CharacterQuestGoals
+				.Where(g => g.CharacterId == characterId && (questId == null || g.QuestId == questId))
+				.ToArrayAsync();
 		}
 
 		// `state` filters in SQL rather than in the caller: the goal-matching paths want only the ACTIVE quests, and a

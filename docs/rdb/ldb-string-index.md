@@ -206,7 +206,7 @@ goals are not reaches.
 
 ### The goal's reserved slots are a third, typed reference
 
-`QuestGoalDefinition.Extra0..Extra6` — the seven "reserved" words — are a lead word plus **three optional
+`QuestGoalDefinition.Extra1..Extra6` — the reserved words `[1..6]` — are **three optional
 `(marker, identity)` reference slots** at `[1..2]` / `[3..4]` / `[5..6]`. The slots float (goal 11252 uses `[1]`
 and `[3]`), and the marker types the identity:
 
@@ -233,8 +233,26 @@ the client never dereferences a token, it is absent from the item template, and 
 The only map that exists is the 23 pairs from goals that *also* state the NPC's LDB refId, and none of the twelve
 Deliver recipients is in it. So reading those recipients out of the objective text is by design, not a stopgap.
 
-The lead word `[0]` is undecoded (0 on 155 goals, then 1/2/4/6 — **not** a count of occupied slots); open work
-tracked in Gitea #550.
+### The lead word `[0]` is the goal's PROGRESS, not definition data
+
+`reserved[0]` is **`QuestGoal_c::SolvedTimes`** — how many of the goal's `RequiredCount` the character has done
+(#550). It is per-character state, which is why it has no column: `QuestObjectiveRegions.ForQuest` takes it from
+the live character, and the byte-exact verifiers feed in the reading of the capture they compare against.
+
+The client settles it, reader and consumer agreeing:
+
+| function | what it says |
+|---|---|
+| `FUN_00925dd0` — `QuestGoal_c`'s stream reader | maps the 21-word record onto the object 1:1 from `+0x24` up, so `RequiredCount` (w7) is `+0x38` and this word (w8) is `+0x3c` |
+| `FUN_00810070` — `CoreQuestHolder::QuestGoalEvent` | on `e_QuestGoalEvent_GoalFinished` calls `SetSolvedTimes(goal, goal->0x38)` — progress jumps to the target; on the progress event `SetSolvedTimes(goal, goal->0x3c + delta)`, then pushes BOTH words to the UI as the "x of y" readout |
+| `FUN_00926220` — `SetSolvedTimes` | writes `+0x3c` and logs `QuestGoal_c::SetSolvedTimes() Character: %d QuestGoal: %d. Set SolvedTimes to: %d.` |
+
+The corpus agrees on every one of its 4742 snapshot goal readings: the word never exceeds the goal's
+`RequiredCount`, it lands exactly **on** it for the goals the captured character had finished (4 of 4, 2 of 2,
+1 of 1 ×12) and short of it where they had not (6 of 13, 1 of 5) — and all 118 goal records carried by a live
+`QuestFullUpdate`, which is the quest **grant**, carry 0. The values that used to read as an unexplained
+`1/2/4/6` spread are simply four characters' half-finished collect-and-destroy objectives: quest 16004's
+"collect 7", with 6 done; quest 13473's seven `Destroy Bowl of Set`, with 4 done.
 
 ### The 74 item goals (`50200`) are inert fetch objectives — and the reference does not type them
 

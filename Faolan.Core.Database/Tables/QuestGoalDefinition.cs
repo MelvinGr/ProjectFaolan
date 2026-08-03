@@ -167,14 +167,18 @@ namespace Faolan.Core.Database.Tables
 		[MaxLength(128)]
 		public string? TrailingToken { get; set; }
 
-		// The goal record's 7 "reserved" words, verbatim - a lead word then three optional (marker, ACGHash-token)
-		// slots at [1..2]/[3..4]/[5..6], which refer to the goal's own target and NPC (#546; QuestObjectiveGoal.Reserved
-		// carries the measured shape). Stored rather than derived because the token resolves to nothing we hold - the
-		// client never dereferences it either (#547). The lead word [0] is undecoded - Gitea #550.
+		// The goal record's reserved words [1..6] - three optional (marker, ACGHash-token) slots at [1..2]/[3..4]/[5..6],
+		// which refer to the goal's own target and NPC (#546; QuestObjectiveGoal.Reserved carries the measured shape).
+		// Stored rather than derived because the token resolves to nothing we hold - the client never dereferences it
+		// either (#547).
+		//
+		// ⚠️ The numbering is the WIRE's, and it starts at 1 because reserved[0] IS NOT DEFINITION DATA: it is
+		// `QuestGoal_c::SolvedTimes`, the goal's per-character PROGRESS counter (#550). It used to be harvested here as
+		// `Extra0`, which shipped one retail character's half-finished objectives to every player. It now comes from
+		// the live character through QuestObjectiveRegions.ForQuest's `solvedTimesOf`.
 		//
 		// Harvested from BOTH wire sources - the snapshot journal (ObjectiveGoalExtractor) and the live QuestFullUpdate
 		// (QuestDefinitionExtractor, #537) - which agree on every goal seen by both.
-		public uint Extra0 { get; set; }
 		public uint Extra1 { get; set; }
 		public uint Extra2 { get; set; }
 		public uint Extra3 { get; set; }

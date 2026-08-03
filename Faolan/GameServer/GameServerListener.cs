@@ -534,7 +534,13 @@ namespace Faolan.GameServer
 		// scalars seeded + the 5 header text refs) - else BuildQuestPortion would throw. An ineligible held quest is
 		// simply ABSENT from the journal: there is no live restore path any more (#389/#390), so widening
 		// IsSnapshotEligible is what makes such a quest appear.
-		private async Task<(List<QuestDefinition> Quests, QuestDefinition? Primary)> LoadSnapshotQuests(Character character)
+		//
+		// It also returns the character's per-goal PROGRESS resolver. The goal record's first reserved word is
+		// `QuestGoal_c::SolvedTimes` (#550) - the "3 of 7" the journal shows - and it is per-character state, so the
+		// snapshot has to source it from the character rather than from the definition row. Progress lives in two
+		// places for the same reason QuestProgressionService reads it from two: a quest's PRIMARY goal keeps the
+		// scalar on CharacterQuest, and only its secondary goals get CharacterQuestGoal rows (#357).
+		private async Task<(List<QuestDefinition> Quests, QuestDefinition? Primary, Func<QuestGoalDefinition, uint> SolvedTimesOf)> LoadSnapshotQuests(Character character)
 		{
 			var quests = new List<QuestDefinition>();
 
@@ -555,7 +561,28 @@ namespace Faolan.GameServer
 			// The tracked (primary) quest owns the snapshot's objective region + index terminal: the beach starter when
 			// held, else the first held quest (null only when the character holds none -> empty region).
 			var primary = quests.FirstOrDefault(q => q.QuestId == BeachStarterQuestId) ?? quests.FirstOrDefault();
-			return (quests, primary);
+
+			// One query for every active quest's secondary-goal rows, and the primary-goal scalar off the rows already
+			// loaded above - so the resolver below is pure lookup and the journal build stays synchronous.
+			var secondary = (await Database.GetCharacterQuestGoals(character.Id)).ToDictionary(g => (g.QuestId, g.GoalId), g => g.Progress);
+			var primaryProgress = active.ToDictionary(q => q.QuestId, q => q.GoalProgress);
+
+			uint SolvedTimesOf(QuestGoalDefinition goal)
+			{
+				if (secondary.TryGetValue((goal.QuestDefinitionId, goal.GoalId), out var p))
+					return p;
+
+				// The quest's FIRST goal is the one whose progress lives on CharacterQuest - the same primary/secondary
+				// split QuestProgressionService.IsPrimaryGoal applies, and it has to agree with it or a quest's two
+				// goals would read each other's counters.
+				return definitions.TryGetValue(goal.QuestDefinitionId, out var d)
+				       && d.Goals.OrderBy(g => g.Sequence).FirstOrDefault()?.GoalId == goal.GoalId
+				       && primaryProgress.TryGetValue(goal.QuestDefinitionId, out var pp)
+					? pp
+					: 0;
+			}
+
+			return (quests, primary, SolvedTimesOf);
 		}
 
 		// Resolves a map argument (numeric id, exact case-insensitive name, or first name-contains match) to its Map row, 		// or null if nothing matches. Shared by the `.teleport <name>` and `.teleport <name> x y z` forms (#247).

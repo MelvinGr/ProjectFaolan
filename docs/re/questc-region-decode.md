@@ -188,7 +188,7 @@ module's string pool names plenty of METHODS and one member, but nothing on this
 | string | what it gives |
 |---|---|
 | `QuestHolder_t::UpdateCurrentProgress() m_pcCurrentQuest is NULL.` | the holder class + its member |
-| `QuestGoal_c::SetParent()` / `SetSolvedTimes()` / `GetQuestLevel()` | goal API; "SolvedTimes" is the goal's progress count |
+| `QuestGoal_c::SetParent()` / `SetSolvedTimes()` / `GetQuestLevel()` | goal API; "SolvedTimes" is the goal's progress count — and it is the goal record's `reserved[0]`, see [ldb-string-index.md](../rdb/ldb-string-index.md) (#550) |
 | `QuestGoal_c::GetQuestLevel() … Returning Stat value` / `Returning Quest value` | the goal's level resolves from a STAT first, the quest second |
 | `MainQuest_c::WriteToStream` | `mainquest.cpp` is a separate class from `quest.cpp` |
 | `QuestRewardNotifyIIR_c`, `QuestRewardSelectionIIR_c` | rewards have their OWN IIRs |

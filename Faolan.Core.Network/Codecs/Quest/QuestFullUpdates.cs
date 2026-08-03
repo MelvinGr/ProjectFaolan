@@ -79,8 +79,11 @@ namespace Faolan.Core.Network.Codecs.Quest
 				N = 1,
 				GoalIdRepeat = def.GoalId,
 				RequiredCount = 1,
+				// reserved[0] is the goal's SolvedTimes (#550) and a full update is the live GRANT, so it is 0 - which
+				// is what all 118 captured full-update goal records carry, without exception. [1..6] are the three
+				// (marker, identity) reference slots and come from the row like every other captured field.
 				Reserved = row != null
-					? [row.Extra0, row.Extra1, row.Extra2, row.Extra3, row.Extra4, row.Extra5, row.Extra6]
+					? [0, row.Extra1, row.Extra2, row.Extra3, row.Extra4, row.Extra5, row.Extra6]
 					: new uint[7],
 				SubId = 0,
 				// 0 is the wire's "no marker" - the same convention QuestObjectiveRegions uses for a goal with a
