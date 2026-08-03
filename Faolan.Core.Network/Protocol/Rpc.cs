@@ -140,10 +140,8 @@ namespace Faolan.Core.Network.Protocol
 		// frame is laid out.
 		public byte[] Serialize()
 		{
-			var sender = Sender.ToProtobuf();
-			var receiver = Receiver.ToProtobuf();
-			var routingContext = RoutingContext?.ToProtobuf();
-			var method = Method; // Rpc is a struct, so the header lambda cannot capture `this` to read it.
+			// Rpc is a struct, so the header lambda cannot capture `this` - every field it writes is copied out here.
+			var (sender, receiver, routingContext, method) = (Sender, Receiver, RoutingContext, Method);
 
 			using var stream = new FaolanStream();
 			stream.WriteUInt32(0); // length     - backfilled below
@@ -152,17 +150,19 @@ namespace Faolan.Core.Network.Protocol
 			// headerLen then the header, from the SAME writes - the length is measured off the bytes rather than
 			// predicted from them. It used to be hand-summed ("each endpoint field costs [tag][byteLen] + its bytes,
 			// and method_instance [tag] + its varint", plus a VarintLength helper existing only to feed it), which is
-			// a second, arithmetic description of the header that a new field has to be remembered in twice.
+			// a second, arithmetic description of the header that a new field has to be remembered in twice - and the
+			// endpoints had to be pre-serialized to feed it, which is why they went in as byte[] rather than as the
+			// messages WriteProtobufByteLength takes.
 			stream.WriteArrayUInt32Length(header =>
 			{
 				header.WriteByte(CallerIdTag);
-				header.WriteArrayByteLength(sender);
+				header.WriteProtobufByteLength(sender);
 				header.WriteByte(EndpointIdTag);
-				header.WriteArrayByteLength(receiver);
+				header.WriteProtobufByteLength(receiver);
 				if (routingContext is not null)
 				{
 					header.WriteByte(RoutingContextTag);
-					header.WriteArrayByteLength(routingContext);
+					header.WriteProtobufByteLength(routingContext);
 				}
 
 				header.WriteByte(MethodInstanceTag);
