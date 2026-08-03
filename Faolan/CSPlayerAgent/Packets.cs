@@ -110,12 +110,15 @@ namespace Faolan.CSPlayerAgent
 		// [V0]
 		private const int MaxCharacterSearchResults = 50;
 
-		// 0x2039 DispatchGuildRenownHistoryUpdate: the renown-over-time graph in the guild window (answer to 0x2040
-		// RequestRenownHistory). The captured body is a fixed 112-byte block of renown/pvp time buckets; we track no
-		// renown history, so we emit it zeroed (a flat graph) - the honest empty form for a guild with no history.
+		// 0x2039 DispatchGuildRenownHistoryUpdate: the renown-over-time figures in the guild window (answer to 0x2040
+		// RequestRenownHistory). The 112-byte body is FOUR named entries, not a blob - GuildRenownHistoryCodec has the
+		// decode (#104). We track no renown history, so the four go out empty; the difference from the `new byte[112]`
+		// this replaced is that the zeros are now the codec's named zeros and the shape is asserted, so the day a
+		// history exists it is a value change rather than a new message.
 		private static Task SendGuildRenownHistory(INetworkClient client, Rpc packet)
 		{
-			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, CSPlayerInterfaceMethods.DispatchGuildRenownHistoryUpdate, new byte[112]));
+			return client.SendAsync(new Rpc(GuildService.ReplySender(packet.Receiver), packet.Sender, GuildRenownHistoryCodec.Method,
+				GuildRenownHistoryCodec.Build(GuildRenownHistory.Empty)));
 		}
 
 		// 0x20A5 DispatchMassivePvpInfoRequestReturn: the Massive-PvP minigame guild leaderboard (the client polls it

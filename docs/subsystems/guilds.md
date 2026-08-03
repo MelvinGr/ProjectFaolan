@@ -111,11 +111,35 @@ live renown total), so the other feat/city/cap fields stay constant pending thei
 - **Search / matchmaking requests** (`Faolan/CSPlayerAgent/Packets.cs`): the client's remaining CS-agent requests are
   now all answered so no window is left hanging. `SearchForGuilds` (0x2043 → `0x205C`) is CONSTRUCTED from the realm's
   guilds via `GuildSearchResultCodec` (byte-exact, `GuildSearchResultCodecTests`) — the guild-finder browse list.
-  `RequestRenownHistory` (0x2040 → `0x2039`) returns a zeroed 112-byte history (we track no time series). The
+  `RequestRenownHistory` (0x2040 → `0x2039`) returns a zeroed history — still zeros, but now the *decoded* zeros of
+  `GuildRenownHistoryCodec` rather than a `new byte[112]` (see below). The
   character/team/PvP-matchmaking searches (`0x200A`→`0x2010`, `0x200B`→`0x200F`, `0x2054`→`0x2092`) return well-formed
   empty `0x3F1` lists (retail's own no-result bodies), and `0x2055` gets no reply (retail sends none).
 - Create path: the capture-true `CreateGuild` RPC (0x2021 → `HandleCreateGuild`), triggered in-client from a
   registrar NPC window. There is no GM guild-create command — creation is only via that in-world registrar window.
+
+### The two renown messages (#104)
+
+Both were on the open list as "replayed blob" / "semantics unknown"; both are decoded, from the client's recovered
+method fields plus the corpus.
+
+**`0x203A DispatchClientAddGuildRenown`** — "you earned renown", NOT the "counters update" it was filed as. The
+client names its fields `(renownType, amount, guildOnly, capType)` and its c2s twin types them
+(`AddGuildRenown(const ID32&, uint8 grType, uint64 amount, bool onlyGuild)`), which gives
+`[u32 renownType][u64 amount][u32 guildOnly][u8 capType]` = 17 bytes. All ten captured records agree: type 2,
+guildOnly and capType 0, and only the amount moves (1 ×7, 3, 108, 139)
+[V3: GuildRenownCodecTests.AddGuildRenown_RoundTripsTheCapturedRecord]. Which tab type 2 is stays open — it is the
+only type captured.
+
+**`0x2039 DispatchGuildRenownHistoryUpdate`** — four fixed entries, not a time series: the client's signature names
+them `(currentEntry, lastEntry, highestEntry, averageEntry)` and 112 = 4 × 28, so an entry is
+`[u64 rank][u64 total][u64 recent][u32 level]` (every u64 carries a zero high word, which is what fixes the widths)
+[V3: GuildRenownCodecTests.RenownHistory_RoundTripsTheCapturedBody]. What each entry varies over confirms the
+names: the first moves between two logins of the same character, the second and fourth track the GUILD, and the
+third is byte-identical across both guilds in the corpus (`11228 / 2772084 / 318876 / 128`) — a row two different
+guilds share is realm-wide, which is what "highest" reads as
+[V3: GuildRenownCodecTests.RenownHistory_TheHighestEntryIsIdenticalAcrossGuilds]. The column meanings inside an
+entry are still ours, from magnitude alone.
 
 Open work is tracked in Gitea #104.
 
