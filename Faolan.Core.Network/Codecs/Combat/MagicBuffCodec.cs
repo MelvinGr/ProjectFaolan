@@ -77,9 +77,23 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var env = r.ReadU8();
 			var spellBaseId = r.ReadU32Be();
 			var form = r.ReadU8();
-			r.ExpectU32Be(EntityClass.Character, "applyFrom class");
+			// applyFrom is an OPTIONAL entity reference. Retail writes a zero class word when the buff has no caster,
+			// and then a zero instance behind it: 14 of the 4,666 captured MagicBuff bodies do this, across three
+			// captures. They are the same grammar, not a misread - their body lengths are exactly the two normal ones
+			// (26 short / 80 long), which a shifted read could not produce. Requiring the class here is what aborted a
+			// full import (#614).
+			var applyFromClass = r.ReadU32Be();
+			if (applyFromClass != EntityClass.Character && applyFromClass != 0)
+				throw new CodecParseException($"MagicBuffCodec: expected applyFrom class 0x{EntityClass.Character:X8} or 0 (no caster), got 0x{applyFromClass:X8}");
+
 			var applyFrom = r.ReadU32Be();
-			return new MagicBuffIIR(applyTo, env, spellBaseId, form, applyFrom, r.ReadRemaining().ToArray());
+
+			// A null reference is BOTH words zero. A zero class with a non-zero instance is neither a Character nor
+			// "no caster", so it stays an error rather than being read as one.
+			if (applyFromClass == 0 && applyFrom != 0)
+				throw new CodecParseException($"MagicBuffCodec: applyFrom class is 0 (no caster) but the instance is 0x{applyFrom:X8}");
+
+			return new MagicBuffIIR(applyTo, env, spellBaseId, form, applyFromClass == 0 ? null : applyFrom, r.ReadRemaining().ToArray());
 		}
 
 		internal static void Write(FaolanStream s, MagicBuffIIR v)
@@ -91,14 +105,18 @@ namespace Faolan.Core.Network.Codecs.Combat
 				.WriteByte(v.Env)
 				.WriteUInt32(v.SpellBaseId)
 				.WriteByte(v.Form)
-				.WriteUInt32(EntityClass.Character)
-				.WriteUInt32(v.ApplyFrom)
+				.WriteUInt32(v.ApplyFrom is null ? 0 : EntityClass.Character)
+				.WriteUInt32(v.ApplyFrom ?? 0)
 				.WriteArray(v.Data);
 		}
 	}
 
 	// MagicBuffIIR (0x6B87E316). `Form` is the wire spell id's low byte: 0 APPLY, 1 END, 2 UPDATE.
-	public sealed record MagicBuffIIR(uint ApplyTo, byte Env, uint SpellBaseId, byte Form, uint ApplyFrom, byte[] Data);
+	//
+	// `ApplyFrom` is NULL when the buff has no caster - the wire writes a zero class word where the entity class would
+	// be, and a zero instance behind it (see Read). Not a sentinel to be flattened to 0: an unsourced buff and a buff
+	// cast by entity 0 would be the same value, and the whole point of the field is which entity to attribute it to.
+	public sealed record MagicBuffIIR(uint ApplyTo, byte Env, uint SpellBaseId, byte Form, uint? ApplyFrom, byte[] Data);
 
 	// The wire spell id <-> (base id, form) split. Not a codec - it is arithmetic on one field, named so the shift and
 	// the mask stop being written out at each call site.

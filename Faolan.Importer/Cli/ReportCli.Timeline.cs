@@ -301,7 +301,11 @@ namespace Faolan.Importer.Cli
 					var name = look.Spells.TryGetValue(buff.SpellBaseId, out var sn) ? sn : $"spell {buff.SpellBaseId}";
 					var at = buff.ApplyTo != 0 && buff.ApplyTo != buff.ApplyFrom ? $" -> {Ent(labels, buff.ApplyTo)}" : "";
 					var end = buff.Form == MagicBuffIds.FormEnd ? " (end)" : "";
-					return $"{Ent(labels, buff.ApplyFrom)} buff {name}{at}{end} [0x{wireId:x}]";
+
+					// A buff can carry NO caster (#614) - retail zeroes the class word. Say so rather than attributing
+					// it to entity 0, which is a real handle space.
+					var from = buff.ApplyFrom is { } caster ? Ent(labels, caster) : "(no caster)";
+					return $"{from} buff {name}{at}{end} [0x{wireId:x}]";
 				}
 				case "LookAtIIR":
 				{

@@ -42,9 +42,19 @@ namespace Faolan.Importer.Extractors
 					continue;
 				}
 
-				if (cast.ApplyFrom == cast.ApplyTo) // a self-buff, not an offensive cast
+				if (cast.ApplyFrom is not { } caster) // no caster at all (#614) - so not an NPC's cast
 					continue;
-				if (!nameByHandle.TryGetValue(cast.ApplyFrom, out var name)) // not a known NPC caster (e.g. the player's own cast)
+				if (caster == cast.ApplyTo) // a self-buff, not an offensive cast
+					continue;
+				// Not a caster this capture spawned by name. That set is wider than it looks: the local player, ANY
+				// OTHER PLAYER in vicinity (their casts are broadcast too, and `nameByHandle` comes from
+				// SimpleCharFullUpdate, which spawns players and NPCs alike), pets/summons, and any NPC whose spawn
+				// fell outside the capture. So a name surviving here is NOT yet known to be an NPC's.
+				//
+				// What actually makes it one is downstream: `ImportOps.ImportNpcSpells` drops any name matching a
+				// Characters row and requires the rest to resolve to an NpcTemplates name. A stranger player seen in a
+				// retail capture is in neither set, so it is the TEMPLATE join that rejects them - see #616.
+				if (!nameByHandle.TryGetValue(caster, out var name))
 					continue;
 				if (cast.Data.Length == 0) // the rank-1 EMPTY twin is the buff-end/terminator, not a standalone cast (#232)
 					continue;
