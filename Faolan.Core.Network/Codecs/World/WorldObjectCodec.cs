@@ -44,17 +44,19 @@ namespace Faolan.Core.Network.Codecs.World
 		// stamped with the live `playfieldInstance` token. This is the sole burst-less / create-editor object path.
 		// THROWS when the row isn't lifted (no display element) - an un-lifted / partially-imported row, not a normal
 		// outcome.
-		public static byte[] Build(WorldObject row, uint handle, uint playfieldInstance = 0)
+		// `isClosed` is the object's LIVE door state (#598) - it has no column, defaults to closed, and the loaded
+		// zone passes its own LiveWorldObject.IsClosed so a door the player opened stays open.
+		public static byte[] Build(WorldObject row, uint handle, uint playfieldInstance = 0, bool isClosed = true)
 		{
 			ArgumentNullException.ThrowIfNull(row);
-			return Build(row, handle, row.Position, row.Rotation, WorldObjectColumns.TypeTagForClass(row.SubOpcode), playfieldInstance);
+			return Build(row, handle, row.Position, row.Rotation, WorldObjectColumns.TypeTagForClass(row.SubOpcode), playfieldInstance, isClosed);
 		}
 
 		// As above but with the transform supplied explicitly - how a loot bag is spawned at a live drop position with
 		// no captured world-object row behind it (LootContainerTemplate).
-		public static byte[] Build(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken)
+		public static byte[] Build(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken, bool isClosed = true)
 		{
-			return Build(ToIir(row, handle, position, rotation, typeTag, playfieldToken));
+			return Build(ToIir(row, handle, position, rotation, typeTag, playfieldToken, isClosed));
 		}
 
 		public static WorldObjectIIR Parse(in ReadOnlySpan<byte> data)
@@ -90,7 +92,7 @@ namespace Faolan.Core.Network.Codecs.World
 
 		// The row -> value mapping the delegating Build overloads use. Stays private (and #533-shaped) rather than
 		// becoming a second encoder.
-		private static WorldObjectIIR ToIir(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken)
+		private static WorldObjectIIR ToIir(WorldObject row, uint handle, ProtoVec3 position, ProtoQuat rotation, uint typeTag, uint playfieldToken, bool isClosed)
 		{
 			if (row?.DisplayKind == null)
 				throw new InvalidOperationException(
@@ -107,7 +109,7 @@ namespace Faolan.Core.Network.Codecs.World
 				PlayfieldInstance = playfieldToken
 			}.ToProtobuf();
 
-			var identity = SimpleDynelIdentityCodec.Build(WorldObjectColumns.ToMessage(row));
+			var identity = SimpleDynelIdentityCodec.Build(WorldObjectColumns.ToMessage(row, isClosed));
 			var geometry = WorldObjectGeometryColumns.ToWire(row); // the bounds record + per-class trailer (#410)
 
 			// A container's trailer is its loot CONTENTS, and the captured contents are not persisted (session state,

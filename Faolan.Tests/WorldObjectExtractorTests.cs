@@ -48,10 +48,11 @@ namespace Faolan.Tests
 
 		// #554: `IsClosed` is the one identity field that changes during play - the map 4020 "Wharf Door" is captured
 		// closed in one session and open (the field ABSENT) in another - so first-seen made ordinal capture FILENAME
-		// order decide a door's world-entry state. The value is really session state and should come from the live
-		// world (#598); until it does, the merge must at least reach the same answer whatever order the captures
-		// arrive in, which is what the reversed case asserts. The all-null case is the sanity check that being
-		// order-independent is not just "it always picks the same slot".
+		// order decide a door's world-entry state. Since #598 the value is not stored at all (it is live state on
+		// LiveWorldObject), so the winner no longer decides what ships - but the merge must still reach the same
+		// answer whatever order the captures arrive in, because it is choosing which capture's bytes EVERY OTHER
+		// field is lifted from. That is what the reversed case asserts. The all-null case is the sanity check that
+		// being order-independent is not just "it always picks the same slot".
 		[Theory, InlineData(true, null, true), InlineData(null, true, true), InlineData(null, null, null), InlineData(false, null, false), InlineData(true, false, true)]
 		public void Merge_ResolvesTheOpenClosedStateByWhatTheEntrySaysNotByCaptureOrder(bool? first, bool? second, bool? expected)
 		{

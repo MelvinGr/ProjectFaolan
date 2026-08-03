@@ -105,17 +105,15 @@ namespace Faolan.Importer.Extractors
 		// capture that happened to sort earlier and caught that door open would have flipped the shipped row, and no
 		// test would have noticed - both are legitimate wire shapes, so the whole-corpus lift gate passes either way.
 		//
-		// ⚠️ INTERIM. `IsClosed` is SESSION state, not a placement fact (Melvin's call, 2026-08-03): a door captured
-		// open was opened by the capturing player, so no capture is evidence of anything but that moment. What is a
-		// definition is only whether the object HAS a door state at all - the field being present. The end state is
-		// that the value comes from the live world at world entry and the import stops carrying it, the way a
-		// container's loot contents already do; that needs a live door-state store and a schema change, so it is
-		// Gitea #598.
+		// `IsClosed` is SESSION state, not a placement fact: a door captured open was opened by the capturing player,
+		// so no capture is evidence of anything but that moment. Since #598 the row does NOT store it - the live world
+		// owns it (LiveWorldObject.IsClosed) and the lift feeds the captured reading into its byte comparison - so
+		// which candidate wins no longer decides anything that ships.
 		//
-		// Until then the row still has to carry SOMETHING, because the identity message is rebuilt byte-exact from
-		// the columns and field 12 sits inside it. So the choice is at least made deterministic: candidates are
-		// ranked closed-present > present > absent, a property of the ENTRY rather than of the file it came from,
-		// which is what stops a newly added capture from silently flipping a door open at world entry.
+		// The ranking stays anyway, and is not dead weight: it is what keeps the dedup a function of what the entries
+		// SAY rather than of the order the capture files happened to sort in. Candidates are ranked closed-present >
+		// present > absent, a property of the ENTRY. Falling back to first-seen here would put filename order back in
+		// charge of which capture's bytes every other field is lifted from - the #554 bug, one field over.
 		public static List<WorldObjectEntry> Merge(IEnumerable<WorldObjectEntry> all)
 		{
 			return Merge(all, out _);

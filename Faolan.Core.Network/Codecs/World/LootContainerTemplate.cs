@@ -108,7 +108,7 @@ namespace Faolan.Core.Network.Codecs.World
 				SubOpcode = ContainerClass,
 				TemplateItemId = (uint)typeId,
 				CarsGroup = 1,
-				IsClosed = true,
+				// (a bag is closed - that is now the BUILD default, not a column; see WorldObjectColumns.ToMessage)
 				Kdtree = 0
 			};
 

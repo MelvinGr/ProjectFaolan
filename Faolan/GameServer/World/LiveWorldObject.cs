@@ -31,6 +31,16 @@ namespace Faolan.GameServer.World
 		// Null for everything that is not a harvest node, so this doubles as "is this being harvested".
 		public uint? Health { get; set; }
 
+		// The object's DOOR STATE (proto field 12), and LIVE state for the same reason Health is (#598): a capture is
+		// evidence of what a door was doing when the packet was sent, not of how it was placed - the map 4020 "Wharf
+		// Door" is captured closed in one session and open in another, which is why it has no column.
+		//
+		// Closed is the resting state, and it is what all 2400 captured objects were streamed in, so a freshly loaded
+		// zone puts out exactly the bytes it did before this became live. Nothing mutates it yet - opening a door is
+		// not modelled - so "open a door, walk away, come back" still shows it closed; what changes here is that the
+		// world OWNS the value, so wiring the open is now a one-line change instead of a schema one.
+		public bool IsClosed { get; set; } = true;
+
 		// True while this node still has something to give. Health bottoms out at 1 in every capture, never 0, and the
 		// node despawns there - so exhausted is <= ExhaustedHealth rather than == 0.
 		public bool IsHarvestable => HarvestCatalog.IsHarvestable(Row.Name) && (Health ?? HarvestCatalog.NodeMaxHealth) > HarvestCatalog.ExhaustedHealth;

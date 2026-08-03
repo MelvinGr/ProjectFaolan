@@ -23,7 +23,7 @@ namespace Faolan.Tests
 			using var con = new SqliteConnection($"Data Source={db};Mode=ReadOnly");
 			con.Open();
 			using var cmd = con.CreateCommand();
-			cmd.CommandText = "SELECT Name,DisplayKind,CarsGroup,IsClosed,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,GeometryAssetType,DisplayId,DisplayToken,DisplayCategory,DisplayFlags,DisplayKey1,DisplayKey2,DisplayKey3,DisplayKey4,DisplayKnubot " + "FROM WorldObjects WHERE DisplayKind IS NOT NULL";
+			cmd.CommandText = "SELECT Name,DisplayKind,CarsGroup,QuestItemEffect,TemplateItemId,Kdtree,WaypointType,GeometryAssetType,DisplayId,DisplayToken,DisplayCategory,DisplayFlags,DisplayKey1,DisplayKey2,DisplayKey3,DisplayKey4,DisplayKnubot " + "FROM WorldObjects WHERE DisplayKind IS NOT NULL";
 			using var r = cmd.ExecuteReader();
 			int total = 0, ok = 0, noTail = 0, mismatch = 0;
 			while (r.Read())
@@ -35,41 +35,41 @@ namespace Faolan.Tests
 					Name = r.GetString(0),
 					DisplayKind = (InnerElementKind)r.GetInt64(1),
 					CarsGroup = (uint)r.GetInt64(2),
-					IsClosed = r.IsDBNull(3) ? null : r.GetBoolean(3),
-					QuestItemEffect = r.IsDBNull(4)
+					// no IsClosed: field 12 is live door state, not a column (#598) - the build below defaults it closed.
+					QuestItemEffect = r.IsDBNull(3)
+						? null
+						: (uint)r.GetInt64(3),
+					TemplateItemId = r.IsDBNull(4)
 						? null
 						: (uint)r.GetInt64(4),
-					TemplateItemId = r.IsDBNull(5)
+					Kdtree = (uint)r.GetInt64(5),
+					WaypointType = r.IsDBNull(6)
 						? null
-						: (uint)r.GetInt64(5),
-					Kdtree = (uint)r.GetInt64(6),
-					WaypointType = r.IsDBNull(7)
+						: (uint)r.GetInt64(6),
+					GeometryAssetType = (uint)r.GetInt64(7),
+					DisplayId = r.IsDBNull(8)
 						? null
-						: (uint)r.GetInt64(7),
-					GeometryAssetType = (uint)r.GetInt64(8),
-					DisplayId = r.IsDBNull(9)
+						: (uint)r.GetInt64(8),
+					DisplayToken = r.IsDBNull(9)
 						? null
-						: (uint)r.GetInt64(9),
-					DisplayToken = r.IsDBNull(10)
+						: r.GetString(9),
+					DisplayCategory = r.IsDBNull(10)
 						? null
-						: r.GetString(10),
-					DisplayCategory = r.IsDBNull(11)
+						: (uint)r.GetInt64(10),
+					DisplayFlags = r.IsDBNull(11)
 						? null
-						: (uint)r.GetInt64(11),
-					DisplayFlags = r.IsDBNull(12)
-						? null
-						: r.GetString(12),
+						: r.GetString(11),
 					// The LDB key is four columns now (#520); rebuild it from them rather than from a string.
 					DisplayKey = new ProtoDecryptionKey
 					{
-						Key1 = (uint)r.GetInt64(13),
-						Key2 = (uint)r.GetInt64(14),
-						Key3 = (uint)r.GetInt64(15),
-						Key4 = (uint)r.GetInt64(16)
+						Key1 = (uint)r.GetInt64(12),
+						Key2 = (uint)r.GetInt64(13),
+						Key3 = (uint)r.GetInt64(14),
+						Key4 = (uint)r.GetInt64(15)
 					},
-					DisplayKnubot = r.IsDBNull(17)
+					DisplayKnubot = r.IsDBNull(16)
 						? null
-						: (uint)r.GetInt64(17)
+						: (uint)r.GetInt64(16)
 				};
 
 				// The geometry record always names an RDB asset (1010030 MESHINDEXFILE / 1010001 RenderMesh /

@@ -25,9 +25,7 @@ namespace Faolan.Core.Network.Codecs.World
 			row.Name = message.Name;
 			WorldObjectDisplay.TryApply(row, message.DisplayName);
 			row.CarsGroup = message.CarsGroup;
-			row.IsClosed = message.ShouldSerializeIsClosed()
-				? message.IsClosed
-				: null;
+			// field 12 ("is closed") is deliberately NOT lifted - it is live door state, not a placement (#598).
 			row.ShowPopupOnUse = message.ShouldSerializeShowPopupOnUse()
 				? message.ShowPopupOnUse
 				: null;
@@ -90,7 +88,15 @@ namespace Faolan.Core.Network.Codecs.World
 		// on world dynels; the nullable columns are emitted only when present, reproducing the captured field-set.
 		// Stays here, not on WorldObject: the entity is a plain Core.Database row, and wire/protobuf construction is
 		// the codec's job - putting it on the row would couple the DB layer to the protobuf message type.
-		public static ProtoSimpleDynelIIR ToMessage(WorldObject row)
+		//
+		// `isClosed` is the object's LIVE door state and has no column (#598): no capture is evidence of a door's
+		// placement, only of what it was doing when the packet was sent - the map 4020 "Wharf Door" is captured closed
+		// in one session and open in another. It defaults to CLOSED, which is the resting state and what all 2400
+		// shipped objects were captured in, so nothing on the wire changes; the live world overrides it per object
+		// (LiveWorldObject.IsClosed) and the byte-exact lift below passes the reading of the record it is comparing
+		// against. Field 12 is written only when closed - retail OMITS it on an open door, which is why the column it
+		// used to live in was `bool?` and why "absent" needs no separate flag.
+		public static ProtoSimpleDynelIIR ToMessage(WorldObject row, bool isClosed = true)
 		{
 			var message = new ProtoSimpleDynelIIR
 			{
@@ -99,8 +105,8 @@ namespace Faolan.Core.Network.Codecs.World
 				DisplayName = WorldObjectDisplay.ToWire(row),
 				CarsGroup = row.CarsGroup
 			};
-			if (row.IsClosed.HasValue)
-				message.IsClosed = row.IsClosed.Value;
+			if (isClosed)
+				message.IsClosed = true;
 			if (row.ShowPopupOnUse.HasValue)
 				message.ShowPopupOnUse = row.ShowPopupOnUse.Value;
 			if (row.QuestItemEffect.HasValue)
@@ -132,7 +138,10 @@ namespace Faolan.Core.Network.Codecs.World
 			}
 
 			ApplyColumns(row, message);
-			if (SimpleDynelIdentityCodec.Build(ToMessage(row)).AsSpan().SequenceEqual(identity))
+			// The captured door state is fed into the comparison rather than stored (#598): every other identity field
+			// still has to rebuild byte-exact, so the lift stays all-or-nothing - it just stops persisting what the
+			// door happened to be doing in this capture.
+			if (SimpleDynelIdentityCodec.Build(ToMessage(row, message.ShouldSerializeIsClosed() && message.IsClosed)).AsSpan().SequenceEqual(identity))
 			{
 				// Columnize the geometry record that follows, and keep the lift ALL-OR-NOTHING (#410). A container's
 				// tail carries its loot CONTENTS after the geometry record; those are session state and are not
@@ -201,14 +210,14 @@ namespace Faolan.Core.Network.Codecs.World
 		// the header + transform + geometry tail. Byte-identical to the original when the columns match the captured
 		// message (proven for every captured field-shape). Returns false when the record can't be framed as a dynel or
 		// the row has no lifted identity.
-		public static bool TryReplaceIdentity(ReadOnlySpan<byte> record, WorldObject row, [NotNullWhen(true)] out byte[]? result)
+		public static bool TryReplaceIdentity(ReadOnlySpan<byte> record, WorldObject row, [NotNullWhen(true)] out byte[]? result, bool isClosed = true)
 		{
 			result = null;
 			if (row?.DisplayKind == null || !TrySplitTail(record, out _, out var geometryTail))
 				return false;
 
 			var iir = WorldObjectCodec.Parse(record);
-			result = WorldObjectCodec.Build(iir with { Tail = [.. SimpleDynelIdentityCodec.Build(ToMessage(row)), .. geometryTail] });
+			result = WorldObjectCodec.Build(iir with { Tail = [.. SimpleDynelIdentityCodec.Build(ToMessage(row, isClosed)), .. geometryTail] });
 			return true;
 		}
 

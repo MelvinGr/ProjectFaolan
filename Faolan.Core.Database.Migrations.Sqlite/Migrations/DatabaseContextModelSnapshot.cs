@@ -3715,9 +3715,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("InteractAction")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool?>("IsClosed")
-                        .HasColumnType("INTEGER");
-
                     b.Property<uint>("Kdtree")
                         .HasColumnType("INTEGER");
 

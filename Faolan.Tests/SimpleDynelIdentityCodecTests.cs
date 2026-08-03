@@ -45,7 +45,7 @@ namespace Faolan.Tests
 			WorldObjectColumns.ApplyColumns(row, msg); // importer side
 			Assert.Equal("Acheronian Ruins", row.Name);
 			Assert.Equal(1u, row.CarsGroup);
-			Assert.True(row.IsClosed);
+			// field 12 is NOT a column (#598) - it is live door state, so the rebuild below supplies it instead.
 			Assert.Null(row.QuestItemEffect); // absent on this dynel
 			Assert.Null(row.TemplateItemId);
 

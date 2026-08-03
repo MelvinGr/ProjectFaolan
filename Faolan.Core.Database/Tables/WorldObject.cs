@@ -85,18 +85,8 @@ namespace Faolan.Core.Database.Tables
 			? null
 			: new Vector3(DestinationX!.Value, DestinationY!.Value, DestinationZ!.Value); // Just throw if any are null, the DB should never have a partial position.
 
-		// proto field 12. Nullable for the same reason as ShowPopupOnUse below: ABSENT and false are different bytes
-		// and the identity rebuild is byte-compared. Almost every captured door carries it explicitly, but the map
-		// 4020 "Wharf Door" omits it - it was standing OPEN when that packet was sent - and while the column was a
-		// plain bool that one record failed the all-or-nothing lift and would have shipped un-spawnable.
-		// ⚠️ It is the one identity field that CHANGES during play, which makes it SESSION state rather than part of
-		// the definition this row is: no capture is evidence of a door's placement, only of what it was doing when
-		// the packet was sent. What IS a definition is whether the object has a door state at all - the field being
-		// present. The value belongs to the live world and should reach the client from there, the way a container's
-		// loot contents already do; that is Gitea #598. Until then this column carries the world-entry state, chosen
-		// deterministically from what the captured entries say rather than by capture filename order (#554), because
-		// the identity message is rebuilt byte-exact from these columns and field 12 sits inside it.
-		public bool? IsClosed { get; set; }
+		// (proto field 12, "is closed", is NOT a column - it is LIVE door state on LiveWorldObject; see #598 and the
+		// note on WorldObjectColumns.ToMessage.)
 
 		// proto field 4 - "using this object opens a popup". Nullable because ABSENT and false are different bytes and
 		// the identity rebuild is byte-compared: exactly one captured object sets it (the map 11040 "Siege Camp"), and
