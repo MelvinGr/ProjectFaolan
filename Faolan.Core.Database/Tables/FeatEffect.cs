@@ -60,15 +60,31 @@ namespace Faolan.Core.Database.Tables
 
 		// The modifier magnitude, in DISPLAY units.
 		//
-		// ⚠️ On the INTERPOLATED kinds this is the ramp's LOW endpoint, not the whole bonus. That element is
-		// `lerp(low@lowLevel, high@highLevel)` over the carrier's Casting/Apprentice Level - `Battle Roar` is +887 at
-		// level 20 and +17500 at 80 - and only the low endpoint fits this column, so a high-level character is
-		// under-granted. The other three slots and the ramp are Gitea #599.
+		// ⚠️ On the INTERPOLATED kinds this is only the ramp's LOW endpoint - see HighValue below.
 		//
 		// ⚠️ NOT the same convention as ItemStatModifier.Amount, which is the RAW WIRE value and must be divided by
 		// CharacterStatId.GetScale(). These are already divided: Strength (scale 10) carries 1..9 here, which as raw
 		// wire would be +0.1 Strength, and HealthMax (scale 100) carries 100..700, which as raw wire would be +1 HP.
 		// Applying the gear convention to these would silently under-grant every feat by 10x or 100x.
 		public uint Value { get; set; }
+
+		// The LEVEL RAMP the INTERPOLATED kinds carry (53220/53221/53068, Gitea #599), null on every other kind. Such
+		// an element is not a flat bonus at all: it grants `lerp(Value@LowLevel, HighValue@HighLevel)` over the
+		// carrier's level, clamped at both ends - `Battle Roar` is +887 health at level 20 and +17500 at 80. Applying
+		// Value alone under-grants by 20x at the ceiling, which is what shipped until these columns existed.
+		//
+		// Three columns rather than an owned type because the ramp is a property of the ROW, and a nullable owned
+		// entity would put the same three columns behind a navigation nothing else needs. Read them through
+		// LevelRamp - the interpolation is the client's float arithmetic and belongs in one place.
+		//
+		// ⚠️ SIGNED, unlike Value. The feat corpus happens to hold no negative endpoint, but the spell corpus does
+		// (SpellStatEffect carries -169), and both come out of the same parser; a uint column would turn that into
+		// 4.29 billion the day a feat grows one. Value's own unsignedness predates this and is the older bug.
+		public int? HighValue { get; set; }
+
+		// The two LEVELS the endpoints are reached at. Only ever 1..100 in the shipped data.
+		public uint? LowLevel { get; set; }
+
+		public uint? HighLevel { get; set; }
 	}
 }

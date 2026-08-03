@@ -27,9 +27,9 @@ namespace Faolan.Tests
 				Row(145240, CharacterStatId.NaturalManaRegen, FlatKind, 500) // a regen formation: ×100 -> +5/s
 			]);
 
-			Assert.Equal([(CharacterStatId.HitRating, 62)], catalog.BySpellBase[145213]);
-			Assert.Equal([(CharacterStatId.Armor, 1000)], catalog.BySpellBase[4239529]);
-			Assert.Equal([(CharacterStatId.NaturalManaRegen, 5)], catalog.BySpellBase[145240]);
+			Assert.Equal([Delta(CharacterStatId.HitRating, 62)], catalog.BySpellBase[145213]);
+			Assert.Equal([Delta(CharacterStatId.Armor, 1000)], catalog.BySpellBase[4239529]);
+			Assert.Equal([Delta(CharacterStatId.NaturalManaRegen, 5)], catalog.BySpellBase[145240]);
 		}
 
 		// Attributes are the one place the spell region and the item region disagree: a spell stores DISPLAY units.
@@ -42,8 +42,8 @@ namespace Faolan.Tests
 				Row(3200, CharacterStatId.Dexterity, 53045, 2) // "Dexterity Buff 2" - the client's own text says "de 2"
 			]);
 
-			Assert.Equal([(CharacterStatId.Strength, 2)], catalog.BySpellBase[5070357]);
-			Assert.Equal([(CharacterStatId.Dexterity, 2)], catalog.BySpellBase[3200]);
+			Assert.Equal([Delta(CharacterStatId.Strength, 2)], catalog.BySpellBase[5070357]);
+			Assert.Equal([Delta(CharacterStatId.Dexterity, 2)], catalog.BySpellBase[3200]);
 			Assert.Equal(1u, BuffStatEffects.SpellScale(CharacterStatId.Strength));
 			Assert.Equal(10u, CharacterStatId.Strength.GetScale()); // …while an ITEM's Strength really is ×10
 		}
@@ -59,7 +59,7 @@ namespace Faolan.Tests
 			]);
 
 			Assert.Empty(catalog.BySpellBase);
-			Assert.Equal([(CharacterStatId.CriticalRating, 200)], catalog.PercentBySpellBase[4331123]);
+			Assert.Equal([Delta(CharacterStatId.CriticalRating, 200)], catalog.PercentBySpellBase[4331123]);
 			Assert.Equal(1, catalog.KindSkipped);
 		}
 
@@ -132,6 +132,46 @@ namespace Faolan.Tests
 			BuffStatEffects.Recompute(entity, catalog);
 
 			Assert.Equal(1070u, entity.CriticalRating); // 1000 x 1.07, not 1071
+		}
+
+		// #599: the interpolated kinds are a LEVEL RAMP, so the same buff is worth different amounts to a level-20 and
+		// a level-80 carrier. The gate is on the RECOMPUTE rather than the catalog, because the catalog cannot resolve
+		// one - it has no carrier - which is the whole reason the ramp is carried into it rather than collapsed there.
+		[Theory]
+		[InlineData(5u, 1000u)]  // below the ramp: clamped to the low endpoint
+		[InlineData(10u, 1000u)] // at the low level
+		[InlineData(30u, 3000u)] // half way
+		[InlineData(50u, 5000u)] // at the high level
+		[InlineData(80u, 5000u)] // above it: clamped to the high endpoint
+		public void RampedBuff_IsWorthTheValueAtTheCarriersLevel(uint level, uint expected)
+		{
+			// A ramp shaped like the shipped ones: 1000 armor at level 10 rising to 5000 at 50. Armor's wire scale is
+			// 1, so the display value IS the raw one and this test is purely about the interpolation.
+			var catalog = BuffStatEffects.BuildCatalog([RampRow(4239529, CharacterStatId.Armor, FlatKind, 1000, 5000, 10, 50)]);
+			var entity = Player();
+			entity.Level = level;
+
+			entity.ActiveBuffs[4239529 << 8] = new ActiveBuff(4239529 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(expected, entity.ArmorRating);
+		}
+
+		// The ramp interpolates in the RAW units it was decoded in and divides by the stat's scale AFTERWARDS. Dividing
+		// the endpoints first truncates twice, and the two readings really do part company: a 550 -> 950 regen ramp
+		// (×100, so +5.5/s to +9.5/s) is +9/s nine tenths of the way up, while pre-divided endpoints of 5 and 9 give
+		// 5 + 0.9 x 4 = 8.6 -> +8/s. This is the reason a ramped row is the one shape BuildCatalog cannot pre-convert.
+		[Fact]
+		public void RampedBuff_ScalesAfterInterpolatingNotBefore()
+		{
+			var catalog = BuffStatEffects.BuildCatalog([RampRow(145240, CharacterStatId.NaturalManaRegen, FlatKind, 550, 950, 20, 60)]);
+			var entity = Player();
+			entity.Level = 56; // nine tenths of the way from 20 to 60
+
+			entity.ActiveBuffs[145240 << 8] = new ActiveBuff(145240 << 8, entity.Handle, System.DateTimeOffset.UtcNow, 10f);
+			BuffStatEffects.Recompute(entity, catalog);
+
+			Assert.Equal(9u, entity.NaturalManaRegen); // (550 + 0.9 x 400) / 100 = 909 / 100 = 9, not 8
 		}
 
 		// A flat record on a stat whose scale we have not verified is imported but inert - counted, not guessed at.
@@ -417,6 +457,23 @@ namespace Faolan.Tests
 				EffectKind = kind,
 				Amount = amount
 			};
+		}
+
+		// A ramped row (#599): `Amount` is the ramp's LOW endpoint and the other three columns carry the rest.
+		private static SpellStatEffect RampRow(uint spellId, CharacterStatId stat, uint kind, int low, int high, uint lowLevel, uint highLevel)
+		{
+			var row = Row(spellId, stat, kind, low);
+			row.HighAmount = high;
+			row.LowLevel = lowLevel;
+			row.HighLevel = highLevel;
+			return row;
+		}
+
+		// The catalog entry a flat row builds - spelled out so the assertions above stay about the AMOUNT rather than
+		// about the shape the catalog happens to hold it in.
+		private static BuffStatEffects.Delta Delta(CharacterStatId stat, int amount)
+		{
+			return new BuffStatEffects.Delta(stat, amount);
 		}
 	}
 }

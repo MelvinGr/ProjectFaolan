@@ -26,6 +26,15 @@ namespace Faolan.Core.Rdb
 		{
 			return System.Array.IndexOf(Keys, key);
 		}
+
+		/// <summary>
+		///     True when this type carries the INTERPOLATED family's four ramp slots - the two VALUES (174 low, 175
+		///     high) and the two LEVELS they are reached at (172 low, 173 high). Asked of the key list rather than of
+		///     a kind allowlist, so a fourth ramp type registered later is one automatically. See
+		///     <see cref="LevelRamp" />.
+		/// </summary>
+		public bool IsLevelRamp => SlotOf(GameActionTypes.KeyLowValue) >= 0 && SlotOf(GameActionTypes.KeyHighValue) >= 0
+		                                                                   && SlotOf(GameActionTypes.KeyLowLevel) >= 0 && SlotOf(GameActionTypes.KeyHighLevel) >= 0;
 	}
 
 	// The client's GameAction type catalog, recovered STATICALLY from the initialiser FUN_008bdf40
@@ -53,6 +62,12 @@ namespace Faolan.Core.Rdb
 		public const int KeyLowValue = 174;
 		public const int KeyLowLevel = 172;
 		public const int KeyHighLevel = 173;
+
+		// The ramp's HIGH endpoint. Deliberately an ALIAS of KeyAmount rather than a second constant: it is the same
+		// slot, and the two names are the two things the client calls it - `Amount` in its descriptor (which on the
+		// plain `ModifyAsRating` really is a percentage) and the ramp's upper value in its apply code. Reading a ramp
+		// through `KeyAmount` compiles to the same thing and reads as the wrong unit.
+		public const int KeyHighValue = KeyAmount;
 
 		// The TEXT slots (see <see cref="TextKeys" />). 209 is the one every string-carrying type uses; 210 is the
 		// second string on `GenerateName` and `NewTextEffect`, the only two types that carry both.

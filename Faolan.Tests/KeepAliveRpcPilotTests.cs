@@ -51,7 +51,10 @@ namespace Faolan.Tests
 			var low = body.ReadUInt32();
 			var first = ((ulong)high << 32) | low;
 			Assert.Equal(0u, high);
-			Assert.InRange(first, 1uL, (ulong)TimeSpan.FromHours(1).TotalMicroseconds);
+			// Lower bound is 0, not 1: two reads of a monotonic clock inside one tick legitimately return the same
+			// value, so a freshly started process can genuinely be up 0 microseconds. A BACKWARDS run is what this
+			// gate is for, and that shows up as a huge unsigned value the upper bound catches.
+			Assert.InRange(first, 0uL, (ulong)TimeSpan.FromHours(1).TotalMicroseconds);
 
 			await KeepAliveService.HandleLatencyCheck(client, incoming, incoming.BodyReader());
 			var second = Rpc.Parse(client.Sent!).BodyReader();

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Rdb;
 using Faolan.GameServer.World;
 using Microsoft.Extensions.Logging;
 
@@ -48,10 +49,15 @@ namespace Faolan.GameServer.Combat
 		// 10000 -> 12000 for a +20% effect, i.e. 10000 IS 1.00.
 		private const int PercentScale = 10000;
 
-		// The kinds whose Amount is a FLAT addition (as opposed to a percent modifier or a health effect). Classified
+		// The kinds whose Amount ADDS to the stat (as opposed to a percent modifier or a health effect). Classified
 		// empirically over all 1714 imported records: these carry values that read as flat in their own units against
 		// the spell's rank ladder and the client's description text (Fend +1000 Armor / +500 Protection, Battle Cry
 		// +62 Hit Rating, "Augmente la Dextérité de 1" for the 0x32E=1 record).
+		//
+		// ⚠️ 53220/53221 are additive but NOT flat: they are a LEVEL RAMP whose Amount is only the low endpoint, and
+		// the row's three ramp columns carry the rest (#599). Honored through LevelRamp at the carrier's level - see
+		// Delta.At. Their percent twin 53068 `InterpolatedModifyAsRating` is deliberately absent, for the same reason
+		// 53067 is: a percentage is not an addition.
 		private static readonly HashSet<uint> FlatKinds = [53045, 53189, 53220, 53221];
 
 		// The stats a flat record is applied for: where the live value lands, and what the client is TOLD. A stat is here
@@ -105,13 +111,14 @@ namespace Faolan.GameServer.Combat
 			_logger = logger;
 		}
 
-		// The honored deltas a buff carries, in display units. Empty for a spell with no region, or one whose records
-		// are all percent / health / unmodelled-stat.
-		public async Task<IReadOnlyList<(CharacterStatId Stat, int Amount)>> ForSpellBase(uint spellBase)
+		// The honored deltas a buff carries, in display units, resolved for a carrier of the given level (a level ramp
+		// is worth more the higher the carrier - #599). Empty for a spell with no region, or one whose records are all
+		// percent / health / unmodelled-stat.
+		public async Task<IReadOnlyList<(CharacterStatId Stat, int Amount)>> ForSpellBase(uint spellBase, uint level)
 		{
 			var catalog = await EnsureLoaded();
 			return catalog.BySpellBase.TryGetValue(spellBase, out var deltas)
-				? deltas
+				? [.. deltas.Select(d => (d.Stat, d.At(level)))]
 				: [];
 		}
 
@@ -127,8 +134,8 @@ namespace Faolan.GameServer.Combat
 		// amount to display units. Also reports what was dropped, so the load summary can say how big the gap is.
 		internal static Catalog BuildCatalog(IEnumerable<SpellStatEffect> rows)
 		{
-			var honored = new Dictionary<uint, List<(CharacterStatId Stat, int Amount)>>();
-			var percent = new Dictionary<uint, List<(CharacterStatId Stat, int Amount)>>();
+			var honored = new Dictionary<uint, List<Delta>>();
+			var percent = new Dictionary<uint, List<Delta>>();
 			int percentSkipped = 0, kindSkipped = 0, statSkipped = 0;
 			foreach (var row in rows)
 			{
@@ -150,17 +157,21 @@ namespace Faolan.GameServer.Combat
 					continue;
 				}
 
-				// A percentage is NOT in the stat's units - it is x100 of a percent - so it is carried raw, while a flat
-				// amount converts to display units here.
-				(isPercent
-					? percent.TryGetValue(row.SpellId, out var list)
-						? list
-						: percent[row.SpellId] = []
-					: honored.TryGetValue(row.SpellId, out list)
-						? list
-						: honored[row.SpellId] = []).Add((row.StatId, isPercent
+				// A percentage is NOT in the stat's units - it is x100 of a percent - so it is carried raw, while a
+				// flat amount converts to display units here.
+				//
+				// ⚠️ A RAMPED row carries BOTH endpoints raw and converts AFTER the interpolation instead (Delta.At),
+				// because the lerp is the client's float arithmetic over the raw endpoints: dividing them first
+				// rounds twice, and the two disagree by one over most of a ramp's span.
+				var ramp = !isPercent && row is { HighAmount: { } high, LowLevel: { } low, HighLevel: { } top }
+					? new LevelRamp(row.Amount, high, low, top)
+					: (LevelRamp?)null;
+				var delta = new Delta(row.StatId, isPercent || ramp is not null
 					? row.Amount
-					: row.Amount / (int)SpellScale(row.StatId)));
+					: row.Amount / (int)SpellScale(row.StatId), ramp);
+
+				var into = isPercent ? percent : honored;
+				(into.TryGetValue(row.SpellId, out var list) ? list : into[row.SpellId] = []).Add(delta);
 			}
 
 			return new Catalog(honored.ToDictionary(kv => kv.Key, kv => kv.Value.ToArray()),
@@ -175,10 +186,15 @@ namespace Faolan.GameServer.Combat
 			// Sum each kind of delta over every live buff. The ActiveBuffs key is the WIRE id ((base << 8) | rank).
 			var flat = new Dictionary<CharacterStatId, int>();
 			var percent = new Dictionary<CharacterStatId, int>();
+			//
+			// The carrier's LEVEL is what resolves a ramped delta (#599) - the same buff is worth +887 health on a
+			// level-20 character and +17500 on a level-80 one - so a level change has to re-run this. It already
+			// does: RebaseFromAttributes below is driven off the same entity.Level.
+			var level = entity.Level;
 			foreach (var buffId in entity.ActiveBuffs.Keys)
 			{
-				Sum(catalog.BySpellBase, buffId >> 8, flat);
-				Sum(catalog.PercentBySpellBase, buffId >> 8, percent);
+				Sum(catalog.BySpellBase, buffId >> 8, flat, level);
+				Sum(catalog.PercentBySpellBase, buffId >> 8, percent, level);
 			}
 
 			// #584: the ATTRIBUTES are resolved and pushed into the entity FIRST, before the loop below, because the
@@ -254,13 +270,13 @@ namespace Faolan.GameServer.Combat
 					: 0;
 			}
 
-			static void Sum(IReadOnlyDictionary<uint, (CharacterStatId Stat, int Amount)[]> from, uint spellBase, Dictionary<CharacterStatId, int> into)
+			static void Sum(IReadOnlyDictionary<uint, Delta[]> from, uint spellBase, Dictionary<CharacterStatId, int> into, uint level)
 			{
 				if (!from.TryGetValue(spellBase, out var deltas))
 					return;
 
-				foreach (var (stat, amount) in deltas)
-					into[stat] = into.GetValueOrDefault(stat) + amount;
+				foreach (var delta in deltas)
+					into[delta.Stat] = into.GetValueOrDefault(delta.Stat) + delta.At(level);
 			}
 		}
 
@@ -302,11 +318,29 @@ namespace Faolan.GameServer.Combat
 			}
 		}
 
+		// One honored delta a spell carries: which stat, and what it is worth. Not a bare amount because a delta is
+		// either a constant or a LEVEL RAMP (#599), and only the carrier's level tells the two apart at the point of
+		// use - see <see cref="Delta.At" />.
+		internal readonly record struct Delta(CharacterStatId Stat, int Amount, LevelRamp? Ramp = null)
+		{
+			// The delta's value for a carrier of this level, in the units the catalog stores for this kind: DISPLAY
+			// units for a flat row (already divided at build time), raw hundredths for a percent one.
+			//
+			// A ramp interpolates in the RAW units it was decoded in and divides afterwards, which is why it is the
+			// one shape the build could not pre-convert.
+			public int At(uint level)
+			{
+				return Ramp is { } ramp
+					? ramp.ValueAt(level) / (int)SpellScale(Stat)
+					: Amount;
+			}
+		}
+
 		// The honored deltas per spell base id - flat ones in DISPLAY units, percent ones raw (x100 of a percent) -
 		// plus what the filter dropped and why.
 		internal readonly record struct Catalog(
-			IReadOnlyDictionary<uint, (CharacterStatId Stat, int Amount)[]> BySpellBase,
-			IReadOnlyDictionary<uint, (CharacterStatId Stat, int Amount)[]> PercentBySpellBase,
+			IReadOnlyDictionary<uint, Delta[]> BySpellBase,
+			IReadOnlyDictionary<uint, Delta[]> PercentBySpellBase,
 			int PercentSkipped,
 			int KindSkipped,
 			int StatSkipped);

@@ -38,5 +38,16 @@ namespace Faolan.Core.Database.Tables
 		public uint EffectKind { get; set; }
 
 		public int Amount { get; set; }
+
+		// The LEVEL RAMP the INTERPOLATED kinds carry (53220/53221/53068, Gitea #599), null on every other kind - the
+		// same three columns, the same meaning and the same reader as FeatEffect's, because it is the same GameAction
+		// element parsed by the same code. `Amount` is then only the ramp's LOW endpoint: the record grants
+		// `lerp(Amount@LowLevel, HighAmount@HighLevel)` over the carrier's level, clamped at both ends, so honoring
+		// Amount alone under-grants every character above LowLevel. Interpolate through LevelRamp.
+		public int? HighAmount { get; set; }
+
+		public uint? LowLevel { get; set; }
+
+		public uint? HighLevel { get; set; }
 	}
 }

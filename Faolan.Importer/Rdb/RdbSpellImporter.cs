@@ -142,7 +142,7 @@ namespace Faolan.Importer.Rdb
 			var toAdd = new List<Spell>();
 			// #367: (spellId -> stat deltas) from the [2][9] region, synced into SpellStatEffects after the spells save.
 			// Inner map dedups a stat the region lists twice (last == authoritative write wins, as for items).
-			var statEffects = new Dictionary<uint, Dictionary<uint, (uint Kind, int Amount)>>();
+			var statEffects = new Dictionary<uint, Dictionary<uint, (uint Kind, int Amount, LevelRamp? Ramp)>>();
 
 			var seen = 0;
 			var inserted = 0;
@@ -214,9 +214,9 @@ namespace Faolan.Importer.Rdb
 				var mods = ItemTemplateStatModifiers.Parse(body.AsSpan(12));
 				if (mods.Count > 0)
 				{
-					var deltas = new Dictionary<uint, (uint Kind, int Amount)>();
+					var deltas = new Dictionary<uint, (uint Kind, int Amount, LevelRamp? Ramp)>();
 					foreach (var m in mods)
-						deltas[m.StatId] = (m.Kind, (int)m.WireAmount); // last write wins on a repeated stat
+						deltas[m.StatId] = (m.Kind, (int)m.WireAmount, m.Ramp); // last write wins on a repeated stat
 					statEffects[entry.Id] = deltas;
 				}
 
@@ -298,7 +298,11 @@ namespace Faolan.Importer.Rdb
 					SpellId = spellId,
 					StatId = (CharacterStatId)statId,
 					EffectKind = effect.Kind,
-					Amount = effect.Amount
+					Amount = effect.Amount,
+					// Null on every kind but the interpolated family (#599).
+					HighAmount = effect.Ramp?.HighValue,
+					LowLevel = effect.Ramp?.LowLevel,
+					HighLevel = effect.Ramp?.HighLevel
 				});
 				effectRows++;
 			}

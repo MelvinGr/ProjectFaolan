@@ -283,9 +283,25 @@ runs `26@10 → 42@24`, `44@25 → 60@39`, `62@40 → 78@54`, `80@55 → 96@69`
 (`--report feat-effect-kinds --report-arg 1040005/53220`).
 
 This is why an element's magnitude cannot be taken positionally: word 1 is the ramp's LOW endpoint here and the
-whole magnitude on `Modify`. `ItemTemplateStatModifiers.ParseStatModifiers` reads by key and takes `174` for this
-family, which under-grants a character above `172` rather than mis-granting one; applying the ramp itself is
-Gitea #599.
+whole magnitude on `Modify`. `ItemTemplateStatModifiers.ParseStatModifiers` reads by key and returns the whole
+ramp beside that endpoint (`Modifier.Ramp`); `LevelRamp.ValueAt` is the lerp above, and `FeatEffect` /
+`SpellStatEffect` carry the other three slots as nullable columns.
+
+### The mode word `element[0x40]` is NOT in the template
+
+`FUN_008c3970` picks between stat `150` and stat `965` on `element[0x40]`, and that word is **not a slot of the
+record** — it is word 0 of a **9-word invocation context** the GameAction is constructed with. `GameActionBase`'s
+constructor `FUN_0089b390` block-copies those nine words into the live object at `+0x40`…`+0x60`
+(`for (iVar6 = 9; ...) *puVar8 = *puVar7;` with `puVar8 = param_1 + 0x10`, i.e. byte offset `0x40`), and the RDB
+deserializer `FUN_00899a60` never writes them: everything it reads goes into the key-addressed maps at `+0x1c` /
+`+0x2c` / `+0x3c`, plus the four always-present ids `0x2d5`/`0x2d6`/`0x2f2`/`0x2f5`.
+
+The word is generic, not interpolation-specific — the plain `ModifySkill` apply `FUN_0089dfd0` reads the same
+`[+0x40]` through the **same** `1→3, 3→2, 4→1, 5→4` switch before calling the stat sink `FUN_007186a0`, and it is
+mode `1` alone that takes the `GetOnCasterModifyPercent` / `GetOnTargetModifyPercent` branch. So mode 1 is the
+CAST path, which is why it is the mode that ramps over `Casting Level` while every other mode uses `Apprentice
+Level`. Both resolve to the character's level on a server that does not model mentoring, so there is nothing to
+import and nothing to store.
 
 ## RE session 2026-07-10: element wire structure confirmed; both lookup tables are RUNTIME-built
 

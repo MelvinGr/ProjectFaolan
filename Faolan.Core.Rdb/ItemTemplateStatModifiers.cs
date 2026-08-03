@@ -170,11 +170,11 @@ namespace Faolan.Core.Rdb
 		///         `SpellLineStatModifier` / `TargetSpellLineStatModifier`, which have their own table (#593).</item>
 		///     </list>
 		///     <para>
-		///         ⚠️ For the INTERPOLATED kinds the magnitude returned is the value at the ramp's LOW level, not a
+		///         ⚠️ For the INTERPOLATED kinds <c>WireAmount</c> is the value at the ramp's LOW level, not a
 		///         level-independent bonus: the record is `lerp(low@lowLevel, high@highLevel)` over the carrier's
-		///         Casting/Apprentice Level (docs/re/gameactionlist-grammar.md). It is the same word the positional
-		///         reader happened to return, so nothing shifts by adopting this - but a consumer applying it to a
-		///         high-level character under-grants. Modelling the ramp is Gitea #599.
+		///         level (docs/re/gameactionlist-grammar.md). Applying it alone under-grants everyone above that
+		///         level, so <see cref="Modifier.Ramp" /> carries the whole ramp beside it - resolve it through
+		///         <see cref="LevelRamp.ValueAt" /> rather than reading the magnitude flat.
 		///     </para>
 		/// </summary>
 		public static IReadOnlyList<Modifier> ParseStatModifiers(ReadOnlySpan<byte> body)
@@ -190,7 +190,7 @@ namespace Faolan.Core.Rdb
 				if (stat is null or 0 or >= MaxStatId || amount is null)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value));
+				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value, e.Ramp));
 			}
 
 			return mods;
@@ -206,7 +206,7 @@ namespace Faolan.Core.Rdb
 				if (statId == 0 || statId < MaxStatId != inStatRange)
 					continue;
 
-				mods.Add(new Modifier(e.Kind, statId, e.Second));
+				mods.Add(new Modifier(e.Kind, statId, e.Second, e.Ramp));
 			}
 
 			return mods;
@@ -225,7 +225,12 @@ namespace Faolan.Core.Rdb
 		// ⚠️ This is the PAIR view: the first two payload words, which is (stat, value) for the plain modifier kinds
 		// and something else for the rest - a `SpellStatModifier` puts the SPELL first and the stat second. Reach for
 		// <see cref="Element" /> when the kind is not known to be a plain modifier.
-		public readonly record struct Modifier(uint Kind, uint StatId, uint WireAmount);
+		//
+		// `Ramp` is non-null exactly for the INTERPOLATED kinds, whose `WireAmount` is only the ramp's LOW endpoint -
+		// a consumer that applies it flat under-grants everyone above that level (Gitea #599). It carries the whole
+		// ramp, low endpoint included, so a caller never has to pair it back up with `WireAmount` (and cannot get the
+		// signedness wrong doing so: the low value is signed and `WireAmount` is not).
+		public readonly record struct Modifier(uint Kind, uint StatId, uint WireAmount, LevelRamp? Ramp = null);
 
 		/// <summary>
 		///     One whole GameAction element: its type id and one value per key of that type's key list, in key order
@@ -253,6 +258,30 @@ namespace Faolan.Core.Rdb
 			{
 				var slot = Type?.SlotOf(key) ?? -1;
 				return slot >= 0 && slot < Values.Length ? Values[slot] : null;
+			}
+
+			/// <summary>
+			///     The LEVEL RAMP this element carries, or null when its type is not one of the interpolated family
+			///     (<see cref="GameActionType.IsLevelRamp" />) or the body ran out before all four slots were read.
+			///     The two values are SIGNED - a spell ramp's low endpoint really is negative in the shipped data
+			///     (`-169`), which reading them as `uint` turns into 4.29 billion.
+			/// </summary>
+			public LevelRamp? Ramp
+			{
+				get
+				{
+					if (Type is not { IsLevelRamp: true })
+						return null;
+
+					var low = Value(GameActionTypes.KeyLowValue);
+					var high = Value(GameActionTypes.KeyHighValue);
+					var lowLevel = Value(GameActionTypes.KeyLowLevel);
+					var highLevel = Value(GameActionTypes.KeyHighLevel);
+
+					return low is null || high is null || lowLevel is null || highLevel is null
+						? null
+						: new LevelRamp((int)low.Value, (int)high.Value, lowLevel.Value, highLevel.Value);
+				}
 			}
 
 			/// <summary>

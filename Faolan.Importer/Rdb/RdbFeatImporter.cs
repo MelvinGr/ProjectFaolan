@@ -254,13 +254,19 @@ namespace Faolan.Importer.Rdb
 			{
 				for (var i = 0; i < list.Count; i++)
 				{
+					// The ramp is null on every kind but the interpolated family, so these three columns are null on
+					// all but ~340 of the 23k rows (#599).
+					var ramp = list[i].Ramp;
 					db.FeatEffects.Add(new FeatEffect
 					{
 						FeatId = featId,
 						Sequence = i,
 						StatId = (CharacterStatId)list[i].StatId,
 						EffectKind = list[i].Kind,
-						Value = list[i].WireAmount
+						Value = list[i].WireAmount,
+						HighValue = ramp?.HighValue,
+						LowLevel = ramp?.LowLevel,
+						HighLevel = ramp?.HighLevel
 					});
 					effectRows++;
 				}

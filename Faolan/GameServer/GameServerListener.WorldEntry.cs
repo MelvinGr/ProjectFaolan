@@ -517,7 +517,7 @@ namespace Faolan.GameServer
 			// nodes, so their feat contribution is a true zero. Do not read an empty result here as missing data.
 			var statBonuses = MaxStatAggregator.Combine(
 				MaxStatAggregator.AggregateGearBonuses(await Database.GetEquippedStatItems(character.Id, character.ActiveWeaponSet)),
-				MaxStatAggregator.AggregateFeatBonuses(await Database.GetCharacterFeatEffects(character.Id)));
+				MaxStatAggregator.AggregateFeatBonuses(await Database.GetCharacterFeatEffects(character.Id), character.Level));
 			// #444: the class/level BASE the character's attributes start from. The client computes this locally (retail
 			// sends a flat 10 for every attribute), so it is decoded data, not wire data - see ClassAttributeBaseModule.
 			var classBase = await Database.GetClassAttributeBase(character.Class, character.Level);

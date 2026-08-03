@@ -20,8 +20,10 @@ how to read `amount`**.
 
 | kind | reading | evidence |
 | --- | --- | --- |
-| 53045, 53189, 53220, 53221 | **flat** addition, in the stat's own wire scale | Fend `0x1C0`=1000 / `0x1C3`=500 (Armor/Protection, the same units a ring uses); Battle Cry: Marshal the Ranks `0x136`=44/62/80 across its rank ladder; a regen formation's `0x1F2`=500 → +5/s, matching the item-tooltip-proven ×100 |
+| 53045, 53189 | **flat** addition, in the stat's own wire scale | Fend `0x1C0`=1000 / `0x1C3`=500 (Armor/Protection, the same units a ring uses); Battle Cry: Marshal the Ranks `0x136`=44/62/80 across its rank ladder; a regen formation's `0x1F2`=500 → +5/s, matching the item-tooltip-proven ×100 |
+| 53220, 53221 | a **LEVEL RAMP** in the stat's own wire scale - `Amount` is only its LOW endpoint | the record carries four slots, not one: `lerp(174 @ 172, 175 @ 173)` over the carrier's level, decompiled from the client's apply ([gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). `Runed Flesh`'s ranks tile the level line 25-40 / 40-55 / 55-70 / 70-80 with values continuous across each seam. Carried as `SpellStatEffect.HighAmount` / `LowLevel` / `HighLevel` and resolved by `LevelRamp.ValueAt` |
 | 53067 | **percent × 100** | Philtre of Guile `0x138`=200, Refined Philtre of Guile `0x138`=500 - and the client's own elixir descriptions read "boost the Character's total Critical Rating by an additional **2%** / **5%**". The same 2/5 and 10/20 tiering recurs across every 53067 consumable |
+| 53068 | the **percent twin of the ramp** - percent × 100 at both endpoints | `InterpolatedModifyAsRating` is to 53067 what 53220 is to 53045: same four ramp slots, percentage units. One shipped row, on a dev test spell, and its element is too short to read the ramp from - imported but never honored |
 | 53219, 53002, 53007, 53013 | a **health effect**, not a buff stat | they only ever carry `0x1B` (Health): Lifestrike R1-R5 = 3400…33700 (an instant heal, `DurationMs` 0), and the `-100000000` drain/kill sentinel on non-buff spells |
 | 53110, 53162, … | unclassified | no evidence either way yet |
 

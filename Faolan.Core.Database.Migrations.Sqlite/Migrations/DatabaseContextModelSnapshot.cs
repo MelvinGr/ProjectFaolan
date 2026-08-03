@@ -1370,6 +1370,15 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("EffectKind")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint?>("HighLevel")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("HighValue")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("LowLevel")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint>("StatId")
                         .HasColumnType("INTEGER");
 
@@ -3430,6 +3439,15 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("EffectKind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("HighAmount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("HighLevel")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("LowLevel")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("SpellId", "StatId");

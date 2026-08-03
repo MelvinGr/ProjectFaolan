@@ -132,6 +132,11 @@ namespace Faolan.Tests
 			Assert.Equal([280u, 1u], mods.Select(m => m.StatId));
 			Assert.Equal([2000u, 887u], mods.Select(m => m.WireAmount));
 
+			// …and the interpolated one carries the whole RAMP beside its low endpoint (#599), while the plain
+			// `Modify` carries none - `Ramp` is what tells the two apart without a kind allowlist at the call site.
+			Assert.Null(mods[0].Ramp);
+			Assert.Equal(new LevelRamp(887, 17500, 20, 80), mods[1].Ramp);
+
 			// ...where the positional view keeps four of the five, two of them nonsense - including the +4232751
 			// health. The one it does drop, `SpellStatModifier`, it drops only because that spell id happens to
 			// exceed the stat-id bound: a smaller one would have sailed through as a stat.
