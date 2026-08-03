@@ -1242,16 +1242,30 @@ namespace Faolan.Importer.Captures
 			{
 				// Delete by DERIVED id, not by a positional match: the id IS the identity (map + position + display
 				// reference), so "the harvest did not yield this row" is exactly "no built row computed this id".
-				// WorldObjectWords cascades, and the enrichment columns other modules own (DestinationMapId,
-				// InteractAction, the quest gates) live on rows the harvest DOES yield, so they are untouched.
+				// WorldObjectWords cascades.
+				//
+				// ⚠️ "The enrichment columns other modules own live on rows the harvest DOES yield" is NOT true, and
+				// this is the reason the mode is still not safe to fire blind on the shipped table (#481). Measured
+				// 2026-08-03 against the 120-capture corpus: 2400 stored vs 2313 harvested = 87 orphans, of which
+				//   * 84 have an EXACT name+position twin on another map - the same object filed under two playfield
+				//     ids, which is what map-tracking residue looks like;
+				//   * 3 are item-named drop dynels with no captured "[TAG]" identity (Girdle of Erlik x2, one glove) -
+				//     the same transient class the TemplateItemId 13782 purge above targets, missed because that
+				//     purge keys on the loot-bag template rather than on "names an item and carries no tag".
+				// So none of them is unique CONTENT - but the twin is not always the row to keep. `Ymir's Pass` on map
+				// 1092 is an orphan carrying InteractAction=ProxyTeleport -> 1090, while its 1090 twin carries neither,
+				// and map 1092 is demonstrably a real place: the table holds the RECIPROCAL zone line (1090
+				// "Amphitheatre of Karutonia" -> 1092). The table has 22 enriched doors and a world-teleports re-run
+				// reproduces only 18, so an overwrite + re-enrich does not restore all of them.
 				var live = pending.Keys.ToHashSet();
 				var orphans = await db.WorldObjects.Where(o => !live.Contains(o.Id)).ToListAsync();
 				if (orphans.Count > 0)
 				{
 					// Print every row, with the columns that say whether it is residue or content. ⚠️ Read this list
 					// before trusting the mode: an "orphan" is only junk if the CURRENT corpus is a superset of the one
-					// that built the table. Ours is not - see the warning on the method - so most of these are real
-					// props from captures that no longer exist, not stale rows.
+					// that built the table, and ours is not. On the shipped table they are cross-map duplicates rather
+					// than lost content (see above) - but which member of a pair is the correct one is decided per map
+					// pair, not by the harvest alone.
 					foreach (var o in orphans.OrderBy(o => o.MapId).ThenBy(o => o.Name))
 						Console.WriteLine($"  ORPHAN map {o.MapId} subop 0x{o.SubOpcode:X8} act={o.InteractAction} dest={o.DestinationMapId?.ToString() ?? "-"} eq={o.EffectQuestId?.ToString() ?? "-"} gq={o.GateQuestId?.ToString() ?? "-"} tmpl={o.TemplateItemId?.ToString() ?? "-"} :: {o.Name ?? o.GeometryName ?? "?"}");
 
