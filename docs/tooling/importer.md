@@ -215,8 +215,13 @@ TYPE, of the PLACEMENT, or of neither? Two `GROUP BY` tables over retail's own l
 `npc_stats.TemplateId`, then by physical map+position. A field no more stable at placement scope than at type
 scope is rolled per SPAWN EVENT and no column can hold it, which is how `VoiceSet` (9.7% / 11.7%),
 `AnimIdleTimer` (50.2% / 45.2%) and `MovementMode` (59.0% / 60.6%) were told apart from the vitals block
-(73.7% / 90.8%), whose `NpcSpawn` columns are the right home. ⚠️ The key is the TemplateId and not the name — a
-name spans several templates, and a field cannot be less stable than the key it is grouped by),
+(73.7% / 90.8%), whose `NpcSpawn` columns are the right home. A third table then gives the VALUE DISTRIBUTION of
+the fields the first two condemn — knowing a field is rolled per event says a column cannot hold it, not what we
+should send instead. ⚠️ The key is the TemplateId and not the name — a name spans several templates, and a field
+cannot be less stable than the key it is grouped by. ⚠️ Read the third table by FREQUENCY, never by distinct-value
+count: 92 of `AnimIdleTimer`'s 94 distinct values lie strictly between 0 and 1, which reads as a continuous
+animation phase, but they carry only 24% of sightings — the field rests at exactly 0 or 1 and is merely caught
+mid-blend, and flattening it to one value cost 167 byte-exact rebuilds before the frequency view caught it),
 `scaffold-heap` (the RETAIL SERVER's own memory, harvested out of the NPC spawn scaffold: retail writes 3 of the
 53 scaffold words on an NPC spawn and sends the other 50 carrying whatever was there, so 17,400 captured spawns
 ship 3.3 MB of server-side data. Yields the script engine's ScriptGroup catalogue and C++ source-file inventory,

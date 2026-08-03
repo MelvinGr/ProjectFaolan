@@ -1597,6 +1597,74 @@ namespace Faolan.Importer.Cli
 			foreach (var s in placementScored.OrderBy(s => s.Pct).ThenBy(s => s.Field).Take(25))
 				Console.WriteLine($"{(s.Field.Length > 39 ? s.Field[..39] : s.Field),-40} {s.Stable,7} {s.Total,5}  {s.Pct,5:F1}%  {s.Worst}");
 
+			// Third table: the VALUE DISTRIBUTION of the fields the two tables above condemn. Knowing a field is
+			// rolled per spawn event says a column cannot hold it; it does not say what WE should send instead. For a
+			// clock the expected answer is 0 - but that is a measurement, not an assumption (Gitea #602 item 2), and
+			// this is the measurement: if the field is an animation PHASE, retail's own values are spread across the
+			// whole range and 0 is simply one of them, so sending 0 is inside retail's distribution rather than a
+			// value retail never sends.
+			var placementPct = placementScored.ToDictionary(s => s.Field, s => s.Pct);
+			// THREE conditions, and dropping any one of them fills the table with fields that belong in neither of the
+			// two above. `placement <= type + 2pp` is the per-spawn-event test proper; `type < 100` requires the field
+			// to BE unstable before asking at which scope; and `placement < 100` is what separates a field that varies
+			// WITHIN one placement from one that is perfectly placement-stable and merely varies between placements
+			// (`PetOwnerInstance` is 98.2% / 100.0% - the 2pp band admits it, and it is placement-scoped, not rolled).
+			var perEvent = scored
+				.Where(s => s.Pct < 100.0
+					&& placementPct.TryGetValue(s.Field, out var p)
+					&& p < 100.0
+					&& p <= s.Pct + 2.0)
+				.OrderBy(s => s.Pct)
+				.ToList();
+
+			Console.WriteLine();
+			Console.WriteLine("--- value distribution of the per-SPAWN-EVENT fields ---");
+			Console.WriteLine("A field no more stable at PLACEMENT scope than at TYPE scope (within 2pp) is rolled per spawn");
+			Console.WriteLine("event. What follows is what retail actually sends for each, so the value WE send can be chosen");
+			Console.WriteLine("from inside retail's own range rather than guessed.");
+			foreach (var s in perEvent)
+			{
+				var values = fields[s.Field].SelectMany(v => v.Value).ToList();
+				var distinct = values.Distinct(StringComparer.Ordinal).ToList();
+				var top = values.GroupBy(v => v, StringComparer.Ordinal).OrderByDescending(g => g.Count()).Take(6).ToList();
+				Console.WriteLine();
+				Console.WriteLine($"{s.Field} - type {s.Pct:F1}% / placement {placementPct[s.Field]:F1}%, {distinct.Count} distinct values");
+				Console.WriteLine($"  most common: {string.Join(", ", top.Select(g => $"{g.Key} (x{g.Count()})"))}");
+
+				// Continuous or enumerated? A clock reads as hundreds of distinct floats with no value dominating; an
+				// enum reads as a handful. That difference is what decides whether 0 is "the start of a cycle" or a
+				// state the client would have to interpret.
+				// ⚠️ TWO traps here, and the second one cost a wrong conclusion once already.
+				//
+				// (1) "parses as a float" is NOT the clock test - every integer id parses as a float, which reads
+				//     `npc_stats.TemplateId` (560 distinct ids) as a continuous phase.
+				// (2) Counting DISTINCT values is not the clock test either. `AnimIdleTimer` has 94 distinct values
+				//     of which 92 lie strictly between 0 and 1, which reads as an obviously-continuous phase - but
+				//     those 92 are seen 1-13 times each while the two ENDPOINTS are seen 264 and 269 times. Weighted
+				//     by how often retail actually sends them, the field is ~90% bimodal 0/1 with a rare transient,
+				//     not a uniformly-sampled clock. A real clock would be roughly uniform across the range.
+				//
+				// So the test is the FREQUENCY share of the strictly-interior values, never their distinct count.
+				var interior = values.Count(v => float.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var f) && f > 0 && f < 1);
+				var interiorDistinct = distinct.Count(v => float.TryParse(v, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var f) && f > 0 && f < 1);
+				if (interiorDistinct > distinct.Count / 2)
+				{
+					var share = 100.0 * interior / values.Count;
+					Console.WriteLine($"  {interiorDistinct} of {distinct.Count} distinct values lie strictly between 0 and 1, but they carry only {share:F0}% of");
+					Console.WriteLine($"  sightings: 0 is sent {values.Count(v => v == "0")}x and 1 {values.Count(v => v == "1")}x, of {values.Count}.");
+					Console.WriteLine(share > 50
+						? "  CLOCK: the interior dominates, so this is a uniformly-sampled phase and any value is as good as another."
+						: "  BIMODAL + TRANSIENT: the field RESTS at 0 or 1 and is only caught in between mid-blend. Which endpoint"
+						+ "\n  it rests at is real information - do NOT flatten it to one value.");
+				}
+				else
+				{
+					var modal = top[0];
+					Console.WriteLine($"  ENUMERATED: {distinct.Count} values, modal `{modal.Key}` on {100.0 * modal.Count() / values.Count:F0}% of spawns"
+						+ " - the resting value, and what we should send absent a reason not to.");
+				}
+			}
+
 			return;
 
 			// Flattens a protobuf message to name -> printed value, one entry per scalar leaf. Collections are

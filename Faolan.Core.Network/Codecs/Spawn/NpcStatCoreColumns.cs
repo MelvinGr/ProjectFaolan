@@ -164,6 +164,54 @@ namespace Faolan.Core.Network.Codecs.Spawn
 			return core;
 		}
 
+		/// <summary>
+		///     Resets the ACTION-ANIMATION slot to its resting value, for a core that is about to become a TYPE row.
+		///     Gitea #602.
+		///     <para>
+		///         <see cref="Lift" /> itself is faithful to the message it is handed and must stay that way - it is the
+		///         message↔columns map, and `NpcStatCoreColumnsTests.StatCore_RoundTripsByteExact` gates that it loses
+		///         nothing. The fault this fixes is one level up: a TYPE row is lifted from ONE representative spawn, so
+		///         a field that has no type-level value at all still gets one - whatever that NPC happened to be doing
+		///         at the instant it was captured - and then every other placement of the type inherits it.
+		///     </para>
+		///     <para>
+		///         The action slot is that, unambiguously. Only 31 of 1018 lifted types carry `AnimActionId` at all;
+		///         retail sends 0 on 93% of spawns, `AnimActionTimer` 0 on 92% and `AnimActionBlend` false on 95%
+		///         (`--report field-stability`, third table). So a non-zero value here means the representative was
+		///         caught PART-WAY THROUGH an emote, and nothing about the type.
+		///     </para>
+		///     <para>
+		///         ⚠️ Presence is preserved: a field is reset only where the type actually carried one, never introduced.
+		///         Nulling it instead would drop it from the rebuilt message and change the body's LENGTH, which is a
+		///         bigger divergence from retail than the value ever was.
+		///     </para>
+		///     <para>
+		///         ⚠️ `AnimIdleTimer` is deliberately NOT reset, and the reason is the whole lesson of this issue. It
+		///         looks like the clearest case: 50.2% type / 45.2% placement stability, and 92 of its 94 DISTINCT
+		///         values lie strictly between 0 and 1, which reads as an animation phase sampled at a random instant.
+		///         Weighted by how often retail actually sends them, those 92 carry only 24% of sightings - the field
+		///         RESTS at exactly 0 (264x) or exactly 1 (269x) and is merely caught in between mid-blend. Which
+		///         endpoint a type rests at is real type-level information: flattening all 1018 types to 0 dropped
+		///         `--report spawn-diff` from 340 byte-exact rebuilds to 173. Counting distinct values instead of
+		///         their frequency is what made a bimodal flag look continuous.
+		///     </para>
+		///     <para>
+		///         ⚠️ `MovementMode` (59.0/60.6) and `npc_stats.SpawnAnimation` (86.2/74.4) also measure as
+		///         per-spawn-event, and are also left alone - neither has a resting value clear enough to reset TO
+		///         (MovementMode's mode carries 69% of spawns), and picking the mode would be the same guess this
+		///         method exists to remove. Tracked separately.
+		///     </para>
+		/// </summary>
+		public static void ClearPerSpawnEventState(NpcStatCore core)
+		{
+			if (core.AnimActionTimer.HasValue)
+				core.AnimActionTimer = 0;
+			if (core.AnimActionId.HasValue)
+				core.AnimActionId = 0;
+			if (core.AnimActionBlend.HasValue)
+				core.AnimActionBlend = false;
+		}
+
 		// Reads the CoreCharacter-IIR header word X out of a captured FA015807 body (#244): the embedded message is
 		// preceded by [u8 0x41 version][u32 X][u32 msgLen], and X is a type-stable field-presence/shape mask lifted
 		// so the header can be rebuilt from the DB. Returns null when the body is not a decodable spawn.

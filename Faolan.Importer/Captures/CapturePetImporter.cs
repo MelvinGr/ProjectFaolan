@@ -67,7 +67,12 @@ namespace Faolan.Importer.Captures
 				var body = WorldObjectColumns.ExtractBody(e.Data);
 				if (body != null && SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 				{
-					type.StatCore ??= NpcStatCoreColumns.Lift(read.Message);
+					// Per-spawn-event runtime state must not become the TYPE's definition of itself (#602).
+					if (type.StatCore == null)
+					{
+						type.StatCore = NpcStatCoreColumns.Lift(read.Message);
+						NpcStatCoreColumns.ClearPerSpawnEventState(type.StatCore);
+					}
 					type.StatCore.IirHeader ??= NpcStatCoreColumns.ReadIirHeaderWord(body);
 					if (type.StatCore.MinimalPostIirWord2 == null && NpcSpawnAppearance.TryReadNoMorphWord2(body, out var rc))
 						type.StatCore.MinimalPostIirWord2 = rc;

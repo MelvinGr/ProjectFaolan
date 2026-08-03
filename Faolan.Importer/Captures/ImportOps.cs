@@ -2075,7 +2075,15 @@ namespace Faolan.Importer.Captures
 					var body = WorldObjectColumns.ExtractBody(e.Data);
 					if (body != null && SpawnBodyReader.TryReadCharacterMessage(body, out var read))
 					{
-						npc.StatCore ??= NpcStatCoreColumns.Lift(read.Message);
+						// ⚠️ The core is lifted from ONE representative spawn, so anything that NPC happened to be doing
+						// at capture time would become the type's definition of itself and be inherited by every other
+						// placement (#602). ClearPerSpawnEventState resets the measured per-event fields first.
+						if (npc.StatCore == null)
+						{
+							npc.StatCore = NpcStatCoreColumns.Lift(read.Message);
+							NpcStatCoreColumns.ClearPerSpawnEventState(npc.StatCore);
+						}
+
 						npc.StatCore.IirHeader ??= NpcStatCoreColumns.ReadIirHeaderWord(body);
 					}
 				}
