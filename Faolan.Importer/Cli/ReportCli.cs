@@ -216,6 +216,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "field-stability":
+				{
+					FieldStability(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "snapshot":
 				{
 					SnapshotScan(NamedCapture.LoadAll(capturesDir));
@@ -1415,6 +1421,223 @@ namespace Faolan.Importer.Cli
 		//
 		// Repeated fields report only their COUNT - element-wise diffing them is the caller's job when it matters
 		// (worn equipment already has its own line) - and a null-vs-set sub-message is named rather than walked.
+		// --report field-stability [--report-arg <name substring>]
+		//
+		// For every field of the captured NPC CoreCharacter message: is its value a property of the NPC TYPE, or of
+		// the individual placement? Asked of retail's own bytes, with no DB involved.
+		//
+		// This is the question `--report spawn-diff` raises but cannot answer (Gitea #602). A spawn-diff difference
+		// says our value disagrees with retail's; it does not say whether the disagreement is a bad lift or a field
+		// that has no type-level value to lift. `NpcStatCoreColumns.Lift` is faithful to the message it is handed -
+		// the fault, where there is one, is that a per-PLACEMENT field was lifted to the TYPE at all, and then every
+		// placement of that type inherits whichever value the representative spawn happened to carry.
+		//
+		// The test is a GROUP BY, not a threshold: group the captured spawns by TYPE, keep the types sighted more
+		// than once, and count in how many of them the field holds one distinct value. A type-stable field is
+		// constant in ~all of them; a per-placement field is constant only where the type happens to have been
+		// sighted in one state. Reported as that ratio plus the worst offender, so "83% stable" is readable as
+		// "nearly type-stable, with a real exception to look at" rather than as a pass mark.
+		//
+		// ⚠️ The group key is retail's own `npc_stats.TemplateId`, NOT the name. Grouping by name was the first cut
+		// and it is wrong: a name spans several templates (the same report scored `TemplateId` itself at 70% stable
+		// under a name key - "Halen van Dummy" alone covers 22 of them), so every field inherits that conflation and
+		// reads as more placement-varying than it is. A field cannot be less stable than the key it is grouped by.
+		//
+		// ⚠️ Only types sighted MORE THAN ONCE can say anything: a type seen once is trivially "constant" and would
+		// inflate every field toward 100%. The single-sighting types are counted and reported separately.
+		private static void FieldStability(IReadOnlyList<NamedCapture> captures, string? filter)
+		{
+			const uint SpawnPollOpcode = 0x2020;
+
+			// field name -> npc TEMPLATE -> the distinct values seen for it
+			var fields = new SortedDictionary<string, Dictionary<uint, HashSet<string>>>(StringComparer.Ordinal);
+			var sightings = new Dictionary<uint, int>();
+			var templateNames = new Dictionary<uint, string>();
+
+			// ...and the same thing keyed by PHYSICAL PLACEMENT (map + position), which is the second half of the
+			// question and the one that decides whether a per-placement field can live in a table AT ALL. A field
+			// that varies between sightings of one placement is not placement-scoped either - it is rolled per spawn
+			// EVENT, and no column can hold it. This accumulator deliberately does NOT dedup by position: repeated
+			// sightings of one placement are exactly its evidence.
+			var byPlacement = new SortedDictionary<string, Dictionary<(uint, float, float, float), HashSet<string>>>(StringComparer.Ordinal);
+			var placementSightings = new Dictionary<(uint, float, float, float), int>();
+			var placementNames = new Dictionary<(uint, float, float, float), string>();
+			var seen = new HashSet<(uint, float, float, float)>();
+
+			foreach (var capture in captures)
+			{
+				var sawPoll = false;
+				uint map = 0;
+				foreach (var p in capture.Packets)
+				{
+					if (p is { IsIirCarrier: true, IsDownload: true, SubOpcode: PlayfieldFCodec.Opcode })
+					{
+						if (p.TryParse(PlayfieldFCodec.Parse, out var change))
+							map = change.MapId;
+
+						sawPoll = false;
+						continue;
+					}
+
+					if (p.Opcode == SpawnPollOpcode)
+					{
+						sawPoll = true;
+						continue;
+					}
+
+					if (sawPoll || map == 0 || p is not { IsIirCarrier: true, IsDownload: true, SubOpcode: SimpleCharFullUpdateCodec.Opcode })
+						continue;
+
+					SimpleCharFullUpdateIIR captured;
+					try
+					{
+						captured = SimpleCharFullUpdateCodec.Parse(p.Record);
+					}
+					catch (CodecParseException)
+					{
+						continue;
+					}
+
+					if (captured.Handle >= EntityHandles.CharacterInstanceBase || captured.Character?.player_stats != null)
+						continue;
+
+					var name = captured.Character?.Name ?? "";
+					if (name.Length == 0 || (!string.IsNullOrEmpty(filter) && !name.Contains(filter, StringComparison.OrdinalIgnoreCase)))
+						continue;
+
+					// The TYPE, from retail's own message - see the group-key warning above.
+					var template = captured.Character?.npc_stats?.TemplateId ?? 0;
+					if (template == 0)
+						continue;
+
+					var pos = captured.Position;
+					var placement = (map, pos.X, pos.Y, pos.Z);
+					var values = FieldValues(captured.Character);
+
+					placementSightings[placement] = placementSightings.GetValueOrDefault(placement) + 1;
+					placementNames[placement] = name;
+					foreach (var (field, value) in values)
+					{
+						var perPlacement = byPlacement.TryGetValue(field, out var pd) ? pd : byPlacement[field] = new Dictionary<(uint, float, float, float), HashSet<string>>();
+						(perPlacement.TryGetValue(placement, out var pv) ? pv : perPlacement[placement] = []).Add(value);
+					}
+
+					// One reading per PHYSICAL spawn for the TYPE table, the same dedup spawn-diff uses: the same NPC
+					// is re-sent on every login in every capture, and counting those would score a field by how often
+					// a zone was visited.
+					if (!seen.Add(placement))
+						continue;
+
+					sightings[template] = sightings.GetValueOrDefault(template) + 1;
+					templateNames[template] = name;
+					foreach (var (field, value) in values)
+					{
+						var perType = fields.TryGetValue(field, out var d) ? d : fields[field] = new Dictionary<uint, HashSet<string>>();
+						(perType.TryGetValue(template, out var vals) ? vals : perType[template] = []).Add(value);
+					}
+				}
+			}
+
+			var repeated = sightings.Where(s => s.Value > 1).Select(s => s.Key).ToHashSet();
+			Console.WriteLine("field-stability: is a captured NPC field a property of the TYPE or of the PLACEMENT?");
+			Console.WriteLine("Measured over retail's own spawns - no DB row is read, so this says nothing about our lift,");
+			Console.WriteLine("only about whether there is a type-level value TO lift (Gitea #602).");
+			Console.WriteLine();
+			Console.WriteLine($"{sightings.Count} templates, {repeated.Count} of them sighted more than once "
+				+ $"({sightings.Count - repeated.Count} single-sighting templates excluded - they are trivially constant).");
+			Console.WriteLine();
+			Console.WriteLine($"{"field",-40} {"stable",7} {"of",5}  {"%",6}  worst offender");
+
+			var scored = new List<(string Field, int Stable, int Total, double Pct, string Worst)>();
+			foreach (var (field, perName) in fields)
+			{
+				var considered = perName.Where(k => repeated.Contains(k.Key)).ToList();
+				if (considered.Count == 0)
+					continue;
+
+				var stable = considered.Count(k => k.Value.Count == 1);
+				var worst = considered.OrderByDescending(k => k.Value.Count).First();
+				scored.Add((field, stable, considered.Count, 100.0 * stable / considered.Count,
+					worst.Value.Count == 1 ? "" : $"{templateNames[worst.Key]} #{worst.Key} ({worst.Value.Count} values: {string.Join("/", worst.Value.Take(4))})"));
+			}
+
+			foreach (var s in scored.OrderBy(s => s.Pct).ThenBy(s => s.Field))
+				Console.WriteLine($"{(s.Field.Length > 39 ? s.Field[..39] : s.Field),-40} {s.Stable,7} {s.Total,5}  {s.Pct,5:F1}%  {s.Worst}");
+
+			// Second table: the SAME physical NPC, sighted on more than one login. A field unstable here cannot be
+			// stored at all - not on the type, not on the placement.
+			var repeatedPlacements = placementSightings.Where(k => k.Value > 1).Select(k => k.Key).ToHashSet();
+			Console.WriteLine();
+			Console.WriteLine("--- by PHYSICAL PLACEMENT (map + position), the same NPC seen on more than one login ---");
+			Console.WriteLine("A field unstable HERE is rolled per spawn event and belongs in no table, type or placement.");
+			Console.WriteLine();
+			Console.WriteLine($"{repeatedPlacements.Count} placements sighted more than once, of {placementSightings.Count}.");
+			Console.WriteLine();
+			Console.WriteLine($"{"field",-40} {"stable",7} {"of",5}  {"%",6}  worst offender");
+
+			var placementScored = new List<(string Field, int Stable, int Total, double Pct, string Worst)>();
+			foreach (var (field, perPlacement) in byPlacement)
+			{
+				var considered = perPlacement.Where(k => repeatedPlacements.Contains(k.Key)).ToList();
+				if (considered.Count == 0)
+					continue;
+
+				var stable = considered.Count(k => k.Value.Count == 1);
+				var worst = considered.OrderByDescending(k => k.Value.Count).First();
+				placementScored.Add((field, stable, considered.Count, 100.0 * stable / considered.Count,
+					worst.Value.Count == 1 ? "" : $"{placementNames[worst.Key]} ({worst.Value.Count} values: {string.Join("/", worst.Value.Take(4))})"));
+			}
+
+			foreach (var s in placementScored.OrderBy(s => s.Pct).ThenBy(s => s.Field).Take(25))
+				Console.WriteLine($"{(s.Field.Length > 39 ? s.Field[..39] : s.Field),-40} {s.Stable,7} {s.Total,5}  {s.Pct,5:F1}%  {s.Worst}");
+
+			return;
+
+			// Flattens a protobuf message to name -> printed value, one entry per scalar leaf. Collections are
+			// reported by COUNT: their contents are a separate question (equipment has its own lifted table) and a
+			// per-element key would drown the per-field one this report exists to answer.
+			static List<(string Field, string Value)> FieldValues(object? message, string prefix = "", int depth = 0)
+			{
+				var values = new List<(string, string)>();
+				if (message == null || depth > 3)
+					return values;
+
+				foreach (var prop in message.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+				{
+					if (prop.GetIndexParameters().Length > 0)
+						continue;
+
+					object? v;
+					try
+					{
+						v = prop.GetValue(message);
+					}
+					catch (System.Reflection.TargetInvocationException)
+					{
+						continue; // protobuf-net throws on an unset field with no default
+					}
+
+					var name = prefix + prop.Name;
+					switch (v)
+					{
+						case System.Collections.ICollection c:
+							values.Add((name + " count", c.Count.ToString()));
+							continue;
+						case null:
+							values.Add((name, "(absent)"));
+							continue;
+					}
+
+					if (prop.PropertyType.IsPrimitive || prop.PropertyType == typeof(string) || prop.PropertyType.IsEnum)
+						values.Add((name, Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture) ?? ""));
+					else if (prop.PropertyType.IsClass && prop.PropertyType != typeof(byte[]))
+						values.AddRange(FieldValues(v, name + ".", depth + 1));
+				}
+
+				return values;
+			}
+		}
+
 		private static List<string> FieldDiff(object? theirs, object? ours, string prefix = "", int depth = 0)
 		{
 			var diffs = new List<string>();
