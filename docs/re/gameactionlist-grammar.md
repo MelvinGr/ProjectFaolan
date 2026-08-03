@@ -62,10 +62,60 @@ pulls keys `0x463` (caster/line) and `0x2f9` (recast centiseconds).
 
 - Header/list framing fully decoded + validated 925/925; `GameActionListCodec` round-trips element bytes verbatim.
 - The full element grammar is now recovered (positional, type-descriptor-driven; string vs u32 by key).
-- **Type id + key list: RECOVERED** (2026-07-11 live Frida dump — see the RESOLVED section below).
-  `docs/re/gameaction_types.json` holds all 68 types' value orders, so any element (recast included) is
-  byte-constructible. The grammar is no longer a blocker; #271's residue is an in-client base-cooldown check +
-  an optional low-prio override emit.
+- **Type id + key list: RECOVERED for all 260 types** — statically, from the initialiser `FUN_008bdf40`
+  ([`gameaction-keylists.tsv`](gameaction-keylists.tsv), 2026-08-03; the 2026-07-11 live Frida dump reached 68 of
+  them and is superseded where the two disagree). Any element is byte-constructible. The grammar is no longer a
+  blocker; #271's residue is an in-client base-cooldown check + an optional low-prio override emit.
+
+## RESOLVED 2026-08-03 — the whole descriptor table IS statically recoverable, and it names the RDB modifier record (#591)
+
+Two things the sections below got wrong, both corrected here:
+
+1. **"Not statically recoverable" was wrong.** The populator is `FUN_008bdf40`, one flat initialiser that writes
+   all 260 descriptors — name, label, key list and (on ~20 types) the key list's own **field names**. It writes
+   them two ways, which is why a single-form search missed it: the address is constant-folded for most types
+   (`MOV [base+8], <enumId>`), and written through a running cursor for the rest
+   (`PUSH <name>; MOV ECX,<enumId>; CALL FUN_008bde20` then `MOV [ECX + EAX*4 + 0xc + 4j], <key>`).
+   `tools/ghidra/DumpGameActionKeyLists.java` walks it with constant-register tracking and emits
+   [`gameaction-keylists.tsv`](gameaction-keylists.tsv) — **260 types, all with key lists**, against the 68 the
+   live Frida dump reached.
+   ⚠️ Where it disagrees with [`gameaction_types.json`](gameaction_types.json), **the static reading is the right
+   one**: `AddProc` and `AddSpellProc` have SIX keys there, not four, and the RDB record widths (below) confirm six.
+   The descriptor is `0xF4` bytes, not the `0x41` the live dump inferred: key list at `+0x0c`, a parallel field-name
+   array at `+0x5c`, a third (always zero) at `+0xac`.
+2. **The RDB feat/spell/item "stat-modifier record" IS a GameAction element.** The `[kind][0][4][0][1][0][2][9][…]`
+   record that `ItemTemplateStatModifiers` parses is this exact element: `kind` is the GameAction type id, the `4`
+   is the version word the deserializer validates, the `0` after it is `subCount`, and **`1,0,2,9` are the four
+   always-present positional values** `v(0x2d5) v(0x2d6) v(0x2f2) v(0x2f5)`. What follows is one u32 per key-list
+   entry — so the "6-word signature" is not a signature at all, it is a constant prefix, and the record's width is
+   **`8 + len(keyList)` words**, not a fixed 10.
+
+**Cross-validated on two independent sources.** Predicted width (`8 + len(keyList)`, from the client's
+initialiser) against measured width (`--report feat-effect-widths`, from single-element RDB records) agrees on
+**17 of the 19** kinds that occur:
+
+| kind | name | keys | width |
+|---|---|---|---|
+| 53019 | `Spell` | `39` | 9 |
+| 53045 / 53067 / 53110 / 53139 | `Modify` / `ModifyAsRating` / `TempChangeSkill` / `SetFlag` | `0`(Stat)`,39` | 10 |
+| 53031 / 53069 | `ChangeRecastTime` / `ChangeLineRecastTime` | `187,39` / `1,39` | 10 |
+| 53030 / 53075 | `ChangeHitPercent` / `ChangeLineHitPercent` | `187,39,55` / `1,39,55` | 11 |
+| 53209 | `UpgradeCombo` | `187,66,67` | 11 |
+| 53054 / 53062 | `SpellStatModifier` / `SpellLineStatModifier` | `88,0`(Stat)`,39,175`(Amount) / `1,0,39,175` | 12 |
+| 53182 | `SpecialAbility` | `39`(Value)`,77`(Hash)`,84`(Level)`,174`(Substate) | 12 |
+| 53213 / 53211 | `AddProc` / `AddSpellProc` | six | 14 |
+
+The two misses are `Charge` (predicted 13, measured 8 — from a single record, likely a coincidental prefix hit)
+and `AddSkinnedMesh` (predicted 9, measured 12 over 117 records — a real disagreement, and the likely cause is a
+key whose value is a STRING rather than a u32, which the element grammar already allows).
+
+**Key indices that carry a name** (recovered from the types that name their own slots; a name transfers by KEY,
+so it resolves that slot on every type that uses it): `0` Stat, `11` Radius, `17..20` AudioEffect*, `24`
+SkillType, `25` TimedLength, `28..30` Rel{X,Y,Z}Pos, `72` TimeExist, `73` Flags, `77` Hash, `84` Level, `103`
+NPCMaster, `174` Substate, `175` Amount, `209` EventString, `1305` FloatValue. Key `39` is deliberately left
+blank: it is `Value` on a modifier and `ScriptID` on a script action, so it carries no transferable name. Key `1`
+is unnamed but is the **spell line** by position — it is the slot that distinguishes every `…Line…` type from its
+per-spell twin.
 
 ## RE session 2026-07-10: element wire structure confirmed; both lookup tables are RUNTIME-built
 
