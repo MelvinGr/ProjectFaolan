@@ -67,6 +67,60 @@ namespace Faolan.Tests
 			}
 		}
 
+		// #455: the direction after a marker is a SELECTOR, not a step. The catalog settles it - the marked rows form
+		// a complete 4 (family) x 5 (direction) grid with every cell present EXACTLY once, and the three reactive
+		// families share one GameActionId per direction. A key SEQUENCE could not come out that way.
+		[Fact]
+		public async Task MarkedCombos_AreAFourByFiveGrid_TheDirectionSelectingTheProc()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var rows = await db.Combos.Where(c => c.Actions != null && c.Actions != "").ToListAsync(ct);
+			var marked = rows
+				.Select(c => (c.Name, c.GameActionId, Parsed: ComboActionParser.TryParseTriggered(c.Actions!, out var t, out var d), Trigger: t, Direction: d))
+				.Where(x => x.Parsed)
+				.ToList();
+
+			// Four families x five directions, one row each.
+			Assert.Equal(20, marked.Count);
+			Assert.Equal(4, marked.Select(x => x.Trigger).Distinct().Count());
+			Assert.Equal(5, marked.Select(x => x.Direction).Distinct().Count());
+			Assert.All(marked.GroupBy(x => (x.Trigger, x.Direction)), cell => Assert.Single(cell));
+
+			// `action` is the fifth marker and the one with no direction after it, so it is a known marker that does
+			// NOT reach the grid.
+			Assert.True(ComboActionParser.TryParseMarker("action", out var placeholder));
+			Assert.Equal(ComboTrigger.Placeholder, placeholder);
+			Assert.False(ComboActionParser.TryParseTriggered("action", out _, out _));
+
+			// The three REACTIVE families are the same five effects - the family says what triggers the proc, the
+			// direction says which proc. MagicCombo is the caster's own distinct set.
+			var reactive = marked.Where(x => x.Trigger != ComboTrigger.MagicCombo).ToList();
+			Assert.Equal(15, reactive.Count);
+			Assert.All(reactive.GroupBy(x => x.Direction), byDirection => Assert.Single(byDirection.Select(x => x.GameActionId).Distinct()));
+			Assert.Empty(reactive.Select(x => x.GameActionId).Intersect(marked.Where(x => x.Trigger == ComboTrigger.MagicCombo).Select(x => x.GameActionId)));
+
+			// Each marked row's own Name is its effect's name, which is what makes the column mapping self-checking:
+			// `Clumsy_combo` / `Clumsy_magic` / `Clumsy` all carry Clumsy's id.
+			var byId = await db.Spells.Where(s => marked.Select(m => m.GameActionId).Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+			Assert.Equal(10, byId.Count); // 5 reactive effects + 5 MagicCombo effects
+		}
+
+		[Theory]
+		[InlineData("Combo_Reactive,CombatHead", ComboTrigger.ComboReactive, ComboInput.Head)]
+		[InlineData("Magic_Reactive,Combatupperleft", ComboTrigger.MagicReactive, ComboInput.UpperLeft)]
+		[InlineData("Melee_Reactive,Combatlowerright", ComboTrigger.MeleeReactive, ComboInput.LowerRight)]
+		[InlineData("MagicCombo,Combatlowerleft", ComboTrigger.MagicCombo, ComboInput.LowerLeft)]
+		public void TryParseTriggered_KeepsTheDirectionTheSequenceParserDiscards(string actions, ComboTrigger trigger, ComboInput direction)
+		{
+			// TryParse still refuses these - they are not a key sequence - but the direction is no longer lost.
+			Assert.False(ComboActionParser.TryParse(actions, out _));
+			Assert.True(ComboActionParser.TryParseTriggered(actions, out var parsedTrigger, out var parsedDirection));
+			Assert.Equal(trigger, parsedTrigger);
+			Assert.Equal(direction, parsedDirection);
+		}
+
 		[Fact]
 		public void AnUnknownToken_IsRejectedRatherThanDropped()
 		{

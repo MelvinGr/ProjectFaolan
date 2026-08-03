@@ -56,9 +56,28 @@ resolves the blend + a backlash roll on deactivate.
   `ComboActionParserTests` — every distinct `Actions` value must parse, carry a known marker, or be blank, with
   **zero** unknown spellings, so a new catalog spelling fails loudly instead of being dropped from a sequence.
   ⚠️ Nothing calls the parser yet: its only consumer was the combo service dropped as dead in #353.
-  ⚠️ The non-directional markers are a **prefix**, not the whole value — every one reads `<marker>,<direction…>`
-  (`MagicCombo,Combatlowerleft`). The direction after the marker is real and currently discarded; open in
-  Gitea #455, along with the 160 of 744 catalog rows whose `Actions` is blank.
+- **The marked combos: the direction is a SELECTOR, not a step (#455, DECODED).** The non-directional markers are a
+  **prefix** — every one reads `<marker>,<direction>` (`MagicCombo,Combatlowerleft`). The catalog settles what that
+  direction means: the marked rows are a complete **4 families × 5 directions grid, each cell present exactly once**,
+  and the three *reactive* families share **one `GameActionId` per direction**:
+
+  | direction | `*_Reactive` effect | `MagicCombo` effect |
+  |---|---|---|
+  | `CombatHead` | 231964 Debilitating Cleave | 700777 Exhaustion |
+  | `Combatupperleft` | 227061 Rage | 700755 Mana Leech |
+  | `Combatupperright` | 227064 Furious Blow | 700751 Discourage |
+  | `Combatlowerleft` | 227060 Clumsy | 700749 Boiling Mana |
+  | `Combatlowerright` | 227063 Weaken | 700791 Mind Purge |
+
+  So the **family says what TRIGGERS the proc** (a completed combo / a spell / a melee hit) and the **direction says
+  WHICH proc** — each row's own `Name` is that spell's name (`Clumsy_combo` / `Clumsy_magic` / `Clumsy`), which makes
+  the mapping self-checking. A key SEQUENCE could not come out as a perfect grid with shared ids down the columns
+  [V3: ComboActionParserTests.MarkedCombos_AreAFourByFiveGrid_TheDirectionSelectingTheProc]. `ComboTrigger` +
+  `ComboActionParser.TryParseTriggered` keep the direction the sequence parser discards; `TryParse` still refuses
+  these, since they are not a key sequence.
+  `action` (69 rows) is the fifth marker and the only one with **no** direction after it — a placeholder for combos
+  whose input the catalog does not model (bow attacks, emotes, `PowerAttack`). The 160 of 744 rows whose `Actions` is
+  blank are the same shape of thing and remain unexplained.
 
 ## Wire decode
 

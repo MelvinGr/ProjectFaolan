@@ -40,13 +40,13 @@ namespace Faolan.GameServer.Combat
 
 		// Non-directional Action tokens: the combo is triggered by a mechanic other than a key sequence (a reactive
 		// proc, or a spellweaving magic combo), so it has no directional grammar to match.
-		private static readonly HashSet<string> NonDirectional = new(StringComparer.OrdinalIgnoreCase)
+		private static readonly Dictionary<string, ComboTrigger> Markers = new(StringComparer.OrdinalIgnoreCase)
 		{
-			"action",
-			"MagicCombo",
-			"Magic_Reactive",
-			"Melee_Reactive",
-			"Combo_Reactive"
+			["action"] = ComboTrigger.Placeholder,
+			["MagicCombo"] = ComboTrigger.MagicCombo,
+			["Magic_Reactive"] = ComboTrigger.MagicReactive,
+			["Melee_Reactive"] = ComboTrigger.MeleeReactive,
+			["Combo_Reactive"] = ComboTrigger.ComboReactive
 		};
 
 		// Parses the comma-separated Actions into the ComboInput sequence. Returns false AND an empty sequence when
@@ -69,7 +69,7 @@ namespace Faolan.GameServer.Combat
 				if (token.Length == 0)
 					continue;
 
-				if (NonDirectional.Contains(token))
+				if (Markers.ContainsKey(token))
 					return false;
 
 				if (!Map.TryGetValue(token, out var input))
@@ -88,21 +88,56 @@ namespace Faolan.GameServer.Combat
 		// True when the value carries a non-directional marker - i.e. TryParse returned false because the combo is
 		// deliberately not key-sequenced, rather than because it carried a spelling we failed to recognise. TryParse
 		// returns false for both, so this is what separates "accounted for" from "unknown" (ComboActionParserTests).
-		//
-		// The marker is a PREFIX, not the whole value: every one of the 21 non-directional rows in the catalog reads
-		// `<marker>,<direction...>` - "MagicCombo,Combatlowerleft", "Magic_Reactive,CombatHead",
-		// "Combo_Reactive,Combatupperright". So the marker tags HOW the combo triggers and a real directional
-		// sequence still follows it, which this parser currently discards. Whether the client uses that direction for
-		// a spellweave/reactive proc is undecoded - Gitea #455. [V0]
 		public static bool IsNonDirectional(string actions)
 		{
+			return TryParseMarker(actions, out _);
+		}
+
+		// The trigger family a marked combo carries, if any. False for a plain directional sequence and for a blank
+		// Actions.
+		public static bool TryParseMarker(string actions, out ComboTrigger trigger)
+		{
+			trigger = ComboTrigger.Directional;
 			if (string.IsNullOrWhiteSpace(actions))
 				return false;
 
 			foreach (var raw in actions.Split(','))
 			{
 				var token = StripStepPrefix(raw.Trim());
-				if (token.Length > 0 && NonDirectional.Contains(token))
+				if (token.Length > 0 && Markers.TryGetValue(token, out trigger))
+					return true;
+			}
+
+			return false;
+		}
+
+		// The direction a MARKED combo is keyed to (#455). The marker is a PREFIX, not the whole value: the four real
+		// markers each read `<marker>,<direction>`, and the direction is a SELECTOR - which of the family's five procs
+		// this row is - not a step in a key sequence.
+		//
+		// The catalog proves it: the marked rows are a complete 4 x 5 grid, each cell present EXACTLY ONCE, and the
+		// three reactive families share one GameActionId per column:
+		//     CombatHead        -> 231964 Debilitating Cleave   | MagicCombo: 700777 Exhaustion
+		//     Combatupperleft   -> 227061 Rage                  |             700755 Mana Leech
+		//     Combatupperright  -> 227064 Furious Blow          |             700751 Discourage
+		//     Combatlowerleft   -> 227060 Clumsy                |             700749 Boiling Mana
+		//     Combatlowerright  -> 227063 Weaken                |             700791 Mind Purge
+		// Each row's own Name is that spell's name (`Clumsy_combo` / `Clumsy_magic` / `Clumsy`), so the family says
+		// WHAT triggers the proc (a completed combo / a spell / a melee hit) and the direction says WHICH proc. A key
+		// SEQUENCE could never come out as a perfect grid with shared ids down the columns.
+		//
+		// `action` (69 rows) is the odd one out - a placeholder marker with no direction after it - so it returns
+		// false here while still being a known marker above.
+		public static bool TryParseTriggered(string actions, out ComboTrigger trigger, out ComboInput direction)
+		{
+			direction = default;
+			if (!TryParseMarker(actions, out trigger))
+				return false;
+
+			foreach (var raw in actions.Split(','))
+			{
+				var token = StripStepPrefix(raw.Trim());
+				if (token.Length > 0 && Map.TryGetValue(token, out direction))
 					return true;
 			}
 
