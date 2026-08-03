@@ -59,7 +59,10 @@ namespace Faolan.Importer.Rdb
 			var found = new List<Feat>();
 			var featEffects = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.Modifier>>();
 			var featSpellMods = new Dictionary<uint, IReadOnlyList<ItemTemplateStatModifiers.Modifier>>();
+			var featSpellStatMods = new Dictionary<uint, IReadOnlyList<SpellStatModifier>>();
+			var featSpellGrants = new Dictionary<uint, IReadOnlyList<uint>>();
 			var skippedUnnamed = 0;
+			var misSlicedElements = 0;
 
 			foreach (var e in rdb.EntriesOfType(TemplateType))
 			{
@@ -93,6 +96,9 @@ namespace Faolan.Importer.Rdb
 				var effects = ParseEffects(body);
 				featEffects[e.Id] = effects;
 				featSpellMods[e.Id] = ParseSpellModifiers(body);
+				featSpellStatMods[e.Id] = ParseSpellStatModifiers(body, out var misSliced);
+				misSlicedElements += misSliced;
+				featSpellGrants[e.Id] = ParseSpellGrants(body);
 				found.Add(new Feat
 				{
 					Id = e.Id,
@@ -198,6 +204,41 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
+			// The spell-scoped STAT modifiers and the spell GRANTS (#593), on the same delete+reinsert rule and scoped
+			// the same way - to every feat PARSED, not just those that still yield rows.
+			var spellStatModRows = 0;
+			db.FeatSpellStatModifiers.RemoveRange(await db.FeatSpellStatModifiers.Where(m => spellTouched.Contains(m.FeatId)).ToListAsync());
+			foreach (var (featId, list) in featSpellStatMods.Where(kv => kv.Value.Count > 0))
+			{
+				for (var i = 0; i < list.Count; i++)
+				{
+					var isLine = list[i].Kind == SpellLineStatModifierKind;
+					db.FeatSpellStatModifiers.Add(new FeatSpellStatModifier
+					{
+						FeatId = featId,
+						Sequence = i,
+						SpellId = isLine ? null : list[i].TargetId,
+						SpellLineId = isLine ? list[i].TargetId : null,
+						StatId = list[i].Stat,
+						Value = list[i].Value,
+						PercentHundredths = list[i].PercentHundredths,
+						EffectKind = list[i].Kind
+					});
+					spellStatModRows++;
+				}
+			}
+
+			var spellGrantRows = 0;
+			db.FeatSpellGrants.RemoveRange(await db.FeatSpellGrants.Where(g => spellTouched.Contains(g.FeatId)).ToListAsync());
+			foreach (var (featId, list) in featSpellGrants.Where(kv => kv.Value.Count > 0))
+			{
+				for (var i = 0; i < list.Count; i++)
+				{
+					db.FeatSpellGrants.Add(new FeatSpellGrant { FeatId = featId, Sequence = i, SpellId = list[i] });
+					spellGrantRows++;
+				}
+			}
+
 			// Effects are delete+reinsert per feat: the list is wholly derived from the record, so reconciling element
 			// by element would only risk leaving a stale tail behind.
 			var effectRows = 0;
@@ -225,13 +266,19 @@ namespace Faolan.Importer.Rdb
 				}
 			}
 
-			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0)
+			if (added > 0 || updated > 0 || effectRows > 0 || stale.Count > 0 || mapRows > 0 || prereqRows > 0 || spellStatModRows > 0 || spellGrantRows > 0)
 				await db.SaveChangesAsync();
 
-			logger?.LogInformation("RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges.",
-				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows);
+			// Never silent: a mis-sliced element is data we chose NOT to import, and the count is the only place that
+			// says so - see the type-id guard in ParseSpellStatModifiers (Gitea #595).
+			if (misSlicedElements > 0)
+				logger?.LogWarning("RdbFeatImporter: {MisSliced} spell stat-modifier elements rejected as mis-sliced (a slot held a GameAction type id) - see Gitea #595.", misSlicedElements);
 
-			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows);
+			logger?.LogInformation(
+				"RdbFeatImporter: {Found} feat templates ({Unnamed} unnamed, skipped); {Added} added, {Updated} updated, {Effects} effects, {Map} id-map rows, {Prereq} prereq edges, {SpellMods} spell modifiers, {SpellStats} spell stat modifiers, {Grants} spell grants.",
+				found.Count, skippedUnnamed, added, updated, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows);
+
+			return new Result(found.Count, added, updated, skippedUnnamed, effectRows, mapRows, prereqRows, spellModRows, spellStatModRows, spellGrantRows);
 		}
 
 		// Splits a catalog name into its tree / group / base / rank. The client encodes all four in the string:
@@ -488,6 +535,93 @@ namespace Faolan.Importer.Rdb
 		// The one effect kind whose (reference, magnitude) payload is decoded: a spell line and a percent x 100.
 		private const uint SpellModifierKind = 53075;
 
+		// The feat's spell-scoped STAT modifiers (#593): kinds 53054 `SpellStatModifier` and 53062
+		// `SpellLineStatModifier`, the same four-slot payload with the target space swapped.
+		//
+		// Read BY KEY, never by position - `(Spell|Line, Stat, Value, Amount)` - which is the whole reason these were
+		// undecodable while the pair readers were the only view: `SpellStatModifier` puts the SPELL first and the STAT
+		// second, so its "magnitude that varied for no reason" was a stat id (#591).
+		//
+		// `Value` and `Amount` are ALTERNATIVES, not a pair, and the client's own tooltip builder is the evidence: at
+		// 014a2714 it renders the `Value` slot through the generic stat formatter (which appends the STAT'S unit
+		// suffix) and the `Amount` slot through a copy that appends a hardcoded `"%"` - the literal at 0x01fbcf18, on
+		// all three of that branch's print paths. Exactly one of the two is set on all 1068 shipped records, so the
+		// pair is stored as two NULLABLE columns rather than a value plus a mode flag.
+		public static IReadOnlyList<SpellStatModifier> ParseSpellStatModifiers(byte[] body)
+		{
+			return ParseSpellStatModifiers(body, out _);
+		}
+
+		/// <summary>
+		///     As <see cref="ParseSpellStatModifiers(byte[])" />, reporting how many elements were rejected as
+		///     mis-sliced so the importer can say so rather than dropping them silently.
+		/// </summary>
+		public static IReadOnlyList<SpellStatModifier> ParseSpellStatModifiers(byte[] body, out int misSliced)
+		{
+			misSliced = 0;
+			if (body.Length <= 12)
+				return [];
+
+			var mods = new List<SpellStatModifier>();
+			foreach (var e in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+			{
+				if (e.Kind != SpellStatModifierKind && e.Kind != SpellLineStatModifierKind)
+					continue;
+
+				// Every slot must be present: a key the type declares but the element does not carry means the element
+				// was mis-sliced, and half a modifier is worse than none.
+				var target = e.Value(e.Kind == SpellStatModifierKind ? GameActionTypes.KeySpell : GameActionTypes.KeyLine);
+				var stat = e.Value(GameActionTypes.KeyStat);
+				var value = e.Value(GameActionTypes.KeyValue);
+				var amount = e.Value(GameActionTypes.KeyAmount);
+				if (target is null or 0 || stat is null or 0 || value is null || amount is null)
+					continue;
+
+				// Both set, or neither, is a shape this decode does not cover - drop it rather than guess which wins.
+				if (value == 0 == (amount == 0))
+					continue;
+
+				// A magnitude that is itself a registered GameAction TYPE id is the next element's opening word, read
+				// as ours because this element was narrower than its key list says. `Swift Pathing` (5031395..5031401)
+				// is the case in the shipped catalog: its two 53054 elements tile the record end to end at TEN words
+				// each, so the `Value` slot lands on the following element's `0xCF3E`. Rejecting on the type-id range
+				// is not a special case for that feat - a spell id, a stat id and a magnitude all live nowhere near
+				// 0xCF09..0xD026, so a slot that does was never ours. Open as Gitea #595.
+				if (GameActionTypes.Get(value.Value) != null || GameActionTypes.Get(amount.Value) != null)
+				{
+					misSliced++;
+					continue;
+				}
+
+				mods.Add(new SpellStatModifier(e.Kind, target.Value, (CharacterStatId)stat.Value,
+					value == 0 ? null : (int)value.Value, amount == 0 ? null : (int)amount.Value));
+			}
+
+			return mods;
+		}
+
+		// The spells the feat GRANTS (#593): kind 53019 `Spell`, a one-slot element carrying a spell TEMPLATE id.
+		// A grant, not a modifier - see FeatSpellGrant.
+		public static IReadOnlyList<uint> ParseSpellGrants(byte[] body)
+		{
+			return body.Length <= 12
+				? []
+				: [.. ItemTemplateStatModifiers.ParseElements(body.AsSpan(12))
+					.Where(e => e.Kind == SpellGrantKind)
+					.Select(e => e.Value(GameActionTypes.KeyValue) ?? 0)
+					.Where(id => id != 0)];
+		}
+
+		private const uint SpellStatModifierKind = 53054;
+		private const uint SpellLineStatModifierKind = 53062;
+		private const uint SpellGrantKind = 53019;
+
+		/// <summary>
+		///     One parsed kind-53054/53062 element. <paramref name="TargetId" /> is a <c>Spell.Id</c> under 53054 and a
+		///     <c>Spell.LineId</c> under 53062 - the kind is what says which.
+		/// </summary>
+		public readonly record struct SpellStatModifier(uint Kind, uint TargetId, CharacterStatId Stat, int? Value, int? PercentHundredths);
+
 		// Kind 53182 is NOT a stat modifier and must not be imported as one. Its element has the same signature, so
 		// the shared parser returns it, but the payload is (index, FOURCC) rather than (statId, amount): the "amount"
 		// decodes to four ASCII characters, identical across a whole feat family - 0x4450434E "DPCN" on every
@@ -549,6 +683,7 @@ namespace Faolan.Importer.Rdb
 
 		public readonly record struct Parsed(string? Tree, string? Group, string BaseName, int Rank);
 
-		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows, int PrereqEdges);
+		public readonly record struct Result(int Found, int Added, int Updated, int Unnamed, int Effects, int MapRows, int PrereqEdges, int SpellModifiers, int SpellStatModifiers,
+			int SpellGrants);
 	}
 }

@@ -125,9 +125,47 @@ and don't contain.
   End to end on the captured Necromancer: NecroL80's `Decomposition` (wire 80004, rank 5) gives **+35.0% on all five
   Flesh to Worms ranks**, which is what the in-client tooltip reads; 52 of her spells are boosted in total.
 
-  ⚠️ **Kind 53075 ONLY is imported.** The other kinds are decoded (below) but not imported: three of them are
-  spell GRANTS, so importing them on the shape would file a spell a feat GIVES you as a boost to one you already
-  have.
+  **Also imported** (#593), each into a table shaped like what it IS rather than like the record it shares:
+
+  | table | kinds | rows | holds |
+  |---|---|---:|---|
+  | `FeatSpellStatModifier` | 53054 + 53062 | 1,078 | a stat scoped to one spell, or to a whole line |
+  | `FeatSpellGrant` | 53019 | 1,510 | a spell the feat TEACHES |
+
+  All three resolve completely against the shipped catalogs — 1,510/1,510 grants and 485/485 line targets and
+  593/593 spell targets — which is the check that makes a reference space decodable at all: resolve the ref and see
+  whether it hits.
+
+  ⚠️ **A grant is not a boost**, which is why 53019 gets its own table rather than a row in the modifier one.
+  Filing it as a modifier would record a spell the feat GIVES you as a boost to one you already have.
+
+  ⚠️ **`Value` and `Amount` are alternatives, not a pair** — exactly one is set on all 1,078 rows, so they are two
+  NULLABLE columns rather than a magnitude plus a mode flag. What they MEAN comes from the client's own item-tooltip
+  builder (`Misc\ItemInfoCreator.cpp`, the 53054/53062/53283 branch at `014a25a6`), which reads the three slots as
+  `GetIntStat(0x2d2 / 0x2f9 / 0x4b7)` — the `GameActionStat_e` ids that key indices 0 / 39 / 175 map to through
+  `DAT_0297cd48`, so the binding is the client's, not an inference from slot order:
+
+  - **`Value` (key 39) is an ABSOLUTE delta** in the stat's own units. The tooltip renders it through the generic
+    stat formatter (`FUN_0149a300`), which appends the STAT'S own unit suffix.
+  - **`Amount` (key 175) is a PERCENTAGE**, in hundredths of a percent. The tooltip renders it through an inlined
+    copy of the same formatter that appends a hardcoded `"%"` — the literal at `0x01fbcf18`, on all three of that
+    branch's print paths. For `CastingTimeSeconds` it takes a separate path that prints `abs(amount) * 0.01` under
+    a `"%.1f%%"` format, and the shipped values are a clean ladder off exactly that scale
+    (-1000 / -2000 / -3300 / -5000 / -6600 / -10000 = -10%…-100%).
+
+  The stat id is the ordinary wire stat space — the tooltip resolves it through **LDB category 615** (`0x267`, the
+  literal it pushes at `014a2714`), the one stat-name table — but the ids the spell half uses name SPELL
+  properties: `ManaCost`, `CastingTimeSeconds`, `SplashRadius`, `SpellCriticalChance`, `Duration`. Two of the
+  fourteen were already in `CharacterStatId` from elsewhere (`SpellColumnRadius`, `AttackRange`), which is what
+  says it is one space and not a parallel one; the other twelve were added from the client's names.
+
+  ⚠️ Seven elements are REJECTED as mis-sliced, and counted rather than dropped silently: a `Value`/`Amount` slot
+  holding a registered GameAction type id is the next element's opening word, read as ours. `Swift Pathing`
+  (5031395..5031401) is the case — its 53054 elements tile the record at TEN words, not the twelve its key list
+  predicts. Open as Gitea #595.
+
+  ⚠️ **Still NOT imported:** 53209 `UpgradeCombo` (a per-combo reuse-time delta, which needs the combo id space
+  joined to `ClassCombos` and a recast path that honours it — Gitea #271), and the proc / weapon-attack families.
 - **The "kind" was never a private id space — it is a GameAction TYPE ID, and the record IS a GameAction element**
   (#591, [gameactionlist-grammar.md](../re/gameactionlist-grammar.md)). Read against the client's own element
   grammar, `[kind][0][4][0][1][0][2][9][…]` is `[typeId][field][version 4][subCount 0][the four always-present
@@ -148,8 +186,8 @@ and don't contain.
   | 53209 x3235 | `UpgradeCombo` | combo, `k66`, `k67` | `Dread Lord` "reduces the reuse time of all combos" carries six, `k67` = **-100** on each. The old "value 0 throughout" was `k66`; the magnitude is the word after it |
   | 53019 x1749 | `Spell` | spell template id | a GRANT, and the **only** payload word. The old "its value repeats its own KIND" was the NEXT element's type id, read past the end of a 9-word record |
   | 53030 x962 | `ChangeHitPercent` | spell, Value, `k55` | the per-spell twin of 53075 |
-  | 53054 x593 | `SpellStatModifier` | **spell, Stat, Value, Amount** | not "a varying value": the second word is a STAT ID. `Fiendish Hand` carries three records for one spell — stats 347/348/349 — which is why there were "several records per (feat, spell)" |
-  | 53062 x475 | `SpellLineStatModifier` | **line, Stat, Value, Amount** | the same record with the spell slot replaced by a line slot. `Brutal Maiming` = line 20410 (Guardian `Disable`), stat 147, value 2750 — the "147 that does not read as a percent" was the stat id |
+  | 53054 x593 | `SpellStatModifier` | **spell, Stat, Value, Amount** | not "a varying value": the second word is a STAT ID. `Fiendish Hand` carries three records for one spell — stats 347/348/349 — which is why there were "several records per (feat, spell)". IMPORTED (#593) |
+  | 53062 x475 | `SpellLineStatModifier` | **line, Stat, Value, Amount** | the same record with the spell slot replaced by a line slot. `Brutal Maiming` = line 20410 (Guardian `Disable`), stat 147, value 2750 — the "147 that does not read as a percent" was the stat id. IMPORTED (#593) |
   | 53212 x421 | `AddComboProc` | spell, `k236`, combo, `k117`, `k237` | |
   | 53075 x342 | `ChangeLineHitPercent` | **line, Value, `k55`** | the decoded one; `k55` (1 or 2) was never read before |
   | 53250 x315 | `ChangeInheritedWeaponAttack` | | |

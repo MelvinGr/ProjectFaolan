@@ -446,6 +446,29 @@ namespace Faolan.Core.Enums
 		ChanceOfOffhandAttack = 0x42F,
 		WeaponDamageMelee = 0x447,
 		WeaponDamageRanged = 0x448,
+
+		// ---- The SPELL half of the same space (#593), likewise named from LDB 615. ----
+		// A stat id does not have to name something a CHARACTER carries: the `SpellStatModifier` /
+		// `SpellLineStatModifier` feat records (kinds 53054 / 53062) target a SPELL's own properties - its mana cost,
+		// its casting time, its splash radius - through this one id space. Two of the fourteen they use were already
+		// here from elsewhere (<see cref="SpellColumnRadius" /> 0x0DE, <see cref="AttackRange" /> 0x11F), which is what
+		// says it IS one space rather than a parallel one; the twelve below are the rest.
+		//
+		// Confirmed by the client: its item-tooltip builder resolves this word through
+		// `GetLocalisedString(615, stat)` - LDB category 615 is `0x267`, the literal it pushes at 014a2714 - so the
+		// name the client would print for the id is the name it has.
+		Duration = 0x008,
+		SpellCriticalDamage = 0x081,
+		ManaCost = 0x084,
+		SpellCriticalChance = 0x093,
+		CastingTimeSeconds = 0x126,
+		SplashRadius = 0x15B,
+		SplashDamage = 0x15C,
+		SplashDamageMaxTargets = 0x15D,
+		ChanceOfBreakOnSpellAttack = 0x181,
+		HealthBreakThreshold = 0x183,
+		ChanceOfBreakOnAttack = 0x1A6,
+		ChannelingInterval = 0x1BF,
 	}
 
 	/// <summary>

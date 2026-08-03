@@ -125,6 +125,48 @@ blank: it is `Value` on a modifier and `ScriptID` on a script action, so it carr
 is unnamed but is the **spell line** by position — it is the slot that distinguishes every `…Line…` type from its
 per-spell twin.
 
+### A key index is not the property id — it indexes into `GameActionStat_e`
+
+A key-list entry is an INDEX, not the property id the client stores under. `FUN_014935c0(byte keyIndex)` maps one
+to the other through `DAT_0297cd48` (asserting `newStat != 0`, from
+`CoreGameFramework/GameActions/GameActionStats.h`), and `FUN_0077a510` is `GetIntStat(GameActionStat_e)` — its
+own log line reads *"Tried to GetIntStat for GameActionStat_e … but it did not exist, returning 0"*. The table is
+runtime-built by `FUN_01492c20`, which writes 243 of its 255 slots as constants, so it reads statically:
+
+| key index | `GameActionStat_e` | name |
+|---:|---:|---|
+| 0 | 722 (`0x2d2`) | Stat |
+| 1 | 723 (`0x2d3`) | Line |
+| 39 | 761 (`0x2f9`) | Value |
+| 88 | 1123 (`0x463`) | Spell |
+| 175 | 1207 (`0x4b7`) | Amount |
+
+⚠️ **The `GameActionStat_e` id is NOT an LDB-615 stat id**, however much it looks like one — 722…1269 lands inside
+that table's id range and one slot even collides with a real name (`84` → 1119 → "PvP Cold Invulnerability
+Rating"), which makes "just look the id up in LDB 615" a tempting and wrong way to name the remaining unnamed
+slots (`55`, `66`, `67`, `117`, `236`, `237`). What LDB 615 names is the VALUE stored under key `0`, not the key.
+
+### What `Value` (39) and `Amount` (175) mean — from the tooltip builder
+
+`Misc\ItemInfoCreator.cpp` renders a `SpellStatModifier` / `SpellLineStatModifier` / `0xD023` element at
+`014a25a6`, reading exactly three of its four slots — `GetIntStat` on `0x2d2`, `0x2f9`, `0x4b7`, i.e. Stat, Value,
+Amount — and branching on `Value == 0`:
+
+- **`Value` set** → the generic stat-delta formatter `FUN_0149a300`, which appends the stat's OWN unit suffix
+  (`FUN_014a6240(stat)`) and divides by a per-stat display scale. So `Value` is an **absolute** delta in the
+  stat's units.
+- **`Value == 0`** → an inlined copy of the same routine applied to `Amount`, but with the suffix replaced by the
+  **hardcoded `"%"`** at `0x01fbcf18` — on all three of that branch's print paths (`014a27e8`, `014a2888`, and the
+  `CastingTimeSeconds` path at `014a267a`, which prints `abs(amount) * 0.01` under `"%.1f%%"`). So `Amount` is a
+  **percentage**, in hundredths of a percent.
+
+The stat id itself is resolved through `GetLocalisedString(615, stat)` — `PUSH 0x267` at `014a2714` — which is
+what ties this word to the ordinary wire stat space (`CharacterStatId`) rather than a spell-local one.
+
+Key `55` (`ChangeHitPercent` / `ChangeLineHitPercent`, values 1 or 2) is read ONLY by the element comparator
+`FUN_014a5670`, never by the tooltip: it participates in sorting/grouping and carries no rendered magnitude, so
+kind 53075's shipped `(line, percent)` decode does not depend on it.
+
 ## RE session 2026-07-10: element wire structure confirmed; both lookup tables are RUNTIME-built
 
 Decompiled the actual (de)serializer + tables (scripts `tools/ghidra/DumpRecastDescriptor.java`,
