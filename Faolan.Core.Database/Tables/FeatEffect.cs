@@ -8,10 +8,13 @@ namespace Faolan.Core.Database.Tables
 	// so this is what the feat DOES - the part a server needs in order to apply it.
 	//
 	// Tail grammar, after the name:
-	//   [u32 2][u32 14][u32 ListFrame(n)] then n x 40-byte elements:
-	//     [u32 53045][u32 0][u32 4][u32 0][u32 1][u32 0][u32 2][u32 9][u32 StatId][u32 Value]
-	// The eight leading words are identical on every element of every feat inspected, so they are a fixed descriptor
-	// (a modifier KIND, presumably) rather than per-effect data, and are not carried as columns until one varies.
+	//   [u32 2][u32 14][u32 ListFrame(n)] then n GameAction ELEMENTS:
+	//     [u32 kind][u32 field][u32 4][u32 subCount][u32 1][u32 0][u32 2][u32 9][one u32 per key of the kind's key list]
+	// The element is not a fixed 40 bytes and the eight leading words are not a descriptor: `kind` is a GameAction
+	// TYPE id and the payload is that type's KEY LIST, so an element is `8 + len(keyList)` words and a slot is
+	// addressed by key, never by position (#591 - see GameActionTypes and docs/re/gameactionlist-grammar.md). The two
+	// columns below are the (Stat, Value) pair that the two-key kinds - `Modify` 53045, `SetFlag` 53139 and the rest
+	// of the plain modifiers - carry, which is what this table models.
 	//
 	// ⚠️ What is NOT here, and is not in the RDB at all: TIER, PREREQUISITES and COST. Diffing records across four
 	// different trees moves only the id, the block count and the name - no header word tracks tree depth. That is

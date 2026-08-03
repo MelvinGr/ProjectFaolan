@@ -314,7 +314,7 @@ namespace Faolan.Importer.Cli
 
 				case "feat-effect-widths":
 				{
-					FeatEffectWidths(RdbDir());
+					FeatEffectWidths(RdbDir(), arg);
 					return 0;
 				}
 
@@ -2413,15 +2413,20 @@ namespace Faolan.Importer.Cli
 			}
 		}
 
-		private static void FeatEffectWidths(string rdbDir)
+		private static void FeatEffectWidths(string rdbDir, string? arg)
 		{
+			var templateType = uint.TryParse(arg, out var t) && t != 0 ? t : FeatTemplateType;
 			using var rdb = new RdbReader(rdbDir);
 			var widths = new Dictionary<uint, Dictionary<int, int>>();
 			var surplus = new Dictionary<uint, (uint Id, uint[] Words)>();
+			var tiled = new Dictionary<uint, Dictionary<int, (int Count, uint First, uint[] Extra)>>();
+			var regions = 0;
+			var framed = 0;
+			var frameAgrees = 0;
 			var singles = 0;
 			var multi = 0;
 
-			foreach (var e in rdb.EntriesOfType(FeatTemplateType))
+			foreach (var e in rdb.EntriesOfType(templateType))
 			{
 				if (e.Size == 0)
 					continue;
@@ -2436,8 +2441,61 @@ namespace Faolan.Importer.Cli
 					continue;
 				}
 
-				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != FeatTemplateType)
+				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != templateType)
 					continue;
+
+				// ---- Measurement 2: TILING (#595) ----
+				// The pass below derives a kind's width from records holding exactly ONE element, where the only
+				// available end marker is the record's, so what it measures is a CEILING - it swallows whatever the
+				// record carries after the element list. Elements sit back to back with nothing between them, so a
+				// record holding SEVERAL measures the non-final ones EXACTLY: the distance to the next element's
+				// opening type word IS that element's width. That is an independent measurement, and it is the one
+				// that sees the `Swift Pathing` case the ceiling pass is structurally blind to (two elements, both
+				// short, in a record with no single-element sibling).
+				//
+				// The final element is deliberately NOT tallied: its end is the record's, so it is a ceiling like the
+				// pass below, and mixing the two would let trailing record content masquerade as element bytes.
+				var located = ItemTemplateStatModifiers.ParseElements(body.AsSpan(12));
+				if (located.Count > 0)
+				{
+					regions++;
+
+					// The list frame sits immediately before the first element's type word - the same `0x3F1` count
+					// word every other list in the protocol carries. Reading it here is what turns "the scan found N
+					// signature hits" into "the record SAYS there are N", so a spurious hit shows up as disagreement
+					// instead of quietly widening a histogram.
+					var frameOff = 12 + located[0].Offset - 4;
+					var declared = frameOff >= 0 && ListFrame.TryCountOf(BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(frameOff)), out var c) ? c : -1;
+					if (declared >= 0)
+						framed++;
+
+					// Tally only where the record's own count agrees with what the scan found. Where it does not, the
+					// scan has either crossed out of the element region (into trailing record content that happens to
+					// carry the signature) or missed one, and the distance between two "consecutive" elements is then
+					// a GAP, not a width - which is where the non-multiple-of-4 "widths" (43B, 47B, 53B...) come
+					// from. Agreement is the cheap, record-supplied proof that a pair really is adjacent.
+					if (declared == located.Count)
+					{
+						frameAgrees++;
+						for (var i = 0; i + 1 < located.Count; i++)
+						{
+							var w = located[i + 1].Offset - located[i].Offset;
+							tiled.TryAdd(located[i].Kind, new Dictionary<int, (int, uint, uint[])>());
+							var seenSoFar = tiled[located[i].Kind];
+							var prior = seenSoFar.GetValueOrDefault(w);
+
+							// The words a measured element carries PAST its key list. Same reason the ceiling pass
+							// prints them: "ChangeHitPercent disagrees" is a shrug, "ChangeHitPercent is followed by
+							// four 0xFF words - the key list's own terminator value" is a lead.
+							var want = GameActionTypes.Get(located[i].Kind) is { IsFixedWidth: true } ft ? 4 * ft.WidthWords : 0;
+							var extra = prior.Count == 0 && want > 0 && w > want
+								? Enumerable.Range(0, (w - want) / 4)
+									.Select(k => BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(12 + located[i].Offset + want + 4 * k))).ToArray()
+								: prior.Extra;
+							seenSoFar[w] = (prior.Count + 1, prior.Count == 0 ? e.Id : prior.First, extra);
+						}
+					}
+				}
 
 				var (start, count) = RdbFeatImporter.EffectTail(body);
 				if (count <= 0 || start + 4 > body.Length)
@@ -2460,7 +2518,8 @@ namespace Faolan.Importer.Cli
 				// and "AddSkinnedMesh is followed by `2 9 207912`". Both surpluses seen so far are trailing RECORD
 				// content, not element bytes: `Modify`'s is a pair of list frames (0x7E2, 0x3F1) and
 				// `SetMorphValue`'s is an ASCII mesh name.
-				var predicted = 4 * (GameActionTypes.Get(kind)?.WidthWords ?? 0);
+				var fixedWidth = GameActionTypes.Get(kind) is { IsFixedWidth: true } fw ? fw : null;
+				var predicted = 4 * (fixedWidth?.WidthWords ?? 0);
 				if (predicted > 0 && width > predicted && !surplus.ContainsKey(kind))
 					surplus[kind] = (e.Id, [.. Enumerable.Range(0, (width - predicted) / 4)
 						.Select(i => BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(start + predicted + 4 * i)))]);
@@ -2471,11 +2530,24 @@ namespace Faolan.Importer.Cli
 			foreach (var (kind, seen) in widths.OrderByDescending(k => k.Value.Values.Sum()))
 			{
 				var type = GameActionTypes.Get(kind);
-				var predicted = type != null ? $"{4 * type.WidthWords}B {type.Name}" : "<unregistered>";
-				var agrees = type != null && seen.Keys.Contains(4 * type.WidthWords) ? "" : "   <-- DISAGREES";
+				var predicted = type == null ? "<unregistered>" : type.IsFixedWidth ? $"{4 * type.WidthWords}B {type.Name}" : $"VARIABLE (a text slot) {type.Name}";
+				var agrees = type == null || !type.IsFixedWidth || seen.Keys.Contains(4 * type.WidthWords) ? "" : "   <-- DISAGREES";
 				Console.WriteLine($"  0x{kind:X4}  {string.Join(", ", seen.OrderByDescending(w => w.Value).Select(w => $"{w.Key}B x{w.Value}"))}   predicted {predicted}{agrees}");
 				if (surplus.TryGetValue(kind, out var extra))
 					Console.WriteLine($"            surplus in {extra.Id}: {string.Join(" ", extra.Words.Select(w => $"{w} (0x{w:X})"))}");
+			}
+
+			Console.WriteLine();
+			Console.WriteLine($"element regions: {regions}   with a readable 0x3F1 frame: {framed}   whose count matches the elements found: {frameAgrees}");
+			Console.WriteLine("kind -> width(s) MEASURED by tiling (an element's start to the NEXT element's start), vs the width its KEY LIST predicts:");
+			foreach (var (kind, seen) in tiled.OrderByDescending(k => k.Value.Values.Sum(v => v.Count)))
+			{
+				var type = GameActionTypes.Get(kind);
+				var predicted = type == null ? "<unregistered>" : type.IsFixedWidth ? $"{4 * type.WidthWords}B {type.Name}" : $"VARIABLE (a text slot) {type.Name}";
+				var agrees = type == null || !type.IsFixedWidth || seen.Keys.All(w => w == 4 * type.WidthWords) ? "" : "   <-- DISAGREES";
+				Console.WriteLine($"  0x{kind:X4}  {string.Join(", ", seen.OrderByDescending(w => w.Value.Count).Select(w => $"{w.Key}B x{w.Value.Count} (e.g. {w.Value.First})"))}   predicted {predicted}{agrees}");
+				foreach (var (width, hit) in seen.Where(w => w.Value.Extra is { Length: > 0 }))
+					Console.WriteLine($"            {width}B carries {hit.Extra.Length} word(s) past the key list, in {hit.First}: {string.Join(" ", hit.Extra.Select(w => $"{w} (0x{w:X})"))}");
 			}
 		}
 

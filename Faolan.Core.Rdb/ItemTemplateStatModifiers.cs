@@ -91,15 +91,32 @@ namespace Faolan.Core.Rdb
 				// How many values follow is a property of the KIND, not a constant: an element carries exactly one
 				// u32 per key-list entry (docs/re/gameactionlist-grammar.md). An unregistered kind gets the two the
 				// old fixed-10-word reader assumed, which is all any caller of the pair readers below ever used.
-				var keys = GameActionTypes.Get(kind)?.Keys.Length ?? 2;
-				if (off + 24 + 4 * keys > body.Length)
-					continue;
+				var type = GameActionTypes.Get(kind);
 
-				var values = new uint[keys];
-				for (var i = 0; i < keys; i++)
+				// A type with a TEXT slot is variable-width: that slot is `[u32 len][bytes]`, so every slot after it
+				// sits at an offset only a string-aware reader knows. Emit the element - it is real, and its position
+				// is what the width harvest measures - but with NO values, because a positional read past the string
+				// would report the string's LENGTH as a stat id and the bytes after it as a magnitude. That is where
+				// `SetMorphValue`'s mesh name was coming from. Reading them properly is Gitea #596.
+				if (type is { IsFixedWidth: false })
+				{
+					elements.Add(new Element(off - 8, kind, []));
+					continue;
+				}
+
+				var keys = type?.Keys.Length ?? 2;
+
+				// Read as many slots as the body HOLDS, not as many as the key list wants. Where an element is
+				// followed by too few bytes for its full payload, dropping it would hide the one thing worth seeing:
+				// an element narrower than its type says (Gitea #595). It is still reported - with a short value
+				// array, so `Value(key)` returns null for the slots that are not there and every caller that needs a
+				// whole modifier rejects it on its own terms rather than on this scan's silence.
+				var avail = Math.Clamp((body.Length - (off + 24)) / 4, 0, keys);
+				var values = new uint[avail];
+				for (var i = 0; i < avail; i++)
 					values[i] = W(body, off + 24 + 4 * i);
 
-				elements.Add(new Element(kind, values));
+				elements.Add(new Element(off - 8, kind, values));
 			}
 
 			return elements;
@@ -141,8 +158,14 @@ namespace Faolan.Core.Rdb
 		///     (docs/re/gameactionlist-grammar.md). <see cref="Value" /> addresses a slot BY KEY, which is what makes
 		///     a reader independent of where the slot sits - the stat is payload word 0 on `Modify` and word 1 on
 		///     `SpellStatModifier`.
+		///     <para>
+		///         <paramref name="Offset" /> is the byte offset of the element's opening TYPE word within the body
+		///         that was scanned. It is what lets a caller measure a width instead of assuming one: the distance
+		///         between two consecutive elements is that element's width, measured rather than predicted
+		///         (`--report feat-effect-widths`, Gitea #595).
+		///     </para>
 		/// </summary>
-		public readonly record struct Element(uint Kind, uint[] Values)
+		public readonly record struct Element(int Offset, uint Kind, uint[] Values)
 		{
 			/// <summary>The registered type, or null when the kind is not a GameAction the client knows.</summary>
 			public GameActionType? Type => GameActionTypes.Get(Kind);

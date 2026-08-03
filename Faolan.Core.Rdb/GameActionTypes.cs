@@ -9,8 +9,17 @@ namespace Faolan.Core.Rdb
 	/// </summary>
 	public sealed record GameActionType(uint Id, string Name, int[] Keys)
 	{
-		/// <summary>Element width in u32 words: the 8-word prefix plus one value per key.</summary>
+		/// <summary>
+		///     Element width in u32 words: the 8-word prefix plus one value per key. Meaningful only when
+		///     <see cref="IsFixedWidth" /> - a TEXT slot is not one word.
+		/// </summary>
 		public int WidthWords => 8 + Keys.Length;
+
+		/// <summary>
+		///     False when any slot holds TEXT, which makes the element variable-width and <see cref="WidthWords" />
+		///     a fiction. See <see cref="GameActionTypes.TextKeys" />.
+		/// </summary>
+		public bool IsFixedWidth => System.Array.TrueForAll(Keys, k => !GameActionTypes.TextKeys.Contains(k));
 
 		/// <summary>Payload slot carrying the given key, or -1.</summary>
 		public int SlotOf(int key)
@@ -36,6 +45,22 @@ namespace Faolan.Core.Rdb
 		public const int KeyValue = 39;
 		public const int KeyAmount = 175;
 		public const int KeySpell = 88;    // the slot SpellStatModifier carries where SpellLineStatModifier has KeyLine
+
+		/// <summary>
+		///     Keys whose slot holds TEXT rather than a u32 - `[u32 byteLength][bytes, the NUL included]` - which is
+		///     what makes an element carrying one VARIABLE-width, so `8 + len(keyList)` does not describe it.
+		///     <para>
+		///         Measured, not assumed (Gitea #595): tiling gives `HeadText` (key `209` EventString, then `39`) a
+		///         width of **47 bytes** in feat 12362 - not a multiple of four, which no all-u32 layout can produce -
+		///         and the bytes there read `[u32 7]["Dimach\0"][u32 3]`. The same key explains `SetMorphValue`'s
+		///         67-byte record, whose surplus the earlier ceiling measurement filed as trailing record content when
+		///         it was this slot's mesh name all along.
+		///     </para>
+		///     ⚠️ `209` is the only key PROVEN to be text; the client reads a string for two `GameActionStat_e` ids
+		///     (`0x4d9`/`0x4da`, docs/re/gameactionlist-grammar.md) and which key indices those are is open work -
+		///     an unregistered kind in the same record (53044) also carries a string, under a key list we do not have.
+		/// </summary>
+		public static readonly System.Collections.Generic.HashSet<int> TextKeys = [209];
 
 		private static readonly Dictionary<uint, GameActionType> ById = new()
 		{

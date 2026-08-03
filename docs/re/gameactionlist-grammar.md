@@ -105,17 +105,61 @@ initialiser) against measured width (`--report feat-effect-widths`, from single-
 | 53182 | `SpecialAbility` | `39`(Value)`,77`(Hash)`,84`(Level)`,174`(Substate) | 12 |
 | 53213 / 53211 | `AddProc` / `AddSpellProc` | six | 14 |
 
-⚠️ **The measurement is an upper BOUND, not the width** — `recordLength - elementStart` also swallows whatever
+⚠️ **That measurement is an upper BOUND, not the width** — `recordLength - elementStart` also swallows whatever
 the record carries after the element list, which is why an exact match on 17 kinds is the strong result and a
-surplus is not automatically a disagreement. `--report feat-effect-widths` now prints the surplus words, and both
-that occur are trailing RECORD content rather than element bytes: `AddSkinnedMesh` (measured 12 words, predicted
-9) is followed by `2 9 207912`, and `SetMorphValue` by an ASCII mesh name — while `Modify`'s wide variants are
-followed by a pair of list frames (`0x7E2`, `0x3F1`). The element width itself is confirmed independently by
-MULTI-element records, where the elements sit back to back with nothing between them: feat 217728 carries four
-`AddSkinnedMesh` elements at exactly 9 words each.
+surplus is not automatically a disagreement. `--report feat-effect-widths` prints the surplus words: `Modify`'s
+wide variants are followed by a pair of list frames (`0x7E2`, `0x3F1`), and `AddSkinnedMesh` (measured 12 words,
+predicted 9) by `2 9 207912`.
 
-The one real miss is `Charge` — predicted 13 words, measured 8, i.e. an element with NO payload words at all. It
-is a single record and is more likely a coincidental prefix hit than a real element.
+### Widths measured by TILING — exact, on 27 kinds (#595)
+
+The bound above only exists because a single-element record has no end marker but its own. Elements sit **back to
+back with nothing between them**, so a record holding SEVERAL measures the non-final ones *exactly*: the distance
+from an element's opening type word to the next element's IS its width. The same report now makes that second,
+independent measurement over 15,987 element regions, tallying a width only where the region's own `0x3F1` frame
+count agrees with the elements the signature walk found (15,880 of them do) — agreement being the record's own
+cheap proof that two elements really are adjacent rather than separated by trailing content.
+
+It reaches **27 kinds against the ceiling pass's 17**, all exact, and settles both of that pass's open readings:
+
+- `AddSkinnedMesh` tiles at exactly **9 words**, so its 12-word ceiling was trailing record content — *not* the
+  string-valued key it looked like.
+- `Charge` never occurs as a non-final element, so its lone 8-word reading stays what it was: probably a
+  coincidental signature hit rather than an element.
+
+### The width model has ONE exception: a TEXT slot
+
+`8 + len(keyList)` describes an element whose every slot is a u32. **Key `209` (`EventString`) is text**, written
+`[u32 byteLength][bytes, the NUL included]`, which makes any element carrying it variable-width. Measured, not
+assumed: a `HeadText` element in feat 12362 tiles at **47 bytes** — not a multiple of four, which no all-u32
+layout can produce — and reads `[u32 7]["Dimach\0"][u32 3]`. The same key is what `SetMorphValue`'s 67-byte record
+was carrying all along, filed as "an ASCII mesh name" after the element when it is a slot *inside* it.
+
+`GameActionTypes.TextKeys` holds the keys proven text (just `209`), `GameActionType.IsFixedWidth` reports the
+consequence, and `ItemTemplateStatModifiers.ParseElements` locates such an element but yields **no** positional
+values for it — reading them would take the string's length for the first slot. ⚠️ The client reads a string for
+two `GameActionStat_e` ids (`0x4d9`/`0x4da`, below) and *which key indices those are* is still open: an
+unregistered kind in that same record (53044) also carries a string, under a key list we do not have. Gitea #596.
+
+### Two shipped-data anomalies, both confined and both characterised
+
+Tiling leaves exactly two kinds disagreeing, and neither is the model being wrong:
+
+- **`SpellStatModifier` (53054) at 10 words, ×7** — feat `Swift Pathing` ranks 4–10 (templates 5031395..5031401).
+  Each record holds two of them tiling it end to end at ten words, and their payload is a plain `(Stat, Value)`
+  pair: **Ride Skill** `5,7,8,10,11,13,14` and **Player Flags** `5`. Those are byte-identical to what the
+  `Basic Riding` family (115944..115953) carries at the same ranks under the *correct* type words — `Modify`
+  (53045) and `SetFlag` (53139), both two-key/ten-word types. Ranks 1–3 of the same family (5031392..5031394,
+  234 B) carry genuine twelve-word `SpellStatModifier` elements (casting time on spells 3663303 / 4054483). So
+  **the type word is stale, not the width**: it survived from ranks 1–3 while the payload was replaced with
+  `Basic Riding`'s. Read at twelve words, the first element's `Value` slot lands on the following element's
+  `0xCF3E`, which is what `RdbFeatImporter.ParseSpellStatModifiers` rejects on.
+- **`ChangeHitPercent` (53030) at 15 words, ×6** — the `Dimach Item k1/k2/k3` crafting entries (e.g. 12362). Its
+  three values (43464, 100, 100) are followed by **four `0x000000FF` words** — the key list's own terminator value,
+  as padding. Also Gitea #596.
+
+Neither is reachable as a stat modifier: the importer rejects both on general rules (a magnitude that is a
+registered GameAction type id was never ours; a stat outside the id range likewise), not by name.
 
 **Key indices that carry a name** (recovered from the types that name their own slots; a name transfers by KEY,
 so it resolves that slot on every type that uses it): `0` Stat, `11` Radius, `17..20` AudioEffect*, `24`
