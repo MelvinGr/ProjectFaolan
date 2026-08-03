@@ -485,11 +485,19 @@ namespace Faolan.Importer.Rdb
 		//
 		// It also carries the KIND, which the hand-rolled version dropped: a 53067 record is a PERCENT modifier, so
 		// reading it as flat turns "+2% Critical Rating" into "+200".
+		//
+		// ⚠️ `ParseStatModifiers`, not `Parse` (Gitea #597). `Parse` is the POSITIONAL pair view - payload words 0 and
+		// 1, whatever they mean - and (stat, value) is only where those words sit on `Modify`. Of the 29 kinds the
+		// feat catalog carries, five put a stat in word 0 and a magnitude in word 1; the rest were imported as
+		// nonsense, the worst of them `DisplayLearnAbility` (Line, 187), whose 110 rows read as `Health += 4232751`
+		// because word 0 happened to be 1. `--report feat-effect-kinds` prints the census the gate is built on.
+		// The excluded ones are not lost: the spell- and line-scoped kinds have their own tables (#590/#593), and
+		// what remains is undecoded rather than dropped.
 		public static IReadOnlyList<ItemTemplateStatModifiers.Modifier> ParseEffects(byte[] body)
 		{
 			return body.Length <= 12
 				? []
-				: [.. ItemTemplateStatModifiers.Parse(body.AsSpan(12)).Where(m => m.Kind != TagRecordKind)];
+				: [.. ItemTemplateStatModifiers.ParseStatModifiers(body.AsSpan(12)).Where(m => m.Kind != TagRecordKind)];
 		}
 
 		// The feat's SPELL modifiers (#590): the records the stat parser REJECTS, because their payload's first word

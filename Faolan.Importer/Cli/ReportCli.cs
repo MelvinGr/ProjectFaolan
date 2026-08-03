@@ -318,6 +318,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "feat-effect-kinds":
+				{
+					FeatEffectKinds(RdbDir(), arg);
+					return 0;
+				}
+
 				case "feat-record":
 				{
 					FeatRecord(RdbDir(), arg);
@@ -2548,6 +2554,110 @@ namespace Faolan.Importer.Cli
 				Console.WriteLine($"  0x{kind:X4}  {string.Join(", ", seen.OrderByDescending(w => w.Value.Count).Select(w => $"{w.Key}B x{w.Value.Count} (e.g. {w.Value.First})"))}   predicted {predicted}{agrees}");
 				foreach (var (width, hit) in seen.Where(w => w.Value.Extra is { Length: > 0 }))
 					Console.WriteLine($"            {width}B carries {hit.Extra.Length} word(s) past the key list, in {hit.First}: {string.Join(" ", hit.Extra.Select(w => $"{w} (0x{w:X})"))}");
+			}
+		}
+
+		// --report feat-effect-kinds [--report-arg <kind>]
+		//
+		// Every effect KIND the feat catalog actually carries, with the key list the client registers for it, and -
+		// the point of the report - what the two readings of the same element DISAGREE about (Gitea #597).
+		//
+		// `ItemTemplateStatModifiers.Modifier` is the PAIR view: payload words 0 and 1, whatever they mean. That is
+		// (stat, value) for `Modify` and for nothing else in particular - `InterpolatedModify` puts a Substate in word
+		// 1 and its Amount in word 3, `TargetSpellLineStatModifier` puts a spell LINE in word 0 and the stat in word
+		// 1, `AddPercentSkillModifier` has no stat slot at all. So the report prints, per kind, the pair a positional
+		// read yields beside the values the KEY-addressed read yields for the same element, and flags every kind where
+		// they differ. A kind whose stat/amount keys are not in slots 0/1 is one the pair view cannot import.
+		private static void FeatEffectKinds(string rdbDir, string? arg)
+		{
+			// `<type>/<kind>` - the same spelling `feat-record` uses. Spell templates (1040005) share the record
+			// layout and the same region parser, so the same census answers "does this kind read the same way for a
+			// spell", which is what ties a decode to the in-client tooltips we have for spells.
+			var spec = (arg ?? "").Split('/', 2, StringSplitOptions.TrimEntries);
+			var templateType = spec.Length == 2 && uint.TryParse(spec[0], out var t) ? t : FeatTemplateType;
+			var only = uint.TryParse(spec[^1], out var k) ? k : 0u;
+			using var rdb = new RdbReader(rdbDir);
+
+			// Per kind: how many elements carry it, one sample (feat id + name + the whole payload), and whether the
+			// pair view and the key-addressed view agree on that sample.
+			var seen = new Dictionary<uint, (int Count, uint FeatId, string FeatName, uint[] Values)>();
+			// Every distinct payload of the FILTERED kind, so a single-kind run reads as a census of that kind's
+			// slots rather than one sample - which is what makes "slot 1 tracks the tooltip, slot 3 does not"
+			// checkable instead of asserted.
+			var samples = new List<(uint Id, string Name, uint[] Values)>();
+
+			foreach (var e in rdb.EntriesOfType(templateType))
+			{
+				if (e.Size == 0)
+					continue;
+
+				byte[] body;
+				try
+				{
+					body = rdb.ReadDecompressed(e);
+				}
+				catch
+				{
+					continue;
+				}
+
+				if (body.Length < 48 || BinaryPrimitives.ReadUInt32LittleEndian(body) != templateType)
+					continue;
+
+				var name = RdbFeatImporter.ReadNameAndDescription(body).Name;
+				foreach (var element in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+				{
+					if (only != 0 && element.Kind != only)
+						continue;
+
+					var prior = seen.GetValueOrDefault(element.Kind);
+					seen[element.Kind] = prior.Count == 0
+						? (1, e.Id, name, element.Values)
+						: (prior.Count + 1, prior.FeatId, prior.FeatName, prior.Values);
+					if (only != 0)
+						samples.Add((e.Id, name, element.Values));
+				}
+			}
+
+			Console.WriteLine("kind -> key list, and what the POSITIONAL pair view reads vs the KEY-addressed one.");
+			Console.WriteLine("A kind whose Stat (key 0) is not payload word 0, or whose magnitude key is not word 1, is MISREAD by the pair view.");
+			Console.WriteLine();
+
+			foreach (var (kind, hit) in seen.OrderByDescending(s => s.Value.Count))
+			{
+				var type = GameActionTypes.Get(kind);
+				var keys = type == null ? "<unregistered>" : $"[{string.Join(", ", type.Keys)}]";
+				Console.WriteLine($"  {kind}  x{hit.Count,-6} {type?.Name ?? "<unregistered>",-32} keys {keys}");
+
+				var statSlot = type?.SlotOf(GameActionTypes.KeyStat) ?? -1;
+				var valueSlot = type?.SlotOf(GameActionTypes.KeyValue) ?? -1;
+				var amountSlot = type?.SlotOf(GameActionTypes.KeyAmount) ?? -1;
+				var magnitudeSlot = amountSlot >= 0 ? amountSlot : valueSlot;
+				var verdict = statSlot == 0 && magnitudeSlot == 1
+					? "pair view OK (Stat @0, magnitude @1)"
+					: $"MISREAD: Stat @{(statSlot < 0 ? "none" : statSlot.ToString())}, magnitude @{(magnitudeSlot < 0 ? "none" : magnitudeSlot.ToString())}";
+				Console.WriteLine($"           {verdict}");
+
+				var payload = type == null
+					? string.Join(" ", hit.Values.Select((v, i) => $"[{i}]={v}"))
+					: string.Join(" ", type.Keys.Select((key, i) => $"{key}={(i < hit.Values.Length ? hit.Values[i].ToString() : "-")}"));
+				Console.WriteLine($"           e.g. feat {hit.FeatId} \"{hit.FeatName}\": {payload}");
+				Console.WriteLine($"           pair view would import (StatId={(hit.Values.Length > 0 ? hit.Values[0] : 0)}, "
+					+ $"Value={(hit.Values.Length > 1 ? hit.Values[1] : 0)})");
+			}
+
+			if (samples.Count == 0)
+				return;
+
+			var only_ = GameActionTypes.Get(only);
+			Console.WriteLine();
+			Console.WriteLine($"--- every {only} ({only_?.Name ?? "<unregistered>"}) element, by key:");
+			foreach (var (id, name, values) in samples.OrderBy(s => s.Name).ThenBy(s => s.Id))
+			{
+				var payload = only_ == null
+					? string.Join(" ", values.Select((v, i) => $"[{i}]={v}"))
+					: string.Join(" ", only_.Keys.Select((key, i) => $"{key}={(i < values.Length ? values[i].ToString() : "-")}"));
+				Console.WriteLine($"  {id,10} {name,-44} {payload}");
 			}
 		}
 

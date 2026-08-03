@@ -96,5 +96,48 @@ namespace Faolan.Tests
 				return (int)(mods.First(m => m.StatId == statId).WireAmount / ((CharacterStatId)statId).GetScale());
 			}
 		}
+
+		// #597: `Parse` is the POSITIONAL pair view - payload words 0 and 1 - and that is (stat, value) only for the
+		// kinds whose key list puts them there. `ParseStatModifiers` addresses BY KEY and drops the kinds that are not
+		// a modifier of the carrier's own stats at all. The payloads below are real feat records, from
+		// `--report feat-effect-kinds`.
+		[Fact]
+		public void ParseStatModifiers_ReadsTheStatByKeyAndDropsWhatIsNotOne()
+		{
+			uint[] words =
+			[
+				// `Modify` (53045) - [Stat, Value]. The one kind the pair view was right about.
+				53045, 0, 4, 0, 1, 0, 2, 9, 280, 2000,
+				// `DisplayLearnAbility` (53176) - [Line, 187]. No stat slot at all: the pair view read the Line word
+				// (1) as CharacterStatId.HealthMax and the ability ref as a +4232751 health bonus.
+				53176, 0, 4, 0, 1, 0, 2, 9, 1, 4232751,
+				// `SpellStatModifier` (53054) - [Spell, Stat, Value, Amount]. It HAS a stat, but the stat belongs to
+				// the SPELL, not the carrier - and the pair view filed the spell id as the stat id. Its own table is
+				// FeatSpellStatModifiers (#593).
+				53054, 0, 4, 0, 1, 0, 2, 9, 3962388, 347, 200, 0,
+				// `AddPercentSkillModifier` (53189) - [66, SkillType, 67, Value]. No stat slot; the pair view reported
+				// (66's value, a skill type).
+				53189, 0, 4, 0, 1, 0, 2, 9, 1095, 2, 1095, 5,
+				// `InterpolatedModify` (53220) - [Stat, low, lowLevel, high, highLevel]. A stat modifier, but its
+				// magnitude is key 174 and NOT key 175 `Amount`; the pair view landed on 174 by luck of position.
+				53220, 0, 4, 0, 1, 0, 2, 9, 1, 887, 20, 17500, 80
+			];
+			var body = new byte[4 + words.Length * 4];
+			for (var i = 0; i < words.Length; i++)
+				body.WriteU32Le(4 + i * 4, words[i]);
+
+			var mods = ItemTemplateStatModifiers.ParseStatModifiers(body);
+
+			Assert.Equal([53045u, 53220u], mods.Select(m => m.Kind));
+			Assert.Equal([280u, 1u], mods.Select(m => m.StatId));
+			Assert.Equal([2000u, 887u], mods.Select(m => m.WireAmount));
+
+			// ...where the positional view keeps four of the five, two of them nonsense - including the +4232751
+			// health. The one it does drop, `SpellStatModifier`, it drops only because that spell id happens to
+			// exceed the stat-id bound: a smaller one would have sailed through as a stat.
+			var positional = ItemTemplateStatModifiers.Parse(body);
+			Assert.Equal(4, positional.Count);
+			Assert.Contains(positional, m => m is { Kind: 53176, StatId: 1, WireAmount: 4232751 });
+		}
 	}
 }

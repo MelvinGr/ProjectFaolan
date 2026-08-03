@@ -122,6 +122,47 @@ namespace Faolan.Core.Rdb
 			return elements;
 		}
 
+		/// <summary>
+		///     The records that really are a modifier of the CARRIER's own stats, read BY KEY rather than by position
+		///     (Gitea #597). Three conditions, each of them a property of the type's key list rather than of the
+		///     bytes:
+		///     <list type="number">
+		///         <item>it has a <c>Stat</c> slot (key 0) - `NanoResistance` (152, Value), `DisplayLearnAbility`
+		///         (Line, 187) and `AddPercentSkillModifier` (66, SkillType, 67, Value) have none, so the pair view's
+		///         first word was a strain / an ability ref / an unnamed slot filed as a stat id;</item>
+		///         <item>it has a magnitude - <c>Value</c> (39), or the interpolated family's low endpoint (174) - so
+		///         a pure damage record (`Hit` is Stat + three unnamed slots) is not mistaken for a bonus;</item>
+		///         <item>it carries NO <c>Spell</c> (88) or <c>Line</c> (1) slot, because such a record modifies that
+		///         SPELL's properties rather than the carrier's stats. That is the whole of `SpellStatModifier` /
+		///         `SpellLineStatModifier` / `TargetSpellLineStatModifier`, which have their own table (#593).</item>
+		///     </list>
+		///     <para>
+		///         ⚠️ For the INTERPOLATED kinds the magnitude returned is the value at the ramp's LOW level, not a
+		///         level-independent bonus: the record is `lerp(low@lowLevel, high@highLevel)` over the carrier's
+		///         Casting/Apprentice Level (docs/re/gameactionlist-grammar.md). It is the same word the positional
+		///         reader happened to return, so nothing shifts by adopting this - but a consumer applying it to a
+		///         high-level character under-grants. Modelling the ramp is Gitea #599.
+		///     </para>
+		/// </summary>
+		public static IReadOnlyList<Modifier> ParseStatModifiers(ReadOnlySpan<byte> body)
+		{
+			var mods = new List<Modifier>();
+			foreach (var e in ParseElements(body))
+			{
+				if (e.Type is not { } type || type.SlotOf(GameActionTypes.KeySpell) >= 0 || type.SlotOf(GameActionTypes.KeyLine) >= 0)
+					continue;
+
+				var stat = e.Value(GameActionTypes.KeyStat);
+				var amount = e.Value(GameActionTypes.KeyValue) ?? e.Value(GameActionTypes.KeyLowValue);
+				if (stat is null or 0 or >= MaxStatId || amount is null)
+					continue;
+
+				mods.Add(new Modifier(e.Kind, stat.Value, amount.Value));
+			}
+
+			return mods;
+		}
+
 		// One element walk for both pair readers. `inStatRange` picks which side of the stat-id bound to keep.
 		private static IReadOnlyList<Modifier> Scan(ReadOnlySpan<byte> body, bool inStatRange)
 		{

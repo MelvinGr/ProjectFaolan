@@ -29,7 +29,24 @@ namespace Faolan.GameServer.Combat
 			return totals;
 		}
 
-		// Total stat bonus per stat across a character's trained FEATS (#251).
+		// The feat effect kinds whose Value is a FLAT addition to the stat, and so the only ones this sums (#597).
+		// The feat region is as heterogeneous as the spell one BuffStatEffects reads, and for the same reason - both
+		// are GameAction elements, and the KIND is what says how to read the payload:
+		//   53045  `Modify`             a flat delta. The bulk of the table.
+		//   53220  `InterpolatedModify` a flat delta too, but a LEVEL RAMP - the stored Value is the low endpoint,
+		//          53221 / 53068        so a high-level character is under-granted rather than mis-granted. Summed
+		//                               at that endpoint, which is what shipped before this gate existed; modelling
+		//                               the ramp needs the other three slots and is Gitea #599.
+		// Deliberately NOT summed, each for a different reason:
+		//   53067  `ModifyAsRating`     a PERCENT stored x100, so "+2% Critical Rating" would add +200. It scales a
+		//                               computed total; BuffStatEffects has the model, this aggregate does not.
+		//   53139  `SetFlag`            a flag WRITE, not a bonus - `Basic Riding` and every class feat carry
+		//                               (864 Player Flags, 5). Summing two of them invents flag 10.
+		//   53026  `Set`                an assignment, not an addition (`Ring of the Griffin` sets 149 Available
+		//                               Slots to 65535). Adding it to a base is meaningless.
+		private static readonly HashSet<uint> FlatFeatKinds = [53045, 53220, 53221, 53068];
+
+		// Total stat bonus per stat across a character's trained FEATS (#251), counting only the FLAT kinds above.
 		//
 		// ⚠️ NO GetScale() division here, unlike the gear path above. FeatEffect.Value is already a DISPLAY value:
 		// Strength (scale 10) carries 1..9 in the feat table, which as a raw wire value would be +0.1 Strength, and
@@ -40,7 +57,12 @@ namespace Faolan.GameServer.Combat
 		{
 			var totals = new Dictionary<CharacterStatId, int>();
 			foreach (var effect in effects)
+			{
+				if (!FlatFeatKinds.Contains(effect.EffectKind))
+					continue;
+
 				totals[effect.StatId] = totals.GetValueOrDefault(effect.StatId) + (int)effect.Value;
+			}
 
 			return totals;
 		}

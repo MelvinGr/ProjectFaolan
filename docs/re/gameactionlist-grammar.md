@@ -183,7 +183,16 @@ runtime-built by `FUN_01492c20`, which writes 243 of its 255 slots as constants,
 | 1 | 723 (`0x2d3`) | Line |
 | 39 | 761 (`0x2f9`) | Value |
 | 88 | 1123 (`0x463`) | Spell |
-| 175 | 1207 (`0x4b7`) | Amount |
+| 172 | 1204 (`0x4b4`) | ramp low LEVEL |
+| 173 | 1205 (`0x4b5`) | ramp high LEVEL |
+| 174 | 1206 (`0x4b6`) | ramp low VALUE (the client calls it `Substate`) |
+| 175 | 1207 (`0x4b7`) | Amount — and the ramp's high VALUE |
+
+Indices 172…174 are **derived**, not read out of the table: the interpolation code below reads exactly
+`{0x4b4, 0x4b5, 0x4b6, 0x4b7}` for a type whose key list is exactly `{0, 174, 172, 175, 173}`, so the four map onto
+each other; `175 → 0x4b7` is already known, `0x4b6` is the lerp's low endpoint and holds a magnitude (which of the
+remaining three is the second magnitude is settled by the shipped values), and `0x4b4 < 0x4b5` matches
+`172 < 173` in every record. Verify before leaning on it for a type outside this family.
 
 ⚠️ **The `GameActionStat_e` id is NOT an LDB-615 stat id**, however much it looks like one — 722…1269 lands inside
 that table's id range and one slot even collides with a real name (`84` → 1119 → "PvP Cold Invulnerability
@@ -210,6 +219,50 @@ what ties this word to the ordinary wire stat space (`CharacterStatId`) rather t
 Key `55` (`ChangeHitPercent` / `ChangeLineHitPercent`, values 1 or 2) is read ONLY by the element comparator
 `FUN_014a5670`, never by the tooltip: it participates in sorting/grouping and carries no rendered magnitude, so
 kind 53075's shipped `(line, percent)` decode does not depend on it.
+
+### The INTERPOLATED family is a LEVEL RAMP — keys `174`/`172`/`175`/`173`
+
+`InterpolatedModify` (53220), `InterpolatedTempChangeSkill` (53221) and `InterpolatedModifyAsRating` (53068) all
+carry `[0 Stat, 174 Substate, 172, 175 Amount, 173]`, and the client's own names for two of those slots
+(`Substate`, `Amount`) describe neither. Decompiled from the apply function `FUN_008b2320` — located by its
+`"InterpolatedModify target not a character.."` log line — and its two helpers `FUN_008c3970` / `FUN_008c39f0`
+(`[V1: tools/ghidra/StrXrefs.java]`, `[V1: tools/ghidra/DisasmFn.java]`):
+
+```
+FUN_008c39f0(x):                       # the interpolation FRACTION
+    lo = GetIntStat(0x4b4)             # key index 172
+    hi = GetIntStat(0x4b5)             # key index 173
+    x  = clamp(x, lo, hi)              # CMOVL / CMOVG at 008c3a20 / 008c3a25
+    return hi == lo ? 1.0 : (float)(x - lo) / (float)(hi - lo)
+
+FUN_008c3970():                        # what is interpolated OVER
+    x = element[0x4c]
+    if x == 0: x = caster.GetStat(element[0x40] == 1 ? 150 : 965, 0)
+    return FUN_008c39f0(x)
+
+FUN_008b2320:                          # the apply
+    t    = FUN_008c3970()
+    low  = GetIntStat(0x4b6)           # key index 174
+    high = GetIntStat(0x4b7)           # key index 175 `Amount`
+    stat = GetIntStat(0x2d2)           # key index 0   `Stat`
+    delta = (int)((float)(high - low) * t + (float)low)
+```
+
+Stat **150** is `Casting Level` and **965** is `Apprentice Level` (LDB 615, `--report ldb-stat-names`) — both
+effective-LEVEL stats — so the element reads:
+
+> modify `Stat` by a value ramped linearly from `174` at level `172` to `175` at level `173`, clamped at both ends.
+
+The shipped data agrees independently and could not by chance: across all 341 feat and 376 spell elements, keys
+`172`/`173` only ever hold `10`/`20`/`60` and `80`/`100`, and consecutive RANKS of one spell tile the level line
+without gaps or overlaps while their values stay continuous across the seam — `Battle Cry: Marshal the Ranks`
+runs `26@10 → 42@24`, `44@25 → 60@39`, `62@40 → 78@54`, `80@55 → 96@69`
+(`--report feat-effect-kinds --report-arg 1040005/53220`).
+
+This is why an element's magnitude cannot be taken positionally: word 1 is the ramp's LOW endpoint here and the
+whole magnitude on `Modify`. `ItemTemplateStatModifiers.ParseStatModifiers` reads by key and takes `174` for this
+family, which under-grants a character above `172` rather than mis-granting one; applying the ramp itself is
+Gitea #599.
 
 ## RE session 2026-07-10: element wire structure confirmed; both lookup tables are RUNTIME-built
 

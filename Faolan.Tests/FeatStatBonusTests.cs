@@ -12,6 +12,11 @@ namespace Faolan.Tests
 	// "feats do nothing much" rather than like a bug.
 	public class FeatStatBonusTests
 	{
+		// `Modify` - the one kind that is a plain flat delta, and so what a fixture must carry to be summed at all
+		// (#597). Written out here rather than reached for from the aggregator, so a change to that set fails the
+		// tests instead of silently agreeing with them.
+		private const uint Modify = 53045;
+
 		[Fact]
 		public void AggregateFeatBonuses_DoesNotApplyTheWireScale()
 		{
@@ -19,8 +24,8 @@ namespace Faolan.Tests
 			// would land as 0 and +500 health as 5.
 			var effects = new[]
 			{
-				new FeatEffect { StatId = CharacterStatId.Strength, Value = 3 },
-				new FeatEffect { StatId = CharacterStatId.HealthMax, Value = 500 }
+				new FeatEffect { StatId = CharacterStatId.Strength, EffectKind = Modify, Value = 3 },
+				new FeatEffect { StatId = CharacterStatId.HealthMax, EffectKind = Modify, Value = 500 }
 			};
 
 			var totals = MaxStatAggregator.AggregateFeatBonuses(effects);
@@ -36,9 +41,9 @@ namespace Faolan.Tests
 		{
 			var effects = new[]
 			{
-				new FeatEffect { StatId = CharacterStatId.AttackRatingOneHandedEdged, Value = 720 },
-				new FeatEffect { StatId = CharacterStatId.AttackRatingOneHandedBlunt, Value = 720 },
-				new FeatEffect { StatId = CharacterStatId.AttackRatingOneHandedEdged, Value = 960 }
+				new FeatEffect { StatId = CharacterStatId.AttackRatingOneHandedEdged, EffectKind = Modify, Value = 720 },
+				new FeatEffect { StatId = CharacterStatId.AttackRatingOneHandedBlunt, EffectKind = Modify, Value = 720 },
+				new FeatEffect { StatId = CharacterStatId.AttackRatingOneHandedEdged, EffectKind = Modify, Value = 960 }
 			};
 
 			var totals = MaxStatAggregator.AggregateFeatBonuses(effects);
@@ -51,6 +56,36 @@ namespace Faolan.Tests
 		public void AggregateFeatBonuses_IsEmptyForACharacterWithNoReadableEffects()
 		{
 			Assert.Empty(MaxStatAggregator.AggregateFeatBonuses([]));
+		}
+
+		// #597: the feat region is heterogeneous and the KIND is what says how to read Value, exactly as it is for the
+		// spell region BuffStatEffects reads. A percent record added as flat turns "+2% Critical Rating" into +200,
+		// and a `SetFlag` record - which every class feat carries as (864 Player Flags, 5) - is a flag write that two
+		// feats would sum into flag 10.
+		[Theory]
+		[InlineData(53067u)] // ModifyAsRating - a PERCENT, stored x100
+		[InlineData(53139u)] // SetFlag        - a flag write, not a bonus
+		[InlineData(53026u)] // Set            - an assignment, not an addition
+		public void AggregateFeatBonuses_IgnoresTheKindsThatAreNotAFlatDelta(uint kind)
+		{
+			var effects = new[]
+			{
+				new FeatEffect { StatId = CharacterStatId.CriticalRating, EffectKind = Modify, Value = 7 },
+				new FeatEffect { StatId = CharacterStatId.CriticalRating, EffectKind = kind, Value = 200 }
+			};
+
+			Assert.Equal(7, MaxStatAggregator.AggregateFeatBonuses(effects)[CharacterStatId.CriticalRating]);
+		}
+
+		// The level-ramp family (53220 `InterpolatedModify` and its two twins) IS a flat delta - the stored Value is
+		// the ramp's low endpoint, so it under-grants a high-level character rather than mis-granting one. Summed on
+		// purpose; the ramp itself is Gitea #599.
+		[Fact]
+		public void AggregateFeatBonuses_SumsTheInterpolatedKindsAtTheirLowEndpoint()
+		{
+			var effects = new[] { new FeatEffect { StatId = CharacterStatId.HealthMax, EffectKind = 53220, Value = 887 } };
+
+			Assert.Equal(887, MaxStatAggregator.AggregateFeatBonuses(effects)[CharacterStatId.HealthMax]);
 		}
 
 		// Gear and feats are separate sources of one additive total - the simulation takes a single table.

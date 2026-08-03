@@ -46,6 +46,14 @@ namespace Faolan.Core.Rdb
 		public const int KeyAmount = 175;
 		public const int KeySpell = 88;    // the slot SpellStatModifier carries where SpellLineStatModifier has KeyLine
 
+		// The four slots of the INTERPOLATED family (53220 `InterpolatedModify`, 53221 `InterpolatedTempChangeSkill`,
+		// 53068 `InterpolatedModifyAsRating`, all `[Stat, 174, 172, 175, 173]`). The client names 174 `Substate` and
+		// 175 `Amount`; what they actually are is the two ENDPOINTS of a level ramp, and 172/173 the levels they are
+		// reached at - see docs/re/gameactionlist-grammar.md for the decompiled lerp (Gitea #597).
+		public const int KeyLowValue = 174;
+		public const int KeyLowLevel = 172;
+		public const int KeyHighLevel = 173;
+
 		/// <summary>
 		///     Keys whose slot holds TEXT rather than a u32 - `[u32 byteLength][bytes, the NUL included]` - which is
 		///     what makes an element carrying one VARIABLE-width, so `8 + len(keyList)` does not describe it.
