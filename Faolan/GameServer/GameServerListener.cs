@@ -32,7 +32,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IGameServerProvider
+	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IQuestShareOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -209,6 +209,9 @@ namespace Faolan.GameServer
 		// The multi-stage quest-chain supersession engine (#261), shared by the kill/loot/talk triggers.
 		private readonly QuestProgressionService _questProgression;
 
+		// Quest SHARING (#101): reaches the team roster through the CS seam and the wire through IQuestShareOutbound.
+		private readonly QuestSharingService _questSharing;
+
 		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/ShopService.cs.
 		private readonly ShopService _shop;
@@ -278,6 +281,7 @@ namespace Faolan.GameServer
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality);
 			_spellweave = new SpellweaveService(logger, this);
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression);
+			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, this, _questProgression, logger);
 			_stockConversation = new StockConversationService(logger, database);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, agentServerDispatcher, logger);
 			_keepAlive = new KeepAliveService(_simulation.Metrics);
@@ -403,7 +407,12 @@ namespace Faolan.GameServer
 			// A trade cannot outlive either connection. Nothing has moved at this point - the exchange only happens on the
 			// double accept - so there is nothing to roll back, just state to drop.
 			if (client.Session.Character is { } tradingCharacter)
+			{
 				_trade.Abandon(tradingCharacter.Id);
+				// Same rule for a quest share offered TO this player: the window is gone with the connection, so the
+				// offer must be too - otherwise a reconnect could accept one made minutes ago on the other side of the map.
+				_questSharing.Forget(tradingCharacter.Id);
+			}
 
 			// A logout also leaves the team - otherwise the roster keeps a member nobody can reach, and the next join
 			// broadcast pushes at a dead connection. Retail dissolves a one-member team, which TeamService does too.

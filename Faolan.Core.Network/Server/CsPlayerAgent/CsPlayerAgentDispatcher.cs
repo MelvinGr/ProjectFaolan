@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Faolan.Core.Network.Server.CsPlayerAgent
@@ -24,6 +25,11 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		{
 			var provider = Provider;
 			return provider != null && await provider.KickFromTeam(leaderId, targetId);
+		}
+
+		public IReadOnlyList<uint> TeamMembersOf(uint characterId)
+		{
+			return Provider?.TeamMembersOf(characterId) ?? [];
 		}
 	}
 }

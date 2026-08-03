@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Faolan.Core.Network.Server.CsPlayerAgent
@@ -28,5 +29,12 @@ namespace Faolan.Core.Network.Server.CsPlayerAgent
 		///     the caller is not the team's leader, so the caller can surface the refusal rather than assume it worked.
 		/// </summary>
 		Task<bool> KickFromTeam(uint leaderId, uint targetId);
+
+		/// <summary>
+		///     Every member of <paramref name="characterId" />'s team, INCLUDING that character, or empty when solo. The
+		///     read half of the same ownership split: a quest share (#101) arrives on the game connection and has to know
+		///     who the sharer's team-mates are, and the roster lives here.
+		/// </summary>
+		IReadOnlyList<uint> TeamMembersOf(uint characterId);
 	}
 }

@@ -176,6 +176,36 @@ and the decrement in one go.
 
 ---
 
+## Quest sharing
+
+### The quest-share message bodies
+**Tracked: Gitea #101.** [V0: the quest-share message bodies] No capture performs a quest share — teams, trade and
+the friend list all came off `login_2-clients_group-trade-friend`, but neither client in it ever shares a quest — so
+the five `0x2047`-`0x2054` bodies ([`../subsystems/quest-sharing.md`](../subsystems/quest-sharing.md)) are recovered
+from the client's own readers rather than observed, and nothing gates them byte-exactly. Two of the recovered facts
+would have been guessed wrong: `ShareQuestAccepted`'s `InstanceID_t` is **one** u32 (its proxy `FUN_00500960`
+byte-swaps a single dword and streams 4 bytes, where the ID32 writer streams 8), and
+`DispatchQuestShareIndividualFeedback`'s `i_cFeedbackValue` is a **string**, not the ID32 its `i_c` prefix implies
+(`FUN_004c5a50` calls the string primitive). Closing this needs a retail two-client share on tape, or an in-client
+check that the window opens and the accept grants.
+
+### The quest-share feedback codes
+**Tracked: Gitea #101.** [V0: the quest-share feedback codes] The twelve codes and which of the two feedback methods
+each rides are read off the client's two jump tables (`FUN_01396ef0` accepts 0,1,2,5,6,7; `FUN_013970e0` accepts
+3,4,8,9,10,11), and each case's LDB message key names it. That makes the SET exhaustive and the names certain. What
+it does not settle is when retail SENDS each one, and two are not implementable from it at all:
+`ShareFeedbackLevelTooLow` / `…TooHigh` need the level band a share is checked against, which no field of the quest
+catalog states, and `ShareFeedbackDoesNotHaveExpansion` needs a per-account expansion entitlement we do not model.
+
+### The quest-share range and timeout
+**Tracked: Gitea #101.** [V0: the quest-share range and timeout] The share window's own tick (`FUN_01220bb0`) drops
+it with `QuestSharePlayerMovedOutOfRange` once the sharer is further than **60.0** units, which is where the server's
+range test comes from — but that is the CLIENT's leash, and whether retail's server applies the same distance before
+offering (rather than only while the window is open) is not established. The window also times out on a countdown
+whose tick units are not pinned; nothing server-side depends on it, since the client closes its own window.
+
+---
+
 ## Guilds
 
 ### The guild bank's two message bodies

@@ -68,6 +68,13 @@ namespace Faolan.CSPlayerAgent
 			return _teams.Kick(leaderId, targetId);
 		}
 
+		public IReadOnlyList<uint> TeamMembersOf(uint characterId)
+		{
+			return _teams.TeamOf(characterId) is { } teamId
+				? _teams.MembersOf(teamId)
+				: [];
+		}
+
 		protected override async Task ReceivedPacket(INetworkClient client, Rpc packet)
 		{
 			var method = (CSPlayerAgentMethods)packet.Method;

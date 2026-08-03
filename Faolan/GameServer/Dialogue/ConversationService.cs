@@ -252,57 +252,6 @@ namespace Faolan.GameServer.Dialogue
 			return fallback;
 		}
 
-		// Reaching a conversation node that GRANTS a quest accepts it for the player: persist it ACTIVE and return its
-		// definition so ServeScreen can deliver the single QuestFullUpdate inline (the retail grant shape - see above).
-		// Returns null when the player already has the quest (re-serving the node must not re-grant) or it has no
-		// definition (state is still persisted; there is just nothing to render).
-		private async Task<QuestDefinition?> PrepareQuestGrant(INetworkClient client, ConversationNode node)
-		{
-			var character = client.Session.Character;
-
-			if (node.GrantQuestId is not { } questId)
-				return null; // this screen grants no quest
-
-			var existing = await _database.GetCharacterQuests(character.Id);
-			if (existing.Any(q => q.QuestId == questId))
-				return null; // already accepted (active) or completed - don't re-grant
-
-			var def = await _database.GetQuestDefinition(questId);
-
-			// Seed the quest's first objective so kills can advance it (#47): GoalRequired = the goal record's decoded
-			// count (QuestGoalDefinition.RequiredCount), GoalTargetName = the seeded kill target (QuestGoalDefinition.
-			// TargetName - server-side, sourced per quest since it's not on the wire). With both set,
-			// QuestProgressionService.AdvanceKillGoals matches a kill of that NPC and advances/completes the quest (e.g. Casilda's
-			// 13479 = kill 1 "Scavenger Tuut"). A talk/collect goal leaves TargetName null - no kill matching, count 0.
-			var firstGoal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
-			var goalRequired = firstGoal is { RequiredCount: > 0 }
-				? firstGoal.RequiredCount
-				: 0u;
-			var goalTargetName = firstGoal?.TargetName;
-
-			await _database.SetCharacterQuest(character.Id, questId, QuestState.Active, goalRequired: goalRequired, goalTargetName: goalTargetName);
-			_logger.LogInformation("Quest {QuestId} granted to {Name} from {NpcTemplate}'s dialogue (goalRequired={Req}, target={Target}).", questId, character.Name, node.NpcName, goalRequired,
-				goalTargetName ?? "-");
-			return def;
-		}
-
-		// Sends the two retail grant packets in order: the QuestLogList (populates the J-panel - all active quests,
-		// just-granted tracked first) then the QuestFullUpdate (the quest's detail). Order + presence both matter: the
-		// list is what makes the quest appear in the log (decoded from the grant capture).
-		private async Task SendQuestGrantPackets(INetworkClient client, QuestDefinition grantDef)
-		{
-			var character = client.Session.Character;
-			var active = await _database.GetCharacterQuests(character.Id, QuestState.Active);
-			var ids = new List<uint>
-			{
-				grantDef.QuestId
-			};
-			ids.AddRange(active.Where(q => q.QuestId != grantDef.QuestId).Select(q => q.QuestId));
-
-			await WorldBroadcaster.SendQuestLogList(client, grantDef, ids);
-			await _broadcaster.SendQuestFullUpdate(client, grantDef);
-		}
-
 		// Serves one dialogue SCREEN: re-addresses its captured response packets to the live player + clicked NPC and
 		// sends them, then records the screen as the session's position in the dialogue tree. Each ConversationNode IS
 		// one screen (the greeting, or an option's reply); the player's next KnubotAnswer picks the child.
@@ -345,8 +294,8 @@ namespace Faolan.GameServer.Dialogue
 			// AppendText -> QuestLogList (0x504B7924, the J-panel list) -> QuestFullUpdate (0x63268258, the detail) ->
 			// AnswerList, with NO QuestIIR and NO QuestJournal (capture randochar-login-get-casilda-quest frame 687-688).
 			// The QuestLogList is what POPULATES the log; sending only the full-update (the detail) leaves the log empty.
-			var grantDef = node.GrantQuestId is > 0
-				? await PrepareQuestGrant(client, node)
+			var grantDef = node.GrantQuestId is > 0 and { } grantQuestId
+				? await _questProgression.Grant(client, grantQuestId, $"{node.NpcName}'s dialogue")
 				: null;
 			var grantSent = false;
 
@@ -366,7 +315,7 @@ namespace Faolan.GameServer.Dialogue
 				// Deliver the quest packets immediately BEFORE the screen's AnswerList, mirroring retail's order.
 				if (grantDef != null && !grantSent && subOp == ConversationSubOpcode.KnubotAnswerList)
 				{
-					await SendQuestGrantPackets(client, grantDef);
+					await _questProgression.SendGrantPackets(client, grantDef);
 					grantSent = true;
 				}
 
@@ -380,7 +329,7 @@ namespace Faolan.GameServer.Dialogue
 			}
 
 			if (grantDef != null && !grantSent) // no AnswerList on this screen - send after the (terminal) screen
-				await SendQuestGrantPackets(client, grantDef);
+				await _questProgression.SendGrantPackets(client, grantDef);
 
 			// #241: accepting the quest changed the player's quest state, so the giver's '!' must update in-place
 			// (retail clears it to 0x00 the instant you accept - capture frame 698) rather than persisting until the

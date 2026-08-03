@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
@@ -36,6 +37,11 @@ namespace Faolan.GameServer.Quest
 		// `level` defaults to the quest's harvested QuestDefinition.Level (per-quest constant, #352); pass an explicit
 		// value only to override.
 		Task SendQuestFullUpdate(INetworkClient client, QuestDefinition def, uint? level = null);
+
+		// QuestLogList / MainQuestUpdate (0x504B7924): the active-quest LIST that POPULATES the J-panel, with
+		// `trackedDef` highlighted and `activeQuestIds` holding every active quest, tracked one first. Paired with
+		// SendQuestFullUpdate on a grant - the detail alone leaves the log empty.
+		Task SendQuestLogList(INetworkClient client, QuestDefinition trackedDef, IReadOnlyList<uint> activeQuestIds);
 
 		// QuestGoal (0x0774C8C1): tell the client what just happened to `goalId` - met, partially advanced, or closed
 		// so the quest can move to its next goal. It carries no running count; the journal holds that (#525).

@@ -676,7 +676,7 @@ namespace Faolan.GameServer
 				// no first objective and nothing to explain why, so a missing definition is corruption, not a case.
 				var beachDef = await Database.GetQuestDefinition(BeachStarterQuestId)
 					?? throw new InvalidOperationException($"The beach starter quest {BeachStarterQuestId} has no QuestDefinition - it is seed data, so this database is incomplete.");
-				await WorldBroadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
+				await _broadcaster.SendQuestLogList(client, beachDef, [BeachStarterQuestId]);
 				await _broadcaster.SendQuestFullUpdate(client, beachDef);
 				Logger.LogInformation("Create-world entry: delivered starter quest {QuestId} live to '{Name}'.", BeachStarterQuestId, character.Name);
 			}

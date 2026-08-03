@@ -55,6 +55,56 @@ namespace Faolan.GameServer.Quest
 			_logger = logger;
 		}
 
+		// ACCEPT a quest for the player: persist it ACTIVE with its first objective seeded, and return the definition so
+		// the caller can render it. Returns null when the player already holds it (accepting twice must not re-grant) or
+		// it has no definition - the state is persisted either way, there is just nothing to draw.
+		//
+		// Lives here rather than on the dialogue service because a grant has two callers now: a conversation node that
+		// hands the quest over, and a team-mate's accepted quest SHARE (#101). `source` is for the log line only.
+		public async Task<QuestDefinition?> Grant(INetworkClient client, uint questId, string source)
+		{
+			var character = client.Session.Character;
+
+			var existing = await _database.GetCharacterQuests(character.Id);
+			if (existing.Any(q => q.QuestId == questId))
+				return null; // already accepted (active) or completed - don't re-grant
+
+			var def = await _database.GetQuestDefinition(questId);
+
+			// Seed the quest's first objective so kills can advance it (#47): GoalRequired = the goal record's decoded
+			// count (QuestGoalDefinition.RequiredCount), GoalTargetName = the seeded kill target (QuestGoalDefinition.
+			// TargetName - server-side, sourced per quest since it's not on the wire). With both set, AdvanceKillGoals
+			// matches a kill of that NPC and advances/completes the quest (e.g. Casilda's 13479 = kill 1 "Scavenger
+			// Tuut"). A talk/collect goal leaves TargetName null - no kill matching, count 0.
+			var firstGoal = def?.Goals.OrderBy(g => g.Sequence).FirstOrDefault();
+			var goalRequired = firstGoal is { RequiredCount: > 0 }
+				? firstGoal.RequiredCount
+				: 0u;
+			var goalTargetName = firstGoal?.TargetName;
+
+			await _database.SetCharacterQuest(character.Id, questId, QuestState.Active, goalRequired: goalRequired, goalTargetName: goalTargetName);
+			_logger.LogInformation("Quest {QuestId} granted to {Name} from {Source} (goalRequired={Req}, target={Target}).", questId, character.Name, source, goalRequired,
+				goalTargetName ?? "-");
+			return def;
+		}
+
+		// The two retail grant packets in order: the QuestLogList (populates the J-panel - all active quests, the
+		// just-granted one tracked first) then the QuestFullUpdate (that quest's detail). Order AND presence both
+		// matter - the list is what makes the quest appear in the log at all (decoded from the grant capture).
+		public async Task SendGrantPackets(INetworkClient client, QuestDefinition grantDef)
+		{
+			var character = client.Session.Character;
+			var active = await _database.GetCharacterQuests(character.Id, QuestState.Active);
+			var ids = new List<uint>
+			{
+				grantDef.QuestId
+			};
+			ids.AddRange(active.Where(q => q.QuestId != grantDef.QuestId).Select(q => q.QuestId));
+
+			await _outbound.SendQuestLogList(client, grantDef, ids);
+			await _outbound.SendQuestFullUpdate(client, grantDef);
+		}
+
 		// A kill of the NPC (`templateId` = its NpcTemplateId, `npcName` = its name) by the player: advance any active
 		// kill goal targeting it. Matched primarily by the STABLE template id (the goal's TrailingRefId), with the name
 		// as a fallback for group-kill goals - see QuestProgress.MatchingKillGoal (#262). templateId is nullable (null =

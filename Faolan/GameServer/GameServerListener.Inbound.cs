@@ -1011,6 +1011,35 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				// 0x204F ShareQuest([ID32 quest]): offer a quest I hold to my team. The ID32's instance is the quest id;
+				// its class word is the client's own and is not a character class, so only the instance is used.
+				case GameCharAgentMethods.ShareQuest:
+				{
+					await _questSharing.Share(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
+					break;
+				}
+
+				// 0x2050 ShareQuestDeclined / 0x2052 ShareQuestBusy ([ID32 requester]): the target pressed No, or their
+				// client would not raise the window. The body names the REQUESTER, but who gets told is taken from our
+				// own pending map - the same rule the team accept and the trade start follow - so the echo is read only
+				// to keep the body accounted for.
+				case GameCharAgentMethods.ShareQuestDeclined:
+				case GameCharAgentMethods.ShareQuestBusy:
+				{
+					EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length));
+					await _questSharing.Decline(client.Session.Character.Id, method == GameCharAgentMethods.ShareQuestBusy);
+					break;
+				}
+
+				// 0x2051 ShareQuestAccepted(InstanceID_t): the target pressed Yes. `InstanceID_t` is ONE u32 on the wire
+				// (the client's proxy byte-swaps a single dword out of it), and the number is the `i_nStartTaskTemplate`
+				// we sent in DispatchQuestShareRequest, echoed back.
+				case GameCharAgentMethods.ShareQuestAccepted:
+				{
+					await _questSharing.Accept(client.Session.Character.Id, body.ReadUInt32());
+					break;
+				}
+
 				// 0x2054 RequestTeamQuestList() / 0x208D RequestMassivePvPScoreData(): both take NO arguments (the
 				// captured bodies are empty) and both ask for state we do not model - shared team quests and the
 				// massive-PvP scoreboard. Retail answers with DispatchUpdateTeamQuestList / the MassivePvPScore
