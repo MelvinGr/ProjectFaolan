@@ -193,10 +193,6 @@ namespace Faolan.GameServer.Dialogue
 			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
 				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
 
-			// Turn-in (#47): a CHAINLESS quest whose objective is already done completes when talking to its giver - the
-			// reply is the reward greeting and the journal moves to Completed. (Chained stages supersede below instead.)
-			await TryTurnInQuests(client, npcName);
-
 			// Pick the greeting in the player's CURRENT (pre-completion) quest state so a talk-stage shows its OWN
 			// dialogue: e.g. Casilda's "I'll protect you now" one-off is gated on HasQuest(13480), so it must be picked
 			// while 13480 is still active (#264).
@@ -206,10 +202,29 @@ namespace Faolan.GameServer.Dialogue
 
 			await ServeScreen(client, greeting, clickedNpcHandle);
 
-			// Quest chain (#261/#264): NOW complete the TalkToNpc goal (e.g. freeing Casilda, 13480 -> escort 12407),
-			// AFTER serving the greeting - so the freeing dialogue shows once, then the stage completes; the next talk
-			// sees the post-freeing (completed) state and gets the post-quest greeting. Matches retail (capture: open ->
-			// supersede -> options).
+			// #260 - SERVE FIRST, COMPLETE AFTER. Both quest-completion paths run here, after the text is on the wire,
+			// because that is the order retail sends them in. Two independent captures agree, on different characters
+			// and different quests:
+			//
+			//   compeltefirstquest  t=57.3 : KnubotOpenChatWindow -> KnubotAppendText "...{resolvegoal BJGY}{delay 1}"
+			//                                -> QuestGoal Satisfied -> QuestIIR 2 -> QuestJournal -> QuestIIR 4
+			//                                -> QuestFullUpdate (the next stage)
+			//   ...questcomplete    t=373.3: byte-for-byte the same order
+			//
+			// The GRANT side is the same shape (…questcomplete t=334.5: AppendText -> MainQuestUpdate ->
+			// QuestFullUpdate), so "text precedes state" is the rule for the whole dialogue, not a completion quirk.
+			//
+			// This ordering is also what makes the greeting PICK correct, which is the bug #260 actually reported.
+			// TryTurnInQuests used to run BEFORE PickConversationScreen: it flipped the quest to Completed, so the
+			// pick then matched the HasCompletedQuest variant and the player was handed the post-quest "already done"
+			// line instead of the turn-in line. Retail has no separate reward node to reach for - the turn-in text IS
+			// the in-progress variant, carrying an inline {resolvegoal <4CC>} directive - so serving pre-completion
+			// serves exactly the right screen.
+			await TryTurnInQuests(client, npcName);
+
+			// Quest chain (#261/#264): complete the TalkToNpc goal (e.g. freeing Casilda, 13480 -> escort 12407) - so
+			// the freeing dialogue shows once, then the stage completes; the next talk sees the post-freeing
+			// (completed) state and gets the post-quest greeting.
 			await _questProgression.AdvanceTalkGoals(client, npcName);
 			return true;
 		}
@@ -366,8 +381,10 @@ namespace Faolan.GameServer.Dialogue
 
 		// Completes any quest GIVEN by `npcName` whose objective is done (Active + GoalProgress >= GoalRequired): marks
 		// it Completed and sends QuestIIR state 2 -> 4 so the client journal moves it to the completed tab (#47). The
-		// kill only advances the objective; the quest is marked Completed here, on TURN-IN at the giver. Called as the
-		// player opens the giver's greeting, so the greeting condition (HasCompletedQuest) then serves the reward line.
+		// kill only advances the objective; the quest is marked Completed here, on TURN-IN at the giver. Called AFTER
+		// the greeting has been served (#260) - the state change follows the text on the wire, as in retail, and the
+		// greeting is therefore picked while the quest is still Active so the player sees the turn-in line rather than
+		// the post-quest "already done" one.
 		private async Task TryTurnInQuests(INetworkClient client, string npcName)
 		{
 			var character = client.Session.Character;

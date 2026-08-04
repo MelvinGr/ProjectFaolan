@@ -139,6 +139,39 @@ those objectives still cannot complete — **51 of the 74** referenced items are
 but their templates are `RDBH`-encrypted with a per-item key only a capture yields, so this is a catalog-coverage
 gap, not a quest bug.
 
+## Turn-in: the text goes out first, the state follows it
+
+There is **no separate turn-in or reward node** to look for. Retail's turn-in screen *is* the in-progress
+variant, and what makes it a turn-in is an inline `{resolvegoal <4CC>}` directive in its own text. So the
+completion is a consequence of the line the player was just shown, and it is sent in that order:
+
+```
+KnubotOpenChatWindow
+KnubotAppendText   "{camera size=5 type=1 tilt=5}…{resolvegoal BJGY}{delay 1}"
+QuestGoal  5745 -> Satisfied
+QuestIIR   13480 state 2 (active)
+QuestJournal
+QuestIIR   13480 state 4 (completed)
+QuestFullUpdate    "Casilda"        ← the next stage, granted in the same burst
+KnubotAnswerList                    ← ~1.2 s later, the {delay 1}
+```
+
+Two captures record this independently, on different characters and different playfields —
+`Stihetfv_…_compeltefirstquest` at t=57.3 and `Blablabla_…_questcomplete` at t=373.3 — with the same record
+order both times. The **grant** side has the same shape (`…questcomplete` t=334.5: `AppendText` →
+`MainQuestUpdate` → `QuestFullUpdate`), so *text precedes state* is the rule for the whole dialogue rather
+than a completion quirk.
+
+That ordering is load-bearing, not cosmetic. `ConversationService` picks the screen variant by evaluating the
+player's **live** quest state, so completing before serving flips the quest to `Completed` and the pick then
+matches the `HasCompletedQuest` variant — handing the player the post-quest *"already done"* line instead of
+the turn-in line. `TryTurnInQuests` and `AdvanceTalkGoals` therefore both run after `ServeScreen`.
+
+⚠️ **Not every quest ends at a giver.** In the same captures, 13479 (*The Scavenger*) and 13563 (*The
+Scavenger's Key*) complete on the **kill** and the **loot** with no dialogue at all — goal satisfied, `QuestIIR`
+2 → 4, and the next stage granted in the same burst. A chain stage supersedes where its goal is met; only the
+talk-goal stage (13480) completes in a conversation.
+
 ## ReachArea: the marker is a pin, the region is the trigger
 
 A `ReachArea` goal carries a map marker, and the marker is what the client draws — not what retail triggers on.
