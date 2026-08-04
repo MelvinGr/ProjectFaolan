@@ -15,7 +15,7 @@ namespace Faolan.Core.Database.Tables
 	///     are the same four-slot payload with the target space swapped, so they share one table and
 	///     <see cref="SpellId" /> / <see cref="SpellLineId" /> say which was used. Both resolve completely against the
 	///     shipped catalogs: 593/593 of the per-spell targets are a <see cref="Spell.Id" /> and 475/475 of the per-line
-	///     targets a <see cref="Spell.LineId" />.
+	///     targets a <see cref="Spell.GuiStackingLine" />.
 	/// </remarks>
 	[PrimaryKey(nameof(FeatId), nameof(Sequence))]
 	public class FeatSpellStatModifier
@@ -36,7 +36,7 @@ namespace Faolan.Core.Database.Tables
 		public uint? SpellId { get; set; }
 
 		/// <summary>
-		///     The spell LINE this is scoped to (<see cref="Spell.LineId" />, i.e. <c>ConanClass × 1000 + lineIndex</c>),
+		///     The spell LINE this is scoped to (<see cref="Spell.GuiStackingLine" />, i.e. <c>ConanClass × 1000 + lineIndex</c>),
 		///     on a kind-53062 record - so the feat covers every RANK of the line at once. Null on a kind-53054 record.
 		/// </summary>
 		public uint? SpellLineId { get; set; }

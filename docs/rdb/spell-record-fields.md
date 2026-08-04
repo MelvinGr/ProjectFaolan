@@ -44,14 +44,14 @@ splash triple. All three are now imported under their own names — `Spell.Splas
 `Spell.SplashDamage` (348 ÷ 100, percent) and `Spell.SplashMaxTargets` (349, a raw count) — and `Faolan.Web`
 labels them as such. Nothing in combat reads them; the spell's real damage magnitude stays unsourced (#592).
 
-## ⚠️ The STACKING family — and two of them are columns we ship under the wrong name
+## ⚠️ The STACKING family — and two of them were columns we shipped under the wrong name
 
-LDB 615 names a whole contiguous family, and it reframes two shipped columns:
+LDB 615 names a whole contiguous family, and it reframed two shipped columns (renamed in #634):
 
 | field | client's name | what we call it |
 |---|---|---|
-| 123 | `GUI Stacking Order` | `Spell.Rank` |
-| 128 | `GUI Stacking Line` | `Spell.LineId` |
+| 123 | `GUI Stacking Order` | `Spell.GuiStackingOrder` (renamed from Rank) |
+| 128 | `GUI Stacking Line` | `Spell.GuiStackingLine` (renamed from LineId) |
 | 546-550 | `Stacking Line 2` … `Stacking Line 6` | unread |
 | 551 | `Stacking Order` | unread (was labelled "a rank-scaling magnitude") |
 
@@ -74,8 +74,11 @@ sound throughout: a feat boosting a "spell line" is boosting a stacking line.
 The client's own dev test spells confirm the reading outright — `Strength Buff 1` / `Strength Buff 2` carry
 551 = 1 / 2, and the same 1/2 pairing runs through `Dexterity Buff`, `Stack Debuff`, `Hostile` and `Buff`.
 
-The columns keep their names for now: renaming `LineId` moves `FeatSpellModifier`'s join with it. Tracked in
-Gitea #634.
+The two columns were renamed to the client's names in #634. The feat side keeps `SpellLineId`: it is the same id
+space, but that name is the CLIENT's too — the GameActions that fill it are `AddSpellLineProc`,
+`SpellLineStatModifier` and `ChangeLineHitPercent`, so renaming it would make the column disagree with the wire
+record it is harvested from. Fields 546-551 are still unread; tracked with the rest of the unread run in Gitea
+#633.
 
 ## ⚠️ Field 54 is not the level requirement — 125 is
 

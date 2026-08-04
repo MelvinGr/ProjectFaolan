@@ -3501,10 +3501,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("EffectSpell")
                         .HasColumnType("INTEGER");
 
-                    b.Property<byte>("Level")
+                    b.Property<uint>("GuiStackingLine")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("LineId")
+                    b.Property<byte>("GuiStackingOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<byte>("Level")
                         .HasColumnType("INTEGER");
 
                     b.Property<ushort>("ManaCost")
@@ -3520,9 +3523,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Property<float>("Range")
                         .HasColumnType("REAL");
-
-                    b.Property<byte>("Rank")
-                        .HasColumnType("INTEGER");
 
                     b.Property<uint>("ScalingAttribute")
                         .HasColumnType("INTEGER");

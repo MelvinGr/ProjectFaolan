@@ -7,32 +7,29 @@ namespace Faolan.Core.Database.Tables
 	{
 		public byte Level { get; set; }
 
-		// RDB field 123 (0x7B), carried RAW.
+		// RDB field 123 (0x7B), carried RAW. The client's own stat-name table (LDB category 615) names it
+		// `GUI Stacking Order`: a spell's precedence within a stacking line, so a higher order supersedes a lower one
+		// and two buffs on the same line refuse to stack (#634). See GuiStackingLine for the line itself.
 		//
-		// ⚠️ **It is not the rank.** The client's own stat-name table (LDB category 615) calls field 123
-		// `GUI Stacking Order` and field 128 `GUI Stacking Line` - see LineId - and that overturns the label rather
-		// than qualifying it (#634).
-		//
-		// It CORRELATES with rank, which is why it read as one: a higher rank stacks over a lower rank, so the
-		// ordering runs with the ranks. But an ORDER only has to be monotone within its own stacking line, and the
-		// scale is otherwise arbitrary - which is exactly the "mystery" this comment used to record. Of the 883
-		// spells with a "(Rank N)" suffix, 669 carry 1/2/3 and 214 carry a clean x10; `Healing Benediction` is
-		// 10/20/30 on stacking line 2 while `Wave of Life` is 1/2/3 on lines 24020+. Both are valid orderings. There
-		// was never anything to discriminate them, because neither is a rank.
-		//
-		// Still carried raw, and the column keeps its name until the rename lands (#634) - a rename touches
-		// FeatSpellModifier's join through LineId, so it is not a comment-sized change.
-		public byte Rank { get; set; }
+		// ⚠️ **It is not the rank**, which is what this column was called until #634. It CORRELATES with rank - a
+		// higher rank stacks over a lower one, so the ordering runs with the ranks - and that is why it read as one.
+		// But an ORDER only has to be monotone within its own line, and the scale is otherwise arbitrary, which is
+		// exactly the "mystery" this comment used to record: of the 883 spells with a "(Rank N)" suffix, 669 carry
+		// 1/2/3 and 214 carry a clean x10 (`Healing Benediction` is 10/20/30 on stacking line 2 while `Wave of Life`
+		// is 1/2/3 on lines 24020+). Both are valid orderings. Nothing discriminated them because neither is a rank -
+		// the real rank is in the name's "(Rank N)" suffix, and the RDB may not state it at all.
+		public byte GuiStackingOrder { get; set; }
 
 		/// <summary>
-		///     ⚠️ RDB field 128 (0x80), which the client's own stat-name table names <c>GUI Stacking Line</c> - NOT a
-		///     "spell line" (#634). The behaviour described below is real and the feat join it supports is sound;
-		///     what is wrong is the NAME, and with it the two things this field recorded as unexplained. Both
-		///     dissolve once it is read as a stacking line: an id whose <c>/1000</c> is not a class is simply a
-		///     stacking line that is not per-class, and the "small numbers (1, 2, 4, …) shared by 25-30 unrelated
-		///     spells, far too coarse to be a line" are SHARED stacking lines - which is the entire purpose of one,
-		///     so that (say) two +Strength buffs refuse to stack. A feat boosting a "spell line" is a feat boosting a
-		///     stacking line, which is why the join works.
+		///     RDB field 128 (0x80), which the client's own stat-name table names <c>GUI Stacking Line</c> - the line a
+		///     spell stacks ON, with <see cref="GuiStackingOrder" /> deciding precedence within it. It was called
+		///     <c>LineId</c> ("the spell line") until #634; the behaviour described below is real and the feat join it
+		///     supports is sound, but the NAME was wrong, and with it the two things this field recorded as
+		///     unexplained. Both dissolve once it is read as a stacking line: an id whose <c>/1000</c> is not a class
+		///     is simply a stacking line that is not per-class, and the "small numbers (1, 2, 4, …) shared by 25-30
+		///     unrelated spells, far too coarse to be a line" are SHARED stacking lines - which is the entire purpose
+		///     of one, so that (say) two +Strength buffs refuse to stack. A feat boosting a "spell line" is a feat
+		///     boosting a stacking line, which is why the join works.
 		///     <para>
 		///     Carried RAW. When it is
 		///     <c>ConanClass × 1000 + lineIndex</c> it is the spell's LINE - what a feat's spell modifier points at
@@ -55,13 +52,13 @@ namespace Faolan.Core.Database.Tables
 		///     so those are some other grouping and are not decoded. Carried raw rather than filtered because the join
 		///     cannot collide: a feat only ever references a class-encoded value.
 		///     <para>
-		///         This also qualifies the note on <see cref="Rank" /> above, which said field 128 "is constant (2)
+		///         This also qualifies the note on <see cref="GuiStackingOrder" /> above, which said field 128 "is constant (2)
 		///         across that family's ranks". It is constant across a family - that part was right - but the 2 was
 		///         one family's value, not the field's meaning.
 		///     </para>
 		///     </para>
 		/// </remarks>
-		public uint LineId { get; set; }
+		public uint GuiStackingLine { get; set; }
 
 		/// <summary>
 		///     RDB field 847 (0x34F) of the spell's type-1040005 record: the ATTRIBUTE this spell's magnitude scales

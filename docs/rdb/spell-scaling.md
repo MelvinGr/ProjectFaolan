@@ -75,9 +75,8 @@ type-1040005 records carry one, and it takes exactly three values:
 | 810 | Wisdom | 224 |
 | 804 | Strength | 10 |
 
-Grouping those records by the class encoded in `LineId / 1000` (see `Spell.LineId`; the field is really the
-client's `GUI Stacking Line` — Gitea #634 — but its class-encoded values are what this grouping uses, and those
-are unaffected) reproduces the client's class rule exactly, from data the client-side decode never touched:
+Grouping those records by the class encoded in `GuiStackingLine / 1000` (see `Spell.GuiStackingLine`, the client's
+`GUI Stacking Line` — its class-encoded values are what this grouping uses) reproduces the client's class rule exactly, from data the client-side decode never touched:
 
 | class | attribute | records |
 |---|---|---|
@@ -99,7 +98,7 @@ data gap.
 Shipped as `Spell.ScalingAttribute`, imported by `rdb-spells` (`RdbSpellImporter`), resolved per character at
 world entry (`IDatabaseRepository.GetCharacterSpellScalingAttributes`) and applied by `WorldEntity.MagicDamageFor`.
 
-⚠️ Two class ids appear in field 847's data that the class registry does not name — `LineId / 1000` of **50**
+⚠️ Two class ids appear in field 847's data that the class registry does not name — `GuiStackingLine / 1000` of **50**
 (5 records) and **440** (1). The 50 is the same anomaly the feat modifiers show; open work is tracked in Gitea
 #591.
 

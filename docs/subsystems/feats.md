@@ -119,7 +119,7 @@ and don't contain.
   magnitude, the one that stays is the target).
 
   **Imported and applied**, for kind 53075 only. `FeatSpellModifier` holds `(feat → spell line, percent × 100)`;
-  `Spell.LineId` holds field 128; `DatabaseRepository.GetCharacterSpellBoosts` joins the two and fans the line out
+  `Spell.GuiStackingLine` holds field 128 (the client's `GUI Stacking Line`, #634); `DatabaseRepository.GetCharacterSpellBoosts` joins the two and fans the line out
   to every RANK, giving `spellId → percent × 100` in ONE query at world entry (`WorldEntity.SpellBoosts`), so the
   cast path is a dictionary lookup rather than a per-cast query. `CombatResolver.ResolveSpellDamage` applies it
   last, over the finished number including Magic Damage — the client's wording is "Increase to damage or healing on

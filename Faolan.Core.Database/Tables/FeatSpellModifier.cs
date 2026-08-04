@@ -27,7 +27,7 @@ namespace Faolan.Core.Database.Tables
 		public int Sequence { get; set; }
 
 		/// <summary>
-		///     The spell LINE this boosts - <see cref="Spell.LineId" />, i.e. <c>ConanClass × 1000 + lineIndex</c>
+		///     The spell LINE this boosts - <see cref="Spell.GuiStackingLine" />, i.e. <c>ConanClass × 1000 + lineIndex</c>
 		///     (41000 = Necromancer line 0 = Flesh to Worms). A line, not a spell, so the feat covers every RANK of it
 		///     at once, which is what a feat has to do. Set on a kind-53075 record; null on a kind-53030 one, where
 		///     <see cref="SpellId" /> carries the target instead.

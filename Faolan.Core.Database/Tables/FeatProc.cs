@@ -40,7 +40,7 @@ namespace Faolan.Core.Database.Tables
 		public uint? ComboId { get; set; }
 
 		/// <summary>
-		///     The spell LINE the proc hangs off (<see cref="Spell.LineId" />), on a kind-53070 record. Null on a
+		///     The spell LINE the proc hangs off (<see cref="Spell.GuiStackingLine" />), on a kind-53070 record. Null on a
 		///     kind-53212 one; exactly one of the two targets is ever set.
 		/// </summary>
 		public uint? SpellLineId { get; set; }

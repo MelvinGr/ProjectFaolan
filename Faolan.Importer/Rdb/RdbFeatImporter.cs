@@ -576,7 +576,7 @@ namespace Faolan.Importer.Rdb
 		//                 FeatComboModifier - see ParseComboModifiers. The "value 0 throughout" that made it look like
 		//                 a pure reference was key 66 on a cooldown-only feat; the magnitude was in key 67, which the
 		//                 pair view cannot reach.
-		//   53062   x475  a spell LINE id (Spell.LineId), the SAME space 53075 uses. `Brutal Maiming` - "Increases the
+		//   53062   x475  a spell LINE id (Spell.GuiStackingLine), the SAME space 53075 uses. `Brutal Maiming` - "Increases the
 		//                 chance of the Disable combo inflicting critical damage" - points at 20410, which is the
 		//                 Guardian's `Disable` line, by name. Its value (147) is NOT a percent and is undecoded.
 		//   53019  x1010  a spell TEMPLATE id (Spell.Id), and a GRANT rather than a modifier: `Spell Unlocking 60-80`
@@ -626,7 +626,7 @@ namespace Faolan.Importer.Rdb
 		}
 
 		/// <summary>
-		///     One parsed kind-53075/53030 element: the target - a <c>Spell.LineId</c> under 53075 and a
+		///     One parsed kind-53075/53030 element: the target - a <c>Spell.GuiStackingLine</c> under 53075 and a
 		///     <c>Spell.Id</c> under 53030 - and the signed percent ×100 both carry in <c>Value</c>.
 		/// </summary>
 		public readonly record struct SpellHitPercentModifier(uint Kind, uint TargetId, int PercentHundredths);
@@ -817,7 +817,7 @@ namespace Faolan.Importer.Rdb
 
 		/// <summary>
 		///     One parsed kind-53054/53062 element. <paramref name="TargetId" /> is a <c>Spell.Id</c> under 53054 and a
-		///     <c>Spell.LineId</c> under 53062 - the kind is what says which.
+		///     <c>Spell.GuiStackingLine</c> under 53062 - the kind is what says which.
 		/// </summary>
 		public readonly record struct SpellStatModifier(uint Kind, uint TargetId, CharacterStatId Stat, int? Value, int? PercentHundredths);
 

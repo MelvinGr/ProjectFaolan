@@ -48,10 +48,10 @@ namespace Faolan.Importer.Rdb
 	// remaining 25 are real player spells absent from every other source (the "Set's Ruin"/"Set's Cold Hatred"
 	// families, "War Lord's March", "Mass Ignition", ...).
 	//
-	// Field map (dumped over all 21,502 records, #367): 8=duration, 123=rank, 125=level, 287=range, 294=cast,
-	// 347/348/349=the splash triple (radius/damage/max-targets, #626), 551=StackingOrder, 79=icon (an id
-	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only), 128=the spell LINE
-	// (#590 - see Spell.LineId).
+	// Field map (dumped over all 21,502 records, #367): 8=duration, 123=GUI Stacking Order, 125=level, 287=range,
+	// 294=cast, 347/348/349=the splash triple (radius/damage/max-targets, #626), 551=Stacking Order, 79=icon (an id
+	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only), 128=GUI Stacking Line
+	// (#590/#634 - see Spell.GuiStackingLine).
 	//
 	// ⚠️ "This FIELD RUN carries no stat ids" was too strong, and #590 is why it is worth re-testing rather than
 	// repeating: field **847 names an ATTRIBUTE** - 716 records carrying exactly 808 (Intelligence, x482), 810
@@ -132,12 +132,12 @@ namespace Faolan.Importer.Rdb
 		// chances there are to import the wrong one - see the field-name warning in docs/rdb/spell-record-fields.md.
 		private const uint LevelField = 0x07D;
 
-		// 123 - the spell's RANK. Named in the #367 field dump but never lifted until now; the rank used to come from
-		// the "(Rank N)" suffix in the name, and with the ellatha scrape gone the RDB is the only source.
-		private const uint RankField = 0x07B;
-		// 128 - the spell's LINE id when it is class-encoded (ConanClass x 1000 + index); see Spell.LineId for why
-		// it is carried raw.
-		private const uint LineField = 0x080;
+		// 123 - `GUI Stacking Order`, the spell's precedence within its stacking line. Read as the RANK until #634,
+		// which it only correlates with; the real rank is the "(Rank N)" suffix in the name.
+		private const uint StackingOrderField = 0x07B;
+		// 128 - `GUI Stacking Line`, class-encoded (ConanClass x 1000 + index) in the common case; see
+		// Spell.GuiStackingLine for why it is carried raw.
+		private const uint StackingLineField = 0x080;
 		private const uint RangeField = 0x11F; // 287 - target range * 100 (Ice Strike 2500 -> 25 metres)
 
 		// 847 - the spell's scaling ATTRIBUTE as a wire stat id (808 Intelligence / 810 Wisdom / 804 Strength); see
@@ -243,14 +243,14 @@ namespace Faolan.Importer.Rdb
 				var level = fields.TryGetValue(LevelField, out var lv) && lv <= byte.MaxValue
 					? (byte)lv
 					: (byte)0;
-				var lineId = fields.GetValueOrDefault(LineField);
+				var stackingLine = fields.GetValueOrDefault(StackingLineField);
 				// Only the three attribute stat ids the field is ever observed to take are accepted. It is an
 				// override read straight into a combat formula, so an unexpected value must land as "no override"
 				// rather than as a stat id nothing scales off (#592).
 				var scalingAttribute = fields.TryGetValue(ScalingAttributeField, out var sa) && IsAttributeStat(sa)
 					? sa
 					: 0u;
-				var rank = fields.TryGetValue(RankField, out var rk) && rk <= byte.MaxValue
+				var stackingOrder = fields.TryGetValue(StackingOrderField, out var rk) && rk <= byte.MaxValue
 					? (byte)rk
 					: (byte)0;
 				// #629: carried RAW, both modes in the one column - clamping the flat rows into a percent range would
@@ -294,8 +294,8 @@ namespace Faolan.Importer.Rdb
 						SplashMaxTargets = splashMaxTargets,
 						DurationMs = durationMs,
 						Level = level,
-						Rank = rank,
-						LineId = lineId,
+						GuiStackingOrder = stackingOrder,
+						GuiStackingLine = stackingLine,
 						ScalingAttribute = scalingAttribute,
 						ManaCost = manaCost,
 						ManaCostIsPercent = manaCostIsPercent
@@ -339,10 +339,10 @@ namespace Faolan.Importer.Rdb
 					levelsSet++;
 				}
 
-				// Rank is set unconditionally, unlike level: the RDB is its ONLY source, so there is no other value
-				// to defer to and a 0 here means the record genuinely carries no rank. LineId likewise (#590).
-				spell.Rank = rank;
-				spell.LineId = lineId;
+				// Both stacking fields are set unconditionally, unlike level: the RDB is their ONLY source, so there is
+				// no other value to defer to and a 0 here means the record genuinely carries none (#590, #634).
+				spell.GuiStackingOrder = stackingOrder;
+				spell.GuiStackingLine = stackingLine;
 				spell.ScalingAttribute = scalingAttribute;
 				spell.ManaCost = manaCost;
 				spell.ManaCostIsPercent = manaCostIsPercent;

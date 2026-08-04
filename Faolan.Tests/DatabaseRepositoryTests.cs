@@ -880,10 +880,10 @@ namespace Faolan.Tests
 					// A modifier on a feat the character has NOT trained, on the same line: it must not leak in.
 					ctx.FeatSpellModifiers.Add(new FeatSpellModifier { FeatId = otherTemplateId, Sequence = 0, SpellLineId = line, PercentHundredths = 9900, EffectKind = 53075 });
 					// Three ranks of the boosted line, plus one spell on another line that must stay unboosted.
-					ctx.Spells.Add(new Spell { Id = 144675, Name = "Flesh to Worms (Rank 3)", LineId = line });
-					ctx.Spells.Add(new Spell { Id = 144676, Name = "Flesh to Worms (Rank 4)", LineId = line });
-					ctx.Spells.Add(new Spell { Id = 144677, Name = "Flesh to Worms (Rank 5)", LineId = line });
-					ctx.Spells.Add(new Spell { Id = 144308, Name = "Pestilential Blast (Rank 2)", LineId = 41001 });
+					ctx.Spells.Add(new Spell { Id = 144675, Name = "Flesh to Worms (Rank 3)", GuiStackingLine = line });
+					ctx.Spells.Add(new Spell { Id = 144676, Name = "Flesh to Worms (Rank 4)", GuiStackingLine = line });
+					ctx.Spells.Add(new Spell { Id = 144677, Name = "Flesh to Worms (Rank 5)", GuiStackingLine = line });
+					ctx.Spells.Add(new Spell { Id = 144308, Name = "Pestilential Blast (Rank 2)", GuiStackingLine = 41001 });
 					await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
 				}
 

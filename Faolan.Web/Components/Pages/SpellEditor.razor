@@ -68,7 +68,7 @@
 						<label>Name<input @bind="_spell.Name"/></label>
 						<label>Level<input class="n" @bind="_spell.Level"/></label>
 						<label title="RDB field 123, carried RAW. The rank for MOST spells but not all: measured over the 883 spells whose name also carries a &quot;(Rank N)&quot; suffix, 669 agree and 214 are a clean rank × 10. The scale differs by spell FAMILY, so do not read this as a rank without checking.">
-							Rank (raw)<input class="n" @bind="_spell.Rank"/>
+							GUI Stacking Order<input class="n" @bind="_spell.GuiStackingOrder"/>
 						</label>
 						<label title="milliseconds — RDB field 0x126 × 10">Cast time (ms)<input class="n" @bind="_spell.CastTime"/></label>
 						<label title="SECONDS, not ms — matches the source that carries it">Cooldown (s)<input class="n" @bind="_spell.Cooldown"/></label>

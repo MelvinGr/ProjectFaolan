@@ -476,7 +476,7 @@ namespace Faolan.Core.Database.Repositories
 			var rows = await (from feat in ctx.CharacterFeats.Where(f => f.CharacterId == characterId)
 				join map in ctx.FeatIdMaps on feat.FeatId equals map.WireFeatId
 				join mod in ctx.FeatSpellModifiers on map.TemplateId equals mod.FeatId
-				join spell in ctx.Spells on mod.SpellLineId equals spell.LineId
+				join spell in ctx.Spells on mod.SpellLineId equals spell.GuiStackingLine
 				select new { spell.Id, mod.PercentHundredths }).ToArrayAsync();
 
 			var totals = new Dictionary<uint, int>();
