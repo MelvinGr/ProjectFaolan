@@ -47,14 +47,17 @@ namespace Faolan.Importer.Extractors
 					continue;
 				if (caster == cast.ApplyTo) // a self-buff, not an offensive cast
 					continue;
-				// Not a caster this capture spawned by name. That set is wider than it looks: the local player, ANY
-				// OTHER PLAYER in vicinity (their casts are broadcast too, and `nameByHandle` comes from
-				// SimpleCharFullUpdate, which spawns players and NPCs alike), pets/summons, and any NPC whose spawn
-				// fell outside the capture. So a name surviving here is NOT yet known to be an NPC's.
+				// Not a caster this capture spawned by name. The dropped set still includes pets/summons and any NPC
+				// whose spawn fell outside the capture, so a name surviving here is not PROVEN to be an NPC's - but
+				// it is no longer a lexical question, which is what #616 asked. PLAYERS are excluded STRUCTURALLY,
+				// upstream: a player's spawn carries player_stats and no npc_stats, and NpcSpawnExtractor drops it on
+				// exactly that (#244), so a player-backed handle never enters this map. Measured over the corpus -
+				// 317 of the 17,717 captured character spawns are player-backed and all 317 are excluded
+				// (NpcSpellExtractorPlayerFilterTests).
 				//
-				// What actually makes it one is downstream: `ImportOps.ImportNpcSpells` drops any name matching a
-				// Characters row and requires the rest to resolve to an NpcTemplates name. A stranger player seen in a
-				// retail capture is in neither set, so it is the TEMPLATE join that rejects them - see #616.
+				// That matters because the fallback would have been the NAME: `ImportOps.ImportNpcSpells` requires
+				// the name to resolve to an NpcTemplates row, which a stranger called `Guard` would have passed.
+				// It is still there as a second line, not as the only one.
 				if (!nameByHandle.TryGetValue(caster, out var name))
 					continue;
 				if (cast.Data.Length == 0) // the rank-1 EMPTY twin is the buff-end/terminator, not a standalone cast (#232)

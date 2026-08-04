@@ -678,9 +678,16 @@ namespace Faolan.Importer.Captures
 		}
 
 		// Caster NPCs' spells (#232), upserted by (NpcTemplate type, spell id). The caster NAME is resolved to its NpcTemplate TYPE id
-		// (types were upserted by ImportNpcSpawns just before) and only stored as the NpcTemplateId FK - a cast whose caster is
-		// a PLAYER (mis-harvested self-buff) or has no captured NpcTemplate type (off-beach named NPCs) is DROPPED, since the
-		// loader reads spells via the FK (NpcTemplate.Spells).
+		// (types were upserted by ImportNpcSpawns just before) and only stored as the NpcTemplateId FK - a cast whose caster
+		// has no captured NpcTemplate type (off-beach named NPCs) is DROPPED, since the loader reads spells via the FK
+		// (NpcTemplate.Spells).
+		//
+		// ⚠️ The `playerNames` check is a BELT, not the braces (#616). It only knows characters in OUR database, so it
+		// never sees a stranger who happened to stand near the capturing client on the live retail server. What keeps
+		// those out is structural and upstream: their spawns carry player_stats, so NpcSpawnExtractor never gives them
+		// a handle -> name entry for NpcSpellExtractor to join on (measured: all 317 player-backed spawns in the
+		// corpus are excluded, NpcSpellExtractorPlayerFilterTests). Keep both - this one also catches the capture's
+		// OWN player once imported, whose spawn is dropped by handle rather than by message.
 		public static async Task<int> ImportNpcSpells(DatabaseContext db, List<NpcSpellEntry> spells)
 		{
 			var playerNames = (await db.Characters.Select(c => c.Name).ToListAsync()).Where(n => !string.IsNullOrEmpty(n)).Select(n => n!.ToLowerInvariant()).ToHashSet();
