@@ -89,6 +89,14 @@ namespace Faolan.Importer.Cli
 				return 0;
 			}
 
+			// RDB (plaintext LDB) + DB (the stat cores), no corpus: the NPC PROFESSION catalog - what each
+			// ProfessionName hash resolves to, grouped by the role tag beside it (#649).
+			if (report == "professions")
+			{
+				await Professions(RdbDir());
+				return 0;
+			}
+
 			// RDB (plaintext LDB) + DB (the goal catalog), no corpus: what each goal's TRAILING typed reference resolves
 			// to, and whether that string can serve as the match key `TargetName` is (#521).
 			if (report == "quest-goal-targets")

@@ -130,6 +130,29 @@ Result on the current data: **1 spell** (222675) and **1015 items** backfilled (
 Diagnostic: `--report ldb-resolve` dumps the whole id→string map, the per-category / per-language breakdown, and
 the spell + item crib scores.
 
+### `253` is the NPC profession / shop-kind table (2026-08-04)
+
+`NpcStatCore.ProfessionName` (`ProtoCoreCharacterIIR.NpcStats.profession_name`, field 11) is an id into
+**category 253**, and every one of the 88 distinct values in the shipped data resolves there — 88/88, with nothing
+left over. The strings are what the column is: `"Trader"`, `"Merchant"`, `"Local Travel"`, `"Guard"`,
+`"Armorsmith"`, `"Master Potions"`, `"Cimmerian Pathfinder"`, `"Wayfarer of Asura"`, `"Aquilonian Dyes"`,
+`"Veteran Rewards"`. The category holds 360 strings in total, so the world we import uses about a quarter of it.
+
+It sits BESIDE `profession_type`, which is the coarse ROLE (`NpcProfession`): 58 of the 88 names live inside
+`Merchant` alone, so the type says *what the NPC is for* and the name says *what it sells*. Where a type has one
+name across every one of its templates, that name **is** the role — which is how `Auctioneer`, `Guard` and
+`WayfarerOfAsura` are named. [V3: NpcProfessionTests.EveryTemplateOfANamedProfession_CarriesAProfessionName]
+
+⚠️ **This id space is not uniformly hashed.** Most ids are the ELF hash of the string
+(`elf("Merchant") == 210363236`, `elf("Trainer") == 193463442`), but eight are small and sequential — `1`, `2`,
+`22`, `28`, `44`, `46`, `53`, `56` — and resolve in the same category. `Guard` carries both kinds at once: ids
+`246974048` and `28` both resolve to `"Guard"`, so the client duplicates that entry. Distinct ids are therefore not
+evidence of distinct professions.
+
+`--report professions` prints the whole catalog: type → name → the templates carrying it, with the unresolved and
+small-id residue called out. The resolved string is deliberately **not** stored on `NpcStatCore` — pages are
+per-language while the id is not, so persisting the English text would bake a language into the seed.
+
 ## The client names every category itself — the descriptor table in `TDL1` (2026-07-30)
 
 Each language record (`1030001`) carries **1,603 trailing bytes after its page table** that the grammar above did

@@ -65,6 +65,7 @@ namespace Faolan.Tests
 		[InlineData(NpcProfession.Traveller, "")] // wagoneers + smugglers; the display names differ
 		[InlineData(NpcProfession.BlackMarketeer, "Black Marketeer")]
 		[InlineData(NpcProfession.Guard, "")] // Guard / Guardsman / Sentinel / City Guard
+		[InlineData(NpcProfession.WayfarerOfAsura, "")] // Blaine, Tanor, Malia, Nidd, Finian - named from LDB[253], not from them
 		public async Task EveryNamedProfession_StillMatchesTemplates(NpcProfession profession, string expectedName)
 		{
 			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
@@ -80,12 +81,51 @@ namespace Faolan.Tests
 				Assert.All(names, n => Assert.Equal(expectedName, n));
 		}
 
+		// EVERY template of a NAMED profession must carry a `ProfessionName`. This is the precondition that makes
+		// naming a member from the client's string honest, and it is not a formality - it caught a real over-claim
+		// while #649 was being written.
+		//
+		// Type 4's one labelled template (Fenor) says LDB[253] "Redeemer", which is a tempting name for the type; the
+		// type has NINE templates and the other eight carry nothing. Naming it from 1 of 9 rows would have described
+		// Fenor and called it the role. So type 4 stays unnamed and this gate keeps the rule: a member may only be
+		// named once every template of its type is labelled.
+		//
+		// ⚠️ It asserts the labels EXIST, not that there is exactly one id. `Guard` has two - 246974048 and the small
+		// id 28 - and both resolve to the same LDB[253] string "Guard", so the client duplicates that entry. Distinct
+		// ids are therefore not evidence of distinct professions, and the strings themselves cannot be checked here
+		// (the suite runs without the RDB, by design). `--report professions` is where the strings are read.
+		[Theory]
+		[InlineData(NpcProfession.Auctioneer)]
+		[InlineData(NpcProfession.WayfarerOfAsura)]
+		[InlineData(NpcProfession.Guard)]
+		public async Task EveryTemplateOfANamedProfession_CarriesAProfessionName(NpcProfession profession)
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+
+			var cores = await db.NpcStatCores.AsNoTracking()
+				.Where(c => c.ProfessionType == (uint)profession)
+				.Select(c => new
+				{
+					c.NpcTemplateId,
+					c.ProfessionName
+				})
+				.ToListAsync(TestContext.Current.CancellationToken);
+
+			Assert.NotEmpty(cores);
+			var unlabelled = cores.Where(c => c.ProfessionName == null).Select(c => c.NpcTemplateId).ToList();
+			Assert.True(unlabelled.Count == 0,
+				$"{profession} is named from the client's profession string, but {unlabelled.Count} of its {cores.Count} template(s) carry none: "
+				+ $"{string.Join(", ", unlabelled.Take(8))}");
+		}
+
 		// `ProfessionName` is the ELF hash of the profession's NAME string - the encoding, pinned by two exact hits.
 		//
-		// This is what identifies the sibling column, and it is the crib the rest of it will be cracked with (#649):
-		// 88 distinct values occur, 60 of them inside the Merchant type alone, so it is a per-shop-kind label rather
-		// than the role. Two of them fall out of a plain wordlist and both land exactly, which is not a coincidence at
-		// 28 bits.
+		// This is what identified the sibling column and is what let #649 resolve it: the hash is an LDB ID, and every
+		// one of the 88 distinct values lands in LDB category 253 (the profession / shop-kind table). Two of them fall
+		// out of a plain wordlist and both land exactly, which is not a coincidence at 28 bits.
+		//
+		// ⚠️ The column is NOT uniformly hashed - eight ids are small and sequential (1, 2, 22, 28, 44, 46, 53, 56) and
+		// resolve in the same category. The hash is how MOST ids are formed, not a rule for reading the column.
 		[Theory]
 		[InlineData("Merchant", 210363236u)]
 		[InlineData("Trainer", 193463442u)]
