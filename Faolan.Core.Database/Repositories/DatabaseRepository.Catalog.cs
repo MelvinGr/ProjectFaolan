@@ -103,6 +103,20 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.ClassComboScalings.ToArrayAsync();
 		}
 
+		// The class's SPELLBOOK spells newly unlocked by crossing into `toLevelInclusive` - what the level-up path
+		// learns (DispatchLearnSpell) and persists.
+		//
+		// ⚠️ A COMBO is not a spellbook spell (#298). `ClassSpells` is derived from the spell record's class-encoded
+		// `GuiStackingLine`, and a melee combo's GameAction has one too, so the map attributes combos to their class
+		// exactly like spells - `Combos.GameActionId` IS a `Spells.Id`, and 726 of the 732 combos that carry one
+		// resolve. Retail never puts those in the spellbook: across the four captured characters' known-spell lists
+		// (246 entries, including a level-80 Necromancer's 109 and a Herald's 127) NOT ONE is a combo GameAction.
+		// They arrive on their own path - `GetClassCombosUnlockedBetween` -> ComboBookIIR, right after the NewLevelIIR.
+		//
+		// Excluding them here is also what explains the per-class feat-grant coverage: the five classes that looked
+		// like a total gap (Barbarian, Guardian, Conqueror, Assassin, Ranger - zero teaching feats between them) are
+		// 227 of 259 combos, so there was nothing for a feat to teach. What is left is a real, ordinary gap of the
+		// same kind the caster classes have.
 		public async Task<uint[]> GetClassSpellsUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -110,6 +124,7 @@ namespace Faolan.Core.Database.Repositories
 				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
 				.Where(s => s.Level > fromLevelExclusive && s.Level <= toLevelInclusive)
+				.Where(s => !ctx.Combos.Any(c => c.GameActionId == s.Id))
 				.OrderBy(s => s.Level)
 				.ThenBy(s => s.Id)
 				.Select(s => s.Id)
@@ -228,6 +243,7 @@ namespace Faolan.Core.Database.Repositories
 				.ClassSpells.Where(cs => cs.Class == 0 || cs.Class == @class)
 				.Join(ctx.Spells, cs => cs.SpellId, s => s.Id, (cs, s) => s)
 				.Where(s => s.Level > 0 && s.Level <= level)
+				.Where(s => !ctx.Combos.Any(c => c.GameActionId == s.Id)) // a combo is not a spellbook spell - see GetClassSpellsUnlockedBetween (#298)
 				.Select(s => new
 				{
 					s.Id,
@@ -293,7 +309,10 @@ namespace Faolan.Core.Database.Repositories
 					cs,
 					s
 				})
-				.Where(x => x.cs.IsStarter || (level > 1 && (x.cs.GrantLevel != null
+				// The LEVEL branch excludes combos - a combo is not a spellbook spell, see GetClassSpellsUnlockedBetween
+				// (#298). The starter kit is left alone: it is a captured LIST, so whatever it holds is what retail
+				// granted (and in fact holds no combo GameAction).
+				.Where(x => x.cs.IsStarter || (level > 1 && !ctx.Combos.Any(c => c.GameActionId == x.s.Id) && (x.cs.GrantLevel != null
 					? x.cs.GrantLevel <= level
 					: x.s.Level > 1 && x.s.Level <= level)))
 				.OrderBy(x => x.s.Level)

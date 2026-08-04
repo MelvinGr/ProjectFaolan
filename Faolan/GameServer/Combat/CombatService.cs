@@ -583,7 +583,8 @@ namespace Faolan.GameServer.Combat
 
 			// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level falls in the newly-crossed
 			// range - learned (DispatchLearnSpell) and persisted to CharacterSpells so they ride every relog, exactly
-			// like .learnspell / a create-flow starter.
+			// like .learnspell / a create-flow starter. Combos are NOT in that set (#298) - they went out above, on the
+			// combo book, which is the only place retail puts them.
 			if (_learnSpell != null)
 			{
 				var learned = await _database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, character.Level);
@@ -613,6 +614,11 @@ namespace Faolan.GameServer.Combat
 		//
 		// Both take effect on the next world entry: feats ride the spawn scaffold's pre-IIR frame, so there is no
 		// mid-session feat packet to send and none is invented here.
+		//
+		// The five classes that came out of the feat grant with ZERO coverage - Barbarian, Guardian, Conqueror,
+		// Assassin, Ranger - were not a gap: 227 of their 259 level-gated catalog entries are COMBOS, which no feat
+		// teaches and which never reach this method any more (see GetClassSpellsUnlockedBetween). What is left is an
+		// ordinary catalog gap of the same kind the caster classes have, Conqueror's ~36 real spells being most of it.
 		private async Task GrantCastabilityFor(Character character, IReadOnlyCollection<uint> learnedSpellIds)
 		{
 			var teachingFeats = await _database.GetFeatsTeachingSpells(learnedSpellIds);

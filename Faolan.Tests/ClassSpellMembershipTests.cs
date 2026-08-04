@@ -1,6 +1,8 @@
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Repositories;
 using Faolan.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -68,6 +70,99 @@ namespace Faolan.Tests
 			var missing = ClassSpellClasses.Where(c => perClass.All(p => p.Class != c)).ToList();
 			Assert.True(missing.Count == 0, "classes with no spells at all: " + string.Join(", ", missing));
 			Assert.All(perClass, p => Assert.True(p.Count >= 25, $"{p.Class} has only {p.Count} spells"));
+		}
+
+		// #298: a COMBO is not a spellbook spell. `ClassSpells` is derived from the class-encoded stacking line and a
+		// melee combo's GameAction carries one, so combos are attributed to their class exactly like spells - which is
+		// correct as MEMBERSHIP and wrong as a spellbook. `Combos.GameActionId` IS a `Spells.Id`, and this is the
+		// oracle that says retail never learns one: every captured character's known-spell list, including a level-80
+		// Necromancer's 109 entries and a Herald's 127.
+		[Fact]
+		public async Task NoCapturedSpellbook_ContainsAComboGameAction()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+
+			var comboActions = await db.Combos.AsNoTracking().Where(c => c.GameActionId != 0).Select(c => c.GameActionId).ToListAsync(ct);
+			var known = await db.CharacterSpells.AsNoTracking().Select(s => s.SpellId).Distinct().ToListAsync(ct);
+
+			var leaked = known.Where(comboActions.Contains).ToList();
+			Assert.True(leaked.Count == 0, "captured spellbook entries that are a combo's GameAction: " + string.Join(", ", leaked));
+		}
+
+		// So neither level-up path may learn one. Both queries feed `DispatchLearnSpell` + `AddCharacterSpell`; the
+		// combos of the level band travel their own way, as ComboBookIIR right after the NewLevelIIR.
+		[Fact]
+		public async Task NeitherSpellGrantQuery_ReturnsAComboGameAction()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+			var comboActions = (await db.Combos.AsNoTracking().Where(c => c.GameActionId != 0).Select(c => c.GameActionId).ToListAsync(ct)).ToHashSet();
+
+			var repo = new DatabaseRepository(new Factory(TestDb.ReadOnly(TestDb.GameDatabase)));
+			foreach (var @class in ClassSpellClasses)
+			{
+				var dinged = await repo.GetClassSpellsUnlockedBetween(@class, 0, 80);
+				Assert.True(dinged.All(id => !comboActions.Contains(id)),
+					$"{@class}: level-up learns combo GameAction(s) {string.Join(", ", dinged.Where(comboActions.Contains))}");
+
+				// The relog re-grant of everything the class should already know, and the default bar seed.
+				var relog = await repo.GetStartingSpells(80, @class);
+				Assert.True(relog.All(id => !comboActions.Contains(id)),
+					$"{@class}: the level-80 re-grant learns combo GameAction(s) {string.Join(", ", relog.Where(comboActions.Contains))}");
+
+				var bar = await repo.GetStartingBarSpells(80, @class);
+				Assert.True(bar.All(id => !comboActions.Contains(id)),
+					$"{@class}: the default bar seeds combo GameAction(s) {string.Join(", ", bar.Where(comboActions.Contains))}");
+			}
+		}
+
+		// ...and the five classes that carried NO teaching feat at all (#298) were combos, not a gap: Barbarian,
+		// Guardian and Assassin are 100% combo, Ranger 44 of 46. They are counted here rather than asserted class by
+		// class so that a catalog refresh that genuinely adds a spell to one of them does not read as a regression.
+		[Fact]
+		public async Task TheMeleeClasses_LevelGatedEntries_AreOverwhelminglyCombos()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+			var ct = TestContext.Current.CancellationToken;
+			var comboActions = (await db.Combos.AsNoTracking().Where(c => c.GameActionId != 0).Select(c => c.GameActionId).ToListAsync(ct)).ToHashSet();
+
+			// The combo SPELL LINES: a weapon variant of a combo whose own Combos row we do not hold (the catalog maps
+			// 304 of 744 - #581) still sits on a line one of the mapped combos owns.
+			var comboLines = await db.Spells.AsNoTracking()
+				.Where(s => comboActions.Contains(s.Id) && s.GuiStackingLine != 0)
+				.Select(s => s.GuiStackingLine)
+				.Distinct()
+				.ToListAsync(ct);
+
+			ConanClass[] melee = [ConanClass.Barbarian, ConanClass.Guardian, ConanClass.Conqueror, ConanClass.Assassin, ConanClass.Ranger];
+			var gated = await db.ClassSpells.AsNoTracking()
+				.Where(c => melee.Contains(c.Class))
+				.Join(db.Spells.AsNoTracking(), c => c.SpellId, s => s.Id, (c, s) => s)
+				.Where(s => s.Level > 0)
+				.Select(s => new
+				{
+					s.Id,
+					s.GuiStackingLine
+				})
+				.Distinct()
+				.ToListAsync(ct);
+
+			var combos = gated.Count(s => comboActions.Contains(s.Id) || comboLines.Contains(s.GuiStackingLine));
+			Assert.True(combos * 100 >= gated.Count * 80, $"only {combos} of {gated.Count} melee level-gated entries are combos");
+		}
+
+		private sealed class Factory(DbContextOptions<DatabaseContext> options) : IDbContextFactory<DatabaseContext>
+		{
+			public DatabaseContext CreateDbContext()
+			{
+				return new DatabaseContext(options);
+			}
+
+			public Task<DatabaseContext> CreateDbContextAsync(CancellationToken ct = default)
+			{
+				return Task.FromResult(new DatabaseContext(options));
+			}
 		}
 
 		// The twelve playable classes - the same set `ClassSpell`'s own CHECK constraint enumerates.
