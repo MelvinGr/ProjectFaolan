@@ -312,15 +312,19 @@ namespace Faolan.GameServer.Combat
 
 		// Spends the caster's mana for a cast and pushes the caster's own 0x96B8DC59 update so the mana bar drops -
 		// the spell/mana analogue of the melee swing's stamina cost. (Mana isn't carried by EnergyIIR, which is
-		// stamina-only in the captures; it rides the vitals stat block.) Per-spell costs aren't decoded yet, so the
-		// cost is provisional. No-op if the player has no mana pool.
+		// stamina-only in the captures; it rides the vitals stat block.) The cost is the spell's own RDB percentage
+		// of the pool (#629). No-op if the player has no mana pool, or if the spell costs nothing.
 		public async Task SpendCasterMana(INetworkClient client, uint spellId)
 		{
 			var player = GetOrAddPlayerVitals(client);
 			if (player.MaxMana == 0)
 				return;
 
-			var cost = CombatResolver.ResolveSpellManaCost(spellId, client.Session.Character.Level);
+			var spell = await _database.GetSpell(spellId);
+			var cost = CombatResolver.ResolveSpellManaCost(spell?.ManaCost ?? 0, player.MaxMana);
+			if (cost == 0)
+				return;
+
 			player.ApplyManaDelta(-(int)cost);
 			await SendStatUpdate(client, player.ToCurrentsBlock(), client.Session.Character.Id); // #586: a cast MOVES mana
 		}

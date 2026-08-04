@@ -43,6 +43,50 @@ A property of one percent of the catalog is not "the spell's damage rating"; it 
 splash triple. `Spell.DamageRating` imports this field and `Faolan.Web` displays it under the wrong label —
 open work is tracked in Gitea #626.
 
+## ⚠️ Field 54 is not the level requirement — 125 is
+
+Both ids are called `Level` somewhere, and 54 is on **20,186** records to 125's **7,645**, so the narrow one
+reads like an import that missed most of the catalog. It is the other way round.
+
+Field 54 takes 23 values over the whole catalog and **19,957 of them are `1` or `80`** — a content BAND
+(pre- vs post-cap), not a per-spell requirement. Field 125 takes 43 values and tracks the unlock ladder every
+other source agrees with: `Gate of Hell` 70, every rank-6 spell 80, and `Ice Strike`'s six ranks
+7 / 20 / 35 / 50 / 65 / 80. `RdbSpellImporter` reads 125, and that is correct.
+
+## Field 132 `ManaCost` is usually a PERCENTAGE of the caster's mana pool
+
+Read straight, 132's values look too small to be a cost: `Ice Strike (Rank 6)` carries **9**. They are
+percentages, and the client says so. `FUN_008d6f70` — the function behind the spell tooltip's
+`ManaCostToolTip` line — is:
+
+```c
+cost = spell.GetIntStat(0x84);                               // this field, clamped to >= 0
+if (spellFlags & 4)                                          // the percent-of-pool mode
+    cost = (int)(caster.GetIntStat(0x1FB) * cost * 0.01f);   // 0x1FB = ManaMax, wire units
+cost = (int)((modifier.Amount * 0.0001f + 1.0f) * (modifier.Value + cost));
+```
+
+and the tooltip prints `cost * 0.01`, dividing the wire's hundredths back to display units. The two modifier
+terms are exactly the [`FeatSpellStatModifier`](../subsystems/feats.md) pair — an absolute `Value` plus an
+`Amount` in hundredths of a percent — that feats already target at `ManaCost`, which is what says this is the
+real cast-cost path rather than a display-only accessor.
+
+**The flag word selects a second, FLAT mode**, and both modes carry real player spells:
+
+| spell | field 132 | reading |
+|---|---:|---|
+| `Ice Strike` ranks 1-6 | 8, 9, 9, 9, 9, 9 | ~9% of the pool at every rank |
+| `Dark Knowledge` rank 1 | 10 | 10% of the pool |
+| `Dark Knowledge` ranks 2-4 | 12800, 26500, 42200 | 128 / 265 / 422 mana flat |
+
+One spell LINE mixing the two rules out "flat is a pre-launch leftover". Which RDB field feeds the flag is
+**not decoded** (Gitea #630), so `CombatResolver.ResolveSpellManaCost` picks the mode by magnitude; the data is
+sharply bimodal, with **1,209** spells at 1..100, **30** at 101..999 and **452** at 1000+.
+
+`Spell.ManaCost` carries the field raw, both modes in the one column. 1,691 of the 20,847 catalogued spells
+carry a cost; a 0 (or an absent field) means the spell is free, which is retail's own reading — the client's
+property accessor returns 0 for a record that carries neither.
+
 ## The named fields
 
 `count` is how many of the 21,502 records carry the field.
@@ -96,8 +140,9 @@ open work is tracked in Gitea #626.
 | 1291 | 0x50B | 12 | `SpellLine2` |
 
 ⚠️ **A name is evidence, not a citation.** The id space is shared, so a name is genuinely the client's name for
-that id — but what the property MEANS on a spell still has to be checked against values. Some read straight
-through (`ManaCost` values 1500–6000; `StaminaCurrent` 7700 on 398 records is a stamina cost;
+that id — but what the property MEANS on a spell still has to be checked against values, and `ManaCost` is the
+worked example: its name is right and reading it as an absolute cost would still be wrong (see above).
+Some do read straight through (`StaminaCurrent` 7700 on 398 records is a stamina cost;
 `SecondaryMagicRating`'s values 932–937 are themselves the `MagicRatingFire..Poison` stat ids). Others are
 Anarchy-Online inheritance wearing a stat id — `AwardedOmniTekTokens` on 8,505 spell records is a ladder of
 1,1,2,2,3,3,4,4, which is a rank, not a token award.

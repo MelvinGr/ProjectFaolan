@@ -72,7 +72,9 @@
 						</label>
 						<label title="milliseconds — RDB field 0x126 × 10">Cast time (ms)<input class="n" @bind="_spell.CastTime"/></label>
 						<label title="SECONDS, not ms — matches the source that carries it">Cooldown (s)<input class="n" @bind="_spell.Cooldown"/></label>
-						<label>Mana cost<input class="n" @bind="_spell.ManaCost"/></label>
+						<label title="RDB field 132, carried RAW — the client reads it in two modes. 1…100 is a PERCENTAGE of the caster's mana pool (cost = manaMax × this ÷ 100); anything larger is an absolute cost in wire hundredths (42200 = 422 mana). 0 = free.">
+							Mana cost (raw)<input class="n" @bind="_spell.ManaCost"/>
+						</label>
 						<label title="metres — RDB field 0x11F / 100">Range (m)<input class="n" @bind="_spell.Range"/></label>
 						<label title="percent — RDB field 0x15C / 100">Damage rating<input class="n" @bind="_spell.DamageRating"/></label>
 						<label title="0 = no self-duration. Drives buff expiry: a timed self-buff gets its end-twin sent at 0 so the icon disappears.">

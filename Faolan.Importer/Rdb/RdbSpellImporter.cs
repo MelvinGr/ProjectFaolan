@@ -20,13 +20,17 @@ namespace Faolan.Importer.Rdb
 	//   field 0x126 (294) = cast time in centiseconds (value*10 = ms): Ice 200->2.0s, ShockStrike 250->2.5s,
 	//     Fire of Gehenna 200->2.0s, Hellfire Stream 100->1.0s, Shocblast 300->3.0s, Inferno of Amher 250->2.5s.
 	//   field 0x11F (287) = target range * 100 (Ice 2500 -> 25); field 0x34C (844 -> no; 348) = spell damage
-	//     rating * 100 (Ice 3000 -> 30.00%). (Mana/min-max damage are rank/level-COMPUTED, not base fields, so
-	//     they are not backfillable from this record.)
+	//     rating * 100 (Ice 3000 -> 30.00%).
 	// Catalogs the FULL spell list from the RDB: every type-1040005 record that carries a display name is upserted
 	// into the Spell table with its Name (the 0x21 string, same framing as item templates - see
-	// RdbItemImporter.ExtractName), CastTime, Range, DamageRating, DurationMs and (additively) Level.
-	// EffectSpell/ManaCost/min-max damage stay untouched - those really are rank/level-COMPUTED and absent from this
+	// RdbItemImporter.ExtractName), CastTime, Range, DamageRating, DurationMs, ManaCost and (additively) Level.
+	// EffectSpell/min-max damage stay untouched - those really are rank/level-COMPUTED and absent from this
 	// record. Idempotent: re-running only rewrites changed values. (#236)
+	//
+	// ⚠️ "Mana is rank/level-COMPUTED, not a base field, so it is not backfillable" (the claim this comment used to
+	// make) was wrong, and wrong in an instructive way: mana IS level-scaled, but the SCALING is what the client does
+	// with the field, not a reason the field is absent. Field 132 is usually the cost as a PERCENT of the caster's
+	// mana pool, which is level-scaled by construction - see Spell.ManaCost (#629).
 	//
 	// #402: a record with NO embedded name is NOT automatically junk. A handful of real player-facing spells (e.g.
 	// the "Set's Ruin" necro family 222682-222685, "Warlord's March", ...) carry no 0x21 string in their 1040005
@@ -58,7 +62,7 @@ namespace Faolan.Importer.Rdb
 	// The narrower claim stands: 551 says "400" but never "400 of WHAT", so a buff's MAGNITUDES are server-GDB-only
 	// here, same as mana/damage/recast (docs/subsystems/stat-engine.md).
 	//
-	// The run is 111 distinct fields wide and the importer reads 13 of them (`--report rdb-field-coverage`). Several
+	// The run is 111 distinct fields wide and the importer reads 14 of them (`--report rdb-field-coverage`). Several
 	// unread ones are on MORE records than the read ones - 54 is on 20,186 of 21,502 - so "we parse this table" is
 	// not the same as "we have this table".
 	//
@@ -73,6 +77,12 @@ namespace Faolan.Importer.Rdb
 		private const uint DurationField = 0x008; // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
 
 		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
+
+		// 132 - the mana cost, carried RAW because the client reads it in two modes: a PERCENTAGE of the caster's
+		// mana pool, or (when its flag word says so) an absolute cost in wire hundredths. Recovered from the
+		// client's own tooltip path (#629); see Spell.ManaCost for the decompiled function, and #630 for the
+		// undecoded flag that picks the mode.
+		private const uint ManaCostField = 0x084;
 
 		// 186 - the client's `Mount` stat id (0x0BA): on a spell record it names the mount CREATURE the summon
 		// spawns, so a record carrying it IS a mount summon. 155 records, 122 distinct creatures - the whole
@@ -100,6 +110,13 @@ namespace Faolan.Importer.Rdb
 		// Ice Strike (Rank 1) at create even though its requirement really is level 7 - and the RDB and ellatha AGREE
 		// on 7, so the pin was overwriting a CORRECT level with a sentinel. The starter kit is now a capture-proven
 		// list on ClassSpell.IsStarter, independent of level, and Spells.Level means only "the level requirement".
+		//
+		// ⚠️ NOT field 54, which the client's stat-name table also calls `Level` and which is on 20,186 records to
+		// this one's 7,645 - a coverage gap that reads like a bug (#629). It is not one. Field 54 takes 23 values
+		// over the whole catalog and 19,957 of them are 1 or 80, where 125 takes 43 values that track the real
+		// unlock ladder: Gate of Hell 70, every rank-6 spell 80, `Ice Strike` 7/20/35/50/65/80 across its ranks.
+		// Field 54 is a content BAND (pre- vs post-cap), not a requirement, and 45 named fields is exactly how many
+		// chances there are to import the wrong one - see the field-name warning in docs/rdb/spell-record-fields.md.
 		private const uint LevelField = 0x07D;
 
 		// 123 - the spell's RANK. Named in the #367 field dump but never lifted until now; the rank used to come from
@@ -219,6 +236,11 @@ namespace Faolan.Importer.Rdb
 				var rank = fields.TryGetValue(RankField, out var rk) && rk <= byte.MaxValue
 					? (byte)rk
 					: (byte)0;
+				// #629: carried RAW, both modes in the one column - clamping the flat rows into a percent range would
+				// silently invent a cost, and picking the mode is the reader's job (CombatResolver.ResolveSpellManaCost).
+				var manaCost = fields.TryGetValue(ManaCostField, out var mc) && mc <= ushort.MaxValue
+					? (ushort)mc
+					: (ushort)0;
 
 				// #627: a record carrying field 186 IS a mount summon, and the value is the creature it seats the
 				// player on. Collected here rather than in a pass of its own precisely because it is a column lift
@@ -253,7 +275,8 @@ namespace Faolan.Importer.Rdb
 						Level = level,
 						Rank = rank,
 						LineId = lineId,
-						ScalingAttribute = scalingAttribute
+						ScalingAttribute = scalingAttribute,
+						ManaCost = manaCost
 					};
 					byId[entry.Id] = spell;
 					toAdd.Add(spell);
@@ -297,6 +320,7 @@ namespace Faolan.Importer.Rdb
 				spell.Rank = rank;
 				spell.LineId = lineId;
 				spell.ScalingAttribute = scalingAttribute;
+				spell.ManaCost = manaCost;
 			}
 
 			if (toAdd.Count > 0)

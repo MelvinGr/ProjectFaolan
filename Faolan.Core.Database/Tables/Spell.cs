@@ -132,6 +132,37 @@ namespace Faolan.Core.Database.Tables
 		// and fit values like Death's Terror 90s in a ushort. (#78)
 		public ushort Cooldown { get; set; }
 
+		/// <summary>
+		///     RDB field 132 (0x084) of the spell's type-1040005 record - the client's
+		///     <see cref="CharacterStatId.ManaCost" /> stat id - carried RAW, because the client reads it in TWO modes
+		///     and the selector is not in this record. 0 = the spell is free, which is retail's own reading of an
+		///     absent property. 1,691 of the 20,847 catalogued spells carry a cost.
+		/// </summary>
+		/// <remarks>
+		///     Recovered from the client, not fitted (#629). <c>FUN_008d6f70</c> - the function behind the spell
+		///     tooltip's <c>ManaCostToolTip</c> line - is:
+		///     <code>
+		///     cost = spell.GetIntStat(0x84);                               // this field, clamped to >= 0
+		///     if (spellFlags &amp; 4)                                          // the percent-of-pool mode
+		///         cost = (int)(caster.GetIntStat(0x1FB) * cost * 0.01f);   // 0x1FB = ManaMax, wire units
+		///     cost = (int)((modifier.Amount * 0.0001f + 1.0f) * (modifier.Value + cost));
+		///     </code>
+		///     and the tooltip prints <c>cost * 0.01</c>, i.e. it divides the wire's hundredths back to display units.
+		///     The two modifier terms are exactly the <see cref="FeatSpellStatModifier" /> pair (an absolute
+		///     <c>Value</c> plus an <c>Amount</c> in hundredths of a percent) that feats already target at
+		///     <see cref="CharacterStatId.ManaCost" />, which is what says this is the real cast-cost path and not a
+		///     display-only accessor.
+		///     <para>
+		///         So with the flag set the value is a PERCENTAGE of the caster's mana pool (<c>Ice Strike</c> 9 = 9%),
+		///         and without it an absolute cost in wire hundredths (<c>Dark Knowledge (Rank 4)</c> 42200 = 422
+		///         mana). ⚠️ Which RDB field feeds that flag is NOT decoded - Gitea #630 - so
+		///         <c>CombatResolver.ResolveSpellManaCost</c> picks the mode by MAGNITUDE instead. The data is
+		///         sharply bimodal, which is what makes that safe for now: 1,209 rows sit at 1..100 and 452 at
+		///         1000+, with 30 in between. Both modes carry real player spells and neither is a legacy artifact -
+		///         one spell LINE can even mix them (<c>Dark Knowledge</c> rank 1 is 10%, ranks 2-4 are 128/265/422
+		///         flat) - so the threshold is a stand-in for the flag, not a theory about it.
+		///     </para>
+		/// </remarks>
 		public ushort ManaCost { get; set; }
 	}
 }

@@ -2831,7 +2831,8 @@ namespace Faolan.Importer.Cli
 				? new Dictionary<uint, string>
 				{
 					[8] = "duration", [79] = "icon", [123] = "rank", [125] = "level", [128] = "spell line (#590)",
-					[129] = "splash percent", [186] = "mount creature (#627)", [287] = "range", [294] = "cast time",
+					[129] = "splash percent", [132] = "mana cost percent (#629)", [186] = "mount creature (#627)",
+					[287] = "range", [294] = "cast time",
 					[321] = "effect set", [347] = "splash radius", [348] = "damage rating", [349] = "max targets",
 					[499] = "mount quality (#627)", [551] = "rank-scaling magnitude", [847] = "scaling attribute (#592)"
 				}

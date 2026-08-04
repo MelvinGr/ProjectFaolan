@@ -483,16 +483,28 @@ namespace Faolan.GameServer.Combat
 			return gearMagicDamage + score * MagicalDpsAbilityModifierPerMille / 1000;
 		}
 
-		// Provisional mana cost for a cast. Per-spell costs aren't decoded from captures yet (like damage), so this
-		// is a simple level-scaled value just so casting visibly drains the mana bar (the spell/mana analogue of the
-		// melee stamina cost).
-		public static uint ResolveSpellManaCost(uint spellId, ushort casterLevel)
-		{
-			var level = casterLevel == 0
-				? (ushort)1
-				: casterLevel;
-			return (uint)(10 + level * 2);
-		}
+		// The mana a cast costs, RETAIL'S OWN FORMULA rather than a placeholder (#629). The client reads the spell's
+		// RDB field 132 (Spell.ManaCost, carried raw) in two modes, both of which land in the wire's hundredths and
+		// are divided by 100 for display:
+		//
+		//   percent mode  cost = manaMax * field / 100      Ice Strike 9 -> 9% of the pool
+		//   flat mode     cost = field                      Dark Knowledge (Rank 4) 42200 -> 422 mana
+		//
+		// A client flag word picks between them; that flag is not decoded (Gitea #630), so the mode is picked by
+		// MAGNITUDE - see Spell.ManaCost for the decompiled function and why the bimodal data makes that safe.
+		// A cost of 0 means FREE, which is retail's reading too rather than a gap papered over: the client's property
+		// accessor returns 0 for a record with no field 132, and 3,783 of the 5,496 records that DO carry it carry a
+		// literal 0. The old level-scaled placeholder (`10 + level * 2`) is gone - it charged mana for the buffs and
+		// toggles retail hands out for nothing.
+		public static uint ResolveSpellManaCost(ushort spellManaCostField, uint casterMaxMana) =>
+			spellManaCostField <= MaxManaCostPercent
+				? (uint)((long)casterMaxMana * spellManaCostField / 100)
+				: (uint)(spellManaCostField / 100); // wire hundredths -> the pool's own display units
+
+		// The magnitude that separates field 132's percent mode from its flat mode. A percent above 100 would be a
+		// spell costing more than the caster's whole pool - i.e. uncastable - and the data has a clean gap there:
+		// 1,209 spells at 1..100, 30 at 101..999, 452 at 1000+.
+		private const ushort MaxManaCostPercent = 100;
 
 		private static int Mitigate(int rawDamage, uint rating, uint halfPoint)
 		{
