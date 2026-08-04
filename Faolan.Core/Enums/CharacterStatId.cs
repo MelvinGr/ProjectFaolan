@@ -261,6 +261,12 @@ namespace Faolan.Core.Enums
 		TempSavePlayfield = 0x253,
 		TempSaveX = 0x254,
 		TempSaveY = 0x255,
+		/// <summary>
+		///     The spawn record's <c>CharacterStats.flags</c> (protobuf field 16) verbatim - the client pushes the whole
+		///     word into the character under this id. Bit 3 = a trade session is open, 5 = a teleport is in flight,
+		///     22 = the first/last name fields are populated, 28 = NPC (which the client always recomputes locally
+		///     rather than trusting ours). See <c>docs/re/corecharacter-flags-bitfield.md</c>.
+		/// </summary>
 		Flags = 0x000,
 		Features = 0x0E0,
 		PreviousMovementMode = 0x0AE,

@@ -55,7 +55,9 @@ namespace Faolan.Core.Database.Tables
 		// NPC" bit** (#646). Measured over the whole corpus: 17,400 NPC records all carry it and all 317 player records
 		// do not, while bit 0 is set on both. So the constancy across NPC types is the value being DECODED, not
 		// undecoded - it is protobuf field 16, addressed by field number, so there was never an offset to get wrong.
-		// Bits 3 and 5 appear only on players and only transiently (Gitea #648).
+		// Bits 3 and 5 appear only on players and only transiently, and are now named from the client (#648):
+		// 3 = a trade session is open, 5 = a teleport is in flight. The whole word is the client's stat 0x000
+		// "Flags" (`CharacterStatId.Flags`) - see docs/re/corecharacter-flags-bitfield.md.
 		// Gated by NpcStatCoreColumnsTests.CharacterStatsFlags_Bit28_IsTheNpcBit.
 		public uint? Flags { get; set; }
 		public uint? HeadMesh { get; set; }
