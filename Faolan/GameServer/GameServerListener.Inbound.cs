@@ -2045,6 +2045,28 @@ namespace Faolan.GameServer
 			// CastGroundTarget reads the reticle; SpellTarget == null confirms there's no locked entity. (#236)
 			var isGroundCast = CastGroundTargetScan.TryReadPosition(actionTrailer, out var groundTarget) && args.Target == null;
 
+			// #271: the recast gate. Retail's client will not SEND a cast that is still on cooldown - its own
+			// recast timer blocks the button - so retail's server has no captured answer to one, and this refuses
+			// by sending NOTHING rather than by inventing a reply. No echo-ack means the client never enters the
+			// channel state, so the cast neither bars nor resolves (the ack is what makes it channel at all - see
+			// the cast-begin ack below). The spell's own base recast is `Spell.RecastCentiseconds`, off the
+			// record's SetSpellRecastTime / SetSpellLineRecastTime element (docs/re/spell-recast-source.md).
+			var spell = await Database.GetSpell(spellId);
+			// The group the client itself arms: a line-scoped recast covers every rank at once, which is what
+			// SetSpellLineRecastTime means and why all five Chill ranks share one 4 s timer. 0 = the spell has no
+			// recast, so nothing is tracked for it.
+			var recastGroup = spell is { RecastCentiseconds: > 0 }
+				? spell.GuiStackingLine != 0
+					? spell.GuiStackingLine
+					: spell.Id
+				: 0;
+			if (recastGroup != 0 && client.Session.SpellReadyAt.TryGetValue(recastGroup, out var readyAt) && Environment.TickCount64 < readyAt)
+			{
+				Logger.LogInformation("CastSpell REFUSED spell=0x{Spell:X} ({Name}): {Remaining} ms of its {Recast} cs recast left.",
+					spellId, spell!.Name, readyAt - Environment.TickCount64, spell.RecastCentiseconds);
+				return;
+			}
+
 			// This cast's invalidation token: a later cancel (or a new cast) bumps ActiveCastToken so the
 			// deferred Resolve below aborts if the cast was interrupted before its cast time elapsed.
 			var castToken = ++client.Session.ActiveCastToken;
@@ -2071,7 +2093,6 @@ namespace Faolan.GameServer
 			// receipt skipped the client's cast bar. CastTime 0 (instant spell, or an un-populated row)
 			// resolves immediately. Movement mid-cast interrupts it (the cancel branch above / the move
 			// handler's token bump); the abort BCC drops the client bar (#347).
-			var spell = await Database.GetSpell(spellId);
 			var castMs = spell?.CastTime ?? 0;
 			if (castMs == 0)
 				await Resolve();
@@ -2110,6 +2131,12 @@ namespace Faolan.GameServer
 					return;
 
 				client.Session.PendingCastArgs = null!; // cast completed; no abort needed
+
+				// #271: the recast starts when the spell actually GOES OFF, not when the cast begins - an
+				// interrupted cast costs no cooldown, which is why this arms here rather than beside the refusal
+				// check above.
+				if (recastGroup != 0)
+					client.Session.SpellReadyAt[recastGroup] = Environment.TickCount64 + spell!.RecastCentiseconds * 10;
 
 				// Cast-complete (#236): the cast bar is the form-0x0a cast behavior (retail BEGIN2/completion BCC, 									// ice-strike idx481/534), not the form-4 begin. The echo-ack derives its form from the packet's
 				// seq word (form = seq+1), so to emit form 0x0a we stamp seq=9 onto a clone, with phase=3

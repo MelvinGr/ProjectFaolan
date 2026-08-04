@@ -71,7 +71,7 @@
 							GUI Stacking Order<input class="n" @bind="_spell.GuiStackingOrder"/>
 						</label>
 						<label title="milliseconds — RDB field 0x126 × 10">Cast time (ms)<input class="n" @bind="_spell.CastTime"/></label>
-						<label title="SECONDS, not ms — matches the source that carries it">Cooldown (s)<input class="n" @bind="_spell.Cooldown"/></label>
+						<label title="CENTISECONDS — the client's own unit for a recast (it applies value × 0.01 s). Sourced from the spell record's SetSpellRecastTime / SetSpellLineRecastTime GameAction element.">Recast (cs)<input class="n" @bind="_spell.RecastCentiseconds"/></label>
 						<label title="RDB field 132, carried RAW — the client reads it in two modes. 1…100 is a PERCENTAGE of the caster's mana pool (cost = manaMax × this ÷ 100); anything larger is an absolute cost in wire hundredths (42200 = 422 mana). 0 = free.">
 							Mana cost (raw)<input class="n" @bind="_spell.ManaCost"/>
 						</label>

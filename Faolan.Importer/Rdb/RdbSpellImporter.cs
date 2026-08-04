@@ -145,6 +145,11 @@ namespace Faolan.Importer.Rdb
 		private const uint ScalingAttributeField = 0x34F;
 		private const uint SpellDataType = 1040005;
 
+		// #271: the two GameAction element types that SET a base recast (docs/re/gameaction-keylists.tsv). Their
+		// `Change...` twins (53031 / 53069) are modifiers, not a base, and are deliberately not read here.
+		private const uint SetSpellRecastTimeKind = 53226;
+		private const uint SetSpellLineRecastTimeKind = 53077;
+
 		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet, int Mounts)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
 			ILogger? logger = null)
 		{
@@ -185,6 +190,14 @@ namespace Faolan.Importer.Rdb
 			var statEffects = new Dictionary<uint, Dictionary<uint, (uint Kind, int Amount, LevelRamp? Ramp)>>();
 			// #627: (summon spell id -> mount creature id + tier) from field 186, synced into Mounts after the save.
 			var mounts = new Dictionary<uint, (uint CreatureId, ItemQuality? Quality)>();
+			// #271: the base recast, off the record's GameAction ELEMENT region. Resolved only after the loop, because
+			// deciding which element applies to a spell needs its GuiStackingLine, which this same loop sets.
+			// `recastOwn` is what a record says when IT is cast; the two `assigned` maps are what every record says
+			// about a target, so a rank carrying no element of its own still inherits its family's timer.
+			var recastOwn = new Dictionary<uint, List<(uint Kind, uint Target, uint Value)>>();
+			var assignedBySpell = new Dictionary<uint, uint>();
+			var assignedByLine = new Dictionary<uint, uint>();
+			var recastDisagreements = 0;
 
 			var seen = 0;
 			var inserted = 0;
@@ -272,6 +285,49 @@ namespace Faolan.Importer.Rdb
 				// #367: buff/debuff stat deltas live in the same [2][9] region as item templates. The record's KIND is
 				// carried through, not dropped: a spell mixes flat and PERCENT records in one region, and reading a
 				// percent one as flat turns "+2% Critical Rating" into "+200" (ItemTemplateStatModifiers).
+				// #271: the base recast. It is an ACTION the spell performs when cast - "set the recast of X" - so it
+				// is filed under its TARGET, not under the record that carries it: `Mesmeric Gaze (Rank 4)` sets the
+				// recast of ranks 1-4, and `Pestilential Blast` carries no element at all, which is exactly the 0 its
+				// retail tooltip shows. Only the two SETTERS are read; ChangeRecastTime / ChangeLineRecastTime are
+				// modifiers on a base the client already holds (docs/re/spell-recast-source.md).
+				foreach (var element in ItemTemplateStatModifiers.ParseElements(body.AsSpan(12)))
+				{
+					var value = element.Value(GameActionTypes.KeyValue) ?? 0;
+					uint target;
+					if (element.Kind == SetSpellRecastTimeKind)
+						target = element.Value(GameActionTypes.KeySpell) ?? 0;
+					else if (element.Kind == SetSpellLineRecastTimeKind)
+						target = element.Value(GameActionTypes.KeyLine) ?? 0;
+					else
+						continue;
+
+					if (value == 0 || target == 0)
+						continue;
+
+					(recastOwn.TryGetValue(entry.Id, out var mine)
+						? mine
+						: recastOwn[entry.Id] = []).Add((element.Kind, target, value));
+
+					// ⚠️ Records DISAGREE about a target - 338 spells and 12 lines are named with two different
+					// values, because a rank arms its whole family and the ranks do not share a number (Embodiment
+					// of Terror: rank 1's own record says 90 s, rank 2's says 80 s for that same rank 1). The
+					// resolution below prefers what the spell's OWN record says, so this map only ever decides for
+					// a spell that carries no element at all, and there the longest wins: under-gating a cast is
+					// the failure that matters.
+					var map = element.Kind == SetSpellRecastTimeKind
+						? assignedBySpell
+						: assignedByLine;
+					if (map.TryGetValue(target, out var existing))
+					{
+						if (existing != value)
+							recastDisagreements++;
+						if (existing >= value)
+							continue;
+					}
+
+					map[target] = value;
+				}
+
 				var mods = ItemTemplateStatModifiers.Parse(body.AsSpan(12));
 				if (mods.Count > 0)
 				{
@@ -348,6 +404,34 @@ namespace Faolan.Importer.Rdb
 				spell.ManaCostIsPercent = manaCostIsPercent;
 			}
 
+			// #271: apply the recast now that every row's GuiStackingLine is set. The spell's OWN record leads - it
+			// is that spell's own statement about itself, and it is what the retail tooltip shows - and a record
+			// naming the spell (or its line) from outside only fills in for a rank that carries no element, which is
+			// how `Unimaginable Terror` rank 1 inherits the 45 s its rank-2 sibling arms on their shared line.
+			// Never CLEARED, only set: a combo's recast comes from the ellatha list instead (no combo record carries
+			// either element), so zeroing the column here would wipe it.
+			var recastsSet = 0;
+			foreach (var spell in byId.Values)
+			{
+				var recast = 0u;
+				if (recastOwn.TryGetValue(spell.Id, out var own))
+					foreach (var (kind, target, value) in own)
+						if ((kind == SetSpellRecastTimeKind && target == spell.Id) ||
+						    (kind == SetSpellLineRecastTimeKind && target == spell.GuiStackingLine))
+							recast = value;
+
+				if (recast == 0)
+					recast = assignedBySpell.GetValueOrDefault(spell.Id);
+				if (recast == 0 && spell.GuiStackingLine != 0)
+					recast = assignedByLine.GetValueOrDefault(spell.GuiStackingLine);
+
+				if (recast == 0 || spell.RecastCentiseconds == recast)
+					continue;
+
+				spell.RecastCentiseconds = recast;
+				recastsSet++;
+			}
+
 			if (toAdd.Count > 0)
 				db.Spells.AddRange(toAdd);
 			await db.SaveChangesAsync();
@@ -408,8 +492,8 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts.",
-				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten);
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements).",
+				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements);
 			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten);
 		}
 

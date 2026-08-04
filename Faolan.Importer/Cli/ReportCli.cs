@@ -389,6 +389,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "spell-recast":
+				{
+					SpellRecast(RdbDir(), arg);
+					return 0;
+				}
+
 				case "spell-line-ids":
 				{
 					SpellLineIds(RdbDir(), arg);

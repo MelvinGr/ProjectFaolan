@@ -1,19 +1,22 @@
 # Spell / stat computation engine (formulas) — #270
 
-## RESOLVED: recast/cooldown is SERVER-AUTHORITATIVE (not client data)
+## ⚠️ SUPERSEDED: recast/cooldown is CLIENT DATA after all — see [`../re/spell-recast-source.md`](../re/spell-recast-source.md)
 
-Found via the exe's recast strings. The recast timer is set by `FUN_007e1080` ("Setting recast timer on
-spell: ... to: <param2>"; param2 = recast centiseconds, ×0.01 = seconds). Its callers:
-- `FUN_008b0f50` = the **`SetSpellRecastTime` GameAction handler** — reads recast from the action
-  (`FUN_0089bd80(action, 0x2f9)`, param id `0x2f9` = recast centiseconds) and sets the timer.
-- `FUN_007e1230` = `ChangeLineRecastTime` — adjusts a spell line's recast by a supplied delta.
+This section used to read *"recast is SERVER-AUTHORITATIVE (not client data) … Faolan defines it and sends the
+GameAction, like retail"*. Both halves are wrong, and acting on them is what left a spell with no cooldown at all:
 
-GameActions in the exe: `SetSpellRecastTime`, `SetSpellLineRecastTime`, `ChangeRecastTime`,
-`ChangeLineRecastTime` (`e_Type_GC_GameAction_*`). **The server computes recast and pushes it to the client**
-at cast time; the client only enforces/displays it. This is why every client-data search failed (6 static + 2
-dynamic) — the recast simply isn't in the client. **Faolan defines it and sends the GameAction**, like retail.
-Same pattern likely for mana/damage. Implementation = a feature (emit `SetSpellRecastTime` on cast), not a
-decode; values from `Spell.Cooldown` (combos) + `Captures/spell_cooldowns_observed.tsv`.
+- **Retail sends no recast, ever.** All 1,745 `GameActionListIIR` bodies in the corpus, across 101 captures,
+  carry five element types and none of the six recast ones. Emitting `SetSpellRecastTime` on cast would have been
+  a packet retail never sends.
+- **The base IS in the client**, in the spell's own `1040005` GameAction ELEMENT region — a
+  `SetSpellRecastTime` / `SetSpellLineRecastTime` element carrying it under key `0x2f9`, the same key the
+  tooltip's "Recast" line reads. The earlier searches missed it because they looked for a property FIELD, and it
+  is not one. 3,682 spells now carry it (`Spell.RecastCentiseconds`), gated against eight retail tooltip readings.
+- `ChangeRecastTime` / `ChangeLineRecastTime` are feat/AA **modifiers** on that base (`FUN_007e1230` computes
+  `base + delta`), which is exactly why they exist as GameActions while the base does not.
+
+What survives unchanged is the RE below it: `FUN_007e1080` is the per-spell recast arm ("Setting recast timer on
+spell: … to: <cs>", ×0.01 s), and `FUN_008b0f50` is the `SetSpellRecastTime` handler that reads `0x2f9`.
 
 ---
 

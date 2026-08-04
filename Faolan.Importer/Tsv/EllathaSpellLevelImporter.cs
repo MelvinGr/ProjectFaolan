@@ -64,9 +64,11 @@ namespace Faolan.Importer.Tsv
 			return (rows, matched, updated);
 		}
 
-		// Backfills Level + Cooldown for COMBOS from the ellatha combos list. Combos are RDB type 1040005 (same as
+		// Backfills Level + the recast for COMBOS from the ellatha combos list. Combos are RDB type 1040005 (same as
 		// spells) and already live in the Spells table under their EXACT name (no rank suffix), so match by name and
-		// set both columns on every id-variant. The combos list is the one source carrying cooldown (recast, seconds).
+		// set both columns on every id-variant. This list is the one source carrying a COMBO's recast - no combo
+		// record carries the GameAction element the spell half comes from (#271) - and it carries it in SECONDS,
+		// scaled up here to the centiseconds the column holds.
 		// A combo name appears once per archetype with the same stats, so de-dup by name. Idempotent.
 		public static async Task<(int Combos, int Matched, int Updated)> ImportCombosAsync(IDatabaseContext db, string tsvPath, ILogger? logger = null)
 		{
@@ -76,8 +78,8 @@ namespace Faolan.Importer.Tsv
 				return (0, 0, 0);
 			}
 
-			// name -> (level, cooldownSeconds). TSV columns: name, level, cooldown, stamina, archetype.
-			var byName = new Dictionary<string, (byte Level, ushort Cooldown)>();
+			// name -> (level, recast centiseconds). TSV columns: name, level, cooldown (SECONDS), stamina, archetype.
+			var byName = new Dictionary<string, (byte Level, uint RecastCentiseconds)>();
 			foreach (var line in await File.ReadAllLinesAsync(tsvPath))
 			{
 				if (line.Length == 0 || line[0] == '#')
@@ -90,9 +92,9 @@ namespace Faolan.Importer.Tsv
 				int.TryParse(c[2], out var cd); // cooldown may be blank -> 0
 				byName[c[0]] = (level is > 0 and <= byte.MaxValue
 					? (byte)level
-					: (byte)0, cd is > 0 and <= ushort.MaxValue
-					? (ushort)cd
-					: (ushort)0);
+					: (byte)0, cd > 0
+					? (uint)cd * 100
+					: 0u);
 			}
 
 			var names = byName.Keys.ToList();
@@ -100,12 +102,12 @@ namespace Faolan.Importer.Tsv
 			var updated = 0;
 			foreach (var spell in spells)
 			{
-				var (level, cooldown) = byName[spell.Name];
-				if (spell.Level != level || spell.Cooldown != cooldown)
+				var (level, recast) = byName[spell.Name];
+				if (spell.Level != level || spell.RecastCentiseconds != recast)
 				{
 					if (level != 0)
 						spell.Level = level;
-					spell.Cooldown = cooldown;
+					spell.RecastCentiseconds = recast;
 					updated++;
 				}
 			}

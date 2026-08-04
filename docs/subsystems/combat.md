@@ -214,8 +214,11 @@ uniform, 9.3 against a per-shield multinomial), so it is rolled, not derived fro
 `Combat_PvE{0..3}ShieldBonus` = **0.2 / 0 / −0.33 / −0.66** and `Combat_PvP{0..3}ShieldBonus` =
 **0.2 / 0 / −0.15 / −0.30**, indexed by the shields covering the struck arc — a *positive* entry is a bonus to
 the attacker, so an unguarded arc takes 20% more. Ghidra `TweakGlobals` reports **reads=0** on all eight (they
-are registered and never consumed), which is the same tell recast had: these are server numbers shipped in the
-client's tuning table [V1: docs/rdb/client-tweak-table.md].
+are registered and never consumed): these are server numbers shipped in the client's tuning table
+[V1: docs/rdb/client-tweak-table.md]. ⚠️ This used to cite recast as the same tell. It is not one — the recast
+base turned out to be client data the client reads for itself (the spell record's own GameAction element, see
+[`../re/spell-recast-source.md`](../re/spell-recast-source.md)); it is the tweak table's `reads=0` that carries
+the argument here, not the analogy.
 
 **A PLAYER's rose is the PLAYER'S — it arrives c2s (#620).** The two sides of the same message are owned by
 opposite ends. An NPC's rose is the server's; a player's is the client's: it owns stat `0xA5`, the shield

@@ -155,6 +155,11 @@ namespace Faolan.Core.Network
 		// that fires after a cancel sees a mismatched token and aborts. This is what makes "move cancels the cast".
 		uint ActiveCastToken { get; set; }
 
+		// #271: when each recast group comes off cooldown, as an Environment.TickCount64 stamp. Keyed by the group
+		// the client itself arms - the spell's GUI stacking line where it has one, so every rank shares the timer,
+		// and the spell id otherwise. Session state by nature: a relog re-arms nothing, which is what retail does.
+		Dictionary<uint, long> SpellReadyAt { get; }
+
 		// The GameAgent sender instance the active conversation's packets use (retail varies it per conversation,
 		// e.g. 0x0a). The close must be sent from this SAME instance or the client won't match it to the dialogue
 		// and re-fires the greeting (#217). Captured from the served screens; 0 = none (fall back to 0x08).
@@ -270,6 +275,8 @@ namespace Faolan.Core.Network
 		public List<uint> ConversationOptions { get; set; } = [];
 		public string ConversationNpcName { get; set; } = null!;
 		public uint ActiveCastToken { get; set; }
+
+		public Dictionary<uint, long> SpellReadyAt { get; } = [];
 		public uint? ConversationAgentInstance { get; set; }
 		public uint? ConversationEndedNpcHandle { get; set; }
 		public uint? ConversationNpcHandle { get; set; }

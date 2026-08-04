@@ -106,28 +106,28 @@ namespace Faolan.Tests
 						Id = 1,
 						Name = "Sweep",
 						Level = 0,
-						Cooldown = 0
+						RecastCentiseconds = 0
 					}); // two id-variants
 					db.Spells.Add(new Spell
 					{
 						Id = 2,
 						Name = "Sweep",
 						Level = 0,
-						Cooldown = 0
+						RecastCentiseconds = 0
 					});
 					db.Spells.Add(new Spell
 					{
 						Id = 3,
 						Name = "Slam",
 						Level = 0,
-						Cooldown = 0
+						RecastCentiseconds = 0
 					});
 					db.Spells.Add(new Spell
 					{
 						Id = 4,
 						Name = "Fireball",
 						Level = 0,
-						Cooldown = 0
+						RecastCentiseconds = 0
 					}); // untouched
 					await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
@@ -139,10 +139,11 @@ namespace Faolan.Tests
 
 				await using (var db = NewContext(dbPath))
 				{
-					Assert.Equal((2, 10), (db.Spells.Single(s => s.Id == 1).Level, db.Spells.Single(s => s.Id == 1).Cooldown));
-					Assert.Equal((2, 10), (db.Spells.Single(s => s.Id == 2).Level, db.Spells.Single(s => s.Id == 2).Cooldown));
-					Assert.Equal((4, 15), (db.Spells.Single(s => s.Id == 3).Level, db.Spells.Single(s => s.Id == 3).Cooldown));
-					Assert.Equal((0, 0), (db.Spells.Single(s => s.Id == 4).Level, db.Spells.Single(s => s.Id == 4).Cooldown));
+					// The TSV carries SECONDS; the column holds centiseconds (#271).
+					Assert.Equal((2, 1000u), (db.Spells.Single(s => s.Id == 1).Level, db.Spells.Single(s => s.Id == 1).RecastCentiseconds));
+					Assert.Equal((2, 1000u), (db.Spells.Single(s => s.Id == 2).Level, db.Spells.Single(s => s.Id == 2).RecastCentiseconds));
+					Assert.Equal((4, 1500u), (db.Spells.Single(s => s.Id == 3).Level, db.Spells.Single(s => s.Id == 3).RecastCentiseconds));
+					Assert.Equal((0, 0u), (db.Spells.Single(s => s.Id == 4).Level, db.Spells.Single(s => s.Id == 4).RecastCentiseconds));
 				}
 			}
 			finally

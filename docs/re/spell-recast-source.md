@@ -87,13 +87,59 @@ Field 65 occurs on only **10 of the 21,502** spell records (`1040005`), with val
 the signature of a per-record override, not the general source — see the sparse-field rule in
 `docs/rdb/spell-record-fields.md`. Field 65 does not occur at all on the `1000020` templates.
 
-## Where the base lives is still OPEN — and two plausible-looking answers are ruled out
+## Where the base lives: the spell record's own ELEMENT region
 
 The tooltip fetches the element list off the spell object itself, via virtual slot `0x84` called with index `0`
 (`0x00769BF9`..`0x00769C05`, the result handed straight to `FUN_0076b200`). The same slot is called with `0x21`
-elsewhere in the builder, so it is an indexed getter for the spell's own GameAction lists. That means the
-elements come from the spell's RDB data rather than from anything on the wire — but the exact record has not been
-pinned, and **two candidates have been checked and eliminated**:
+elsewhere in the builder, so it is an indexed getter for the spell's own GameAction lists — the elements come from
+the spell's RDB data, not from the wire.
+
+**They are in the `1040005` record's GameAction ELEMENT region** — the same region a feat's spell modifiers live
+in, read by the same `ItemTemplateStatModifiers.ParseElements`. Nothing new had to be decoded. The region was
+never looked at for a recast because the search was framed as *"which property FIELD is it"*, and the two
+eliminations below are both answers to that question; a property field is not what the client reads.
+
+`Life Leech` (220979) carries `SetSpellLineRecastTime(line 41026, 3000)`, and 3000 centiseconds is the **30 s**
+its retail tooltip shows.
+
+### The gate: eight tooltip readings, transcribed before any of this was decoded
+
+`Captures/spell_cooldowns_observed.tsv` is a human reading of a level-80 necromancer's spell tooltips, written
+down when the value was believed to be unsourceable. Every row comes back out of the decode:
+
+| spell | tooltip | element |
+|---|---|---|
+| `Chill` rank 5 | 4 s | `SetSpellLineRecastTime(41028, 400)` |
+| `Lifestrike` rank 5 | 12 s | `SetSpellLineRecastTime(41027, 1200)` |
+| `Life Leech` | 30 s | `SetSpellLineRecastTime(41026, 3000)` |
+| `Unimaginable Terror` rank 2 | 45 s | `SetSpellLineRecastTime(41023, 4500)` |
+| `Pestilential Blast` | — | no element, and none on line 41001 |
+| `Ice Strike` | — | no element, and none on line 41005 |
+
+The three zeroes are the half that makes it a gate rather than a coincidence: `Pestilential Blast` and
+`Ice Strike` are that character's most-used spells, and a decode that put a plausible number on everything would
+pass the four values and fail here. Pinned by `Faolan.Tests/SpellRecastTests.cs`.
+
+### Sweep and import
+
+`--report spell-recast [--report-arg <spellId>]` prints every recast element in the catalog: **5,872 elements on
+3,316 of the 21,502 spell records**, 5,195 `SetSpellRecastTime` and 674 `SetSpellLineRecastTime` (plus 3
+`ChangeLineRecastTime`, which is a modifier and is not read).
+
+`RdbSpellImporter` fills `Spell.RecastCentiseconds` from them — **3,682 spells**, against 408 before, all of
+which were combos backfilled from the ellatha scrape. Two rules, both forced by the data:
+
+- **A spell's OWN record leads.** 338 spells and 12 lines are named by two records with two different values,
+  because a rank arms its whole family and the ranks do not agree: `Embodiment of Terror` rank 1's own record
+  says 90 s, rank 2's record says 80 s *for that same rank 1*. Each rank keeps what it says about itself, which
+  is what its own tooltip shows.
+- **A rank with no element of its own inherits its line's.** `Unimaginable Terror` rank 1 carries nothing;
+  rank 2 arms 45 s on their shared line 41023, and arming a line is by definition arming every rank on it.
+
+⚠️ The column is **centiseconds**, the client's own unit (`value * 0.01` s). It held seconds until this landed,
+and 67 of the shipped values are not a whole number of them.
+
+### Two plausible-looking answers that were checked and eliminated first
 
 - **Not a top-level field of the spell record.** The `1040005` field run has 111 distinct field ids
   (`docs/rdb/spell-record-fields.md`); `761` (`0x2F9`) is not among them, and `65` `RecastTime` occurs on 10
@@ -112,15 +158,24 @@ Combos are the one place this already works from our side, and by a completely d
 cooldown is a plain attribute of the client's combo XML (RDB `1010206`), imported by
 `Faolan.Importer/Rdb/RdbComboImporter.cs` — 292 of 744 combos carry one.
 
+## The server gate
+
+`HandleBccCastSpell` refuses a cast whose recast group is still armed, and does it by **sending nothing at all**.
+That is not laziness about the reply, it is the only honest option: retail's client will not *send* a cast that is
+on cooldown — its own recast timer blocks the button — so retail's server has no captured answer to one, and any
+reply we chose here would be invented. Sending no echo-ack is also self-consistent, because the echo-ack is
+precisely what makes the client enter the channel state; without it the cast neither bars nor resolves.
+
+The group is the one the client itself arms: the spell's GUI stacking line where it has one (so all five `Chill`
+ranks share the 4 s), the spell id otherwise. It is armed **when the spell goes off**, not when the cast begins —
+an interrupted cast costs no cooldown — and lives on the session, so a relog re-arms nothing.
+
 ## What is still open
 
-Finding the record the spell's GameAction elements live in, and importing the `KeyValue` recast as
-`Spell.Cooldown`. Today only 408 of 20,848 `Spells` rows carry a cooldown, all of them combos backfilled from
-the ellatha scrape, and **none** is a castable player spell — which is why a spell can be re-cast with no delay.
-
-A caveat to settle alongside it: if retail never sends a recast GameAction *and* the client's cast path arms only
-the GCD constants, then the client must read that base locally at cast time, and that local read has not been
-pinned to a call site. So it is not yet proven that importing the value alone would make the client gate. The
-**server-side gate is required regardless** — a server must not depend on the client to refuse a cast.
+Whether the CLIENT gates too. Retail never sends a recast GameAction and the client's cast path arms only the GCD
+constants, so the client must read this same base locally at cast time — the elements are right there on the spell
+object, and the only per-spell arm (`FUN_007e1080`) is reachable from the `SetSpellRecastTime` handler, which is
+exactly the element type the record carries. That is a coherent account, and it is now the leading one, but the
+local call site has not been pinned. It changes nothing server-side: the gate above does not depend on it.
 
 Open work tracked in Gitea #271.

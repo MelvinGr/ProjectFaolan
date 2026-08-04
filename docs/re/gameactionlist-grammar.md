@@ -91,7 +91,9 @@ casts on one.
 - **Type id + key list: RECOVERED for all 260 types** — statically, from the initialiser `FUN_008bdf40`
   ([`gameaction-keylists.tsv`](gameaction-keylists.tsv), 2026-08-03; the 2026-07-11 live Frida dump reached 68 of
   them and is superseded where the two disagree). Any element is byte-constructible. The grammar is no longer a
-  blocker; #271's residue is an in-client base-cooldown check + an optional low-prio override emit.
+  blocker; #271's base cooldown is SOURCED and gated server-side (the spell record's own `SetSpellRecastTime` /
+  `SetSpellLineRecastTime` element - [spell-recast-source.md](spell-recast-source.md)), and its residue is the
+  in-client check plus an optional low-prio override emit.
 
 ## RESOLVED 2026-08-03 — the whole descriptor table IS statically recoverable, and it names the RDB modifier record (#591)
 
@@ -496,10 +498,12 @@ construction (#190, #271).
 
 **Not shipping a recast builder yet, deliberately:** the capture set still contains no recast GameAction, and
 the gameplay-capture analysis (#271 comment 2026-06-22) showed retail does **not** push a recast on a normal
-cast — base cooldowns are client-side (the client reads recast from its own RDB on cast). So the remaining
-`#271` scope is (a) an in-client confirmation that a granted spell goes on cooldown with no server emit, and
-(b) an *optional*, low-priority server override emit (cooldown resets / AA reductions) — now constructible via
-`ChangeRecastTime` the moment it's wanted.
+cast — base cooldowns are client-side. That reading held up: the base is a `SetSpellRecastTime` /
+`SetSpellLineRecastTime` element in the spell's OWN `1040005` record, now imported as `Spell.RecastCentiseconds`
+and gated server-side ([spell-recast-source.md](spell-recast-source.md)). So the remaining `#271` scope is (a) an
+in-client confirmation that a granted spell goes on cooldown with no server emit, and (b) an *optional*,
+low-priority server override emit (cooldown resets / AA reductions) — now constructible via `ChangeRecastTime`
+the moment it's wanted.
 
 ## The full type-id catalog — 260 types, and the id space the client asserts
 

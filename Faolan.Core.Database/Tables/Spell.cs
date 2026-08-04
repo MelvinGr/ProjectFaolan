@@ -159,12 +159,29 @@ namespace Faolan.Core.Database.Tables
 		// Backfilled from the RDB spell-data record (type 1040005) by RdbSpellImporter (#236):
 		public ushort CastTime { get; set; } // milliseconds (RDB field 0x126 * 10)
 
-		// Recast / cooldown in SECONDS. Backfilled from the ellatha combos list (the one bulk source that carries it)
-		// by EllathaSpellLevelImporter for combo rows. Magic-spell cooldown is NOT in any bulk source (proven not in
-		// the RDB record, and not on ellatha's spell list), so it stays 0 for spells - capture key ones by hand from
-		// retail tooltips (Captures/spell_cooldowns_observed.tsv). Seconds (not ms like CastTime) to match the source
-		// and fit values like Death's Terror 90s in a ushort. (#78)
-		public ushort Cooldown { get; set; }
+		/// <summary>
+		///     The spell's base recast (cooldown) in CENTISECONDS - the client's own unit for it, applied as
+		///     <c>value * 0.01</c> seconds by the recast timer <c>FUN_007e1080</c>.
+		///     <para>
+		///         Sourced from the spell record's own GameAction ELEMENT region (#271): a
+		///         <c>SetSpellRecastTime</c> (53226) element keys it on the spell and a <c>SetSpellLineRecastTime</c>
+		///         (53077) one on the whole GUI stacking line, both under <c>GameActionTypes.KeyValue</c>
+		///         (0x2f9) - the same key the tooltip's "Recast" line reads
+		///         (<c>docs/re/spell-recast-source.md</c>). Combos are backfilled from the ellatha list instead, in
+		///         seconds, scaled up on import.
+		///     </para>
+		///     <para>
+		///         ⚠️ NOT seconds, which is what this column held until #271 found the real source. 67 of the 3,682
+		///         shipped values are not a whole number of seconds (<c>Divine Wave</c> 2.7 s,
+		///         <c>Scourge of Derketo</c> 6.5 s), so a seconds column silently truncated them - and the ceiling
+		///         went with it: <c>Renewing Faith</c> is 1800 s, which no longer fits alongside the precision.
+		///     </para>
+		///     <para>
+		///         ⚠️ This is the BASE. <c>ChangeRecastTime</c> (53031) / <c>ChangeLineRecastTime</c> (53069) are
+		///         feat/AA MODIFIERS the client adds to it, and are deliberately not folded in here.
+		///     </para>
+		/// </summary>
+		public uint RecastCentiseconds { get; set; }
 
 		/// <summary>
 		///     RDB field 132 (0x084) of the spell's type-1040005 record - the client's
