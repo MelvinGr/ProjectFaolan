@@ -1148,82 +1148,29 @@ namespace Faolan.Core.Enums
 	}
 
 	/// <summary>
-	///     The wire scale a stat's player-facing value is multiplied by - vitals ×100, attributes ×10, the rest ×1.
-	///     <see cref="CharacterStatBlock" />.Set applies it, so callers pass DISPLAY values.
+	///     The wire scale a stat's player-facing value is multiplied by - vitals and most percents ×100, attributes
+	///     ×10, five composed ids ×10000, the rest ×1. <see cref="CharacterStatBlock" />.Set applies it, so callers
+	///     pass DISPLAY values.
 	/// </summary>
 	/// <remarks>
-	///     ⚠️ <b>This table is INCOMPLETE, and its default is a silent wrong answer.</b> An id it does not name falls to
-	///     ×1, which reads exactly like "this stat is unscaled" - and that is how a ×100 stat went unnoticed:
-	///     <see cref="CharacterStatId.WeaponDamageMelee" /> was in the enum but not here, so a feat granting 3800 would
-	///     have been applied as +3800% where the client renders +38%. Assume an id absent from this switch is
-	///     UNMEASURED rather than known to be ×1.
+	///     <b>This is no longer a hand-maintained list.</b> It forwards to <see cref="StatDisplayScale" />, which is the
+	///     client's own rule transcribed from <c>AgeOfConan.exe</c>'s tooltip renderer (#251) and therefore covers every
+	///     stat id, not just the ones somebody has hovered. The remark this used to carry - "assume an id absent from
+	///     this switch is UNMEASURED rather than known to be ×1", after
+	///     <see cref="CharacterStatId.WeaponDamageMelee" /> sat in the enum but not the table and would have applied
+	///     +3800% where the client draws +38% - no longer applies: an id not in either percent set is ×1 because the
+	///     client prints it through its integer formatter.
 	///     <para>
-	///         <b>How an entry gets added: only from a RENDERED value.</b> The client keeps its whole stat table in WIRE
-	///         units and divides only when it draws, so the `ClientInterface` log cannot tell you a scale - mining 64
-	///         client-applied deltas across 11 stats against our stored amounts returns a ratio of 1 for every one of
-	///         them (which does independently confirm our <c>ItemStatModifier.Amount</c> values are right, just not
-	///         their scale). A scale needs a number a human can read: a tooltip or the character sheet, against the
-	///         wire value we hold. That is how the three groups below were each established.
+	///         The 27 values that WERE established by hand (the character sheet via <c>.setstat</c>, and item/feat
+	///         tooltips) are kept as the cross-check in <c>StatDisplayScaleTests</c> - all 27 reproduce, which is what
+	///         licenses replacing the measured table with the transcribed one.
 	///     </para>
 	/// </remarks>
 	public static class CharacterStatIdExtensions
 	{
 		public static uint GetScale(this CharacterStatId statId)
 		{
-			return statId switch
-			{
-				// Vitals: proven on screen twice (2026-07-27) - wire 428500 renders as 4285 health, 205300 as 2053
-				// stamina. MagicDamage's ×100 came from the in-client Royal Signet tooltip (#3).
-				CharacterStatId.HealthCurrent or CharacterStatId.HealthMax or CharacterStatId.StaminaMax or CharacterStatId.StaminaCurrent or CharacterStatId.ManaMax or CharacterStatId.ManaCurrent
-					or CharacterStatId.MagicDamage or CharacterStatId.NaturalManaRegen or CharacterStatId.NaturalStaminaRegen or CharacterStatId.PvpMagicDamage or CharacterStatId.MagicDamageHoly
-					or CharacterStatId.BowRangeModifier => 100,
-
-				// The weapon-damage PERCENTS. Proven in-client 2026-07-27: the feat `Lotus Blades` holds 3800/7600/
-				// 11400/15200/19000 across its five ranks on 1095 and the client's own tooltip renders rank 1 as
-				// "+38% Weapon Damage (Melee)" - exactly ×100, and the whole curve reads 38/76/114/152/190. 1096 is
-				// its ranged twin: same LDB 615 family, adjacent id, and the same feat trees carry both.
-				CharacterStatId.WeaponDamageMelee or CharacterStatId.WeaponDamageRanged => 100,
-
-				// The CHANCE percents, measured the same way (2026-07-27): `.setstat 254 10000` moved the sheet's Evade
-				// Chance from 100.0% to 200.0%, and `.setstat 1071 10000` moved Offhand Attack Chance from 0.0% to
-				// 100.0% - 10000 wire == 100.00 percentage points in both.
-				//
-				// ⚠️ A chance is NOT the rating that sits in the same sheet row. `Hit Bonus Chance` renders a Rating
-				// column of 10000 (x1, stat 310) beside an Effect of 2000.0%, which is a derived combat formula, not a
-				// unit conversion. Rating stats and chance stats are different ids with different scales; read the
-				// Rating/Score/Value column for a scale and never the Effect column.
-				CharacterStatId.EvadeChance or CharacterStatId.ChanceOfOffhandAttack
-					// 326 Immunity: the sheet's Immunity Chance moved 105.0% -> 205.0%, i.e. +100 points from 10000
-					// wire. 380 Spell Fatality Chance: 0.0% -> 100%.
-					or CharacterStatId.Immunity or CharacterStatId.SpellFatalityChance
-					// 334 Bonus Protection is a MULTIPLIER, and proving that needed a second probe: at 10000 wire it
-					// took the Protection score 10000 -> 20000, which fits a flat +10000 exactly as well as a +100%.
-					// Re-probed against an UNEQUAL base (451 = 4000) it drew 8000, i.e. x2 - so it is a percent. It
-					// also confirms the "percent, magical branch" note this member already carried from the item
-					// tooltips (2026-07-22), by an independent method.
-					or CharacterStatId.BonusProtection => 100,
-
-				// Attributes: proven on a freshly created Necromancer's sheet (2026-07-27) - a 10-wire class base
-				// renders as 1. Ferocity is the sixth attribute and shares their scale: `.setstat 1403 10000` draws as
-				// 1000 on the General tab.
-				CharacterStatId.Strength or CharacterStatId.Constitution or CharacterStatId.Intelligence or CharacterStatId.Wisdom or CharacterStatId.Dexterity
-					or CharacterStatId.Ferocity => 10,
-
-				// MEASURED x1 (`.setstat <id> 10000`, 2026-07-27, read off the character sheet): 448 Armor drew 10002
-				// = 10000 + its base of 2; 310 Hit Bonus Chance and 711 Critical Bonus Damage drew 10000 in the Rating
-				// column (their "Effect" percent is a derived game formula, not a scale); 451 Protection drew 10000 and
-				// feeds all five schools off the one stat; 875 Combat Rating drew 10003 as the sheet's "Combat Damage
-				// Increase"; 375 Fatality Chance drew "10000.0 %" and 170 Hate Modifier "10000.0 %" - the raw value
-				// verbatim with a % suffix, which is a FORMAT and not a scale. They land on the default below - listed
-				// here so they read as measured rather than assumed.
-				//
-				// ⚠️ Still UNMEASURED, because the sheet does not render them for a level-1 Conqueror: 920 Attack
-				// Rating, 922 Defense Rating, 923 Magic Rating, 925 Magical Resist, 974 Damage Deflection, 1037
-				// Knockback Resistance, 156 Chance of Being Staggered, 252 Miss Chance, 535 Healing Efficiency, 861
-				// Magic Damage. Probing them needs a surface that shows them - an item/feat tooltip carrying the stat,
-				// or a character that has one.
-				_ => 1
-			};
+			return StatDisplayScale.Of((uint)statId);
 		}
 	}
 }

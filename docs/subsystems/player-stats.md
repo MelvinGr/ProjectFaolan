@@ -21,7 +21,52 @@ tagged-uint64 encoding now documented on the `CharacterStatId` enum
 its leading zero byte, so every t64 hit produced a spurious p7 hit. The shipped codec uses this **single
 8-byte encoding**.)
 
-Scale (raw → displayed): vitals (Health/Mana/Stamina) are **×100**; everything else seen is ×1.
+## The wire → display scale is the CLIENT'S rule, and it is fully recovered
+
+Every stat travels in WIRE units and the client divides only when it draws, so a scale can never be read off
+the wire or off the client's own live stat table — both sides are wire. It used to be established one stat at
+a time from a rendered number (a tooltip, or the character sheet through `.setstat`), which left ten stats
+unreachable because a level-1 character's sheet does not draw them.
+
+That is no longer how the table is built. The modifier line of an item/feat tooltip is rendered by
+`FUN_0149a300(text, value, invertGoodBad)`, and **that function IS the scale rule** — it picks a float divisor
+and then prints either `value / divisor` (`FUN_0149a5c0`) or, when none applies, the raw integer
+(`FUN_0149a540`):
+
+```
+divisor = 1.0                                            # 0x01f27500
+if (predicate1(stat)) divisor  = 100.0                   # 0x01f24468
+if (predicate2(stat)) divisor *= 100.0                   # the two COMPOSE -> 10000
+if (stat in {0x324,0x326,0x328,0x32A,0x32C,0x32E,0x57B}) divisor = 10.0    # 0x01f68aa4, overrides
+```
+
+The two predicates are signal slots the client registers at startup — `FUN_011196e0` stores them at
+`DAT_029c8200` / `DAT_029c8204` with the RTTI type
+`SlotFull1<SignalTarget, SignalSignatureStat1<bool, stats::Int32Stat_e, SignalTarget>, …>`, i.e.
+`bool(Int32Stat_e)` — and `FUN_00651ca0` is the generic invoker that dispatches through them. Their bodies are
+`FUN_011197f0` and `FUN_01119ca0`, each one large jump table of stat ids. Both are transcribed in
+`Faolan.Core/Enums/StatDisplayScale.cs`; `CharacterStatId.GetScale()` forwards to it.
+
+**It reproduces all 27 values that had been measured by hand** (`Faolan.Tests/StatDisplayScaleTests.cs`),
+including the pair that warns against inferring a scale from a neighbour — `0x0177 FatalityChance` prints its
+raw value with a `%` suffix (a FORMAT, not a scale) while `0x017C SpellFatalityChance` five ids away is a real
+×100. That agreement is what licenses replacing the measured table with the transcribed one.
+
+Consequences worth knowing:
+
+- **The ten previously unmeasurable stats are answered.** ×100: `920` Attack Rating, `922` Defense Rating,
+  `923` Magic Rating, `925` Magical Resist, `252` Miss Chance, `535` Healing Efficiency, `861` Magic Damage
+  Modifier. ×1: `974` Damage Deflection, `1037` Knockback Resistance, `156` Chance of Being Staggered.
+- **×10000 is real.** Five ids sit in BOTH predicate sets and the client multiplies the divisors (an explicit
+  `MULSS` against the same `100.0` constant): `0x00FF` Evade Level Growth, `0x013C` Variance, `0x013D`,
+  `0x0140` Magic Variance, `0x0397` Critical Blast Chance.
+- **×1 is now an answer, not a default.** An id in neither set takes the client's integer formatter. The old
+  table's standing warning — "assume an id absent from this switch is UNMEASURED rather than ×1", written after
+  a ×100 stat sat in the enum but not the table — no longer applies.
+
+⚠️ The one deliberate divergence is `BuffStatEffects.SpellScale`: spells store ATTRIBUTE amounts in display
+units while items store them ×10, so it overrides the five attributes to ×1. That is a difference between two
+data sources, not a disagreement with the client.
 
 ## Confirmed stat ids (decoded value matches the screenshot exactly)
 
