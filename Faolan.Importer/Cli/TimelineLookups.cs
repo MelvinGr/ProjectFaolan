@@ -190,6 +190,12 @@ namespace Faolan.Importer.Cli
 		// captures that are known to contain mis-framed buffers (a lossy capture's three such packets are noted above),
 		// and a diagnostic should render those as a raw id rather than abort the whole timeline. Nothing on the wire
 		// path swallows a parse failure.
+		//
+		// ⚠️ `InvalidDataException` is listed EXPLICITLY and is not redundant (#628). It lives in `System.IO` but
+		// derives from `SystemException`, NOT from `IOException` - so the `IOException` catch that was here alone read
+		// as covering it and did not. `Rpc.Parse` wraps the underlying `EndOfStreamException` (which IS an
+		// `IOException`) in one, so the only exception this ever actually saw was the one slipping through, and the
+		// timeline died on all three mount captures.
 		private static string NameOfMethod(CapturedPacket packet, Type methods)
 		{
 			uint method;
@@ -197,7 +203,7 @@ namespace Faolan.Importer.Cli
 			{
 				method = Rpc.Parse(packet.Bytes).Method;
 			}
-			catch (IOException)
+			catch (Exception e) when (e is IOException or InvalidDataException)
 			{
 				return $"0x{packet.WireOpcode:x4} (unparseable header)";
 			}
