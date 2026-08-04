@@ -608,8 +608,7 @@ namespace Faolan.GameServer
 				// Level AND ApprenticeLevel - the client divides by the latter for armour mitigation, and the
 				// nameplate renders max() of the two. See CharacterStatBlock.SetLevel.
 				.SetLevel(character.Level)
-				.Set(CharacterStatId.Exp, character.Experience)
-				.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
+				.SetExperience(character.Level, character.Experience);
 
 			return BuildStatUpdate(client, block, client.Session.Character.Id);
 		}

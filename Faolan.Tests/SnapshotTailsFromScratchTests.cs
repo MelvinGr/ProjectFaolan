@@ -204,11 +204,13 @@ namespace Faolan.Tests
 			Assert.Equal(character.MaxVitals(VitalAttributes.LevelOneBase).Mana, tails.PostAccessBlock.CurrentMana);
 			Assert.Equal(character.MaxVitals(VitalAttributes.LevelOneBase).Stamina, tails.PostAccessBlock.CurrentStamina);
 
-			// The XP bar is authored as a consistent triple by stat id (#447): within-level progress in 0x34, the
-			// curve's to-next-level cost in 0x15E - word [80] - and a zero base for the current level.
-			Assert.Equal(LevelingResolver.XpForNextLevel(7), tails.PostAccessBlock.MaxExp);
-			Assert.Equal(98760u, StatValue(tails.PostAccessBlock, CharacterStatId.Exp));
-			Assert.Equal(0u, StatValue(tails.PostAccessBlock, CharacterStatId.ExpCurrentLevelBase));
+			// The XP bar is authored as a consistent triple by stat id (#447), in retail's CUMULATIVE form (#297):
+			// the running total in 0x34, this level's threshold in 0x39 and the next level's in 0x15E (word [80]).
+			// The character row's 98,760 is WITHIN-level progress, so the running total is that plus level 7's base.
+			var level7Base = LevelingResolver.CumulativeXpForLevel(7);
+			Assert.Equal(LevelingResolver.CumulativeXpForLevel(8), tails.PostAccessBlock.MaxExp);
+			Assert.Equal(level7Base + 98760u, StatValue(tails.PostAccessBlock, CharacterStatId.Exp));
+			Assert.Equal(level7Base, StatValue(tails.PostAccessBlock, CharacterStatId.ExpCurrentLevelBase));
 		}
 
 		// A stat's value out of the built block, BY ID. Asserts the stat is actually there rather than letting

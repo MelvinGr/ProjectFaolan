@@ -43,9 +43,11 @@ namespace Faolan.Tests
 			Assert.Equal(0x0802ABCDu, Value(sheet, CharacterStatId.PlayfieldToken));
 			Assert.Equal(GmRoles.All, Value(sheet, CharacterStatId.GmLevel));
 			Assert.Equal(80u, Value(sheet, CharacterStatId.Level));
-			Assert.Equal(4242u, Value(sheet, CharacterStatId.Exp));
-			Assert.Equal(LevelingResolver.XpForNextLevel(80), Value(sheet, CharacterStatId.MaxExp));
-			Assert.Equal(0u, Value(sheet, CharacterStatId.ExpCurrentLevelBase));
+			// The XP triple is retail's CUMULATIVE form (#297): the row's 4242 is within-level progress and rides on
+			// level 80's own threshold, which is also the base the client subtracts to fill the bar.
+			Assert.Equal(LevelingResolver.CumulativeXpForLevel(80) + 4242u, Value(sheet, CharacterStatId.Exp));
+			Assert.Equal(LevelingResolver.CumulativeXpForLevel(81), Value(sheet, CharacterStatId.MaxExp));
+			Assert.Equal(LevelingResolver.CumulativeXpForLevel(80), Value(sheet, CharacterStatId.ExpCurrentLevelBase));
 		}
 
 		// An override writes EVERY occurrence, not just the first. Level and the XP stats appear in both StatList#1

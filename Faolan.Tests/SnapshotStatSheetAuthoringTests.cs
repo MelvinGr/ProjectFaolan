@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
+using Faolan.Core.Progression;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Xunit;
 
@@ -86,8 +87,10 @@ namespace Faolan.Tests
 
 				Assert.Equal(12u, Value(a, CharacterStatId.Level));
 				Assert.Equal(40u, Value(b, CharacterStatId.Level));
-				Assert.Equal(345u, Value(a, CharacterStatId.Exp));
-				Assert.Equal(999u, Value(b, CharacterStatId.Exp));
+				// Exp is a RUNNING TOTAL on the wire (#297), so the row's within-level progress rides on the level's
+				// own threshold - which is also what makes it a per-character value rather than a baseline one.
+				Assert.Equal(LevelingResolver.CumulativeXpForLevel(12) + 345u, Value(a, CharacterStatId.Exp));
+				Assert.Equal(LevelingResolver.CumulativeXpForLevel(40) + 999u, Value(b, CharacterStatId.Exp));
 				Assert.Equal((uint)Sex.Male, Value(a, CharacterStatId.Sex));
 				Assert.Equal((uint)Sex.Female, Value(b, CharacterStatId.Sex));
 				Assert.Equal(0x1111u, Value(a, CharacterStatId.PlayfieldToken));

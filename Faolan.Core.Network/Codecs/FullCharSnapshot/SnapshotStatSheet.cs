@@ -111,14 +111,17 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 			// holds the level the character had when it was imported - stale the moment it dings.
 			yield return (CharacterStatId.Level, character.Level);
 
-			// The XP bar, authored as a consistent triple instead of being half-reset. `Exp` is WITHIN-level progress
-			// (0..MaxExp, resets on ding), so the current level's base is always 0 and MaxExp is the curve's
-			// to-next-level cost. The previous build reset MaxExp and the base to the SKELETON's level-1 values for an
-			// imported character and left Exp alone, which its own comment admitted left the bar "internally
-			// inconsistent" and was only harmless if the client happened to read XP from the live StatIIR instead.
-			yield return (CharacterStatId.Exp, character.Experience);
-			yield return (CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(character.Level));
-			yield return (CharacterStatId.ExpCurrentLevelBase, 0);
+			// The XP bar, authored as a consistent triple instead of being half-reset. All three stats are retail's
+			// CUMULATIVE form (#297): `Exp` is a running total, `ExpCurrentLevelBase` the total at which this level
+			// began and `MaxExp` the total at which the next one does, so the bar fills (Exp-Base)/(MaxExp-Base).
+			// The character row stores WITHIN-level progress, so the base is added back here.
+			// (The previous build reset MaxExp and the base to the SKELETON's level-1 values for an imported character
+			// and left Exp alone, which its own comment admitted left the bar "internally inconsistent"; the build
+			// after that authored a consistent but non-retail base-0 triple.)
+			var levelBase = LevelingResolver.CumulativeXpForLevel(character.Level);
+			yield return (CharacterStatId.Exp, levelBase + character.Experience);
+			yield return (CharacterStatId.MaxExp, LevelingResolver.CumulativeXpForLevel(character.Level + 1u));
+			yield return (CharacterStatId.ExpCurrentLevelBase, levelBase);
 
 			// The SKILL-POINT pool (#507), which is purely level-derived - so like Level above, a captured sheet holds
 			// the value for whatever level the character was imported at and goes stale the moment it dings.

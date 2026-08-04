@@ -18,10 +18,12 @@ namespace Faolan.Core.Network.Codecs.Combat
 	//   [u32 instance]     the target GameInterface object (= the receiver endpoint instance / ClientInstance)
 	//   [u8  0x00]         lead/env flag (constant 0 in the capture)
 	//   [u32 newLevel]     the level just reached (2 in the capture -> "reached level 2")
-	//   [u32 x6]           stat/derived deltas for the client's level-up summary panel (capture: 168,100,340,1,8,0).
-	//                      Their exact per-class semantics are not yet decoded; the banner + effect key only off
-	//                      newLevel, and the visible attribute gains ride the separate AttributeChanged lines, so the
-	//                      live path sends zeros here (a display summary refinement is a follow-up).
+	//   [u32 x6]           the XP summary, DECODED (#297): [Exp, ExpCurrentLevelBase, MaxExp, 1, 8, 0] - the same
+	//                      cumulative triple the stat sheet carries, for the level just reached, then three
+	//                      constants. Proven across the 14 dings in the corpus: the first word is the player's own
+	//                      running total and varies (the L2 ding reads 100 / 120 / 168 across seven captures) while
+	//                      the two thresholds behind it never do (100 and 340 at every L2 ding, 340/740 at every L3,
+	//                      ...). Gated by LevelingCurveCorpusTests.
 	//
 	// The u32 carrier length belongs to the SENDER (#530 rule 2).
 	public static class NewLevelCodec

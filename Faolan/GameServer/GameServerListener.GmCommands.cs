@@ -732,8 +732,7 @@ namespace Faolan.GameServer
 					// a level-DOWN showing the old level over the health bar while the sheet showed the new one
 					// (#472). See CharacterStatBlock.SetLevel.
 					.SetLevel(level)
-					.Set(CharacterStatId.Exp, character.Experience)
-					.Set(CharacterStatId.MaxExp, LevelingResolver.XpForNextLevel(level)),
+					.SetExperience(level, character.Experience),
 				client.Session.Character.Id);
 			// On an increase, emit the retail level-up attribute feedback (one AttributeChanged line per primary) so
 			// the change shows the same as an XP-driven ding (#209); the vitals push above already raised the maxima.

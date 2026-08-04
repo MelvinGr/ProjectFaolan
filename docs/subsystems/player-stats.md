@@ -344,7 +344,7 @@ table either way, by stat id:
 | `0xBF` PlayfieldToken | the live zone's minted token — session state, never the captured one |
 | `0x0D7` GmLevel | the account type's GM privilege mask ([gm-commands.md](gm-commands.md)) |
 | `0x36` Level | the character (a captured sheet's level is stale the moment it dings) |
-| `0x34` Exp / `0x15E` MaxExp / `0x39` ExpCurrentLevelBase | the character's within-level progress and `LevelingResolver`'s to-next-level cost, with a zero base |
+| `0x34` Exp / `0x15E` MaxExp / `0x39` ExpCurrentLevelBase | the XP triple, authored together by `CharacterStatBlock.SetExperience` — see [The XP triple is cumulative](#the-xp-triple-is-cumulative) |
 
 Before that there were two authoring paths patching different slots, so an override added to one silently did
 nothing on the other — which is how the GM Level stat came to be set on the static fresh list and never reach
@@ -355,6 +355,34 @@ the wire for a single real login.
 coincidence: the beach template is a level-1 character whose MaxExp is 100, and the golden test carried
 `Experience = 10` so `10 × 10` landed on it. The same golden now passes with that character's real, zero,
 experience and MaxExp authored from the curve.
+
+### The XP triple is cumulative
+
+The three XP stats are a **running total and its two boundaries**, not a within-level amount:
+
+| stat | meaning |
+|---|---|
+| `0x034` `Exp` | the character's running total |
+| `0x039` `ExpCurrentLevelBase` | the running total at which the CURRENT level began |
+| `0x15E` `MaxExp` | the running total at which the NEXT level begins |
+
+so the client fills the bar as `(Exp - Base) / (MaxExp - Base)` and a level's **cost** is `MaxExp - Base`. Three
+independent readings of the corpus say so: every captured snapshot has `Base <= Exp <= MaxExp`; a level-23
+character carries `base=230240 max=263640` while a level-24 one carries `base=263640` — *the same number*; and the
+`NewLevelIIR` ding's six "deltas" are `[Exp, Base, MaxExp, 1, 8, 0]`, where only the first varies between players
+dinging to the same level. [V3: LevelingCurveCorpusTests.TheResolverReproducesEveryCapturedXpTriple]
+
+`LevelingResolver` therefore stores **thresholds**, not costs, and derives `XpForNextLevel` as a difference. It
+used to store the captured `MaxExp` values and hand them back as per-level costs, which made a level cost the
+whole running total up to it — level 24 asked for 298,040 XP instead of its real 34,400, and
+`CumulativeXpForLevel` summed the inflated values on top of that.
+
+The curve is **server data**: the client ships none of it. There is no XP table among the 25 named `CoreTables`
+data tables, `GAMETWEAKS` (RDB 1000516) has no level-threshold entry, and the exe's only XP strings are the three
+UI value names it fills from these very stats. So the anchors are the levels a capture pinned — 1–6, 8, 9, 23–25,
+80 (and 81, which is only ever a bar boundary) — and everything between them is linearly interpolated on the
+cumulative curve. The character row keeps within-level progress; the base is added back when the triple is
+authored.
 
 The per-class vitals are still positional (`ApplyClassVitals`, slots 21/23/54/56/60/62/64/66/68 with their +148
 copies) because several of them share a stat id within one list and the id alone cannot say which is which. That

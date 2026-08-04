@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Faolan.Core.Enums;
+using Faolan.Core.Progression;
 
 namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 {
@@ -104,6 +105,26 @@ namespace Faolan.Core.Network.Codecs.FullCharSnapshot
 		public CharacterStatBlock SetLevel(uint level)
 		{
 			return Set(CharacterStatId.Level, level).Set(CharacterStatId.ApprenticeLevel, level);
+		}
+
+		/// <summary>
+		///     The XP bar's three stats, authored together in retail's CUMULATIVE form (#297): the client fills the bar
+		///     as <c>(Exp - ExpCurrentLevelBase) / (MaxExp - ExpCurrentLevelBase)</c>, so all three must agree or the
+		///     bar is wrong however right any one of them is.
+		/// </summary>
+		/// <remarks>
+		///     <paramref name="withinLevelProgress" /> is what the character row stores (XP since the last ding); the
+		///     running total the wire wants is that plus the current level's base. Setting <c>Exp</c> to the raw
+		///     within-level value while leaving the base at 0 is what this replaced - self-consistent, but not what
+		///     retail sends, and it broke the moment either boundary was sourced from a capture.
+		/// </remarks>
+		public CharacterStatBlock SetExperience(uint level, uint withinLevelProgress)
+		{
+			var levelBase = LevelingResolver.CumulativeXpForLevel(level);
+
+			return Set(CharacterStatId.Exp, levelBase + withinLevelProgress)
+				.Set(CharacterStatId.ExpCurrentLevelBase, levelBase)
+				.Set(CharacterStatId.MaxExp, LevelingResolver.CumulativeXpForLevel(level + 1));
 		}
 	}
 }
