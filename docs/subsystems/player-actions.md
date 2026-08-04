@@ -23,22 +23,59 @@ protobuf: f1 = behaviourId, [f2], f3 = phase, [f4], f5, f6
 `f3` is a per-session monotonic phase counter, so it differs on every send and is never part of a selector's
 identity. `form`, `slot` and `f1` are.
 
+## The selector IS the ability's grant slot
+
+A selector names itself. `Ability.Slot` — the leading `u32` of that ability's `0x2052` `AddSpecialAbility`
+grant — **is** the word the client sends back in `PerformSpecialAction`. Every selector in the catalog below
+resolves against the `Abilities` table by that column, with no exception and no near-miss:
+
+```
+0x064 = 100  Search           0x103 = 259  Switch Weapons     0x4E1 = 1249  Path of Asura
+0x068 = 104  Hide             0x105 = 261  Pet Attack         0x4E2 = 1250  Toggle Combat
+0x06A = 106  Rest             0x109 = 265  Pet Dismiss        0x4E4 = 1252  Crouch
+0x06C = 108  Upper Left Atk   0x10C = 268  Spellweaving       0x4E6 = 1254  Dash
+0x0FC = 252  Spellweaving     0x10D = 269  Mammoth Charge
+0x0FF = 255  Recipes book     0x11C = 284  Quick Dismount
+```
+
+That was already half-known from the other end: `Ability.Slot` was verified against the combat capture as
+`769094 → 108` and `769099 → 112`, which are `Upper Left Attack` and `Overhead Attack` — the same two numbers
+the melee combo inputs send here.
+
+**This is why an ungranted action is one the client never sends.** The client only has the number if a grant
+gave it the number, so a stance button whose ability was never granted is inert *client-side* and no packet
+reaches the server at all. That is the difference between "the server ignores it" and "nothing arrives", and it
+is the first thing to check when an action does nothing.
+
+Re-derive the whole table with:
+
+```zsh
+dotnet run --project Faolan.Importer -- --report player-actions --captures <data-repo>/Captures
+dotnet run --project Faolan.Importer -- --report player-actions --report-arg 068 --captures <data-repo>/Captures
+```
+
+The second form narrows to one selector and prints the answering records in full — actor, form, slot, the
+parsed `CommandMessage` and the tail — which is the spec a server-side implementation has to reproduce.
+
 ## Selector catalog
 
 Measured by slicing the chat-annotated gameplay captures at each annotation and reading the client's own
-`PerformSpecialAction` bodies, then cross-checking every selector against the whole capture corpus.
+`PerformSpecialAction` bodies, then cross-checking every selector against the whole capture corpus, and now
+named mechanically by the slot rule above.
 
 | selector | action | evidence |
 |---|---|---|
-| `0x064` | search | annotation `seach`; appears with the hide/rest triple |
-| `0x068` | **hide** (stealth) | emits `SetShadowCoverageIIR` — see below |
+| `0x064` | search | answered by `BehaviorId.Search` (32), `flags 8`, `activation 159`, 5-byte zero tail |
+| `0x068` | **hide** (stealth) | answered by `BehaviorId.SneakHide` (30), `flags 10`, tail `00 00 00 64`; emits `SetShadowCoverageIIR` — see below |
 | `0x06A` | rest | annotation `rest`; answered by `StatUpdateIIR` ×4 + `DispatchUpdateSprintBar` ×3 (regen) |
 | `0x06C` `0x06D` `0x070` `0x0F0` | melee combo inputs | [docs/subsystems/combos.md](combos.md) |
 | `0x0FC` | spellweave toggle — **necromancer** | see *per-class selectors* |
 | `0x0FF` | open Crafting → Recipes book | `…shops_open-crrafting-receipies` |
-| `0x103` – `0x109` | weapon-set / equipment selection | all answered by behaviour **75123**, slot 46, and accompanied by `DispatchSetItemStat` |
+| `0x103` | **Switch Weapons** — the weapon-set swap | answered by `BehaviorId.SwapAlternateEquipmentCommand` (46), accompanied by `DispatchSetItemStat` |
+| `0x105` – `0x109` | **pet commands** — attack / defend / follow / assist / dismiss | `Abilities.Slot` 261–265; the behaviour-46 records around them are the neighbouring weapon swap, not their answer |
 | `0x10C` | spellweave toggle — **demonologist** | see *per-class selectors* |
-| `0x10D` `0x11C` | unidentified | [V0: 0x205A selectors 0x10D and 0x11C are unidentified] |
+| `0x10D` | **Mount Ability: Mammoth Charge** | `Abilities.Slot` 269; sits either side of the `blue snow mamoth mount` annotation |
+| `0x11C` | **Mount Ability: Quick Dismount** | `Abilities.Slot` 284; answered by `CharDCMoveIIR` + `SimpleCharFullUpdateIIR`, which is a dismount, not a stance |
 | `0x4E1` | Path of Asura (recall to the **bound** location) | behaviour 177216, slot 4 |
 | `0x4E2` | combat toggle (sheathe / draw) | behaviour id varies per class & weapon |
 | `0x4E4` | crouch — a **toggle**, same selector both ways | pressed to crouch and again to stand |
@@ -98,7 +135,11 @@ one to send it, so a value other than 100 is expected somewhere the corpus simpl
 
 ## Code
 
-- `GameServerListener.Inbound.cs` — the `PerformSpecialAction` handler and its routing.
+- `GameServerListener.Inbound.cs` — the `PerformSpecialAction` handler and its routing. ⚠️ It answers only the
+  spellweave toggle and Path of Asura today; every other selector is logged and dropped, so the stance never
+  visibly takes even though the client sent it.
+- `Ability.Slot` — the selector, from the ability's own grant.
+- `--report player-actions` — the census + per-selector spec this page is measured from.
 - `StartingData.SpellweaveToggleAction` — the per-class spellweave selector.
 - `SpellweaveService` — the trance state machine ([docs/subsystems/combos.md](combos.md)).
 - `BehaviorAnimations.Registration` — the BCC record every action is answered with.

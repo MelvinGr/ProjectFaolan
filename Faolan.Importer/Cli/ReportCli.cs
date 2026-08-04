@@ -186,6 +186,15 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "player-actions":
+				{
+					// The ability catalog names the selectors: a selector IS an ability's Slot (#505).
+					await using (var db = OpenDb())
+						PlayerActions(NamedCapture.LoadAll(capturesDir), await db.Abilities.Where(a => a.Slot != 0).ToDictionaryAsync(a => a.Slot, a => a.Name), arg);
+
+					return 0;
+				}
+
 				case "bcc-census":
 				{
 					BccCensus(NamedCapture.LoadAll(capturesDir), arg);

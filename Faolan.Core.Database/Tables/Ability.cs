@@ -20,9 +20,19 @@ namespace Faolan.Core.Database.Tables
 		// The leading identity word of the 0x2052 grant (written before the key). Distinct from Key; meaning not fully decoded.
 		public uint Data0 { get; set; }
 
-		// The ability's wire "slot"/template word: the leading u32 of the 0x2052 ability-grant packet (verified against
-		// the strickenbla combat capture: 769094->108, 769099->112). Despite the "slot" name it is ability-intrinsic
-		// metadata, not a hotbar position.
+		// The ability's ACTION NUMBER: the leading u32 of its 0x2052 grant, and the word the client sends back in
+		// `PerformSpecialAction` (0x205A) when the player triggers it. Not a hotbar position, despite the name.
+		//
+		// The two halves were established from opposite directions and meet exactly (#505): this column was verified
+		// against the strickenbla combat capture as 769094->108 and 769099->112, and 0x06C/0x070 are the two
+		// `PerformSpecialAction` selectors the melee combo inputs send - which are `Upper Left Attack` and
+		// `Overhead Attack`. Every selector the corpus contains resolves against this column, with no near-miss:
+		// 0x064 Search, 0x068 Hide, 0x06A Rest, 0x0FF the recipe book, 0x103 Switch Weapons, 0x105-0x109 the pet
+		// commands, 0x4E2 Toggle Combat, 0x4E4 Crouch, 0x4E6 Dash (docs/subsystems/player-actions.md).
+		//
+		// The consequence is worth stating where it will be read: **the client only has the number if a grant gave it
+		// the number**, so an ability that was never granted is a button that emits NOTHING - not a packet the server
+		// ignores. That is the first thing to check when a stance does nothing in-client.
 		public uint Slot { get; set; }
 
 		// True when this row carries everything a 0x2052 grant needs. FALSE for the identity-only rows the client's own

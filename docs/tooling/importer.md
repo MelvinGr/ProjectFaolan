@@ -212,6 +212,10 @@ Read-only inspection modes are **not** imports and don't share the import runner
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
+`player-actions` (every `PerformSpecialAction` 0x205A selector in the corpus, NAMED out of the `Abilities`
+catalog — the selector is the ability's grant `Slot` — with the server's answering BCC records and IIRs.
+`--report-arg <selector hex>` narrows to one and prints those answers in full, which is the spec a server-side
+stance has to reproduce; see [player-actions.md](../subsystems/player-actions.md)),
 `combo-swings` (every melee-combo swing in the corpus, resolved against the `Combos` catalog — the census
 [combos.md](../subsystems/combos.md) quotes: which combo, which step, the `bcc_action_id`→direction map and the
 player/NPC split. `--report-arg <file>` also writes the matched packets whole, for `--report fixture-set`),
