@@ -1,8 +1,10 @@
 # Feats subsystem (Gitea #251)
 
-Feats are **decoded at the wire level but not implemented as a subsystem.** This documents what a feat is
-(vs. what the code currently calls a "skill"), the wire protocol recovered, and what the capture dumps do
-and don't contain.
+Feats are **a live subsystem**: the catalog, the wire↔template id map, the prerequisite graph and the
+per-level point budget all come off the client's own RDB, a character's trained set round-trips through the
+player spawn, train/untrain runs on the wire, and a feat's effects are applied to the live character. This
+documents what a feat is (vs. what the code calls a "skill"), the wire protocol, and where each piece of the
+data comes from.
 
 ## TL;DR
 
@@ -22,7 +24,7 @@ and don't contain.
   different id-space. It gates spell *usability* (see #298) but is unrelated to the feat tree. An earlier RE
   conflated the two; that has been corrected across code + memories.
 - **The feat CATALOG now exists** (#251): `Feat` (**19,777** rows from the RDB 1000020 plaintext templates - id, name,
-  description, tree, group, rank) + `FeatEffect` (**23,321** stat modifiers, 173 distinct stats). Built by
+  description, tree, group, rank) + `FeatEffect` (**23,033** stat modifiers, 161 distinct stats). Built by
   `RdbFeatImporter` (the `rdb-feats` module), no TEA key and no capture needed.
 - **Feats, spells and items are the SAME RDB record layout** - `[u32 type][u32 id][u32 1000000][...]` - so they
   share the stat-modifier region AND its parser, `ItemTemplateStatModifiers.Parse(body[12..])`. (The "TB magic" that
@@ -36,7 +38,7 @@ and don't contain.
   **Kind 53182 is excluded** - decoded, and it is NOT a stat modifier: its element is `(index, FOURCC)`, the "amount"
   being four ASCII characters identical across a feat family (`0x4450434E` "DPCN" on every Perception feat,
   `0x5633534D` "V3SM" on Hide In Shadows, `0x454F4854` "EOHT" on the crafting ranks). It carried 480 of the 561 bad
-  rows; dropping the whole KIND rather than the rows that failed a stat lookup took the residue to **81 of 23,321**.
+  rows; dropping the whole KIND rather than the rows that failed a stat lookup took the residue to **81 rows**.
   The 1,145 of its rows that landed on named stats were just as bogus - a small index is often a valid stat id.
   ⚠️ 17 stat ids remain unnamed by LDB 615, including the `1084..1094` family (values 100..900) which looks
   deliberate - identify those before anyone adds a whitelist, which would silence exactly them.
@@ -59,9 +61,9 @@ and don't contain.
   ⚠️ **No `GetScale()` division**, unlike the gear path: `FeatEffect.Value` is a DISPLAY value where
   `ItemStatModifier.Amount` is raw wire. Strength (scale 10) carries 1..9 in the feat table and HealthMax
   (scale 100) carries 100..700 - dividing those would under-grant every feat by 10x or 100x.
-  **2,939 of the 6,593 mapped feats have readable effects.** The captured characters DO now resolve - all 56 of
-  their feats name a real feat - but only 9 of those 56 carry stat effects.
-- ⚠️ **The other 47 are NOT feats "whose record has no modifier region" — that claim was wrong (#590).** Their
+  **2,720 of the 6,593 mapped feats have readable effects.** The captured characters DO now resolve - all 56 of
+  their feats name a real feat - but only 6 of those 56 carry stat effects.
+- ⚠️ **The other 50 are NOT feats "whose record has no modifier region" — that claim was wrong (#590).** Their
   records carry a modifier record in the ordinary place, with the ordinary `4,0,1,0,2,9` signature; the parser
   finds it and then **drops it**, because `ItemTemplateStatModifiers.Parse` bounds the payload's first word to
   `< 0x1000` on the reasoning that it is a stat id. For these it is not a stat id — it is a REFERENCE to whatever
@@ -265,9 +267,11 @@ and don't contain.
   no 4300), and every id they DO carry is rank-bearing. So the roots look **auto-granted rather than trained** -
   which is what `ClassAutotrainLevelMap` (33,830 entries, via the client's `GameCode/Feats` debug channel) would
   encode. Not yet verified.
-- A resolved `TemplateId` is not always a `Feat` row: the catalog holds only the plaintext ~21% of type 1000020, and
-  the captured characters' feats resolve largely into the TEA-encrypted remainder (id 1173628 is a real 217-byte
-  record we cannot read). The MAPPING is complete; the catalog is not.
+- **Every mapped feat resolves to a catalog row** — all 6,593 `FeatIdMap` entries name a `Feat`, and so do all 56
+  ids the captured characters carry (`1173628` = `Decomposition`). An earlier pass reported the opposite, because
+  it only knew the `[u32 len][name]` record shape and every one of those feats uses the `[u16 nameLen][u16 descLen]`
+  one. What the catalog still does not cover is EFFECTS: 2,720 of the 6,593 mapped feats carry a readable
+  stat-modifier region, so a trained feat naming no bonus is the norm rather than a decode failure.
 
 ## Feats vs. skills — the key distinction
 
@@ -275,7 +279,7 @@ AoC has two separate systems, and the codebase's naming predates the distinction
 
 | | what it is | where it lives on the wire | in our code |
 |---|---|---|---|
-| **Feats** (talent tree) | points spent to unlock/rank tree feats | full set in the **`FA015807` player-spawn pre-IIR** feat list; train/unlock via `FeatIIR 0x28DA68A0` | **nothing yet** |
+| **Feats** (talent tree) | points spent to unlock/rank tree feats | full set in the **`FA015807` player-spawn pre-IIR** feat list; train/unlock via `FeatIIR 0x28DA68A0` | `CharacterFeat(FeatId, Sequence)` + the `Feat`/`FeatIdMap`/`FeatPrereq`/`FeatEffect` catalogs, trained through `FeatService` |
 | **Skills / abilities** (spawn scaffold) | the flat id list a char carries; gates spell usability | the **`FA015807` player-spawn post-IIR** id-list | `CharacterSkill(SkillId, Rank)`, built by `SimpleCharFullUpdateCodec` |
 
 **Proof they're distinct** (same packet, two different regions + id-spaces): unlocking the Hellfire feat
@@ -354,17 +358,18 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
 - **Per-character unlocked-feat list: modeled + generated (2026-07-14).** `CharacterFeat` rows carry each char's
   trained feats; the player spawn regenerates the pre-IIR feat list from them (`PlayerSpawnScaffoldRows`).
 - **Train + reset: implemented (2026-07-14).** `GameServerListener.Feats.cs`:
-  - **Train** — c2s `FeatIIR` state `0x04` → `Database.AddCharacterFeats` (append, dedup) → s2c `FeatIIR` state
-    `0x05` ack (echoes the list, byte-exact via `FeatCodec`).
+  - **Train** — c2s `FeatIIR` state `0x04` → `Database.AddCharacterFeats` (REPLACES the row for that feat BASE,
+    keeping its original `Sequence`, because retail carries exactly one id per base at the current rank) → s2c
+    `FeatIIR` state `0x05` ack (echoes the list, byte-exact via `FeatCodec`).
   - **Reset** (untrain-all) — c2s `UntrainFeat` (`0x2041`) → server sends the **confirm dialog**
     `DispatchFeatUntrainMessageBox` (`0x2064`, `FeatUntrainMessageBoxCodec`, byte-exact) → client confirms with
     `FeatUntrainAnswer` (`0x203E`, echoes the dialog's 16-byte payload + a leading `0x01`) → `Database.ClearCharacterFeats`
     → world reload (`DoTeleport` to the current spot), so the fresh spawn carries the cleared list (retail's "loading
     screen"). A session token in the dialog is matched against the answer so a stray answer can't reset.
-  - **Prerequisite guard** — training is rejected when the resulting feat set would exceed the character's feat-point
-    budget (`FeatRules`: `max(1, rank)` per feat vs `max(0, level−9)` points, i.e. 1/level from L10, calibrated so
-    every captured char fits with headroom). This is the enforceable subset without the client's RDB catalog; the
-    tier/parent-feat prerequisite graph still needs the `Feat` definition table.
+  - **Prerequisite guard** — `FeatService` rejects a train that would exceed the character's feat-point budget
+    (`FeatRules.PointBudget`, off the client's own RDB 1000044 per-level table: 79 points at L80, not the 71 a
+    flat 1/level from L10 gives) **or** leave a prerequisite unmet (`FeatRules.MissingPrerequisites` over
+    `FeatPrereq`, satisfied by the same BASE at an equal-or-higher rank — see the rank note above).
   - GM command `.feat list | train <id>... | reset` is the test bootstrap (the retail trigger is the client's Feats
     window + its point economy, which the server can't drive).
 - `DoSkillSellback` (`0x205C`) is a debug-log stub.
@@ -384,13 +389,16 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
   enumerates client IIR classes we've never named/seen. This is how `FeatIIR` was found.
 - `tools/ghidra/DumpVtableReaders.java` — recovers any IIR's `ReadSubClass` reader (vtable slot 8) → authoritative
   hash + grammar. Run headless via the `#`-free symlink (see the `ghidra_hash_path_symlink` memory).
-- RDB feat catalog: type 1000020, ~20,417 plaintext feats (id + name + tree + rank; all tree names present); ~79% are
-  TEA-encrypted with server-only keys (costs/prereqs unrecoverable from captures — see the `feat_trees_decode_251` memory).
+- RDB feat catalog: type 1000020, **19,777** readable feat templates (id + name + description + tree + rank).
+  The remainder of that type is TEA-encrypted with server-only keys, but that costs the feat tree nothing:
+  prerequisites and the wire↔template map come from type **1000042** and the point budget from **1000044**,
+  both plaintext (see the `feat_trees_decode_251` memory).
 
 ## References
 
-- Issues: **#251** (this tracker), **#298** (skills scaffold gates spell usability), **#313** (create-flow combos,
-  same server-held-key class).
+- The subsystem tracker **#251 is closed**; the remaining feat work is tracked per gap: **#593** (the modifier
+  kinds still unimported — `ChangeInheritedWeaponAttack`, and the unnamed trigger/magnitude slots on the proc
+  family), **#595** (the seven mis-sliced `Swift Pathing` elements), **#271** (nothing consumes
+  `FeatComboModifier`'s reuse-time half yet), **#298** (skills scaffold gates spell usability), **#313**
+  (create-flow combos, same server-held-key class).
 - Memories: `feat_trees_decode_251` (the correction + FeatIIR), `snapshot_known_spell_list`, `player_spawn_scaffold_generated`.
-- Session commits (2026-07-14): `FeatIIR` added to `Opcodes.cs`; `decode_skill_scaffold.py`; skills-vs-feats corrections across
-  code + docs + memories.
