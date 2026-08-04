@@ -18,6 +18,7 @@ using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.Core.Network.Server.GameServer;
 using Faolan.Core.Protobuf;
+using Faolan.GameServer.Apprentice;
 using Faolan.GameServer.Combat;
 using Faolan.GameServer.CreateFlow;
 using Faolan.GameServer.Dialogue;
@@ -32,7 +33,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer
 {
-	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IQuestShareOutbound, IGameServerProvider
+	public partial class GameServerListener : RpcServer, IWorldOutbound, IEnvironmentOutbound, IEconomyOutbound, ISpellEffectOutbound, ISpellweaveOutbound, ITradeOutbound, ITravelOutbound, IQuestShareOutbound, IApprenticeOutbound, IGameServerProvider
 	{
 		// Squared world-distance a move must cover to count as a real TRANSLATION that interrupts an in-flight cast
 		// (#347). Above pure-rotation jitter (turning in place leaves the position unchanged) but well under one walk
@@ -220,6 +221,7 @@ namespace Faolan.GameServer
 
 		// Quest SHARING (#101): reaches the team roster through the CS seam and the wire through IQuestShareOutbound.
 		private readonly QuestSharingService _questSharing;
+		private readonly ApprenticeService _apprentice;
 
 		// NPC vendor / shop sell-buy-undo flow (owns the open-shop/last-sale state). The wallet-update + item-grant
 		// outbound ops are injected as seams (shared with other subsystems). See Economy/ShopService.cs.
@@ -292,6 +294,7 @@ namespace Faolan.GameServer
 			_spellweave = new SpellweaveService(logger, this);
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, this, _questProgression, logger);
+			_apprentice = new ApprenticeService(this, csPlayerAgentDispatcher, logger);
 			_stockConversation = new StockConversationService(logger, database);
 			_loot = new LootService(_broadcaster, this, database, _questProgression, agentServerDispatcher, logger);
 			_keepAlive = new KeepAliveService(_simulation.Metrics);
@@ -422,6 +425,9 @@ namespace Faolan.GameServer
 				// Same rule for a quest share offered TO this player: the window is gone with the connection, so the
 				// offer must be too - otherwise a reconnect could accept one made minutes ago on the other side of the map.
 				_questSharing.Forget(tradingCharacter.Id);
+				// And every apprenticeship they are in, on either side: the level boost is a pushed stat, so a bond
+				// that survived a disconnect would leave the OTHER party's client holding it (#144).
+				_ = _apprentice.Forget(tradingCharacter.Id);
 			}
 
 			// A logout also leaves the team - otherwise the roster keeps a member nobody can reach, and the next join

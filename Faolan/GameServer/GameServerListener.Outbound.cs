@@ -9,6 +9,7 @@ using Faolan.Core;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Core.Network;
+using Faolan.Core.Network.Codecs.Apprentice;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
@@ -19,6 +20,7 @@ using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
+using Faolan.GameServer.Apprentice;
 using Faolan.GameServer.Combat;
 using Faolan.Core.Network.Server.ChatServer;
 using Faolan.Core.Network.Server.GameServer;
@@ -761,5 +763,68 @@ namespace Faolan.GameServer
 		}
 
 		// Sends a pre-framed world IIR body ([len]-prefixed) on the world conversation (opcode 0x2000).
+
+		// ---- APPRENTICESHIP (#144) ----
+		//
+		// ⚠️ Un-gated, for the same reason quest sharing's are: no capture performs an apprenticeship, so the ENDPOINT
+		// pair is taken from the neighbouring GameCharInterfaceProject dispatches that ARE observed (SyncCanSprint /
+		// UpdateSprintBar) rather than from an observation of these. The BODIES are the client's own signatures. [V0]
+		async Task<bool> IApprenticeOutbound.SendApprenticeRequest(uint studentId, uint teacherId)
+		{
+			if (ClientForCharacter(studentId) is not { } client)
+				return false;
+
+			await SendApprenticeRpc(client, GameCharInterfaceProjectMethods.DispatchRequestApprentice, RequestApprenticeCodec.Build(teacherId));
+			return true;
+		}
+
+		Task IApprenticeOutbound.SendApprenticeEntry(uint recipientId, uint teacherId, uint studentId, bool added)
+		{
+			return ClientForCharacter(recipientId) is { } client
+				? SendApprenticeRpc(client, added
+					? GameCharInterfaceProjectMethods.DispatchAddApprenticeEntry
+					: GameCharInterfaceProjectMethods.DispatchRemoveApprenticeEntry, ApprenticeEntryCodec.Build(teacherId, studentId))
+				: Task.CompletedTask;
+		}
+
+		Task IApprenticeOutbound.SendApprenticeMode(uint recipientId, bool on)
+		{
+			// The mode flag is on GameCharInterface, not GameCharInterfaceProject - a different interface, so a
+			// different endpoint pair, which is exactly the distinction `WireOpcode` cannot express.
+			return ClientForCharacter(recipientId) is { } client
+				? client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x10), client.Endpoint(Endpoints.GameCharInterfaceType),
+					GameCharInterfaceMethods.DispatchApprenticeModeOnOff, ApprenticeModeCodec.Build(on)))
+				: Task.CompletedTask;
+		}
+
+		async Task IApprenticeOutbound.SendApprenticeLevel(uint characterId, uint apprenticeLevel)
+		{
+			if (ClientForCharacter(characterId) is not { } client)
+				return;
+
+			// ApprenticeLevel ALONE - not `SetLevel`, which deliberately writes Level too so the nameplate tracks a GM
+			// `.level` (#472). Here the real level is unchanged and only the mitigation term moves.
+			await SendStatUpdate(client, new CharacterStatBlock().Set(CharacterStatId.ApprenticeLevel, apprenticeLevel), characterId);
+		}
+
+		Task IApprenticeOutbound.SendApprenticeFeedback(uint characterId, string message)
+		{
+			return _agentServerDispatcher.SendSystemMessage(characterId, message);
+		}
+
+		uint? IApprenticeOutbound.LevelOf(uint characterId)
+		{
+			return ClientForCharacter(characterId)?.Session.Character.Level;
+		}
+
+		string? IApprenticeOutbound.NameOf(uint characterId)
+		{
+			return ClientForCharacter(characterId)?.Session.Character.Name;
+		}
+
+		private static Task SendApprenticeRpc(INetworkClient client, GameCharInterfaceProjectMethods method, byte[] body)
+		{
+			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType), method, body));
+		}
 	}
 }

@@ -1481,6 +1481,33 @@ namespace Faolan.GameServer
 					break;
 				}
 
+				// APPRENTICESHIP (#144). Three of the four name one party as an ID32 and carry nothing else; the fourth
+				// is no-arg. The client filters on its own rules before sending, so what arrives here is normally
+				// already legal - ApprenticeService still checks, and answers when it is not.
+				case GameCharAgentProjectMethods.RequestApprenticeStudent: // 0x2004 - the TEACHER names a student
+				{
+					await _apprentice.Request(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
+					break;
+				}
+
+				case GameCharAgentProjectMethods.AcceptApprenticeTeacher: // 0x2002
+				{
+					await _apprentice.Accept(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
+					break;
+				}
+
+				case GameCharAgentProjectMethods.DeclineApprenticeTeacher: // 0x2003
+				{
+					await _apprentice.Decline(client.Session.Character.Id, EntityIdCodec.Parse(body.ReadArray(EntityIdCodec.Length)).Id);
+					break;
+				}
+
+				case GameCharAgentProjectMethods.LeaveApprenticeMode: // 0x2005 - no arguments; either side ends it
+				{
+					await _apprentice.Leave(client.Session.Character.Id);
+					break;
+				}
+
 				case GameCharAgentProjectMethods.SetSprintInputState: // 0x200C, the sprint key
 				{
 					// A fire-and-forget input-state update retail does NOT reply to (#72). Body = [u16 state] (1 = on,
