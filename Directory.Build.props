@@ -33,7 +33,22 @@
         <ContainerImageTag>dev</ContainerImageTag>
     </PropertyGroup>-->
 
-	<Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile">
+	<!--
+	  The startup banner's build stamp (Faolan.Core/Global.cs). `BuildDateTimeUtc` is a TIMESTAMP, so an assembly
+	  carrying it can never be byte-identical across two builds of the same source - it was the whole of #551: three
+	  no-op `dotnet build`s, three different `Faolan.Core.Database.dll` hashes, and that hash is part of the test
+	  fixture cache key, so every build threw the cached fixture away.
+
+	  It is scoped to the ENTRY assembly because that is the only place it is ever read: `Global` resolves both
+	  attributes off `Assembly.GetEntryAssembly()` and degrades gracefully when they are absent, so the twelve library
+	  copies were paying determinism for a value nothing could reach. `OutputType == Exe` is the condition rather than
+	  a project list so a new host picks it up by being a host.
+
+	  ⚠️ The executables themselves are still non-deterministic by construction - that is what a build timestamp IS.
+	  Making them deterministic too means sourcing the stamp from the COMMIT rather than the clock; the git SHA
+	  already rides along for free in the informational version, so the date is the only piece left.
+	-->
+	<Target Name="GenerateBuildInfo" BeforeTargets="BeforeCompile" Condition="'$(OutputType)' == 'Exe'">
 		<ItemGroup>
 			<AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
 				<_Parameter1>BuildDateTimeUtc</_Parameter1>
