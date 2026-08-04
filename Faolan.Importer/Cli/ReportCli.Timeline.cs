@@ -307,6 +307,23 @@ namespace Faolan.Importer.Cli
 					var from = buff.ApplyFrom is { } caster ? Ent(labels, caster) : "(no caster)";
 					return $"{from} buff {name}{at}{end} [0x{wireId:x}]";
 				}
+				case "ScryScriptIIR":
+				{
+					// The Tortage destiny/tutorial STEP driver. Without this the whole intro sequence
+					// (StartFixed3d -> WelcomeTutorial -> ApproachCasilda -> CombatTutorial -> QuestRewards)
+					// reads as undifferentiated hex, which is exactly the part of a create/beach capture one
+					// opens a timeline to follow. int_parameter is the ZIGZAG-DECODED script-group id (#234).
+					var scry = ScryScriptCodec.Parse(content).Script;
+					var step = scry.type is ProtoScryScriptIIR.Type.ScriptMessage or ProtoScryScriptIIR.Type.PlayOrSkipQuestion
+					           && scry.StringParameterOne.Length > 0
+						? $" \"{scry.StringParameterOne}\""
+						: "";
+					// A step token carries no group id; a StartScriptGroupOnClient carries nothing else.
+					var group = scry.IntParameter != 0 ? $" group {scry.IntParameter}" : "";
+					var bound = scry.IdParameter is { Instance: not 0 } id ? $" -> {Ent(labels, id.Instance)}" : "";
+					var res = scry.StringParameterTwo.Length > 0 ? $" (+{scry.StringParameterTwo.Length} B resources)" : "";
+					return $"{scry.type}{step}{group}{bound}{res}";
+				}
 				case "LookAtIIR":
 				{
 					var look2 = LookAtCodec.Parse(content);
