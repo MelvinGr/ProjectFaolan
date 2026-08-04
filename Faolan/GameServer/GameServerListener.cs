@@ -42,6 +42,11 @@ namespace Faolan.GameServer
 		private const int EnergyRegenPerTick = 600;
 		private const int EnergyTickMs = 1000;
 
+		// How many energy ticks between two CharacterStatId.Energy mirrors. Retail's own-handle cadence is a push every
+		// ~3-7s while the pool is moving and nothing at all once it is back at the max, so this is the floor of that
+		// range and the "did it change" guard supplies the silence (RunEnergyMirror).
+		private const int EnergyMirrorTicks = 3;
+
 		// Server-side ENERGY mirror for sprint: the client owns the yellow bar's visual during sprint, but we track the
 		// same drain/regen into session.Energy (silently, no packets) so spellweaving starts from the real value and we
 		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).

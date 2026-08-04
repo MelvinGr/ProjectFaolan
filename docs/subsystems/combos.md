@@ -160,6 +160,44 @@ that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then
   pushes carry exactly those, and they do not scale with level), with a parallel `0xe9f24184` "Spellweaving Cost"
   gauge (`0x37E68C`). When energy hits 0:
   the `Exhausted` debuff (0xB90) + the `0x37E690` gauge draining HEALTH (the over-weave DoT).
+
+### The energy pool is a CLIENT model the server feeds through four stats
+
+The yellow bar is not drawn from the `0x200E` packet alone — it is a client-side simulation, which is why sprinting
+drains the bar with no server traffic at all and only the server-driven WEAVE drain shows up on the wire. The client
+registers every stat id against a name in a static metadata table (`tools/ghidra/DumpStatNameTable.java`), and four
+of them are the whole model. `FUN_0112ad70` listens on exactly these ids and caches them side by side:
+
+| stat | client's name | role | on the wire? |
+|---|---|---|---|
+| `1000028` (`0xF425C`) | `Energy` | the pool itself | **yes** — 1,650 records on `StatUpdateIIR` (`0x96B8DC59`), per entity |
+| `1000029` (`0xF425D`) | `MaxEnergy` | the bar's denominator | never observed |
+| `1000031` (`0xF425F`) | `EnergySprintDrain` | drain rate while sprinting | never observed |
+| `1351` (`0x547`) | `NaturalEnergyRegeneration` | regen rate | never observed |
+
+The names are the client's own, not ours: the same table's low half round-trips against ids recovered from entirely
+different directions (`0x324 Strength`, `0x42F OffhandChance`, and `0x547`, which LDB category 615 also names
+"Natural Energy Regeneration").
+
+**The bar renders `Energy / MaxEnergy`.** `SprintBarView::Update` (`FUN_0155b390`) re-reads `MaxEnergy` on every
+update, and the renderer (`FUN_0155b570`) computes `current / max * 100` **only `if (max > 0)`** — so a `MaxEnergy`
+of zero draws the bar at 0% whatever current is pushed. The view's init (`FUN_0155b110`) seeds *both* current and max
+from `MaxEnergy` and then takes its current from the energy model's cached `Energy`, so the `0x200E` stream is a
+correction on top of the client's own simulation rather than the sole source.
+
+⚠️ `MaxEnergy` and the two rate stats appear **zero** times in any stat block across the 120-capture corpus — the only
+`0x000F425D` bytes anywhere sit inside the retail server's leaked scaffold region on `0xFA015807` spawns (#603), which
+is not a value it wrote. So the client sources the ceiling and the rates itself; do not invent a push for them.
+
+`Energy`'s own-handle series independently re-confirms `EnergyMaxForClass`: it tops out at **exactly** 9000 for
+casters and **exactly** 14000 for the rest, and retail's cadence is a push every ~3–7s while the pool is moving,
+going silent once it is back at the max.
+
+**`Exhausted` is server-applied on the sprint path too**, not only the weave. In `Hoxxling_..._gameplay2` the `Energy`
+stat reaches exactly 0 at 20:53:41.247 and in the same millisecond retail sends `ApplySpell 0x6B87E316` carrying spell
+id `000B9000` (base `0xB90`, form 0 = apply), applyTo == applyFrom == the player; 3.4s later, on the first push that
+lifts energy back above zero (1019), it sends `000B9001` — the form-1 END twin with an empty payload. The client has
+its own exhausted STATE keyed on the same stat, but that is separate from the icon.
 - **Fire / cancel**: on the 2nd toggle, the s2c `f98e10b3` burst (the weave firing) + trance-buff end-twins + a
   trance-EXIT BCC. Per add: the component's own spell as an immediate self-buff + add-gesture BCC; the Spellweaving(1)
   buff re-applies at an incremented id each picker reappear (stacks ~x2).
@@ -186,7 +224,8 @@ The Necromancer weave is built end-to-end and byte-exact (golden tests `Spellwea
   (Necromancer only) + `EnergyMaxForClass`.
 - `GameServerListener.Buffs.cs` — `SendSprintBar` (`0x200E`) + the persistent energy loop (`RunEnergyMirror`:
   drain-on-sprint / regen-when-idle / step-aside-while-weaving; the sprint drain itself is client-side, the server
-  mirrors it).
+  mirrors it). The loop also pushes `CharacterStatId.Energy` on the retail cadence and owns the sprint-path
+  `Exhausted` apply/remove — see the four-stat table above.
 - `GameServerListener.Inbound.cs` — the `CombatReactiveIIR` add case + the `PerformSpecialAction` (`0x205A`) handler.
 
 ## Implementation (melee combos)

@@ -181,7 +181,7 @@ namespace Faolan.GameServer
 		// the client rejects the short shape for these ("MagicBuffIIR_c::ReadSubClass failed"). Looks up the spell's
 		// real duration so the client counts it down and SendMagicBuffIir arms the matching expiry. The narrow seam
 		// the SpellweaveService uses for every buff it emits.
-		private async Task ApplySpellweaveBuff(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
+		private async Task ApplyBuffById(INetworkClient client, uint applyTo, uint applyFrom, uint spellId)
 		{
 			var spellBase = spellId >> 8;
 			var spell = await Database.GetSpell(spellBase) ?? await Database.GetSpell(spellId);
@@ -264,11 +264,29 @@ namespace Faolan.GameServer
 		// (the weave owns the drain + the 0x200E stream). Persistent - it keeps ticking for the whole session so energy
 		// recovers after a weave/sprint - and exits only on disconnect. A PeriodicTimer loop, not a self-rescheduling
 		// callback. EnergyLoopActive guards against a second loop.
+		//
+		// It also MIRRORS the pool to the client as CharacterStatId.Energy, which is not a decoration: 1000028 is the
+		// value the client's own energy model holds (FUN_0112ad70 caches it and drives the Exhausted state off it), and
+		// it is what the sprint bar's view is seeded from. Retail streams exactly this - 1,650 records across the
+		// corpus, on StatUpdateIIR (0x96B8DC59), per entity - and its cadence is a push every ~3-7s WHILE the pool is
+		// moving, going silent once it is back at the max (Hoxxling_..._gameplay2: 14000 -> 13977 -> 14000 -> quiet,
+		// with ~4800-point drops for real sprints). EnergyMirrorTicks + the `!= mirrored` guard reproduce that shape:
+		// the loop is silent at full and speaks only while the number is changing.
+		//
+		// ⚠️ This is a MIRROR, not the visual. The client sprints and drains locally with no server traffic at all -
+		// which is why retail sends no 0x200E during a sprint - so what this restores is the server's number, not the
+		// bar. Only the SPELLWEAVE drain is server-driven, and that owns the 0x200E stream (see SpellweaveService).
 		private async Task RunEnergyMirror(INetworkClient client)
 		{
 			client.Session.EnergyLoopActive = true;
 			try
 			{
+				// What was last put on the wire as CharacterStatId.Energy, so the mirror only speaks when the pool
+				// actually moved. uint.MaxValue is "nothing sent yet" rather than 0, which is a legal energy value.
+				var mirrored = uint.MaxValue;
+				var sinceMirror = 0;
+				var exhausted = false;
+
 				using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(EnergyTickMs));
 				while (await timer.WaitForNextTickAsync())
 				{
@@ -281,9 +299,34 @@ namespace Faolan.GameServer
 
 					if (session.IsSprinting)
 						session.Energy -= (uint)Math.Min(SprintEnergyDrainPerTick, (int)session.Energy);
-					// Exhausted is client-driven for sprint (it owns the visual); nothing to send here.
 					else if (session.Energy < session.EnergyMax)
 						session.Energy = Math.Min(session.EnergyMax, session.Energy + EnergyRegenPerTick);
+
+					// Exhausted rides the pool, not the weave: retail applies it the instant Energy reaches 0 and sends
+					// the end twin on the first push that lifts it back above zero, sprint included
+					// (SpellweaveCatalog.ExhaustedBuff carries the capture). The weave has its own copy of this because
+					// it also owns a health DoT while empty; this is the plain-sprint half.
+					if (session.Character is { } self)
+					{
+						if (session.Energy == 0 && !exhausted)
+						{
+							exhausted = true;
+							await ApplyBuffById(client, self.Id, self.Id, SpellweaveCatalog.ExhaustedBuff);
+						}
+						else if (session.Energy > 0 && exhausted)
+						{
+							exhausted = false;
+							await SendBuffRemoval(client, self.Id, self.Id, SpellweaveCatalog.ExhaustedBuff);
+						}
+					}
+
+					if (++sinceMirror >= EnergyMirrorTicks && session.Energy != mirrored && session.Character != null)
+					{
+						sinceMirror = 0;
+						mirrored = session.Energy;
+						await SendStatUpdate(client, new CharacterStatBlock { [CharacterStatId.Energy] = session.Energy },
+							session.Character.Id);
+					}
 				}
 			}
 			catch (Exception ex)
@@ -590,7 +633,7 @@ namespace Faolan.GameServer
 
 		Task ISpellweaveOutbound.ApplyBuff(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId)
 		{
-			return ApplySpellweaveBuff(client, applyTo, applyFrom, wireSpellId);
+			return ApplyBuffById(client, applyTo, applyFrom, wireSpellId);
 		}
 
 		Task ISpellweaveOutbound.RemoveBuff(INetworkClient client, uint applyTo, uint applyFrom, uint wireSpellId)

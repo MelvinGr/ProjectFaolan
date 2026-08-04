@@ -44,9 +44,9 @@ namespace Faolan.GameServer.Combat
 
 		private const uint DotStartHealth = 602_395; // ~necro health when the DoT began (approx; should be real health)
 
-		// The "Exhausted" debuff (spell 0xB90, 100s) applied when stamina hits 0 - the standard stamina-depletion
-		// debuff. Not in the capture (the client applies it locally), so the id is our choice; applied server-side.
-		private const uint ExhaustedBuff = 0xB90 << 8;
+		// The "Exhausted" debuff applied when the energy pool hits 0. Shared with the SPRINT path, which retail drives
+		// the same way - see SpellweaveCatalog.ExhaustedBuff for the capture that confirms the id and both twins.
+		private const uint ExhaustedBuff = SpellweaveCatalog.ExhaustedBuff;
 		private readonly ILogger _logger;
 		private readonly ISpellweaveOutbound _out;
 

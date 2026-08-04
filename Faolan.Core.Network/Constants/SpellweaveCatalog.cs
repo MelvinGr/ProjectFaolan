@@ -31,6 +31,17 @@ namespace Faolan.Core.Network.Constants
 		// 0x396AE9, Arcane Surge 0x3969D8, Parasite Host 0x37E6D9, Death God 0x396A22, Death 0x396A3D; fire stages
 		// 0x398/0x39B/0x39A/0x39D.
 
+		// "Exhausted" (spell base 0xB90), the debuff retail applies when the ENERGY pool empties - on the sprint path as
+		// much as the weave, which is why it lives here beside the pool rather than inside the weave service.
+		//
+		// ⚠️ CAPTURE-CONFIRMED, and it used to be recorded as "not in the capture, so the id is our choice". It is in the
+		// capture: in `Hoxxling_..._gameplay2` the `Energy` stat (1000028) reaches exactly 0 at 20:53:41.247, and in the
+		// SAME millisecond retail sends `ApplySpell 0x6B87E316` carrying spell id `000B9000` (base 0xB90, form 0 = apply)
+		// with applyTo == applyFrom == the player. 3.4s later, on the first push that puts energy back above zero (1019),
+		// it sends `000B9001` - the form-1 END twin, empty payload. So the SERVER owns this debuff on the sprint path
+		// too; the client's own exhausted STATE (it has one, keyed on the same stat) is a separate thing from the icon.
+		public const uint ExhaustedBuff = 0xB90 << 8;
+
 		// The universal ENERGY (yellow sprint-bar) max by class - the value retail pushes on `DispatchUpdateSprintBar`
 		// (0x200E) when the bar is FULL. Two flat values, and they are flat: the same 14000 reaches a level-24 Herald
 		// and a level-23 assassin as a level-80 one, so this is per class family, not a level curve.

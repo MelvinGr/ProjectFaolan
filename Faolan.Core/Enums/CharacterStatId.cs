@@ -469,6 +469,39 @@ namespace Faolan.Core.Enums
 		HealthBreakThreshold = 0x183,
 		ChanceOfBreakOnAttack = 0x1A6,
 		ChannelingInterval = 0x1BF,
+
+		// ---- The ENERGY pool: the yellow sprint/spellweave bar (#141). ----
+		// Named by the CLIENT, not by us and not by the LDB - LDB category 615 names none of the 1000000+ range, but
+		// the client registers every stat id against a name string in a static metadata table
+		// (`tools/ghidra/DumpStatNameTable.java`; `MaxEnergy` is the literal at 0x01f72a00, bound to 0xF425D at
+		// 0x01de6e20). The table's low half round-trips against ids we already had from an entirely different
+		// direction - 0x324 `Strength`, 0x42F `OffhandChance`, 0x547 `NaturalEnergyRegeneration` - which is what says
+		// these four names are the client's own and not a guess.
+		//
+		// The four together ARE the client's energy simulation (`FUN_0112ad70` listens on exactly these ids and caches
+		// them at +0x30/+0x34/+0x38/+0x3c): it holds the pool, its ceiling, and the two rates that move it. That is why
+		// sprinting drains the bar with no server traffic at all - the drain is the CLIENT running this model - and why
+		// only the SPELLWEAVE drain, which the server drives, shows up on the wire as `DispatchUpdateSprintBar`.
+		//
+		// ⚠️ Of the four, retail is only ever observed sending <see cref="Energy" /> (1,650 records across the 120-capture
+		// corpus, on `StatUpdateIIR` 0x96B8DC59, per entity). `MaxEnergy`, `EnergySprintDrain` and
+		// `NaturalEnergyRegeneration` appear ZERO times in any stat block - the only 0x000F425D bytes in the corpus sit
+		// inside the retail server's leaked scaffold region on 0xFA015807 spawns (#603), which is not a value it wrote.
+		// So the client sources the ceiling and the rates itself; do not invent a push for them.
+		Energy = 0xF425C,
+
+		// The DENOMINATOR of the sprint/spellweave bar. `SprintBarView::Update` (FUN_0155b390) re-reads it on every
+		// update and the renderer (FUN_0155b570) computes `current / max * 100` only `if (max > 0)` - so a MaxEnergy of
+		// zero draws the bar at 0% no matter what current is pushed. Read with kind 2 (base + modifiers), unlike
+		// <see cref="Energy" /> which is read raw (kind 0).
+		MaxEnergy = 0xF425D,
+
+		// Energy drained per `Energy_StatsTimeBase` while sprinting - the rate the client's local drain runs at.
+		EnergySprintDrain = 0xF425F,
+
+		// The energy pool's regeneration rate. Already named the same way by LDB 615 ("Natural Energy Regeneration"),
+		// which is the cross-check on the client table above.
+		NaturalEnergyRegeneration = 0x547,
 	}
 
 	/// <summary>
