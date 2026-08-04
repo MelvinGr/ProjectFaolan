@@ -11,20 +11,20 @@ namespace Faolan.Core.Database.Repositories
 	{
 		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
 
-		// The ROOTS of `npcName`'s dialogue for one trigger (#642), each with its opening screen loaded: talk roots
-		// (`worldObjectId` null), the use-object root of that object, or the approach root. Several can share a trigger
-		// and differ only by quest gate, so the caller picks (ConversationService.PickByLatestQuest).
-		Task<ConversationEntry[]> GetConversationEntries(string npcName, ConversationTrigger trigger, uint? worldObjectId, uint clickedTemplateId);
+		// The ROOTS of the NPC TEMPLATE's dialogue for one trigger (#642/#646), each with its opening screen loaded:
+		// talk roots (`worldObjectId` null), the use-object root of that object, or the approach root. Several can
+		// share a trigger and differ only by quest gate, so the caller picks (ConversationService.PickByLatestQuest).
+		Task<ConversationEntry[]> GetConversationEntries(uint npcTemplateId, ConversationTrigger trigger, uint? worldObjectId);
 
 		// The branches OUT of one screen, each with its destination screen loaded (#642).
 		Task<ConversationEdge[]> GetConversationEdges(uint fromNodeId);
 		Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap();
 
-		// The NPCs whose SERVER-OPENED conversation is triggered by using world object `worldObjectId` (#523).
-		Task<string[]> GetServerInitiatedConversationNpcs(uint worldObjectId);
+		// The NPC TEMPLATES whose SERVER-OPENED conversation is triggered by using world object `worldObjectId` (#523).
+		Task<uint[]> GetServerInitiatedConversationNpcs(uint worldObjectId);
 
-		// The NPCs whose SERVER-OPENED conversation fires on APPROACH rather than on using an object (#523).
-		Task<string[]> GetApproachConversationNpcs();
+		// The NPC TEMPLATES whose SERVER-OPENED conversation fires on APPROACH rather than on using an object (#523).
+		Task<uint[]> GetApproachConversationNpcs();
 		Task<ConanClass[]> GetImportedSpawnClasses(uint mapId);
 		Task<NpcTemplate?> GetNpcByName(string name);
 		Task<NpcTemplate?> GetNpcByTemplateId(uint templateId);
@@ -35,7 +35,7 @@ namespace Faolan.Core.Database.Repositories
 		Task<NpcSpawn[]> GetNpcSpawns(uint mapId, ConanClass? forClass);
 		Task<NpcSpell[]> GetNpcSpellsByName(string name);
 		Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap();
-		Task<Dictionary<string, uint>> GetQuestGiverMap();
+		Task<Dictionary<uint, uint>> GetQuestGiverMap();
 		Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId);
 		Task<Shop?> GetShopByTemplate(uint npcTemplateId);
 		Task<int> GraduateSpawnArea(uint areaId);
@@ -66,7 +66,9 @@ namespace Faolan.Core.Database.Repositories
 		// One lookup replaces the four that used to differ only in which of `ServerInitiated` / `TriggerWorldObjectId` /
 		// `AnswerPath == ""` they filtered on. The trigger is now stated by a column, so "which of Casilda's two
 		// server-opened conversations is this" is answered by the key rather than by whichever row came back first.
-		public async Task<ConversationEntry[]> GetConversationEntries(string npcName, ConversationTrigger trigger, uint? worldObjectId, uint clickedTemplateId)
+		// #646: keyed by the NPC's TEMPLATE, which is the identity, rather than by its display name with the template as
+		// a nullable side-gate. The gate is gone because the key does its job.
+		public async Task<ConversationEntry[]> GetConversationEntries(uint npcTemplateId, ConversationTrigger trigger, uint? worldObjectId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
@@ -74,8 +76,7 @@ namespace Faolan.Core.Database.Repositories
 				.ThenInclude(n => n.Packets)
 				.ThenInclude(p => p.Screens)
 				.ThenInclude(s => s.Parameters)
-				.Where(e => e.NpcName == npcName && e.Trigger == trigger && e.TriggerWorldObjectId == worldObjectId
-					&& (e.NpcTemplateId == null || e.NpcTemplateId == clickedTemplateId))
+				.Where(e => e.NpcTemplateId == npcTemplateId && e.Trigger == trigger && e.TriggerWorldObjectId == worldObjectId)
 				.ToArrayAsync();
 		}
 
@@ -99,12 +100,12 @@ namespace Faolan.Core.Database.Repositories
 		// It is also what ENDS her escort, with no extra data: the object that opens the escortee's farewell is the
 		// object the escort was leading to. That keeps the escort's completion data-driven off the trigger we already
 		// harvested rather than needing a hard-coded door or a new column on the goal.
-		public async Task<string[]> GetServerInitiatedConversationNpcs(uint worldObjectId)
+		public async Task<uint[]> GetServerInitiatedConversationNpcs(uint worldObjectId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.ConversationEntries.Where(e => e.Trigger == ConversationTrigger.UseWorldObject && e.TriggerWorldObjectId == worldObjectId)
-				.Select(e => e.NpcName)
+				.Select(e => e.NpcTemplateId)
 				.Distinct()
 				.ToArrayAsync();
 		}
@@ -112,12 +113,12 @@ namespace Faolan.Core.Database.Repositories
 		// The NPCs with an APPROACH-triggered server conversation (#523). Saddur's beach confrontation is the worked
 		// example - walking up to him is what opens it. Small and static, so the caller caches it and the per-move
 		// check stays a pure in-memory name test.
-		public async Task<string[]> GetApproachConversationNpcs()
+		public async Task<uint[]> GetApproachConversationNpcs()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
 				.ConversationEntries.Where(e => e.Trigger == ConversationTrigger.Approach)
-				.Select(e => e.NpcName)
+				.Select(e => e.NpcTemplateId)
 				.Distinct()
 				.ToArrayAsync();
 		}
@@ -275,6 +276,12 @@ namespace Faolan.Core.Database.Repositories
 		// targets it - which is what "this NPC still has business with you" actually means. Widening only the reveal
 		// set keeps the flag's original job intact: a mechanically-resolved kill target (#521) that nothing flags
 		// still gates nothing, so it does not hide its population or stop respawning.
+		//
+		// ⚠️ This one stays keyed by NAME while everything around it moved to the template id (#646), and deliberately
+		// so: both sides of it are `QuestGoalDefinition.TargetName`, a string in the client's OWN RDB data that we do
+		// not resolve yet - 32 of its 48 distinct names match no template at all. Re-keying it would mean inventing
+		// that resolution, which is #521's job, not this lookup's. The giver set is compared against those same names,
+		// so it reads the node's NpcName label rather than its template.
 		public async Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
@@ -298,19 +305,21 @@ namespace Faolan.Core.Database.Repositories
 				.ToDictionary(g => g.Key, g => g.Select(x => x.QuestId).Distinct().ToArray());
 		}
 
-		public async Task<Dictionary<string, uint>> GetQuestGiverMap()
+		// Which quest each NPC TEMPLATE gives, derived from the dialogue graph's own grants (#646: keyed by template,
+		// like everything else that routes off a click - the display name it used to key on is ambiguous in the world).
+		public async Task<Dictionary<uint, uint>> GetQuestGiverMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var grants = await ctx
 				.ConversationEdges.Where(e => e.GrantQuestId > 0)
 				.Select(e => new
 				{
-					e.From.NpcName,
+					e.From.NpcTemplateId,
 					e.GrantQuestId
 				})
 				.Distinct()
 				.ToListAsync();
-			return grants.GroupBy(g => g.NpcName).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId!.Value));
+			return grants.GroupBy(g => g.NpcTemplateId).ToDictionary(g => g.Key, g => g.Min(x => x.GrantQuestId!.Value));
 		}
 
 		public async Task<NpcSpawnArea[]> GetResolvedSpawnAreas(uint mapId)

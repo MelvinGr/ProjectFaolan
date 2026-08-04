@@ -176,7 +176,7 @@ namespace Faolan.GameServer
 
 		// The NPC names that HAVE an approach-triggered conversation, cached on first use - a small static set, so the
 		// per-move check costs one hash lookup for the overwhelming majority of players who are near nobody special.
-		private HashSet<string>? _approachConversationNpcs;
+		private HashSet<uint>? _approachConversationNpcs;
 		private readonly FatalityService _fatality;
 
 		// #439: the spell effects the server acts on itself - pet summons and triggered procs, from the SpellEffect

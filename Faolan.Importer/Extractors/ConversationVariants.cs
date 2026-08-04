@@ -8,7 +8,7 @@ namespace Faolan.Importer.Extractors
 {
 	// Splits an NPC's CONDITION-VARYING screens apart, from the captures alone.
 	//
-	// The problem it solves (#526): a screen's identity is (NpcName, TypeId, AnswerPath) plus its quest gate, and
+	// The problem it solves (#526): a screen's identity is (NpcTemplateId, TypeId, AnswerPath) plus its quest gate, and
 	// without a gate every variant of one greeting collapses to a single key. `ConversationExtractor.Merge` then picks
 	// between them by PACKET COUNT - so two genuinely different screens are treated as one screen captured better or
 	// worse, and the longer wins, silently. That is how Turach's and Laranga's fresh-character greetings were lost:
@@ -41,8 +41,11 @@ namespace Faolan.Importer.Extractors
 		public static List<ConversationWalk> SplitConflicts(IReadOnlyList<ConversationWalk> all, ICollection<string>? report = null)
 		{
 			var result = new List<ConversationWalk>(all.Count);
+			// Grouped by the NPC's TEMPLATE, not its name (#646) - same reason as Merge's: two same-named different
+			// NPCs must not have their variants compared against each other. Same fallback chain, shared so the two
+			// groupings cannot disagree.
 			var groups = all.GroupBy(e => (
-				Identity: string.IsNullOrEmpty(e.NpcName) ? $"#{e.CapturedNpcHandle}" : e.NpcName,
+				Identity: ConversationExtractor.WalkIdentity(e),
 				e.TypeId, e.AnswerPath, e.TriggerWorldObjectId));
 
 			foreach (var group in groups)

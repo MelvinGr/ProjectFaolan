@@ -110,6 +110,20 @@ namespace Faolan.Core.Network.Codecs.Quest
 				                     && g.TargetName.Equals(sourceNpcName, StringComparison.OrdinalIgnoreCase));
 		}
 
+		// The Escort goal the escortee with `templateId` advances (#646). An Escort goal's TrailingRefId IS the
+		// escortee's NPC template - Casilda 9411 on quest 12407, the only escort in the shipped data - so it matches on
+		// the stable id with no name fallback, unlike the kill path. There is nothing for a fallback to catch: an
+		// escort has exactly one escortee, and a goal without the id names an NPC we could not resolve anyway.
+		public static QuestGoalDefinition? MatchingEscortGoal(IEnumerable<QuestGoalDefinition> goals, uint templateId)
+		{
+			if (goals == null || templateId == 0)
+				return null;
+
+			return goals
+				.OrderBy(g => g.Sequence)
+				.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort && g.TrailingRefId == templateId);
+		}
+
 		public static QuestGoalDefinition? MatchingGoal(IEnumerable<QuestGoalDefinition> goals, QuestGoalType triggerType, string targetName)
 		{
 			if (goals == null || string.IsNullOrEmpty(targetName))

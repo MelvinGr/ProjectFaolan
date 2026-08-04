@@ -1209,7 +1209,7 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
-                    b.Property<uint?>("NpcTemplateId")
+                    b.Property<uint>("NpcTemplateId")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("Trigger")
@@ -1221,8 +1221,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("NodeId");
-
-                    b.HasIndex("NpcName");
 
                     b.HasIndex("NpcTemplateId");
 
@@ -1254,15 +1252,13 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
-                    b.Property<uint?>("NpcTemplateId")
+                    b.Property<uint>("NpcTemplateId")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("Verified")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("NpcName");
 
                     b.HasIndex("NpcTemplateId");
 
@@ -4494,7 +4490,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
                         .WithMany()
                         .HasForeignKey("NpcTemplateId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Faolan.Core.Database.Tables.WorldObject", "TriggerWorldObject")
                         .WithMany()
@@ -4513,7 +4510,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
                         .WithMany()
                         .HasForeignKey("NpcTemplateId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("NpcTemplate");
                 });

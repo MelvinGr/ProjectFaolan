@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Faolan.Core.Database.Tables;
@@ -452,28 +453,47 @@ namespace Faolan.Importer.Extractors
 			return 0;
 		}
 
-		// Merges screens from many captures/instances, deduped by (NpcName, TypeId, AnswerPath) - the stable branch
-		// key. This is what UNIONS the option tree: each conversation re-walk (a different Mode) explored a different
-		// option at a screen, so it contributes a different answer-path screen; merging them assembles the full tree.
-		// Keyed by NPC NAME (stable), not the session-volatile handle. The winner is the MOST COMPLETE capture of the
-		// screen - the one with the most response packets; a truncated capture must never displace a full one.
+		// Merges screens from many captures/instances, deduped by (NpcTemplateId, TypeId, AnswerPath) - the stable
+		// branch key. This is what UNIONS the option tree: each conversation re-walk (a different Mode) explored a
+		// different option at a screen, so it contributes a different answer-path screen; merging them assembles the
+		// full tree. The winner is the MOST COMPLETE capture of the screen - the one with the most response packets; a
+		// truncated capture must never displace a full one.
+		//
+		// #646: the identity is the NPC's TEMPLATE, not its display name. Merging by name would union the walks of two
+		// same-named but DIFFERENT NPCs into one screen here, before the fold ever sees them - and a name is ambiguous
+		// in the world ("Halen van Dummy" is 27 templates). A walk whose template did not resolve falls back to the
+		// name and then to the captured handle: it cannot become a row either way (the fold drops it), but grouping it
+		// by the best signal left is what makes the fold's report say "Kalanthes: 5 walks" rather than one line per
+		// handle.
 		//
 		// It used to also prefer a capture whose player instance was a 4-byte varint, because the runtime SUBSTITUTED
 		// the live instance into the replayed bytes and a shorter captured varint changed the record length. #188
 		// retired that path - every packet is now constructed from typed columns with the live instance - so the term
 		// selected for a property that could no longer affect anything. Measured over the whole corpus before
 		// removing it: 242 merge keys, 29 with more than one candidate, and the winner changed in ZERO of them.
+		// The NPC a walk belongs to, for grouping: its TEMPLATE where one resolved (#646), else the display name, else
+		// the captured handle. Shared by Merge and ConversationVariants so the two cannot disagree about which walks
+		// belong to the same NPC.
+		public static string WalkIdentity(ConversationWalk walk)
+		{
+			ArgumentNullException.ThrowIfNull(walk);
+			if (walk.NpcTemplateId is { } template)
+				return template.ToString(CultureInfo.InvariantCulture);
+
+			return string.IsNullOrEmpty(walk.NpcName)
+				? $"#{walk.CapturedNpcHandle}"
+				: walk.NpcName;
+		}
+
 		public static List<ConversationWalk> Merge(IEnumerable<ConversationWalk> all)
 		{
 			var best = new Dictionary<(string, uint, string, uint?, QuestState?, uint?), (int score, ConversationWalk entry)>();
 			foreach (var e in all)
 			{
-				var identity = string.IsNullOrEmpty(e.NpcName)
-					? $"#{e.CapturedNpcHandle}"
-					: e.NpcName;
+				var identity = WalkIdentity(e);
 				// The quest-state gate is part of the key so a NPC's conditioned variants (e.g. Casilda's pre- vs
 				// post-first-quest greeting) stay SEPARATE rows instead of merging into one mixed screen.
-				// The TRIGGER is part of the key for the same reason it is part of ConversationNode's identity: an NPC can
+				// The TRIGGER is part of the key for the same reason it is part of ConversationEntry's identity: an NPC can
 				// have SEVERAL server-opened conversations, and they all sit at AnswerPath "". Without it Casilda's two
 				// collapse into one here - before the importer ever computes an id - and the shorter (her city-door
 				// "{hidegoodbye}Friend?" opener) loses to the longer.

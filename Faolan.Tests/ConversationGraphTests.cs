@@ -19,6 +19,9 @@ namespace Faolan.Tests
 	public class ConversationGraphTests
 	{
 		private const string Npc = "Casilda";
+
+		// The NPC's TEMPLATE - the screen's identity since #646, so every synthetic walk here carries Casilda's real one.
+		private const uint NpcTemplate = 9411;
 		private const uint TypeId = 42008;
 
 		// The headline case. Two routes reach the same screen, so the answer-path tree stored it twice - once per route,
@@ -223,7 +226,7 @@ namespace Faolan.Tests
 			for (var i = 0; i < packets.Length; i++)
 				packets[i].Sequence = i;
 
-			return new ConversationGraph.Harvested(new ConversationWalk(TypeId, answerPath, 0x4DEE9, [], Npc, GrantQuestId: grant), [.. packets]);
+			return new ConversationGraph.Harvested(new ConversationWalk(TypeId, answerPath, 0x4DEE9, [], Npc, NpcTemplate, GrantQuestId: grant), [.. packets]);
 		}
 
 		// The NPC's spoken line: one screen, category 50002.

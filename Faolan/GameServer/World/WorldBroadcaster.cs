@@ -115,7 +115,7 @@ namespace Faolan.GameServer.World
 		private readonly WorldSimulation _sim;
 
 		// Quest-giver NPC name -> granted quest id, cached once (small set).
-		private Dictionary<string, uint> _questGivers = null!;
+		private Dictionary<uint, uint> _questGivers = null!;
 
 		// Quest-gated NPC name -> the quest ids that reveal it (#261). Cached once; an NPC in this map is streamed only
 		// to players holding one of its quests active (see WorldEntity.GateQuestIds / IsVisibleTo).
@@ -184,7 +184,7 @@ namespace Faolan.GameServer.World
 
 			var npc = _sim.World.ZoneForEntity(player).Entities.FirstOrDefault(e => !e.IsPlayer && string.Equals(e.Name, npcName, StringComparison.OrdinalIgnoreCase));
 			if (npc != null)
-				await SendQuestMarker(client, npc.Handle, await ComputeGiverMarkerState(client, npcName, npc.MapId));
+				await SendQuestMarker(client, npc.Handle, await ComputeGiverMarkerState(client, npc));
 		}
 
 		// #261: re-evaluate quest-gated NPC visibility for one player after their quest state changed (accept / advance /
@@ -1276,7 +1276,7 @@ namespace Faolan.GameServer.World
 		{
 			var player = _sim.PlayerWorldEntity(client);
 			if (player != null && _sim.World.ZoneForEntity(player).TryGet(handle, out var npc) && !npc.IsPlayer)
-				return await ComputeGiverMarkerState(client, npc.Name, npc.MapId);
+				return await ComputeGiverMarkerState(client, npc);
 
 			return QuestMarkerNone;
 		}
@@ -1745,13 +1745,19 @@ namespace Faolan.GameServer.World
 			return null;
 		}
 
-		// The quest-marker state byte (#241) for a viewer + giver NPC name, from the player's CharacterQuests:
+		// The quest-marker state byte (#241) for a viewer + a giver NPC in view, from the player's CharacterQuests:
 		// no quest held -> '!' (0x02); goals complete -> '?' (0x04); active/in-progress -> cleared (0x00). Returns
 		// 0x00 for a non-giver. Shared by the interest-spawn push AND the 0x2020-poll reply so they never disagree.
-		private async Task<byte> ComputeGiverMarkerState(INetworkClient client, string npcName, uint npcMapId)
+		//
+		// It takes the ENTITY rather than a name because its two questions want different keys (#646): "is this the NPC
+		// my next talk goal names" is name-vs-name, since a talk goal's target is a string in the client's own RDB data
+		// (#521), while "does this NPC give a quest" is answered by the TEMPLATE, which is what the dialogue graph the
+		// giver map is derived from is keyed by.
+		private async Task<byte> ComputeGiverMarkerState(INetworkClient client, WorldEntity npc)
 		{
 			var character = client.Session.Character;
-			if (npcName == null || character == null)
+			var npcName = npc?.Name;
+			if (npc == null || npcName == null || character == null)
 				return QuestMarkerNone;
 
 			// '?' (0x04) when the player has an ACTIVE quest whose current goal is to TALK to this NPC - she's the
@@ -1773,16 +1779,16 @@ namespace Faolan.GameServer.World
 			}
 
 			_questGivers ??= await _database.GetQuestGiverMap();
-			if (!_questGivers.TryGetValue(npcName, out var questId))
+			if (!_questGivers.TryGetValue(npc.NpcTemplateId, out var questId))
 				return QuestMarkerNone;
 
-			// A giver's '!'/'?' belongs ONLY to the NPC on the grant-quest's own map. NPC INTERNAL names are often a
-			// shared placeholder - "Halen van Dummy" is the internal name of 25 unrelated templates (the castle Child,
-			// dummies, ...) - so a name match alone paints the marker on every same-named NPC world-wide (e.g. the '!'
-			// on the castle children for a Conarch-Village quest). Gate on the grant quest's MapId (its QuestDefinition,
-			// #244): only the giver's own map shows it.
+			// A giver's '!'/'?' belongs ONLY to the NPC on the grant-quest's own map. Gate on the grant quest's MapId
+			// (its QuestDefinition, #244): only the giver's own map shows it. This used to also be what stopped a
+			// same-NAMED NPC world-wide from wearing the marker - "Halen van Dummy" is the internal name of 27
+			// unrelated templates - but the lookup above is keyed by TEMPLATE since #646, so the map gate is back to
+			// meaning only what it says.
 			var giverQuest = await _database.GetQuestDefinition(questId);
-			if (giverQuest != null && giverQuest.MapId != npcMapId)
+			if (giverQuest != null && giverQuest.MapId != npc.MapId)
 				return QuestMarkerNone;
 
 			var held = Array.Find(quests, q => q.QuestId == questId);
@@ -2013,10 +2019,10 @@ namespace Faolan.GameServer.World
 				return;
 
 			_questGivers ??= await _database.GetQuestGiverMap();
-			if (!_questGivers.ContainsKey(npc.Name))
+			if (!_questGivers.ContainsKey(npc.NpcTemplateId))
 				return; // not a quest-giver -> no marker
 
-			await SendQuestMarker(client, npc.Handle, await ComputeGiverMarkerState(client, npc.Name, npc.MapId));
+			await SendQuestMarker(client, npc.Handle, await ComputeGiverMarkerState(client, npc));
 		}
 
 		// Removes the subject from `recipient`'s view - the n3ToClientQuit despawn (N3ToClientQuitCodec). Stamped with the

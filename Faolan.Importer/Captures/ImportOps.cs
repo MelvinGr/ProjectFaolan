@@ -467,26 +467,26 @@ namespace Faolan.Importer.Captures
 				? []
 				: (await db.ConversationNodes.Where(n => n.Verified).Select(n => n.Id).ToListAsync()).ToHashSet();
 
-			// A conversation NPC's template must exist to be the FK target (#244); the world is pruned, so a template
-			// resolved from a capture may not be imported - null it out (name-only fallback) rather than fail the FK.
+			// A conversation NPC's template must exist to be the FK target (#244), and since #646 it is also the
+			// screen's IDENTITY - so a walk whose template is not imported is DROPPED rather than downgraded to a
+			// name-only row. The world is pruned, so this can legitimately happen; the count is reported.
 			var knownTemplates = (await db.NpcTemplates.Select(t => t.TemplateId).ToListAsync()).ToHashSet();
 			var knownQuests = (await db.QuestDefinitions.Select(q => q.QuestId).ToListAsync()).ToHashSet();
 			var knownObjects = (await db.WorldObjects.Select(o => o.Id).ToListAsync()).ToHashSet();
 
+			// The NAME is now only a LABEL (#646), so it is stored as harvested - empty where the capture never named
+			// the NPC - instead of being given the "#<handle>" stand-in identity it needed while it was the key. What
+			// must be present is the TEMPLATE: a walk pointing at one we did not import cannot be a row, so it is
+			// filtered out here and the fold reports the rest (a walk with NO template at all).
+			var unknownTemplate = conversations.Count(e => e.NpcTemplateId is { } t && !knownTemplates.Contains(t));
 			var harvested = conversations
-				.Select(e => new ConversationGraph.Harvested(e with
-				{
-					NpcName = string.IsNullOrEmpty(e.NpcName)
-						// The NAME is the identity the runtime routes on, so it must be present. A walk whose NPC could
-						// not be named from its capture's spawns keeps the "#<handle>" fallback the extractor's Merge
-						// already dedups on - a distinct, addressable identity instead of a NULL (which no key
-						// constrains).
-						? $"#{e.CapturedNpcHandle}"
-						: e.NpcName
-				}, [.. e.Packets.Select(BuildPacket)]))
+				.Where(e => e.NpcTemplateId is not { } t || knownTemplates.Contains(t))
+				.Select(e => new ConversationGraph.Harvested(e, [.. e.Packets.Select(BuildPacket)]))
 				.ToList();
 
 			var graph = ConversationGraph.Fold(harvested);
+			if (unknownTemplate > 0)
+				graph.Report.Add($"{unknownTemplate} walk(s) name an NPC template that is not imported - dropped (the world is pruned)");
 
 			// The ids are DERIVED from each row's identity, so a re-harvest of the same corpus reproduces them exactly
 			// and faolan.sql does not churn. Two rows hashing to one id is either the same screen twice (the fold
@@ -495,8 +495,8 @@ namespace Faolan.Importer.Captures
 			var byId = new Dictionary<uint, string>();
 			foreach (var n in graph.Nodes)
 			{
-				if (!byId.TryAdd(n.Id, $"{n.NpcName} {n.ContentKey}#{n.Discriminator}"))
-					throw new InvalidOperationException($"Conversation node id 0x{n.Id:X8} is not unique: '{n.NpcName} {n.ContentKey}' collides with '{byId[n.Id]}'.");
+				if (!byId.TryAdd(n.Id, $"{n.NpcName} ({n.NpcTemplateId}) {n.ContentKey}#{n.Discriminator}"))
+					throw new InvalidOperationException($"Conversation node id 0x{n.Id:X8} is not unique: '{n.NpcName} ({n.NpcTemplateId}) {n.ContentKey}' collides with '{byId[n.Id]}'.");
 			}
 
 			// The rebuild drops the WIRING before the screens: an edge names two nodes, and the model deliberately does
@@ -522,9 +522,7 @@ namespace Faolan.Importer.Captures
 					NpcName = n.NpcName,
 					ContentKey = n.ContentKey,
 					Discriminator = n.Discriminator,
-					NpcTemplateId = n.NpcTemplateId is { } t && knownTemplates.Contains(t)
-						? t
-						: null,
+					NpcTemplateId = n.NpcTemplateId,
 					Packets = n.Packets
 				});
 				inserted++;
@@ -565,11 +563,9 @@ namespace Faolan.Importer.Captures
 
 				db.ConversationEntries.Add(new ConversationEntry
 				{
-					Id = ConversationEntry.ComputeId(e.NpcName, e.Trigger, e.TriggerWorldObjectId, e.ConditionQuestId, e.ConditionQuestState),
+					Id = ConversationEntry.ComputeId(e.NpcTemplateId, e.Trigger, e.TriggerWorldObjectId, e.ConditionQuestId, e.ConditionQuestState),
 					NpcName = e.NpcName,
-					NpcTemplateId = e.NpcTemplateId is { } t && knownTemplates.Contains(t)
-						? t
-						: null,
+					NpcTemplateId = e.NpcTemplateId,
 					Trigger = e.Trigger,
 					TriggerWorldObjectId = e.TriggerWorldObjectId is { } w && knownObjects.Contains(w)
 						? w

@@ -10,23 +10,24 @@ namespace Faolan.Core.Database.Tables
 	// It replaces the `AnswerPath == ""` idiom plus the `ServerInitiated` / `TypeId 0` pair that used to encode the
 	// same thing across three columns of the node. The three ways retail opens a window are now one enum, and the four
 	// runtime lookups that differed only in which of those columns they filtered on collapse into one.
-	[Index(nameof(NpcName))]
+	[Index(nameof(NpcTemplateId))]
 	public class ConversationEntry : IDerivedKey, IQuestGated
 	{
 		[Key]
 		[DatabaseGenerated(DatabaseGeneratedOption.None)]
 		public uint Id { get; set; }
 
-		[MaxLength(128)]
-		public string NpcName { get; set; } = null!;
-
-		// The NPC TYPE the trigger is gated on (#244) - null means match by name alone. Not an identity column, for the
-		// same reason it is not one on ConversationNode: the name already determines it, and a nullable column cannot
-		// key a row.
-		public uint? NpcTemplateId { get; set; }
+		// WHOSE root this is: the NPC's TEMPLATE id, and part of the entry's identity (#646). Same reasoning as
+		// ConversationNode's - a display name is ambiguous in the world and cannot key a root, and this used to be a
+		// nullable gate beside a name key, which is the wrong half to have kept.
+		public uint NpcTemplateId { get; set; }
 
 		[ForeignKey(nameof(NpcTemplateId))]
-		public virtual NpcTemplate? NpcTemplate { get; set; }
+		public virtual NpcTemplate NpcTemplate { get; set; } = null!;
+
+		// The NPC's display name - a LABEL for logs and reports, never routed on (#646).
+		[MaxLength(128)]
+		public string NpcName { get; set; } = null!;
 
 		[ConstrainToEnumValues]
 		public ConversationTrigger Trigger { get; set; }
@@ -55,19 +56,19 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(NodeId))]
 		public virtual ConversationNode Node { get; set; } = null!;
 
-		public static uint ComputeId(string npcName, ConversationTrigger trigger, uint? triggerWorldObjectId, uint? conditionQuestId, QuestState? conditionQuestState)
+		public static uint ComputeId(uint npcTemplateId, ConversationTrigger trigger, uint? triggerWorldObjectId, uint? conditionQuestId, QuestState? conditionQuestState)
 		{
-			return DerivedKey.From(npcName, (uint)trigger, triggerWorldObjectId, conditionQuestId, conditionQuestState);
+			return DerivedKey.From(npcTemplateId, (uint)trigger, triggerWorldObjectId, conditionQuestId, conditionQuestState);
 		}
 
 		public uint ComputeId()
 		{
-			return ComputeId(NpcName, Trigger, TriggerWorldObjectId, ConditionQuestId, ConditionQuestState);
+			return ComputeId(NpcTemplateId, Trigger, TriggerWorldObjectId, ConditionQuestId, ConditionQuestState);
 		}
 
 		public override string ToString()
 		{
-			return $"{Id} [{nameof(ConversationEntry)}] {NpcName} {Trigger} -> {NodeId}";
+			return $"{Id} [{nameof(ConversationEntry)}] {NpcName} ({NpcTemplateId}) {Trigger} -> {NodeId}";
 		}
 	}
 

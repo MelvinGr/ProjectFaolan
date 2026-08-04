@@ -84,10 +84,25 @@ namespace Faolan.Tests
 			Assert.Equal(2, merged.Count);
 		}
 
-		private static ConversationWalk Entry(string answerPath, int packets = 1, uint grant = 0, uint? conditionQuest = null, QuestState? conditionState = null, string npcName = "Casilda")
+		// #646: two NPCs that SHARE a display name but are different templates are different NPCs, and their walks must
+		// not union into one screen. This is the case the name key could not express - "Halen van Dummy" is the internal
+		// name of 27 templates in the shipped data - and it merged silently, before the fold ever saw them.
+		[Fact]
+		public void SameNameDifferentTemplate_AreNotMergedTogether()
 		{
-			return new ConversationWalk(TypeId, answerPath, 0x4DEE9, [.. Enumerable.Range(0, packets).Select(i => new[] { (byte)i })], npcName, ConditionQuestId: conditionQuest,
-				ConditionQuestState: conditionState, GrantQuestId: grant);
+			var merged = ConversationExtractor.Merge([
+				Entry("", npcName: "Halen van Dummy", npcTemplate: 12236),
+				Entry("", npcName: "Halen van Dummy", npcTemplate: 12237)
+			]);
+
+			Assert.Equal(2, merged.Count);
+		}
+
+		private static ConversationWalk Entry(string answerPath, int packets = 1, uint grant = 0, uint? conditionQuest = null, QuestState? conditionState = null, string npcName = "Casilda",
+			uint? npcTemplate = null)
+		{
+			return new ConversationWalk(TypeId, answerPath, 0x4DEE9, [.. Enumerable.Range(0, packets).Select(i => new[] { (byte)i })], npcName, npcTemplate,
+				ConditionQuestId: conditionQuest, ConditionQuestState: conditionState, GrantQuestId: grant);
 		}
 	}
 }

@@ -118,23 +118,24 @@ namespace Faolan.GameServer
 		// are different mechanisms (#513), so nothing here needs region geometry.
 		//
 		// Fires ONCE per NPC per session (`ApproachedConversationNpcs`): Saddur's nodes carry no quest gate, so without
-		// a latch the window would re-open on every step taken near him. The names that have one at all are cached on
-		// the listener, so a player walking past ordinary NPCs pays one hash lookup and no DB hit.
+		// a latch the window would re-open on every step taken near him. The TEMPLATES that have one at all are cached
+		// on the listener (#646 - a display name would open Saddur's confrontation on any NPC that happened to share
+		// his name), so a player walking past ordinary NPCs pays one hash lookup and no DB hit.
 		private async Task CheckPlayerApproachConversations(INetworkClient client, WorldEntity player, Vector3 position)
 		{
-			var names = _approachConversationNpcs ??= [.. await Database.GetApproachConversationNpcs()];
-			if (names.Count == 0 || client.Session.ConversationNodeId != null)
+			var templates = _approachConversationNpcs ??= [.. await Database.GetApproachConversationNpcs()];
+			if (templates.Count == 0 || client.Session.ConversationNodeId != null)
 				return; // nothing to open, or a conversation is already up
 
 			var zone = _simulation.World.ZoneForEntity(player);
 			foreach (var npc in zone.EntitiesInRange(position, ApproachConversationRadius, player.Handle))
 			{
-				if (npc.IsPlayer || npc.Name == null || !names.Contains(npc.Name))
+				if (npc.IsPlayer || !templates.Contains(npc.NpcTemplateId))
 					continue;
 				if (!client.Session.ApproachedConversationNpcs.Add(npc.Handle))
 					continue; // already opened for this NPC this session
 
-				if (await _conversation.TryOpenApproachConversation(client, npc.Name, npc.Handle))
+				if (await _conversation.TryOpenApproachConversation(client, npc.NpcTemplateId, npc.Handle))
 				{
 					Logger.LogInformation("#523: player {Char} approached {Npc} - opening its server-initiated conversation.", client.Session.Character.Name, npc.Name);
 					return; // one conversation at a time

@@ -39,10 +39,14 @@ namespace Faolan.GameServer.World
 			_logger = logger;
 		}
 
-		/// <summary>The destinations an NPC offers, empty when it is not a travel NPC at all.</summary>
+		/// <summary>
+		///     The destinations an NPC offers, by DISPLAY NAME - the `.travel` GM bootstrap's entry, because a GM types
+		///     a name. Nothing on the retail path resolves a traveller this way since #646; the dialogue reaches a row
+		///     through the branch that is its key.
+		/// </summary>
 		public Task<TravelDestination[]> DestinationsOf(string npcName)
 		{
-			return _database.GetTravelDestinations(npcName);
+			return _database.GetTravelDestinationsByNpcName(npcName);
 		}
 
 		/// <summary>
@@ -51,17 +55,21 @@ namespace Faolan.GameServer.World
 		///     criminal, or an empty wallet), which is the caller's cue to keep the player off the list.
 		///     A screen that presents no list at all is not a fare gate and returns true untouched.
 		/// </summary>
-		public async Task<bool> TryChargeFare(INetworkClient client, string npcName, uint listNodeId)
+		public async Task<bool> TryChargeFare(INetworkClient client, uint listNodeId)
 		{
 			var character = client.Session.Character;
 			if (character == null)
 				return true;
 
 			// The fare gate is the screen a destination's branch LEAVES: retail's own tree puts the list on one screen
-			// and each destination one pick deeper, and the edge states which screen that is.
-			var offered = (await DestinationsOf(npcName)).Where(d => d.FromNodeId == listNodeId).ToArray();
+			// and each destination one pick deeper, and the edge states which screen that is. That screen is half of
+			// this table's primary key, so it is the LOOKUP (#646) - the NPC no longer has to be named to find it, and
+			// its name comes back off the row for the text and the log lines.
+			var offered = await _database.GetTravelDestinationsFrom(listNodeId);
 			if (offered.Length == 0)
 				return true;
+
+			var npcName = offered[0].NpcName;
 
 			// Every destination of one NPC carries the same fare (retail charges before the list is shown, so there is
 			// only one price to charge); Max rather than First so a partially-harvested NPC cannot be ridden for free.
@@ -102,17 +110,19 @@ namespace Faolan.GameServer.World
 		///     Step 3: the player picked a destination. Returns false when this dialogue branch sells no trip, which is
 		///     the normal case for every other conversation screen in the game and must not be treated as an error.
 		/// </summary>
-		public async Task<bool> TryTravel(INetworkClient client, string npcName, uint fromNodeId, uint optionId)
+		public async Task<bool> TryTravel(INetworkClient client, uint fromNodeId, uint optionId)
 		{
 			var character = client.Session.Character;
 			if (character == null)
 				return false;
 
-			var destination = (await DestinationsOf(npcName)).FirstOrDefault(d => d.FromNodeId == fromNodeId && d.OptionId == optionId);
+			// `(FromNodeId, OptionId)` IS the table's primary key, so the pick is a single-row lookup rather than a
+			// fetch-by-name filtered down to one (#646).
+			var destination = await _database.GetTravelDestination(fromNodeId, optionId);
 			if (destination == null)
 				return false;
 
-			await Travel(client, npcName, destination);
+			await Travel(client, destination.NpcName, destination);
 			return true;
 		}
 

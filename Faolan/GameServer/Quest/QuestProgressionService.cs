@@ -129,7 +129,7 @@ namespace Faolan.GameServer.Quest
 			return Advance(client, QuestGoalType.TalkToNpc, npcName);
 		}
 
-		// The escort reached its destination: complete any active Escort goal for `npcName` (#521/#523).
+		// The escort reached its destination: complete any active Escort goal for the escortee TEMPLATE (#521/#523).
 		//
 		// Retail ends the Tortage escort when the player USES THE CITY DOOR - decoded from both beach-to-city captures:
 		// c2s UseObject -> QuestGoal 12407/3544 1/1 -> QuestIIR Active then Completed, and only THEN does Casilda's
@@ -138,9 +138,15 @@ namespace Faolan.GameServer.Quest
 		// Which door is data-driven, not hard-coded: the object that opens the escortee's server-opened farewell is the
 		// object the escort was leading to (ConversationNode.TriggerWorldObjectId), so the caller resolves the NPC from
 		// the used object and this just completes the goal.
-		public Task AdvanceEscortGoals(INetworkClient client, string npcName)
+		//
+		// #646: matched by the escortee's TEMPLATE id, which is what an Escort goal's TrailingRefId actually holds
+		// (Casilda 9411 on quest 12407 - the only escort in the shipped data, and it resolves to a real NpcTemplate).
+		// That is NOT true of the other name-targeted goal types: a TalkToNpc goal's TrailingRefId is the item the
+		// player hands over, and a LootFromNpc goal carries none at all, so those two still match by name (see
+		// ConversationService.TryReplayConversation and QuestProgress.MatchingLootGoal).
+		public Task AdvanceEscortGoals(INetworkClient client, uint npcTemplateId)
 		{
-			return Advance(client, QuestGoalType.Escort, npcName);
+			return Advance(client, QuestGoalType.Escort, null!, npcTemplateId);
 		}
 
 		// The player's rank in the named faction, or NULL when that cannot be answered - which is the case today,
@@ -154,15 +160,16 @@ namespace Faolan.GameServer.Quest
 			return null;
 		}
 
-		// Whether the player is CURRENTLY escorting `npcName` - an active quest with an unfinished Escort goal naming it.
+		// Whether the player is CURRENTLY escorting the NPC TEMPLATE - an active quest with an unfinished Escort goal
+		// pointing at it (the goal's TrailingRefId, #646).
 		//
 		// The caller needs this BEFORE advancing, to tell the one door use that ends an escort from every later use of
 		// the same door: the farewell plays once, and the zone line behaves normally afterwards.
-		public async Task<bool> HasActiveEscortGoal(uint characterId, string npcName)
+		public async Task<bool> HasActiveEscortGoal(uint characterId, uint npcTemplateId)
 		{
 			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(characterId, QuestState.Active))
 			{
-				var goal = def.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort && string.Equals(g.TargetName, npcName, StringComparison.OrdinalIgnoreCase));
+				var goal = def.Goals.FirstOrDefault(g => g.GoalType == QuestGoalType.Escort && g.TrailingRefId == npcTemplateId);
 				if (goal == null)
 					continue;
 
@@ -294,13 +301,15 @@ namespace Faolan.GameServer.Quest
 			foreach (var (quest, def) in await _database.GetCharacterQuestsWithDefinitions(character.Id, QuestState.Active))
 			{
 				// Match the goal to advance: a kill by the STABLE target template id (TrailingRefId), name as fallback; a
-				// collect by its item id (TrailingRefId); a LOOT by the bag's source NPC AND the item received; talk/escort
-				// by name (the NPC greeting's name) - #262.
+				// collect by its item id (TrailingRefId); an ESCORT by the escortee's template (also TrailingRefId, #646);
+				// a LOOT by the bag's source NPC AND the item received; a TALK by name, because a talk goal's
+				// TrailingRefId is the hand-over ITEM rather than the NPC - #262.
 				var goal = triggerType switch
 				{
 					QuestGoalType.Kill        => QuestProgress.MatchingKillGoal(def.Goals, targetTemplateId, targetName),
 					QuestGoalType.CollectItem => QuestProgress.MatchingCollectGoal(def.Goals, targetTemplateId ?? 0),
 					QuestGoalType.LootFromNpc => QuestProgress.MatchingLootGoal(def.Goals, targetName, targetTemplateId ?? 0),
+					QuestGoalType.Escort      => QuestProgress.MatchingEscortGoal(def.Goals, targetTemplateId ?? 0),
 					_                         => QuestProgress.MatchingGoal(def.Goals, triggerType, targetName)
 				};
 				if (goal == null)

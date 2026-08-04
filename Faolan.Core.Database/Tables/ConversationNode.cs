@@ -8,7 +8,8 @@ namespace Faolan.Core.Database.Tables
 	// One NPC-conversation SCREEN, identified by WHAT IT SAYS: the ordered list of LDB string references its
 	// remoteformat screens are built from (ContentKey), scoped to the NPC saying them. Holds the response packets to
 	// send (ordered), fully structured since #188. Imported from captures by Faolan.Importer; served by
-	// ConversationService. Identified by NPC NAME (stable), not the session-volatile handle.
+	// ConversationService. Scoped by the NPC's TEMPLATE id, not by the session-volatile handle and not by its
+	// display name.
 	//
 	// A node is a VERTEX of the NPC's dialogue graph: `ConversationEntry` names the roots (what opens the
 	// conversation) and `ConversationEdge` the branches (which option leads where, under which quest gate). It carries
@@ -28,7 +29,7 @@ namespace Faolan.Core.Database.Tables
 	// packet/screen/parameter children, ~17k rows - on every run, churning faolan.sql (the reviewable data mirror,
 	// #411) for zero semantic change. A derived id is byte-stable across re-imports instead, and it ENFORCES the
 	// identity: two nodes agreeing on every component are the same node and collide on the PK.
-	[Index(nameof(NpcName))]
+	[Index(nameof(NpcTemplateId))]
 	public class ConversationNode : IDerivedKey
 	{
 		[Key]
@@ -53,16 +54,22 @@ namespace Faolan.Core.Database.Tables
 		// than of iteration order.
 		public uint Discriminator { get; set; }
 
-		// The NPC's TYPE id (NpcStats.template_id from the same spawn) - the STABLE per-type key the runtime gates the
-		// conversation on (#244). Needed now that same-named conversational NPCs exist: "Halen van Dummy" is the
-		// internal name of 25 templates (the quest-giver Atraxus 12236 + children/dummies), so a name match ALONE would
-		// open Atraxus's dialogue on any of them. Null when the conversation NPC's spawn (its template) wasn't in the
-		// capture - then the runtime falls back to name-only matching (create-flow scripted intros, etc.).
-		// NOT an identity column: it is a gate the name already determines, and a nullable column cannot key a row.
-		public uint? NpcTemplateId { get; set; }
+		// WHO SAYS IT: the NPC's TYPE id (NpcStats.template_id from the same spawn), and the screen's other identity
+		// half (#646).
+		//
+		// ⚠️ It used to be a nullable GATE beside a name KEY, which was backwards. Names are ambiguous in the world -
+		// "Halen van Dummy" is the internal name of 27 templates (the quest-giver Atraxus 12236 plus children and
+		// dummies), "Conarch Village Guard" and "Smuggler" of 5 each - and this column's own comment used to say so
+		// while still keying on the name and gating on the template. That worked only because the corpus happens to
+		// hold one dialogue per name; a second Smuggler with its own tree could not be told apart by the key, and the
+		// gate that had to do it was nullable. `Shop` already keys by template and is the precedent.
+		//
+		// NOT NULL, therefore: a screen we cannot attribute to a template is one the runtime could never route a click
+		// to, so the importer drops it with a report line rather than storing an unreachable row.
+		public uint NpcTemplateId { get; set; }
 
 		[ForeignKey(nameof(NpcTemplateId))]
-		public virtual NpcTemplate? NpcTemplate { get; set; }
+		public virtual NpcTemplate NpcTemplate { get; set; } = null!;
 
 		// Hand-reviewed: the importer must not touch this row. Set from the editor, NEVER by an import.
 		//
@@ -82,26 +89,26 @@ namespace Faolan.Core.Database.Tables
 		// The branches OUT of this screen, and the roots that open on it.
 		public virtual ICollection<ConversationEdge> OutgoingEdges { get; set; } = [];
 
-		// The NPC's name, resolved at import from the captured FA015807 spawn with this handle - the identity the
-		// runtime routes on, gated by NpcTemplateId. Never null: a node whose NPC could not be named from its capture
-		// stores the "#<handle>" fallback the importer's merge already dedups on, so it stays a distinct, addressable
-		// identity rather than a NULL no key can constrain.
+		// The NPC's DISPLAY NAME, resolved at import from the captured FA015807 spawn with this handle. A LABEL, not an
+		// identity (#646): it is what a log line, a report and the travel refusal text read, and nothing routes on it.
+		// Empty when the capture never named the NPC - which is now merely a missing label rather than the "#<handle>"
+		// stand-in identity it used to have to be.
 		[MaxLength(128)]
 		public string NpcName { get; set; } = null!;
 
-		public static uint ComputeId(string npcName, string contentKey, uint discriminator)
+		public static uint ComputeId(uint npcTemplateId, string contentKey, uint discriminator)
 		{
-			return DerivedKey.From(npcName, contentKey, discriminator);
+			return DerivedKey.From(npcTemplateId, contentKey, discriminator);
 		}
 
 		public uint ComputeId()
 		{
-			return ComputeId(NpcName, ContentKey, Discriminator);
+			return ComputeId(NpcTemplateId, ContentKey, Discriminator);
 		}
 
 		public override string ToString()
 		{
-			return $"{Id} [{nameof(ConversationNode)}] {NpcName} {ContentKey}";
+			return $"{Id} [{nameof(ConversationNode)}] {NpcName} ({NpcTemplateId}) {ContentKey}";
 		}
 	}
 }

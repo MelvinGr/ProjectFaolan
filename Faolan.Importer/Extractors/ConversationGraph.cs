@@ -32,11 +32,11 @@ namespace Faolan.Importer.Extractors
 		// screen rows, so it needs the decoded form rather than the raw bytes.
 		public sealed record Harvested(ConversationWalk Walk, List<ConversationPacket> Packets);
 
-		public sealed record Node(uint Id, string NpcName, uint? NpcTemplateId, string ContentKey, uint Discriminator, List<ConversationPacket> Packets);
+		public sealed record Node(uint Id, string NpcName, uint NpcTemplateId, string ContentKey, uint Discriminator, List<ConversationPacket> Packets);
 
 		public sealed record Edge(uint FromNodeId, uint OptionId, uint ToNodeId, uint? ConditionQuestId, QuestState? ConditionQuestState, uint? GrantQuestId);
 
-		public sealed record Entry(string NpcName, uint? NpcTemplateId, ConversationTrigger Trigger, uint? TriggerWorldObjectId, uint? ConditionQuestId, QuestState? ConditionQuestState, uint NodeId);
+		public sealed record Entry(string NpcName, uint NpcTemplateId, ConversationTrigger Trigger, uint? TriggerWorldObjectId, uint? ConditionQuestId, QuestState? ConditionQuestState, uint NodeId);
 
 		public sealed record Graph(List<Node> Nodes, List<Edge> Edges, List<Entry> Entries, List<string> Report);
 
@@ -49,15 +49,26 @@ namespace Faolan.Importer.Extractors
 			ArgumentNullException.ThrowIfNull(harvested);
 
 			var report = new List<string>();
+
+			// #646: a walk whose NPC could not be attributed to a TEMPLATE is dropped here, before anything is folded.
+			// The template is the screen's identity now, so an unattributed walk has no key - and the runtime routes a
+			// click by template, so it could never be reached even if it were stored. Reported per NPC rather than
+			// silently skipped: a template that stops resolving is a harvest regression, not a shrug.
+			foreach (var group in harvested.Where(h => h.Walk.NpcTemplateId == null).GroupBy(h => h.Walk.NpcName).OrderBy(g => g.Key, StringComparer.Ordinal))
+			{
+				report.Add($"{(string.IsNullOrEmpty(group.Key) ? $"#{group.First().Walk.CapturedNpcHandle}" : group.Key)}: "
+				           + $"{group.Count()} walk(s) resolve to no NPC template - dropped (a screen with no template has no identity)");
+			}
+
 			// A deterministic order everything downstream inherits: the fold must be a pure function of the corpus, or
 			// two runs over the same captures produce different Discriminators and faolan.sql churns for nothing.
-			var walks = harvested.OrderBy(WalkKey, StringComparer.Ordinal).ToList();
+			var walks = harvested.Where(h => h.Walk.NpcTemplateId != null).OrderBy(WalkKey, StringComparer.Ordinal).ToList();
 			var contentKeys = walks.ToDictionary(h => h, ContentKeyOf);
 			var options = walks.ToDictionary(h => h, OptionIdsOf);
 			var parents = LinkParents(walks, contentKeys, report);
 
 			// --- 2. partition refinement -------------------------------------------------------------------------
-			var classOf = walks.ToDictionary(h => h, h => $"{h.Walk.NpcName}\0{contentKeys[h]}");
+			var classOf = walks.ToDictionary(h => h, h => $"{h.Walk.NpcTemplateId}\0{contentKeys[h]}");
 			for (var round = 0; round < MaxRefinementRounds; round++)
 			{
 				var refined = Refine(walks, classOf, parents, options);
@@ -70,7 +81,7 @@ namespace Faolan.Importer.Extractors
 			// --- 3. one node per class ---------------------------------------------------------------------------
 			var nodes = new List<Node>();
 			var nodeIdOf = new Dictionary<string, uint>();
-			foreach (var group in walks.GroupBy(h => $"{h.Walk.NpcName}\0{contentKeys[h]}").OrderBy(g => g.Key, StringComparer.Ordinal))
+			foreach (var group in walks.GroupBy(h => $"{h.Walk.NpcTemplateId}\0{contentKeys[h]}").OrderBy(g => g.Key, StringComparer.Ordinal))
 			{
 				// Ordered by each class's own first walk, so the Discriminator is a function of the corpus rather than
 				// of the order the refinement happened to converge in.
@@ -84,15 +95,15 @@ namespace Faolan.Importer.Extractors
 					// The RICHEST capture of the screen wins its packet list, the same rule Merge applies between
 					// captures of one walk: a truncated dump must never displace a full one.
 					var best = members.OrderByDescending(m => m.Packets.Count).ThenBy(WalkKey, StringComparer.Ordinal).First();
-					var id = ConversationNode.ComputeId(best.Walk.NpcName, contentKeys[best], (uint)i);
+					var id = ConversationNode.ComputeId(best.Walk.NpcTemplateId!.Value, contentKeys[best], (uint)i);
 					nodeIdOf[classes[i].Key] = id;
-					nodes.Add(new Node(id, best.Walk.NpcName, members.Select(m => m.Walk.NpcTemplateId).FirstOrDefault(t => t != null), contentKeys[best], (uint)i, best.Packets));
+					nodes.Add(new Node(id, best.Walk.NpcName, best.Walk.NpcTemplateId.Value, contentKeys[best], (uint)i, best.Packets));
 				}
 			}
 
 			// --- 4. edges and entries ----------------------------------------------------------------------------
 			var edges = new Dictionary<(uint From, uint Option, uint? Quest, QuestState? State), Edge>();
-			var entries = new Dictionary<(string, ConversationTrigger, uint?, uint?, QuestState?), Entry>();
+			var entries = new Dictionary<(uint, ConversationTrigger, uint?, uint?, QuestState?), Entry>();
 
 			foreach (var h in walks)
 			{
@@ -100,8 +111,8 @@ namespace Faolan.Importer.Extractors
 				if (h.Walk.AnswerPath.Length == 0)
 				{
 					var trigger = TriggerOf(h.Walk);
-					var key = (h.Walk.NpcName, trigger, h.Walk.TriggerWorldObjectId, h.Walk.ConditionQuestId, h.Walk.ConditionQuestState);
-					if (!entries.TryAdd(key, new Entry(h.Walk.NpcName, h.Walk.NpcTemplateId, trigger, h.Walk.TriggerWorldObjectId, h.Walk.ConditionQuestId, h.Walk.ConditionQuestState, toId))
+					var key = (h.Walk.NpcTemplateId!.Value, trigger, h.Walk.TriggerWorldObjectId, h.Walk.ConditionQuestId, h.Walk.ConditionQuestState);
+					if (!entries.TryAdd(key, new Entry(h.Walk.NpcName, h.Walk.NpcTemplateId.Value, trigger, h.Walk.TriggerWorldObjectId, h.Walk.ConditionQuestId, h.Walk.ConditionQuestState, toId))
 						&& entries[key].NodeId != toId)
 						report.Add($"{h.Walk.NpcName}: two different screens open the same {trigger} root under the same gate - kept the first");
 
@@ -243,8 +254,8 @@ namespace Faolan.Importer.Extractors
 		// is preferred so the refinement sees the tightest link available.
 		private static Dictionary<Harvested, (Harvested Parent, uint OptionId)> LinkParents(List<Harvested> walks, Dictionary<Harvested, string> contentKeys, List<string> report)
 		{
-			var byContent = walks.ToLookup(h => (h.Walk.NpcName, contentKeys[h]));
-			var byPath = walks.ToLookup(h => (h.Walk.NpcName, h.Walk.TypeId, h.Walk.ServerInitiated, h.Walk.TriggerWorldObjectId, h.Walk.AnswerPath));
+			var byContent = walks.ToLookup(h => (h.Walk.NpcTemplateId, contentKeys[h]));
+			var byPath = walks.ToLookup(h => (h.Walk.NpcTemplateId, h.Walk.TypeId, h.Walk.ServerInitiated, h.Walk.TriggerWorldObjectId, h.Walk.AnswerPath));
 			var links = new Dictionary<Harvested, (Harvested, uint)>();
 			var recovered = 0;
 			var dropped = 0;
@@ -256,7 +267,7 @@ namespace Faolan.Importer.Extractors
 
 				var parent = h.Walk.ParentContentKey.Length == 0
 					? null
-					: Pick(byContent[(h.Walk.NpcName, h.Walk.ParentContentKey)].ToList(), h, ParentPath(h));
+					: Pick(byContent[(h.Walk.NpcTemplateId, h.Walk.ParentContentKey)].ToList(), h, ParentPath(h));
 				var optionId = h.Walk.OptionId;
 
 				// FALLBACK to the answer path when the harvested link does not resolve - the capture that offered the
@@ -270,7 +281,7 @@ namespace Faolan.Importer.Extractors
 					if (!uint.TryParse(cut < 0 ? h.Walk.AnswerPath : h.Walk.AnswerPath[(cut + 1)..], out var index))
 						continue;
 
-					parent = Pick(byPath[(h.Walk.NpcName, h.Walk.TypeId, h.Walk.ServerInitiated, h.Walk.TriggerWorldObjectId, parentPath)].ToList(), h, parentPath);
+					parent = Pick(byPath[(h.Walk.NpcTemplateId, h.Walk.TypeId, h.Walk.ServerInitiated, h.Walk.TriggerWorldObjectId, parentPath)].ToList(), h, parentPath);
 					var offered = parent == null ? [] : OptionIdsOf(parent);
 					if (index >= offered.Count)
 					{
@@ -435,7 +446,7 @@ namespace Faolan.Importer.Extractors
 		// across runs and across machines.
 		private static string WalkKey(Harvested h)
 		{
-			return $"{h.Walk.NpcName}{h.Walk.TypeId}{h.Walk.ServerInitiated}{h.Walk.TriggerWorldObjectId}"
+			return $"{h.Walk.NpcTemplateId}{h.Walk.TypeId}{h.Walk.ServerInitiated}{h.Walk.TriggerWorldObjectId}"
 			       + $"{h.Walk.AnswerPath.Length:D3}{h.Walk.AnswerPath}{h.Walk.ConditionQuestId}{h.Walk.ConditionQuestState}";
 		}
 	}

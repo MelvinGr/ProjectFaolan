@@ -84,6 +84,12 @@ carries a foreign key to the screen.
 ⚠️ The old `(NpcName, DestinationMapId)` key could not express this at all: Cordelia offers nine destinations
 and every one of them is on map 1020, so the key had room for exactly one.
 
+Since Gitea #646 the branch is also how the runtime **looks a row up**, not just how it is keyed:
+`GetTravelDestinationsFrom(listNodeId)` for the fare and `GetTravelDestination(fromNodeId, optionId)` for the pick.
+It used to fetch by NPC display name and then filter the result down to the screen the caller already held — asking
+the database a wider question with the ambiguous half of the NPC's identity. `NpcName` survives as the label the
+refusal text and the log lines read, and as the `.travel` GM bootstrap's entry, because a GM types a name.
+
 Two gates keep the wiring honest — every shipped trip must name a dialogue branch that exists, and the list
 screen that charges for it must exist too.
 [V3: LocalTravelTests.EveryShippedTrip_NamesADialogueBranchThatExists]

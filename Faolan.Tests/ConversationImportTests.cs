@@ -28,6 +28,9 @@ namespace Faolan.Tests
 		private const uint MapId = 4010;
 		private const uint TypeId = 42008;
 
+		// Casilda's real NPC template - the screen's identity since #646, and a real FK, so the row has to exist.
+		private const uint NpcTemplate = 9411;
+
 		[Fact]
 		public async Task TheFoldedGraphSurvivesTheRoundTrip()
 		{
@@ -112,7 +115,7 @@ namespace Faolan.Tests
 		{
 			return new ConversationWalk(TypeId, answerPath, 0x4DEE9, answerPath.Length == 0
 				? [Packet(KnubotCodecTestData.AppendTextBody), Packet(KnubotCodecTestData.AnswerListBody)]
-				: [Packet(KnubotCodecTestData.CloseChatWindowBody)], "Casilda", GrantQuestId: grant);
+				: [Packet(KnubotCodecTestData.CloseChatWindowBody)], "Casilda", NpcTemplate, GrantQuestId: grant);
 		}
 
 		// A captured record wrapped in the carrier the decoder scans by offset (12-byte frame head + an empty rpcHeader).
@@ -134,11 +137,17 @@ namespace Faolan.Tests
 				await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
 
 				// GrantQuestId is a real FK, and a QuestDefinition FKs its area and map in turn - so the grant a branch
-				// carries needs that whole chain present before it can be referenced.
+				// carries needs that whole chain present before it can be referenced. Since #646 the NPC TEMPLATE is a
+				// non-null FK on both the node and the root, so it joins that set.
 				db.Maps.Add(new Map
 				{
 					Id = MapId,
 					Name = "Tortage Island"
+				});
+				db.NpcTemplates.Add(new NpcTemplate
+				{
+					TemplateId = NpcTemplate,
+					Name = "Casilda"
 				});
 				db.QuestLines.Add(new QuestLine
 				{

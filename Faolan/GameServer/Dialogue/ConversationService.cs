@@ -108,7 +108,7 @@ namespace Faolan.GameServer.Dialogue
 			// sits immediately in front of "Your coin is good enough. Where to?" - so it is charged here, on the way in.
 			// A refusal (criminal, or too poor) must not then hand the player the list: close the window instead.
 			// ⚠️ The corpus has no refused traveller, so closing is the conservative reading rather than a captured one.
-			if (!await _travel.TryChargeFare(client, npcName, edge.ToNodeId))
+			if (!await _travel.TryChargeFare(client, edge.ToNodeId))
 			{
 				await SendConversationClose(client);
 				return;
@@ -119,7 +119,7 @@ namespace Faolan.GameServer.Dialogue
 			// The destination pick: retail closes the chat window and THEN teleports (the close is the served screen's
 			// own only packet), so the trip runs after the screen, in the same "text precedes state" order the quest
 			// grants follow.
-			await _travel.TryTravel(client, npcName, fromNodeId, optionId);
+			await _travel.TryTravel(client, fromNodeId, optionId);
 		}
 
 		// #523: open a conversation the SERVER initiates - one with no player TalkToNpc in front of it, served because
@@ -133,39 +133,38 @@ namespace Faolan.GameServer.Dialogue
 		//
 		// Returns false when the NPC has no such root - or, for the object trigger, when it is not spawned for this
 		// player, which is the right outcome for an escortee who is not there.
-		public Task<bool> TryOpenApproachConversation(INetworkClient client, string npcName, uint npcHandle)
+		public async Task<bool> TryOpenApproachConversation(INetworkClient client, uint npcTemplateId, uint npcHandle)
 		{
-			return OpenRoot(client, npcName, ConversationTrigger.Approach, null, npcHandle);
+			return await OpenRoot(client, npcTemplateId, ConversationTrigger.Approach, null, npcHandle) != null;
 		}
 
-		public async Task<bool> TryOpenTriggeredConversation(INetworkClient client, string npcName, uint worldObjectId)
+		public async Task<bool> TryOpenTriggeredConversation(INetworkClient client, uint npcTemplateId, uint worldObjectId)
 		{
-			var handle = client.Session.SpawnedNpcNamesByHandle
-				.FirstOrDefault(kv => string.Equals(kv.Value, npcName, StringComparison.OrdinalIgnoreCase))
+			// #646: the escortee is found by TEMPLATE, so a same-named bystander can no longer answer for them. The
+			// session already carries this map beside the name one, written on the adjacent line.
+			var handle = client.Session.SpawnedNpcTemplatesByHandle
+				.FirstOrDefault(kv => kv.Value == npcTemplateId)
 				.Key;
 			if (handle == 0)
 				return false; // the escortee is not spawned for this player - the conversation simply does not open
 
-			return await OpenRoot(client, npcName, ConversationTrigger.UseWorldObject, worldObjectId, handle);
-		}
-
-		// Serves `npcName`'s greeting through the live CONSTRUCT path (the Talk root -> ServeScreen, rebuilt via
-		// KnubotCodec re-addressed to `npcHandle`) - the #188 dialogue-VM entry the .npcsay GM command reuses instead of
-		// replaying a baked captured line. Returns false when the NPC has no talk root.
-		public Task<bool> ServeGreeting(INetworkClient client, string npcName, uint npcHandle)
-		{
-			return OpenRoot(client, npcName, ConversationTrigger.Talk, null, npcHandle);
+			return await OpenRoot(client, npcTemplateId, ConversationTrigger.UseWorldObject, worldObjectId, handle) != null;
 		}
 
 		// Opens one of an NPC's dialogue ROOTS (#642) and serves its screen. The three ways retail opens a window - the
 		// player clicking, the player using an object, the player walking up - differ only in the trigger they look up
 		// with, so they are one method rather than three near-copies. Several roots can share a trigger and differ only
 		// by quest gate (Casilda has six talk roots); the gate rule is the same one the branches use.
-		private async Task<bool> OpenRoot(INetworkClient client, string npcName, ConversationTrigger trigger, uint? worldObjectId, uint npcHandle)
+		//
+		// Returns the root it served, or null when the NPC has none for this trigger. The ROOT rather than a bool
+		// because the caller needs the NPC's display name afterwards (#646, for the talk-goal match) and the root is
+		// where that label lives - reading it back off the session would be wrong, since a terminal screen ends the
+		// conversation and clears it.
+		private async Task<ConversationEntry?> OpenRoot(INetworkClient client, uint npcTemplateId, ConversationTrigger trigger, uint? worldObjectId, uint npcHandle)
 		{
-			var roots = await _database.GetConversationEntries(npcName, trigger, worldObjectId, client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(npcHandle));
+			var roots = await _database.GetConversationEntries(npcTemplateId, trigger, worldObjectId);
 			if (roots.Length == 0)
-				return false;
+				return null;
 
 			var character = client.Session.Character;
 			var quests = character == null
@@ -174,17 +173,18 @@ namespace Faolan.GameServer.Dialogue
 
 			var opening = PickByLatestQuest(roots, quests) ?? Array.Find(roots, r => r.ConditionQuestId == null);
 			if (opening == null)
-				return false;
+				return null;
 
 			if (opening.ConditionQuestId != null)
-				_logger.LogInformation("Conversation: npc={Name} opened its {Trigger} root gated on quest {Quest} {State}.", npcName, trigger, opening.ConditionQuestId, opening.ConditionQuestState);
+				_logger.LogInformation("Conversation: npc={Name} ({Template}) opened its {Trigger} root gated on quest {Quest} {State}.", opening.NpcName, npcTemplateId, trigger,
+					opening.ConditionQuestId, opening.ConditionQuestState);
 
 			await ServeScreen(client, opening.Node, npcHandle);
-			return true;
+			return opening;
 		}
 
-		// Starts an NPC conversation from its greeting: routes by the clicked NPC's stable NAME (handles are
-		// session-volatile) to the NPC's Talk root and serves the screen it opens on. Returns true if a greeting was
+		// Starts an NPC conversation from its greeting: routes by the clicked NPC's stable TEMPLATE id (#646 - handles
+		// are session-volatile and display names are ambiguous) to the NPC's Talk root and serves the screen it opens on. Returns true if a greeting was
 		// found+served. Runs for world-burst (beach) AND create-world sessions; the create-world scripted intro stays
 		// the fallback for NPCs with no captured dialogue. The graph lives in the DB (ConversationEntry ->
 		// ConversationNode -> ConversationEdge), imported from captures by Faolan.Importer. (Option picks after the
@@ -210,13 +210,13 @@ namespace Faolan.GameServer.Dialogue
 				return true;
 			}
 
-			if (!client.Session.SpawnedNpcNamesByHandle.TryGetValue(clickedNpcHandle, out var npcName))
+			if (!client.Session.SpawnedNpcTemplatesByHandle.TryGetValue(clickedNpcHandle, out var npcTemplateId))
 				return false; // unknown NPC (not spawned this session) -> create-world scripted intro fallback
 
 			// Pick the greeting in the player's CURRENT (pre-completion) quest state so a talk-stage shows its OWN
 			// dialogue: e.g. Casilda's "I'll protect you now" one-off is gated on HasQuest(13480), so it must be picked
 			// while 13480 is still active (#264).
-			if (!await OpenRoot(client, npcName, ConversationTrigger.Talk, null, clickedNpcHandle))
+			if (await OpenRoot(client, npcTemplateId, ConversationTrigger.Talk, null, clickedNpcHandle) is not { } opened)
 				return false;
 
 			// #260 - SERVE FIRST, COMPLETE AFTER. Both quest-completion paths run here, after the text is on the wire,
@@ -237,12 +237,19 @@ namespace Faolan.GameServer.Dialogue
 			// line instead of the turn-in line. Retail has no separate reward node to reach for - the turn-in text IS
 			// the in-progress variant, carrying an inline {resolvegoal <4CC>} directive - so serving pre-completion
 			// serves exactly the right screen.
-			await TryTurnInQuests(client, npcName);
+			await TryTurnInQuests(client, npcTemplateId);
 
 			// Quest chain (#261/#264): complete the TalkToNpc goal (e.g. freeing Casilda, 13480 -> escort 12407) - so
 			// the freeing dialogue shows once, then the stage completes; the next talk sees the post-freeing
 			// (completed) state and gets the post-quest greeting.
-			await _questProgression.AdvanceTalkGoals(client, npcName);
+			//
+			// ⚠️ This one is matched by NAME and stays that way (#646). A TalkToNpc goal's target is
+			// `QuestGoalDefinition.TargetName`, a string in the CLIENT's own RDB data, and the goal's TrailingRefId is
+			// not the NPC at all - on the 12 talk goals that carry one it is the item the player HANDS OVER (quest
+			// 12371's Turach goal carries 193400, the Shipwrecked stone brick). So there is no template id on the goal
+			// side to match against; resolving those names is #521's job. The name comes off the node we just served,
+			// so it is the label of the template we routed to rather than a second lookup.
+			await _questProgression.AdvanceTalkGoals(client, opened.NpcName);
 			return true;
 		}
 
@@ -424,20 +431,20 @@ namespace Faolan.GameServer.Dialogue
 				node.Packets.Count, client.Session.ConversationOptions.Count, clickedNpcHandle);
 		}
 
-		// Completes any quest GIVEN by `npcName` whose objective is done (Active + GoalProgress >= GoalRequired): marks
+		// Completes any quest GIVEN by the NPC TEMPLATE whose objective is done (Active + GoalProgress >= GoalRequired): marks
 		// it Completed and sends QuestIIR state 2 -> 4 so the client journal moves it to the completed tab (#47). The
 		// kill only advances the objective; the quest is marked Completed here, on TURN-IN at the giver. Called AFTER
 		// the greeting has been served (#260) - the state change follows the text on the wire, as in retail, and the
 		// greeting is therefore picked while the quest is still Active so the player sees the turn-in line rather than
 		// the post-quest "already done" one.
-		private async Task TryTurnInQuests(INetworkClient client, string npcName)
+		private async Task TryTurnInQuests(INetworkClient client, uint npcTemplateId)
 		{
 			var character = client.Session.Character;
-			if (character == null || npcName == null)
+			if (character == null)
 				return;
 
-			var givers = await _database.GetQuestGiverMap(); // NpcName -> the quest id it grants
-			if (!givers.TryGetValue(npcName, out var givenQuestId))
+			var givers = await _database.GetQuestGiverMap(); // NpcTemplateId -> the quest id it grants
+			if (!givers.TryGetValue(npcTemplateId, out var givenQuestId))
 				return;
 
 			var held = (await _database.GetCharacterQuests(character.Id)).FirstOrDefault(q => q.QuestId == givenQuestId);
@@ -447,8 +454,8 @@ namespace Faolan.GameServer.Dialogue
 			await _database.SetCharacterQuest(character.Id, held.QuestId, QuestState.Completed, held.GoalProgress, held.GoalRequired, held.GoalTargetName);
 			await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateActive);
 			await _broadcaster.SendQuestIir(client, held.QuestId, QuestCodec.StateCompleted);
-			_logger.LogInformation("Quest {Quest} turned in to {NpcTemplate} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcName, character.Name, held.GoalProgress,
-				held.GoalRequired);
+			_logger.LogInformation("Quest {Quest} turned in to template {NpcTemplate} by {Char} (objective {Progress}/{Required}).", held.QuestId, npcTemplateId, character.Name,
+				held.GoalProgress, held.GoalRequired);
 		}
 
 		// Closes the NPC chat window gracefully (KnubotCloseChatWindow with an empty answer list), re-addressed to the

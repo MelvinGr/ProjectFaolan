@@ -56,8 +56,11 @@ namespace Faolan.Core.Database.Tables
 		// The destination option's own LDB string id - which entry of that list buys this trip.
 		public uint OptionId { get; set; }
 
-		// The travel NPC's display name. Not part of the key any more (the screen already belongs to exactly one NPC),
-		// but kept as the label every report, GM command and log line reads.
+		// The travel NPC's display name. Not part of the key (the screen already belongs to exactly one NPC), and since
+		// #646 not what anything LOOKS UP by either: the runtime reaches a row through the branch that IS its key
+		// (`FromNodeId`, or `(FromNodeId, OptionId)` for the pick), so the name is purely the label the refusal text,
+		// the log lines and `.travel` read. The GM command is the one place a name still resolves a row, because a GM
+		// types one.
 		[MaxLength(128)]
 		public string NpcName { get; set; } = null!;
 

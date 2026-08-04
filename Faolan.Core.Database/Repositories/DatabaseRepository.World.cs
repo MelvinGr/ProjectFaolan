@@ -14,7 +14,9 @@ namespace Faolan.Core.Database.Repositories
 		Task<Map?> GetMap(uint id);
 		Task<MapArea[]> GetMapAreas(uint mapId);
 		Task<MapHazard[]> GetMapHazards(uint mapId);
-		Task<TravelDestination[]> GetTravelDestinations(string npcName);
+		Task<TravelDestination[]> GetTravelDestinationsFrom(uint fromNodeId);
+		Task<TravelDestination?> GetTravelDestination(uint fromNodeId, uint optionId);
+		Task<TravelDestination[]> GetTravelDestinationsByNpcName(string npcName);
 		Task<Item[]> GetMapLootSample(uint mapId, int count);
 		Task<Map[]> GetMaps();
 		Task<QuestLine[]> GetQuestLines();
@@ -58,9 +60,30 @@ namespace Faolan.Core.Database.Repositories
 			return await ctx.MapAreas.Where(a => a.MapId == mapId).ToArrayAsync();
 		}
 
-		// The destinations a local-travel NPC offers, keyed by its NAME (#506) - the stable key, since a spawn handle is
-		// session-volatile. Empty for an NPC that is not a traveller, which is the common case and not an error.
-		public async Task<TravelDestination[]> GetTravelDestinations(string npcName)
+		// The destinations offered from one dialogue SCREEN - the list screen, which is where retail charges the fare
+		// (#514). Empty for every other screen in the game, which is the common case and not an error.
+		//
+		// #646: this used to fetch by NPC NAME and then filter the result down to this screen, which asked the database
+		// a question ("what does this name offer?") that the caller then narrowed to the one it actually had - and it
+		// asked it with the ambiguous half of the NPC's identity. The screen IS half of the table's primary key, so
+		// keying on it is both narrower and exact.
+		public async Task<TravelDestination[]> GetTravelDestinationsFrom(uint fromNodeId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.TravelDestinations.Where(d => d.FromNodeId == fromNodeId).ToArrayAsync();
+		}
+
+		// The trip a single dialogue PICK buys, by the table's full primary key. Null when that branch sells no trip -
+		// true of every other conversation branch, so it is the normal answer rather than an error.
+		public async Task<TravelDestination?> GetTravelDestination(uint fromNodeId, uint optionId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.TravelDestinations.FirstOrDefaultAsync(d => d.FromNodeId == fromNodeId && d.OptionId == optionId);
+		}
+
+		// By NPC display NAME - for the `.travel` GM bootstrap ONLY, because a GM types a name. Nothing on the retail
+		// path resolves a traveller this way any more (#646).
+		public async Task<TravelDestination[]> GetTravelDestinationsByNpcName(string npcName)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.TravelDestinations.Where(d => d.NpcName == npcName).ToArrayAsync();

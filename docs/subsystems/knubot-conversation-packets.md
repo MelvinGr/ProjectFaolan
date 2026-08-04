@@ -28,9 +28,9 @@ Three tables, and between them they are retail's own shape:
 
 | table | is | keyed by |
 |---|---|---|
-| `ConversationNode` | one screen | `(NpcName, ContentKey, Discriminator)` |
+| `ConversationNode` | one screen | `(NpcTemplateId, ContentKey, Discriminator)` |
 | `ConversationEdge` | one branch — clicking option *X* on screen *A* serves screen *B* | `(FromNodeId, OptionId, ConditionQuestId, ConditionQuestState)` |
-| `ConversationEntry` | one root — what OPENS the conversation | `(NpcName, Trigger, TriggerWorldObjectId, ConditionQuestId, ConditionQuestState)` |
+| `ConversationEntry` | one root — what OPENS the conversation | `(NpcTemplateId, Trigger, TriggerWorldObjectId, ConditionQuestId, ConditionQuestState)` |
 
 `ContentKey` is the ordered `category:id` list of the screen's remoteformat screens — the NPC's spoken line
 (category **50002**), each option button (**50001**; `0` is the universal *"Goodbye"*, shared by 417 screens) and
@@ -72,8 +72,32 @@ same corpus produce byte-identical tables. Two consequences worth knowing:
   old incremental upsert existed for (*the most complete capture of a screen wins*) runs inside the fold instead,
   across all captures at once.
 
-`NpcName` is non-nullable and is the identity the runtime routes on; a node whose NPC could not be named from
-its capture stores the `#<handle>` fallback the merge already dedups on.
+#### Who says it is the NPC's TEMPLATE, not its name (Gitea #646)
+
+`NpcTemplateId` is non-null and is what the runtime routes on, end to end: the click resolves the handle to a
+template (`INetworkClientSession.SpawnedNpcTemplatesByHandle`), `GetConversationEntries` looks the roots up by it,
+the quest-giver map and the approach-conversation set are keyed by it, and `TravelDestination` is reached through
+the dialogue branch that IS its primary key. `NpcName` is a **label** — logs, reports, the travel refusal text —
+and is empty where a capture never named the NPC.
+
+⚠️ It was the other way round until #646: the name was the KEY and the template a nullable GATE beside it. That is
+backwards, because a display name is ambiguous in the world — **`Halen van Dummy` is the internal name of 27
+templates**, `Conarch Village Guard` and `Smuggler` of 5 each — while a template is exactly one kind of NPC. It
+worked only because the corpus happens to hold one dialogue per name; a second `Smuggler` with its own tree could
+not be told apart by the key, and the gate that had to do it was nullable. `Shop` already keyed by template and was
+the precedent.
+
+Two things follow. A harvested walk whose NPC resolves to **no** template (or to one the pruned world did not
+import) is now **dropped with a report line** rather than stored as an unreachable row — the runtime could never
+route a click to it. And the `#<handle>` stand-in identity is gone: it existed only because a NULL cannot key a
+row, and the name no longer keys anything.
+
+Two lookups deliberately stay name-keyed, and both are the same reason: `QuestGoalDefinition.TargetName` is a
+string in the CLIENT's own RDB data that we do not resolve yet (32 of its 48 distinct names match no template at
+all — Gitea #521). So the TalkToNpc goal match and `GetQuestGatedNpcMap` compare name against name. The Escort goal
+does NOT: its `TrailingRefId` really is the escortee's template (Casilda 9411 on quest 12407), so it matches by id.
+A TalkToNpc goal's `TrailingRefId` is the item the player HANDS OVER, not the NPC — quest 12371's Turach goal
+carries `193400`, the Shipwrecked stone brick — which is why it has no id to match on.
 
 ### The fold: from harvested walks to the graph
 

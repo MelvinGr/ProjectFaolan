@@ -2341,9 +2341,15 @@ namespace Faolan.GameServer
 
 			// Auction-house open (the real trigger for the Tradepost - the `.ah` GM command is only a PoC
 			// bootstrap). Retail opens the AH window when the player interacts with the "Trader" auctioneer
-			// NPC (capture `sell_items_to_trader-intract-with-auctionhouse`: FA015807 "Trader"). The NPC NAME
-			// is the stable key (like shop vendors above); the player is standing next to the auctioneer to
-			// click it, so their own position trivially satisfies the 15-unit client proximity check.
+			// NPC (capture `sell_items_to_trader-intract-with-auctionhouse`: FA015807 "Trader"); the player is
+			// standing next to the auctioneer to click it, so their own position trivially satisfies the
+			// 15-unit client proximity check.
+			//
+			// ⚠️ The NAME is still the key here, unlike the vendor branch above, and that is not an oversight
+			// (#646): "Trader" is a ROLE the auction NPC plays on many templates, and the corpus names exactly
+			// one auctioneer without pinning which templates carry it. Keying on the one captured template
+			// would silently break every other auctioneer in the world. Left as a name until a template set is
+			// harvested - Gitea #647.
 			if (npcHandle != 0 && args.CommandqueueServerId == 0 && client.Session.SpawnedNpcNamesByHandle.TryGetValue(npcHandle, out var talkedNpcName) &&
 			    talkedNpcName == AuctioneerNpcName && _simulation.PlayerWorldEntity(client) is { } auctioneerPlayer)
 			{
