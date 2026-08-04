@@ -7,6 +7,7 @@ using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
+using Faolan.Core.Database.Tables;
 using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors
@@ -15,8 +16,9 @@ namespace Faolan.Importer.Extractors
 	// sells which trip, for how much, and where it lands the player. Every field is stated on the wire, which is why
 	// this is an extractor and not a seed table:
 	//
-	//   * the BRANCH - the player's KnubotAnswerIIR picks walk the same answer path ConversationExtractor keys its
-	//     nodes by, so the harvested row joins straight onto the imported ConversationNode;
+	//   * the BRANCH - the player's KnubotAnswerIIR names an option of the screen that was on their display, so the
+	//     harvested row joins onto the imported graph by that screen's CONTENT and that option's own LDB id (#642).
+	//     Content rather than a node id because the ids are assigned by the fold, which has not run yet;
 	//   * the DESTINATION and ARRIVAL - the GameActionListIIR the server sends the instant the destination is picked
 	//     carries "xpos=1136;ypos=133;zpos=223;PlayFieldID=1020;Local=1" (TravelActionCodec);
 	//   * the FARE - the wallet DELTA across the conversation. Retail charges through a Knubot trade before the
@@ -27,8 +29,10 @@ namespace Faolan.Importer.Extractors
 	// guessed at.
 	public static class TravelDestinationExtractor
 	{
-		// One harvested trip.
-		public sealed record Entry(string NpcName, string AnswerPath, uint DestinationMapId, uint? Cost, float ArrivalX, float ArrivalY, float ArrivalZ);
+		// One harvested trip. `FromContentKey` names the screen that PRESENTED the destination list - the same
+		// `category:id` rendering ConversationGraph keys its nodes by - and `OptionId` the destination the player
+		// clicked, by its own LDB string id.
+		public sealed record Entry(string NpcName, string FromContentKey, uint OptionId, uint DestinationMapId, uint? Cost, float ArrivalX, float ArrivalY, float ArrivalZ);
 
 		public static List<Entry> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
@@ -38,9 +42,12 @@ namespace Faolan.Importer.Extractors
 			var wallet = CapturedPacket.Wire(GameCharInterfaceMethods.DispatchUpdateCash);
 			var found = new List<Entry>();
 
-			// The live conversation: which NPC, how deep into its tree, and what the wallet did while it was open.
+			// The live conversation: which NPC, which screen the player is looking at, which option they last clicked,
+			// and what the wallet did while it was open.
 			uint npc = 0;
-			var path = "";
+			var screen = new List<byte[]>(); // the packets of the screen currently on the player's display
+			var fromContentKey = "";
+			uint optionId = 0;
 			var active = false;
 			ulong? balanceNow = null;
 			// NULL until a wallet DROP is actually seen inside the conversation. A 0 would claim a free ride; the
@@ -72,20 +79,32 @@ namespace Faolan.Importer.Extractors
 				if (p.IsDownload && p.TryParse(KnubotCodec.Parse, out var opened) && opened is KnubotOpenChatWindowIIR open)
 				{
 					npc = open.NpcHandle;
-					path = "";
+					screen = [p.Bytes];
+					fromContentKey = "";
+					optionId = 0;
 					active = true;
 					spentInConversation = null;
 					continue;
 				}
 
+				// The player clicked: the screen we have been accumulating IS the one that offered the option, so name
+				// both before starting the next screen. An index the screen does not offer means we missed its answer
+				// list, and a trip we cannot name the branch of is not one we can wire up.
 				if (!p.IsDownload && p.TryParse(KnubotCodec.Parse, out var picked) && picked is KnubotAnswerIIR pick)
 				{
 					if (!active)
 						continue;
 
-					path = path.Length == 0
-						? pick.Index.ToString()
-						: $"{path}>{pick.Index}";
+					var offered = ConversationGraph.OptionIdsOf(ConversationGraph.Columnize(screen));
+					fromContentKey = pick.Index < offered.Count ? ConversationGraph.ContentKeyOf(ConversationGraph.Columnize(screen)) : "";
+					optionId = pick.Index < offered.Count ? offered[(int)pick.Index] : 0;
+					screen = [];
+					continue;
+				}
+
+				if (p.IsDownload && p.IsIirCarrier && p.TryParse(KnubotCodec.Parse, out _))
+				{
+					screen.Add(p.Bytes);
 					continue;
 				}
 
@@ -107,10 +126,10 @@ namespace Faolan.Importer.Extractors
 						continue;
 					}
 
-					if (namesByHandle.GetValueOrDefault(npc) is not { Length: > 0 } name)
+					if (namesByHandle.GetValueOrDefault(npc) is not { Length: > 0 } name || fromContentKey.Length == 0)
 						continue;
 
-					found.Add(new Entry(name, path, trip.DestinationMapId, spentInConversation, trip.X, trip.Y, trip.Z));
+					found.Add(new Entry(name, fromContentKey, optionId, trip.DestinationMapId, spentInConversation, trip.X, trip.Y, trip.Z));
 				}
 			}
 
@@ -123,10 +142,11 @@ namespace Faolan.Importer.Extractors
 		{
 			ArgumentNullException.ThrowIfNull(entries);
 			return entries
-				.GroupBy(e => (e.NpcName, e.AnswerPath))
+				.GroupBy(e => (e.NpcName, e.FromContentKey, e.OptionId))
 				.Select(g => g.OrderByDescending(e => e.Cost).First())
 				.OrderBy(e => e.NpcName, StringComparer.Ordinal)
-				.ThenBy(e => e.AnswerPath, StringComparer.Ordinal)
+				.ThenBy(e => e.FromContentKey, StringComparer.Ordinal)
+				.ThenBy(e => e.OptionId)
 				.ToList();
 		}
 

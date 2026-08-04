@@ -84,9 +84,9 @@ namespace Faolan.Tests
 			Assert.Equal(2, merged.Count);
 		}
 
-		private static ConversationEntry Entry(string answerPath, int packets = 1, uint grant = 0, uint? conditionQuest = null, QuestState? conditionState = null, string npcName = "Casilda")
+		private static ConversationWalk Entry(string answerPath, int packets = 1, uint grant = 0, uint? conditionQuest = null, QuestState? conditionState = null, string npcName = "Casilda")
 		{
-			return new ConversationEntry(TypeId, answerPath, 0x4DEE9, [.. Enumerable.Range(0, packets).Select(i => new[] { (byte)i })], npcName, ConditionQuestId: conditionQuest,
+			return new ConversationWalk(TypeId, answerPath, 0x4DEE9, [.. Enumerable.Range(0, packets).Select(i => new[] { (byte)i })], npcName, ConditionQuestId: conditionQuest,
 				ConditionQuestState: conditionState, GrantQuestId: grant);
 		}
 	}

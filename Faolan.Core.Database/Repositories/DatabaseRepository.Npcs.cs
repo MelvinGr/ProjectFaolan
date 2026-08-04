@@ -10,21 +10,21 @@ namespace Faolan.Core.Database.Repositories
 	public interface INpcRepository
 	{
 		Task<int> DeleteNpcSpawns(uint mapId, string name, float? x, float? y, float? z, float radius);
-		Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
-		Task<ConversationNode[]> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId);
+
+		// The ROOTS of `npcName`'s dialogue for one trigger (#642), each with its opening screen loaded: talk roots
+		// (`worldObjectId` null), the use-object root of that object, or the approach root. Several can share a trigger
+		// and differ only by quest gate, so the caller picks (ConversationService.PickByLatestQuest).
+		Task<ConversationEntry[]> GetConversationEntries(string npcName, ConversationTrigger trigger, uint? worldObjectId, uint clickedTemplateId);
+
+		// The branches OUT of one screen, each with its destination screen loaded (#642).
+		Task<ConversationEdge[]> GetConversationEdges(uint fromNodeId);
 		Task<Dictionary<uint, uint>> GetEscortHiddenNpcMap();
 
 		// The NPCs whose SERVER-OPENED conversation is triggered by using world object `worldObjectId` (#523).
 		Task<string[]> GetServerInitiatedConversationNpcs(uint worldObjectId);
 
-		// The OPENING screen ("" path) of the server-opened conversation `worldObjectId` triggers for `npcName` (#523).
-		Task<ConversationNode[]> GetTriggeredConversations(string npcName, uint worldObjectId);
-
 		// The NPCs whose SERVER-OPENED conversation fires on APPROACH rather than on using an object (#523).
 		Task<string[]> GetApproachConversationNpcs();
-
-		// The opening screens of the approach-triggered conversation for `npcName` (#523).
-		Task<ConversationNode[]> GetApproachConversations(string npcName);
 		Task<ConanClass[]> GetImportedSpawnClasses(uint mapId);
 		Task<NpcTemplate?> GetNpcByName(string name);
 		Task<NpcTemplate?> GetNpcByTemplateId(uint templateId);
@@ -61,14 +61,36 @@ namespace Faolan.Core.Database.Repositories
 			return await query.ExecuteDeleteAsync();
 		}
 
-		public async Task<ConversationNode?> GetConversationScreen(string npcName, uint typeId, string answerPath, uint clickedTemplateId)
+		// The ROOTS of an NPC's dialogue for one trigger, each with its opening screen fully loaded (#642).
+		//
+		// One lookup replaces the four that used to differ only in which of `ServerInitiated` / `TriggerWorldObjectId` /
+		// `AnswerPath == ""` they filtered on. The trigger is now stated by a column, so "which of Casilda's two
+		// server-opened conversations is this" is answered by the key rather than by whichever row came back first.
+		public async Task<ConversationEntry[]> GetConversationEntries(string npcName, ConversationTrigger trigger, uint? worldObjectId, uint clickedTemplateId)
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
-				.ConversationNodes.Include(n => n.Packets)
+				.ConversationEntries.Include(e => e.Node)
+				.ThenInclude(n => n.Packets)
 				.ThenInclude(p => p.Screens)
 				.ThenInclude(s => s.Parameters)
-				.FirstOrDefaultAsync(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath && (n.NpcTemplateId == null || n.NpcTemplateId == clickedTemplateId));
+				.Where(e => e.NpcName == npcName && e.Trigger == trigger && e.TriggerWorldObjectId == worldObjectId
+					&& (e.NpcTemplateId == null || e.NpcTemplateId == clickedTemplateId))
+				.ToArrayAsync();
+		}
+
+		// The branches out of one screen, each with its destination screen fully loaded (#642) - one round-trip per
+		// dialogue pick, the same as the old path lookup cost.
+		public async Task<ConversationEdge[]> GetConversationEdges(uint fromNodeId)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx
+				.ConversationEdges.Include(e => e.To)
+				.ThenInclude(n => n.Packets)
+				.ThenInclude(p => p.Screens)
+				.ThenInclude(s => s.Parameters)
+				.Where(e => e.FromNodeId == fromNodeId)
+				.ToArrayAsync();
 		}
 
 		// The distinct NPCs whose server-opened conversation this world object triggers (#523). Retail's city door is
@@ -81,66 +103,23 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
-				.ConversationNodes.Where(n => n.ServerInitiated && n.TriggerWorldObjectId == worldObjectId)
-				.Select(n => n.NpcName)
+				.ConversationEntries.Where(e => e.Trigger == ConversationTrigger.UseWorldObject && e.TriggerWorldObjectId == worldObjectId)
+				.Select(e => e.NpcName)
 				.Distinct()
 				.ToArrayAsync();
 		}
 
-		// The OPENING screen of the conversation this world object triggers for this NPC (#523).
-		//
-		// ⚠️ It selects on the TRIGGER, not through the ordinary name/type/path lookup, because an NPC can have SEVERAL
-		// server-opened conversations and they all sit at AnswerPath "" - Casilda has two. The name+path lookup cannot
-		// tell them apart and would serve whichever came back first; the trigger is exactly what distinguishes them,
-		// which is why it is part of the node's identity.
-		public async Task<ConversationNode[]> GetTriggeredConversations(string npcName, uint worldObjectId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.ConversationNodes.Include(n => n.Packets)
-				.ThenInclude(p => p.Screens)
-				.ThenInclude(s => s.Parameters)
-				.Where(n => n.ServerInitiated && n.TriggerWorldObjectId == worldObjectId && n.NpcName == npcName && n.AnswerPath == "")
-				.OrderByDescending(n => n.ConditionQuestId != null) // conditioned first; the unconditional one is the fallback
-				.ToArrayAsync();
-		}
-
-		// The NPCs with an APPROACH-triggered server conversation: server-opened, but with no world object behind them
-		// (#523). Saddur's beach confrontation is the worked example - walking up to him is what opens it. Small and
-		// static, so the caller caches it and the per-move check stays a pure in-memory name test.
+		// The NPCs with an APPROACH-triggered server conversation (#523). Saddur's beach confrontation is the worked
+		// example - walking up to him is what opens it. Small and static, so the caller caches it and the per-move
+		// check stays a pure in-memory name test.
 		public async Task<string[]> GetApproachConversationNpcs()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx
-				.ConversationNodes.Where(n => n.ServerInitiated && n.TriggerWorldObjectId == null && n.AnswerPath == "")
-				.Select(n => n.NpcName)
+				.ConversationEntries.Where(e => e.Trigger == ConversationTrigger.Approach)
+				.Select(e => e.NpcName)
 				.Distinct()
 				.ToArrayAsync();
-		}
-
-		public async Task<ConversationNode[]> GetApproachConversations(string npcName)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			return await ctx
-				.ConversationNodes.Include(n => n.Packets)
-				.ThenInclude(p => p.Screens)
-				.ThenInclude(s => s.Parameters)
-				.Where(n => n.ServerInitiated && n.TriggerWorldObjectId == null && n.NpcName == npcName && n.AnswerPath == "")
-				.OrderByDescending(n => n.ConditionQuestId != null)
-				.ToArrayAsync();
-		}
-
-		public async Task<ConversationNode[]> GetConversationScreens(string npcName, uint typeId, string answerPath, uint clickedTemplateId)
-		{
-			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var nodes = await ctx
-				.ConversationNodes.Include(n => n.Packets)
-				.ThenInclude(p => p.Screens)
-				.ThenInclude(s => s.Parameters)
-				.Where(n => n.NpcName == npcName && n.TypeId == typeId && n.AnswerPath == answerPath && (n.NpcTemplateId == null || n.NpcTemplateId == clickedTemplateId))
-				.ToListAsync();
-
-			return nodes.OrderBy(n => n.ConditionQuestId == null).ToArray(); // conditioned variants first, unconditional fallback last
 		}
 
 		// #262: escortee NPCs that DISAPPEAR once their escort quest is COMPLETED (the escort is over - they're not back
@@ -299,7 +278,7 @@ namespace Faolan.Core.Database.Repositories
 		public async Task<Dictionary<string, uint[]>> GetQuestGatedNpcMap()
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
-			var givers = (await ctx.ConversationNodes.Where(n => n.GrantQuestId > 0).Select(n => n.NpcName).Distinct().ToListAsync()).ToHashSet();
+			var givers = (await ctx.ConversationEdges.Where(e => e.GrantQuestId > 0).Select(e => e.From.NpcName).Distinct().ToListAsync()).ToHashSet();
 
 			var targeted = await ctx
 				.QuestGoalDefinitions.Where(g => g.TargetName != null && g.TargetName != "")
@@ -323,11 +302,11 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			var grants = await ctx
-				.ConversationNodes.Where(n => n.GrantQuestId > 0)
-				.Select(n => new
+				.ConversationEdges.Where(e => e.GrantQuestId > 0)
+				.Select(e => new
 				{
-					n.NpcName,
-					n.GrantQuestId
+					e.From.NpcName,
+					e.GrantQuestId
 				})
 				.Distinct()
 				.ToListAsync();

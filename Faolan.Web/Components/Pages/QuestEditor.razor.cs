@@ -17,7 +17,7 @@ namespace Faolan.Web.Components.Pages
 	//
 	// Three columns are shown but NOT editable, because they are not ours to set. The goal's KIND TAG (#521) is the
 	// client's own word for what the objective asks; the goal's REGION name (#521) is resolved from the typed reference
-	// the row already carries; and the granting/gating CONVERSATIONS (#523) belong to ConversationNodes. They are here
+	// the row already carries; and the granting/gating CONVERSATIONS (#523) belong to the dialogue graph. They are here
 	// because each one answers a question the editable fields raise - what the goal really is, where its trigger volume
 	// sits, and whether anything grants the quest at all.
 	public partial class QuestEditor
@@ -25,10 +25,13 @@ namespace Faolan.Web.Components.Pages
 		private static readonly QuestGoalType[] GoalTypes = Enum.GetValues<QuestGoalType>();
 		private List<QuestDefinition> _quests = [];
 
-		// The conversation nodes that GRANT or GATE a quest (#523). Only the quest-linked ones are held - 38 of the 485
-		// nodes - because that is the whole point of showing them here: a quest nothing grants is unreachable in game,
-		// and that is invisible on the quest row itself. Read-only; ConversationNodes are edited in the generic DbEditor.
-		private List<ConversationNode> _questConversations = [];
+		// The dialogue wiring that GRANTS or GATES a quest (#523). Only the quest-linked rows are held, because that is
+		// the whole point of showing them here: a quest nothing grants is unreachable in game, and that is invisible on
+		// the quest row itself. Read-only; the graph is edited in the generic DbEditor.
+		//
+		// Two tables since #642 - a quest is granted or gated by a BRANCH (ConversationEdge) and an NPC's greeting is
+		// gated by a ROOT (ConversationEntry) - so they are projected into one row shape here rather than shown twice.
+		private List<QuestConversation> _questConversations = [];
 
 		// Named trigger volumes, for resolving a goal's RegionId to something readable (#521). 14 rows.
 		private Dictionary<uint, MapRegion> _regions = [];
@@ -38,10 +41,19 @@ namespace Faolan.Web.Components.Pages
 		{
 			_quests = await ctx.QuestDefinitions.Include(q => q.Goals).OrderBy(q => q.QuestId).ToListAsync();
 			_regions = await ctx.MapRegions.ToDictionaryAsync(r => r.Id);
-			_questConversations = await ctx.ConversationNodes
-				.Where(c => c.GrantQuestId != null || c.ConditionQuestId != null)
-				.OrderBy(c => c.NpcName).ThenBy(c => c.AnswerPath)
+			var branches = await ctx.ConversationEdges
+				.Include(e => e.From)
+				.Where(e => e.GrantQuestId != null || e.ConditionQuestId != null)
+				.Select(e => new QuestConversation(e.From.NpcName, e.From.NpcTemplateId, $"option {e.OptionId} out of 0x{e.FromNodeId:X8}", e.GrantQuestId, e.ConditionQuestId,
+					e.ConditionQuestState, "branch", null))
 				.ToListAsync();
+			var roots = await ctx.ConversationEntries
+				.Where(e => e.ConditionQuestId != null)
+				.Select(e => new QuestConversation(e.NpcName, e.NpcTemplateId, $"{e.Trigger} root", null, e.ConditionQuestId, e.ConditionQuestState, e.Trigger.ToString(),
+					e.TriggerWorldObjectId))
+				.ToListAsync();
+
+			_questConversations = [.. branches.Concat(roots).OrderBy(c => c.NpcName, StringComparer.Ordinal).ThenBy(c => c.Where, StringComparer.Ordinal)];
 			// Open on something worth looking at rather than the lowest quest id, which has no goals at all: the quests
 			// that HAVE goals are the reason this page exists (SpellEditor opens the same way, for the same reason).
 			var first = _quests.FirstOrDefault(q => q.Goals.Count > 0) ?? _quests.FirstOrDefault();
@@ -52,10 +64,16 @@ namespace Faolan.Web.Components.Pages
 		// The conversations that reach this quest at all: the ones that grant it, and the ones whose screen is gated on
 		// holding it. Both directions matter when wiring a chain - the grant is how the quest starts, the gate is what
 		// the NPC says while it runs.
-		private IEnumerable<ConversationNode> Conversations(QuestDefinition q)
+		private IEnumerable<QuestConversation> Conversations(QuestDefinition q)
 		{
 			return _questConversations.Where(c => c.GrantQuestId == q.QuestId || c.ConditionQuestId == q.QuestId);
 		}
+
+		// One row of the read-only wiring table: a branch that grants or gates the quest, or a root whose greeting is
+		// gated on it. `Where` is the human-readable position in the graph - a branch names its option and the screen it
+		// leaves, a root names what opens it.
+		private sealed record QuestConversation(string NpcName, uint? NpcTemplateId, string Where, uint? GrantQuestId, uint? ConditionQuestId, QuestState? ConditionQuestState,
+			string Trigger, uint? TriggerWorldObjectId);
 
 		// The goal's own KIND TAG as the client states it - the wire's `Separator` word, decoded in QuestGoalKind (#521).
 		// Shown read-only beside the editable GoalType because it is the EVIDENCE the wiring should follow, not a second

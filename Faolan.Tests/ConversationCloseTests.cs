@@ -27,18 +27,18 @@ namespace Faolan.Tests
 			{
 				Session =
 				{
-					ConversationAnswerPath = "0>1",
+					ConversationNodeId = 0x1D8A5C31,
+					ConversationOptions = [7615, 0],
 					ConversationNpcName = "Casilda",
-					ConversationTypeId = 13,
 					ConversationNpcHandle = 0x000818D6
 				}
 			};
 
 			ConversationService.EndConversation(client);
 
-			Assert.Null(client.Session.ConversationAnswerPath);
+			Assert.Null(client.Session.ConversationNodeId);
+			Assert.Empty(client.Session.ConversationOptions);
 			Assert.Null(client.Session.ConversationNpcName);
-			Assert.Null(client.Session.ConversationTypeId);
 			Assert.Null(client.Session.ConversationNpcHandle);
 			Assert.Empty(client.Sent); // a client-initiated close gets NO reply (the window is already closed)
 		}

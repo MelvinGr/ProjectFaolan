@@ -67,81 +67,75 @@ namespace Faolan.GameServer.Dialogue
 			_travel = travel;
 		}
 
-		// The player picked option `answerIndex` in the active conversation: navigate to the child screen at the
-		// extended answer-path and serve it. An un-walked branch (no captured screen) closes the window gracefully so
-		// the client never hangs. No-op when no conversation is active.
+		// The player picked option `answerIndex` in the active conversation: resolve it to the option's own LDB id on the
+		// screen we last SENT, take the edge that option opens, and serve where it lands. A branch the captures never
+		// walked closes the window gracefully so the client never hangs. No-op when no conversation is active.
+		//
+		// ⚠️ The index is resolved against the screen actually on the player's display, never persisted (#642). The
+		// same screen offers different option lists in different quest states - Casilda's greeting has six - so an
+		// index means six different things while the option's string id means one.
 		public async Task AdvanceConversation(INetworkClient client, uint answerIndex)
 		{
-			// An active conversation means all three slots are set; guarding them here states that invariant once instead
-			// of defaulting each to 0 further down (a 0 handle/type would silently look up the wrong screen).
-			var path = client.Session.ConversationAnswerPath;
-			if (path == null || client.Session.ConversationNpcHandle is not { } npcHandle || client.Session.ConversationTypeId is not { } typeId)
+			// An active conversation means both slots are set; guarding them here states that invariant once instead of
+			// defaulting each further down (a 0 handle would silently address the wrong NPC).
+			if (client.Session.ConversationNodeId is not { } fromNodeId || client.Session.ConversationNpcHandle is not { } npcHandle)
 				return;
 
 			var npcName = client.Session.ConversationNpcName;
-			var childPath = path.Length == 0
-				? answerIndex.ToString()
-				: $"{path}>{answerIndex}";
+			if (client.Session.ConversationOptions.Count <= answerIndex)
+			{
+				// The client offered an option the screen we sent does not have. That is not a coverage gap, it is a
+				// disagreement about what is on screen, so say so rather than closing as if the branch were un-walked.
+				_logger.LogWarning("Conversation: npc={Name} answered option {Index} but the served screen offers {Count}; closing.", npcName, answerIndex,
+					client.Session.ConversationOptions.Count);
+				await SendConversationClose(client);
+				return;
+			}
+
+			var optionId = client.Session.ConversationOptions[(int)answerIndex];
+			var edge = await PickConversationEdge(client, fromNodeId, optionId);
+			if (edge == null)
+			{
+				_logger.LogInformation("Conversation: npc={Name} has no captured branch for option {Option} out of screen 0x{Node:X8}; closing.", npcName, optionId, fromNodeId);
+				await SendConversationClose(client);
+				return;
+			}
 
 			// #514: LOCAL TRAVEL rides this walk, and both of its steps are dialogue picks, which is why the hook is
-			// here rather than in ServeScreen (a greeting can never be either one).
+			// here rather than in ServeScreen (a root can never be either one).
 			//
 			// The FARE comes off BEFORE the screen that presents the destination list - retail's DispatchUpdateCash
 			// sits immediately in front of "Your coin is good enough. Where to?" - so it is charged here, on the way in.
 			// A refusal (criminal, or too poor) must not then hand the player the list: close the window instead.
 			// ⚠️ The corpus has no refused traveller, so closing is the conservative reading rather than a captured one.
-			if (!await _travel.TryChargeFare(client, npcName, childPath))
+			if (!await _travel.TryChargeFare(client, npcName, edge.ToNodeId))
 			{
 				await SendConversationClose(client);
 				return;
 			}
 
-			var screen = await PickConversationScreen(client, npcName, typeId, childPath,
-				client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(npcHandle));
-			if (screen == null)
-			{
-				_logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", npcName, childPath);
-				await SendConversationClose(client);
-				return;
-			}
-
-			await ServeScreen(client, screen, npcHandle);
+			await ServeScreen(client, edge.To, npcHandle, edge.GrantQuestId);
 
 			// The destination pick: retail closes the chat window and THEN teleports (the close is the served screen's
 			// own only packet), so the trip runs after the screen, in the same "text precedes state" order the quest
 			// grants follow.
-			await _travel.TryTravel(client, npcName, childPath);
+			await _travel.TryTravel(client, npcName, fromNodeId, optionId);
 		}
 
 		// #523: open a conversation the SERVER initiates - one with no player TalkToNpc in front of it, served because
 		// some EVENT fired. Casilda's city-door farewell is the worked example: the player uses the door, the escort
 		// completes, and retail opens her window unprompted.
 		//
-		// These nodes carry TypeId 0 (there is no BCC action to take one from), which is also why the ordinary talk path
-		// can never reach them: GetConversationScreens matches on TypeId, and every captured talk node carries 42008.
-		// Serving goes through the SAME ServeGreeting as a talk, so the session's answer-path state is armed identically
-		// and the player's KnubotAnswer picks walk the tree normally.
+		// ⚠️ The APPROACH-triggered counterpart - walking up to the NPC is what opens it, with no object to use.
+		// Saddur's beach confrontation ("{hidegoodbye}Who stands before Saddur?") is the worked example. This is
+		// proximity to the NPC, NOT entry into a bounded area; only volume-entry lives in RDB 1000053, and the two are
+		// different mechanisms (Gitea #513's own research says so), which is why this needs no region.
 		//
-		// Returns false when the NPC is not spawned for this player - the conversation simply does not open, which is
-		// the right outcome for an escortee who is not there.
-		// #523: the APPROACH-triggered counterpart - walking up to the NPC is what opens it, with no object to use.
-		// Saddur's beach confrontation ("{hidegoodbye}Who stands before Saddur?") is the worked example.
-		//
-		// ⚠️ This is proximity to the NPC, NOT entry into a bounded area. Only volume-entry lives in RDB 1000053, and
-		// the two are different mechanisms (Gitea #513's own research says so), which is why this needs no region.
-		public async Task<bool> TryOpenApproachConversation(INetworkClient client, string npcName, uint npcHandle)
+		// Returns false when the NPC has no such root - or, for the object trigger, when it is not spawned for this
+		// player, which is the right outcome for an escortee who is not there.
+		public Task<bool> TryOpenApproachConversation(INetworkClient client, string npcName, uint npcHandle)
 		{
-			var variants = await _database.GetApproachConversations(npcName);
-			if (variants.Length == 0)
-				return false;
-
-			var quests = await _database.GetCharacterQuests(client.Session.Character.Id);
-			var opening = PickByLatestQuest(variants, quests) ?? variants.FirstOrDefault(v => v.ConditionQuestId == null);
-			if (opening == null)
-				return false;
-
-			await ServeScreen(client, opening, npcHandle);
-			return true;
+			return OpenRoot(client, npcName, ConversationTrigger.Approach, null, npcHandle);
 		}
 
 		public async Task<bool> TryOpenTriggeredConversation(INetworkClient client, string npcName, uint worldObjectId)
@@ -152,46 +146,50 @@ namespace Faolan.GameServer.Dialogue
 			if (handle == 0)
 				return false; // the escortee is not spawned for this player - the conversation simply does not open
 
-			// Selected by TRIGGER, not by the name/type/path lookup ServeGreeting uses: an NPC can have several
-			// server-opened conversations and they all sit at AnswerPath "" (Casilda has two), so only the trigger tells
-			// them apart. From the first pick onwards the paths are deeper and unambiguous, so the ordinary
-			// AdvanceConversation walk takes over unchanged.
-			var variants = await _database.GetTriggeredConversations(npcName, worldObjectId);
-			if (variants.Length == 0)
+			return await OpenRoot(client, npcName, ConversationTrigger.UseWorldObject, worldObjectId, handle);
+		}
+
+		// Serves `npcName`'s greeting through the live CONSTRUCT path (the Talk root -> ServeScreen, rebuilt via
+		// KnubotCodec re-addressed to `npcHandle`) - the #188 dialogue-VM entry the .npcsay GM command reuses instead of
+		// replaying a baked captured line. Returns false when the NPC has no talk root.
+		public Task<bool> ServeGreeting(INetworkClient client, string npcName, uint npcHandle)
+		{
+			return OpenRoot(client, npcName, ConversationTrigger.Talk, null, npcHandle);
+		}
+
+		// Opens one of an NPC's dialogue ROOTS (#642) and serves its screen. The three ways retail opens a window - the
+		// player clicking, the player using an object, the player walking up - differ only in the trigger they look up
+		// with, so they are one method rather than three near-copies. Several roots can share a trigger and differ only
+		// by quest gate (Casilda has six talk roots); the gate rule is the same one the branches use.
+		private async Task<bool> OpenRoot(INetworkClient client, string npcName, ConversationTrigger trigger, uint? worldObjectId, uint npcHandle)
+		{
+			var roots = await _database.GetConversationEntries(npcName, trigger, worldObjectId, client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(npcHandle));
+			if (roots.Length == 0)
 				return false;
 
-			// One trigger can still have quest-state VARIANTS, and the gate is real harvested data: Casilda's farewell is
-			// gated on the escort (12407) being Completed, which the door use has just made true. Conditioned variants
-			// come first and the unconditional one is the fallback - the same rule PickConversationScreen uses for talk
-			// dialogue, so a stale gate cannot hijack a player who is not in that state.
-			var quests = await _database.GetCharacterQuests(client.Session.Character.Id);
-			var opening = PickByLatestQuest(variants, quests) ?? variants.FirstOrDefault(v => v.ConditionQuestId == null);
+			var character = client.Session.Character;
+			var quests = character == null
+				? []
+				: await _database.GetCharacterQuests(character.Id);
+
+			var opening = PickByLatestQuest(roots, quests) ?? Array.Find(roots, r => r.ConditionQuestId == null);
 			if (opening == null)
 				return false;
 
-			await ServeScreen(client, opening, handle);
-			return true;
-		}
+			if (opening.ConditionQuestId != null)
+				_logger.LogInformation("Conversation: npc={Name} opened its {Trigger} root gated on quest {Quest} {State}.", npcName, trigger, opening.ConditionQuestId, opening.ConditionQuestState);
 
-		// Serves `npcName`'s greeting screen through the live CONSTRUCT path (PickConversationScreen -> ServeScreen,
-		// rebuilt via KnubotCodec re-addressed to `npcHandle`) - the #188 dialogue-VM entry the .npcsay GM command reuses
-		// instead of replaying a baked captured line. Returns false when the NPC has no matching screen for `typeId`.
-		public async Task<bool> ServeGreeting(INetworkClient client, string npcName, uint typeId, uint npcHandle)
-		{
-			var greeting = await PickConversationScreen(client, npcName, typeId, "", client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(npcHandle));
-			if (greeting == null)
-				return false;
-
-			await ServeScreen(client, greeting, npcHandle);
+			await ServeScreen(client, opening.Node, npcHandle);
 			return true;
 		}
 
 		// Starts an NPC conversation from its greeting: routes by the clicked NPC's stable NAME (handles are
-		// session-volatile) to the dialogue's "" screen and serves it. Returns true if a greeting was found+served.
-		// Runs for world-burst (beach) AND create-world sessions; the create-world scripted intro stays the fallback
-		// for NPCs with no captured dialogue. The nodes live in the DB (ConversationNode/ConversationPacket), imported
-		// from captures by Faolan.Importer. (Option picks after the greeting are KnubotAnswers -> AdvanceConversation.)
-		public async Task<bool> TryReplayConversation(INetworkClient client, uint typeId, uint field3, uint clickedNpcHandle)
+		// session-volatile) to the NPC's Talk root and serves the screen it opens on. Returns true if a greeting was
+		// found+served. Runs for world-burst (beach) AND create-world sessions; the create-world scripted intro stays
+		// the fallback for NPCs with no captured dialogue. The graph lives in the DB (ConversationEntry ->
+		// ConversationNode -> ConversationEdge), imported from captures by Faolan.Importer. (Option picks after the
+		// greeting are KnubotAnswers -> AdvanceConversation.)
+		public async Task<bool> TryReplayConversation(INetworkClient client, uint field3, uint clickedNpcHandle)
 		{
 			if (client.Session is { WorldEntered: false, EntryMode: not WorldEntryMode.CreateWorld })
 				return false;
@@ -200,7 +198,7 @@ namespace Faolan.GameServer.Dialogue
 			// answers that second one with nothing). Only the greeting opens the dialogue; a non-greeting click while a
 			// conversation is already active is absorbed (return true, no reply) so it doesn't reset or close it.
 			if (field3 != 0)
-				return client.Session.ConversationAnswerPath != null;
+				return client.Session.ConversationNodeId != null;
 
 			// #217: absorb the reflexive greeting the client re-fires right after we close (it keeps the NPC
 			// targeted and re-talks with no new SelectDeselect). Stays suppressed until the player re-selects the
@@ -218,11 +216,8 @@ namespace Faolan.GameServer.Dialogue
 			// Pick the greeting in the player's CURRENT (pre-completion) quest state so a talk-stage shows its OWN
 			// dialogue: e.g. Casilda's "I'll protect you now" one-off is gated on HasQuest(13480), so it must be picked
 			// while 13480 is still active (#264).
-			var greeting = await PickConversationScreen(client, npcName, typeId, "", client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(clickedNpcHandle));
-			if (greeting == null)
+			if (!await OpenRoot(client, npcName, ConversationTrigger.Talk, null, clickedNpcHandle))
 				return false;
-
-			await ServeScreen(client, greeting, clickedNpcHandle);
 
 			// #260 - SERVE FIRST, COMPLETE AFTER. Both quest-completion paths run here, after the text is on the wire,
 			// because that is the order retail sends them in. Two independent captures agree, on different characters
@@ -251,36 +246,36 @@ namespace Faolan.GameServer.Dialogue
 			return true;
 		}
 
-		// Picks the conversation-screen variant whose quest-state CONDITION matches the live player (quest-gated
-		// dialogue, issue #37). Most screens have a single unconditional variant - fast path. When conditioned variants
-		// exist, evaluate each (conditioned-first) against the character's quest states and serve the first that
-		// matches; the unconditional (null-gate) variant is the fallback. A variant with no matching quest is skipped,
-		// so a stale gate can't hijack a player who isn't in that state.
-		private async Task<ConversationNode?> PickConversationScreen(INetworkClient client, string npcName, uint typeId, string answerPath, uint clickedTemplateId)
+		// The branch out of `fromNodeId` that clicking option `optionId` takes, or null when the captures never walked it.
+		//
+		// The gate lives on the BRANCH rather than on the screen (#642): two harvested walks reached Turach's 2832 by
+		// the same option with identical screen content, one granting quest 12371 and one granting nothing, and that
+		// difference belongs to how you got there. Most options have a single unconditional edge - fast path.
+		private async Task<ConversationEdge?> PickConversationEdge(INetworkClient client, uint fromNodeId, uint optionId)
 		{
-			var variants = await _database.GetConversationScreens(npcName, typeId, answerPath, clickedTemplateId);
-			if (variants.Length == 0)
+			var branches = Array.FindAll(await _database.GetConversationEdges(fromNodeId), e => e.OptionId == optionId);
+			if (branches.Length == 0)
 				return null;
-			if (variants.Length == 1 || variants.All(v => v.ConditionQuestId == null))
-				return variants[0]; // GetConversationScreens orders the unconditional fallback last
+			if (branches.Length == 1)
+				return branches[0];
 
 			var character = client.Session.Character;
 			var quests = character == null
 				? []
 				: await _database.GetCharacterQuests(character.Id);
 
-			var matched = PickByLatestQuest(variants, quests);
+			var matched = PickByLatestQuest(branches, quests);
 			if (matched != null)
 			{
-				_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant (quest {Quest} {State}).", npcName, answerPath, matched.ConditionQuestId,
+				_logger.LogInformation("Conversation: option {Option} out of screen 0x{Node:X8} took the branch gated on quest {Quest} {State}.", optionId, fromNodeId, matched.ConditionQuestId,
 					matched.ConditionQuestState);
 				return matched;
 			}
 
-			return variants.FirstOrDefault(v => v.ConditionQuestId == null);
+			return Array.Find(branches, e => e.ConditionQuestId == null);
 		}
 
-		// The gated variant to serve when SEVERAL gates pass at once, or null when none does.
+		// The gated row to use when SEVERAL gates pass at once, or null when none does.
 		//
 		// Gates overlap by construction: the importer derives them from the quest state each screen was captured in
 		// (#639), and a player deep in a chain holds every earlier quest of it too - Casilda's escort greeting is gated
@@ -288,9 +283,9 @@ namespace Faolan.GameServer.Dialogue
 		// player is actually ON is the quest they accepted MOST RECENTLY, and CharacterQuest is insert-ordered, so the
 		// highest row id among the passing gates is that beat. Without this the pick fell to whatever order the query
 		// returned, which is a database detail rather than a rule.
-		internal static ConversationNode? PickByLatestQuest(IReadOnlyCollection<ConversationNode> variants, IReadOnlyCollection<CharacterQuest> quests)
+		internal static T? PickByLatestQuest<T>(IReadOnlyCollection<T> variants, IReadOnlyCollection<CharacterQuest> quests) where T : class, IQuestGated
 		{
-			ConversationNode? best = null;
+			T? best = null;
 			var bestRank = 0u;
 			foreach (var v in variants)
 			{
@@ -309,9 +304,12 @@ namespace Faolan.GameServer.Dialogue
 		}
 
 		// Serves one dialogue SCREEN: re-addresses its captured response packets to the live player + clicked NPC and
-		// sends them, then records the screen as the session's position in the dialogue tree. Each ConversationNode IS
-		// one screen (the greeting, or an option's reply); the player's next KnubotAnswer picks the child.
-		private async Task ServeScreen(INetworkClient client, ConversationNode node, uint clickedNpcHandle)
+		// sends them, then records the screen as the session's position in the graph, together with the OPTION IDS it
+		// put on the player's display - which is what the next KnubotAnswer's index is resolved against (#642).
+		//
+		// `grantQuestId` is the quest the BRANCH that got here grants, not a property of the screen: the same screen
+		// reached two ways can grant on one route and not the other (Turach's 2832).
+		private async Task ServeScreen(INetworkClient client, ConversationNode node, uint clickedNpcHandle, uint? grantQuestId = null)
 		{
 			var liveInstance = client.Session.Character.Id;
 
@@ -350,8 +348,8 @@ namespace Faolan.GameServer.Dialogue
 			// AppendText -> QuestLogList (0x504B7924, the J-panel list) -> QuestFullUpdate (0x63268258, the detail) ->
 			// AnswerList, with NO QuestIIR and NO QuestJournal (capture randochar-login-get-casilda-quest frame 687-688).
 			// The QuestLogList is what POPULATES the log; sending only the full-update (the detail) leaves the log empty.
-			var grantDef = node.GrantQuestId is > 0 and { } grantQuestId
-				? await _questProgression.Grant(client, grantQuestId, $"{node.NpcName}'s dialogue")
+			var grantDef = grantQuestId is > 0 and { } granted
+				? await _questProgression.Grant(client, granted, $"{node.NpcName}'s dialogue")
 				: null;
 			var grantSent = false;
 
@@ -407,17 +405,23 @@ namespace Faolan.GameServer.Dialogue
 			{
 				client.Session.ConversationNpcHandle = clickedNpcHandle; // ensure the guard arms for THIS npc
 				EndConversation(client);
-				_logger.LogInformation("Conversation ended (npc={Name}, typeId={TypeId}, path='{Path}') for NPC 0x{NpcTemplate:X}.", node.NpcName, node.TypeId, node.AnswerPath, clickedNpcHandle);
+				_logger.LogInformation("Conversation ended (npc={Name}, screen 0x{Node:X8}) for NPC 0x{NpcTemplate:X}.", node.NpcName, node.Id, clickedNpcHandle);
 				return;
 			}
 
 			client.Session.ConversationNpcName = node.NpcName;
-			client.Session.ConversationTypeId = node.TypeId;
-			client.Session.ConversationAnswerPath = node.AnswerPath;
+			client.Session.ConversationNodeId = node.Id;
+			// The option buttons as the client now draws them, so the next KnubotAnswer's INDEX resolves to the
+			// option's own LDB id. Taken from the screen we just sent rather than looked up again: the index is only
+			// meaningful against what is actually on the display.
+			client.Session.ConversationOptions = [.. orderedPackets
+				.Where(p => p.SubOpcode == ConversationSubOpcode.KnubotAnswerList)
+				.OrderBy(p => p.Sequence)
+				.LastOrDefault()?.Screens.OrderBy(s => s.Sequence).Select(s => s.ScreenId) ?? []];
 			client.Session.ConversationNpcHandle = clickedNpcHandle;
 
-			_logger.LogInformation("Conversation screen (npc={Name}, typeId={TypeId}, path='{Path}') -> {Packets} packet(s) for NPC 0x{NpcTemplate:X}.", node.NpcName, node.TypeId, node.AnswerPath,
-				node.Packets.Count, clickedNpcHandle);
+			_logger.LogInformation("Conversation screen (npc={Name}, screen 0x{Node:X8}) -> {Packets} packet(s), {Options} option(s) for NPC 0x{NpcTemplate:X}.", node.NpcName, node.Id,
+				node.Packets.Count, client.Session.ConversationOptions.Count, clickedNpcHandle);
 		}
 
 		// Completes any quest GIVEN by `npcName` whose objective is done (Active + GoalProgress >= GoalRequired): marks
@@ -463,9 +467,9 @@ namespace Faolan.GameServer.Dialogue
 			if (client.Session.ConversationNpcHandle is not null)
 				client.Session.ConversationEndedNpcHandle = client.Session.ConversationNpcHandle;
 
-			client.Session.ConversationAnswerPath = null!;
+			client.Session.ConversationNodeId = null;
+			client.Session.ConversationOptions = [];
 			client.Session.ConversationNpcName = null!;
-			client.Session.ConversationTypeId = null;
 			client.Session.ConversationNpcHandle = null;
 			client.Session.ConversationAgentInstance = null;
 		}
@@ -541,9 +545,9 @@ namespace Faolan.GameServer.Dialogue
 		// A conditioned variant applies when the player holds ConditionQuestId in state ConditionQuestState - the two
 		// shapes retail's dialogue Lua actually used: HasCompletedQuest(X) == (X, Completed), and HasQuest(X) and not
 		// HasCompletedQuest(X) == (X, Active). Kept internal-static so ConversationConditionTests can pin the gate.
-		internal static bool QuestConditionMet(ConversationNode node, IReadOnlyCollection<CharacterQuest> quests)
+		internal static bool QuestConditionMet(IQuestGated gated, IReadOnlyCollection<CharacterQuest> quests)
 		{
-			return node.ConditionQuestId is { } questId && quests.Any(q => q.QuestId == questId && q.State == node.ConditionQuestState);
+			return gated.ConditionQuestId is { } questId && quests.Any(q => q.QuestId == questId && q.State == gated.ConditionQuestState);
 		}
 
 		// Frames a constructed Knubot record exactly as retail does (verified against the captures): the conversation

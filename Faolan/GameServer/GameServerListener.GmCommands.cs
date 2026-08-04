@@ -969,20 +969,19 @@ namespace Faolan.GameServer
 			var arg = (arguments ?? string.Empty).Trim();
 			if (arg.Length == 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .travel <npc name> [answer path]");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .travel <npc name> [option id]");
 				return;
 			}
 
-			// The answer path, when present, is the LAST whitespace-separated token - NPC names contain spaces, so
-			// splitting from the front would break on every real traveller. A path is digits and '>' ("0>3"), which no
-			// NPC name ends with.
+			// The destination's OPTION ID, when present, is the LAST whitespace-separated token - NPC names contain
+			// spaces, so splitting from the front would break on every real traveller, and no NPC name ends in digits.
 			var split = arg.LastIndexOf(' ');
 			var npcName = arg;
-			string? answerPath = null;
-			if (split > 0 && arg[(split + 1)..] is { Length: > 0 } tail && tail.All(c => char.IsAsciiDigit(c) || c == '>'))
+			uint? optionId = null;
+			if (split > 0 && arg[(split + 1)..] is { Length: > 0 } tail && uint.TryParse(tail, out var parsedOption))
 			{
 				npcName = arg[..split].Trim();
-				answerPath = tail;
+				optionId = parsedOption;
 			}
 
 			var destinations = await _travel.DestinationsOf(npcName);
@@ -992,21 +991,29 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			if (answerPath == null)
+			if (optionId == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, $"\"{npcName}\" travels to:");
 				foreach (var destination in destinations)
 				{
 					var map = await Database.GetMap(destination.DestinationMapId);
 					await _agentServerDispatcher.SendSystemMessage(characterId,
-						$"  '{destination.AnswerPath}' -> {destination.DestinationMapId} {(string.IsNullOrEmpty(map?.Name) ? "" : map.Name)} - {destination.Cost} tin");
+						$"  option {destination.OptionId} -> {destination.DestinationMapId} {(string.IsNullOrEmpty(map?.Name) ? "" : map.Name)} - {destination.Cost} tin");
 				}
 
 				return;
 			}
 
-			if (!await _travel.TryTravel(client, npcName, answerPath))
-				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"\"{npcName}\" sells no trip on branch '{answerPath}'."));
+			// The GM form names the destination alone; the screen it hangs off is whichever of this NPC's screens
+			// offers it, which the row already states.
+			var picked = Array.Find(destinations, d => d.OptionId == optionId);
+			if (picked == null)
+			{
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"\"{npcName}\" sells no trip on option {optionId}."));
+				return;
+			}
+
+			await _travel.Travel(client, npcName, picked);
 		}
 
 		private async Task TeleportCommand(INetworkClient client, string arguments)

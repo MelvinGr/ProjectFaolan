@@ -9,7 +9,6 @@ namespace Faolan.Core.Network
 	public interface INetworkClientSession
 	{
 		// The active dialogue's NPC type id, or null when no conversation is open.
-		uint? ConversationTypeId { get; set; }
 
 		// The map id of the ~Playfield chat channel this client is currently subscribed to, or 0 for none. Held per
 		// SESSION rather than read off Character.MapId, because those are two different facts: the character's map is
@@ -133,13 +132,21 @@ namespace Faolan.Core.Network
 		// an incremented buff id (37e5a8 -> 37e5a9 -> 37e5aa), overlapping the previous (retail stacks to ~x2).
 		int SpellweaveBuffStack { get; set; }
 
-		string ConversationAnswerPath { get; set; }
+		// The SCREEN the player is currently looking at - the runtime's position in the NPC's dialogue GRAPH (#642).
+		// Null = no active conversation, which is the one authoritative "is a dialogue open" test.
+		//
+		// It replaced an answer-index PATH string. The path had to be extended and re-looked-up on every pick, and it
+		// could not name a screen a loop returns to; a node id names one screen, and the branch out of it is a row.
+		uint? ConversationNodeId { get; set; }
 
-		// The active NPC conversation's position in the dialogue TREE. The runtime serves the screen for the current
-		// AnswerPath ("" = greeting, "0", "0>1", ...); each KnubotAnswer appends the picked option index and serves the
-		// child screen. NpcName/TypeId identify the dialogue; NpcHandle is the live clicked handle the captured screen
-		// packets are re-addressed to. Null AnswerPath = no active conversation. (Replaces the old stage/Mode/Field3
-		// model - Mode and Field3 were session-volatile counters, not branch ids; memory protocol_conversation_routing.)
+		// The option buttons on the player's display, in the order the client drew them - the LDB string id of each.
+		// A KnubotAnswer carries an INDEX into this list, and the index is only meaningful against the screen actually
+		// on screen (the same screen offers different lists in different quest states), so it is resolved here and
+		// never persisted. Empty when the served screen offered no options.
+		List<uint> ConversationOptions { get; set; }
+
+		// The NPC of the active conversation, by NAME - the stable identity the runtime routes on (the handle is
+		// session-volatile and is only what the screen packets are re-addressed to).
 		string ConversationNpcName { get; set; }
 
 		// Invalidation token for the in-flight spell cast (#236 interrupt handling). Bumped on every cast BEGIN (the
@@ -208,7 +215,6 @@ namespace Faolan.Core.Network
 
 	public sealed class NetworkClientSession : INetworkClientSession
 	{
-		public uint? ConversationTypeId { get; set; }
 		public uint PlayfieldChannelId { get; set; }
 		public Account Account { get; set; } = null!;
 		public Character Character { get; set; } = null!;
@@ -260,7 +266,8 @@ namespace Faolan.Core.Network
 		public int ActiveComboStep { get; set; }
 		public uint ActiveComboCentiseconds { get; set; }
 		public int SpellweaveBuffStack { get; set; }
-		public string ConversationAnswerPath { get; set; } = null!;
+		public uint? ConversationNodeId { get; set; }
+		public List<uint> ConversationOptions { get; set; } = [];
 		public string ConversationNpcName { get; set; } = null!;
 		public uint ActiveCastToken { get; set; }
 		public uint? ConversationAgentInstance { get; set; }

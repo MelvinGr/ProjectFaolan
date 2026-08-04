@@ -76,40 +76,30 @@ namespace Faolan.Tests
 			Assert.ThrowsAny<Exception>(() => TravelActionCodec.Parse("xpos=1;ypos=2;zpos=3;PlayFieldID=4;Whatever=5", 0));
 		}
 
-		// The fare gate is DERIVED, not stored: retail puts the destination list on one screen and each destination one
-		// pick deeper, so the screen that charges is the parent of the destination's answer path.
-		[Theory]
-		[InlineData("0>3", "0")]
-		[InlineData("0>5", "0")]
-		[InlineData("1>0", "1")]
-		[InlineData("0", "")]
-		[InlineData("", "")]
-		public void TheFareGate_IsTheDestinationsParentScreen(string answerPath, string expected)
-		{
-			Assert.Equal(expected, TravelService.ParentPath(answerPath));
-		}
-
-		// THE wiring invariant (#514): a shipped trip is only reachable if the dialogue branch it names exists. A row
-		// whose (npc, answer path) matches no ConversationNode is dead wiring - the trip can never be picked - and that
-		// is precisely the failure a hand-authored path would produce silently.
+		// THE wiring invariant (#514/#642): a shipped trip is only reachable if the dialogue BRANCH it names exists. The
+		// row IS that branch now - keyed by the screen it leaves and the option's own LDB id - so the check is that the
+		// graph has an edge with exactly that key. A row with none is dead wiring: the trip can never be picked, and
+		// that is precisely the failure a hand-authored path would produce silently.
 		[Fact]
 		public void EveryShippedTrip_NamesADialogueBranchThatExists()
 		{
-			var nodes = ShippedRows("SELECT NpcName, AnswerPath FROM ConversationNodes", r => (r.GetString(0), r.GetString(1))).ToHashSet();
-			var trips = ShippedRows("SELECT NpcName, AnswerPath FROM TravelDestinations", r => (r.GetString(0), r.GetString(1))).ToList();
+			var edges = ShippedRows("SELECT FromNodeId, OptionId FROM ConversationEdges", r => ((uint)r.GetInt64(0), (uint)r.GetInt64(1))).ToHashSet();
+			var trips = ShippedRows("SELECT FromNodeId, OptionId FROM TravelDestinations", r => ((uint)r.GetInt64(0), (uint)r.GetInt64(1))).ToList();
 
 			Assert.NotEmpty(trips);
-			Assert.Equal([], trips.Where(t => !nodes.Contains(t)).ToArray());
+			Assert.Equal([], trips.Where(t => !edges.Contains(t)).ToArray());
 		}
 
-		// ...and the screen that PRESENTS the list has to exist too, or the fare is never charged.
+		// ...and the screen that PRESENTS the list has to exist too, or the fare is never charged. That screen is the
+		// branch's own From node, so this is now a foreign key rather than a string-surgery derivation - which is the
+		// point of the re-key, and worth pinning because the old form silently accepted a path with no parent row.
 		[Fact]
 		public void EveryShippedTrip_HasTheListScreenThatChargesForIt()
 		{
-			var nodes = ShippedRows("SELECT NpcName, AnswerPath FROM ConversationNodes", r => (r.GetString(0), r.GetString(1))).ToHashSet();
-			var trips = ShippedRows("SELECT NpcName, AnswerPath FROM TravelDestinations", r => (r.GetString(0), r.GetString(1))).ToList();
+			var screens = ShippedRows("SELECT Id FROM ConversationNodes", r => (uint)r.GetInt64(0)).ToHashSet();
+			var trips = ShippedRows("SELECT FromNodeId FROM TravelDestinations", r => (uint)r.GetInt64(0)).ToList();
 
-			Assert.Equal([], trips.Where(t => !nodes.Contains((t.Item1, TravelService.ParentPath(t.Item2)))).ToArray());
+			Assert.Equal([], trips.Where(t => !screens.Contains(t)).ToArray());
 		}
 
 		private static IEnumerable<T> ShippedRows<T>(string sql, Func<SqliteDataReader, T> read)

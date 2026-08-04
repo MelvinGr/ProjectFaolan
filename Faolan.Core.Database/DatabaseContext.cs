@@ -55,6 +55,8 @@ namespace Faolan.Core.Database
 		DbSet<ClassComboScaling> ClassComboScalings { get; }
 		DbSet<ClassSpell> ClassSpells { get; }
 		DbSet<Combo> Combos { get; }
+		DbSet<ConversationEdge> ConversationEdges { get; }
+		DbSet<ConversationEntry> ConversationEntries { get; }
 		DbSet<ConversationNode> ConversationNodes { get; }
 		DbSet<ConversationPacket> ConversationPackets { get; }
 		DbSet<ConversationScreen> ConversationScreens { get; }
@@ -157,6 +159,8 @@ namespace Faolan.Core.Database
 		public DbSet<ClassComboScaling> ClassComboScalings { get; set; }
 		public DbSet<ClassSpell> ClassSpells { get; set; }
 		public DbSet<Combo> Combos { get; set; }
+		public DbSet<ConversationEdge> ConversationEdges { get; set; }
+		public DbSet<ConversationEntry> ConversationEntries { get; set; }
 		public DbSet<ConversationNode> ConversationNodes { get; set; }
 		public DbSet<ConversationPacket> ConversationPackets { get; set; }
 		public DbSet<ConversationScreen> ConversationScreens { get; set; }
@@ -429,6 +433,8 @@ namespace Faolan.Core.Database
 			// id is derived from its identity and never store-generated; each child's key is its parent's key plus
 			// its Sequence, so every FK below the root is composite. Children cascade-delete with their parent.
 			modelBuilder.Entity<ConversationNode>().Property(n => n.Id).ValueGeneratedNever();
+			modelBuilder.Entity<ConversationEdge>().Property(e => e.Id).ValueGeneratedNever();
+			modelBuilder.Entity<ConversationEntry>().Property(e => e.Id).ValueGeneratedNever();
 
 			// The other DERIVED-id roots (see DerivedKey): each id is a pure function of the row's identity, so a
 			// re-harvest reproduces it instead of renumbering the table and every child FK under it. Configured
@@ -482,6 +488,21 @@ namespace Faolan.Core.Database
 			// NPC (25 share "Halen van Dummy") can't open another's dialogue. Nullable (create-flow scripted screens have
 			// no captured spawn/template); Restrict, the type is reference data.
 			modelBuilder.Entity<ConversationNode>().HasOne(n => n.NpcTemplate).WithMany().OnDelete(DeleteBehavior.Restrict);
+			modelBuilder.Entity<ConversationEntry>().HasOne(e => e.NpcTemplate).WithMany().OnDelete(DeleteBehavior.Restrict);
+
+			// The dialogue GRAPH (#642). An edge leaves one node and enters another, so the two ends need different
+			// delete behaviour or the model has two cascade paths into the same row: the OUT end cascades (deleting a
+			// screen takes its own branches with it), the IN end does NOT (an edge pointing AT a deleted screen is a
+			// dangling branch the importer must resolve, not something to silently delete twice over). The importer's
+			// rebuild drops edges and entries before nodes for the same reason.
+			modelBuilder.Entity<ConversationNode>().HasMany(n => n.OutgoingEdges).WithOne(e => e.From).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<ConversationEdge>().HasOne(e => e.To).WithMany().OnDelete(DeleteBehavior.NoAction);
+			modelBuilder.Entity<ConversationEdge>().HasOne(e => e.GrantQuest).WithMany().OnDelete(DeleteBehavior.SetNull);
+			modelBuilder.Entity<ConversationEntry>().HasOne(e => e.Node).WithMany().OnDelete(DeleteBehavior.Cascade);
+
+			// SetNull rather than Cascade: losing the trigger object should degrade the conversation to "trigger
+			// unknown", not delete the dialogue (see ConversationEntry.TriggerWorldObjectId).
+			modelBuilder.Entity<ConversationEntry>().HasOne(e => e.TriggerWorldObject).WithMany().OnDelete(DeleteBehavior.SetNull);
 
 			// A summon-only creature's TYPE-level equipment + appearance table (#307), cascade-deletes with its NpcTemplate type.
 			modelBuilder.Entity<NpcTemplate>().HasMany(n => n.Equipment).WithOne(e => e.NpcTemplate).OnDelete(DeleteBehavior.Cascade);

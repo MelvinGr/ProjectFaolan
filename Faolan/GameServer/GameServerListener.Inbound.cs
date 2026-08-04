@@ -2353,7 +2353,7 @@ namespace Faolan.GameServer
 
 			// Real branching dialogue: replay the captured conversation node for whichever NPC/node
 			// the client asked for, re-addressed to the clicked NPC.
-			if (await _conversation.TryReplayConversation(client, args.BccActionId, args.CommandqueueServerId, npcHandle))
+			if (await _conversation.TryReplayConversation(client, args.CommandqueueServerId, npcHandle))
 				return;
 
 			// Only a GREETING click (Field3 == 0) may OPEN a dialogue. The client fires a second

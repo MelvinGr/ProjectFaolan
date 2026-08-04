@@ -52,6 +52,8 @@ namespace Faolan.Tests
 				("ShopItems", await db.ShopItems.CountAsync(ct), 300),
 				("QuestDefinitions", await db.QuestDefinitions.CountAsync(ct), 50),
 				("ConversationNodes", await db.ConversationNodes.CountAsync(ct), 100),
+				("ConversationEdges", await db.ConversationEdges.CountAsync(ct), 100),
+				("ConversationEntries", await db.ConversationEntries.CountAsync(ct), 10),
 				("ConversationPackets", await db.ConversationPackets.CountAsync(ct), 300),
 				("ConversationScreenParameters", await db.ConversationScreenParameters.CountAsync(ct), 3000),
 				("Recipes", await db.Recipes.CountAsync(ct), 100),
@@ -428,18 +430,17 @@ namespace Faolan.Tests
 			var ct = TestContext.Current.CancellationToken;
 
 			var openings = await db
-				.Set<ConversationNode>().Where(n => n.ServerInitiated && n.AnswerPath == "")
-				.Select(n => new { n.Id, n.NpcName, n.TypeId, n.TriggerWorldObjectId })
+				.Set<ConversationEntry>().Where(e => e.Trigger != ConversationTrigger.Talk)
+				.Select(e => new { e.Id, e.NpcName, e.Trigger, e.TriggerWorldObjectId })
 				.ToListAsync(ct);
 
 			Assert.NotEmpty(openings); // Casilda's city-door farewell and Saddur's beach confrontation are shipped content
 
 			foreach (var o in openings)
 			{
-				// TypeId 0 is what keeps these OUT of the talk path: GetConversationScreens matches on it, and every
-				// captured talk node carries its BCC action id (42008). A non-zero one here would make the node
-				// reachable by clicking the NPC, which is not how retail opens it.
-				Assert.Equal(ConversationService.ServerInitiatedTypeId, o.TypeId);
+				// The trigger is what keeps these OUT of the talk path: the runtime looks a root up BY trigger, so a
+				// server-opened root can never be reached by clicking the NPC - which is not how retail opens it.
+				Assert.Equal(o.Trigger == ConversationTrigger.UseWorldObject, o.TriggerWorldObjectId != null);
 
 				// An approach trigger needs no column - the NPC is the target - but it does need an NPC that exists.
 				Assert.True(await db.Set<NpcTemplate>().AnyAsync(t => t.Name == o.NpcName, ct),
@@ -473,9 +474,9 @@ namespace Faolan.Tests
 			foreach (var escort in escorts)
 			{
 				var trigger = await db
-					.Set<ConversationNode>()
-					.Where(n => n.NpcName == escort.Target && n.ServerInitiated && n.TriggerWorldObjectId != null)
-					.Select(n => n.TriggerWorldObjectId)
+					.Set<ConversationEntry>()
+					.Where(e => e.NpcName == escort.Target && e.Trigger == ConversationTrigger.UseWorldObject && e.TriggerWorldObjectId != null)
+					.Select(e => e.TriggerWorldObjectId)
 					.FirstOrDefaultAsync(ct);
 
 				Assert.True(trigger != null,

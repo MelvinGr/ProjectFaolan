@@ -15,7 +15,7 @@ namespace Faolan.Importer.Extractors
 	// Turach's root is three different answer sets depending on chain stage, and only the last one survived.
 	//
 	// The gate does not need to be hand-written, and since #639 none of it is: the captured QUEST STATE at the greeting
-	// (`ConversationEntry.QuestStates` - every quest the capture has seen a full-update or a state flip for, in its
+	// (`ConversationWalk.QuestStates` - every quest the capture has seen a full-update or a state flip for, in its
 	// latest state) is the discriminator. It replaced a five-row table keyed on capture FILE NAMES, which silently
 	// dropped any Casilda screen from a capture nobody had listed.
 	//
@@ -38,9 +38,9 @@ namespace Faolan.Importer.Extractors
 		// (its variants share the same captured quest state - most often a variant gated on something that is not quest
 		// state at all, like the [MALE]/[FEMALE] answer pair, #418). Those are left to Merge's existing packet-count
 		// tiebreak rather than dropped: the goal is to import the BULK and hand-correct the tail, not to be exhaustive.
-		public static List<ConversationEntry> SplitConflicts(IReadOnlyList<ConversationEntry> all, ICollection<string>? report = null)
+		public static List<ConversationWalk> SplitConflicts(IReadOnlyList<ConversationWalk> all, ICollection<string>? report = null)
 		{
-			var result = new List<ConversationEntry>(all.Count);
+			var result = new List<ConversationWalk>(all.Count);
 			var groups = all.GroupBy(e => (
 				Identity: string.IsNullOrEmpty(e.NpcName) ? $"#{e.CapturedNpcHandle}" : e.NpcName,
 				e.TypeId, e.AnswerPath, e.TriggerWorldObjectId));
@@ -110,7 +110,7 @@ namespace Faolan.Importer.Extractors
 		// are the same screen as far as the captures can say - most often one capture of it carried a trailing close
 		// window and the other did not - so handing both the same gate lets Merge keep the richer, which is exactly the
 		// old behaviour, WITHOUT dropping the gates every other variant in the group had earned.
-		private static (Dictionary<string, (uint Quest, QuestState State)> Gates, int Unsplit) Discriminate(List<IGrouping<string, ConversationEntry>> classes)
+		private static (Dictionary<string, (uint Quest, QuestState State)> Gates, int Unsplit) Discriminate(List<IGrouping<string, ConversationWalk>> classes)
 		{
 			// A capture that never showed us a quest state says nothing about which variant this is, so it cannot
 			// contribute pairs; a class of nothing BUT such entries can only ever be the fallback.
@@ -150,7 +150,7 @@ namespace Faolan.Importer.Extractors
 		// The (quest, state) pairs EVERY informative capture of this variant agrees on. Intersecting rather than
 		// unioning is what keeps a pair that one walk happened to carry (an unrelated quest the player picked up) from
 		// being read as the thing that selects the variant.
-		private static HashSet<(uint Quest, QuestState State)> Agreed(IGrouping<string, ConversationEntry> c)
+		private static HashSet<(uint Quest, QuestState State)> Agreed(IGrouping<string, ConversationWalk> c)
 		{
 			HashSet<(uint, QuestState)>? agreed = null;
 			foreach (var e in c)
@@ -169,7 +169,7 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// Every pair ANY capture of this variant carried - what it may not be confused with.
-		private static HashSet<(uint Quest, QuestState State)> Carried(IGrouping<string, ConversationEntry> c)
+		private static HashSet<(uint Quest, QuestState State)> Carried(IGrouping<string, ConversationWalk> c)
 		{
 			return c.SelectMany(e => e.QuestStates ?? new Dictionary<uint, QuestState>()).Select(kv => (kv.Key, kv.Value)).ToHashSet();
 		}
@@ -181,7 +181,7 @@ namespace Faolan.Importer.Extractors
 		// at almost every key. The LDB reference list is stable across those and is exactly the thing that differs when
 		// the screen is genuinely a different one: Turach's roots share the same "Aye?" line and differ only in the
 		// answers they offer.
-		private static string Signature(ConversationEntry entry)
+		private static string Signature(ConversationWalk entry)
 		{
 			var refs = new List<string>();
 			foreach (var packet in entry.Packets)

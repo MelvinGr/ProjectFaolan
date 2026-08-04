@@ -9,14 +9,13 @@ namespace Faolan.Core.Database.Tables
 	// `UseObject` -> `N3Teleport` on a fixed door - while this is a per-NPC LIST the player chooses from inside an
 	// ordinary Knubot conversation, which is why it needs a table.
 	//
-	// ⚠️ THE ROW *IS* THE CONVERSATION WIRING (#514). It is keyed by the dialogue node the player's pick lands on -
-	// `(NpcName, AnswerPath)` - so the runtime needs no separate "this answer sells a trip" overlay: serving a screen
-	// whose (npc, path) has a row here IS the trip. The NPC is identified by NAME, never by a spawn handle, for the
-	// same reason conversations and shops are; the answer path is the stable branch key the dialogue tree already uses
-	// (ConversationNode.AnswerPath). TypeId is not part of the key - every captured travel tree is the ordinary talk
-	// type 42008, so it would only ever repeat.
+	// ⚠️ THE ROW *IS* THE CONVERSATION WIRING (#514). It is keyed by the dialogue EDGE the player's pick takes -
+	// `(FromNodeId, OptionId)` - so the runtime needs no separate "this answer sells a trip" overlay: taking a branch
+	// that has a row here IS the trip. The screen that presents the destination list, which is where retail charges the
+	// fare, is the edge's own From screen - stated by the key rather than derived by string surgery on an answer path
+	// (#642; it used to be `(NpcName, AnswerPath)` with the fare gate computed as "the path minus its last index").
 	//
-	// ⚠️ It is keyed by ANSWER PATH and not by destination map, and that is not a style choice: Wagoner Cordelia offers
+	// ⚠️ It is keyed by the BRANCH and not by destination map, and that is not a style choice: Wagoner Cordelia offers
 	// NINE destinations and every one of them is on her own map (Field of the Dead). A `(NpcName, DestinationMapId)`
 	// key - what this table shipped with until #514 - can hold exactly one of them.
 	//
@@ -44,19 +43,23 @@ namespace Faolan.Core.Database.Tables
 	// travellers exist (the Tortage Smuggler and Wagoner Polus both carry an inline `{teleportplayer}` directive in
 	// their dialogue text instead), so the runtime still tells the two apart by comparing DestinationMapId with the
 	// player's current map and picks the right wire path.
-	[PrimaryKey(nameof(NpcName), nameof(AnswerPath))]
+	[PrimaryKey(nameof(FromNodeId), nameof(OptionId))]
 	public class TravelDestination
 	{
-		// The travel NPC's display name - the stable key (see above).
+		// The screen that PRESENTS the destination list - "Your coin is good enough. Where to?" - and is therefore
+		// where the fare comes off, one pick before any destination is chosen.
+		public uint FromNodeId { get; set; }
+
+		[ForeignKey(nameof(FromNodeId))]
+		public virtual ConversationNode FromNode { get; set; } = null!;
+
+		// The destination option's own LDB string id - which entry of that list buys this trip.
+		public uint OptionId { get; set; }
+
+		// The travel NPC's display name. Not part of the key any more (the screen already belongs to exactly one NPC),
+		// but kept as the label every report, GM command and log line reads.
 		[MaxLength(128)]
 		public string NpcName { get; set; } = null!;
-
-		// The dialogue branch this destination sits on: the ConversationNode.AnswerPath of the screen the pick lands
-		// on ("0>3" = the player picked option 0 at the greeting, then option 3 from the destination list). The
-		// PARENT of this path is the screen that presents the list, which is where the fare is charged - derived
-		// rather than stored, because retail's own tree already states it.
-		[MaxLength(128)]
-		public string AnswerPath { get; set; } = null!;
 
 		public uint DestinationMapId { get; set; }
 

@@ -70,11 +70,16 @@ destinations are all on Field of the Dead, and "the border of Ymir's Pass" is th
 
 ## The wiring is the row
 
-The retail trigger is the conversation itself, so `TravelDestination` is keyed by the dialogue branch the pick
-lands on — `(NpcName, AnswerPath)`, the same stable branch key `ConversationNode` uses. Serving a screen whose
-`(npc, path)` has a row **is** the trip; the screen that presents the list — and therefore charges the fare —
-is that path's **parent**, derived rather than stored, because retail's own tree already states it.
-[V3: LocalTravelTests.TheFareGate_IsTheDestinationsParentScreen]
+The retail trigger is the conversation itself, so `TravelDestination` **is** a dialogue branch: it is keyed by
+`(FromNodeId, OptionId)` — the screen the pick leaves and the option's own LDB string id, the same key
+`ConversationEdge` uses. Taking a branch that has a row here **is** the trip; the screen that presents the list —
+and therefore charges the fare — is that branch's own `From` screen, stated by the key rather than derived.
+[V3: LocalTravelTests.EveryShippedTrip_HasTheListScreenThatChargesForIt]
+
+⚠️ It was keyed by `(NpcName, AnswerPath)` until Gitea #642, with the fare gate computed as "the answer path minus
+its last index". That worked, but it was string surgery over a key that could not name a screen a menu loops back
+to, and a trip whose branch did not exist could be written and sit there unreachable. Now it cannot: the row
+carries a foreign key to the screen.
 
 ⚠️ The old `(NpcName, DestinationMapId)` key could not express this at all: Cordelia offers nine destinations
 and every one of them is on map 1020, so the key had room for exactly one.

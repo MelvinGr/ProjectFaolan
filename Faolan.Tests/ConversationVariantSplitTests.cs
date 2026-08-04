@@ -105,18 +105,18 @@ namespace Faolan.Tests
 		}
 
 		// The screen ids this entry was built from - the test's own handle on which variant a row is.
-		private static string Signature(ConversationEntry e)
+		private static string Signature(ConversationWalk e)
 		{
 			return string.Join(",", e.Packets.Select(p => Regex.Match(Encoding.Latin1.GetString(p), "id=\"(\\d+)\"").Groups[1].Value));
 		}
 
-		private static ConversationEntry Entry(string answerPath, uint[] screenIds, params (uint Quest, QuestState State)[] quests)
+		private static ConversationWalk Entry(string answerPath, uint[] screenIds, params (uint Quest, QuestState State)[] quests)
 		{
 			var packets = screenIds
 				.Select(id => Encoding.Latin1.GetBytes($"<remoteformat id=\"{id}\" category=\"50002\" key=\"k\" knubot=\"0\"  ></remoteformat>"))
 				.ToList();
 
-			return new ConversationEntry(TypeId, answerPath, 0x4DEE9, packets, "Casilda",
+			return new ConversationWalk(TypeId, answerPath, 0x4DEE9, packets, "Casilda",
 				QuestStates: quests.ToDictionary(q => q.Quest, q => q.State));
 		}
 	}

@@ -23,9 +23,9 @@ namespace Faolan.GameServer.World
 	//   3. picking a destination closes the window and teleports, immediately. There is NO confirmation box: the
 	//      scry box in the same capture belongs to the zone-line door the player walked into half a minute later.
 	//
-	// Both steps are driven off the dialogue TREE rather than off any server-side state: a TravelDestination row is
-	// keyed by the answer path its pick lands on, and the fare gate is that path's parent. ConversationService calls
-	// in as it serves each screen.
+	// Both steps are driven off the dialogue GRAPH rather than off any server-side state: a TravelDestination row IS the
+	// edge its pick takes, so the screen that charges the fare is that edge's own From screen (#642 - it used to be
+	// derived by chopping the last index off an answer path). ConversationService calls in as it takes each branch.
 	public sealed class TravelService
 	{
 		private readonly IDatabaseRepository _database;
@@ -51,15 +51,15 @@ namespace Faolan.GameServer.World
 		///     criminal, or an empty wallet), which is the caller's cue to keep the player off the list.
 		///     A screen that presents no list at all is not a fare gate and returns true untouched.
 		/// </summary>
-		public async Task<bool> TryChargeFare(INetworkClient client, string npcName, string listPath)
+		public async Task<bool> TryChargeFare(INetworkClient client, string npcName, uint listNodeId)
 		{
 			var character = client.Session.Character;
 			if (character == null)
 				return true;
 
-			// The fare gate is the PARENT of a destination's answer path: retail's own tree puts the list on one screen
-			// and each destination one pick deeper, so no column has to say which screen charges.
-			var offered = (await DestinationsOf(npcName)).Where(d => ParentPath(d.AnswerPath) == listPath).ToArray();
+			// The fare gate is the screen a destination's branch LEAVES: retail's own tree puts the list on one screen
+			// and each destination one pick deeper, and the edge states which screen that is.
+			var offered = (await DestinationsOf(npcName)).Where(d => d.FromNodeId == listNodeId).ToArray();
 			if (offered.Length == 0)
 				return true;
 
@@ -102,13 +102,13 @@ namespace Faolan.GameServer.World
 		///     Step 3: the player picked a destination. Returns false when this dialogue branch sells no trip, which is
 		///     the normal case for every other conversation screen in the game and must not be treated as an error.
 		/// </summary>
-		public async Task<bool> TryTravel(INetworkClient client, string npcName, string answerPath)
+		public async Task<bool> TryTravel(INetworkClient client, string npcName, uint fromNodeId, uint optionId)
 		{
 			var character = client.Session.Character;
 			if (character == null)
 				return false;
 
-			var destination = (await DestinationsOf(npcName)).FirstOrDefault(d => d.AnswerPath == answerPath);
+			var destination = (await DestinationsOf(npcName)).FirstOrDefault(d => d.FromNodeId == fromNodeId && d.OptionId == optionId);
 			if (destination == null)
 				return false;
 
@@ -147,17 +147,5 @@ namespace Faolan.GameServer.World
 			_logger.LogInformation("Travel: {Character} travelled with \"{Npc}\" to map {Map}.", character.Name, npcName, destination.DestinationMapId);
 		}
 
-		/// <summary>
-		///     The dialogue screen one pick SHALLOWER than <paramref name="answerPath" /> - the screen that offered it.
-		///     "0&gt;3" -&gt; "0", "0" -&gt; "" (the greeting). Kept internal-static so TravelWiringTests can pin it.
-		/// </summary>
-		internal static string ParentPath(string answerPath)
-		{
-			if (string.IsNullOrEmpty(answerPath))
-				return "";
-
-			var cut = answerPath.LastIndexOf('>');
-			return cut < 0 ? "" : answerPath[..cut];
-		}
 	}
 }

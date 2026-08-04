@@ -123,7 +123,7 @@ namespace Faolan.GameServer
 		private async Task CheckPlayerApproachConversations(INetworkClient client, WorldEntity player, Vector3 position)
 		{
 			var names = _approachConversationNpcs ??= [.. await Database.GetApproachConversationNpcs()];
-			if (names.Count == 0 || client.Session.ConversationAnswerPath != null)
+			if (names.Count == 0 || client.Session.ConversationNodeId != null)
 				return; // nothing to open, or a conversation is already up
 
 			var zone = _simulation.World.ZoneForEntity(player);

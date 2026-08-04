@@ -131,10 +131,10 @@ namespace Faolan.Tests
 		[Fact]
 		public void Merge_UnionsBranchesAndDedupesByPath()
 		{
-			var greetingA = new ConversationEntry(42008, "", 0x4DEE9, [[1]], "Kalanthes");
-			var greetingB = new ConversationEntry(42008, "", 0x81906, [[1], [2]], "Kalanthes"); // richer
-			var branch0 = new ConversationEntry(42008, "0>0", 0x4DEE9, [[1]], "Kalanthes");
-			var branch1 = new ConversationEntry(42008, "0>1", 0x81906, [[1]], "Kalanthes");
+			var greetingA = new ConversationWalk(42008, "", 0x4DEE9, [[1]], "Kalanthes");
+			var greetingB = new ConversationWalk(42008, "", 0x81906, [[1], [2]], "Kalanthes"); // richer
+			var branch0 = new ConversationWalk(42008, "0>0", 0x4DEE9, [[1]], "Kalanthes");
+			var branch1 = new ConversationWalk(42008, "0>1", 0x81906, [[1]], "Kalanthes");
 
 			var merged = ConversationExtractor.Merge([greetingA, greetingB, branch0, branch1]);
 

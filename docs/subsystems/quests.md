@@ -367,12 +367,12 @@ These screens are imported as of `c76593a9` (Gitea #523): the extractor used to 
 `TalkToNpc(field3=0)` greeting, and nothing ever ENDED an instance, so a server-opened window could not start one
 and its packets were appended to whatever screen was last open — misattributed rather than merely lost.
 `KnubotOpenChatWindow`/`CloseChatWindow` are exactly paired on the wire, so the close is the instance boundary,
-and `ConversationNode.ServerInitiated` marks the result.
+and a `ConversationEntry` whose `Trigger` is not `Talk` marks the result.
 
-⚠️ **One screen is still merged away: `13228`**, the `{hidegoodbye}Friend?` opener. Casilda has TWO server-opened
-conversations and both key to `AnswerPath ""`, so the longer wins. Their identity needs the TRIGGER, which is why
-the decode above matters — and adding it to `ConversationNode.ComputeId` only for `ServerInitiated` rows keeps it
-a pure function of the row while leaving all 467 talk-node ids untouched. Open on #523.
+⚠️ Casilda has TWO server-opened conversations, and under the old answer-path key both sat at `AnswerPath ""`, so
+the longer merged the other away (`13228`, the `{hidegoodbye}Friend?` opener). Their identity is the TRIGGER, which
+is why the decode above matters — and since #642 the trigger is a column of the ROOT rather than a conditional term
+in a hash, so the two are simply two rows.
 
 ### The importer types goals from their own objective text
 

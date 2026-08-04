@@ -182,9 +182,11 @@ namespace Faolan.Importer.Cli
 		// Same join as the quest half: ciphertext from the client's LDB pages, keys from our own tables. A conversation
 		// SCREEN carries its own (Category, ScreenId, Key1..4), so each line of dialogue decrypts independently.
 		//
-		// Ordered by the node's ANSWER PATH, because that is the shape of the conversation: "" is the greeting, and each
-		// deeper path is what the NPC says after the option the player picked. Reading a whole NPC in path order is how
-		// you find a specific beat - a farewell, a hand-off, a quest grant - rather than guessing which screen it is.
+		// WALKED, in the shape of the conversation itself (#642): each root first, then breadth-first along the option
+		// edges, with every screen indented by how deep it is and labelled with the option that reaches it. Reading a
+		// whole NPC this way is how you find a specific beat - a farewell, a hand-off, a quest grant - rather than
+		// guessing which screen it is. A screen already printed is named again but not re-expanded, so the three genuine
+		// LOOPS in the corpus (Bhaltair, Guard Captain Marcus, Hadrathus) show as loops instead of running forever.
 		private static async Task LdbDialogue(string rdbDir, string? npcFilter)
 		{
 			var ciphertext = EncryptedLdbBlobs(rdbDir);
@@ -199,14 +201,27 @@ namespace Faolan.Importer.Cli
 			var nodes = await db
 				.Set<ConversationNode>().AsNoTracking()
 				.Where(n => npcFilter == null || n.NpcName == npcFilter)
-				.Select(n => new { n.Id, n.NpcName, n.TypeId, n.AnswerPath, n.ConditionQuestId, n.ConditionQuestState, n.GrantQuestId })
+				.Select(n => new { n.Id, n.NpcName, n.ContentKey, n.Discriminator })
 				.ToListAsync();
 
 			if (nodes.Count == 0)
 			{
-				Console.WriteLine($"ldb-dialogue: no conversation nodes for '{npcFilter}'.");
+				Console.WriteLine($"ldb-dialogue: no conversation screens for '{npcFilter}'.");
 				return;
 			}
+
+			var nodeIds = nodes.Select(n => n.Id).ToHashSet();
+			var roots = await db
+				.Set<ConversationEntry>().AsNoTracking()
+				.Where(e => nodeIds.Contains(e.NodeId))
+				.Select(e => new { e.NpcName, e.Trigger, e.TriggerWorldObjectId, e.ConditionQuestId, e.ConditionQuestState, e.NodeId })
+				.ToListAsync();
+			var edges = (await db
+					.Set<ConversationEdge>().AsNoTracking()
+					.Where(e => nodeIds.Contains(e.FromNodeId))
+					.Select(e => new { e.FromNodeId, e.OptionId, e.ToNodeId, e.ConditionQuestId, e.ConditionQuestState, e.GrantQuestId })
+					.ToListAsync())
+				.ToLookup(e => e.FromNodeId);
 
 			var ids = nodes.Select(n => n.Id).ToHashSet();
 			var screens = await db
@@ -217,47 +232,81 @@ namespace Faolan.Importer.Cli
 
 			var byNode = screens.ToLookup(s => s.ConversationNodeId);
 
-			Console.WriteLine($"=== dialogue: {nodes.Count} node(s), {screens.Count} screen(s) ===");
+			Console.WriteLine($"=== dialogue: {nodes.Count} screen(s), {roots.Count} root(s), {edges.SelectMany(g => g).Count()} branch(es), {screens.Count} string(s) ===");
 			int ok = 0, failed = 0;
-			foreach (var node in nodes.OrderBy(n => n.NpcName).ThenBy(n => n.AnswerPath.Length).ThenBy(n => n.AnswerPath))
+			var names = nodes.ToDictionary(n => n.Id, n => n.NpcName);
+			foreach (var root in roots.OrderBy(r => r.NpcName, StringComparer.Ordinal).ThenBy(r => r.Trigger).ThenBy(r => r.ConditionQuestId))
 			{
-				// The gate is the interesting part on a quest NPC: a screen served only while quest N is in state S is
-				// how retail scripts a hand-off, so print it beside the path rather than leaving it in the DB.
-				var gate = node.ConditionQuestId is { } q
-					? $"  [if quest {q} state {node.ConditionQuestState}]"
+				var gate = root.ConditionQuestId is { } q
+					? $"  [if quest {q} state {root.ConditionQuestState}]"
 					: "";
-				var grant = node.GrantQuestId is { } g
-					? $"  [grants quest {g}]"
+				var trigger = root.TriggerWorldObjectId is { } w
+					? $" (object {w})"
 					: "";
-				Console.WriteLine($"\n-- {node.NpcName}  type={node.TypeId}  path='{node.AnswerPath}'{gate}{grant}");
+				Console.WriteLine($"\n== {root.NpcName}  {root.Trigger}{trigger}{gate}");
 
-				foreach (var s in byNode[node.Id].OrderBy(s => s.PacketSequence).ThenBy(s => s.Sequence))
+				// Breadth-first, so the option list of a screen is printed together rather than interleaved with a
+				// depth-first dive down its first branch.
+				var seen = new HashSet<uint>();
+				var queue = new Queue<(uint Node, int Depth, string Label)>();
+				queue.Enqueue((root.NodeId, 0, ""));
+				while (queue.Count > 0)
 				{
-					string text;
-					if (s.Key.IsEmpty)
-						text = "(no key captured)";
-					else if (!ciphertext.TryGetValue((s.Category, s.ScreenId), out var blob))
-						text = $"(no LDB[{s.Category}][{s.ScreenId}] on an English page)";
-					else
+					var (nodeId, depth, label) = queue.Dequeue();
+					var indent = new string(' ', 2 + depth * 2);
+					if (!seen.Add(nodeId))
 					{
-						var plain = LdbKey.Decrypt(blob, s.Key);
-						if (plain == null)
-						{
-							text = "(DECRYPT FAILED)";
-							failed++;
-						}
-						else
-						{
-							text = plain;
-							ok++;
-						}
+						Console.WriteLine($"{indent}{label}-> 0x{nodeId:X8} (already shown - the menu loops back here)");
+						continue;
 					}
 
-					Console.WriteLine($"   [{s.PacketSequence}.{s.Sequence}] cat {s.Category} id {s.ScreenId}: {Flatten(text)}");
+					Console.WriteLine($"{indent}{label}screen 0x{nodeId:X8}");
+					foreach (var s in byNode[nodeId].OrderBy(s => s.PacketSequence).ThenBy(s => s.Sequence))
+					{
+						string text;
+						if (s.Key.IsEmpty)
+							text = "(no key captured)";
+						else if (!ciphertext.TryGetValue((s.Category, s.ScreenId), out var blob))
+							text = $"(no LDB[{s.Category}][{s.ScreenId}] on an English page)";
+						else
+						{
+							var plain = LdbKey.Decrypt(blob, s.Key);
+							if (plain == null)
+							{
+								text = "(DECRYPT FAILED)";
+								failed++;
+							}
+							else
+							{
+								text = plain;
+								ok++;
+							}
+						}
+
+						Console.WriteLine($"{indent}  [{s.PacketSequence}.{s.Sequence}] cat {s.Category} id {s.ScreenId}: {Flatten(text)}");
+					}
+
+					foreach (var e in edges[nodeId].OrderBy(e => e.OptionId).ThenBy(e => e.ConditionQuestId))
+					{
+						var branchGate = e.ConditionQuestId is { } bq
+							? $" [if quest {bq} state {e.ConditionQuestState}]"
+							: "";
+						var grant = e.GrantQuestId is { } g
+							? $" [grants quest {g}]"
+							: "";
+						queue.Enqueue((e.ToNodeId, depth + 1, $"option {e.OptionId}{branchGate}{grant} "));
+					}
 				}
 			}
 
-			Console.WriteLine($"\ndecrypted {ok}/{screens.Count}; {failed} FAILED");
+			// A screen no root reaches is unreachable in game, which the answer-path tree could not even express.
+			var reachable = new HashSet<uint>(roots.Select(r => r.NodeId));
+			foreach (var e in edges.SelectMany(g => g))
+				reachable.Add(e.ToNodeId);
+			foreach (var orphan in nodes.Where(n => !reachable.Contains(n.Id)).OrderBy(n => n.NpcName, StringComparer.Ordinal))
+				Console.WriteLine($"\n!! {orphan.NpcName} screen 0x{orphan.Id:X8} has no root and no inbound branch - unreachable ({orphan.ContentKey})");
+
+			Console.WriteLine($"\ndecrypted {ok}/{screens.Count}; {failed} FAILED; {names.Count} screen(s) held");
 		}
 
 		// `--report ldb-decrypt --report-arg <category>:<id>:<wire key>` - decrypt ONE encrypted LDB string from a key

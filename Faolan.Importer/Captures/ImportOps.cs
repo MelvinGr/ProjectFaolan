@@ -446,164 +446,155 @@ namespace Faolan.Importer.Captures
 			return (added, filled);
 		}
 
-		// OVERWRITE rebuilds the tree from the whole corpus; UPSERT merges a dump into what is already stored (#419),
-		// which is what makes dropping a single new capture in useful. Both run the same comparison - overwrite just
-		// starts from an empty table, so "nothing stored" falls out rather than being a second code path.
+		// Rebuilds the dialogue GRAPH from the whole corpus (#642): the harvested walks are columnized here, folded into
+		// content-addressed nodes + explicit edges by ConversationGraph, and written whole.
 		//
-		// The merge rule is the extractor's, applied against the database: the MOST COMPLETE capture of a screen wins
-		// (most response packets), so a truncated dump can never displace a screen already captured in full. Two
-		// fields are merged rather than overwritten - GrantQuestId and NpcTemplateId are sparsely observed (only the
-		// capture that walked the accept branch sees the grant), so a dump that did not see one must not clear it.
-		// A row marked Verified is hand-reviewed and survives BOTH paths untouched unless `force`. That is what makes
-		// "import the bulk, correct the tail by hand" a workflow rather than a treadmill: without it the next import
-		// silently undoes every correction.
-		public static async Task<ConversationImportResult> ImportConversations(DatabaseContext db, List<ConversationEntry> conversations, bool overwrite, bool force = false)
+		// ⚠️ WHOLE-CORPUS ONLY, which the answer-path tree was not (#419 supported an upsert that merged one new dump
+		// into what was stored). The fold is a global partition over every walk - which screens merge, and which need a
+		// Discriminator, is decided by comparing them against each other - so folding one capture against a database
+		// that no longer remembers the walks it came from cannot reproduce the same classification. The module
+		// therefore advertises Overwrite only, and the merge rule the upsert existed for ("the most complete capture of
+		// a screen wins") is applied inside the fold instead, across all captures at once.
+		//
+		// A row marked Verified is hand-reviewed and survives untouched unless `force`. That is what makes "import the
+		// bulk, correct the tail by hand" a workflow rather than a treadmill. Edges and entries always rebuild: they
+		// are wiring between screens, not content, and half a rebuilt graph is not a graph.
+		public static async Task<ConversationImportResult> ImportConversations(DatabaseContext db, List<ConversationWalk> conversations, bool force = false)
 		{
+			ArgumentNullException.ThrowIfNull(conversations);
+
 			var verified = force
 				? []
 				: (await db.ConversationNodes.Where(n => n.Verified).Select(n => n.Id).ToListAsync()).ToHashSet();
 
-			if (overwrite)
-			{
-				// The drop MUST land before the inserts are staged. The node ids are derived from the node's identity,
-				// so a re-import of the same corpus reuses the very same keys - queueing the deletes and the inserts
-				// into one SaveChanges races them on the same primary key ("UNIQUE constraint failed:
-				// ConversationScreens..."). ExecuteDelete runs the DELETE immediately (inside the importer's
-				// transaction) and cascades to packets/screens/parameters in the database.
-				// A verified row is exempt from the rebuild: overwrite means "make the table what the captures say",
-				// and a hand-reviewed row is a deliberate statement that the captures are wrong there.
-				await db.ConversationNodes.Where(n => force || !n.Verified).ExecuteDeleteAsync();
-
-				// ...but it goes straight to the database and does NOT tell the change tracker, so anything this
-				// context already holds would collide on the identity map when the same (derived) ids are re-added.
-				foreach (var entry in db.ChangeTracker.Entries<ConversationNode>().ToList())
-					entry.State = EntityState.Detached;
-			}
-
 			// A conversation NPC's template must exist to be the FK target (#244); the world is pruned, so a template
 			// resolved from a capture may not be imported - null it out (name-only fallback) rather than fail the FK.
 			var knownTemplates = (await db.NpcTemplates.Select(t => t.TemplateId).ToListAsync()).ToHashSet();
+			var knownQuests = (await db.QuestDefinitions.Select(q => q.QuestId).ToListAsync()).ToHashSet();
+			var knownObjects = (await db.WorldObjects.Select(o => o.Id).ToListAsync()).ToHashSet();
 
-			// The node id is DERIVED from the node's identity (ConversationNode.ComputeId), so a re-harvest of the same
-			// corpus reproduces the same ids and faolan.sql doesn't churn. Two entries hashing to one id is either the
-			// same screen twice (the extractor's Merge should already have deduped it) or a genuine hash collision -
-			// both are import bugs, so name the pair and fail rather than let one screen silently overwrite the other.
-			var byId = new Dictionary<uint, string>();
-			var desired = new List<ConversationNode>();
-
-			foreach (var e in conversations)
-			{
-				// The NAME is the identity the runtime routes on, so it must be present. An entry whose NPC couldn't be
-				// named from its capture's spawns keeps the "#<handle>" fallback the extractor's Merge already dedups
-				// on - a distinct, addressable identity instead of a NULL (which no key constrains).
-				var npcName = string.IsNullOrEmpty(e.NpcName)
-					? $"#{e.CapturedNpcHandle}"
-					: e.NpcName;
-				var id = ConversationNode.ComputeId(npcName, e.TypeId, e.AnswerPath, e.ConditionQuestId, e.ConditionQuestState, e.ServerInitiated, e.TriggerWorldObjectId);
-				var identity = $"{npcName}/{e.TypeId}/'{e.AnswerPath}'/{e.ConditionQuestId}/{e.ConditionQuestState}";
-				if (!byId.TryAdd(id, identity))
-					throw new InvalidOperationException($"Conversation node id 0x{id:X8} is not unique: '{identity}' collides with '{byId[id]}'.");
-
-				desired.Add(new ConversationNode
+			var harvested = conversations
+				.Select(e => new ConversationGraph.Harvested(e with
 				{
-					Id = id,
-					TypeId = e.TypeId,
-					AnswerPath = e.AnswerPath,
-					NpcName = npcName,
+					NpcName = string.IsNullOrEmpty(e.NpcName)
+						// The NAME is the identity the runtime routes on, so it must be present. A walk whose NPC could
+						// not be named from its capture's spawns keeps the "#<handle>" fallback the extractor's Merge
+						// already dedups on - a distinct, addressable identity instead of a NULL (which no key
+						// constrains).
+						? $"#{e.CapturedNpcHandle}"
+						: e.NpcName
+				}, [.. e.Packets.Select(BuildPacket)]))
+				.ToList();
+
+			var graph = ConversationGraph.Fold(harvested);
+
+			// The ids are DERIVED from each row's identity, so a re-harvest of the same corpus reproduces them exactly
+			// and faolan.sql does not churn. Two rows hashing to one id is either the same screen twice (the fold
+			// should already have merged it) or a genuine hash collision - both are import bugs, so name the pair and
+			// fail rather than let one silently overwrite the other.
+			var byId = new Dictionary<uint, string>();
+			foreach (var n in graph.Nodes)
+			{
+				if (!byId.TryAdd(n.Id, $"{n.NpcName} {n.ContentKey}#{n.Discriminator}"))
+					throw new InvalidOperationException($"Conversation node id 0x{n.Id:X8} is not unique: '{n.NpcName} {n.ContentKey}' collides with '{byId[n.Id]}'.");
+			}
+
+			// The rebuild drops the WIRING before the screens: an edge names two nodes, and the model deliberately does
+			// not cascade its inbound end (see DatabaseContext), so deleting a node underneath a live edge is a foreign
+			// key violation rather than a silent orphan.
+			await db.ConversationEntries.ExecuteDeleteAsync();
+			await db.ConversationEdges.ExecuteDeleteAsync();
+			await db.ConversationNodes.Where(n => force || !n.Verified).ExecuteDeleteAsync();
+
+			// ExecuteDelete goes straight to the database and does NOT tell the change tracker, so anything this
+			// context already holds would collide on the identity map when the same (derived) ids are re-added.
+			db.ChangeTracker.Clear();
+
+			var inserted = 0;
+			foreach (var n in graph.Nodes)
+			{
+				if (verified.Contains(n.Id))
+					continue; // hand-reviewed: the stored screen IS the answer
+
+				db.ConversationNodes.Add(new ConversationNode
+				{
+					Id = n.Id,
+					NpcName = n.NpcName,
+					ContentKey = n.ContentKey,
+					Discriminator = n.Discriminator,
+					NpcTemplateId = n.NpcTemplateId is { } t && knownTemplates.Contains(t)
+						? t
+						: null,
+					Packets = n.Packets
+				});
+				inserted++;
+			}
+
+			await db.SaveChangesAsync();
+
+			// The screens have to exist before anything can point at them, so the wiring is a second pass.
+			var nodeIds = graph.Nodes.Select(n => n.Id).Concat(verified).ToHashSet();
+			var edges = 0;
+			foreach (var e in graph.Edges)
+			{
+				// A branch into or out of a screen that did not survive the fold is dangling wiring; dropping it is
+				// what keeps the FK honest, and the count is reported rather than swallowed.
+				if (!nodeIds.Contains(e.FromNodeId) || !nodeIds.Contains(e.ToNodeId))
+					continue;
+
+				db.ConversationEdges.Add(new ConversationEdge
+				{
+					Id = ConversationEdge.ComputeId(e.FromNodeId, e.OptionId, e.ConditionQuestId, e.ConditionQuestState),
+					FromNodeId = e.FromNodeId,
+					OptionId = e.OptionId,
+					ToNodeId = e.ToNodeId,
+					ConditionQuestId = e.ConditionQuestId,
+					ConditionQuestState = e.ConditionQuestState,
+					GrantQuestId = e.GrantQuestId is { } q && knownQuests.Contains(q)
+						? q
+						: null
+				});
+				edges++;
+			}
+
+			var entries = 0;
+			foreach (var e in graph.Entries)
+			{
+				if (!nodeIds.Contains(e.NodeId))
+					continue;
+
+				db.ConversationEntries.Add(new ConversationEntry
+				{
+					Id = ConversationEntry.ComputeId(e.NpcName, e.Trigger, e.TriggerWorldObjectId, e.ConditionQuestId, e.ConditionQuestState),
+					NpcName = e.NpcName,
 					NpcTemplateId = e.NpcTemplateId is { } t && knownTemplates.Contains(t)
 						? t
 						: null,
+					Trigger = e.Trigger,
+					TriggerWorldObjectId = e.TriggerWorldObjectId is { } w && knownObjects.Contains(w)
+						? w
+						: null,
 					ConditionQuestId = e.ConditionQuestId,
 					ConditionQuestState = e.ConditionQuestState,
-					GrantQuestId = e.GrantQuestId == 0
-						? null
-						: e.GrantQuestId,
-					ServerInitiated = e.ServerInitiated,
-					TriggerWorldObjectId = e.TriggerWorldObjectId,
-					Packets = e.Packets.Select((p, i) => BuildPacket(p, i)).ToList()
+					NodeId = e.NodeId
 				});
+				entries++;
 			}
 
-			// What is already there, by id - only the fields the merge decides on.
-			var wanted = desired.Select(d => d.Id).ToList();
-			var stored = await db
-				.ConversationNodes.Where(n => wanted.Contains(n.Id))
-				.Select(n => new
-				{
-					n.Id,
-					PacketCount = n.Packets.Count,
-					n.GrantQuestId,
-					n.NpcTemplateId
-				})
-				.ToDictionaryAsync(x => x.Id);
-
-			var insert = new List<ConversationNode>();
-			var replace = new List<uint>();
-			var kept = 0;
-			var untouched = 0;
-
-			foreach (var node in desired)
-			{
-				// Hand-reviewed rows are left exactly as they are - not replaced, and not even taught the sparse
-				// fields below, because "verified" means the stored row is the answer.
-				if (verified.Contains(node.Id))
-				{
-					untouched++;
-					continue;
-				}
-
-				if (!stored.TryGetValue(node.Id, out var existing))
-				{
-					insert.Add(node);
-					continue;
-				}
-
-				if (node.Packets.Count > existing.PacketCount)
-				{
-					// A richer capture of a screen we already hold: carry the sparse fields across so replacing the
-					// screen cannot lose a grant (or a template gate) that only the older capture observed.
-					node.GrantQuestId ??= existing.GrantQuestId;
-					node.NpcTemplateId ??= existing.NpcTemplateId;
-					replace.Add(node.Id);
-					insert.Add(node);
-					continue;
-				}
-
-				// The stored screen is at least as complete, so it stays - but it can still LEARN the sparse fields
-				// from this capture.
-				kept++;
-				if (node.GrantQuestId is { } grant || node.NpcTemplateId is { } template)
-				{
-					var row = await db.ConversationNodes.FirstAsync(n => n.Id == node.Id);
-					row.GrantQuestId ??= node.GrantQuestId;
-					row.NpcTemplateId ??= node.NpcTemplateId;
-				}
-			}
-
-			// Same-key delete-then-insert has to be two round-trips, for the reason spelled out above.
-			if (replace.Count > 0)
-			{
-				await db.ConversationNodes.Where(n => replace.Contains(n.Id)).ExecuteDeleteAsync();
-
-				// ExecuteDelete goes straight to the database and does NOT tell the change tracker, so a node this
-				// context still holds from an earlier import would collide on the identity map when the replacement
-				// is added under the same (derived) id. Detach them.
-				foreach (var entry in db.ChangeTracker.Entries<ConversationNode>().Where(x => replace.Contains(x.Entity.Id)).ToList())
-					entry.State = EntityState.Detached;
-			}
-
-			db.ConversationNodes.AddRange(insert);
 			await db.SaveChangesAsync();
 
-			return new ConversationImportResult(insert.Count - replace.Count, replace.Count, kept, untouched);
+			var dropped = graph.Edges.Count - edges + (graph.Entries.Count - entries);
+			if (dropped > 0)
+				graph.Report.Add($"{dropped} edge(s)/entrie(s) point at a screen that did not survive the fold - dropped");
+
+			return new ConversationImportResult(inserted, edges, entries, verified.Count, graph.Report);
 		}
 
-		// What an incremental conversation import did: rows newly added, rows replaced by a richer capture, rows left
-		// alone because what is stored is already at least as complete, and rows skipped as hand-verified.
-		//
-		// Protected is reported rather than silent on purpose: a skipped row is exactly the thing you would otherwise
-		// spend an afternoon on, wondering why a re-import "did nothing".
-		public sealed record ConversationImportResult(int Inserted, int Replaced, int Kept, int Protected = 0);
+		// What a conversation rebuild produced: the screens, the branches between them, the roots that open them, and
+		// the rows skipped as hand-verified. `Report` carries what the fold could not do cleanly - a content group it
+		// had to discriminate, a branch whose option list was never captured - because a silent fold is exactly the
+		// thing you would otherwise spend an afternoon on.
+		public sealed record ConversationImportResult(int Nodes, int Edges, int Entries, int Protected, List<string> Report);
 
 		// Rebuild the per-map loot pool (#273) from the captured bag contents. Clean rebuild (the pool is fully derived
 		// from the captures, so a re-run should not accumulate stale rows), keyed for dedup by (MapId, ItemTemplateId).
@@ -1626,7 +1617,7 @@ namespace Faolan.Importer.Captures
 		// ConversationPacket is stored FULLY STRUCTURED (#188): decoded into typed columns + ConversationScreen rows,
 		// no raw Data blob. A packet that doesn't decode to a recognised sub-opcode is a REJECT (throws) rather than a
 		// silent raw-replay - the runtime has no Data fallback, so an un-decodable packet must surface here.
-		private static ConversationPacket BuildPacket(byte[] data, int sequence)
+		internal static ConversationPacket BuildPacket(byte[] data, int sequence)
 		{
 			if (ConversationScreenDecoder.Decode(data) is not { } cols)
 				throw new InvalidOperationException($"Conversation packet #{sequence} did not decode to a recognised sub-opcode (no Data fallback exists).");

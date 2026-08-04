@@ -22,31 +22,95 @@ from the rows via `ConversationScreenColumns.ToScreen` → `RemoteFormatScreenCo
 columns are authoritative. The screen TEXT (`key`) is the captured template; the content `key` is non-computable
 (same as the item TEA keys).
 
-### Keys — derived, so a re-import is byte-stable
+### The dialogue is a GRAPH, keyed by what each screen says (Gitea #642)
 
-The tree carries **no surrogate ids**. A `ConversationNode`'s primary key is DERIVED from its identity —
-`ConversationNode.ComputeId(NpcName, TypeId, AnswerPath, ConditionQuestId, ConditionQuestState)`, FNV-1a over a
-NUL-separated rendering — and each child is keyed by its parent's key plus its own `Sequence`:
-`ConversationPacket` = `(node, Sequence)`, `ConversationScreen` = `(node, PacketSequence, Sequence)`,
-`ConversationScreenParameter` = `(node, PacketSequence, ScreenSequence, Sequence)`.
+Three tables, and between them they are retail's own shape:
 
-The importer rebuilds the whole tree on every re-harvest (`conversations` is an `Overwrite`-only module: the
-merge scores each screen across ALL captures and keeps the winner, so it is not incremental). With
-AUTOINCREMENT that renumbered all 8781 rows every run, churning `faolan.sql` for no semantic change; with
-derived keys two runs over the same corpus produce byte-identical tables. Two consequences worth knowing:
+| table | is | keyed by |
+|---|---|---|
+| `ConversationNode` | one screen | `(NpcName, ContentKey, Discriminator)` |
+| `ConversationEdge` | one branch — clicking option *X* on screen *A* serves screen *B* | `(FromNodeId, OptionId, ConditionQuestId, ConditionQuestState)` |
+| `ConversationEntry` | one root — what OPENS the conversation | `(NpcName, Trigger, TriggerWorldObjectId, ConditionQuestId, ConditionQuestState)` |
 
-- The derived id also **enforces** the identity, which the old unique index could not — two of its columns are
-  nullable and SQL treats NULLs as distinct, so the 232 unconditional nodes were never constrained by it.
+`ContentKey` is the ordered `category:id` list of the screen's remoteformat screens — the NPC's spoken line
+(category **50002**), each option button (**50001**; `0` is the universal *"Goodbye"*, shared by 417 screens) and
+the close screen (**100:0**). In the shipped data that `(id, category)` pair determines the LDB decryption key
+1:1, so it is a content-derived name for the screen. A **spurious trailing close** is excluded, exactly as
+`ConversationService.ServeScreen` excludes it: a captured screen that offers options sometimes also carries a
+`CloseChatWindow` because the capturing session shut the window right after, and the runtime drops that packet so
+the option list stays interactive.
+
+`Trigger` is `Talk` / `UseWorldObject` / `Approach` — the three ways retail opens a window, replacing the
+`ServerInitiated` + `TypeId 0` + `AnswerPath == ""` trio that used to encode it across three columns.
+
+⚠️ **It used to be keyed by the answer-index PATH the player walked** (`""`, `"0"`, `"0>1"`, …), chosen before we
+could read the dialogue's own identifiers off the wire. That key was provably lossy against the shipped data:
+
+- **It could not represent a loop.** Three genuine cycles exist — Bhaltair of Lacheish (7 screens), Guard Captain
+  Marcus (4) and Hadrathus (2) — and a path has to unroll them, which is why `AnswerPath` reached depth 15. It
+  could only unroll as far as some capture happened to walk, so **going round one of these menus twice closed the
+  window on the player**. As an edge back into the graph it just works, with no new capture.
+- **It stored every convergent screen once per route.** 553 harvested walks are 511 distinct screens.
+- **An answer INDEX means different things in different variants of one screen.** Casilda's greeting has six
+  option lists across its quest-state variants; index `0` is `17474` / `8176` / `7615` / `8149` / `12557` / `7617`
+  depending on which was served. The option's own LDB string id means one thing everywhere, so the index is
+  resolved against the screen actually on the player's display and never persisted.
+
+The tree beneath a screen carries **no surrogate ids** either: each child is keyed by its parent's key plus its own
+`Sequence` — `ConversationPacket` = `(node, Sequence)`, `ConversationScreen` = `(node, PacketSequence, Sequence)`,
+`ConversationScreenParameter` = `(node, PacketSequence, ScreenSequence, Sequence)`. The three roots are
+`DerivedKey` ids (FNV-1a over a NUL-separated rendering of the identity above). With AUTOINCREMENT a re-harvest
+renumbered ~17k rows every run, churning `faolan.sql` for no semantic change; derived keys make two runs over the
+same corpus produce byte-identical tables. Two consequences worth knowing:
+
 - Because a re-import reuses the same keys, the rebuild must DELETE before it stages the inserts
-  (`ExecuteDeleteAsync`); queuing both into one `SaveChanges` races them on the same primary key.
+  (`ExecuteDeleteAsync`), and it must drop the WIRING before the screens — an edge names two nodes and its inbound
+  end deliberately does not cascade, so deleting a screen underneath a live edge is a foreign-key violation.
+- `conversations` is **`Overwrite`-only**. The fold is a global partition over every harvested walk — which screens
+  merge, and which need a `Discriminator`, is decided by comparing them against each other — so it cannot be
+  applied to one new dump against a database that has forgotten the walks the rest came from. The merge rule the
+  old incremental upsert existed for (*the most complete capture of a screen wins*) runs inside the fold instead,
+  across all captures at once.
 
 `NpcName` is non-nullable and is the identity the runtime routes on; a node whose NPC could not be named from
 its capture stores the `#<handle>` fallback the merge already dedups on.
 
+### The fold: from harvested walks to the graph
+
+A capture is a **walk** — the player opened a window and clicked down one route — so `ConversationExtractor`
+produces one row per (route position, quest state). `ConversationGraph.Fold` turns those into the graph:
+
+1. **Signature** each walk by its `ContentKey`.
+2. **Partition-refine** within each signature group: two same-content walks MERGE unless a *shared* `(option, gate)`
+   slot leads to children in different classes. Shared-only is what lets a truncated loop lap merge into the fuller
+   screen instead of splitting off; iterate to a fixed point (terminates, and handles cycles).
+3. **Emit** one node per class, `Discriminator` assigned deterministically within the group.
+4. **Emit** the edges and roots from the walks' parent links.
+
+The parent link is **harvested, not derived**: `ConversationWalk.ParentContentKey` / `OptionId` name the screen the
+player was looking at when they picked and the option they clicked, both read off the wire. A path only says "one
+pick shallower", and where a screen has quest-gated variants that is several different screens — Casilda's `2`
+sub-tree was harvested under her five-option `12373` greeting but is itself ungated, so a path-derived parent
+attached it to the three-option unconditional greeting and index 2 named *"Goodbye"*. Where the harvested link does
+not resolve (7 branches: the capture that offered the option lost the merge) the path is the fallback, and the
+count is reported rather than assumed.
+
+**The acceptance gate is a walk replay.** Every harvested walk must still be reachable by starting at the root its
+own capture opened on and clicking the same sequence of option ids: **549 of 553** on the shipped corpus, with the
+4 that are not named in the import log. The fold also reports every screen nothing reaches — a class of defect the
+answer-path key could not even express, because there the path *was* the route.
+
+Two irreducible facts the corpus states, both reported by the import:
+
+- **`Discriminator` is not decoration.** Laranga's `19827` (options: just *"Goodbye"*) is two different screens:
+  one route's *"Goodbye"* goes to `20148`, the other's to `1384`.
+- **The grant rides the branch**, not the screen. Turach's `2832` was harvested twice with identical content, once
+  granting quest 12371 and once granting nothing.
+
 ### Quest-state variants — derived from the captures, not from capture names (Gitea #639)
 
-One NPC says different things at different points in a chain, and every version arrives at the same
-`(NpcName, TypeId, AnswerPath)`. The gate that tells them apart — `ConditionQuestId` + `ConditionQuestState` — is
+One NPC says different things at different points in a chain, and every version says it at the same point in the
+dialogue. The gate that tells them apart — `ConditionQuestId` + `ConditionQuestState` — is
 **derived** by `ConversationVariants.SplitConflicts` from the quest state each capture was in when the screen was
 served (`ConversationEntry.QuestStates`: every quest that capture has seen a full-update or a state flip for, in
 its latest state).

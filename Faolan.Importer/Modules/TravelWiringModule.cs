@@ -13,19 +13,20 @@ namespace Faolan.Importer.Modules
 	// drops the player.
 	//
 	// ⚠️ HARVESTED, not hand-authored - unlike `quest-wiring`, which it otherwise resembles. Retail states every field
-	// of a trip on the wire, so there is nothing left to author: the answer path comes from the player's KnubotAnswer
-	// picks, the destination and arrival from the trip's own GameActionListIIR ("xpos=..;ypos=..;zpos=..;
-	// PlayFieldID=..;Local=1", TravelActionCodec), and the fare from the wallet delta across the conversation. See
-	// TravelDestinationExtractor.
+	// of a trip on the wire, so there is nothing left to author: the branch comes from the player's KnubotAnswer pick
+	// (the screen it answered, and that option's own LDB id), the destination and arrival from the trip's own
+	// GameActionListIIR ("xpos=..;ypos=..;zpos=..;PlayFieldID=..;Local=1", TravelActionCodec), and the fare from the
+	// wallet delta across the conversation. See TravelDestinationExtractor.
 	//
 	// A separate module rather than part of `conversations` because it is a different harvest over the same packets and
-	// writes a different table - and because a targeted re-run of one must not drag the other's heavy rebuild in.
+	// writes a different table.
 	public sealed class TravelWiringModule : IImportModule
 	{
-		// Maps must exist first - DestinationMapId is an FK. Conversations are NOT a hard dependency: the row is keyed
-		// by (name, answer path) and stands on its own, so a targeted `--only travel-wiring` run must not drag the
-		// whole dialogue re-harvest in. The runtime simply finds no node to fire it on until they are imported.
-		public IReadOnlyList<string> DependsOn => [nameof(MapsModule)];
+		// Maps must exist first (DestinationMapId is an FK) and so must the CONVERSATIONS: since #642 the row is keyed
+		// by the dialogue screen its branch leaves, so the screen has to be there to point at. That is stricter than
+		// before - the old (name, answer path) key stood on its own - and it is the point: a trip whose branch does not
+		// exist is dead wiring, and now it cannot be written at all rather than sitting there unreachable.
+		public IReadOnlyList<string> DependsOn => [nameof(MapsModule), nameof(ConversationsModule)];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
 		{
@@ -53,6 +54,20 @@ namespace Faolan.Importer.Modules
 			}
 
 			var known = (await ctx.Db.Maps.Select(m => m.Id).ToListAsync()).ToHashSet();
+			// The screen that presents each NPC's destination list, by its content - the join onto the imported graph.
+			// A content key that matches several screens of one NPC is a discriminated pair (ConversationNode.
+			// Discriminator); the lowest one is taken and the ambiguity reported rather than guessed at silently.
+			var screens = (await ctx.Db.ConversationNodes.Select(n => new
+				{
+					n.Id,
+					n.NpcName,
+					n.ContentKey,
+					n.Discriminator
+				})
+				.ToListAsync())
+				.GroupBy(n => (n.NpcName, n.ContentKey))
+				.ToDictionary(g => g.Key, g => g.OrderBy(n => n.Discriminator).First().Id);
+
 			var added = 0;
 			var updated = 0;
 			var skipped = 0;
@@ -62,18 +77,26 @@ namespace Faolan.Importer.Modules
 				// A missing map would fail the FK at SaveChanges with nothing naming the row, so say which one.
 				if (!known.Contains(trip.DestinationMapId))
 				{
-					Console.WriteLine($"  travel-wiring: skipping \"{trip.NpcName}\" '{trip.AnswerPath}' - map {trip.DestinationMapId} is not imported.");
+					Console.WriteLine($"  travel-wiring: skipping \"{trip.NpcName}\" option {trip.OptionId} - map {trip.DestinationMapId} is not imported.");
 					skipped++;
 					continue;
 				}
 
-				var row = await ctx.Db.TravelDestinations.FirstOrDefaultAsync(d => d.NpcName == trip.NpcName && d.AnswerPath == trip.AnswerPath);
+				if (!screens.TryGetValue((trip.NpcName, trip.FromContentKey), out var fromNodeId))
+				{
+					Console.WriteLine($"  travel-wiring: skipping \"{trip.NpcName}\" option {trip.OptionId} - the screen that offered it is not in the imported graph.");
+					skipped++;
+					continue;
+				}
+
+				var row = await ctx.Db.TravelDestinations.FirstOrDefaultAsync(d => d.FromNodeId == fromNodeId && d.OptionId == trip.OptionId);
 				if (row == null)
 				{
 					ctx.Db.TravelDestinations.Add(new TravelDestination
 					{
+						FromNodeId = fromNodeId,
+						OptionId = trip.OptionId,
 						NpcName = trip.NpcName,
-						AnswerPath = trip.AnswerPath,
 						DestinationMapId = trip.DestinationMapId,
 						Cost = trip.Cost,
 						ArrivalX = trip.ArrivalX,
@@ -87,6 +110,7 @@ namespace Faolan.Importer.Modules
 				if (ctx.ModeFor(Name) == WriteMode.Insert)
 					continue;
 
+				row.NpcName = trip.NpcName;
 				row.DestinationMapId = trip.DestinationMapId;
 				row.Cost = trip.Cost;
 				row.ArrivalX = trip.ArrivalX;
@@ -98,7 +122,7 @@ namespace Faolan.Importer.Modules
 			await ctx.Db.SaveChangesAsync();
 
 			return new ImportResult($"{trips.Count} trip(s) harvested: {added} added, {updated} refreshed" +
-			                        (cleared > 0 ? $", {cleared} cleared" : "") + (skipped > 0 ? $", {skipped} skipped (map not imported)" : "") + ".");
+			                        (cleared > 0 ? $", {cleared} cleared" : "") + (skipped > 0 ? $", {skipped} skipped (map or screen not imported)" : "") + ".");
 		}
 	}
 }

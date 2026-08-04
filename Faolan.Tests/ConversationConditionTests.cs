@@ -4,11 +4,12 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// The quest-state-gated dialogue building block (issue #37): a ConversationNode carries a (ConditionQuestId,
-	// ConditionQuestState) gate, and the runtime serves the variant whose gate matches the player's quest state
-	// (unconditional = fallback). This locks the quest-gate evaluation that picks Casilda's pre- vs post-first-quest
-	// dialogue. Replaced the old Lua-interpreter conditions - the two shapes retail's dialogue Lua used map exactly
-	// onto (X, Completed) and (X, Active), so the gate is a plain state match, no interpreter.
+	// The quest-state-gated dialogue building block (issue #37): both ends of the dialogue graph carry a
+	// (ConditionQuestId, ConditionQuestState) gate - a ConversationEntry decides WHICH greeting an NPC gives, a
+	// ConversationEdge decides WHERE an option leads - and the runtime takes the one whose gate matches the player's
+	// quest state (unconditional = fallback). This locks the gate evaluation that picks Casilda's pre- vs
+	// post-first-quest dialogue. Replaced the old Lua-interpreter conditions - the two shapes retail's dialogue Lua
+	// used map exactly onto (X, Completed) and (X, Active), so the gate is a plain state match, no interpreter.
 	public class ConversationConditionTests
 	{
 		[Fact]
@@ -75,9 +76,9 @@ namespace Faolan.Tests
 			Assert.Null(ConversationService.PickByLatestQuest([Gate(12407, QuestState.Active)], [Held(13479, QuestState.Active)]));
 		}
 
-		private static ConversationNode Gate(uint questId, QuestState state)
+		private static ConversationEdge Gate(uint questId, QuestState state)
 		{
-			return new ConversationNode
+			return new ConversationEdge
 			{
 				ConditionQuestId = questId,
 				ConditionQuestState = state

@@ -25,7 +25,13 @@ namespace Faolan.Importer.Extractors
 	// player's quest state AT THE GREETING. Lets a single capture that talks to one NPC at MULTIPLE chain stages (e.g.
 	// Casilda: offer pre-quest, then "free me" once you have the key) be split per-state, since the answer path alone
 	// ("" greeting both times) can't distinguish them (#264). 0 = no quest active at the greeting.
-	public sealed record ConversationEntry(
+	// ParentContentKey/OptionId: the screen the player was looking at when they picked, and the LDB id of the option
+	// they clicked - both read straight off the wire (#642). This is what LINKS the walk to its parent in the folded
+	// graph, and it has to be harvested rather than derived from the answer path: the path only says "one pick
+	// shallower", and when a screen has quest-gated VARIANTS that is several different screens. Casilda's `2` sub-tree
+	// is the worked example - harvested under her 5-option 12373 greeting, but ungated itself, so a path-derived parent
+	// attached it to the 3-option unconditional greeting and index 2 named the wrong option ("Goodbye").
+	public sealed record ConversationWalk(
 		uint TypeId,
 		string AnswerPath,
 		uint CapturedNpcHandle,
@@ -38,7 +44,9 @@ namespace Faolan.Importer.Extractors
 		uint QuestContextId = 0,
 		bool ServerInitiated = false,
 		uint? TriggerWorldObjectId = null,
-		IReadOnlyDictionary<uint, QuestState>? QuestStates = null);
+		IReadOnlyDictionary<uint, QuestState>? QuestStates = null,
+		string ParentContentKey = "",
+		uint OptionId = 0);
 
 	// Reconstructs each NPC's dialogue as a TREE of screens keyed by answer-index PATH, from the captured request/
 	// response flow. The grammar (memory protocol_conversation_routing): a conversation INSTANCE = TalkToNpc(f3=0)
@@ -76,7 +84,7 @@ namespace Faolan.Importer.Extractors
 		// it is a generic interact ack, not a screen).
 		private static readonly HashSet<uint> ResponseSubOpcodes = [.. KnubotCodec.HandledTypes.Select(t => (uint)t)];
 
-		public static List<ConversationEntry> Extract(IReadOnlyList<CapturedPacket> packets)
+		public static List<ConversationWalk> Extract(IReadOnlyList<CapturedPacket> packets)
 		{
 			var namesByHandle = BuildSpawnNameMap(packets);
 			// handle -> NPC TEMPLATE id (#244): the runtime gates the conversation on the clicked NPC's template so a
@@ -118,7 +126,7 @@ namespace Faolan.Importer.Extractors
 				}
 			}
 
-			var entries = new List<ConversationEntry>();
+			var entries = new List<ConversationWalk>();
 
 			// Per-conversation-instance state, reset at each greeting (TalkToNpc f3=0).
 			var active = false;
@@ -144,6 +152,8 @@ namespace Faolan.Importer.Extractors
 			var index = -1;
 			var path = ""; // answer-index path of the CURRENT screen (the one whose responses we're collecting)
 			var screen = new List<byte[]>();
+			var parentContentKey = ""; // the screen the player picked FROM, by content (#642)
+			uint optionId = 0; // and the LDB id of the option they clicked
 			uint grant = 0; // a quest the server granted while collecting THIS screen's responses (0 = none)
 			var questsSeen = new HashSet<uint>(); // every quest whose full-update appeared earlier in THIS capture
 			// The last quest whose full-update appeared - the active quest at any point in the capture.
@@ -201,6 +211,8 @@ namespace Faolan.Importer.Extractors
 					path = "";
 					screen = [];
 					grant = 0;
+					parentContentKey = "";
+					optionId = 0;
 					instanceContext = currentQuest; // the quest active WHEN the player opened this conversation (#264)
 					instanceQuests = new Dictionary<uint, QuestState>(questStates);
 				}
@@ -233,6 +245,8 @@ namespace Faolan.Importer.Extractors
 					path = "";
 					screen = [p.Bytes];
 					grant = 0;
+					parentContentKey = "";
+					optionId = 0;
 					instanceContext = currentQuest;
 					instanceQuests = new Dictionary<uint, QuestState>(questStates);
 				}
@@ -244,7 +258,17 @@ namespace Faolan.Importer.Extractors
 					&& p.TryParse(KnubotCodec.Parse, out var record) && record is KnubotAnswerIIR pick)
 				{
 					var idx = pick.Index;
+					// The screen being flushed IS the one that offered this option, so name the branch off it - that is
+					// the whole point of harvesting the link rather than deriving it from the answer path.
+					//
+					// ⚠️ Named BEFORE the flush but ASSIGNED after it: Flush() emits the walk for the screen the player
+					// is leaving, and that walk carries the link that reached IT, not the one being taken now.
+					var columnized = ConversationGraph.Columnize(screen);
+					var offered = ConversationGraph.OptionIdsOf(columnized);
+					var named = idx < offered.Count;
 					Flush();
+					parentContentKey = named ? ConversationGraph.ContentKeyOf(columnized) : "";
+					optionId = named ? offered[(int)idx] : 0;
 					path = path.Length == 0
 						? idx.ToString()
 						: $"{path}>{idx}";
@@ -343,7 +367,7 @@ namespace Faolan.Importer.Extractors
 						: null);
 
 
-				entries.Add(new ConversationEntry(typeId, path, npc, [.. screen], name, template,
+				entries.Add(new ConversationWalk(typeId, path, npc, [.. screen], name, template,
 					ConditionQuestId: serverInitiated
 						? serverCondition.Quest
 						: null,
@@ -351,7 +375,8 @@ namespace Faolan.Importer.Extractors
 						? serverCondition.State
 						: null,
 					GrantQuestId: grant, QuestContextId: instanceContext, ServerInitiated: serverInitiated,
-					TriggerWorldObjectId: serverTrigger, QuestStates: new Dictionary<uint, QuestState>(instanceQuests)));
+					TriggerWorldObjectId: serverTrigger, QuestStates: new Dictionary<uint, QuestState>(instanceQuests),
+					ParentContentKey: parentContentKey, OptionId: optionId));
 			}
 		}
 
@@ -438,9 +463,9 @@ namespace Faolan.Importer.Extractors
 		// retired that path - every packet is now constructed from typed columns with the live instance - so the term
 		// selected for a property that could no longer affect anything. Measured over the whole corpus before
 		// removing it: 242 merge keys, 29 with more than one candidate, and the winner changed in ZERO of them.
-		public static List<ConversationEntry> Merge(IEnumerable<ConversationEntry> all)
+		public static List<ConversationWalk> Merge(IEnumerable<ConversationWalk> all)
 		{
-			var best = new Dictionary<(string, uint, string, uint?, QuestState?, uint?), (int score, ConversationEntry entry)>();
+			var best = new Dictionary<(string, uint, string, uint?, QuestState?, uint?), (int score, ConversationWalk entry)>();
 			foreach (var e in all)
 			{
 				var identity = string.IsNullOrEmpty(e.NpcName)

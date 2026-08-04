@@ -202,10 +202,10 @@
 							<tr>
 								<th title="the conversation's NPC (the stable routing key)">NPC</th>
 								<th title="the NPC's template id — the gate that stops a same-named NPC opening this tree">Template</th>
-								<th title="the answer-index path to the screen: empty = the greeting">Path</th>
+								<th title="where in the NPC's dialogue graph this sits">Where</th>
 								<th title="what this screen does for THIS quest">Role</th>
 								<th title="the quest state the gated variant applies in">State</th>
-								<th title="TRUE when retail opens this window itself, with no player click in front of it">Server-opened</th>
+								<th title="what opens it: a branch the player clicks, or a root retail fires itself">Trigger</th>
 								<th title="for a server-opened screen: the world object whose use fired it">Trigger object</th>
 							</tr>
 							</thead>
@@ -215,9 +215,7 @@
 								<tr>
 									<td>@c.NpcName</td>
 									<td class="n">@(c.NpcTemplateId?.ToString() ?? "—")</td>
-									<td>@(string.IsNullOrEmpty(c.AnswerPath)
-										      ? "(greeting)"
-										      : c.AnswerPath)</td>
+									<td>@c.Where</td>
 									<td>
 										@if (c.GrantQuestId == _quest.QuestId)
 										{
@@ -231,9 +229,7 @@
 									<td>@(c.ConditionQuestId == _quest.QuestId
 										      ? c.ConditionQuestState?.ToString() ?? "any"
 										      : "—")</td>
-									<td>@(c.ServerInitiated
-										      ? "yes"
-										      : "—")</td>
+									<td>@c.Trigger</td>
 									<td class="n">@(c.TriggerWorldObjectId?.ToString() ?? "—")</td>
 								</tr>
 							}
@@ -252,9 +248,10 @@
 					<p class="hint">
 						How a quest is ENTERED and how its dialogue changes while it runs. A <b>grants</b> screen persists the quest
 						the moment the player walks that branch of the tree; a <b>gated on</b> screen is a variant the NPC serves
-						only while the player holds this quest in the given state. A <b>server-opened</b> row is one retail opens
-						itself, with no player click in front of it — it is not reachable by talking, so it needs its trigger.
-						Edit these in the <a href="/admin/db">DB editor</a> (<code>ConversationNodes</code>); they are shown here
+						only while the player holds this quest in the given state. A root whose trigger is not <b>Talk</b> is one
+						retail opens itself, with no player click in front of it — it is not reachable by talking, so it needs
+						its trigger object. Edit these in the <a href="/admin/db">DB editor</a>
+						(<code>ConversationEdges</code> / <code>ConversationEntries</code>); they are shown here
 						because a quest nothing grants looks perfectly well-formed on the rows above.
 					</p>
 

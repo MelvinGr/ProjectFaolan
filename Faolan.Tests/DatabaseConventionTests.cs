@@ -101,18 +101,26 @@ namespace Faolan.Tests
 			var ct = TestContext.Current.CancellationToken;
 
 			var nodes = await db.ConversationNodes.AsNoTracking().ToListAsync(ct);
+			var edges = await db.ConversationEdges.AsNoTracking().ToListAsync(ct);
+			var entries = await db.ConversationEntries.AsNoTracking().ToListAsync(ct);
 			var spawns = await db.NpcSpawns.AsNoTracking().ToListAsync(ct);
 			var areas = await db.NpcSpawnAreas.AsNoTracking().ToListAsync(ct);
 			var objects = await db.WorldObjects.AsNoTracking().ToListAsync(ct);
 
 			Assert.NotEmpty(nodes);
+			Assert.NotEmpty(edges);
+			Assert.NotEmpty(entries);
 			Assert.NotEmpty(spawns);
 			Assert.NotEmpty(areas);
 			Assert.NotEmpty(objects);
 
 			var wrong = new List<string>();
 			foreach (var n in nodes.Where(n => n.Id != n.ComputeId()))
-				wrong.Add($"ConversationNode {n.Id} ('{n.NpcName}' '{n.AnswerPath}') != {n.ComputeId()}");
+				wrong.Add($"ConversationNode {n.Id} ('{n.NpcName}' {n.ContentKey}#{n.Discriminator}) != {n.ComputeId()}");
+			foreach (var e in edges.Where(e => e.Id != e.ComputeId()))
+				wrong.Add($"ConversationEdge {e.Id} ({e.FromNodeId} -{e.OptionId}->) != {e.ComputeId()}");
+			foreach (var e in entries.Where(e => e.Id != e.ComputeId()))
+				wrong.Add($"ConversationEntry {e.Id} ('{e.NpcName}' {e.Trigger}) != {e.ComputeId()}");
 			foreach (var s in spawns.Where(s => s.Id != s.ComputeId()))
 				wrong.Add($"NpcSpawn {s.Id} (map {s.MapId} @ {s.Position}) != {s.ComputeId()}");
 			foreach (var a in areas.Where(a => a.Id != a.ComputeId()))

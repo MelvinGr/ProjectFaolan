@@ -1153,15 +1153,10 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("Combos");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationEdge", b =>
                 {
                     b.Property<uint>("Id")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("AnswerPath")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
 
                     b.Property<uint?>("ConditionQuestId")
                         .HasColumnType("INTEGER");
@@ -1169,7 +1164,44 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<int?>("ConditionQuestState")
                         .HasColumnType("INTEGER");
 
+                    b.Property<uint>("FromNodeId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<uint?>("GrantQuestId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("OptionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("ToNodeId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FromNodeId");
+
+                    b.HasIndex("GrantQuestId");
+
+                    b.HasIndex("ToNodeId");
+
+                    b.ToTable("ConversationEdges", t =>
+                        {
+                            t.HasCheckConstraint("CK_ConversationEdge_ConditionQuestState", "ConditionQuestState IN (0, 1)");
+                        });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationEntry", b =>
+                {
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint?>("ConditionQuestId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ConditionQuestState")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("NodeId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("NpcName")
@@ -1180,13 +1212,49 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint?>("NpcTemplateId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("ServerInitiated")
+                    b.Property<int>("Trigger")
                         .HasColumnType("INTEGER");
 
                     b.Property<uint?>("TriggerWorldObjectId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<uint>("TypeId")
+                    b.HasKey("Id");
+
+                    b.HasIndex("NodeId");
+
+                    b.HasIndex("NpcName");
+
+                    b.HasIndex("NpcTemplateId");
+
+                    b.HasIndex("TriggerWorldObjectId");
+
+                    b.ToTable("ConversationEntries", t =>
+                        {
+                            t.HasCheckConstraint("CK_ConversationEntry_ConditionQuestState", "ConditionQuestState IN (0, 1)");
+
+                            t.HasCheckConstraint("CK_ConversationEntry_Trigger", "Trigger IN (0, 1, 2)");
+                        });
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
+                {
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContentKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint>("Discriminator")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("NpcName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<uint?>("NpcTemplateId")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("Verified")
@@ -1194,13 +1262,9 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GrantQuestId");
+                    b.HasIndex("NpcName");
 
                     b.HasIndex("NpcTemplateId");
-
-                    b.HasIndex("TriggerWorldObjectId");
-
-                    b.HasIndex("NpcName", "TypeId", "AnswerPath");
 
                     b.ToTable("ConversationNodes");
                 });
@@ -3637,13 +3701,11 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.TravelDestination", b =>
                 {
-                    b.Property<string>("NpcName")
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
+                    b.Property<uint>("FromNodeId")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<string>("AnswerPath")
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
+                    b.Property<uint>("OptionId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float?>("ArrivalX")
                         .HasColumnType("REAL");
@@ -3660,7 +3722,12 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<uint>("DestinationMapId")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("NpcName", "AnswerPath");
+                    b.Property<string>("NpcName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("FromNodeId", "OptionId");
 
                     b.HasIndex("DestinationMapId");
 
@@ -4391,11 +4458,39 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Navigation("Spell");
                 });
 
-            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationEdge", b =>
                 {
+                    b.HasOne("Faolan.Core.Database.Tables.ConversationNode", "From")
+                        .WithMany("OutgoingEdges")
+                        .HasForeignKey("FromNodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Faolan.Core.Database.Tables.QuestDefinition", "GrantQuest")
                         .WithMany()
-                        .HasForeignKey("GrantQuestId");
+                        .HasForeignKey("GrantQuestId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Faolan.Core.Database.Tables.ConversationNode", "To")
+                        .WithMany()
+                        .HasForeignKey("ToNodeId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("From");
+
+                    b.Navigation("GrantQuest");
+
+                    b.Navigation("To");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationEntry", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.ConversationNode", "Node")
+                        .WithMany()
+                        .HasForeignKey("NodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
                         .WithMany()
@@ -4404,13 +4499,24 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.HasOne("Faolan.Core.Database.Tables.WorldObject", "TriggerWorldObject")
                         .WithMany()
-                        .HasForeignKey("TriggerWorldObjectId");
+                        .HasForeignKey("TriggerWorldObjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("GrantQuest");
+                    b.Navigation("Node");
 
                     b.Navigation("NpcTemplate");
 
                     b.Navigation("TriggerWorldObject");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.NpcTemplate", "NpcTemplate")
+                        .WithMany()
+                        .HasForeignKey("NpcTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("NpcTemplate");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationPacket", b =>
@@ -5460,7 +5566,15 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("Faolan.Core.Database.Tables.ConversationNode", "FromNode")
+                        .WithMany()
+                        .HasForeignKey("FromNodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("DestinationMap");
+
+                    b.Navigation("FromNode");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.WorldObject", b =>
@@ -5559,6 +5673,8 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.ConversationNode", b =>
                 {
+                    b.Navigation("OutgoingEdges");
+
                     b.Navigation("Packets");
                 });
 
