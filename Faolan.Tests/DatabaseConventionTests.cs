@@ -6,8 +6,10 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Interfaces;
+using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Xunit;
 
 namespace Faolan.Tests
@@ -129,6 +131,37 @@ namespace Faolan.Tests
 				wrong.Add($"WorldObject {o.Id} (map {o.MapId} display {o.DisplayKind}/{o.DisplayId}/{o.DisplayToken}) != {o.ComputeId()}");
 
 			Assert.True(wrong.Count == 0, $"{wrong.Count} row(s) carry an id that is not derived from their identity: {string.Join("; ", wrong.Take(5))}");
+		}
+
+		// No GAME-CONTENT table may have a store-generated key. That is the invariant CLAUDE.md states when it says
+		// the `faolan.seq.*` sidecars are expected to be empty - and it was quietly false: `FeatIdMaps.WireFeatId` is
+		// harvested from RDB 1000042 and assigned explicitly by RdbFeatImporter, yet it was declared AUTOINCREMENT,
+		// so the sidecar carried a high-water mark of 2,000,500 over 6,593 rows (#646).
+		//
+		// A generated key on a table the importer delete+reinserts is a real defect, not cosmetics: the value is
+		// reassigned on every re-harvest, so a reimport churns thousands of `faolan.sql` lines for zero semantic
+		// change and cascades into every child FK. The scope is exactly the seed's own table set (SqlSeedWriter's
+		// ContentTables), because PLAYER state legitimately generates ids - a new character or auction listing has
+		// no natural key to be assigned from.
+		[Fact]
+		public async Task NoGameContentTable_HasAStoreGeneratedKey()
+		{
+			await using var db = new DatabaseContext(TestDb.ReadOnly(TestDb.GameDatabase));
+
+			var content = SqlSeedWriter.ContentTables(db);
+			Assert.NotEmpty(content);
+
+			var offenders = content
+				.SelectMany(table => table
+					.SelectMany(entity => entity.FindPrimaryKey()?.Properties ?? [])
+					.Where(property => property.ValueGenerated != ValueGenerated.Never)
+					.Select(property => $"{table.Key}.{property.Name} ({property.ValueGenerated})"))
+				.Distinct()
+				.ToList();
+
+			Assert.True(offenders.Count == 0,
+				$"Game-content tables must key on a natural or derived id, never a store-generated one - add " +
+				$".ValueGeneratedNever() and a migration. Offenders: {string.Join(", ", offenders)}");
 		}
 	}
 }

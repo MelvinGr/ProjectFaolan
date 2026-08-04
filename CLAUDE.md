@@ -176,7 +176,10 @@ Two things already run ahead of that move:
   identity-sequence high-water marks, and no game-content table has a store-generated key any more — every one is
   keyed by its identity (see the model conventions above). They are still generated and still part of the restore
   because they repopulate automatically the moment a generated key reappears; an empty sidecar is the signal that
-  the seed is fully identity-keyed, not that something failed.
+  the seed is fully identity-keyed, not that something failed. This was an *aspiration* until #646 — `FeatIdMaps`
+  was still AUTOINCREMENT over an id `RdbFeatImporter` assigns itself, so the SQLite sidecar carried one line. It
+  is now a GATE: `DatabaseConventionTests.NoGameContentTable_HasAStoreGeneratedKey` fails the build on the next
+  one, so the sidecars cannot quietly go non-empty again.
   It is GENERATED from the EF model (`SqlSeedWriter`), not by `sqlite3 .dump`, because a dump is SQLite-only:
   identifiers are quoted (Postgres folds unquoted `Items` to `items`), every row carries an explicit column list
   (so column ORDER is irrelevant), literals come from each property's **CLR type** rather than the value the

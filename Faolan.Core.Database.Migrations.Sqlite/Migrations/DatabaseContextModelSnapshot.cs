@@ -1496,7 +1496,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
             modelBuilder.Entity("Faolan.Core.Database.Tables.FeatIdMap", b =>
                 {
                     b.Property<uint>("WireFeatId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
                     b.Property<uint>("BaseIndex")

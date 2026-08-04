@@ -287,6 +287,7 @@ namespace Faolan.Core.Database
 			// EF must not treat the integer PK as auto-increment (like Character/RespawnPoint/MorphTarget below).
 			modelBuilder.Entity<Ability>().Property(a => a.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Feat>().Property(f => f.Id).ValueGeneratedNever(); // the RDB template id, the same id space the wire uses
+			modelBuilder.Entity<FeatIdMap>().Property(f => f.WireFeatId).ValueGeneratedNever(); // harvested from RDB 1000042 by RdbFeatImporter (#646)
 			modelBuilder.Entity<Spell>().Property(s => s.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Combo>().Property(c => c.Id).ValueGeneratedNever();
 			modelBuilder.Entity<Item>().Property(i => i.Id).ValueGeneratedNever();
