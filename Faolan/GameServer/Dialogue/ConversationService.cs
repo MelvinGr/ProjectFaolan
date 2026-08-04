@@ -136,7 +136,7 @@ namespace Faolan.GameServer.Dialogue
 				return false;
 
 			var quests = await _database.GetCharacterQuests(client.Session.Character.Id);
-			var opening = variants.FirstOrDefault(v => QuestConditionMet(v, quests)) ?? variants.FirstOrDefault(v => v.ConditionQuestId == null);
+			var opening = PickByLatestQuest(variants, quests) ?? variants.FirstOrDefault(v => v.ConditionQuestId == null);
 			if (opening == null)
 				return false;
 
@@ -165,7 +165,7 @@ namespace Faolan.GameServer.Dialogue
 			// come first and the unconditional one is the fallback - the same rule PickConversationScreen uses for talk
 			// dialogue, so a stale gate cannot hijack a player who is not in that state.
 			var quests = await _database.GetCharacterQuests(client.Session.Character.Id);
-			var opening = variants.FirstOrDefault(v => QuestConditionMet(v, quests)) ?? variants.FirstOrDefault(v => v.ConditionQuestId == null);
+			var opening = PickByLatestQuest(variants, quests) ?? variants.FirstOrDefault(v => v.ConditionQuestId == null);
 			if (opening == null)
 				return false;
 
@@ -269,24 +269,43 @@ namespace Faolan.GameServer.Dialogue
 				? []
 				: await _database.GetCharacterQuests(character.Id);
 
-			ConversationNode? fallback = null;
-			foreach (var v in variants)
+			var matched = PickByLatestQuest(variants, quests);
+			if (matched != null)
 			{
-				if (v.ConditionQuestId == null)
-				{
-					fallback = v;
-					continue;
-				}
-
-				if (QuestConditionMet(v, quests))
-				{
-					_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant (quest {Quest} {State}).", npcName, answerPath, v.ConditionQuestId,
-						v.ConditionQuestState);
-					return v;
-				}
+				_logger.LogInformation("Conversation: npc={Name} path='{Path}' matched conditioned variant (quest {Quest} {State}).", npcName, answerPath, matched.ConditionQuestId,
+					matched.ConditionQuestState);
+				return matched;
 			}
 
-			return fallback;
+			return variants.FirstOrDefault(v => v.ConditionQuestId == null);
+		}
+
+		// The gated variant to serve when SEVERAL gates pass at once, or null when none does.
+		//
+		// Gates overlap by construction: the importer derives them from the quest state each screen was captured in
+		// (#639), and a player deep in a chain holds every earlier quest of it too - Casilda's escort greeting is gated
+		// on 12407 Active, and the two greetings after it sit on top of a 12407 that is still active. The beat the
+		// player is actually ON is the quest they accepted MOST RECENTLY, and CharacterQuest is insert-ordered, so the
+		// highest row id among the passing gates is that beat. Without this the pick fell to whatever order the query
+		// returned, which is a database detail rather than a rule.
+		internal static ConversationNode? PickByLatestQuest(IReadOnlyCollection<ConversationNode> variants, IReadOnlyCollection<CharacterQuest> quests)
+		{
+			ConversationNode? best = null;
+			var bestRank = 0u;
+			foreach (var v in variants)
+			{
+				if (v.ConditionQuestId is not { } questId)
+					continue;
+
+				var held = quests.FirstOrDefault(q => q.QuestId == questId && q.State == v.ConditionQuestState);
+				if (held == null || (best != null && held.Id <= bestRank))
+					continue;
+
+				best = v;
+				bestRank = held.Id;
+			}
+
+			return best;
 		}
 
 		// Serves one dialogue SCREEN: re-addresses its captured response packets to the live player + clicked NPC and

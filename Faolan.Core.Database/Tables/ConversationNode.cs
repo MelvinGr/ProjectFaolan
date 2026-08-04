@@ -29,9 +29,12 @@ namespace Faolan.Core.Database.Tables
 		// The QUEST-STATE gate for this screen variant - how the SAME (NpcName, TypeId, AnswerPath) serves different
 		// dialogue by quest state (e.g. Casilda's pre- vs post-first-quest greeting). NULL = unconditional (the fallback).
 		// When set, the variant applies only while the player holds quest ConditionQuestId in state ConditionQuestState
-		// (Active = accepted-not-completed, Completed = turned in). The runtime picks the first variant whose gate passes,
-		// else the unconditional one. The importer tags each captured variant with the state it was captured in
-		// (ConversationConditions). Replaced the old free-form Lua condition source (issue #37); the two shapes retail's
+		// (Active = accepted-not-completed, Completed = turned in). Several gates can pass at once, so the runtime serves
+		// the one whose quest the player accepted MOST RECENTLY - the beat they are actually on - and the unconditional
+		// variant only when none passes. The importer DERIVES the gate from the quest state the capture was in when the
+		// screen was served (ConversationVariants); it used to be a hand-written table keyed on capture FILE NAMES, which
+		// silently dropped any screen from a capture nobody had listed (#639). Replaced the free-form Lua condition
+		// source (issue #37); the two shapes retail's
 		// Lua actually used - HasCompletedQuest(X) and HasQuest(X) and not HasCompletedQuest(X) - are exactly these two
 		// columns, so no interpreter is needed.
 		public uint? ConditionQuestId { get; set; }

@@ -40,6 +40,41 @@ namespace Faolan.Tests
 			Assert.False(ConversationService.QuestConditionMet(gate, [Held(13479, QuestState.Completed)]));
 		}
 
+		// Gates OVERLAP by construction since #639: the importer derives them from the quest state each variant was
+		// captured in, and a player deep in a chain still holds every earlier quest of it. Casilda's escort greeting is
+		// gated on 12407 Active and the two greetings after it sit on top of a 12407 that is STILL active, so all three
+		// pass at once. The beat the player is on is the quest they accepted most recently.
+		[Fact]
+		public void OverlappingGates_ServeTheMostRecentlyAcceptedQuest()
+		{
+			var escort = Gate(12407, QuestState.Active);
+			var later = Gate(12369, QuestState.Active);
+
+			// CharacterQuest is insert-ordered, so the higher row id is the quest accepted later.
+			var quests = new[] { Held(12407, QuestState.Active, id: 4), Held(12369, QuestState.Active, id: 9) };
+
+			Assert.Same(later, ConversationService.PickByLatestQuest([escort, later], quests));
+			Assert.Same(later, ConversationService.PickByLatestQuest([later, escort], quests)); // order-independent
+		}
+
+		// Once the later quest is turned in, its Active gate stops passing and the escort greeting is served again.
+		[Fact]
+		public void OverlappingGates_FallBackToTheEarlierBeatWhenTheLaterGateStopsPassing()
+		{
+			var escort = Gate(12407, QuestState.Active);
+			var later = Gate(12369, QuestState.Active);
+			var quests = new[] { Held(12407, QuestState.Active, id: 4), Held(12369, QuestState.Completed, id: 9) };
+
+			Assert.Same(escort, ConversationService.PickByLatestQuest([escort, later], quests));
+		}
+
+		// No gate passes -> the caller serves the unconditional variant.
+		[Fact]
+		public void NoGatePasses_PicksNothing()
+		{
+			Assert.Null(ConversationService.PickByLatestQuest([Gate(12407, QuestState.Active)], [Held(13479, QuestState.Active)]));
+		}
+
 		private static ConversationNode Gate(uint questId, QuestState state)
 		{
 			return new ConversationNode
@@ -49,10 +84,11 @@ namespace Faolan.Tests
 			};
 		}
 
-		private static CharacterQuest Held(uint questId, QuestState state)
+		private static CharacterQuest Held(uint questId, QuestState state, uint id = 0)
 		{
 			return new CharacterQuest
 			{
+				Id = id,
 				QuestId = questId,
 				State = state
 			};

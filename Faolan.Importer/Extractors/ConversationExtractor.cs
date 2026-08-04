@@ -37,7 +37,8 @@ namespace Faolan.Importer.Extractors
 		uint GrantQuestId = 0,
 		uint QuestContextId = 0,
 		bool ServerInitiated = false,
-		uint? TriggerWorldObjectId = null);
+		uint? TriggerWorldObjectId = null,
+		IReadOnlyDictionary<uint, QuestState>? QuestStates = null);
 
 	// Reconstructs each NPC's dialogue as a TREE of screens keyed by answer-index PATH, from the captured request/
 	// response flow. The grammar (memory protocol_conversation_routing): a conversation INSTANCE = TalkToNpc(f3=0)
@@ -131,6 +132,12 @@ namespace Faolan.Importer.Extractors
 			uint lastQuestId = 0;
 			QuestState? lastQuestState = null;
 			var lastQuestAt = int.MinValue;
+			// The player's WHOLE quest state as the capture has told it so far - every quest the capture has seen a
+			// full-update or a state flip for, in its latest state. QuestContextId (the single last quest) is a
+			// one-quest projection of this, and it is too coarse to tell some variants apart: the Hoxxling gameplay
+			// capture greets Casilda TWICE at context 13479 and gets a different option list each time, because what
+			// actually changed between them was a DIFFERENT quest's state (ConversationVariants.SplitConflicts).
+			var questStates = new Dictionary<uint, QuestState>();
 			(uint? Quest, QuestState? State) serverCondition = (null, null);
 			uint lastUseObjectHandle = 0;
 			var lastUseObjectAt = int.MinValue; // packet index of that UseObject, for the window test
@@ -150,6 +157,7 @@ namespace Faolan.Importer.Extractors
 			// 84.5s naming 12373, which is what the player was on for the two Turach greetings at 29.3s and 43.6s.
 			var currentQuest = InitialQuestContext(packets);
 			var instanceContext = currentQuest; // currentQuest AT the active instance's greeting - the player's state when they talked
+			var instanceQuests = new Dictionary<uint, QuestState>(); // questStates AT that greeting - the whole picture, not just the last quest
 
 			foreach (var p in packets)
 			{
@@ -194,6 +202,7 @@ namespace Faolan.Importer.Extractors
 					screen = [];
 					grant = 0;
 					instanceContext = currentQuest; // the quest active WHEN the player opened this conversation (#264)
+					instanceQuests = new Dictionary<uint, QuestState>(questStates);
 				}
 				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: ConversationScreenDecoder.OpenChatWindow } && !active)
 				{
@@ -225,6 +234,7 @@ namespace Faolan.Importer.Extractors
 					screen = [p.Bytes];
 					grant = 0;
 					instanceContext = currentQuest;
+					instanceQuests = new Dictionary<uint, QuestState>(questStates);
 				}
 				// The player picked option `idx`: the current screen is complete (emit it), and the responses that
 				// follow belong to the child screen reached by that option. Selected by the RECORD's type rather
@@ -251,6 +261,7 @@ namespace Faolan.Importer.Extractors
 							? QuestState.Active
 							: QuestState.Completed;
 						lastQuestAt = index;
+						questStates[flip.QuestId] = lastQuestState.Value;
 					}
 				}
 				else if (p is { IsDownload: true, IsIirCarrier: true, SubOpcode: QuestFullUpdateCodec.Opcode })
@@ -275,6 +286,11 @@ namespace Faolan.Importer.Extractors
 						lastQuestId = questId;
 						lastQuestState = QuestState.Active;
 						lastQuestAt = index;
+
+						// A full-update does NOT un-complete a quest: retail re-sends the record on a re-display, and the
+						// journal keeps showing completed entries. Only an explicit state flip may move a quest back.
+						if (questStates.GetValueOrDefault(questId) != QuestState.Completed)
+							questStates[questId] = QuestState.Active;
 						if (active && path.Length != 0 && questsSeen.Add(questId))
 							grant = questId;
 						else
@@ -335,7 +351,7 @@ namespace Faolan.Importer.Extractors
 						? serverCondition.State
 						: null,
 					GrantQuestId: grant, QuestContextId: instanceContext, ServerInitiated: serverInitiated,
-					TriggerWorldObjectId: serverTrigger));
+					TriggerWorldObjectId: serverTrigger, QuestStates: new Dictionary<uint, QuestState>(instanceQuests)));
 			}
 		}
 

@@ -14,11 +14,12 @@ namespace Faolan.Importer.Extractors
 	// worse, and the longer wins, silently. That is how Turach's and Laranga's fresh-character greetings were lost:
 	// Turach's root is three different answer sets depending on chain stage, and only the last one survived.
 	//
-	// The gate does not need to be hand-written. `ConversationEntry.QuestContextId` - the quest active at that greeting
-	// - is already extracted, and it IS the discriminator: in the necromancer play2 capture Turach appears at contexts
-	// 0 / 10320 / 12371 and Laranga at 0 / 10286, one-to-one with their five distinct trees.
+	// The gate does not need to be hand-written, and since #639 none of it is: the captured QUEST STATE at the greeting
+	// (`ConversationEntry.QuestStates` - every quest the capture has seen a full-update or a state flip for, in its
+	// latest state) is the discriminator. It replaced a five-row table keyed on capture FILE NAMES, which silently
+	// dropped any Casilda screen from a capture nobody had listed.
 	//
-	// ⚠️ But gating EVERY entry on its context would be wrong: greet a vendor while some unrelated quest happens to be
+	// ⚠️ But gating EVERY entry on its state would be wrong: greet a vendor while some unrelated quest happens to be
 	// active and the vendor's greeting becomes conditional on it. So the split is CONFLICT-DRIVEN - a group is only
 	// gated when its entries actually disagree about what the screen says. An NPC captured consistently stays
 	// unconditional, which is nearly all of them.
@@ -31,14 +32,10 @@ namespace Faolan.Importer.Extractors
 			"<(?:remoteformat|localized)[^>]*?\\bid=\"?(\\d+)\"?[^>]*?\\bcategory=\"?(\\d+)\"?",
 			RegexOptions.Compiled);
 
-		// Conflicting entries are gated on the quest that was ACTIVE at the greeting. Active is right by construction:
-		// QuestContextId is the last QuestFullUpdate before it, and a full-update IS the grant.
-		private const QuestState GateState = QuestState.Active;
-
 		// Assigns a quest gate to the entries that need one, and returns the whole set for Merge.
 		//
 		// `report` receives one line per group that was split, and one per group that conflicts but could NOT be split
-		// (its entries disagree while sharing a context - most often a variant gated on something that is not quest
+		// (its variants share the same captured quest state - most often a variant gated on something that is not quest
 		// state at all, like the [MALE]/[FEMALE] answer pair, #418). Those are left to Merge's existing packet-count
 		// tiebreak rather than dropped: the goal is to import the BULK and hand-correct the tail, not to be exhaustive.
 		public static List<ConversationEntry> SplitConflicts(IReadOnlyList<ConversationEntry> all, ICollection<string>? report = null)
@@ -50,44 +47,131 @@ namespace Faolan.Importer.Extractors
 
 			foreach (var group in groups)
 			{
-				// An entry that already carries a gate was classified deliberately; leave it exactly as it is.
+				// An entry that already carries a gate was classified deliberately (the server-opened conversations,
+				// which ConversationExtractor gates on the quest beat they belong to); leave it exactly as it is.
 				var ungated = group.Where(e => e.ConditionQuestId == null).ToList();
 				result.AddRange(group.Where(e => e.ConditionQuestId != null));
 				if (ungated.Count == 0)
 					continue;
 
-				var signatures = ungated.Select(Signature).Distinct().Count();
-				if (signatures < 2)
+				// One screen, captured consistently - one unconditional row, as before.
+				var classes = ungated.GroupBy(Signature).ToList();
+				if (classes.Count < 2)
 				{
-					result.AddRange(ungated); // captured consistently - one unconditional screen, as before
-					continue;
-				}
-
-				// The entries disagree. Gate each on its own context; context 0 stays the unconditional fallback, which
-				// is what a fresh character with no chain progress gets.
-				var contexts = ungated.Select(e => e.QuestContextId).Distinct().Count();
-				if (contexts < 2)
-				{
-					report?.Add($"{group.Key.Identity} '{group.Key.AnswerPath}': {signatures} variants share context "
-					            + $"{ungated[0].QuestContextId} - cannot split, keeping the richest");
 					result.AddRange(ungated);
 					continue;
 				}
 
-				report?.Add($"{group.Key.Identity} '{group.Key.AnswerPath}': {signatures} variants split across "
-				            + $"{contexts} quest contexts ({string.Join(", ", ungated.Select(e => e.QuestContextId).Distinct().OrderBy(c => c))})");
+				var (gates, unsplit) = Discriminate(classes);
+				var shared = unsplit > 0
+					? $"; {unsplit} share a captured state and are left to Merge's packet-count tiebreak"
+					: "";
 
-				foreach (var e in ungated)
-					result.Add(e.QuestContextId == 0
-						? e
-						: e with
+				report?.Add(gates.Count == 0
+					? $"{group.Key.Identity} '{group.Key.AnswerPath}': {classes.Count} variants, none the captured quest state can tell apart "
+					  + "- keeping the richest"
+					: $"{group.Key.Identity} '{group.Key.AnswerPath}': {classes.Count} variants split on quest state ("
+					  + string.Join(", ", classes.Select(c => gates.TryGetValue(c.Key, out var g)
+						  ? $"{g.Quest} {g.State}"
+						  : "fallback")) + ")" + shared);
+
+				foreach (var c in classes)
+				{
+					if (!gates.TryGetValue(c.Key, out var gate))
+					{
+						result.AddRange(c); // the least-informed variant is what a player with no chain progress gets
+						continue;
+					}
+
+					foreach (var e in c)
+						result.Add(e with
 						{
-							ConditionQuestId = e.QuestContextId,
-							ConditionQuestState = GateState
+							ConditionQuestId = gate.Quest,
+							ConditionQuestState = gate.State
 						});
+				}
 			}
 
 			return result;
+		}
+
+		// Picks one (quest, state) gate per signature class, plus how many classes the captured state could NOT tell
+		// apart from the one before them.
+		//
+		// The classes are ordered by how much of the player's quest state the capture knew - a variant seen deep in a
+		// chain knows more quests than the one a fresh character got - and the LEAST-informed class becomes the
+		// unconditional fallback. Every other class is gated on a (quest, state) pair its captures agree on and that no
+		// less-or-equally-informed class carries. Two variants late in the same chain can therefore end up with gates
+		// that BOTH pass at once (Casilda's escort greeting is 12407 Active; her later ones add 12369/12373 on top of a
+		// still-active 12407); the runtime resolves that by serving the variant gated on the quest the player accepted
+		// most recently, which is the beat they are actually on (ConversationService.PickConversationScreen).
+		//
+		// ⚠️ A class with no pair left INHERITS the previous class's gate rather than failing the whole group. Those two
+		// are the same screen as far as the captures can say - most often one capture of it carried a trailing close
+		// window and the other did not - so handing both the same gate lets Merge keep the richer, which is exactly the
+		// old behaviour, WITHOUT dropping the gates every other variant in the group had earned.
+		private static (Dictionary<string, (uint Quest, QuestState State)> Gates, int Unsplit) Discriminate(List<IGrouping<string, ConversationEntry>> classes)
+		{
+			// A capture that never showed us a quest state says nothing about which variant this is, so it cannot
+			// contribute pairs; a class of nothing BUT such entries can only ever be the fallback.
+			var pairs = classes.ToDictionary(c => c.Key, Agreed);
+			var reach = classes.ToDictionary(c => c.Key, c => c.Max(e => e.QuestStates?.Count ?? 0));
+			var ordered = classes.Select(c => c.Key).OrderBy(k => reach[k]).ThenBy(k => k, System.StringComparer.Ordinal).ToList();
+
+			var gates = new Dictionary<string, (uint Quest, QuestState State)>();
+			var unsplit = 0;
+			for (var i = 1; i < ordered.Count; i++)
+			{
+				var key = ordered[i];
+				// Absent from every class the runtime would otherwise confuse this one with: the fallback and everything
+				// less informed. A more-informed class is allowed to share the pair - it carries a gate of its own that
+				// is strictly later in the chain, and the most-recent-quest rule prefers it.
+				var blocked = ordered.Take(i).SelectMany(k => Carried(classes.First(c => c.Key == k))).ToHashSet();
+				// ACTIVE first: a conditioned variant is about the quest the player is ON, and that is also the gate the
+				// runtime's most-recent-quest tiebreak can order. Gating Casilda's 12369 greeting on "10238 Completed"
+				// (equally true, and the lowest id available) would be true from far earlier in the chain and would lose
+				// the tiebreak to a later quest, serving the wrong line.
+				var pick = pairs[key].Where(p => !blocked.Contains(p)).OrderBy(p => p.State == QuestState.Active ? 0 : 1).ThenBy(p => p.Quest).ToList();
+				if (pick.Count == 0)
+				{
+					unsplit++;
+					if (gates.TryGetValue(ordered[i - 1], out var inherited))
+						gates[key] = inherited;
+
+					continue;
+				}
+
+				gates[key] = pick[0];
+			}
+
+			return (gates, unsplit);
+		}
+
+		// The (quest, state) pairs EVERY informative capture of this variant agrees on. Intersecting rather than
+		// unioning is what keeps a pair that one walk happened to carry (an unrelated quest the player picked up) from
+		// being read as the thing that selects the variant.
+		private static HashSet<(uint Quest, QuestState State)> Agreed(IGrouping<string, ConversationEntry> c)
+		{
+			HashSet<(uint, QuestState)>? agreed = null;
+			foreach (var e in c)
+			{
+				if (e.QuestStates is not { Count: > 0 } states)
+					continue;
+
+				var here = states.Select(kv => (kv.Key, kv.Value)).ToHashSet();
+				if (agreed == null)
+					agreed = here;
+				else
+					agreed.IntersectWith(here);
+			}
+
+			return agreed ?? [];
+		}
+
+		// Every pair ANY capture of this variant carried - what it may not be confused with.
+		private static HashSet<(uint Quest, QuestState State)> Carried(IGrouping<string, ConversationEntry> c)
+		{
+			return c.SelectMany(e => e.QuestStates ?? new Dictionary<uint, QuestState>()).Select(kv => (kv.Key, kv.Value)).ToHashSet();
 		}
 
 		// What the screen SAYS, as its ordered LDB references.

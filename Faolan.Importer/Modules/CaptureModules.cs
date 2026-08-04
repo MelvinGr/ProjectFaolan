@@ -264,7 +264,7 @@ namespace Faolan.Importer.Modules
 			// The variant split runs over the WHOLE corpus rather than per capture: a screen is only a conflict
 			// relative to the other captures of it, and an NPC's states usually come from different dumps (#526).
 			var extracted = ctx.Captures
-				.SelectMany(c => ConversationConditions.Apply(c.Name, ConversationExtractor.Extract(c.Packets)))
+				.SelectMany(c => ConversationExtractor.Extract(c.Packets))
 				.ToList();
 			var variants = new List<string>();
 			var split = ConversationVariants.SplitConflicts(extracted, variants);

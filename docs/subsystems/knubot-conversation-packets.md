@@ -43,6 +43,38 @@ derived keys two runs over the same corpus produce byte-identical tables. Two co
 `NpcName` is non-nullable and is the identity the runtime routes on; a node whose NPC could not be named from
 its capture stores the `#<handle>` fallback the merge already dedups on.
 
+### Quest-state variants — derived from the captures, not from capture names (Gitea #639)
+
+One NPC says different things at different points in a chain, and every version arrives at the same
+`(NpcName, TypeId, AnswerPath)`. The gate that tells them apart — `ConditionQuestId` + `ConditionQuestState` — is
+**derived** by `ConversationVariants.SplitConflicts` from the quest state each capture was in when the screen was
+served (`ConversationEntry.QuestStates`: every quest that capture has seen a full-update or a state flip for, in
+its latest state).
+
+The split is **conflict-driven**: a group is only gated when its captures actually disagree about what the screen
+says (the `remoteformat` `category:id` list — `ConversationVariants.Signature`). Greeting a vendor while an
+unrelated quest happens to be active must not make that vendor conditional on it, and nearly every NPC stays
+unconditional. Within a group that does disagree:
+
+- The classes are ordered by how much of the player's quest state their captures knew. The **least-informed**
+  class is the unconditional fallback — what a character with no chain progress gets.
+- Every other class is gated on a `(quest, state)` pair *all* of its captures agree on and that no
+  less-or-equally-informed class carries. **Active** is preferred over Completed where both would do.
+- Two classes the captured state cannot tell apart share one gate, and `ConversationExtractor.Merge`'s
+  packet-count tiebreak keeps the richer. That is scoped to the pair — it does not cost the group its other gates.
+
+Gates therefore **overlap** by construction: a player deep in a chain still holds every earlier quest of it, so
+Casilda's escort greeting (`12407` Active) and the two greetings after it all pass at once. The runtime resolves
+that by serving the variant gated on the quest the player accepted **most recently**
+(`ConversationService.PickByLatestQuest` — `CharacterQuest` is insert-ordered, so the highest row id is the beat
+the player is on), falling back to the unconditional variant when no gate passes.
+
+⚠️ This replaced a five-row table (`ConversationConditions`) keyed on capture **file names**. It made itself
+authoritative for every NPC it named, so a Casilda screen from any capture nobody had listed was silently
+dropped: adding a capture got nothing, renaming one lost the gate. Deriving it instead recovers her in-progress
+greeting and adds four further chain-stage variants (`12369` / `12373` / `12407`), and turns the old
+`13480 Completed` post-freeing gate into `12407 Active` — the same beat, stated by the data.
+
 ### Session slots — regenerated, never stored (#417)
 
 A screen carries no dialogue text: `id`+`category` name a string in the CLIENT's LDB and each `<parameter>` fills
