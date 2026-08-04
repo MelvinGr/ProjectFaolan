@@ -156,7 +156,9 @@ that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then
   reactive element LIST (`0x54C02089`, the addable elements) + a trance-pose BCC animation (`0x642CD3D6`).
 - **Energy bar** (the yellow "sprint" bar, a SEPARATE universal pool from the class-resource stamina stat) drains
   during the weave: **`DispatchUpdateSprintbar 0x200E`** (`[u32 energy][u8 01]`) is the packet that moves the bar
-  (full 8910 for the necro), with a parallel `0xe9f24184` "Spellweaving Cost" gauge (`0x37E68C`). When energy hits 0:
+  (full **9000** for the necromancer and demonologist, **14000** for the melee classes - retail's idle "bar is full"
+  pushes carry exactly those, and they do not scale with level), with a parallel `0xe9f24184` "Spellweaving Cost"
+  gauge (`0x37E68C`). When energy hits 0:
   the `Exhausted` debuff (0xB90) + the `0x37E690` gauge draining HEALTH (the over-weave DoT).
 - **Fire / cancel**: on the 2nd toggle, the s2c `f98e10b3` burst (the weave firing) + trance-buff end-twins + a
   trance-EXIT BCC. Per add: the component's own spell as an immediate self-buff + add-gesture BCC; the Spellweaving(1)

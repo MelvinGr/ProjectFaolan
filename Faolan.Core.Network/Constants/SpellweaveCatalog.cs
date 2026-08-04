@@ -31,14 +31,27 @@ namespace Faolan.Core.Network.Constants
 		// 0x396AE9, Arcane Surge 0x3969D8, Parasite Host 0x37E6D9, Death God 0x396A22, Death 0x396A3D; fire stages
 		// 0x398/0x39B/0x39A/0x39D.
 
-		// The universal ENERGY (yellow sprint-bar) max by class. Capture-derived: necro 8910, assassin 13984. Casters
-		// have the lower pool; everyone else the higher one (approximate until per-class energy captures land).
+		// The universal ENERGY (yellow sprint-bar) max by class - the value retail pushes on `DispatchUpdateSprintBar`
+		// (0x200E) when the bar is FULL. Two flat values, and they are flat: the same 14000 reaches a level-24 Herald
+		// and a level-23 assassin as a level-80 one, so this is per class family, not a level curve.
+		//
+		// ⚠️ Corrected 2026-08-04 from 8910 / 13984, both of which were off by one observation. 8910 is 9000 minus one
+		// 90-point drain tick - it was read off the FIRST packet of a weave, which is already one tick in. The round
+		// numbers are the giveaway: retail's idle "bar is full" pushes carry exactly 9000 and exactly 14000, with a
+		// single distinct value across the whole capture.
+		//   9000  necromancer (4 captures, 3 characters) + demonologist (1)
+		//  14000  Herald of Xotli (3 captures, 2 characters) + assassin (2)
+		// Priest of Mitra and Tempest of Set are grouped with the casters by class family; neither is observed.
+		//
+		// ⚠️ Deriving these from a dump needs `BodyHex` length 5 as well as the opcode: `0x200E` is the LOSSY wire
+		// RENDERING of a hash-registered method, so a plain `Opcode == 0x200e` filter also catches SimpleCharFullUpdate
+		// bodies and reads a "max" of 57001 out of a character name (see the method-enum memory / #615).
 		public static uint EnergyMaxForClass(ConanClass characterClass)
 		{
 			return characterClass switch
 			{
-				ConanClass.Necromancer or ConanClass.Demonologist or ConanClass.PriestOfMitra or ConanClass.TempestOfSet => 8910,
-				_ => 13984
+				ConanClass.Necromancer or ConanClass.Demonologist or ConanClass.PriestOfMitra or ConanClass.TempestOfSet => 9000,
+				_ => 14000
 			};
 		}
 

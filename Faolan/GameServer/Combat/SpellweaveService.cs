@@ -33,7 +33,7 @@ namespace Faolan.GameServer.Combat
 		private const int ElementCooldownMs = 8000;
 
 		// Trance drain: the yellow ENERGY bar drains while weaving. The bar is moved by DispatchUpdateSprintbar (0x200E,
-		// ISpellweaveOutbound.SendSprintBar) - full = 8910 for the necro - alongside the 0x37E68C "Spellweaving Cost" gauge (both retail
+		// ISpellweaveOutbound.SendSprintBar) - full = 9000 for the necro - alongside the 0x37E68C "Spellweaving Cost" gauge (both retail
 		// sends, same token). The drain accelerates as the weave goes on (the capture's -90 -> -270). When energy hits
 		// 0 the health DoT (0x37E690) kicks in, draining ~31705 health/tick - the damage for over-weaving. Streamed on
 		// a self-rescheduling timer; the DoT is visual (drains the health bar) - authoritative vitals/death is a follow-up.

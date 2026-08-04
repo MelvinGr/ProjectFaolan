@@ -532,7 +532,7 @@ namespace Faolan.GameServer
 		// DispatchUpdateSprintbar (0x200E): the ENERGY / sprint bar update - the yellow bar. Body = [u32 energy][u8 01].
 		// This is what actually MOVES the yellow bar (the e9f24184 "Spellweaving Cost" gauge is separate accounting).
 		// Retail streams it while weaving to drain the energy bar (decode_spellweave, sender GameCharAgentProject/0x54
-		// -> GameCharInterfaceProject/instance; energy full = 8910 for the necro).
+		// -> GameCharInterfaceProject/instance; energy full = 9000 for the necro, 14000 for the melee classes).
 		private static Task SendSprintBar(INetworkClient client, uint energy)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType),

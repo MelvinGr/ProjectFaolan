@@ -45,7 +45,7 @@ namespace Faolan.GameServer
 		// Server-side ENERGY mirror for sprint: the client owns the yellow bar's visual during sprint, but we track the
 		// same drain/regen into session.Energy (silently, no packets) so spellweaving starts from the real value and we
 		// know when it hits 0. Rates are approximate (no capture shows the exact sprint drain/regen).
-		private const int SprintEnergyDrainPerTick = 900; // ~necro 8910 -> ~10s of continuous sprintource.
+		private const int SprintEnergyDrainPerTick = 900; // ~necro 9000 -> ~10s of continuous sprint.
 
 		private const uint BankFlagListed = 0x401; // flags value while listed for sale
 		private const uint BankFlagMailPending = 0x8001; // flags value while attached to an outgoing mail

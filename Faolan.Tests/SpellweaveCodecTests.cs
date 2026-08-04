@@ -13,6 +13,28 @@ namespace Faolan.Tests
 	// carrier's u32 length prefix (the golden hex is the frame body with that prefix stripped).
 	public class SpellweaveCodecTests
 	{
+		// The universal ENERGY (yellow sprint-bar) maxima retail pushes on a FULL bar (0x200E body [u32 energy][u8 01]).
+		// Locked because both were wrong by one observation until 2026-08-04: 8910 is 9000 minus a single 90-point weave
+		// drain tick, read off the first packet of a weave rather than an idle full push, and 13984 is 14000 minus 16.
+		// The round numbers ARE the evidence - across the corpus a capture that never weaves carries exactly one
+		// distinct value for the whole session, and it is 9000 or 14000.
+		//
+		// ⚠️ Re-deriving these from a dump needs the BODY LENGTH as well as the opcode: `0x200E` is the lossy wire
+		// rendering of a hash-registered method (#615), so filtering on the dump's `Opcode` alone also catches
+		// SimpleCharFullUpdate bodies and reads a "max" of 57001 out of the bytes of a character name.
+		[Theory]
+		[InlineData(ConanClass.Necromancer, 9000u)] // 4 captures, 3 characters
+		[InlineData(ConanClass.Demonologist, 9000u)] // DemoL80_mage-demonologist_login_randomActions-very_long_loading_screen
+		[InlineData(ConanClass.PriestOfMitra, 9000u)] // unobserved - grouped with the casters
+		[InlineData(ConanClass.TempestOfSet, 9000u)] // unobserved - grouped with the casters
+		[InlineData(ConanClass.HeraldOfXotli, 14000u)] // 3 captures, 2 characters (levels 24 and 80 - it does not scale)
+		[InlineData(ConanClass.Assassin, 14000u)] // Strie_rogue-assassin_login_3 / _randomActions
+		[InlineData(ConanClass.Barbarian, 14000u)] // unobserved - the non-caster default
+		public void EnergyMaxForClass_MatchesTheCapturedFullBar(ConanClass characterClass, uint expected)
+		{
+			Assert.Equal(expected, SpellweaveCatalog.EnergyMaxForClass(characterClass));
+		}
+
 		[Theory, InlineData(0x398u, "f98e10b30000c3500802e5d4010000039800007bd4"), InlineData(0x39Bu, "f98e10b30000c3500802e5d4010000039b00007bd4"),
 		 InlineData(0x39Au, "f98e10b30000c3500802e5d4010000039a00007bd4"), InlineData(0x39Du, "f98e10b30000c3500802e5d4010000039d00007bd4")]
 		// frame#1843
