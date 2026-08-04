@@ -2053,6 +2053,25 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.ToTable("MorphTargets");
                 });
 
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Mount", b =>
+                {
+                    b.Property<uint>("Id")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<uint>("CreatureId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Quality")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Mounts", t =>
+                        {
+                            t.HasCheckConstraint("CK_Mount_Quality", "Quality IN (0, 1, 2, 3, 4, 5)");
+                        });
+                });
+
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>
                 {
                     b.Property<uint>("NpcTemplateId")
@@ -4726,6 +4745,17 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                         .IsRequired();
 
                     b.Navigation("Region");
+                });
+
+            modelBuilder.Entity("Faolan.Core.Database.Tables.Mount", b =>
+                {
+                    b.HasOne("Faolan.Core.Database.Tables.Spell", "Spell")
+                        .WithMany()
+                        .HasForeignKey("Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Spell");
                 });
 
             modelBuilder.Entity("Faolan.Core.Database.Tables.NpcChatter", b =>

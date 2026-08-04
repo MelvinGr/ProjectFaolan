@@ -1743,10 +1743,10 @@ namespace Faolan.GameServer
 						// animation end. Confirmed NOT server-side - retail sends nothing extra during the dismount window (only
 						// this end-twin + StatUpd), and both immediate and timer-deferred dismount show it. It is a client-side
 						// ground/height recalculation on the mount->ground transition; a fix would need live client RE. #27.
-						var mount = MountCatalog.ForId(from) ?? throw new InvalidOperationException($"SummonMount: unknown mount id 0x{from:X8} (not in MountCatalog)");
+						var mount = await Database.GetMount(from) ?? throw new InvalidOperationException($"SummonMount: unknown mount id 0x{from:X8} (not in the Mounts catalog)");
 						var playerEntity = _simulation.PlayerWorldEntity(client);
 						var dismounting = playerEntity?.IsMounted ?? false;
-						Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.CreatureName, dismounting
+						Logger.LogInformation("SummonMount: from=0x{From:X} -> {Mount} ({Action}). {Args}", from, mount.Spell.Name, dismounting
 							? "dismount"
 							: "mount", args);
 
@@ -1796,13 +1796,13 @@ namespace Faolan.GameServer
 							await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(CasterLevel(client))); // seat (#26)
 							var mountStats = new CharacterStatBlock
 							{
-								[CharacterStatId.Mount] = mount.RideStat,
-								[CharacterStatId.MountSpeed] = 100
+								[CharacterStatId.Mount] = mount.CreatureId,
+								[CharacterStatId.MountSpeed] = MountCatalog.MountSpeed
 							}; // the mount StatUpd (frame 520)
 							await SendStatUpdate(client, mountStats, self);
 							await _broadcaster.BroadcastStatsToViewers(client, mountStats); // #428: the horse renders from THIS, so viewers need it too
 							playerEntity?.IsMounted = true;
-							playerEntity?.MountRideStat = mount.RideStat; // so a viewer arriving LATER can be told (#428)
+							playerEntity?.MountRideStat = mount.CreatureId; // so a viewer arriving LATER can be told (#428)
 
 							// Persist the mount so it survives a relog / a trip through a no-mount area (restored on
 							// world entry to a mount-allowed map). Cleared only on a voluntary dismount above.

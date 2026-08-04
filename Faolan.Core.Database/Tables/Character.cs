@@ -40,7 +40,7 @@ namespace Faolan.Core.Database.Tables
 		[ForeignKey(nameof(MapId))]
 		public virtual Map Map { get; set; } = null!;
 
-		// The mount the character is currently riding (a MountCatalog mount id; null = on foot). Persisted so the mount
+		// The mount the character is currently riding (a Mounts row id; null = on foot). Persisted so the mount
 		// survives a relog and a trip through a no-mount area: it is set when the player summons a mount and cleared
 		// on a voluntary dismount, but NOT on the auto-dismount the client does when entering a no-mount playfield -
 		// so re-entering a mount-allowed area (or logging back in there) re-seats the same mount. Re-applied on world

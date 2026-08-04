@@ -74,6 +74,7 @@ namespace Faolan.Core.Database
 		DbSet<TravelDestination> TravelDestinations { get; }
 		DbSet<MapLootEntry> MapLootEntries { get; }
 		DbSet<MorphTarget> MorphTargets { get; }
+		DbSet<Mount> Mounts { get; }
 		DbSet<NpcChatter> NpcChatter { get; }
 		DbSet<NpcChatterParameter> NpcChatterParameter { get; }
 		DbSet<NpcEncounter> NpcEncounters { get; }
@@ -175,6 +176,7 @@ namespace Faolan.Core.Database
 		public DbSet<TravelDestination> TravelDestinations { get; set; }
 		public DbSet<MapLootEntry> MapLootEntries { get; set; }
 		public DbSet<MorphTarget> MorphTargets { get; set; }
+		public DbSet<Mount> Mounts { get; set; }
 		public DbSet<NpcChatter> NpcChatter { get; set; }
 		public DbSet<NpcChatterParameter> NpcChatterParameter { get; set; }
 		public DbSet<NpcEncounter> NpcEncounters { get; set; }
@@ -309,6 +311,10 @@ namespace Faolan.Core.Database
 			modelBuilder.Entity<Item>().HasMany(i => i.StatModifiers).WithOne(m => m.Item).OnDelete(DeleteBehavior.Cascade);
 			modelBuilder.Entity<Spell>().HasMany<SpellStatEffect>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade); // #367
 			modelBuilder.Entity<Spell>().HasMany<SpellEffect>().WithOne(e => e.Spell).OnDelete(DeleteBehavior.Cascade);
+
+			// A mount's key IS its summon spell's id (#627), so the row goes with the spell.
+			modelBuilder.Entity<Spell>().HasMany<Mount>().WithOne(m => m.Spell).OnDelete(DeleteBehavior.Cascade);
+			modelBuilder.Entity<Mount>().Property(m => m.Id).ValueGeneratedNever();
 
 			// A hazard's boundary polygon (#504); cascade-delete with the hazard so a re-import of the RDB volumes never
 			// leaves orphan vertices behind.

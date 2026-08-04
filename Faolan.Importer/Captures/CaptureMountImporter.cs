@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -5,12 +6,9 @@ using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.Core.Network.Constants;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-
-// MountCatalog (namespaced here despite its file living under Faolan.Core.Network)
 
 namespace Faolan.Importer.Captures
 {
@@ -19,13 +17,18 @@ namespace Faolan.Importer.Captures
 	// it must NOT auto-spawn into the world like a map NPC. Done the RIGHT way like pets (#307/#244): its captured
 	// stat core + worn equipment + appearance morphs are lifted onto the creature TYPE (no NpcSpawn placement), and the
 	// server spawns it FROM THE TYPE at the summoner's position (NpcSpawnBuilder.TryBuildFromType). Resolved at summon
-	// time by NAME (SpawnMountForPlayer -> GetNpcByName), the same name MountCatalog maps each mount id to.
+	// time by NAME (SpawnMountForPlayer -> GetNpcByName), which is the name of the mount's summon SPELL (#627).
 	public static class CaptureMountImporter
 	{
 		public static async Task<(int Seen, int Seeded)> ImportAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<CapturedPacket>> captures, ILogger? logger = null)
 		{
-			// The creature names we actually need (the MountCatalog targets), lower-cased for matching.
-			var wanted = MountCatalog.All.Select(m => m.CreatureName.ToLowerInvariant()).ToHashSet();
+			// The creature names we actually need - every mount in the catalog (#627: the Mounts table, keyed by the
+			// summon spell whose NAME is the creature's), lower-cased for matching. Only a handful will ever match:
+			// the corpus contains the mounts the captured sessions rode, not all 155.
+			var wanted = (await db.Mounts.Include(m => m.Spell).Select(m => m.Spell.Name).ToListAsync()).Select(n => n.ToLowerInvariant()).ToHashSet();
+			if (wanted.Count == 0)
+				throw new InvalidOperationException(
+					"CaptureMountImporter: the Mounts catalog is empty, so there is nothing to match the captured spawns against. It is imported from the RDB spell records - run `--only rdb-spells --RdbDir <dir>` first (#627).");
 
 			// Every FA015807 spawn across the captures whose name is one of the wanted mounts; keep the first (most
 			// complete) per creature name.

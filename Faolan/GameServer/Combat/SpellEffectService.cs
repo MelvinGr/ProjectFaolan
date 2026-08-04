@@ -21,8 +21,9 @@ namespace Faolan.GameServer.Combat
 	//
 	// What is deliberately NOT here, because it is not keyed by spell id and folding it in would be a fake
 	// unification:
-	//   - MOUNTS (MountCatalog) are keyed by the client's MOUNT id (the SummonMount behavior's `from` word), and carry
-	//     a captured ride-buff payload + the mount stat the client animates from. A different axis.
+	//   - MOUNTS (the Mounts table, #627) are keyed by the client's MOUNT id - the SummonMount behavior's `from` word,
+	//     which is the SUMMON spell's id, not the ridden spell's - and carry the mount creature the client animates
+	//     from. A different axis; the wire constants around it stay in MountCatalog (docs/subsystems/mounts.md).
 	//   - SPELLWEAVES (SpellweaveCatalog) are keyed by CLASS - the weave elements and the energy pool are per-class
 	//     profiles, not per-spell effects.
 	//   - Shield of the Risen and Exhausted are single named spell ids each used at ONE call site (world entry, energy

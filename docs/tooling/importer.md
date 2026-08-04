@@ -81,12 +81,17 @@ Capture-sourced (default group, run in dependency order):
 | `map-loot` (per-map loot pool, overwrite-only) | `items` |
 | `quests` (definitions + the hand-decoded seed steps) | — |
 
-Opt-in capture-sourced (run only when named via `--only`): `mounts`, `pets`, `recipes`.
+Opt-in capture-sourced (run only when named via `--only`): `mounts`, `pets`, `recipes`. ⚠️ `mounts` harvests
+the mount CREATURE models and selects them against the mount CATALOG, which `rdb-spells` imports — so run
+that first on an empty database, or the module fails with that instruction rather than silently finding
+nothing ([mounts.md](../subsystems/mounts.md)).
 
 RDB-sourced (require `--rdb`, **not** in the default group — opt-in via `--only`):
 `rdb-quest-catalog` (the client's quest catalog, RDB 1000104 — quest lines/quests/goals + their plaintext
 names; see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)),
-`rdb-inventory` (read-only type-count report), `rdb-morphs`, `rdb-appearance`, `rdb-spells`, `rdb-abilities`,
+`rdb-inventory` (read-only type-count report), `rdb-morphs`, `rdb-appearance`,
+`rdb-spells` (the spell catalog + the 155-row mount catalog, [mounts.md](../subsystems/mounts.md)),
+`rdb-abilities`,
 `rdb-combos`, `rdb-maps`, `rdb-respawns` (+ CDN fetch), `rdb-items` (template decrypt),
 `rdb-hazards` (lava volumes), `rdb-regions` (the bounded-area trigger volumes a subsystem consumes — depends on
 `rdb-respawns`), `class-attributes` (the per-class/level attribute + health BASE, #444 — see below).

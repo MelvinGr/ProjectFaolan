@@ -74,6 +74,16 @@ namespace Faolan.Importer.Rdb
 
 		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
 
+		// 186 - the client's `Mount` stat id (0x0BA): on a spell record it names the mount CREATURE the summon
+		// spawns, so a record carrying it IS a mount summon. 155 records, 122 distinct creatures - the whole
+		// mount catalog, lifted into Mounts (#627). See Mount.CreatureId.
+		private const uint MountField = 0x0BA;
+
+		// 499 - the QUALITY/rarity tier, the same field (and the same 0-indexed ItemQuality ladder) an item template
+		// carries; on a mount record it is the ONLY field separating "Swift <horse>" from "<horse>". Read into
+		// Mount.Quality - NOT as a speed, see Mount.Quality's remarks.
+		private const uint QualityField = 0x1F3;
+
 		// 125 - the level requirement. Verified against the independent wiki scrape: identical for every rank >= 2
 		// (Runed Flesh 25/40/55/70, Pestilential Blast 20/35/50/65/80) and MORE COMPLETE than it - the wiki has
 		// Pestilential Blast R7 at Level 0, the RDB says 80. 19,239 of 20,822 rows had no level at all, so this is
@@ -105,7 +115,7 @@ namespace Faolan.Importer.Rdb
 		private const uint ScalingAttributeField = 0x34F;
 		private const uint SpellDataType = 1040005;
 
-		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
+		public static async Task<(int Seen, int Inserted, int NamesSet, int CastTimesSet, int LevelsSet, int Mounts)> ImportAsync(IDatabaseContext db, string rdbDir, string? cdnBase = null,
 			ILogger? logger = null)
 		{
 			using var rdb = new RdbReader(rdbDir, cdnBase);
@@ -143,6 +153,8 @@ namespace Faolan.Importer.Rdb
 			// #367: (spellId -> stat deltas) from the [2][9] region, synced into SpellStatEffects after the spells save.
 			// Inner map dedups a stat the region lists twice (last == authoritative write wins, as for items).
 			var statEffects = new Dictionary<uint, Dictionary<uint, (uint Kind, int Amount, LevelRamp? Ramp)>>();
+			// #627: (summon spell id -> mount creature id + tier) from field 186, synced into Mounts after the save.
+			var mounts = new Dictionary<uint, (uint CreatureId, ItemQuality? Quality)>();
 
 			var seen = 0;
 			var inserted = 0;
@@ -207,6 +219,14 @@ namespace Faolan.Importer.Rdb
 				var rank = fields.TryGetValue(RankField, out var rk) && rk <= byte.MaxValue
 					? (byte)rk
 					: (byte)0;
+
+				// #627: a record carrying field 186 IS a mount summon, and the value is the creature it seats the
+				// player on. Collected here rather than in a pass of its own precisely because it is a column lift
+				// off a record this loop already decompressed and parsed.
+				if (fields.TryGetValue(MountField, out var mountCreature) && mountCreature != 0)
+					mounts[entry.Id] = (mountCreature, fields.TryGetValue(QualityField, out var q) && q <= (uint)ItemQuality.Legendary
+						? (ItemQuality)q
+						: null);
 
 				// #367: buff/debuff stat deltas live in the same [2][9] region as item templates. The record's KIND is
 				// carried through, not dropped: a spell mixes flat and PERCENT records in one region, and reading a
@@ -307,12 +327,41 @@ namespace Faolan.Importer.Rdb
 				effectRows++;
 			}
 
+			// #627: the mount catalog is wholly DERIVED from field 186, so the RDB is authoritative for the table as a
+			// whole - a row whose record no longer carries the field is gone, not stale. Rows whose summon spell did
+			// not make it into the catalog (a nameless dev record) are dropped rather than inserted as an FK orphan.
+			var stillThere = await db.Mounts.ToListAsync();
+			foreach (var row in stillThere.Where(m => !mounts.ContainsKey(m.Id)))
+				db.Mounts.Remove(row);
+			var mountRows = stillThere.ToDictionary(m => m.Id);
+			var mountsWritten = 0;
+			foreach (var (spellId, (creatureId, quality)) in mounts)
+			{
+				if (!byId.ContainsKey(spellId))
+					continue; // the summon spell is not catalogued (nameless dev record) - Mount.Id FKs Spells
+
+				if (!mountRows.TryGetValue(spellId, out var row))
+					db.Mounts.Add(new Mount
+					{
+						Id = spellId,
+						CreatureId = creatureId,
+						Quality = quality
+					});
+				else
+				{
+					row.CreatureId = creatureId;
+					row.Quality = quality;
+				}
+
+				mountsWritten++;
+			}
+
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects.", seen, inserted,
-				namesSet, castTimesSet, statEffects.Count, effectRows);
-			return (seen, inserted, namesSet, castTimesSet, levelsSet);
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts.",
+				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten);
+			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten);
 		}
 
 		// #402: the game's dev/PvP-internal naming conventions for the buffs that live in cat 50210 but are NOT

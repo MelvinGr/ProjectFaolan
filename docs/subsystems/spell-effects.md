@@ -36,8 +36,9 @@ module, which is `Db`-sourced — the facts are decoded, not extracted, so it ru
 Not everything keyed by an id belongs here — the table answers "what does this SPELL do", and three
 neighbouring mechanisms are keyed by something else:
 
-- **Mounts** (`MountCatalog`) are keyed by the client's MOUNT id (the `SummonMount` behavior's `from` word) and
-  carry a captured ride-buff payload plus the mount stat the client animates from.
+- **Mounts** (the `Mount` table) are keyed by the client's MOUNT id (the `SummonMount` behavior's `from` word,
+  which is the summon spell's own record id) and carry the mount creature the client animates from. The
+  ride-buff payload and the summon channel stay in `MountCatalog` — see `mounts.md`.
 - **Spellweaves** (`SpellweaveCatalog`) are keyed by CLASS: weave elements and the energy pool are per-class
   profiles.
 - **Shield of the Risen** and **Exhausted** are single spell ids used at one call site each (world entry,

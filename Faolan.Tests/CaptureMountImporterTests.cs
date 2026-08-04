@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
+using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
 using Faolan.Importer.Captures;
 using Faolan.Tests.Support;
@@ -13,7 +14,7 @@ namespace Faolan.Tests
 {
 	// The mount harvest (#27): a player-cast SummonMount renders only if the mount creature ("Fading Black Horse")
 	// is in the DB to spawn. CaptureMountImporter must lift it out of the real mount captures' FA015807 spawns and
-	// seed it under the never-loaded sentinel Mounts map, resolvable by name (the MountCatalog target).
+	// seed it under the never-loaded sentinel Mounts map, resolvable by the name its summon spell carries (#627).
 	public class CaptureMountImporterTests
 	{
 		[Fact]
@@ -33,6 +34,13 @@ namespace Faolan.Tests
 			{
 				await using var db = NewContext(dbPath);
 				await db.Database.EnsureCreatedAsync(TestContext.Current.CancellationToken);
+
+				// The catalog the harvest selects against (#627): a mount is a Mounts row keyed by its summon spell,
+				// and the SPELL's name is the creature name the captured spawn has to match. Real values - spell
+				// 4076785 is 0x3E34F1, the mount id the capture's SummonMount carries.
+				db.Spells.Add(new Spell { Id = 0x3E34F1u, Name = "Fading Black Horse" });
+				db.Mounts.Add(new Mount { Id = 0x3E34F1u, CreatureId = 0x00313C9Bu });
+				await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
 				var (seen, seeded) = await CaptureMountImporter.ImportAsync(db, [packets]);
 

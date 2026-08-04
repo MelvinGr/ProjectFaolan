@@ -23,6 +23,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<uint?> GetItemSearchCategory(uint template);
 		Task<Item[]> GetItems(params IReadOnlyList<uint> ids);
 		Task<IReadOnlyDictionary<string, MorphTarget>> GetMorphTargetRegistry();
+		Task<Mount?> GetMount(uint id);
+		Task<Mount[]> GetMounts();
 		Task<Item[]> GetRandomBuildableItems(int count);
 		Task<Item[]> GetRandomLootExcludedItems();
 		Task<Recipe[]> GetRecipes();
@@ -174,6 +176,21 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.Recipes.Include(r => r.Items).ThenInclude(i => i.Item).OrderBy(r => r.Id).ToArrayAsync();
+		}
+
+		// One summonable mount by the id the client sends in its SummonMount action (#627). The summon Spell is
+		// included because the mount's NAME lives there - a Mount row is its creature id and quality, and the name is
+		// the spell's (Mount.Id IS the spell id).
+		public async Task<Mount?> GetMount(uint id)
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Mounts.Include(m => m.Spell).FirstOrDefaultAsync(m => m.Id == id);
+		}
+
+		public async Task<Mount[]> GetMounts()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Mounts.Include(m => m.Spell).OrderBy(m => m.Id).ToArrayAsync();
 		}
 
 		public async Task<Spell?> GetSpell(uint id)

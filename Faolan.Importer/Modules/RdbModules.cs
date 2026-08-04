@@ -115,13 +115,13 @@ namespace Faolan.Importer.Modules
 
 		public ImportSource Source => ImportSource.Rdb;
 
-		public string Description => "Named spell records (cast time/name) from the RDB.";
+		public string Description => "Named spell records (cast time/name) + the mount catalog from the RDB.";
 		public string Name => "rdb-spells";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var r = await RdbSpellImporter.ImportAsync(ctx.Db, ctx.RdbDir!, ctx.RdbProxyBase);
-			return new ImportResult($"{r.Seen} named records, {r.Inserted} new, {r.NamesSet} names, {r.CastTimesSet} cast times, {r.LevelsSet} levels.");
+			return new ImportResult($"{r.Seen} named records, {r.Inserted} new, {r.NamesSet} names, {r.CastTimesSet} cast times, {r.LevelsSet} levels, {r.Mounts} mounts.");
 		}
 	}
 

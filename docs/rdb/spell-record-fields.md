@@ -105,8 +105,12 @@ Anarchy-Online inheritance wearing a stat id — `AwardedOmniTekTokens` on 8,505
 ## The mount catalog falls out of it
 
 Field **186 `Mount`** occurs on **155** records, 122 distinct values — every mount summon spell in the game,
-each naming its mount creature id. `MountCatalog`'s hand-built entries are a two-row slice of it: the catalog's
+each naming its mount creature id. `MountCatalog`'s hand-built entries were a two-row slice of it: the
 `Fading Black Horse` id `0x3E34F1` is RDB spell **4076785**, whose field 186 is 3226779.
+
+All 155 are imported as the `Mounts` table — see [`../subsystems/mounts.md`](../subsystems/mounts.md), which
+also settles what separates the `Swift` / `Azure-barded` variants of a horse (field **499**, the same
+quality/rarity ladder an item template carries — *not* a speed).
 
 ## Reproducing it
 

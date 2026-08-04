@@ -465,7 +465,7 @@ namespace Faolan.GameServer
 			if (((map?.PlayfieldFlags ?? 0) & MountAllowedFlag) == 0)
 				return;
 
-			var mount = MountCatalog.ForId(mountId);
+			var mount = await Database.GetMount(mountId);
 			if (mount == null)
 				return;
 
@@ -473,15 +473,15 @@ namespace Faolan.GameServer
 			await SendMagicBuffIir(client, self, self, MountCatalog.RideSpell, MountCatalog.RideBuffPayload(CasterLevel(client)));
 			await SendStatUpdate(client, new CharacterStatBlock
 			{
-				[CharacterStatId.Mount] = mount.RideStat,
-				[CharacterStatId.MountSpeed] = 100
+				[CharacterStatId.Mount] = mount.CreatureId,
+				[CharacterStatId.MountSpeed] = MountCatalog.MountSpeed
 			}, self);
 
 			var entity = _simulation.PlayerWorldEntity(client);
 			entity?.IsMounted = true;
-			entity?.MountRideStat = mount.RideStat;
+			entity?.MountRideStat = mount.CreatureId;
 
-			Logger.LogInformation("Restored mount {Mount} for {Name} on map {Map}.", mount.CreatureName, character.Name, character.MapId);
+			Logger.LogInformation("Restored mount {Mount} for {Name} on map {Map}.", mount.Spell.Name, character.Name, character.MapId);
 		}
 
 		// Builds + sends the entire world entry from generated/structured pieces - no captured burst (#210). Mirrors

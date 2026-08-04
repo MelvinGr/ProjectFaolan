@@ -60,7 +60,7 @@ namespace Faolan.Core.Enums
 		/// <summary>Moving an item between an equipment slot and the inventory.</summary>
 		Equip = 0x09,
 
-		/// <summary>Summoning a mount; the args' <c>from</c> is the mount id (<c>MountCatalog</c>).</summary>
+		/// <summary>Summoning a mount; the args' <c>from</c> is the mount id - a <c>Mount</c> row's key, which is its summon spell's id (#627).</summary>
 		Mount = 0x0A,
 		Dance = 0x0B,
 		DisarmTrap = 0x0C,

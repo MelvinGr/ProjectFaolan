@@ -1,22 +1,61 @@
+using System.Collections.Generic;
+using System.Linq;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Constants;
+using Faolan.Tests.Support;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Faolan.Tests
 {
-	// The summonable-mount catalog (#27): the capture-grounded mount ids resolve to their creature + summon spell.
+	// The summonable-mount protocol (#27) and the shipped mount catalog (#627). The catalog used to be two
+	// hand-built rows in MountCatalog; it is now the `Mounts` table, lifted whole from the client's own data (RDB
+	// spell field 186), so the identity half of this gate reads the committed faolan.db.
 	public class MountCatalogTests
 	{
 		[Fact]
-		public void FadingBlackHorse_ResolvesByIdAndName()
+		public void FadingBlackHorse_IsInTheShippedCatalog_WithItsCapturedCreatureId()
 		{
-			var byId = MountCatalog.ForId(0x3E34F1u);
-			Assert.NotNull(byId);
-			Assert.Equal("Fading Black Horse", byId!.CreatureName);
-			Assert.Equal(0x3BAD7Du, byId.SummonSpellId);
+			var mounts = ShippedMounts();
 
-			Assert.Same(byId, MountCatalog.ForName("fading black horse"));
-			Assert.Equal(byId, MountCatalog.Default);
+			// The two mount ids the NecroL80 mount/dismount captures show the client sending as the SummonMount
+			// action's `from` word. 0x3E34F1's creature id is the one retail pushed in the frame-520 StatUpd
+			// (stat 0x0BA = 0x00313C9B) - the capture and the client's own RDB catalog agreeing on the same number
+			// from two directions is what makes the import a mirror of retail rather than a guess.
+			Assert.Equal(("Fading Black Horse", 0x00313C9Bu), mounts[0x3E34F1u]);
+			Assert.Equal(("Swift Fading Black Horse", 0x00313C9Fu), mounts[0x3E34F2u]);
+		}
+
+		[Fact]
+		public void TheCatalog_IsTheWholeClientList_KeyedByTheSummonSpell()
+		{
+			var mounts = ShippedMounts();
+
+			// 155 records of RDB type 1040005 carry field 186. All of them are here: a mount id IS its summon
+			// spell's record id, so nothing is dropped for want of a key.
+			Assert.Equal(155, mounts.Count);
+
+			// The creature id is NOT unique and must never be used as the key - two "Killer Rhino" summons name one
+			// creature, and three "Ridden Death" summons name three different ones.
+			Assert.True(mounts.Count > new HashSet<uint>(mounts.Values.Select(m => m.CreatureId)).Count);
+		}
+
+		[Fact]
+		public void Quality_IsTheOnlyVariantDiscriminator_AndIsARarityLadder()
+		{
+			// #627 asked whether a speed field distinguishes "Swift <horse>" from "<horse>". It does not: field 499
+			// is the only field that differs, and it is the same 0-indexed ItemQuality ladder an item template
+			// carries. A Swift horse is Enchanted; its plain and Azure-barded twins carry no tier at all.
+			var quality = ShippedQuality();
+			Assert.Null(quality[0x3E34F1u]); // Fading Black Horse
+			Assert.Equal(ItemQuality.Enchanted, quality[0x3E34F2u]); // Swift Fading Black Horse
+			Assert.Null(quality[4076787u]); // Azure-barded Fading Black Horse
+
+			// The ladder is sparse in exactly the way rarity is and a speed would not be: nothing is Superior, and
+			// the top of it is the Legendary end of the mount store (Blood of Zath, Abomination of Selkhet).
+			Assert.DoesNotContain(ItemQuality.Superior, quality.Values);
+			Assert.Equal(ItemQuality.Legendary, quality[5069286u]); // Blood of Zath
 		}
 
 		[Fact]
@@ -38,10 +77,37 @@ namespace Faolan.Tests
 			Assert.Equal(captured, MagicBuffDataCodec.Build(MountCatalog.RideBuffPayload(80, 0x1560F9BB))); // the mount capture is a level-80 character (#438)
 		}
 
-		[Fact]
-		public void UnknownId_ResolvesNull()
+		// (mount id -> name + creature id) straight out of the committed faolan.db.
+		private static Dictionary<uint, (string Name, uint CreatureId)> ShippedMounts()
 		{
-			Assert.Null(MountCatalog.ForId(0xDEADBEEFu));
+			var rows = new Dictionary<uint, (string, uint)>();
+			foreach (var (id, name, creature, _) in ReadCatalog())
+				rows[id] = (name, creature);
+			return rows;
+		}
+
+		private static Dictionary<uint, ItemQuality?> ShippedQuality()
+		{
+			var rows = new Dictionary<uint, ItemQuality?>();
+			foreach (var (id, _, _, quality) in ReadCatalog())
+				rows[id] = quality;
+			return rows;
+		}
+
+		private static List<(uint Id, string Name, uint CreatureId, ItemQuality? Quality)> ReadCatalog()
+		{
+			using var con = new SqliteConnection($"Data Source={TestPaths.FaolanDb};Mode=ReadOnly");
+			con.Open();
+			using var cmd = con.CreateCommand();
+			cmd.CommandText = "SELECT m.Id, s.Name, m.CreatureId, m.Quality FROM Mounts m JOIN Spells s ON s.Id = m.Id";
+			using var r = cmd.ExecuteReader();
+			var rows = new List<(uint, string, uint, ItemQuality?)>();
+			while (r.Read())
+				rows.Add(((uint)r.GetInt64(0), r.GetString(1), (uint)r.GetInt64(2), r.IsDBNull(3)
+					? null
+					: (ItemQuality)r.GetInt64(3)));
+
+			return rows;
 		}
 	}
 }
