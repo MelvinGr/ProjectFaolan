@@ -748,15 +748,21 @@ namespace Faolan.GameServer
 					await SendAddSpecialAbility(client, ability);
 
 				// Level-gated SPELL unlocks (#209/#74): the class's spells whose Spells.Level is in the crossed range, 				// learned + persisted like .learnspell (so they ride every relog). Same as the XP-driven ding.
-				foreach (var spellId in await Database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, level))
+				var learned = await Database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, level);
+				foreach (var spellId in learned)
 				{
 					await SendLearnSpell(client, spellId);
 					await Database.AddCharacterSpell(character.Id, spellId);
 				}
 
-				// Ability/skill scaffold (#298/#251): a learned spell only becomes CASTABLE once the char carries the
-				// matching ability/skill scaffold entry, so we grant the whole harvested class scaffold. NB this is the
-				// skill list, NOT the feat tree (feats ride a separate FeatIIR 0x28da68a0). Rides the next spawn (relog).
+				// Castability (#298): the TEACHING FEATS for what was just learned (exact, per spell, all twelve
+				// classes - read backwards out of FeatSpellGrants), plus the older class SKILL scaffold, which is a
+				// different table and only ever covered the four captured classes. Both ride the next spawn (relog).
+				// Kept identical to CombatService.GrantCastabilityFor - the two level-up paths must not diverge.
+				var teachingFeats = await Database.GetFeatsTeachingSpells(learned);
+				if (teachingFeats.Length > 0)
+					await Database.AddCharacterFeats(character.Id, teachingFeats);
+
 				var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
 				if (fullScaffold != null)
 					await Database.EnsureCharacterSkills(character.Id, fullScaffold);

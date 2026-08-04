@@ -1,16 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Enums;
-using Faolan.Core.Network;
 using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Network.Codecs.FullCharSnapshot;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Network.Codecs.Text;
 using Faolan.Core.Network.Codecs.World;
+using Faolan.Core.Network;
 using Faolan.Core.Progression;
 using Faolan.GameServer.Quest;
 using Faolan.GameServer.World;
@@ -585,19 +586,45 @@ namespace Faolan.GameServer.Combat
 			// like .learnspell / a create-flow starter.
 			if (_learnSpell != null)
 			{
-				foreach (var spellId in await _database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, character.Level))
+				var learned = await _database.GetClassSpellsUnlockedBetween(character.Class, previousLevel, character.Level);
+				foreach (var spellId in learned)
 				{
 					await _learnSpell(killer, spellId);
 					await _database.AddCharacterSpell(character.Id, spellId);
 				}
 
-				// Ability/skill scaffold (#298/#251): grant the harvested class scaffold so the just-learned spells
-				// become castable (the client gates usability on the ability/skill entry). NB this is the skill list,
-				// NOT the feat tree - feats ride a separate FeatIIR (0x28da68a0); see [[feat_trees_decode_251]].
-				var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
-				if (fullScaffold != null)
-					await _database.EnsureCharacterSkills(character.Id, fullScaffold);
+				await GrantCastabilityFor(character, learned);
 			}
+		}
+
+		// What makes a just-learned spell CASTABLE (#298). Learning a spell puts it in the book, which is enough for
+		// it to render and for the level to read right, but the client refuses the cast until the character carries
+		// the FEAT that teaches it (its criteria evaluator's feat case, `YouCanNotUseYet`). Two grants, and they are
+		// different things:
+		//
+		//   1. the TEACHING FEATS, read backwards out of FeatSpellGrants - exact, per spell, and available for all
+		//      twelve classes because it comes from the client RDB rather than from a capture;
+		//   2. the class SKILL scaffold, which is the older stand-in and is kept because it is a different table
+		//      (skills, not feats) and still covers whatever the feat grants do not.
+		//
+		// The scaffold alone only ever worked for the four classes with a high-level capture (Necromancer,
+		// Demonologist, Assassin, Herald of Xotli) - `FullSkillIdsFor` returns null for the other eight, so their
+		// level-up spells stayed gated. The feat grant is what closes that.
+		//
+		// Both take effect on the next world entry: feats ride the spawn scaffold's pre-IIR frame, so there is no
+		// mid-session feat packet to send and none is invented here.
+		private async Task GrantCastabilityFor(Character character, IReadOnlyCollection<uint> learnedSpellIds)
+		{
+			var teachingFeats = await _database.GetFeatsTeachingSpells(learnedSpellIds);
+			if (teachingFeats.Length > 0)
+			{
+				await _database.AddCharacterFeats(character.Id, teachingFeats);
+				_logger.LogInformation("Level-up: trained {Count} feat(s) that teach {Spells} newly learned spell(s) for {Name}.", teachingFeats.Length, learnedSpellIds.Count, character.Name);
+			}
+
+			var fullScaffold = PlayerSpawnScaffoldRows.FullSkillIdsFor(character.Class);
+			if (fullScaffold != null)
+				await _database.EnsureCharacterSkills(character.Id, fullScaffold);
 		}
 
 		// The NPC's authoritative live vitals: the world-model entity's if it is a tracked NPC (also returned, so the

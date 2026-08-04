@@ -35,6 +35,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<CharacterCombo[]> GetCharacterCombos(uint characterId);
 		Task<CharacterEquipment?> GetCharacterEquipment(uint characterId);
 		Task<uint[]> GetCharacterFeats(uint characterId);
+
+		Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds);
 		Task<Dictionary<uint, uint[]>> GetFeatPrereqs(IEnumerable<uint> featIds);
 		Task<FeatEffect[]> GetCharacterFeatEffects(uint characterId);
 
@@ -449,6 +451,30 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.CharacterFeats.Where(f => f.CharacterId == characterId).OrderBy(f => f.Sequence).Select(f => f.FeatId).ToArrayAsync();
+		}
+
+		// The WIRE feat ids of the feats that TEACH any of `spellIds` (#298). The inverse of FeatSpellGrants: a feat
+		// template's GameAction kind 53019 `Spell` element names the spell the feat grants, so reading it backwards
+		// answers "which feat has to be trained for this spell to be castable".
+		//
+		// This is the datum the issue was parked on for a month. The workaround it replaces - granting a whole
+		// captured character's skill scaffold - existed because the spell->feat mapping was believed to be
+		// server-GDB-only; it is in the client RDB, and all 1,510 grant rows resolve to a shipped Spells.Id.
+		//
+		// Two hops for the same reason GetCharacterFeatEffects has two: FeatSpellGrant.FeatId is the RDB TEMPLATE id
+		// and the wire (and CharacterFeat) speak a different id space, which FeatIdMaps bridges. A feat whose
+		// template has no wire id contributes nothing - 58 of the 1,510 rows - which is expected, not a fault: it
+		// cannot be put on the wire, so training it would be invisible to the client anyway.
+		public async Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds)
+		{
+			var wanted = spellIds as IReadOnlyCollection<uint> ?? [.. spellIds];
+			if (wanted.Count == 0)
+				return [];
+
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await (from grant in ctx.FeatSpellGrants.Where(g => wanted.Contains(g.SpellId))
+				join map in ctx.FeatIdMaps on grant.FeatId equals map.TemplateId
+				select map.WireFeatId).Distinct().ToArrayAsync();
 		}
 
 		// The stat modifiers a character's trained feats grant. Two hops, because the wire and the catalog use
