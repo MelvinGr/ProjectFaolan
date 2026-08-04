@@ -89,6 +89,63 @@ fresh buff apply — retail's entry-restore record is byte-identical to a player
 id and nonce, so there is no "silent" variant to reconstruct inside the snapshot.
 [V2: NecroL80_mage-necromancer_login_leave_king_conan_castle-Dismount.tshark.json]
 
+## Mounted combat
+
+The client's data says a surprising amount about this, and all of it points the same way: **the saddle gate is
+a lance charge and nothing else**, and **no magnitude for a charge exists anywhere in the client**.
+
+**The gate.** Exactly two of the client's 260 GameAction types ask whether they may be used from the saddle —
+`Charge` (type 53009) and `ChargeSpecialAbility` (53253), both carrying key index 245 →
+`0x4FD GameAction_CanUseIfMounted`. There is no general "usable while mounted" property on any other action, so
+the client never asks the question of an ordinary cast. [V1: docs/re/gameaction-keylists.tsv]
+
+**What carries it.** `ChargeSpecialAbility` occurs **zero** times in the shipped catalog. `Charge` occurs on
+**16** of the 21,502 spell records — and exactly **one** of them sets the flag:
+
+```
+4707261 Tiger Charge   187=0        248=0 245=1 243=1802 254=1801
+4267183 Charge         187=4267326  248=0 245=0 243=1725 254=1726
+5035719 Charge         187=5035720  248=0 245=0 243=203  254=119
+… 13 more, all 245=0
+```
+
+`Tiger Charge` is also the only one whose `GameAction_TemplateID` is 0. Its ability twin is
+`Mount Ability: Tiger Charge` (4707293), an adjacent id.
+
+**The abilities exist and are already granted.** The catalog holds 14 `Mount Ability: …` rows, and six of them
+carry real captured grant keys and bar slots — so retail's own `AddSpecialAbility` grant for them was observed:
+
+| slot | ability |
+|---|---|
+| 269 | Mount Ability: Mammoth Charge |
+| 270 | Mount Ability: Mammoth Sweep |
+| 273 | Mount Ability: Cavalry Charge |
+| 274 | Mount Ability: Trample |
+| 275 | Mount Ability: Hind Leg Kick |
+| 284 | Mount Ability: Quick Dismount |
+
+The other eight (Rhino Charge/Sweep, Tiger Charge, Equestrian Bow/Dance, Maul, Venomous Spit, a second Quick
+Dismount) are LDB-identity only — no capture ever granted them, and a grant needs the per-ability TEA key,
+which is random.
+
+Those six ids appear in the **login** burst of many unrelated captures, not in the three mount captures. So
+retail grants the mount abilities like every other ability, at world entry, and the client itself decides
+whether the button is usable — which is what `GameAction_CanUseIfMounted` is for. Our server already sends
+them on the same path as every other ability; nothing mounted-specific is needed to put them on the bar.
+
+⚠️ They currently sit in `ClassAbilities` under Necromancer and Demonologist at level 80 because those are the
+captured characters. That is a **capture artifact**, not a rule the data states — a mount ability comes with
+the mount, not the class. Widening it is the class-aware ability coverage problem, not mounted combat.
+
+**What is missing is a capture, not a decode.** The `Charge` element carries only `TemplateID`, `TemplateID2`,
+`CanUseIfMounted`, `BccEvent` and `PoseEvent` — a presentation action. There is no damage, no knockback, no
+radius on it, none of the mount-ability ids has a spell record at all, and none of the 16 charge spells carries
+a `[2][9]` stat-effect region. So a charge's magnitude is server-GDB-only, exactly like ordinary spell
+magnitudes (`stat-engine.md`), and no capture in the corpus shows a mounted character fighting. Implementing
+trample damage or a charge knockback today would mean inventing both the numbers and the packets.
+
+Open work tracked in Gitea #142.
+
 ## Where the pieces live
 
 | | |
