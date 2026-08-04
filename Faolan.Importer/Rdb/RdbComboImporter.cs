@@ -1,9 +1,12 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Rdb;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -128,9 +131,103 @@ namespace Faolan.Importer.Rdb
 				spell.RecastCentiseconds = recast;
 			}
 
-			await db.SaveChangesAsync();
-			logger?.LogInformation("RdbComboImporter: {Seen} combo XML entries parsed, {Imported} combos imported, {Recasts} combo recasts set on their spell rows ({Cleared} cleared).", seen, imported, recastsSet, recastsCleared);
+			var classCombos = await SyncClassCombos(db, existing.Values, logger);
+
+			logger?.LogInformation(
+				"RdbComboImporter: {Seen} combo XML entries parsed, {Imported} combos imported, {Recasts} combo recasts set on their spell rows ({Cleared} cleared), {ClassCombos} class<->combo rows.",
+				seen, imported, recastsSet, recastsCleared, classCombos);
 			return (seen, imported);
+		}
+
+		/// <summary>
+		///     Fill the class↔combo map from the stacking line of the SPELL each combo drives (#581/#296). A combo's
+		///     <c>GameActionId</c> is a spell id, and a spell's <c>GuiStackingLine</c> encoded as
+		///     <c>ConanClass * 1000 + lineIndex</c> names its class - so the client answers "which class gets this
+		///     combo" for the feat-tree prefixes (<c>Reaver_</c>, <c>Liberator_</c>, <c>Halberdier_</c>, <c>Lich_</c>)
+		///     that the name heuristic in <c>CaptureAbilityImporter</c> deliberately refuses to guess at.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ <b>Only lineIndex ≥ 400.</b> The archetype-shared combos sit in a LOW block that reads as class 20
+		///     and is not one: <c>Soldier_</c> on 20002-20005, <c>Rogue_</c> on 20006-20007, <c>Priest_</c> on 20008 -
+		///     three different archetypes under the same "20", so the number is a block, not a class. Taking it at
+		///     face value files every Rogue and Priest archetype combo under Guardian. The split is exceptionless over
+		///     all 17 name prefixes in the catalog: every class-specific and feat-tree combo is at 401+
+		///     (Barbarian 18401-18409, Guardian 20401-20406, Halberdier 20407-20410, Ranger 39401-39412, …) and every
+		///     archetype-shared one is at ≤ 8. Which class each archetype combo ALSO belongs to needs the captured
+		///     action bars - Gitea #581.
+		///     <para>
+		///         Corroborated where it can be: over the combos the existing name-prefix + action-bar map already
+		///         covers, this agrees on <b>257 of 257</b>, with no disagreements.
+		///     </para>
+		///     <para>
+		///         NPC/monster combos are excluded by name, as they already are in <c>CaptureAbilityImporter</c>.
+		///         Nearly all of them carry no stacking line at all, but a handful reuse a PLAYER spell's game action
+		///         (<c>generic_DOT</c> drives the Conqueror's <c>Bloody Hack II</c>), and those would otherwise arrive
+		///         as a real class row.
+		///     </para>
+		/// </remarks>
+		private static async Task<int> SyncClassCombos(IDatabaseContext db, IEnumerable<Combo> combos, ILogger? logger)
+		{
+			// The lowest lineIndex any class-specific or feat-tree combo uses; everything below is the shared
+			// archetype block. See the remarks - this is measured over the whole catalog, not chosen.
+			const uint firstClassLineIndex = 400;
+
+			var lineBySpell = await db.Spells.Where(s => s.GuiStackingLine > 0).ToDictionaryAsync(s => s.Id, s => s.GuiStackingLine);
+			var known = (await db.ClassCombos.ToListAsync()).ToHashSet(new ClassComboKey());
+			var added = 0;
+			var conflicts = 0;
+
+			foreach (var combo in combos)
+			{
+				if (NpcComboPrefixes.Any(p => combo.Name.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+					continue;
+
+				if (!lineBySpell.TryGetValue(combo.GameActionId, out var line) || line % 1000 < firstClassLineIndex)
+					continue;
+
+				if (!Enum.IsDefined((ConanClass)(line / 1000)))
+					continue;
+
+				var row = new ClassCombo
+				{
+					ComboId = combo.Id,
+					Class = (ConanClass)(line / 1000),
+					Level = combo.Level
+				};
+				if (!known.Add(row))
+					continue;
+
+				// A combo already mapped to a DIFFERENT class is worth saying out loud: one stacking line means one
+				// class, so this is a disagreement to look at rather than a combo two classes share.
+				if (known.Any(k => k.ComboId == row.ComboId && k.Class != row.Class))
+					conflicts++;
+
+				db.ClassCombos.Add(row);
+				added++;
+			}
+
+			await db.SaveChangesAsync();
+			logger?.LogInformation("RdbComboImporter: {Added} class<->combo rows from the driven spell's stacking line ({Conflicts} on a combo another class already claims).", added, conflicts);
+			return added;
+		}
+
+		// NPC/monster/generic combo name prefixes - not player combos, and excluded here for the same reason
+		// CaptureAbilityImporter excludes them.
+		private static readonly string[] NpcComboPrefixes = ["combo_npc_", "monster_", "generic_", "Ghauhk_"];
+
+		// (Class, ComboId) identity - the table's own primary key - so an existing row is recognised regardless of
+		// the Level it carries.
+		private sealed class ClassComboKey : IEqualityComparer<ClassCombo>
+		{
+			public bool Equals(ClassCombo? a, ClassCombo? b)
+			{
+				return a?.ComboId == b?.ComboId && a?.Class == b?.Class;
+			}
+
+			public int GetHashCode(ClassCombo x)
+			{
+				return HashCode.Combine(x.ComboId, x.Class);
+			}
 		}
 
 		private static uint ParseUint(XElement el, string attr)

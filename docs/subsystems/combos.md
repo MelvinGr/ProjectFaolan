@@ -23,6 +23,36 @@ fire the accumulated weave at the target and leave the trance. Because it is pla
 fixed catalog to match (unlike melee) — the server accumulates the added components' contributions and
 resolves the blend + a backlash roll on deactivate.
 
+## Which class gets which combo
+
+The map (`ClassCombos`) has two sources, and the second was added in #296 because the first refuses to guess:
+
+1. **The combo's NAME prefix**, for the class-named ones (`Guardian_`, `Ranger_`, …) — `CaptureAbilityImporter`,
+   plus captured action bars for direct `(class, combo)` evidence.
+2. **The stacking line of the SPELL the combo drives.** A combo's `GameActionId` is a spell id, and a class-encoded
+   `Spell.GuiStackingLine` (`ConanClass × 1000 + lineIndex`) names the class. This resolves the FEAT-TREE prefixes
+   the name heuristic cannot — `Reaver_` → Barbarian, `Liberator_` → Conqueror, `Halberdier_` → Guardian —
+   and it agrees with source 1 on **257 of 257** combos where both speak.
+
+⚠️ **Only lineIndex ≥ 400, and this is the whole subtlety.** The ARCHETYPE-shared combos sit in a low block that
+reads as class 20 and is not one:
+
+| prefix | stacking lines |
+|---|---|
+| `Soldier_` | 20002–20005 |
+| `Rogue_` | 20006–20007 |
+| `Priest_` | 20008 |
+
+Three different archetypes under the same leading `20`, so the number is a BLOCK, not a class — taking it at face
+value files every Rogue and Priest archetype combo under Guardian. The split is exceptionless across all 17 name
+prefixes in the catalog: every class-specific and feat-tree combo is at 401+ (Barbarian 18401–18409,
+Guardian 20401–20406, Halberdier 20407–20410, Ranger 39401–39412, …) and every archetype-shared one is at ≤ 8.
+
+Which classes each ARCHETYPE combo belongs to still needs the captured action bars — open work tracked in
+Gitea #581. Gated by `Faolan.Tests/ClassComboMembershipTests.cs`, which pins both halves: the rule never
+contradicts source 1, and the low-block combos are not mapped from it.
+
+
 ## Data model (DONE)
 
 - **`Combos`** catalog — RDB 1010206 (plaintext XML), **744 rows = all 744 entries of the type**. `Name` is an engine
