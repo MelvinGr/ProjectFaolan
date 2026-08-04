@@ -159,8 +159,9 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Buff stat effects** — a buff's per-stat bonuses and penalties apply to your live stats and come back off when
   it expires, is cancelled or you die; flat ones add, percentage ones scale, and one that raises a max pool moves
   the pool so the bar fills to it. Awaiting an in-client check of the applied values (#367, #435, #436, #450)
-- 🟡 **Spell cooldowns** — fully reverse-engineered; the client runs the recast timer from its own data (retail
-  sends nothing), pending an in-client confirm of the server-override case (#271)
+- 🔴 **Spell cooldowns** — spells can be re-cast with no delay. Retail sends no recast on a cast (proven across
+  the whole corpus) and the client's own cast path arms only the shared global cooldown, so the per-spell base
+  must come from client data we have not located yet; no cooldown is enforced server-side either (#271)
 - 🟡 **Spellweaving** (necromancer and demonologist) — built and playable; the toggle turned out to be a different
   key per class, so demonologists could not weave at all. The energy-bar drain is the last piece, and Priest of
   Mitra / Tempest of Set are unmapped because no capture shows either weaving (#141, #505)
