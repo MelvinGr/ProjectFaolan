@@ -4357,8 +4357,14 @@ namespace Faolan.Importer.Cli
 				return;
 			}
 
-			foreach (var kv in counts.OrderByDescending(k => k.Value).Take(40))
-				Console.WriteLine($"0x{kv.Key:X3} ({kv.Key,4}) count={kv.Value,5}  samples={string.Join(",", samples[kv.Key])}");
+			// Every field id, not a top-N: the tail is where the undecoded ones live. The name comes from the
+			// client's own static stat-name table (CharacterStatId, `docs/re/aoc-client-stat-names.tsv`) - the
+			// spell record's field ids ARE that namespace, which is what names the 0x300+ run outright.
+			foreach (var kv in counts.OrderByDescending(k => k.Value))
+			{
+				var name = Enum.GetName(typeof(CharacterStatId), kv.Key) ?? "";
+				Console.WriteLine($"0x{kv.Key:X3} ({kv.Key,4}) count={kv.Value,5}  {name,-38} samples={string.Join(",", samples[kv.Key])}");
+			}
 		}
 
 		// Matrix CSV for ONE opcode (arg, e.g. "0x2000"; default 0x2000): one row per capture, one column per

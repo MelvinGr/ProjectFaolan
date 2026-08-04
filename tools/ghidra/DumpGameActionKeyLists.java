@@ -40,6 +40,15 @@ public class DumpGameActionKeyLists extends GhidraScript {
 	static final int NAMES = 0x5c;
 	// The key list ends at this sentinel rather than carrying a count.
 	static final long TERMINATOR = 0xffL;
+	// The KEY-INDEX TABLE. A descriptor's key list holds an INDEX, not the property key itself; the element reader
+	// resolves it as `statKey = DAT_025073c0[index]` (see docs/re/gameactionlist-grammar.md). That table is built at
+	// runtime by FUN_00897bd0 - a straight run of `MOV dword ptr [0x025073c0 + 4i], <key>` - so it is recovered from
+	// the initialiser's instructions, not from the image bytes (which are still zero). Resolving it is what turns a
+	// key list into NAMES: the keys are ordinary stat ids, so `CharacterStatId` names them.
+	static final long KEY_TABLE = 0x025073c0L;
+	static final int KEY_TABLE_BYTES = 0x3fc;      // the memset width at the head of FUN_00897bd0 - 255 u32 slots
+	static final long KEY_TABLE_INIT_FN = 0x00897bd0L;
+
 	// The id space the descriptor ARRAY spans, straight out of the lookup `FUN_008c3910`:
 	// `descriptor = &DAT_025077c8 + (id - 0xCF09) * 0x41` undefined4s (= 0x104 bytes), guarded by
 	// `(id - 0xCF09) <= 0x11D`. So the array has 0x11E = 286 slots, and an id in range whose slot the
@@ -85,6 +94,28 @@ public class DumpGameActionKeyLists extends GhidraScript {
 		final List<Long> keys = new ArrayList<>();
 		final List<String> fields = new ArrayList<>();
 		String form;
+	}
+
+	// index -> stat key, off FUN_00897bd0's absolute stores into the key table.
+	Map<Long, Long> readKeyTable() {
+		Map<Long, Long> table = new TreeMap<>();
+		Function fn = getFunctionAt(toAddr(KEY_TABLE_INIT_FN));
+		if (fn == null) { println("no key-table initialiser at " + Long.toHexString(KEY_TABLE_INIT_FN)); return table; }
+		InstructionIterator it = currentProgram.getListing().getInstructions(fn.getBody(), true);
+		while (it.hasNext()) {
+			Instruction in = it.next();
+			if (!in.getMnemonicString().equals("MOV") || in.getNumOperands() != 2) continue;
+			// `MOV dword ptr [0x025073c0],0x2d2` - the destination renders as an Address operand, not a Scalar.
+			Object[] dst = in.getOpObjects(0), src = in.getOpObjects(1);
+			if (dst.length != 1 || src.length != 1 || !(src[0] instanceof Scalar)) continue;
+			long addr;
+			if (dst[0] instanceof Address) addr = ((Address) dst[0]).getOffset();
+			else if (dst[0] instanceof Scalar) addr = ((Scalar) dst[0]).getUnsignedValue();
+			else continue;
+			if (addr < KEY_TABLE || addr >= KEY_TABLE + KEY_TABLE_BYTES) continue;
+			table.put((addr - KEY_TABLE) / 4, ((Scalar) src[0]).getUnsignedValue());
+		}
+		return table;
 	}
 
 	public void run() throws Exception {
@@ -222,18 +253,27 @@ public class DumpGameActionKeyLists extends GhidraScript {
 		for (Map.Entry<Long, Set<String>> e : seen.entrySet())
 			if (e.getValue().size() == 1) keyNames.put(e.getKey(), e.getValue().iterator().next());
 
+		Map<Long, Long> keyTable = readKeyTable();
+
 		try (PrintWriter w = new PrintWriter(OUT + "gameaction-keylists.tsv")) {
-			w.println("typeId\ttypeIdHex\tname\tlabel\twidthWords\tkeys\tfields\tform");
+			w.println("typeId\ttypeIdHex\tname\tlabel\twidthWords\tkeys\tstatKeys\tfields\tform");
 			for (Desc d : out.values()) {
-				StringBuilder keys = new StringBuilder(), fields = new StringBuilder();
+				StringBuilder keys = new StringBuilder(), stats = new StringBuilder(), fields = new StringBuilder();
 				for (int i = 0; i < d.keys.size(); i++) {
-					if (i > 0) { keys.append(';'); fields.append(';'); }
+					if (i > 0) { keys.append(';'); stats.append(';'); fields.append(';'); }
 					keys.append(d.keys.get(i));
+					// An entry inside the table's 255 slots is an INDEX; the two that are not (1305 / 1307) are the
+					// property key ITSELF - both are float-typed keys, and both land on the names the client's own
+					// field-name array already gives those slots (`GameAction_FloatValue1` / `_FloatMultiplier`),
+					// which is what says the pass-through is right and not a missing table entry.
+					long entry = d.keys.get(i);
+					Long stat = keyTable.containsKey(entry) ? keyTable.get(entry) : entry;
+					stats.append("0x" + Long.toHexString(stat).toUpperCase());
 					String f = d.fields.get(i).isEmpty() ? keyNames.getOrDefault(d.keys.get(i), "") : d.fields.get(i);
 					fields.append(f);
 				}
 				w.println(d.enumId + "\t0x" + Long.toHexString(d.enumId).toUpperCase() + "\t" + d.name + "\t" + d.label
-						+ "\t" + (8 + d.keys.size()) + "\t" + keys + "\t" + fields + "\t" + d.form);
+						+ "\t" + (8 + d.keys.size()) + "\t" + keys + "\t" + stats + "\t" + fields + "\t" + d.form);
 			}
 		}
 		// The HOLES. The array is indexed by id, so "in range but never written" is a fact about the client, not a
@@ -249,6 +289,7 @@ public class DumpGameActionKeyLists extends GhidraScript {
 			if (d.hasStringValue() && String.valueOf(d.getValue()).startsWith("e_Type_GC_GameAction_")
 					&& String.valueOf(d.getValue()).length() > "e_Type_GC_GameAction_".length()) named++;
 
+		println("key table: " + keyTable.size() + " indices resolved to stat keys");
 		println("descriptors: " + out.size() + " of " + (LAST_ID - FIRST_ID + 1) + " slots"
 				+ "  named keys: " + keyNames.size() + "  e_Type_GC_GameAction_* strings in the image: " + named);
 		println("unregistered: " + holes);

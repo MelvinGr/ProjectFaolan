@@ -58,6 +58,32 @@ the keys are in the STATIC descriptor, not on the wire). Read at runtime by the 
 `FUN_0089bd80(action, key)` — e.g. SetSpellRecastTime (`FUN_008b0f50`, string `GameCode/GameAction/SetSpellRecastTime`)
 pulls keys `0x463` (caster/line) and `0x2f9` (recast centiseconds).
 
+## The key INDEX table — what a key list entry actually names
+
+A descriptor's key list does not hold property keys; it holds an **index** into a 255-slot table the client
+builds at runtime, `DAT_025073c0`, written by `FUN_00897bd0` as a flat run of
+`MOV dword ptr [0x025073c0 + 4i], <key>` (244 of the 255 slots are filled). `DumpGameActionKeyLists.java`
+reads that initialiser and emits the resolution as the tsv's **`statKeys`** column, so a key list can be read
+without the indirection.
+
+The resolved keys are **ordinary stat ids** — the same id space as `CharacterStatId` — which is what names them:
+148 distinct keys are used across the 260 types and 120 of them already have a client name, most from the
+`GameAction_*` run at `0x300`–`0x50B`. Confirmed against the one pair published independently: index 88 → `0x463`
+and index 39 → `0x2f9` are exactly the two keys `SetSpellRecastTime` is decompiled reading.
+
+⚠️ **An entry of 1305 / 1307 is the key ITSELF, not an index** (both are past the table's 255 slots). They resolve
+to `0x519 GameAction_FloatValue1` and `0x51B GameAction_FloatMultiplier`, which is precisely what the client's own
+field-name array calls those two slots — so the pass-through is the reading, not a hole in the table. This
+supersedes the `key = statKeyTable[entry & 0xFF]` sketch above: `& 0xFF` would fold 1305 onto index 25 (`0x2eb`).
+
+The 28 keys with no name yet all sit in `0x2D2`–`0x2FE` — below the 768 floor the client's stat-name-table sweep
+excludes as too noisy, so naming them is that sweep's sub-768 half (Gitea #625), not new GameAction work.
+
+**What it settles for mounted combat (#142):** exactly two of the 260 types ask whether they may be used from the
+saddle — `Charge` and `ChargeSpecialAbility`, both carrying key index 245 → `0x4FD GameAction_CanUseIfMounted`.
+There is no general "usable while mounted" property on any other action, so the client does not gate ordinary
+casts on one.
+
 ## Status (#190 / #271)
 
 - Header/list framing fully decoded + validated 925/925; `GameActionListCodec` round-trips element bytes verbatim.

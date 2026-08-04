@@ -1,261 +1,261 @@
-typeId	typeIdHex	name	label	widthWords	keys	fields	form
-53002	0xCF0A	e_Type_GC_GameAction_Hit		12	0;2;37;71	Stat;;;	abs
-53003	0xCF0B	e_Type_GC_GameAction_AddLayeredSkinnedMesh		10	194;39	;	abs
-53004	0xCF0C	e_Type_GC_GameAction_StartParticleEffectOnHead		14	209;86;138;28;29;30	;;;RelXPos;RelYPos;RelZPos	abs
-53005	0xCF0D	e_Type_GC_GameAction_BindAtLocation		8			reg
-53006	0xCF0E	e_Type_GC_GameAction_TeleportToBindLocation		8			reg
-53007	0xCF0F	e_Type_GC_GameAction_HitPercentage		12	0;39;1;71	Stat;;;	abs
-53008	0xCF10	e_Type_GC_GameAction_Remove		9	12		abs
-53009	0xCF11	e_Type_GC_GameAction_Charge		13	187;248;245;243;254	;;;;	abs
-53010	0xCF12	e_Type_GC_GameAction_SetMorphValue		10	209;39	;	reg
-53011	0xCF13	e_Type_GC_GameAction_AudioEffect	AudioEffect	13	17;18;19;20;11	AudioEffectID;AudioEffectDuration;AudioEffectRepeat;AudioEffectVolume;Radius	abs
-53012	0xCF14	e_Type_GC_GameAction_Skill	ModifySkill	11	0;39;24	Stat;Value;SkillType	abs
-53013	0xCF15	e_Type_GC_GameAction_DPSHit		12	0;39;66;71	Stat;;;	abs
-53014	0xCF16	e_Type_GC_GameAction_TimedEffect		13	0;39;11;46;25	Stat;;Radius;;TimedLength	abs
-53015	0xCF17	e_Type_GC_GameAction_AddFormation		9	187		abs
-53016	0xCF18	e_Type_GC_GameAction_Teleport		13	28;29;30;151;31	RelXPos;RelYPos;RelZPos;;	abs
-53018	0xCF1A	e_Type_GC_GameAction_AreaRangeFormula		11	88;2;11	;;Radius	abs
-53019	0xCF1B	e_Type_GC_GameAction_Spell		9	39		abs
-53020	0xCF1C	e_Type_GC_GameAction_Bandaging		8			abs
-53021	0xCF1D	e_Type_GC_GameAction_RenewMana		8			abs
-53022	0xCF1E	e_Type_GC_GameAction_LayeredVisualLocation		18	193;194;195;196;197;198;199;200;201;39	;;;;;;;;;	abs
-53023	0xCF1F	e_Type_GC_GameAction_CatMesh		9	44		abs
-53024	0xCF20	e_Type_GC_GameAction_SetFollowerScriptGroup		9	66		reg
-53025	0xCF21	e_Type_GC_GameAction_AddHateToPets		9	66		reg
-53026	0xCF22	e_Type_GC_GameAction_Set		11	55;0;39	;Stat;	abs
-53027	0xCF23	e_Type_GC_GameAction_ItemText		10	39;209	;	abs
-53028	0xCF24	e_Type_GC_GameAction_PolyMorph		8			reg
-53029	0xCF25	e_Type_GC_GameAction_ChangeModifyPercent		11	187;39;55	;;	abs
-53030	0xCF26	e_Type_GC_GameAction_ChangeHitPercent		11	187;39;55	;;	abs
-53031	0xCF27	e_Type_GC_GameAction_ChangeRecastTime		10	187;39	;	abs
-53032	0xCF28	e_Type_GC_GameAction_AOERadiusModification		10	187;11	;Radius	abs
-53033	0xCF29	e_Type_GC_GameAction_ApplyFactionRank		10	66;67	;	reg
-53034	0xCF2A	e_Type_GC_GameAction_SummonFollower		8			reg
-53035	0xCF2B	e_Type_GC_GameAction_EnterSiegeTargeting		8			abs
-53036	0xCF2C	e_Type_GC_GameAction_SpawnQuest		9	209		reg
-53037	0xCF2D	e_Type_GC_GameAction_Charmed		14	66;67;68;69;163;39	;;;;;	abs
-53038	0xCF2E	e_Type_GC_GameAction_PlaceTrap		15	77;84;88;25;66;67;68	Hash;Level;;TimedLength;;;	reg
-53040	0xCF30	e_Type_GC_GameAction_StartTracking		9	39	Tier	reg
-53041	0xCF31	e_Type_GC_GameAction_ModifyBasedOnStat		12	174;175;0;207	Substate;Amount;Stat;	abs
-53042	0xCF32	e_Type_GC_GameAction_Modify_PowerSurge		9	39		abs
-53043	0xCF33	e_Type_GC_GameAction_ExecuteBccAction		9	243		abs
-53045	0xCF35	e_Type_GC_GameAction_Modify		10	0;39	Stat;	abs
-53046	0xCF36	e_Type_GC_GameAction_AddAbsorb		13	0;70;33;34;88	Stat;;;;	reg
-53047	0xCF37	e_Type_GC_GameAction_CameraShake		11	204;249;191	;;	reg
-53048	0xCF38	e_Type_GC_GameAction_Name		9	209		abs
-53049	0xCF39	e_Type_GC_GameAction_SpawnMonster		17	47;48;39;72;73;28;29;30;77	;;;TimeExist;Flags;RelXPos;RelYPos;RelZPos;Hash	abs
-53050	0xCF3A	e_Type_GC_GameAction_RemoveBuffs		8			abs
-53051	0xCF3B	e_Type_GC_GameAction_CastNano		9	39		abs
-53052	0xCF3C	e_Type_GC_GameAction_StrTexture		11	58;56;8	;;	abs
-53053	0xCF3D	e_Type_GC_GameAction_CameraRoll		9	191		reg
-53054	0xCF3E	e_Type_GC_GameAction_SpellStatModifier		12	88;0;39;175	;Stat;;Amount	reg
-53055	0xCF3F	e_Type_GC_GameAction_AttractorMesh		10	56;8	;	abs
-53056	0xCF40	e_Type_GC_GameAction_RemoveCowardStatus		8			reg
-53057	0xCF41	e_Type_GC_GameAction_HeadText		10	209;39	;	abs
-53058	0xCF42	e_Type_GC_GameAction_SpawnRemotePet		12	77;39;88;175	Hash;;;Amount	reg
-53059	0xCF43	e_Type_GC_GameAction_LineTeleport		12	9;10;31;100	;;;	abs
-53060	0xCF44	e_Type_GC_GameAction_MonsterShape	MonsterShape	10	39;25	Value;TimedLength	abs
-53061	0xCF45	e_Type_GC_GameAction_BCCCastSpell		9	39		abs
-53062	0xCF46	e_Type_GC_GameAction_SpellLineStatModifier		12	1;0;39;175	;Stat;;Amount	reg
-53063	0xCF47	e_Type_GC_GameAction_SpawnMonsterACG	SpawnMonsterACG	16	77;84;72;73;28;29;30;103	Hash;Level;TimeExist;Flags;RelXPos;RelYPos;RelZPos;NPCMaster	abs
-53064	0xCF48	e_Type_GC_GameAction_SpawnItemOnCharacter		16	77;84;85;72;73;28;29;30	Hash;Level;;TimeExist;Flags;RelXPos;RelYPos;RelZPos	abs
-53065	0xCF49	e_Type_GC_GameAction_CoreSpellStatModifier		13	88;0;39;175;1305	;Stat;;Amount;FloatValue	reg
-53066	0xCF4A	e_Type_GC_GameAction_TeamFormula		9	88		abs
-53067	0xCF4B	e_Type_GC_GameAction_ModifyAsRating		10	0;39	Stat;	abs
-53068	0xCF4C	e_Type_GC_GameAction_InterpolatedModifyAsRating		13	0;174;172;175;173	Stat;Substate;;Amount;	abs
-53069	0xCF4D	e_Type_GC_GameAction_ChangeLineRecastTime		10	1;39	;	abs
-53070	0xCF4E	e_Type_GC_GameAction_AddSpellLineProc		14	88;236;1;117;237;73	;;;;;Flags	abs
-53071	0xCF4F	e_Type_GC_GameAction_DoorToAutoDoor		11	31;90;91	;;	abs
-53072	0xCF50	e_Type_GC_GameAction_StopAudioEffect		9	17	AudioEffectID	abs
-53073	0xCF51	e_Type_GC_GameAction_AreaHit		13	0;2;37;71;11	Stat;;;;Radius	abs
-53074	0xCF52	e_Type_GC_GameAction_LineAOERadiusModification		10	1;11	;Radius	abs
-53075	0xCF53	e_Type_GC_GameAction_ChangeLineHitPercent		11	1;39;55	;;	abs
-53076	0xCF54	e_Type_GC_GameAction_CoreSpellLineStatModifier		13	1;0;39;175;1305	;Stat;;Amount;FloatValue	reg
-53077	0xCF55	e_Type_GC_GameAction_SetSpellLineRecastTime		10	1;39	;	abs
-53078	0xCF56	e_Type_GC_GameAction_CastSpellOnOwner		9	39		abs
-53079	0xCF57	e_Type_GC_GameAction_CastInvertibleBuff		9	39		abs
-53080	0xCF58	e_Type_GC_GameAction_PetFormula		10	39;64	;	abs
-53081	0xCF59	e_Type_GC_GameAction_ProxyForceTeleport		8			abs
-53082	0xCF5A	e_Type_GC_GameAction_ProxyTeleport		14	94;95;96;97;98;99	;;;;;	abs
-53083	0xCF5B	e_Type_GC_GameAction_ProxyTeleportLine		15	94;95;96;97;98;99;100	;;;;;;	abs
-53084	0xCF5C	e_Type_GC_GameAction_ColumnFormula		16	88;238;39;170;93;250;66;67	;;;;;;;	abs
-53085	0xCF5D	e_Type_GC_GameAction_Recovery		8			abs
-53086	0xCF5E	e_Type_GC_GameAction_EnableShieldTaunt		8			abs
-53087	0xCF5F	e_Type_GC_GameAction_AreaFormula		10	88;11	;Radius	abs
-53088	0xCF60	e_Type_GC_GameAction_FilteredAreaFormula		13	88;11;170;93;250	;Radius;;;	abs
-53089	0xCF61	e_Type_GC_GameAction_ItemFormula		10	88;39	;	abs
-53090	0xCF62	e_Type_GC_GameAction_EnableCriminalStatus		8			reg
-53091	0xCF63	e_Type_GC_GameAction_FEDOCSTest		8			reg
-53092	0xCF64	e_Type_GC_GameAction_SetTradingPostAccess	OpenTradepost	10	39;11	Value;Radius	abs
-53093	0xCF65	e_Type_GC_GameAction_LockMetaline		12	39;72;66;67	;TimeExist;;	abs
-53094	0xCF66	e_Type_GC_GameAction_RestoreChar		8			abs
-53095	0xCF67	e_Type_GC_GameAction_DisableMinigames		8			abs
-53096	0xCF68	e_Type_GC_GameAction_CoreFilteredAreaFormula		18	88;11;170;93;250;66;67;138;212;2	;Radius;;;;;;;;	abs
-53097	0xCF69	e_Type_GC_GameAction_ChangeTokenPoints		10	66;67	;	reg
-53098	0xCF6A	e_Type_GC_GameAction_TargetSpellStatModifier		12	88;0;39;175	;Stat;;Amount	reg
-53099	0xCF6B	e_Type_GC_GameAction_TargetSpellLineStatModifier		12	1;0;39;175	;Stat;;Amount	reg
-53100	0xCF6C	e_Type_GC_GameAction_HateValueAdd		10	239;240	;	reg
-53101	0xCF6D	e_Type_GC_GameAction_HateSetAdd		10	242;240	;	reg
-53102	0xCF6E	e_Type_GC_GameAction_HateModify		10	241;240	;	reg
-53103	0xCF6F	e_Type_GC_GameAction_HatelistStepUp		8			reg
-53104	0xCF70	e_Type_GC_GameAction_HatelistStepDown		8			reg
-53105	0xCF71	e_Type_GC_GameAction_RemoveBuff		11	84;116;39	Level;;	abs
-53106	0xCF72	e_Type_GC_GameAction_TriggerUse		8			abs
-53107	0xCF73	e_Type_GC_GameAction_HatelistStepToTop		8			reg
-53108	0xCF74	e_Type_GC_GameAction_AddBuffCounter		11	1;39;187	;;	reg
-53109	0xCF75	e_Type_GC_GameAction_RemoveBuffCounter		12	1;39;187;66	;;;	reg
-53110	0xCF76	e_Type_GC_GameAction_TempChangeSkill		10	0;39	Stat;	abs
-53111	0xCF77	e_Type_GC_GameAction_Assign		10	0;39	Stat;	abs
-53112	0xCF78	e_Type_GC_GameAction_TransferBuffCounter		8			reg
-53113	0xCF79	e_Type_GC_GameAction_ModifyGameAction		14	1;193;174;175;1307;1305	;;Substate;Amount;;FloatValue	abs
-53114	0xCF7A	e_Type_GC_GameAction_RegisterTemplateSetEntry		8			reg
-53115	0xCF7B	e_Type_GC_GameAction_OpenDialog		11	209;39;117	;;	abs
-53116	0xCF7C	e_Type_GC_GameAction_LockSpellLine		8			reg
-53117	0xCF7D	e_Type_GC_GameAction_ModifySpellLineCooldown		8			reg
-53118	0xCF7E	e_Type_GC_GameAction_ModifyTemplateCooldown		8			reg
-53119	0xCF7F	e_Type_GC_GameAction_LockAllSpells		8			reg
-53120	0xCF80	e_Type_GC_GameAction_AddSkill	AddSkill	11	0;39;1305	Stat;Value;FloatValue	abs
-53121	0xCF81	e_Type_GC_GameAction_Feared		11	66;163;67	;;	abs
-53122	0xCF82	e_Type_GC_GameAction_Stun		8			abs
-53123	0xCF83	e_Type_GC_GameAction_RemoveSpellLineBuff		10	39;174	;Substate	abs
-53124	0xCF84	e_Type_GC_GameAction_CoreLockSpellLineTemplate		11	39;66;67	;;	reg
-53125	0xCF85	e_Type_GC_GameAction_RndSpawnMonsterACG		9	39		abs
-53128	0xCF88	e_Type_GC_GameAction_AddTokenStateCounter		10	66;39	;	reg
-53129	0xCF89	e_Type_GC_GameAction_Root		8			abs
-53130	0xCF8A	e_Type_GC_GameAction_GrantAccessToPlayfield		8			reg
-53132	0xCF8C	e_Type_GC_GameAction_GenerateName		11	209;210;39	;;	abs
-53134	0xCF8E	e_Type_GC_GameAction_NewTextEffect		11	209;210;39	;;	abs
-53135	0xCF8F	e_Type_GC_GameAction_RemoveTokenStateCounter		10	66;39	;	reg
-53136	0xCF90	e_Type_GC_GameAction_TransferTokenStateCounter		12	66;67;39;1	;;;	reg
-53137	0xCF91	e_Type_GC_GameAction_StartParticleEffectOnMount		13	209;86;28;29;30	;;RelXPos;RelYPos;RelZPos	abs
-53138	0xCF92	e_Type_GC_GameAction_StartFlymode		8			abs
-53139	0xCF93	e_Type_GC_GameAction_SetFlag	SetFlag	10	0;39	Stat;Value	abs
-53140	0xCF94	e_Type_GC_GameAction_ClearFlag	ClearFlag	10	0;39	Stat;Value	abs
-53141	0xCF95	e_Type_GC_GameAction_ToggleFlag	ToggleFlag	10	0;39	Stat;Value	abs
-53144	0xCF98	e_Type_GC_GameAction_TeleportToSaveSpot	TeleportToSaveSpot	8			abs
-53148	0xCF9C	e_Type_GC_GameAction_PersistentStatChange		8			reg
-53150	0xCF9E	e_Type_GC_GameAction_ExecuteGenericAttack		8			reg
-53152	0xCFA0	e_Type_GC_GameAction_ActivateFeatSpec		8			reg
-53153	0xCFA1	e_Type_GC_GameAction_CorePersistentGroundEffect		8			reg
-53154	0xCFA2	e_Type_GC_GameAction_SummonTeamMember		8			abs
-53155	0xCFA3	e_Type_GC_GameAction_SummonWholeTeam		8			abs
-53159	0xCFA7	e_Type_GC_GameAction_CoreRandomPointAreaFormula		12	88;11;170;171	;Radius;;	abs
-53160	0xCFA8	e_Type_GC_GameAction_Clone		8			abs
-53162	0xCFAA	e_Type_GC_GameAction_NanoResistance		10	152;39	;	abs
-53163	0xCFAB	e_Type_GC_GameAction_AddDiminishingReturn		11	39;174;1	;Substate;	reg
-53164	0xCFAC	e_Type_GC_GameAction_SaveHere		8			abs
-53165	0xCFAD	e_Type_GC_GameAction_ProxyTeleport_WithPetHandling		14	94;95;96;97;98;99	;;;;;	abs
-53166	0xCFAE	e_Type_GC_GameAction_TransferBuff		8			reg
-53167	0xCFAF	e_Type_GC_GameAction_TransferSpellLine		8			reg
-53168	0xCFB0	e_Type_GC_GameAction_StartEffect		14	187;6;5;28;29;30	;;;RelXPos;RelYPos;RelZPos	abs
-53169	0xCFB1	e_Type_GC_GameAction_DamageRedirect		8			reg
-53170	0xCFB2	e_Type_GC_GameAction_InheritedComboAttack		13	224;222;226;71;221	;;;;	reg
-53171	0xCFB3	e_Type_GC_GameAction_InheritedComboHit		13	224;66;71;221;88	;;;;	reg
-53172	0xCFB4	e_Type_GC_GameAction_AdjustHitTable		11	67;66;39	;;	abs
-53173	0xCFB5	e_Type_GC_GameAction_AdjustSpellHitTable		12	67;66;187;39	;;;	abs
-53174	0xCFB6	e_Type_GC_GameAction_AdjustSpellLineHitTable		12	67;66;187;39	;;;	abs
-53175	0xCFB7	e_Type_GC_GameAction_AddLeech		11	39;174;192	;Substate;	reg
-53176	0xCFB8	e_Type_GC_GameAction_DisplayLearnAbility		10	1;187	;	abs
-53177	0xCFB9	e_Type_GC_GameAction_Dispell		10	0;39	Stat;	abs
-53178	0xCFBA	e_Type_GC_GameAction_MultiHit		10	187;3	;	reg
-53179	0xCFBB	e_Type_GC_GameAction_TeleportToGuildCity		8			reg
-53180	0xCFBC	e_Type_GC_GameAction_Tracer		17	28;29;30;134;135;136;87;73;89	RelXPos;RelYPos;RelZPos;;;;;Flags;	abs
-53182	0xCFBE	e_Type_GC_GameAction_SpecialAbility	SpecialAbility	12	39;77;84;174	Value;Hash;Level;Substate	abs
-53183	0xCFBF	e_Type_GC_GameAction_AddSelfResurrectionSpell		11	88;67;188	;;	reg
-53184	0xCFC0	e_Type_GC_GameAction_StatMultiplier		10	0;39	Stat;	abs
-53185	0xCFC1	e_Type_GC_GameAction_Drain		13	0;2;37;71;39	Stat;;;;	abs
-53187	0xCFC3	e_Type_GC_GameAction_Heal		8			reg
-53188	0xCFC4	e_Type_GC_GameAction_DialogFeedback		9	209		abs
-53189	0xCFC5	e_Type_GC_GameAction_AddPercentSkillModifier		12	66;24;67;39	;SkillType;;	reg
-53190	0xCFC6	e_Type_GC_GameAction_StartSpellWeavingMode		13	88;66;67;68;69	;;;;	abs
-53191	0xCFC7	e_Type_GC_GameAction_AddComboHate		11	110;240;111	;;	reg
-53192	0xCFC8	e_Type_GC_GameAction_SpawnMonsterACGRot		17	77;84;72;73;28;29;30;103;151	Hash;Level;TimeExist;Flags;RelXPos;RelYPos;RelZPos;NPCMaster;	abs
-53193	0xCFC9	e_Type_GC_GameAction_PolymorphAttack		10	44;7	;	abs
-53194	0xCFCA	e_Type_GC_GameAction_Interrupt		9	123		abs
-53195	0xCFCB	e_Type_GC_GameAction_DebuffDPS		16	66;174;67;175;68;176;69;177	;Substate;;Amount;;;;	abs
-53196	0xCFCC	e_Type_GC_GameAction_SpecialHit		12	0;2;37;71	Stat;;;	abs
-53197	0xCFCD	e_Type_GC_GameAction_BCCCastSpellOnGround		9	39		abs
-53198	0xCFCE	e_Type_GC_GameAction_LearnRecipe		9	39		reg
-53199	0xCFCF	e_Type_GC_GameAction_InheritedWeaponAttackHateFlag		8			reg
-53200	0xCFD0	e_Type_GC_GameAction_LockPicking		9	66		reg
-53201	0xCFD1	e_Type_GC_GameAction_RemoveSpell		9	39		abs
-53202	0xCFD2	e_Type_GC_GameAction_LockTemplate		11	187;66;67	;;	reg
-53203	0xCFD3	e_Type_GC_GameAction_PickPocket		8			reg
-53204	0xCFD4	e_Type_GC_GameAction_AddBliss		9	174	Substate	reg
-53205	0xCFD5	e_Type_GC_GameAction_AddSwaying		9	174	Substate	reg
-53206	0xCFD6	e_Type_GC_GameAction_AddFocus		9	174	Substate	reg
-53207	0xCFD7	e_Type_GC_GameAction_Feedback		9	39		abs
-53208	0xCFD8	e_Type_GC_GameAction_PerformCorruptionCheck		10	66;67	;	reg
-53209	0xCFD9	e_Type_GC_GameAction_UpgradeCombo		11	187;66;67	;;	reg
-53210	0xCFDA	e_Type_GC_GameAction_AddGuildRenown		10	39;175	Type;Amount	reg
-53211	0xCFDB	e_Type_GC_GameAction_AddSpellProc		14	88;236;187;117;237;73	;;;;;Flags	abs
-53212	0xCFDC	e_Type_GC_GameAction_AddComboProc		13	88;236;187;117;237	;;;;	reg
-53213	0xCFDD	e_Type_GC_GameAction_AddProc		14	88;236;117;73;237;66	;;;Flags;;	abs
-53214	0xCFDE	e_Type_GC_GameAction_DrunkBrawlingSpecial		9	224		abs
-53215	0xCFDF	e_Type_GC_GameAction_SetMaxModifier	SetMaxModifier	10	0;39	Stat;Value	abs
-53217	0xCFE1	e_Type_GC_GameAction_Knockback		10	191;238	;	abs
-53218	0xCFE2	e_Type_GC_GameAction_EnableDefensiveStance	enabledefensivestance	8			abs
-53219	0xCFE3	e_Type_GC_GameAction_InterpolatedHit		16	0;168;170;172;169;171;173;71	Stat;;;;;;;	abs
-53220	0xCFE4	e_Type_GC_GameAction_InterpolatedModify		13	0;174;172;175;173	Stat;Substate;;Amount;	abs
-53221	0xCFE5	e_Type_GC_GameAction_InterpolatedTempChangeSkill		13	0;174;172;175;173	Stat;Substate;;Amount;	abs
-53222	0xCFE6	e_Type_GC_GameAction_InterpolatedSpawnPetACG		25	77;176;172;177;173;72;73;28;29;30;103;128;129;130;131;132;133	Hash;;;;;TimeExist;Flags;RelXPos;RelYPos;RelZPos;NPCMaster;;;;;;	abs
-53223	0xCFE7	e_Type_GC_GameAction_CastingLevelModifier		10	0;39	Stat;	abs
-53224	0xCFE8	e_Type_GC_GameAction_TeamPropagatedBuff		9	88		abs
-53225	0xCFE9	e_Type_GC_GameAction_InheritedWeaponAttack		25	71;220;221;222;223;224;225;226;227;228;229;230;231;232;233;234;235	;;;;;;;;;;;;;;;;	abs
-53226	0xCFEA	e_Type_GC_GameAction_SetSpellRecastTime		10	88;39	;	abs
-53227	0xCFEB	e_Type_GC_GameAction_ResurrectTarget		9	188		abs
-53228	0xCFEC	e_Type_GC_GameAction_VisualLocation		17	193;194;195;196;197;198;199;200;201	;;;;;;;;	abs
-53229	0xCFED	e_Type_GC_GameAction_StartClientSideScryScript	StartClientSideScryScript	9	39	ScriptID	abs
-53230	0xCFEE	e_Type_GC_GameAction_StartServerSideScryScript	StartServerSideScryScript	9	39	ScriptID	abs
-53231	0xCFEF	e_Type_GC_GameAction_StopScryScript	StopScryScript	9	39	ScriptID	abs
-53232	0xCFF0	e_Type_GC_GameAction_DynamicKDTree		9	39		abs
-53233	0xCFF1	e_Type_GC_GameAction_SetBaseAnim		9	209		abs
-53234	0xCFF2	e_Type_GC_GameAction_InterpolatedMagicHit		8			reg
-53235	0xCFF3	e_Type_GC_GameAction_CinematicCamera		13	202;203;204;205;209	;;;;	abs
-53236	0xCFF4	e_Type_GC_GameAction_CombatSpecialMove		15	209;189;39;207;43;206;187	;;;;;;	abs
-53237	0xCFF5	e_Type_GC_GameAction_PlayActionAnim		9	209		abs
-53238	0xCFF6	e_Type_GC_GameAction_StartParticleEffect		14	209;86;138;28;29;30	;;;RelXPos;RelYPos;RelZPos	abs
-53239	0xCFF7	e_Type_GC_GameAction_StopParticleEffect		10	209;86	;	abs
-53240	0xCFF8	e_Type_GC_GameAction_AddSkinnedMesh		9	194		abs
-53241	0xCFF9	e_Type_GC_GameAction_SendScryEvent	SendScryEvent	12	209;39;5;6	EventString;;;	abs
-53242	0xCFFA	e_Type_GC_GameAction_Disarm		14	172;173;168;170;169;171	;;;;;	abs
-53243	0xCFFB	e_Type_GC_GameAction_StartParticleEffectOnEquippedItem		15	209;193;86;138;28;29;30	;;;;RelXPos;RelYPos;RelZPos	abs
-53244	0xCFFC	e_Type_GC_GameAction_SummonMount		11	76;205;201	;;	abs
-53245	0xCFFD	e_Type_GC_GameAction_BanishMount		8			abs
-53246	0xCFFE	e_Type_GC_GameAction_RegisterSubSpellForSpellLine		8			reg
-53247	0xCFFF	e_Type_GC_GameAction_AreaKnockback		11	11;191;238	Radius;;	abs
-53249	0xD001	e_Type_GC_GameAction_ColumnAddTargets		10	11;238	Radius;	abs
-53250	0xD002	e_Type_GC_GameAction_ChangeInheritedWeaponAttack		14	187;84;66;67;68;69	;Level;;;;	reg
-53251	0xD003	e_Type_GC_GameAction_CodeHooks		10	39;175	;Amount	reg
-53252	0xD004	e_Type_GC_GameAction_OverrideMostHatedTarget		8			abs
-53253	0xD005	e_Type_GC_GameAction_ChargeSpecialAbility		12	187;248;245;243	;;;	abs
-53254	0xD006	e_Type_GC_GameAction_UpdateCommunityCharacter		10	39;175	;Amount	reg
-53255	0xD007	e_Type_GC_GameAction_AddCleaveTargets		12	212;213;11;33	;;Radius;	abs
-53256	0xD008	e_Type_GC_GameAction_MagicHit		10	39;71	;	reg
-53257	0xD009	e_Type_GC_GameAction_WeaponHit		9	244		reg
-53259	0xD00B	e_Type_GC_GameAction_ConeFormula		12	88;212;213;11	;;;Radius	abs
-53260	0xD00C	e_Type_GC_GameAction_StartClientSideScryScriptWithParams	StartClientSideScryScriptWithParams	10	39;209	ScriptID;ScriptParams	abs
-53261	0xD00D	e_Type_GC_GameAction_StartServerSideScryScriptWithParams	StartServerSideScryScriptWithParams	10	39;209	ScriptID;ScriptParams	abs
-53262	0xD00E	e_Type_GC_GameAction_DefensiveStance		9	88		abs
-53263	0xD00F	e_Type_GC_GameAction_ParryStance		9	88		abs
-53264	0xD010	e_Type_GC_GameAction_FrenzyStance		9	88		abs
-53265	0xD011	e_Type_GC_GameAction_ChangeSubstate		9	39		abs
-53266	0xD012	e_Type_GC_GameAction_SetCatMesh		17	193;194;195;196;197;198;199;200;201	;;;;;;;;	abs
-53267	0xD013	e_Type_GC_GameAction_Fatality		8			abs
-53268	0xD014	e_Type_GC_GameAction_SetIdleBaseAnim		9	209		abs
-53269	0xD015	e_Type_GC_GameAction_AddTexScript	AddTexScript	9	39	ScriptID	abs
-53270	0xD016	e_Type_GC_GameAction_RemoveTexScript	RemoveTexScript	10	39;204	ScriptID;	abs
-53271	0xD017	e_Type_GC_GameAction_Search		8			reg
-53272	0xD018	e_Type_GC_GameAction_Sneak		8			reg
-53273	0xD019	e_Type_GC_GameAction_AttackAddTargets		11	212;213;11	;;Radius	abs
-53274	0xD01A	e_Type_GC_GameAction_RefreshAirSupply		8			reg
-53275	0xD01B	e_Type_GC_GameAction_ToggleSubstate		9	39		abs
-53276	0xD01C	e_Type_GC_GameAction_AddTexScriptWithParams		12	39;204;54;209	;;;	abs
-53277	0xD01D	e_Type_GC_GameAction_TryEnterDrunkenBrawling		8			reg
-53278	0xD01E	e_Type_GC_GameAction_BindAtSetLocation		11	251;252;253	;;	reg
-53281	0xD021	e_Type_GC_GameAction_AddTag		8			reg
-53282	0xD022	e_Type_GC_GameAction_GlobalAOERadiusModification		9	11	Radius	abs
-53283	0xD023	e_Type_GC_GameAction_GlobalSpellStatModifier		11	0;39;175	Stat;;Amount	reg
-53284	0xD024	e_Type_GC_GameAction_GlobalCoreSpellStatModifier		12	0;39;175;1305	Stat;;Amount;FloatValue	reg
-53285	0xD025	e_Type_GC_GameAction_GlobalTargetSpellStatModifier		11	0;39;175	Stat;;Amount	reg
-53286	0xD026	e_Type_GC_GameAction_GlobalModifyGameAction		13	193;174;175;1307;1305	;Substate;Amount;;FloatValue	abs
+typeId	typeIdHex	name	label	widthWords	keys	statKeys	fields	form
+53002	0xCF0A	e_Type_GC_GameAction_Hit		12	0;2;37;71	0x2D2;0x2D4;0x2F7;0x31A	Stat;;;	abs
+53003	0xCF0B	e_Type_GC_GameAction_AddLayeredSkinnedMesh		10	194;39	0x4CA;0x2F9	;	abs
+53004	0xCF0C	e_Type_GC_GameAction_StartParticleEffectOnHead		14	209;86;138;28;29;30	0x4D9;0x461;0x49A;0x2EE;0x2EF;0x2F0	;;;RelXPos;RelYPos;RelZPos	abs
+53005	0xCF0D	e_Type_GC_GameAction_BindAtLocation		8				reg
+53006	0xCF0E	e_Type_GC_GameAction_TeleportToBindLocation		8				reg
+53007	0xCF0F	e_Type_GC_GameAction_HitPercentage		12	0;39;1;71	0x2D2;0x2F9;0x2D3;0x31A	Stat;;;	abs
+53008	0xCF10	e_Type_GC_GameAction_Remove		9	12	0x2DE		abs
+53009	0xCF11	e_Type_GC_GameAction_Charge		13	187;248;245;243;254	0x4C3;0x500;0x4FD;0x4FB;0x506	;;;;	abs
+53010	0xCF12	e_Type_GC_GameAction_SetMorphValue		10	209;39	0x4D9;0x2F9	;	reg
+53011	0xCF13	e_Type_GC_GameAction_AudioEffect	AudioEffect	13	17;18;19;20;11	0x2E3;0x2E4;0x2E5;0x2E6;0x2DD	AudioEffectID;AudioEffectDuration;AudioEffectRepeat;AudioEffectVolume;Radius	abs
+53012	0xCF14	e_Type_GC_GameAction_Skill	ModifySkill	11	0;39;24	0x2D2;0x2F9;0x2EA	Stat;Value;SkillType	abs
+53013	0xCF15	e_Type_GC_GameAction_DPSHit		12	0;39;66;71	0x2D2;0x2F9;0x315;0x31A	Stat;;;	abs
+53014	0xCF16	e_Type_GC_GameAction_TimedEffect		13	0;39;11;46;25	0x2D2;0x2F9;0x2DD;0x301;0x2EB	Stat;;Radius;;TimedLength	abs
+53015	0xCF17	e_Type_GC_GameAction_AddFormation		9	187	0x4C3		abs
+53016	0xCF18	e_Type_GC_GameAction_Teleport		13	28;29;30;151;31	0x2EE;0x2EF;0x2F0;0x49E;0x2F1	RelXPos;RelYPos;RelZPos;;	abs
+53018	0xCF1A	e_Type_GC_GameAction_AreaRangeFormula		11	88;2;11	0x463;0x2D4;0x2DD	;;Radius	abs
+53019	0xCF1B	e_Type_GC_GameAction_Spell		9	39	0x2F9		abs
+53020	0xCF1C	e_Type_GC_GameAction_Bandaging		8				abs
+53021	0xCF1D	e_Type_GC_GameAction_RenewMana		8				abs
+53022	0xCF1E	e_Type_GC_GameAction_LayeredVisualLocation		18	193;194;195;196;197;198;199;200;201;39	0x4C9;0x4CA;0x4CB;0x4CC;0x4CD;0x4CE;0x4CF;0x4D0;0x4D1;0x2F9	;;;;;;;;;	abs
+53023	0xCF1F	e_Type_GC_GameAction_CatMesh		9	44	0x2FE		abs
+53024	0xCF20	e_Type_GC_GameAction_SetFollowerScriptGroup		9	66	0x315		reg
+53025	0xCF21	e_Type_GC_GameAction_AddHateToPets		9	66	0x315		reg
+53026	0xCF22	e_Type_GC_GameAction_Set		11	55;0;39	0x30A;0x2D2;0x2F9	;Stat;	abs
+53027	0xCF23	e_Type_GC_GameAction_ItemText		10	39;209	0x2F9;0x4D9	;	abs
+53028	0xCF24	e_Type_GC_GameAction_PolyMorph		8				reg
+53029	0xCF25	e_Type_GC_GameAction_ChangeModifyPercent		11	187;39;55	0x4C3;0x2F9;0x30A	;;	abs
+53030	0xCF26	e_Type_GC_GameAction_ChangeHitPercent		11	187;39;55	0x4C3;0x2F9;0x30A	;;	abs
+53031	0xCF27	e_Type_GC_GameAction_ChangeRecastTime		10	187;39	0x4C3;0x2F9	;	abs
+53032	0xCF28	e_Type_GC_GameAction_AOERadiusModification		10	187;11	0x4C3;0x2DD	;Radius	abs
+53033	0xCF29	e_Type_GC_GameAction_ApplyFactionRank		10	66;67	0x315;0x316	;	reg
+53034	0xCF2A	e_Type_GC_GameAction_SummonFollower		8				reg
+53035	0xCF2B	e_Type_GC_GameAction_EnterSiegeTargeting		8				abs
+53036	0xCF2C	e_Type_GC_GameAction_SpawnQuest		9	209	0x4D9		reg
+53037	0xCF2D	e_Type_GC_GameAction_Charmed		14	66;67;68;69;163;39	0x315;0x316;0x317;0x318;0x4AA;0x2F9	;;;;;	abs
+53038	0xCF2E	e_Type_GC_GameAction_PlaceTrap		15	77;84;88;25;66;67;68	0x456;0x45F;0x463;0x2EB;0x315;0x316;0x317	Hash;Level;;TimedLength;;;	reg
+53040	0xCF30	e_Type_GC_GameAction_StartTracking		9	39	0x2F9	Tier	reg
+53041	0xCF31	e_Type_GC_GameAction_ModifyBasedOnStat		12	174;175;0;207	0x4B6;0x4B7;0x2D2;0x4D7	Substate;Amount;Stat;	abs
+53042	0xCF32	e_Type_GC_GameAction_Modify_PowerSurge		9	39	0x2F9		abs
+53043	0xCF33	e_Type_GC_GameAction_ExecuteBccAction		9	243	0x4FB		abs
+53045	0xCF35	e_Type_GC_GameAction_Modify		10	0;39	0x2D2;0x2F9	Stat;	abs
+53046	0xCF36	e_Type_GC_GameAction_AddAbsorb		13	0;70;33;34;88	0x2D2;0x319;0x2F3;0x2F4;0x463	Stat;;;;	reg
+53047	0xCF37	e_Type_GC_GameAction_CameraShake		11	204;249;191	0x4D4;0x501;0x4C7	;;	reg
+53048	0xCF38	e_Type_GC_GameAction_Name		9	209	0x4D9		abs
+53049	0xCF39	e_Type_GC_GameAction_SpawnMonster		17	47;48;39;72;73;28;29;30;77	0x302;0x303;0x2F9;0x31B;0x31C;0x2EE;0x2EF;0x2F0;0x456	;;;TimeExist;Flags;RelXPos;RelYPos;RelZPos;Hash	abs
+53050	0xCF3A	e_Type_GC_GameAction_RemoveBuffs		8				abs
+53051	0xCF3B	e_Type_GC_GameAction_CastNano		9	39	0x2F9		abs
+53052	0xCF3C	e_Type_GC_GameAction_StrTexture		11	58;56;8	0x30D;0x30B;0x2DA	;;	abs
+53053	0xCF3D	e_Type_GC_GameAction_CameraRoll		9	191	0x4C7		reg
+53054	0xCF3E	e_Type_GC_GameAction_SpellStatModifier		12	88;0;39;175	0x463;0x2D2;0x2F9;0x4B7	;Stat;;Amount	reg
+53055	0xCF3F	e_Type_GC_GameAction_AttractorMesh		10	56;8	0x30B;0x2DA	;	abs
+53056	0xCF40	e_Type_GC_GameAction_RemoveCowardStatus		8				reg
+53057	0xCF41	e_Type_GC_GameAction_HeadText		10	209;39	0x4D9;0x2F9	;	abs
+53058	0xCF42	e_Type_GC_GameAction_SpawnRemotePet		12	77;39;88;175	0x456;0x2F9;0x463;0x4B7	Hash;;;Amount	reg
+53059	0xCF43	e_Type_GC_GameAction_LineTeleport		12	9;10;31;100	0x2DB;0x2DC;0x2F1;0x46F	;;;	abs
+53060	0xCF44	e_Type_GC_GameAction_MonsterShape	MonsterShape	10	39;25	0x2F9;0x2EB	Value;TimedLength	abs
+53061	0xCF45	e_Type_GC_GameAction_BCCCastSpell		9	39	0x2F9		abs
+53062	0xCF46	e_Type_GC_GameAction_SpellLineStatModifier		12	1;0;39;175	0x2D3;0x2D2;0x2F9;0x4B7	;Stat;;Amount	reg
+53063	0xCF47	e_Type_GC_GameAction_SpawnMonsterACG	SpawnMonsterACG	16	77;84;72;73;28;29;30;103	0x456;0x45F;0x31B;0x31C;0x2EE;0x2EF;0x2F0;0x472	Hash;Level;TimeExist;Flags;RelXPos;RelYPos;RelZPos;NPCMaster	abs
+53064	0xCF48	e_Type_GC_GameAction_SpawnItemOnCharacter		16	77;84;85;72;73;28;29;30	0x456;0x45F;0x460;0x31B;0x31C;0x2EE;0x2EF;0x2F0	Hash;Level;;TimeExist;Flags;RelXPos;RelYPos;RelZPos	abs
+53065	0xCF49	e_Type_GC_GameAction_CoreSpellStatModifier		13	88;0;39;175;1305	0x463;0x2D2;0x2F9;0x4B7;0x519	;Stat;;Amount;FloatValue	reg
+53066	0xCF4A	e_Type_GC_GameAction_TeamFormula		9	88	0x463		abs
+53067	0xCF4B	e_Type_GC_GameAction_ModifyAsRating		10	0;39	0x2D2;0x2F9	Stat;	abs
+53068	0xCF4C	e_Type_GC_GameAction_InterpolatedModifyAsRating		13	0;174;172;175;173	0x2D2;0x4B6;0x4B4;0x4B7;0x4B5	Stat;Substate;;Amount;	abs
+53069	0xCF4D	e_Type_GC_GameAction_ChangeLineRecastTime		10	1;39	0x2D3;0x2F9	;	abs
+53070	0xCF4E	e_Type_GC_GameAction_AddSpellLineProc		14	88;236;1;117;237;73	0x463;0x4F4;0x2D3;0x47F;0x4F5;0x31C	;;;;;Flags	abs
+53071	0xCF4F	e_Type_GC_GameAction_DoorToAutoDoor		11	31;90;91	0x2F1;0x465;0x466	;;	abs
+53072	0xCF50	e_Type_GC_GameAction_StopAudioEffect		9	17	0x2E3	AudioEffectID	abs
+53073	0xCF51	e_Type_GC_GameAction_AreaHit		13	0;2;37;71;11	0x2D2;0x2D4;0x2F7;0x31A;0x2DD	Stat;;;;Radius	abs
+53074	0xCF52	e_Type_GC_GameAction_LineAOERadiusModification		10	1;11	0x2D3;0x2DD	;Radius	abs
+53075	0xCF53	e_Type_GC_GameAction_ChangeLineHitPercent		11	1;39;55	0x2D3;0x2F9;0x30A	;;	abs
+53076	0xCF54	e_Type_GC_GameAction_CoreSpellLineStatModifier		13	1;0;39;175;1305	0x2D3;0x2D2;0x2F9;0x4B7;0x519	;Stat;;Amount;FloatValue	reg
+53077	0xCF55	e_Type_GC_GameAction_SetSpellLineRecastTime		10	1;39	0x2D3;0x2F9	;	abs
+53078	0xCF56	e_Type_GC_GameAction_CastSpellOnOwner		9	39	0x2F9		abs
+53079	0xCF57	e_Type_GC_GameAction_CastInvertibleBuff		9	39	0x2F9		abs
+53080	0xCF58	e_Type_GC_GameAction_PetFormula		10	39;64	0x2F9;0x313	;	abs
+53081	0xCF59	e_Type_GC_GameAction_ProxyForceTeleport		8				abs
+53082	0xCF5A	e_Type_GC_GameAction_ProxyTeleport		14	94;95;96;97;98;99	0x469;0x46A;0x46B;0x46C;0x46D;0x46E	;;;;;	abs
+53083	0xCF5B	e_Type_GC_GameAction_ProxyTeleportLine		15	94;95;96;97;98;99;100	0x469;0x46A;0x46B;0x46C;0x46D;0x46E;0x46F	;;;;;;	abs
+53084	0xCF5C	e_Type_GC_GameAction_ColumnFormula		16	88;238;39;170;93;250;66;67	0x463;0x4F6;0x2F9;0x4B2;0x468;0x502;0x315;0x316	;;;;;;;	abs
+53085	0xCF5D	e_Type_GC_GameAction_Recovery		8				abs
+53086	0xCF5E	e_Type_GC_GameAction_EnableShieldTaunt		8				abs
+53087	0xCF5F	e_Type_GC_GameAction_AreaFormula		10	88;11	0x463;0x2DD	;Radius	abs
+53088	0xCF60	e_Type_GC_GameAction_FilteredAreaFormula		13	88;11;170;93;250	0x463;0x2DD;0x4B2;0x468;0x502	;Radius;;;	abs
+53089	0xCF61	e_Type_GC_GameAction_ItemFormula		10	88;39	0x463;0x2F9	;	abs
+53090	0xCF62	e_Type_GC_GameAction_EnableCriminalStatus		8				reg
+53091	0xCF63	e_Type_GC_GameAction_FEDOCSTest		8				reg
+53092	0xCF64	e_Type_GC_GameAction_SetTradingPostAccess	OpenTradepost	10	39;11	0x2F9;0x2DD	Value;Radius	abs
+53093	0xCF65	e_Type_GC_GameAction_LockMetaline		12	39;72;66;67	0x2F9;0x31B;0x315;0x316	;TimeExist;;	abs
+53094	0xCF66	e_Type_GC_GameAction_RestoreChar		8				abs
+53095	0xCF67	e_Type_GC_GameAction_DisableMinigames		8				abs
+53096	0xCF68	e_Type_GC_GameAction_CoreFilteredAreaFormula		18	88;11;170;93;250;66;67;138;212;2	0x463;0x2DD;0x4B2;0x468;0x502;0x315;0x316;0x49A;0x4DC;0x2D4	;Radius;;;;;;;;	abs
+53097	0xCF69	e_Type_GC_GameAction_ChangeTokenPoints		10	66;67	0x315;0x316	;	reg
+53098	0xCF6A	e_Type_GC_GameAction_TargetSpellStatModifier		12	88;0;39;175	0x463;0x2D2;0x2F9;0x4B7	;Stat;;Amount	reg
+53099	0xCF6B	e_Type_GC_GameAction_TargetSpellLineStatModifier		12	1;0;39;175	0x2D3;0x2D2;0x2F9;0x4B7	;Stat;;Amount	reg
+53100	0xCF6C	e_Type_GC_GameAction_HateValueAdd		10	239;240	0x4F7;0x4F8	;	reg
+53101	0xCF6D	e_Type_GC_GameAction_HateSetAdd		10	242;240	0x4FA;0x4F8	;	reg
+53102	0xCF6E	e_Type_GC_GameAction_HateModify		10	241;240	0x4F9;0x4F8	;	reg
+53103	0xCF6F	e_Type_GC_GameAction_HatelistStepUp		8				reg
+53104	0xCF70	e_Type_GC_GameAction_HatelistStepDown		8				reg
+53105	0xCF71	e_Type_GC_GameAction_RemoveBuff		11	84;116;39	0x45F;0x47E;0x2F9	Level;;	abs
+53106	0xCF72	e_Type_GC_GameAction_TriggerUse		8				abs
+53107	0xCF73	e_Type_GC_GameAction_HatelistStepToTop		8				reg
+53108	0xCF74	e_Type_GC_GameAction_AddBuffCounter		11	1;39;187	0x2D3;0x2F9;0x4C3	;;	reg
+53109	0xCF75	e_Type_GC_GameAction_RemoveBuffCounter		12	1;39;187;66	0x2D3;0x2F9;0x4C3;0x315	;;;	reg
+53110	0xCF76	e_Type_GC_GameAction_TempChangeSkill		10	0;39	0x2D2;0x2F9	Stat;	abs
+53111	0xCF77	e_Type_GC_GameAction_Assign		10	0;39	0x2D2;0x2F9	Stat;	abs
+53112	0xCF78	e_Type_GC_GameAction_TransferBuffCounter		8				reg
+53113	0xCF79	e_Type_GC_GameAction_ModifyGameAction		14	1;193;174;175;1307;1305	0x2D3;0x4C9;0x4B6;0x4B7;0x51B;0x519	;;Substate;Amount;;FloatValue	abs
+53114	0xCF7A	e_Type_GC_GameAction_RegisterTemplateSetEntry		8				reg
+53115	0xCF7B	e_Type_GC_GameAction_OpenDialog		11	209;39;117	0x4D9;0x2F9;0x47F	;;	abs
+53116	0xCF7C	e_Type_GC_GameAction_LockSpellLine		8				reg
+53117	0xCF7D	e_Type_GC_GameAction_ModifySpellLineCooldown		8				reg
+53118	0xCF7E	e_Type_GC_GameAction_ModifyTemplateCooldown		8				reg
+53119	0xCF7F	e_Type_GC_GameAction_LockAllSpells		8				reg
+53120	0xCF80	e_Type_GC_GameAction_AddSkill	AddSkill	11	0;39;1305	0x2D2;0x2F9;0x519	Stat;Value;FloatValue	abs
+53121	0xCF81	e_Type_GC_GameAction_Feared		11	66;163;67	0x315;0x4AA;0x316	;;	abs
+53122	0xCF82	e_Type_GC_GameAction_Stun		8				abs
+53123	0xCF83	e_Type_GC_GameAction_RemoveSpellLineBuff		10	39;174	0x2F9;0x4B6	;Substate	abs
+53124	0xCF84	e_Type_GC_GameAction_CoreLockSpellLineTemplate		11	39;66;67	0x2F9;0x315;0x316	;;	reg
+53125	0xCF85	e_Type_GC_GameAction_RndSpawnMonsterACG		9	39	0x2F9		abs
+53128	0xCF88	e_Type_GC_GameAction_AddTokenStateCounter		10	66;39	0x315;0x2F9	;	reg
+53129	0xCF89	e_Type_GC_GameAction_Root		8				abs
+53130	0xCF8A	e_Type_GC_GameAction_GrantAccessToPlayfield		8				reg
+53132	0xCF8C	e_Type_GC_GameAction_GenerateName		11	209;210;39	0x4D9;0x4DA;0x2F9	;;	abs
+53134	0xCF8E	e_Type_GC_GameAction_NewTextEffect		11	209;210;39	0x4D9;0x4DA;0x2F9	;;	abs
+53135	0xCF8F	e_Type_GC_GameAction_RemoveTokenStateCounter		10	66;39	0x315;0x2F9	;	reg
+53136	0xCF90	e_Type_GC_GameAction_TransferTokenStateCounter		12	66;67;39;1	0x315;0x316;0x2F9;0x2D3	;;;	reg
+53137	0xCF91	e_Type_GC_GameAction_StartParticleEffectOnMount		13	209;86;28;29;30	0x4D9;0x461;0x2EE;0x2EF;0x2F0	;;RelXPos;RelYPos;RelZPos	abs
+53138	0xCF92	e_Type_GC_GameAction_StartFlymode		8				abs
+53139	0xCF93	e_Type_GC_GameAction_SetFlag	SetFlag	10	0;39	0x2D2;0x2F9	Stat;Value	abs
+53140	0xCF94	e_Type_GC_GameAction_ClearFlag	ClearFlag	10	0;39	0x2D2;0x2F9	Stat;Value	abs
+53141	0xCF95	e_Type_GC_GameAction_ToggleFlag	ToggleFlag	10	0;39	0x2D2;0x2F9	Stat;Value	abs
+53144	0xCF98	e_Type_GC_GameAction_TeleportToSaveSpot	TeleportToSaveSpot	8				abs
+53148	0xCF9C	e_Type_GC_GameAction_PersistentStatChange		8				reg
+53150	0xCF9E	e_Type_GC_GameAction_ExecuteGenericAttack		8				reg
+53152	0xCFA0	e_Type_GC_GameAction_ActivateFeatSpec		8				reg
+53153	0xCFA1	e_Type_GC_GameAction_CorePersistentGroundEffect		8				reg
+53154	0xCFA2	e_Type_GC_GameAction_SummonTeamMember		8				abs
+53155	0xCFA3	e_Type_GC_GameAction_SummonWholeTeam		8				abs
+53159	0xCFA7	e_Type_GC_GameAction_CoreRandomPointAreaFormula		12	88;11;170;171	0x463;0x2DD;0x4B2;0x4B3	;Radius;;	abs
+53160	0xCFA8	e_Type_GC_GameAction_Clone		8				abs
+53162	0xCFAA	e_Type_GC_GameAction_NanoResistance		10	152;39	0x49F;0x2F9	;	abs
+53163	0xCFAB	e_Type_GC_GameAction_AddDiminishingReturn		11	39;174;1	0x2F9;0x4B6;0x2D3	;Substate;	reg
+53164	0xCFAC	e_Type_GC_GameAction_SaveHere		8				abs
+53165	0xCFAD	e_Type_GC_GameAction_ProxyTeleport_WithPetHandling		14	94;95;96;97;98;99	0x469;0x46A;0x46B;0x46C;0x46D;0x46E	;;;;;	abs
+53166	0xCFAE	e_Type_GC_GameAction_TransferBuff		8				reg
+53167	0xCFAF	e_Type_GC_GameAction_TransferSpellLine		8				reg
+53168	0xCFB0	e_Type_GC_GameAction_StartEffect		14	187;6;5;28;29;30	0x4C3;0x2D8;0x2D7;0x2EE;0x2EF;0x2F0	;;;RelXPos;RelYPos;RelZPos	abs
+53169	0xCFB1	e_Type_GC_GameAction_DamageRedirect		8				reg
+53170	0xCFB2	e_Type_GC_GameAction_InheritedComboAttack		13	224;222;226;71;221	0x4E8;0x4E6;0x4EA;0x31A;0x4E5	;;;;	reg
+53171	0xCFB3	e_Type_GC_GameAction_InheritedComboHit		13	224;66;71;221;88	0x4E8;0x315;0x31A;0x4E5;0x463	;;;;	reg
+53172	0xCFB4	e_Type_GC_GameAction_AdjustHitTable		11	67;66;39	0x316;0x315;0x2F9	;;	abs
+53173	0xCFB5	e_Type_GC_GameAction_AdjustSpellHitTable		12	67;66;187;39	0x316;0x315;0x4C3;0x2F9	;;;	abs
+53174	0xCFB6	e_Type_GC_GameAction_AdjustSpellLineHitTable		12	67;66;187;39	0x316;0x315;0x4C3;0x2F9	;;;	abs
+53175	0xCFB7	e_Type_GC_GameAction_AddLeech		11	39;174;192	0x2F9;0x4B6;0x4C8	;Substate;	reg
+53176	0xCFB8	e_Type_GC_GameAction_DisplayLearnAbility		10	1;187	0x2D3;0x4C3	;	abs
+53177	0xCFB9	e_Type_GC_GameAction_Dispell		10	0;39	0x2D2;0x2F9	Stat;	abs
+53178	0xCFBA	e_Type_GC_GameAction_MultiHit		10	187;3	0x4C3;0x2D5	;	reg
+53179	0xCFBB	e_Type_GC_GameAction_TeleportToGuildCity		8				reg
+53180	0xCFBC	e_Type_GC_GameAction_Tracer		17	28;29;30;134;135;136;87;73;89	0x2EE;0x2EF;0x2F0;0x496;0x497;0x498;0x462;0x31C;0x464	RelXPos;RelYPos;RelZPos;;;;;Flags;	abs
+53182	0xCFBE	e_Type_GC_GameAction_SpecialAbility	SpecialAbility	12	39;77;84;174	0x2F9;0x456;0x45F;0x4B6	Value;Hash;Level;Substate	abs
+53183	0xCFBF	e_Type_GC_GameAction_AddSelfResurrectionSpell		11	88;67;188	0x463;0x316;0x4C4	;;	reg
+53184	0xCFC0	e_Type_GC_GameAction_StatMultiplier		10	0;39	0x2D2;0x2F9	Stat;	abs
+53185	0xCFC1	e_Type_GC_GameAction_Drain		13	0;2;37;71;39	0x2D2;0x2D4;0x2F7;0x31A;0x2F9	Stat;;;;	abs
+53187	0xCFC3	e_Type_GC_GameAction_Heal		8				reg
+53188	0xCFC4	e_Type_GC_GameAction_DialogFeedback		9	209	0x4D9		abs
+53189	0xCFC5	e_Type_GC_GameAction_AddPercentSkillModifier		12	66;24;67;39	0x315;0x2EA;0x316;0x2F9	;SkillType;;	reg
+53190	0xCFC6	e_Type_GC_GameAction_StartSpellWeavingMode		13	88;66;67;68;69	0x463;0x315;0x316;0x317;0x318	;;;;	abs
+53191	0xCFC7	e_Type_GC_GameAction_AddComboHate		11	110;240;111	0x479;0x4F8;0x47A	;;	reg
+53192	0xCFC8	e_Type_GC_GameAction_SpawnMonsterACGRot		17	77;84;72;73;28;29;30;103;151	0x456;0x45F;0x31B;0x31C;0x2EE;0x2EF;0x2F0;0x472;0x49E	Hash;Level;TimeExist;Flags;RelXPos;RelYPos;RelZPos;NPCMaster;	abs
+53193	0xCFC9	e_Type_GC_GameAction_PolymorphAttack		10	44;7	0x2FE;0x2D9	;	abs
+53194	0xCFCA	e_Type_GC_GameAction_Interrupt		9	123	0x48E		abs
+53195	0xCFCB	e_Type_GC_GameAction_DebuffDPS		16	66;174;67;175;68;176;69;177	0x315;0x4B6;0x316;0x4B7;0x317;0x4B8;0x318;0x4B9	;Substate;;Amount;;;;	abs
+53196	0xCFCC	e_Type_GC_GameAction_SpecialHit		12	0;2;37;71	0x2D2;0x2D4;0x2F7;0x31A	Stat;;;	abs
+53197	0xCFCD	e_Type_GC_GameAction_BCCCastSpellOnGround		9	39	0x2F9		abs
+53198	0xCFCE	e_Type_GC_GameAction_LearnRecipe		9	39	0x2F9		reg
+53199	0xCFCF	e_Type_GC_GameAction_InheritedWeaponAttackHateFlag		8				reg
+53200	0xCFD0	e_Type_GC_GameAction_LockPicking		9	66	0x315		reg
+53201	0xCFD1	e_Type_GC_GameAction_RemoveSpell		9	39	0x2F9		abs
+53202	0xCFD2	e_Type_GC_GameAction_LockTemplate		11	187;66;67	0x4C3;0x315;0x316	;;	reg
+53203	0xCFD3	e_Type_GC_GameAction_PickPocket		8				reg
+53204	0xCFD4	e_Type_GC_GameAction_AddBliss		9	174	0x4B6	Substate	reg
+53205	0xCFD5	e_Type_GC_GameAction_AddSwaying		9	174	0x4B6	Substate	reg
+53206	0xCFD6	e_Type_GC_GameAction_AddFocus		9	174	0x4B6	Substate	reg
+53207	0xCFD7	e_Type_GC_GameAction_Feedback		9	39	0x2F9		abs
+53208	0xCFD8	e_Type_GC_GameAction_PerformCorruptionCheck		10	66;67	0x315;0x316	;	reg
+53209	0xCFD9	e_Type_GC_GameAction_UpgradeCombo		11	187;66;67	0x4C3;0x315;0x316	;;	reg
+53210	0xCFDA	e_Type_GC_GameAction_AddGuildRenown		10	39;175	0x2F9;0x4B7	Type;Amount	reg
+53211	0xCFDB	e_Type_GC_GameAction_AddSpellProc		14	88;236;187;117;237;73	0x463;0x4F4;0x4C3;0x47F;0x4F5;0x31C	;;;;;Flags	abs
+53212	0xCFDC	e_Type_GC_GameAction_AddComboProc		13	88;236;187;117;237	0x463;0x4F4;0x4C3;0x47F;0x4F5	;;;;	reg
+53213	0xCFDD	e_Type_GC_GameAction_AddProc		14	88;236;117;73;237;66	0x463;0x4F4;0x47F;0x31C;0x4F5;0x315	;;;Flags;;	abs
+53214	0xCFDE	e_Type_GC_GameAction_DrunkBrawlingSpecial		9	224	0x4E8		abs
+53215	0xCFDF	e_Type_GC_GameAction_SetMaxModifier	SetMaxModifier	10	0;39	0x2D2;0x2F9	Stat;Value	abs
+53217	0xCFE1	e_Type_GC_GameAction_Knockback		10	191;238	0x4C7;0x4F6	;	abs
+53218	0xCFE2	e_Type_GC_GameAction_EnableDefensiveStance	enabledefensivestance	8				abs
+53219	0xCFE3	e_Type_GC_GameAction_InterpolatedHit		16	0;168;170;172;169;171;173;71	0x2D2;0x4AF;0x4B2;0x4B4;0x4B1;0x4B3;0x4B5;0x31A	Stat;;;;;;;	abs
+53220	0xCFE4	e_Type_GC_GameAction_InterpolatedModify		13	0;174;172;175;173	0x2D2;0x4B6;0x4B4;0x4B7;0x4B5	Stat;Substate;;Amount;	abs
+53221	0xCFE5	e_Type_GC_GameAction_InterpolatedTempChangeSkill		13	0;174;172;175;173	0x2D2;0x4B6;0x4B4;0x4B7;0x4B5	Stat;Substate;;Amount;	abs
+53222	0xCFE6	e_Type_GC_GameAction_InterpolatedSpawnPetACG		25	77;176;172;177;173;72;73;28;29;30;103;128;129;130;131;132;133	0x456;0x4B8;0x4B4;0x4B9;0x4B5;0x31B;0x31C;0x2EE;0x2EF;0x2F0;0x472;0x490;0x491;0x492;0x493;0x494;0x495	Hash;;;;;TimeExist;Flags;RelXPos;RelYPos;RelZPos;NPCMaster;;;;;;	abs
+53223	0xCFE7	e_Type_GC_GameAction_CastingLevelModifier		10	0;39	0x2D2;0x2F9	Stat;	abs
+53224	0xCFE8	e_Type_GC_GameAction_TeamPropagatedBuff		9	88	0x463		abs
+53225	0xCFE9	e_Type_GC_GameAction_InheritedWeaponAttack		25	71;220;221;222;223;224;225;226;227;228;229;230;231;232;233;234;235	0x31A;0x4E4;0x4E5;0x4E6;0x4E7;0x4E8;0x4E9;0x4EA;0x4EB;0x4EC;0x4ED;0x4EE;0x4EF;0x4F0;0x4F1;0x4F2;0x4F3	;;;;;;;;;;;;;;;;	abs
+53226	0xCFEA	e_Type_GC_GameAction_SetSpellRecastTime		10	88;39	0x463;0x2F9	;	abs
+53227	0xCFEB	e_Type_GC_GameAction_ResurrectTarget		9	188	0x4C4		abs
+53228	0xCFEC	e_Type_GC_GameAction_VisualLocation		17	193;194;195;196;197;198;199;200;201	0x4C9;0x4CA;0x4CB;0x4CC;0x4CD;0x4CE;0x4CF;0x4D0;0x4D1	;;;;;;;;	abs
+53229	0xCFED	e_Type_GC_GameAction_StartClientSideScryScript	StartClientSideScryScript	9	39	0x2F9	ScriptID	abs
+53230	0xCFEE	e_Type_GC_GameAction_StartServerSideScryScript	StartServerSideScryScript	9	39	0x2F9	ScriptID	abs
+53231	0xCFEF	e_Type_GC_GameAction_StopScryScript	StopScryScript	9	39	0x2F9	ScriptID	abs
+53232	0xCFF0	e_Type_GC_GameAction_DynamicKDTree		9	39	0x2F9		abs
+53233	0xCFF1	e_Type_GC_GameAction_SetBaseAnim		9	209	0x4D9		abs
+53234	0xCFF2	e_Type_GC_GameAction_InterpolatedMagicHit		8				reg
+53235	0xCFF3	e_Type_GC_GameAction_CinematicCamera		13	202;203;204;205;209	0x4D2;0x4D3;0x4D4;0x4D5;0x4D9	;;;;	abs
+53236	0xCFF4	e_Type_GC_GameAction_CombatSpecialMove		15	209;189;39;207;43;206;187	0x4D9;0x4C5;0x2F9;0x4D7;0x2FD;0x4D6;0x4C3	;;;;;;	abs
+53237	0xCFF5	e_Type_GC_GameAction_PlayActionAnim		9	209	0x4D9		abs
+53238	0xCFF6	e_Type_GC_GameAction_StartParticleEffect		14	209;86;138;28;29;30	0x4D9;0x461;0x49A;0x2EE;0x2EF;0x2F0	;;;RelXPos;RelYPos;RelZPos	abs
+53239	0xCFF7	e_Type_GC_GameAction_StopParticleEffect		10	209;86	0x4D9;0x461	;	abs
+53240	0xCFF8	e_Type_GC_GameAction_AddSkinnedMesh		9	194	0x4CA		abs
+53241	0xCFF9	e_Type_GC_GameAction_SendScryEvent	SendScryEvent	12	209;39;5;6	0x4D9;0x2F9;0x2D7;0x2D8	EventString;;;	abs
+53242	0xCFFA	e_Type_GC_GameAction_Disarm		14	172;173;168;170;169;171	0x4B4;0x4B5;0x4AF;0x4B2;0x4B1;0x4B3	;;;;;	abs
+53243	0xCFFB	e_Type_GC_GameAction_StartParticleEffectOnEquippedItem		15	209;193;86;138;28;29;30	0x4D9;0x4C9;0x461;0x49A;0x2EE;0x2EF;0x2F0	;;;;RelXPos;RelYPos;RelZPos	abs
+53244	0xCFFC	e_Type_GC_GameAction_SummonMount		11	76;205;201	0x31F;0x4D5;0x4D1	;;	abs
+53245	0xCFFD	e_Type_GC_GameAction_BanishMount		8				abs
+53246	0xCFFE	e_Type_GC_GameAction_RegisterSubSpellForSpellLine		8				reg
+53247	0xCFFF	e_Type_GC_GameAction_AreaKnockback		11	11;191;238	0x2DD;0x4C7;0x4F6	Radius;;	abs
+53249	0xD001	e_Type_GC_GameAction_ColumnAddTargets		10	11;238	0x2DD;0x4F6	Radius;	abs
+53250	0xD002	e_Type_GC_GameAction_ChangeInheritedWeaponAttack		14	187;84;66;67;68;69	0x4C3;0x45F;0x315;0x316;0x317;0x318	;Level;;;;	reg
+53251	0xD003	e_Type_GC_GameAction_CodeHooks		10	39;175	0x2F9;0x4B7	;Amount	reg
+53252	0xD004	e_Type_GC_GameAction_OverrideMostHatedTarget		8				abs
+53253	0xD005	e_Type_GC_GameAction_ChargeSpecialAbility		12	187;248;245;243	0x4C3;0x500;0x4FD;0x4FB	;;;	abs
+53254	0xD006	e_Type_GC_GameAction_UpdateCommunityCharacter		10	39;175	0x2F9;0x4B7	;Amount	reg
+53255	0xD007	e_Type_GC_GameAction_AddCleaveTargets		12	212;213;11;33	0x4DC;0x4DD;0x2DD;0x2F3	;;Radius;	abs
+53256	0xD008	e_Type_GC_GameAction_MagicHit		10	39;71	0x2F9;0x31A	;	reg
+53257	0xD009	e_Type_GC_GameAction_WeaponHit		9	244	0x4FC		reg
+53259	0xD00B	e_Type_GC_GameAction_ConeFormula		12	88;212;213;11	0x463;0x4DC;0x4DD;0x2DD	;;;Radius	abs
+53260	0xD00C	e_Type_GC_GameAction_StartClientSideScryScriptWithParams	StartClientSideScryScriptWithParams	10	39;209	0x2F9;0x4D9	ScriptID;ScriptParams	abs
+53261	0xD00D	e_Type_GC_GameAction_StartServerSideScryScriptWithParams	StartServerSideScryScriptWithParams	10	39;209	0x2F9;0x4D9	ScriptID;ScriptParams	abs
+53262	0xD00E	e_Type_GC_GameAction_DefensiveStance		9	88	0x463		abs
+53263	0xD00F	e_Type_GC_GameAction_ParryStance		9	88	0x463		abs
+53264	0xD010	e_Type_GC_GameAction_FrenzyStance		9	88	0x463		abs
+53265	0xD011	e_Type_GC_GameAction_ChangeSubstate		9	39	0x2F9		abs
+53266	0xD012	e_Type_GC_GameAction_SetCatMesh		17	193;194;195;196;197;198;199;200;201	0x4C9;0x4CA;0x4CB;0x4CC;0x4CD;0x4CE;0x4CF;0x4D0;0x4D1	;;;;;;;;	abs
+53267	0xD013	e_Type_GC_GameAction_Fatality		8				abs
+53268	0xD014	e_Type_GC_GameAction_SetIdleBaseAnim		9	209	0x4D9		abs
+53269	0xD015	e_Type_GC_GameAction_AddTexScript	AddTexScript	9	39	0x2F9	ScriptID	abs
+53270	0xD016	e_Type_GC_GameAction_RemoveTexScript	RemoveTexScript	10	39;204	0x2F9;0x4D4	ScriptID;	abs
+53271	0xD017	e_Type_GC_GameAction_Search		8				reg
+53272	0xD018	e_Type_GC_GameAction_Sneak		8				reg
+53273	0xD019	e_Type_GC_GameAction_AttackAddTargets		11	212;213;11	0x4DC;0x4DD;0x2DD	;;Radius	abs
+53274	0xD01A	e_Type_GC_GameAction_RefreshAirSupply		8				reg
+53275	0xD01B	e_Type_GC_GameAction_ToggleSubstate		9	39	0x2F9		abs
+53276	0xD01C	e_Type_GC_GameAction_AddTexScriptWithParams		12	39;204;54;209	0x2F9;0x4D4;0x309;0x4D9	;;;	abs
+53277	0xD01D	e_Type_GC_GameAction_TryEnterDrunkenBrawling		8				reg
+53278	0xD01E	e_Type_GC_GameAction_BindAtSetLocation		11	251;252;253	0x503;0x504;0x505	;;	reg
+53281	0xD021	e_Type_GC_GameAction_AddTag		8				reg
+53282	0xD022	e_Type_GC_GameAction_GlobalAOERadiusModification		9	11	0x2DD	Radius	abs
+53283	0xD023	e_Type_GC_GameAction_GlobalSpellStatModifier		11	0;39;175	0x2D2;0x2F9;0x4B7	Stat;;Amount	reg
+53284	0xD024	e_Type_GC_GameAction_GlobalCoreSpellStatModifier		12	0;39;175;1305	0x2D2;0x2F9;0x4B7;0x519	Stat;;Amount;FloatValue	reg
+53285	0xD025	e_Type_GC_GameAction_GlobalTargetSpellStatModifier		11	0;39;175	0x2D2;0x2F9;0x4B7	Stat;;Amount	reg
+53286	0xD026	e_Type_GC_GameAction_GlobalModifyGameAction		13	193;174;175;1307;1305	0x4C9;0x4B6;0x4B7;0x51B;0x519	;Substate;Amount;;FloatValue	abs

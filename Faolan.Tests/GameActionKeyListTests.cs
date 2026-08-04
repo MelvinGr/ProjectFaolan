@@ -41,6 +41,45 @@ namespace Faolan.Tests
 			}
 		}
 
+		// A descriptor's key list holds an INDEX; the element reader resolves it through the client's key table
+		// (`DAT_025073c0`, built by `FUN_00897bd0`) to the real property key, which is an ordinary STAT id. The
+		// `statKeys` column carries that resolution, and the mapping is a property of the INDEX - so the same index
+		// must resolve the same way on every one of the 260 types. A re-dump that mis-read the table would show up
+		// here as one index with two keys, rather than as silently renamed properties.
+		[Fact]
+		public void EveryKeyIndexResolvesToOneStatKeyAcrossAllTypes()
+		{
+			var byIndex = new Dictionary<int, string>();
+			foreach (var line in File.ReadAllLines(TestPaths.Repo("docs", "re", "gameaction-keylists.tsv")).Skip(1))
+			{
+				var f = line.Split('\t');
+				if (f[5].Length == 0)
+					continue;
+
+				var keys = f[5].Split(';');
+				var stats = f[6].Split(';');
+				Assert.Equal(keys.Length, stats.Length);
+				for (var i = 0; i < keys.Length; i++)
+				{
+					Assert.NotEmpty(stats[i]);
+					var index = int.Parse(keys[i]);
+					if (byIndex.TryGetValue(index, out var seen))
+						Assert.Equal(seen, stats[i]);
+					else
+						byIndex[index] = stats[i];
+				}
+			}
+
+			// The two the mounted-combat question turns on (#142): the lance charge is the only action that asks
+			// whether it may be used from the saddle, and it asks through stat 0x4FD `GameAction_CanUseIfMounted`.
+			Assert.Equal("0x4FD", byIndex[245]);
+
+			// And the pair the recast RE already published by their resolved keys, which is what says the table is
+			// read right rather than merely read consistently (docs/re/gameactionlist-grammar.md).
+			Assert.Equal("0x463", byIndex[88]);
+			Assert.Equal("0x2F9", byIndex[39]);
+		}
+
 		// The id space the client asserts on every read: `i_nGameAction >= e_Type_GC_GameAction && < _End`,
 		// compiled as `(id - 0xCF09) <= 0x11D` (docs/re/gameactionlist-grammar.md).
 		[Fact]
