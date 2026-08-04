@@ -377,6 +377,44 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
   `PlayerSpawnScaffoldRows.ExtractTo`) and hand-transcribed per class in `PlayerSpawnScaffoldRows.FullSkillIdsFor`
   (from Necro/Demo/Assassin/Herald high-level captures). On level-up / a GM command, the class scaffold is granted so
   learned spells become castable (#298). **This is skills, not feats** — it just happens to share the `0x3F1`-list shape.
+- **The teaching feat is granted with the spell (2026-08-04, #298).** `FeatSpellGrants` (1,510 rows, 915 feats,
+  667 spells — GameAction element kind `53019 Spell` on a feat template) is read *backwards* by
+  `IDatabaseRepository.GetFeatsTeachingSpells`, so both level-up paths train exactly the feats that teach the
+  spells just learned. That comes from the client RDB rather than a capture, so it covers all twelve classes
+  instead of the four with a high-level player-spawn capture.
+
+## Why a learned spell may still refuse to cast — the feat criterion
+
+A spell in the book is not a castable spell. The client runs a generic criteria evaluator
+(`FUN_006dd970`, log channel `GameCode/Criteria`) on an actual action attempt, and **case `0x5d` is the FEAT
+criterion**: it asks the character's feat holder whether it carries feat *F*, with **no level comparison of any
+kind**. On failure it picks one of three LDB messages by what it can say about *F*:
+
+| token | LDB | English text |
+|---|---|---|
+| `YouCanNotUse` | cat 130, id 89130261 | *"You cannot use this item"* — the template did not resolve |
+| `CriteriaMissingFeat` | cat 100, id 194997716 | *"You must have trained the feat: %s"* |
+| `YouCanNotUseYet` | cat 130, id 5372612 | *"Your class cannot use this item until level %d"* |
+
+⚠️ **The third one reads like a level gate and is not.** The `%d` is a number the message carries about the
+FEAT; the criterion that produced it compared nothing to the player's level. #298 spent a month on that reading
+— at character level 15 a Dark Templar was told "until level 10", which looked like a third, undiscovered
+player-level field stuck at 1, and the whole `.setstat` sweep of `0x00`–`0x600` that followed found nothing
+because there was nothing to find. A real stat requirement is a *different* case (`2`) with a *different*
+message, `Criteria_IsRequiredToBeAtLeast` = *"%s %s must be at least %d"*.
+
+The one datum the level-gate reading rested on — "`GameAction_MinLevel` is stat `0x45B`" — was also wrong:
+`CharacterStatId` carried an inherited label block there that the client's own LDB 615 table contradicts on all
+seven slots at once (`0x45B`–`0x461` are the **PvP invulnerability ratings**, one per damage school). Corrected
+2026-08-05; nothing had ever read one.
+
+Resolving those tokens needs no live client — an LDB string id is the 28-bit ELF hash of the token name
+(`LdbStringIndex.TokenId`), so any `FUN_0061f640(<cat>, "<Token>")` in the exe resolves statically:
+
+```zsh
+dotnet run --project Faolan.Importer -- --report ldb-resolve --RdbDir <rdb-dir> \
+  --report-arg YouCanNotUseYet,CriteriaMissingFeat,Criteria_IsRequiredToBeAtLeast
+```
 
 ## RE assets & tools
 

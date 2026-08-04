@@ -39,6 +39,26 @@ namespace Faolan.Core.Rdb
 		// (ReportCli's ldb-stat-names does it against CharacterStatId's own names).
 		public const uint StatNameCategory = 615;
 
+		// The id the client would look a TOKEN NAME up by: a string id is the 28-bit ELF/PJW hash of the literal
+		// token the exe passes to its LDB getter (`FUN_0061f640(<category>, "<Token>")`), so any token name found
+		// statically resolves to its shipped string with no live client.
+		//
+		// ⚠️ Hashing is one-way and the id space is NOT uniformly hashed - a handful of ids are small and sequential
+		// (`Guard` resolves from both `246974048` and `28`). So a hit is evidence and a MISS is not: it can mean the
+		// token is spelled differently, or that this particular entry is one of the sequential ones.
+		// See docs/rdb/ldb-string-index.md.
+		public static uint TokenId(string token)
+		{
+			var h = 0u;
+			foreach (var c in token)
+			{
+				h = (h << 4) + c;
+				h = (h ^ ((h & 0xF0000000) >> 24)) & 0x0FFFFFFF;
+			}
+
+			return h;
+		}
+
 		// The page's category, or 0 if the body is not a TDC2 page (too short / wrong magic).
 		public static uint CategoryOf(ReadOnlySpan<byte> body)
 		{

@@ -769,13 +769,24 @@ namespace Faolan.Core.Enums
 		GameAction_Hash = 0x456,
 		GemFamily = 0x457,
 		GameAction_ToClient = 0x45A,
-		GameAction_MinLevel = 0x45B,
-		GameAction_MaxLevel = 0x45C,
-		GameAction_MonsterData = 0x45D,
-		GameAction_Cluster = 0x45E,
-		GameAction_Level = 0x45F,
-		GameAction_Seed = 0x460,
-		GameAction_AttractorID = 0x461,
+
+		// 0x45B..0x461 is the PvP INVULNERABILITY RATING series - one slot per damage school, in the same school
+		// order the rest of the enum uses. They carried `GameAction_MinLevel`/`MaxLevel`/`MonsterData`/`Cluster`/
+		// `Level`/`Seed`/`AttractorID` until 2026-08-05, which the client's own LDB 615 table contradicts on all
+		// seven at once - an inherited label block, not a decode (nothing ever read one).
+		//
+		// ⚠️ `GameAction_MinLevel` in particular was a live false lead: #298 was hunting a second, level-based
+		// usability gate behind "Your class cannot use this item until level %d" and this slot was the one datum it
+		// had. There is no such gate - that message is the LDB token `YouCanNotUseYet`, emitted by the FEAT criterion
+		// (FUN_006dd970 case 0x5d), which compares no level at all. The neighbours above that the client's table does
+		// not name are the same inherited block and should be trusted no further than this one was.
+		PvPSlashingInvulnerabilityRating = 0x45B,
+		PvPPiercingInvulnerabilityRating = 0x45C,
+		PvPCrushingInvulnerabilityRating = 0x45D,
+		PvPFireInvulnerabilityRating = 0x45E,
+		PvPColdInvulnerabilityRating = 0x45F,
+		PvPElectricalInvulnerabilityRating = 0x460,
+		PvPHolyInvulnerabilityRating = 0x461,
 		GameAction_GfxID = 0x462,
 		GameAction_NanoTemplate = 0x463,
 		GameAction_GfxColor = 0x464,

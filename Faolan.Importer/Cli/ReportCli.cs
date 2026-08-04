@@ -593,6 +593,21 @@ namespace Faolan.Importer.Cli
 					// names our catalog already carries (#291/#300): 50210 spell names, 50200/50220 item names.
 					var spellNamePages = new List<(uint page, Dictionary<uint, string> ids)>();
 					var itemNamePages = new List<(uint cat, uint page, Dictionary<uint, string> ids)>();
+
+					// The lookups: `--report-arg` takes a comma-separated list of raw ids AND/OR literal TOKEN NAMES.
+					// A token is hashed with the client's own key function (LdbStringIndex.TokenId), which is what turns
+					// a `FUN_0061f640(<cat>, "<Token>")` call found in the exe into the string it prints - statically,
+					// with no live client. Resolved per PAGE rather than off `byCat`, because every category is shipped
+					// once per language and the last page to write a slot wins: an unqualified lookup silently answers
+					// in Korean.
+					var wanted = (arg ?? "")
+						.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+						.ToDictionary(needle => uint.TryParse(needle, out var raw)
+							? raw
+							: LdbStringIndex.TokenId(needle), needle => needle);
+					var languageByPage = LdbLanguageIndex.LanguageByPage(rdb);
+					var lookupHits = new List<(uint Id, uint Cat, uint Page, string Lang, string Value)>();
+
 					var pages = 0;
 					foreach (var (pageId, category, strings) in LdbPagesOf(rdb))
 					{
@@ -601,6 +616,8 @@ namespace Faolan.Importer.Cli
 						{
 							map[id] = str;
 							byCat[(category, id)] = str;
+							if (wanted.ContainsKey(id))
+								lookupHits.Add((id, category, pageId, languageByPage.GetValueOrDefault(pageId, "?"), str));
 						}
 
 						perCategory[category] = perCategory.GetValueOrDefault(category) + strings.Count;
@@ -624,6 +641,29 @@ namespace Faolan.Importer.Cli
 							? 0
 							: sample.Count(c => c < 128) * 100 / sample.Length;
 						Console.WriteLine($"  cat {cat,-8} n={cnt,-6} ascii={ascii,3}%  '{sample.Substring(0, Math.Min(40, sample.Length))}'");
+					}
+
+					if (wanted.Count > 0)
+					{
+						Console.WriteLine("=== lookups (English page first; a token that misses may just be spelled differently) ===");
+						foreach (var (id, needle) in wanted)
+						{
+							var hits = lookupHits.Where(h => h.Id == id)
+								.OrderByDescending(h => h.Lang == LdbLanguageIndex.English)
+								.ThenBy(h => h.Cat)
+								.ToList();
+							var label = needle == id.ToString()
+								? needle
+								: $"{needle} -> {id}";
+							if (hits.Count == 0)
+							{
+								Console.WriteLine($"  {label}: (no entry)");
+								continue;
+							}
+
+							foreach (var hit in hits)
+								Console.WriteLine($"  {label}  cat {hit.Cat} page {hit.Page} [{hit.Lang}]: '{hit.Value.ReplaceLineEndings(" ")}'");
+						}
 					}
 
 					// (No language histogram: language is per-PAGE, not per-entry - the index entry's 2nd u32 is

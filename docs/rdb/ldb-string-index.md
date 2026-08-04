@@ -428,6 +428,17 @@ def elf(s):                      # the classic UNIX ELF/PJW hash, masked to 28 b
     return h
 ```
 
+It ships as `LdbStringIndex.TokenId`, and `--report ldb-resolve` takes token names (or raw ids) directly —
+resolved **per page**, English first, because every category is shipped once per language and an unqualified
+lookup answers in whichever language happened to be parsed last:
+
+```zsh
+dotnet run --project Faolan.Importer -- --report ldb-resolve --RdbDir <rdb-dir> \
+  --report-arg SkywalkingCommand_Name,YouCanNotUseYet
+#   SkywalkingCommand_Name -> 47110773  cat 10002 page 4312046 [English]: 'luke'
+#   YouCanNotUseYet -> 5372612  cat 130 page 222116 [English]: 'Your class cannot use this item until level %d '
+```
+
 Verified on 21 independent token/value pairs: `SkywalkingCommand_Description` → 97813470
 (`"This command enables skywalking."`), `SkywalkingEnabled` → 80504532, `SkywalkingDisabled` → 137024644, and
 18 `<Class>Command_Name` tokens each landing on exactly the expected verb in category **10002** -
