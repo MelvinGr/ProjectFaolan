@@ -75,6 +75,11 @@ namespace Faolan.GameServer
 		// (StartingData.RacialHomeMap). Two different destinations, two different handlers.
 		private const uint PathOfAsuraSpecialAction = 0x4E1;
 
+		// The two stance selectors we answer (#505). Like every 0x205A selector these ARE the granted ability's
+		// `Ability.Slot`: 0x064 is `Search` (100) and 0x068 is `Hide` (104).
+		private const uint SearchSpecialAction = 0x064;
+		private const uint SneakHideSpecialAction = 0x068;
+
 		// Shield of the Risen (#221) base spell ids - the two persistent protection buffs applied on every world entry.
 		private const uint ShieldOfTheRisenBase1 = 4061768; // 1h  (wire (base<<8) = 0x3DFA4800)
 		private const uint ShieldOfTheRisenBase2 = 3666828; // 10h (wire (base<<8) = 0x37F38C00)

@@ -38,6 +38,12 @@ namespace Faolan.Importer.Cli
 			foreach (var capture in captures)
 			{
 				var packets = capture.Packets;
+				// The PLAYER's own handle, so an answer can be told from the ambient NPC traffic that shares the
+				// window. The client only ever sends BehaviorControlCenter records for the character it drives, so
+				// the most common actor across the c2s ones IS the player - no session state needed, and it works
+				// on a capture whose character we do not otherwise know. Without this the window folds in every
+				// nearby NPC's idle Emote and the per-selector spec reads as noise.
+				var player = PlayerHandle(packets);
 				for (var i = 0; i < packets.Count; i++)
 				{
 					if (packets[i].IsDownload || packets[i].WireOpcode != CapturedPacket.Wire(GameCharAgentMethods.PerformSpecialAction))
@@ -68,6 +74,9 @@ namespace Faolan.Importer.Cli
 
 						if (answer.SubOpcode == BehaviorControlCenterCodec.Opcode && answer.TryParse(BehaviorControlCenterCodec.Parse, out var bcc))
 						{
+							if (player != 0 && bcc.Actor != player)
+								continue; // an NPC's behaviour that merely shares the window
+
 							var key = (bcc.BehaviorId, (uint)bcc.Args.Length, (uint)bcc.Tail.Length);
 							entry.Behaviors[key] = entry.Behaviors.GetValueOrDefault(key) + 1;
 							// Narrowed to one selector, the report becomes a SPEC rather than a census: the first few
@@ -118,8 +127,28 @@ namespace Faolan.Importer.Cli
 						+ $"recharge={(command.ShouldSerializeRechargeTime() ? command.RechargeTime.ToString() : "-")} "
 						+ $"activation={(command.ShouldSerializeActivationTime() ? command.ActivationTime.ToString() : "-")}");
 					Console.WriteLine($"                 tail   {Convert.ToHexString(bcc.Tail)}");
+					Console.WriteLine($"                 record {Convert.ToHexString(BehaviorControlCenterCodec.Build(bcc))}");
 				}
 			}
+		}
+
+		// The handle of the character the capture's client drives: the most common actor among the c2s
+		// BehaviorControlCenterIIR records. 0 when the capture carries none (then nothing is filtered, which is the
+		// safe direction for a diagnostic - it shows more, not less).
+		private static uint PlayerHandle(IReadOnlyList<CapturedPacket> packets)
+		{
+			var actors = new Dictionary<uint, int>();
+			foreach (var p in packets)
+			{
+				if (p.IsDownload || !p.IsIirCarrier || p.SubOpcode != BehaviorControlCenterCodec.Opcode || !p.TryParse(BehaviorControlCenterCodec.Parse, out var bcc))
+					continue;
+
+				actors[bcc.Actor] = actors.GetValueOrDefault(bcc.Actor) + 1;
+			}
+
+			return actors.Count == 0
+				? 0u
+				: actors.MaxBy(a => a.Value).Key;
 		}
 
 		// A selector's sightings: how often, in which captures, and what the server answered with.

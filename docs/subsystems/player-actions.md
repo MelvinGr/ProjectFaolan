@@ -117,6 +117,39 @@ does nothing and says so, where a wrong id would silently open a trance on the w
 [V2: DemoL80_mage-demonologist_login_randomActions.tshark.json]
 [V2: NecroL80_mage-necromancer_login_spellweaving.tshark.json]
 
+## The implemented stances
+
+**Search** and **hide** are answered; the rest are not yet.
+
+| | search (`0x064`) | hide enter (`0x068`) | hide leave (`0x068` again) |
+|---|---|---|---|
+| slot | `BehaviorId.Search` (32) | `BehaviorId.SneakHide` (30) | `BehaviorId.SneakHide` (30) |
+| form | `0x0004` | `0x0004` | `0x0004` |
+| `f5` flags | 8 | **10** | 8 |
+| `f2` client cmd id | — | echoed | — |
+| `f12` activation | **159** | — | — |
+| tail | 5 bytes, zero | 4 bytes = the shadow coverage | 8 bytes, zero |
+| action id | **per class** | **per class** | **43818, shared** |
+
+The action id is the *character's*, not the stance's — 42013/42014 on the necromancer, 53091/187137 on the
+Herald of Xotli — while everything else is identical between them. Leaving hide is the exception and is the
+useful asymmetry: both captured characters exit with the same id, so the enter animation is the character's own
+sneak pose and the exit is the shared stand-up.
+
+Only those two classes are mapped, deliberately, exactly as the spellweave toggle stops at two: an unmapped
+class logs and does nothing, where a borrowed id would play another class's animation and read as working.
+
+⚠️ The hide-**leave** shape is the two necromancer sightings (flags 8, no command id). The single Herald exit in
+the corpus carries flags 10 and a command id on an otherwise identical 8-byte-tailed record. Three sightings
+disagreeing two-to-one is not enough to model the difference, so the majority form is sent for both.
+[V3: PlayerStanceCodecTests.SneakHideExit_MatchesTheCapturedRecord_AndIsNotClassSpecific]
+[V3: PlayerStanceCodecTests.SearchStance_MatchesTheCapturedRecord]
+[V3: PlayerStanceCodecTests.SneakHideEnter_MatchesTheCapturedRecord]
+
+Hide is a **toggle** on one selector, so the server holds the state (`WorldEntity.IsHidden`), and the coverage
+in the enter tail is whatever the client last reported in its own `SetShadowCoverageIIR` — two separate
+arrivals, so it is remembered on the entity rather than read out of the press.
+
 ## `SetShadowCoverageIIR` (0xD6C1F0CC)
 
 The stealth channel, and the reason `0x068` = hide is the most certain row in the table. Entering hide, the
@@ -135,9 +168,13 @@ one to send it, so a value other than 100 is expected somewhere the corpus simpl
 
 ## Code
 
-- `GameServerListener.Inbound.cs` — the `PerformSpecialAction` handler and its routing. ⚠️ It answers only the
-  spellweave toggle and Path of Asura today; every other selector is logged and dropped, so the stance never
-  visibly takes even though the client sent it.
+- `GameServerListener.Inbound.cs` — the `PerformSpecialAction` handler and its routing. It answers the
+  spellweave toggle, Path of Asura, **search** and **hide**; every other selector is still logged and dropped, so
+  those stances never visibly take even though the client sent them.
+- `GameServerListener.Outbound.cs` — `PerformSearchStance` / `ToggleSneakHide`.
+- `BehaviorAnimations.SearchStance` / `SneakHideEnter` / `SneakHideExit` — the records, byte-exact
+  (`PlayerStanceCodecTests`).
+- `StartingData.SearchStanceAction` / `SneakHideEnterAction` / `SneakHideExitAction` — the per-class animation.
 - `Ability.Slot` — the selector, from the ability's own grant.
 - `--report player-actions` — the census + per-selector spec this page is measured from.
 - `StartingData.SpellweaveToggleAction` — the per-class spellweave selector.

@@ -36,6 +36,13 @@ namespace Faolan.Core.Network.Codecs.Combat
 
 		private const uint IdleBehaviorAction = 41413; // the capture's `08 c5 c3 02` varint
 
+		// The search stance's `activation` word - 159 on both captured classes, so it is the record's constant and not
+		// the per-character part (that is the action id; see StartingData.SearchStanceAction).
+		private const uint SearchActivation = 159;
+
+		// Entering hide is the one stance whose `flags` is not 8. Both captured classes send 10.
+		private const uint SneakHideEnterFlags = 10;
+
 		private const float SitBlend = 2.6153848f; // 0x40276277 - the sit animation's blend/duration (raw-body BE float)
 		private const string SitAnimName = "chair_sit_calm";
 		private const string StandAnimName = "standup";
@@ -269,6 +276,51 @@ namespace Faolan.Core.Network.Codecs.Combat
 			tail.WriteUInt32(4).WriteUInt32(0x27).WriteUInt32(0).WriteUInt32(0).WriteUInt32(0);
 
 			return new BehaviorControlCenterIIR(caster, SeqBegin, 1, message.ToProtobuf(), tail.ToArray());
+		}
+
+		// The SEARCH stance (#505), retail's answer to `PerformSpecialAction` 0x064. Slot `BehaviorId.Search`, form 4,
+		// flags 8, `activation` 159 - identical on both captured classes, which is why only `animActionId` is a
+		// parameter (`StartingData.SearchStanceAction`). The five-byte tail is zero in every capture but one, where
+		// its FIRST byte is 1; that byte is passed rather than pinned, since one differing sighting is not a constant.
+		// [necro f15625 / f2898, hox f3461]
+		public static BehaviorControlCenterIIR SearchStance(uint actor, uint animActionId, uint phase, byte lead = 0)
+		{
+			var message = ArgsPrefix(animActionId, phase, 0);
+			message.ActivationTime = SearchActivation;
+
+			using var tail = new FaolanStream();
+			tail.WriteByte(lead).WriteArray(new byte[4]);
+
+			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.Search, message.ToProtobuf(), tail.ToArray());
+		}
+
+		// ENTERING hide (#505), retail's answer to `PerformSpecialAction` 0x068. Slot `BehaviorId.SneakHide`, form 4,
+		// and - unlike every other stance here - `flags` 10 rather than 8, with the client's own command id echoed
+		// back in `CommandqueueClientId`. The four-byte tail is the SHADOW COVERAGE the client just reported in its
+		// SetShadowCoverageIIR (100 in every observation, hence a parameter rather than a constant: the client
+		// computes it from local lighting, which is the whole reason it is the one that sends it).
+		// [necro f830 / f15643, hox f3420]
+		public static BehaviorControlCenterIIR SneakHideEnter(uint actor, uint animActionId, uint phase, uint clientCommandId, uint shadowCoverage)
+		{
+			var message = ArgsPrefix(animActionId, phase, 0);
+			message.Flags = SneakHideEnterFlags;
+			message.CommandqueueClientId = clientCommandId;
+
+			using var tail = new FaolanStream();
+			tail.WriteUInt32(shadowCoverage);
+
+			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.SneakHide, message.ToProtobuf(), tail.ToArray());
+		}
+
+		// LEAVING hide (#505). Same slot as the enter, but back to `flags` 8 with no client command id, an eight-byte
+		// zero tail, and - the part worth noticing - an action id that is NOT class-specific: both captured characters
+		// exit with `StartingData.SneakHideExitAction`. The enter animation is the character's own sneak pose; the
+		// exit is the shared stand-up. [necro f843 / f15660, hox f3452]
+		public static BehaviorControlCenterIIR SneakHideExit(uint actor, uint animActionId, uint phase)
+		{
+			var message = ArgsPrefix(animActionId, phase, 0);
+
+			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.SneakHide, message.ToProtobuf(), new byte[8]);
 		}
 
 		// The standup feedback remoteformat: shows "Standing up" as the on-screen feedback.

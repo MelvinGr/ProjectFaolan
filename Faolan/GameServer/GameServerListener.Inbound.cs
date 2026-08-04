@@ -486,6 +486,10 @@ namespace Faolan.GameServer
 					var shadow = SetShadowCoverageCodec.Parse(rawPayload);
 					Logger.LogDebug("GameServer shadow coverage {Percent}% for handle {Handle}.", shadow.Percent, shadow.Handle);
 					await WorldIir.Send(client, SetShadowCoverageCodec.Build(shadow.Handle, shadow.Percent));
+					// Remembered for the hide stance (#505): retail carries this number in the hide-enter behaviour's
+					// tail, and the client reports it BEFORE pressing hide, so the two are separate arrivals.
+					if (_simulation.PlayerWorldEntity(client) is { } shadowed)
+						shadowed.ShadowCoverage = shadow.Percent;
 					break;
 				}
 
@@ -1362,6 +1366,23 @@ namespace Faolan.GameServer
 						case PathOfAsuraSpecialAction when !client.Session.IsTeleportingOut:
 						{
 							await RecallToBindCommand(client);
+							break;
+						}
+
+						// The SEARCH stance (#505). Retail answers with the player's own BehaviorControlCenterIIR at
+						// slot BehaviorId.Search - the client waits for it before the stance visibly takes, so the
+						// press does nothing at all without this. There is no server-side search state yet: the record
+						// is the whole of retail's observed answer.
+						case SearchSpecialAction:
+						{
+							await PerformSearchStance(client);
+							break;
+						}
+
+						// The HIDE stance (#505) - a toggle, like the mount.
+						case SneakHideSpecialAction:
+						{
+							await ToggleSneakHide(client);
 							break;
 						}
 					}

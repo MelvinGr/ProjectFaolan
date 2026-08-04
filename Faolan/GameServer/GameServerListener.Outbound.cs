@@ -822,6 +822,61 @@ namespace Faolan.GameServer
 			return ClientForCharacter(characterId)?.Session.Character.Name;
 		}
 
+		// The SEARCH stance (#505): retail's answer to PerformSpecialAction 0x064 is one player-addressed
+		// BehaviorControlCenterIIR at slot BehaviorId.Search, and nothing else - no stat change, no buff. The client
+		// waits for it before the stance takes, which is why a press with no answer reads as "the client sent
+		// nothing".
+		//
+		// The animation action is the CHARACTER's, not the stance's, so it comes from a per-class map holding only the
+		// two classes a capture shows. An unmapped class logs and does nothing, the same call the spellweave toggle
+		// makes: a borrowed id would play some other class's animation and read as working.
+		private async Task PerformSearchStance(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (!StartingData.SearchStanceAction.TryGetValue(character.Class, out var animAction))
+			{
+				Logger.LogInformation("Search stance: no captured animation action for class {Class} - not answering (#505).", character.Class);
+				return;
+			}
+
+			var entity = _simulation.PlayerWorldEntity(client);
+			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.SearchStance(character.Id, animAction, entity?.NextBehaviorPhase() ?? 3)));
+		}
+
+		// The HIDE stance (#505) - a TOGGLE on one selector, so the server holds which way the next press goes.
+		// Entering carries the shadow coverage the client itself reported a moment earlier (SetShadowCoverageIIR);
+		// leaving is the shared stand-up action, the one part of the pair that is NOT class-specific.
+		//
+		// ⚠️ The EXIT record's shape is taken from the two necromancer sightings (flags 8, no echoed command id). The
+		// one Herald of Xotli exit in the corpus carries flags 10 and a command id instead, on an otherwise identical
+		// 8-byte-tailed record. Three sightings that disagree two-to-one is not enough to model the difference, so the
+		// majority form is sent for both and the divergence is written down rather than silently averaged away.
+		private async Task ToggleSneakHide(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			if (!StartingData.SneakHideEnterAction.TryGetValue(character.Class, out var enterAction))
+			{
+				Logger.LogInformation("Hide stance: no captured animation action for class {Class} - not answering (#505).", character.Class);
+				return;
+			}
+
+			var entity = _simulation.PlayerWorldEntity(client);
+			var hidden = entity?.IsHidden ?? false;
+			var phase = entity?.NextBehaviorPhase() ?? 3;
+
+			var record = hidden
+				? BehaviorAnimations.SneakHideExit(character.Id, StartingData.SneakHideExitAction, phase)
+				: BehaviorAnimations.SneakHideEnter(character.Id, enterAction, phase, entity?.NextBehaviorCommandId() ?? 3, entity?.ShadowCoverage ?? 100);
+
+			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(record));
+			if (entity != null)
+				entity.IsHidden = !hidden;
+
+			Logger.LogInformation("Hide stance: '{Name}' {Action}.", character.Name, hidden
+				? "left hiding"
+				: "entered hiding");
+		}
+
 		private static Task SendApprenticeRpc(INetworkClient client, GameCharInterfaceProjectMethods method, byte[] body)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType), method, body));

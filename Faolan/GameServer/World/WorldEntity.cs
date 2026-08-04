@@ -408,6 +408,30 @@ namespace Faolan.GameServer.World
 		// and the client gets stuck at the end of the dismount channel.
 		public bool IsMounted { get; set; }
 
+		// The SNEAK/HIDE stance (#505). A toggle: the same `PerformSpecialAction` selector both enters and leaves it,
+		// so the server has to remember which way the next press goes - exactly like the mount toggle above.
+		public bool IsHidden { get; set; }
+
+		// The shadow coverage the CLIENT last reported for this entity (SetShadowCoverageIIR). Retail puts this number
+		// in the hide-enter behaviour's tail, so it has to be remembered between the client's report and the press.
+		// 100 in every observation, which is what the client sends when it has not reported anything else yet - not a
+		// scale that has been established (docs/subsystems/player-actions.md).
+		public uint ShadowCoverage { get; set; } = 100;
+
+		// A per-entity monotonic counter for the behaviour records the server initiates on this entity's behalf: the
+		// `CommandMessage` phase (f3) and the command id retail echoes in `CommandqueueClientId`. Retail's is
+		// per-session and monotonic, and the client does not key anything off the exact value - what it must not do is
+		// repeat. Starts at 3 because that is the first value both captured sessions used for a stance.
+		public uint NextBehaviorPhase() => ++_behaviorPhase;
+
+		// The command id retail echoes in `CommandqueueClientId`. A SEPARATE counter from the phase, because the two
+		// disagree in the captures: one hide-enter carries phase 5 with command id 3, and the Herald's pair runs
+		// phase 3/4 against command id 3/4. Only the stance records that carry the field advance it.
+		public uint NextBehaviorCommandId() => ++_behaviorCommandId;
+
+		private uint _behaviorCommandId = 2;
+		private uint _behaviorPhase = 2;
+
 		// The mount's RIDE STAT - the value the Mount stat carries on the wire, not the DB id - so a viewer arriving
 		// after the mount can be told (#428). The player's SpawnBody is the FA015807 captured at their world ENTRY:
 		// frozen, so it can never carry a mount taken later, and the client renders the horse from the Mount/MountSpeed

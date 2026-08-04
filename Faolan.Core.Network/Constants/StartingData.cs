@@ -39,6 +39,34 @@ namespace Faolan.Core.Network.Constants
 			[ConanClass.Demonologist] = 0x10C
 		}.ToImmutableDictionary();
 
+		// The SEARCH stance's animation action, per class (#505). Retail answers `PerformSpecialAction` 0x064 with a
+		// player `BehaviorControlCenterIIR` at slot `BehaviorId.Search`, and its action id is the character's own -
+		// 42013 on the necromancer, 53091 on the Herald of Xotli - while everything ELSE about the record is shared
+		// (form 4, flags 8, activation 159, a five-byte zero tail). So the class-varying part is exactly one number.
+		//
+		// Only the two classes a capture shows are here, deliberately, for the same reason SpellweaveToggleAction
+		// stops at two: an unmapped class logs and does nothing, which is visible, where a borrowed id would play the
+		// wrong animation and read as working.
+		public static readonly ImmutableDictionary<ConanClass, uint> SearchStanceAction = new Dictionary<ConanClass, uint>
+		{
+			[ConanClass.Necromancer] = 42013,
+			[ConanClass.HeraldOfXotli] = 53091
+		}.ToImmutableDictionary();
+
+		// The HIDE stance's ENTER animation action, per class (#505) - `PerformSpecialAction` 0x068, answered at slot
+		// `BehaviorId.SneakHide`. Class-specific like the search stance above: 42014 on the necromancer (adjacent to
+		// its search action), 187137 on the Herald of Xotli. Same deliberate two-row limit.
+		public static readonly ImmutableDictionary<ConanClass, uint> SneakHideEnterAction = new Dictionary<ConanClass, uint>
+		{
+			[ConanClass.Necromancer] = 42014,
+			[ConanClass.HeraldOfXotli] = 187137
+		}.ToImmutableDictionary();
+
+		// Leaving hide is NOT class-specific: both captured characters exit with the same action id, which is what
+		// makes it a constant here rather than a third map. That asymmetry is the useful part - the enter animation is
+		// the character's own sneak pose, the exit is the shared stand-up.
+		public const uint SneakHideExitAction = 43818;
+
 		// Each race's HOME city - where the Totem of Origins sends you. This is a DIFFERENT destination from the bind
 		// point: the Path of Asura spell recalls to the bound location (the bindstone/Wayfarer point the player last
 		// set), while the Totem returns you to your race's origin regardless of where you are bound. Both used to
