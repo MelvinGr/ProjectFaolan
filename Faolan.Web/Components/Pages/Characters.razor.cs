@@ -39,7 +39,7 @@ namespace Faolan.Web.Components.Pages
 		private IJSObjectReference? _module;
 		private IReadOnlyDictionary<string, ItemInfo> _equipment = new Dictionary<string, ItemInfo>();
 		private IReadOnlyList<(ItemInfo Info, string Tab)> _inventory = [];
-		private IReadOnlyList<(string Name, byte Level, float Range, float Damage)> _spells = [];
+		private IReadOnlyList<(string Name, byte Level, float Range, float SplashDamage)> _spells = [];
 
 		private List<Character>? _characters;
 		private bool _ownsSelected;

@@ -16,8 +16,30 @@ Each file `<type>_<id>.bin` = `[12-byte RDB-Id header][body]`. Dissector: `Dispa
 ## Body grammar
 
 After a short fixed header the body is an RDB **property table**: a run of `[fieldId u32][value u32]` pairs
-(LE) with **strictly DECREASING fieldId**. Field ids are RDB template field numbers (973, 972, 971, 857,
-615, 499, 496, 462, 460, 436, 360, 316, 294, 287, 286, 285, 211, 148, …), NOT wire stat ids.
+(LE) with **strictly DECREASING fieldId**.
+
+⚠️ **The field ids ARE wire stat ids** — this page said "NOT wire stat ids" until #626 showed the spell
+record's are, and the two share several numbers (287, 294). Resolved against the client's own stat-name table
+(LDB category 615, `--report ldb-stat-names`), 15 of the 18 ids listed here name something, and every name
+matches the meaning the field was decoded to hold empirically:
+
+| field | client's name | field | client's name |
+|---|---|---|---|
+| 973 | `Weapon Critical Damage` | 360 | `Scale` |
+| 972 | `Weapon Attribute` | 316 | `Variance` |
+| 971 | `Weapon Critical Chance` | 294 | `Casting Time (Seconds)` |
+| 857 | `Secondary Attack Rating` | 287 | `Attack Range` |
+| 499 | `Power Level` | 286 | `Min Damage` |
+| 462 | `Enemy Damage` | 285 | `Max Damage` |
+| 436 | `Damage Type` | 211 | `Equip Delay` |
+| | | 148 | `Occupy Slots` |
+
+(615, 496 and 460 have no entry in the table — an id the client never names, not a decode failure.)
+
+⚠️ That makes the `971` reading below **doubtful**: the client calls it `Weapon Critical Chance`, not "the
+amount for 972", and 971/972/973 read as a weapon triple in exactly the shape 347/348/349 do on a spell
+record. Tracked in Gitea #631; the import already treats 971/972 as a last-resort fallback used only when the
+`[2][9]` region is empty, so the blast radius is small.
 
 ### VALIDATED — the primary-attribute modifier
 

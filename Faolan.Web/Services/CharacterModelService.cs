@@ -730,7 +730,7 @@ namespace Faolan.Web.Services
 
 		// The character's learned spells, resolved to readable names via the Spells catalog (RDB-imported). Ordered by
 		// level then name. Range is metres, Damage is the spell's damage-rating percent (0 when not a damage spell).
-		public IReadOnlyList<(string Name, byte Level, float Range, float Damage)> Spells(uint characterId)
+		public IReadOnlyList<(string Name, byte Level, float Range, float SplashDamage)> Spells(uint characterId)
 		{
 			using var db = _dbFactory.CreateDbContext();
 			return db
@@ -742,7 +742,7 @@ namespace Faolan.Web.Services
 				.AsEnumerable()
 				.Select(s => (string.IsNullOrWhiteSpace(s.Name)
 					? $"Spell {s.Id}"
-					: s.Name, s.Level, s.Range, s.DamageRating))
+					: s.Name, s.Level, s.Range, s.SplashDamage))
 				.ToList();
 		}
 

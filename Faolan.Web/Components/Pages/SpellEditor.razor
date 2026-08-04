@@ -76,7 +76,9 @@
 							Mana cost (raw)<input class="n" @bind="_spell.ManaCost"/>
 						</label>
 						<label title="metres — RDB field 0x11F / 100">Range (m)<input class="n" @bind="_spell.Range"/></label>
-						<label title="percent — RDB field 0x15C / 100">Damage rating<input class="n" @bind="_spell.DamageRating"/></label>
+						<label title="metres — RDB field 347 / 100. The client calls it Splash Radius (LDB cat 615).">Splash radius (m)<input class="n" @bind="_spell.SplashRadius"/></label>
+						<label title="percent — RDB field 348 / 100. The client calls it Splash Damage; it is NOT the spell's damage rating (#626), and only 215 of 21,502 spells carry one.">Splash damage (%)<input class="n" @bind="_spell.SplashDamage"/></label>
+						<label title="raw count — RDB field 349, the client's &quot;Splash damage max targets&quot;">Splash max targets<input class="n" @bind="_spell.SplashMaxTargets"/></label>
 						<label title="0 = no self-duration. Drives buff expiry: a timed self-buff gets its end-twin sent at 0 so the icon disappears.">
 							Duration (ms)<input class="n" @bind="_spell.DurationMs"/>
 						</label>

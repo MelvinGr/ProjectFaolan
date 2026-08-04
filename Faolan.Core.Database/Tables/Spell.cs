@@ -68,7 +68,30 @@ namespace Faolan.Core.Database.Tables
 		/// </remarks>
 		public uint ScalingAttribute { get; set; }
 
-		public float DamageRating { get; set; } // spell damage rating percent (RDB field 0x15C / 100)
+		/// <summary>
+		///     The SPLASH triple of the spell's type-1040005 record - RDB fields 347/348/349 (0x15B/0x15C/0x15D),
+		///     which the client's own stat-name table (LDB category 615) names <c>Splash Radius</c>,
+		///     <c>Splash Damage</c> and <c>Splash damage max targets</c>. They travel together: all three are on the
+		///     same 215 of 21,502 records, and `--report rdb-field-coverage --report-arg 1040005:347x348` pairs them
+		///     row for row. Radius is in centimetre-hundredths like <see cref="Range" /> (200 -> 2 m), damage is a
+		///     percentage ×100 (3000 -> 30%), max-targets is a raw count (0…24). 0 = the spell has no splash, which
+		///     is 99% of the catalog.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ <c>SplashDamage</c> was imported as <c>DamageRating</c> until #626, described as "the spell's
+		///     damage rating, 0-8000 = 0-80%". It never was one: a property carried by 1% of the catalog cannot be
+		///     the damage rating of every damaging spell, and the reading came from matching one tooltip's
+		///     "Effect 50.00" to a 5000 that also appears here. The spell's real damage MAGNITUDE remains unsourced
+		///     (#592) - nothing in combat reads these three; they are catalog data.
+		/// </remarks>
+		public float SplashRadius { get; set; }
+
+		/// <inheritdoc cref="SplashRadius" />
+		public float SplashDamage { get; set; }
+
+		/// <inheritdoc cref="SplashRadius" />
+		public uint SplashMaxTargets { get; set; }
+
 		public float Range { get; set; } // target range in metres (RDB field 0x11F / 100)
 
 		// Damage-over-time per tick on HealthCurrent, extracted from captured StatDamageIIR (0xE9F24184) records keyed

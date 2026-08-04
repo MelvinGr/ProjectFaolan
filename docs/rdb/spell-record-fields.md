@@ -40,8 +40,9 @@ The client names `0x15C` **`SplashDamage`**, and the data says the same thing: 3
 Cross-tabulating 347 against 348 pairs them row for row — 124 records carry `347=0` and `348=0` together.
 
 A property of one percent of the catalog is not "the spell's damage rating"; it is the third member of the
-splash triple. `Spell.DamageRating` imports this field and `Faolan.Web` displays it under the wrong label —
-open work is tracked in Gitea #626.
+splash triple. All three are now imported under their own names — `Spell.SplashRadius` (347 ÷ 100, metres),
+`Spell.SplashDamage` (348 ÷ 100, percent) and `Spell.SplashMaxTargets` (349, a raw count) — and `Faolan.Web`
+labels them as such. Nothing in combat reads them; the spell's real damage magnitude stays unsourced (#592).
 
 ## ⚠️ Field 54 is not the level requirement — 125 is
 

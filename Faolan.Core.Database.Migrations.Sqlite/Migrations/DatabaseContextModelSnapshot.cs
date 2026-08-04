@@ -3423,9 +3423,6 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
                     b.Property<ushort>("Cooldown")
                         .HasColumnType("INTEGER");
 
-                    b.Property<float>("DamageRating")
-                        .HasColumnType("REAL");
-
                     b.Property<string>("Description")
                         .HasMaxLength(2048)
                         .HasColumnType("TEXT");
@@ -3467,6 +3464,15 @@ namespace Faolan.Core.Database.Migrations.Sqlite.Migrations
 
                     b.Property<uint>("ScalingAttribute")
                         .HasColumnType("INTEGER");
+
+                    b.Property<float>("SplashDamage")
+                        .HasColumnType("REAL");
+
+                    b.Property<uint>("SplashMaxTargets")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<float>("SplashRadius")
+                        .HasColumnType("REAL");
 
                     b.HasKey("Id");
 

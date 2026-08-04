@@ -19,11 +19,12 @@ namespace Faolan.Importer.Rdb
 	// see RdbItemImporter.TryReadPropertyField). Validated against the in-client Ice Strike tooltip + 6 spells:
 	//   field 0x126 (294) = cast time in centiseconds (value*10 = ms): Ice 200->2.0s, ShockStrike 250->2.5s,
 	//     Fire of Gehenna 200->2.0s, Hellfire Stream 100->1.0s, Shocblast 300->3.0s, Inferno of Amher 250->2.5s.
-	//   field 0x11F (287) = target range * 100 (Ice 2500 -> 25); field 0x34C (844 -> no; 348) = spell damage
-	//     rating * 100 (Ice 3000 -> 30.00%).
+	//   field 0x11F (287) = target range * 100 (Ice 2500 -> 25); fields 347/348/349 = the SPLASH triple
+	//     (radius / damage percent * 100 / max targets), on 215 records - NOT the damage rating they were read as
+	//     until #626.
 	// Catalogs the FULL spell list from the RDB: every type-1040005 record that carries a display name is upserted
 	// into the Spell table with its Name (the 0x21 string, same framing as item templates - see
-	// RdbItemImporter.ExtractName), CastTime, Range, DamageRating, DurationMs, ManaCost and (additively) Level.
+	// RdbItemImporter.ExtractName), CastTime, Range, the splash triple, DurationMs, ManaCost and (additively) Level.
 	// EffectSpell/min-max damage stay untouched - those really are rank/level-COMPUTED and absent from this
 	// record. Idempotent: re-running only rewrites changed values. (#236)
 	//
@@ -73,7 +74,12 @@ namespace Faolan.Importer.Rdb
 	public static class RdbSpellImporter
 	{
 		private const uint CastTimeField = 0x126; // 294 - cast time in centiseconds (value * 10 = milliseconds)
-		private const uint DamageRatingField = 0x15C; // 348 - spell damage rating * 100 (Ice 3000 -> 30.00%)
+		// 347/348/349 - the SPLASH triple, named by the client's own stat-name table (LDB cat 615): Splash Radius /
+		// Splash Damage / Splash damage max targets. All three sit on the same 215 records, so they are read together;
+		// see Spell.SplashRadius for the units and for why 348 is NOT the "damage rating" it was imported as (#626).
+		private const uint SplashRadiusField = 0x15B;
+		private const uint SplashDamageField = 0x15C;
+		private const uint SplashMaxTargetsField = 0x15D;
 		private const uint DurationField = 0x008; // 8 - buff/effect duration in CENTISECONDS (×10ms); stored ×10 as ms. Rend 700=7s, Exhausted 10000=100s; 0 = none (#274)
 
 		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
@@ -217,9 +223,13 @@ namespace Faolan.Importer.Rdb
 				var range = fields.TryGetValue(RangeField, out var r)
 					? r / 100f
 					: 0f;
-				var damageRating = fields.TryGetValue(DamageRatingField, out var dr)
-					? dr / 100f
+				var splashRadius = fields.TryGetValue(SplashRadiusField, out var sr)
+					? sr / 100f
 					: 0f;
+				var splashDamage = fields.TryGetValue(SplashDamageField, out var sd)
+					? sd / 100f
+					: 0f;
+				var splashMaxTargets = fields.GetValueOrDefault(SplashMaxTargetsField);
 				var durationMs = fields.TryGetValue(DurationField, out var du)
 					? du * 10
 					: 0u; // centiseconds -> ms
@@ -270,7 +280,9 @@ namespace Faolan.Importer.Rdb
 						Name = name,
 						CastTime = castTime,
 						Range = range,
-						DamageRating = damageRating,
+						SplashRadius = splashRadius,
+						SplashDamage = splashDamage,
+						SplashMaxTargets = splashMaxTargets,
 						DurationMs = durationMs,
 						Level = level,
 						Rank = rank,
@@ -305,7 +317,9 @@ namespace Faolan.Importer.Rdb
 				}
 
 				spell.Range = range;
-				spell.DamageRating = damageRating;
+				spell.SplashRadius = splashRadius;
+				spell.SplashDamage = splashDamage;
+				spell.SplashMaxTargets = splashMaxTargets;
 				spell.DurationMs = durationMs;
 
 				// The RDB leads on level, over both the scrapes and the captures (see LevelField).
