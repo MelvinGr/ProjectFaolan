@@ -281,6 +281,68 @@ namespace Faolan.Core.Rdb.Assets
 				: null;
 		}
 
+		/// <summary>
+		///     What a body atlas's dilation is deciding, both ways (#294): the colour heuristic's gutter mask beside
+		///     the mesh's own UV coverage, the latter rasterized with V as-is AND flipped so the orientation is
+		///     measured rather than assumed. Printed by `--report body-atlas-coverage`. Takes any of the three ids a
+		///     body is reached by - a CHARACTERCREATOR <body monsterdataid>, a MESHINDEXFILE manifest, or a bare
+		///     RenderMesh. Null when none of them resolves to geometry with a diffuse.
+		/// </summary>
+		public static BodyAtlasCoverage? DescribeBodyAtlasCoverage(RdbReader rdb, uint id)
+		{
+			// The id is whichever of the two the caller has: a MESHINDEXFILE manifest (armour, props) or a bare
+			// RenderMesh (the skinned CHARACTERCREATOR bodies, which have no manifest - which is exactly why
+			// BuildBodyDiffuse resolves their diffuse from the blob's own header refs).
+			// …or a CHARACTERCREATOR <body monsterdataid>, which is the id a race/sex actually names.
+			if (ResolveBodyRenderMesh(rdb, id) is { } fromMonsterData)
+				id = fromMonsterData;
+
+			MeshIndexFile? mesh = null;
+			var renderMeshId = id;
+			if (rdb.TryGet(MeshIndexFileType, id, out var idx))
+			{
+				mesh = MeshIndexFile.Parse(id, rdb.ReadDecompressed(idx));
+				if (mesh.RenderMeshId is not { } mapped)
+					return null;
+
+				renderMeshId = mapped;
+			}
+
+			if (!rdb.TryGet(RenderMeshType, renderMeshId, out var rm) || !rdb.CanRead(rm))
+				return null;
+
+			var blob = rdb.ReadDecompressed(rm);
+			var subs = RenderMeshReader.Read(blob);
+			if (subs.Count == 0)
+				return null;
+
+			byte[]? rgba = null;
+			int w = 0, h = 0;
+			foreach (var t in mesh?.UniqueTextures ?? [])
+			{
+				if (TryDecodeRgba(rdb, t.Type!.Value, t.Id, out rgba, out w, out h))
+					break;
+			}
+
+			if (rgba == null)
+			{
+				foreach (var (type, texId) in RenderMeshReader.ReadHeaderTextureRefs(blob))
+				{
+					if (TryDecodeRgba(rdb, type, texId, out rgba, out w, out h))
+						break;
+				}
+			}
+
+			if (rgba == null)
+				return null;
+
+			return new BodyAtlasCoverage(w, h, subs.Count, BodyAtlasDilator.DetectGutter(rgba, w, h),
+				BodyAtlasUvCoverage.TryRasterize(subs, w, h), BodyAtlasUvCoverage.TryRasterize(subs, w, h, true));
+		}
+
+		/// <inheritdoc cref="DescribeBodyAtlasCoverage" />
+		public sealed record BodyAtlasCoverage(int Width, int Height, int SubMeshes, bool[] HeuristicGutter, bool[]? Covered, bool[]? CoveredFlipped);
+
 		// Diagnostic: is the body's front UV mirrored left/right? Splits the body rendermesh vertices by sign(X) and
 		// reports each half's U range. Overlapping ranges => left and right share atlas texels (mirrored) => a tattoo
 		// can't be baked onto one side only. Disjoint ranges => unique unwrap => atlas placement can target one side.
@@ -814,7 +876,8 @@ namespace Faolan.Core.Rdb.Assets
 		// Decode the body's base diffuse to RGBA, dilate its background gutter into the skin (BodyAtlasDilator, so UV-island
 		// seams don't sample the flat gutter), paste the character's tattoo decals on top (texscript projecttexture is a 2D
 		// texture-space placement, not a 3D projection - Ghidra ProjectTextureOperation_c), then encode (+ skin tint).
-		private static byte[]? BuildBodyDiffuse(RdbReader rdb, MeshIndexFile? mesh, ReadOnlySpan<byte> blob, Tint? tint, IReadOnlyList<BodyDecal> decals)
+		private static byte[]? BuildBodyDiffuse(RdbReader rdb, MeshIndexFile? mesh, ReadOnlySpan<byte> blob, Tint? tint, IReadOnlyList<BodyDecal> decals,
+			IReadOnlyList<RenderMeshReader.SubMesh>? subs = null)
 		{
 			byte[]? rgba = null;
 			int w = 0, h = 0;
@@ -840,7 +903,14 @@ namespace Faolan.Core.Rdb.Assets
 			// UV-island edge triangles don't sample the gutter and show as lighter seam/blotch artifacts (the atlas
 			// edge-padding a game engine does at texture-build time; the raw RDB atlas lacks it). Island pixels are kept
 			// exactly; decals below paste onto those island pixels. Cached per source atlas inside the dilator.
-			rgba = BodyAtlasDilator.Dilate(rgba, w, h);
+			//
+			// #294: hand the dilator the MESH's own UV coverage where the caller has the geometry, so "gutter" is the
+			// texels no triangle samples rather than the texels that look like the background. The colour heuristic
+			// flattened a smooth patch of upper chest, because tan skin and a tan background are not separable by
+			// colour; a UV triangle is not an opinion about the colour.
+			rgba = BodyAtlasDilator.Dilate(rgba, w, h, subs == null
+				? null
+				: BodyAtlasUvCoverage.TryRasterize(subs, w, h));
 
 			//TODO: Scale 2x as test
 
@@ -1211,7 +1281,7 @@ namespace Faolan.Core.Rdb.Assets
 			// Skinned bodies have no material manifest, so pass no MeshIndexFile - the diffuse resolves from the blob's own
 			// header texture refs. Always go through BuildBodyDiffuse so the gutter dilation runs whether or not the
 			// character has tattoo decals; the atlas is opaque skin, so the alpha is always Opaque.
-			var diffuse = BuildBodyDiffuse(rdb, null, blob, tint, decals ?? []);
+			var diffuse = BuildBodyDiffuse(rdb, null, blob, tint, decals ?? [], subs);
 			if (diffuse == null)
 				return subs;
 
@@ -1254,7 +1324,7 @@ namespace Faolan.Core.Rdb.Assets
 
 			// With body decals (mesh -1/-2 tattoos), paste them into the body atlas (texture space); else plain diffuse.
 			var (diffuse, alpha) = decals is { Count: > 0 }
-				? (BuildBodyDiffuse(rdb, mesh, blob, tint, decals), RenderMeshReader.AlphaMode.Opaque)
+				? (BuildBodyDiffuse(rdb, mesh, blob, tint, decals, subs), RenderMeshReader.AlphaMode.Opaque)
 				: DecodeDiffusePng(rdb, mesh, blob, tint);
 			return diffuse == null
 				? subs

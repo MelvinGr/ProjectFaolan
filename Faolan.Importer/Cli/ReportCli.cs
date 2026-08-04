@@ -389,6 +389,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "body-atlas-coverage":
+				{
+					BodyAtlasCoverage(RdbDir(), arg, options.Out);
+					return 0;
+				}
+
 				case "spell-recast":
 				{
 					SpellRecast(RdbDir(), arg);

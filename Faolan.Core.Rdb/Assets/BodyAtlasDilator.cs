@@ -9,6 +9,12 @@ namespace Faolan.Core.Rdb.Assets
 	// gutter (#275). Without it the viewer shows lighter seam/blotch artifacts along the body midline, spine, waist and
 	// island boundaries - the raw RDB atlas lacks the edge-padding a game engine applies at texture-build time. Only
 	// gutter pixels are changed; island pixels are preserved exactly. Results are cached per source atlas.
+	//
+	// **Which pixels are gutter comes from the MESH where it can** (#294): a texel no UV triangle covers is never drawn
+	// on the character, so filling it cannot lose anything, and a texel one does cover is skin by definition. That is a
+	// measurement, where the colour+flatness test below is a guess - and a guess with a known failure: the tan
+	// background is close enough to tan skin that a smooth patch of upper chest passes both guards and gets flattened,
+	// which is the residual blotch #294 was opened for. The heuristic stays as the path for a caller with no mesh.
 	public static class BodyAtlasDilator
 	{
 		// How close to the sampled background colour a pixel must be to count as gutter (per channel).
@@ -20,14 +26,27 @@ namespace Faolan.Core.Rdb.Assets
 		// atlas's L/R divide) fills without a visible meeting-seam. Islands are re-pinned after every pass.
 		private static readonly int[] BlurRadii = [4, 8, 16, 32, 64, 96];
 
-		// Return an RGBA copy of the atlas with its background gutter dilated into skin. Cached by the source content
-		// (the input is the untinted, decal-free base atlas, so the same source hits the cache across characters).
-		public static byte[] Dilate(byte[] rgba, int width, int height)
+		/// <summary>
+		///     Return an RGBA copy of the atlas with its background gutter dilated into skin. Cached by the source
+		///     content (the input is the untinted, decal-free base atlas, so the same source hits the cache across
+		///     characters).
+		/// </summary>
+		/// <param name="covered">
+		///     The mesh's own UV coverage from <see cref="BodyAtlasUvCoverage.TryRasterize" /> - true where a triangle
+		///     samples the texel. When given it REPLACES the colour heuristic outright: gutter is exactly the
+		///     uncovered set. Null falls back to the heuristic.
+		/// </param>
+		public static byte[] Dilate(byte[] rgba, int width, int height, bool[]? covered = null)
 		{
 			if (width <= 0 || height <= 0 || rgba.Length < width * height * 4)
 				return rgba;
 
-			return Cache.GetOrAdd(Signature(rgba, width, height), _ => Compute(rgba, width, height));
+			if (covered != null && covered.Length != width * height)
+				covered = null; // a mask for a different atlas is not a mask; fall back rather than mis-index
+
+			// The mask is part of the cache identity: two characters sharing one atlas but not one mesh do not share
+			// a result. Keyed on the mask's own signature so a same-shaped mask from a different mesh still misses.
+			return Cache.GetOrAdd(Signature(rgba, width, height) ^ MaskSignature(covered), _ => Compute(rgba, width, height, covered));
 		}
 
 		// Separable box blur on the RGB channels (alpha untouched), edges clamped via a shrinking window count.
@@ -102,10 +121,12 @@ namespace Faolan.Core.Rdb.Assets
 			return outp;
 		}
 
-		private static byte[] Compute(byte[] src, int w, int h)
+		private static byte[] Compute(byte[] src, int w, int h, bool[]? covered)
 		{
 			var n = w * h;
-			var gutter = DetectGutter(src, w, h);
+			var gutter = covered != null
+				? Uncovered(covered)
+				: DetectGutter(src, w, h);
 			var outp = (byte[])src.Clone();
 
 			// Fill every gutter pixel with the nearest island colour (grassfire; leaves Voronoi-ish streaks the blur clears).
@@ -150,7 +171,7 @@ namespace Faolan.Core.Rdb.Assets
 		// background colour, AND (2) it must be locally FLAT (tiny neighbour variation) - real skin, even tan skin, always
 		// has gradient/detail, so the flood stops at the skin edge instead of eating into it. This is why a global colour
 		// test (or a loose flood) smears skin: skin pixels get classified as gutter and blurred.
-		private static bool[] DetectGutter(byte[] rgba, int w, int h)
+		internal static bool[] DetectGutter(byte[] rgba, int w, int h)
 		{
 			var gutter = new bool[w * h];
 			var ci = (2 * w + 2) * 4;
@@ -323,6 +344,36 @@ namespace Faolan.Core.Rdb.Assets
 					q.Enqueue(i + w);
 				}
 			}
+		}
+
+		// The gutter IS the complement of the mesh's UV coverage - no colour test, no flatness test, no flood fill from
+		// the border. Written out rather than inlined so the one line that turns a measurement into the dilator's
+		// input is visible next to the heuristic it replaces.
+		private static bool[] Uncovered(bool[] covered)
+		{
+			var gutter = new bool[covered.Length];
+			for (var i = 0; i < covered.Length; i++)
+				gutter[i] = !covered[i];
+
+			return gutter;
+		}
+
+		// Sparse signature of the coverage mask, folded into the cache key. 0 for "no mask" so the heuristic result
+		// keeps the key it always had.
+		private static long MaskSignature(bool[]? covered)
+		{
+			if (covered == null)
+				return 0;
+
+			var sig = unchecked((long)0x9E3779B97F4A7C15UL) ^ covered.Length;
+			for (var i = 0; i < covered.Length; i += 1021)
+			{
+				sig = (sig * 1099511628211L) ^ (covered[i]
+					? 1u
+					: 0u);
+			}
+
+			return sig;
 		}
 
 		// Cheap content signature (dimensions + sparsely sampled bytes) to key the per-atlas cache.
