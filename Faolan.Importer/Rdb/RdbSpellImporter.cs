@@ -49,7 +49,7 @@ namespace Faolan.Importer.Rdb
 	// families, "War Lord's March", "Mass Ignition", ...).
 	//
 	// Field map (dumped over all 21,502 records, #367): 8=duration, 123=rank, 125=level, 287=range, 294=cast,
-	// 347/348/349=the splash triple (radius/damage/max-targets, #626), 551=a rank-scaling MAGNITUDE, 79=icon (an id
+	// 347/348/349=the splash triple (radius/damage/max-targets, #626), 551=StackingOrder, 79=icon (an id
 	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only), 128=the spell LINE
 	// (#590 - see Spell.LineId).
 	//
@@ -60,10 +60,11 @@ namespace Faolan.Importer.Rdb
 	// Spell.ScalingAttribute, as a per-spell OVERRIDE of the client's per-CLASS default (#592,
 	// docs/rdb/spell-scaling.md).
 	//
-	// The narrower claim stands: 551 says "400" but never "400 of WHAT", so a buff's MAGNITUDES are server-GDB-only
-	// here, same as mana/damage/recast (docs/subsystems/stat-engine.md).
+	// ⚠️ 551 is NOT a "rank-scaling magnitude" - that was our label for an unread number, and the client's own
+	// stat-name table calls it `Stacking Order` (#633). The narrower claim it was supporting still stands on its own:
+	// a buff's MAGNITUDES are not in this run, same as damage/recast (docs/subsystems/stat-engine.md).
 	//
-	// The run is 111 distinct fields wide and the importer reads 14 of them (`--report rdb-field-coverage`). Several
+	// The run is 111 distinct fields wide and the importer reads 13 of them (`--report rdb-field-coverage`). Several
 	// unread ones are on MORE records than the read ones - 54 is on 20,186 of 21,502 - so "we parse this table" is
 	// not the same as "we have this table".
 	//
