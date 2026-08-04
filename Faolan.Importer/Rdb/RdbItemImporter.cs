@@ -69,13 +69,6 @@ namespace Faolan.Importer.Rdb
 			(uint)CharacterStatId.CombatRating // #399: provisional flat melee damage bonus
 		];
 
-		// The 5 primary-attribute wire stat ids field 972 is validated to hold (Str/Con/Int/Wis/Dex) - the guard that
-		// keeps the field-972 import to the decode-first-clean slice (docs/rdb/item-template-stats.md, #3).
-		private static readonly HashSet<uint> AttributeStatIds =
-		[
-			(uint)CharacterStatId.Strength, (uint)CharacterStatId.Constitution, (uint)CharacterStatId.Intelligence, (uint)CharacterStatId.Wisdom, (uint)CharacterStatId.Dexterity
-		];
-
 		private static readonly uint[] ItemTemplateTypes = [1000020, 1000620];
 
 		public static string? ExtractName(ReadOnlySpan<byte> template)
@@ -220,27 +213,27 @@ namespace Faolan.Importer.Rdb
 				}
 
 				// The item's equipped stat bonuses (docs/rdb/item-template-stats.md, #3), as ItemStatModifier rows keyed
-				// (ItemId, StatId). Two decoded sources, unioned - the region wins on the rare overlap:
-				//  - the [2][9] stat-modifier region (ItemTemplateStatModifiers.Parse): the whole tooltip stat list
-				//    (attributes, vitals, ratings) at wire scale, whitelisted to the stats we can name (ApplicableStatIds);
-				//  - the field-972 primary attribute (only ever Str/Dex +1/+2/+3), scaled UP to wire (×10) so both
-				//    sources share the raw-wire Amount convention. Complementary: only 17 of 468 items carry the 972
-				//    attribute in the region too.
+				// (ItemId, StatId). ONE decoded source: the [2][9] stat-modifier region
+				// (ItemTemplateStatModifiers.Parse) - the whole tooltip stat list (attributes, vitals, ratings) at wire
+				// scale, whitelisted to the stats we can name (ApplicableStatIds).
+				//
+				// ⚠️ There used to be a second source here: field 972 (`Weapon Attribute`, a stat id as its VALUE) with
+				// field 971 read as its amount, applied when the region parsed to nothing. **971 is not 972's amount**
+				// (#631). 971/972/973 are the client's own coherent TRIPLE - `Weapon Critical Chance` /
+				// `Weapon Attribute` / `Weapon Critical Damage` - and the client PROVES 971 is a percent: its
+				// unit-suffix helper (FUN_01119f20) appends "%" for exactly the stat ids listed in it, and 971 and 973
+				// are both in that list while 972 is not. A crit chance is not a "+1 Strength", so the fallback was
+				// emitting a bonus the client never applies, on templates whose region is empty.
+				//
+				// Nothing replaces it. 972 names an attribute but states no amount (it reads like the spell record's
+				// ScalingAttribute - what the weapon scales OFF, not a bonus it grants), and 971/973 are crit stats
+				// whose wire scale is unmeasured, so emitting them would be inventing a number. Tracked in #631.
 				var mods = new Dictionary<uint, int>();
 				foreach (var m in ItemTemplateStatModifiers.Parse(template.AsSpan(12)))
 				{
 					if (ApplicableStatIds.Contains(m.StatId))
 						mods[m.StatId] = (int)m.WireAmount; // region is authoritative; last (== only) write wins
 				}
-
-				// ⚠️ Only when the region gave us NOTHING (#441). It used to fill in whenever that one stat was absent,
-				// which - now that the region actually parses - invents bonuses the client does not apply: Obliteratus'
-				// records are Con 360 / Int 800 and the client applies exactly those, while field 972 added a phantom
-				// Str +1 on top. So 971/972 is the last resort for a template whose region is genuinely empty, not a
-				// per-stat top-up.
-				if (mods.Count == 0 && TryReadPropertyField(template.AsSpan(12), 972, out var primaryStat) && AttributeStatIds.Contains(primaryStat) &&
-				    TryReadPropertyField(template.AsSpan(12), 971, out var primaryAmount) && primaryAmount is > 0 and <= 100)
-					mods[primaryStat] = (int)(primaryAmount * 10); // 971 is the DISPLAY value (+1/+2/+3); attributes scale ×10
 
 				if (SyncStatModifiers(item, mods))
 					statsAdded++;

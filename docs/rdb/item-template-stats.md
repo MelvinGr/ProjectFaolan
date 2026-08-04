@@ -36,21 +36,28 @@ matches the meaning the field was decoded to hold empirically:
 
 (615, 496 and 460 have no entry in the table — an id the client never names, not a decode failure.)
 
-⚠️ That makes the `971` reading below **doubtful**: the client calls it `Weapon Critical Chance`, not "the
-amount for 972", and 971/972/973 read as a weapon triple in exactly the shape 347/348/349 do on a spell
-record. Tracked in Gitea #631; the import already treats 971/972 as a last-resort fallback used only when the
-`[2][9]` region is empty, so the blast radius is small.
+### ⚠️ RETRACTED — 971 is not 972's amount (#631)
 
-### VALIDATED — the primary-attribute modifier
+`971`/`972`/`973` are a coherent **weapon triple**, in exactly the shape `347`/`348`/`349` are on a spell record,
+and we had press-ganged 971 into being its neighbour's amount:
 
-| field | meaning | values seen |
-|-------|---------|-------------|
-| `972` | modifier's **wire stat id** | only `804`=Str / `806`=Con / `808`=Int / `810`=Wis / `814`=Dex (`0x324/0x326/0x328/0x32a/0x32e`, per `Archive` `devStuff/StatIds.txt`) |
-| `971` | amount | `+1` / `+2` / `+3` |
+| field | client's name | what we read it as until #631 |
+|---|---|---|
+| `973` | `Weapon Critical Damage` | unread |
+| `972` | `Weapon Attribute` (a stat id as its VALUE) | the stat id of an attribute bonus |
+| `971` | `Weapon Critical Chance` | the AMOUNT of that bonus (`+1`/`+2`/`+3`) |
 
-Self-validation: across all 1964 decrypted templates, field 972 holds an attribute stat id in **253** items
-and a non-attribute value in **0** — so this slot is safe to import as a `(statId, amount)` attribute bonus.
-In practice only Str (178) and Dex (75) appear as the *primary* attribute.
+**The client settles it.** Its unit-suffix helper `FUN_01119f20` takes a stat id and appends `"%"` for exactly the
+ids listed in it and nothing otherwise (the suffix string at `01fbcf18` is literally `"%"`). **971 and 973 are both
+in that list; 972 is not.** A crit chance is a percentage; a `+1 Strength` is not, so 971 was never the amount of
+an attribute bonus.
+
+That reading is gone from the import. **Nothing replaces it:** 972 names an attribute but states no amount — it
+reads like the spell record's `ScalingAttribute`, i.e. what the weapon scales OFF rather than a bonus it grants —
+and 971/973 are crit stats whose wire scale is unmeasured, so emitting them would be inventing a number. Field 972
+does self-validate as a stat id (across all 1964 decrypted templates it holds an attribute id in **253** items and
+a non-attribute value in **0**, in practice only Str (178) and Dex (75)), which is why the wrong reading looked so
+solid; a value that is definitely a stat id is not thereby a bonus.
 
 ## VALIDATED — the full stat-modifier list (the `[2][9]` record region)
 
@@ -113,12 +120,11 @@ flat level placeholder. `[V0: exact combat scale/formula — the real per-hit da
 
 ## Implemented
 
-- **Decoded + validated:** `972`/`971` primary attribute (Str/Dex +1/+2/+3) AND the full `[2][9]` region
-  (vitals + attributes + Magic Damage + Hit Rating, wire-scaled) — Royal-Signet-anchored
-  (`ItemTemplateStatModifierTests`).
-- **IMPORTED:** both sources are unioned into the `ItemStatModifier` child table (natural key `(ItemId,
-  StatId)`, `Amount` = raw wire value), populated by `RdbItemImporter` via `ItemTemplateStatModifiers.Parse`
-  (the `[2][9]` region) plus the field-972 primary; the region wins on the rare overlap. Whitelisted to the
+- **Decoded + validated:** the full `[2][9]` region (vitals + attributes + Magic Damage + Hit Rating,
+  wire-scaled) — Royal-Signet-anchored (`ItemTemplateStatModifierTests`).
+- **IMPORTED:** that one source fills the `ItemStatModifier` child table (natural key `(ItemId,
+  StatId)`, `Amount` = raw wire value), populated by `RdbItemImporter` via `ItemTemplateStatModifiers.Parse`.
+  The field-972/971 fallback was removed in #631 (403 rows), leaving the region as the only source. Whitelisted to the
   stats a server consumer exists for today — the three vitals (HealthMax/StaminaMax/ManaMax), the five
   attributes, and the physical **Armor** rating `0x1c0` (#401) (`ApplicableStatIds`); the other decoded ratings
   (Magic Damage `0x35d`, Hit Rating `0x136`, the magical-protection `0x1c3`, …) are left unimported until a
@@ -168,9 +174,10 @@ Verified against the client's own applied stats for **18/18** items observed on 
 (`docs/tooling/client-debug-logging.md`) across four characters. Regression gate:
 `ItemTemplateStatModifierTests.FindsARecordAtEveryByteAlignment`, which builds the record at all four byte phases.
 
-One consequence: the **field-972/971 primary attribute is now a last resort**, applied only when the region is
+One consequence: the **field-972/971 primary attribute became a last resort**, applied only when the region was
 genuinely empty. It used to fill in whenever that one stat was missing, which — with the region parsing properly —
 invents bonuses the client does not apply (`Obliteratus` records Con 360 / Int 800, and 972 added a phantom Str +1).
+#631 then removed it outright: it was not a weakly-sourced bonus, it was not a bonus at all.
 
 The property fields below are still real and still worth knowing, they are simply not a stat *source*:
 
