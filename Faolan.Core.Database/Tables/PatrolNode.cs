@@ -72,7 +72,8 @@ namespace Faolan.Core.Database.Tables
 		public byte? TrailerByte { get; set; }
 
 		// mode 8 Approach's tail, which is [u8 flag][9 zero bytes] - only the flag carries anything, the padding is
-		// re-emitted by the builder. Null for every other mode.
+		// re-emitted by the builder. Null for every other mode, and so null on every shipped row - see ApproachTarget
+		// below for why the harvester never produces a mode-8 node.
 		public byte? ApproachFlag { get; set; }
 		public float? AnchorX { get; set; } // trailer word 4
 		public float? AnchorY { get; set; } // trailer word 5
@@ -114,11 +115,23 @@ namespace Faolan.Core.Database.Tables
 		// The wander path within that territory. 0xFFFF = none.
 		public int? TerritoryPathIndex { get; set; }
 		public int? RotateTail { get; set; } // mode 2 trailing u16
+
+		// mode 8 Approach: which entity the task walks to, and its class word.
+		//
+		// ⚠️ NULL on every shipped row, and that is BY CONSTRUCTION, not a gap (#646). `PatrolPathExtractor` deliberately
+		// REJECTS a task that approaches a character - walking to a player is a scripted follow (an escort or a
+		// companion), never an idle patrol, and importing one made Casilda's 25-waypoint rescue walk into a "patrol"
+		// that wandered her off her cage before the player had freed her. So the harvester cannot produce these, while
+		// `PatrolNodeMapper` still has to read and write them: mode 8 is a real node shape on the wire and the mapper
+		// is the only decoder of it. Dropping the columns would make the mapper lossy for a shape it correctly handles.
 		public uint? ApproachTarget { get; set; }
 
-		// mode 8 Approach
 		public uint? ApproachType { get; set; }
-		public uint? PathFloat10 { get; set; } // present iff PathFlags & 0x10 (raw u32 bits - semantics unknown)
-		public uint? PathFloat20 { get; set; } // present iff PathFlags & 0x20
+
+		// present iff PathFlags & 0x10 / & 0x20 (raw u32 bits - semantics unknown). Also all-NULL in the shipped data:
+		// no captured patrol sets either flag. Presence-gated by the flag word, so the column existing costs nothing
+		// and its absence would truncate the node the day one does.
+		public uint? PathFloat10 { get; set; }
+		public uint? PathFloat20 { get; set; }
 	}
 }

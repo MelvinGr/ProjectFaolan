@@ -17,6 +17,16 @@ namespace Faolan.Core.Database.Tables
 	// health/mana, scale, voice, ...) are overridden per-instance from NpcSpawn; transient runtime state (animation
 	// phase, BccState, current HP) is emitted canonical at spawn from the live tier (WorldEntity), never stored here.
 	// See docs/subsystems/npc-three-tier-architecture.md.
+	//
+	// ⚠️ **The column set comes from the client's SCHEMA, not from the corpus** (#646). Ten of these are NULL on all
+	// 1,018 shipped rows - `RunSpeed`, `MaxRunSpeed`, `Skulk`, `MaxSkulk`, `FactionId`, `LosHeight`, `MountMesh`,
+	// `OocMovementMultiplier`, `TradeskillFlags`, `ClientScryScript` - and #646's DB sweep read that as schema for a
+	// decode that never landed, proposing they be dropped. They are not: `NpcStatCoreColumns.Lift` writes every one of
+	// them, and NULL states the FACT that retail does not set that proto field on an NPC spawn. Since this table
+	// REPLACED the captured `Data` blob, a field with no column is a field silently dropped from the rebuilt spawn the
+	// first time a capture carries it. `NpcStatCoreColumnsTests.EveryStatCoreProtoField_SurvivesTheRoundTrip_EvenTheOnesNoCaptureSets`
+	// drives every field set explicitly, so each column stands on its own evidence rather than on a capture's - and a
+	// dropped mapping fails by NAME instead of hiding behind an all-NULL column.
 	[PrimaryKey(nameof(NpcTemplateId)), NoReorder]
 	public class NpcStatCore
 	{

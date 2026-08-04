@@ -111,6 +111,11 @@ namespace Faolan.Core.Database.Tables
 		// A text record addresses its string by numeric id OR by a name TOKEN (`token="Noname"`). Non-null selects the
 		// token form; the RefId is then unused. Modelling only the id form rendered `id="0"` where the wire had a
 		// token - 8 bytes short, and everything after it desynced.
+		//
+		// ⚠️ NULL on all 7,317 shipped rows, which is NOT evidence the column is dead (#646). The token form is proven
+		// live on the SIBLING slot - `TrailingToken` is set on 52 rows, harvested from the same records by the same
+		// code - so the alternative is real in the grammar and this slot simply never takes it in the corpus we have.
+		// Dropping it would re-introduce the desync above the first time one does.
 		[MaxLength(128)]
 		public string? ObjectiveToken { get; set; }
 
