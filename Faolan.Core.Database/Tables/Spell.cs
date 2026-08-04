@@ -5,6 +5,23 @@ namespace Faolan.Core.Database.Tables
 	//[Index(nameof(Name), IsUnique = true)]
 	public class Spell : BaseEntity
 	{
+		/// <summary>
+		///     The spell's own level requirement — RDB field 125 of its type-1040005 record, which is where the
+		///     overwhelming majority of these come from and which leads over every other source.
+		/// </summary>
+		/// <remarks>
+		///     ⚠️ **Not every row is re-derivable.** The RDB carries field 125 on 7,645 of 21,502 records while the
+		///     shipped catalog has 8,221 rows with a level, so roughly 576 of them came from the community scrapes
+		///     retired in #296 (plus captures) and survive only because `faolan.db` is committed — a fresh import
+		///     rebuilds those spells with `Level = 0`. They are deliberately NOT cleared: this is the gate
+		///     `GetClassSpellsUnlockedBetween` queries, so zeroing them would grant those spells at level 0. There is
+		///     no marker saying which rows are which; Gitea #650 tracks closing that.
+		///     <para>
+		///         ⚠️ It is also NOT the level a character is actually GRANTED the spell at — retail grants at or
+		///         below this, never above. Where a capture has caught the grant, <see cref="ClassSpell.GrantLevel" />
+		///         holds that and wins; this field reads more like a trainer / full-power level.
+		///     </para>
+		/// </remarks>
 		public byte Level { get; set; }
 
 		// RDB field 123 (0x7B), carried RAW. The client's own stat-name table (LDB category 615) names it
