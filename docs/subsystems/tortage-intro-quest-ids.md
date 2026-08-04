@@ -59,7 +59,32 @@ city run and compare this 10286/10287/14012… set.
 QuestRewards` (beach), then `ShacklesOff, StartScriptGroup(2012264), GoingInside, GoingOutside` (free/escort).
 
 - `ApproachCasilda`/`LeaveCasilda` are **cycling tutorial-camera waypoints** (fire repeatedly, before she's
-  freed) — NOT the wall lift.
+  freed) — NOT the wall lift. In-client their whole visible effect is a couple of tip **message boxes**, not a
+  scripted camera tutorial.
+
+### The beach step tail is EVENT-driven, not a sequence
+
+Corpus census of the beach tail (occurrences / captures carrying it): `ApproachCasilda` 25 / 17,
+`CombatTutorial` 12 / 9, `LeaveCasilda` 8 / 8, `Level` 8 / 7, `QuestRewards` 7 / 7. `WelcomeTutorial` (55 / 45)
+and `StartFixed3d` (44 / 44) are the intro proper and appear in essentially every beach capture.
+
+The tail is **not a fixed order** — two captures disagree, so it is driven by what the player does, not by a
+script the server plays out:
+
+| capture | order (`--report timeline`) |
+|---|---|
+| `Hoxxling_…_login_gameplay` | ApproachCasilda → LeaveCasilda → CombatTutorial → Level ×2 → ApproachCasilda → QuestRewards |
+| `Blablabla_soldier-guardian_create_…` | CombatTutorial → ApproachCasilda → LeaveCasilda → CombatTutorial → Level → ApproachCasilda → QuestRewards → ApproachCasilda |
+
+⚠️ **No captured c2s packet triggers any of them.** Each is a bare server push, and the frames immediately
+before it are ordinary interest-stream traffic (`0x2020`, despawns, BCC) — retail is evaluating them from its
+own game state (proximity to Casilda, entering combat, level-up, quest turn-in), which the capture does not
+carry. So the *step bytes* are fully constructible (`ScryScriptCodec`) but the *trigger conditions* are not
+recoverable from the corpus; picking radii and conditions would be invention, not construction. Open work
+tracked in Gitea #234.
+
+`--report timeline` decodes these inline (type, step token, zigzag-decoded script group, bound entity), which is
+how the orderings above were read off.
 - **`ShacklesOff`** is the **PLAYER's** manacle removal (the player washes ashore in Slave Manacles, #220), and it
   happens in **Tortage CITY, not on the beach**. PROVEN: `ShacklesOff` occurs in only one capture
   (`Hoxxling_..._login_gameplay2` @5579), and that whole capture is in the city — it references maps 4020/4022 from
