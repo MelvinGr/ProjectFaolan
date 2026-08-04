@@ -465,6 +465,18 @@ namespace Faolan.Core.Database.Repositories
 		// and the wire (and CharacterFeat) speak a different id space, which FeatIdMaps bridges. A feat whose
 		// template has no wire id contributes nothing - 58 of the 1,510 rows - which is expected, not a fault: it
 		// cannot be put on the wire, so training it would be invisible to the client anyway.
+		//
+		// ⚠️ PROGRESSION TRACKS are excluded, because retail never puts one in a character's feat list and this list
+		// goes on the wire. They are the bases whose low digits run past the client's own rank ceiling
+		// (<see cref="FeatIdMap.MaxRank" />, FUN_007850c0's `base*100 + 10`) - so the digits are a family INDEX, not
+		// a rank: the twelve `<Class> Class Feat 001` tracks with one entry per character level, plus `2HE 60-80`,
+		// `Bow 60-80` and `Class Specific HP 60-80`. Filtered per BASE rather than per row, since ranks 0..9 of an
+		// 80-entry track are inside the ceiling and would otherwise leak through.
+		//
+		// The evidence they are not trained is the captured lists themselves: across the four imported characters
+		// not one of them appears, and a level-80 Necromancer casts all 109 of her spells carrying 25 feats, none of
+		// them her class track. So training one would be inventing wire content to satisfy a criterion that
+		// demonstrably does not need it.
 		public async Task<uint[]> GetFeatsTeachingSpells(IEnumerable<uint> spellIds)
 		{
 			var wanted = spellIds as IReadOnlyCollection<uint> ?? [.. spellIds];
@@ -472,8 +484,11 @@ namespace Faolan.Core.Database.Repositories
 				return [];
 
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			var progressionTracks = ctx.FeatIdMaps.GroupBy(m => m.BaseIndex).Where(g => g.Max(m => m.Rank) >= FeatIdMap.MaxRank).Select(g => g.Key);
+
 			return await (from grant in ctx.FeatSpellGrants.Where(g => wanted.Contains(g.SpellId))
 				join map in ctx.FeatIdMaps on grant.FeatId equals map.TemplateId
+				where !progressionTracks.Contains(map.BaseIndex)
 				select map.WireFeatId).Distinct().ToArrayAsync();
 		}
 

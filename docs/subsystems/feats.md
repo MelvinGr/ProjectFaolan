@@ -382,6 +382,13 @@ The feat-window request/reply opcodes exist in `Opcodes.cs` but are unimplemente
   `IDatabaseRepository.GetFeatsTeachingSpells`, so both level-up paths train exactly the feats that teach the
   spells just learned. That comes from the client RDB rather than a capture, so it covers all twelve classes
   instead of the four with a high-level player-spawn capture.
+  ⚠️ **PROGRESSION TRACKS are excluded from that grant** — the bases whose low digits run past the client's own
+  rank ceiling (`FeatIdMap.MaxRank`), so the digits index a family instead of naming a rank: the twelve
+  `<Class> Class Feat 001` tracks with one entry per character level, plus `2HE 60-80`, `Bow 60-80` and
+  `Class Specific HP 60-80`. Retail never puts one in a character's feat list — none appears across the four
+  captured lists, and a level-80 Necromancer casts all 109 of her spells carrying 25 feats, none of them her
+  class track. The feat list goes on the wire, so training one would be inventing content to satisfy a criterion
+  that demonstrably does not need it.
 
 ## Why a learned spell may still refuse to cast — the feat criterion
 

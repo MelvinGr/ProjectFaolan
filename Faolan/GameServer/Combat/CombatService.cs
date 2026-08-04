@@ -604,7 +604,9 @@ namespace Faolan.GameServer.Combat
 		// different things:
 		//
 		//   1. the TEACHING FEATS, read backwards out of FeatSpellGrants - exact, per spell, and available for all
-		//      twelve classes because it comes from the client RDB rather than from a capture;
+		//      twelve classes because it comes from the client RDB rather than from a capture. It deliberately stops
+		//      short of the class PROGRESSION tracks, which retail never puts in a feat list (see
+		//      GetFeatsTeachingSpells);
 		//   2. the class SKILL scaffold, which is the older stand-in and is kept because it is a different table
 		//      (skills, not feats) and still covers whatever the feat grants do not.
 		//
