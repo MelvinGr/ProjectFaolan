@@ -84,8 +84,11 @@ and don't contain.
   spellLineId = ConanClass x 1000 + lineIndex        41000 = Necromancer (41), line 0 = Flesh to Worms
   ```
 
-  It is carried by the SPELL templates themselves, in **property-table field 128** — so a feat names a spell LINE
-  and therefore all of its ranks at once, which is exactly what a feat needs to do. Resolve one with
+  It is carried by the SPELL templates themselves, in **property-table field 128** — so a feat names a whole
+  GROUP of spells, and therefore all of a spell's ranks at once, which is exactly what a feat needs to do.
+  ⚠️ That group is a STACKING line, not a "spell line": the client names field 128 `GUI Stacking Line`
+  (Gitea #634). Nothing about the behaviour here changes — a feat boosting a stacking line boosts the same set
+  of spells — only the name. Resolve one with
   `--report spell-line-ids --report-arg <lineId>`: 41000 returns the five `Flesh to Worms` ranks (144674–144677 +
   1206011) and nothing else. 3,158 of the 21,502 spell templates carry the field.
 

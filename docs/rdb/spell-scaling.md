@@ -75,8 +75,9 @@ type-1040005 records carry one, and it takes exactly three values:
 | 810 | Wisdom | 224 |
 | 804 | Strength | 10 |
 
-Grouping those records by their spell LINE's class (`LineId / 1000`, see `Spell.LineId`) reproduces the client's
-class rule exactly, from data the client-side decode never touched:
+Grouping those records by the class encoded in `LineId / 1000` (see `Spell.LineId`; the field is really the
+client's `GUI Stacking Line` — Gitea #634 — but its class-encoded values are what this grouping uses, and those
+are unaffected) reproduces the client's class rule exactly, from data the client-side decode never touched:
 
 | class | attribute | records |
 |---|---|---|
