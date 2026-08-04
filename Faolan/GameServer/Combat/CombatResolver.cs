@@ -490,21 +490,17 @@ namespace Faolan.GameServer.Combat
 		//   percent mode  cost = manaMax * field / 100      Ice Strike 9 -> 9% of the pool
 		//   flat mode     cost = field                      Dark Knowledge (Rank 4) 42200 -> 422 mana
 		//
-		// A client flag word picks between them; that flag is not decoded (Gitea #630), so the mode is picked by
-		// MAGNITUDE - see Spell.ManaCost for the decompiled function and why the bimodal data makes that safe.
+		// Which mode is in force is STATED by the record, not inferred (#630): bit 2 of the spell record's flags word,
+		// imported into Spell.ManaCostIsPercent, is the same bit the client reads at `spell + 0xC8`.
+		//
 		// A cost of 0 means FREE, which is retail's reading too rather than a gap papered over: the client's property
 		// accessor returns 0 for a record with no field 132, and 3,783 of the 5,496 records that DO carry it carry a
 		// literal 0. The old level-scaled placeholder (`10 + level * 2`) is gone - it charged mana for the buffs and
 		// toggles retail hands out for nothing.
-		public static uint ResolveSpellManaCost(ushort spellManaCostField, uint casterMaxMana) =>
-			spellManaCostField <= MaxManaCostPercent
+		public static uint ResolveSpellManaCost(ushort spellManaCostField, uint casterMaxMana, bool isPercent) =>
+			isPercent
 				? (uint)((long)casterMaxMana * spellManaCostField / 100)
 				: (uint)(spellManaCostField / 100); // wire hundredths -> the pool's own display units
-
-		// The magnitude that separates field 132's percent mode from its flat mode. A percent above 100 would be a
-		// spell costing more than the caster's whole pool - i.e. uncastable - and the data has a clean gap there:
-		// 1,209 spells at 1..100, 30 at 101..999, 452 at 1000+.
-		private const ushort MaxManaCostPercent = 100;
 
 		private static int Mitigate(int rawDamage, uint rating, uint halfPoint)
 		{

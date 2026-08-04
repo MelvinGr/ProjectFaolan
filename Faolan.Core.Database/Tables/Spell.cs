@@ -178,14 +178,37 @@ namespace Faolan.Core.Database.Tables
 		///     <para>
 		///         So with the flag set the value is a PERCENTAGE of the caster's mana pool (<c>Ice Strike</c> 9 = 9%),
 		///         and without it an absolute cost in wire hundredths (<c>Dark Knowledge (Rank 4)</c> 42200 = 422
-		///         mana). ⚠️ Which RDB field feeds that flag is NOT decoded - Gitea #630 - so
-		///         <c>CombatResolver.ResolveSpellManaCost</c> picks the mode by MAGNITUDE instead. The data is
-		///         sharply bimodal, which is what makes that safe for now: 1,209 rows sit at 1..100 and 452 at
-		///         1000+, with 30 in between. Both modes carry real player spells and neither is a legacy artifact -
-		///         one spell LINE can even mix them (<c>Dark Knowledge</c> rank 1 is 10%, ranks 2-4 are 128/265/422
-		///         flat) - so the threshold is a stand-in for the flag, not a theory about it.
+		///         mana). Which of the two is in force is <see cref="ManaCostIsPercent" /> - the record STATES it
+		///         (#630), so nothing here is inferred from the magnitude any more.
 		///     </para>
 		/// </remarks>
 		public ushort ManaCost { get; set; }
+
+		/// <summary>
+		///     Bit 2 of the spell record's FLAGS word (body byte 52), which is the word the client keeps at
+		///     <c>spell + 0xC8</c> and tests as <c>*(uint*)(spell + 0xC8) &gt;&gt; 2 &amp; 1</c> to choose how to read
+		///     <see cref="ManaCost" />: set = a percentage of the caster's mana pool, clear = an absolute cost in wire
+		///     hundredths.
+		/// </summary>
+		/// <remarks>
+		///     Found by sweeping the catalog rather than by reading the loader (#630). Three shapes over the ascending
+		///     PROPERTY run - value buckets, single bits, and mere presence - all came up empty, which is what said to
+		///     look outside it: the run is only ~16 fields wide and starts at word 15, so ~80% of a 964-byte record is
+		///     not property table at all. Bit 2 of word 13 is set on 995 of the catalog's percent-mode spells and on
+		///     ZERO flat-mode ones.
+		///     <para>
+		///         It also lands exactly where the client says it should - bit 2 - and it settles the case the ticket
+		///         raised as proof the mode is per-record: <c>Dark Knowledge</c> rank 1 (10%) has the bit set while
+		///         ranks 2-4 (128/265/422 flat) have it clear, in one spell line.
+		///     </para>
+		///     <para>
+		///         ⚠️ It disagrees with the old <c>&lt;= 100 is a percent</c> heuristic on 215 of 1,713 records, and
+		///         the flag is right on all of them: they are tiny FLAT costs (mostly a literal 1, i.e. 0.01 mana) plus
+		///         the catalog's test spells, which the magnitude rule read as 1% costs. Nobody would have noticed -
+		///         both readings are ~free - which is exactly why a heuristic that agrees 87% of the time is worth
+		///         replacing with the stated bit.
+		///     </para>
+		/// </remarks>
+		public bool ManaCostIsPercent { get; set; }
 	}
 }

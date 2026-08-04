@@ -49,7 +49,7 @@ namespace Faolan.Importer.Rdb
 	// families, "War Lord's March", "Mass Ignition", ...).
 	//
 	// Field map (dumped over all 21,502 records, #367): 8=duration, 123=rank, 125=level, 287=range, 294=cast,
-	// 347/129/349=splash radius/percent/max-targets, 348=damage rating, 551=a rank-scaling MAGNITUDE, 79=icon (an id
+	// 347/348/349=the splash triple (radius/damage/max-targets, #626), 551=a rank-scaling MAGNITUDE, 79=icon (an id
 	// into type 1010008 PNG), 321=effect-set (an id into type 1010214, animation/VFX XML only), 128=the spell LINE
 	// (#590 - see Spell.LineId).
 	//
@@ -85,10 +85,16 @@ namespace Faolan.Importer.Rdb
 		private const uint LdbType = 1030002; // #402: the localized-string DB, cat 50210 = spell names
 
 		// 132 - the mana cost, carried RAW because the client reads it in two modes: a PERCENTAGE of the caster's
-		// mana pool, or (when its flag word says so) an absolute cost in wire hundredths. Recovered from the
-		// client's own tooltip path (#629); see Spell.ManaCost for the decompiled function, and #630 for the
-		// undecoded flag that picks the mode.
+		// mana pool, or (when the flags word below says so) an absolute cost in wire hundredths. Recovered from the
+		// client's own tooltip path (#629); see Spell.ManaCost for the decompiled function.
 		private const uint ManaCostField = 0x084;
+
+		// Byte 52 of the record - word 13, its FLAGS word, and the one the client keeps at `spell + 0xC8`. Bit 2 says
+		// how to read the mana cost: set = a percent of the caster's pool, clear = an absolute cost in wire hundredths
+		// (#630, Spell.ManaCostIsPercent). It is NOT a property-table field - it sits in the fixed struct ahead of the
+		// ascending run, which is why three sweeps over that run found nothing.
+		private const int FlagsWordOffset = 52;
+		private const int ManaCostIsPercentBit = 2;
 
 		// 186 - the client's `Mount` stat id (0x0BA): on a spell record it names the mount CREATURE the summon
 		// spawns, so a record carrying it IS a mount summon. 155 records, 122 distinct creatures - the whole
@@ -251,6 +257,8 @@ namespace Faolan.Importer.Rdb
 				var manaCost = fields.TryGetValue(ManaCostField, out var mc) && mc <= ushort.MaxValue
 					? (ushort)mc
 					: (ushort)0;
+				var manaCostIsPercent = body.Length >= FlagsWordOffset + 4 &&
+				                        (body.ReadU32Le(FlagsWordOffset) >> ManaCostIsPercentBit & 1) == 1;
 
 				// #627: a record carrying field 186 IS a mount summon, and the value is the creature it seats the
 				// player on. Collected here rather than in a pass of its own precisely because it is a column lift
@@ -288,7 +296,8 @@ namespace Faolan.Importer.Rdb
 						Rank = rank,
 						LineId = lineId,
 						ScalingAttribute = scalingAttribute,
-						ManaCost = manaCost
+						ManaCost = manaCost,
+						ManaCostIsPercent = manaCostIsPercent
 					};
 					byId[entry.Id] = spell;
 					toAdd.Add(spell);
@@ -335,6 +344,7 @@ namespace Faolan.Importer.Rdb
 				spell.LineId = lineId;
 				spell.ScalingAttribute = scalingAttribute;
 				spell.ManaCost = manaCost;
+				spell.ManaCostIsPercent = manaCostIsPercent;
 			}
 
 			if (toAdd.Count > 0)

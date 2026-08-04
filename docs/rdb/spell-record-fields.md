@@ -80,13 +80,32 @@ real cast-cost path rather than a display-only accessor.
 | `Dark Knowledge` rank 1 | 10 | 10% of the pool |
 | `Dark Knowledge` ranks 2-4 | 12800, 26500, 42200 | 128 / 265 / 422 mana flat |
 
-One spell LINE mixing the two rules out "flat is a pre-launch leftover". Which RDB field feeds the flag is
-**not decoded** (Gitea #630), so `CombatResolver.ResolveSpellManaCost` picks the mode by magnitude; the data is
-sharply bimodal, with **1,209** spells at 1..100, **30** at 101..999 and **452** at 1000+.
+One spell LINE mixing the two rules out "flat is a pre-launch leftover".
 
-`Spell.ManaCost` carries the field raw, both modes in the one column. 1,691 of the 20,847 catalogued spells
-carry a cost; a 0 (or an absent field) means the spell is free, which is retail's own reading — the client's
-property accessor returns 0 for a record that carries neither.
+### The flag is word 13 of the record, and it is not a property field
+
+The selector is **bit 2 of the u32 at body byte 52** — the record's flags word, which is what the client keeps
+at `spell + 0xC8`. Set = percent mode, clear = flat. Imported as `Spell.ManaCostIsPercent`.
+
+Finding it meant looking OUTSIDE the property table, and the negative result is the useful part: three
+independent sweeps over the ascending run — every field's value buckets, every single BIT of every field, and
+each field's mere PRESENCE — all failed to separate the two modes (`--report spell-mana-mode`). That is what
+said to look elsewhere. **The ascending run is only ~16 fields wide and starts at word 15, so roughly 80% of a
+964-byte spell record is not property table at all**; word 13 sits in the fixed struct ahead of it.
+
+Bit 2 of word 13 is set on **995** of the catalog's percent-mode spells and on **zero** flat-mode ones, it is
+bit 2 exactly as the client's `>> 2 & 1` says, and it settles `Dark Knowledge`: rank 1 has it set, ranks 2-4
+clear.
+
+⚠️ It disagrees with the old "≤ 100 is a percent" heuristic on **215 of 1,713** records, and the flag is right
+on every one: they are tiny FLAT costs — mostly a literal `1`, i.e. 0.01 mana — plus the catalog's test spells,
+which the magnitude rule read as 1% costs. The import independently confirms the split: no percent-mode spell
+exceeds **75**, where flat mode spans 1..65500.
+
+`Spell.ManaCost` carries the field raw, both modes in the one column, with `ManaCostIsPercent` saying which.
+1,691 of the 20,847 catalogued spells carry a cost (994 percent, 697 flat); a 0 (or an absent field) means the
+spell is free, which is retail's own reading — the client's property accessor returns 0 for a record that
+carries neither.
 
 ## The named fields
 

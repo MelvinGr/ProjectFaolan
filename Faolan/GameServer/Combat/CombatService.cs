@@ -321,7 +321,7 @@ namespace Faolan.GameServer.Combat
 				return;
 
 			var spell = await _database.GetSpell(spellId);
-			var cost = CombatResolver.ResolveSpellManaCost(spell?.ManaCost ?? 0, player.MaxMana);
+			var cost = CombatResolver.ResolveSpellManaCost(spell?.ManaCost ?? 0, player.MaxMana, spell?.ManaCostIsPercent ?? false);
 			if (cost == 0)
 				return;
 

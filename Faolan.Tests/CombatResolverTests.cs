@@ -245,21 +245,24 @@ namespace Faolan.Tests
 			Assert.Equal(50, CombatResolver.ApplyMagicMitigation(100, CombatResolver.ProtectionHalfMitigation));
 		}
 
-		// #629: the mana a cast costs is the client's own formula over RDB field 132, not a level placeholder. The
-		// numbers are the shipped catalog's - Ice Strike (Rank 6) carries 9, Dark Knowledge (Rank 4) carries 42200 -
-		// so a regression in the mode split shows up as a real spell costing the wrong thing rather than as an
-		// abstract off-by-one.
+		// #629/#630: the mana a cast costs is the client's own formula over RDB field 132, not a level placeholder,
+		// and which of its two modes applies is STATED by bit 2 of the record's flags word rather than guessed from
+		// the magnitude. The numbers are the shipped catalog's - Ice Strike (Rank 6) carries 9 with the bit set, Dark
+		// Knowledge (Rank 4) 42200 with it clear - so a regression shows up as a real spell costing the wrong thing.
 		[Theory]
-		[InlineData(0, 6523, 0)] // no field / a literal 0 = free, which is retail's own reading
-		[InlineData(9, 6523, 587)] // Ice Strike (Rank 6): 9% of the pool
-		[InlineData(5, 6523, 326)] // Pestilential Blast (Rank 6)
-		[InlineData(100, 6523, 6523)] // the top of the percent mode is the whole pool
-		[InlineData(42200, 6523, 422)] // Dark Knowledge (Rank 4): flat, in wire hundredths
-		[InlineData(12800, 900, 128)] // ...its rank 2, and a flat cost does NOT scale with the pool
-		[InlineData(12800, 6523, 128)]
-		public void SpellManaCost_IsAPercentOfThePoolBelow100_AndAFlatHundredthsCostAbove(int field, uint maxMana, uint expected)
+		[InlineData(0, 6523, true, 0)] // no field / a literal 0 = free, which is retail's own reading
+		[InlineData(9, 6523, true, 587)] // Ice Strike (Rank 6): 9% of the pool
+		[InlineData(5, 6523, true, 326)] // Pestilential Blast (Rank 6)
+		[InlineData(100, 6523, true, 6523)] // the whole pool
+		[InlineData(42200, 6523, false, 422)] // Dark Knowledge (Rank 4): flat, in wire hundredths
+		[InlineData(12800, 900, false, 128)] // ...its rank 2, and a flat cost does NOT scale with the pool
+		[InlineData(12800, 6523, false, 128)]
+		// The 215 records where the flag and the old `<= 100 is a percent` heuristic disagree are all of this shape:
+		// a tiny FLAT cost the magnitude rule read as a percentage. 1 means 0.01 mana, not 1% of the pool.
+		[InlineData(1, 6523, false, 0)]
+		public void SpellManaCost_ReadsFieldInTheModeTheRecordStates(int field, uint maxMana, bool isPercent, uint expected)
 		{
-			Assert.Equal(expected, CombatResolver.ResolveSpellManaCost((ushort)field, maxMana));
+			Assert.Equal(expected, CombatResolver.ResolveSpellManaCost((ushort)field, maxMana, isPercent));
 		}
 
 		[Fact]
@@ -267,9 +270,9 @@ namespace Faolan.Tests
 		{
 			// The whole point of the percent mode: Ice Strike is 9% of the pool at every level, so it costs a
 			// levelling caster progressively more mana without the catalog carrying a per-level number.
-			Assert.Equal(43u, CombatResolver.ResolveSpellManaCost(9, 485));
-			Assert.Equal(234u, CombatResolver.ResolveSpellManaCost(9, 2604));
-			Assert.Equal(587u, CombatResolver.ResolveSpellManaCost(9, 6523));
+			Assert.Equal(43u, CombatResolver.ResolveSpellManaCost(9, 485, true));
+			Assert.Equal(234u, CombatResolver.ResolveSpellManaCost(9, 2604, true));
+			Assert.Equal(587u, CombatResolver.ResolveSpellManaCost(9, 6523, true));
 		}
 	}
 }
