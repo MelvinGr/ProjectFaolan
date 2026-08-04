@@ -73,6 +73,18 @@ namespace Faolan.Tests
 			Assert.DoesNotContain(ConanClass.Demonologist, StartingData.SearchStanceAction.Keys);
 		}
 
+		// REST (selector 0x06A). Not a stance record at all - a self-cast of the `Resting` spell (3164147, "Recovering
+		// health, mana, energy, and stamina"), which is why it rides slot 4 MagicAttack. The action id is the GENERIC
+		// cast animation shared with the Path of Asura recall, so unlike search and hide this one is neither class-
+		// nor spell-specific: two classes, two captures, one id.
+		[Theory]
+		[InlineData("642CD3D60000C3500802E5D40004000000040000001808C0E80A180828083000520908D0860310D4CB8B4060821000000001003047F30100000000000000000000080200", Necro, 8u)]
+		[InlineData("642CD3D60000C35001316E710004000000040000001808C0E80A181028083000520908D0860310F1DCC50960821000000001003047F30100000000000000000000080200", 0x01316E71u, 16u)]
+		public void RestCast_MatchesTheCapturedRecord(string hex, uint actor, uint phase)
+		{
+			Assert.Equal(Bytes(hex), BehaviorControlCenterCodec.Build(BehaviorAnimations.RestCast(actor, phase)));
+		}
+
 		private static byte[] Bytes(string hex)
 		{
 			return Convert.FromHexString(hex);

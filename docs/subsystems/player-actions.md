@@ -119,7 +119,7 @@ does nothing and says so, where a wrong id would silently open a trance on the w
 
 ## The implemented stances
 
-**Search** and **hide** are answered; the rest are not yet.
+**Search**, **hide** and **rest** are answered; the others are not yet.
 
 | | search (`0x064`) | hide enter (`0x068`) | hide leave (`0x068` again) |
 |---|---|---|---|
@@ -149,6 +149,28 @@ disagreeing two-to-one is not enough to model the difference, so the majority fo
 Hide is a **toggle** on one selector, so the server holds the state (`WorldEntity.IsHidden`), and the coverage
 in the enter tail is whatever the client last reported in its own `SetShadowCoverageIIR` — two separate
 arrivals, so it is remembered on the entity rather than read out of the press.
+
+### Rest is a CAST, not a stance
+
+`0x06A` draws no stance record at all. Retail answers with a self-cast on slot 4 `MagicAttack` of the spell the
+client calls **`Resting`** (3164147, *"Recovering health, mana, energy, and stamina"*) — the player regains
+vitals over the channel, which is what a 20-second cast bar with nothing at the end of it is.
+
+Three things make this the best-evidenced action on the page rather than the weakest:
+
+- the action id **177216 is the GENERIC cast animation**, shared with the Path of Asura recall — so it says
+  "this character is casting", not which spell, and it is neither class- nor spell-specific. Six sightings
+  across five captures and four characters, necromancer and Herald of Xotli alike, all carry it.
+- `activation` **2050** is not a magic number: it is the `Resting` spell row's own 20,500 ms cast time in
+  centiseconds.
+- the 22-byte tail is byte-identical in every sighting and carries the wire spell id (`base << 8 | rank`).
+
+[V3: PlayerStanceCodecTests.RestCast_MatchesTheCapturedRecord]
+
+⚠️ What the server emits is the **cast**. The regen **rate** while resting is not modelled: no capture measures
+it, and the tick's rates are corpus-verified (`RegenRates`) numbers a guessed rest multiplier would quietly
+break. `WorldEntity.RestingUntil` holds the channel — its length taken from the spell row, not chosen — so the
+tick can be taught the real rate once one is measured.
 
 ## `SetShadowCoverageIIR` (0xD6C1F0CC)
 

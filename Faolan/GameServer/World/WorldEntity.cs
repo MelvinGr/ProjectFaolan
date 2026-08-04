@@ -412,6 +412,13 @@ namespace Faolan.GameServer.World
 		// so the server has to remember which way the next press goes - exactly like the mount toggle above.
 		public bool IsHidden { get; set; }
 
+		// When the `Resting` channel ends (#505). Rest is a 20.5 s self-cast during which the player regains vitals,
+		// so it is a window rather than a flag - and the window's length is the spell row's own cast time, not a
+		// number chosen here. Null = not resting.
+		public DateTimeOffset? RestingUntil { get; set; }
+
+		public bool IsResting => RestingUntil > DateTimeOffset.UtcNow;
+
 		// The shadow coverage the CLIENT last reported for this entity (SetShadowCoverageIIR). Retail puts this number
 		// in the hide-enter behaviour's tail, so it has to be remembered between the client's report and the press.
 		// 100 in every observation, which is what the client sends when it has not reported anything else yet - not a

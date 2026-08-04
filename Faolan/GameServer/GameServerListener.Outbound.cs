@@ -877,6 +877,31 @@ namespace Faolan.GameServer
 				: "entered hiding");
 		}
 
+		// REST (#505). Unlike search and hide this is not a stance at all: retail answers with a self-CAST of the
+		// spell the client calls `Resting` - "Recovering health, mana, energy, and stamina" - on slot 4 MagicAttack,
+		// with the spell row's own 20,500 ms cast time in the record. The player regains vitals over that channel,
+		// which is what a 20-second cast bar with no spell at the end of it IS.
+		//
+		// The record is class-independent (the cast animation 177216 is shared with the Path of Asura recall) and is
+		// byte-identical across four captured characters, so there is no per-class map here.
+		//
+		// ⚠️ What is emitted is the CAST. The regen RATE while resting is not modelled: no capture measures it, and
+		// the tick's rates are corpus-verified numbers (RegenRates, #442) that a guessed rest multiplier would
+		// quietly break. `IsResting` is set so the tick can be taught the real rate once one is measured, and it is
+		// cleared when the channel elapses - the channel length is the spell row's, not invented.
+		private async Task PerformRestCast(INetworkClient client)
+		{
+			var character = client.Session.Character;
+			var entity = _simulation.PlayerWorldEntity(client);
+
+			await WorldIir.Send(client, BehaviorControlCenterCodec.Build(BehaviorAnimations.RestCast(character.Id, entity?.NextBehaviorPhase() ?? 1)));
+			if (entity == null)
+				return;
+
+			entity.RestingUntil = DateTimeOffset.UtcNow.AddMilliseconds(RestingChannelMs);
+			Logger.LogInformation("Rest: '{Name}' began resting for {Ms} ms.", character.Name, RestingChannelMs);
+		}
+
 		private static Task SendApprenticeRpc(INetworkClient client, GameCharInterfaceProjectMethods method, byte[] body)
 		{
 			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentProjectType, 0x54), client.Endpoint(Endpoints.GameCharInterfaceProjectType), method, body));

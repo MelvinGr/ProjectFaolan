@@ -43,6 +43,14 @@ namespace Faolan.Core.Network.Codecs.Combat
 		// Entering hide is the one stance whose `flags` is not 8. Both captured classes send 10.
 		private const uint SneakHideEnterFlags = 10;
 
+		// The GENERIC cast animation - shared by resting and the Path of Asura recall, so it says "this character is
+		// casting", not which spell. The spell is in the tail.
+		private const uint RestCastAction = 177216;
+
+		// The `Resting` spell (3164147), and its cast time in centiseconds - the Spells row says 20,500 ms.
+		private const uint RestingSpell = 0x3047F3;
+		private const uint RestActivation = 2050;
+
 		private const float SitBlend = 2.6153848f; // 0x40276277 - the sit animation's blend/duration (raw-body BE float)
 		private const string SitAnimName = "chair_sit_calm";
 		private const string StandAnimName = "standup";
@@ -321,6 +329,29 @@ namespace Faolan.Core.Network.Codecs.Combat
 			var message = ArgsPrefix(animActionId, phase, 0);
 
 			return new BehaviorControlCenterIIR(actor, SeqBegin, (uint)BehaviorId.SneakHide, message.ToProtobuf(), new byte[8]);
+		}
+
+		// RESTING (#505), retail's answer to `PerformSpecialAction` 0x06A. It is not a stance record like search or
+		// hide at all - it is a self-CAST of the spell the client calls `Resting` ("Recovering health, mana, energy,
+		// and stamina"), which is why it rides slot 4 `MagicAttack` with a spell target and a cast time.
+		//
+		// Two things make this the most solidly evidenced action on the page, not the least:
+		//   - `RestCastAction` (177216) is the GENERIC cast animation, shared with the Path of Asura recall, so it is
+		//     neither class- nor spell-specific. Six sightings across five captures and four characters, necromancer
+		//     and Herald of Xotli alike, all carry it.
+		//   - `activation` 2050 is not a magic number: it is the `Resting` spell row's own 20,500 ms cast time in
+		//     centiseconds, which is what the whole args block is saying - "this character is casting Resting".
+		// The 22-byte tail is byte-identical in every sighting and carries the wire spell id (base << 8 | rank).
+		public static BehaviorControlCenterIIR RestCast(uint actor, uint phase)
+		{
+			var message = ArgsPrefix(RestCastAction, phase, 0);
+			message.Target = Target(EntityClass.Character, actor);
+			message.ActivationTime = RestActivation;
+
+			using var tail = new FaolanStream();
+			tail.WriteUInt32(1).WriteUInt32(RestingSpell).WriteByte(0x01).WriteArray(new byte[10]).WriteByte(0x08).WriteByte(0x02).WriteByte(0x00);
+
+			return new BehaviorControlCenterIIR(actor, SeqBegin, 4, message.ToProtobuf(), tail.ToArray());
 		}
 
 		// The standup feedback remoteformat: shows "Standing up" as the on-screen feedback.

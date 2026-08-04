@@ -1385,6 +1385,13 @@ namespace Faolan.GameServer
 							await ToggleSneakHide(client);
 							break;
 						}
+
+						// REST (#505) - not a stance record at all, a self-cast of the `Resting` spell.
+						case RestSpecialAction:
+						{
+							await PerformRestCast(client);
+							break;
+						}
 					}
 
 					break;

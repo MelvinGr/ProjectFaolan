@@ -79,6 +79,12 @@ namespace Faolan.GameServer
 		// `Ability.Slot`: 0x064 is `Search` (100) and 0x068 is `Hide` (104).
 		private const uint SearchSpecialAction = 0x064;
 		private const uint SneakHideSpecialAction = 0x068;
+		private const uint RestSpecialAction = 0x06A;
+
+		// How long the `Resting` channel runs. NOT a number chosen here: it is the Spells row for 3164147 `Resting`
+		// ("Recovering health, mana, energy, and stamina"), whose 20,500 ms cast time is exactly the 2050
+		// centiseconds retail puts in the rest behaviour record.
+		private const int RestingChannelMs = 20_500;
 
 		// Shield of the Risen (#221) base spell ids - the two persistent protection buffs applied on every world entry.
 		private const uint ShieldOfTheRisenBase1 = 4061768; // 1h  (wire (base<<8) = 0x3DFA4800)
