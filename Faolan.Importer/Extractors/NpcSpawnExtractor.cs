@@ -51,10 +51,19 @@ namespace Faolan.Importer.Extractors
 	// (>= 0x02000000), whereas NPC handles are small. Dedup key is (map, position); the handle/name vary.
 	public static class NpcSpawnExtractor
 	{
-		// The client's spawn poll - ends the pre-poll login burst window. A WIRE opcode (the method tag 0x20 plus the
-		// method's first varint group) rather than a named method: the class it is sent to has never been pinned, and a
-		// method index is only a name once you know which interface it indexes (#615).
-		private const uint SpawnPollWireOpcode = 0x2020;
+		// What ends the pre-poll login burst window (#619). Named at last: on the 26,011 captured c2s frames carrying
+		// this the RECEIVER class is `GameCharAgent` (0xA9ECB95D), so index 0x20 indexes GameCharAgent - and the
+		// client's own method table calls that `UpdateQuestMarkerNPC`. The body agrees: it is two ID32s, the second
+		// constant per capture (the player's own instance) and the first a handle that matches an FA015807 spawn from
+		// the same capture in 1,054 of 1,137 cases (the residue spawned before the capture opened). So it is the
+		// client asking "what quest marker do I draw over this NPC, for me" once per NPC it has taken delivery of -
+		// which is why it reads like a spawn poll and why the first one marks the end of the burst.
+		//
+		// ⚠️ The DIRECTION filter is load-bearing, not decoration. 0x2020 is the wire rendering of index 0x20 on
+		// whichever interface the frame is addressed to, and s2c that is `GameCharInterface.DispatchAddItem` - 165 of
+		// them in the corpus. Without the c2s test an item delivery during world entry would close the burst window
+		// early and truncate the map's spawn set.
+		internal static readonly uint QuestMarkerQueryWireOpcode = CapturedPacket.Wire(GameCharAgentMethods.UpdateQuestMarkerNPC);
 
 		// Every FA015807 spawn in the capture (login burst AND mid-session interest/respawn spawns), all maps. This
 		// accretes the cross-session UNION - the same physical NPC at slightly different spots across sessions - so
@@ -87,14 +96,14 @@ namespace Faolan.Importer.Extractors
 		}
 
 		// Only the NPCs of a map's LOGIN WORLD BUILD: the FA015807 spawns in the pre-poll burst window (a MapChange
-		// up to the client's first 0x2020 spawn poll - the same window MapWorldBurstExtractor delimits). This is the
+		// up to the client's first UpdateQuestMarkerNPC query - the same window MapWorldBurstExtractor delimits). This is the
 		// retail-shaped set as it arrives on world entry; it EXCLUDES the mid-session interest/respawn spawns that
 		// otherwise accrete duplicates (Gitea #185 / #244). `allowedMaps` (null = all) restricts which maps to lift.
 		public static List<NpcSpawnEntry> ExtractLoginBurst(IReadOnlyList<CapturedPacket> packets, ISet<uint>? allowedMaps = null)
 		{
 			var entries = new List<NpcSpawnEntry>();
 			uint currentMap = 0;
-			var sawPoll = false; // the first 0x2020 poll ends the pre-poll spawn burst
+			var sawPoll = false; // the first quest-marker query ends the pre-poll spawn burst
 
 			foreach (var p in packets)
 			{
@@ -111,7 +120,7 @@ namespace Faolan.Importer.Extractors
 				if (currentMap == 0)
 					continue;
 
-				if (p.WireOpcode == SpawnPollWireOpcode) // client spawn poll - ends the pre-poll burst window
+				if (!p.IsDownload && p.WireOpcode == QuestMarkerQueryWireOpcode) // the client's quest-marker query - ends the pre-poll burst window
 				{
 					sawPoll = true;
 					continue;

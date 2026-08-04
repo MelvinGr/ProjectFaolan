@@ -28,10 +28,17 @@ namespace Faolan.Importer.Captures
 		// ClaimsModule used to keep a hand-copied duplicate with a comment pointing here, which is exactly how the
 		// two drift.
 		internal const string ImportAccountName = "faolan";
-		// PlayerAgent.SendCharacterList. A WIRE opcode, and it has to stay one: PlayerAgent registers its methods by
-		// 32-bit HASH, so the two bytes the dump recorded keep 7 of those 32 bits and there is no method to name it with
-		// (#613). `PlayerAgentMethodIds.ObservedOpcode` is the same view computed from the constant.
-		private const uint CharacterListWireOpcode = 0x20EF;
+		// The s2c character list. Named at last (#619): on all 135 captured frames the sender is `PlayerAgent`
+		// (0x82F20484) and the receiver `PlayerInterface` (0x7D155738), and the dump's own `MethodId` is the full
+		// 32-bit registration hash 0xC414C5EF - which is already in the enum, under the name the client gives it.
+		// (`SendCharacterList` was our name for it before the method table was recovered; #615 replaced it with
+		// `UpdateClientPlayerData`, which is why the ticket went looking for a member that no longer existed.)
+		//
+		// It stays a WIRE comparison because that is the space the dump records in, and on the hash-registered pair
+		// the rendering keeps only 7 of 32 bits - six PlayerAgent/PlayerInterface pairs really do collide at this
+		// width (`AuthenticateLoggedIn`/`ReceivedCharacterSettings` both render 0x20EC). This one does NOT: 0x20EF is
+		// unique across both enums' 51 members, so the filter is exact rather than merely close.
+		private static readonly uint CharacterListWireOpcode = CapturedPacket.Wire(PlayerInterfaceMethods.UpdateClientPlayerData);
 		private const uint InventorySnapshotSubOpcode = FullPlayerCharacterCodec.Opcode;
 		private const uint MapChangeSubOpcode = PlayfieldFCodec.Opcode;
 
@@ -114,7 +121,7 @@ namespace Faolan.Importer.Captures
 				var spawns = new List<(string Name, byte[] Body, uint MapId, uint Handle)>();
 				foreach (var p in capture)
 				{
-					if (p is { WireOpcode: CharacterListWireOpcode, IsDownload: true })
+					if (p.IsDownload && p.WireOpcode == CharacterListWireOpcode)
 					{
 						HarvestCharacterList(p.Bytes, charList);
 						continue;

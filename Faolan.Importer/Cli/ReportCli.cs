@@ -1294,7 +1294,6 @@ namespace Faolan.Importer.Cli
 		private static void SpawnDiff(IReadOnlyList<NamedCapture> captures, string? filter)
 		{
 			// The client's spawn poll, which ends the login-burst window (NpcSpawnExtractor names it the same way).
-			const uint SpawnPollWireOpcode = 0x2020; // a WIRE opcode - the poll's interface has never been pinned (#615)
 
 			using var db = OpenDb();
 			var rows = db
@@ -1327,7 +1326,7 @@ namespace Faolan.Importer.Cli
 
 					// The LOGIN BURST window only, the same gate NpcSpawnExtractor.ExtractLoginBurst imports through
 					// (the client's spawn poll ends it).
-					if (p.WireOpcode == SpawnPollWireOpcode)
+					if (!p.IsDownload && p.WireOpcode == NpcSpawnExtractor.QuestMarkerQueryWireOpcode)
 					{
 						sawPoll = true;
 						continue;
@@ -1474,7 +1473,6 @@ namespace Faolan.Importer.Cli
 		// inflate every field toward 100%. The single-sighting types are counted and reported separately.
 		private static void FieldStability(IReadOnlyList<NamedCapture> captures, string? filter)
 		{
-			const uint SpawnPollWireOpcode = 0x2020; // a WIRE opcode - the poll's interface has never been pinned (#615)
 
 			// field name -> npc TEMPLATE -> the distinct values seen for it
 			var fields = new SortedDictionary<string, Dictionary<uint, HashSet<string>>>(StringComparer.Ordinal);
@@ -1506,7 +1504,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					if (p.WireOpcode == SpawnPollWireOpcode)
+					if (!p.IsDownload && p.WireOpcode == NpcSpawnExtractor.QuestMarkerQueryWireOpcode)
 					{
 						sawPoll = true;
 						continue;
@@ -1772,7 +1770,6 @@ namespace Faolan.Importer.Cli
 		// invisible to a report that only walks the protobuf.
 		private static void FieldPredictors(IReadOnlyList<NamedCapture> captures, string? target)
 		{
-			const uint SpawnPollWireOpcode = 0x2020; // a WIRE opcode - the poll's interface has never been pinned (#615)
 			target = string.IsNullOrWhiteSpace(target) ? "MovementMode" : target.Trim();
 
 			// One row per SIGHTING - deliberately not deduped by placement, unlike the type table in field-stability.
@@ -1799,7 +1796,7 @@ namespace Faolan.Importer.Cli
 						continue;
 					}
 
-					if (p.WireOpcode == SpawnPollWireOpcode)
+					if (!p.IsDownload && p.WireOpcode == NpcSpawnExtractor.QuestMarkerQueryWireOpcode)
 					{
 						sawPoll = true;
 						continue;
