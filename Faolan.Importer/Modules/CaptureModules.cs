@@ -158,22 +158,14 @@ namespace Faolan.Importer.Modules
 		}
 	}
 
-	// Ability grants (0x2052) -> Abilities. Also rehomes the 6 archive-only ability "slot" constants (the old
-	// ArchiveSqlImporter's only unique data) so the slot column survives a re-import without the archive.
+	// Ability grants (0x2052) -> Abilities.
+	//
+	// ⚠️ This used to carry six (abilityId -> slot) constants rehomed from the retired archive sqlite, and apply them
+	// AFTER the harvest - so for those six the constant beat the wire. It is gone (#638): the 0x2052 grant's own
+	// leading word is the slot (CaptureAbilityImporter), and blanking all six and re-harvesting restores every one of
+	// them to the identical value, so the table was pure duplication with the wrong precedence.
 	public sealed class AbilitiesModule : IImportModule
 	{
-		// Ability id -> 0x2052 grant leading "slot" word. Was carried in the old archive sqlite `abilities`
-		// table (mirrors the AddAbilitySlot migration backfill); kept here now the archive import is gone.
-		private static readonly Dictionary<uint, uint> AbilitySlots = new Dictionary<uint, uint>
-		{
-			[269272] = 106, // Rest
-			[769094] = 108, // Normal Attack Left
-			[769095] = 109, // Normal Attack Right
-			[769099] = 112, // Normal Attack Front
-			[3316611] = 1250, // toggle combat
-			[3675584] = 259 // switch weapon
-		};
-
 		public IReadOnlyList<string> DependsOn => [];
 
 		public IReadOnlySet<WriteMode> SupportedModes => new HashSet<WriteMode>
@@ -184,27 +176,14 @@ namespace Faolan.Importer.Modules
 
 		public ImportSource Source => ImportSource.Captures;
 
-		public string Description => "Ability grants (0x2052), incl. the rehomed slot seed.";
+		public string Description => "Ability grants (0x2052).";
 		public string Name => "abilities";
 
 		public async Task<ImportResult> RunAsync(ImportContext ctx)
 		{
 			var (seen, added, updated) = await CaptureAbilityImporter.ImportAsync(ctx.Db, ctx.RawPackets);
 
-			var slotted = 0;
-			foreach (var ability in await ctx.Db.Abilities.ToListAsync())
-			{
-				if (AbilitySlots.TryGetValue(ability.Id, out var slot) && ability.Slot != slot)
-				{
-					ability.Slot = slot;
-					slotted++;
-				}
-			}
-
-			if (slotted > 0)
-				await ctx.Db.SaveChangesAsync();
-
-			return new ImportResult($"{seen} seen, {added} new, {updated} updated; {slotted} slot constants set.");
+			return new ImportResult($"{seen} seen, {added} new, {updated} updated.");
 		}
 	}
 

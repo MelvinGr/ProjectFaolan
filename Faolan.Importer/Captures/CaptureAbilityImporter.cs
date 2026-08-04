@@ -54,18 +54,6 @@ namespace Faolan.Importer.Captures
 			("Assassin_", ConanClass.Assassin), ("BearShaman_", ConanClass.BearShaman), ("Herald_", ConanClass.HeraldOfXotli) // capture-validated: Hakotep HoX lvl-24 0x2076 combo book
 		];
 
-		// The few human-readable names the old archive knows (the rest are client-side / unknown). Still the only
-		// name source for these ability ids, so it is used at import time (not obsolete).
-		private static readonly Dictionary<uint, string> KnownNames = new()
-		{
-			[769094] = "Normal Attack Left",
-			[769095] = "Normal Attack Right",
-			[769099] = "Normal Attack Front",
-			[3316611] = "Toggle Combat",
-			[3675584] = "Switch Weapon",
-			[269272] = "Rest"
-		};
-
 		// Derives the class<->ability ACCESS (ClassAbility) from the per-character grants (CharacterAbility x Character):
 		// a row per (class, ability) that a captured character of that class holds, with the ability's PER-CLASS unlock
 		// level = the MIN level of that class's holders (create-flow chars land its universal kit at L1; gameplay-only
@@ -382,7 +370,12 @@ namespace Faolan.Importer.Captures
 					a = new Ability
 					{
 						Id = id,
-						Name = KnownNames.GetValueOrDefault(id, string.Empty)
+						// ⚠️ NOT named here (#638). Six human-readable names used to be baked in from the retired archive
+						// sqlite, claiming to be "the only name source for these ability ids". They were not, and they
+						// were WRONG: the client calls 769094 "Upper Left Attack", not "Normal Attack Left". The names
+						// come from the client's own templates (`rdb-abilities` / `rdb-ldb-abilities`), which name all
+						// six; an ability left blank by a captures-only run is honestly unnamed rather than mis-named.
+						Name = string.Empty
 					};
 					db.Abilities.Add(a);
 					existing[id] = a;
@@ -397,8 +390,6 @@ namespace Faolan.Importer.Captures
 				a.Key.Key2 = g.D2;
 				a.Key.Key3 = g.D3;
 				a.Key.Key4 = g.D4;
-				if (string.IsNullOrEmpty(a.Name) && KnownNames.TryGetValue(id, out var n))
-					a.Name = n;
 			}
 
 			await db.SaveChangesAsync();
