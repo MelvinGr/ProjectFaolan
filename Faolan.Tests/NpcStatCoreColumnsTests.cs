@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Spawn;
 using Faolan.Core.Protobuf;
 using Faolan.Tests.Support;
@@ -81,6 +82,61 @@ namespace Faolan.Tests
 
 			Assert.True(missing.Count == 0,
 				$"{missing.Count} stat-core proto field(s) do not survive Lift -> NpcStatCore -> To*: {string.Join(", ", missing)}");
+		}
+
+		// `CharacterStats.flags` is a real BITFIELD, and bit 28 is the "this is an NPC" bit (#646).
+		//
+		// The sweep flagged it as a decode smell: `NpcStatCores.Flags` is 268435457 (0x10000001) on all 1,018 shipped
+		// rows, and "a flags word with one value across the whole corpus is either not a flags word or is being read at
+		// the wrong offset". Neither. It is protobuf field 16, addressed by field NUMBER, so there is no offset to get
+		// wrong - and the corpus explains the constancy rather than undermining it:
+		//
+		//   NPC records    (17,400): 0x10000001, every one
+		//   PLAYER records    (317): 0x00000001 x308, 0x00000021 x5, 0x00000009 x4 - bit 28 NEVER set
+		//
+		// So bit 0 is set on everything and bit 28 separates NPC from player. It is constant across NPCs BECAUSE they
+		// are all NPCs, which is the opposite of the value being undecoded.
+		//
+		// ⚠️ Bits 3 (0x8) and 5 (0x20) are per-player STATE, not identity, and are still unknown: the same character
+		// carries 0x1 at one moment and 0x9 or 0x21 at another (Viriden, Beriyah, Skylights, Dejachicka, Korlinius,
+		// Kathokla, Shirux each appear with two values), and the two never co-occur. Tracked as Gitea #648. This gate
+		// deliberately asserts only what is decoded, so a future capture that sets bit 28 on a player - or clears it on
+		// an NPC - fails here rather than being absorbed.
+		[Fact]
+		public void CharacterStatsFlags_Bit28_IsTheNpcBit()
+		{
+			const uint npcBit = 1u << 28;
+			var npcs = 0;
+			var players = 0;
+			var wrong = new List<string>();
+
+			foreach (var iir in new[] { IirTypes.SimpleCharFullUpdateIIR, IirTypes.FullPlayerCharacterIIR })
+			foreach (var (source, body) in CorpusExtract.OfType((uint)iir))
+			{
+				if (!SpawnBodyReader.TryReadCharacterMessage(body, out var read))
+					continue;
+
+				var stats = read.Message.Stats;
+				if (stats == null || !stats.ShouldSerializeFlags())
+					continue;
+
+				// `npc_stats` present IS the record being an NPC - the independent signal the bit is checked against.
+				var isNpc = read.Message.npc_stats != null;
+				if (isNpc)
+					npcs++;
+				else
+					players++;
+
+				if (((stats.Flags & npcBit) != 0) != isNpc)
+					wrong.Add($"{read.Message.Name} 0x{stats.Flags:X8} (npc_stats {(isNpc ? "present" : "absent")}) in {source}");
+
+				if ((stats.Flags & 1) == 0)
+					wrong.Add($"{read.Message.Name} 0x{stats.Flags:X8} has bit 0 clear in {source}");
+			}
+
+			Assert.True(npcs > 1000, $"only {npcs} NPC stat cores in the corpus - the gate would be vacuous");
+			Assert.True(players > 100, $"only {players} player stat cores in the corpus - the gate would be vacuous");
+			Assert.True(wrong.Count == 0, $"{wrong.Count} record(s) disagree with the bit-28 = NPC reading: {string.Join("; ", wrong.Take(5))}");
 		}
 
 		// The writable, protobuf-mapped scalar properties of a generated message - the ones a column has to exist for.

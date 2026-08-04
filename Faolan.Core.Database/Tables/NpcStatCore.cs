@@ -50,6 +50,13 @@ namespace Faolan.Core.Database.Tables
 		public Sex? Sex { get; set; }
 
 		public uint? Side { get; set; }
+
+		// `CharacterStats.flags` - a real bitfield, and 0x10000001 on every NPC because **bit 28 IS the "this is an
+		// NPC" bit** (#646). Measured over the whole corpus: 17,400 NPC records all carry it and all 317 player records
+		// do not, while bit 0 is set on both. So the constancy across NPC types is the value being DECODED, not
+		// undecoded - it is protobuf field 16, addressed by field number, so there was never an offset to get wrong.
+		// Bits 3 and 5 appear only on players and only transiently (Gitea #648).
+		// Gated by NpcStatCoreColumnsTests.CharacterStatsFlags_Bit28_IsTheNpcBit.
 		public uint? Flags { get; set; }
 		public uint? HeadMesh { get; set; }
 		public uint? MonsterData { get; set; }
