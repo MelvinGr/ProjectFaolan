@@ -167,8 +167,10 @@ namespace Faolan.Core.Database.Tables
 		///         <c>SetSpellRecastTime</c> (53226) element keys it on the spell and a <c>SetSpellLineRecastTime</c>
 		///         (53077) one on the whole GUI stacking line, both under <c>GameActionTypes.KeyValue</c>
 		///         (0x2f9) - the same key the tooltip's "Recast" line reads
-		///         (<c>docs/re/spell-recast-source.md</c>). Combos are backfilled from the ellatha list instead, in
-		///         seconds, scaled up on import.
+		///         (<c>docs/re/spell-recast-source.md</c>). A COMBO's reuse time is a separate fact in a separate
+		///         place - the combo XML's own <c>cooldown</c> attribute (RDB 1010206, <c>Combos.Cooldown</c>, in
+		///         seconds), written here by <c>RdbComboImporter</c> against the combo's <c>GameActionId</c>. The two
+		///         sources are disjoint over the whole catalog, so neither can overwrite the other.
 		///     </para>
 		///     <para>
 		///         ⚠️ NOT seconds, which is what this column held until #271 found the real source. 67 of the 3,682

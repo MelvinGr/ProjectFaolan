@@ -31,7 +31,7 @@ Spell stats shown in the tooltip — **mana, recast (cooldown), damage, range** 
 not stored**. Proven empirically (`tools/capture/decode_spell_fields.py`): the displayed value (e.g. Chill
 rank 5 recast 4s, mana 417 @L80) appears in **no** RDB record in any unit (int/u16/float, s/ds/cs/ms), and no
 field is proportional to it. The RDB spell record (type `1040005`) holds only **base** fields; the client
-applies modifiers + level/stat scaling. This is why ellatha's spell stats are wrong (it lists static bases)
+applies modifiers + level/stat scaling. This is why a scraped spell-stat list is wrong (it lists static bases)
 and why screenshots were the only ground truth.
 
 ## The computation pipeline
@@ -84,10 +84,15 @@ elixirs and a slice of the class buffs; it is *not* how the buffs seen in retail
 it does not make this page's headline finding any less true.
 
 ## Open (the remaining engine decode)
-1. **Recast base** — ⚠️ this page said "recast is NOT a field-table value (proven)". That is **wrong**: field
-   **210**, which the client names `Recharge Delay`, is a field-table value, on 3,567 of 21,502 records. The
-   "proof" was a search of the ids this page had mapped, which was a small fraction of the run. Open work is
-   tracked in Gitea #271 (its unit still needs confirming in-client) and #633.
+1. ~~**Recast base**~~ — **ANSWERED**: it is a `SetSpellRecastTime` / `SetSpellLineRecastTime` GameAction
+   ELEMENT in the spell's own record, not a field-table value at all
+   ([`../re/spell-recast-source.md`](../re/spell-recast-source.md)). Both of this page's previous positions were
+   wrong in the same way — "recast is NOT a field-table value (proven)" was proven only over the ids this page
+   had mapped, and the correction that named field **210** `Recharge Delay` as the answer does not survive the
+   tooltip oracle: `Life Leech` carries 210 = **100** where its tooltip recast is **3000** cs, and the field is
+   **0 on 2,334 of the 3,567 records that carry it** across just 36 distinct values — far too coarse to be a
+   catalog whose recasts run from 1 to 180,000. Whatever 210 is, it is not this. Gitea #633 still tracks reading
+   it, and #271 now only wants the in-client confirmation.
 2. **Stat inputs** — what stat `0x17d` (and siblings) are, and where the buff/gear modifier lists are populated.
 3. **Field-id → property map** — map the remaining base field-ids to mana/damage/etc. via the accessor family /
    `FUN_00769220` lines.
@@ -112,5 +117,6 @@ applied by the **cooldown subsystem** (a separate function, likely at cast-compl
 target now that gdb works: breakpoint the cooldown/recast-timer set and read the value there.
 
 Ground truth for validation: L80-necro tooltip recasts in `Captures/spell_cooldowns_observed.tsv` (Chill 4s,
-Lifestrike R6 12s, Life Leech 30s, Unimaginable Terror R2 45s, Death's Terror 90s); combo level/cooldown in
-`Captures/ellatha_combos.tsv`.
+Lifestrike R6 12s, Life Leech 30s, Unimaginable Terror R2 45s, Death's Terror 90s) — all of which the decode now
+reproduces, see [`../re/spell-recast-source.md`](../re/spell-recast-source.md). A combo's level and reuse time
+come from the client's own combo XML (RDB 1010206), not from a scrape.

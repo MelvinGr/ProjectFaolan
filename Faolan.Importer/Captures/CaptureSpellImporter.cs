@@ -146,7 +146,7 @@ namespace Faolan.Importer.Captures
 		// editor command CaptureAbilityImporter uses (value/2). A spell granted under >= 2 distinct classes is GENERIC
 		// (Class 0); under exactly one it is class-specific. Upserts on (Class, SpellId), so it is safe to re-run. This
 		// is pure membership (the spell's unlock LEVEL lives on Spells.Level); coverage is only the classes present in
-		// the captures - a class-aware ellatha scrape fills the full per-level progression.
+		// the captures - the class-encoded GuiStackingLine fills the full per-class membership (RdbSpellImporter, #296).
 		public static async Task<(int Spells, int Inserted)> ImportClassSpellsAsync(IDatabaseContext db, IEnumerable<IReadOnlyList<byte[]>> createCaptures, ILogger? logger = null)
 		{
 			// spellId -> the distinct classes whose create capture granted it (null class = unattributed capture).
@@ -294,7 +294,7 @@ namespace Faolan.Importer.Captures
 		// A create-capture DispatchLearnSpell grant id (s2c 0x200A, GameCharAgent -> GameCharInterface, [u32 spellId]).
 		// #376: the (class, spell, LEVEL) map, from capture truth. A NewLevelIIR (0x6D314743) carries the level just
 		// reached; every 0x200A grant that follows it in the same capture is a grant AT that level. That is a direct
-		// observation of what retail hands out and when - unlike the ellatha/wiki scrape, it cannot be wrong about it.
+		// observation of what retail hands out and when, which no catalog field can be a substitute for.
 		//
 		// The class comes from the PLAYER's own spawn: body[136] on the pre-IIR frame is the class byte
 		// (CaptureCharacterImporter, "verified 10/10"), and a player's spawn handle == its character id
@@ -363,8 +363,8 @@ namespace Faolan.Importer.Captures
 		// This used to write LEVELS instead: it pinned every granted spell to Level 1 and pushed every other level-1
 		// access row of that class to 2, so that the level-gated "Level <= charLevel" starter query happened to return
 		// the captured set. That conflated two independent facts and corrupted a correct one - retail grants the necro
-		// Ice Strike (Rank 1) at create even though its requirement really is level 7 (the RDB and ellatha AGREE on 7;
-		// the old comment here blamed an ellatha mis-tag, but the client says the same). The starter kit is a fixed
+		// Ice Strike (Rank 1) at create even though its requirement really is level 7 (an older comment here blamed a
+		// scrape mis-tag for the 7; the client's own record says the same). The starter kit is a fixed
 		// LIST, not a level query, so it is now stated outright and Spells.Level is left to the RDB, which leads on
 		// level data (verified 2026-07-16). Idempotent; only classes whose create capture actually reached a grant are
 		// touched, and it no longer has to run after the level modules.

@@ -127,7 +127,7 @@ pass the four values and fail here. Pinned by `Faolan.Tests/SpellRecastTests.cs`
 `ChangeLineRecastTime`, which is a modifier and is not read).
 
 `RdbSpellImporter` fills `Spell.RecastCentiseconds` from them — **3,682 spells**, against 408 before, all of
-which were combos backfilled from the ellatha scrape. Two rules, both forced by the data:
+which were combos backfilled from a since-retired scrape. Two rules, both forced by the data:
 
 - **A spell's OWN record leads.** 338 spells and 12 lines are named by two records with two different values,
   because a rank arms its whole family and the ranks do not agree: `Embodiment of Terror` rank 1's own record
@@ -156,7 +156,12 @@ the 30 s recast the player-spell tooltip shows. Two unrelated values can agree b
 
 Combos are the one place this already works from our side, and by a completely different route: a combo's
 cooldown is a plain attribute of the client's combo XML (RDB `1010206`), imported by
-`Faolan.Importer/Rdb/RdbComboImporter.cs` — 292 of 744 combos carry one.
+`Faolan.Importer/Rdb/RdbComboImporter.cs` — 292 of 744 combos carry one, and it is written onto the spell the
+combo drives (`Combos.GameActionId`).
+
+⚠️ The two sources are **disjoint**, measured over the whole catalog: of the 246 combo spells carrying an XML
+cooldown, none is named by a `SetSpellRecastTime` element and none sits on a line a `SetSpellLineRecastTime`
+element targets. A combo's reuse time and a spell's recast are two different facts in two different places.
 
 ## The server gate
 

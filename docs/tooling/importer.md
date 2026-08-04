@@ -22,7 +22,6 @@ the folders are organisational):
 | `Captures/` | Capture reading (`TsharkCaptureReader`, `NamedCapture`), the shared `ImportOps` orchestration, and the per-subsystem `CaptureX` importers. |
 | `Extractors/` | Packet-grammar extractors (conversations, NPC spawns/spells, patrol paths, quests, world objects, per-map loot pools, item-hash harvesting). |
 | `Rdb/` | Client-RDB readers/importers (opt-in, require `--rdb`). |
-| `Tsv/` | Ellatha + AoC-wiki scrape backfills (spell/combo levels, class↔spell access). |
 
 ## Module abstraction
 
@@ -96,9 +95,12 @@ names; see [quest-catalog-1000104.md](../rdb/quest-catalog-1000104.md)),
 `rdb-hazards` (lava volumes), `rdb-regions` (the bounded-area trigger volumes a subsystem consumes — depends on
 `rdb-respawns`), `class-attributes` (the per-class/level attribute + health BASE, #444 — see below).
 
-TSV-sourced (default group; each self-skips if its `.tsv` is absent): `ellatha-levels`, `ellatha-combos`,
-`wiki-class-spells`, `wiki-spell-levels`. Plus `starter-spells` — capture-sourced but registered late
-so it overrides the scraped spell levels with the level-1 create truth.
+TSV-sourced: `starter-spells` — the create-flow starter kit, registered late so it lands after the catalog.
+
+⚠️ **The scrape modules are gone** (`ellatha-levels`, `ellatha-combos`, `wiki-class-spells`,
+`wiki-spell-levels`). The client leads, and it turned out to carry both facts they stood in for: a spell's class
+MEMBERSHIP is its class-encoded `GuiStackingLine` (`rdb-spells`, all twelve classes) and a combo's REUSE TIME is
+the combo XML's own `cooldown` (`rdb-combos`). See Gitea #296.
 
 ### Seed data has an explicit home
 

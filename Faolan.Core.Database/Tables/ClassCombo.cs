@@ -12,7 +12,7 @@ namespace Faolan.Core.Database.Tables
 	// (Necromancer/Demonologist/Priest of Mitra/Tempest of Set) simply have NO rows here, so they get no combos.
 	//
 	// Compound key (Class, ComboId); FK into the Combos catalog (RDB 1010206). The table ships EMPTY on purpose: the
-	// class+level assignments come from dumps later (the ellatha combos list carries name+class+level, but the
+	// class+level assignments come from dumps later (a scraped combo list carries name+class+level, but the
 	// name->ComboId match is lossy, so it is deferred). Empty is the safe default - GrantCharacterCombos then grants
 	// nothing rather than the wrong thing ("grant too little, not too much").
 	[PrimaryKey(nameof(Class), nameof(ComboId))]

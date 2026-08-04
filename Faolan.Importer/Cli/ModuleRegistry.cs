@@ -25,8 +25,10 @@ namespace Faolan.Importer.Cli
 			new ClaimsModule(), // opt-in (account claims -> AccountClaim)
 			new RecipesModule(), // opt-in (crafting recipe book)
 			// --- tsv modules ---
-			new EllathaLevelsModule(), new EllathaCombosModule(), new WikiClassSpellsModule(), new WikiSpellLevelsModule(),
-			new StarterSpellLevelsModule(), // capture-sourced but runs late: overrides the ellatha/wiki levels
+			// The ellatha + AoC-fandom-wiki scrapes are GONE: the RDB leads, and it turned out to carry both facts
+			// they were standing in for - a spell's class membership (the class-encoded GuiStackingLine, RdbSpellImporter)
+			// and a combo's reuse time (the combo XML's own `cooldown`, RdbComboImporter). See Gitea #296.
+			new StarterSpellLevelsModule(), // capture-sourced, and the create kit is a LIST, not a level query
 			// --- rdb modules (opt-in, require --rdb) ---
 			new RdbInventoryModule(), new RdbMorphsModule(), new RdbAppearanceModule(), new RdbSpellsModule(), new RdbLdbNamesModule(), new RdbLdbAbilitiesModule(), new RdbAbilitiesModule(), new RdbCombosModule(), new RdbFeatsModule(),
 			new RdbMapsModule(), new RdbRespawnsModule(), new RdbQuestCatalogModule(), new RdbItemsModule(), new RdbNpcSpawnsModule(), new RdbHazardsModule(), new RdbQuestTextModule(), new RdbRegionsModule(), new ClassAttributeBaseModule(), new ClassComboScalingModule()

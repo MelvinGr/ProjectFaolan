@@ -436,6 +436,8 @@ namespace Faolan.Importer.Rdb
 				db.Spells.AddRange(toAdd);
 			await db.SaveChangesAsync();
 
+			var classSpellsAdded = await SyncClassMembership(db, byId.Values, logger);
+
 			// #367: sync the SpellStatEffect rows now that every affected spell exists (FK). Delete-then-insert per
 			// spell is idempotent and matches the region being authoritative for a spell's stat deltas.
 			var affected = statEffects.Keys.ToList();
@@ -492,9 +494,65 @@ namespace Faolan.Importer.Rdb
 			await db.SaveChangesAsync();
 
 			logger?.LogInformation(
-				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements).",
-				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements);
+				"RdbSpellImporter: {Seen} named spell records, {Inserted} new, {NamesSet} names set, {CastTimesSet} cast times set, {StatSpells} spells with {StatRows} stat effects, {Mounts} mounts, {Recasts} recasts set ({Disagreements} cross-record disagreements), {ClassSpells} class<->spell rows.",
+				seen, inserted, namesSet, castTimesSet, statEffects.Count, effectRows, mountsWritten, recastsSet, recastDisagreements, classSpellsAdded);
 			return (seen, inserted, namesSet, castTimesSet, levelsSet, mountsWritten);
+		}
+
+		/// <summary>
+		///     Fill the class↔spell ACCESS map from the spell's own <c>GuiStackingLine</c> (#296). A stacking line
+		///     encoded as <c>ConanClass × 1000 + lineIndex</c> names the class the line belongs to, so the client's
+		///     own catalog answers "which class may cast this" for all twelve classes at once.
+		/// </summary>
+		/// <remarks>
+		///     This replaces an AoC-fandom-wiki scrape, whose importer asserted the opposite - "the client RDB spell
+		///     record has no class field (class progression is server-side), so the community wiki is the source".
+		///     It has one, and the two AGREE on 342 of the 343 rows where both spoke, which is what says the field
+		///     really is class membership rather than something that correlates with it.
+		///     <para>
+		///         ⚠️ ADDITIVE, never destructive. The capture-sourced rows carry two facts this cannot see -
+		///         <see cref="ClassSpell.IsStarter" /> (the create kit is a LIST, not a level query) and
+		///         <see cref="ClassSpell.GrantLevel" /> (the level a capture SHOWS the grant at) - so an existing row
+		///         is left exactly as it is. A spell already attributed to a DIFFERENT class is counted and logged
+		///         rather than silently doubled up: one class-encoded line means one class, so a second attribution
+		///         is a disagreement to look at, not a spell two classes share.
+		///     </para>
+		/// </remarks>
+		private static async Task<int> SyncClassMembership(IDatabaseContext db, IEnumerable<Spell> spells, ILogger? logger)
+		{
+			var known = (await db.ClassSpells.ToListAsync())
+				.GroupBy(c => c.SpellId)
+				.ToDictionary(g => g.Key, g => g.Select(c => c.Class).ToList());
+
+			var added = 0;
+			var conflicts = 0;
+			foreach (var spell in spells)
+			{
+				if (spell.GuiStackingLine == 0 || !Enum.IsDefined((ConanClass)(spell.GuiStackingLine / 1000)))
+					continue; // no line, or a line whose high part is not a class (50000 and 440061 - see Spell.GuiStackingLine)
+
+				var @class = (ConanClass)(spell.GuiStackingLine / 1000);
+				if (known.TryGetValue(spell.Id, out var already))
+				{
+					if (already.Contains(@class))
+						continue;
+
+					conflicts++;
+					logger?.LogWarning("RdbSpellImporter: spell {Spell} '{Name}' is on line {Line} ({Class}) but is already mapped to {Other} - adding the RDB's reading alongside it.",
+						spell.Id, spell.Name, spell.GuiStackingLine, @class, string.Join('/', already));
+				}
+
+				db.ClassSpells.Add(new ClassSpell
+				{
+					SpellId = spell.Id,
+					Class = @class
+				});
+				added++;
+			}
+
+			await db.SaveChangesAsync();
+			logger?.LogInformation("RdbSpellImporter: {Added} class<->spell rows from the class-encoded stacking line ({Conflicts} disagreed with an existing mapping).", added, conflicts);
+			return added;
 		}
 
 		// #402: the game's dev/PvP-internal naming conventions for the buffs that live in cat 50210 but are NOT

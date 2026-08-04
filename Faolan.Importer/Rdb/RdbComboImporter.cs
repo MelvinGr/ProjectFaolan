@@ -87,7 +87,49 @@ namespace Faolan.Importer.Rdb
 			}
 
 			await db.SaveChangesAsync();
-			logger?.LogInformation("RdbComboImporter: {Seen} combo XML entries parsed, {Imported} combos imported.", seen, imported);
+
+			// #296: a combo's reuse time onto the SPELL row the combo drives. `Combos.Cooldown` is the XML's own
+			// `cooldown` attribute in seconds; `Spell.RecastCentiseconds` is the client's centiseconds.
+			//
+			// This replaces an ellatha scrape that matched by DISPLAY NAME, and the name is exactly what it got wrong:
+			// several combos share one display name (`Enraging Strike III` is a 1h and a polearm variant) and the
+			// scrape wrote one value across every id-variant. Joining on `GameActionId` is per-combo and per-id.
+			//
+			// ⚠️ The two recast sources are DISJOINT, and that is measured, not assumed: of the 246 combo spells
+			// carrying an XML cooldown, ZERO are named by a `SetSpellRecastTime` element and ZERO sit on a stacking
+			// line a `SetSpellLineRecastTime` element targets (#271). A combo's reuse time and a spell's recast are
+			// two separate facts in two separate places, so neither pass can overwrite the other's answer.
+			//
+			// EVERY combo, not only the ones carrying a cooldown: the XML is the sole authority here, so a stale
+			// value left behind by the retired scrape has to go back to 0 rather than survive as the last thing that
+			// wrote it.
+			//
+			// ⚠️ MAX across the combos sharing a game action, not last-write-wins. One ability is driven by several
+			// combo rows - `Enraging Wound I` (166263) by its 1h, polearm and 2h variants, all stating 12 s - and a
+			// MONSTER combo can reuse the same game action while stating none (`Ghauhk_eatface`, `monster_snare`).
+			// A 0 there means that row does not state a cooldown, not that the ability has none, so it must not win.
+			var byGameAction = existing.Values
+				.GroupBy(c => c.GameActionId)
+				.ToDictionary(g => g.Key, g => (uint)g.Max(c => c.Cooldown) * 100);
+			var targets = byGameAction.Keys.ToList();
+			var recastsSet = 0;
+			var recastsCleared = 0;
+			foreach (var spell in await db.Spells.Where(s => targets.Contains(s.Id)).ToListAsync())
+			{
+				var recast = byGameAction[spell.Id];
+				if (spell.RecastCentiseconds == recast)
+					continue;
+
+				if (recast == 0)
+					recastsCleared++;
+				else
+					recastsSet++;
+
+				spell.RecastCentiseconds = recast;
+			}
+
+			await db.SaveChangesAsync();
+			logger?.LogInformation("RdbComboImporter: {Seen} combo XML entries parsed, {Imported} combos imported, {Recasts} combo recasts set on their spell rows ({Cleared} cleared).", seen, imported, recastsSet, recastsCleared);
 			return (seen, imported);
 		}
 
