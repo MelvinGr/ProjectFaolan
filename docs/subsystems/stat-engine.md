@@ -61,23 +61,30 @@ final           = + a stat-0x17d scaling layer            // FUN_008d7080, vtabl
   the line (format string `DAT_01f78354`, append via `FUN_0060f190`), scaling the value by `×0.01`.
 - Spell loader: `FUN_0099bef0` = generic async resource load `(type=0xFDE85 spell, id)`.
 
-### Known base field-ids (from `decode_spell_fields.py` over the RDB records)
-`0x126` cast (centiseconds, ×10 = ms) · `0x11F` range (×100) · `0x15C` damage rating (×100). Many more
-(`0x36 0x4B 0x7B 0x80 0x81 0x93 0x227 0x34C …`) are unmapped.
+### Known base field-ids
+`0x126` cast (centiseconds, ×10 = ms) · `0x11F` range (×100) · `0x15C` **splash damage** (×100 — not the
+"damage rating" this page called it until #626).
+
+⚠️ "Many more are unmapped" is no longer true, and the ids this page listed as unmapped are the ones that make
+the point: the client NAMES them. `0x36` `Level` · `0x4B` `AwardedOmniTekTokens` · `0x7B` `Rank` · `0x80` the
+spell line · `0x81` `SpellCriticalDamage` · `0x93` `SpellCriticalChance` · `0x227` `StackingOrder` · `0x34C`
+`AttackRatingType`. The field ids ARE wire stat ids, so LDB category 615 names them —
+[spell-record-fields.md](../rdb/spell-record-fields.md) has all 111, and Gitea #633 tracks the ones still
+unread.
 
 ### The one place a spell template DOES name a stat
-The increasing field run carries magnitudes without saying what they modify (`551` is "400", never "400 of
-WHAT"). The `[2][9]` region in the same record is the exception: it carries explicit `(kind, statId, amount)`
+The increasing field run carries magnitudes without saying what they modify. The `[2][9]` region in the same
+record is the exception: it carries explicit `(kind, statId, amount)`
 records, which is where a buff's armour/rating/attribute deltas come from -
 [spell-stat-effects.md](../rdb/spell-stat-effects.md), applied by `BuffStatEffects` (#367). It covers potions,
 elixirs and a slice of the class buffs; it is *not* how the buffs seen in retail captures express themselves, so
 it does not make this page's headline finding any less true.
 
 ## Open (the remaining engine decode)
-1. **Recast base** — recast is NOT a field-table value (proven). It is computed or uses a **cooldown-category**
-   (a small index → a global time table), or a separate path not yet found. Likely needs **dynamic analysis**
-   (gdb the client, breakpoint the getField/tooltip with a known spell — see memory `gdb_live_client_debugging`)
-   to pin which input yields 4s/45s, rather than more static tracing.
+1. **Recast base** — ⚠️ this page said "recast is NOT a field-table value (proven)". That is **wrong**: field
+   **210**, which the client names `Recharge Delay`, is a field-table value, on 3,567 of 21,502 records. The
+   "proof" was a search of the ids this page had mapped, which was a small fraction of the run. Open work is
+   tracked in Gitea #271 (its unit still needs confirming in-client) and #633.
 2. **Stat inputs** — what stat `0x17d` (and siblings) are, and where the buff/gear modifier lists are populated.
 3. **Field-id → property map** — map the remaining base field-ids to mana/damage/etc. via the accessor family /
    `FUN_00769220` lines.

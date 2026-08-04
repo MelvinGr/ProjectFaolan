@@ -44,6 +44,39 @@ splash triple. All three are now imported under their own names — `Spell.Splas
 `Spell.SplashDamage` (348 ÷ 100, percent) and `Spell.SplashMaxTargets` (349, a raw count) — and `Faolan.Web`
 labels them as such. Nothing in combat reads them; the spell's real damage magnitude stays unsourced (#592).
 
+## ⚠️ The STACKING family — and two of them are columns we ship under the wrong name
+
+LDB 615 names a whole contiguous family, and it reframes two shipped columns:
+
+| field | client's name | what we call it |
+|---|---|---|
+| 123 | `GUI Stacking Order` | `Spell.Rank` |
+| 128 | `GUI Stacking Line` | `Spell.LineId` |
+| 546-550 | `Stacking Line 2` … `Stacking Line 6` | unread |
+| 551 | `Stacking Order` | unread (was labelled "a rank-scaling magnitude") |
+
+So a spell sits on up to six stacking LINES and carries an ORDER within them; a higher order supersedes a
+lower one on the same line, which is how an MMO stops two +Strength buffs from stacking.
+
+**This dissolves two mysteries these pages recorded as open.**
+
+*Field 123 is not the rank.* It correlates with rank — a higher rank stacks over a lower one — which is why it
+read as one. But an order only has to be MONOTONE within its own line, and the scale is otherwise free. Of the
+883 spells with a `(Rank N)` suffix, 669 carry 1/2/3 and 214 a clean ×10: `Healing Benediction` is 10/20/30 on
+stacking line **2**, `Wave of Life` is 1/2/3 on lines 24020+. Both are valid orderings. Nothing "discriminates
+the two scales" because neither is a rank.
+
+*Field 128's "far too coarse to be a line" small values are the point.* `Healing Benediction`'s line is `2` —
+shared with dozens of unrelated spells, which is exactly what a shared stacking line is for. And an id whose
+`/1000` is not a class (`50000`, `440061`) is just a stacking line that is not per-class. The feat join is
+sound throughout: a feat boosting a "spell line" is boosting a stacking line.
+
+The client's own dev test spells confirm the reading outright — `Strength Buff 1` / `Strength Buff 2` carry
+551 = 1 / 2, and the same 1/2 pairing runs through `Dexterity Buff`, `Stack Debuff`, `Hostile` and `Buff`.
+
+The columns keep their names for now: renaming `LineId` moves `FeatSpellModifier`'s join with it. Tracked in
+Gitea #634.
+
 ## ⚠️ Field 54 is not the level requirement — 125 is
 
 Both ids are called `Level` somewhere, and 54 is on **20,186** records to 125's **7,645**, so the narrow one

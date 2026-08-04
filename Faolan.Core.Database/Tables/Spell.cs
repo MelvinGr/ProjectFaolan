@@ -7,25 +7,39 @@ namespace Faolan.Core.Database.Tables
 	{
 		public byte Level { get; set; }
 
-		// RDB field 123 (0x7B) of the spell's type-1040005 record, carried RAW.
+		// RDB field 123 (0x7B), carried RAW.
 		//
-		// ⚠️ It is the rank for MOST spells but NOT all, so do not read it as one without checking. Measured against
-		// the "(Rank N)" suffix in the name over the 883 spells that have both: 669 agree, and the other 214 are a
-		// clean rank x10 - "Healing Benediction (Rank 1/2/3)" carries 10/20/30 where "Wave of Life (Rank 2)" carries
-		// 2. The scale differs by spell FAMILY and nothing found so far discriminates the two: field 128 is constant
-		// (2) across that family's ranks, so it is not the selector either.
+		// ⚠️ **It is not the rank.** The client's own stat-name table (LDB category 615) calls field 123
+		// `GUI Stacking Order` and field 128 `GUI Stacking Line` - see LineId - and that overturns the label rather
+		// than qualifying it (#634).
 		//
-		// Kept raw rather than normalised because the two cases are genuinely ambiguous at 10 - a true rank 10 and a
-		// x10-encoded rank 1 are the same value - and guessing would silently corrupt one of them. The #367 field dump
-		// labelled 123 "rank"; this is that label qualified, not overturned.
+		// It CORRELATES with rank, which is why it read as one: a higher rank stacks over a lower rank, so the
+		// ordering runs with the ranks. But an ORDER only has to be monotone within its own stacking line, and the
+		// scale is otherwise arbitrary - which is exactly the "mystery" this comment used to record. Of the 883
+		// spells with a "(Rank N)" suffix, 669 carry 1/2/3 and 214 carry a clean x10; `Healing Benediction` is
+		// 10/20/30 on stacking line 2 while `Wave of Life` is 1/2/3 on lines 24020+. Both are valid orderings. There
+		// was never anything to discriminate them, because neither is a rank.
+		//
+		// Still carried raw, and the column keeps its name until the rename lands (#634) - a rename touches
+		// FeatSpellModifier's join through LineId, so it is not a comment-sized change.
 		public byte Rank { get; set; }
 
 		/// <summary>
-		///     RDB field 128 (0x80) of the spell's type-1040005 record, carried RAW. When it is
+		///     ⚠️ RDB field 128 (0x80), which the client's own stat-name table names <c>GUI Stacking Line</c> - NOT a
+		///     "spell line" (#634). The behaviour described below is real and the feat join it supports is sound;
+		///     what is wrong is the NAME, and with it the two things this field recorded as unexplained. Both
+		///     dissolve once it is read as a stacking line: an id whose <c>/1000</c> is not a class is simply a
+		///     stacking line that is not per-class, and the "small numbers (1, 2, 4, …) shared by 25-30 unrelated
+		///     spells, far too coarse to be a line" are SHARED stacking lines - which is the entire purpose of one,
+		///     so that (say) two +Strength buffs refuse to stack. A feat boosting a "spell line" is a feat boosting a
+		///     stacking line, which is why the join works.
+		///     <para>
+		///     Carried RAW. When it is
 		///     <c>ConanClass × 1000 + lineIndex</c> it is the spell's LINE - what a feat's spell modifier points at
 		///     (<see cref="FeatSpellModifier.SpellLineId" />): 41000 is Necromancer line 0, and the five
 		///     <c>Flesh to Worms</c> ranks all carry it, which is how a feat boosts a spell without naming a rank.
 		///     0 when the record has no such field (only 3,158 of 21,502 templates carry one).
+		///     </para>
 		/// </summary>
 		/// <remarks>
 		///     ⚠️ <c>ConanClass × 1000 + index</c> is the common CASE, not the encoding (#591). Line <c>50000</c> is a
