@@ -119,8 +119,9 @@ FAOLAN_GHIDRA_OUT=<dir> /opt/ghidra/support/analyzeHeadless <data-repo>/Ghidra a
 
 ## What this does NOT settle
 
-Field **348** (the spell's damage rating, 0–8000 = 0–80%) does not vary with 847 — cross-tabulating the two
-gives the same rating distribution under both attributes — so the rating is a property of the spell and the
-attribute a property of the caster, and how the two combine into a final number is still ours rather than
-retail's. `CombatResolver.ResolveSpellDamage` remains `20 + level × 5 + magicDamage`, with the attribute term
-now inside `magicDamage`. Open work is tracked in Gitea #592.
+**The spell's own damage rating is still missing.** Field 348 was read as one, and is not: the client names
+`0x15C` `SplashDamage`, and it occurs on 215 of the 21,502 records — the same 215 that carry
+349 `SplashDamageMaxTargets`, inside 347 `SplashRadius`'s 231 (`spell-record-fields.md`). So the attribute
+term has nothing on the record to combine WITH, and how a spell's magnitude is reached is still ours rather
+than retail's. `CombatResolver.ResolveSpellDamage` remains `20 + level × 5 + magicDamage`, with the attribute
+term now inside `magicDamage`. Open work is tracked in Gitea #592, and the mislabelled import in #626.
