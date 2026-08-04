@@ -208,14 +208,22 @@ namespace Faolan.ClientLauncher
 				switch (ClientExePatcher.PatchPublicKey(exe, ClientExePatcher.NewPublicKey))
 				{
 					case ClientExePatcher.Result.Patched:
+					{
 						Console.WriteLine("login-key : patched DH pubkey (password validation enabled)");
 						break;
+					}
+
 					case ClientExePatcher.Result.AlreadyDone:
+					{
 						Console.WriteLine("login-key : DH pubkey already patched");
 						break;
+					}
+
 					case ClientExePatcher.Result.NotFound:
+					{
 						Console.Error.WriteLine("login-key : DH pubkey not found in the exe; launching without password validation.");
 						break;
+					}
 				}
 			}
 
@@ -226,14 +234,22 @@ namespace Faolan.ClientLauncher
 				switch (ClientExePatcher.PatchLauncherNotes(exe, launcherNotes))
 				{
 					case ClientExePatcher.Result.Patched:
+					{
 						Console.WriteLine($"notes-url : {launcherNotes}");
 						break;
+					}
+
 					case ClientExePatcher.Result.AlreadyDone:
+					{
 						Console.WriteLine("notes-url : launcher-notes URL already redirected");
 						break;
+					}
+
 					case ClientExePatcher.Result.NotFound:
+					{
 						Console.Error.WriteLine("notes-url : launcher-notes URL not found in the exe (or replacement too long); skipped.");
 						break;
+					}
 				}
 			}
 

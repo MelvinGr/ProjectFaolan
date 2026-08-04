@@ -8,7 +8,6 @@ using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
-using Faolan.GameServer.Dialogue;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 

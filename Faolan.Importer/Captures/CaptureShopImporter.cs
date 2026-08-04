@@ -1,15 +1,14 @@
-using Faolan.Core.Enums;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Database;
 using Faolan.Core.Database.Tables;
+using Faolan.Core.Enums;
 using Faolan.Core.Extensions;
 using Faolan.Core.Network.Codecs.Economy;
 using Faolan.Importer.Extractors;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-
 // The codec's per-WARE record and this file's per-SHOP one are both called ShopEntry; alias the wire one.
 using WireShopEntry = Faolan.Core.Network.Codecs.Economy.ShopEntry;
 

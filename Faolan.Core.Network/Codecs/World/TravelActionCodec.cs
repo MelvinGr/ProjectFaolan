@@ -115,24 +115,41 @@ namespace Faolan.Core.Network.Codecs.World
 				switch (key)
 				{
 					case "xpos":
+					{
 						x = ParseFloat(key, raw);
 						break;
+					}
+
 					case "ypos":
+					{
 						y = ParseFloat(key, raw);
 						break;
+					}
+
 					case "zpos":
+					{
 						z = ParseFloat(key, raw);
 						break;
+					}
+
 					case "PlayFieldID":
+					{
 						map = ParseUInt(key, raw);
 						break;
+					}
+
 					case LocalFlag:
 					case HeroicEnabledFlag:
+					{
 						flagKey = key;
 						flagValue = ParseUInt(key, raw);
 						break;
+					}
+
 					default:
+					{
 						throw CodecParseException.Unexpected(nameof(TravelActionCodec), 0, "a known travel key", key);
+					}
 				}
 			}
 

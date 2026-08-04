@@ -116,7 +116,9 @@ namespace Faolan.GameServer.Combat
 				}
 
 				default:
+				{
 					throw new ArgumentOutOfRangeException(nameof(effect), effect.Kind, "Unhandled spell-effect kind.");
+				}
 			}
 		}
 

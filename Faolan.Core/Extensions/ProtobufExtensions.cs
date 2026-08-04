@@ -88,11 +88,17 @@ namespace Faolan.Core.Extensions
 				switch (tag & 7)
 				{
 					case 0:
+					{
 						ReadVarint(encoded, ref i);
 						break;
+					}
+
 					case 1:
+					{
 						i += 8;
 						break;
+					}
+
 					case 2:
 					{
 						// NB the length is read FIRST: `i += ReadVarint(encoded, ref i)` evaluates `i` before the
@@ -102,12 +108,17 @@ namespace Faolan.Core.Extensions
 						break;
 					}
 					case 5:
+					{
 						i += 4;
 						break;
+					}
+
 					default:
+					{
 						// Groups (3/4). Unreachable: the only field this method is ever called for is a packed
 						// repeated scalar, whose message has no group fields. Loud rather than silently copied.
 						throw new NotSupportedException($"cannot re-pack a message carrying a group field ({tag & 7}) at offset {tagAt}");
+					}
 				}
 
 				if ((tag & 7) != 2 && fields.Contains((int)(tag >> 3)))

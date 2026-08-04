@@ -1,7 +1,7 @@
 using System.Linq;
+using Faolan.Core.Enums;
 using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.Text;
-using Faolan.Core.Enums;
 using Xunit;
 
 namespace Faolan.Tests

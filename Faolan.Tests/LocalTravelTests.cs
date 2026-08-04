@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Faolan.Core.Network.Codecs.World;
-using Faolan.GameServer.World;
 using Faolan.Tests.Support;
 using Microsoft.Data.Sqlite;
 using Xunit;

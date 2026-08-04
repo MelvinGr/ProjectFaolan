@@ -80,14 +80,22 @@ namespace Faolan.Core.Network.Constants
 				switch (stream.ReadByte<ProtoEndpoint.FieldTags>())
 				{
 					case ProtoEndpoint.FieldTags.Type:
+					{
 						endpoint.Type = stream.ReadUInt32LittleEndian();
 						break;
+					}
+
 					case ProtoEndpoint.FieldTags.Instance:
+					{
 						endpoint.Instance = (uint)stream.ReadVarint();
 						break;
+					}
+
 					case ProtoEndpoint.FieldTags.Token:
+					{
 						endpoint.Token = (uint)stream.ReadVarint();
 						break;
+					}
 				}
 			}
 

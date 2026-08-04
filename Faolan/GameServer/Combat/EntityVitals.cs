@@ -66,19 +66,30 @@ namespace Faolan.GameServer.Combat
 			switch (stat)
 			{
 				case CharacterStatId.HealthMax:
+				{
 					MaxHealth = Add(BaseMaxHealth, bonus);
 					Health = ClampToMax(Health, MaxHealth);
 					return MaxHealth;
+				}
+
 				case CharacterStatId.ManaMax:
+				{
 					MaxMana = Add(BaseMaxMana, bonus);
 					Mana = ClampToMax(Mana, MaxMana);
 					return MaxMana;
+				}
+
 				case CharacterStatId.StaminaMax:
+				{
 					MaxStamina = Add(BaseMaxStamina, bonus);
 					Stamina = ClampToMax(Stamina, MaxStamina);
 					return MaxStamina;
+				}
+
 				default:
+				{
 					throw new ArgumentOutOfRangeException(nameof(stat), stat, "not one of the three max-pool stats");
+				}
 			}
 		}
 

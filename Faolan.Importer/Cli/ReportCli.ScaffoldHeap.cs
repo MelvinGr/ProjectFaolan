@@ -93,18 +93,22 @@ namespace Faolan.Importer.Cli
 			switch (mode)
 			{
 				case "runs":
+				{
 					Console.WriteLine();
 					Console.WriteLine("--- every distinct run ---");
 					foreach (var (run, n) in runs.OrderByDescending(r => r.Value).ThenBy(r => r.Key, StringComparer.Ordinal))
 						Console.WriteLine($"{n,6}  {run}");
 					break;
+				}
 
 				case "dump":
+				{
 					var path = Path.Combine(Path.GetTempPath(), "scaffold-heap.txt");
 					WriteBlockDump(blocks, path);
 					Console.WriteLine();
 					Console.WriteLine($"wrote {blocks.Count} block dumps to {path}");
 					break;
+				}
 			}
 		}
 

@@ -220,7 +220,9 @@ namespace Faolan.Importer.Cli
 				}
 
 				default:
+				{
 					return ([], null);
+				}
 			}
 		}
 	}

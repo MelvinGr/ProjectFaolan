@@ -67,20 +67,37 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			switch (sub)
 			{
 				case IirTypes.KnubotOpenChatWindowIIR:
+				{
 					return new KnubotOpenChatWindowIIR(player, npc, env, r.ReadU8());
+				}
+
 				case IirTypes.KnubotAppendTextIIR:
+				{
 					var field = r.ReadU32Be();
 					var xml = r.ReadBytesU16Length().ToArray();
 
 					return new KnubotAppendTextIIR(player, npc, env, field, xml, r.ReadU8());
+				}
+
 				case IirTypes.KnubotAnswerListIIR:
+				{
 					return new KnubotAnswerListIIR(player, npc, env, ReadStrings(ref r));
+				}
+
 				case IirTypes.KnubotCloseChatWindowIIR:
+				{
 					return new KnubotCloseChatWindowIIR(player, npc, env, ReadStrings(ref r));
+				}
+
 				case IirTypes.KnubotAnswerIIR:
+				{
 					return new KnubotAnswerIIR(player, npc, env, r.ReadU32Be());
+				}
+
 				default:
+				{
 					throw CodecParseException.Unexpected(nameof(KnubotCodec), 0, "a Knubot IIR sub-opcode", $"0x{(uint)sub:X8}");
+				}
 			}
 		}
 
@@ -89,27 +106,44 @@ namespace Faolan.Core.Network.Codecs.Dialogue
 			switch (v)
 			{
 				case KnubotOpenChatWindowIIR open:
+				{
 					Header(s, IirTypes.KnubotOpenChatWindowIIR, open).WriteByte(open.Value);
 
 					break;
+				}
+
 				case KnubotAppendTextIIR text:
+				{
 					Header(s, IirTypes.KnubotAppendTextIIR, text).WriteUInt32(text.Field).WriteUInt16(text.Xml.Length).WriteArray(text.Xml).WriteByte(text.Trailing);
 
 					break;
+				}
+
 				case KnubotAnswerListIIR answers:
+				{
 					WriteStrings(Header(s, IirTypes.KnubotAnswerListIIR, answers), answers.Strings);
 
 					break;
+				}
+
 				case KnubotCloseChatWindowIIR close:
+				{
 					WriteStrings(Header(s, IirTypes.KnubotCloseChatWindowIIR, close), close.Strings);
 
 					break;
+				}
+
 				case KnubotAnswerIIR answer:
+				{
 					Header(s, IirTypes.KnubotAnswerIIR, answer).WriteUInt32(answer.Index);
 
 					break;
+				}
+
 				default:
+				{
 					throw new ArgumentOutOfRangeException(nameof(v), v, "not a Knubot record");
+				}
 			}
 		}
 

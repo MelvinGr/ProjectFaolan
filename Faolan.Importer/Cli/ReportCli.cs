@@ -1735,11 +1735,16 @@ namespace Faolan.Importer.Cli
 				switch (v)
 				{
 					case System.Collections.ICollection c:
+					{
 						values.Add((name + " count", c.Count.ToString()));
 						continue;
+					}
+
 					case null:
+					{
 						values.Add((name, "(absent)"));
 						continue;
+					}
 				}
 
 				if (message.GetType().GetMethod("ShouldSerialize" + prop.Name, Type.EmptyTypes) is { } present

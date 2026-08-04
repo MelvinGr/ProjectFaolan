@@ -114,17 +114,23 @@ namespace Faolan.GameServer.Economy
 			switch (sub)
 			{
 				case CoreClaimSubOpcode.Request:
+				{
 					await SendClaimList(client);
 					break;
+				}
 
 				case CoreClaimSubOpcode.Redeem:
+				{
 					var index = body.ReadUInt32();
 					await RedeemClaim(client, index);
 					break;
+				}
 
 				default:
+				{
 					_logger.LogDebug("Unhandled CoreClaimIIR sub 0x{Sub:X4} ({RawLength} bytes).", (ushort)sub, body.Length);
 					break;
+				}
 			}
 		}
 

@@ -51,13 +51,21 @@ namespace Faolan.Core.Network.Codecs.Economy
 			switch (v)
 			{
 				case MailOpResult op:
+				{
 					s.WriteByte(op.Error);
 					break;
+				}
+
 				case MailSendResult send:
+				{
 					s.WriteString(send.Xml);
 					break;
+				}
+
 				default:
+				{
 					throw new ArgumentOutOfRangeException(nameof(v), v, "unknown DispatchSendMailResult form");
+				}
 			}
 		}
 	}

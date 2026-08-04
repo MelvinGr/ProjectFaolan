@@ -867,14 +867,18 @@ namespace Faolan.GameServer.World
 								}
 
 								case WorldTickEffectType.EncounterTrigger:
+								{
 									// The trap springs: the lure is replaced by its boss on the same spot.
 									await _output.SwapEncounterLureForBoss(effect.Entity);
 									break;
+								}
 
 								case WorldTickEffectType.EncounterReset:
+								{
 									// The boss's corpse has cleared - put the lure back so it can fire again.
 									await _output.RestoreEncounterLure(effect.Entity);
 									break;
+								}
 
 								case WorldTickEffectType.NpcChatter:
 								{

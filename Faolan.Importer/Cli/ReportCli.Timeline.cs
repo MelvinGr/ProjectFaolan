@@ -157,14 +157,22 @@ namespace Faolan.Importer.Cli
 				switch (e.Name)
 				{
 					case "PlayfieldFIIR" when e.Raw.Length >= 38:
+					{
 						mapId = e.Raw.ReadU32Be(34);
 						break;
+					}
+
 					case "FullPlayerCharacterIIR" when e.Raw.Length >= 16:
+					{
 						labels[e.Raw.ReadU32Be(12)] = "the player";
 						break;
+					}
+
 					case "PetIIR" when e.Raw.Length >= 29:
+					{
 						labels[e.Raw.ReadU32Be(25)] = "pet";
 						break;
+					}
 				}
 			}
 
@@ -249,26 +257,41 @@ namespace Faolan.Importer.Cli
 			switch (e.Name)
 			{
 				case "InitiateAuthentication" when raw.Length > 2:
+				{
 					return $"account \"{Encoding.Latin1.GetString(raw, 2, Math.Min(raw.ReadU16Be(0), raw.Length - 2))}\"";
+				}
+
 				case "PlayfieldFIIR" when raw.Length >= 38:
 				{
 					var pf = raw.ReadU32Be(34);
 					return $"playfield {pf}" + (look.Maps.TryGetValue(pf, out var m) ? $" \"{m}\"" : "");
 				}
 				case "FullPlayerCharacterIIR":
+				{
 					return $"login snapshot, {raw.Length} B";
+				}
+
 				case "DispatchUpdateBindLocation" when raw.Length >= 4:
+				{
 					return $"bind playfield {raw.ReadU32Be(0)}";
+				}
+
 				case "QuestGoalIIR":
 				{
 					var goal = QuestGoalCodec.Parse(content);
 					return $"quest {goal.QuestId} goal {goal.GoalId} -> {goal.Update}";
 				}
 				case "QuestJournalIIR":
+				{
 					return Journal(QuestJournalCodec.Parse(content), look);
+				}
+
 				case "KnubotAnswerIIR" or "KnubotAnswerListIIR" or "KnubotAppendTextIIR"
 					or "KnubotCloseChatWindowIIR" or "KnubotOpenChatWindowIIR":
+				{
 					return Dialogue(KnubotCodec.Parse(content), look, labels);
+				}
+
 				case "DispatchSetDialogueCamera":
 				{
 					var camera = SetDialogueCameraCodec.Parse(raw);
@@ -330,7 +353,10 @@ namespace Faolan.Importer.Cli
 					return $"{Ent(labels, look2.Subject)} " + (look2.Target != 0 ? $"selects {Ent(labels, look2.Target)}" : "deselects");
 				}
 				case "StatDamageIIR":
+				{
 					return StatDelta(content, look, labels);
+				}
+
 				case "DamageResultIIR":
 				{
 					var hit = DamageResultCodec.Parse(content);
@@ -338,31 +364,55 @@ namespace Faolan.Importer.Cli
 					       + $"{hit.Damage} ({hit.Damage / 100.0:F2} shown), school {(uint)hit.School}";
 				}
 				case "ChainKillIIR":
+				{
 					return $"chain {ChainKillCodec.Parse(content).Count}";
+				}
+
 				case "HateListUpdateIIR":
 				{
 					var hate = HateListUpdateCodec.Parse(content);
 					return $"{Ent(labels, hate.Handle)} -> {Ent(labels, hate.Target)}";
 				}
 				case "CombatShieldIIR":
+				{
 					return $"shield {CombatShieldCodec.Parse(content).Value}";
+				}
+
 				case "PetIIR":
 				{
 					var pet = PetCodec.Parse(content);
 					return $"{Ent(labels, pet.Pet)} " + (pet.Mode == PetCodec.ModeRemove ? "dismissed" : "summoned");
 				}
 				case "N3ToClientFadeIIR" when raw.Length >= 16:
+				{
 					return $"despawn {Ent(labels, raw.ReadU32Be(12))}";
+				}
+
 				case "N3ToClientQuitIIR" when raw.Length >= 16:
+				{
 					return $"quit {Ent(labels, raw.ReadU32Be(12))}";
+				}
+
 				case "SimpleDynelVisualChangeIIR" when raw.Length > 20:
+				{
 					return $"{Ent(labels, raw.ReadU32Be(12))} visual state 0x{raw[20]:x2}";
+				}
+
 				case "DispatchAddItem":
+				{
 					return AddedItem(raw, look);
+				}
+
 				case "DispatchUpdateCash" when raw.Length >= 12:
+				{
 					return $"cash {raw.ReadU32Be(4)} (+{raw.ReadU32Be(8)})";
+				}
+
 				case "DispatchOpenLootBag" or "DispatchCloseLootBag" or "TryLootAll" or "TryLootCash" when raw.Length >= 8:
+				{
 					return $"bag {Ent(labels, raw.ReadU32Be(4))}";
+				}
+
 				case "SimpleCharFullUpdateIIR" or "SimpleDynelFullUpdateIIR" or "DoorFullUpdateIIR"
 					or "LootBagFullUpdateIIR" or "TombStoneFullUpdateIIR" or "ClimbingDynelFullUpdateIIR" when raw.Length >= 16:
 				{
@@ -370,7 +420,9 @@ namespace Faolan.Importer.Cli
 					return $"spawn {Ent(labels, raw.ReadU32Be(12))}{at}";
 				}
 				default:
+				{
 					return look.Text(raw);
+				}
 			}
 		}
 
@@ -387,22 +439,39 @@ namespace Faolan.Importer.Cli
 			switch (message)
 			{
 				case KnubotAppendTextIIR text:
+				{
 					return $"{who}: {look.Text(text.Xml)}";
+				}
+
 				case KnubotAnswerListIIR answers:
+				{
 					return $"{who} offers {answers.Strings.Count}: "
 					       + string.Join(" | ", answers.Strings.Select(s => look.Text(s)));
+				}
+
 				case KnubotAnswerIIR answer:
+				{
 					return $"picks answer {answer.Index} to {who}";
+				}
+
 				case KnubotOpenChatWindowIIR:
+				{
 					return $"opens dialogue with {who}";
+				}
+
 				case KnubotCloseChatWindowIIR close:
+				{
 					// The close carries a string list that is the EMPTY sentinel in every capture - LDB[100][0], which
 					// resolves to "" now that the plaintext categories are readable (#561). Printing it would leave a
 					// dangling colon, so an all-empty list renders as nothing rather than as an empty quote.
 					var closing = close.Strings.Select(look.Text).Where(t => t.Length > 0).ToList();
 					return $"closes dialogue with {who}" + (closing.Count > 0 ? ": " + string.Join(" | ", closing) : "");
+				}
+
 				default:
+				{
 					return who;
+				}
 			}
 		}
 

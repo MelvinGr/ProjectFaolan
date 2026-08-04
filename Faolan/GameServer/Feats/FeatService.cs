@@ -101,8 +101,10 @@ namespace Faolan.GameServer.Feats
 				}
 
 				default:
+				{
 					await _chat.SendSystemMessage(character.Id, "Usage: .feat list | .feat train <id> ... | .feat reset");
 					return;
+				}
 			}
 		}
 

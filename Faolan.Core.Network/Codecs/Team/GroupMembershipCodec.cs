@@ -55,16 +55,22 @@ namespace Faolan.Core.Network.Codecs.Team
 			switch (type)
 			{
 				case IirTypes.AddToGroupIIR:
+				{
 					r.ExpectU32Be(EntityClass.Character, "the leader's entity class");
 					value = new AddToGroupIIR(memberId, teamId, r.ReadU32Be());
 					break;
+				}
 
 				case IirTypes.RemoveFromGroupIIR:
+				{
 					value = new RemoveFromGroupIIR(memberId, teamId);
 					break;
+				}
 
 				default:
+				{
 					throw CodecParseException.Unexpected(nameof(GroupMembershipCodec), 0, "AddToGroupIIR or RemoveFromGroupIIR", $"0x{(uint)type:X8}");
+				}
 			}
 
 			r.EnsureAtEnd();

@@ -58,20 +58,28 @@ namespace Faolan.GameServer
 			switch (client.Session.EntryMode)
 			{
 				case WorldEntryMode.CreateEditor:
+				{
 					Logger.LogInformation("Create-editor connection: the post-0x205F follow-up waits for the create handoff, not for this 0x2020 poll.");
 					return;
+				}
 
 				case WorldEntryMode.CreateWorld:
+				{
 					Logger.LogInformation("Create-world connection: the ready burst belongs to its CharInPlayIIR, not to this poll.");
 					return;
+				}
 
 				case WorldEntryMode.Login:
 				case WorldEntryMode.TeleportReentry:
+				{
 					break; // the two modes this burst is FOR
+				}
 
 				default:
+				{
 					Logger.LogError("Post-0x205F flush on an unhandled entry mode {Mode}: sending the login burst by default, which may be wrong for it.", client.Session.EntryMode);
 					break;
+				}
 			}
 
 			// Past the early return the character is always named: the create-editor connection returned above (it

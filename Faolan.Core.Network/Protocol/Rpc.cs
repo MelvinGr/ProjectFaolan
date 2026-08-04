@@ -3,7 +3,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using Faolan.Core.Crypt;
-using Faolan.Core.Extensions;
 using Faolan.Core.Protobuf;
 
 namespace Faolan.Core.Network.Protocol
@@ -244,20 +243,27 @@ namespace Faolan.Core.Network.Protocol
 					switch (tag)
 					{
 						case CallerIdTag:
+						{
 							sender = sender is null ? ReadEndpoint(header) : throw Repeated("caller_id", at);
 							break;
+						}
 
 						case EndpointIdTag:
+						{
 							receiver = receiver is null ? ReadEndpoint(header) : throw Repeated("endpoint_id", at);
 							break;
+						}
 
 						// `repeated` in the schema, but all 472 captured frames carry exactly one, so a second is
 						// something we have never seen and says so rather than being dropped.
 						case RoutingContextTag:
+						{
 							routingContext = routingContext is null ? ReadEndpoint(header) : throw Repeated("full_routing_context", at);
 							break;
+						}
 
 						case MethodInstanceTag:
+						{
 							if (method is not null)
 								throw Repeated("method_instance", at);
 
@@ -267,12 +273,17 @@ namespace Faolan.Core.Network.Protocol
 
 							method = (uint)value;
 							break;
+						}
 
 						case RoutingDestinationTag:
+						{
 							throw new InvalidDataException($"RpcHeader carries routing_destination (field 5) at offset {at}, which no captured frame does.");
+						}
 
 						default:
+						{
 							throw new InvalidDataException($"Unexpected RpcHeader field tag 0x{tag:X2} at offset {at}.");
+						}
 					}
 				}
 			}

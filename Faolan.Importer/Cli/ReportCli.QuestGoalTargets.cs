@@ -215,13 +215,19 @@ namespace Faolan.Importer.Cli
 				// string is the only thing the reference yields. Still reported by name against the templates, because
 				// that is the only way to see whether a group description could serve as a kill-goal name fallback.
 				case CategoryTreeCategory:
+				{
 					return "group description; " + CountByName(text, templatesByName, spawnedNames, c);
+				}
 
 				case BoundedAreaCategory:
+				{
 					return "region name (geometry lives in MapRegion)";
+				}
 
 				default:
+				{
 					return "unclassified category";
+				}
 			}
 		}
 

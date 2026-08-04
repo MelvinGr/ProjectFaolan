@@ -64,19 +64,29 @@ namespace Faolan.Core.Network.Codecs.World
 				}
 
 				case CoreClaimSubOpcode.RedeemAck:
+				{
 					return new CoreClaimRedeemAckIIR(handle, ReadEntry(ref r));
+				}
 
 				case CoreClaimSubOpcode.NewClaims:
+				{
 					return new CoreClaimNewClaimsIIR(handle);
+				}
 
 				case CoreClaimSubOpcode.Request:
+				{
 					return new CoreClaimRequestIIR(handle);
+				}
 
 				case CoreClaimSubOpcode.Redeem:
+				{
 					return new CoreClaimRedeemIIR(handle, r.ReadU32Be());
+				}
 
 				default:
+				{
 					throw CodecParseException.Unexpected(nameof(CoreClaimCodec), subOffset, "a modelled CoreClaim sub-opcode", $"0x{(ushort)sub:X4}");
+				}
 			}
 		}
 

@@ -140,14 +140,22 @@ namespace Faolan.Importer.Cli
 						switch (terrain.Trace(mapId, s, new Vector3(x, groundY, z)))
 						{
 							case LineOfSightBlocker.None:
+							{
 								clear++;
 								break;
+							}
+
 							case LineOfSightBlocker.Terrain:
+							{
 								byTerrain++;
 								break;
+							}
+
 							case LineOfSightBlocker.Collision:
+							{
 								byCollision++;
 								break;
+							}
 						}
 					}
 				}

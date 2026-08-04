@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Faolan.Core.Enums;
-using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Extensions;
+using Faolan.Core.Network.Codecs.Combat;
 using Faolan.Core.Protobuf;
 using Faolan.Importer.Captures;
 

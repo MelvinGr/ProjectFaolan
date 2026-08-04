@@ -7,7 +7,6 @@ using Faolan.Core.Network.Codecs.Dialogue;
 using Faolan.Core.Network.Codecs.World;
 using Faolan.Core.Network.Constants;
 using Faolan.Core.Network.Protocol;
-using Faolan.Core.Database.Tables;
 using Faolan.Importer.Captures;
 
 namespace Faolan.Importer.Extractors

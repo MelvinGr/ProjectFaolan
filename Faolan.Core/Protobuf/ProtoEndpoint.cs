@@ -29,16 +29,27 @@ namespace Faolan.Core.Protobuf
 				switch (tag)
 				{
 					case FieldTags.Type:
+					{
 						endpoint.Type = stream.ReadUInt32LittleEndian();
 						break;
+					}
+
 					case FieldTags.Instance:
+					{
 						endpoint.Instance = (uint)stream.ReadVarint();
 						break;
+					}
+
 					case FieldTags.Token:
+					{
 						endpoint.Token = (uint)stream.ReadVarint();
 						break;
+					}
+
 					default:
+					{
 						throw new InvalidDataException($"Unexpected ProtoEndpoint field tag 0x{tag:X2} at offset {stream.Position}.");
+					}
 				}
 			}
 

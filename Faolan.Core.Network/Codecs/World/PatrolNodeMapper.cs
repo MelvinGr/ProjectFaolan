@@ -23,10 +23,13 @@ namespace Faolan.Core.Network.Codecs.World
 			switch (m.Mode)
 			{
 				case 0: // Wait
+				{
 					CopyHeaderToNode(m, n);
 					break;
+				}
 
 				case 1: // Path
+				{
 					CopyHeaderToNode(m, n);
 					n.PathFlags = m.PathFlags;
 					if ((m.PathFlags & 0x10) != 0)
@@ -61,18 +64,24 @@ namespace Faolan.Core.Network.Codecs.World
 					n.PathDirection1 = ToFloat(m.TrailerWords[2]);
 					n.PathDirection2 = ToFloat(m.TrailerWords[3]);
 					break;
+				}
 
 				case 2: // Rotate
+				{
 					SetTransform(n, m.Vec7);
 					n.RotateTail = m.RotateTail;
 					break;
+				}
 
 				case 3: // Jump
 				case 11: // GroundAlign
+				{
 					n.Flag = m.Flag;
 					break;
+				}
 
 				case 4: // List
+				{
 					CopyHeaderToNode(m, n);
 					n.ListMin = m.ListMin;
 					for (var i = 0; i < m.Children.Count; i++)
@@ -83,33 +92,46 @@ namespace Faolan.Core.Network.Codecs.World
 					}
 
 					break;
+				}
 
 				case 5: // Ballistic
+				{
 					CopyHeaderToNode(m, n);
 					SetWords(n, m.Ballistic7);
 					n.Flag = m.Flag;
 					break;
+				}
 
 				case 6: // Animated - nothing
+				{
 					break;
+				}
 
 				case 7: // Formation
+				{
 					SetWords(n, m.Formation6);
 					break;
+				}
 
 				case 8: // Approach
+				{
 					n.ApproachType = m.ApproachType;
 					n.ApproachTarget = m.ApproachTarget;
 					// The tail is [u8 flag][9 zero bytes]; only the flag is data (#410).
 					n.ApproachFlag = m.ApproachTail[0];
 					break;
+				}
 
 				case 10: // SetPos
+				{
 					SetTransform(n, m.Vec7);
 					break;
+				}
 
 				default:
+				{
 					throw new InvalidOperationException($"PatrolNodeMapper: unsupported MoveTask mode {m.Mode}");
+				}
 			}
 
 			return n;
@@ -126,10 +148,13 @@ namespace Faolan.Core.Network.Codecs.World
 			switch (n.Mode)
 			{
 				case 0:
+				{
 					CopyHeaderToTask(n, m);
 					break;
+				}
 
 				case 1:
+				{
 					CopyHeaderToTask(n, m);
 					m.PathFlags = n.PathFlags!.Value;
 					if ((m.PathFlags & 0x10) != 0)
@@ -159,50 +184,69 @@ namespace Faolan.Core.Network.Codecs.World
 						ToBits(n.AnchorX), ToBits(n.AnchorY), ToBits(n.AnchorZ)
 					];
 					break;
+				}
 
 				case 2:
+				{
 					m.Vec7 = Transform(n);
 					m.RotateTail = (ushort)n.RotateTail!.Value;
 					break;
+				}
 
 				case 3:
 				case 11:
+				{
 					m.Flag = n.Flag!.Value;
 					break;
+				}
 
 				case 4:
+				{
 					CopyHeaderToTask(n, m);
 					m.ListMin = n.ListMin!.Value;
 					foreach (var child in n.Children.OrderBy(c => c.Ordinal))
 						m.Children.Add(ToTask(child));
 					break;
+				}
 
 				case 5:
+				{
 					CopyHeaderToTask(n, m);
 					m.Ballistic7 = Words(n, 7);
 					m.Flag = n.Flag!.Value;
 					break;
+				}
 
 				case 6:
+				{
 					break;
+				}
 
 				case 7:
+				{
 					m.Formation6 = Words(n, 6);
 					break;
+				}
 
 				case 8:
+				{
 					m.ApproachType = n.ApproachType!.Value;
 					m.ApproachTarget = n.ApproachTarget!.Value;
 					m.ApproachTail = new byte[10];
 					m.ApproachTail[0] = n.ApproachFlag!.Value;
 					break;
+				}
 
 				case 10:
+				{
 					m.Vec7 = Transform(n);
 					break;
+				}
 
 				default:
+				{
 					throw new InvalidOperationException($"PatrolNodeMapper: unsupported PatrolNode mode {n.Mode}");
+				}
 			}
 
 			return m;

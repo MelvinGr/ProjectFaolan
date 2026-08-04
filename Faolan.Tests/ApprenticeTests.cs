@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Faolan.Core.Network.Codecs.Apprentice;
-using Faolan.Core.Network.Codecs.Team;
 using Faolan.Core.Network.Server.CsPlayerAgent;
 using Faolan.GameServer.Apprentice;
 using Microsoft.Extensions.Logging.Abstractions;

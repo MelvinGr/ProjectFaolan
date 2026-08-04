@@ -196,7 +196,9 @@ namespace Faolan.Core.Network.Codecs.World
 				}
 
 				default:
+				{
 					throw new CodecParseException($"{nameof(TeleportCodec)}: unsupported teleport record {v.GetType().Name}");
+				}
 			}
 		}
 	}

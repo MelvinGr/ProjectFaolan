@@ -1,6 +1,6 @@
 using System;
-using Faolan.Core.Extensions;
 using Faolan.Core.Enums;
+using Faolan.Core.Extensions;
 
 namespace Faolan.Importer.Captures
 {

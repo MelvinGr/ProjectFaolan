@@ -40,17 +40,28 @@ namespace Faolan.Core.Network.Codecs.Text
 			switch (value.Kind)
 			{
 				case InnerElementKind.Localized:
+				{
 					var reference = value.Token is { } token
 						? $"token=\"{token}\""
 						: $"id=\"{value.Id}\"";
 
 					return $"<localized {reference} category=\"{value.Category}\" flags=\"{value.Flags}\" key=\"{value.Key}\" >";
+				}
+
 				case InnerElementKind.StringEntry:
+				{
 					return $"<stringentry string=\"{value.Text}\" flags=\"{value.Flags}\" >";
+				}
+
 				case InnerElementKind.RemoteFormat:
+				{
 					return $"<remoteformat id=\"{value.Id}\" category=\"{value.Category}\" key=\"{value.Key}\" knubot=\"{value.Knubot}\"  ></remoteformat>";
+				}
+
 				default:
+				{
 					throw new CodecParseException($"InnerElementCodec: unknown inner-element kind {value.Kind}.");
+				}
 			}
 		}
 

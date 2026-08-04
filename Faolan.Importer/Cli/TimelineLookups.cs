@@ -246,21 +246,32 @@ namespace Faolan.Importer.Cli
 			switch (tier)
 			{
 				case "universe":
+				{
 					yield return c2s ? typeof(UniverseAgentMethods) : typeof(UniverseInterfaceMethods);
 					break;
+				}
+
 				// No "playeragent" case: that pair is named from its method constant (MethodsByReceiver), which needs
 				// the frame, and its enums are uint-backed so a bare u16 opcode could not index them anyway (#613).
 				case "cs":
+				{
 					yield return c2s ? typeof(CSPlayerAgentMethods) : typeof(CSPlayerInterfaceMethods);
 					break;
+				}
+
 				case "chat":
+				{
 					yield return c2s ? typeof(ChatServerOpcodes) : typeof(ChatServerInterfaceOpcodes);
 					break;
+				}
+
 				default:
+				{
 					yield return c2s ? typeof(GameAgentMethods) : typeof(GameInterfaceMethods);
 					yield return c2s ? typeof(GameCharAgentMethods) : typeof(GameCharInterfaceMethods);
 					yield return c2s ? typeof(TradepostAgentMethods) : typeof(TradepostInterfaceMethods);
 					break;
+				}
 			}
 		}
 
