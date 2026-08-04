@@ -244,6 +244,12 @@ namespace Faolan.GameServer.Combat
 			// Not from the saddle. The trance ROOTS the caster (the move handler pins their position while
 			// IsSpellweaving) and plays a kneeling pose, neither of which a mounted character can do - the rider would
 			// be pinned mid-gallop with the horse animating underneath. Refuse the open rather than produce that.
+			//
+			// This stays a server-side policy: it cannot be driven off the client's own saddle gate. That gate is the
+			// per-action property `GameAction_CanUseIfMounted` (stat key 0x4FD), and exactly two of the client's 260
+			// GameAction types carry it - `Charge` and `ChargeSpecialAbility`, the lance charge
+			// (docs/re/gameactionlist-grammar.md). No general "usable while mounted" property exists, so the client
+			// asks the question only of a charge and never of a cast. Don't go looking for data behind this check.
 			if (_out.IsMounted(client))
 			{
 				_logger.LogInformation("Spellweave START refused for '{Name}': mounted.", session.Character.Name);
