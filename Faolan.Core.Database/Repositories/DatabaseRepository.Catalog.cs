@@ -16,6 +16,8 @@ namespace Faolan.Core.Database.Repositories
 		Task<Ability[]> GetClassAbilitiesUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<Combo[]> GetClassCombos(uint level, ConanClass @class);
 		Task<Combo[]> GetClassCombosUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive);
+		Task<Combo[]> GetCombos();
+		Task<ClassComboScaling[]> GetClassComboScalings();
 		Task<uint[]> GetClassSpellsUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive);
 		Task<Item?> GetItem(uint id);
 		Task<uint?> GetItemSearchCategory(uint template);
@@ -79,6 +81,24 @@ namespace Faolan.Core.Database.Repositories
 		{
 			await using var ctx = await _contextFactory.CreateDbContextAsync();
 			return await ctx.ClassCombos.Where(cc => cc.Class == @class && cc.Level > fromLevelExclusive && cc.Level <= toLevelInclusive).Include(cc => cc.Combo).Select(cc => cc.Combo).ToArrayAsync();
+		}
+
+		// The whole combo catalog (744 rows). The combo RUNTIME (ComboService) needs to resolve an arbitrary
+		// `CommandMessage.combo_id` off the wire - including combos the player's class does not own, which is a real
+		// captured case (a Herald performing `Slave_1_AOE_2hb_Sweep_2`) and the NPC combos NPCs swing with - so it
+		// caches the catalog whole rather than querying per swing.
+		public async Task<Combo[]> GetCombos()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.Combos.OrderBy(c => c.Id).ToArrayAsync();
+		}
+
+		// The per-class/level combo DPS + stamina curve (RDB 1000513, 12 classes x 80 levels). Cached whole by the
+		// combo runtime for the same reason as the catalog above: it is read once per finisher.
+		public async Task<ClassComboScaling[]> GetClassComboScalings()
+		{
+			await using var ctx = await _contextFactory.CreateDbContextAsync();
+			return await ctx.ClassComboScalings.ToArrayAsync();
 		}
 
 		public async Task<uint[]> GetClassSpellsUnlockedBetween(ConanClass @class, uint fromLevelExclusive, uint toLevelInclusive)

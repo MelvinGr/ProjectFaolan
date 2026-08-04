@@ -75,33 +75,73 @@ resolves the blend + a backlash roll on deactivate.
   [V3: ComboActionParserTests.MarkedCombos_AreAFourByFiveGrid_TheDirectionSelectingTheProc]. `ComboTrigger` +
   `ComboActionParser.TryParseTriggered` keep the direction the sequence parser discards; `TryParse` still refuses
   these, since they are not a key sequence.
-  `action` (69 rows) is the fifth marker and the only one with **no** direction after it — a placeholder for combos
-  whose input the catalog does not model (bow attacks, emotes, `PowerAttack`). The 160 of 744 rows whose `Actions` is
-  blank are the same shape of thing and remain unexplained.
+  `action` (69 rows) is the fifth marker and the only one with **no** direction after it — and it is the **NPC combo
+  set**. All 69 rows are named `combo_npc_*` (`combo_npc_generic_polearm`, `combo_npc_guardian_polearm_1_sweep`,
+  `combo_npc_barbarian_2h_1_butcher`, …), and the corpus confirms it from the other side: those ids appear **only
+  s2c, with an NPC's actor handle, in 0 of 153 client requests** — the AI drives them, so there is no key sequence
+  because there is no keyboard [V3: ComboWireTests.NpcComboRows_AreTheActionMarkerSet]. They carry `combo_attack_num`
+  0 or the unstepped sentinel `0xFFFFFFFF`, never a real step. ⚠️ This is NOT the "input the catalog does not model"
+  bucket it used to be read as — that is the **160 blank-`Actions` rows** (`Freefireattack`, `firebreath`,
+  `PowerAttack`, `Bladestorm`, the mounted charges, the racial dance emotes), which carry no marker at all and
+  remain unexplained.
 
 ## Wire decode
 
-**Melee** (dumps: `Hakotep_hox_login_gameplay0`, `Hoxxling_mage-heraldofxotli_combos` [HoX], plus
-`AssassinL23_rogue-assassin_login_combos` [Assassin, incl. a few DELIBERATELY FAILED combos]):
-- A combo is a **sequence of `Combat:Melee` (BehaviorControlCenter, `BehaviorId` 0xF)** c2s actions. **No separate
-  activation packet** precedes the swings (checked the 3s before a combo's first swing: only heartbeat + move) —
-  the swings ARE the input, not an "activate combo X then confirm" flow.
-- Swing payload (after the offset-i+18 LENGTH; NB the earlier "direction 0x12/0x15" read was that length field):
-  `[08][animByte][2B marker][u32 counter][u32 cid = 0x300038XX][tail]`.
-  - **`cid`** (offset 8) groups the swings of one combo attempt and REPEATS per combo-type within a session (the
-    Assassin's `b6`/`cb`/`9a` recur). But it does NOT cleanly encode the catalog combo id — the cid low-byte
-    matched the combo-id low-byte for the HoX (`b0`=Molten Steel Slash II, `bf`=Pillar I, `f1`=Body/Spirit Wrack I,
-    `fa`=Hell Strikes II) but FAILED on the Assassin (`b6`/`cb`/`9a`/`84` have no such combo) → coincidence, it's a
-    client-side handle.
-  - **`animByte`** (offset 1) varies per swing but is **class/weapon-relative, not a class-independent direction
-    code**: HoX uses `b2`/`b3`/`b4`, Assassin uses `c0`/`c2`/`c4`. For the HoX `b2/b3/b4` lined up with `UL/UR/UP`
-    (matching Pillar `UL,UR,UP`, Molten Steel Slash `UL,UR`, Hell Strikes `UL,UP`), but the Assassin (whose combos
-    also use `LL`/`LR`) only surfaced 3 byte values, so it reads more like a **weapon swing-animation index** than a
-    raw direction. `[08][animByte][f105]` marks the FIRST swing of a combo; continuations carry a class marker
-    (`c702` HoX / `8403` Assassin).
-- **Not recoverable from packets alone**: the `cid → combo` and `animByte → ComboInput` mappings are computed
-  client-side (the client derives the `cid` and selects the swing anim per (combo, direction, weapon)), so
-  pinning them needs client-side Ghidra RE. `ComboActionParser` consumes the map once it exists.
+**Melee** — DECODED. The combo is **stated on the wire**, not inferred (dumps: `AssassinL23_rogue-assassin_login_combos`
+[Assassin, incl. a few DELIBERATELY FAILED combos], `Hoxxling_mage-heraldofxotli_combos`, `Hakotep_hox_login_gameplay0`,
+and 23 more — 840 swings in all). Re-derive the whole census with
+`dotnet run --project Faolan.Importer -- --report combo-swings`.
+
+- A combo is a **sequence of `Combat:Melee` (BehaviorControlCenter, `BehaviorId` 0x0F)** actions. **No separate
+  activation packet** precedes the swings — the swings ARE the input, not an "activate combo X then confirm" flow.
+- The record's args are a **`CommandMessage`** (the client's own descriptor — see
+  `docs/re/behaviorcontrolcenter-grammar.md`), and three of its fields are the combo:
+
+  | field | name | meaning |
+  |---|---|---|
+  | 7 | `combo_id` | the `Combos` catalog id, **verbatim** |
+  | 8 | `combo_attack_num` | the **0-based step**, absent on the opener (protobuf omits a zero) |
+  | 9 | `combo_attack_hits` | the hit count — never set anywhere in the corpus |
+
+  Across 840 captured swings in 26 captures, all 60 distinct `combo_id` values resolve to a shipped catalog row,
+  with **zero** unknowns, and `combo_attack_num` never once runs past the combo's own step count
+  [V3: ComboWireTests.CapturedComboSwings_AllResolveToTheCatalog,
+  ComboWireTests.ComboAttackNum_StaysInsideTheCatalogStepSequence]. So the server does not have to match key
+  sequences at all — the client says which combo and which step, every swing.
+- **Phases** (the record's `Seq`): c2s `0x03` request → s2c `0x04` ack, and c2s `0x02` → s2c `0x07` is the ABORT
+  pair (the capture's deliberately failed combos). `commandqueue_client_id` (field 2) is the client's own monotonic
+  command counter and `commandqueue_server_id` (field 3) the server's, assigned in the ack — they drift apart
+  exactly where the client abandoned a command.
+- `recharge_time` (11) and `activation_time` (12) are **centiseconds**, and both are per (combo, step, animation):
+  a non-final step reports 56–60 cs and the finisher its own longer animation (Grim Corruption II 60 + 115, Vicious
+  Strike II 60 + 60 + 170). Summing `activation_time` over the steps is the server's only source for what the
+  client calls `BCTCombo::GetComboAnimationLength`.
+- **`bcc_action_id` (field 1) is the swing ANIMATION, and per class+weapon it *is* the direction** — one id per
+  direction within a family, which is what the older raw-byte read was reaching for when it called the varint's
+  first byte an "animByte":
+
+  | family | UL | UR | UP / Head |
+  |---|---|---|---|
+  | Assassin / Rogue (dagger) | 49732 | 49730 | 49728 |
+  | Herald / Conqueror / Soldier (2h) | 41906 | 41907 | 41908 |
+  | Slave / Bear Shaman (2hb) | 48878 | 48877 | 48876 (Head) |
+
+  The `96xxx` / `200xxx` ids are the session's first swing of a family — a distinct draw-and-strike animation
+  [V3: ComboWireTests.BccActionId_IsTheDirection_PerClassAndWeapon]. Nothing needs this map, because the combo and
+  step are stated outright; it is recorded because it is what the old read was missing.
+- **Every step deals damage**, not just the finisher: both steps of the captured `Slave_1_AOE_2hb_Sweep_2` carry an
+  81-byte hit-result block, and the AoE forms carry 130/138/179-byte ones (a second and third victim at 49 bytes
+  each). Measured against the same attacker's plain swings the opener lands at ~1.4–1.7× and the finisher far
+  above it (Slave_1 Sweep 2.2–4.8×; `Soldier_19_damagetaunt_Brutal_Enraging_Strike` 3.2× / 2.7× / **16.8×**). The
+  spread between combos is per-combo, which is what a per-combo payload produces and a uniform step multiplier
+  could not — see the implementation below.
+
+⚠️ **The superseded read.** This section used to describe the swing body as
+`[08][animByte][2B marker][u32 counter][u32 cid = 0x300038XX][tail]` and conclude that the `cid → combo` and
+`animByte → direction` maps were computed client-side and needed Ghidra. That was the protobuf misparsed as raw
+bytes: `0x300038XX` is `[30 00]` (`execution_status` = 0) followed by the `[38 …]` `combo_id` tag, and the
+"counter" was `[10 …][28 …]` (`commandqueue_client_id`, `flags`). The `cid` low-byte "coincidence" was the combo
+id's own low byte, which is why it matched for the HoX. No client RE was needed for any of it.
 
 **Spellweaving** — DECODED (`Captures/NecroL80_mage-necromancer_login_consuming-potions-food-spellweaving`, a necro
 that ate 3 potions/food then wove Arcane Renewal + Arcane Surge + Death God then stopped):
@@ -147,4 +187,38 @@ The Necromancer weave is built end-to-end and byte-exact (golden tests `Spellwea
   mirrors it).
 - `GameServerListener.Inbound.cs` — the `CombatReactiveIIR` add case + the `PerformSpecialAction` (`0x205A`) handler.
 
-Open work — melee combo execution (**Gitea #2**) and spellweaving polish (**Gitea #141**) — is tracked on those issues.
+## Implementation (melee combos)
+
+The runtime is `ComboService` (`Faolan/GameServer/Combat/ComboService.cs`), composed on the listener beside
+`CombatService`. It reads the combo fields off each `Combat:Melee` request and tracks the running attempt on the
+session (`ActiveComboId` / `ActiveComboStep` / `ActiveComboCentiseconds`):
+
+- A swing with no `combo_id` **ends** the attempt — a plain hit breaks the chain, so the next combo swing opens a
+  new one rather than resuming at a stale step.
+- A step that does not continue the running attempt **restarts** it. Retail does this itself (the assassin capture
+  re-sends step 0 twice inside one Cunning Strike), and the client is authoritative on which combo is running, so
+  this is bookkeeping rather than a rejection. A `combo_id` outside the catalog resolves as a plain swing.
+- `0xFFFFFFFF` is the **unstepped sentinel**, collapsed to a single-step combo — read as a signed step it would be
+  −1 and index off the front of the sequence.
+
+**The finisher's payload is a SPELL.** `Combo.GameActionId` resolves into the `Spells` catalog for **726 of the
+744** shipped combos, under the combo's own display name (`Assassin_20b_…_Grim_Corruption_II` → 149094 *Grim
+Corruption II*) [V3: ComboWireTests.ComboGameActionIds_ResolveIntoTheSpellCatalog]. So a combo's damage, its DoT
+and its debuff are that spell's, and `GameServerListener.ResolveComboFinisher` runs the same two ops a cast does
+(`ApplySpell` + `CombatService.ResolveOffensiveCast`) instead of a bespoke combo-damage model — which is also what
+the per-combo spread in the measured numbers above says it should be. The steps themselves need nothing special:
+they are ordinary damaging swings already.
+
+**Stamina** is spent on the finisher by the client's own formula (`FUN_007d7ba0`):
+`MaxStamina(0x1F9) × (Combo.Stamina / 100) × animationSeconds ÷ ClassComboScaling.StaminaDivisor`, with the
+animation length summed from the steps' `activation_time`. The client gates *starting* a combo on that cost being
+affordable (`FUN_007d5930`), so the two ends agree rather than letting a player chain combos for free.
+
+⚠️ The **DPS half of the same table is a tooltip number**, not the damage formula — see `ClassComboScaling` and
+`docs/rdb/client-data-tables.md`. Nothing here scales damage by it.
+
+Gated by `ComboServiceTests` (the runtime) and `ComboWireTests` (the wire claims, against the captured swings in
+the `combo-swings.bin` fixture).
+
+Open work — combo cooldowns (`Combo.Cooldown`), the combo-completed on-screen feedback, and NPC combos on the
+server's own AI — is tracked on **Gitea #139**; spellweaving polish on **Gitea #141**.

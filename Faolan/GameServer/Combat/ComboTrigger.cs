@@ -8,9 +8,16 @@ namespace Faolan.GameServer.Combat
 		// No marker: `Actions` is a key sequence the player performs (`UR,UP`).
 		Directional,
 
-		// The bare `action` marker - 69 catalog rows, and the only marker with NO direction after it. A placeholder
-		// for a combo whose input is not modelled in the catalog at all (bow attacks, emotes, PowerAttack).
-		Placeholder,
+		// The bare `action` marker - 69 catalog rows, and the only marker with NO direction after it. It is the NPC
+		// combo set: all 69 rows are named `combo_npc_*` (`combo_npc_generic_polearm`,
+		// `combo_npc_guardian_polearm_1_sweep`, ...) and the corpus confirms it from the other side - those ids
+		// appear ONLY s2c, with an NPC's actor handle, never in a c2s request. So there is no key sequence because
+		// there is no keyboard: the AI drives them.
+		// [V3: ComboWireTests.NpcComboRows_AreTheActionMarkerSet + the corpus census in docs/subsystems/combos.md]
+		// ⚠️ This is NOT the "combos the catalog does not model" bucket that was read into it - those are the 160
+		// BLANK-Actions rows (bow attacks, `firebreath`, `PowerAttack`, the mounted charges, the racial dances),
+		// which carry no marker at all.
+		NpcCombo,
 
 		// The caster set: a spellweave magic combo. Its five procs are its own (Exhaustion / Boiling Mana /
 		// Mind Purge / Mana Leech / Discourage).

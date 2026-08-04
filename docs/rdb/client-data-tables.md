@@ -376,13 +376,23 @@ min(comboLevel, stat 0x3C5 = ApprenticeLevel))`, and it logs
 
 | value | client's own name for it | used as |
 |---|---|---|
-| `dpsModifier` | "DPS modifier" (`FUN_007d7cc0`) | `dpsModifier/100 × BCTCombo::GetComboAnimationLength(combo) × 0.01` |
+| `dpsModifier` | "DPS modifier" (`FUN_007d7cc0`) | `dpsModifier/100 × BCTCombo::GetComboAnimationLength(combo) × 0.01` — a **tooltip** number, see below |
 | `secondary` | — | parsed, cached, and **read by nothing on this build** |
 | `staminaDivisor` | "stamina lookup duration" (`FUN_007d7ba0`) | `staminaCost = (int)(MaxStamina(0x1F9) × comboStaminaFactor × animLength ÷ staminaDivisor)` |
 
 `FUN_007d5930` gates starting a combo on that stamina cost being `<=` current stamina (0x1F8), so the divisor
 is a real gameplay constraint and not just a tooltip number. Both consumers substitute **1.0** and log a
 `MISSING …` line when their value is `<= 0`.
+
+⚠️ **The two halves are not equally load-bearing, and the call graph says which is which.** `FUN_007d7cc0` (the DPS
+chain) has **exactly one caller** — `FUN_007d6c10`, which computes it, computes the stamina cost beside it, and
+hands both to `FUN_005efbc0`, the builder that emits the `ComboStarter` / `ComboFinisher` description lines; and
+`FUN_007d6c10`'s own callers are the combo-book list and `GetComboTooltip`. So the DPS number is **displayed, never
+applied**: nothing in the client spends it on a hit. `FUN_007d7ba0` (the stamina chain) has **seven** callers,
+including the start gate above. The multiply itself is `dpsModifier(cached, already ÷100) × animLength × 0.01`,
+with both float constants read straight off the binary (`0x01f27500` = 1.0 fallback, `0x01f2800c` = 0.01) — which
+also settles the arithmetic the two-way "/100 … ×0.01" phrasing left ambiguous. Combo DAMAGE is the server's, and
+in our implementation it is the combo's own spell (`Combo.GameActionId`, see `docs/subsystems/combos.md`).
 
 What the data says:
 

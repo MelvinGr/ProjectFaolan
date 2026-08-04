@@ -42,7 +42,7 @@ namespace Faolan.GameServer.Combat
 		// proc, or a spellweaving magic combo), so it has no directional grammar to match.
 		private static readonly Dictionary<string, ComboTrigger> Markers = new(StringComparer.OrdinalIgnoreCase)
 		{
-			["action"] = ComboTrigger.Placeholder,
+			["action"] = ComboTrigger.NpcCombo,
 			["MagicCombo"] = ComboTrigger.MagicCombo,
 			["Magic_Reactive"] = ComboTrigger.MagicReactive,
 			["Melee_Reactive"] = ComboTrigger.MeleeReactive,
@@ -126,7 +126,7 @@ namespace Faolan.GameServer.Combat
 		// WHAT triggers the proc (a completed combo / a spell / a melee hit) and the direction says WHICH proc. A key
 		// SEQUENCE could never come out as a perfect grid with shared ids down the columns.
 		//
-		// `action` (69 rows) is the odd one out - a placeholder marker with no direction after it - so it returns
+		// `action` (69 rows) is the odd one out - the NPC-combo marker, with no direction after it - so it returns
 		// false here while still being a known marker above.
 		public static bool TryParseTriggered(string actions, out ComboTrigger trigger, out ComboInput direction)
 		{

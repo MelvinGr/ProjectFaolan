@@ -91,7 +91,7 @@ namespace Faolan.Tests
 			// `action` is the fifth marker and the one with no direction after it, so it is a known marker that does
 			// NOT reach the grid.
 			Assert.True(ComboActionParser.TryParseMarker("action", out var placeholder));
-			Assert.Equal(ComboTrigger.Placeholder, placeholder);
+			Assert.Equal(ComboTrigger.NpcCombo, placeholder);
 			Assert.False(ComboActionParser.TryParseTriggered("action", out _, out _));
 
 			// The three REACTIVE families are the same five effects - the family says what triggers the proc, the

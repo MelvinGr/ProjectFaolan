@@ -145,6 +145,10 @@ namespace Faolan.GameServer
 		// wire packets. The opcode dispatch (Handle0x2000) and GM .hurt/.heal call into it. See Combat/CombatService.cs.
 		private readonly CombatService _combat;
 
+		// Melee combos (#139): reads the combo id + step the client puts on every Combat:Melee swing and tracks the
+		// running attempt, so the finisher can deliver the combo's own spell. See Combat/ComboService.cs.
+		private readonly ComboService _combos;
+
 		// NPC dialogue runtime (TalkToNpc/KnubotAnswer -> captured conversation nodes + quest grants). Composed
 		// collaborator; uses the broadcaster for quest pushes + C# ConditionQuestId/State gates for branch conditions. See Dialogue/ConversationService.cs.
 		private readonly ConversationService _conversation;
@@ -279,6 +283,7 @@ namespace Faolan.GameServer
 			_fatality = new FatalityService(logger, this, _spellEffects);
 			_buffStats = new BuffStatEffects(database, logger);
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality);
+			_combos = new ComboService(database, logger);
 			_spellweave = new SpellweaveService(logger, this);
 			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, this, _questProgression, logger);

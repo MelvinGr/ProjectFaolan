@@ -116,6 +116,19 @@ namespace Faolan.Core.Network
 		// capture it increments by 1 per player swing-ack; the client uses it to sequence the behaviour responses.
 		int NormalAttackAckPhase { get; set; }
 
+		// The melee combo the player is part-way through (#139), or null between attempts. The CLIENT names the
+		// combo and the step on every swing (CommandMessage.combo_id / combo_attack_num), so this is not a
+		// reconstruction of the key sequence - it is the running attempt's bookkeeping: which combo the next swing
+		// must continue, the step it must carry, and the animation time accumulated so far (the sum of the steps'
+		// `activation_time`, which is what the stamina cost scales by). See ComboService.
+		uint? ActiveComboId { get; set; }
+
+		// The step the NEXT swing of the running combo must carry (so 0 means "no step taken yet").
+		int ActiveComboStep { get; set; }
+
+		// The running attempt's accumulated `activation_time`, in centiseconds.
+		uint ActiveComboCentiseconds { get; set; }
+
 		// The Spellweaving(1) buff STACK level: each time the component picker reappears a fresh stack is applied at
 		// an incremented buff id (37e5a8 -> 37e5a9 -> 37e5aa), overlapping the previous (retail stacks to ~x2).
 		int SpellweaveBuffStack { get; set; }
@@ -243,6 +256,9 @@ namespace Faolan.Core.Network
 
 		public int CreateWorldChunkIndex { get; set; }
 		public int NormalAttackAckPhase { get; set; }
+		public uint? ActiveComboId { get; set; }
+		public int ActiveComboStep { get; set; }
+		public uint ActiveComboCentiseconds { get; set; }
 		public int SpellweaveBuffStack { get; set; }
 		public string ConversationAnswerPath { get; set; } = null!;
 		public string ConversationNpcName { get; set; } = null!;

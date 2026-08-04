@@ -1977,7 +1977,15 @@ namespace Faolan.GameServer
 						// The melee swing / auto-attack: ack the behavior + resolve the hit (see
 						// SendNormalAttackResponse). The target is in the request args (SpellTarget.TargetHandle).
 						await BreakShieldOnAggression(client); // swinging a weapon is aggressive - drops the shield (#361)
-						await _combat.SendNormalAttackResponse(client, rawPayload, args.Target?.Instance ?? 0, args.CommandqueueClientId);
+						var targetHandle = args.Target?.Instance ?? 0;
+
+						// #139: the swing NAMES its combo and step (CommandMessage.combo_id / combo_attack_num), so
+						// the runtime reads them rather than matching directions. Every step is an ordinary damaging
+						// swing; the finisher adds the combo's own spell (ResolveComboFinisher).
+						var combo = await _combos.TrackSwing(client, args);
+						await _combat.SendNormalAttackResponse(client, rawPayload, targetHandle, args.CommandqueueClientId);
+						if (combo is { IsFinisher: true })
+							await ResolveComboFinisher(client, combo, targetHandle);
 
 						break;
 					}

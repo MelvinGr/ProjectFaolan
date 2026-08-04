@@ -325,6 +325,23 @@ namespace Faolan.GameServer.Combat
 			await SendStatUpdate(client, player.ToCurrentsBlock(), client.Session.Character.Id); // #586: a cast MOVES mana
 		}
 
+		// Spends the stamina a completed melee combo costs and pushes the player's own vitals so the bar drops - the
+		// combo twin of SpendCasterMana. The COST comes from ComboService (the client's own formula); this half is
+		// only the deduction plus the push, which is why it takes a number rather than a combo. No-op for a free
+		// combo or a player with no stamina pool.
+		public async Task SpendComboStamina(INetworkClient client, uint cost)
+		{
+			if (cost == 0)
+				return;
+
+			var player = GetOrAddPlayerVitals(client);
+			if (player.MaxStamina == 0)
+				return;
+
+			player.Stamina = cost >= player.Stamina ? 0 : player.Stamina - cost;
+			await SendStatUpdate(client, player.ToCurrentsBlock(), client.Session.Character.Id);
+		}
+
 		// Damages every attackable NPC within GroundAoeRadiusUnits of `target` for one tick: shows the floating
 		// DamageResult number (0xFEC4158A) over each victim + applies the HP move. Friendly NPCs (civilians /
 		// quest-givers, Disposition == Friendly) are spared; hostile + neutral are hit; players never (no PvP model).

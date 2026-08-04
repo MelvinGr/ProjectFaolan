@@ -207,6 +207,9 @@ Read-only inspection modes are **not** imports and don't share the import runner
 `bcc-census` (every BehaviorControlCenterIIR bucketed by command, with the tail lengths each carries — the census
 [behaviorcontrolcenter-grammar.md](../re/behaviorcontrolcenter-grammar.md) quotes; `--report-arg <phase hex>` also
 dumps every record of one phase in full),
+`combo-swings` (every melee-combo swing in the corpus, resolved against the `Combos` catalog — the census
+[combos.md](../subsystems/combos.md) quotes: which combo, which step, the `bcc_action_id`→direction map and the
+player/NPC split. `--report-arg <file>` also writes the matched packets whole, for `--report fixture-set`),
 `bounded-areas` (the client's trigger-volume survey — no arg prints the census, `--report-arg <bucket>` lists one
 bucket and cross-checks it against what we already hold; see
 [bounded-areas-1000053.md](../rdb/bounded-areas-1000053.md)),

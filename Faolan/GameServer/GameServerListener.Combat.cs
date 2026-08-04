@@ -107,5 +107,38 @@ namespace Faolan.GameServer
 		{
 			return ((ISpellEffectOutbound)this).ApplySelfBuff(client, wireSpellId);
 		}
+
+		// Delivers a completed melee combo (#139). Every step of a combo is an ordinary damaging swing - the corpus
+		// is explicit about that, both steps of the captured `Slave_1_AOE_2hb_Sweep_2` carry an 81-byte hit-result
+		// block - so the steps need nothing special here. What the FINISHER adds is the combo's payload, and that
+		// payload is a SPELL: `Combo.GameActionId` resolves into the `Spells` catalog for 726 of the 744 shipped
+		// combos, under the combo's own display name (`Assassin_20b_..._Grim_Corruption_II` -> 149094 "Grim
+		// Corruption II"). So a combo's damage, its DoT and its debuff are that spell's, and the finisher runs the
+		// same two ops a cast does rather than a bespoke combo-damage model.
+		//
+		// That also matches the shape of the measured numbers: across the captured player combos a finisher lands
+		// far above the steps around it (Slave_1 Sweep 1.5x a white swing on the opener, 2.6x on the finisher;
+		// Soldier_19 Brutal Enraging Strike 3.2x / 2.7x / 16.8x), and the spread between combos is per-combo -
+		// which is what a per-combo spell produces and a uniform step multiplier could not.
+		private async Task ResolveComboFinisher(INetworkClient client, ComboSwing swing, uint targetHandle)
+		{
+			var casterHandle = client.Session.Character.Id;
+			var spellId = swing.SpellId;
+
+			// The combo costs stamina by the client's own formula, and the client gates STARTING a combo on being
+			// able to afford it - so spending it here keeps the two ends agreeing rather than letting a player
+			// chain combos for free.
+			await _combat.SpendComboStamina(client, await _combos.StaminaCost(
+				client.Session.Character.Class, client.Session.Character.Level, _combat.GetOrAddPlayerVitals(client).MaxStamina, swing));
+
+			// No target: the finisher still played, but there is nothing to land it on (retail's air swing).
+			if (targetHandle == 0 || targetHandle == casterHandle)
+				return;
+
+			// ApplySpell takes the WIRE buff id ((base << 8) | rank); the catalog carries the bare base, same as
+			// the cast path (#274).
+			await ApplySpell(client, targetHandle, casterHandle, spellId << 8);
+			await _combat.ResolveOffensiveCast(client, casterHandle, targetHandle, spellId);
+		}
 	}
 }

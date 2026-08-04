@@ -168,8 +168,7 @@ we've seen_, and names the gaps). Regenerate with
 - 🟡 **Fatalities** — the roll (5% at level 1 to 30% at 80), both fatality buffs, the necromancer's Frozen Hatred
   proc and its pet all work in-client (#140); the finishing-move *animation* never plays and the trigger for it is
   client-side (#440)
-- ⬜ **Real directional combat** with defensive shield arcs (#20) · **combos** — the client already drives the whole
-  combo chain; the finisher's bonus damage needs server-side data not present in the client (#139)
+- ⬜ **Real directional combat** with defensive shield arcs (#20)
 
 ### Character progression
 
@@ -535,8 +534,6 @@ captures against the local server (no root needed) and retail-session captures a
 - **Guild-bank** deposit/withdraw, and **guild** member kick/promote/demote (#132, #104)
 - A **necromancer pet summon in the open world** (#307), and the **s2c side of a trade cancel / decline /
   remove-item** — the c2s half is handled, but cancelling currently leaves the partner's window open (#427)
-- A **combo landing on a live target** → the combo-finisher's bonus damage, which retail decides server-side and so
-  cannot be recovered from the client alone (#139)
 - A second **quest abandoned** in a live session → the `QuestLogList` refresh variant retail sends with it; two
   samples do not pin a grammar, and a malformed list takes the whole route down (#482)
 - A **guild-city piece taking damage** (a siege, or any attack on a plot structure) → the destructible bodies are

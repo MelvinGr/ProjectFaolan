@@ -192,6 +192,12 @@ namespace Faolan.Importer.Cli
 					return 0;
 				}
 
+				case "combo-swings":
+				{
+					await ComboSwings(NamedCapture.LoadAll(capturesDir), arg);
+					return 0;
+				}
+
 				case "equip":
 				{
 					Equip(NamedCapture.LoadAll(capturesDir), arg ?? "Casilda");

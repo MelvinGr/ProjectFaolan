@@ -15,6 +15,12 @@ namespace Faolan.Core.Database.Tables
 	//   stamina  = (int)(MaxStamina(0x1F9) * comboStaminaFactor * animLength / StaminaDivisor)
 	// and the combo is startable only while that stamina cost is <= current stamina (0x1F8).
 	//
+	// ⚠️ THE TWO HALVES ARE NOT EQUALLY LOAD-BEARING. The DPS chain (FUN_007d7cc0) has exactly ONE caller, and it is
+	// the combo-book DESCRIPTION builder (FUN_007d6c10 -> FUN_005efbc0, the `ComboStarter`/`ComboFinisher` lines,
+	// reached from the combo list and `GetComboTooltip`) - so `DpsModifier` is a number the client SHOWS, never one it
+	// spends on a hit. The stamina chain (FUN_007d7ba0) has seven callers including the start gate. Combo damage is
+	// the SERVER's, and ours is the combo's own spell (`Combo.GameActionId`) - nothing scales a hit by this column.
+	//
 	// The client divides the two modifier columns by 100 the moment it parses them; they are carried RAW here (the
 	// same convention as ItemStatModifier.Amount / ClassAttributeBase.Amount), so a consumer applies /100 itself.
 	[PrimaryKey(nameof(Class), nameof(Level))]
