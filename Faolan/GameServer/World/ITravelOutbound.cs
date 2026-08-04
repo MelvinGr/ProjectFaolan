@@ -8,10 +8,6 @@ namespace Faolan.GameServer.World
 	// listener itself, same pattern as IWorldOutbound / IEconomyOutbound / IEnvironmentOutbound.
 	public interface ITravelOutbound
 	{
-		// The scry confirmation box naming the destination MAP (DispatchScryShowMessageBox 0x205E). `threadCtxId` and
-		// `cookie` come straight back in the player's answer, which is what correlates the reply to the pending trip.
-		Task SendTravelConfirm(INetworkClient client, uint destinationMapId, uint threadCtxId, ulong cookie);
-
 		// Tell the player why the NPC will not take them (criminal, or too poor).
 		Task SendTravelRefusal(INetworkClient client, string reason);
 

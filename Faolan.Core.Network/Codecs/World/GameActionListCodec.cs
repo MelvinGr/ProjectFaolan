@@ -127,5 +127,13 @@ namespace Faolan.Core.Network.Codecs.World
 
 	// GameActionListIIR_t (0xF508F4C1). DynelHandle/Field3 are also the element's typeId/field; ActionTail is the rest
 	// of that element (from GameActionDataCodec.PrefixThrough0x2d5), still opaque per action type.
-	public sealed record GameActionListIIR(uint FrameHandle, uint DynelHandle, uint Field3, byte[] ActionTail);
+	public sealed record GameActionListIIR(uint FrameHandle, uint DynelHandle, uint Field3, byte[] ActionTail)
+	{
+		// Whether the tail is one we can TYPE. The tail is per-action-type and the codec carries it verbatim by design,
+		// so decoding it stays the caller's step (TravelActionCodec.Parse) - but the mapping from the type word to the
+		// codec that reads it belongs beside the word that selects it, not copied into every caller. It sits on the
+		// VALUE rather than on the codec because a codec's surface is Build and Parse and nothing else (#530 rule 1).
+		// 0xD00D is the only tail decoded so far: the move-the-player action behind local travel (#514).
+		public bool IsTravelAction => DynelHandle == TravelActionCodec.TypeId;
+	}
 }

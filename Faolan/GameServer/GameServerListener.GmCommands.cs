@@ -955,33 +955,34 @@ namespace Faolan.GameServer
 				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", "Not displaced (no direction to push along, or fully resisted)."));
 		}
 
-		// .travel <npc name> [destination map id] - drives local travel (#506) the way retail's conversation would.
-		// With no map id it LISTS what that NPC offers; with one it runs the real flow - criminal gate, fee, the scry
-		// confirmation box, and the trip once the player clicks through it.
+		// .travel <npc name> [answer path] - drives local travel (#506/#514). With no path it LISTS what that NPC
+		// offers; with one it runs that trip directly.
 		//
-		// This exists because the retail TRIGGER is not wired: the pick happens inside the NPC's captured Knubot
-		// conversation, and marking a conversation node as "this one sells a trip to map N" is hand-authored wiring we
-		// have not done (the quest-wiring module is the precedent). So the command is the standard GM bootstrap for a
-		// feature whose trigger isn't wired yet - everything downstream of the pick is the real path, not a shortcut.
+		// Since #514 the retail trigger IS wired - a wagoneer's destination pick inside the ordinary Knubot
+		// conversation runs the whole flow - so this is no longer the only way in. It stays as the diagnostic: it names
+		// the answer path of every destination, which is the wiring key, and runs a trip without walking the tree.
+		// ⚠️ It deliberately skips the FARE (that is charged one screen earlier, when the destination list is served),
+		// so a GM trip is free.
 		private async Task TravelCommand(INetworkClient client, string arguments)
 		{
 			var characterId = client.Session.Character.Id;
 			var arg = (arguments ?? string.Empty).Trim();
 			if (arg.Length == 0)
 			{
-				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .travel <npc name> [destination map id]");
+				await _agentServerDispatcher.SendSystemMessage(characterId, "Usage: .travel <npc name> [answer path]");
 				return;
 			}
 
-			// The map id, when present, is the LAST whitespace-separated token - NPC names contain spaces, so splitting
-			// from the front would break on every real traveller.
+			// The answer path, when present, is the LAST whitespace-separated token - NPC names contain spaces, so
+			// splitting from the front would break on every real traveller. A path is digits and '>' ("0>3"), which no
+			// NPC name ends with.
 			var split = arg.LastIndexOf(' ');
 			var npcName = arg;
-			uint? mapId = null;
-			if (split > 0 && uint.TryParse(arg[(split + 1)..], out var parsed))
+			string? answerPath = null;
+			if (split > 0 && arg[(split + 1)..] is { Length: > 0 } tail && tail.All(c => char.IsAsciiDigit(c) || c == '>'))
 			{
 				npcName = arg[..split].Trim();
-				mapId = parsed;
+				answerPath = tail;
 			}
 
 			var destinations = await _travel.DestinationsOf(npcName);
@@ -991,20 +992,21 @@ namespace Faolan.GameServer
 				return;
 			}
 
-			if (mapId == null)
+			if (answerPath == null)
 			{
 				await _agentServerDispatcher.SendSystemMessage(characterId, $"\"{npcName}\" travels to:");
 				foreach (var destination in destinations)
 				{
 					var map = await Database.GetMap(destination.DestinationMapId);
 					await _agentServerDispatcher.SendSystemMessage(characterId,
-						$"  {destination.DestinationMapId} {(string.IsNullOrEmpty(map?.Name) ? "" : map.Name)} - {destination.Cost} tin");
+						$"  '{destination.AnswerPath}' -> {destination.DestinationMapId} {(string.IsNullOrEmpty(map?.Name) ? "" : map.Name)} - {destination.Cost} tin");
 				}
 
 				return;
 			}
 
-			await _travel.BeginTravel(client, npcName, mapId.Value);
+			if (!await _travel.TryTravel(client, npcName, answerPath))
+				await _agentServerDispatcher.SendSystemMessage(characterId, ChatMarkup.Color("red", $"\"{npcName}\" sells no trip on branch '{answerPath}'."));
 		}
 
 		private async Task TeleportCommand(INetworkClient client, string arguments)

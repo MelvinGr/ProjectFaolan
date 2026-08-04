@@ -56,13 +56,15 @@ namespace Faolan.GameServer.Dialogue
 		private readonly ILogger _logger;
 		private readonly QuestProgressionService _questProgression;
 		private readonly WorldBroadcaster _broadcaster;
+		private readonly TravelService _travel;
 
-		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestProgressionService questProgression)
+		public ConversationService(IDatabaseRepository database, ILogger logger, WorldBroadcaster broadcaster, QuestProgressionService questProgression, TravelService travel)
 		{
 			_database = database;
 			_logger = logger;
 			_broadcaster = broadcaster;
 			_questProgression = questProgression;
+			_travel = travel;
 		}
 
 		// The player picked option `answerIndex` in the active conversation: navigate to the child screen at the
@@ -76,19 +78,39 @@ namespace Faolan.GameServer.Dialogue
 			if (path == null || client.Session.ConversationNpcHandle is not { } npcHandle || client.Session.ConversationTypeId is not { } typeId)
 				return;
 
+			var npcName = client.Session.ConversationNpcName;
 			var childPath = path.Length == 0
 				? answerIndex.ToString()
 				: $"{path}>{answerIndex}";
-			var screen = await PickConversationScreen(client, client.Session.ConversationNpcName, typeId, childPath,
+
+			// #514: LOCAL TRAVEL rides this walk, and both of its steps are dialogue picks, which is why the hook is
+			// here rather than in ServeScreen (a greeting can never be either one).
+			//
+			// The FARE comes off BEFORE the screen that presents the destination list - retail's DispatchUpdateCash
+			// sits immediately in front of "Your coin is good enough. Where to?" - so it is charged here, on the way in.
+			// A refusal (criminal, or too poor) must not then hand the player the list: close the window instead.
+			// ⚠️ The corpus has no refused traveller, so closing is the conservative reading rather than a captured one.
+			if (!await _travel.TryChargeFare(client, npcName, childPath))
+			{
+				await SendConversationClose(client);
+				return;
+			}
+
+			var screen = await PickConversationScreen(client, npcName, typeId, childPath,
 				client.Session.SpawnedNpcTemplatesByHandle.GetValueOrDefault(npcHandle));
 			if (screen == null)
 			{
-				_logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", client.Session.ConversationNpcName, childPath);
+				_logger.LogInformation("Conversation: no captured screen for npc={Name} path='{Path}' (un-walked branch); closing.", npcName, childPath);
 				await SendConversationClose(client);
 				return;
 			}
 
 			await ServeScreen(client, screen, npcHandle);
+
+			// The destination pick: retail closes the chat window and THEN teleports (the close is the served screen's
+			// own only packet), so the trip runs after the screen, in the same "text precedes state" order the quest
+			// grants follow.
+			await _travel.TryTravel(client, npcName, childPath);
 		}
 
 		// #523: open a conversation the SERVER initiates - one with no player TalkToNpc in front of it, served because

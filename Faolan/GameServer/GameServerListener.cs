@@ -303,7 +303,11 @@ namespace Faolan.GameServer
 			_combat = new CombatService(_simulation, database, _questProgression, logger, (c, a) => SendAddSpecialAbility(c, a), SendLearnSpell, _fatality);
 			_combos = new ComboService(database, logger);
 			_spellweave = new SpellweaveService(logger, this);
-			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression);
+			// #506/#514: local travel. Reaches the wire through ITravelOutbound (GameServerListener.Travel.cs), and is
+			// built BEFORE the dialogue runtime because the travel TRIGGER is a conversation node (a wagoneer's
+			// destination pick), so ConversationService drives it.
+			_travel = new TravelService(database, this, logger);
+			_conversation = new ConversationService(database, logger, _broadcaster, _questProgression, _travel);
 			_questSharing = new QuestSharingService(database, csPlayerAgentDispatcher, this, _questProgression, logger);
 			_apprentice = new ApprenticeService(this, csPlayerAgentDispatcher, logger);
 			_stockConversation = new StockConversationService(logger, database);
@@ -319,8 +323,6 @@ namespace Faolan.GameServer
 			// handler (both triggers are edges on the player's own position stream), reaching the wire through
 			// IEnvironmentOutbound, which this listener implements (GameServerListener.Combat.cs).
 			_environment = new EnvironmentService(database, this, logger);
-			// #506: local travel. Reaches the wire through ITravelOutbound (GameServerListener.Travel.cs).
-			_travel = new TravelService(database, this, logger);
 			// #496: knockback. The buff apply is a single shared op, so it comes in as a delegate seam rather than a port.
 			_knockback = new KnockbackService(_simulation, _broadcaster, (c, id) => ((ISpellEffectOutbound)this).ApplySelfBuff(c, id), logger);
 

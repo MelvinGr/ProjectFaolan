@@ -991,13 +991,11 @@ namespace Faolan.GameServer
 					var scriptThreadCtxId = body.ReadUInt32();
 					var ctxCookie = body.ReadUInt64();
 
-					// #506: a LOCAL TRAVEL confirmation is one of these, and the echoed thread-context id is what
-					// identifies it - the client hands our own correlation id straight back, so no script thread is
-					// needed to resume the trip. Any other box still falls through to the log below: the create flow and
-					// the castle transitions raise boxes we never track, and treating those as an error would be wrong.
-					if (await _travel.ConfirmTravel(client, answer, scriptThreadCtxId))
-						break;
-
+					// ⚠️ NOT local travel (#514). The captured box that reads "Do you want to travel to Ymir's Pass?"
+					// belongs to the ZONE-LINE DOOR the player selects, not to the wagoneer they rode half a minute
+					// earlier - the wagoner trip teleports straight off the destination pick with no box at all. We
+					// raise none of these ourselves, so there is no thread to resume; consumed and logged so a stray
+					// answer is visible rather than reported as an unknown opcode.
 					Logger.LogInformation("ScryMessageBoxAnswer {Answer} for script thread 0x{Thread:X8} (cookie 0x{Cookie:X16}) - no script thread to resume.", answer, scriptThreadCtxId, ctxCookie);
 
 					break;

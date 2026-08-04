@@ -1,51 +1,81 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 
 namespace Faolan.Core.Database.Tables
 {
 	// One destination a LOCAL TRAVEL NPC offers (#506): a wagoneer, ship captain or caravan master who moves the player
-	// to another playfield for a fee. Distinct from the zone-line doors the `world-teleports` module already handles -
-	// those are a captured `UseObject` -> `N3Teleport` on a fixed door, while this is a per-NPC LIST the player chooses
-	// from, which is why it needs a table.
+	// for a fee. Distinct from the zone-line doors the `world-teleports` module handles - those are a captured
+	// `UseObject` -> `N3Teleport` on a fixed door - while this is a per-NPC LIST the player chooses from inside an
+	// ordinary Knubot conversation, which is why it needs a table.
 	//
-	// Keyed by (NpcName, DestinationMapId): a travel NPC is identified by NAME, never by a spawn handle, for the same
-	// reason conversations and shops are - the handle is session-volatile and the name is the stable key.
+	// ⚠️ THE ROW *IS* THE CONVERSATION WIRING (#514). It is keyed by the dialogue node the player's pick lands on -
+	// `(NpcName, AnswerPath)` - so the runtime needs no separate "this answer sells a trip" overlay: serving a screen
+	// whose (npc, path) has a row here IS the trip. The NPC is identified by NAME, never by a spawn handle, for the
+	// same reason conversations and shops are; the answer path is the stable branch key the dialogue tree already uses
+	// (ConversationNode.AnswerPath). TypeId is not part of the key - every captured travel tree is the ordinary talk
+	// type 42008, so it would only ever repeat.
 	//
-	// The flow the captures show, end to end (NecroL80_..._chat-annotated-4):
+	// ⚠️ It is keyed by ANSWER PATH and not by destination map, and that is not a style choice: Wagoner Cordelia offers
+	// NINE destinations and every one of them is on her own map (Field of the Dead). A `(NpcName, DestinationMapId)`
+	// key - what this table shipped with until #514 - can hold exactly one of them.
 	//
-	//   1. an ordinary Knubot conversation with the NPC, where the player picks a destination;
-	//   2. the fee is charged AT THE PICK - the wallet drops by a round 50,000 at 20:16:41, ~40 s before anything else
-	//      happens, which is what `Cost` records;
-	//   3. a scry confirmation box naming the destination map (ScryMessageBoxCodec);
-	//   4. on confirm, a redirect + MapChange to that map.
+	// The flow, decoded end to end from NecroL80_..._chat-annotated-4 (two complete trips, Wagoner Cordelia at t=767..782
+	// and Wagoner Treva at t=1023..1030):
 	//
-	// ⚠️ The player arrives at the destination's ENTRANCE, not at an arbitrary spot - so a destination needs an arrival
-	// POINT, not just a map id. `ArrivalX/Y/Z` carries it, and when it is null the runtime falls back to the
-	// destination map's default RespawnPoint, which is the closest thing to "the entrance" we already have per map.
+	//   1. talk to the NPC -> greeting + an answer list offering "I am willing to pay for a ride on your wagon
+	//      <font color="red">(Pay to travel)</font>";
+	//   2. the player picks it -> SetDialogueCamera, "I'll take you wherever you like, once you've paid.", and a
+	//      KnubotStartTradeIIR - retail takes the FARE through the Knubot TRADE window, not through the pick;
+	//   3. the client answers KnubotFinishTradeIIR, and the server sends DispatchUpdateCash (the new balance) followed
+	//      by "Your coin is good enough. Where to?" + the DESTINATION answer list. The fee is therefore charged at the
+	//      screen that PRESENTS the list, one step before any destination is chosen;
+	//   4. the player picks a destination -> StopIIR, KnubotCloseChatWindow, a GameActionListIIR carrying
+	//      "xpos=1136;ypos=133;zpos=223;PlayFieldID=1020;Local=1", the "Racer" buff, IntendedTeleport + N3Teleport, and
+	//      the player is re-streamed at exactly that position.
 	//
-	// ⚠️ A destination is NOT always another playfield. Melvin's own description of the mechanic: local travel moves
-	// you within the map/region to the entrance of whatever you picked, and there are SEPARATE travellers that cross
-	// maps. Both are this one row shape - a same-map destination simply sets DestinationMapId to the map the NPC
-	// stands on and relies on ArrivalX/Y/Z - and the runtime tells them apart to pick the right wire path: a same-map
-	// trip relocates in place (no loading screen), a cross-map trip goes through the full changemap handoff. That is
-	// why ArrivalX/Y/Z are here rather than being derived from the destination map alone: for a same-map destination
-	// the map id carries no information at all.
-	[PrimaryKey(nameof(NpcName), nameof(DestinationMapId))]
+	// ⚠️ There is NO confirmation box anywhere in that flow. The `DispatchScryShowMessageBox` "Do you want to travel to
+	// Ymir's Pass?" in the same capture belongs to the ZONE-LINE DOOR the player walked into ~28 s after Cordelia
+	// dropped them at the border (they select door 0x863 at t=809.8, the box follows, and answering it does the
+	// cross-map redirect). Reading it as travel's last step is what made the pre-#514 model wrong.
+	//
+	// ⚠️ A destination is USUALLY the same map. Both captured trips are `Local=1` - a relocate in place with no loading
+	// screen - because a wagoneer moves you within the region to the entrance of whatever you picked. Cross-map
+	// travellers exist (the Tortage Smuggler and Wagoner Polus both carry an inline `{teleportplayer}` directive in
+	// their dialogue text instead), so the runtime still tells the two apart by comparing DestinationMapId with the
+	// player's current map and picks the right wire path.
+	[PrimaryKey(nameof(NpcName), nameof(AnswerPath))]
 	public class TravelDestination
 	{
 		// The travel NPC's display name - the stable key (see above).
+		[MaxLength(128)]
 		public string NpcName { get; set; } = null!;
+
+		// The dialogue branch this destination sits on: the ConversationNode.AnswerPath of the screen the pick lands
+		// on ("0>3" = the player picked option 0 at the greeting, then option 3 from the destination list). The
+		// PARENT of this path is the screen that presents the list, which is where the fare is charged - derived
+		// rather than stored, because retail's own tree already states it.
+		[MaxLength(128)]
+		public string AnswerPath { get; set; } = null!;
 
 		public uint DestinationMapId { get; set; }
 
 		[ForeignKey(nameof(DestinationMapId))]
 		public virtual Map DestinationMap { get; set; } = null!;
 
-		// The fee in the wallet's own units. 50,000 is the one directly observed price (Ymir's Pass); a 0 means free,
-		// which the corpus also shows - the Amphitheatre of Karutonia trip moves no money at all.
-		public uint Cost { get; set; }
+		// The fare in the wallet's own units, measured as the wallet delta at step 3: 50,000 for Cordelia (level band
+		// "L40 to 49") and 70,000 for Treva ("L50 to 59"). It is a per-NPC price - every destination the same wagoneer
+		// offers costs the same, because retail charges once, before the list is even shown - so every row of one NPC
+		// repeats it and the runtime charges it once per visit to the list screen.
+		//
+		// ⚠️ NULL = the capture did not state it, which is NOT the same as free. Wagoner Glendon's trip is the case:
+		// its DispatchUpdateCash is the FIRST wallet update in that capture, so there is no earlier balance to
+		// subtract and the fare is unmeasured. A 0 here would have shipped "Glendon gives free rides" as a fact.
+		public uint? Cost { get; set; }
 
-		// Where the player lands. Null = use the destination map's default RespawnPoint (see the note above).
+		// Where the player lands, straight out of the trip's GameActionListIIR (`xpos`/`ypos`/`zpos`; ypos is the
+		// height). Null = use the destination map's default RespawnPoint, for a destination whose coordinates have not
+		// been captured.
 		public float? ArrivalX { get; set; }
 		public float? ArrivalY { get; set; }
 		public float? ArrivalZ { get; set; }

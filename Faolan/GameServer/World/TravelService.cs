@@ -1,7 +1,6 @@
-using System.Collections.Concurrent;
+using System;
 using System.Linq;
 using System.Numerics;
-using System.Threading;
 using System.Threading.Tasks;
 using Faolan.Core.Database.Repositories;
 using Faolan.Core.Database.Tables;
@@ -11,34 +10,27 @@ using Microsoft.Extensions.Logging;
 
 namespace Faolan.GameServer.World
 {
-	// Local travel (#506): a wagoneer, ship captain or caravan master who moves the player somewhere for a fee. The
-	// zone-line doors the `world-teleports` module handles are a different thing - a fixed captured UseObject on one
-	// door - whereas this is a per-NPC LIST the player chooses from, which is why it is data plus a flow.
+	// Local travel (#506/#514): a wagoneer, ship captain or caravan master who moves the player somewhere for a fee.
+	// The zone-line doors the `world-teleports` module handles are a different thing - a fixed captured UseObject on
+	// one door - whereas this is a per-NPC LIST the player chooses from inside an ordinary Knubot conversation.
 	//
-	// The flow the annotated capture shows, and the one implemented here:
+	// The flow, as the annotated capture actually shows it (see TravelDestination for the full frame-by-frame):
 	//
-	//   1. an ordinary NPC conversation where the player picks a destination;
-	//   2. the FEE is charged at the pick - the wallet drops by a round 50,000 at 20:16:41, well before anything else;
-	//   3. a scry confirmation box naming the destination map (ScryMessageBoxCodec);
-	//   4. on confirm, the trip happens.
+	//   1. the greeting offers "(Pay to travel)";
+	//   2. picking it opens a Knubot trade, and when the client closes the trade the server pushes the new wallet
+	//      balance and THEN the destination list. So the FARE is charged at the screen that PRESENTS the list, one
+	//      step before any destination is chosen - not at the destination pick, and not at a confirmation;
+	//   3. picking a destination closes the window and teleports, immediately. There is NO confirmation box: the
+	//      scry box in the same capture belongs to the zone-line door the player walked into half a minute later.
 	//
-	// ⚠️ Step 4 is two different wire paths and the service picks between them, because a destination is not always
-	// another playfield: a SAME-MAP destination relocates the player in place (no loading screen), a cross-map one goes
-	// through the full changemap handoff. See TravelDestination.
+	// Both steps are driven off the dialogue TREE rather than off any server-side state: a TravelDestination row is
+	// keyed by the answer path its pick lands on, and the fare gate is that path's parent. ConversationService calls
+	// in as it serves each screen.
 	public sealed class TravelService
 	{
 		private readonly IDatabaseRepository _database;
 		private readonly ILogger _logger;
 		private readonly ITravelOutbound _output;
-
-		// Trips awaiting the player's confirmation, keyed by the scry thread-context id the box was raised with. The
-		// client echoes that id back verbatim in its answer, which is exactly what makes it a usable correlation handle
-		// (ScryMessageBoxCodec) - so no server-side script thread is needed to resume the action.
-		private readonly ConcurrentDictionary<uint, PendingTrip> _pending = new();
-
-		// The scry context id counter. Any value works (the client only echoes it); it starts high enough not to
-		// collide with the small ids the create-flow's own scry steps use.
-		private uint _nextContext = 0x00300000;
 
 		public TravelService(IDatabaseRepository database, ITravelOutbound output, ILogger logger)
 		{
@@ -54,14 +46,30 @@ namespace Faolan.GameServer.World
 		}
 
 		/// <summary>
-		///     Step 2+3: charge the fee and raise the confirmation box. Returns false (with the player told why) when
-		///     the trip cannot start - an unknown destination, an empty wallet, or a criminal.
+		///     Step 2: the player reached the screen that PRESENTS an NPC's destination list, so the fare comes off
+		///     here - that is where retail's DispatchUpdateCash sits. Returns false when the trip is refused (a
+		///     criminal, or an empty wallet), which is the caller's cue to keep the player off the list.
+		///     A screen that presents no list at all is not a fare gate and returns true untouched.
 		/// </summary>
-		public async Task<bool> BeginTravel(INetworkClient client, string npcName, uint destinationMapId)
+		public async Task<bool> TryChargeFare(INetworkClient client, string npcName, string listPath)
 		{
 			var character = client.Session.Character;
 			if (character == null)
-				return false;
+				return true;
+
+			// The fare gate is the PARENT of a destination's answer path: retail's own tree puts the list on one screen
+			// and each destination one pick deeper, so no column has to say which screen charges.
+			var offered = (await DestinationsOf(npcName)).Where(d => ParentPath(d.AnswerPath) == listPath).ToArray();
+			if (offered.Length == 0)
+				return true;
+
+			// Every destination of one NPC carries the same fare (retail charges before the list is shown, so there is
+			// only one price to charge); Max rather than First so a partially-harvested NPC cannot be ridden for free.
+			// ⚠️ A NULL cost is "the capture never showed the fare", not "free" - charging 0 there would invent a price
+			// as surely as charging a guessed one would, so nothing is taken and the gap is logged.
+			var fare = offered.Max(d => d.Cost ?? 0);
+			if (offered.All(d => d.Cost == null))
+				_logger.LogInformation("Travel: \"{Npc}\" has no captured fare, so this ride is free - the capture never showed the wallet move.", npcName);
 
 			// The criminal gate is the client's own rule, quoted in CriminalStatus: "Wagoneers & ship captains will not
 			// transport you...". Checked BEFORE the fee, so a refused criminal is never charged.
@@ -72,101 +80,84 @@ namespace Faolan.GameServer.World
 				return false;
 			}
 
-			var destination = (await DestinationsOf(npcName)).FirstOrDefault(d => d.DestinationMapId == destinationMapId);
-			if (destination == null)
-			{
-				_logger.LogWarning("Travel: \"{Npc}\" offers no destination {Map}.", npcName, destinationMapId);
-				return false;
-			}
-
-			if (character.Money < destination.Cost)
+			if (character.Money < fare)
 			{
 				await _output.SendTravelRefusal(client, "You cannot afford that journey.");
-				_logger.LogInformation("Travel: {Character} can't afford {Npc} -> map {Map} ({Cost} tin, has {Balance}).", character.Name, npcName, destinationMapId, destination.Cost,
-					character.Money);
+				_logger.LogInformation("Travel: {Character} can't afford \"{Npc}\" ({Fare} tin, has {Balance}).", character.Name, npcName, fare, character.Money);
 				return false;
 			}
 
-			// Charge at the PICK, matching retail's ordering - the wallet moves ~40 s before the confirmation box in
-			// the capture, so the fee is the price of choosing, not of confirming.
-			if (destination.Cost > 0)
+			if (fare > 0)
 			{
-				character.Money -= destination.Cost;
+				character.Money -= fare;
 				await _database.SetCharacterMoney(character.Id, character.Money);
 				await _output.SendTravelFeeCharged(client, character.Money);
+				_logger.LogInformation("Travel: {Character} paid \"{Npc}\" {Fare} tin for a ride ({Count} destination(s) offered).", character.Name, npcName, fare, offered.Length);
 			}
 
-			var context = Interlocked.Increment(ref _nextContext);
-			// The cookie is only ever echoed back, so it needs to be unpredictable-ish rather than meaningful; pairing
-			// it with the character makes a stray answer from another session identifiable in the log.
-			var cookie = ((ulong)character.Id << 32) | context;
-			_pending[context] = new PendingTrip(character.Id, npcName, destination);
-
-			await _output.SendTravelConfirm(client, destination.DestinationMapId, context, cookie);
-			_logger.LogInformation("Travel: {Character} booked \"{Npc}\" -> map {Map} for {Cost} tin; awaiting confirmation (ctx 0x{Ctx:X8}).", character.Name, npcName,
-				destinationMapId, destination.Cost, context);
 			return true;
 		}
 
 		/// <summary>
-		///     Step 4: the player answered the confirmation box. Answer 1 is the confirm button (every captured answer
-		///     is 1); anything else cancels. Returns false when the context names no pending trip, which is the normal
-		///     case for the OTHER scry boxes in the game and must not be treated as an error.
+		///     Step 3: the player picked a destination. Returns false when this dialogue branch sells no trip, which is
+		///     the normal case for every other conversation screen in the game and must not be treated as an error.
 		/// </summary>
-		public async Task<bool> ConfirmTravel(INetworkClient client, uint answer, uint threadCtxId)
+		public async Task<bool> TryTravel(INetworkClient client, string npcName, string answerPath)
 		{
-			if (!_pending.TryRemove(threadCtxId, out var trip))
-				return false;
-
 			var character = client.Session.Character;
-			if (character == null || character.Id != trip.CharacterId)
+			if (character == null)
 				return false;
 
-			if (answer != 1)
-			{
-				// ⚠️ The fee is NOT refunded, deliberately: retail charges at the pick and the corpus has no cancelled
-				// trip to show what happens next, so refunding would be inventing a rule. Logged so that if a cancel is
-				// ever tested in-client and DOES refund, this line is where the wrong assumption is.
-				_logger.LogInformation("Travel: {Character} declined the trip to map {Map} (answer {Answer}); the {Cost} tin fee is not refunded.", character.Name,
-					trip.Destination.DestinationMapId, answer, trip.Destination.Cost);
-				return true;
-			}
+			var destination = (await DestinationsOf(npcName)).FirstOrDefault(d => d.AnswerPath == answerPath);
+			if (destination == null)
+				return false;
 
-			var arrival = trip.Destination.ArrivalX is { } x && trip.Destination.ArrivalY is { } y && trip.Destination.ArrivalZ is { } z
-				? new Vector3(x, y, z)
-				: (Vector3?)null;
-
-			// Same map = relocate in place; different map = the full changemap handoff. A same-map trip with no arrival
-			// point would move the player nowhere at all, so it is refused rather than silently doing nothing.
-			if (trip.Destination.DestinationMapId == character.MapId)
-			{
-				if (arrival == null)
-				{
-					_logger.LogWarning("Travel: \"{Npc}\" -> map {Map} is a SAME-MAP destination with no arrival point; nothing to do.", trip.NpcName, trip.Destination.DestinationMapId);
-					return true;
-				}
-
-				await _output.RelocateOnSameMap(client, arrival.Value);
-				_logger.LogInformation("Travel: {Character} travelled with \"{Npc}\" to {Arrival} on map {Map} (in place, no loading screen).", character.Name, trip.NpcName, arrival,
-					trip.Destination.DestinationMapId);
-				return true;
-			}
-
-			await _output.TravelToMap(character.Id, trip.Destination.DestinationMapId, arrival);
-			_logger.LogInformation("Travel: {Character} travelled with \"{Npc}\" to map {Map}.", character.Name, trip.NpcName, trip.Destination.DestinationMapId);
+			await Travel(client, npcName, destination);
 			return true;
 		}
 
-		/// <summary>Drops any pending trip for a client that went away, so the table cannot grow unbounded.</summary>
-		public void Forget(uint characterId)
+		/// <summary>Runs a trip the caller has already picked (the GM bootstrap takes this entry).</summary>
+		public async Task Travel(INetworkClient client, string npcName, TravelDestination destination)
 		{
-			foreach (var pair in _pending)
+			ArgumentNullException.ThrowIfNull(destination);
+
+			var character = client.Session.Character;
+			var arrival = destination.ArrivalX is { } x && destination.ArrivalY is { } y && destination.ArrivalZ is { } z
+				? new Vector3(x, y, z)
+				: (Vector3?)null;
+
+			// Same map = relocate in place (retail's `Local=1`); different map = the full changemap handoff. A same-map
+			// trip with no arrival point would move the player nowhere at all, so it is refused rather than silently
+			// doing nothing.
+			if (destination.DestinationMapId == character.MapId)
 			{
-				if (pair.Value.CharacterId == characterId)
-					_pending.TryRemove(pair.Key, out _);
+				if (arrival == null)
+				{
+					_logger.LogWarning("Travel: \"{Npc}\" -> map {Map} is a SAME-MAP destination with no arrival point; nothing to do.", npcName, destination.DestinationMapId);
+					return;
+				}
+
+				await _output.RelocateOnSameMap(client, arrival.Value);
+				_logger.LogInformation("Travel: {Character} travelled with \"{Npc}\" to {Arrival} on map {Map} (in place, no loading screen).", character.Name, npcName, arrival,
+					destination.DestinationMapId);
+				return;
 			}
+
+			await _output.TravelToMap(character.Id, destination.DestinationMapId, arrival);
+			_logger.LogInformation("Travel: {Character} travelled with \"{Npc}\" to map {Map}.", character.Name, npcName, destination.DestinationMapId);
 		}
 
-		private sealed record PendingTrip(uint CharacterId, string NpcName, TravelDestination Destination);
+		/// <summary>
+		///     The dialogue screen one pick SHALLOWER than <paramref name="answerPath" /> - the screen that offered it.
+		///     "0&gt;3" -&gt; "0", "0" -&gt; "" (the greeting). Kept internal-static so TravelWiringTests can pin it.
+		/// </summary>
+		internal static string ParentPath(string answerPath)
+		{
+			if (string.IsNullOrEmpty(answerPath))
+				return "";
+
+			var cut = answerPath.LastIndexOf('>');
+			return cut < 0 ? "" : answerPath[..cut];
+		}
 	}
 }

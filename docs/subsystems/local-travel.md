@@ -1,87 +1,149 @@
-# Local travel — the NPCs who move you for a fee (#506)
+# Local travel — the NPCs who move you for a fee (#506, corrected in #514)
 
 A wagoneer, ship captain or caravan master who relocates the player. Distinct from the zone-line doors the
 `world-teleports` module handles: those are one captured `UseObject` → `N3Teleport` on a fixed door, while this
-is a per-NPC **list** the player chooses from, with a price and a confirmation.
+is a per-NPC **list** the player chooses from inside an ordinary Knubot conversation.
 
 ## The flow
 
 Decoded end to end from `NecroL80_mage-necromancer_login_gameplay_chat-annotated-4`, which contains two complete
-trips (`took local travel to ymirs pass`, `took local travel to amphiteatrea of kartunia`):
+trips (Wagoner Cordelia at t=767…782, Wagoner Treva at t=1023…1030):
 
 | step | wire | evidence |
 |---|---|---|
-| 1. talk to the NPC | an ordinary Knubot conversation (`KnubotOpenChatWindowIIR` → `KnubotAppendTextIIR` + `KnubotAnswerListIIR`) | 20:16:37 with **Wagoner Cordelia** (handle `0x30B0B`) |
-| 2. pick a destination | c2s `KnubotAnswerIIR` | 20:16:39 |
-| 3. **the fee is charged here** | `DispatchUpdateCash` | 20:16:41, wallet −**50,000** |
-| 4. confirmation box | s2c `DispatchScryShowMessageBox` (0x205E) | 20:17:20, `<localized id="1090" category="520" …>` |
-| 5. confirm | c2s `ScryMessageBoxAnswer` (0x203B), answer 1 | 20:17:21 |
-| 6. the trip | `DispatchRedirectToServer` → `Authenticate2` → `MapChange` | 20:17:23 → map **1090** |
+| 1. talk to the NPC | `KnubotOpenChatWindowIIR` + `KnubotAppendTextIIR` + an answer list offering `(Pay to travel)` | t=767.4 with **Wagoner Cordelia** (handle `0x30B0B`) |
+| 2. pick "(Pay to travel)" | c2s `KnubotAnswerIIR` index 0 | t=768.8 |
+| 3. **the fare is taken here** | `DispatchSetDialogueCamera` → "I'll take you wherever you like, once you've paid." → **`KnubotStartTradeIIR`** → c2s `KnubotFinishTradeIIR` → **`DispatchUpdateCash`** | t=769.2 … t=771.1, wallet 1,893,628 → 1,843,628 = −**50,000** |
+| 4. the destination list | "Your coin is good enough. Where to?" + a 10-option `KnubotAnswerListIIR` | t=771.1 |
+| 5. pick a destination | c2s `KnubotAnswerIIR` index 3 | t=781.2 |
+| 6. **the trip** | `StopIIR`, `KnubotCloseChatWindowIIR`, **`GameActionListIIR`** (action `0xD00D`), the *Racer* buff, `IntendedTeleportIIR` + `N3TeleportIIR` | t=781.5 |
+| 7. arrival | the player is re-streamed at the action's own coordinates | t=782.1, `SimpleCharFullUpdate` at (1136.0, 132.8, 223.0) on playfield 1020 |
 
-⚠️ **The fee is charged at the PICK, not at the confirm** — ~40 s earlier in the capture. So the price is the
-cost of choosing, and the box only confirms.
+⚠️ **The fare is taken through a Knubot TRADE, at the "(Pay to travel)" answer — one screen before any
+destination is chosen.** It is the price of being shown the list, not the price of a particular trip, which is
+why every destination one wagoneer offers costs the same.
 
-⚠️ **The `id` in the confirmation box is the DESTINATION MAP ID**, not a message id. All three captured boxes name
-the map that the redirect then delivers — 1020 Field of the Dead, 1090 Ymir's Pass, 1092 the Amphitheatre of
-Karutonia — and category 520 is the client's map-name category.
-[V3: ScryShowMessageBoxCodecTests.YmirsPassConfirm_IsByteIdentical]
+⚠️ **There is no confirmation box.** The `DispatchScryShowMessageBox` reading *"Do you want to travel to Ymir's
+Pass?"* in the same capture belongs to the **zone-line door** the player walked into ~28 s after Cordelia
+dropped them at the border — they select door `0x863` at t=809.8, the box follows, and answering it drives the
+cross-map redirect. Reading that box as travel's last step is what made the pre-#514 model wrong, and it also
+mis-stated the destinations (see below).
 
-The answer is a pure echo of the box's `(threadCtxId, cookie)` plus the button index, which is what lets a
-pending trip be resumed with no server-side script thread — see `ScryShowMessageBoxCodec` and `ScryMessageBoxAnswerCodec`.
+## The trip is one wire string
 
-## A destination is not always another map
+The `GameActionListIIR` at step 6 carries a single `GameActionData` element of type **`0xD00D`** whose payload
+spells the whole trip out:
 
-Melvin's description of the mechanic: local travel moves you **within the map/region to the entrance of whatever
-you picked**, and there are separate travellers that cross maps. `TravelDestination` covers both — a same-map
-destination just names the map the NPC stands on and relies on its arrival point — and `TravelService` picks the
-wire path accordingly:
+```
+xpos=1136;ypos=133;zpos=223;PlayFieldID=1020;Local=1
+```
 
-- **same map** → relocate in place, no loading screen (the revive-teleport path);
+`ypos` is the **height**, and the player's re-stream confirms all three to the centimetre.
+[V3: LocalTravelTests.TheWagonerTrip_ParsesToItsDestinationAndArrival]
+
+The action is **not travel-only**, and the trailing flag says which use it is. All four captured actions share
+the `xpos/ypos/zpos/PlayFieldID` head and then differ:
+
+| flag | meaning | example |
+|---|---|---|
+| `Local=1` | a same-playfield relocate, no loading screen | the three wagoner trips |
+| `HeroicEnabled=0` | a cross-map entry carrying the difficulty mode (#511) | Wagoner Mycus → Poitain (2070) |
+
+So `TravelActionCodec` carries the flag as a `(key, value)` pair rather than as a bool called `Local`:
+collapsing the two would make an instance entry read as a non-local trip *and* re-emit the wrong key.
+[V3: LocalTravelTests.TheHeroicFlagTrip_KeepsItsOwnKeyAndIsNotLocal]
+
+⚠️ **We parse this action; we do not send it.** Building the trip's own `GameActionList` would need the
+element's `Field` word (`0x1A18` on Cordelia's trip, `0x08FA` on Treva's — per-trip and derivable from nothing
+we hold), so the server drives the relocate through the capture-verified revive teleport pair
+(`IntendedTeleport` on the live playfield token + `N3Teleport` carrying the destination) instead. That, and the
+*Racer* buff retail applies, are the two known fidelity gaps. Open work is tracked in Gitea #514.
+
+## A destination is usually the same map
+
+Local travel moves you **within the map/region to the entrance of whatever you picked** — Cordelia's nine
+destinations are all on Field of the Dead, and "the border of Ymir's Pass" is the border *on her own map*.
+`TravelService` tells the two shapes apart by comparing the destination map with the player's current one:
+
+- **same map** → relocate in place, no loading screen (`WorldSimulation.RelocateSameMap`);
 - **different map** → the full changemap handoff (the same path GM `.teleport` and the recalls take).
 
-That is why a destination carries an arrival point at all: for a same-map trip the map id carries no information.
-When the point is null the runtime falls back to the destination map's default `RespawnPoint`, which is the
-closest thing to "the entrance" we already have per map.
+## The wiring is the row
 
-## The criminal gate
+The retail trigger is the conversation itself, so `TravelDestination` is keyed by the dialogue branch the pick
+lands on — `(NpcName, AnswerPath)`, the same stable branch key `ConversationNode` uses. Serving a screen whose
+`(npc, path)` has a row **is** the trip; the screen that presents the list — and therefore charges the fare —
+is that path's **parent**, derived rather than stored, because retail's own tree already states it.
+[V3: LocalTravelTests.TheFareGate_IsTheDestinationsParentScreen]
 
-The client's own Criminal spell description states the rule and covers both halves in one sentence:
+⚠️ The old `(NpcName, DestinationMapId)` key could not express this at all: Cordelia offers nine destinations
+and every one of them is on map 1020, so the key had room for exactly one.
 
-> Wagoneers & ship captains will not transport you and normal vendors will not trade with you. **You can seek out
-> smugglers at outlaw camps instead.**
-
-The vendor half was already implemented (#503); `CriminalStatus.TransportsCriminals` is the transport half, using
-the same name-based smuggler exception. It is checked **before** the fee, so a refused criminal is never charged.
-
-⚠️ Not separately capture-confirmed — the corpus has no criminal attempting to travel — so it is the conservative
-reading: every NPC that is not explicitly an outlaw fence refuses.
+Two gates keep the wiring honest — every shipped trip must name a dialogue branch that exists, and the list
+screen that charges for it must exist too.
+[V3: LocalTravelTests.EveryShippedTrip_NamesADialogueBranchThatExists]
 
 ## Data
 
-`TravelDestination`, keyed `(NpcName, DestinationMapId)` — a travel NPC is identified by NAME, never by a
-session-volatile spawn handle, the same rule conversations and shops follow. Seeded from the two fully evidenced
-trips:
+Harvested, not hand-authored: `TravelDestinationExtractor` reads the branch from the player's `KnubotAnswer`
+picks, the destination and arrival from the trip's own action, and the fare from the wallet delta across the
+conversation. The `travel-wiring` importer module writes them.
 
-| NPC | destination | fee | arrival |
-|---|---|---|---|
-| Wagoner Cordelia | 1090 Ymir's Pass | 50,000 | (366.0, 250.3, 107.0) |
-| Wagoner Treva | 1092 The Amphitheatre of Karutonia | 69,488 | (112.0, 69.85, 39.0) |
-
-Both fees and both arrival points are measured, not invented: the wallet delta two seconds after each pick, and
-the player's first position sample after each `MapChange`.
-
-## Driving it
-
-The retail TRIGGER is not wired: the pick happens inside the NPC's captured Knubot conversation, and marking a
-conversation node as "this one sells a trip to map N" is hand-authored wiring (the `quest-wiring` module is the
-precedent) that has not been done. So the GM command is the bootstrap — everything downstream of the pick is the
-real path:
-
-```
-.travel Wagoner Cordelia          # list what that NPC offers
-.travel Wagoner Cordelia 1090     # run the real flow: criminal gate, fee, confirm box, trip
+```zsh
+dotnet run --project Faolan.Importer -- --only travel-wiring --mode overwrite --captures <data-repo>/Captures
 ```
 
-Open work — the conversation-node wiring, and the third captured trip whose NPC is ambiguous (the
-`disconnect-after-wayfarer` capture shows the player talking to both `Osithma` and a `Tortage Smuggler` before
-returning to Tortage) — is tracked in Gitea #506.
+| NPC | branch | destination | fare | arrival |
+|---|---|---|---|---|
+| Wagoner Cordelia | `0>3` | 1020 Field of the Dead (the Ymir's Pass border) | 50,000 | (1136, 133, 223) |
+| Wagoner Glendon | `0>5` | 1010 Conall's Valley (the Conarch Village border) | *unmeasured* | (106, 475, 207) |
+| Wagoner Mycus | `1>0` | 2070 Poitain | *unmeasured* | (1520, 172, 1476) |
+| Wagoner Treva | `0>5` | 1090 Ymir's Pass (the Amphitheatre entrance) | 70,000 | (1204, 298, 778) |
+
+⚠️ **An unmeasured fare is NULL, not 0.** Glendon's `DispatchUpdateCash` is the first wallet update in its
+capture, so there is no earlier balance to subtract; a 0 would have shipped "Glendon gives free rides" as a
+fact. The runtime charges nothing and logs the gap.
+
+⚠️ Only trips the captures actually **took** are here. A wagoneer offers six to nine destinations; the others
+have a name in the LDB (`[FOTD]Take me to the Haunted Forest.`) and coordinates nowhere, because the trip is
+what reveals them.
+
+## Other travellers use a different mechanism
+
+Not every traveller is a wagoneer with a list. The **Tortage Smuggler** and **Wagoner Polus** carry the
+destination inline in their dialogue TEXT instead, as a `{teleportplayer}` directive the server acts on after a
+`{delay}`:
+
+```
+Then we go.{delay 6}{teleportplayer 210 205 y 11 4579}
+Climb aboard, then. […]{delay 3}{teleportplayer 349 564 1000}{hidegoodbye}{quit}
+```
+
+Both are followed by an `IntendedTeleport` naming exactly the trailing number (4579 "Abandoned Warehouse",
+1000), so the directive's last token is the destination map. That path is decoded but not implemented — it
+needs a dialogue-directive runtime rather than a table — and it is what settles the old "the third captured
+trip's NPC is ambiguous" question: **Osithma's tree has no travel option at all** (it is pure flavour), so the
+traveller in `disconnect-after-wayfarer` is the Tortage Smuggler, which independently confirms the smuggler
+exception in the criminal gate.
+
+## The criminal gate
+
+The client's own Criminal spell description states the rule:
+
+> Wagoneers & ship captains will not transport you and normal vendors will not trade with you. **You can seek
+> out smugglers at outlaw camps instead.**
+
+`CriminalStatus.TransportsCriminals` is the transport half, using the same name-based smuggler exception the
+vendor half (#503) uses. It is checked at the fare gate, **before** the fee, so a refused criminal is never
+charged.
+
+⚠️ Not separately capture-confirmed — the corpus has no criminal attempting to travel — so it is the
+conservative reading: every NPC that is not explicitly an outlaw fence refuses. Refusal closes the chat window,
+which is likewise the conservative choice rather than a captured one.
+
+## Driving it by hand
+
+```
+.travel Wagoner Cordelia          # list the branches, destinations and fares
+.travel Wagoner Cordelia 0>3      # run that trip directly (skips the fare, which a screen earlier charges)
+```

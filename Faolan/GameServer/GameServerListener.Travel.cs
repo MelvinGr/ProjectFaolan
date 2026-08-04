@@ -15,25 +15,6 @@ namespace Faolan.GameServer
 	// The wire side of local travel (#506) - ITravelOutbound. The decisions live in World/TravelService.cs.
 	public partial class GameServerListener
 	{
-		// The localized-format key the travel confirmation box carries. Retail's boxes each ship a different 20-char
-		// key (`%z&#36;n_zw5ComNiHcqoW4j` for Ymir's Pass, `rtE^QH#90Dh9&#92;(YR+b,K` for Field of the Dead), so it is
-		// per-STRING rather than per-message-type - it is the client's own string-table addressing, and we cannot
-		// synthesise the right one for an arbitrary map. One captured key is reused for every destination: the client
-		// resolves the text from `id`+`category`, which ARE correct, so the box names the right map.
-		// ⚠️ [V0] Whether a wrong key degrades the rendering (a fallback string instead of the map name) is unverified
-		// in-client - that is exactly what the needs-testing pass on #506 has to look at.
-		private const string TravelConfirmKey = "%z&#36;n_zw5ComNiHcqoW4j";
-
-		// The scry confirmation box (DispatchScryShowMessageBox 0x205E) naming the destination map. Framed on the same
-		// GameCharAgent -> GameCharInterface conversation as the sibling scry/stock-phrase dispatches.
-		Task ITravelOutbound.SendTravelConfirm(INetworkClient client, uint destinationMapId, uint threadCtxId, ulong cookie)
-		{
-			var id = client.Session.Character.Id;
-			return client.SendAsync(new Rpc(Endpoints.Endpoint(Endpoints.GameCharAgentType, 0x08), Endpoints.Endpoint(Endpoints.GameCharInterfaceType, id),
-				GameCharInterfaceMethods.DispatchScryShowMessageBox,
-				ScryShowMessageBoxCodec.Build(destinationMapId, TravelConfirmKey, threadCtxId, cookie)));
-		}
-
 		Task ITravelOutbound.SendTravelRefusal(INetworkClient client, string reason)
 		{
 			return _agentServerDispatcher.SendSystemMessage(client.Session.Character.Id, ChatMarkup.Color("red", reason));
@@ -51,20 +32,18 @@ namespace Faolan.GameServer
 			return DoTeleport(characterId, destinationMapId, arrival);
 		}
 
-		// A SAME-MAP trip: relocate in place with no loading screen. Retail's own wire path for this is the revive
-		// teleport (IntendedTeleport + n3Teleport on the current playfield token), so it is reused verbatim rather than
+		// A SAME-MAP trip: relocate in place with no loading screen - retail's `Local=1` trip. The wire pair is the one
+		// the revive already uses (IntendedTeleport on the live playfield token, then n3Teleport carrying the
+		// destination), which is exactly what the captured wagoner trip sends at t=781.5, so it is reused rather than
 		// running a changemap the client would answer with a full reload.
-		async Task ITravelOutbound.RelocateOnSameMap(INetworkClient client, Vector3 arrival)
+		//
+		// ⚠️ Retail ALSO precedes the pair with a GameActionListIIR carrying "xpos=..;ypos=..;zpos=..;PlayFieldID=..;
+		// Local=1" and a "Racer" buff. We send neither: the n3Teleport already carries the position (the revive path
+		// is in-client verified), and the GameActionList's string form is a movement instruction we have no builder
+		// for. That is a fidelity gap, not a guess - tracked on #514.
+		Task ITravelOutbound.RelocateOnSameMap(INetworkClient client, Vector3 arrival)
 		{
-			var character = client.Session.Character;
-			var entity = _simulation.PlayerWorldEntity(client);
-
-			character.Position = arrival;
-			if (entity != null)
-				entity.Position = arrival;
-
-			await Database.SaveCharacterTransform(character.Id, arrival, character.Rotation, character.MapId);
-			await ((IWorldOutbound)this).SendReviveDestination(client, character.Id, character.MapId, arrival, 0f, 0f);
+			return _simulation.RelocateSameMap(client, arrival);
 		}
 	}
 }

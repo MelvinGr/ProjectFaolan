@@ -5,15 +5,21 @@ using Xunit;
 
 namespace Faolan.Tests
 {
-	// Byte-exact gates for the scry confirmation box (#506) - the last step of local travel. Goldens are the three
-	// captured local-travel boxes in NecroL80_mage-necromancer_login_gameplay_chat-annotated-4 and their answers.
+	// Byte-exact gates for the scry confirmation box - "Do you want to travel to Ymir's Pass?". Goldens are the
+	// captured boxes in NecroL80_mage-necromancer_login_gameplay_chat-annotated-4 and their answers.
+	//
+	// ⚠️ NOT local travel (#514), despite what these gates used to say. The box belongs to the ZONE-LINE DOOR the
+	// player selects: at t=809.8 they click door 0x863 on Field of the Dead, the box follows, and answering it drives
+	// the cross-map redirect. The wagoneer who dropped them at that border half a minute earlier teleported them
+	// straight off the destination pick, with no box at all (docs/subsystems/local-travel.md). Nothing sends these
+	// yet - the door path is `world-teleports`, which has no confirmation step.
 	//
 	// The point worth gating is that `id` is the DESTINATION MAP ID: all three boxes name the map the player is about
 	// to be moved to, and each is followed by a redirect and a MapChange to exactly that map.
 	public class ScryShowMessageBoxCodecTests
 	{
-		// 20:17:20 - the box for Ymir's Pass (map 1090), which the redirect at 20:17:23 and the MapChange at 20:17:24
-		// then deliver.
+		// t=810.4 - the box for Ymir's Pass (map 1090), which the redirect at t=812.9 and the MapChange at t=814.5
+		// then deliver, after the player selected the border door at t=809.8.
 		[Fact]
 		public void YmirsPassConfirm_IsByteIdentical()
 		{
@@ -26,7 +32,7 @@ namespace Faolan.Tests
 			Assert.Equal(captured, built);
 		}
 
-		// 20:12:45 - Field of the Dead (map 1020). Same shape, different map and key, which is what shows `id` tracks
+		// t=536 - Field of the Dead (map 1020). Same shape, different map and key, which is what shows `id` tracks
 		// the destination rather than being a message identity.
 		[Fact]
 		public void FieldOfTheDeadConfirm_IsByteIdentical()
