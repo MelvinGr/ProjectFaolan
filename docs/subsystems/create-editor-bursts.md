@@ -164,6 +164,16 @@ Every record in `RetailCreateEditorInitialBurst` is constructed from typed data 
    Wiring `InitialBurst.bin` surfaced an un-pinned u32 near PlayfieldFIIR `[58:62]` (0 in the test capture,
    `0x01000000` here) — added as a pass-through param. It is now framed as the client reads it, a plain `0`/`1`
    word at `[55:59]` (`sceneWord`, see the table above). Locked by `BurstGoldenTests`.
+- **The avatar's FullChar snapshot** — the create editor sends the new character its own `0x737A6DF9`
+   `FullPlayerCharacterIIR` on a `DispatchPassBlob`. It is **carried**, not generated
+   (`CreateEditorAvatarSnapshot.bin`, 8,078 B), but it is not opaque: `FullPlayerCharacterCodec` parses the whole
+   record and re-encodes it byte-exact, giving a typed root (`subscription_flags = 769` + the four EMPTY containers
+   `0x65`/`0x68`/`0x70`/`0x71`) and a fully decoded sub-class (empty quest regions, 86 `PFAccessWindow_` entries,
+   the stat block). `CreateFlowService.EditorAvatarSnapshotFor` re-stamps the instance + every container owner and
+   emits it through the codec; there is no hand-written protobuf on the send path any more (it used to splice the
+   record's tail onto a 77-byte hand-encoded prefix whose sub-message lengths assumed a 4-varint-byte character id).
+   [V3: EditorAvatarSnapshotTests.TheWholeRecord_RoundTripsThroughTheSnapshotCodec] Generating it from the
+   character — the same shape `SnapshotTails.FromScratch` already authors for world entry — is Gitea #651.
 - **Record coverage** — the only record left verbatim is the live `Character…` preview
    (`CreateEditorCharBuilder.LivePreview`, intentionally verbatim — see above). Across `WorldPrepBurst` +
    `CreationScriptBurst`, **every `*IIR` record type with structured per-record variation is now decoded + built
